@@ -1,0 +1,5 @@
+Lexer:
+- proper support of preprocessor
+- parse float numbers
+- octal&hex escape sequences
+- handling of newline is probably not correct for all strange OSes
