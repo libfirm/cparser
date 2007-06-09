@@ -1,0 +1,16 @@
+string 'bla?'
+string 'bla??'
+string 'bla???'
+string 'bla
+'
+string 'bla?
+'
+string 'bla??
+'
+string 'bla'
+string 'bla?'
+string 'bla??'
+string 'bla'
+string 'bla
+'
+end of file

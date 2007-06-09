@@ -92,6 +92,22 @@ int replace_trigraph(lexer_t *this)
 	return 0;
 }
 
+#define SKIP_TRIGRAPHS(no_trigraph_code)       \
+	case '?':                                  \
+		next_char(this);                       \
+		if(this->c != '?') {                   \
+			put_back(this, this->c);           \
+			this->c = '?';                     \
+			no_trigraph_code;                  \
+		}                                      \
+		next_char(this);                       \
+		if(replace_trigraph(this))             \
+			break;                             \
+		put_back(this, '?');                   \
+		put_back(this, this->c);               \
+		this->c = '?';                         \
+		no_trigraph_code;                      \
+
 static
 void parse_symbol(lexer_t *this, token_t *token)
 {
@@ -318,22 +334,6 @@ int parse_escape_sequence(lexer_t *this)
 	}
 }
 
-#define SKIP_TRIGRAPHS(no_trigraph_code)       \
-	case '?':                                  \
-		next_char(this);                       \
-		if(this->c != '?') {                   \
-			put_back(this, this->c);           \
-			this->c = '?';                     \
-			no_trigraph_code;                  \
-		}                                      \
-		next_char(this);                       \
-		if(replace_trigraph(this))             \
-			break;                             \
-		put_back(this, '?');                   \
-		put_back(this, this->c);               \
-		this->c = '?';                         \
-		no_trigraph_code;                      \
-
 static
 void parse_string_literal(lexer_t *this, token_t *token)
 {
@@ -348,6 +348,7 @@ void parse_string_literal(lexer_t *this, token_t *token)
 		switch(this->c) {
 		SKIP_TRIGRAPHS(
 			obstack_1grow(&symbol_obstack, '?');
+			next_char(this);
 			break;
 		)
 
@@ -404,28 +405,32 @@ void parse_character_constant(lexer_t *this, token_t *token)
 	assert(this->c == '\'');
 	next_char(this);
 
+	int found_char = 0;
 	while(1) {
 		switch(this->c) {
 		SKIP_TRIGRAPHS(
-			token->type       = T_INTEGER;
-			token->v.intvalue = '?';
-			goto end_of_char_constant;
+			found_char = '?';
+			break;
 		)
 
 		case '\\':
 			next_char(this);
 			if(this->c == '\n') {
+				next_char(this);
 				this->source_position.linenr++;
 				break;
 			}
-			token->type       = T_INTEGER;
-			token->v.intvalue = parse_escape_sequence(this);
-			goto end_of_char_constant;
+			found_char = '\\';
+			break;
 
 		case '\n':
 			next_char(this);
 			parse_error(this, "newline while parsing character constant");
 			this->source_position.linenr++;
+			break;
+
+		case '\'':
+			next_char(this);
 			goto end_of_char_constant;
 
 		case EOF:
@@ -434,19 +439,21 @@ void parse_character_constant(lexer_t *this, token_t *token)
 			return;
 
 		default:
-			token->type       = T_INTEGER;
-			token->v.intvalue = this->c;
-			next_char(this);
-			goto end_of_char_constant;
+			if(found_char != 0) {
+				parse_error(this, "more than 1 characters in character "
+				            "constant");
+				goto end_of_char_constant;
+			} else {
+				found_char = this->c;
+				next_char(this);
+			}
+			break;
 		}
 	}
 
 end_of_char_constant:
-	if(this->c != '\'') {
-		parse_error(this, "multibyte character constant");
-	} else {
-		next_char(this);
-	}
+	token->type       = T_INTEGER;
+	token->v.intvalue = found_char;
 }
 
 static
