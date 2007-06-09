@@ -11,7 +11,7 @@
 #include <ctype.h>
 
 //#define DEBUG_CHARS
-#define MAX_PUTBACK 1
+#define MAX_PUTBACK 2
 
 static
 void error_prefix_at(lexer_t *this, const char *input_name, unsigned linenr)
@@ -305,7 +305,8 @@ int parse_escape_sequence(lexer_t *this)
 		if(replace_trigraph(this)) {
 			return parse_escape_sequence(this);
 		}
-		put_back(this, '?');
+		put_back(this, this->c);
+		this->c = '?';
 		return '?';
 
 	case EOF:
@@ -316,6 +317,22 @@ int parse_escape_sequence(lexer_t *this)
 		return EOF;
 	}
 }
+
+#define SKIP_TRIGRAPHS(no_trigraph_code)       \
+	case '?':                                  \
+		next_char(this);                       \
+		if(this->c != '?') {                   \
+			put_back(this, this->c);           \
+			this->c = '?';                     \
+			no_trigraph_code;                  \
+		}                                      \
+		next_char(this);                       \
+		if(replace_trigraph(this))             \
+			break;                             \
+		put_back(this, '?');                   \
+		put_back(this, this->c);               \
+		this->c = '?';                         \
+		no_trigraph_code;                      \
 
 static
 void parse_string_literal(lexer_t *this, token_t *token)
@@ -329,19 +346,10 @@ void parse_string_literal(lexer_t *this, token_t *token)
 
 	while(1) {
 		switch(this->c) {
-		case '?':
-			next_char(this);
-			if(this->c != '?') {
-				obstack_1grow(&symbol_obstack, '?');
-				break;
-			}
-			next_char(this);
-			if(replace_trigraph(this))
-				break;
+		SKIP_TRIGRAPHS(
 			obstack_1grow(&symbol_obstack, '?');
-			put_back(this, this->c);
-			this->c = '?';
 			break;
+		)
 
 		case '\\':
 			next_char(this);
@@ -388,6 +396,57 @@ end_of_string:
 
 	token->type     = T_STRING_LITERAL;
 	token->v.string = result;
+}
+
+static
+void parse_character_constant(lexer_t *this, token_t *token)
+{
+	assert(this->c == '\'');
+	next_char(this);
+
+	while(1) {
+		switch(this->c) {
+		SKIP_TRIGRAPHS(
+			token->type       = T_INTEGER;
+			token->v.intvalue = '?';
+			goto end_of_char_constant;
+		)
+
+		case '\\':
+			next_char(this);
+			if(this->c == '\n') {
+				this->source_position.linenr++;
+				break;
+			}
+			token->type       = T_INTEGER;
+			token->v.intvalue = parse_escape_sequence(this);
+			goto end_of_char_constant;
+
+		case '\n':
+			next_char(this);
+			parse_error(this, "newline while parsing character constant");
+			this->source_position.linenr++;
+			goto end_of_char_constant;
+
+		case EOF:
+			parse_error(this, "EOF while parsing character constant");
+			token->type = T_ERROR;
+			return;
+
+		default:
+			token->type       = T_INTEGER;
+			token->v.intvalue = this->c;
+			next_char(this);
+			goto end_of_char_constant;
+		}
+	}
+
+end_of_char_constant:
+	if(this->c != '\'') {
+		parse_error(this, "multibyte character constant");
+	} else {
+		next_char(this);
+	}
 }
 
 static
@@ -506,285 +565,240 @@ void preprocessor_next_token(lexer_t *this, token_t *token)
 
 void lexer_next_token(lexer_t *this, token_t *token)
 {
-	int line_begin = 0;
+	while(1) {
+		switch(this->c) {
+		case ' ':
+		case '\t':
+		case '\r':
+			next_char(this);
+			break;
 
-	/* skip whitespaces */
-	while(this->c == ' ' || this->c == '\t' || this->c == '\n'
-	      || this->c == '\r') {
-		if(this->c == '\n') {
-			line_begin = 1;
+		case '\n':
 			this->source_position.linenr++;
-		}
-		next_char(this);
-	}
-
-	switch(this->c) {
-	case 'A' ... 'Z':
-	case 'a' ... 'z':
-	case '_':
-		parse_symbol(this, token);
-		break;
-
-	case '0' ... '9':
-		parse_number(this, token);
-		break;
-
-	case '"':
-		parse_string_literal(this, token);
-		break;
-
-	case '\'':
-		next_char(this);
-		if(this->c == '\\') {
 			next_char(this);
-			token->type       = T_INTEGER;
-			token->v.intvalue = parse_escape_sequence(this);
-		} else {
-			if(this->c == '\n') {
-				parse_error(this, "newline while parsing character constant");
-				this->source_position.linenr++;
-			}
-			token->type       = T_INTEGER;
-			token->v.intvalue = this->c;
-			next_char(this);
-		}
-		if(this->c != '\'') {
-			parse_error(this, "multibyte character constant");
-			token->type = T_ERROR;
-		} else {
-			next_char(this);
-		}
-		break;
+			break;
 
-	case '\\':
-		next_char(this);
-		if(this->c == '\n') {
-			next_char(this);
-			this->source_position.linenr++;
-			lexer_next_token(this, token);
+		case 'A' ... 'Z':
+		case 'a' ... 'z':
+		case '_':
+			parse_symbol(this, token);
 			return;
-		} else {
-			parse_error(this, "unexpected '\\' found");
-			token->type = T_ERROR;
-		}
-		break;
 
-#define MAYBE1(ch, set_type)                           \
-		next_char(this);                               \
-		while(1) {                                     \
-			switch(this->c) {                          \
-			case ch:                                   \
-				next_char(this);                       \
-				token->type = set_type;                \
-				return;                                \
+		case '0' ... '9':
+			parse_number(this, token);
+			return;
 
-#define MAYBE(ch, set_type)                            \
-			case ch:                                   \
-				next_char(this);                       \
-				token->type = set_type;                \
-				return;
+		case '"':
+			parse_string_literal(this, token);
+			return;
 
-#define ELSE(set_type)                                 \
-			case '?':                                  \
-				next_char(this);                       \
-				if(this->c != '?') {                   \
-					put_back(this, this->c);           \
-					this->c = '?';                     \
-					token->type = set_type;            \
-					return;                            \
-				}                                      \
-				next_char(this);                       \
-				if(replace_trigraph(this))             \
-					break;                             \
-				put_back(this, '?');                   \
-				put_back(this, this->c);               \
-				this->c = '?';                         \
-				token->type = set_type;                \
-				return;                                \
-                                                       \
-			case '\\':                                 \
-				next_char(this);                       \
-				if(this->c == '\n') {                  \
-					next_char(this);                   \
-					this->source_position.linenr++;    \
-					break;                             \
-				}                                      \
-				/* fallthrough */                      \
-			default:                                   \
-				token->type = set_type;                \
-				return;                                \
-			}                                          \
-		} /* end of while(1) */                        \
-		break;
+		case '\'':
+			parse_character_constant(this, token);
+			return;
 
-	case '.':
-		next_char(this);
-		if(this->c == '.') {
+		case '\\':
 			next_char(this);
-			if(this->c == '.') {
+			if(this->c == '\n') {
 				next_char(this);
-				token->type = T_DOTDOTDOT;
-			} else {
-				put_back(this, '.');
-				token->type = '.';
-			}
-		} else {
-			token->type = '.';
-		}
-		break;
-	case '&':
-		MAYBE1('&', T_ANDAND)
-		MAYBE('=', T_ANDEQUAL)
-		ELSE('&')
-	case '*':
-		MAYBE1('=', T_ASTERISKEQUAL)
-		ELSE('*')
-	case '+':
-		MAYBE1('+', T_PLUSPLUS)
-		MAYBE('=', T_PLUSEQUAL)
-		ELSE('+')
-	case '-':
-		MAYBE1('-', T_MINUSMINUS)
-		MAYBE('=', T_MINUSEQUAL)
-		ELSE('-')
-	case '!':
-		MAYBE1('=', T_EXCLAMATIONMARKEQUAL)
-		ELSE('!')
-	case '/':
-		MAYBE1('=', T_SLASHEQUAL)
-			case '*':
-				next_char(this);
-				skip_multiline_comment(this);
-				lexer_next_token(this, token);
-				return;
-			case '/':
-				next_char(this);
-				skip_line_comment(this);
-				lexer_next_token(this, token);
-				return;
-		ELSE('/')
-	case '%':
-		MAYBE1('=', T_PERCENTEQUAL)
-			case ':':
-				/* TODO find trigraphs... */
-				next_char(this);
-				if(this->c == '%') {
-					next_char(this);
-					if(this->c == ':') {
-						next_char(this);
-						token->type = T_PERCENTCOLONPERCENTCOLON;
-					} else {
-						put_back(this, '%');
-						token->type = T_PERCENTCOLON;
-					}
-					return;
-				}
-				token->type = T_PERCENTCOLON;
-				return;
-		MAYBE('>', T_PERCENTGREATER)
-		ELSE('%')
-	case '<':
-		MAYBE1(':', T_LESSCOLON)
-		MAYBE('%', T_LESSPERCENT)
-			case '<':
-				/* TODO trigraphs... */
-				next_char(this);
-				if(this->c == '<') {
-					next_char(this);
-					if(this->c == '=') {
-						next_char(this);
-						token->type = T_LESSLESSEQUAL;
-					} else {
-						token->type = T_LESSLESS;
-					}
-				} else {
-					token->type = T_LESS;
-				}
-				return;
-		ELSE('<')
-	case '>':
-		next_char(this);
-		while(1) {
-			switch(this->c) {
-			case '>':
-				next_char(this);
-				/* TODO trigraphs */
-				if(this->c == '=') {
-					next_char(this);
-					token->type = T_GREATERGREATEREQUAL;
-				} else {
-					token->type = T_GREATERGREATER;
-				}
+				this->source_position.linenr++;
 				break;
-		ELSE('>')
-	case '^':
-		MAYBE1('=', T_CARETEQUAL)
-		ELSE('^')
-	case '|':
-		MAYBE1('=', T_PIPEEQUAL)
-		MAYBE('|', T_PIPEPIPE)
-		ELSE('|')
-	case ':':
-		MAYBE1('>', T_COLONGREATER)
-		ELSE(':')
-	case '=':
-		MAYBE1('=', T_EQUALEQUAL)
-		ELSE('=')
-	case '#':
-		MAYBE1('#', T_HASHHASH)
-#if 0
-		else {
-			if(line_begin) {
-				parse_preprocessor_directive(this, token);
-				return;
 			} else {
-				token->type = '#';
+				parse_error(this, "unexpected '\\' found");
+				token->type = T_ERROR;
 			}
+			return;
+
+#define MAYBE_PROLOG                                       \
+			next_char(this);                               \
+			while(1) {                                     \
+				switch(this->c) {
+
+#define MAYBE(ch, set_type)                                \
+				case ch:                                   \
+					next_char(this);                       \
+					token->type = set_type;                \
+					return;
+
+#define ELSE_CODE(code)                                    \
+				SKIP_TRIGRAPHS(                            \
+					code;                                  \
+				)                                          \
+														   \
+				case '\\':                                 \
+					next_char(this);                       \
+					if(this->c == '\n') {                  \
+						next_char(this);                   \
+						this->source_position.linenr++;    \
+						break;                             \
+					}                                      \
+					/* fallthrough */                      \
+				default:                                   \
+					code;                                  \
+				}                                          \
+			} /* end of while(1) */                        \
+			break;
+
+#define ELSE(set_type)                                     \
+		ELSE_CODE(                                         \
+			token->type = set_type;                        \
+			return;                                        \
+		)
+
+		case '.':
+			MAYBE_PROLOG
+				case '.':
+					MAYBE_PROLOG
+					MAYBE('.', T_DOTDOTDOT)
+					ELSE_CODE(
+						put_back(this, this->c);
+						this->c = '.';
+						token->type = '.';
+						return;
+					)
+			ELSE('.')
+		case '&':
+			MAYBE_PROLOG
+			MAYBE('&', T_ANDAND)
+			MAYBE('=', T_ANDEQUAL)
+			ELSE('&')
+		case '*':
+			MAYBE_PROLOG
+			MAYBE('=', T_ASTERISKEQUAL)
+			ELSE('*')
+		case '+':
+			MAYBE_PROLOG
+			MAYBE('+', T_PLUSPLUS)
+			MAYBE('=', T_PLUSEQUAL)
+			ELSE('+')
+		case '-':
+			MAYBE_PROLOG
+			MAYBE('-', T_MINUSMINUS)
+			MAYBE('=', T_MINUSEQUAL)
+			ELSE('-')
+		case '!':
+			MAYBE_PROLOG
+			MAYBE('=', T_EXCLAMATIONMARKEQUAL)
+			ELSE('!')
+		case '/':
+			MAYBE_PROLOG
+			MAYBE('=', T_SLASHEQUAL)
+				case '*':
+					next_char(this);
+					skip_multiline_comment(this);
+					lexer_next_token(this, token);
+					return;
+				case '/':
+					next_char(this);
+					skip_line_comment(this);
+					lexer_next_token(this, token);
+					return;
+			ELSE('/')
+		case '%':
+			MAYBE_PROLOG
+			MAYBE('>', T_PERCENTGREATER)
+			MAYBE('=', T_PERCENTEQUAL)
+				case ':':
+					MAYBE_PROLOG
+						case '%':
+							MAYBE_PROLOG
+							MAYBE(':', T_PERCENTCOLONPERCENTCOLON)
+							ELSE_CODE(
+								put_back(this, this->c);
+								this->c = '%';
+								token->type = T_PERCENTCOLON;
+								return;
+							)
+					ELSE(T_PERCENTCOLON)
+			ELSE('%')
+		case '<':
+			MAYBE_PROLOG
+			MAYBE(':', T_LESSCOLON)
+			MAYBE('%', T_LESSPERCENT)
+				case '<':
+					MAYBE_PROLOG
+					MAYBE('=', T_LESSLESSEQUAL)
+					ELSE(T_LESSLESS)
+			ELSE('<')
+		case '>':
+			MAYBE_PROLOG
+				case '>':
+					MAYBE_PROLOG
+					MAYBE('=', T_GREATERGREATEREQUAL)
+					ELSE(T_GREATERGREATER)
+			ELSE('>')
+		case '^':
+			MAYBE_PROLOG
+			MAYBE('=', T_CARETEQUAL)
+			ELSE('^')
+		case '|':
+			MAYBE_PROLOG
+			MAYBE('=', T_PIPEEQUAL)
+			MAYBE('|', T_PIPEPIPE)
+			ELSE('|')
+		case ':':
+			MAYBE_PROLOG
+			MAYBE('>', T_COLONGREATER)
+			ELSE(':')
+		case '=':
+			MAYBE_PROLOG
+			MAYBE('=', T_EQUALEQUAL)
+			ELSE('=')
+		case '#':
+			MAYBE_PROLOG
+			MAYBE('#', T_HASHHASH)
+#if 0
+			else {
+				if(line_begin) {
+					parse_preprocessor_directive(this, token);
+					return;
+				} else {
+					token->type = '#';
+				}
 #else
-		ELSE('#')
+			ELSE('#')
 #endif
 
-	case '?':
-		next_char(this);
-		/* just a simple ? */
-		if(this->c != '?') {
+		case '?':
+			next_char(this);
+			/* just a simple ? */
+			if(this->c != '?') {
+				token->type = '?';
+				return;
+			}
+			/* might be a trigraph */
+			next_char(this);
+			if(replace_trigraph(this)) {
+				break;
+			}
+			put_back(this, this->c);
+			this->c = '?';
 			token->type = '?';
-			break;
-		}
-		/* might be a trigraph */
-		next_char(this);
-		if(replace_trigraph(this)) {
-			lexer_next_token(this, token);
+			return;
+
+		case '[':
+		case ']':
+		case '(':
+		case ')':
+		case '{':
+		case '}':
+		case '~':
+		case ';':
+		case ',':
+			token->type = this->c;
+			next_char(this);
+			return;
+
+		case EOF:
+			token->type = T_EOF;
+			return;
+
+		default:
+			next_char(this);
+			error_prefix(this);
+			fprintf(stderr, "unknown character '%c' found\n", this->c);
+			token->type = T_ERROR;
 			return;
 		}
-		put_back(this, this->c);
-		this->c = '?';
-		token->type = '?';
-		break;
-
-	case '[':
-	case ']':
-	case '(':
-	case ')':
-	case '{':
-	case '}':
-	case '~':
-	case ';':
-	case ',':
-		token->type = this->c;
-		next_char(this);
-		break;
-
-	case EOF:
-		token->type = T_EOF;
-		break;
-
-	default:
-		error_prefix(this);
-		fprintf(stderr, "unknown character '%c' found\n", this->c);
-		token->type = T_ERROR;
-		next_char(this);
-		break;
 	}
 }
 

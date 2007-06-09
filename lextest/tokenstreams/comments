@@ -1,0 +1,11 @@
+/* skip me */
+/\
+* skip me*\
+/
+// I'm skipped ??/
+  me too
+// and I'm even more skipped
+/* multi lines should of course
+   work
+   yeah */
+/* and comments are not /* recursive */
