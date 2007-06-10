@@ -11,7 +11,7 @@
 #include <ctype.h>
 
 //#define DEBUG_CHARS
-#define MAX_PUTBACK 2
+#define MAX_PUTBACK 3
 
 static
 void error_prefix_at(lexer_t *this, const char *input_name, unsigned linenr)
@@ -67,6 +67,7 @@ void put_back(lexer_t *this, int c)
 #endif
 }
 
+
 static
 int replace_trigraph(lexer_t *this)
 {
@@ -92,17 +93,20 @@ int replace_trigraph(lexer_t *this)
 	return 0;
 }
 
-#define SKIP_TRIGRAPHS(no_trigraph_code)       \
+#define SKIP_TRIGRAPHS(custom_putback, no_trigraph_code) \
 	case '?':                                  \
 		next_char(this);                       \
 		if(this->c != '?') {                   \
+			custom_putback;                    \
 			put_back(this, this->c);           \
 			this->c = '?';                     \
 			no_trigraph_code;                  \
 		}                                      \
 		next_char(this);                       \
-		if(replace_trigraph(this))             \
+		if(replace_trigraph(this)) {           \
 			break;                             \
+		}                                      \
+		custom_putback;                        \
 		put_back(this, '?');                   \
 		put_back(this, this->c);               \
 		this->c = '?';                         \
@@ -354,7 +358,7 @@ void parse_string_literal(lexer_t *this, token_t *token)
 
 	while(1) {
 		switch(this->c) {
-		SKIP_TRIGRAPHS(
+		SKIP_TRIGRAPHS(,
 			obstack_1grow(&symbol_obstack, '?');
 			next_char(this);
 			break;
@@ -425,7 +429,7 @@ void parse_character_constant(lexer_t *this, token_t *token)
 	int found_char = 0;
 	while(1) {
 		switch(this->c) {
-		SKIP_TRIGRAPHS(
+		SKIP_TRIGRAPHS(,
 			found_char = '?';
 			break;
 		)
@@ -566,11 +570,14 @@ void skip_line_comment(lexer_t *this)
 static
 void parse_preprocessor_directive(lexer_t *this, token_t *result_token)
 {
-	(void) result_token;
-	/* skip whitespaces */
-	while(this->c == ' ' || this->c == '\t' || this->c == '\r') {
+	printf("PP: ");
+	while(this->c != '\n') {
+		printf("%c", this->c);
 		next_char(this);
 	}
+	printf("\n");
+
+	lexer_next_token(this, result_token);
 }
 
 void preprocessor_next_token(lexer_t *this, token_t *token)
@@ -588,10 +595,41 @@ void preprocessor_next_token(lexer_t *this, token_t *token)
 	}
 }
 
-void lexer_next_token(lexer_t *this, token_t *token)
-{
-	int line_begin = 0;
+#define MAYBE_PROLOG                                       \
+			next_char(this);                               \
+			while(1) {                                     \
+				switch(this->c) {
 
+#define MAYBE(ch, set_type)                                \
+				case ch:                                   \
+					next_char(this);                       \
+					token->type = set_type;                \
+					return;
+
+#define ELSE_CODE(code)                                    \
+				SKIP_TRIGRAPHS(,                           \
+					code;                                  \
+				)                                          \
+														   \
+				case '\\':                                 \
+					next_char(this);                       \
+					EAT_NEWLINE(break;)                    \
+					/* fallthrough */                      \
+				default:                                   \
+					code;                                  \
+				}                                          \
+			} /* end of while(1) */                        \
+			break;
+
+#define ELSE(set_type)                                     \
+		ELSE_CODE(                                         \
+			token->type = set_type;                        \
+			return;                                        \
+		)
+
+static
+void eat_whitespace(lexer_t *this)
+{
 	while(1) {
 		switch(this->c) {
 		case ' ':
@@ -599,7 +637,82 @@ void lexer_next_token(lexer_t *this, token_t *token)
 			next_char(this);
 			break;
 
-		MATCH_NEWLINE(break;)
+		MATCH_NEWLINE(
+			break;
+		)
+
+		case '\\':
+			next_char(this);
+			if(this->c == '\n') {
+				next_char(this);
+				this->source_position.linenr++;
+				break;
+			}
+
+			put_back(this, this->c);
+			this->c = '\\';
+			return;
+
+		SKIP_TRIGRAPHS(,
+			return;
+		)
+
+		case '/':
+			next_char(this);
+			while(1) {
+				switch(this->c) {
+				case '*':
+					next_char(this);
+					skip_multiline_comment(this);
+					eat_whitespace(this);
+					return;
+				case '/':
+					next_char(this);
+					skip_line_comment(this);
+					eat_whitespace(this);
+					return;
+
+				SKIP_TRIGRAPHS(
+						put_back(this, '?');
+					,
+						this->c = '/';
+						return;
+				)
+
+				case '\\':
+					next_char(this);
+					EAT_NEWLINE(break;)
+					/* fallthrough */
+				default:
+					return;
+				}
+			}
+			break;
+
+		default:
+			return;
+		}
+	}
+}
+
+void lexer_next_token(lexer_t *this, token_t *token)
+{
+	while(1) {
+		switch(this->c) {
+		case ' ':
+		case '\t':
+			next_char(this);
+			break;
+
+		MATCH_NEWLINE(
+			eat_whitespace(this);
+			if(this->c == '#') {
+				next_char(this);
+				parse_preprocessor_directive(this, token);
+				return;
+			}
+			break;
+		)
 
 		case 'A' ... 'Z':
 		case 'a' ... 'z':
@@ -630,42 +743,6 @@ void lexer_next_token(lexer_t *this, token_t *token)
 				token->type = T_ERROR;
 			}
 			return;
-
-#define MAYBE_PROLOG                                       \
-			next_char(this);                               \
-			while(1) {                                     \
-				switch(this->c) {
-
-#define MAYBE(ch, set_type)                                \
-				case ch:                                   \
-					next_char(this);                       \
-					token->type = set_type;                \
-					return;
-
-#define ELSE_CODE(code)                                    \
-				SKIP_TRIGRAPHS(                            \
-					code;                                  \
-				)                                          \
-														   \
-				case '\\':                                 \
-					next_char(this);                       \
-					if(this->c == '\n') {                  \
-						next_char(this);                   \
-						this->source_position.linenr++;    \
-						break;                             \
-					}                                      \
-					/* fallthrough */                      \
-				default:                                   \
-					code;                                  \
-				}                                          \
-			} /* end of while(1) */                        \
-			break;
-
-#define ELSE(set_type)                                     \
-		ELSE_CODE(                                         \
-			token->type = set_type;                        \
-			return;                                        \
-		)
 
 		case '.':
 			MAYBE_PROLOG
@@ -769,15 +846,7 @@ void lexer_next_token(lexer_t *this, token_t *token)
 		case '#':
 			MAYBE_PROLOG
 			MAYBE('#', T_HASHHASH)
-			ELSE_CODE(
-				if(line_begin) {
-					parse_preprocessor_directive(this, token);
-					return;
-				} else {
-					token->type = '#';
-					return;
-				}
-			)
+			ELSE('#')
 
 		case '?':
 			next_char(this);

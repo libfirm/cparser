@@ -16,17 +16,6 @@ typedef enum {
 	T_ERROR = -2
 } token_type_t;
 
-typedef enum {
-#define T(x,str,val) TP_##x val,
-#define TS(x,str,val) TP_##x val,
-#include "tokens.inc"
-#undef TS
-#undef T
-
-	TP_EOF   = T_EOF,
-	TP_ERROR = T_ERROR
-} preprocessor_token_type_t;
-
 typedef struct {
 	int type;
 	union {

@@ -47,6 +47,10 @@ void print_token_type(FILE *f, token_type_t token_type)
 		fputs("end of file", f);
 		return;
 	}
+	if(token_type == T_ERROR) {
+		fputs("error", f);
+		return;
+	}
 
 	int token_symbols_len = T_LAST_TOKEN;
 	if(token_type < 0 || token_type >= token_symbols_len) {

@@ -5,6 +5,8 @@
 TS(IDENTIFIER,     "identifier", = 256)
 TS(INTEGER,        "integer number",)
 TS(STRING_LITERAL, "string literal",)
+TS(PP_NEWLINE,     "praeprocessor newline",)
+TS(PP_HEADER_NAME, "praeprocessor header name",)
 
 #define S(x)   T(x,#x,)
 S(auto)
