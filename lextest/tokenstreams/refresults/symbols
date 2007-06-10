@@ -11,4 +11,6 @@ symbol 'symbo'
 '?'
 symbol 'symbo'
 '?'
+symbol 'one'
+symbol 'two'
 end of file
