@@ -472,29 +472,46 @@ static
 void skip_multiline_comment(lexer_t *this)
 {
 	unsigned start_linenr = this->source_position.linenr;
+	int had_star = 0;
 
 	while(1) {
 		switch(this->c) {
 		case '*':
 			next_char(this);
-			if(this->c == '/') {
-				next_char(this);
+			had_star = 1;
+			break;
+
+		case '/':
+			next_char(this);
+			if(had_star) {
 				return;
 			}
+			had_star = 0;
 			break;
+
+		case '\\':
+			next_char(this);
+			EAT_NEWLINE(break;)
+			had_star = 0;
+			break;
+
 		case '?':
 			next_char(this);
-			if(this->c != '?')
+			if(this->c != '?') {
+				had_star = 0;
 				break;
+			}
 			next_char(this);
 			if(replace_trigraph(this))
 				break;
-			put_back(this, '?');
+			put_back(this, this->c);
+			this->c = '?';
+			had_star = 0;
 			/* we don't put back the 2nd ? as the comment text is discarded
 			 * anyway */
 			break;
 
-		MATCH_NEWLINE(break;)
+		MATCH_NEWLINE(had_star = 0; break;)
 
 		case EOF:
 			error_prefix_at(this, this->source_position.input_name,
@@ -502,6 +519,7 @@ void skip_multiline_comment(lexer_t *this)
 			fprintf(stderr, "at end of file while looking for comment end\n");
 			return;
 		default:
+			had_star = 0;
 			next_char(this);
 			break;
 		}
