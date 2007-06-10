@@ -106,7 +106,20 @@ int replace_trigraph(lexer_t *this)
 		put_back(this, '?');                   \
 		put_back(this, this->c);               \
 		this->c = '?';                         \
-		no_trigraph_code;                      \
+		no_trigraph_code;
+
+#define EAT_NEWLINE(newline_code)              \
+	if(this->c == '\r') {                      \
+		next_char(this);                       \
+		if(this->c == '\n')                    \
+			next_char(this);                   \
+		this->source_position.linenr++;        \
+		newline_code;                          \
+	} else if(this->c == '\n') {               \
+		next_char(this);                       \
+		this->source_position.linenr++;        \
+		newline_code;                          \
+	}
 
 static
 void parse_symbol(lexer_t *this, token_t *token)
@@ -121,11 +134,8 @@ void parse_symbol(lexer_t *this, token_t *token)
 		switch(this->c) {
 		case '\\':
 			next_char(this);
-			if(this->c == '\n') {
-				next_char(this);
-				this->source_position.linenr++;
-				break;
-			}
+			EAT_NEWLINE(break;)
+			goto end_symbol;
 
 		case 'A' ... 'Z':
 		case 'a' ... 'z':
@@ -286,51 +296,49 @@ void parse_number(lexer_t *this, token_t *token)
 static
 int parse_escape_sequence(lexer_t *this)
 {
-	int c = this->c;
-	next_char(this);
-
-	switch(c) {
-	case '"': return '"';
-	case '\'': return'\'';
-	case '\\':
-		if(this->c == '\n') {
-			this->source_position.linenr++;
-			next_char(this);
-			return parse_escape_sequence(this);
-		}
-	  	return '\\';
-	case 'a': return '\a';
-	case 'b': return '\b';
-	case 'f': return '\f';
-	case 'n': return '\n';
-	case 'r': return '\r';
-	case 't': return '\t';
-	case 'v': return '\v';
-	case 'x': /* TODO parse hex number ... */
-		parse_error(this, "hex escape sequences not implemented yet");
-		return EOF;
-	case 0 ... 8: /* TODO parse octal number ... */
-		parse_error(this, "octal escape sequences not implemented yet");
-		return EOF;
-	case '?':
-		if(this->c != '?') {
-			return '?';
-		}
-		/* might be a trigraph */
+	while(1) {
+		int c = this->c;
 		next_char(this);
-		if(replace_trigraph(this)) {
-			return parse_escape_sequence(this);
-		}
-		put_back(this, this->c);
-		this->c = '?';
-		return '?';
 
-	case EOF:
-		parse_error(this, "reached end of file while parsing escape sequence");
-		return EOF;
-	default:
-		parse_error(this, "unknown escape sequence\n");
-		return EOF;
+		switch(c) {
+		case '"': return '"';
+		case '\'': return'\'';
+		case '\\':
+			EAT_NEWLINE(break;)
+			return '\\';
+		case 'a': return '\a';
+		case 'b': return '\b';
+		case 'f': return '\f';
+		case 'n': return '\n';
+		case 'r': return '\r';
+		case 't': return '\t';
+		case 'v': return '\v';
+		case 'x': /* TODO parse hex number ... */
+			parse_error(this, "hex escape sequences not implemented yet");
+			return EOF;
+		case 0 ... 8: /* TODO parse octal number ... */
+			parse_error(this, "octal escape sequences not implemented yet");
+			return EOF;
+		case '?':
+			if(this->c != '?') {
+				return '?';
+			}
+			/* might be a trigraph */
+			next_char(this);
+			if(replace_trigraph(this)) {
+				break;
+			}
+			put_back(this, this->c);
+			this->c = '?';
+			return '?';
+
+		case EOF:
+			parse_error(this, "reached end of file while parsing escape sequence");
+			return EOF;
+		default:
+			parse_error(this, "unknown escape sequence");
+			return EOF;
+		}
 	}
 }
 
@@ -354,11 +362,7 @@ void parse_string_literal(lexer_t *this, token_t *token)
 
 		case '\\':
 			next_char(this);
-			if(this->c == '\n') {
-				next_char(this);
-				this->source_position.linenr++;
-				break;
-			}
+			EAT_NEWLINE(break;)
 			int c = parse_escape_sequence(this);
 			obstack_1grow(&symbol_obstack, c);
 			break;
@@ -399,6 +403,19 @@ end_of_string:
 	token->v.string = result;
 }
 
+#define MATCH_NEWLINE(code)                 \
+	case '\r':                              \
+		next_char(this);                    \
+		if(this->c == '\n') {               \
+			next_char(this);                \
+		}                                   \
+		this->source_position.linenr++;     \
+		code;                               \
+	case '\n':                              \
+		next_char(this);                    \
+		this->source_position.linenr++;     \
+		code;
+
 static
 void parse_character_constant(lexer_t *this, token_t *token)
 {
@@ -415,19 +432,14 @@ void parse_character_constant(lexer_t *this, token_t *token)
 
 		case '\\':
 			next_char(this);
-			if(this->c == '\n') {
-				next_char(this);
-				this->source_position.linenr++;
-				break;
-			}
+			EAT_NEWLINE(break;)
 			found_char = '\\';
 			break;
 
-		case '\n':
-			next_char(this);
+		MATCH_NEWLINE(
 			parse_error(this, "newline while parsing character constant");
-			this->source_position.linenr++;
 			break;
+		)
 
 		case '\'':
 			next_char(this);
@@ -482,10 +494,8 @@ void skip_multiline_comment(lexer_t *this)
 			 * anyway */
 			break;
 
-		case '\n':
-			this->source_position.linenr++;
-			next_char(this);
-			break;
+		MATCH_NEWLINE(break;)
+
 		case EOF:
 			error_prefix_at(this, this->source_position.input_name,
 			                start_linenr);
@@ -524,8 +534,10 @@ void skip_line_comment(lexer_t *this)
 			break;
 
 		case EOF:
+		case '\r':
 		case '\n':
 			return;
+
 		default:
 			next_char(this);
 			break;
@@ -533,17 +545,6 @@ void skip_line_comment(lexer_t *this)
 	}
 }
 
-#if 0
-static
-void eat_until_newline(lexer_t *this)
-{
-	while(this->c != '\n') {
-		next_char(this);
-	}
-}
-#endif
-
-#if 0
 static
 void parse_preprocessor_directive(lexer_t *this, token_t *result_token)
 {
@@ -553,7 +554,6 @@ void parse_preprocessor_directive(lexer_t *this, token_t *result_token)
 		next_char(this);
 	}
 }
-#endif
 
 void preprocessor_next_token(lexer_t *this, token_t *token)
 {
@@ -572,18 +572,16 @@ void preprocessor_next_token(lexer_t *this, token_t *token)
 
 void lexer_next_token(lexer_t *this, token_t *token)
 {
+	int line_begin = 0;
+
 	while(1) {
 		switch(this->c) {
 		case ' ':
 		case '\t':
-		case '\r':
 			next_char(this);
 			break;
 
-		case '\n':
-			this->source_position.linenr++;
-			next_char(this);
-			break;
+		MATCH_NEWLINE(break;)
 
 		case 'A' ... 'Z':
 		case 'a' ... 'z':
@@ -753,17 +751,15 @@ void lexer_next_token(lexer_t *this, token_t *token)
 		case '#':
 			MAYBE_PROLOG
 			MAYBE('#', T_HASHHASH)
-#if 0
-			else {
+			ELSE_CODE(
 				if(line_begin) {
 					parse_preprocessor_directive(this, token);
 					return;
 				} else {
 					token->type = '#';
+					return;
 				}
-#else
-			ELSE('#')
-#endif
+			)
 
 		case '?':
 			next_char(this);
