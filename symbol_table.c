@@ -10,6 +10,7 @@ static inline
 void init_symbol_table_entry(symbol_t *entry, const char *string)
 {
 	entry->ID     = 0;
+	entry->pp_ID  = 0;
 	entry->string = string;
 }
 
@@ -41,28 +42,20 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 #include "adt/hashset.c"
 
 static symbol_table_t  symbol_table;
-static symbol_table_t  preprocessor_symbol_table;
 
 symbol_t *symbol_table_insert(const char *symbol)
 {
 	return _symbol_table_insert(&symbol_table, symbol);
 }
 
-symbol_t *preprocessor_symbol_table_insert(const char *symbol)
-{
-	return _symbol_table_insert(&preprocessor_symbol_table, symbol);
-}
-
 void init_symbol_table(void)
 {
 	obstack_init(&symbol_obstack);
 	_symbol_table_init(&symbol_table);
-	_symbol_table_init(&preprocessor_symbol_table);
 }
 
 void exit_symbol_table(void)
 {
 	_symbol_table_destroy(&symbol_table);
-	_symbol_table_destroy(&preprocessor_symbol_table);
 	obstack_free(&symbol_obstack, NULL);
 }

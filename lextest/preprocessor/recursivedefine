@@ -1,0 +1,15 @@
+#define concat(a,b,x,y)  a##b(x,y,a,b);
+#define bla(a,b,x,y)     a##b(x,y,a,b);
+
+int (bla)(int a, int b, int c, int d) {
+	return a + b + c + d;
+}
+
+int main()
+{
+	int con = 0;
+	int cat = 0;
+	int b = 0;
+	int la = 0;
+	return bla(con,cat,b,la);
+}

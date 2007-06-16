@@ -31,6 +31,15 @@ void init_tokens(void)
 
 #undef TS
 #undef T
+
+#define T(x,str,val)                                               \
+	assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);                 \
+	symbol               = symbol_table_insert(str);               \
+	symbol->pp_ID        = TP_##x;
+
+#include "tokens_preprocessor.inc"
+
+#undef T
 }
 
 void exit_tokens(void)
@@ -39,10 +48,6 @@ void exit_tokens(void)
 
 void print_token_type(FILE *f, token_type_t token_type)
 {
-	if(token_type >= 0 && token_type < 256) {
-		fprintf(f, "'%c'", token_type);
-		return;
-	}
 	if(token_type == T_EOF) {
 		fputs("end of file", f);
 		return;
@@ -62,6 +67,10 @@ void print_token_type(FILE *f, token_type_t token_type)
 	if(symbol != NULL) {
 		fputs(symbol->string, f);
 	} else {
+		if(token_type >= 0 && token_type < 256) {
+			fprintf(f, "'%c'", token_type);
+			return;
+		}
 		fputs("unknown token", f);
 	}
 }

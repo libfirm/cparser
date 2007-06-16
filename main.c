@@ -7,6 +7,7 @@
 
 #include "lexer_t.h"
 #include "token_t.h"
+#include "parser.h"
 
 #if 0
 static
@@ -37,7 +38,6 @@ void get_output_name(char *buf, size_t buflen, const char *inputname,
 static
 void compile(const char *fname)
 {
-	lexer_t         lexer;
 	token_t         token;
 
 	FILE *in = fopen(fname, "r");
@@ -46,15 +46,14 @@ void compile(const char *fname)
 		exit(1);
 	}
 
-	lexer_init(&lexer, in, fname);
+	lexer_open_stream(in, fname);
 
 	do {
-		lexer_next_token(&lexer, &token);
+		lexer_next_token(&token);
 		print_token(stdout, &token);
 		puts("");
 	} while(token.type != T_EOF);
 
-	lexer_destroy(&lexer);
 	fclose(in);
 }
 
@@ -62,11 +61,15 @@ int main(int argc, char **argv)
 {
 	init_symbol_table();
 	init_tokens();
+	init_lexer();
+	init_parser();
 
 	for(int i = 1; i < argc; ++i) {
 		compile(argv[i]);
 	}
 
+	exit_parser();
+	exit_lexer();
 	exit_tokens();
 	exit_symbol_table();
 	return 0;

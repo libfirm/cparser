@@ -16,18 +16,11 @@ struct source_position_t {
 	unsigned    linenr;
 };
 
-struct lexer_t {
-	int               c;
-	source_position_t source_position;
-	FILE             *input;
-	char              buf[1024];
-	const char       *bufend;
-	const char       *bufpos;
-	strset_t          stringset;
-};
+extern source_position_t source_position;
 
-void lexer_init(lexer_t *lexer, FILE *stream, const char *input_name);
+void init_lexer(void);
+void exit_lexer(void);
 
-void lexer_destroy(lexer_t *lexer);
+void lexer_open_stream(FILE *stream, const char *input_name);
 
 #endif

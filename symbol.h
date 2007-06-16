@@ -5,7 +5,8 @@ typedef struct symbol_t symbol_t;
 
 struct symbol_t {
 	const char          *string;
-	unsigned             ID;
+	unsigned short       ID;
+	unsigned short       pp_ID;
 };
 
 #endif

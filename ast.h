@@ -6,6 +6,7 @@
 typedef struct expression_t               expression_t;
 typedef struct const_t                    const_t;
 typedef struct string_literal_t           string_literal_t;
+typedef struct reference_expression_t     reference_expression_t;
 typedef struct cast_expression_t          cast_expression_t;
 typedef struct call_argument_t            call_argument_t;
 typedef struct type_argument_t            type_argument_t;
