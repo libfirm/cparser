@@ -38,8 +38,6 @@ void get_output_name(char *buf, size_t buflen, const char *inputname,
 static
 void compile(const char *fname)
 {
-	token_t         token;
-
 	FILE *in = fopen(fname, "r");
 	if(in == NULL) {
 		fprintf(stderr, "Couldn't open '%s': %s\n", fname, strerror(errno));
@@ -48,11 +46,16 @@ void compile(const char *fname)
 
 	lexer_open_stream(in, fname);
 
+#if 0
+	token_t token;
 	do {
 		lexer_next_token(&token);
 		print_token(stdout, &token);
 		puts("");
 	} while(token.type != T_EOF);
+#else
+	parse();
+#endif
 
 	fclose(in);
 }
@@ -62,6 +65,7 @@ int main(int argc, char **argv)
 	init_symbol_table();
 	init_tokens();
 	init_lexer();
+	init_ast();
 	init_parser();
 
 	for(int i = 1; i < argc; ++i) {
@@ -69,6 +73,7 @@ int main(int argc, char **argv)
 	}
 
 	exit_parser();
+	exit_ast();
 	exit_lexer();
 	exit_tokens();
 	exit_symbol_table();

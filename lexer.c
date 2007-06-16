@@ -181,14 +181,11 @@ end_symbol:
 	string = obstack_finish(&symbol_obstack);
 	symbol = symbol_table_insert(string);
 
-#if 0
 	if(symbol->ID > 0) {
 		token->type = symbol->ID;
 	} else {
 		token->type = T_IDENTIFIER;
 	}
-#endif
-	token->type     = T_IDENTIFIER;
 	token->v.symbol = symbol;
 
 	if(symbol->string != string) {

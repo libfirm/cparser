@@ -65,7 +65,7 @@ void print_token_type(FILE *f, token_type_t token_type)
 
 	const symbol_t *symbol = token_symbols[token_type];
 	if(symbol != NULL) {
-		fputs(symbol->string, f);
+		fprintf(f, "'%s'", symbol->string);
 	} else {
 		if(token_type >= 0 && token_type < 256) {
 			fprintf(f, "'%c'", token_type);

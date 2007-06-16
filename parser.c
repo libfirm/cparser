@@ -224,7 +224,6 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		case T_struct:
 		case T_enum:
-		case T_IDENTIFIER:
 			/* TODO */
 			assert(0);
 			break;
@@ -365,6 +364,7 @@ declarator_t *parse_declarator(void)
 	case T_IDENTIFIER:
 		declarator = allocate_ast_zero(sizeof(declarator[0]));
 		declarator->symbol = token.v.symbol;
+		next_token();
 		return declarator;
 	case '(':
 		next_token();
@@ -394,15 +394,15 @@ declarator_t *parse_declarator(void)
 	return declarator;
 }
 
-declarator_t *parse_init_declarator(void)
+void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
+	(void) specifiers;
 	declarator_t *declarator = parse_declarator();
 	if(token.type == '=') {
 		next_token();
 		//parse_initialize();
 	}
-
-	return declarator;
+	(void) declarator;
 }
 
 typedef struct declaration_t declaration_t;
@@ -416,6 +416,8 @@ void parse_declaration(void)
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
+
+	parse_init_declarators(&specifiers);
 }
 
 #if 0
@@ -1077,14 +1079,15 @@ void parse_translation_unit(void)
 			continue;
 		}
 
-		declarator_t *declarators = parse_declarator();
-		(void) declarators;
+		parse_declaration();
 		/* multiple declarations? */
 
 		if(token.type == '{') {
 			parse_compound_statement();
 		} else if(token.type == ';') {
 			next_token();
+		} else {
+			parse_error_expected("while parsing declarations", '{', ';', 0);
 		}
 	}
 }

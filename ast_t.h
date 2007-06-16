@@ -219,16 +219,16 @@ struct expression_statement_t {
 	expression_t *expression;
 };
 
-enum namespace_entry_type_t {
-	NAMESPACE_ENTRY_INVALID,
-	NAMESPACE_ENTRY_METHOD,
-	NAMESPACE_ENTRY_VARIABLE,
+enum unit_entry_type_t {
+	UNIT_ENTRY_INVALID,
+	UNIT_ENTRY_METHOD,
+	UNIT_ENTRY_VARIABLE,
 };
 
-struct namespace_entry_t {
-	namespace_entry_type_t  type;
-	namespace_entry_t      *next;
-	source_position_t       source_position;
+struct unit_entry_t {
+	unit_entry_type_t  type;
+	unit_entry_t      *next;
+	source_position_t  source_position;
 };
 
 struct method_parameter_t {
@@ -239,7 +239,7 @@ struct method_parameter_t {
 };
 
 struct method_t {
-	namespace_entry_t   namespace_entry;
+	unit_entry_t        unit_entry;
 	symbol_t           *symbol;
 	method_type_t      *type;
 	method_parameter_t *parameters;
@@ -248,13 +248,13 @@ struct method_t {
 };
 
 struct global_variable_t {
-	namespace_entry_t  namespace_entry;
-	symbol_t          *symbol;
-	type_t            *type;
+	unit_entry_t  unit_entry;
+	symbol_t     *symbol;
+	type_t       *type;
 };
 
-struct namespace_t {
-	namespace_entry_t *entries;
+struct translation_unit_t {
+	unit_entry_t *entries;
 };
 
 static inline

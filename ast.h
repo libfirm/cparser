@@ -30,19 +30,19 @@ typedef struct expression_statement_t     expression_statement_t;
 typedef struct goto_statement_t           goto_statement_t;
 typedef struct label_statement_t          label_statement_t;
 
-typedef enum   namespace_entry_type_t     namespace_entry_type_t;
-typedef struct namespace_entry_t          namespace_entry_t;
-typedef struct namespace_t                namespace_t;
+typedef enum   unit_entry_type_t          unit_entry_type_t;
+typedef struct unit_entry_t               unit_entry_t;
+typedef struct translation_unit_t         translation_unit_t;
 typedef struct method_parameter_t         method_parameter_t;
 typedef struct method_t                   method_t;
 typedef struct global_variable_t          global_variable_t;
 
-void  init_ast_module(void);
-void  exit_ast_module(void);
+void  init_ast(void);
+void  exit_ast(void);
 
 void  print_expression(FILE *out, const expression_t *expression);
 void  print_statement(FILE *out, int indent, const statement_t *statement);
-void  print_ast(FILE *out, const namespace_t *namespace);
+void  print_ast(FILE *out, const translation_unit_t *unit);
 void *allocate_ast(size_t size);
 
 #endif

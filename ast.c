@@ -280,26 +280,26 @@ void print_method(FILE *out, const method_t *method)
 }
 
 static
-void print_namespace_entry(FILE *out, const namespace_entry_t *entry)
+void print_namespace_entry(FILE *out, const unit_entry_t *entry)
 {
 	switch(entry->type) {
-	case NAMESPACE_ENTRY_METHOD:
+	case UNIT_ENTRY_METHOD:
 		print_method(out, (const method_t*) entry);
 		break;
-	case NAMESPACE_ENTRY_VARIABLE:
+	case UNIT_ENTRY_VARIABLE:
 		/* TODO */
 		fprintf(out, "some namespace entry of type %d\n\n", entry->type);
 		break;
-	case NAMESPACE_ENTRY_INVALID:
+	case UNIT_ENTRY_INVALID:
 	default:
 		fprintf(out, "invalid namespace entry (%d)\n", entry->type);
 		break;
 	}
 }
 
-void print_ast(FILE *out, const namespace_t *namespace)
+void print_ast(FILE *out, const translation_unit_t *unit)
 {
-	namespace_entry_t *entry = namespace->entries;
+	unit_entry_t *entry = unit->entries;
 
 	while(entry != NULL) {
 		print_namespace_entry(out, entry);
@@ -308,12 +308,12 @@ void print_ast(FILE *out, const namespace_t *namespace)
 	}
 }
 
-void init_ast_module(void)
+void init_ast(void)
 {
 	obstack_init(&ast_obstack);
 }
 
-void exit_ast_module(void)
+void exit_ast(void)
 {
 	obstack_free(&ast_obstack, NULL);
 }

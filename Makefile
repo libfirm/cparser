@@ -5,12 +5,12 @@ GOAL = cparser
 FIRM_CFLAGS = -I$(HOME)/projects/firm/libfirm/include -I$(HOME)/projects/firm/libcore
 FIRM_LIBS = -L$(HOME)/projects/firm/build/i686-pc-linux-gnu/debug -lfirm -llpp -lcore -lm
 
-CFLAGS += -Wall -W -Werror -O0 -g3 -std=c99
+CFLAGS += -Wall -W -Wextra -Werror -O0 -g3 -std=c99
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
 CFLAGS += $(FIRM_CFLAGS)
 
-LFLAGS = $(FIRM_LIBS) -llpp -ldl --export-dynamic
+LFLAGS = $(FIRM_LIBS) -llpp -ldl --export-dynamic -g3
 
 SOURCES := \
 	adt/hashset.c \
