@@ -14,7 +14,6 @@ typedef enum {
 	TYPE_COMPOUND_STRUCT,
 	TYPE_COMPOUND_UNION,
 	TYPE_ENUM,
-	TYPE_TYPEDEF,
 	TYPE_METHOD,
 	TYPE_POINTER
 } type_type_t;
@@ -49,8 +48,16 @@ typedef enum {
 #endif
 } atomic_type_type_t;
 
+typedef enum {
+	TYPE_QUALIFIER_CONST    = 1 << 0,
+	TYPE_QUALIFIER_RESTRICT = 1 << 1,
+	TYPE_QUALIFIER_VOLATILE = 1 << 2,
+	TYPE_QUALIFIER_INLINE   = 1 << 3,
+} type_qualifier_t;
+
 struct type_t {
 	type_type_t  type;
+	unsigned     qualifiers;
 };
 
 struct atomic_type_t {
@@ -85,6 +92,12 @@ struct compound_entry_t {
 struct compound_type_t {
 	type_t             type;
 	compound_entry_t  *entries;
+	symbol_t          *symbol;
+	source_position_t  source_position;
+};
+
+struct enum_type_t {
+	/* todo */
 	symbol_t          *symbol;
 	source_position_t  source_position;
 };

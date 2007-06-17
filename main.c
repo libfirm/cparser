@@ -7,6 +7,7 @@
 
 #include "lexer_t.h"
 #include "token_t.h"
+#include "type_hash.h"
 #include "parser.h"
 
 #if 0
@@ -65,6 +66,8 @@ int main(int argc, char **argv)
 	init_symbol_table();
 	init_tokens();
 	init_lexer();
+	init_types();
+	init_typehash();
 	init_ast();
 	init_parser();
 
@@ -74,6 +77,8 @@ int main(int argc, char **argv)
 
 	exit_parser();
 	exit_ast();
+	exit_typehash();
+	exit_types();
 	exit_lexer();
 	exit_tokens();
 	exit_symbol_table();

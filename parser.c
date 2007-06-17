@@ -6,6 +6,7 @@
 #include "lexer_t.h"
 #include "token_t.h"
 #include "type_t.h"
+#include "type_hash.h"
 #include "ast_t.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
@@ -104,6 +105,15 @@ void eat_until_semi(void)
     }                                              \
     next_token();
 
+#define expect_void(expected)                      \
+    if(UNLIKELY(token.type != (expected))) {       \
+        parse_error_expected(NULL, (expected), 0); \
+        eat_until_semi();                          \
+        return;                                    \
+    }                                              \
+    next_token();
+
+
 typedef enum {
 	SPECIFIER_SIGNED    = 1 << 0,
 	SPECIFIER_UNSIGNED  = 1 << 1,
@@ -125,13 +135,6 @@ typedef enum {
 } specifiers_t;
 
 typedef enum {
-	TYPE_QUALIFIER_CONST    = 1 << 0,
-	TYPE_QUALIFIER_RESTRICT = 1 << 1,
-	TYPE_QUALIFIER_VOLATILE = 1 << 2,
-	TYPE_QUALIFIER_INLINE   = 1 << 3,
-} type_qualifier_t;
-
-typedef enum {
 	STORAGE_CLASS_NONE,
 	STORAGE_CLASS_TYPEDEF,
 	STORAGE_CLASS_EXTERN,
@@ -143,7 +146,7 @@ typedef enum {
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	storage_class_t  storage_class;
-	int              type_qualifiers;
+	type_t          *type;
 };
 
 static
@@ -151,6 +154,7 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_type_t        type_type       = TYPE_INVALID;
 	atomic_type_type_t atomic_type     = ATOMIC_TYPE_INVALID;
+	unsigned           type_qualifiers = 0;
 	unsigned           type_specifiers = 0;
 
 	while(1) {
@@ -176,7 +180,7 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* type qualifiers */
 #define MATCH_TYPE_QUALIFIER(token, qualifier)                          \
 		case token:                                                     \
-			specifiers->type_qualifiers |= qualifier;                   \
+			type_qualifiers |= qualifier;                               \
 			next_token();                                               \
 			break;
 
@@ -230,10 +234,11 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		/* function specifier */
 		default:
-			return;;
+			goto finish_specifiers;
 		}
 	}
 
+finish_specifiers:
 	if(type_type == TYPE_INVALID) {
 		/* match valid basic types */
 		switch(type_specifiers) {
@@ -334,7 +339,25 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			} else {
 				parse_error("multiple datatypes in declaration");
 			}
+			atomic_type = ATOMIC_TYPE_INVALID;
 		}
+
+		atomic_type_t *type = obstack_alloc(type_obst, sizeof(type[0]));
+		memset(type, 0, sizeof(type[0]));
+		type->type.type       = TYPE_ATOMIC;
+		type->type.qualifiers = type_qualifiers;
+		type->atype           = atomic_type;
+
+		type_t *result = typehash_insert((type_t*) type);
+		if(result != (type_t*) type) {
+			obstack_free(type_obst, type);
+		}
+
+		specifiers->type = result;
+
+		fprintf(stderr, "Specifiers type: ");
+		print_type(stderr, result);
+		fprintf(stderr, "\n");
 	} else {
 		if(type_specifiers != 0) {
 			parse_error("multiple datatypes in declaration");
@@ -342,35 +365,60 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	}
 }
 
-typedef struct declarator_t declarator_t;
-struct declarator_t {
-	/* pointer stuff... */
-	symbol_t     *symbol;
-
-	declarator_t *next;
-};
-
-declarator_t *parse_declarator(void)
+static
+unsigned parse_type_qualifiers()
 {
+	unsigned type_qualifiers = 0;
+
+	while(1) {
+		switch(token.type) {
+		/* type qualifiers */
+		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
+		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
+		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
+		MATCH_TYPE_QUALIFIER(T_inline,   TYPE_QUALIFIER_INLINE);
+
+		default:
+			return type_qualifiers;
+		}
+	}
+}
+
+static
+void parse_declarator(const declaration_specifiers_t *specifiers)
+{
+	type_t *type = specifiers->type;
+
 	while(token.type == '*') {
 		/* pointer */
 		next_token();
-		//parse_type_qualifiers();
-	}
 
-	declarator_t *declarator;
+		pointer_type_t *pointer_type
+			= obstack_alloc(type_obst, sizeof(pointer_type[0]));
+		memset(pointer_type, 0, sizeof(pointer_type[0]));
+		pointer_type->type.type = TYPE_POINTER;
+		pointer_type->points_to = type;
+
+		pointer_type->type.qualifiers = parse_type_qualifiers();
+
+		type_t *result = typehash_insert((type_t*) pointer_type);
+		if(result != (type_t*) pointer_type) {
+			obstack_free(type_obst, pointer_type);
+		}
+
+		type = result;
+	}
 
 	switch(token.type) {
 	case T_IDENTIFIER:
-		declarator = allocate_ast_zero(sizeof(declarator[0]));
-		declarator->symbol = token.v.symbol;
+		(void) token.v.symbol;
 		next_token();
-		return declarator;
+		break;
 	case '(':
 		next_token();
-		declarator = parse_declarator();
-		expect(')')
-		return declarator;
+		parse_declarator(specifiers);
+		expect_void(')');
+		return;
 	default:
 		parse_error("problem while parsing declarator");
 	}
@@ -380,7 +428,7 @@ declarator_t *parse_declarator(void)
 
 		/* parse parameter-type-list or identifier-list */
 
-		expect(')');
+		expect_void(')');
 	} else if(token.type == '[') {
 		next_token();
 
@@ -388,28 +436,22 @@ declarator_t *parse_declarator(void)
 
 		/* assignment_expression or '*' or nothing */
 
-		expect(']');
+		expect_void(']');
 	}
 
-	return declarator;
+	fprintf(stderr, "Declarator type: ");
+	print_type(stderr, type);
+	fprintf(stderr, "\n");
 }
 
 void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
-	(void) specifiers;
-	declarator_t *declarator = parse_declarator();
+	parse_declarator(specifiers);
 	if(token.type == '=') {
 		next_token();
 		//parse_initialize();
 	}
-	(void) declarator;
 }
-
-typedef struct declaration_t declaration_t;
-struct declaration_t {
-	declaration_specifiers_t  specifiers;
-	declaration_t            *declarators;
-};
 
 void parse_declaration(void)
 {
@@ -419,15 +461,6 @@ void parse_declaration(void)
 
 	parse_init_declarators(&specifiers);
 }
-
-#if 0
-namespace_t *parse(FILE *in, const char *input_name)
-{
-	namespace_t *namespace = parse_namespace();
-
-	return namespace;
-}
-#endif
 
 
 
@@ -1069,9 +1102,11 @@ statement_t *parse_compound_statement(void)
 static
 void parse_translation_unit(void)
 {
+	/*
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
+	*/
 
 	while(token.type != T_EOF) {
 		if(token.type == '{') {

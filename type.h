@@ -10,9 +10,10 @@ typedef struct method_parameter_type_t  method_parameter_type_t;
 typedef struct method_type_t            method_type_t;
 typedef struct compound_entry_t         compound_entry_t;
 typedef struct compound_type_t          compound_type_t;
+typedef struct enum_type_t              enum_type_t;
 
-void init_type_module(void);
-void exit_type_module(void);
+void init_types(void);
+void exit_types(void);
 
 /**
  * prints a human readable form of @p type to a stream

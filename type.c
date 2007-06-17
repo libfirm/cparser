@@ -6,19 +6,39 @@
 static struct obstack  _type_obst;
 struct obstack        *type_obst = &_type_obst;
 
-void init_type_module()
+void init_types()
 {
 	obstack_init(type_obst);
 }
 
-void exit_type_module()
+void exit_types()
 {
 	obstack_free(type_obst, NULL);
 }
 
 static
+void print_type_qualifiers(FILE *out, const type_t *type)
+{
+	unsigned qualifiers = type->qualifiers;
+	if(qualifiers & TYPE_QUALIFIER_CONST) {
+		fputs("const ", out);
+	}
+	if(qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		fputs("volatile ", out);
+	}
+	if(qualifiers & TYPE_QUALIFIER_RESTRICT) {
+		fputs("restrict ", out);
+	}
+	if(qualifiers & TYPE_QUALIFIER_INLINE) {
+		fputs("inline ", out);
+	}
+}
+
+static
 void print_atomic_type(FILE *out, const atomic_type_t *type)
 {
+	print_type_qualifiers(out, & type->type);
+
 	switch(type->atype) {
 	case ATOMIC_TYPE_INVALID:   fputs("INVALIDATOMIC", out); break;
 	case ATOMIC_TYPE_BOOL:      fputs("bool", out); break;
@@ -42,6 +62,8 @@ void print_atomic_type(FILE *out, const atomic_type_t *type)
 static
 void print_method_type(FILE *out, const method_type_t *type)
 {
+	print_type_qualifiers(out, & type->type);
+
 	fputs("<", out);
 	print_type(out, type->result_type);
 	fputs(" ", out);
@@ -69,6 +91,7 @@ void print_pointer_type(FILE *out, const pointer_type_t *type)
 {
 	print_type(out, type->points_to);
 	fputs("*", out);
+	print_type_qualifiers(out, &type->type);
 }
 
 void print_type(FILE *out, const type_t *type)
@@ -83,7 +106,7 @@ void print_type(FILE *out, const type_t *type)
 		fputs("invalid", out);
 		return;
 	case TYPE_ENUM:
-	case TYPE_TYPEDEF:
+		print_type_qualifiers(out, type);
 		fputs("TODO", out);
 		return;
 	case TYPE_ATOMIC:
@@ -91,6 +114,7 @@ void print_type(FILE *out, const type_t *type)
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
+		print_type_qualifiers(out, type);
 		fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
 		return;
 	case TYPE_METHOD:
