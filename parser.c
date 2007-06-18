@@ -446,11 +446,20 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 					type_specifiers & SPECIFIER_LONG) {
 				parse_error("multiple type specifiers given");
 			} else {
-				type_specifiers |= specifier;
+				type_specifiers |= SPECIFIER_LONG_LONG;
 			}
 			break;
 
-			type_specifiers
+		case T___u_quad_t:
+			next_token();
+			if(type_specifiers & SPECIFIER_LONG_LONG ||
+					type_specifiers & SPECIFIER_LONG ||
+					type_specifiers & SPECIFIER_UNSIGNED) {
+				parse_error("multiple type specifiers given");
+			} else {
+				type_specifiers |= SPECIFIER_LONG_LONG | SPECIFIER_UNSIGNED;
+			}
+			break;
 
 		case T_struct:
 			type = parse_struct_specifier();

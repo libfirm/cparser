@@ -1,18 +1,13 @@
 GOAL = cparser
 
-#FIRM_CFLAGS = `pkg-config --cflags libfirm`
-#FIRM_LIBS = `pkg-config --libs libfirm`
-FIRM_CFLAGS =
-FIRM_LIBS = -L. -lfirm
-
 CFLAGS += -Wall -W -Wextra -Werror -O0 -g3 -std=c99 -pedantic
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
-CFLAGS += $(FIRM_CFLAGS)
 
-LFLAGS = -g3 $(FIRM_LIBS)
+LFLAGS = -g3
 
 SOURCES := \
+	adt/array.c \
 	adt/hashset.c \
 	adt/strset.c \
 	adt/xmalloc.c \
