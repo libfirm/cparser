@@ -181,16 +181,11 @@ void print_if_statement(FILE *out, int indent, const if_statement_t *statement)
 }
 
 static
-void print_variable_declaration_statement(FILE *out,
-                     const variable_declaration_statement_t *statement)
+void print_declaration_statement(FILE *out,
+                                 const declaration_statement_t *statement)
 {
-	fprintf(out, "var");
-	if(statement->type != NULL) {
-		fprintf(out, "<");
-		print_type(out, statement->type);
-		fprintf(out, ">");
-	}
-	fprintf(out, " %s", statement->symbol->string);
+	(void) statement;
+	fprintf(out, "*declaration statement*");
 }
 
 void print_statement(FILE *out, int indent, const statement_t *statement)
@@ -219,9 +214,9 @@ void print_statement(FILE *out, int indent, const statement_t *statement)
 	case STATEMENT_IF:
 		print_if_statement(out, indent, (const if_statement_t*) statement);
 		break;
-	case STATEMENT_VARIABLE_DECLARATION:
-		print_variable_declaration_statement(out,
-		        (const variable_declaration_statement_t*) statement);
+	case STATEMENT_DECLARATION:
+		print_declaration_statement(out,
+		                            (const declaration_statement_t*) statement);
 		break;
 	case STATEMENT_INVALID:
 	default:
@@ -232,6 +227,7 @@ void print_statement(FILE *out, int indent, const statement_t *statement)
 	fprintf(out, "\n");
 }
 
+#if 0
 static
 void print_method_parameters(FILE *out, const method_parameter_t *parameters,
                              const method_type_t *method_type)
@@ -259,42 +255,20 @@ void print_method_parameters(FILE *out, const method_parameter_t *parameters,
 
 	fprintf(out, ")");
 }
+#endif
 
 static
-void print_method(FILE *out, const method_t *method)
+void print_declaration(FILE *out, const declaration_t *declaration)
 {
-	method_type_t *type = method->type;
-
-	fprintf(out, "func ");
-	print_type(out, type->result_type);
-	fprintf(out, " %s", method->symbol->string);
-
-	print_method_parameters(out, method->parameters, type);
-
-	if(method->statement != NULL) {
-		fprintf(out, ":\n");
-		print_statement(out, 0, method->statement);
-	} else {
-		fprintf(out, "\n");
-	}
+	/* TODO */
+	print_type(out, declaration->type);
+	fprintf(out, " %s", declaration->symbol->string);
 }
 
 static
 void print_namespace_entry(FILE *out, const unit_entry_t *entry)
 {
-	switch(entry->type) {
-	case UNIT_ENTRY_METHOD:
-		print_method(out, (const method_t*) entry);
-		break;
-	case UNIT_ENTRY_VARIABLE:
-		/* TODO */
-		fprintf(out, "some namespace entry of type %d\n\n", entry->type);
-		break;
-	case UNIT_ENTRY_INVALID:
-	default:
-		fprintf(out, "invalid namespace entry (%d)\n", entry->type);
-		break;
-	}
+	print_declaration(out, &entry->declaration);
 }
 
 void print_ast(FILE *out, const translation_unit_t *unit)

@@ -1,6 +1,7 @@
 #include <config.h>
 
 #include "symbol_table_t.h"
+#include "token_t.h"
 #include "adt/hash_string.h"
 #include "adt/obst.h"
 
@@ -9,9 +10,10 @@ struct obstack symbol_obstack;
 static inline
 void init_symbol_table_entry(symbol_t *entry, const char *string)
 {
-	entry->ID     = 0;
-	entry->pp_ID  = 0;
 	entry->string = string;
+	entry->ID     = T_IDENTIFIER;
+	entry->pp_ID  = 0;
+	entry->thing  = NULL;
 }
 
 #define HashSet                    symbol_table_t

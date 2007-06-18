@@ -133,6 +133,61 @@ int replace_trigraph(void)
 		newline_code;                          \
 	}
 
+#define SYMBOL_CHARS  \
+	case 'a':         \
+	case 'b':         \
+	case 'c':         \
+	case 'd':         \
+	case 'e':         \
+	case 'f':         \
+	case 'g':         \
+	case 'h':         \
+	case 'i':         \
+	case 'j':         \
+	case 'k':         \
+	case 'l':         \
+	case 'm':         \
+	case 'n':         \
+	case 'o':         \
+	case 'p':         \
+	case 'q':         \
+	case 'r':         \
+	case 's':         \
+	case 't':         \
+	case 'u':         \
+	case 'v':         \
+	case 'w':         \
+	case 'x':         \
+	case 'y':         \
+	case 'z':         \
+	case 'A':         \
+	case 'B':         \
+	case 'C':         \
+	case 'D':         \
+	case 'E':         \
+	case 'F':         \
+	case 'G':         \
+	case 'H':         \
+	case 'I':         \
+	case 'J':         \
+	case 'K':         \
+	case 'L':         \
+	case 'M':         \
+	case 'N':         \
+	case 'O':         \
+	case 'P':         \
+	case 'Q':         \
+	case 'R':         \
+	case 'S':         \
+	case 'T':         \
+	case 'U':         \
+	case 'V':         \
+	case 'W':         \
+	case 'X':         \
+	case 'Y':         \
+	case 'Z':         \
+	case '_':
+
 static
 void parse_symbol(token_t *token)
 {
@@ -149,9 +204,7 @@ void parse_symbol(token_t *token)
 			EAT_NEWLINE(break;)
 			goto end_symbol;
 
-		case 'A' ... 'Z':
-		case 'a' ... 'z':
-		case '_':
+		SYMBOL_CHARS
 			obstack_1grow(&symbol_obstack, c);
 			next_char();
 			break;
@@ -181,11 +234,7 @@ end_symbol:
 	string = obstack_finish(&symbol_obstack);
 	symbol = symbol_table_insert(string);
 
-	if(symbol->ID > 0) {
-		token->type = symbol->ID;
-	} else {
-		token->type = T_IDENTIFIER;
-	}
+	token->type     = symbol->ID;
 	token->v.symbol = symbol;
 
 	if(symbol->string != string) {
@@ -307,7 +356,15 @@ int parse_escape_sequence()
 		case 'x': /* TODO parse hex number ... */
 			parse_error("hex escape sequences not implemented yet");
 			return EOF;
-		case 0 ... 8: /* TODO parse octal number ... */
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+			/* TODO parse octal number ... */
 			parse_error("octal escape sequences not implemented yet");
 			return EOF;
 		case '?':
@@ -555,6 +612,14 @@ void skip_line_comment(void)
 static
 void lexer_next_preprocessing_token(token_t *token);
 
+static token_t pp_token;
+
+static inline
+void next_pp_token(void)
+{
+	lexer_next_preprocessing_token(&pp_token);
+}
+
 static
 void eat_until_newline(void)
 {
@@ -599,8 +664,30 @@ void endif_directive(void)
 }
 
 static
-void found_preprocessor_identifier(symbol_t *symbol)
+void parse_line_directive(void)
 {
+	if(pp_token.type != T_INTEGER) {
+		parse_error("expected integer");
+	} else {
+		source_position.linenr = pp_token.v.intvalue - 1;
+		next_pp_token();
+	}
+	if(pp_token.type == T_STRING_LITERAL) {
+		source_position.input_name = pp_token.v.string;
+		next_pp_token();
+	}
+
+	while(pp_token.type != T_EOF && pp_token.type != '\n') {
+		next_pp_token();
+	}
+}
+
+static
+void parse_preprocessor_identifier(void)
+{
+	assert(pp_token.type == T_IDENTIFIER);
+	symbol_t *symbol = pp_token.v.symbol;
+
 	switch(symbol->pp_ID) {
 	case TP_include:
 		printf("include - enable header name parsing!\n");
@@ -617,11 +704,14 @@ void found_preprocessor_identifier(symbol_t *symbol)
 	case TP_endif:
 		endif_directive();
 		break;
+	case TP_line:
+		next_pp_token();
+		parse_line_directive();
+		break;
 	case TP_if:
 	case TP_else:
 	case TP_elif:
 	case TP_undef:
-	case TP_line:
 	case TP_error:
 		error_directive();
 		break;
@@ -633,15 +723,18 @@ void found_preprocessor_identifier(symbol_t *symbol)
 static
 void parse_preprocessor_directive(token_t *result_token)
 {
-	token_t temptoken;
+	next_pp_token();
 
-	(void) result_token;
-	lexer_next_preprocessing_token(&temptoken);
-	switch(temptoken.type) {
+	switch(pp_token.type) {
 	case T_IDENTIFIER:
-		found_preprocessor_identifier(temptoken.v.symbol);
+		parse_preprocessor_identifier();
+		break;
+	case T_INTEGER:
+		parse_line_directive();
 		break;
 	}
+
+	lexer_next_token(result_token);
 }
 
 #define MAYBE_PROLOG                                       \
@@ -765,13 +858,20 @@ void lexer_next_preprocessing_token(token_t *token)
 			return;
 		)
 
-		case 'A' ... 'Z':
-		case 'a' ... 'z':
-		case '_':
+		SYMBOL_CHARS
 			parse_symbol(token);
 			return;
 
-		case '0' ... '9':
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
 			parse_number(token);
 			return;
 

@@ -42,10 +42,7 @@ struct reference_expression_t {
 	expression_t                      expression;
 	symbol_t                         *symbol;
 	union {
-		variable_declaration_statement_t *variable;
-		method_t                         *method;
-		global_variable_t                *global_variable;
-		method_parameter_t               *method_parameter;
+		declaration_t    *declaration;
 	} r;
 };
 
@@ -161,10 +158,35 @@ struct comma_expression_t {
 };
 
 typedef enum {
+	STORAGE_CLASS_NONE,
+	STORAGE_CLASS_TYPEDEF,
+	STORAGE_CLASS_EXTERN,
+	STORAGE_CLASS_STATIC,
+	STORAGE_CLASS_AUTO,
+	STORAGE_CLASS_REGISTER
+} storage_class_t;
+
+struct method_parameter_t {
+	method_parameter_t *next;
+	symbol_t           *symbol;
+	type_t             *type;
+	int                 num;
+};
+
+struct declaration_t {
+	storage_class_t     storage_class;
+	type_t             *type;
+	symbol_t           *symbol;
+	method_parameter_t *parameters;
+	statement_t        *statement;
+	source_position_t   source_position;
+};
+
+typedef enum {
 	STATEMENT_INVALID,
 	STATEMENT_BLOCK,
 	STATEMENT_RETURN,
-	STATEMENT_VARIABLE_DECLARATION,
+	STATEMENT_DECLARATION,
 	STATEMENT_IF,
 	STATEMENT_EXPRESSION,
 	STATEMENT_GOTO,
@@ -187,13 +209,12 @@ struct block_statement_t {
 	statement_t *first_statement;
 };
 
-struct variable_declaration_statement_t {
-	statement_t  statement;
-	type_t      *type;
-	symbol_t    *symbol;
+struct declaration_statement_t {
+	statement_t    statement;
+	declaration_t  declaration;
 
-	int          value_number; /**< filled in by semantic phase */
-	int          refs;
+	int            value_number; /**< filled in by semantic phase */
+	int            refs;
 };
 
 struct if_statement_t {
@@ -219,38 +240,9 @@ struct expression_statement_t {
 	expression_t *expression;
 };
 
-enum unit_entry_type_t {
-	UNIT_ENTRY_INVALID,
-	UNIT_ENTRY_METHOD,
-	UNIT_ENTRY_VARIABLE,
-};
-
 struct unit_entry_t {
-	unit_entry_type_t  type;
-	unit_entry_t      *next;
-	source_position_t  source_position;
-};
-
-struct method_parameter_t {
-	method_parameter_t *next;
-	symbol_t           *symbol;
-	type_t             *type;
-	int                 num;
-};
-
-struct method_t {
-	unit_entry_t        unit_entry;
-	symbol_t           *symbol;
-	method_type_t      *type;
-	method_parameter_t *parameters;
-
-	statement_t        *statement;
-};
-
-struct global_variable_t {
-	unit_entry_t  unit_entry;
-	symbol_t     *symbol;
-	type_t       *type;
+	declaration_t  declaration;
+	unit_entry_t  *next;
 };
 
 struct translation_unit_t {

@@ -45,6 +45,10 @@ S(while)
 S(_Bool)
 S(_Complex)
 S(_Imaginary)
+S(__extension__)
+S(__attribute__)
+S(__u_quad_t)
+S(__quad_t)
 #undef S
 
 T(SELECT,                   "->",)

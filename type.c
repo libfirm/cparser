@@ -115,7 +115,9 @@ void print_type(FILE *out, const type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 		print_type_qualifiers(out, type);
-		fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
+		if(((const compound_type_t*) type)->symbol != NULL) {
+			fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
+		}
 		return;
 	case TYPE_METHOD:
 		print_method_type(out, (const method_type_t*) type);

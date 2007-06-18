@@ -593,4 +593,6 @@ void hashset_remove_iterator(HashSet *this, const HashSetIterator *iter)
 	this->consider_shrink = 1;
 }
 
+#else
+__attribute__((unused)) static int dummy;
 #endif

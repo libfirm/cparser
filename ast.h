@@ -20,17 +20,17 @@ typedef struct conditional_expression_t   conditional_expression_t;
 typedef struct expression_list_element_t  expression_list_element_t;
 typedef struct comma_expression_t         comma_expression_t;
 
+typedef struct declaration_t              declaration_t;
+
 typedef struct statement_t                statement_t;
 typedef struct block_statement_t          block_statement_t;
 typedef struct return_statement_t         return_statement_t;
 typedef struct if_statement_t             if_statement_t;
-typedef struct variable_declaration_statement_t
-                                          variable_declaration_statement_t;
+typedef struct declaration_statement_t    declaration_statement_t;
 typedef struct expression_statement_t     expression_statement_t;
 typedef struct goto_statement_t           goto_statement_t;
 typedef struct label_statement_t          label_statement_t;
 
-typedef enum   unit_entry_type_t          unit_entry_type_t;
 typedef struct unit_entry_t               unit_entry_t;
 typedef struct translation_unit_t         translation_unit_t;
 typedef struct method_parameter_t         method_parameter_t;

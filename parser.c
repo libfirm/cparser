@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
+#include "parser.h"
 #include "lexer_t.h"
 #include "token_t.h"
 #include "type_t.h"
@@ -10,10 +11,32 @@
 #include "ast_t.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
+#include "adt/array.h"
 
 #define PRINT_TOKENS
 
-static token_t token;
+struct environment_entry_t {
+	symbol_t            *symbol;
+	environment_entry_t *old_entry;
+	declaration_t       *declaration;
+	unsigned short       old_symbol_ID;
+};
+
+static token_t               token;
+static struct obstack        environment_obstack;
+static environment_entry_t **environment_stack = NULL;
+static translation_unit_t   *translation_unit  = NULL;
+static block_statement_t    *context           = NULL;
+
+static
+statement_t *parse_compound_statement(void);
+static
+statement_t *parse_statement(void);
+
+static
+expression_t *parse_sub_expression(unsigned precedence);
+static
+expression_t *parse_expression(void);
 
 static inline
 void *allocate_ast_zero(size_t size)
@@ -22,6 +45,92 @@ void *allocate_ast_zero(size_t size)
 	memset(res, 0, size);
 	return res;
 }
+
+static inline
+void *allocate_type_zero(size_t size)
+{
+	void *res = obstack_alloc(type_obst, size);
+	memset(res, 0, size);
+	return res;
+}
+
+/**
+ * pushs an environment_entry on the environment stack and links the
+ * corresponding symbol to the new entry
+ */
+static inline
+environment_entry_t *environment_push(symbol_t *symbol)
+{
+	environment_entry_t *entry
+		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
+	memset(entry, 0, sizeof(entry[0]));
+
+	int top = ARR_LEN(environment_stack);
+	ARR_RESIZE(environment_stack, top + 1);
+	environment_stack[top] = entry;
+
+	entry->old_entry = symbol->thing;
+	entry->symbol    = symbol;
+	symbol->thing    = entry;
+
+	return entry;
+}
+
+/**
+ * pops symbols from the environment stack until @p new_top is the top element
+ */
+static inline
+void environment_pop_to(size_t new_top)
+{
+	environment_entry_t *entry = NULL;
+	size_t top = ARR_LEN(environment_stack);
+	size_t i;
+
+	if(new_top == top)
+		return;
+
+	assert(new_top < top);
+	i = top;
+	do {
+		entry = environment_stack[i - 1];
+
+		symbol_t *symbol = entry->symbol;
+
+#if 0
+		if(entry->type == ENTRY_LOCAL_VARIABLE
+				&& entry->e.variable->refs == 0) {
+			variable_declaration_statement_t *variable = entry->e.variable;
+			print_warning_prefix(env, variable->statement.source_position);
+			fprintf(stderr, "variable '%s' was declared but never read\n",
+			        symbol->string);
+		}
+#endif
+
+		if(entry->declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
+			fprintf(stderr, "pop typename '%s'\n", entry->symbol->string);
+			symbol->ID = entry->old_symbol_ID;
+		}
+
+		assert(symbol->thing == entry);
+		symbol->thing = entry->old_entry;
+
+		--i;
+	} while(i != new_top);
+	obstack_free(&environment_obstack, entry);
+
+	ARR_SHRINKLEN(environment_stack, (int) new_top);
+}
+
+/**
+ * returns the top element of the environment stack
+ */
+static inline
+size_t environment_top()
+{
+	return ARR_LEN(environment_stack);
+}
+
+
 
 static inline
 void next_token(void)
@@ -113,6 +222,68 @@ void eat_until_semi(void)
     }                                              \
     next_token();
 
+static expression_t *parse_constant_expression(void)
+{
+	/* TODO: not correct yet */
+	return parse_expression();
+}
+
+static compound_entry_t *parse_compound_type_entries(void);
+
+typedef struct declaration_specifiers_t  declaration_specifiers_t;
+struct declaration_specifiers_t {
+	storage_class_t  storage_class;
+	type_t          *type;
+};
+
+static type_t *parse_struct_specifier(void)
+{
+	eat(T_struct);
+
+	compound_type_t *struct_type = allocate_type_zero(sizeof(struct_type[0]));
+	struct_type->type.type       = TYPE_COMPOUND_STRUCT;
+	struct_type->source_position = source_position;
+
+	if(token.type == T_IDENTIFIER) {
+		/* TODO */
+		next_token();
+		if(token.type == '{') {
+			parse_compound_type_entries();
+		}
+	} else if(token.type == '{') {
+		parse_compound_type_entries();
+	} else {
+		parse_error_expected("problem while parsing struct type specifiers",
+		                     T_IDENTIFIER, '{');
+		return NULL;
+	}
+
+	return (type_t*) struct_type;
+}
+
+static type_t *parse_union_specifier(void)
+{
+	eat(T_union);
+
+	compound_type_t *union_type = allocate_type_zero(sizeof(union_type[0]));
+	union_type->type.type       = TYPE_COMPOUND_UNION;
+	union_type->source_position = source_position;
+
+	if(token.type == T_IDENTIFIER) {
+		/* TODO */
+		next_token();
+		if(token.type == '{') {
+			parse_compound_type_entries();
+		}
+	} else if(token.type == '{') {
+		parse_compound_type_entries();
+	} else {
+		parse_error_expected("problem while parsing union type specifiers",
+		                     T_IDENTIFIER, '{');
+	}
+
+	return (type_t*) union_type;
+}
 
 typedef enum {
 	SPECIFIER_SIGNED    = 1 << 0,
@@ -134,28 +305,61 @@ typedef enum {
 #endif
 } specifiers_t;
 
-typedef enum {
-	STORAGE_CLASS_NONE,
-	STORAGE_CLASS_TYPEDEF,
-	STORAGE_CLASS_EXTERN,
-	STORAGE_CLASS_STATIC,
-	STORAGE_CLASS_AUTO,
-	STORAGE_CLASS_REGISTER
-} storage_class_t;
+#define STORAGE_CLASSES     \
+	case T_typedef:         \
+	case T_extern:          \
+	case T_static:          \
+	case T_auto:            \
+	case T_register:
 
-typedef struct declaration_specifiers_t  declaration_specifiers_t;
-struct declaration_specifiers_t {
-	storage_class_t  storage_class;
-	type_t          *type;
-};
+#define TYPE_QUALIFIERS     \
+	case T_const:           \
+	case T_restrict:        \
+	case T_volatile:        \
+	case T_inline:          \
+	case T___extension__:   \
+	case T___attribute__:
+
+#ifdef PROVIDE_COMPLEX
+#define COMPLEX_SPECIFIERS  \
+	case T__Complex:
+#else
+#define COMPLEX_SPECIFIERS
+#endif
+
+#ifdef PROVIDE_IMAGINARY
+#define IMAGINARY_SPECIFIERS \
+	case T__Imaginary:
+#else
+#define IMAGINARY_SPECIFIERS
+#endif
+
+#define TYPE_SPECIFIERS     \
+	case T_TYPENAME:        \
+	case T_void:            \
+	case T_char:            \
+	case T_short:           \
+	case T_int:             \
+	case T_long:            \
+	case T_float:           \
+	case T_double:          \
+	case T_signed:          \
+	case T_unsigned:        \
+	case T__Bool:           \
+	case T_struct:          \
+	case T_union:           \
+	case T_enum:            \
+	case T___quad_t:        \
+	case T___u_quad_t:      \
+	COMPLEX_SPECIFIERS      \
+	IMAGINARY_SPECIFIERS
 
 static
 void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_type_t        type_type       = TYPE_INVALID;
-	atomic_type_type_t atomic_type     = ATOMIC_TYPE_INVALID;
-	unsigned           type_qualifiers = 0;
-	unsigned           type_specifiers = 0;
+	type_t             *type            = NULL;
+	unsigned            type_qualifiers = 0;
+	unsigned            type_specifiers = 0;
 
 	while(1) {
 		switch(token.type) {
@@ -189,6 +393,16 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
 		MATCH_TYPE_QUALIFIER(T_inline,   TYPE_QUALIFIER_INLINE);
 
+		case T___extension__:
+			/* TODO */
+			next_token();
+			break;
+
+		case T___attribute__:
+			fprintf(stderr, "TODO: __attribute__ not handled yet\n");
+			next_token();
+			break;
+
 		/* type specifiers */
 #define MATCH_SPECIFIER(token, specifier, name)                         \
 		case token:                                                     \
@@ -218,7 +432,7 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T_long:
 			next_token();
 			if(type_specifiers & SPECIFIER_LONG_LONG) {
-				parse_error("too many long type specifiers given");
+				parse_error("multiple type specifiers given");
 			} else if(type_specifiers & SPECIFIER_LONG) {
 				type_specifiers |= SPECIFIER_LONG_LONG;
 			} else {
@@ -226,10 +440,37 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}
 			break;
 
+		case T___quad_t:
+			next_token();
+			if(type_specifiers & SPECIFIER_LONG_LONG ||
+					type_specifiers & SPECIFIER_LONG) {
+				parse_error("multiple type specifiers given");
+			} else {
+				type_specifiers |= specifier;
+			}
+			break;
+
+			type_specifiers
+
 		case T_struct:
+			type = parse_struct_specifier();
+			break;
+		case T_union:
+			type = parse_union_specifier();
+			break;
 		case T_enum:
 			/* TODO */
 			assert(0);
+			break;
+
+		case T_TYPENAME:
+			if(type != NULL || type_specifiers != 0) {
+				goto finish_specifiers;
+			}
+
+			type = token.v.symbol->thing->declaration->type;
+			assert(type != NULL);
+			next_token();
 			break;
 
 		/* function specifier */
@@ -239,7 +480,10 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	}
 
 finish_specifiers:
-	if(type_type == TYPE_INVALID) {
+
+	if(type == NULL) {
+		atomic_type_type_t atomic_type;
+
 		/* match valid basic types */
 		switch(type_specifiers) {
 		case SPECIFIER_VOID:
@@ -342,27 +586,29 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		atomic_type_t *type = obstack_alloc(type_obst, sizeof(type[0]));
-		memset(type, 0, sizeof(type[0]));
-		type->type.type       = TYPE_ATOMIC;
-		type->type.qualifiers = type_qualifiers;
-		type->atype           = atomic_type;
+		atomic_type_t *atype = allocate_type_zero(sizeof(atype[0]));
+		atype->type.type     = TYPE_ATOMIC;
+		atype->atype         = atomic_type;
 
-		type_t *result = typehash_insert((type_t*) type);
-		if(result != (type_t*) type) {
-			obstack_free(type_obst, type);
-		}
-
-		specifiers->type = result;
-
-		fprintf(stderr, "Specifiers type: ");
-		print_type(stderr, result);
-		fprintf(stderr, "\n");
+		type = (type_t*) atype;
 	} else {
 		if(type_specifiers != 0) {
 			parse_error("multiple datatypes in declaration");
 		}
 	}
+
+	type->qualifiers = type_qualifiers;
+
+	type_t *result = typehash_insert(type);
+	if(result != (type_t*) type) {
+		obstack_free(type_obst, type);
+	}
+
+	specifiers->type = result;
+
+	fprintf(stderr, "Specifiers type: ");
+	print_type(stderr, result);
+	fprintf(stderr, "\n");
 }
 
 static
@@ -385,17 +631,15 @@ unsigned parse_type_qualifiers()
 }
 
 static
-void parse_declarator(const declaration_specifiers_t *specifiers)
+void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
+                      type_t *type)
 {
-	type_t *type = specifiers->type;
-
 	while(token.type == '*') {
 		/* pointer */
 		next_token();
 
 		pointer_type_t *pointer_type
-			= obstack_alloc(type_obst, sizeof(pointer_type[0]));
-		memset(pointer_type, 0, sizeof(pointer_type[0]));
+			= allocate_type_zero(sizeof(pointer_type[0]));
 		pointer_type->type.type = TYPE_POINTER;
 		pointer_type->points_to = type;
 
@@ -408,17 +652,20 @@ void parse_declarator(const declaration_specifiers_t *specifiers)
 
 		type = result;
 	}
+	declaration->storage_class = storage_class;
+	declaration->type          = type;
 
 	switch(token.type) {
+	case T_TYPENAME:
 	case T_IDENTIFIER:
-		(void) token.v.symbol;
+		declaration->symbol = token.v.symbol;
 		next_token();
 		break;
 	case '(':
 		next_token();
-		parse_declarator(specifiers);
+		parse_declarator(declaration, storage_class, type);
 		expect_void(')');
-		return;
+		break;
 	default:
 		parse_error("problem while parsing declarator");
 	}
@@ -442,15 +689,90 @@ void parse_declarator(const declaration_specifiers_t *specifiers)
 	fprintf(stderr, "Declarator type: ");
 	print_type(stderr, type);
 	fprintf(stderr, "\n");
+
+	symbol_t *symbol = declaration->symbol;
+
+	environment_entry_t *entry = environment_push(symbol);
+	entry->declaration         = declaration;
+	entry->old_symbol_ID       = symbol->ID;
+
+	if(storage_class == STORAGE_CLASS_TYPEDEF) {
+		symbol->ID       = T_TYPENAME;
+	} else {
+		symbol->ID       = T_IDENTIFIER;
+	}
 }
 
+static
 void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
-	parse_declarator(specifiers);
-	if(token.type == '=') {
+	while(1) {
+		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+
+		parse_declarator(declaration, specifiers->storage_class,
+		                 specifiers->type);
+		if(token.type == '=') {
+			next_token();
+			// parse_initializer TODO
+		} else if(token.type == '{') {
+			parse_compound_statement();
+			return;
+		}
+
+		if(token.type != ',')
+			break;
 		next_token();
-		//parse_initialize();
 	}
+	expect_void(';');
+}
+
+static
+void parse_struct_declarators(const declaration_specifiers_t *specifiers)
+{
+	while(1) {
+		declaration_t declaration;
+		compound_entry_t *entry = allocate_ast_zero(sizeof(entry[0]));
+
+		if(token.type == ':') {
+			next_token();
+			parse_constant_expression();
+			/* TODO */
+		} else {
+			parse_declarator(&declaration, specifiers->storage_class,
+			                 specifiers->type);
+
+			if(token.type == ':') {
+				next_token();
+				parse_constant_expression();
+				/* TODO */
+			}
+		}
+
+		if(token.type != ',')
+			break;
+		next_token();
+	}
+	expect_void(';');
+}
+
+static compound_entry_t *parse_compound_type_entries(void)
+{
+	eat('{');
+
+	compound_entry_t *entries = NULL;
+
+	while(token.type != '}' && token.type != T_EOF) {
+		declaration_specifiers_t specifiers;
+		memset(&specifiers, 0, sizeof(specifiers));
+		/* TODO not correct as this allows storage class stuff... but only
+		 * specifiers and qualifiers sould be allowed here */
+		parse_declaration_specifiers(&specifiers);
+
+		parse_struct_declarators(&specifiers);
+	}
+	next_token();
+
+	return entries;
 }
 
 void parse_declaration(void)
@@ -459,15 +781,14 @@ void parse_declaration(void)
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
 
+	if(token.type == ';') {
+		next_token();
+		return;
+	}
 	parse_init_declarators(&specifiers);
 }
 
 
-
-static
-expression_t *parse_sub_expression(unsigned precedence);
-static
-expression_t *parse_expression(void);
 
 typedef expression_t* (*parse_expression_function) (unsigned precedence);
 typedef expression_t* (*parse_expression_infix_function) (unsigned precedence,
@@ -677,14 +998,14 @@ expression_t *parse_##unexpression_type(unsigned precedence)              \
 	return (expression_t*) unary_expression;                              \
 }
 
-CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE);
-CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS);
-CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT);
-CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE);
-CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS);
-CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE);
-CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT);
-CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT);
+CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE)
+CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS)
+CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT)
+CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE)
+CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS)
+CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE)
+CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT)
+CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT)
 
 #define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type) \
 static                                                                        \
@@ -703,8 +1024,8 @@ expression_t *parse_##unexpression_type(unsigned precedence,                  \
 	return (expression_t*) unary_expression;                                  \
 }
 
-CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT);
-CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT);
+CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT)
+CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT)
 
 #define CREATE_BINEXPR_PARSER(token_type, binexpression_type)    \
 static                                                           \
@@ -725,22 +1046,22 @@ expression_t *parse_##binexpression_type(unsigned precedence,    \
 	return (expression_t*) binexpr;                              \
 }
 
-CREATE_BINEXPR_PARSER('*', BINEXPR_MUL);
-CREATE_BINEXPR_PARSER('/', BINEXPR_DIV);
-CREATE_BINEXPR_PARSER('+', BINEXPR_ADD);
-CREATE_BINEXPR_PARSER('-', BINEXPR_SUB);
-CREATE_BINEXPR_PARSER('<', BINEXPR_LESS);
-CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER);
-CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN);
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL);
-CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_NOTEQUAL);
-CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL);
-CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL);
-CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND);
-CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR);
-CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR);
-CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT);
-CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT);
+CREATE_BINEXPR_PARSER('*', BINEXPR_MUL)
+CREATE_BINEXPR_PARSER('/', BINEXPR_DIV)
+CREATE_BINEXPR_PARSER('+', BINEXPR_ADD)
+CREATE_BINEXPR_PARSER('-', BINEXPR_SUB)
+CREATE_BINEXPR_PARSER('<', BINEXPR_LESS)
+CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER)
+CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL)
+CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_NOTEQUAL)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL)
+CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL)
+CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND)
+CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR)
+CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR)
+CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT)
+CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT)
 
 static
 expression_t *parse_sub_expression(unsigned precedence)
@@ -866,12 +1187,6 @@ void init_expression_parsers(void)
 	register_expression_parser(parse_sizeof,                  T_sizeof,     25);
 }
 
-
-static
-statement_t *parse_compound_statement(void);
-
-static
-statement_t *parse_statement(void);
 
 static
 statement_t *parse_case_statement(void)
@@ -1020,6 +1335,13 @@ statement_t *parse_return(void)
 }
 
 static
+statement_t *parse_declaration_statement(void)
+{
+	parse_declaration();
+	return NULL;
+}
+
+static
 statement_t *parse_statement(void)
 {
 	statement_t *statement = NULL;
@@ -1081,6 +1403,12 @@ statement_t *parse_statement(void)
 	case ';':
 		statement = NULL;
 		break;
+
+	STORAGE_CLASSES
+	TYPE_QUALIFIERS
+	TYPE_SPECIFIERS
+		statement = parse_declaration_statement();
+		break;
 	}
 
 	return statement;
@@ -1089,48 +1417,50 @@ statement_t *parse_statement(void)
 static
 statement_t *parse_compound_statement(void)
 {
-	expect('{');
+	eat('{');
+
+	int top = environment_top();
 
 	while(token.type != '}') {
 		parse_statement();
 	}
+
+	environment_pop_to(top);
+
 	next_token();
 
 	return NULL;
 }
 
 static
-void parse_translation_unit(void)
+translation_unit_t *parse_translation_unit(void)
 {
-	/*
-	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-	parse_declaration_specifiers(&specifiers);
-	*/
+	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
+
+	assert(translation_unit == NULL);
+	assert(context == NULL);
+	translation_unit = unit;
 
 	while(token.type != T_EOF) {
-		if(token.type == '{') {
-			next_token();
-			continue;
-		}
-
 		parse_declaration();
-		/* multiple declarations? */
-
-		if(token.type == '{') {
-			parse_compound_statement();
-		} else if(token.type == ';') {
-			next_token();
-		} else {
-			parse_error_expected("while parsing declarations", '{', ';', 0);
-		}
 	}
+
+	translation_unit = NULL;
+	return unit;
 }
 
-void parse(void)
+translation_unit_t *parse(void)
 {
+	obstack_init(&environment_obstack);
+	environment_stack = NEW_ARR_F(environment_entry_t*, 0);
+
 	next_token();
-	parse_translation_unit();
+	translation_unit_t *unit = parse_translation_unit();
+
+	DEL_ARR_F(environment_stack);
+	obstack_free(&environment_obstack, NULL);
+
+	return unit;
 }
 
 void init_parser(void)
