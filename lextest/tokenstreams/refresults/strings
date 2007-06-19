@@ -1,16 +1,28 @@
+'newline'
 string 'bla?'
+'newline'
 string 'bla??'
+'newline'
 string 'bla???'
+'newline'
 string 'bla
 '
+'newline'
 string 'bla?
 '
+'newline'
 string 'bla??
 '
+'newline'
 string 'bla'
+'newline'
 string 'bla?'
+'newline'
 string 'bla??'
+'newline'
 string 'bla'
+'newline'
 string 'bla
 '
+'newline'
 end of file

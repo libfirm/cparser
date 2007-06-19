@@ -41,6 +41,7 @@ void print_atomic_type(FILE *out, const atomic_type_t *type)
 
 	switch(type->atype) {
 	case ATOMIC_TYPE_INVALID:   fputs("INVALIDATOMIC", out); break;
+	case ATOMIC_TYPE_VOID:      fputs("void", out); break;
 	case ATOMIC_TYPE_BOOL:      fputs("bool", out); break;
 	case ATOMIC_TYPE_CHAR:      fputs("char", out); break;
 	case ATOMIC_TYPE_SCHAR:     fputs("signed char", out); break;

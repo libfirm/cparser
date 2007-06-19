@@ -707,6 +707,7 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 
 	if(storage_class == STORAGE_CLASS_TYPEDEF) {
 		symbol->ID       = T_TYPENAME;
+		fprintf(stderr, "typedef '%s'\n", symbol->string);
 	} else {
 		symbol->ID       = T_IDENTIFIER;
 	}

@@ -47,7 +47,7 @@ void compile(const char *fname)
 
 	lexer_open_stream(in, fname);
 
-#if 0
+#if 1
 	token_t token;
 	do {
 		lexer_next_token(&token);
@@ -61,6 +61,27 @@ void compile(const char *fname)
 	fclose(in);
 }
 
+static
+void lextest(const char *fname)
+{
+	FILE *in = fopen(fname, "r");
+	if(in == NULL) {
+		fprintf(stderr, "Couldn't open '%s': %s\n", fname, strerror(errno));
+		exit(1);
+	}
+
+	lexer_open_stream(in, fname);
+
+	token_t token;
+	do {
+		lexer_next_preprocessing_token(&token);
+		print_token(stdout, &token);
+		puts("");
+	} while(token.type != T_EOF);
+
+	fclose(in);
+}
+
 int main(int argc, char **argv)
 {
 	init_symbol_table();
@@ -70,6 +91,11 @@ int main(int argc, char **argv)
 	init_typehash();
 	init_ast();
 	init_parser();
+
+	if(argc > 2 && strcmp(argv[1], "--lextest") == 0) {
+		lextest(argv[2]);
+		return 0;
+	}
 
 	for(int i = 1; i < argc; ++i) {
 		compile(argv[i]);

@@ -77,6 +77,13 @@ T(HASHHASH,                 "##",)
 
 #define T_LAST_TOKEN  (T_HASHHASH+1)
 
+T(LESSCOLON,                "<:",   = '[')
+T(COLONGREATER,             ":>",   = ']')
+T(LESSPERCENT,              "<%",   = '{')
+T(PERCENTGREATER,           "%>",   = '}')
+T(PERCENTCOLON,             "%:",   = '#')
+T(PERCENTCOLONPERCENTCOLON, "%:%:", = T_HASHHASH)
+
 T(RBRACK,          "[", = '[')
 T(LBRACK,          "]", = ']')
 T(LBRACE,          "(", = '(')
@@ -102,12 +109,5 @@ T(SEMICOLON,       ";", = ';')
 T(EQUAL,           "=", = '=')
 T(COMMA,           ",", = ',')
 T(HASH,            "#", = '#')
-
-T(LESSCOLON,                "<:",   = '[')
-T(COLONGREATER,             ":>",   = ']')
-T(LESSPERCENT,              "<%",   = '{')
-T(PERCENTGREATER,           "%>",   = '}')
-T(PERCENTCOLON,             "%:",   = '#')
-T(PERCENTCOLONPERCENTCOLON, "%:%:", = T_HASHHASH)
 
 TS(NEWLINE,        "newline", = '\n')

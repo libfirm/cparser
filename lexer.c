@@ -188,6 +188,18 @@ int replace_trigraph(void)
 	case 'Z':         \
 	case '_':
 
+#define DIGITS        \
+	case '0':         \
+	case '1':         \
+	case '2':         \
+	case '3':         \
+	case '4':         \
+	case '5':         \
+	case '6':         \
+	case '7':         \
+	case '8':         \
+	case '9':
+
 static
 void parse_symbol(token_t *token)
 {
@@ -204,6 +216,7 @@ void parse_symbol(token_t *token)
 			EAT_NEWLINE(break;)
 			goto end_symbol;
 
+		DIGITS
 		SYMBOL_CHARS
 			obstack_1grow(&symbol_obstack, c);
 			next_char();
@@ -356,14 +369,14 @@ int parse_escape_sequence()
 		case 'x': /* TODO parse hex number ... */
 			parse_error("hex escape sequences not implemented yet");
 			return EOF;
-		case 0:
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7:
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
 			/* TODO parse octal number ... */
 			parse_error("octal escape sequences not implemented yet");
 			return EOF;
@@ -609,9 +622,6 @@ void skip_line_comment(void)
 	}
 }
 
-static
-void lexer_next_preprocessing_token(token_t *token);
-
 static token_t pp_token;
 
 static inline
@@ -623,7 +633,9 @@ void next_pp_token(void)
 static
 void eat_until_newline(void)
 {
-	/* TODO */
+	while(pp_token.type != '\n' && pp_token.type != T_EOF) {
+		next_pp_token();
+	}
 }
 
 static
@@ -677,9 +689,7 @@ void parse_line_directive(void)
 		next_pp_token();
 	}
 
-	while(pp_token.type != T_EOF && pp_token.type != '\n') {
-		next_pp_token();
-	}
+	eat_until_newline();
 }
 
 static
@@ -721,7 +731,7 @@ void parse_preprocessor_identifier(void)
 }
 
 static
-void parse_preprocessor_directive(token_t *result_token)
+void parse_preprocessor_directive()
 {
 	next_pp_token();
 
@@ -732,9 +742,11 @@ void parse_preprocessor_directive(token_t *result_token)
 	case T_INTEGER:
 		parse_line_directive();
 		break;
+	default:
+		parse_error("invalid preprocessor directive");
+		eat_until_newline();
+		break;
 	}
-
-	lexer_next_token(result_token);
 }
 
 #define MAYBE_PROLOG                                       \
@@ -769,75 +781,6 @@ void parse_preprocessor_directive(token_t *result_token)
 			return;                                        \
 		)
 
-static
-void eat_whitespace()
-{
-	while(1) {
-		switch(c) {
-		case ' ':
-		case '\t':
-			next_char();
-			break;
-
-		case '\r':
-		case '\n':
-			return;
-
-		case '\\':
-			next_char();
-			if(c == '\n') {
-				next_char();
-				source_position.linenr++;
-				break;
-			}
-
-			put_back(c);
-			c = '\\';
-			return;
-
-		SKIP_TRIGRAPHS(,
-			return;
-		)
-
-		case '/':
-			next_char();
-			while(1) {
-				switch(c) {
-				case '*':
-					next_char();
-					skip_multiline_comment();
-					eat_whitespace();
-					return;
-				case '/':
-					next_char();
-					skip_line_comment();
-					eat_whitespace();
-					return;
-
-				SKIP_TRIGRAPHS(
-						put_back('?');
-					,
-						c = '/';
-						return;
-				)
-
-				case '\\':
-					next_char();
-					EAT_NEWLINE(break;)
-					/* fallthrough */
-				default:
-					return;
-				}
-			}
-			break;
-
-		default:
-			return;
-		}
-	}
-}
-
-static
 void lexer_next_preprocessing_token(token_t *token)
 {
 	while(1) {
@@ -848,12 +791,6 @@ void lexer_next_preprocessing_token(token_t *token)
 			break;
 
 		MATCH_NEWLINE(
-			eat_whitespace();
-			if(c == '#') {
-				next_char();
-				parse_preprocessor_directive(token);
-				return;
-			}
 			token->type = '\n';
 			return;
 		)
@@ -862,16 +799,7 @@ void lexer_next_preprocessing_token(token_t *token)
 			parse_symbol(token);
 			return;
 
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-		case '8':
-		case '9':
+		DIGITS
 			parse_number(token);
 			return;
 
@@ -1045,9 +973,20 @@ void lexer_next_preprocessing_token(token_t *token)
 
 void lexer_next_token(token_t *token)
 {
-	do {
+	while(1) {
 		lexer_next_preprocessing_token(token);
-	} while(token->type == '\n');
+		if(token->type == '\n') {
+			do {
+				lexer_next_preprocessing_token(token);
+			} while(token->type == '\n');
+
+			if(token->type == '#') {
+				parse_preprocessor_directive();
+				continue;
+			}
+		}
+		return;
+	}
 }
 
 void init_lexer(void)
