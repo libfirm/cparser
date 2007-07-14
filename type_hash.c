@@ -97,6 +97,9 @@ unsigned hash_type(const type_t *type)
 	case TYPE_POINTER:
 		hash = hash_pointer_type((const pointer_type_t*) type);
 		break;
+	case TYPE_BUILTIN:
+		hash = hash_ptr(((const builtin_type_t*) type)->symbol);
+		break;
 	}
 
 	unsigned some_prime = 99991;
@@ -173,6 +176,13 @@ int enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
 }
 
 static
+int builtin_types_equal(const builtin_type_t *type1,
+                        const builtin_type_t *type2)
+{
+	return type1->symbol == type2->symbol;
+}
+
+static
 int types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
@@ -201,6 +211,9 @@ int types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_POINTER:
 		return pointer_types_equal((const pointer_type_t*) type1,
 		                           (const pointer_type_t*) type2);
+	case TYPE_BUILTIN:
+		return builtin_types_equal((const builtin_type_t*) type1,
+		                           (const builtin_type_t*) type2);
 	}
 
 	abort();

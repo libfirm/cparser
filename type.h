@@ -11,6 +11,7 @@ typedef struct method_type_t            method_type_t;
 typedef struct compound_entry_t         compound_entry_t;
 typedef struct compound_type_t          compound_type_t;
 typedef struct enum_type_t              enum_type_t;
+typedef struct builtin_type_t           builtin_type_t;
 
 void init_types(void);
 void exit_types(void);

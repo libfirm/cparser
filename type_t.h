@@ -15,7 +15,8 @@ typedef enum {
 	TYPE_COMPOUND_UNION,
 	TYPE_ENUM,
 	TYPE_METHOD,
-	TYPE_POINTER
+	TYPE_POINTER,
+	TYPE_BUILTIN
 } type_type_t;
 
 typedef enum {
@@ -65,6 +66,18 @@ struct atomic_type_t {
 	atomic_type_type_t  atype;
 };
 
+struct builtin_type_t {
+	type_t    type;
+	symbol_t *symbol;
+};
+
+struct enum_type_t {
+	type_t             type;
+	symbol_t          *symbol;
+	/* TODO: list of enum members */
+	source_position_t  source_position;
+};
+
 struct pointer_type_t {
 	type_t   type;
 	type_t  *points_to;
@@ -92,12 +105,6 @@ struct compound_entry_t {
 struct compound_type_t {
 	type_t             type;
 	compound_entry_t  *entries;
-	symbol_t          *symbol;
-	source_position_t  source_position;
-};
-
-struct enum_type_t {
-	/* todo */
 	symbol_t          *symbol;
 	source_position_t  source_position;
 };

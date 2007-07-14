@@ -973,19 +973,18 @@ void lexer_next_preprocessing_token(token_t *token)
 
 void lexer_next_token(token_t *token)
 {
-	while(1) {
-		lexer_next_preprocessing_token(token);
-		if(token->type == '\n') {
-			do {
-				lexer_next_preprocessing_token(token);
-			} while(token->type == '\n');
-
-			if(token->type == '#') {
-				parse_preprocessor_directive();
-				continue;
-			}
-		}
+	lexer_next_preprocessing_token(token);
+	if(token->type != '\n')
 		return;
+
+newline_found:
+	do {
+		lexer_next_preprocessing_token(token);
+	} while(token->type == '\n');
+
+	if(token->type == '#') {
+		parse_preprocessor_directive();
+		goto newline_found;
 	}
 }
 

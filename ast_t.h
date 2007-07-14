@@ -134,10 +134,7 @@ struct array_access_expression_t {
 
 struct sizeof_expression_t {
 	expression_t  expression;
-	union {
-		type_t       *type;
-		expression_t *size_expression;
-	} v;
+	type_t       *type;
 };
 
 struct conditional_expression_t {

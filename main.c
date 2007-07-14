@@ -47,16 +47,7 @@ void compile(const char *fname)
 
 	lexer_open_stream(in, fname);
 
-#if 1
-	token_t token;
-	do {
-		lexer_next_token(&token);
-		print_token(stdout, &token);
-		puts("");
-	} while(token.type != T_EOF);
-#else
 	parse();
-#endif
 
 	fclose(in);
 }

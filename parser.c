@@ -196,12 +196,12 @@ void parse_error_expected(const char *message, ...)
 }
 
 static
-void eat_until_semi(void)
+void eat_until(int token_type)
 {
-	while(token.type != ';') {
-		next_token();
+	while(token.type != token_type) {
 		if(token.type == T_EOF)
 			return;
+		next_token();
 	}
 	next_token();
 }
@@ -209,7 +209,7 @@ void eat_until_semi(void)
 #define expect(expected)                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
-        eat_until_semi();                          \
+        eat_until(';');                            \
         return NULL;                               \
     }                                              \
     next_token();
@@ -217,7 +217,7 @@ void eat_until_semi(void)
 #define expect_void(expected)                      \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
-        eat_until_semi();                          \
+        eat_until(';');                            \
         return;                                    \
     }                                              \
     next_token();
@@ -228,7 +228,15 @@ static expression_t *parse_constant_expression(void)
 	return parse_expression();
 }
 
+static expression_t *parse_assignment_expression(void)
+{
+	/* TODO: not correct yet */
+	return parse_expression();
+}
+
 static compound_entry_t *parse_compound_type_entries(void);
+static void parse_declarator(declaration_t *declaration,
+                             storage_class_t storage_class, type_t *type);
 
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
@@ -244,7 +252,7 @@ static type_t *parse_struct_specifier(void)
 	struct_type->type.type       = TYPE_COMPOUND_STRUCT;
 	struct_type->source_position = source_position;
 
-	if(token.type == T_IDENTIFIER) {
+	if(token.type == T_IDENTIFIER || token.type == T_TYPENAME) {
 		/* TODO */
 		next_token();
 		if(token.type == '{') {
@@ -254,7 +262,7 @@ static type_t *parse_struct_specifier(void)
 		parse_compound_type_entries();
 	} else {
 		parse_error_expected("problem while parsing struct type specifiers",
-		                     T_IDENTIFIER, '{');
+		                     T_IDENTIFIER, '{', 0);
 		return NULL;
 	}
 
@@ -270,7 +278,7 @@ static type_t *parse_union_specifier(void)
 	union_type->source_position = source_position;
 
 	if(token.type == T_IDENTIFIER) {
-		/* TODO */
+		union_type->symbol = token.v.symbol;
 		next_token();
 		if(token.type == '{') {
 			parse_compound_type_entries();
@@ -283,6 +291,61 @@ static type_t *parse_union_specifier(void)
 	}
 
 	return (type_t*) union_type;
+}
+
+static void parse_enum_type_entries()
+{
+	eat('{');
+
+	if(token.type == '}') {
+		next_token();
+		parse_error("empty enum not allowed");
+		return;
+	}
+
+	do {
+		if(token.type != T_IDENTIFIER) {
+			parse_error_expected("problem while parsing enum entry",
+			                     T_IDENTIFIER, 0);
+			eat_until('}');
+			return;
+		}
+		next_token();
+
+		if(token.type == '=') {
+			parse_constant_expression();
+		}
+
+		if(token.type != ',')
+			break;
+		next_token();
+	} while(token.type != '}');
+
+	expect_void('}');
+}
+
+static type_t *parse_enum_specifier(void)
+{
+	eat(T_enum);
+
+	enum_type_t *enum_type     = allocate_type_zero(sizeof(enum_type[0]));
+	enum_type->type.type       = TYPE_ENUM;
+	enum_type->source_position = source_position;
+
+	if(token.type == T_IDENTIFIER) {
+		enum_type->symbol = token.v.symbol;
+		next_token();
+		if(token.type == '{') {
+			parse_enum_type_entries();
+		}
+	} else if(token.type == '{') {
+		parse_enum_type_entries();
+	} else {
+		parse_error_expected("problem while parsing enum type specifiers",
+		                     T_IDENTIFIER, '{');
+	}
+
+	return (type_t*) enum_type;
 }
 
 typedef enum {
@@ -317,8 +380,7 @@ typedef enum {
 	case T_restrict:        \
 	case T_volatile:        \
 	case T_inline:          \
-	case T___extension__:   \
-	case T___attribute__:
+	case T___extension__:
 
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
@@ -349,10 +411,28 @@ typedef enum {
 	case T_struct:          \
 	case T_union:           \
 	case T_enum:            \
-	case T___quad_t:        \
-	case T___u_quad_t:      \
 	COMPLEX_SPECIFIERS      \
 	IMAGINARY_SPECIFIERS
+
+#define DECLARATION_START   \
+	STORAGE_CLASSES         \
+	TYPE_QUALIFIERS         \
+	TYPE_SPECIFIERS
+
+static
+type_t *create_builtin_type(symbol_t *symbol)
+{
+	builtin_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type      = TYPE_BUILTIN;
+	type->symbol         = symbol;
+
+	type_t *result = typehash_insert((type_t*) type);
+	if(result != (type_t*) type) {
+		obstack_free(type_obst, type);
+	}
+
+	return result;
+}
 
 static
 void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
@@ -398,11 +478,6 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			next_token();
 			break;
 
-		case T___attribute__:
-			fprintf(stderr, "TODO: __attribute__ not handled yet\n");
-			next_token();
-			break;
-
 		/* type specifiers */
 #define MATCH_SPECIFIER(token, specifier, name)                         \
 		case token:                                                     \
@@ -440,27 +515,6 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}
 			break;
 
-		case T___quad_t:
-			next_token();
-			if(type_specifiers & SPECIFIER_LONG_LONG ||
-					type_specifiers & SPECIFIER_LONG) {
-				parse_error("multiple type specifiers given");
-			} else {
-				type_specifiers |= SPECIFIER_LONG_LONG;
-			}
-			break;
-
-		case T___u_quad_t:
-			next_token();
-			if(type_specifiers & SPECIFIER_LONG_LONG ||
-					type_specifiers & SPECIFIER_LONG ||
-					type_specifiers & SPECIFIER_UNSIGNED) {
-				parse_error("multiple type specifiers given");
-			} else {
-				type_specifiers |= SPECIFIER_LONG_LONG | SPECIFIER_UNSIGNED;
-			}
-			break;
-
 		case T_struct:
 			type = parse_struct_specifier();
 			break;
@@ -468,8 +522,11 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			type = parse_union_specifier();
 			break;
 		case T_enum:
-			/* TODO */
-			assert(0);
+			type = parse_enum_specifier();
+			break;
+		case T___builtin_va_list:
+			type = create_builtin_type(token.v.symbol);
+			next_token();
 			break;
 
 		case T_TYPENAME:
@@ -536,14 +593,16 @@ finish_specifiers:
 		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONG;
 			break;
-		case SPECIFIER_LONG_LONG:
-		case SPECIFIER_SIGNED | SPECIFIER_LONG_LONG:
-		case SPECIFIER_LONG_LONG | SPECIFIER_INT:
-		case SPECIFIER_SIGNED | SPECIFIER_LONG_LONG | SPECIFIER_INT:
+		case SPECIFIER_LONG | SPECIFIER_LONG_LONG:
+		case SPECIFIER_SIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG:
+		case SPECIFIER_LONG | SPECIFIER_LONG_LONG | SPECIFIER_INT:
+		case SPECIFIER_SIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG
+			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_LONGLONG;
 			break;
-		case SPECIFIER_UNSIGNED | SPECIFIER_LONG_LONG:
-		case SPECIFIER_UNSIGNED | SPECIFIER_LONG_LONG | SPECIFIER_INT:
+		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG:
+		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG
+			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONGLONG;
 			break;
 		case SPECIFIER_FLOAT:
@@ -640,8 +699,7 @@ unsigned parse_type_qualifiers()
 }
 
 static
-void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
-                      type_t *type)
+type_t *parse_pointer(type_t *type)
 {
 	while(token.type == '*') {
 		/* pointer */
@@ -661,6 +719,106 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 
 		type = result;
 	}
+
+	return type;
+}
+
+static
+void parse_identifier_list()
+{
+	while(1) {
+		if(token.type != T_IDENTIFIER) {
+			parse_error_expected("problem while parsing parameter identifier "
+			                     "list", T_IDENTIFIER, 0);
+			return;
+		}
+		next_token();
+		if(token.type != ',')
+			break;
+		next_token();
+	}
+}
+
+static
+void parse_parameter()
+{
+	if(token.type == T_DOTDOTDOT) {
+		next_token();
+		return;
+	}
+
+	declaration_specifiers_t specifiers;
+	memset(&specifiers, 0, sizeof(specifiers));
+
+	parse_declaration_specifiers(&specifiers);
+	specifiers.type = parse_pointer(specifiers.type);
+
+	if(token.type == '(' || token.type == T_IDENTIFIER
+			|| token.type == T_TYPENAME) {
+		declaration_t declaration;
+		memset(&declaration, 0, sizeof(declaration));
+		parse_declarator(&declaration, specifiers.storage_class,
+		                 specifiers.type);
+	}
+}
+
+static
+void parse_parameters()
+{
+	if(token.type == T_IDENTIFIER) {
+		parse_identifier_list();
+		return;
+	}
+
+	while(1) {
+		switch(token.type) {
+		case T_DOTDOTDOT:
+		DECLARATION_START
+			parse_parameter();
+			break;
+		default:
+			return;
+		}
+		if(token.type != ',')
+			return;
+		next_token();
+	}
+}
+
+static
+void parse_attributes(void)
+{
+	while(token.type == T___attribute__) {
+		next_token();
+		fprintf(stderr, "TODO: __attribute__ not handled yet\n");
+
+		expect_void('(');
+		int depth = 1;
+		while(depth > 0) {
+			switch(token.type) {
+			case T_EOF:
+				parse_error("EOF while parsing attribute");
+				break;
+			case '(':
+				next_token();
+				depth++;
+				break;
+			case ')':
+				next_token();
+				depth--;
+				break;
+			default:
+				next_token();
+			}
+		}
+	}
+}
+
+static
+void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
+                      type_t *type)
+{
+	type = parse_pointer(type);
 	declaration->storage_class = storage_class;
 	declaration->type          = type;
 
@@ -676,24 +834,48 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 		expect_void(')');
 		break;
 	default:
-		parse_error("problem while parsing declarator");
+		parse_error_expected("problem while parsing declarator", T_TYPENAME,
+		                     T_IDENTIFIER, '(', 0);
 	}
 
-	if(token.type == '(') {
-		next_token();
+	while(1) {
+		switch(token.type) {
+		case '(':
+			next_token();
 
-		/* parse parameter-type-list or identifier-list */
+			parse_parameters();
 
-		expect_void(')');
-	} else if(token.type == '[') {
-		next_token();
+			expect_void(')');
+			break;
+		case '[':
+			next_token();
 
-		/* multiple type qualifiers, and static */
+			if(token.type == T_static) {
+				next_token();
+			}
 
-		/* assignment_expression or '*' or nothing */
+			unsigned type_qualifiers = parse_type_qualifiers();
+			if(type_qualifiers != 0) {
+				if(token.type == T_static) {
+					next_token();
+				}
+			}
 
-		expect_void(']');
+			if(token.type == '*' /* TODO: && lookahead == ']' */) {
+				next_token();
+			} else if(token.type != ']') {
+				parse_assignment_expression();
+			}
+
+			expect_void(']');
+			break;
+		default:
+			goto declarator_finished;
+		}
 	}
+
+declarator_finished:
+	parse_attributes();
 
 	fprintf(stderr, "Declarator type: ");
 	print_type(stderr, type);
@@ -701,15 +883,17 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 
 	symbol_t *symbol = declaration->symbol;
 
-	environment_entry_t *entry = environment_push(symbol);
-	entry->declaration         = declaration;
-	entry->old_symbol_ID       = symbol->ID;
+	if(symbol != NULL) {
+		environment_entry_t *entry = environment_push(symbol);
+		entry->declaration         = declaration;
+		entry->old_symbol_ID       = symbol->ID;
 
-	if(storage_class == STORAGE_CLASS_TYPEDEF) {
-		symbol->ID       = T_TYPENAME;
-		fprintf(stderr, "typedef '%s'\n", symbol->string);
-	} else {
-		symbol->ID       = T_IDENTIFIER;
+		if(storage_class == STORAGE_CLASS_TYPEDEF) {
+			symbol->ID       = T_TYPENAME;
+			fprintf(stderr, "typedef '%s'\n", symbol->string);
+		} else {
+			symbol->ID       = T_IDENTIFIER;
+		}
 	}
 }
 
@@ -723,7 +907,12 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 		                 specifiers->type);
 		if(token.type == '=') {
 			next_token();
-			// parse_initializer TODO
+			if(token.type == '{') {
+				// TODO
+				expect_void('}');
+			} else {
+				parse_assignment_expression();
+			}
 		} else if(token.type == '{') {
 			parse_compound_statement();
 			return;
@@ -797,6 +986,19 @@ void parse_declaration(void)
 	}
 	parse_init_declarators(&specifiers);
 }
+
+type_t *parse_typename(void)
+{
+	declaration_specifiers_t specifiers;
+	memset(&specifiers, 0, sizeof(specifiers));
+	/* TODO not correct storage class elements are not allowed here */
+	parse_declaration_specifiers(&specifiers);
+
+	specifiers.type = parse_pointer(specifiers.type);
+
+	return specifiers.type;
+}
+
 
 
 
@@ -922,13 +1124,32 @@ expression_t *parse_array_expression(unsigned precedence,
 }
 
 static
+type_t *get_expression_type(const expression_t *expression)
+{
+	(void) expression;
+	/* TODO */
+	return NULL;
+}
+
+static
 expression_t *parse_sizeof(unsigned precedence)
 {
-	(void) precedence;
 	eat(T_sizeof);
-	/* TODO... */
 
-	return NULL;
+	sizeof_expression_t *sizeof_expression
+		= allocate_ast_zero(sizeof(sizeof_expression[0]));
+	sizeof_expression->expression.type = EXPR_SIZEOF;
+
+	if(token.type == '(' /* && LA1 is type_specifier */) {
+		next_token();
+		sizeof_expression->type = parse_typename();
+		expect(')');
+	} else {
+		expression_t *expression = parse_sub_expression(precedence);
+		sizeof_expression->type  = get_expression_type(expression);
+	}
+
+	return (expression_t*) sizeof_expression;
 }
 
 static
@@ -1414,9 +1635,7 @@ statement_t *parse_statement(void)
 		statement = NULL;
 		break;
 
-	STORAGE_CLASSES
-	TYPE_QUALIFIERS
-	TYPE_SPECIFIERS
+	DECLARATION_START
 		statement = parse_declaration_statement();
 		break;
 	}

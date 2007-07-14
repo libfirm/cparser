@@ -40,24 +40,25 @@ void print_atomic_type(FILE *out, const atomic_type_t *type)
 	print_type_qualifiers(out, & type->type);
 
 	switch(type->atype) {
-	case ATOMIC_TYPE_INVALID:   fputs("INVALIDATOMIC", out); break;
-	case ATOMIC_TYPE_VOID:      fputs("void", out); break;
-	case ATOMIC_TYPE_BOOL:      fputs("bool", out); break;
-	case ATOMIC_TYPE_CHAR:      fputs("char", out); break;
-	case ATOMIC_TYPE_SCHAR:     fputs("signed char", out); break;
-	case ATOMIC_TYPE_UCHAR:     fputs("unsigned char", out); break;
-	case ATOMIC_TYPE_INT:       fputs("int", out); break;
-	case ATOMIC_TYPE_UINT:      fputs("unsigned int", out); break;
-	case ATOMIC_TYPE_SHORT:     fputs("short", out); break;
-	case ATOMIC_TYPE_USHORT:    fputs("unsigned short", out); break;
-	case ATOMIC_TYPE_LONG:      fputs("long", out); break;
-	case ATOMIC_TYPE_ULONG:     fputs("unsigned long", out); break;
-	case ATOMIC_TYPE_LONGLONG:  fputs("long long", out); break;
-	case ATOMIC_TYPE_ULONGLONG: fputs("unsigned long long", out); break;
-	case ATOMIC_TYPE_FLOAT:     fputs("float", out); break;
-	case ATOMIC_TYPE_DOUBLE:    fputs("double", out); break;
-	default:                    fputs("UNKNOWNATOMIC", out); break;
+	case ATOMIC_TYPE_INVALID:     fputs("INVALIDATOMIC", out); return;
+	case ATOMIC_TYPE_VOID:        fputs("void", out); return;
+	case ATOMIC_TYPE_BOOL:        fputs("bool", out); return;
+	case ATOMIC_TYPE_CHAR:        fputs("char", out); return;
+	case ATOMIC_TYPE_SCHAR:       fputs("signed char", out); return;
+	case ATOMIC_TYPE_UCHAR:       fputs("unsigned char", out); return;
+	case ATOMIC_TYPE_INT:         fputs("int", out); return;
+	case ATOMIC_TYPE_UINT:        fputs("unsigned int", out); return;
+	case ATOMIC_TYPE_SHORT:       fputs("short", out); return;
+	case ATOMIC_TYPE_USHORT:      fputs("unsigned short", out); return;
+	case ATOMIC_TYPE_LONG:        fputs("long", out); return;
+	case ATOMIC_TYPE_ULONG:       fputs("unsigned long", out); return;
+	case ATOMIC_TYPE_LONGLONG:    fputs("long long", out); return;
+	case ATOMIC_TYPE_ULONGLONG:   fputs("unsigned long long", out); return;
+	case ATOMIC_TYPE_LONG_DOUBLE: fputs("long double", out); return;
+	case ATOMIC_TYPE_FLOAT:       fputs("float", out); return;
+	case ATOMIC_TYPE_DOUBLE:      fputs("double", out); return;
 	}
+	fputs("UNKNOWNATOMIC", out);
 }
 
 static
@@ -108,7 +109,7 @@ void print_type(FILE *out, const type_t *type)
 		return;
 	case TYPE_ENUM:
 		print_type_qualifiers(out, type);
-		fputs("TODO", out);
+		fputs("enum (TODO)", out);
 		return;
 	case TYPE_ATOMIC:
 		print_atomic_type(out, (const atomic_type_t*) type);
@@ -119,6 +120,9 @@ void print_type(FILE *out, const type_t *type)
 		if(((const compound_type_t*) type)->symbol != NULL) {
 			fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
 		}
+		return;
+	case TYPE_BUILTIN:
+		fputs(((builtin_type_t*) type)->symbol->string, out);
 		return;
 	case TYPE_METHOD:
 		print_method_type(out, (const method_type_t*) type);
