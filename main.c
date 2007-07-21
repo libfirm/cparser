@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "lexer_t.h"
+#include "lexer.h"
 #include "token_t.h"
 #include "type_hash.h"
 #include "parser.h"
@@ -63,12 +63,11 @@ void lextest(const char *fname)
 
 	lexer_open_stream(in, fname);
 
-	token_t token;
 	do {
-		lexer_next_preprocessing_token(&token);
-		print_token(stdout, &token);
+		lexer_next_preprocessing_token();
+		print_token(stdout, &lexer_token);
 		puts("");
-	} while(token.type != T_EOF);
+	} while(lexer_token.type != T_EOF);
 
 	fclose(in);
 }

@@ -4,7 +4,7 @@
 #include <stdarg.h>
 
 #include "parser.h"
-#include "lexer_t.h"
+#include "lexer.h"
 #include "token_t.h"
 #include "type_t.h"
 #include "type_hash.h"
@@ -14,15 +14,17 @@
 #include "adt/array.h"
 
 #define PRINT_TOKENS
+#define MAX_LOOKAHEAD 2
 
 struct environment_entry_t {
-	symbol_t            *symbol;
-	environment_entry_t *old_entry;
-	declaration_t       *declaration;
-	unsigned short       old_symbol_ID;
+	symbol_t      *symbol;
+	declaration_t *old_declaration;
+	const void    *old_context;
 };
 
 static token_t               token;
+static token_t               lookahead_buffer[MAX_LOOKAHEAD];
+static int                   lookahead_bufpos;
 static struct obstack        environment_obstack;
 static environment_entry_t **environment_stack = NULL;
 static translation_unit_t   *translation_unit  = NULL;
@@ -55,73 +57,6 @@ void *allocate_type_zero(size_t size)
 }
 
 /**
- * pushs an environment_entry on the environment stack and links the
- * corresponding symbol to the new entry
- */
-static inline
-environment_entry_t *environment_push(symbol_t *symbol)
-{
-	environment_entry_t *entry
-		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
-	memset(entry, 0, sizeof(entry[0]));
-
-	int top = ARR_LEN(environment_stack);
-	ARR_RESIZE(environment_stack, top + 1);
-	environment_stack[top] = entry;
-
-	entry->old_entry = symbol->thing;
-	entry->symbol    = symbol;
-	symbol->thing    = entry;
-
-	return entry;
-}
-
-/**
- * pops symbols from the environment stack until @p new_top is the top element
- */
-static inline
-void environment_pop_to(size_t new_top)
-{
-	environment_entry_t *entry = NULL;
-	size_t top = ARR_LEN(environment_stack);
-	size_t i;
-
-	if(new_top == top)
-		return;
-
-	assert(new_top < top);
-	i = top;
-	do {
-		entry = environment_stack[i - 1];
-
-		symbol_t *symbol = entry->symbol;
-
-#if 0
-		if(entry->type == ENTRY_LOCAL_VARIABLE
-				&& entry->e.variable->refs == 0) {
-			variable_declaration_statement_t *variable = entry->e.variable;
-			print_warning_prefix(env, variable->statement.source_position);
-			fprintf(stderr, "variable '%s' was declared but never read\n",
-			        symbol->string);
-		}
-#endif
-
-		if(entry->declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
-			fprintf(stderr, "pop typename '%s'\n", entry->symbol->string);
-			symbol->ID = entry->old_symbol_ID;
-		}
-
-		assert(symbol->thing == entry);
-		symbol->thing = entry->old_entry;
-
-		--i;
-	} while(i != new_top);
-	obstack_free(&environment_obstack, entry);
-
-	ARR_SHRINKLEN(environment_stack, (int) new_top);
-}
-
-/**
  * returns the top element of the environment stack
  */
 static inline
@@ -135,12 +70,24 @@ size_t environment_top()
 static inline
 void next_token(void)
 {
-	lexer_next_token(&token);
+	token                              = lookahead_buffer[lookahead_bufpos];
+	lookahead_buffer[lookahead_bufpos] = lexer_token;
+	lexer_next_token();
+
+	lookahead_bufpos = (lookahead_bufpos+1) % MAX_LOOKAHEAD;
 
 #ifdef PRINT_TOKENS
 	print_token(stderr, &token);
 	fprintf(stderr, "\n");
 #endif
+}
+
+static inline
+const token_t *la(int num)
+{
+	assert(num > 0 && num <= MAX_LOOKAHEAD);
+	int pos = (num-1) % MAX_LOOKAHEAD;
+	return & lookahead_buffer[pos];
 }
 
 static inline
@@ -150,12 +97,17 @@ void eat(token_type_t type)
 	next_token();
 }
 
-void parser_print_error_prefix(void)
+void parser_print_error_prefix_pos(const source_position_t source_position)
 {
     fputs(source_position.input_name, stderr);
     fputc(':', stderr);
     fprintf(stderr, "%d", source_position.linenr);
     fputs(": error: ", stderr);
+}
+
+void parser_print_error_prefix(void)
+{
+	parser_print_error_prefix_pos(token.source_position);
 }
 
 static
@@ -222,6 +174,75 @@ void eat_until(int token_type)
     }                                              \
     next_token();
 
+
+/**
+ * pushs an environment_entry on the environment stack and links the
+ * corresponding symbol to the new entry
+ */
+static inline
+void environment_push(declaration_t *declaration, const void *context)
+{
+	environment_entry_t *entry
+		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
+	memset(entry, 0, sizeof(entry[0]));
+
+	int top = ARR_LEN(environment_stack);
+	ARR_RESIZE(environment_stack, top + 1);
+	environment_stack[top] = entry;
+
+	symbol_t *symbol = declaration->symbol;
+	assert(declaration != symbol->declaration);
+
+	if(symbol->context == context) {
+		if(context != NULL) {
+			assert(symbol->declaration != NULL);
+			parser_print_error_prefix_pos(declaration->source_position);
+			fprintf(stderr, "multiple definitions for symbol '%s'.\n",
+					symbol->string);
+			parser_print_error_prefix_pos(symbol->declaration->source_position);
+			fprintf(stderr, "this is the location of the previous declaration.\n");
+		}
+	}
+
+	entry->old_declaration = symbol->declaration;
+	entry->old_context     = symbol->context;
+	entry->symbol          = symbol;
+	symbol->declaration    = declaration;
+	symbol->context        = context;
+}
+
+/**
+ * pops symbols from the environment stack until @p new_top is the top element
+ */
+static inline
+void environment_pop_to(size_t new_top)
+{
+	environment_entry_t *entry = NULL;
+	size_t top = ARR_LEN(environment_stack);
+	size_t i;
+
+	if(new_top == top)
+		return;
+
+	assert(new_top < top);
+	i = top;
+	do {
+		entry = environment_stack[i - 1];
+
+		symbol_t *symbol = entry->symbol;
+
+		symbol->declaration = entry->old_declaration;
+		symbol->context     = entry->old_context;
+
+		--i;
+	} while(i != new_top);
+	obstack_free(&environment_obstack, entry);
+
+	ARR_SHRINKLEN(environment_stack, (int) new_top);
+}
+
+
+
 static expression_t *parse_constant_expression(void)
 {
 	/* TODO: not correct yet */
@@ -250,9 +271,9 @@ static type_t *parse_struct_specifier(void)
 
 	compound_type_t *struct_type = allocate_type_zero(sizeof(struct_type[0]));
 	struct_type->type.type       = TYPE_COMPOUND_STRUCT;
-	struct_type->source_position = source_position;
+	struct_type->source_position = token.source_position;
 
-	if(token.type == T_IDENTIFIER || token.type == T_TYPENAME) {
+	if(token.type == T_IDENTIFIER) {
 		/* TODO */
 		next_token();
 		if(token.type == '{') {
@@ -275,7 +296,7 @@ static type_t *parse_union_specifier(void)
 
 	compound_type_t *union_type = allocate_type_zero(sizeof(union_type[0]));
 	union_type->type.type       = TYPE_COMPOUND_UNION;
-	union_type->source_position = source_position;
+	union_type->source_position = token.source_position;
 
 	if(token.type == T_IDENTIFIER) {
 		union_type->symbol = token.v.symbol;
@@ -330,7 +351,7 @@ static type_t *parse_enum_specifier(void)
 
 	enum_type_t *enum_type     = allocate_type_zero(sizeof(enum_type[0]));
 	enum_type->type.type       = TYPE_ENUM;
-	enum_type->source_position = source_position;
+	enum_type->source_position = token.source_position;
 
 	if(token.type == T_IDENTIFIER) {
 		enum_type->symbol = token.v.symbol;
@@ -397,7 +418,6 @@ typedef enum {
 #endif
 
 #define TYPE_SPECIFIERS     \
-	case T_TYPENAME:        \
 	case T_void:            \
 	case T_char:            \
 	case T_short:           \
@@ -413,6 +433,7 @@ typedef enum {
 	case T_enum:            \
 	COMPLEX_SPECIFIERS      \
 	IMAGINARY_SPECIFIERS
+/* TODO: T_IDENTIFIER && typename */
 
 #define DECLARATION_START   \
 	STORAGE_CLASSES         \
@@ -437,9 +458,10 @@ type_t *create_builtin_type(symbol_t *symbol)
 static
 void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t             *type            = NULL;
-	unsigned            type_qualifiers = 0;
-	unsigned            type_specifiers = 0;
+	declaration_t *declaration;
+	type_t        *type            = NULL;
+	unsigned       type_qualifiers = 0;
+	unsigned       type_specifiers = 0;
 
 	while(1) {
 		switch(token.type) {
@@ -515,6 +537,7 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}
 			break;
 
+		/* TODO: if type != NULL for the following rules issue an error */
 		case T_struct:
 			type = parse_struct_specifier();
 			break;
@@ -529,12 +552,14 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			next_token();
 			break;
 
-		case T_TYPENAME:
-			if(type != NULL || type_specifiers != 0) {
+		case T_IDENTIFIER:
+			declaration = token.v.symbol->declaration;
+			if(declaration == NULL ||
+					declaration->storage_class != STORAGE_CLASS_TYPEDEF) {
 				goto finish_specifiers;
 			}
 
-			type = token.v.symbol->thing->declaration->type;
+			type = declaration->type;
 			assert(type != NULL);
 			next_token();
 			break;
@@ -753,8 +778,7 @@ void parse_parameter()
 	parse_declaration_specifiers(&specifiers);
 	specifiers.type = parse_pointer(specifiers.type);
 
-	if(token.type == '(' || token.type == T_IDENTIFIER
-			|| token.type == T_TYPENAME) {
+	if(token.type == '(' || token.type == T_IDENTIFIER) {
 		declaration_t declaration;
 		memset(&declaration, 0, sizeof(declaration));
 		parse_declarator(&declaration, specifiers.storage_class,
@@ -823,7 +847,6 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 	declaration->type          = type;
 
 	switch(token.type) {
-	case T_TYPENAME:
 	case T_IDENTIFIER:
 		declaration->symbol = token.v.symbol;
 		next_token();
@@ -834,8 +857,8 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 		expect_void(')');
 		break;
 	default:
-		parse_error_expected("problem while parsing declarator", T_TYPENAME,
-		                     T_IDENTIFIER, '(', 0);
+		parse_error_expected("problem while parsing declarator", T_IDENTIFIER,
+		                     '(', 0);
 	}
 
 	while(1) {
@@ -884,16 +907,7 @@ declarator_finished:
 	symbol_t *symbol = declaration->symbol;
 
 	if(symbol != NULL) {
-		environment_entry_t *entry = environment_push(symbol);
-		entry->declaration         = declaration;
-		entry->old_symbol_ID       = symbol->ID;
-
-		if(storage_class == STORAGE_CLASS_TYPEDEF) {
-			symbol->ID       = T_TYPENAME;
-			fprintf(stderr, "typedef '%s'\n", symbol->string);
-		} else {
-			symbol->ID       = T_IDENTIFIER;
-		}
+		environment_push(declaration, context);
 	}
 }
 
@@ -1303,7 +1317,7 @@ expression_t *parse_sub_expression(unsigned precedence)
 
 	expression_parser_function_t *parser
 		= &expression_parsers[token.type];
-	source_position_t             source_position = source_position;
+	source_position_t             source_position = token.source_position;
 	expression_t                 *left;
 
 	if(parser->parser != NULL) {
@@ -1444,7 +1458,7 @@ static
 statement_t *parse_label_statement(void)
 {
 	eat(T_IDENTIFIER);
-	expect(';');
+	expect(':');
 	parse_statement();
 
 	return NULL;
@@ -1573,9 +1587,17 @@ statement_t *parse_declaration_statement(void)
 }
 
 static
+statement_t *parse_expression_statement(void)
+{
+	parse_expression();
+	return NULL;
+}
+
+static
 statement_t *parse_statement(void)
 {
-	statement_t *statement = NULL;
+	declaration_t *declaration;
+	statement_t   *statement = NULL;
 
 	/* declaration or statement */
 	switch(token.type) {
@@ -1585,10 +1607,6 @@ statement_t *parse_statement(void)
 
 	case T_default:
 		statement = parse_default_statement();
-		break;
-
-	case T_IDENTIFIER:
-		statement = parse_label_statement();
 		break;
 
 	case '{':
@@ -1633,6 +1651,22 @@ statement_t *parse_statement(void)
 
 	case ';':
 		statement = NULL;
+		break;
+
+	case T_IDENTIFIER:
+		if(la(1)->type == ':') {
+			statement = parse_label_statement();
+			break;
+		}
+
+		declaration = token.v.symbol->declaration;
+		if(declaration != NULL &&
+				declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
+			statement = parse_declaration_statement();
+			break;
+		}
+
+		statement = parse_expression_statement();
 		break;
 
 	DECLARATION_START
@@ -1683,7 +1717,10 @@ translation_unit_t *parse(void)
 	obstack_init(&environment_obstack);
 	environment_stack = NEW_ARR_F(environment_entry_t*, 0);
 
-	next_token();
+	lookahead_bufpos = 0;
+	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
+		next_token();
+	}
 	translation_unit_t *unit = parse_translation_unit();
 
 	DEL_ARR_F(environment_stack);

@@ -1,9 +1,10 @@
 #include <config.h>
 
-#include "lexer_t.h"
+#include "lexer.h"
 #include "token_t.h"
 #include "symbol_table_t.h"
 #include "adt/error.h"
+#include "adt/strset.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -13,15 +14,15 @@
 //#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 
-static int               c;
-source_position_t source_position;
-static FILE             *input;
-static char              buf[1027];
-static const char       *bufend;
-static const char       *bufpos;
-static strset_t          stringset;
-//static FILE            **input_stack;
-//static char            **buf_stack;
+static int         c;
+token_t            lexer_token;
+static FILE       *input;
+static char        buf[1024 + MAX_PUTBACK];
+static const char *bufend;
+static const char *bufpos;
+static strset_t    stringset;
+//static FILE      **input_stack;
+//static char      **buf_stack;
 
 static
 void error_prefix_at(const char *input_name, unsigned linenr)
@@ -30,9 +31,10 @@ void error_prefix_at(const char *input_name, unsigned linenr)
 }
 
 static
-void error_prefix()
+void error_prefix(void)
 {
-	error_prefix_at(source_position.input_name, source_position.linenr);
+	error_prefix_at(lexer_token.source_position.input_name,
+	                lexer_token.source_position.linenr);
 }
 
 static
@@ -43,7 +45,7 @@ void parse_error(const char *msg)
 }
 
 static inline
-void next_char()
+void next_char(void)
 {
 	bufpos++;
 	if(bufpos >= bufend) {
@@ -125,11 +127,11 @@ int replace_trigraph(void)
 		next_char();                           \
 		if(c == '\n')                          \
 			next_char();                       \
-		source_position.linenr++;              \
+		lexer_token.source_position.linenr++;  \
 		newline_code;                          \
 	} else if(c == '\n') {                     \
 		next_char();                           \
-		source_position.linenr++;              \
+		lexer_token.source_position.linenr++;  \
 		newline_code;                          \
 	}
 
@@ -201,7 +203,7 @@ int replace_trigraph(void)
 	case '9':
 
 static
-void parse_symbol(token_t *token)
+void parse_symbol(void)
 {
 	symbol_t *symbol;
 	char     *string;
@@ -247,8 +249,8 @@ end_symbol:
 	string = obstack_finish(&symbol_obstack);
 	symbol = symbol_table_insert(string);
 
-	token->type     = symbol->ID;
-	token->v.symbol = symbol;
+	lexer_token.type     = symbol->ID;
+	lexer_token.v.symbol = symbol;
 
 	if(symbol->string != string) {
 		obstack_free(&symbol_obstack, string);
@@ -256,7 +258,7 @@ end_symbol:
 }
 
 static
-void parse_number_hex(token_t *token)
+void parse_number_hex(void)
 {
 	assert(c == 'x' || c == 'X');
 	next_char();
@@ -265,7 +267,7 @@ void parse_number_hex(token_t *token)
 		!('A' <= c && c <= 'F') &&
 		!('a' <= c && c <= 'f')) {
 		parse_error("premature end of hex number literal");
-		token->type = T_ERROR;
+		lexer_token.type = T_ERROR;
 		return;
 	}
 
@@ -278,8 +280,8 @@ void parse_number_hex(token_t *token)
 		} else if ('a' <= c && c <= 'f') {
 			value = 16 * value + c - 'a' + 10;
 		} else {
-			token->type     = T_INTEGER;
-			token->v.intvalue = value;
+			lexer_token.type     = T_INTEGER;
+			lexer_token.v.intvalue = value;
 			return;
 		}
 		next_char();
@@ -287,7 +289,7 @@ void parse_number_hex(token_t *token)
 }
 
 static
-void parse_number_oct(token_t *token)
+void parse_number_oct(void)
 {
 	assert(c == 'o' || c == 'O');
 	next_char();
@@ -297,8 +299,8 @@ void parse_number_oct(token_t *token)
 		if ('0' <= c && c <= '7') {
 			value = 8 * value + c - '0';
 		} else {
-			token->type     = T_INTEGER;
-			token->v.intvalue = value;
+			lexer_token.type       = T_INTEGER;
+			lexer_token.v.intvalue = value;
 			return;
 		}
 		next_char();
@@ -306,7 +308,7 @@ void parse_number_oct(token_t *token)
 }
 
 static
-void parse_number_dec(token_t *token, int first_char)
+void parse_number_dec(int first_char)
 {
 	int value = 0;
 	if(first_char > 0) {
@@ -318,8 +320,8 @@ void parse_number_dec(token_t *token, int first_char)
 		if (isdigit(c)) {
 			value = 10 * value + c - '0';
 		} else {
-			token->type     = T_INTEGER;
-			token->v.intvalue = value;
+			lexer_token.type       = T_INTEGER;
+			lexer_token.v.intvalue = value;
 			return;
 		}
 		next_char();
@@ -327,7 +329,7 @@ void parse_number_dec(token_t *token, int first_char)
 }
 
 static
-void parse_number(token_t *token)
+void parse_number(void)
 {
 	// TODO check for overflow
 	// TODO check for various invalid inputs sequences
@@ -336,18 +338,18 @@ void parse_number(token_t *token)
 		next_char();
 		switch (c) {
 			case 'X':
-			case 'x': parse_number_hex(token); break;
+			case 'x': parse_number_hex(); break;
 			case 'o':
-			case 'O': parse_number_oct(token); break;
-			default:  parse_number_dec(token, '0');
+			case 'O': parse_number_oct(); break;
+			default:  parse_number_dec('0');
 		}
 	} else {
-		parse_number_dec(token, 0);
+		parse_number_dec(0);
 	}
 }
 
 static
-int parse_escape_sequence()
+int parse_escape_sequence(void)
 {
 	while(1) {
 		int ec = c;
@@ -404,9 +406,9 @@ int parse_escape_sequence()
 }
 
 static
-void parse_string_literal(token_t *token)
+void parse_string_literal(void)
 {
-	unsigned    start_linenr = source_position.linenr;
+	unsigned    start_linenr = lexer_token.source_position.linenr;
 	char       *string;
 	const char *result;
 
@@ -429,9 +431,10 @@ void parse_string_literal(token_t *token)
 			break;
 
 		case EOF:
-			error_prefix_at(source_position.input_name, start_linenr);
+			error_prefix_at(lexer_token.source_position.input_name,
+			                start_linenr);
 			fprintf(stderr, "string has no end\n");
-			token->type = T_ERROR;
+			lexer_token.type = T_ERROR;
 			return;
 
 		case '"':
@@ -459,25 +462,25 @@ end_of_string:
 		obstack_free(&symbol_obstack, string);
 	}
 
-	token->type     = T_STRING_LITERAL;
-	token->v.string = result;
+	lexer_token.type     = T_STRING_LITERAL;
+	lexer_token.v.string = result;
 }
 
-#define MATCH_NEWLINE(code)                 \
-	case '\r':                              \
-		next_char();                        \
-		if(c == '\n') {                     \
-			next_char();                    \
-		}                                   \
-		source_position.linenr++;           \
-		code;                               \
-	case '\n':                              \
-		next_char();                        \
-		source_position.linenr++;           \
+#define MATCH_NEWLINE(code)                   \
+	case '\r':                                \
+		next_char();                          \
+		if(c == '\n') {                       \
+			next_char();                      \
+		}                                     \
+		lexer_token.source_position.linenr++; \
+		code;                                 \
+	case '\n':                                \
+		next_char();                          \
+		lexer_token.source_position.linenr++; \
 		code;
 
 static
-void parse_character_constant(token_t *token)
+void parse_character_constant(void)
 {
 	assert(c == '\'');
 	next_char();
@@ -507,7 +510,7 @@ void parse_character_constant(token_t *token)
 
 		case EOF:
 			parse_error("EOF while parsing character constant");
-			token->type = T_ERROR;
+			lexer_token.type = T_ERROR;
 			return;
 
 		default:
@@ -524,14 +527,14 @@ void parse_character_constant(token_t *token)
 	}
 
 end_of_char_constant:
-	token->type       = T_INTEGER;
-	token->v.intvalue = found_char;
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = found_char;
 }
 
 static
 void skip_multiline_comment(void)
 {
-	unsigned start_linenr = source_position.linenr;
+	unsigned start_linenr = lexer_token.source_position.linenr;
 	int had_star = 0;
 
 	while(1) {
@@ -574,7 +577,8 @@ void skip_multiline_comment(void)
 		MATCH_NEWLINE(had_star = 0; break;)
 
 		case EOF:
-			error_prefix_at(source_position.input_name, start_linenr);
+			error_prefix_at(lexer_token.source_position.input_name,
+			                start_linenr);
 			fprintf(stderr, "at end of file while looking for comment end\n");
 			return;
 		default:
@@ -606,7 +610,7 @@ void skip_line_comment(void)
 			next_char();
 			if(c == '\n') {
 				next_char();
-				source_position.linenr++;
+				lexer_token.source_position.linenr++;
 			}
 			break;
 
@@ -627,7 +631,8 @@ static token_t pp_token;
 static inline
 void next_pp_token(void)
 {
-	lexer_next_preprocessing_token(&pp_token);
+	lexer_next_preprocessing_token();
+	pp_token = lexer_token;
 }
 
 static
@@ -650,10 +655,8 @@ void error_directive(void)
 static
 void define_directive(void)
 {
-	token_t temptoken;
-
-	lexer_next_preprocessing_token(&temptoken);
-	if(temptoken.type != T_IDENTIFIER) {
+	lexer_next_preprocessing_token();
+	if(lexer_token.type != T_IDENTIFIER) {
 		parse_error("expected identifier after #define\n");
 		eat_until_newline();
 	}
@@ -663,8 +666,7 @@ static
 void ifdef_directive(int is_ifndef)
 {
 	(void) is_ifndef;
-	token_t temptoken;
-	lexer_next_preprocessing_token(&temptoken);
+	lexer_next_preprocessing_token();
 	//expect_identifier();
 	//extect_newline();
 }
@@ -681,11 +683,11 @@ void parse_line_directive(void)
 	if(pp_token.type != T_INTEGER) {
 		parse_error("expected integer");
 	} else {
-		source_position.linenr = pp_token.v.intvalue - 1;
+		lexer_token.source_position.linenr = pp_token.v.intvalue - 1;
 		next_pp_token();
 	}
 	if(pp_token.type == T_STRING_LITERAL) {
-		source_position.input_name = pp_token.v.string;
+		lexer_token.source_position.input_name = pp_token.v.string;
 		next_pp_token();
 	}
 
@@ -757,7 +759,7 @@ void parse_preprocessor_directive()
 #define MAYBE(ch, set_type)                                \
 				case ch:                                   \
 					next_char();                           \
-					token->type = set_type;                \
+					lexer_token.type = set_type;           \
 					return;
 
 #define ELSE_CODE(code)                                    \
@@ -777,11 +779,11 @@ void parse_preprocessor_directive()
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
-			token->type = set_type;                        \
+			lexer_token.type = set_type;                   \
 			return;                                        \
 		)
 
-void lexer_next_preprocessing_token(token_t *token)
+void lexer_next_preprocessing_token(void)
 {
 	while(1) {
 		switch(c) {
@@ -791,35 +793,35 @@ void lexer_next_preprocessing_token(token_t *token)
 			break;
 
 		MATCH_NEWLINE(
-			token->type = '\n';
+			lexer_token.type = '\n';
 			return;
 		)
 
 		SYMBOL_CHARS
-			parse_symbol(token);
+			parse_symbol();
 			return;
 
 		DIGITS
-			parse_number(token);
+			parse_number();
 			return;
 
 		case '"':
-			parse_string_literal(token);
+			parse_string_literal();
 			return;
 
 		case '\'':
-			parse_character_constant(token);
+			parse_character_constant();
 			return;
 
 		case '\\':
 			next_char();
 			if(c == '\n') {
 				next_char();
-				source_position.linenr++;
+				lexer_token.source_position.linenr++;
 				break;
 			} else {
 				parse_error("unexpected '\\' found");
-				token->type = T_ERROR;
+				lexer_token.type = T_ERROR;
 			}
 			return;
 
@@ -831,7 +833,7 @@ void lexer_next_preprocessing_token(token_t *token)
 					ELSE_CODE(
 						put_back(c);
 						c = '.';
-						token->type = '.';
+						lexer_token.type = '.';
 						return;
 					)
 			ELSE('.')
@@ -864,12 +866,12 @@ void lexer_next_preprocessing_token(token_t *token)
 				case '*':
 					next_char();
 					skip_multiline_comment();
-					lexer_next_preprocessing_token(token);
+					lexer_next_preprocessing_token();
 					return;
 				case '/':
 					next_char();
 					skip_line_comment();
-					lexer_next_preprocessing_token(token);
+					lexer_next_preprocessing_token();
 					return;
 			ELSE('/')
 		case '%':
@@ -884,7 +886,7 @@ void lexer_next_preprocessing_token(token_t *token)
 							ELSE_CODE(
 								put_back(c);
 								c = '%';
-								token->type = T_PERCENTCOLON;
+								lexer_token.type = T_PERCENTCOLON;
 								return;
 							)
 					ELSE(T_PERCENTCOLON)
@@ -931,7 +933,7 @@ void lexer_next_preprocessing_token(token_t *token)
 			next_char();
 			/* just a simple ? */
 			if(c != '?') {
-				token->type = '?';
+				lexer_token.type = '?';
 				return;
 			}
 			/* might be a trigraph */
@@ -941,7 +943,7 @@ void lexer_next_preprocessing_token(token_t *token)
 			}
 			put_back(c);
 			c = '?';
-			token->type = '?';
+			lexer_token.type = '?';
 			return;
 
 		case '[':
@@ -953,36 +955,36 @@ void lexer_next_preprocessing_token(token_t *token)
 		case '~':
 		case ';':
 		case ',':
-			token->type = c;
+			lexer_token.type = c;
 			next_char();
 			return;
 
 		case EOF:
-			token->type = T_EOF;
+			lexer_token.type = T_EOF;
 			return;
 
 		default:
 			next_char();
 			error_prefix();
 			fprintf(stderr, "unknown character '%c' found\n", c);
-			token->type = T_ERROR;
+			lexer_token.type = T_ERROR;
 			return;
 		}
 	}
 }
 
-void lexer_next_token(token_t *token)
+void lexer_next_token(void)
 {
-	lexer_next_preprocessing_token(token);
-	if(token->type != '\n')
+	lexer_next_preprocessing_token();
+	if(lexer_token.type != '\n')
 		return;
 
 newline_found:
 	do {
-		lexer_next_preprocessing_token(token);
-	} while(token->type == '\n');
+		lexer_next_preprocessing_token();
+	} while(lexer_token.type == '\n');
 
-	if(token->type == '#') {
+	if(lexer_token.type == '#') {
 		parse_preprocessor_directive();
 		goto newline_found;
 	}
@@ -995,9 +997,9 @@ void init_lexer(void)
 
 void lexer_open_stream(FILE *stream, const char *input_name)
 {
-	input                      = stream;
-	source_position.linenr     = 0;
-	source_position.input_name = input_name;
+	input                                  = stream;
+	lexer_token.source_position.linenr     = 0;
+	lexer_token.source_position.input_name = input_name;
 
 	/* we place a virtual '\n' at the beginning so the lexer knows we're at the
 	 * beginning of a line */

@@ -81,9 +81,6 @@ void print_token(FILE *f, const token_t *token)
 	case T_IDENTIFIER:
 		fprintf(f, "symbol '%s'", token->v.symbol->string);
 		break;
-	case T_TYPENAME:
-		fprintf(f, "typename '%s'", token->v.symbol->string);
-		break;
 	case T_INTEGER:
 		fprintf(f, "integer number %d", token->v.intvalue);
 		break;

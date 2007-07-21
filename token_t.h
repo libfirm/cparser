@@ -24,6 +24,12 @@ typedef enum {
 #undef T
 } preprocessor_token_type_t;
 
+typedef struct source_position_t source_position_t;
+struct source_position_t {
+	const char *input_name;
+	unsigned    linenr;
+};
+
 typedef struct {
 	int type;
 	union {
@@ -31,6 +37,7 @@ typedef struct {
 		int         intvalue;
 		const char *string;
 	} v;
+	source_position_t  source_position;
 } token_t;
 
 void init_tokens(void);

@@ -3,7 +3,7 @@
 
 #include "type.h"
 #include "symbol.h"
-#include "lexer_t.h"
+#include "token_t.h"
 #include "adt/obst.h"
 
 struct obstack *type_obst;

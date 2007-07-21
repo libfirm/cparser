@@ -3,7 +3,7 @@
 
 #include "ast.h"
 #include "symbol.h"
-#include "lexer_t.h"
+#include "token_t.h"
 #include "type.h"
 #include "adt/obst.h"
 
@@ -39,11 +39,9 @@ struct string_literal_t {
 };
 
 struct reference_expression_t {
-	expression_t                      expression;
-	symbol_t                         *symbol;
-	union {
-		declaration_t    *declaration;
-	} r;
+	expression_t    expression;
+	symbol_t       *symbol;
+	declaration_t  *declaration;
 };
 
 struct call_argument_t {

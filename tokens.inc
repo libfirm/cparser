@@ -3,7 +3,6 @@
 #endif
 
 TS(IDENTIFIER,     "identifier", = 256)
-TS(TYPENAME,       "typename",)
 TS(INTEGER,        "integer number",)
 TS(STRING_LITERAL, "string literal",)
 
