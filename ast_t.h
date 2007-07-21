@@ -179,7 +179,7 @@ struct declaration_t {
 
 typedef enum {
 	STATEMENT_INVALID,
-	STATEMENT_BLOCK,
+	STATEMENT_COMPOUND,
 	STATEMENT_RETURN,
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
@@ -199,7 +199,7 @@ struct return_statement_t {
 	expression_t *return_value;
 };
 
-struct block_statement_t {
+struct compound_statement_t {
 	statement_t  statement;
 	statement_t *first_statement;
 };

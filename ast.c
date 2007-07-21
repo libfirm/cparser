@@ -121,8 +121,8 @@ void print_expression(FILE *out, const expression_t *expression)
 }
 
 static
-void print_block_statement(FILE *out, int indent,
-                           const block_statement_t *block)
+void print_compound_statement(FILE *out, int indent,
+                              const compound_statement_t *block)
 {
 	statement_t *statement = block->first_statement;
 	while(statement != NULL) {
@@ -194,9 +194,9 @@ void print_statement(FILE *out, int indent, const statement_t *statement)
 		fprintf(out, "\t");
 
 	switch(statement->type) {
-	case STATEMENT_BLOCK:
-		print_block_statement(out, indent,
-		                      (const block_statement_t*) statement);
+	case STATEMENT_COMPOUND:
+		print_compound_statement(out, indent,
+		                         (const compound_statement_t*) statement);
 		break;
 	case STATEMENT_RETURN:
 		print_return_statement(out, (const return_statement_t*) statement);

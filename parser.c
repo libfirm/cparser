@@ -28,7 +28,7 @@ static int                   lookahead_bufpos;
 static struct obstack        environment_obstack;
 static environment_entry_t **environment_stack = NULL;
 static translation_unit_t   *translation_unit  = NULL;
-static block_statement_t    *context           = NULL;
+static const void           *context           = NULL;
 
 static
 statement_t *parse_compound_statement(void);
@@ -190,11 +190,13 @@ void environment_push(declaration_t *declaration, const void *context)
 	ARR_RESIZE(environment_stack, top + 1);
 	environment_stack[top] = entry;
 
+	assert(declaration->source_position.input_name != NULL);
+
 	symbol_t *symbol = declaration->symbol;
 	assert(declaration != symbol->declaration);
 
 	if(symbol->context == context) {
-		if(context != NULL) {
+		if(symbol->declaration != NULL) {
 			assert(symbol->declaration != NULL);
 			parser_print_error_prefix_pos(declaration->source_position);
 			fprintf(stderr, "multiple definitions for symbol '%s'.\n",
@@ -203,6 +205,8 @@ void environment_push(declaration_t *declaration, const void *context)
 			fprintf(stderr, "this is the location of the previous declaration.\n");
 		}
 	}
+
+	fprintf(stderr, "Set '%s' to %p\n", symbol->string, (void*) declaration);
 
 	entry->old_declaration = symbol->declaration;
 	entry->old_context     = symbol->context;
@@ -258,6 +262,7 @@ static expression_t *parse_assignment_expression(void)
 static compound_entry_t *parse_compound_type_entries(void);
 static void parse_declarator(declaration_t *declaration,
                              storage_class_t storage_class, type_t *type);
+static void maybe_push_declaration(declaration_t *declaration);
 
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
@@ -273,19 +278,30 @@ static type_t *parse_struct_specifier(void)
 	struct_type->type.type       = TYPE_COMPOUND_STRUCT;
 	struct_type->source_position = token.source_position;
 
+	fprintf(stderr, "New struct %p\n", (void*) struct_type);
+
+	int         top          = environment_top();
+	const void *last_context = context;
+	context                  = struct_type;
+
 	if(token.type == T_IDENTIFIER) {
-		/* TODO */
 		next_token();
 		if(token.type == '{') {
 			parse_compound_type_entries();
 		}
+		fprintf(stderr, "Finished struct %p\n",(void*)  struct_type);
 	} else if(token.type == '{') {
 		parse_compound_type_entries();
+		fprintf(stderr, "Finished struct %p\n", (void*) struct_type);
 	} else {
 		parse_error_expected("problem while parsing struct type specifiers",
 		                     T_IDENTIFIER, '{', 0);
-		return NULL;
+		struct_type = NULL;
 	}
+
+	assert(context == struct_type);
+	context = last_context;
+	environment_pop_to(top);
 
 	return (type_t*) struct_type;
 }
@@ -298,6 +314,10 @@ static type_t *parse_union_specifier(void)
 	union_type->type.type       = TYPE_COMPOUND_UNION;
 	union_type->source_position = token.source_position;
 
+	int         top          = environment_top();
+	const void *last_context = context;
+	context                  = union_type;
+
 	if(token.type == T_IDENTIFIER) {
 		union_type->symbol = token.v.symbol;
 		next_token();
@@ -309,7 +329,12 @@ static type_t *parse_union_specifier(void)
 	} else {
 		parse_error_expected("problem while parsing union type specifiers",
 		                     T_IDENTIFIER, '{');
+		union_type = NULL;
 	}
+
+	assert(context == union_type);
+	context = last_context;
+	environment_pop_to(top);
 
 	return (type_t*) union_type;
 }
@@ -433,7 +458,6 @@ typedef enum {
 	case T_enum:            \
 	COMPLEX_SPECIFIERS      \
 	IMAGINARY_SPECIFIERS
-/* TODO: T_IDENTIFIER && typename */
 
 #define DECLARATION_START   \
 	STORAGE_CLASSES         \
@@ -462,6 +486,7 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	type_t        *type            = NULL;
 	unsigned       type_qualifiers = 0;
 	unsigned       type_specifiers = 0;
+	int            newtype         = 0;
 
 	while(1) {
 		switch(token.type) {
@@ -682,6 +707,7 @@ finish_specifiers:
 		atomic_type_t *atype = allocate_type_zero(sizeof(atype[0]));
 		atype->type.type     = TYPE_ATOMIC;
 		atype->atype         = atomic_type;
+		newtype              = 1;
 
 		type = (type_t*) atype;
 	} else {
@@ -693,7 +719,7 @@ finish_specifiers:
 	type->qualifiers = type_qualifiers;
 
 	type_t *result = typehash_insert(type);
-	if(result != (type_t*) type) {
+	if(newtype && result != (type_t*) type) {
 		obstack_free(type_obst, type);
 	}
 
@@ -779,10 +805,10 @@ void parse_parameter()
 	specifiers.type = parse_pointer(specifiers.type);
 
 	if(token.type == '(' || token.type == T_IDENTIFIER) {
-		declaration_t declaration;
-		memset(&declaration, 0, sizeof(declaration));
-		parse_declarator(&declaration, specifiers.storage_class,
+		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+		parse_declarator(declaration, specifiers.storage_class,
 		                 specifiers.type);
+		maybe_push_declaration(declaration);
 	}
 }
 
@@ -790,13 +816,19 @@ static
 void parse_parameters()
 {
 	if(token.type == T_IDENTIFIER) {
-		parse_identifier_list();
-		return;
+		symbol_t      *symbol      = token.v.symbol;
+		declaration_t *declaration = symbol->declaration;
+		if(declaration == NULL
+				|| declaration->storage_class != STORAGE_CLASS_TYPEDEF) {
+			parse_identifier_list();
+			return;
+		}
 	}
 
 	while(1) {
 		switch(token.type) {
 		case T_DOTDOTDOT:
+		case T_IDENTIFIER:
 		DECLARATION_START
 			parse_parameter();
 			break;
@@ -848,7 +880,8 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 
 	switch(token.type) {
 	case T_IDENTIFIER:
-		declaration->symbol = token.v.symbol;
+		declaration->symbol          = token.v.symbol;
+		declaration->source_position = token.source_position;
 		next_token();
 		break;
 	case '(':
@@ -866,7 +899,15 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 		case '(':
 			next_token();
 
+			int         top          = environment_top();
+			const void *last_context = context;
+			context                  = NULL;
+
 			parse_parameters();
+
+			assert(context == NULL);
+			context = last_context;
+			environment_pop_to(top);
 
 			expect_void(')');
 			break;
@@ -884,7 +925,7 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 				}
 			}
 
-			if(token.type == '*' /* TODO: && lookahead == ']' */) {
+			if(token.type == '*' && la(1)->type == ']') {
 				next_token();
 			} else if(token.type != ']') {
 				parse_assignment_expression();
@@ -899,9 +940,14 @@ void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
 
 declarator_finished:
 	parse_attributes();
+}
 
-	fprintf(stderr, "Declarator type: ");
-	print_type(stderr, type);
+static
+void maybe_push_declaration(declaration_t *declaration)
+{
+	fprintf(stderr, "Declarator '%s' type: ",
+			declaration->symbol ? declaration->symbol->string : "");
+	print_type(stderr, declaration->type);
 	fprintf(stderr, "\n");
 
 	symbol_t *symbol = declaration->symbol;
@@ -919,6 +965,7 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 
 		parse_declarator(declaration, specifiers->storage_class,
 		                 specifiers->type);
+		maybe_push_declaration(declaration);
 		if(token.type == '=') {
 			next_token();
 			if(token.type == '{') {
@@ -943,16 +990,19 @@ static
 void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 {
 	while(1) {
-		declaration_t declaration;
+		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+
 		compound_entry_t *entry = allocate_ast_zero(sizeof(entry[0]));
+		entry->declaration = declaration;
 
 		if(token.type == ':') {
 			next_token();
 			parse_constant_expression();
 			/* TODO */
 		} else {
-			parse_declarator(&declaration, specifiers->storage_class,
+			parse_declarator(declaration, specifiers->storage_class,
 			                 specifiers->type);
+			maybe_push_declaration(declaration);
 
 			if(token.type == ':') {
 				next_token();
@@ -1682,12 +1732,20 @@ statement_t *parse_compound_statement(void)
 {
 	eat('{');
 
-	int top = environment_top();
+	compound_statement_t *compound_statement
+		= allocate_ast_zero(sizeof(compound_statement[0]));
+	compound_statement->statement.type = STATEMENT_COMPOUND;
+
+	int         top          = environment_top();
+	const void *last_context = context;
+	context                  = compound_statement;
 
 	while(token.type != '}') {
 		parse_statement();
 	}
 
+	assert(context == compound_statement);
+	context = last_context;
 	environment_pop_to(top);
 
 	next_token();

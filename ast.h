@@ -23,7 +23,7 @@ typedef struct comma_expression_t         comma_expression_t;
 typedef struct declaration_t              declaration_t;
 
 typedef struct statement_t                statement_t;
-typedef struct block_statement_t          block_statement_t;
+typedef struct compound_statement_t       compound_statement_t;
 typedef struct return_statement_t         return_statement_t;
 typedef struct if_statement_t             if_statement_t;
 typedef struct declaration_statement_t    declaration_statement_t;

@@ -96,8 +96,7 @@ struct method_type_t {
 };
 
 struct compound_entry_t {
-	type_t            *type;
-	symbol_t          *symbol;
+	declaration_t     *declaration;
 	compound_entry_t  *next;
 	source_position_t  source_position;
 };
