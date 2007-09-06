@@ -4,6 +4,7 @@
 #include "type.h"
 #include "symbol.h"
 #include "token_t.h"
+#include "ast_t.h"
 #include "adt/obst.h"
 
 struct obstack *type_obst;
@@ -95,16 +96,10 @@ struct method_type_t {
 	const char              *abi_style;
 };
 
-struct compound_entry_t {
-	declaration_t     *declaration;
-	compound_entry_t  *next;
-	source_position_t  source_position;
-};
-
 struct compound_type_t {
 	type_t             type;
-	compound_entry_t  *entries;
 	symbol_t          *symbol;
+	context_t          context;
 	source_position_t  source_position;
 };
 

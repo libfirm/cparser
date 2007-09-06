@@ -37,7 +37,7 @@ void get_output_name(char *buf, size_t buflen, const char *inputname,
 #endif
 
 static
-void compile(const char *fname)
+translation_unit_t *compile(const char *fname)
 {
 	FILE *in = fopen(fname, "r");
 	if(in == NULL) {
@@ -47,9 +47,11 @@ void compile(const char *fname)
 
 	lexer_open_stream(in, fname);
 
-	parse();
+	translation_unit_t *unit = parse();
 
 	fclose(in);
+
+	return unit;
 }
 
 static
@@ -72,6 +74,8 @@ void lextest(const char *fname)
 	fclose(in);
 }
 
+void write_fluffy_decls(translation_unit_t *unit);
+
 int main(int argc, char **argv)
 {
 	init_symbol_table();
@@ -88,7 +92,8 @@ int main(int argc, char **argv)
 	}
 
 	for(int i = 1; i < argc; ++i) {
-		compile(argv[i]);
+		translation_unit_t *unit = compile(argv[i]);
+		write_fluffy_decls(unit);
 	}
 
 	exit_parser();

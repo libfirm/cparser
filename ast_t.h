@@ -22,6 +22,10 @@ typedef enum {
 	EXPR_SIZEOF,
 } expresion_type_t;
 
+struct context_t {
+	declaration_t *declarations;
+};
+
 struct expression_t {
 	expresion_type_t   type;
 	type_t            *datatype;
@@ -39,9 +43,9 @@ struct string_literal_t {
 };
 
 struct reference_expression_t {
-	expression_t    expression;
-	symbol_t       *symbol;
-	declaration_t  *declaration;
+	expression_t   expression;
+	symbol_t      *symbol;
+	declaration_t *declaration;
 };
 
 struct call_argument_t {
@@ -117,11 +121,11 @@ struct binary_expression_t {
 };
 
 struct select_expression_t {
-	expression_t      expression;
-	expression_t     *compound;
-	symbol_t         *symbol;
+	expression_t   expression;
+	expression_t  *compound;
+	symbol_t      *symbol;
 
-	compound_entry_t *compound_entry;
+	declaration_t *compound_entry;
 };
 
 struct array_access_expression_t {
@@ -175,6 +179,9 @@ struct declaration_t {
 	method_parameter_t *parameters;
 	statement_t        *statement;
 	source_position_t   source_position;
+	context_t           context;
+
+	declaration_t      *next;
 };
 
 typedef enum {
@@ -202,6 +209,7 @@ struct return_statement_t {
 struct compound_statement_t {
 	statement_t  statement;
 	statement_t *first_statement;
+	context_t    context;
 };
 
 struct declaration_statement_t {
@@ -235,13 +243,8 @@ struct expression_statement_t {
 	expression_t *expression;
 };
 
-struct unit_entry_t {
-	declaration_t  declaration;
-	unit_entry_t  *next;
-};
-
 struct translation_unit_t {
-	unit_entry_t *entries;
+	context_t context;
 };
 
 static inline

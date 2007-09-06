@@ -121,19 +121,19 @@ int compound_types_equal(const compound_type_t *type1,
 	if(type1->symbol != type2->symbol)
 		return 0;
 
-#if 0
-	struct_entry_t *entry1 = type1->entries;
-	struct_entry_t *entry2 = type2->entries;
+	declaration_t *entry1 = type1->context.declarations;
+	declaration_t *entry2 = type2->context.declarations;
 
 	while(entry1 != NULL && entry2 != NULL) {
 		if(entry1->type != entry2->type)
+			return 0;
+		if(entry1->symbol != entry2->symbol)
 			return 0;
 		entry1 = entry1->next;
 		entry2 = entry2->next;
 	}
 	if(entry1 != NULL || entry2 != NULL)
 		return 0;
-#endif
 
 	return 1;
 }

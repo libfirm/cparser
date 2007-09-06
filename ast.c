@@ -265,20 +265,14 @@ void print_declaration(FILE *out, const declaration_t *declaration)
 	fprintf(out, " %s", declaration->symbol->string);
 }
 
-static
-void print_namespace_entry(FILE *out, const unit_entry_t *entry)
-{
-	print_declaration(out, &entry->declaration);
-}
-
 void print_ast(FILE *out, const translation_unit_t *unit)
 {
-	unit_entry_t *entry = unit->entries;
+	declaration_t *declaration = unit->context.declarations;
 
-	while(entry != NULL) {
-		print_namespace_entry(out, entry);
+	while(declaration != NULL) {
+		print_declaration(out, declaration);
 
-		entry = entry->next;
+		declaration = declaration->next;
 	}
 }
 

@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+typedef struct context_t                  context_t;
+
 typedef struct expression_t               expression_t;
 typedef struct const_t                    const_t;
 typedef struct string_literal_t           string_literal_t;
@@ -31,7 +33,6 @@ typedef struct expression_statement_t     expression_statement_t;
 typedef struct goto_statement_t           goto_statement_t;
 typedef struct label_statement_t          label_statement_t;
 
-typedef struct unit_entry_t               unit_entry_t;
 typedef struct translation_unit_t         translation_unit_t;
 typedef struct method_parameter_t         method_parameter_t;
 typedef struct method_t                   method_t;

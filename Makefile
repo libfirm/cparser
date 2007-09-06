@@ -18,7 +18,8 @@ SOURCES := \
 	symbol_table.c \
 	token.c \
 	type.c \
-	type_hash.c
+	type_hash.c \
+	write_fluffy.c
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
 

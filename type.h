@@ -8,7 +8,6 @@ typedef struct atomic_type_t            atomic_type_t;
 typedef struct pointer_type_t           pointer_type_t;
 typedef struct method_parameter_type_t  method_parameter_type_t;
 typedef struct method_type_t            method_type_t;
-typedef struct compound_entry_t         compound_entry_t;
 typedef struct compound_type_t          compound_type_t;
 typedef struct enum_type_t              enum_type_t;
 typedef struct builtin_type_t           builtin_type_t;
