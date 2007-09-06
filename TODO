@@ -4,3 +4,6 @@ Lexer:
 - octal&hex escape sequences
 - wide string constants
 - proper handling of different file encodings
+
+Parser:
+- proper handling of function pointer types
