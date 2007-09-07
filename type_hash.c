@@ -57,7 +57,6 @@ unsigned hash_method_type(const method_type_t *type)
 		result ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
 	}
-	result ^= hash_ptr(type->abi_style);
 
 	return result;
 }
@@ -118,6 +117,8 @@ static
 int compound_types_equal(const compound_type_t *type1,
                          const compound_type_t *type2)
 {
+	if(type1->type.type != type2->type.type)
+		return 0;
 	if(type1->symbol != type2->symbol)
 		return 0;
 
@@ -142,9 +143,6 @@ static
 int method_types_equal(const method_type_t *type1, const method_type_t *type2)
 {
 	if(type1->result_type != type2->result_type)
-		return 0;
-
-	if(type1->abi_style != type2->abi_style)
 		return 0;
 
 	method_parameter_type_t *param1 = type1->parameter_types;
