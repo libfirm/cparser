@@ -70,9 +70,6 @@ void print_method_type(FILE *out, const method_type_t *type)
 	print_type(out, type->result_type);
 	fputs(" ", out);
 
-	if(type->abi_style != NULL) {
-		fprintf(out, "\"%s\" ", type->abi_style);
-	}
 	fputs("method(", out);
 	method_parameter_type_t *param_type = type->parameter_types;
 	int first = 1;

@@ -86,6 +86,7 @@ struct pointer_type_t {
 
 struct method_parameter_type_t {
 	type_t                  *type;
+	symbol_t                *symbol;
 	method_parameter_type_t *next;
 };
 
@@ -93,7 +94,8 @@ struct method_type_t {
 	type_t                   type;
 	type_t                  *result_type;
 	method_parameter_type_t *parameter_types;
-	const char              *abi_style;
+	int                      variadic;
+	int                      unspecified_parameters;
 };
 
 struct compound_type_t {
