@@ -165,18 +165,10 @@ typedef enum {
 	STORAGE_CLASS_REGISTER
 } storage_class_t;
 
-struct method_parameter_t {
-	method_parameter_t *next;
-	symbol_t           *symbol;
-	type_t             *type;
-	int                 num;
-};
-
 struct declaration_t {
 	storage_class_t     storage_class;
 	type_t             *type;
 	symbol_t           *symbol;
-	method_parameter_t *parameters;
 	statement_t        *statement;
 	source_position_t   source_position;
 	context_t           context;
