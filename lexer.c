@@ -405,6 +405,23 @@ int parse_escape_sequence(void)
 	}
 }
 
+const char *concat_strings(const char *s1, const char *s2)
+{
+	size_t  len1   = strlen(s1);
+	size_t  len2   = strlen(s2);
+
+	char   *concat = obstack_alloc(&symbol_obstack, len1 + len2 + 1);
+	memcpy(concat, s1, len1);
+	memcpy(concat + len1, s2, len2 + 1);
+
+	const char *result = strset_insert(&stringset, concat);
+	if(result != concat) {
+		obstack_free(&symbol_obstack, concat);
+	}
+
+	return result;
+}
+
 static
 void parse_string_literal(void)
 {

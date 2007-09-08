@@ -14,6 +14,7 @@
 #include "adt/array.h"
 
 //#define PRINT_TOKENS
+//#define ABORT_ON_ERROR
 #define MAX_LOOKAHEAD 2
 
 struct environment_entry_t {
@@ -87,7 +88,7 @@ static inline
 const token_t *la(int num)
 {
 	assert(num > 0 && num <= MAX_LOOKAHEAD);
-	int pos = (num-1) % MAX_LOOKAHEAD;
+	int pos = (lookahead_bufpos+num-1) % MAX_LOOKAHEAD;
 	return & lookahead_buffer[pos];
 }
 
@@ -104,6 +105,9 @@ void parser_print_error_prefix_pos(const source_position_t source_position)
     fputc(':', stderr);
     fprintf(stderr, "%d", source_position.linenr);
     fputs(": error: ", stderr);
+#ifdef ABORT_ON_ERROR
+	abort();
+#endif
 }
 
 void parser_print_error_prefix(void)
@@ -860,7 +864,7 @@ void parse_parameters(method_type_t *type)
 		return;
 	}
 
-	declaration_t *declaration;
+	declaration_t           *declaration;
 	method_parameter_type_t *parameter_type;
 	method_parameter_type_t *last_parameter_type = NULL;
 
@@ -897,31 +901,69 @@ void parse_parameters(method_type_t *type)
 }
 
 static
+const char *parse_string_literals(void)
+{
+	assert(token.type == T_STRING_LITERAL);
+	const char *result = token.v.string;
+
+	next_token();
+
+	while(token.type == T_STRING_LITERAL) {
+		result = concat_strings(result, token.v.string);
+		next_token();
+	}
+
+	return result;
+}
+
+static
 void parse_attributes(void)
 {
-	while(token.type == T___attribute__) {
-		next_token();
+	while(1) {
+		switch(token.type) {
+		case T___attribute__:
+			next_token();
 
-		expect_void('(');
-		int depth = 1;
-		while(depth > 0) {
-			switch(token.type) {
-			case T_EOF:
-				parse_error("EOF while parsing attribute");
-				break;
-			case '(':
-				next_token();
-				depth++;
-				break;
-			case ')':
-				next_token();
-				depth--;
-				break;
-			default:
-				next_token();
+			expect_void('(');
+			int depth = 1;
+			while(depth > 0) {
+				switch(token.type) {
+				case T_EOF:
+					parse_error("EOF while parsing attribute");
+					break;
+				case '(':
+					next_token();
+					depth++;
+					break;
+				case ')':
+					next_token();
+					depth--;
+					break;
+				default:
+					next_token();
+				}
 			}
+			break;
+		case T_asm:
+			next_token();
+			expect_void('(');
+			if(token.type != T_STRING_LITERAL) {
+				parse_error_expected("while parsing assembler attribute",
+				                     T_STRING_LITERAL);
+				eat_until(')');
+				break;
+			} else {
+				parse_string_literals();
+			}
+			expect_void(')');
+			break;
+		default:
+			goto attributes_finished;
 		}
 	}
+
+attributes_finished:
+	;
 }
 
 typedef struct declarator_part declarator_part;
@@ -940,6 +982,9 @@ declarator_part *parse_inner_declarator(declaration_t *declaration,
 	memset(part, 0, sizeof(part[0]));
 
 	part->pointers = parse_pointers();
+
+	/* TODO: find out if this is correct */
+	parse_attributes();
 
 	switch(token.type) {
 	case T_IDENTIFIER:
@@ -1226,9 +1271,7 @@ expression_t *parse_string_const(void)
 	string_literal_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 	cnst->expression.type = EXPR_STRING_LITERAL;
-	cnst->value           = token.v.string;
-
-	next_token();
+	cnst->value           = parse_string_literals();
 
 	return (expression_t*) cnst;
 }
@@ -1898,7 +1941,7 @@ statement_t *parse_compound_statement(void)
 
 	statement_t *last_statement = NULL;
 
-	while(token.type != '}') {
+	while(token.type != '}' && token.type != T_EOF) {
 		statement_t *statement = parse_statement();
 
 		if(last_statement != NULL) {

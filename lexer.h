@@ -16,4 +16,6 @@ void exit_lexer(void);
 
 void lexer_open_stream(FILE *stream, const char *input_name);
 
+const char *concat_strings(const char *string1, const char *string2);
+
 #endif
