@@ -72,10 +72,16 @@ struct builtin_type_t {
 	symbol_t *symbol;
 };
 
+struct enum_entry_t {
+	symbol_t     *symbol;
+	expression_t *value;
+	enum_entry_t *next;
+};
+
 struct enum_type_t {
 	type_t             type;
 	symbol_t          *symbol;
-	/* TODO: list of enum members */
+	enum_entry_t      *entries;
 	source_position_t  source_position;
 };
 

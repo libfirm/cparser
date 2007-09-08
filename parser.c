@@ -29,6 +29,7 @@ static struct obstack        environment_obstack;
 static environment_entry_t **environment_stack = NULL;
 static context_t            *context           = NULL;
 static declaration_t        *last_declaration  = NULL;
+static struct obstack        temp_obst;
 
 static
 statement_t *parse_compound_statement(void);
@@ -60,7 +61,7 @@ void *allocate_type_zero(size_t size)
  * returns the top element of the environment stack
  */
 static inline
-size_t environment_top()
+size_t environment_top(void)
 {
 	return ARR_LEN(environment_stack);
 }
@@ -275,7 +276,7 @@ static expression_t *parse_assignment_expression(void)
 static void parse_compound_type_entries(void);
 static void parse_declarator(declaration_t *declaration,
                              storage_class_t storage_class, type_t *type,
-                             int may_omit_identifier);
+                             int may_be_abstract);
 static void maybe_push_declaration(declaration_t *declaration);
 static void record_declaration(declaration_t *declaration);
 
@@ -350,7 +351,7 @@ static type_t *parse_union_specifier(void)
 	return (type_t*) union_type;
 }
 
-static void parse_enum_type_entries()
+static void parse_enum_type_entries(void)
 {
 	eat('{');
 
@@ -738,7 +739,7 @@ finish_specifiers:
 }
 
 static
-unsigned parse_type_qualifiers()
+unsigned parse_type_qualifiers(void)
 {
 	unsigned type_qualifiers = 0;
 
@@ -756,29 +757,44 @@ unsigned parse_type_qualifiers()
 	}
 }
 
+typedef struct parsed_pointer_t parsed_pointer_t;
+struct parsed_pointer_t {
+	unsigned          type_qualifiers;
+	parsed_pointer_t *next;
+};
+
 static
-int parse_pointers(void)
+parsed_pointer_t *parse_pointers(void)
 {
-	int result = 0;
+	parsed_pointer_t *result       = NULL;
+	parsed_pointer_t *last_pointer = NULL;
 
 	while(token.type == '*') {
 		next_token();
-		result++;
+		parsed_pointer_t *pointer
+			= obstack_alloc(&temp_obst, sizeof(pointer[0]));
+		pointer->type_qualifiers = parse_type_qualifiers();
+
+		if(last_pointer != NULL) {
+			last_pointer->next = pointer;
+		} else {
+			result = pointer;
+		}
+		last_pointer = pointer;
 	}
 
 	return result;
 }
 
 static
-type_t *make_pointers(type_t *type, int count)
+type_t *make_pointers(type_t *type, parsed_pointer_t *pointer)
 {
-	for(int i = 0; i < count; ++i) {
+	for( ; pointer != NULL; pointer = pointer->next) {
 		pointer_type_t *pointer_type
 			= allocate_type_zero(sizeof(pointer_type[0]));
-		pointer_type->type.type = TYPE_POINTER;
-		pointer_type->points_to = type;
-
-		pointer_type->type.qualifiers = parse_type_qualifiers();
+		pointer_type->type.type       = TYPE_POINTER;
+		pointer_type->points_to       = type;
+		pointer_type->type.qualifiers = pointer->type_qualifiers;
 
 		type_t *result = typehash_insert((type_t*) pointer_type);
 		if(result != (type_t*) pointer_type) {
@@ -818,13 +834,6 @@ declaration_t *parse_parameter(void)
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
 	parse_declarator(declaration, specifiers.storage_class,
 	                 specifiers.type, 1);
-
-#if 0
-	if(declaration->symbol != NULL) {
-		maybe_push_declaration(declaration);
-		record_declaration(declaration);
-	}
-#endif
 
 	return declaration;
 }
@@ -917,15 +926,15 @@ void parse_attributes(void)
 
 typedef struct declarator_part declarator_part;
 struct declarator_part {
-	int              pointers;
-	method_type_t   *method_type;
-	declarator_part *inner;
+	parsed_pointer_t *pointers;
+	method_type_t    *method_type;
+	declarator_part  *inner;
 };
 
-static struct obstack  temp_obst;
 
 static
-declarator_part *parse_inner_declarator(declaration_t *declaration)
+declarator_part *parse_inner_declarator(declaration_t *declaration,
+                                        int may_be_abstract)
 {
 	declarator_part *part = obstack_alloc(&temp_obst, sizeof(part[0]));
 	memset(part, 0, sizeof(part[0]));
@@ -934,16 +943,22 @@ declarator_part *parse_inner_declarator(declaration_t *declaration)
 
 	switch(token.type) {
 	case T_IDENTIFIER:
-		declaration->symbol          = token.v.symbol;
-		declaration->source_position = token.source_position;
+		if(declaration == NULL) {
+			parse_error("no identifier expected in typename");
+		} else {
+			declaration->symbol          = token.v.symbol;
+			declaration->source_position = token.source_position;
+		}
 		next_token();
 		break;
 	case '(':
 		next_token();
-		part->inner = parse_inner_declarator(declaration);
+		part->inner = parse_inner_declarator(declaration, may_be_abstract);
 		expect(')');
 		break;
 	default:
+		if(may_be_abstract)
+			break;
 		parse_error_expected("problem while parsing declarator", T_IDENTIFIER,
 		                     '(', 0);
 	}
@@ -953,23 +968,11 @@ declarator_part *parse_inner_declarator(declaration_t *declaration)
 		case '(':
 			next_token();
 
-#if 0
-			int         top          = environment_top();
-			context_t  *last_context = context;
-			set_context(&declaration->context);
-#endif
-
 			method_type_t *method_type
 				= allocate_type_zero(sizeof(method_type[0]));
 			method_type->type.type   = TYPE_METHOD;
 
 			parse_parameters(method_type);
-
-#if 0
-			assert(context == &declaration->context);
-			set_context(last_context);
-			environment_pop_to(top);
-#endif
 
 			part->method_type = method_type;
 
@@ -1031,100 +1034,28 @@ type_t *construct_declarator_type(declarator_part *part, type_t *type)
 
 static
 void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
-                      type_t *type, int may_omit_identifier)
+                      type_t *type, int may_be_abstract)
 {
-	(void) may_omit_identifier;
-	declarator_part *part = parse_inner_declarator(declaration);
+	declarator_part *part
+		= parse_inner_declarator(declaration, may_be_abstract);
 
-	declaration->type          = construct_declarator_type(part, type);
-	declaration->storage_class = storage_class;
-	obstack_free(&temp_obst, part);
+	if(part != NULL) {
+		declaration->type          = construct_declarator_type(part, type);
+		declaration->storage_class = storage_class;
+		obstack_free(&temp_obst, part);
+	}
 }
 
-#if 0
 static
-void parse_declarator(declaration_t *declaration, storage_class_t storage_class,
-                      type_t *type, int may_omit_identifier)
+type_t *parse_abstract_declarator(type_t *base_type)
 {
-	ir_type *outer_type = parse_pointers(type);
+	declarator_part *part = parse_inner_declarator(NULL, 1);
 
-	declaration->storage_class = storage_class;
-	declaration->type          = outer_type;
+	type_t *result = construct_declarator_type(part, base_type);
+	obstack_free(&temp_obst, part);
 
-	switch(token.type) {
-	case T_IDENTIFIER:
-		declaration->symbol          = token.v.symbol;
-		declaration->source_position = token.source_position;
-		next_token();
-		break;
-	case '(':
-		next_token();
-		parse_declarator(declaration, storage_class, type, 0);
-		expect_void(')');
-		break;
-	default:
-		if(may_omit_identifier)
-			goto declarator_finished;
-		parse_error_expected("problem while parsing declarator", T_IDENTIFIER,
-		                     '(', 0);
-	}
-
-	while(1) {
-		switch(token.type) {
-		case '(':
-			next_token();
-
-			int         top          = environment_top();
-			context_t  *last_context = context;
-			set_context(&declaration->context);
-
-			method_type_t *method_type
-				= allocate_type_zero(sizeof(method_type[0]));
-			method_type->type.type   = TYPE_METHOD;
-			method_type->result_type = outer_type;
-
-			parse_parameters(method_type);
-
-			assert(context == &declaration->context);
-			set_context(last_context);
-			environment_pop_to(top);
-
-			replace_type(&declaration->type, outer_type,
-			             method_type);
-
-			expect_void(')');
-			break;
-		case '[':
-			next_token();
-
-			if(token.type == T_static) {
-				next_token();
-			}
-
-			unsigned type_qualifiers = parse_type_qualifiers();
-			if(type_qualifiers != 0) {
-				if(token.type == T_static) {
-					next_token();
-				}
-			}
-
-			if(token.type == '*' && la(1)->type == ']') {
-				next_token();
-			} else if(token.type != ']') {
-				parse_assignment_expression();
-			}
-
-			expect_void(']');
-			break;
-		default:
-			goto declarator_finished;
-		}
-	}
-
-declarator_finished:
-	parse_attributes();
+	return result;
 }
-#endif
 
 static void record_declaration(declaration_t *declaration)
 {
@@ -1244,13 +1175,17 @@ type_t *parse_typename(void)
 {
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
-	/* TODO not correct storage class elements are not allowed here */
 	parse_declaration_specifiers(&specifiers);
+	if(specifiers.storage_class != STORAGE_CLASS_NONE) {
+		/* TODO: improve error message, user does probably not know what a
+		 * storage class is...
+		 */
+		parse_error("typename may not have a storage class");
+	}
 
-	int pointers = parse_pointers();
-	specifiers.type = make_pointers(specifiers.type, pointers);
+	type_t *result = parse_abstract_declarator(specifiers.type);
 
-	return specifiers.type;
+	return result;
 }
 
 
@@ -1468,6 +1403,23 @@ expression_t *parse_call_expression(unsigned precedence,
 	return (expression_t*) call;
 }
 
+static
+expression_t *parse_conditional_expression(unsigned precedence,
+                                           expression_t *expression)
+{
+	eat('?');
+
+	conditional_expression_t *conditional
+		= allocate_ast_zero(sizeof(conditional[0]));
+	conditional->condition = expression;
+
+	conditional->true_expression = parse_expression();
+	expect(':');
+	conditional->false_expression = parse_sub_expression(precedence);
+
+	return (expression_t*) conditional;
+}
+
 #define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type)     \
 static                                                                    \
 expression_t *parse_##unexpression_type(unsigned precedence)              \
@@ -1545,6 +1497,8 @@ CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL)
 CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND)
 CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR)
 CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR)
+CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND)
+CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR)
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT)
 
@@ -1650,6 +1604,9 @@ void init_expression_parsers(void)
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_AND, '&',        12);
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_XOR, '^',        11);
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_OR,  '|',        10);
+	register_expression_infix_parser(parse_BINEXPR_LOGICAL_AND, T_ANDAND,    9);
+	register_expression_infix_parser(parse_BINEXPR_LOGICAL_OR,  T_PIPEPIPE,  8);
+	register_expression_infix_parser(parse_conditional_expression, '?',      7);
 	register_expression_infix_parser(parse_BINEXPR_ASSIGN,      T_EQUAL,     2);
 
 	register_expression_infix_parser(parse_array_expression,        '[',    30);
@@ -1797,7 +1754,11 @@ statement_t *parse_continue(void)
 	eat(T_continue);
 	expect(';');
 
-	return NULL;
+	statement_t *statement     = allocate_ast_zero(sizeof(statement[0]));
+	statement->source_position = token.source_position;
+	statement->type            = STATEMENT_CONTINUE;
+
+	return statement;
 }
 
 static
@@ -1813,10 +1774,15 @@ static
 statement_t *parse_return(void)
 {
 	eat(T_return);
-	parse_expression();
+
+	return_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type = STATEMENT_RETURN;
+	if(token.type != ';') {
+		statement->return_value = parse_expression();
+	}
 	expect(';');
 
-	return NULL;
+	return (statement_t*) statement;
 }
 
 static
@@ -1930,8 +1896,17 @@ statement_t *parse_compound_statement(void)
 	context_t *last_context = context;
 	set_context(&compound_statement->context);
 
+	statement_t *last_statement = NULL;
+
 	while(token.type != '}') {
-		parse_statement();
+		statement_t *statement = parse_statement();
+
+		if(last_statement != NULL) {
+			last_statement->next = statement;
+		} else {
+			compound_statement->statements = statement;
+		}
+		last_statement = statement;
 	}
 
 	assert(context == &compound_statement->context);
