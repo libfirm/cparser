@@ -37,7 +37,7 @@ void get_output_name(char *buf, size_t buflen, const char *inputname,
 #endif
 
 static
-translation_unit_t *compile(const char *fname)
+translation_unit_t *do_parsing(const char *fname)
 {
 	FILE *in = fopen(fname, "r");
 	if(in == NULL) {
@@ -91,8 +91,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	if(argc > 2 && strcmp(argv[1], "--print-ast") == 0) {
+		translation_unit_t *unit = do_parsing(argv[2]);
+		ast_set_output(stdout);
+		print_ast(unit);
+		return 0;
+	}
+
 	for(int i = 1; i < argc; ++i) {
-		translation_unit_t *unit = compile(argv[i]);
+		translation_unit_t *unit = do_parsing(argv[i]);
 		write_fluffy_decls(unit);
 	}
 
