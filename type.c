@@ -5,6 +5,10 @@
 
 static struct obstack  _type_obst;
 struct obstack        *type_obst = &_type_obst;
+static FILE           *out;
+
+static void intern_print_type_pre(const type_t *type);
+static void intern_print_type_post(const type_t *type);
 
 void init_types()
 {
@@ -16,8 +20,13 @@ void exit_types()
 	obstack_free(type_obst, NULL);
 }
 
+void type_set_output(FILE *stream)
+{
+	out = stream;
+}
+
 static
-void print_type_qualifiers(FILE *out, const type_t *type)
+void print_type_qualifiers(const type_t *type)
 {
 	unsigned qualifiers = type->qualifiers;
 	if(qualifiers & TYPE_QUALIFIER_CONST) {
@@ -35,9 +44,9 @@ void print_type_qualifiers(FILE *out, const type_t *type)
 }
 
 static
-void print_atomic_type(FILE *out, const atomic_type_t *type)
+void print_atomic_type(const atomic_type_t *type)
 {
-	print_type_qualifiers(out, & type->type);
+	print_type_qualifiers(& type->type);
 
 	switch(type->atype) {
 	case ATOMIC_TYPE_INVALID:     fputs("INVALIDATOMIC", out); return;
@@ -62,58 +71,80 @@ void print_atomic_type(FILE *out, const atomic_type_t *type)
 }
 
 static
-void print_method_type(FILE *out, const method_type_t *type)
+void print_method_type_pre(const method_type_t *type)
 {
-	print_type_qualifiers(out, & type->type);
+	print_type_qualifiers(& type->type);
 
-	fputs("<", out);
-	print_type(out, type->result_type);
-	fputs(" ", out);
+	intern_print_type_pre(type->result_type);
 
-	fputs("method(", out);
-	method_parameter_type_t *param_type = type->parameter_types;
-	int first = 1;
-	while(param_type != NULL) {
+	/* TODO: don't emit braces if we're the toplevel type... */
+	fputc('(', out);
+}
+
+static
+void print_method_type_post(const method_type_t *type)
+{
+	/* TODO: don't emit braces if we're the toplevel type... */
+	intern_print_type_post(type->result_type);
+	fputc(')', out);
+
+	fputc('(', out);
+
+	method_parameter_type_t *parameter = type->parameter_types;
+	int                      first     = 1;
+	for( ; parameter != NULL; parameter = parameter->next) {
 		if(first) {
 			first = 0;
 		} else {
 			fputs(", ", out);
 		}
-		print_type(out, param_type->type);
-		param_type = param_type->next;
+		print_type(parameter->type, parameter->symbol);
 	}
-	fputs(")>", out);
+	if(type->variadic) {
+		if(first) {
+			first = 0;
+		} else {
+			fputs(", ", out);
+		}
+		fputs("...", out);
+	}
+	if(first && !type->unspecified_parameters) {
+		fputs("void", out);
+	}
+	fputc(')', out);
 }
 
 static
-void print_pointer_type(FILE *out, const pointer_type_t *type)
+void print_pointer_type_pre(const pointer_type_t *type)
 {
-	print_type(out, type->points_to);
+	intern_print_type_pre(type->points_to);
 	fputs("*", out);
-	print_type_qualifiers(out, &type->type);
+	print_type_qualifiers(&type->type);
 }
 
-void print_type(FILE *out, const type_t *type)
+static
+void print_pointer_type_post(const pointer_type_t *type)
 {
-	if(type == NULL) {
-		fputs("nil type", out);
-		return;
-	}
+	intern_print_type_post(type->points_to);
+}
 
+static
+void intern_print_type_pre(const type_t *type)
+{
 	switch(type->type) {
 	case TYPE_INVALID:
 		fputs("invalid", out);
 		return;
 	case TYPE_ENUM:
-		print_type_qualifiers(out, type);
+		print_type_qualifiers(type);
 		fputs("enum (TODO)", out);
 		return;
 	case TYPE_ATOMIC:
-		print_atomic_type(out, (const atomic_type_t*) type);
+		print_atomic_type((const atomic_type_t*) type);
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		print_type_qualifiers(out, type);
+		print_type_qualifiers(type);
 		if(((const compound_type_t*) type)->symbol != NULL) {
 			fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
 		}
@@ -122,13 +153,48 @@ void print_type(FILE *out, const type_t *type)
 		fputs(((builtin_type_t*) type)->symbol->string, out);
 		return;
 	case TYPE_METHOD:
-		print_method_type(out, (const method_type_t*) type);
+		print_method_type_pre((const method_type_t*) type);
 		return;
 	case TYPE_POINTER:
-		print_pointer_type(out, (const pointer_type_t*) type);
+		print_pointer_type_pre((const pointer_type_t*) type);
 		return;
 	}
 	fputs("unknown", out);
+}
+
+static
+void intern_print_type_post(const type_t *type)
+{
+	switch(type->type) {
+	case TYPE_METHOD:
+		print_method_type_post((const method_type_t*) type);
+		return;
+	case TYPE_POINTER:
+		print_pointer_type_post((const pointer_type_t*) type);
+		return;
+	case TYPE_INVALID:
+	case TYPE_ATOMIC:
+	case TYPE_ENUM:
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+	case TYPE_BUILTIN:
+		break;
+	}
+}
+
+void print_type(const type_t *type, const symbol_t *symbol)
+{
+	if(type == NULL) {
+		fputs("nil type", out);
+		return;
+	}
+
+	intern_print_type_pre(type);
+	if(symbol != NULL) {
+		fputc(' ', out);
+		fputs(symbol->string, out);
+	}
+	intern_print_type_post(type);
 }
 
 int type_valid(const type_t *type)
@@ -163,7 +229,10 @@ int is_type_int(const type_t *type)
 static __attribute__((unused))
 void dbg_type(const type_t *type)
 {
-	print_type(stdout,type);
+	FILE *old_out = out;
+	out = stderr;
+	print_type(type, NULL);
 	puts("\n");
-	fflush(stdout);
+	fflush(stderr);
+	out = old_out;
 }
