@@ -183,6 +183,7 @@ typedef enum {
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
 	STATEMENT_EXPRESSION,
+	STATEMENT_CONTINUE,
 	STATEMENT_GOTO,
 	STATEMENT_LABEL
 } statement_type_t;
@@ -200,7 +201,7 @@ struct return_statement_t {
 
 struct compound_statement_t {
 	statement_t  statement;
-	statement_t *first_statement;
+	statement_t *statements;
 	context_t    context;
 };
 

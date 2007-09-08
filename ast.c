@@ -11,23 +11,29 @@
 
 struct obstack ast_obstack;
 
+static FILE *out;
+static int   indent;
+
+static void print_expression(const expression_t *expression);
+static void print_statement(const statement_t *statement);
+
 static
-void print_const(FILE *out, const const_t *cnst)
+void print_const(const const_t *cnst)
 {
 	fprintf(out, "%d", cnst->value);
 }
 
 static
-void print_string_literal(FILE *out, const string_literal_t *string_literal)
+void print_string_literal(const string_literal_t *string_literal)
 {
 	/* TODO escape " and non-printable chars */
 	fprintf(out, "\"%s\"", string_literal->value);
 }
 
 static
-void print_call_expression(FILE *out, const call_expression_t *call)
+void print_call_expression(const call_expression_t *call)
 {
-	print_expression(out, call->method);
+	print_expression(call->method);
 	fprintf(out, "(");
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
@@ -37,7 +43,7 @@ void print_call_expression(FILE *out, const call_expression_t *call)
 		} else {
 			first = 0;
 		}
-		print_expression(out, argument->expression);
+		print_expression(argument->expression);
 
 		argument = argument->next;
 	}
@@ -45,10 +51,10 @@ void print_call_expression(FILE *out, const call_expression_t *call)
 }
 
 static
-void print_binary_expression(FILE *out, const binary_expression_t *binexpr)
+void print_binary_expression(const binary_expression_t *binexpr)
 {
 	fprintf(out, "(");
-	print_expression(out, binexpr->left);
+	print_expression(binexpr->left);
 	fprintf(out, " ");
 	switch(binexpr->type) {
 	case BINEXPR_INVALID:
@@ -87,27 +93,27 @@ void print_binary_expression(FILE *out, const binary_expression_t *binexpr)
 		break;
 	}
 	fprintf(out, " ");
-	print_expression(out, binexpr->right);
+	print_expression(binexpr->right);
 	fprintf(out, ")");
 }
 
-void print_expression(FILE *out, const expression_t *expression)
+void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
 	case EXPR_INVALID:
 		fprintf(out, "*invalid expression*");
 		break;
 	case EXPR_CONST:
-		print_const(out, (const const_t*) expression);
+		print_const((const const_t*) expression);
 		break;
 	case EXPR_STRING_LITERAL:
-		print_string_literal(out, (const string_literal_t*) expression);
+		print_string_literal((const string_literal_t*) expression);
 		break;
 	case EXPR_CALL:
-		print_call_expression(out, (const call_expression_t*) expression);
+		print_call_expression((const call_expression_t*) expression);
 		break;
 	case EXPR_BINARY:
-		print_binary_expression(out, (const binary_expression_t*) expression);
+		print_binary_expression((const binary_expression_t*) expression);
 		break;
 	case EXPR_REFERENCE:
 	case EXPR_UNARY:
@@ -121,34 +127,37 @@ void print_expression(FILE *out, const expression_t *expression)
 }
 
 static
-void print_compound_statement(FILE *out, int indent,
-                              const compound_statement_t *block)
+void print_compound_statement(const compound_statement_t *block)
 {
-	statement_t *statement = block->first_statement;
+	fputs("{\n", out);
+	indent++;
+
+	statement_t *statement = block->statements;
 	while(statement != NULL) {
-		print_statement(out, indent + 1, statement);
+		print_statement(statement);
 
 		statement = statement->next;
 	}
+	indent--;
+	fputs("}\n", out);
 }
 
 static
-void print_return_statement(FILE *out, const return_statement_t *statement)
+void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
 	if(statement->return_value != NULL)
-		print_expression(out, statement->return_value);
+		print_expression(statement->return_value);
 }
 
 static
-void print_expression_statement(FILE *out,
-                                const expression_statement_t *statement)
+void print_expression_statement(const expression_statement_t *statement)
 {
-	print_expression(out, statement->expression);
+	print_expression(statement->expression);
 }
 
 static
-void print_goto_statement(FILE *out, const goto_statement_t *statement)
+void print_goto_statement(const goto_statement_t *statement)
 {
 	fprintf(out, "goto ");
 	if(statement->label != NULL) {
@@ -159,64 +168,60 @@ void print_goto_statement(FILE *out, const goto_statement_t *statement)
 }
 
 static
-void print_label_statement(FILE *out, const label_statement_t *statement)
+void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(out, ":%s", statement->symbol->string);
 }
 
 static
-void print_if_statement(FILE *out, int indent, const if_statement_t *statement)
+void print_if_statement(const if_statement_t *statement)
 {
 	fprintf(out, "if ");
-	print_expression(out, statement->condition);
+	print_expression(statement->condition);
 	fprintf(out, ":\n");
 	if(statement->true_statement != NULL) {
-		print_statement(out, indent, statement->true_statement);
+		print_statement(statement->true_statement);
 	}
 
 	if(statement->false_statement != NULL) {
 		fprintf(out, "else:\n");
-		print_statement(out, indent, statement->false_statement);
+		print_statement(statement->false_statement);
 	}
 }
 
 static
-void print_declaration_statement(FILE *out,
-                                 const declaration_statement_t *statement)
+void print_declaration_statement(const declaration_statement_t *statement)
 {
 	(void) statement;
 	fprintf(out, "*declaration statement*");
 }
 
-void print_statement(FILE *out, int indent, const statement_t *statement)
+void print_statement(const statement_t *statement)
 {
 	for(int i = 0; i < indent; ++i)
 		fprintf(out, "\t");
 
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
-		print_compound_statement(out, indent,
-		                         (const compound_statement_t*) statement);
+		print_compound_statement((const compound_statement_t*) statement);
 		break;
 	case STATEMENT_RETURN:
-		print_return_statement(out, (const return_statement_t*) statement);
+		print_return_statement((const return_statement_t*) statement);
 		break;
 	case STATEMENT_EXPRESSION:
-		print_expression_statement(out,
-		                           (const expression_statement_t*) statement);
+		print_expression_statement((const expression_statement_t*) statement);
 		break;
 	case STATEMENT_LABEL:
-		print_label_statement(out, (const label_statement_t*) statement);
+		print_label_statement((const label_statement_t*) statement);
 		break;
 	case STATEMENT_GOTO:
-		print_goto_statement(out, (const goto_statement_t*) statement);
+		print_goto_statement((const goto_statement_t*) statement);
 		break;
 	case STATEMENT_IF:
-		print_if_statement(out, indent, (const if_statement_t*) statement);
+		print_if_statement((const if_statement_t*) statement);
 		break;
 	case STATEMENT_DECLARATION:
-		print_declaration_statement(out,
-		                            (const declaration_statement_t*) statement);
+		print_declaration_statement((const declaration_statement_t*) statement);
 		break;
 	case STATEMENT_INVALID:
 	default:
@@ -229,7 +234,7 @@ void print_statement(FILE *out, int indent, const statement_t *statement)
 
 #if 0
 static
-void print_method_parameters(FILE *out, const method_parameter_t *parameters,
+void print_method_parameters(const method_parameter_t *parameters,
                              const method_type_t *method_type)
 {
 	fprintf(out, "(");
@@ -245,7 +250,7 @@ void print_method_parameters(FILE *out, const method_parameter_t *parameters,
 			first = 0;
 		}
 
-		print_type(out, parameter_type->type);
+		print_type(parameter_type->type);
 		fprintf(out, " %s", parameter->symbol->string);
 
 		parameter      = parameter->next;
@@ -258,19 +263,20 @@ void print_method_parameters(FILE *out, const method_parameter_t *parameters,
 #endif
 
 static
-void print_declaration(FILE *out, const declaration_t *declaration)
+void print_declaration(const declaration_t *declaration)
 {
-	/* TODO */
-	print_type(out, declaration->type);
-	fprintf(out, " %s", declaration->symbol->string);
+	print_type(declaration->type, declaration->symbol);
+	fprintf(out, "\n");
+	if(declaration->statement != NULL) {
+		print_statement(declaration->statement);
+	}
 }
 
-void print_ast(FILE *out, const translation_unit_t *unit)
+void print_ast(const translation_unit_t *unit)
 {
 	declaration_t *declaration = unit->context.declarations;
-
 	while(declaration != NULL) {
-		print_declaration(out, declaration);
+		print_declaration(declaration);
 
 		declaration = declaration->next;
 	}
@@ -284,6 +290,12 @@ void init_ast(void)
 void exit_ast(void)
 {
 	obstack_free(&ast_obstack, NULL);
+}
+
+void ast_set_output(FILE *stream)
+{
+	out = stream;
+	type_set_output(stream);
 }
 
 void* (allocate_ast) (size_t size)

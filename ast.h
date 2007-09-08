@@ -41,9 +41,8 @@ typedef struct global_variable_t          global_variable_t;
 void  init_ast(void);
 void  exit_ast(void);
 
-void  print_expression(FILE *out, const expression_t *expression);
-void  print_statement(FILE *out, int indent, const statement_t *statement);
-void  print_ast(FILE *out, const translation_unit_t *unit);
+void  ast_set_output(FILE *out);
+void  print_ast(const translation_unit_t *unit);
 void *allocate_ast(size_t size);
 
 #endif
