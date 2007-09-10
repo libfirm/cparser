@@ -26,9 +26,8 @@ void type_set_output(FILE *stream)
 }
 
 static
-void print_type_qualifiers(const type_t *type)
+void print_type_qualifiers(unsigned qualifiers)
 {
-	unsigned qualifiers = type->qualifiers;
 	if(qualifiers & TYPE_QUALIFIER_CONST) {
 		fputs("const ", out);
 	}
@@ -46,7 +45,7 @@ void print_type_qualifiers(const type_t *type)
 static
 void print_atomic_type(const atomic_type_t *type)
 {
-	print_type_qualifiers(& type->type);
+	print_type_qualifiers(type->type.qualifiers);
 
 	switch(type->atype) {
 	case ATOMIC_TYPE_INVALID:     fputs("INVALIDATOMIC", out); return;
@@ -73,7 +72,7 @@ void print_atomic_type(const atomic_type_t *type)
 static
 void print_method_type_pre(const method_type_t *type)
 {
-	print_type_qualifiers(& type->type);
+	print_type_qualifiers(type->type.qualifiers);
 
 	intern_print_type_pre(type->result_type);
 
@@ -119,13 +118,36 @@ void print_pointer_type_pre(const pointer_type_t *type)
 {
 	intern_print_type_pre(type->points_to);
 	fputs("*", out);
-	print_type_qualifiers(&type->type);
+	print_type_qualifiers(type->type.qualifiers);
 }
 
 static
 void print_pointer_type_post(const pointer_type_t *type)
 {
 	intern_print_type_post(type->points_to);
+}
+
+static
+void print_type_enum(const enum_type_t *type)
+{
+	print_type_qualifiers(type->type.qualifiers);
+	if(type->symbol != NULL) {
+		fprintf(out, "enum %s", type->symbol->string);
+	} else {
+		fprintf(out, "enum {\n");
+
+		enum_entry_t *entry = type->entries;
+		for( ; entry != NULL; entry = entry->next) {
+			fprintf(out, "\t%s", entry->symbol->string);
+			if(entry->value != NULL) {
+				fprintf(out, " = ");
+				print_expression(entry->value);
+			}
+			fprintf(out, ",\n");
+		}
+
+		fprintf(out, "} ");
+	}
 }
 
 static
@@ -136,15 +158,14 @@ void intern_print_type_pre(const type_t *type)
 		fputs("invalid", out);
 		return;
 	case TYPE_ENUM:
-		print_type_qualifiers(type);
-		fputs("enum (TODO)", out);
+		print_type_enum((const enum_type_t*) type);
 		return;
 	case TYPE_ATOMIC:
 		print_atomic_type((const atomic_type_t*) type);
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		print_type_qualifiers(type);
+		print_type_qualifiers(type->qualifiers);
 		if(((const compound_type_t*) type)->symbol != NULL) {
 			fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
 		}

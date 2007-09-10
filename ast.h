@@ -42,6 +42,7 @@ void  init_ast(void);
 void  exit_ast(void);
 
 void  ast_set_output(FILE *out);
+void  print_expression(const expression_t *expression);
 void  print_ast(const translation_unit_t *unit);
 void *allocate_ast(size_t size);
 

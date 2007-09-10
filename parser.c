@@ -355,35 +355,48 @@ static type_t *parse_union_specifier(void)
 	return (type_t*) union_type;
 }
 
-static void parse_enum_type_entries(void)
+static enum_entry_t *parse_enum_type_entries(void)
 {
 	eat('{');
 
 	if(token.type == '}') {
 		next_token();
 		parse_error("empty enum not allowed");
-		return;
+		return NULL;
 	}
 
+	enum_entry_t *result     = NULL;
+	enum_entry_t *last_entry = NULL;
 	do {
+		enum_entry_t *entry = allocate_ast_zero(sizeof(entry[0]));
 		if(token.type != T_IDENTIFIER) {
 			parse_error_expected("problem while parsing enum entry",
 			                     T_IDENTIFIER, 0);
 			eat_until('}');
-			return;
+			return result;
 		}
+		entry->symbol = token.v.symbol;
 		next_token();
 
 		if(token.type == '=') {
-			parse_constant_expression();
+			next_token();
+			entry->value = parse_constant_expression();
 		}
+
+		if(last_entry != NULL) {
+			last_entry->next = entry;
+		} else {
+			result = entry;
+		}
+		last_entry = entry;
 
 		if(token.type != ',')
 			break;
 		next_token();
 	} while(token.type != '}');
 
-	expect_void('}');
+	expect('}');
+	return result;
 }
 
 static type_t *parse_enum_specifier(void)
@@ -398,16 +411,82 @@ static type_t *parse_enum_specifier(void)
 		enum_type->symbol = token.v.symbol;
 		next_token();
 		if(token.type == '{') {
-			parse_enum_type_entries();
+			enum_type->entries = parse_enum_type_entries();
 		}
 	} else if(token.type == '{') {
-		parse_enum_type_entries();
+		enum_type->entries = parse_enum_type_entries();
 	} else {
 		parse_error_expected("problem while parsing enum type specifiers",
 		                     T_IDENTIFIER, '{');
 	}
 
 	return (type_t*) enum_type;
+}
+
+static
+const char *parse_string_literals(void)
+{
+	assert(token.type == T_STRING_LITERAL);
+	const char *result = token.v.string;
+
+	next_token();
+
+	while(token.type == T_STRING_LITERAL) {
+		result = concat_strings(result, token.v.string);
+		next_token();
+	}
+
+	return result;
+}
+
+static
+void parse_attributes(void)
+{
+	while(1) {
+		switch(token.type) {
+		case T___attribute__:
+			next_token();
+
+			expect_void('(');
+			int depth = 1;
+			while(depth > 0) {
+				switch(token.type) {
+				case T_EOF:
+					parse_error("EOF while parsing attribute");
+					break;
+				case '(':
+					next_token();
+					depth++;
+					break;
+				case ')':
+					next_token();
+					depth--;
+					break;
+				default:
+					next_token();
+				}
+			}
+			break;
+		case T_asm:
+			next_token();
+			expect_void('(');
+			if(token.type != T_STRING_LITERAL) {
+				parse_error_expected("while parsing assembler attribute",
+				                     T_STRING_LITERAL);
+				eat_until(')');
+				break;
+			} else {
+				parse_string_literals();
+			}
+			expect_void(')');
+			break;
+		default:
+			goto attributes_finished;
+		}
+	}
+
+attributes_finished:
+	;
 }
 
 typedef enum {
@@ -591,6 +670,11 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T___builtin_va_list:
 			type = create_builtin_type(token.v.symbol);
 			next_token();
+			break;
+
+		case T___attribute__:
+			/* TODO */
+			parse_attributes();
 			break;
 
 		case T_IDENTIFIER:
@@ -898,72 +982,6 @@ void parse_parameters(method_type_t *type)
 			return;
 		next_token();
 	}
-}
-
-static
-const char *parse_string_literals(void)
-{
-	assert(token.type == T_STRING_LITERAL);
-	const char *result = token.v.string;
-
-	next_token();
-
-	while(token.type == T_STRING_LITERAL) {
-		result = concat_strings(result, token.v.string);
-		next_token();
-	}
-
-	return result;
-}
-
-static
-void parse_attributes(void)
-{
-	while(1) {
-		switch(token.type) {
-		case T___attribute__:
-			next_token();
-
-			expect_void('(');
-			int depth = 1;
-			while(depth > 0) {
-				switch(token.type) {
-				case T_EOF:
-					parse_error("EOF while parsing attribute");
-					break;
-				case '(':
-					next_token();
-					depth++;
-					break;
-				case ')':
-					next_token();
-					depth--;
-					break;
-				default:
-					next_token();
-				}
-			}
-			break;
-		case T_asm:
-			next_token();
-			expect_void('(');
-			if(token.type != T_STRING_LITERAL) {
-				parse_error_expected("while parsing assembler attribute",
-				                     T_STRING_LITERAL);
-				eat_until(')');
-				break;
-			} else {
-				parse_string_literals();
-			}
-			expect_void(')');
-			break;
-		default:
-			goto attributes_finished;
-		}
-	}
-
-attributes_finished:
-	;
 }
 
 typedef struct declarator_part declarator_part;
@@ -1303,9 +1321,42 @@ expression_t *parse_reference(void)
 }
 
 static
+expression_t *parse_cast(void)
+{
+	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
+
+	cast->expression.type            = EXPR_UNARY;
+	cast->type                       = UNEXPR_CAST;
+	cast->expression.source_position = token.source_position;
+
+	type_t *type  = parse_typename();
+
+	expect(')');
+	expression_t *value = parse_sub_expression(20);
+
+	cast->expression.datatype = type;
+	cast->value               = value;
+
+	return (expression_t*) cast;
+}
+
+static
 expression_t *parse_brace_expression(void)
 {
 	eat('(');
+
+	declaration_t *declaration;
+	switch(token.type) {
+	TYPE_QUALIFIERS
+	TYPE_SPECIFIERS
+		return parse_cast();
+	case T_IDENTIFIER:
+		declaration = token.v.symbol->declaration;
+		if(declaration != NULL &&
+				(declaration->storage_class & STORAGE_CLASS_TYPEDEF)) {
+			return parse_cast();
+		}
+	}
 
 	expression_t *result = parse_expression();
 	expect(')');

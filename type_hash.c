@@ -169,8 +169,22 @@ int pointer_types_equal(const pointer_type_t *type1,
 static
 int enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
 {
-	/* TODO */
-	return type1->symbol == type2->symbol;
+	if(type1->symbol != NULL && type1->symbol == type2->symbol)
+		return 1;
+
+	enum_entry_t *entry1 = type1->entries;
+	enum_entry_t *entry2 = type2->entries;
+	while(entry1 != NULL && entry2 != NULL) {
+		if(entry1->symbol != entry2->symbol)
+			return 0;
+		/* TODO: compare expressions */
+		entry1 = entry1->next;
+		entry2 = entry2->next;
+	}
+	if(entry1 != NULL || entry2 != NULL)
+		return 0;
+
+	return 1;
 }
 
 static

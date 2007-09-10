@@ -14,7 +14,6 @@ struct obstack ast_obstack;
 static FILE *out;
 static int   indent;
 
-static void print_expression(const expression_t *expression);
 static void print_statement(const statement_t *statement);
 
 static
@@ -263,12 +262,29 @@ void print_method_parameters(const method_parameter_t *parameters,
 #endif
 
 static
+void print_storage_class(storage_class_t storage_class)
+{
+	switch(storage_class) {
+	case STORAGE_CLASS_NONE:
+		break;
+	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ", out); break;
+	case STORAGE_CLASS_EXTERN:   fputs("extern ", out); break;
+	case STORAGE_CLASS_STATIC:   fputs("static ", out); break;
+	case STORAGE_CLASS_AUTO:     fputs("auto ", out); break;
+	case STORAGE_CLASS_REGISTER: fputs("register ", out); break;
+	}
+}
+
+static
 void print_declaration(const declaration_t *declaration)
 {
+	print_storage_class(declaration->storage_class);
 	print_type(declaration->type, declaration->symbol);
-	fprintf(out, "\n");
 	if(declaration->statement != NULL) {
+		fprintf(out, "\n");
 		print_statement(declaration->statement);
+	} else {
+		fprintf(out, ";\n");
 	}
 }
 

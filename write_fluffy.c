@@ -138,7 +138,6 @@ static void write_struct_entry(const declaration_t *declaration)
 
 static void write_struct(const symbol_t *symbol, const compound_type_t *type)
 {
-	(void) type;
 	fprintf(out, "struct %s:\n", symbol->string);
 
 	const declaration_t *declaration = type->context.declarations;
@@ -147,6 +146,69 @@ static void write_struct(const symbol_t *symbol, const compound_type_t *type)
 		declaration = declaration->next;
 	}
 
+	fprintf(out, "\n");
+}
+
+static void write_union(const symbol_t *symbol, const compound_type_t *type)
+{
+	fprintf(out, "union %s:\n", symbol->string);
+
+	const declaration_t *declaration = type->context.declarations;
+	while(declaration != NULL) {
+		write_struct_entry(declaration);
+		declaration = declaration->next;
+	}
+
+	fprintf(out, "\n");
+}
+
+static void write_expression(const expression_t *expression);
+
+static void write_unary_expression(const unary_expression_t *expression)
+{
+	switch(expression->type) {
+	case UNEXPR_NEGATE:
+		fputc('-', out);
+		break;
+	case UNEXPR_NOT:
+		fputc('!', out);
+		break;
+	default:
+		panic("unimeplemented unary expression found");
+	}
+	write_expression(expression->value);
+}
+
+static void write_expression(const expression_t *expression)
+{
+	const const_t *constant;
+	/* TODO */
+	switch(expression->type) {
+	case EXPR_CONST:
+		constant = (const const_t*) expression;
+		fprintf(out, "%d", constant->value);
+		break;
+	case EXPR_UNARY:
+		write_unary_expression((const unary_expression_t*) expression);
+		break;
+	default:
+		panic("not implemented expression");
+	}
+}
+
+static void write_enum(const symbol_t *symbol, const enum_type_t *type)
+{
+	fprintf(out, "enum %s:\n", symbol->string);
+
+	const enum_entry_t *entry = type->entries;
+	for ( ; entry != NULL; entry = entry->next) {
+		fprintf(out, "\t%s", entry->symbol->string);
+		if(entry->value != NULL) {
+			fprintf(out, " <- ");
+			write_expression(entry->value);
+		}
+		fputc('\n', out);
+	}
 	fprintf(out, "\n");
 }
 
@@ -209,7 +271,7 @@ void write_fluffy_decls(const translation_unit_t *unit)
 
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
-	/* write structs + enums */
+	/* write structs,unions + enums */
 	declaration_t *declaration = unit->context.declarations;
 	while(declaration != NULL) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
@@ -221,7 +283,9 @@ void write_fluffy_decls(const translation_unit_t *unit)
 		if(type->type == TYPE_COMPOUND_STRUCT) {
 			write_struct(declaration->symbol, (compound_type_t*) type);
 		} else if(type->type == TYPE_COMPOUND_UNION) {
-			/* TODO */
+			write_union(declaration->symbol, (compound_type_t*) type);
+		} else if(type->type == TYPE_ENUM) {
+			write_enum(declaration->symbol, (enum_type_t*) type);
 		}
 
 		declaration = declaration->next;
