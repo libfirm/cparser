@@ -85,7 +85,7 @@ void next_token(void)
 }
 
 static inline
-const token_t *la(int num)
+const token_t *look_ahead(int num)
 {
 	assert(num > 0 && num <= MAX_LOOKAHEAD);
 	int pos = (lookahead_bufpos+num-1) % MAX_LOOKAHEAD;
@@ -152,21 +152,60 @@ void parse_error_expected(const char *message, ...)
 	fprintf(stderr, "\n");
 }
 
-static
-void eat_until(int token_type)
+static void eat_block(void)
 {
-	while(token.type != token_type) {
+	if(token.type == '{')
+		next_token();
+
+	while(token.type != '}') {
 		if(token.type == T_EOF)
 			return;
+		if(token.type == '{') {
+			eat_block();
+			continue;
+		}
 		next_token();
 	}
-	next_token();
+	eat('}');
+}
+
+static void eat_statement(void)
+{
+	while(token.type != ';') {
+		if(token.type == T_EOF)
+			return;
+		if(token.type == '}')
+			return;
+		if(token.type == '{') {
+			eat_block();
+			continue;
+		}
+		next_token();
+	}
+	eat(';');
+}
+
+static void eat_brace(void)
+{
+	if(token.type == '(')
+		next_token();
+
+	while(token.type != ')') {
+		if(token.type == T_EOF)
+			return;
+		if(token.type == '{') {
+			eat_block();
+			continue;
+		}
+		next_token();
+	}
+	eat(')');
 }
 
 #define expect(expected)                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
-        eat_until(';');                            \
+        eat_statement();                           \
         return NULL;                               \
     }                                              \
     next_token();
@@ -174,7 +213,7 @@ void eat_until(int token_type)
 #define expect_void(expected)                      \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
-        eat_until(';');                            \
+        eat_statement();                           \
         return;                                    \
     }                                              \
     next_token();
@@ -409,7 +448,7 @@ static enum_entry_t *parse_enum_type_entries(void)
 		if(token.type != T_IDENTIFIER) {
 			parse_error_expected("problem while parsing enum entry",
 			                     T_IDENTIFIER, 0);
-			eat_until('}');
+			eat_block();
 			return result;
 		}
 		entry->symbol = token.v.symbol;
@@ -514,7 +553,7 @@ void parse_attributes(void)
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
 				                     T_STRING_LITERAL);
-				eat_until(')');
+				eat_brace();
 				break;
 			} else {
 				parse_string_literals();
@@ -985,7 +1024,7 @@ declaration_t *parse_parameters(method_type_t *type)
 		type->unspecified_parameters = 1;
 		return NULL;
 	}
-	if(token.type == T_void && la(1)->type == ')') {
+	if(token.type == T_void && look_ahead(1)->type == ')') {
 		next_token();
 		return NULL;
 	}
@@ -1081,7 +1120,10 @@ declarator_part *parse_inner_declarator(declaration_t *declaration,
 				= allocate_type_zero(sizeof(method_type[0]));
 			method_type->type.type   = TYPE_METHOD;
 
-			declaration->context.declarations = parse_parameters(method_type);
+			declaration_t *parameters = parse_parameters(method_type);
+			if(declaration != NULL) {
+				declaration->context.declarations = parameters;
+			}
 
 			part->method_type = method_type;
 
@@ -1103,7 +1145,7 @@ declarator_part *parse_inner_declarator(declaration_t *declaration,
 
 			/* TODO */
 
-			if(token.type == '*' && la(1)->type == ']') {
+			if(token.type == '*' && look_ahead(1)->type == ']') {
 				next_token();
 			} else if(token.type != ']') {
 				parse_assignment_expression();
@@ -1163,6 +1205,9 @@ static
 type_t *parse_abstract_declarator(type_t *base_type)
 {
 	declarator_part *part = parse_inner_declarator(NULL, 1);
+
+	if(part == NULL)
+		return NULL;
 
 	type_t *result = construct_declarator_type(part, base_type);
 	obstack_free(&temp_obst, part);
@@ -1241,7 +1286,22 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
+			int         top          = environment_top();
+			context_t  *last_context = context;
+			set_context(&declaration->context);
+
+			/* push function parameters */
+			declaration_t *parameter = declaration->context.declarations;
+			for( ; parameter != NULL; parameter = parameter->next) {
+				environment_push(parameter, context);
+			}
+
 			statement_t *statement = parse_compound_statement();
+
+			assert(context == &declaration->context);
+			set_context(last_context);
+			environment_pop_to(top);
+
 			declaration->statement = statement;
 			return;
 		}
@@ -1265,7 +1325,7 @@ void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			declaration_t *declaration
 				= allocate_ast_zero(sizeof(declaration[0]));
 			parse_declarator(declaration, specifiers->storage_class,
-			                 specifiers->type, 0);
+			                 specifiers->type, 1);
 
 			/* TODO: check for doubled fields */
 			record_declaration(declaration);
@@ -1394,8 +1454,14 @@ expression_t *parse_reference(void)
 {
 	reference_expression_t *ref = allocate_ast_zero(sizeof(ref[0]));
 
-	ref->expression.type            = EXPR_REFERENCE;
-	ref->symbol                     = token.v.symbol;
+	ref->expression.type = EXPR_REFERENCE;
+	ref->symbol          = token.v.symbol;
+
+	if(ref->symbol->declaration == NULL) {
+		parser_print_error_prefix();
+		fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
+	}
+	ref->declaration     = ref->symbol->declaration;
 
 	next_token();
 
@@ -1460,7 +1526,11 @@ expression_t *parse_primary_expression(void)
 		return parse_brace_expression();
 	}
 
-	/* TODO: error message */
+	parser_print_error_prefix();
+	fprintf(stderr, "unexpected token ");
+	print_token(stderr, &token);
+	fprintf(stderr, "\n");
+	eat_statement();
 	return NULL;
 }
 
@@ -1497,6 +1567,26 @@ type_t *get_expression_type(const expression_t *expression)
 }
 
 static
+int is_type_specifier(const token_t *token)
+{
+	declaration_t *declaration;
+
+	switch(token->type) {
+		TYPE_SPECIFIERS
+			return 1;
+		case T_IDENTIFIER:
+			declaration = token->v.symbol->declaration;
+			if(declaration == NULL)
+				return 0;
+			if(declaration->storage_class != STORAGE_CLASS_TYPEDEF)
+				return 0;
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+static
 expression_t *parse_sizeof(unsigned precedence)
 {
 	eat(T_sizeof);
@@ -1505,7 +1595,7 @@ expression_t *parse_sizeof(unsigned precedence)
 		= allocate_ast_zero(sizeof(sizeof_expression[0]));
 	sizeof_expression->expression.type = EXPR_SIZEOF;
 
-	if(token.type == '(' /* && LA1 is type_specifier */) {
+	if(token.type == '(' && is_type_specifier(look_ahead(1))) {
 		next_token();
 		sizeof_expression->type = parse_typename();
 		expect(')');
@@ -1667,7 +1757,7 @@ CREATE_BINEXPR_PARSER('<', BINEXPR_LESS)
 CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER)
 CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN)
 CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL)
-CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_NOTEQUAL)
+CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, BINEXPR_NOTEQUAL)
 CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL)
 CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL)
 CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND)
@@ -1841,17 +1931,21 @@ static
 statement_t *parse_if(void)
 {
 	eat(T_if);
+
+	if_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type = STATEMENT_IF;
+
 	expect('(');
-	parse_expression();
+	statement->condition = parse_expression();
 	expect(')');
 
-	parse_statement();
+	statement->true_statement = parse_statement();
 	if(token.type == T_else) {
 		next_token();
-		parse_statement();
+		statement->false_statement = parse_statement();
 	}
 
-	return NULL;
+	return (statement_t*) statement;
 }
 
 static
@@ -2032,11 +2126,12 @@ statement_t *parse_statement(void)
 		break;
 
 	case ';':
+		next_token();
 		statement = NULL;
 		break;
 
 	case T_IDENTIFIER:
-		if(la(1)->type == ':') {
+		if(look_ahead(1)->type == ':') {
 			statement = parse_label_statement();
 			break;
 		}
@@ -2053,6 +2148,10 @@ statement_t *parse_statement(void)
 
 	DECLARATION_START
 		statement = parse_declaration_statement();
+		break;
+
+	default:
+		statement = parse_expression_statement();
 		break;
 	}
 

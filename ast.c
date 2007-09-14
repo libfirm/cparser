@@ -16,6 +16,12 @@ static int   indent;
 
 static void print_statement(const statement_t *statement);
 
+static void print_indent(void)
+{
+	for(int i = 0; i < indent; ++i)
+		fprintf(out, "\t");
+}
+
 static
 void print_const(const const_t *cnst)
 {
@@ -96,6 +102,11 @@ void print_binary_expression(const binary_expression_t *binexpr)
 	fprintf(out, ")");
 }
 
+static void print_reference_expression(const reference_expression_t *ref)
+{
+	fprintf(out, "%s", ref->declaration->symbol->string);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -115,6 +126,8 @@ void print_expression(const expression_t *expression)
 		print_binary_expression((const binary_expression_t*) expression);
 		break;
 	case EXPR_REFERENCE:
+		print_reference_expression((const reference_expression_t*) expression);
+		break;
 	case EXPR_UNARY:
 	case EXPR_SELECT:
 	case EXPR_ARRAY_ACCESS:
@@ -133,11 +146,13 @@ void print_compound_statement(const compound_statement_t *block)
 
 	statement_t *statement = block->statements;
 	while(statement != NULL) {
+		print_indent();
 		print_statement(statement);
 
 		statement = statement->next;
 	}
 	indent--;
+	print_indent();
 	fputs("}\n", out);
 }
 
@@ -147,6 +162,7 @@ void print_return_statement(const return_statement_t *statement)
 	fprintf(out, "return ");
 	if(statement->return_value != NULL)
 		print_expression(statement->return_value);
+	fputs(";\n", out);
 }
 
 static
@@ -164,26 +180,28 @@ void print_goto_statement(const goto_statement_t *statement)
 	} else {
 		fprintf(out, "?%s", statement->label_symbol->string);
 	}
+	fputs(";\n", out);
 }
 
 static
 void print_label_statement(const label_statement_t *statement)
 {
-	fprintf(out, ":%s", statement->symbol->string);
+	fprintf(out, "%s:\n", statement->symbol->string);
 }
 
 static
 void print_if_statement(const if_statement_t *statement)
 {
-	fprintf(out, "if ");
+	fprintf(out, "if(");
 	print_expression(statement->condition);
-	fprintf(out, ":\n");
+	fprintf(out, ") ");
 	if(statement->true_statement != NULL) {
 		print_statement(statement->true_statement);
 	}
 
 	if(statement->false_statement != NULL) {
-		fprintf(out, "else:\n");
+		print_indent();
+		fprintf(out, "else ");
 		print_statement(statement->false_statement);
 	}
 }
@@ -197,9 +215,6 @@ void print_declaration_statement(const declaration_statement_t *statement)
 
 void print_statement(const statement_t *statement)
 {
-	for(int i = 0; i < indent; ++i)
-		fprintf(out, "\t");
-
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
 		print_compound_statement((const compound_statement_t*) statement);
@@ -228,7 +243,6 @@ void print_statement(const statement_t *statement)
 		break;
 
 	}
-	fprintf(out, "\n");
 }
 
 #if 0
@@ -281,7 +295,7 @@ void print_declaration(const declaration_t *declaration)
 	print_storage_class(declaration->storage_class);
 	print_type(declaration->type, declaration->symbol);
 	if(declaration->statement != NULL) {
-		fprintf(out, "\n");
+		fputs("\n", out);
 		print_statement(declaration->statement);
 	} else {
 		fprintf(out, ";\n");
