@@ -52,9 +52,9 @@ unsigned hash_method_type(const method_type_t *type)
 {
 	unsigned result = hash_ptr(type->result_type);
 
-	method_parameter_type_t *parameter = type->parameter_types;
+	declaration_t *parameter = type->parameters;
 	while(parameter != NULL) {
-		result ^= hash_ptr(parameter->type);
+		result ^= hash_ptr(parameter);
 		parameter = parameter->next;
 	}
 
@@ -145,8 +145,8 @@ int method_types_equal(const method_type_t *type1, const method_type_t *type2)
 	if(type1->result_type != type2->result_type)
 		return 0;
 
-	method_parameter_type_t *param1 = type1->parameter_types;
-	method_parameter_type_t *param2 = type2->parameter_types;
+	declaration_t *param1 = type1->parameters;
+	declaration_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
 		if(param1->type != param2->type)
 			return 0;

@@ -89,8 +89,8 @@ void print_method_type_post(const method_type_t *type)
 
 	fputc('(', out);
 
-	method_parameter_type_t *parameter = type->parameter_types;
-	int                      first     = 1;
+	declaration_t *parameter = type->parameters;
+	int            first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		if(first) {
 			first = 0;

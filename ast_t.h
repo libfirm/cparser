@@ -171,7 +171,7 @@ struct declaration_t {
 	symbol_t           *symbol;
 	statement_t        *statement;
 	source_position_t   source_position;
-	context_t           context;
+	//context_t           context;
 
 	declaration_t      *next;
 };

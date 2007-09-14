@@ -46,7 +46,7 @@ static void write_pointer_type(const pointer_type_t *type)
 	fputc('*', out);
 }
 
-static void write_compound_type(const compound_type_t *type)
+static declaration_t *find_typedef(const type_t *type)
 {
 	/* first: search for a matching typedef in the global type... */
 	declaration_t *declaration = global_context->declarations;
@@ -55,11 +55,17 @@ static void write_compound_type(const compound_type_t *type)
 			declaration = declaration->next;
 			continue;
 		}
-		if(declaration->type == (type_t*) type)
+		if(declaration->type == type)
 			break;
 		declaration = declaration->next;
 	}
 
+	return declaration;
+}
+
+static void write_compound_type(const compound_type_t *type)
+{
+	declaration_t *declaration = find_typedef((const type_t*) type);
 	if(declaration != NULL) {
 		fprintf(out, "%s", declaration->symbol->string);
 		return;
@@ -75,28 +81,46 @@ static void write_compound_type(const compound_type_t *type)
 	fprintf(out, "/* TODO anonymous struct */byte");
 }
 
+static void write_enum_type(const enum_type_t *type)
+{
+	declaration_t *declaration = find_typedef((const type_t*) type);
+	if(declaration != NULL) {
+		fprintf(out, "%s", declaration->symbol->string);
+		return;
+	}
+
+	/* does the enum have a name? */
+	if(type->symbol != NULL) {
+		/* TODO: make sure we create an enum for it... */
+		fprintf(out, "%s", type->symbol->string);
+		return;
+	}
+	/* TODO: create a struct and use its name here... */
+	fprintf(out, "/* TODO anonymous enum */byte");
+}
+
 static void write_method_type(const method_type_t *type)
 {
 	fprintf(out, "(func(");
 
-	method_parameter_type_t *parameter_type = type->parameter_types;
-	int                      first          = 1;
-	while(parameter_type != NULL) {
+	declaration_t *parameter = type->parameters;
+	int            first     = 1;
+	while(parameter != NULL) {
 		if(!first) {
 			fprintf(out, ", ");
 		} else {
 			first = 0;
 		}
 
-		if(parameter_type->symbol != NULL) {
-			fprintf(out, "%s : ", parameter_type->symbol->string);
+		if(parameter->symbol != NULL) {
+			fprintf(out, "%s : ", parameter->symbol->string);
 		} else {
 			/* TODO make up some unused names (or allow _ in fluffy?) */
 			fprintf(out, "_ : ");
 		}
-		write_type(parameter_type->type);
+		write_type(parameter->type);
 
-		parameter_type = parameter_type->next;
+		parameter = parameter->next;
 	}
 
 	fprintf(out, ") : ");
@@ -116,6 +140,9 @@ static void write_type(const type_t *type)
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
 		write_compound_type((const compound_type_t*) type);
+		return;
+	case TYPE_ENUM:
+		write_enum_type((const enum_type_t*) type);
 		return;
 	case TYPE_METHOD:
 		write_method_type((const method_type_t*) type);
@@ -209,6 +236,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 		}
 		fputc('\n', out);
 	}
+	fprintf(out, "typealias %s <- int\n", symbol->string);
 	fprintf(out, "\n");
 }
 
@@ -230,7 +258,9 @@ static void write_function(const declaration_t *declaration)
 	fprintf(out, "func extern %s(",
 	        declaration->symbol->string);
 
-	declaration_t *parameter = declaration->context.declarations;
+	const method_type_t *method_type = (const method_type_t*) declaration->type;
+
+	declaration_t *parameter = method_type->parameters;
 	int            first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		if(!first) {
@@ -245,9 +275,16 @@ static void write_function(const declaration_t *declaration)
 		}
 		write_type(parameter->type);
 	}
+	if(method_type->variadic) {
+		if(!first) {
+			fprintf(out, ", ");
+		} else {
+			first = 0;
+		}
+		fputs("...", out);
+	}
 	fprintf(out, ")");
 
-	const method_type_t *method_type = (const method_type_t*) declaration->type;
 	const type_t        *result_type = method_type->result_type;
 	if(result_type->type != TYPE_ATOMIC ||
 			((const atomic_type_t*) result_type)->atype != ATOMIC_TYPE_VOID) {

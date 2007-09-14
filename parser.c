@@ -948,9 +948,8 @@ void parse_parameters(method_type_t *type)
 		return;
 	}
 
-	declaration_t           *declaration;
-	method_parameter_type_t *parameter_type;
-	method_parameter_type_t *last_parameter_type = NULL;
+	declaration_t *parameter;
+	declaration_t *last_parameter = NULL;
 
 	while(1) {
 		switch(token.type) {
@@ -961,18 +960,14 @@ void parse_parameters(method_type_t *type)
 
 		case T_IDENTIFIER:
 		DECLARATION_START
-			declaration = parse_parameter();
+			parameter = parse_parameter();
 
-			parameter_type = allocate_type_zero(sizeof(parameter_type[0]));
-			parameter_type->type   = declaration->type;
-			parameter_type->symbol = declaration->symbol;
-
-			if(last_parameter_type != NULL) {
-				last_parameter_type->next = parameter_type;
+			if(last_parameter != NULL) {
+				last_parameter->next = parameter;
 			} else {
-				type->parameter_types = parameter_type;
+				type->parameters = parameter;
 			}
-			last_parameter_type = parameter_type;
+			last_parameter = parameter;
 			break;
 
 		default:
