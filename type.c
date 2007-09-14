@@ -89,15 +89,15 @@ void print_method_type_post(const method_type_t *type)
 
 	fputc('(', out);
 
-	declaration_t *parameter = type->parameters;
-	int            first     = 1;
+	method_parameter_t *parameter = type->parameters;
+	int                 first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		if(first) {
 			first = 0;
 		} else {
 			fputs(", ", out);
 		}
-		print_type(parameter->type, parameter->symbol);
+		print_type(parameter->type, NULL);
 	}
 	if(type->variadic) {
 		if(first) {

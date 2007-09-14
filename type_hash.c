@@ -52,7 +52,7 @@ unsigned hash_method_type(const method_type_t *type)
 {
 	unsigned result = hash_ptr(type->result_type);
 
-	declaration_t *parameter = type->parameters;
+	method_parameter_t *parameter = type->parameters;
 	while(parameter != NULL) {
 		result ^= hash_ptr(parameter);
 		parameter = parameter->next;
@@ -122,6 +122,18 @@ int compound_types_equal(const compound_type_t *type1,
 	if(type1->symbol != type2->symbol)
 		return 0;
 
+	if(type1->symbol == NULL) {
+		/* previous tests should already have checked for this */
+		assert(type1 != type2);
+		/* anonymous types are only equal if they are the very same type */
+		return 0;
+	} else {
+		/* non-anonymous types are equal if they have the same symbol */
+		/* TODO: is this correct */
+		return 1;
+	}
+
+#if 0
 	declaration_t *entry1 = type1->context.declarations;
 	declaration_t *entry2 = type2->context.declarations;
 
@@ -135,6 +147,7 @@ int compound_types_equal(const compound_type_t *type1,
 	}
 	if(entry1 != NULL || entry2 != NULL)
 		return 0;
+#endif
 
 	return 1;
 }
@@ -145,8 +158,8 @@ int method_types_equal(const method_type_t *type1, const method_type_t *type2)
 	if(type1->result_type != type2->result_type)
 		return 0;
 
-	declaration_t *param1 = type1->parameters;
-	declaration_t *param2 = type2->parameters;
+	method_parameter_t *param1 = type1->parameters;
+	method_parameter_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
 		if(param1->type != param2->type)
 			return 0;

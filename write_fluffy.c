@@ -103,8 +103,8 @@ static void write_method_type(const method_type_t *type)
 {
 	fprintf(out, "(func(");
 
-	declaration_t *parameter = type->parameters;
-	int            first     = 1;
+	method_parameter_t *parameter = type->parameters;
+	int                 first     = 1;
 	while(parameter != NULL) {
 		if(!first) {
 			fprintf(out, ", ");
@@ -112,12 +112,15 @@ static void write_method_type(const method_type_t *type)
 			first = 0;
 		}
 
+#if 0
 		if(parameter->symbol != NULL) {
 			fprintf(out, "%s : ", parameter->symbol->string);
 		} else {
 			/* TODO make up some unused names (or allow _ in fluffy?) */
 			fprintf(out, "_ : ");
 		}
+#endif
+		fputs("_ : ", out);
 		write_type(parameter->type);
 
 		parameter = parameter->next;
@@ -260,7 +263,7 @@ static void write_function(const declaration_t *declaration)
 
 	const method_type_t *method_type = (const method_type_t*) declaration->type;
 
-	declaration_t *parameter = method_type->parameters;
+	declaration_t *parameter = declaration->context.declarations;
 	int            first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		if(!first) {

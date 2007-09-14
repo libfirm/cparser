@@ -195,6 +195,20 @@ static void set_context(context_t *new_context)
 	last_declaration = declaration;
 }
 
+#if 0
+/**
+ * called when we find a 2nd declarator for an identifier we already have a
+ * declarator for
+ */
+static void multiple_occurence(declaration_t *declaration,
+                              declaration_t *previous)
+{
+	if(declaration->type != previous->type) {
+
+	}
+}
+#endif
+
 /**
  * pushs an environment_entry on the environment stack and links the
  * corresponding symbol to the new entry
@@ -290,69 +304,85 @@ struct declaration_specifiers_t {
 	type_t          *type;
 };
 
-static type_t *parse_struct_specifier(void)
+static compound_type_t *find_compound_type(compound_type_t *types,
+                                           const symbol_t *symbol)
 {
-	eat(T_struct);
-
-	compound_type_t *struct_type = allocate_type_zero(sizeof(struct_type[0]));
-	struct_type->type.type       = TYPE_COMPOUND_STRUCT;
-	struct_type->source_position = token.source_position;
-
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&struct_type->context);
-
-	if(token.type == T_IDENTIFIER) {
-		next_token();
-		if(token.type == '{') {
-			parse_compound_type_entries();
-		}
-	} else if(token.type == '{') {
-		parse_compound_type_entries();
-	} else {
-		parse_error_expected("problem while parsing struct type specifiers",
-		                     T_IDENTIFIER, '{', 0);
-		struct_type = NULL;
+	compound_type_t *type = types;
+	for( ; type != NULL; type = type->next) {
+		if(type->symbol == symbol)
+			return type;
 	}
 
-	assert(context == &struct_type->context);
-	set_context(last_context);
-	environment_pop_to(top);
-
-	return (type_t*) struct_type;
+	return NULL;
 }
 
-static type_t *parse_union_specifier(void)
+static type_t *parse_compound_type_specifier(int is_struct)
 {
-	eat(T_union);
-
-	compound_type_t *union_type = allocate_type_zero(sizeof(union_type[0]));
-	union_type->type.type       = TYPE_COMPOUND_UNION;
-	union_type->source_position = token.source_position;
-
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&union_type->context);
-
-	if(token.type == T_IDENTIFIER) {
-		union_type->symbol = token.v.symbol;
-		next_token();
-		if(token.type == '{') {
-			parse_compound_type_entries();
-		}
-	} else if(token.type == '{') {
-		parse_compound_type_entries();
+	if(is_struct) {
+		eat(T_struct);
 	} else {
-		parse_error_expected("problem while parsing union type specifiers",
-		                     T_IDENTIFIER, '{');
-		union_type = NULL;
+		eat(T_union);
 	}
 
-	assert(context == &union_type->context);
-	set_context(last_context);
-	environment_pop_to(top);
+	symbol_t        *symbol        = NULL;
+	compound_type_t *compound_type = NULL;
 
-	return (type_t*) union_type;
+	if(token.type == T_IDENTIFIER) {
+		symbol = token.v.symbol;
+		next_token();
+
+		if(context != NULL) {
+			if(is_struct) {
+				compound_type = find_compound_type(context->structs, symbol);
+			} else {
+				compound_type = find_compound_type(context->unions, symbol);
+			}
+		}
+	} else if(token.type != '{') {
+		if(is_struct) {
+			parse_error_expected("problem while parsing struct type specifiers",
+			                     T_IDENTIFIER, '{', 0);
+		} else {
+			parse_error_expected("problem while parsing union type specifiers",
+			                     T_IDENTIFIER, '{', 0);
+		}
+
+		return NULL;
+	}
+
+	if(compound_type == NULL) {
+		compound_type = allocate_type_zero(sizeof(compound_type[0]));
+
+		if(is_struct) {
+			compound_type->type.type = TYPE_COMPOUND_STRUCT;
+		} else {
+			compound_type->type.type = TYPE_COMPOUND_UNION;
+		}
+		compound_type->source_position = token.source_position;
+		compound_type->symbol          = symbol;
+	}
+
+	if(token.type == '{') {
+		if(compound_type->defined) {
+			parser_print_error_prefix();
+			fprintf(stderr, "multiple definition of %s %s\n",
+					is_struct ? "struct" : "union", symbol->string);
+			compound_type->context.declarations = NULL;
+		}
+		compound_type->defined = 1;
+
+		int         top          = environment_top();
+		context_t  *last_context = context;
+		set_context(&compound_type->context);
+
+		parse_compound_type_entries();
+
+		assert(context == &compound_type->context);
+		set_context(last_context);
+		environment_pop_to(top);
+	}
+
+	return (type_t*) compound_type;
 }
 
 static enum_entry_t *parse_enum_type_entries(void)
@@ -659,10 +689,10 @@ void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		/* TODO: if type != NULL for the following rules issue an error */
 		case T_struct:
-			type = parse_struct_specifier();
+			type = parse_compound_type_specifier(1);
 			break;
 		case T_union:
-			type = parse_union_specifier();
+			type = parse_compound_type_specifier(0);
 			break;
 		case T_enum:
 			type = parse_enum_specifier();
@@ -927,54 +957,64 @@ declaration_t *parse_parameter(void)
 }
 
 static
-void parse_parameters(method_type_t *type)
+declaration_t *parse_parameters(method_type_t *type)
 {
 	if(token.type == T_IDENTIFIER) {
 		symbol_t      *symbol      = token.v.symbol;
 		declaration_t *declaration = symbol->declaration;
 		if(declaration == NULL
 				|| declaration->storage_class != STORAGE_CLASS_TYPEDEF) {
+			/* TODO */
 			parse_identifier_list();
-			return;
+			return NULL;
 		}
 	}
 
 	if(token.type == ')') {
 		type->unspecified_parameters = 1;
-		return;
+		return NULL;
 	}
 	if(token.type == T_void && la(1)->type == ')') {
 		next_token();
-		return;
+		return NULL;
 	}
 
-	declaration_t *parameter;
-	declaration_t *last_parameter = NULL;
+	declaration_t      *declarations = NULL;
+	declaration_t      *declaration;
+	declaration_t      *last_declaration = NULL;
+	method_parameter_t *parameter;
+	method_parameter_t *last_parameter = NULL;
 
 	while(1) {
 		switch(token.type) {
 		case T_DOTDOTDOT:
 			next_token();
 			type->variadic = 1;
-			return;
+			return declarations;
 
 		case T_IDENTIFIER:
 		DECLARATION_START
-			parameter = parse_parameter();
+			declaration = parse_parameter();
+
+			parameter       = allocate_type_zero(sizeof(parameter[0]));
+			parameter->type = declaration->type;
 
 			if(last_parameter != NULL) {
-				last_parameter->next = parameter;
+				last_declaration->next = declaration;
+				last_parameter->next   = parameter;
 			} else {
 				type->parameters = parameter;
+				declarations     = declaration;
 			}
-			last_parameter = parameter;
+			last_parameter   = parameter;
+			last_declaration = declaration;
 			break;
 
 		default:
-			return;
+			return declarations;
 		}
 		if(token.type != ',')
-			return;
+			return declarations;
 		next_token();
 	}
 }
@@ -1030,7 +1070,7 @@ declarator_part *parse_inner_declarator(declaration_t *declaration,
 				= allocate_type_zero(sizeof(method_type[0]));
 			method_type->type.type   = TYPE_METHOD;
 
-			parse_parameters(method_type);
+			declaration->context.declarations = parse_parameters(method_type);
 
 			part->method_type = method_type;
 
@@ -1152,7 +1192,7 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				// TODO
 				expect_void('}');
 			} else {
-				parse_assignment_expression();
+				declaration->initializer = parse_assignment_expression();
 			}
 		} else if(token.type == '{') {
 			statement_t *statement = parse_compound_statement();

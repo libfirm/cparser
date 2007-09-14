@@ -23,7 +23,10 @@ typedef enum {
 } expresion_type_t;
 
 struct context_t {
-	declaration_t *declarations;
+	declaration_t   *declarations;
+	compound_type_t *structs;
+	compound_type_t *unions;
+	compound_type_t *enums;
 };
 
 struct expression_t {
@@ -170,8 +173,9 @@ struct declaration_t {
 	type_t             *type;
 	symbol_t           *symbol;
 	statement_t        *statement;
+	expression_t       *initializer;
 	source_position_t   source_position;
-	//context_t           context;
+	context_t           context;
 
 	declaration_t      *next;
 };

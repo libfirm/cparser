@@ -34,7 +34,6 @@ typedef struct goto_statement_t           goto_statement_t;
 typedef struct label_statement_t          label_statement_t;
 
 typedef struct translation_unit_t         translation_unit_t;
-typedef struct method_parameter_t         method_parameter_t;
 typedef struct method_t                   method_t;
 typedef struct global_variable_t          global_variable_t;
 

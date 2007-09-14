@@ -83,6 +83,7 @@ struct enum_type_t {
 	symbol_t          *symbol;
 	enum_entry_t      *entries;
 	source_position_t  source_position;
+	enum_type_t       *next;
 };
 
 struct pointer_type_t {
@@ -90,12 +91,17 @@ struct pointer_type_t {
 	type_t  *points_to;
 };
 
+struct method_parameter_t {
+	type_t             *type;
+	method_parameter_t *next;
+};
+
 struct method_type_t {
-	type_t         type;
-	type_t        *result_type;
-	declaration_t *parameters;
-	int            variadic;
-	int            unspecified_parameters;
+	type_t              type;
+	type_t             *result_type;
+	method_parameter_t *parameters;
+	int                 variadic;
+	int                 unspecified_parameters;
 };
 
 struct compound_type_t {
@@ -103,6 +109,8 @@ struct compound_type_t {
 	symbol_t          *symbol;
 	context_t          context;
 	source_position_t  source_position;
+	int                defined;
+	compound_type_t   *next;
 };
 
 #endif
