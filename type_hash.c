@@ -15,6 +15,9 @@
 #undef HashSetIterator
 #undef HashSet
 
+/* TODO: ^= is a bad way of combining hashes since most addresses are very
+ * similar */
+
 static
 unsigned hash_ptr(const void *ptr)
 {
@@ -54,7 +57,7 @@ unsigned hash_method_type(const method_type_t *type)
 
 	method_parameter_t *parameter = type->parameters;
 	while(parameter != NULL) {
-		result ^= hash_ptr(parameter);
+		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
 	}
 
@@ -156,6 +159,10 @@ static
 int method_types_equal(const method_type_t *type1, const method_type_t *type2)
 {
 	if(type1->result_type != type2->result_type)
+		return 0;
+	if(type1->variadic != type2->variadic)
+		return 0;
+	if(type1->unspecified_parameters != type2->unspecified_parameters)
 		return 0;
 
 	method_parameter_t *param1 = type1->parameters;
