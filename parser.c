@@ -195,26 +195,23 @@ static void set_context(context_t *new_context)
 	last_declaration = declaration;
 }
 
-#if 0
 /**
  * called when we find a 2nd declarator for an identifier we already have a
  * declarator for
  */
-static void multiple_occurence(declaration_t *declaration,
-                              declaration_t *previous)
+static int is_compatible_declaration (declaration_t *declaration,
+                                      declaration_t *previous)
 {
-	if(declaration->type != previous->type) {
-
-	}
+	/* TODO: not correct yet */
+	return declaration->type == previous->type;
 }
-#endif
 
 /**
  * pushs an environment_entry on the environment stack and links the
  * corresponding symbol to the new entry
  */
 static inline
-void environment_push(declaration_t *declaration, const void *context)
+declaration_t *environment_push(declaration_t *declaration, const void *context)
 {
 	environment_entry_t *entry
 		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
@@ -230,13 +227,22 @@ void environment_push(declaration_t *declaration, const void *context)
 	assert(declaration != symbol->declaration);
 
 	if(symbol->context == context) {
+		declaration_t *previous_declaration = symbol->declaration;
 		if(symbol->declaration != NULL) {
-			assert(symbol->declaration != NULL);
-			parser_print_error_prefix_pos(declaration->source_position);
-			fprintf(stderr, "multiple definitions for symbol '%s'.\n",
-					symbol->string);
-			parser_print_error_prefix_pos(symbol->declaration->source_position);
-			fprintf(stderr, "this is the location of the previous declaration.\n");
+			if(!is_compatible_declaration(declaration, previous_declaration)) {
+				parser_print_error_prefix_pos(declaration->source_position);
+				fprintf(stderr, "definition of symbol '%s' with type ",
+				        declaration->symbol->string);
+				print_type(declaration->type, NULL);
+				fputc('\n', stderr);
+				parser_print_error_prefix_pos(
+						previous_declaration->source_position);
+				fprintf(stderr, "is incompatible with previous declaration "
+				        "of type ");
+				print_type(previous_declaration->type, NULL);
+				fputc('\n', stderr);
+			}
+			return previous_declaration;
 		}
 	}
 
@@ -245,6 +251,8 @@ void environment_push(declaration_t *declaration, const void *context)
 	entry->symbol          = symbol;
 	symbol->declaration    = declaration;
 	symbol->context        = context;
+
+	return declaration;
 }
 
 /**
@@ -295,8 +303,7 @@ static void parse_compound_type_entries(void);
 static void parse_declarator(declaration_t *declaration,
                              storage_class_t storage_class, type_t *type,
                              int may_be_abstract);
-static void maybe_push_declaration(declaration_t *declaration);
-static void record_declaration(declaration_t *declaration);
+static declaration_t *record_declaration(declaration_t *declaration);
 
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
@@ -436,6 +443,10 @@ static type_t *parse_enum_specifier(void)
 	enum_type_t *enum_type     = allocate_type_zero(sizeof(enum_type[0]));
 	enum_type->type.type       = TYPE_ENUM;
 	enum_type->source_position = token.source_position;
+
+	/* TODO: rewrite to the same style as struct/union above to handle
+	 * type identities correctly
+	 */
 
 	if(token.type == T_IDENTIFIER) {
 		enum_type->symbol = token.v.symbol;
@@ -1121,7 +1132,11 @@ type_t *construct_declarator_type(declarator_part *part, type_t *type)
 		if(method_type != NULL) {
 			method_type->result_type = type;
 
-			type = (type_t*) method_type;
+			type_t *result = typehash_insert((type_t*) method_type);
+			if(result != (type_t*) method_type) {
+				obstack_free(type_obst, method_type);
+			}
+			type = result;
 		}
 
 		part = part->inner;
@@ -1155,39 +1170,59 @@ type_t *parse_abstract_declarator(type_t *base_type)
 	return result;
 }
 
-static void record_declaration(declaration_t *declaration)
+static declaration_t *record_declaration(declaration_t *declaration)
 {
+	if(context == NULL)
+		return declaration;
+
+	symbol_t *symbol = declaration->symbol;
+	if(symbol != NULL) {
+		declaration_t *alias = environment_push(declaration, context);
+		if(alias != declaration)
+			return alias;
+	}
+
 	if(last_declaration != NULL) {
 		last_declaration->next = declaration;
 	} else {
-		if(context != NULL)
-			context->declarations = declaration;
+		context->declarations  = declaration;
 	}
 	last_declaration = declaration;
+
+	return declaration;
 }
 
 static
-void maybe_push_declaration(declaration_t *declaration)
+void parser_error_multiple_definition(declaration_t *previous,
+                                      declaration_t *declaration)
 {
-	symbol_t *symbol = declaration->symbol;
-
-	if(symbol != NULL) {
-		environment_push(declaration, context);
-	}
+	parser_print_error_prefix_pos(declaration->source_position);
+	fprintf(stderr, "multiple definition of symbol '%s'\n",
+	        declaration->symbol->string);
+	parser_print_error_prefix_pos(previous->source_position);
+	fprintf(stderr, "this is the location of the previous "
+	        "definition.\n");
 }
 
 static
 void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
 	while(1) {
-		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+		declaration_t *ndeclaration
+			= allocate_ast_zero(sizeof(ndeclaration[0]));
 
-		parse_declarator(declaration, specifiers->storage_class,
+		parse_declarator(ndeclaration, specifiers->storage_class,
 		                 specifiers->type, 0);
-		maybe_push_declaration(declaration);
-		record_declaration(declaration);
+		declaration_t *declaration = record_declaration(ndeclaration);
 		if(token.type == '=') {
 			next_token();
+
+			/* TODO: check that this is an allowed type (esp. no method type) */
+
+			if(declaration->initializer != NULL) {
+				parser_error_multiple_definition(declaration, ndeclaration);
+			}
+
 			if(token.type == '{') {
 				// TODO
 				expect_void('}');
@@ -1195,6 +1230,17 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				declaration->initializer = parse_assignment_expression();
 			}
 		} else if(token.type == '{') {
+			if(declaration->type->type != TYPE_METHOD) {
+				parser_print_error_prefix();
+				fprintf(stderr, "Declarator ");
+				print_type(declaration->type, declaration->symbol);
+				fprintf(stderr, " is not a method type.\n");
+			}
+
+			if(declaration->initializer != NULL) {
+				parser_error_multiple_definition(declaration, ndeclaration);
+			}
+
 			statement_t *statement = parse_compound_statement();
 			declaration->statement = statement;
 			return;
@@ -1220,7 +1266,8 @@ void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 				= allocate_ast_zero(sizeof(declaration[0]));
 			parse_declarator(declaration, specifiers->storage_class,
 			                 specifiers->type, 0);
-			maybe_push_declaration(declaration);
+
+			/* TODO: check for doubled fields */
 			record_declaration(declaration);
 
 			if(token.type == ':') {
@@ -2070,6 +2117,8 @@ translation_unit_t *parse(void)
 {
 	obstack_init(&environment_obstack);
 	environment_stack = NEW_ARR_F(environment_entry_t*, 0);
+
+	type_set_output(stderr);
 
 	lookahead_bufpos = 0;
 	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {

@@ -313,10 +313,9 @@ void write_fluffy_decls(const translation_unit_t *unit)
 
 	/* write structs,unions + enums */
 	declaration_t *declaration = unit->context.declarations;
-	while(declaration != NULL) {
+	for( ; declaration != NULL; declaration = declaration->next) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
 		if(! (declaration->storage_class & STORAGE_CLASS_TYPEDEF)) {
-			declaration = declaration->next;
 			continue;
 		}
 		type_t *type = declaration->type;
@@ -327,8 +326,6 @@ void write_fluffy_decls(const translation_unit_t *unit)
 		} else if(type->type == TYPE_ENUM) {
 			write_enum(declaration->symbol, (enum_type_t*) type);
 		}
-
-		declaration = declaration->next;
 	}
 
 	/* write global variables */
