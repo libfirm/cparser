@@ -12,12 +12,12 @@ static FILE            *out;
 static void intern_print_type_pre(const type_t *type);
 static void intern_print_type_post(const type_t *type);
 
-void init_types()
+void init_types(void)
 {
 	obstack_init(type_obst);
 }
 
-void exit_types()
+void exit_types(void)
 {
 	obstack_free(type_obst, NULL);
 }

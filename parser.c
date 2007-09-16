@@ -1315,6 +1315,10 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			if(declaration->initializer != NULL) {
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
+			if(ndeclaration != declaration) {
+				memcpy(&declaration->context, &ndeclaration->context,
+				       sizeof(declaration->context));
+			}
 
 			int         top          = environment_top();
 			context_t  *last_context = context;
