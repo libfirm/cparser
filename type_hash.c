@@ -18,40 +18,34 @@
 /* TODO: ^= is a bad way of combining hashes since most addresses are very
  * similar */
 
-static
-unsigned hash_ptr(const void *ptr)
+static unsigned hash_ptr(const void *ptr)
 {
 	unsigned ptr_int = ((char*) ptr - (char*) NULL);
 	return ptr_int >> 3;
 }
 
-static
-unsigned hash_atomic_type(const atomic_type_t *type)
+static unsigned hash_atomic_type(const atomic_type_t *type)
 {
 	unsigned some_prime = 27644437;
 
 	return type->atype * some_prime;
 }
 
-static
-unsigned hash_pointer_type(const pointer_type_t *type)
+static unsigned hash_pointer_type(const pointer_type_t *type)
 {
 	return hash_ptr(type->points_to);
 }
 
-static
-unsigned hash_compound_type(const compound_type_t *type)
+static unsigned hash_compound_type(const compound_type_t *type)
 {
 	unsigned result = hash_ptr(type->symbol);
 
 	return result;
 }
 
-static
-unsigned hash_type(const type_t *type);
+static unsigned hash_type(const type_t *type);
 
-static
-unsigned hash_method_type(const method_type_t *type)
+static unsigned hash_method_type(const method_type_t *type)
 {
 	unsigned result = hash_ptr(type->result_type);
 
@@ -64,18 +58,14 @@ unsigned hash_method_type(const method_type_t *type)
 	return result;
 }
 
-static
-unsigned hash_enum_type(const enum_type_t *type)
+static unsigned hash_enum_type(const enum_type_t *type)
 {
 	unsigned result = hash_ptr(type->symbol);
-
-	/* TODO */
 
 	return result;
 }
 
-static
-unsigned hash_type(const type_t *type)
+static unsigned hash_type(const type_t *type)
 {
 	unsigned hash;
 
@@ -110,53 +100,51 @@ unsigned hash_type(const type_t *type)
 	return hash;
 }
 
-static
-int atomic_types_equal(const atomic_type_t *type1, const atomic_type_t *type2)
+static int atomic_types_equal(const atomic_type_t *type1,
+                              const atomic_type_t *type2)
 {
 	return type1->atype == type2->atype;
 }
 
-static
-int compound_types_equal(const compound_type_t *type1,
-                         const compound_type_t *type2)
+static int compound_types_equal(const compound_type_t *type1,
+                                const compound_type_t *type2)
 {
 	if(type1->type.type != type2->type.type)
 		return 0;
 	if(type1->symbol != type2->symbol)
 		return 0;
 
+	/* anonymous types? */
 	if(type1->symbol == NULL) {
 		/* previous tests should already have checked for this */
 		assert(type1 != type2);
 		/* anonymous types are only equal if they are the very same type */
 		return 0;
-	} else {
-		/* non-anonymous types are equal if they have the same symbol */
-		/* TODO: is this correct */
-		return 1;
 	}
 
-#if 0
-	declaration_t *entry1 = type1->context.declarations;
-	declaration_t *entry2 = type2->context.declarations;
-
-	while(entry1 != NULL && entry2 != NULL) {
-		if(entry1->type != entry2->type)
-			return 0;
-		if(entry1->symbol != entry2->symbol)
-			return 0;
-		entry1 = entry1->next;
-		entry2 = entry2->next;
-	}
-	if(entry1 != NULL || entry2 != NULL)
-		return 0;
-#endif
-
+	/* non-anonymous types with same symbol are equal */
 	return 1;
 }
 
-static
-int method_types_equal(const method_type_t *type1, const method_type_t *type2)
+static int enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
+{
+	if(type1->symbol != type2->symbol)
+		return 0;
+
+	/* anonymous types? */
+	if(type1->symbol == NULL) {
+		/* previous tests should already have checked for this */
+		assert(type1 != type2);
+		/* 2 anonymous enums are never equal */
+		return 0;
+	}
+
+	/* non-anonymous types with same symbol are equal */
+	return 1;
+}
+
+static int method_types_equal(const method_type_t *type1,
+                              const method_type_t *type2)
 {
 	if(type1->result_type != type2->result_type)
 		return 0;
@@ -179,43 +167,19 @@ int method_types_equal(const method_type_t *type1, const method_type_t *type2)
 	return 1;
 }
 
-static
-int pointer_types_equal(const pointer_type_t *type1,
-                        const pointer_type_t *type2)
+static int pointer_types_equal(const pointer_type_t *type1,
+                               const pointer_type_t *type2)
 {
 	return type1->points_to == type2->points_to;
 }
 
-static
-int enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
-{
-	if(type1->symbol != NULL && type1->symbol == type2->symbol)
-		return 1;
-
-	enum_entry_t *entry1 = type1->entries;
-	enum_entry_t *entry2 = type2->entries;
-	while(entry1 != NULL && entry2 != NULL) {
-		if(entry1->symbol != entry2->symbol)
-			return 0;
-		/* TODO: compare expressions */
-		entry1 = entry1->next;
-		entry2 = entry2->next;
-	}
-	if(entry1 != NULL || entry2 != NULL)
-		return 0;
-
-	return 1;
-}
-
-static
-int builtin_types_equal(const builtin_type_t *type1,
-                        const builtin_type_t *type2)
+static int builtin_types_equal(const builtin_type_t *type1,
+                               const builtin_type_t *type2)
 {
 	return type1->symbol == type2->symbol;
 }
 
-static
-int types_equal(const type_t *type1, const type_t *type2)
+static int types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
 		return 1;

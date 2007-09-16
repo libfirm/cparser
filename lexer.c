@@ -27,7 +27,7 @@ static strset_t    stringset;
 static
 void error_prefix_at(const char *input_name, unsigned linenr)
 {
-	fprintf(stderr, "%s:%d: Error: ", input_name, linenr);
+	fprintf(stderr, "%s:%u: Error: ", input_name, linenr);
 }
 
 static
@@ -272,7 +272,7 @@ void parse_number_hex(void)
 	}
 
 	int value = 0;
-	for(;;) {
+	while(1) {
 		if (isdigit(c)) {
 			value = 16 * value + c - '0';
 		} else if ('A' <= c && c <= 'F') {
@@ -295,7 +295,7 @@ void parse_number_oct(void)
 	next_char();
 
 	int value = 0;
-	for(;;) {
+	while(1) {
 		if ('0' <= c && c <= '7') {
 			value = 8 * value + c - '0';
 		} else {
@@ -346,10 +346,61 @@ void parse_number(void)
 	} else {
 		parse_number_dec(0);
 	}
+	if(c == 'U' || c == 'U') {
+		/* TODO do something with the suffixes... */
+		next_char();
+		if(c == 'L' || c == 'l') {
+			next_char();
+			if(c == 'L' || c == 'l') {
+				next_char();
+			}
+		}
+	} else if(c == 'l' || c == 'L') {
+		next_char();
+		if(c == 'l' || c == 'L') {
+			next_char();
+			if(c == 'u' || c == 'U') {
+				next_char();
+			}
+		} else if(c == 'u' || c == 'U') {
+			next_char();
+		}
+	}
 }
 
-static
-int parse_escape_sequence(void)
+static int parse_octal_sequence(void)
+{
+	int value = 0;
+	while(1) {
+		if(c < '0' || c > '7')
+			break;
+		value = 8 * value + c - '0';
+		next_char();
+	}
+
+	return value;
+}
+
+static int parse_hex_sequence(void)
+{
+	int value = 0;
+	while(1) {
+		if (c >= '0' && c <= '9') {
+			value = 16 * value + c - '0';
+		} else if ('A' <= c && c <= 'F') {
+			value = 16 * value + c - 'A' + 10;
+		} else if ('a' <= c && c <= 'f') {
+			value = 16 * value + c - 'a' + 10;
+		} else {
+			break;
+		}
+		next_char();
+	}
+
+	return value;
+}
+
+static int parse_escape_sequence(void)
 {
 	while(1) {
 		int ec = c;
@@ -368,9 +419,8 @@ int parse_escape_sequence(void)
 		case 'r': return '\r';
 		case 't': return '\t';
 		case 'v': return '\v';
-		case 'x': /* TODO parse hex number ... */
-			parse_error("hex escape sequences not implemented yet");
-			return EOF;
+		case 'x':
+			return parse_hex_sequence();
 		case '0':
 		case '1':
 		case '2':
@@ -379,9 +429,7 @@ int parse_escape_sequence(void)
 		case '5':
 		case '6':
 		case '7':
-			/* TODO parse octal number ... */
-			parse_error("octal escape sequences not implemented yet");
-			return EOF;
+			return parse_octal_sequence();
 		case '?':
 			if(c != '?') {
 				return '?';
@@ -506,6 +554,7 @@ void parse_character_constant(void)
 	while(1) {
 		switch(c) {
 		SKIP_TRIGRAPHS(,
+			next_char();
 			found_char = '?';
 			break;
 		)
@@ -513,7 +562,7 @@ void parse_character_constant(void)
 		case '\\':
 			next_char();
 			EAT_NEWLINE(break;)
-			found_char = '\\';
+			found_char = parse_escape_sequence();
 			break;
 
 		MATCH_NEWLINE(
@@ -870,6 +919,7 @@ void lexer_next_preprocessing_token(void)
 			ELSE('+')
 		case '-':
 			MAYBE_PROLOG
+			MAYBE('>', T_MINUSGREATER)
 			MAYBE('-', T_MINUSMINUS)
 			MAYBE('=', T_MINUSEQUAL)
 			ELSE('-')
@@ -912,6 +962,7 @@ void lexer_next_preprocessing_token(void)
 			MAYBE_PROLOG
 			MAYBE(':', T_LESSCOLON)
 			MAYBE('%', T_LESSPERCENT)
+			MAYBE('=', T_LESSEQUAL)
 				case '<':
 					MAYBE_PROLOG
 					MAYBE('=', T_LESSLESSEQUAL)
@@ -919,6 +970,7 @@ void lexer_next_preprocessing_token(void)
 			ELSE('<')
 		case '>':
 			MAYBE_PROLOG
+			MAYBE('=', T_GREATEREQUAL)
 				case '>':
 					MAYBE_PROLOG
 					MAYBE('=', T_GREATERGREATEREQUAL)

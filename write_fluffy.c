@@ -51,7 +51,7 @@ static declaration_t *find_typedef(const type_t *type)
 	/* first: search for a matching typedef in the global type... */
 	declaration_t *declaration = global_context->declarations;
 	while(declaration != NULL) {
-		if(! (declaration->storage_class & STORAGE_CLASS_TYPEDEF)) {
+		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			declaration = declaration->next;
 			continue;
 		}
@@ -230,12 +230,12 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	const enum_entry_t *entry = type->entries;
-	for ( ; entry != NULL; entry = entry->next) {
+	declaration_t *entry = type->entries_begin;
+	for ( ; entry != type->entries_end->next; entry = entry->next) {
 		fprintf(out, "\t%s", entry->symbol->string);
-		if(entry->value != NULL) {
+		if(entry->initializer != NULL) {
 			fprintf(out, " <- ");
-			write_expression(entry->value);
+			write_expression(entry->initializer);
 		}
 		fputc('\n', out);
 	}
@@ -315,7 +315,7 @@ void write_fluffy_decls(const translation_unit_t *unit)
 	declaration_t *declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
-		if(! (declaration->storage_class & STORAGE_CLASS_TYPEDEF)) {
+		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			continue;
 		}
 		type_t *type = declaration->type;
@@ -331,7 +331,8 @@ void write_fluffy_decls(const translation_unit_t *unit)
 	/* write global variables */
 	declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->storage_class & STORAGE_CLASS_TYPEDEF)
+		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
+				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
 
 		type_t *type = declaration->type;
@@ -344,7 +345,8 @@ void write_fluffy_decls(const translation_unit_t *unit)
 	/* write functions */
 	declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->storage_class & STORAGE_CLASS_TYPEDEF)
+		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
+				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
 
 		type_t *type = declaration->type;

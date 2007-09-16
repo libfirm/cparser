@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "adt/error.h"
 
@@ -15,6 +16,7 @@ static FILE *out;
 static int   indent;
 
 static void print_statement(const statement_t *statement);
+static void print_declaration(const declaration_t *declaration);
 
 static void print_indent(void)
 {
@@ -22,21 +24,39 @@ static void print_indent(void)
 		fprintf(out, "\t");
 }
 
-static
-void print_const(const const_t *cnst)
+static void print_const(const const_t *cnst)
 {
 	fprintf(out, "%d", cnst->value);
 }
 
-static
-void print_string_literal(const string_literal_t *string_literal)
+static void print_string_literal(const string_literal_t *string_literal)
 {
-	/* TODO escape " and non-printable chars */
-	fprintf(out, "\"%s\"", string_literal->value);
+	fputc('"', out);
+	for(const char *c = string_literal->value; *c != '\0'; ++c) {
+		switch(*c) {
+		case '\"':  fputs("\\\"", out); break;
+		case '\\':  fputs("\\\\", out); break;
+		case '\a':  fputs("\\a", out); break;
+		case '\b':  fputs("\\b", out); break;
+		case '\f':  fputs("\\f", out); break;
+		case '\n':  fputs("\\n", out); break;
+		case '\r':  fputs("\\r", out); break;
+		case '\t':  fputs("\\t", out); break;
+		case '\v':  fputs("\\v", out); break;
+		case '\?':  fputs("\\?", out); break;
+		default:
+			if(!isprint(*c)) {
+				fprintf(out, "\\x%x", *c);
+				break;
+			}
+			fputc(*c, out);
+			break;
+		}
+	}
+	fputc('"', out);
 }
 
-static
-void print_call_expression(const call_expression_t *call)
+static void print_call_expression(const call_expression_t *call)
 {
 	print_expression(call->method);
 	fprintf(out, "(");
@@ -55,56 +75,114 @@ void print_call_expression(const call_expression_t *call)
 	fprintf(out, ")");
 }
 
-static
-void print_binary_expression(const binary_expression_t *binexpr)
+static void print_binary_expression(const binary_expression_t *binexpr)
 {
 	fprintf(out, "(");
 	print_expression(binexpr->left);
 	fprintf(out, " ");
 	switch(binexpr->type) {
-	case BINEXPR_INVALID:
-		fprintf(out, "INVOP");
-		break;
-	case BINEXPR_ASSIGN:
-		fprintf(out, "<-");
-		break;
-	case BINEXPR_ADD:
-		fprintf(out, "+");
-		break;
-	case BINEXPR_SUB:
-		fprintf(out, "-");
-		break;
-	case BINEXPR_NOTEQUAL:
-		fprintf(out, "/=");
-		break;
-	case BINEXPR_EQUAL:
-		fprintf(out, "=");
-		break;
-	case BINEXPR_LESS:
-		fprintf(out, "<");
-		break;
-	case BINEXPR_LESSEQUAL:
-		fprintf(out, "<=");
-		break;
-	case BINEXPR_GREATER:
-		fprintf(out, ">");
-		break;
-	case BINEXPR_GREATEREQUAL:
-		fprintf(out, ">=");
-		break;
-	default:
-		/* TODO: add missing ops */
-		fprintf(out, "op%d", binexpr->type);
-		break;
+	case BINEXPR_INVALID:	         fputs("INVOP", out); break;
+	case BINEXPR_COMMA:              fputs(",", out);     break;
+	case BINEXPR_ASSIGN:             fputs("=", out);     break;
+	case BINEXPR_ADD:                fputs("+", out);     break;
+	case BINEXPR_SUB:                fputs("-", out);     break;
+	case BINEXPR_MUL:                fputs("*", out);     break;
+	case BINEXPR_MOD:                fputs("%", out);     break;
+	case BINEXPR_DIV:                fputs("/", out);     break;
+	case BINEXPR_BITWISE_OR:         fputs("|", out);     break;
+	case BINEXPR_BITWISE_AND:        fputs("&", out);     break;
+	case BINEXPR_BITWISE_XOR:        fputs("^", out);     break;
+	case BINEXPR_LOGICAL_OR:         fputs("||", out);    break;
+	case BINEXPR_LOGICAL_AND:        fputs("&&", out);    break;
+	case BINEXPR_NOTEQUAL:           fputs("!=", out);    break;
+	case BINEXPR_EQUAL:              fputs("==", out);    break;
+	case BINEXPR_LESS:               fputs("<", out);     break;
+	case BINEXPR_LESSEQUAL:          fputs("<=", out);    break;
+	case BINEXPR_GREATER:            fputs(">", out);     break;
+	case BINEXPR_GREATEREQUAL:       fputs(">=", out);    break;
+	case BINEXPR_SHIFTLEFT:          fputs("<<", out);    break;
+	case BINEXPR_SHIFTRIGHT:         fputs(">>", out);    break;
+
+	case BINEXPR_ADD_ASSIGN:         fputs("+=", out);    break;
+	case BINEXPR_SUB_ASSIGN:         fputs("-=", out);    break;
+	case BINEXPR_MUL_ASSIGN:         fputs("*=", out);    break;
+	case BINEXPR_MOD_ASSIGN:         fputs("%=", out);    break;
+	case BINEXPR_DIV_ASSIGN:         fputs("/=", out);    break;
+	case BINEXPR_BITWISE_OR_ASSIGN:  fputs("|=", out);    break;
+	case BINEXPR_BITWISE_AND_ASSIGN: fputs("&=", out);    break;
+	case BINEXPR_BITWISE_XOR_ASSIGN: fputs("^=", out);    break;
+	case BINEXPR_SHIFTLEFT_ASSIGN:   fputs("<<=", out);   break;
+	case BINEXPR_SHIFTRIGHT_ASSIGN:  fputs(">>=", out);   break;
 	}
 	fprintf(out, " ");
 	print_expression(binexpr->right);
 	fprintf(out, ")");
 }
 
+static void print_unary_expression(const unary_expression_t *unexpr)
+{
+	switch(unexpr->type) {
+	case UNEXPR_NEGATE:           fputs("-", out);  break;
+	case UNEXPR_PLUS:             fputs("+", out);  break;
+	case UNEXPR_NOT:              fputs("!", out);  break;
+	case UNEXPR_BITWISE_NEGATE:   fputs("~", out);  break;
+	case UNEXPR_PREFIX_INCREMENT: fputs("++", out); break;
+	case UNEXPR_PREFIX_DECREMENT: fputs("--", out); break;
+	case UNEXPR_DEREFERENCE:      fputs("*", out);  break;
+	case UNEXPR_TAKE_ADDRESS:     fputs("&", out);  break;
+
+	case UNEXPR_POSTFIX_INCREMENT:
+		fputs("(", out);
+		print_expression(unexpr->value);
+		fputs(")", out);
+		fputs("++", out);
+		return;
+	case UNEXPR_POSTFIX_DECREMENT:
+		fputs("(", out);
+		print_expression(unexpr->value);
+		fputs(")", out);
+		fputs("--", out);
+		return;
+	case UNEXPR_CAST:
+		fputs("(", out);
+		print_type(unexpr->expression.datatype);
+		fputs(")", out);
+		break;
+	case UNEXPR_INVALID:
+		fprintf(out, "unop%d", unexpr->type);
+		break;
+	}
+	fputs("(", out);
+	print_expression(unexpr->value);
+	fputs(")", out);
+}
+
 static void print_reference_expression(const reference_expression_t *ref)
 {
 	fprintf(out, "%s", ref->declaration->symbol->string);
+}
+
+static void print_array_expression(const array_access_expression_t *expression)
+{
+	fputs("(", out);
+	print_expression(expression->array_ref);
+	fputs(")[", out);
+	print_expression(expression->index);
+	fputs("]", out);
+}
+
+static void print_sizeof_expression(const sizeof_expression_t *expression)
+{
+	fputs("sizeof", out);
+	if(expression->size_expression != NULL) {
+		fputc('(', out);
+		print_expression(expression->size_expression);
+		fputc(')', out);
+	} else {
+		fputc('(', out);
+		print_type(expression->type);
+		fputc(')', out);
+	}
 }
 
 void print_expression(const expression_t *expression)
@@ -116,6 +194,8 @@ void print_expression(const expression_t *expression)
 	case EXPR_CONST:
 		print_const((const const_t*) expression);
 		break;
+	case EXPR_FUNCTION:
+	case EXPR_PRETTY_FUNCTION:
 	case EXPR_STRING_LITERAL:
 		print_string_literal((const string_literal_t*) expression);
 		break;
@@ -128,18 +208,25 @@ void print_expression(const expression_t *expression)
 	case EXPR_REFERENCE:
 		print_reference_expression((const reference_expression_t*) expression);
 		break;
-	case EXPR_UNARY:
-	case EXPR_SELECT:
 	case EXPR_ARRAY_ACCESS:
+		print_array_expression((const array_access_expression_t*) expression);
+		break;
+	case EXPR_UNARY:
+		print_unary_expression((const unary_expression_t*) expression);
+		break;
 	case EXPR_SIZEOF:
+		print_sizeof_expression((const sizeof_expression_t*) expression);
+		break;
+
+	case EXPR_STATEMENT:
+	case EXPR_SELECT:
 		/* TODO */
 		fprintf(out, "some expression of type %d", expression->type);
 		break;
 	}
 }
 
-static
-void print_compound_statement(const compound_statement_t *block)
+static void print_compound_statement(const compound_statement_t *block)
 {
 	fputs("{\n", out);
 	indent++;
@@ -156,8 +243,7 @@ void print_compound_statement(const compound_statement_t *block)
 	fputs("}\n", out);
 }
 
-static
-void print_return_statement(const return_statement_t *statement)
+static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
 	if(statement->return_value != NULL)
@@ -165,14 +251,13 @@ void print_return_statement(const return_statement_t *statement)
 	fputs(";\n", out);
 }
 
-static
-void print_expression_statement(const expression_statement_t *statement)
+static void print_expression_statement(const expression_statement_t *statement)
 {
 	print_expression(statement->expression);
+	fputs(";\n", out);
 }
 
-static
-void print_goto_statement(const goto_statement_t *statement)
+static void print_goto_statement(const goto_statement_t *statement)
 {
 	fprintf(out, "goto ");
 	if(statement->label != NULL) {
@@ -183,34 +268,78 @@ void print_goto_statement(const goto_statement_t *statement)
 	fputs(";\n", out);
 }
 
-static
-void print_label_statement(const label_statement_t *statement)
+static void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(out, "%s:\n", statement->symbol->string);
 }
 
-static
-void print_if_statement(const if_statement_t *statement)
+static void print_if_statement(const if_statement_t *statement)
 {
-	fprintf(out, "if(");
+	fputs("if(", out);
 	print_expression(statement->condition);
-	fprintf(out, ") ");
+	fputs(") ", out);
 	if(statement->true_statement != NULL) {
 		print_statement(statement->true_statement);
 	}
 
 	if(statement->false_statement != NULL) {
 		print_indent();
-		fprintf(out, "else ");
+		fputs("else ", out);
 		print_statement(statement->false_statement);
 	}
 }
 
-static
-void print_declaration_statement(const declaration_statement_t *statement)
+static void print_switch_statement(const switch_statement_t *statement)
 {
-	(void) statement;
-	fprintf(out, "*declaration statement*");
+	fputs("switch(", out);
+	print_expression(statement->expression);
+	fputs(") ", out);
+	print_statement(statement->body);
+}
+
+static void print_case_label(const case_label_statement_t *statement)
+{
+	if(statement->expression == NULL) {
+		fputs("default:\n", out);
+	} else {
+		fputs("case ", out);
+		print_expression(statement->expression);
+		fputs(":\n", out);
+	}
+}
+
+static void print_declaration_statement(
+		const declaration_statement_t *statement)
+{
+	declaration_t *declaration = statement->declarations_begin;
+	for( ; declaration != statement->declarations_end->next;
+	       declaration = declaration->next) {
+		print_declaration(declaration);
+	}
+}
+
+static void print_while_statement(const while_statement_t *statement)
+{
+	fputs("while(", out);
+	print_expression(statement->condition);
+	fputs(") ", out);
+	print_statement(statement->body);
+}
+
+static void print_do_while_statement(const do_while_statement_t *statement)
+{
+	fputs("do ", out);
+	print_statement(statement->body);
+	print_indent();
+	fputs("while(", out);
+	print_expression(statement->condition);
+	fputs(");\n", out);
+}
+
+static void print_for_statemenet(const for_statement_t *statement)
+{
+	fprintf(out, "for(TODO) ");
+	print_statement(statement->body);
 }
 
 void print_statement(const statement_t *statement)
@@ -231,54 +360,43 @@ void print_statement(const statement_t *statement)
 	case STATEMENT_GOTO:
 		print_goto_statement((const goto_statement_t*) statement);
 		break;
+	case STATEMENT_CONTINUE:
+		fputs("continue;\n", out);
+		break;
+	case STATEMENT_BREAK:
+		fputs("break;\n", out);
+		break;
 	case STATEMENT_IF:
 		print_if_statement((const if_statement_t*) statement);
+		break;
+	case STATEMENT_SWITCH:
+		print_switch_statement((const switch_statement_t*) statement);
+		break;
+	case STATEMENT_CASE_LABEL:
+		print_case_label((const case_label_statement_t*) statement);
 		break;
 	case STATEMENT_DECLARATION:
 		print_declaration_statement((const declaration_statement_t*) statement);
 		break;
+	case STATEMENT_WHILE:
+		print_while_statement((const while_statement_t*) statement);
+		break;
+	case STATEMENT_DO_WHILE:
+		print_do_while_statement((const do_while_statement_t*) statement);
+		break;
+	case STATEMENT_FOR:
+		print_for_statemenet((const for_statement_t*) statement);
+		break;
 	case STATEMENT_INVALID:
-	default:
 		fprintf(out, "*invalid statement*");
 		break;
-
 	}
 }
 
-#if 0
-static
-void print_method_parameters(const method_parameter_t *parameters,
-                             const method_type_t *method_type)
-{
-	fprintf(out, "(");
-
-	int                            first          = 1;
-	const method_parameter_t      *parameter      = parameters;
-	const method_parameter_type_t *parameter_type
-		= method_type->parameter_types;
-	while(parameter != NULL && parameter_type != NULL) {
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
-
-		print_type(parameter_type->type);
-		fprintf(out, " %s", parameter->symbol->string);
-
-		parameter      = parameter->next;
-		parameter_type = parameter_type->next;
-	}
-	assert(parameter == NULL && parameter_type == NULL);
-
-	fprintf(out, ")");
-}
-#endif
-
-static
-void print_storage_class(storage_class_t storage_class)
+static void print_storage_class(storage_class_t storage_class)
 {
 	switch(storage_class) {
+	case STORAGE_CLASS_ENUM_ENTRY:
 	case STORAGE_CLASS_NONE:
 		break;
 	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ", out); break;
@@ -289,14 +407,18 @@ void print_storage_class(storage_class_t storage_class)
 	}
 }
 
-static
-void print_declaration(const declaration_t *declaration)
+static void print_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
-	print_type(declaration->type, declaration->symbol);
+	print_type_ext(declaration->type, declaration->symbol,
+	               &declaration->context);
 	if(declaration->statement != NULL) {
 		fputs("\n", out);
 		print_statement(declaration->statement);
+	} else if(declaration->initializer != NULL) {
+		fputs(" = ", out);
+		print_expression(declaration->initializer);
+		fprintf(out, ";\n");
 	} else {
 		fprintf(out, ";\n");
 	}

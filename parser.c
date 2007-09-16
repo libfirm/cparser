@@ -272,13 +272,13 @@ declaration_t *environment_push(declaration_t *declaration, const void *context)
 				parser_print_error_prefix_pos(declaration->source_position);
 				fprintf(stderr, "definition of symbol '%s' with type ",
 				        declaration->symbol->string);
-				print_type(declaration->type, NULL);
+				print_type(declaration->type);
 				fputc('\n', stderr);
 				parser_print_error_prefix_pos(
 						previous_declaration->source_position);
 				fprintf(stderr, "is incompatible with previous declaration "
 				        "of type ");
-				print_type(previous_declaration->type, NULL);
+				print_type(previous_declaration->type);
 				fputc('\n', stderr);
 			}
 			return previous_declaration;
@@ -328,14 +328,14 @@ void environment_pop_to(size_t new_top)
 
 static expression_t *parse_constant_expression(void)
 {
-	/* TODO: not correct yet */
-	return parse_expression();
+	/* start parsing at precedence 7 (conditional expression) */
+	return parse_sub_expression(7);
 }
 
 static expression_t *parse_assignment_expression(void)
 {
-	/* TODO: not correct yet */
-	return parse_expression();
+	/* start parsing at precedence 2 (assignment expression) */
+	return parse_sub_expression(2);
 }
 
 static void parse_compound_type_entries(void);
@@ -386,10 +386,10 @@ static type_t *parse_compound_type_specifier(int is_struct)
 		}
 	} else if(token.type != '{') {
 		if(is_struct) {
-			parse_error_expected("problem while parsing struct type specifiers",
+			parse_error_expected("problem while parsing struct type specifier",
 			                     T_IDENTIFIER, '{', 0);
 		} else {
-			parse_error_expected("problem while parsing union type specifiers",
+			parse_error_expected("problem while parsing union type specifier",
 			                     T_IDENTIFIER, '{', 0);
 		}
 
@@ -431,73 +431,103 @@ static type_t *parse_compound_type_specifier(int is_struct)
 	return (type_t*) compound_type;
 }
 
-static enum_entry_t *parse_enum_type_entries(void)
+static void parse_enum_entries(void)
 {
 	eat('{');
 
 	if(token.type == '}') {
 		next_token();
 		parse_error("empty enum not allowed");
-		return NULL;
+		return;
 	}
 
-	enum_entry_t *result     = NULL;
-	enum_entry_t *last_entry = NULL;
 	do {
-		enum_entry_t *entry = allocate_ast_zero(sizeof(entry[0]));
+		declaration_t *entry = allocate_ast_zero(sizeof(entry[0]));
+
 		if(token.type != T_IDENTIFIER) {
 			parse_error_expected("problem while parsing enum entry",
 			                     T_IDENTIFIER, 0);
 			eat_block();
-			return result;
+			return;
 		}
-		entry->symbol = token.v.symbol;
+		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
+		entry->symbol          = token.v.symbol;
+		entry->source_position = token.source_position;
 		next_token();
 
 		if(token.type == '=') {
 			next_token();
-			entry->value = parse_constant_expression();
+			entry->initializer = parse_constant_expression();
 		}
 
-		if(last_entry != NULL) {
-			last_entry->next = entry;
-		} else {
-			result = entry;
-		}
-		last_entry = entry;
+		record_declaration(entry);
 
 		if(token.type != ',')
 			break;
 		next_token();
 	} while(token.type != '}');
 
-	expect('}');
-	return result;
+	expect_void('}');
+}
+
+static enum_type_t *find_enum_type(enum_type_t *types, const symbol_t *symbol)
+{
+	enum_type_t *type = types;
+	for( ; type != NULL; type = type->next) {
+		if(type->symbol == symbol)
+			return type;
+	}
+
+	return NULL;
 }
 
 static type_t *parse_enum_specifier(void)
 {
 	eat(T_enum);
 
-	enum_type_t *enum_type     = allocate_type_zero(sizeof(enum_type[0]));
-	enum_type->type.type       = TYPE_ENUM;
-	enum_type->source_position = token.source_position;
-
-	/* TODO: rewrite to the same style as struct/union above to handle
-	 * type identities correctly
-	 */
+	symbol_t    *symbol    = NULL;
+	enum_type_t *enum_type = NULL;
 
 	if(token.type == T_IDENTIFIER) {
-		enum_type->symbol = token.v.symbol;
+		symbol = token.v.symbol;
 		next_token();
-		if(token.type == '{') {
-			enum_type->entries = parse_enum_type_entries();
+
+		if(context != NULL) {
+			enum_type = find_enum_type(context->enums, symbol);
 		}
-	} else if(token.type == '{') {
-		enum_type->entries = parse_enum_type_entries();
-	} else {
-		parse_error_expected("problem while parsing enum type specifiers",
-		                     T_IDENTIFIER, '{');
+	} else if(token.type != '{') {
+		parse_error_expected("problem while parsing enum type specifier",
+		                     T_IDENTIFIER, '{', 0);
+		return NULL;
+	}
+
+	if(enum_type == NULL) {
+		enum_type                  = allocate_type_zero(sizeof(enum_type[0]));
+		enum_type->type.type       = TYPE_ENUM;
+		enum_type->source_position = token.source_position;
+		enum_type->symbol          = symbol;
+	}
+
+	if(token.type == '{') {
+		if(enum_type->defined) {
+			parser_print_error_prefix();
+			fprintf(stderr, "multiple definitions of enum %s\n",
+			        symbol->string);
+			enum_type->entries_begin = NULL;
+			enum_type->entries_end   = NULL;
+		}
+		enum_type->defined = 1;
+
+		declaration_t *before = last_declaration;
+
+		parse_enum_entries();
+
+		if(before == NULL) {
+			enum_type->entries_begin = context->declarations;
+		} else {
+			enum_type->entries_begin = before->next;
+		}
+		enum_type->entries_end = last_declaration;
 	}
 
 	return (type_t*) enum_type;
@@ -600,8 +630,7 @@ typedef enum {
 	case T_const:           \
 	case T_restrict:        \
 	case T_volatile:        \
-	case T_inline:          \
-	case T___extension__:
+	case T_inline:
 
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
@@ -1043,6 +1072,7 @@ declaration_t *parse_parameters(method_type_t *type)
 			return declarations;
 
 		case T_IDENTIFIER:
+		case T___extension__:
 		DECLARATION_START
 			declaration = parse_parameter();
 
@@ -1278,7 +1308,7 @@ void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			if(declaration->type->type != TYPE_METHOD) {
 				parser_print_error_prefix();
 				fprintf(stderr, "Declarator ");
-				print_type(declaration->type, declaration->symbol);
+				print_type_ext(declaration->type, declaration->symbol, NULL);
 				fprintf(stderr, " is not a method type.\n");
 			}
 
@@ -1489,19 +1519,36 @@ expression_t *parse_cast(void)
 }
 
 static
+expression_t *parse_statement_expression(void)
+{
+	statement_expression_t *expression
+		= allocate_ast_zero(sizeof(expression[0]));
+	expression->expression.type = EXPR_STATEMENT;
+	expression->statement       = parse_compound_statement();
+
+	expect(')');
+
+	return (expression_t*) expression;
+}
+
+static
 expression_t *parse_brace_expression(void)
 {
 	eat('(');
 
 	declaration_t *declaration;
 	switch(token.type) {
+	case '{':
+		/* gcc extension: a stement expression */
+		return parse_statement_expression();
+
 	TYPE_QUALIFIERS
 	TYPE_SPECIFIERS
 		return parse_cast();
 	case T_IDENTIFIER:
 		declaration = token.v.symbol->declaration;
 		if(declaration != NULL &&
-				(declaration->storage_class & STORAGE_CLASS_TYPEDEF)) {
+				(declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			return parse_cast();
 		}
 	}
@@ -1510,6 +1557,32 @@ expression_t *parse_brace_expression(void)
 	expect(')');
 
 	return result;
+}
+
+static
+expression_t *parse_function_keyword(void)
+{
+	eat(T___FUNCTION__);
+	/* TODO */
+
+	string_literal_t *expression = allocate_ast_zero(sizeof(expression[0]));
+	expression->expression.type  = EXPR_FUNCTION;
+	expression->value            = "TODO: FUNCTION";
+
+	return (expression_t*) expression;
+}
+
+static
+expression_t *parse_pretty_function_keyword(void)
+{
+	eat(T___PRETTY_FUNCTION__);
+	/* TODO */
+
+	string_literal_t *expression = allocate_ast_zero(sizeof(expression[0]));
+	expression->expression.type  = EXPR_PRETTY_FUNCTION;
+	expression->value            = "TODO: PRETTY FUNCTION";
+
+	return (expression_t*) expression;
 }
 
 static
@@ -1522,6 +1595,10 @@ expression_t *parse_primary_expression(void)
 		return parse_string_const();
 	case T_IDENTIFIER:
 		return parse_reference();
+	case T___FUNCTION__:
+		return parse_function_keyword();
+	case T___PRETTY_FUNCTION__:
+		return parse_pretty_function_keyword();
 	case '(':
 		return parse_brace_expression();
 	}
@@ -1567,7 +1644,7 @@ type_t *get_expression_type(const expression_t *expression)
 }
 
 static
-int is_type_specifier(const token_t *token)
+int is_declaration_specifier(const token_t *token, int only_type_specifiers)
 {
 	declaration_t *declaration;
 
@@ -1581,6 +1658,12 @@ int is_type_specifier(const token_t *token)
 			if(declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 				return 0;
 			return 1;
+		STORAGE_CLASSES
+		TYPE_QUALIFIERS
+			if(only_type_specifiers)
+				return 0;
+			return 1;
+
 		default:
 			return 0;
 	}
@@ -1595,13 +1678,14 @@ expression_t *parse_sizeof(unsigned precedence)
 		= allocate_ast_zero(sizeof(sizeof_expression[0]));
 	sizeof_expression->expression.type = EXPR_SIZEOF;
 
-	if(token.type == '(' && is_type_specifier(look_ahead(1))) {
+	if(token.type == '(' && is_declaration_specifier(look_ahead(1), 1)) {
 		next_token();
 		sizeof_expression->type = parse_typename();
 		expect(')');
 	} else {
-		expression_t *expression = parse_sub_expression(precedence);
-		sizeof_expression->type  = get_expression_type(expression);
+		expression_t *expression           = parse_sub_expression(precedence);
+		sizeof_expression->type            = get_expression_type(expression);
+		sizeof_expression->size_expression = expression;
 	}
 
 	return (expression_t*) sizeof_expression;
@@ -1613,7 +1697,7 @@ expression_t *parse_select_expression(unsigned precedence,
 {
 	(void) precedence;
 
-	assert(token.type == '.' || token.type == T_SELECT);
+	assert(token.type == '.' || token.type == T_MINUSGREATER);
 	next_token();
 
 	select_expression_t *select = allocate_ast_zero(sizeof(select[0]));
@@ -1651,7 +1735,9 @@ expression_t *parse_call_expression(unsigned precedence,
 		while(1) {
 			call_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
-			argument->expression = parse_expression();
+			/* we start parsing at precedence 2 so we don't get comma operators
+			 * parsed */
+			argument->expression = parse_sub_expression(2);
 			if(last_argument == NULL) {
 				call->arguments = argument;
 			} else {
@@ -1684,6 +1770,15 @@ expression_t *parse_conditional_expression(unsigned precedence,
 	conditional->false_expression = parse_sub_expression(precedence);
 
 	return (expression_t*) conditional;
+}
+
+static expression_t *parse_extension(unsigned precedence)
+{
+	eat(T___extension__);
+
+	/* TODO enable extensions */
+
+	return parse_sub_expression(precedence);
 }
 
 #define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type)     \
@@ -1741,14 +1836,15 @@ expression_t *parse_##binexpression_type(unsigned precedence,    \
                                                                  \
 	binary_expression_t *binexpr                                 \
 		= allocate_ast_zero(sizeof(binexpr[0]));                 \
-	binexpr->expression.type            = EXPR_BINARY;           \
-	binexpr->type                       = binexpression_type;    \
-	binexpr->left                       = left;                  \
-	binexpr->right                      = right;                 \
+	binexpr->expression.type = EXPR_BINARY;                      \
+	binexpr->type            = binexpression_type;               \
+	binexpr->left            = left;                             \
+	binexpr->right           = right;                            \
                                                                  \
 	return (expression_t*) binexpr;                              \
 }
 
+CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA)
 CREATE_BINEXPR_PARSER('*', BINEXPR_MUL)
 CREATE_BINEXPR_PARSER('/', BINEXPR_DIV)
 CREATE_BINEXPR_PARSER('+', BINEXPR_ADD)
@@ -1767,6 +1863,16 @@ CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND)
 CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR)
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT)
+CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN)
+CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN)
+CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN)
+CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN)
+CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, BINEXPR_MOD_ASSIGN)
+CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, BINEXPR_SHIFTLEFT_ASSIGN)
+CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, BINEXPR_SHIFTRIGHT_ASSIGN)
+CREATE_BINEXPR_PARSER(T_ANDEQUAL, BINEXPR_BITWISE_AND_ASSIGN)
+CREATE_BINEXPR_PARSER(T_PIPEEQUAL, BINEXPR_BITWISE_OR_ASSIGN)
+CREATE_BINEXPR_PARSER(T_CARETEQUAL, BINEXPR_BITWISE_XOR_ASSIGN)
 
 static
 expression_t *parse_sub_expression(unsigned precedence)
@@ -1857,28 +1963,48 @@ void init_expression_parsers(void)
 	                           T_LESSLESS, 16);
 	register_expression_infix_parser(parse_BINEXPR_SHIFTRIGHT,
 	                           T_GREATERGREATER, 16);
-	register_expression_infix_parser(parse_BINEXPR_ADD,       '+', 15);
-	register_expression_infix_parser(parse_BINEXPR_SUB,       '-', 15);
-	register_expression_infix_parser(parse_BINEXPR_LESS,      '<', 14);
-	register_expression_infix_parser(parse_BINEXPR_GREATER,   '>', 14);
-	register_expression_infix_parser(parse_BINEXPR_LESSEQUAL, T_LESSEQUAL, 14);
+	register_expression_infix_parser(parse_BINEXPR_ADD,         '+',        15);
+	register_expression_infix_parser(parse_BINEXPR_SUB,         '-',        15);
+	register_expression_infix_parser(parse_BINEXPR_LESS,        '<',        14);
+	register_expression_infix_parser(parse_BINEXPR_GREATER,     '>',        14);
+	register_expression_infix_parser(parse_BINEXPR_LESSEQUAL, T_LESSEQUAL,  14);
 	register_expression_infix_parser(parse_BINEXPR_GREATEREQUAL,
-	                           T_GREATEREQUAL, 14);
+	                                                        T_GREATEREQUAL, 14);
 	register_expression_infix_parser(parse_BINEXPR_EQUAL,     T_EQUALEQUAL, 13);
 	register_expression_infix_parser(parse_BINEXPR_NOTEQUAL,
-	                                 T_EXCLAMATIONMARKEQUAL, 13);
+	                                                T_EXCLAMATIONMARKEQUAL, 13);
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_AND, '&',        12);
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_XOR, '^',        11);
 	register_expression_infix_parser(parse_BINEXPR_BITWISE_OR,  '|',        10);
 	register_expression_infix_parser(parse_BINEXPR_LOGICAL_AND, T_ANDAND,    9);
 	register_expression_infix_parser(parse_BINEXPR_LOGICAL_OR,  T_PIPEPIPE,  8);
 	register_expression_infix_parser(parse_conditional_expression, '?',      7);
-	register_expression_infix_parser(parse_BINEXPR_ASSIGN,      T_EQUAL,     2);
+	register_expression_infix_parser(parse_BINEXPR_ASSIGN,      '=',         2);
+	register_expression_infix_parser(parse_BINEXPR_ADD_ASSIGN, T_PLUSEQUAL,  2);
+	register_expression_infix_parser(parse_BINEXPR_SUB_ASSIGN, T_MINUSEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_MUL_ASSIGN,
+	                                                        T_ASTERISKEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_DIV_ASSIGN, T_SLASHEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_MOD_ASSIGN,
+	                                                         T_PERCENTEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_SHIFTLEFT_ASSIGN,
+	                                                        T_LESSLESSEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_SHIFTRIGHT_ASSIGN,
+	                                                  T_GREATERGREATEREQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_BITWISE_AND_ASSIGN,
+	                                                             T_ANDEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_BITWISE_OR_ASSIGN,
+	                                                            T_PIPEEQUAL, 2);
+	register_expression_infix_parser(parse_BINEXPR_BITWISE_XOR_ASSIGN,
+	                                                           T_CARETEQUAL, 2);
+
+	register_expression_infix_parser(parse_BINEXPR_COMMA,       ',',         1);
 
 	register_expression_infix_parser(parse_array_expression,        '[',    30);
 	register_expression_infix_parser(parse_call_expression,         '(',    30);
 	register_expression_infix_parser(parse_select_expression,       '.',    30);
-	register_expression_infix_parser(parse_select_expression,  T_SELECT,    30);
+	register_expression_infix_parser(parse_select_expression,
+	                                                        T_MINUSGREATER, 30);
 	register_expression_infix_parser(parse_UNEXPR_POSTFIX_INCREMENT,
 	                                 T_PLUSPLUS, 30);
 	register_expression_infix_parser(parse_UNEXPR_POSTFIX_DECREMENT,
@@ -1893,6 +2019,7 @@ void init_expression_parsers(void)
 	register_expression_parser(parse_UNEXPR_PREFIX_INCREMENT, T_PLUSPLUS,   25);
 	register_expression_parser(parse_UNEXPR_PREFIX_DECREMENT, T_MINUSMINUS, 25);
 	register_expression_parser(parse_sizeof,                  T_sizeof,     25);
+	register_expression_parser(parse_extension,            T___extension__, 25);
 }
 
 
@@ -1900,21 +2027,31 @@ static
 statement_t *parse_case_statement(void)
 {
 	eat(T_case);
-	parse_expression();
-	expect(':');
-	parse_statement();
+	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->statement.type            = STATEMENT_CASE_LABEL;
+	label->statement.source_position = token.source_position;
 
-	return NULL;
+	label->expression = parse_expression();
+
+	expect(':');
+	label->statement.next = parse_statement();
+
+	return (statement_t*) label;
 }
 
 static
 statement_t *parse_default_statement(void)
 {
 	eat(T_default);
-	expect(':');
-	parse_statement();
 
-	return NULL;
+	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->statement.type            = STATEMENT_CASE_LABEL;
+	label->statement.source_position = token.source_position;
+
+	expect(':');
+	label->statement.next = parse_statement();
+
+	return (statement_t*) label;
 }
 
 static
@@ -1933,7 +2070,8 @@ statement_t *parse_if(void)
 	eat(T_if);
 
 	if_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type = STATEMENT_IF;
+	statement->statement.type            = STATEMENT_IF;
+	statement->statement.source_position = token.source_position;
 
 	expect('(');
 	statement->condition = parse_expression();
@@ -1952,60 +2090,96 @@ static
 statement_t *parse_switch(void)
 {
 	eat(T_switch);
-	expect('(');
-	parse_expression();
-	expect(')');
-	parse_statement();
 
-	return NULL;
+	switch_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_SWITCH;
+	statement->statement.source_position = token.source_position;
+
+	expect('(');
+	statement->expression = parse_expression();
+	expect(')');
+	statement->body = parse_statement();
+
+	return (statement_t*) statement;
 }
 
 static
 statement_t *parse_while(void)
 {
 	eat(T_while);
-	expect('(');
-	parse_expression();
-	expect(')');
-	parse_statement();
 
-	return NULL;
+	while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_WHILE;
+	statement->statement.source_position = token.source_position;
+
+	expect('(');
+	statement->condition = parse_expression();
+	expect(')');
+	statement->body = parse_statement();
+
+	return (statement_t*) statement;
 }
 
 static
 statement_t *parse_do(void)
 {
 	eat(T_do);
-	parse_statement();
+
+	do_while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_DO_WHILE;
+	statement->statement.source_position = token.source_position;
+
+	statement->body = parse_statement();
 	expect(T_while);
 	expect('(');
-	parse_expression();
+	statement->condition = parse_expression();
 	expect(')');
+	expect(';');
 
-	return NULL;
+	return (statement_t*) statement;
 }
 
 static
 statement_t *parse_for(void)
 {
 	eat(T_for);
+
+	for_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_FOR;
+	statement->statement.source_position = token.source_position;
+
 	expect('(');
+
+	int         top          = environment_top();
+	context_t  *last_context = context;
+	set_context(&statement->context);
+
 	if(token.type != ';') {
-		/* TODO not correct... this could also be a declaration */
-		parse_expression();
+		if(is_declaration_specifier(&token, 0)) {
+			parse_declaration();
+		} else {
+			statement->initialisation = parse_expression();
+			expect(';');
+		}
+	} else {
+		expect(';');
 	}
-	expect(';');
+
 	if(token.type != ';') {
-		parse_expression();
+		statement->condition = parse_expression();
 	}
 	expect(';');
 	if(token.type != ')') {
-		parse_expression();
+		statement->step = parse_expression();
 	}
 	expect(')');
-	parse_statement();
+	statement->body = parse_statement();
 
-	return NULL;
+	assert(context == &statement->context);
+	set_context(last_context);
+	environment_pop_to(top);
+
+	return (statement_t*) statement;
 }
 
 static
@@ -2037,7 +2211,11 @@ statement_t *parse_break(void)
 	eat(T_break);
 	expect(';');
 
-	return NULL;
+	statement_t *statement     = allocate_ast_zero(sizeof(statement[0]));
+	statement->source_position = token.source_position;
+	statement->type            = STATEMENT_BREAK;
+
+	return statement;
 }
 
 static
@@ -2046,7 +2224,9 @@ statement_t *parse_return(void)
 	eat(T_return);
 
 	return_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type = STATEMENT_RETURN;
+
+	statement->statement.type            = STATEMENT_RETURN;
+	statement->statement.source_position = token.source_position;
 	if(token.type != ';') {
 		statement->return_value = parse_expression();
 	}
@@ -2058,15 +2238,45 @@ statement_t *parse_return(void)
 static
 statement_t *parse_declaration_statement(void)
 {
-	parse_declaration();
-	return NULL;
+	declaration_t *before = last_declaration;
+
+	declaration_statement_t *statement
+		= allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_DECLARATION;
+	statement->statement.source_position = token.source_position;
+
+	declaration_specifiers_t specifiers;
+	memset(&specifiers, 0, sizeof(specifiers));
+	parse_declaration_specifiers(&specifiers);
+
+	if(token.type == ';') {
+		eat(';');
+	} else {
+		parse_init_declarators(&specifiers);
+	}
+
+	if(before == NULL) {
+		statement->declarations_begin = context->declarations;
+	} else {
+		statement->declarations_begin = before->next;
+	}
+	statement->declarations_end = last_declaration;
+
+	return (statement_t*) statement;
 }
 
 static
 statement_t *parse_expression_statement(void)
 {
-	parse_expression();
-	return NULL;
+	expression_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_EXPRESSION;
+	statement->statement.source_position = token.source_position;
+
+	statement->expression = parse_expression();
+
+	expect(';');
+
+	return (statement_t*) statement;
 }
 
 static
@@ -2146,6 +2356,15 @@ statement_t *parse_statement(void)
 		statement = parse_expression_statement();
 		break;
 
+	case T___extension__:
+		/* this can be a prefix to a declaration or an expression statement */
+		/* we simply eat it now and parse the rest with tail recursion */
+		do {
+			next_token();
+		} while(token.type == T___extension__);
+		statement = parse_statement();
+		break;
+
 	DECLARATION_START
 		statement = parse_declaration_statement();
 		break;
@@ -2154,6 +2373,8 @@ statement_t *parse_statement(void)
 		statement = parse_expression_statement();
 		break;
 	}
+
+	assert(statement == NULL || statement->source_position.input_name != NULL);
 
 	return statement;
 }
@@ -2165,7 +2386,8 @@ statement_t *parse_compound_statement(void)
 
 	compound_statement_t *compound_statement
 		= allocate_ast_zero(sizeof(compound_statement[0]));
-	compound_statement->statement.type = STATEMENT_COMPOUND;
+	compound_statement->statement.type            = STATEMENT_COMPOUND;
+	compound_statement->statement.source_position = token.source_position;
 
 	int        top          = environment_top();
 	context_t *last_context = context;
@@ -2175,12 +2397,18 @@ statement_t *parse_compound_statement(void)
 
 	while(token.type != '}' && token.type != T_EOF) {
 		statement_t *statement = parse_statement();
+		if(statement == NULL)
+			continue;
 
 		if(last_statement != NULL) {
 			last_statement->next = statement;
 		} else {
 			compound_statement->statements = statement;
 		}
+
+		while(statement->next != NULL)
+			statement = statement->next;
+
 		last_statement = statement;
 	}
 

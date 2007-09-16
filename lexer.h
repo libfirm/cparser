@@ -4,7 +4,7 @@
 #include "symbol_table_t.h"
 #include "token_t.h"
 
-token_t lexer_token;
+extern token_t lexer_token;
 
 void lexer_next_token(void);
 

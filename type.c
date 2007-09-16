@@ -1,11 +1,13 @@
 #include <config.h>
 
+#include <stdio.h>
+#include <assert.h>
 #include "type_t.h"
 #include "adt/error.h"
 
-static struct obstack  _type_obst;
-struct obstack        *type_obst = &_type_obst;
-static FILE           *out;
+static struct obstack   _type_obst;
+struct obstack         *type_obst = &_type_obst;
+static FILE            *out;
 
 static void intern_print_type_pre(const type_t *type);
 static void intern_print_type_post(const type_t *type);
@@ -35,7 +37,7 @@ void print_type_qualifiers(unsigned qualifiers)
 		fputs("volatile ", out);
 	}
 	if(qualifiers & TYPE_QUALIFIER_RESTRICT) {
-		fputs("restrict ", out);
+		fputs("__restrict ", out);
 	}
 	if(qualifiers & TYPE_QUALIFIER_INLINE) {
 		fputs("inline ", out);
@@ -81,7 +83,7 @@ void print_method_type_pre(const method_type_t *type)
 }
 
 static
-void print_method_type_post(const method_type_t *type)
+void print_method_type_post(const method_type_t *type, const context_t *context)
 {
 	/* TODO: don't emit braces if we're the toplevel type... */
 	intern_print_type_post(type->result_type);
@@ -89,15 +91,28 @@ void print_method_type_post(const method_type_t *type)
 
 	fputc('(', out);
 
-	method_parameter_t *parameter = type->parameters;
 	int                 first     = 1;
-	for( ; parameter != NULL; parameter = parameter->next) {
-		if(first) {
-			first = 0;
-		} else {
-			fputs(", ", out);
+	if(context == NULL) {
+		method_parameter_t *parameter = type->parameters;
+		for( ; parameter != NULL; parameter = parameter->next) {
+			if(first) {
+				first = 0;
+			} else {
+				fputs(", ", out);
+			}
+			print_type(parameter->type);
 		}
-		print_type(parameter->type, NULL);
+	} else {
+		declaration_t *parameter = context->declarations;
+		for( ; parameter != NULL; parameter = parameter->next) {
+			if(first) {
+				first = 0;
+			} else {
+				fputs(", ", out);
+			}
+			print_type_ext(parameter->type, parameter->symbol,
+			               &parameter->context);
+		}
 	}
 	if(type->variadic) {
 		if(first) {
@@ -136,12 +151,12 @@ void print_type_enum(const enum_type_t *type)
 	} else {
 		fprintf(out, "enum {\n");
 
-		enum_entry_t *entry = type->entries;
-		for( ; entry != NULL; entry = entry->next) {
+		declaration_t *entry = type->entries_begin;
+		for( ; entry != type->entries_end->next; entry = entry->next) {
 			fprintf(out, "\t%s", entry->symbol->string);
-			if(entry->value != NULL) {
+			if(entry->initializer != NULL) {
 				fprintf(out, " = ");
-				print_expression(entry->value);
+				print_expression(entry->initializer);
 			}
 			fprintf(out, ",\n");
 		}
@@ -188,7 +203,7 @@ void intern_print_type_post(const type_t *type)
 {
 	switch(type->type) {
 	case TYPE_METHOD:
-		print_method_type_post((const method_type_t*) type);
+		print_method_type_post((const method_type_t*) type, NULL);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post((const pointer_type_t*) type);
@@ -203,7 +218,13 @@ void intern_print_type_post(const type_t *type)
 	}
 }
 
-void print_type(const type_t *type, const symbol_t *symbol)
+void print_type(const type_t *type)
+{
+	print_type_ext(type, NULL, NULL);
+}
+
+void print_type_ext(const type_t *type, const symbol_t *symbol,
+                    const context_t *context)
 {
 	if(type == NULL) {
 		fputs("nil type", out);
@@ -215,7 +236,11 @@ void print_type(const type_t *type, const symbol_t *symbol)
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
-	intern_print_type_post(type);
+	if(type->type == TYPE_METHOD) {
+		print_method_type_post((const method_type_t*) type, context);
+	} else {
+		intern_print_type_post(type);
+	}
 }
 
 int type_valid(const type_t *type)
@@ -252,7 +277,7 @@ void dbg_type(const type_t *type)
 {
 	FILE *old_out = out;
 	out = stderr;
-	print_type(type, NULL);
+	print_type(type);
 	puts("\n");
 	fflush(stderr);
 	out = old_out;

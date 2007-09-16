@@ -20,13 +20,17 @@ typedef enum {
 	EXPR_SELECT,
 	EXPR_ARRAY_ACCESS,
 	EXPR_SIZEOF,
+
+	EXPR_FUNCTION,
+	EXPR_PRETTY_FUNCTION,
+	EXPR_STATEMENT
 } expresion_type_t;
 
 struct context_t {
 	declaration_t   *declarations;
 	compound_type_t *structs;
 	compound_type_t *unions;
-	compound_type_t *enums;
+	enum_type_t     *enums;
 };
 
 struct expression_t {
@@ -113,7 +117,8 @@ typedef enum {
 	BINEXPR_SHIFTRIGHT_ASSIGN,
 	BINEXPR_BITWISE_AND_ASSIGN,
 	BINEXPR_BITWISE_XOR_ASSIGN,
-	BINEXPR_BITWISE_OR_ASSIGN
+	BINEXPR_BITWISE_OR_ASSIGN,
+	BINEXPR_COMMA
 } binary_expression_type_t;
 
 struct binary_expression_t {
@@ -140,6 +145,7 @@ struct array_access_expression_t {
 struct sizeof_expression_t {
 	expression_t  expression;
 	type_t       *type;
+	expression_t *size_expression;
 };
 
 struct conditional_expression_t {
@@ -149,14 +155,9 @@ struct conditional_expression_t {
 	expression_t *false_expression;
 };
 
-struct expression_list_element_t {
-	expression_t *expression;
-	expression_t *next;
-};
-
-struct comma_expression_t {
-	expression_t               expression;
-	expression_list_element_t *expressions;
+struct statement_expression_t {
+	expression_t  expression;
+	statement_t  *statement;
 };
 
 typedef enum {
@@ -165,7 +166,8 @@ typedef enum {
 	STORAGE_CLASS_EXTERN,
 	STORAGE_CLASS_STATIC,
 	STORAGE_CLASS_AUTO,
-	STORAGE_CLASS_REGISTER
+	STORAGE_CLASS_REGISTER,
+	STORAGE_CLASS_ENUM_ENTRY
 } storage_class_t;
 
 struct declaration_t {
@@ -186,10 +188,16 @@ typedef enum {
 	STATEMENT_RETURN,
 	STATEMENT_DECLARATION,
 	STATEMENT_IF,
+	STATEMENT_SWITCH,
 	STATEMENT_EXPRESSION,
 	STATEMENT_CONTINUE,
+	STATEMENT_BREAK,
 	STATEMENT_GOTO,
-	STATEMENT_LABEL
+	STATEMENT_LABEL,
+	STATEMENT_CASE_LABEL,
+	STATEMENT_WHILE,
+	STATEMENT_DO_WHILE,
+	STATEMENT_FOR
 } statement_type_t;
 
 struct statement_t {
@@ -211,7 +219,8 @@ struct compound_statement_t {
 
 struct declaration_statement_t {
 	statement_t    statement;
-	declaration_t  declaration;
+	declaration_t *declarations_begin;
+	declaration_t *declarations_end;
 
 	int            value_number; /**< filled in by semantic phase */
 	int            refs;
@@ -224,10 +233,21 @@ struct if_statement_t {
 	statement_t  *false_statement;
 };
 
+struct switch_statement_t {
+	statement_t   statement;
+	expression_t *expression;
+	statement_t  *body;
+};
+
 struct goto_statement_t {
 	statement_t        statement;
 	symbol_t          *label_symbol;
 	label_statement_t *label;
+};
+
+struct case_label_statement_t {
+	statement_t   statement;
+	expression_t *expression;
 };
 
 struct label_statement_t {
@@ -238,6 +258,27 @@ struct label_statement_t {
 struct expression_statement_t {
 	statement_t   statement;
 	expression_t *expression;
+};
+
+struct while_statement_t {
+	statement_t   statement;
+	expression_t *condition;
+	statement_t  *body;
+};
+
+struct do_while_statement_t {
+	statement_t   statement;
+	expression_t *condition;
+	statement_t  *body;
+};
+
+struct for_statement_t {
+	statement_t   statement;
+	expression_t  *initialisation;
+	expression_t  *condition;
+	expression_t  *step;
+	statement_t   *body;
+	context_t      context;
 };
 
 struct translation_unit_t {
