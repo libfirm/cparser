@@ -23,6 +23,8 @@ typedef enum {
 
 	EXPR_FUNCTION,
 	EXPR_PRETTY_FUNCTION,
+	EXPR_BUILTIN_SYMBOL,
+	EXPR_OFFSETOF,
 	EXPR_STATEMENT
 } expresion_type_t;
 
@@ -47,6 +49,11 @@ struct const_t {
 struct string_literal_t {
 	expression_t  expression;
 	const char   *value;
+};
+
+struct builtin_symbol_expression_t {
+	symbol_t     *symbol;
+	expression_t  expression;
 };
 
 struct reference_expression_t {
@@ -146,6 +153,18 @@ struct sizeof_expression_t {
 	expression_t  expression;
 	type_t       *type;
 	expression_t *size_expression;
+};
+
+struct member_designator_t {
+	symbol_t            *symbol;
+	expression_t        *array_access;
+	member_designator_t *next;
+};
+
+struct offsetof_expression_t {
+	expression_t         expression;
+	type_t              *type;
+	member_designator_t *member_designators;
 };
 
 struct conditional_expression_t {

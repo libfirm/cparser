@@ -185,6 +185,11 @@ static void print_sizeof_expression(const sizeof_expression_t *expression)
 	}
 }
 
+static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
+{
+	fputs(expression->symbol->string, out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -217,7 +222,11 @@ void print_expression(const expression_t *expression)
 	case EXPR_SIZEOF:
 		print_sizeof_expression((const sizeof_expression_t*) expression);
 		break;
+	case EXPR_BUILTIN_SYMBOL:
+		print_builtin_symbol((const builtin_symbol_expression_t*) expression);
+		break;
 
+	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
 	case EXPR_SELECT:
 		/* TODO */

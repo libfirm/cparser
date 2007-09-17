@@ -136,14 +136,12 @@ void print_pointer_type_pre(const pointer_type_t *type)
 	print_type_qualifiers(type->type.qualifiers);
 }
 
-static
-void print_pointer_type_post(const pointer_type_t *type)
+static void print_pointer_type_post(const pointer_type_t *type)
 {
 	intern_print_type_post(type->points_to);
 }
 
-static
-void print_type_enum(const enum_type_t *type)
+static void print_type_enum(const enum_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 	if(type->symbol != NULL) {
@@ -165,8 +163,7 @@ void print_type_enum(const enum_type_t *type)
 	}
 }
 
-static
-void intern_print_type_pre(const type_t *type)
+static void intern_print_type_pre(const type_t *type)
 {
 	switch(type->type) {
 	case TYPE_INVALID:
