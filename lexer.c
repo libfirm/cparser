@@ -5,6 +5,7 @@
 #include "symbol_table_t.h"
 #include "adt/error.h"
 #include "adt/strset.h"
+#include "adt/util.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -24,28 +25,24 @@ static strset_t    stringset;
 //static FILE      **input_stack;
 //static char      **buf_stack;
 
-static
-void error_prefix_at(const char *input_name, unsigned linenr)
+static void error_prefix_at(const char *input_name, unsigned linenr)
 {
 	fprintf(stderr, "%s:%u: Error: ", input_name, linenr);
 }
 
-static
-void error_prefix(void)
+static void error_prefix(void)
 {
 	error_prefix_at(lexer_token.source_position.input_name,
 	                lexer_token.source_position.linenr);
 }
 
-static
-void parse_error(const char *msg)
+static void parse_error(const char *msg)
 {
 	error_prefix();
 	fprintf(stderr, "%s\n", msg);
 }
 
-static inline
-void next_char(void)
+static inline void next_real_char(void)
 {
 	bufpos++;
 	if(bufpos >= bufend) {
@@ -59,13 +56,9 @@ void next_char(void)
 		bufend = buf + MAX_PUTBACK + s;
 	}
 	c = *(bufpos);
-#ifdef DEBUG_CHARS
-	printf("nchar '%c'\n", c);
-#endif
 }
 
-static inline
-void put_back(int pc)
+static inline void put_back(int pc)
 {
 	char *p = (char*) bufpos - 1;
 	bufpos--;
@@ -77,63 +70,80 @@ void put_back(int pc)
 #endif
 }
 
+static inline void next_char(void);
 
-static
-int replace_trigraph(void)
+#define MATCH_NEWLINE(code)                   \
+	case '\r':                                \
+		next_char();                          \
+		if(c == '\n') {                       \
+			next_char();                      \
+		}                                     \
+		lexer_token.source_position.linenr++; \
+		code;                                 \
+	case '\n':                                \
+		next_char();                          \
+		lexer_token.source_position.linenr++; \
+		code;
+
+static void maybe_concat_lines(void)
 {
-#define MATCH_TRIGRAPH(ch,replacement)           \
-	case ch:                                     \
-		c = replacement;                         \
-		return 1;
-
+	next_char();
 	switch(c) {
-	MATCH_TRIGRAPH('=', '#')
-	MATCH_TRIGRAPH('(', '[')
-	MATCH_TRIGRAPH('/', '\\')
-	MATCH_TRIGRAPH(')', ']')
-	MATCH_TRIGRAPH('\'', '^')
-	MATCH_TRIGRAPH('<', '{')
-	MATCH_TRIGRAPH('!', '|')
-	MATCH_TRIGRAPH('>', '}')
-	MATCH_TRIGRAPH('-', '~')
+	MATCH_NEWLINE(return;)
+
 	default:
 		break;
 	}
 
-	return 0;
+	put_back(c);
+	c = '\\';
 }
 
-#define SKIP_TRIGRAPHS(custom_putback, no_trigraph_code) \
-	case '?':                                  \
-		next_char();                           \
-		if(c != '?') {                         \
-			custom_putback;                    \
-			put_back(c);                       \
-			c = '?';                           \
-			no_trigraph_code;                  \
-		}                                      \
-		next_char();                           \
-		if(replace_trigraph()) {               \
-			break;                             \
-		}                                      \
-		custom_putback;                        \
-		put_back('?');                         \
-		put_back(c);                           \
-		c = '?';                               \
-		no_trigraph_code;
+static inline void next_char(void)
+{
+	next_real_char();
 
-#define EAT_NEWLINE(newline_code)              \
-	if(c == '\r') {                            \
-		next_char();                           \
-		if(c == '\n')                          \
-			next_char();                       \
-		lexer_token.source_position.linenr++;  \
-		newline_code;                          \
-	} else if(c == '\n') {                     \
-		next_char();                           \
-		lexer_token.source_position.linenr++;  \
-		newline_code;                          \
+	/* filter trigraphs */
+	if(UNLIKELY(c == '\\')) {
+		maybe_concat_lines();
+		goto end_of_next_char;
 	}
+
+	if(LIKELY(c != '?'))
+		goto end_of_next_char;
+
+	next_real_char();
+	if(LIKELY(c != '?')) {
+		put_back(c);
+		c = '?';
+		goto end_of_next_char;
+	}
+
+	next_real_char();
+	switch(c) {
+	case '=': c = '#'; break;
+	case '(': c = '['; break;
+	case '/': c = '\\'; maybe_concat_lines(); break;
+	case ')': c = ']'; break;
+	case '\'': c = '^'; break;
+	case '<': c = '{'; break;
+	case '!': c = '|'; break;
+	case '>': c = '}'; break;
+	case '-': c = '~'; break;
+	default:
+		put_back('?');
+		put_back(c);
+		c = '?';
+		break;
+	}
+
+end_of_next_char:
+#ifdef DEBUG_CHARS
+	printf("nchar '%c'\n", c);
+#else
+	;
+#endif
+}
 
 #define SYMBOL_CHARS  \
 	case 'a':         \
@@ -202,8 +212,7 @@ int replace_trigraph(void)
 	case '8':         \
 	case '9':
 
-static
-void parse_symbol(void)
+static void parse_symbol(void)
 {
 	symbol_t *symbol;
 	char     *string;
@@ -213,36 +222,17 @@ void parse_symbol(void)
 
 	while(1) {
 		switch(c) {
-		case '\\':
-			next_char();
-			EAT_NEWLINE(break;)
-			goto end_symbol;
-
 		DIGITS
 		SYMBOL_CHARS
 			obstack_1grow(&symbol_obstack, c);
 			next_char();
 			break;
 
-		case '?':
-			next_char();
-			if(c != '?') {
-				put_back(c);
-				c = '?';
-				goto end_symbol;
-			}
-			next_char();
-			if(replace_trigraph())
-				break;
-			put_back('?');
-			put_back(c);
-			c = '?';
-			goto end_symbol;
-
 		default:
 			goto end_symbol;
 		}
 	}
+
 end_symbol:
 	obstack_1grow(&symbol_obstack, '\0');
 
@@ -257,8 +247,7 @@ end_symbol:
 	}
 }
 
-static
-void parse_number_hex(void)
+static void parse_number_hex(void)
 {
 	assert(c == 'x' || c == 'X');
 	next_char();
@@ -288,16 +277,16 @@ void parse_number_hex(void)
 	}
 }
 
-static
-void parse_number_oct(void)
+static void parse_number_oct(void)
 {
-	assert(c == 'o' || c == 'O');
-	next_char();
-
 	int value = 0;
 	while(1) {
 		if ('0' <= c && c <= '7') {
 			value = 8 * value + c - '0';
+		} else if (c == '8' || c == '9') {
+			parse_error("invalid octal number");
+			lexer_token.type = T_ERROR;
+			return;
 		} else {
 			lexer_token.type       = T_INTEGER;
 			lexer_token.v.intvalue = value;
@@ -307,14 +296,9 @@ void parse_number_oct(void)
 	}
 }
 
-static
-void parse_number_dec(int first_char)
+static void parse_number_dec(void)
 {
 	int value = 0;
-	if(first_char > 0) {
-		assert(first_char >= '0' && first_char <= '9');
-		value = first_char - '0';
-	}
 
 	for(;;) {
 		if (isdigit(c)) {
@@ -328,24 +312,8 @@ void parse_number_dec(int first_char)
 	}
 }
 
-static
-void parse_number(void)
+static void parse_integer_suffix(void)
 {
-	// TODO check for overflow
-	// TODO check for various invalid inputs sequences
-
-	if (c == '0') {
-		next_char();
-		switch (c) {
-			case 'X':
-			case 'x': parse_number_hex(); break;
-			case 'o':
-			case 'O': parse_number_oct(); break;
-			default:  parse_number_dec('0');
-		}
-	} else {
-		parse_number_dec(0);
-	}
 	if(c == 'U' || c == 'U') {
 		/* TODO do something with the suffixes... */
 		next_char();
@@ -366,6 +334,22 @@ void parse_number(void)
 			next_char();
 		}
 	}
+}
+
+static void parse_number(void)
+{
+	if (c == '0') {
+		next_char();
+		switch (c) {
+			case 'X':
+			case 'x': parse_number_hex(); break;
+			default:  parse_number_oct(); break;
+		}
+	} else {
+		parse_number_dec();
+	}
+
+	parse_integer_suffix();
 }
 
 static int parse_octal_sequence(void)
@@ -407,11 +391,10 @@ static int parse_escape_sequence(void)
 		next_char();
 
 		switch(ec) {
-		case '"': return '"';
+		case '"':  return '"';
 		case '\'': return'\'';
-		case '\\':
-			EAT_NEWLINE(break;)
-			return '\\';
+		case '\\': return '\\';
+		case '?': return '\?';
 		case 'a': return '\a';
 		case 'b': return '\b';
 		case 'f': return '\f';
@@ -430,19 +413,6 @@ static int parse_escape_sequence(void)
 		case '6':
 		case '7':
 			return parse_octal_sequence();
-		case '?':
-			if(c != '?') {
-				return '?';
-			}
-			/* might be a trigraph */
-			next_char();
-			if(replace_trigraph()) {
-				break;
-			}
-			put_back(c);
-			c = '?';
-			return '?';
-
 		case EOF:
 			parse_error("reached end of file while parsing escape sequence");
 			return EOF;
@@ -470,8 +440,7 @@ const char *concat_strings(const char *s1, const char *s2)
 	return result;
 }
 
-static
-void parse_string_literal(void)
+static void parse_string_literal(void)
 {
 	unsigned    start_linenr = lexer_token.source_position.linenr;
 	char       *string;
@@ -482,15 +451,8 @@ void parse_string_literal(void)
 
 	while(1) {
 		switch(c) {
-		SKIP_TRIGRAPHS(,
-			obstack_1grow(&symbol_obstack, '?');
-			next_char();
-			break;
-		)
-
 		case '\\':
 			next_char();
-			EAT_NEWLINE(break;)
 			int ec = parse_escape_sequence();
 			obstack_1grow(&symbol_obstack, ec);
 			break;
@@ -531,21 +493,7 @@ end_of_string:
 	lexer_token.v.string = result;
 }
 
-#define MATCH_NEWLINE(code)                   \
-	case '\r':                                \
-		next_char();                          \
-		if(c == '\n') {                       \
-			next_char();                      \
-		}                                     \
-		lexer_token.source_position.linenr++; \
-		code;                                 \
-	case '\n':                                \
-		next_char();                          \
-		lexer_token.source_position.linenr++; \
-		code;
-
-static
-void parse_character_constant(void)
+static void parse_character_constant(void)
 {
 	assert(c == '\'');
 	next_char();
@@ -553,15 +501,8 @@ void parse_character_constant(void)
 	int found_char = 0;
 	while(1) {
 		switch(c) {
-		SKIP_TRIGRAPHS(,
-			next_char();
-			found_char = '?';
-			break;
-		)
-
 		case '\\':
 			next_char();
-			EAT_NEWLINE(break;)
 			found_char = parse_escape_sequence();
 			break;
 
@@ -597,92 +538,44 @@ end_of_char_constant:
 	lexer_token.v.intvalue = found_char;
 }
 
-static
-void skip_multiline_comment(void)
+static void skip_multiline_comment(void)
 {
 	unsigned start_linenr = lexer_token.source_position.linenr;
-	int had_star = 0;
 
 	while(1) {
 		switch(c) {
 		case '*':
 			next_char();
-			had_star = 1;
-			break;
-
-		case '/':
-			next_char();
-			if(had_star) {
+			if(c == '/') {
+				next_char();
 				return;
 			}
-			had_star = 0;
 			break;
 
-		case '\\':
-			next_char();
-			EAT_NEWLINE(break;)
-			had_star = 0;
-			break;
-
-		case '?':
-			next_char();
-			if(c != '?') {
-				had_star = 0;
-				break;
-			}
-			next_char();
-			if(replace_trigraph())
-				break;
-			put_back(c);
-			c = '?';
-			had_star = 0;
-			/* we don't put back the 2nd ? as the comment text is discarded
-			 * anyway */
-			break;
-
-		MATCH_NEWLINE(had_star = 0; break;)
+		MATCH_NEWLINE(break;)
 
 		case EOF:
 			error_prefix_at(lexer_token.source_position.input_name,
 			                start_linenr);
 			fprintf(stderr, "at end of file while looking for comment end\n");
 			return;
+
 		default:
-			had_star = 0;
 			next_char();
 			break;
 		}
 	}
 }
 
-static
-void skip_line_comment(void)
+static void skip_line_comment(void)
 {
 	while(1) {
 		switch(c) {
-		case '?':
-			next_char();
-			if(c != '?')
-				break;
-			next_char();
-			if(replace_trigraph())
-				break;
-			put_back('?');
-			/* we don't put back the 2nd ? as the comment text is discarded
-			 * anyway */
-			break;
-
-		case '\\':
-			next_char();
-			if(c == '\n') {
-				next_char();
-				lexer_token.source_position.linenr++;
-			}
-			break;
-
 		case EOF:
-		case '\r':
+			return;
+
 		case '\n':
+		case '\r':
 			return;
 
 		default:
@@ -694,23 +587,20 @@ void skip_line_comment(void)
 
 static token_t pp_token;
 
-static inline
-void next_pp_token(void)
+static inline void next_pp_token(void)
 {
 	lexer_next_preprocessing_token();
 	pp_token = lexer_token;
 }
 
-static
-void eat_until_newline(void)
+static void eat_until_newline(void)
 {
 	while(pp_token.type != '\n' && pp_token.type != T_EOF) {
 		next_pp_token();
 	}
 }
 
-static
-void error_directive(void)
+static void error_directive(void)
 {
 	error_prefix();
 	fprintf(stderr, "#error directive: \n");
@@ -718,8 +608,7 @@ void error_directive(void)
 	/* parse pp-tokens until new-line */
 }
 
-static
-void define_directive(void)
+static void define_directive(void)
 {
 	lexer_next_preprocessing_token();
 	if(lexer_token.type != T_IDENTIFIER) {
@@ -728,8 +617,7 @@ void define_directive(void)
 	}
 }
 
-static
-void ifdef_directive(int is_ifndef)
+static void ifdef_directive(int is_ifndef)
 {
 	(void) is_ifndef;
 	lexer_next_preprocessing_token();
@@ -737,14 +625,12 @@ void ifdef_directive(int is_ifndef)
 	//extect_newline();
 }
 
-static
-void endif_directive(void)
+static void endif_directive(void)
 {
 	//expect_newline();
 }
 
-static
-void parse_line_directive(void)
+static void parse_line_directive(void)
 {
 	if(pp_token.type != T_INTEGER) {
 		parse_error("expected integer");
@@ -760,8 +646,7 @@ void parse_line_directive(void)
 	eat_until_newline();
 }
 
-static
-void parse_preprocessor_identifier(void)
+static void parse_preprocessor_identifier(void)
 {
 	assert(pp_token.type == T_IDENTIFIER);
 	symbol_t *symbol = pp_token.v.symbol;
@@ -798,8 +683,7 @@ void parse_preprocessor_identifier(void)
 	}
 }
 
-static
-void parse_preprocessor_directive()
+static void parse_preprocessor_directive()
 {
 	next_pp_token();
 
@@ -829,14 +713,6 @@ void parse_preprocessor_directive()
 					return;
 
 #define ELSE_CODE(code)                                    \
-				SKIP_TRIGRAPHS(,                           \
-					code;                                  \
-				)                                          \
-														   \
-				case '\\':                                 \
-					next_char();                           \
-					EAT_NEWLINE(break;)                    \
-					/* fallthrough */                      \
 				default:                                   \
 					code;                                  \
 				}                                          \
@@ -877,18 +753,6 @@ void lexer_next_preprocessing_token(void)
 
 		case '\'':
 			parse_character_constant();
-			return;
-
-		case '\\':
-			next_char();
-			if(c == '\n') {
-				next_char();
-				lexer_token.source_position.linenr++;
-				break;
-			} else {
-				parse_error("unexpected '\\' found");
-				lexer_token.type = T_ERROR;
-			}
 			return;
 
 		case '.':
@@ -999,22 +863,6 @@ void lexer_next_preprocessing_token(void)
 			ELSE('#')
 
 		case '?':
-			next_char();
-			/* just a simple ? */
-			if(c != '?') {
-				lexer_token.type = '?';
-				return;
-			}
-			/* might be a trigraph */
-			next_char();
-			if(replace_trigraph()) {
-				break;
-			}
-			put_back(c);
-			c = '?';
-			lexer_token.type = '?';
-			return;
-
 		case '[':
 		case ']':
 		case '(':
@@ -1024,6 +872,7 @@ void lexer_next_preprocessing_token(void)
 		case '~':
 		case ';':
 		case ',':
+		case '\\':
 			lexer_token.type = c;
 			next_char();
 			return;
@@ -1067,12 +916,10 @@ void init_lexer(void)
 void lexer_open_stream(FILE *stream, const char *input_name)
 {
 	input                                  = stream;
-	lexer_token.source_position.linenr     = 0;
+	lexer_token.source_position.linenr     = 1;
 	lexer_token.source_position.input_name = input_name;
 
-	/* we place a virtual '\n' at the beginning so the lexer knows we're at the
-	 * beginning of a line */
-	c = '\n';
+	next_char();
 }
 
 void exit_lexer(void)

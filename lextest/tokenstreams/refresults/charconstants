@@ -1,19 +1,17 @@
-'newline'
 integer number 97
 'newline'
 integer number 98
 'newline'
 integer number 99
 'newline'
-integer number 92
+integer number 100
 'newline'
-integer number 92
+integer number 39
+integer number 39
 'newline'
-integer number 92
+integer number 39
 'newline'
-integer number 92
-'newline'
-integer number 92
+integer number 39
 'newline'
 'newline'
 end of file

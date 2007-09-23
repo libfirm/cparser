@@ -226,6 +226,7 @@ void print_expression(const expression_t *expression)
 		print_builtin_symbol((const builtin_symbol_expression_t*) expression);
 		break;
 
+	case EXPR_CONDITIONAL:
 	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
 	case EXPR_SELECT:

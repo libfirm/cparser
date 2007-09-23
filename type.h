@@ -2,6 +2,7 @@
 #define TYPE_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include "symbol.h"
 
 typedef struct type_t                   type_t;
@@ -32,14 +33,24 @@ void print_type_ext(const type_t *type, const symbol_t *symbol,
 void type_set_output(FILE *out);
 
 /**
- * returns 1 if type contains integer numbers
+ * returns true if type contains integer numbers
  */
-int is_type_int(const type_t *type);
+bool is_type_integer(const type_t *type);
 
 /**
- * returns 1 if the type is valid. A type is valid if it contains no unresolved
- * references anymore and is not of TYPE_INVALID.
+ * returns true if the type is valid. A type is valid if it contains no
+ * unresolved references anymore and is not of TYPE_INVALID.
  */
-int type_valid(const type_t *type);
+bool type_valid(const type_t *type);
+
+/**
+ * returns true if the type is an arithmetic type (6.2.18)
+ */
+bool is_type_arithmetic(const type_t *type);
+
+/**
+ * returns true if the type is a scalar type (6.2.21)
+ */
+bool is_type_scalar(const type_t *type);
 
 #endif

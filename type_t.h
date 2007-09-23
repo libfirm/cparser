@@ -109,4 +109,7 @@ struct compound_type_t {
 	compound_type_t   *next;
 };
 
+type_t *make_atomic_type(atomic_type_type_t type, unsigned qualifiers);
+type_t *make_pointer_type(type_t *points_to, unsigned qualifiers);
+
 #endif

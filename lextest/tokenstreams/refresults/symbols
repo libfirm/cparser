@@ -1,4 +1,3 @@
-'newline'
 symbol 't'
 'newline'
 symbol 'tt'
@@ -20,6 +19,7 @@ symbol 'symbo'
 'newline'
 'newline'
 symbol 'one'
+'\'
 symbol 'two'
 'newline'
 end of file

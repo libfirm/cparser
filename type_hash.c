@@ -27,8 +27,9 @@ static unsigned hash_ptr(const void *ptr)
 static unsigned hash_atomic_type(const atomic_type_t *type)
 {
 	unsigned some_prime = 27644437;
+	unsigned result     = type->atype * some_prime;
 
-	return type->atype * some_prime;
+	return result;
 }
 
 static unsigned hash_pointer_type(const pointer_type_t *type)

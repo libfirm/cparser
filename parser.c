@@ -33,6 +33,12 @@ static context_t            *context           = NULL;
 static declaration_t        *last_declaration  = NULL;
 static struct obstack        temp_obst;
 
+static type_t               *type_int        = NULL;
+static type_t               *type_const_char = NULL;
+static type_t               *type_string     = NULL;
+static type_t               *type_void       = NULL;
+static type_t               *type_size_t     = NULL;
+
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
 
@@ -282,7 +288,7 @@ static void set_context(context_t *new_context)
  * called when we find a 2nd declarator for an identifier we already have a
  * declarator for
  */
-static int is_compatible_declaration (declaration_t *declaration,
+static bool is_compatible_declaration (declaration_t *declaration,
                                       declaration_t *previous)
 {
 	/* TODO: not correct yet */
@@ -405,7 +411,7 @@ static compound_type_t *find_compound_type(compound_type_t *types,
 	return NULL;
 }
 
-static type_t *parse_compound_type_specifier(int is_struct)
+static type_t *parse_compound_type_specifier(bool is_struct)
 {
 	if(is_struct) {
 		eat(T_struct);
@@ -805,10 +811,10 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		/* TODO: if type != NULL for the following rules issue an error */
 		case T_struct:
-			type = parse_compound_type_specifier(1);
+			type = parse_compound_type_specifier(true);
 			break;
 		case T_union:
-			type = parse_compound_type_specifier(0);
+			type = parse_compound_type_specifier(false);
 			break;
 		case T_enum:
 			type = parse_enum_specifier();
@@ -1490,8 +1496,9 @@ static expression_t *parse_string_const(void)
 {
 	string_literal_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
-	cnst->expression.type = EXPR_STRING_LITERAL;
-	cnst->value           = parse_string_literals();
+	cnst->expression.type     = EXPR_STRING_LITERAL;
+	cnst->expression.datatype = type_string;
+	cnst->value               = parse_string_literals();
 
 	return (expression_t*) cnst;
 }
@@ -1500,8 +1507,9 @@ static expression_t *parse_int_const(void)
 {
 	const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
-	cnst->expression.type = EXPR_CONST;
-	cnst->value           = token.v.intvalue;
+	cnst->expression.type     = EXPR_CONST;
+	cnst->expression.datatype = type_int;
+	cnst->value               = token.v.intvalue;
 
 	next_token();
 
@@ -1519,11 +1527,19 @@ static expression_t *parse_reference(void)
 		parser_print_error_prefix();
 		fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
 	}
-	ref->declaration     = ref->symbol->declaration;
+	ref->declaration         = ref->symbol->declaration;
+	ref->expression.datatype = ref->declaration->type;
 
 	next_token();
 
 	return (expression_t*) ref;
+}
+
+static void check_cast_allowed(expression_t *expression, type_t *dest_type)
+{
+	(void) expression;
+	(void) dest_type;
+	/* TODO check if cast is allowed and issue warnings/errors */
 }
 
 static expression_t *parse_cast(void)
@@ -1539,6 +1555,8 @@ static expression_t *parse_cast(void)
 	expect(')');
 	expression_t *value = parse_sub_expression(20);
 
+	check_cast_allowed(value, type);
+
 	cast->expression.datatype = type;
 	cast->value               = value;
 
@@ -1551,6 +1569,22 @@ static expression_t *parse_statement_expression(void)
 		= allocate_ast_zero(sizeof(expression[0]));
 	expression->expression.type = EXPR_STATEMENT;
 	expression->statement       = parse_compound_statement();
+
+	/* find last statement and use it's type */
+	const statement_t *last_statement = NULL;
+	const statement_t *statement      = expression->statement;
+	for( ; statement != NULL; statement = statement->next) {
+		last_statement = statement;
+	}
+
+	if(last_statement->type == STATEMENT_EXPRESSION) {
+		const expression_statement_t *expression_statement =
+			(const expression_statement_t*) last_statement;
+		expression->expression.datatype
+			= expression_statement->expression->datatype;
+	} else {
+		expression->expression.datatype = type_void;
+	}
 
 	expect(')');
 
@@ -1590,8 +1624,9 @@ static expression_t *parse_function_keyword(void)
 	/* TODO */
 
 	string_literal_t *expression = allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type  = EXPR_FUNCTION;
-	expression->value            = "TODO: FUNCTION";
+	expression->expression.type     = EXPR_FUNCTION;
+	expression->expression.datatype = type_string;
+	expression->value               = "TODO: FUNCTION";
 
 	return (expression_t*) expression;
 }
@@ -1602,8 +1637,9 @@ static expression_t *parse_pretty_function_keyword(void)
 	/* TODO */
 
 	string_literal_t *expression = allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type  = EXPR_PRETTY_FUNCTION;
-	expression->value            = "TODO: PRETTY FUNCTION";
+	expression->expression.type     = EXPR_PRETTY_FUNCTION;
+	expression->expression.datatype = type_string;
+	expression->value               = "TODO: PRETTY FUNCTION";
 
 	return (expression_t*) expression;
 }
@@ -1667,7 +1703,8 @@ static expression_t *parse_offsetof(void)
 
 	offsetof_expression_t *expression
 		= allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type = EXPR_OFFSETOF;
+	expression->expression.type     = EXPR_OFFSETOF;
+	expression->expression.datatype = type_size_t;
 
 	expect('(');
 	expression->type = parse_typename();
@@ -1683,6 +1720,8 @@ static expression_t *parse_builtin_symbol(void)
 	builtin_symbol_expression_t *expression
 		= allocate_ast_zero(sizeof(expression[0]));
 	expression->expression.type = EXPR_BUILTIN_SYMBOL;
+
+	/* TODO: set datatype */
 
 	expression->symbol = token.v.symbol;
 
@@ -1725,7 +1764,7 @@ static expression_t *parse_primary_expression(void)
 }
 
 static expression_t *parse_array_expression(unsigned precedence,
-                                     expression_t *array_ref)
+                                            expression_t *array_ref)
 {
 	(void) precedence;
 
@@ -1734,9 +1773,19 @@ static expression_t *parse_array_expression(unsigned precedence,
 	array_access_expression_t *array_access
 		= allocate_ast_zero(sizeof(array_access[0]));
 
-	array_access->expression.type = EXPR_ARRAY_ACCESS;
-	array_access->array_ref       = array_ref;
-	array_access->index           = parse_expression();
+	array_access->expression.type     = EXPR_ARRAY_ACCESS;
+	array_access->array_ref           = array_ref;
+	array_access->index               = parse_expression();
+
+	type_t *array_type = array_ref->datatype;
+	if(array_type != NULL) {
+		if(array_type->type == TYPE_POINTER) {
+			pointer_type_t *pointer           = (pointer_type_t*) array_type;
+			array_access->expression.datatype = pointer->points_to;
+		} else {
+			parse_error("array access on non-pointer type");
+		}
+	}
 
 	if(token.type != ']') {
 		parse_error_expected("Problem while parsing array access", ']', 0);
@@ -1747,15 +1796,8 @@ static expression_t *parse_array_expression(unsigned precedence,
 	return (expression_t*) array_access;
 }
 
-static type_t *get_expression_type(const expression_t *expression)
-{
-	(void) expression;
-	/* TODO */
-	return NULL;
-}
-
-static int is_declaration_specifier(const token_t *token,
-                                    int only_type_specifiers)
+static bool is_declaration_specifier(const token_t *token,
+                                     bool only_type_specifiers)
 {
 	declaration_t *declaration;
 
@@ -1786,15 +1828,16 @@ static expression_t *parse_sizeof(unsigned precedence)
 
 	sizeof_expression_t *sizeof_expression
 		= allocate_ast_zero(sizeof(sizeof_expression[0]));
-	sizeof_expression->expression.type = EXPR_SIZEOF;
+	sizeof_expression->expression.type     = EXPR_SIZEOF;
+	sizeof_expression->expression.datatype = type_size_t;
 
-	if(token.type == '(' && is_declaration_specifier(look_ahead(1), 1)) {
+	if(token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		sizeof_expression->type = parse_typename();
 		expect(')');
 	} else {
 		expression_t *expression           = parse_sub_expression(precedence);
-		sizeof_expression->type            = get_expression_type(expression);
+		sizeof_expression->type            = expression->datatype;
 		sizeof_expression->size_expression = expression;
 	}
 
@@ -1814,9 +1857,10 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->expression.type = EXPR_SELECT;
 	select->compound        = compound;
 
+	/* TODO: datatype */
+
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("Problem while parsing compound select",
-		                     T_IDENTIFIER, 0);
+		parse_error_expected("Problem while parsing select", T_IDENTIFIER, 0);
 		return NULL;
 	}
 	select->symbol = token.v.symbol;
@@ -1831,8 +1875,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 	(void) precedence;
 	call_expression_t *call = allocate_ast_zero(sizeof(call[0]));
 
-	call->expression.type            = EXPR_CALL;
-	call->method                     = expression;
+	call->expression.type     = EXPR_CALL;
+	call->method              = expression;
 
 	/* parse arguments */
 	eat('(');
@@ -1858,7 +1902,47 @@ static expression_t *parse_call_expression(unsigned precedence,
 	}
 	expect(')');
 
+	type_t *type = expression->datatype;
+	if(type != NULL && type->type != TYPE_METHOD) {
+		parser_print_error_prefix();
+		fprintf(stderr, "expected a method type for call but found type ");
+		print_type(expression->datatype);
+		fprintf(stderr, "\n");
+	} else {
+		method_type_t *method_type = (method_type_t*) type;
+		call->expression.datatype  = method_type->result_type;
+	}
+
 	return (expression_t*) call;
+}
+
+static void type_error(const char *msg, const source_position_t source_position,
+                       const type_t *type)
+{
+	parser_print_error_prefix_pos(source_position);
+	fprintf(stderr, "%s, but found type ", msg);
+	print_type(type);
+	fputc('\n', stderr);
+}
+
+static void type_error_incompatible(const char *msg,
+		const source_position_t source_position, const type_t *type1,
+		const type_t *type2)
+{
+	parser_print_error_prefix_pos(source_position);
+	fprintf(stderr, "%s, incompatible types: ", msg);
+	print_type(type1);
+	fprintf(stderr, " - ");
+	print_type(type2);
+	fprintf(stderr, ")\n");
+}
+
+static type_t *get_type_after_conversion(const type_t *type1,
+                                         const type_t *type2)
+{
+	/* TODO... */
+	(void) type2;
+	return (type_t*) type1;
 }
 
 static expression_t *parse_conditional_expression(unsigned precedence,
@@ -1868,11 +1952,51 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	conditional_expression_t *conditional
 		= allocate_ast_zero(sizeof(conditional[0]));
+	conditional->expression.type = EXPR_CONDITIONAL;
 	conditional->condition = expression;
+
+	/* 6.5.15.2 */
+	type_t *condition_type = conditional->condition->datatype;
+	if(condition_type != NULL) {
+		if(!is_type_scalar(condition_type)) {
+			type_error("expected a scalar type", expression->source_position,
+			           condition_type);
+		}
+	}
 
 	conditional->true_expression = parse_expression();
 	expect(':');
 	conditional->false_expression = parse_sub_expression(precedence);
+
+	type_t *true_type  = conditional->true_expression->datatype;
+	if(true_type == NULL)
+		return (expression_t*) conditional;
+	type_t *false_type = conditional->false_expression->datatype;
+	if(false_type == NULL)
+		return (expression_t*) conditional;
+
+	/* 6.4.15.3 */
+	if(true_type == false_type) {
+		conditional->expression.datatype = true_type;
+	} else if(is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
+		type_t *result = get_type_after_conversion(true_type, false_type);
+		/* TODO: create implicit convs if necessary */
+		conditional->expression.datatype = result;
+	} else if(true_type->type == TYPE_POINTER &&
+	          false_type->type == TYPE_POINTER &&
+			  true /* TODO compatible points_to types */) {
+		/* TODO */
+	} else if(/* (is_null_ptr_const(true_type) && false_type->type == TYPE_POINTER)
+	       || (is_null_ptr_const(false_type) &&
+	           true_type->type == TYPE_POINTER) TODO*/ false) {
+		/* TODO */
+	} else if(/* 1 is pointer to object type, other is void* */ false) {
+		/* TODO */
+	} else {
+		type_error_incompatible("problem while parsing conditional",
+		                        expression->source_position, true_type,
+		                        false_type);
+	}
 
 	return (expression_t*) conditional;
 }
@@ -1996,8 +2120,9 @@ static expression_t *parse_sub_expression(unsigned precedence)
 	} else {
 		left = parse_primary_expression();
 	}
-	if(left != NULL)
-		left->source_position = source_position;
+	assert(left != NULL);
+	assert(left->type != EXPR_INVALID);
+	left->source_position = source_position;
 
 	while(true) {
 		if(token.type < 0) {
@@ -2011,8 +2136,10 @@ static expression_t *parse_sub_expression(unsigned precedence)
 			break;
 
 		left = parser->infix_parser(parser->infix_precedence, left);
-		if(left != NULL)
-			left->source_position = source_position;
+
+		assert(left != NULL);
+		assert(left->type != EXPR_INVALID);
+		left->source_position = source_position;
 	}
 
 	return left;
@@ -2250,7 +2377,7 @@ static statement_t *parse_for(void)
 	set_context(&statement->context);
 
 	if(token.type != ';') {
-		if(is_declaration_specifier(&token, 0)) {
+		if(is_declaration_specifier(&token, false)) {
 			parse_declaration();
 		} else {
 			statement->initialisation = parse_expression();
@@ -2549,6 +2676,12 @@ void init_parser(void)
 {
 	init_expression_parsers();
 	obstack_init(&temp_obst);
+
+	type_int        = make_atomic_type(ATOMIC_TYPE_INT, 0);
+	type_size_t     = make_atomic_type(ATOMIC_TYPE_UINT, 0);
+	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
+	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, 0);
+	type_string     = make_pointer_type(type_const_char, 0);
 }
 
 void exit_parser(void)
