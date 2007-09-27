@@ -142,6 +142,19 @@ static void print_pointer_type_post(const pointer_type_t *type)
 	intern_print_type_post(type->points_to);
 }
 
+static void print_array_type_post(const array_type_t *type)
+{
+	fputc('[', out);
+	if(type->is_static) {
+		fputs("static ", out);
+	}
+	print_type_qualifiers(type->type.qualifiers);
+	if(type->size != NULL) {
+		print_expression(type->size);
+	}
+	fputc(']', out);
+}
+
 static void print_type_enum(const enum_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
@@ -192,6 +205,8 @@ static void intern_print_type_pre(const type_t *type)
 	case TYPE_POINTER:
 		print_pointer_type_pre((const pointer_type_t*) type);
 		return;
+	case TYPE_ARRAY:
+		return;
 	}
 	fputs("unknown", out);
 }
@@ -205,6 +220,9 @@ void intern_print_type_post(const type_t *type)
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post((const pointer_type_t*) type);
+		return;
+	case TYPE_ARRAY:
+		print_array_type_post((const array_type_t*) type);
 		return;
 	case TYPE_INVALID:
 	case TYPE_ATOMIC:

@@ -1,6 +1,8 @@
 #ifndef TYPE_T_H
 #define TYPE_T_H
 
+#include <stdbool.h>
+
 #include "type.h"
 #include "symbol.h"
 #include "token_t.h"
@@ -17,6 +19,7 @@ typedef enum {
 	TYPE_ENUM,
 	TYPE_METHOD,
 	TYPE_POINTER,
+	TYPE_ARRAY,
 	TYPE_BUILTIN
 } type_type_t;
 
@@ -58,8 +61,8 @@ typedef enum {
 } type_qualifier_t;
 
 struct type_t {
-	type_type_t  type;
-	unsigned     qualifiers;
+	type_type_t       type;
+	type_qualifier_t  qualifiers;
 };
 
 struct atomic_type_t {
@@ -79,12 +82,20 @@ struct enum_type_t {
 	enum_type_t       *next;
 	declaration_t     *entries_begin;
 	declaration_t     *entries_end;
-	int                defined;
+	bool               defined;
 };
 
 struct pointer_type_t {
 	type_t   type;
 	type_t  *points_to;
+};
+
+struct array_type_t {
+	type_t        type;
+	type_t       *element_type;
+	bool          is_static;
+	bool          is_variable;
+	expression_t *size;
 };
 
 struct method_parameter_t {
@@ -96,8 +107,8 @@ struct method_type_t {
 	type_t              type;
 	type_t             *result_type;
 	method_parameter_t *parameters;
-	int                 variadic;
-	int                 unspecified_parameters;
+	bool                variadic;
+	bool                unspecified_parameters;
 };
 
 struct compound_type_t {
@@ -105,11 +116,11 @@ struct compound_type_t {
 	symbol_t          *symbol;
 	context_t          context;
 	source_position_t  source_position;
-	int                defined;
+	bool               defined;
 	compound_type_t   *next;
 };
 
-type_t *make_atomic_type(atomic_type_type_t type, unsigned qualifiers);
-type_t *make_pointer_type(type_t *points_to, unsigned qualifiers);
+type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers);
+type_t *make_pointer_type(type_t *points_to, type_qualifier_t qualifiers);
 
 #endif

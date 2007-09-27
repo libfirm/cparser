@@ -4,6 +4,7 @@
 
 TS(IDENTIFIER,     "identifier", = 256)
 TS(INTEGER,        "integer number",)
+TS(FLOATINGPOINT,  "floatingpoint number",)
 TS(STRING_LITERAL, "string literal",)
 
 #define S(x)   T(x,#x,)

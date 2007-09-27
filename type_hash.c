@@ -1,5 +1,7 @@
 #include <config.h>
 
+#include <stdbool.h>
+
 #include "type_hash.h"
 
 #include "adt/error.h"
@@ -35,6 +37,11 @@ static unsigned hash_atomic_type(const atomic_type_t *type)
 static unsigned hash_pointer_type(const pointer_type_t *type)
 {
 	return hash_ptr(type->points_to);
+}
+
+static unsigned hash_array_type(const array_type_t *type)
+{
+	return hash_ptr(type->element_type);
 }
 
 static unsigned hash_compound_type(const compound_type_t *type)
@@ -90,6 +97,9 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_POINTER:
 		hash = hash_pointer_type((const pointer_type_t*) type);
 		break;
+	case TYPE_ARRAY:
+		hash = hash_array_type((const array_type_t*) type);
+		break;
 	case TYPE_BUILTIN:
 		hash = hash_ptr(((const builtin_type_t*) type)->symbol);
 		break;
@@ -101,97 +111,113 @@ static unsigned hash_type(const type_t *type)
 	return hash;
 }
 
-static int atomic_types_equal(const atomic_type_t *type1,
-                              const atomic_type_t *type2)
+static bool atomic_types_equal(const atomic_type_t *type1,
+                               const atomic_type_t *type2)
 {
 	return type1->atype == type2->atype;
 }
 
-static int compound_types_equal(const compound_type_t *type1,
-                                const compound_type_t *type2)
+static bool compound_types_equal(const compound_type_t *type1,
+                                 const compound_type_t *type2)
 {
 	if(type1->type.type != type2->type.type)
-		return 0;
+		return false;
 	if(type1->symbol != type2->symbol)
-		return 0;
+		return false;
 
 	/* anonymous types? */
 	if(type1->symbol == NULL) {
 		/* previous tests should already have checked for this */
 		assert(type1 != type2);
 		/* anonymous types are only equal if they are the very same type */
-		return 0;
+		return false;
 	}
 
 	/* non-anonymous types with same symbol are equal */
-	return 1;
+	return true;
 }
 
-static int enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
+static bool enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
 {
 	if(type1->symbol != type2->symbol)
-		return 0;
+		return false;
 
 	/* anonymous types? */
 	if(type1->symbol == NULL) {
 		/* previous tests should already have checked for this */
 		assert(type1 != type2);
 		/* 2 anonymous enums are never equal */
-		return 0;
+		return false;
 	}
 
 	/* non-anonymous types with same symbol are equal */
-	return 1;
+	return true;
 }
 
-static int method_types_equal(const method_type_t *type1,
-                              const method_type_t *type2)
+static bool method_types_equal(const method_type_t *type1,
+                               const method_type_t *type2)
 {
 	if(type1->result_type != type2->result_type)
-		return 0;
+		return false;
 	if(type1->variadic != type2->variadic)
-		return 0;
+		return false;
 	if(type1->unspecified_parameters != type2->unspecified_parameters)
-		return 0;
+		return false;
 
 	method_parameter_t *param1 = type1->parameters;
 	method_parameter_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
 		if(param1->type != param2->type)
-			return 0;
+			return false;
 		param1 = param1->next;
 		param2 = param2->next;
 	}
 	if(param1 != NULL || param2 != NULL)
-		return 0;
+		return false;
 
-	return 1;
+	return true;
 }
 
-static int pointer_types_equal(const pointer_type_t *type1,
-                               const pointer_type_t *type2)
+static bool pointer_types_equal(const pointer_type_t *type1,
+                                const pointer_type_t *type2)
 {
 	return type1->points_to == type2->points_to;
 }
 
-static int builtin_types_equal(const builtin_type_t *type1,
-                               const builtin_type_t *type2)
+static bool array_types_equal(const array_type_t *type1,
+                              const array_type_t *type2)
+{
+	if(type1->element_type != type2->element_type)
+		return false;
+	if(type1->is_variable != type2->is_variable)
+		return false;
+	if(type1->is_static != type2->is_static)
+		return false;
+	/* TODO: compare expressions for equality... */
+	if(type1->size != type2->size)
+		return false;
+
+	return true;
+}
+
+static bool builtin_types_equal(const builtin_type_t *type1,
+                                const builtin_type_t *type2)
 {
 	return type1->symbol == type2->symbol;
 }
 
-static int types_equal(const type_t *type1, const type_t *type2)
+static bool types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
-		return 1;
+		return true;
 	if(type1->type != type2->type)
-		return 0;
+		return false;
 	if(type1->qualifiers != type2->qualifiers)
-		return 0;
+		return false;
 
 	switch(type1->type) {
 	case TYPE_INVALID:
-		return 0;
+		return false;
 	case TYPE_ATOMIC:
 		return atomic_types_equal((const atomic_type_t*) type1,
 		                          (const atomic_type_t*) type2);
@@ -208,6 +234,9 @@ static int types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_POINTER:
 		return pointer_types_equal((const pointer_type_t*) type1,
 		                           (const pointer_type_t*) type2);
+	case TYPE_ARRAY:
+		return array_types_equal((const array_type_t*) type1,
+		                         (const array_type_t*) type2);
 	case TYPE_BUILTIN:
 		return builtin_types_equal((const builtin_type_t*) type1,
 		                           (const builtin_type_t*) type2);

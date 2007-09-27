@@ -35,6 +35,7 @@ typedef struct {
 	union {
 		symbol_t   *symbol;
 		int         intvalue;
+		double      floatvalue;
 		const char *string;
 	} v;
 	source_position_t  source_position;

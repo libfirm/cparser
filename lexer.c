@@ -247,71 +247,6 @@ end_symbol:
 	}
 }
 
-static void parse_number_hex(void)
-{
-	assert(c == 'x' || c == 'X');
-	next_char();
-
-	if (!isdigit(c) &&
-		!('A' <= c && c <= 'F') &&
-		!('a' <= c && c <= 'f')) {
-		parse_error("premature end of hex number literal");
-		lexer_token.type = T_ERROR;
-		return;
-	}
-
-	int value = 0;
-	while(1) {
-		if (isdigit(c)) {
-			value = 16 * value + c - '0';
-		} else if ('A' <= c && c <= 'F') {
-			value = 16 * value + c - 'A' + 10;
-		} else if ('a' <= c && c <= 'f') {
-			value = 16 * value + c - 'a' + 10;
-		} else {
-			lexer_token.type     = T_INTEGER;
-			lexer_token.v.intvalue = value;
-			return;
-		}
-		next_char();
-	}
-}
-
-static void parse_number_oct(void)
-{
-	int value = 0;
-	while(1) {
-		if ('0' <= c && c <= '7') {
-			value = 8 * value + c - '0';
-		} else if (c == '8' || c == '9') {
-			parse_error("invalid octal number");
-			lexer_token.type = T_ERROR;
-			return;
-		} else {
-			lexer_token.type       = T_INTEGER;
-			lexer_token.v.intvalue = value;
-			return;
-		}
-		next_char();
-	}
-}
-
-static void parse_number_dec(void)
-{
-	int value = 0;
-
-	for(;;) {
-		if (isdigit(c)) {
-			value = 10 * value + c - '0';
-		} else {
-			lexer_token.type       = T_INTEGER;
-			lexer_token.v.intvalue = value;
-			return;
-		}
-		next_char();
-	}
-}
-
 static void parse_integer_suffix(void)
 {
 	if(c == 'U' || c == 'U') {
@@ -336,20 +271,180 @@ static void parse_integer_suffix(void)
 	}
 }
 
+static void parse_number_hex(void)
+{
+	assert(c == 'x' || c == 'X');
+	next_char();
+
+	if (!isdigit(c) &&
+		!('A' <= c && c <= 'F') &&
+		!('a' <= c && c <= 'f')) {
+		parse_error("premature end of hex number literal");
+		lexer_token.type = T_ERROR;
+		return;
+	}
+
+	int value = 0;
+	while(1) {
+		if (isdigit(c)) {
+			value = 16 * value + c - '0';
+		} else if ('A' <= c && c <= 'F') {
+			value = 16 * value + c - 'A' + 10;
+		} else if ('a' <= c && c <= 'f') {
+			value = 16 * value + c - 'a' + 10;
+		} else {
+			parse_integer_suffix();
+
+			lexer_token.type       = T_INTEGER;
+			lexer_token.v.intvalue = value;
+			return;
+		}
+		next_char();
+	}
+
+	if(c == '.' || c == 'p' || c == 'P') {
+		next_char();
+		panic("Hex floating point numbers not implemented yet");
+	}
+}
+
+static void parse_number_oct(void)
+{
+	int value = 0;
+	while(c >= '0' && c <= '7') {
+		value = 8 * value + c - '0';
+		next_char();
+	}
+	if (c == '8' || c == '9') {
+		parse_error("invalid octal number");
+		lexer_token.type = T_ERROR;
+		return;
+	}
+
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = value;
+
+	parse_integer_suffix();
+}
+
+static void parse_floatingpoint_exponent(long double value)
+{
+	unsigned int expo = 0;
+	long double  factor = 10.;
+
+	if(c == '-') {
+		next_char();
+		factor = 0.1;
+	} else if(c == '+') {
+		next_char();
+	}
+
+	while(c >= '0' && c <= '9') {
+		expo = 10 * expo + (c - '0');
+		next_char();
+	}
+
+	while(1) {
+		if(expo & 1)
+			value *= factor;
+		expo >>= 1;
+		if(expo == 0)
+			break;
+		factor *= factor;
+	}
+
+	lexer_token.type         = T_FLOATINGPOINT;
+	lexer_token.v.floatvalue = value;
+}
+
+static void parse_floatingpoint_fract(int integer_part)
+{
+	long double value  = integer_part;
+	long double factor = 1.;
+
+	while(c >= '0' && c <= '9') {
+		factor *= 0.1;
+		value  += (c - '0') * factor;
+		next_char();
+	}
+
+	if(c == 'e' || c == 'E') {
+		next_char();
+		parse_floatingpoint_exponent(value);
+		return;
+	}
+
+	lexer_token.type         = T_FLOATINGPOINT;
+	lexer_token.v.floatvalue = value;
+}
+
+static void parse_number_dec(void)
+{
+	int value = 0;
+
+	while(isdigit(c)) {
+		value = 10 * value + c - '0';
+		next_char();
+	}
+
+	if(c == '.') {
+		next_char();
+		parse_floatingpoint_fract(value);
+		return;
+	}
+	if(c == 'e' || c == 'E') {
+		next_char();
+		parse_floatingpoint_exponent(value);
+		return;
+	}
+	parse_integer_suffix();
+
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = value;
+}
+
 static void parse_number(void)
 {
 	if (c == '0') {
 		next_char();
 		switch (c) {
 			case 'X':
-			case 'x': parse_number_hex(); break;
-			default:  parse_number_oct(); break;
+			case 'x':
+				parse_number_hex();
+				break;
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+				parse_number_oct();
+				break;
+			case '.':
+				next_char();
+				parse_floatingpoint_fract(0);
+				break;
+			case 'e':
+			case 'E':
+				parse_floatingpoint_exponent(0);
+				break;
+			case '8':
+			case '9':
+				next_char();
+				parse_error("invalid octal number");
+				lexer_token.type = T_ERROR;
+				return;
+			default:
+				put_back(c);
+				c = '0';
+				parse_number_dec();
+				return;
 		}
 	} else {
 		parse_number_dec();
 	}
-
-	parse_integer_suffix();
 }
 
 static int parse_octal_sequence(void)

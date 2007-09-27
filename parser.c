@@ -302,18 +302,9 @@ static bool is_compatible_declaration (declaration_t *declaration,
 static inline declaration_t *environment_push(declaration_t *declaration,
                                               const void *context)
 {
-	environment_entry_t *entry
-		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
-	memset(entry, 0, sizeof(entry[0]));
-
-	int top = ARR_LEN(environment_stack);
-	ARR_RESIZE(environment_stack, top + 1);
-	environment_stack[top] = entry;
-
-	assert(declaration->source_position.input_name != NULL);
-
 	symbol_t *symbol = declaration->symbol;
 	assert(declaration != symbol->declaration);
+	assert(declaration->source_position.input_name != NULL);
 
 	if(symbol->context == context) {
 		declaration_t *previous_declaration = symbol->declaration;
@@ -334,6 +325,14 @@ static inline declaration_t *environment_push(declaration_t *declaration,
 			return previous_declaration;
 		}
 	}
+
+	environment_entry_t *entry
+		= obstack_alloc(&environment_obstack, sizeof(entry[0]));
+	memset(entry, 0, sizeof(entry[0]));
+
+	int top = ARR_LEN(environment_stack);
+	ARR_RESIZE(environment_stack, top + 1);
+	environment_stack[top] = entry;
 
 	entry->old_declaration = symbol->declaration;
 	entry->old_context     = symbol->context;
@@ -981,9 +980,9 @@ finish_specifiers:
 	specifiers->type = result;
 }
 
-static unsigned parse_type_qualifiers(void)
+static type_qualifier_t parse_type_qualifiers(void)
 {
-	unsigned type_qualifiers = 0;
+	type_qualifier_t type_qualifiers = 0;
 
 	while(true) {
 		switch(token.type) {
@@ -997,54 +996,6 @@ static unsigned parse_type_qualifiers(void)
 			return type_qualifiers;
 		}
 	}
-}
-
-typedef struct parsed_pointer_t parsed_pointer_t;
-struct parsed_pointer_t {
-	unsigned          type_qualifiers;
-	parsed_pointer_t *next;
-};
-
-static parsed_pointer_t *parse_pointers(void)
-{
-	parsed_pointer_t *result       = NULL;
-	parsed_pointer_t *last_pointer = NULL;
-
-	while(token.type == '*') {
-		next_token();
-		parsed_pointer_t *pointer
-			= obstack_alloc(&temp_obst, sizeof(pointer[0]));
-		pointer->type_qualifiers = parse_type_qualifiers();
-
-		if(last_pointer != NULL) {
-			last_pointer->next = pointer;
-		} else {
-			result = pointer;
-		}
-		last_pointer = pointer;
-	}
-
-	return result;
-}
-
-static type_t *make_pointers(type_t *type, parsed_pointer_t *pointer)
-{
-	for( ; pointer != NULL; pointer = pointer->next) {
-		pointer_type_t *pointer_type
-			= allocate_type_zero(sizeof(pointer_type[0]));
-		pointer_type->type.type       = TYPE_POINTER;
-		pointer_type->points_to       = type;
-		pointer_type->type.qualifiers = pointer->type_qualifiers;
-
-		type_t *result = typehash_insert((type_t*) pointer_type);
-		if(result != (type_t*) pointer_type) {
-			obstack_free(type_obst, pointer_type);
-		}
-
-		type = result;
-	}
-
-	return type;
 }
 
 static void parse_identifier_list(void)
@@ -1139,24 +1090,133 @@ static declaration_t *parse_parameters(method_type_t *type)
 	}
 }
 
-typedef struct declarator_part declarator_part;
-struct declarator_part {
-	parsed_pointer_t *pointers;
-	method_type_t    *method_type;
-	declarator_part  *inner;
+typedef enum {
+	CONSTRUCT_POINTER,
+	CONSTRUCT_METHOD,
+	CONSTRUCT_ARRAY
+} construct_type_type_t;
+
+typedef struct construct_type_t construct_type_t;
+struct construct_type_t {
+	construct_type_type_t  type;
+	construct_type_t      *next;
 };
 
+typedef struct parsed_pointer_t parsed_pointer_t;
+struct parsed_pointer_t {
+	construct_type_t  construct_type;
+	type_qualifier_t  type_qualifiers;
+};
 
-static declarator_part *parse_inner_declarator(declaration_t *declaration,
-                                               int may_be_abstract)
+typedef struct construct_method_type_t construct_method_type_t;
+struct construct_method_type_t {
+	construct_type_t  construct_type;
+	method_type_t    *method_type;
+};
+
+typedef struct parsed_array_t parsed_array_t;
+struct parsed_array_t {
+	construct_type_t  construct_type;
+	type_qualifier_t  type_qualifiers;
+	bool              is_static;
+	bool              is_variable;
+	expression_t     *size;
+};
+
+typedef struct construct_base_type_t construct_base_type_t;
+struct construct_base_type_t {
+	construct_type_t  construct_type;
+	type_t           *type;
+};
+
+static construct_type_t *parse_pointer_declarator(void)
 {
-	declarator_part *part = obstack_alloc(&temp_obst, sizeof(part[0]));
-	memset(part, 0, sizeof(part[0]));
+	eat('*');
 
-	part->pointers = parse_pointers();
+	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
+	memset(pointer, 0, sizeof(pointer[0]));
+	pointer->type_qualifiers = parse_type_qualifiers();
+
+	return (construct_type_t*) pointer;
+}
+
+static construct_type_t *parse_array_declarator(void)
+{
+	eat('[');
+
+	parsed_array_t *array = obstack_alloc(&temp_obst, sizeof(array[0]));
+	memset(array, 0, sizeof(array[0]));
+
+	if(token.type == T_static) {
+		array->is_static = true;
+		next_token();
+	}
+
+	type_qualifier_t type_qualifiers = parse_type_qualifiers();
+	if(type_qualifiers != 0) {
+		if(token.type == T_static) {
+			array->is_static = true;
+			next_token();
+		}
+	}
+	array->type_qualifiers = type_qualifiers;
+
+	if(token.type == '*' && look_ahead(1)->type == ']') {
+		array->is_variable = true;
+		next_token();
+	} else if(token.type != ']') {
+		array->size = parse_assignment_expression();
+	}
+
+	expect(']');
+
+	return (construct_type_t*) array;
+}
+
+static construct_type_t *parse_method_declarator(declaration_t *declaration)
+{
+	eat('(');
+
+	method_type_t *method_type
+		= allocate_type_zero(sizeof(method_type[0]));
+	method_type->type.type   = TYPE_METHOD;
+
+	declaration_t *parameters = parse_parameters(method_type);
+	if(declaration != NULL) {
+		declaration->context.declarations = parameters;
+	}
+
+	construct_method_type_t *construct_method_type =
+		obstack_alloc(&temp_obst, sizeof(construct_method_type[0]));
+	memset(construct_method_type, 0, sizeof(construct_method_type[0]));
+	construct_method_type->construct_type.type = CONSTRUCT_METHOD;
+	construct_method_type->method_type         = method_type;
+
+	expect(')');
+
+	return (construct_type_t*) construct_method_type;
+}
+
+static construct_type_t *parse_inner_declarator(declaration_t *declaration,
+		int may_be_abstract)
+{
+	construct_type_t *result = NULL;
+	construct_type_t *last   = NULL;
+
+	while(token.type == '*') {
+		construct_type_t *type = parse_pointer_declarator();
+		if(last != NULL) {
+			last->next = type;
+		} else {
+			result = type;
+		}
+		last = type;
+	}
 
 	/* TODO: find out if this is correct */
 	parse_attributes();
+
+	construct_type_t *inner_types = NULL;
 
 	switch(token.type) {
 	case T_IDENTIFIER:
@@ -1170,7 +1230,7 @@ static declarator_part *parse_inner_declarator(declaration_t *declaration,
 		break;
 	case '(':
 		next_token();
-		part->inner = parse_inner_declarator(declaration, may_be_abstract);
+		inner_types = parse_inner_declarator(declaration, may_be_abstract);
 		expect(')');
 		break;
 	default:
@@ -1181,76 +1241,114 @@ static declarator_part *parse_inner_declarator(declaration_t *declaration,
 	}
 
 	while(true) {
+		construct_type_t *type;
 		switch(token.type) {
 		case '(':
-			next_token();
-
-			method_type_t *method_type
-				= allocate_type_zero(sizeof(method_type[0]));
-			method_type->type.type   = TYPE_METHOD;
-
-			declaration_t *parameters = parse_parameters(method_type);
-			if(declaration != NULL) {
-				declaration->context.declarations = parameters;
-			}
-
-			part->method_type = method_type;
-
-			expect(')');
+			type = parse_method_declarator(declaration);
 			break;
 		case '[':
-			next_token();
-
-			if(token.type == T_static) {
-				next_token();
-			}
-
-			unsigned type_qualifiers = parse_type_qualifiers();
-			if(type_qualifiers != 0) {
-				if(token.type == T_static) {
-					next_token();
-				}
-			}
-
-			/* TODO */
-
-			if(token.type == '*' && look_ahead(1)->type == ']') {
-				next_token();
-			} else if(token.type != ']') {
-				parse_assignment_expression();
-			}
-
-			expect(']');
+			type = parse_array_declarator();
 			break;
 		default:
 			goto declarator_finished;
 		}
+
+		if(last != NULL) {
+			last->next = type;
+		} else {
+			result = type;
+		}
+		last = type;
 	}
 
 declarator_finished:
 	parse_attributes();
 
-	return part;
+	if(inner_types != NULL) {
+		if(last != NULL) {
+			last->next = inner_types;
+		} else {
+			result = inner_types;
+		}
+		last = inner_types;
+	}
+
+	return result;
 }
 
-static type_t *construct_declarator_type(declarator_part *part, type_t *type)
+#if 0
+static type_t *make_pointers(type_t *type, parsed_pointer_t *pointer)
 {
-	do {
-		type = make_pointers(type, part->pointers);
+	for( ; pointer != NULL; pointer = pointer->next) {
+		pointer_type_t *pointer_type
+			= allocate_type_zero(sizeof(pointer_type[0]));
+		pointer_type->type.type       = TYPE_POINTER;
+		pointer_type->points_to       = type;
+		pointer_type->type.qualifiers = pointer->type_qualifiers;
 
-		method_type_t *method_type = part->method_type;
-		if(method_type != NULL) {
-			method_type->result_type = type;
-
-			type_t *result = typehash_insert((type_t*) method_type);
-			if(result != (type_t*) method_type) {
-				obstack_free(type_obst, method_type);
-			}
-			type = result;
+		type_t *result = typehash_insert((type_t*) pointer_type);
+		if(result != (type_t*) pointer_type) {
+			obstack_free(type_obst, pointer_type);
 		}
 
-		part = part->inner;
-	} while(part != NULL);
+		type = result;
+	}
+
+	return type;
+}
+#endif
+
+static type_t *construct_declarator_type(construct_type_t *construct_list,
+                                         type_t *type)
+{
+	construct_type_t *iter = construct_list;
+	for( ; iter != NULL; iter = iter->next) {
+		parsed_pointer_t        *parsed_pointer;
+		parsed_array_t          *parsed_array;
+		construct_method_type_t *construct_method_type;
+		method_type_t           *method_type;
+		pointer_type_t          *pointer_type;
+		array_type_t            *array_type;
+
+		switch(iter->type) {
+		case CONSTRUCT_METHOD:
+			construct_method_type = (construct_method_type_t*) iter;
+			method_type           = construct_method_type->method_type;
+
+			method_type->result_type = type;
+			type                     = (type_t*) method_type;
+			break;
+
+		case CONSTRUCT_POINTER:
+			parsed_pointer = (parsed_pointer_t*) iter;
+			pointer_type   = allocate_type_zero(sizeof(pointer_type[0]));
+
+			pointer_type->type.type       = TYPE_POINTER;
+			pointer_type->points_to       = type;
+			pointer_type->type.qualifiers = parsed_pointer->type_qualifiers;
+			type                          = (type_t*) pointer_type;
+			break;
+
+		case CONSTRUCT_ARRAY:
+			parsed_array  = (parsed_array_t*) iter;
+			array_type    = allocate_type_zero(sizeof(array_type[0]));
+
+			array_type->type.type       = TYPE_ARRAY;
+			array_type->element_type    = type;
+			array_type->type.qualifiers = parsed_array->type_qualifiers;
+			array_type->is_static       = parsed_array->is_static;
+			array_type->is_variable     = parsed_array->is_variable;
+			array_type->size            = parsed_array->size;
+			type                        = (type_t*) array_type;
+			break;
+		}
+
+		type_t *hashed_type = typehash_insert((type_t*) type);
+		if(hashed_type != type) {
+			obstack_free(type_obst, type);
+			type = hashed_type;
+		}
+	}
 
 	return type;
 }
@@ -1259,25 +1357,26 @@ static void parse_declarator(declaration_t *declaration,
                              storage_class_t storage_class, type_t *type,
                              int may_be_abstract)
 {
-	declarator_part *part
+	construct_type_t *construct_type
 		= parse_inner_declarator(declaration, may_be_abstract);
 
-	if(part != NULL) {
-		declaration->type          = construct_declarator_type(part, type);
-		declaration->storage_class = storage_class;
-		obstack_free(&temp_obst, part);
+	declaration->type         = construct_declarator_type(construct_type, type);
+	declaration->storage_class = storage_class;
+	if(construct_type != NULL) {
+		obstack_free(&temp_obst, construct_type);
 	}
 }
 
 static type_t *parse_abstract_declarator(type_t *base_type)
 {
-	declarator_part *part = parse_inner_declarator(NULL, 1);
+	construct_type_t *construct_type
+		= parse_inner_declarator(NULL, 1);
 
-	if(part == NULL)
+	if(construct_type == NULL)
 		return NULL;
 
-	type_t *result = construct_declarator_type(part, base_type);
-	obstack_free(&temp_obst, part);
+	type_t *result = construct_declarator_type(construct_type, base_type);
+	obstack_free(&temp_obst, construct_type);
 
 	return result;
 }
@@ -1783,7 +1882,10 @@ static expression_t *parse_array_expression(unsigned precedence,
 			pointer_type_t *pointer           = (pointer_type_t*) array_type;
 			array_access->expression.datatype = pointer->points_to;
 		} else {
-			parse_error("array access on non-pointer type");
+			parser_print_error_prefix();
+			fprintf(stderr, "array access on object with non-pointer type ");
+			print_type(array_type);
+			fprintf(stderr, "\n");
 		}
 	}
 
@@ -1903,14 +2005,22 @@ static expression_t *parse_call_expression(unsigned precedence,
 	expect(')');
 
 	type_t *type = expression->datatype;
-	if(type != NULL && type->type != TYPE_METHOD) {
-		parser_print_error_prefix();
-		fprintf(stderr, "expected a method type for call but found type ");
-		print_type(expression->datatype);
-		fprintf(stderr, "\n");
-	} else {
-		method_type_t *method_type = (method_type_t*) type;
-		call->expression.datatype  = method_type->result_type;
+	if(type != NULL) {
+		/* we can call pointer to function */
+		if(type->type == TYPE_POINTER) {
+			pointer_type_t *pointer = (pointer_type_t*) type;
+			type = pointer->points_to;
+		}
+
+		if(type == NULL || type->type != TYPE_METHOD) {
+			parser_print_error_prefix();
+			fprintf(stderr, "expected a method type for call but found type ");
+			print_type(expression->datatype);
+			fprintf(stderr, "\n");
+		} else {
+			method_type_t *method_type = (method_type_t*) type;
+			call->expression.datatype  = method_type->result_type;
+		}
 	}
 
 	return (expression_t*) call;
