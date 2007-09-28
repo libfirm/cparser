@@ -162,7 +162,7 @@ static void print_type_enum(const enum_type_t *type)
 			fprintf(out, "\t%s", entry->symbol->string);
 			if(entry->initializer != NULL) {
 				fprintf(out, " = ");
-				print_expression(entry->initializer);
+				print_initializer(entry->initializer);
 			}
 			fprintf(out, ",\n");
 		}

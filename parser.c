@@ -493,6 +493,105 @@ attributes_finished:
 	;
 }
 
+static designator_t *parse_designation(void)
+{
+	if(token.type != '[' && token.type != '.')
+		return NULL;
+
+	designator_t *result = NULL;
+	designator_t *last   = NULL;
+
+	while(1) {
+		designator_t *designator;
+		switch(token.type) {
+		case '[':
+			designator = allocate_ast_zero(sizeof(designator[0]));
+			next_token();
+			designator->array_access = parse_constant_expression();
+			expect(']');
+			break;
+		case '.':
+			designator = allocate_ast_zero(sizeof(designator[0]));
+			next_token();
+			if(token.type != T_IDENTIFIER) {
+				parse_error_expected("problem while parsing designator",
+				                     T_IDENTIFIER, 0);
+				return NULL;
+			}
+			designator->symbol = token.v.symbol;
+			next_token();
+			break;
+		default:
+			expect('=');
+			return result;
+		}
+
+		assert(designator != NULL);
+		if(last != NULL) {
+			last->next = designator;
+		} else {
+			result = designator;
+		}
+		last = designator;
+	}
+}
+
+static initializer_t *parse_initializer_list(void);
+
+static initializer_t *parse_initializer(void)
+{
+	designator_t *designator = parse_designation();
+
+	initializer_t *result;
+	if(token.type == '{') {
+		result = parse_initializer_list();
+	} else {
+		result          = allocate_ast_zero(sizeof(result[0]));
+		result->type    = INITIALIZER_VALUE;
+		result->v.value = parse_assignment_expression();
+	}
+	result->designator = designator;
+
+	return result;
+}
+
+static initializer_t *parse_initializer_list(void)
+{
+	eat('{');
+
+	initializer_t *result = allocate_ast_zero(sizeof(result[0]));
+	result->type = INITIALIZER_LIST;
+
+	initializer_t *last = NULL;
+	while(1) {
+		initializer_t *initializer = parse_initializer();
+		if(last != NULL) {
+			last->next = initializer;
+		} else {
+			result->v.list = initializer;
+		}
+		last = initializer;
+
+		if(token.type == '}')
+			break;
+
+		if(token.type != ',') {
+			parse_error_expected("problem while parsing initializer list",
+			                     ',', '}', 0);
+			eat_block();
+			return result;
+		}
+		eat(',');
+
+		if(token.type == '}')
+			break;
+	}
+
+	expect('}');
+
+	return result;
+}
+
 static compound_type_t *find_compound_type(compound_type_t *types,
                                            const symbol_t *symbol)
 {
@@ -601,7 +700,7 @@ static void parse_enum_entries(void)
 
 		if(token.type == '=') {
 			next_token();
-			entry->initializer = parse_constant_expression();
+			entry->initializer = parse_initializer();
 		}
 
 		record_declaration(entry);
@@ -1432,66 +1531,6 @@ static void parser_error_multiple_definition(declaration_t *previous,
 	error();
 }
 
-static void parse_designation(void)
-{
-	if(token.type != '[' && token.type != '.')
-		return;
-
-	while(1) {
-		switch(token.type) {
-		case '[':
-			next_token();
-			parse_constant_expression();
-			expect_void(']');
-			break;
-		case '.':
-			next_token();
-			expect_void(T_IDENTIFIER);
-			break;
-		default:
-			expect_void('=');
-			return;
-		}
-	}
-}
-
-static void parse_initializer_list(void);
-
-static void parse_initializer(void)
-{
-	parse_designation();
-
-	if(token.type == '{') {
-		parse_initializer_list();
-	} else {
-		parse_assignment_expression();
-	}
-}
-
-static void parse_initializer_list(void)
-{
-	eat('{');
-
-	while(1) {
-		parse_initializer();
-		if(token.type == '}')
-			break;
-
-		if(token.type != ',') {
-			parse_error_expected("problem while parsing initializer list",
-			                     ',', '}', 0);
-			eat_block();
-			return;
-		}
-		eat(',');
-
-		if(token.type == '}')
-			break;
-	}
-
-	expect_void('}');
-}
-
 static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
 	while(true) {
@@ -1510,7 +1549,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
-			parse_initializer();
+			ndeclaration->initializer = parse_initializer();
 		} else if(token.type == '{') {
 			if(declaration->type->type != TYPE_METHOD) {
 				parser_print_error_prefix();
@@ -1878,9 +1917,9 @@ static expression_t *parse_pretty_function_keyword(void)
 	return (expression_t*) expression;
 }
 
-static member_designator_t *parse_member_designators(void)
+static designator_t *parse_designator(void)
 {
-	member_designator_t *result = allocate_ast_zero(sizeof(result[0]));
+	designator_t *result = allocate_ast_zero(sizeof(result[0]));
 
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("problem while parsing member designator",
@@ -1891,7 +1930,7 @@ static member_designator_t *parse_member_designators(void)
 	result->symbol = token.v.symbol;
 	next_token();
 
-	member_designator_t *last_designator = result;
+	designator_t *last_designator = result;
 	while(true) {
 		if(token.type == '.') {
 			next_token();
@@ -1901,9 +1940,8 @@ static member_designator_t *parse_member_designators(void)
 				eat_brace();
 				return NULL;
 			}
-			member_designator_t *designator
-				= allocate_ast_zero(sizeof(result[0]));
-			designator->symbol = token.v.symbol;
+			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
+			designator->symbol       = token.v.symbol;
 			next_token();
 
 			last_designator->next = designator;
@@ -1912,8 +1950,7 @@ static member_designator_t *parse_member_designators(void)
 		}
 		if(token.type == '[') {
 			next_token();
-			member_designator_t *designator
-				= allocate_ast_zero(sizeof(result[0]));
+			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
 			designator->array_access = parse_expression();
 			if(designator->array_access == NULL) {
 				eat_brace();
@@ -1943,7 +1980,7 @@ static expression_t *parse_offsetof(void)
 	expect('(');
 	expression->type = parse_typename();
 	expect(',');
-	expression->member_designators = parse_member_designators();
+	expression->designator = parse_designator();
 	expect(')');
 
 	return (expression_t*) expression;

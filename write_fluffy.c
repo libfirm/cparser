@@ -231,6 +231,15 @@ static void write_expression(const expression_t *expression)
 	}
 }
 
+static void write_initializer(const initializer_t *initializer)
+{
+	if(initializer->type != INITIALIZER_VALUE) {
+		panic("list initializers not supported yet");
+	}
+
+	write_expression(initializer->v.value);
+}
+
 static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
@@ -240,7 +249,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 		fprintf(out, "\t%s", entry->symbol->string);
 		if(entry->initializer != NULL) {
 			fprintf(out, " <- ");
-			write_expression(entry->initializer);
+			write_initializer(entry->initializer);
 		}
 		fputc('\n', out);
 	}

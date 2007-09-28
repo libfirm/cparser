@@ -467,6 +467,25 @@ static void print_storage_class(storage_class_t storage_class)
 	}
 }
 
+void print_initializer(const initializer_t *initializer)
+{
+	if(initializer->type == INITIALIZER_VALUE) {
+		print_expression(initializer->v.value);
+		return;
+	}
+
+	assert(initializer->type == INITIALIZER_LIST);
+	fputs("{ ", out);
+	initializer_t *iter = initializer->v.list;
+	for( ; iter != NULL; iter = iter->next) {
+		print_initializer(iter);
+		if(iter->next != NULL) {
+			fputs(", ", out);
+		}
+	}
+	fputs("}", out);
+}
+
 static void print_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
@@ -477,7 +496,7 @@ static void print_declaration(const declaration_t *declaration)
 		print_statement(declaration->statement);
 	} else if(declaration->initializer != NULL) {
 		fputs(" = ", out);
-		print_expression(declaration->initializer);
+		print_initializer(declaration->initializer);
 		fprintf(out, ";\n");
 	} else {
 		fprintf(out, ";\n");

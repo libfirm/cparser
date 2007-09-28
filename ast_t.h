@@ -160,16 +160,16 @@ struct sizeof_expression_t {
 	expression_t *size_expression;
 };
 
-struct member_designator_t {
-	symbol_t            *symbol;
-	expression_t        *array_access;
-	member_designator_t *next;
+struct designator_t {
+	symbol_t     *symbol;
+	expression_t *array_access;
+	designator_t *next;
 };
 
 struct offsetof_expression_t {
-	expression_t         expression;
-	type_t              *type;
-	member_designator_t *member_designators;
+	expression_t  expression;
+	type_t       *type;
+	designator_t *designator;
 };
 
 struct va_arg_expression_t {
@@ -200,12 +200,27 @@ typedef enum {
 	STORAGE_CLASS_ENUM_ENTRY
 } storage_class_t;
 
+typedef enum {
+	INITIALIZER_VALUE,
+	INITIALIZER_LIST,
+} initializer_type_t;
+
+struct initializer_t {
+	initializer_type_t type;
+	designator_t      *designator;
+	union {
+		initializer_t *list;
+		expression_t  *value;
+	} v;
+	initializer_t *next;
+};
+
 struct declaration_t {
 	storage_class_t     storage_class;
 	type_t             *type;
 	symbol_t           *symbol;
 	statement_t        *statement;
-	expression_t       *initializer;
+	initializer_t      *initializer;
 	source_position_t   source_position;
 	context_t           context;
 

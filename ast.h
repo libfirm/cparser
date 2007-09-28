@@ -22,11 +22,12 @@ typedef struct conditional_expression_t     conditional_expression_t;
 typedef struct expression_list_element_t    expression_list_element_t;
 typedef struct comma_expression_t           comma_expression_t;
 typedef struct statement_expression_t       statement_expression_t;
-typedef struct member_designator_t          member_designator_t;
+typedef struct designator_t                 designator_t;
 typedef struct offsetof_expression_t        offsetof_expression_t;
 typedef struct va_arg_expression_t          va_arg_expression_t;
 typedef struct builtin_symbol_expression_t  builtin_symbol_expression_t;
 
+typedef struct initializer_t                initializer_t;
 typedef struct declaration_t                declaration_t;
 
 typedef struct statement_t                  statement_t;
@@ -52,6 +53,7 @@ void  exit_ast(void);
 
 void  ast_set_output(FILE *out);
 void  print_expression(const expression_t *expression);
+void  print_initializer(const initializer_t *initializer);
 void  print_ast(const translation_unit_t *unit);
 void *allocate_ast(size_t size);
 
