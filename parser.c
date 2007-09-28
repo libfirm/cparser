@@ -14,7 +14,7 @@
 #include "adt/error.h"
 #include "adt/array.h"
 
-#define PRINT_TOKENS
+//#define PRINT_TOKENS
 //#define ABORT_ON_ERROR
 #define MAX_LOOKAHEAD 2
 //#define STRICT_C99

@@ -12,7 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define DEBUG_CHARS
+//#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 
 static int         c;
@@ -58,10 +58,15 @@ static inline void next_real_char(void)
 
 static inline void put_back(int pc)
 {
-	char *p = (char*) bufpos - 1;
-	bufpos--;
-	assert(p >= buf);
+	assert(bufpos >= buf);
+	assert(bufpos < buf+MAX_PUTBACK || *bufpos == pc);
+
+	char *p = buf + (bufpos - buf);
 	*p = pc;
+
+	/* going backwards in the buffer is legal as long as it's not more often
+	 * than MAX_PUTBACK */
+	bufpos--;
 
 #ifdef DEBUG_CHARS
 	printf("putback '%c'\n", pc);
