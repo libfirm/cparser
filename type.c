@@ -50,26 +50,28 @@ void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
+	const char *s;
 	switch(type->atype) {
-	case ATOMIC_TYPE_INVALID:     fputs("INVALIDATOMIC", out); return;
-	case ATOMIC_TYPE_VOID:        fputs("void", out); return;
-	case ATOMIC_TYPE_BOOL:        fputs("bool", out); return;
-	case ATOMIC_TYPE_CHAR:        fputs("char", out); return;
-	case ATOMIC_TYPE_SCHAR:       fputs("signed char", out); return;
-	case ATOMIC_TYPE_UCHAR:       fputs("unsigned char", out); return;
-	case ATOMIC_TYPE_INT:         fputs("int", out); return;
-	case ATOMIC_TYPE_UINT:        fputs("unsigned int", out); return;
-	case ATOMIC_TYPE_SHORT:       fputs("short", out); return;
-	case ATOMIC_TYPE_USHORT:      fputs("unsigned short", out); return;
-	case ATOMIC_TYPE_LONG:        fputs("long", out); return;
-	case ATOMIC_TYPE_ULONG:       fputs("unsigned long", out); return;
-	case ATOMIC_TYPE_LONGLONG:    fputs("long long", out); return;
-	case ATOMIC_TYPE_ULONGLONG:   fputs("unsigned long long", out); return;
-	case ATOMIC_TYPE_LONG_DOUBLE: fputs("long double", out); return;
-	case ATOMIC_TYPE_FLOAT:       fputs("float", out); return;
-	case ATOMIC_TYPE_DOUBLE:      fputs("double", out); return;
+	case ATOMIC_TYPE_INVALID:     s = "INVALIDATOMIC";      break;
+	case ATOMIC_TYPE_VOID:        s = "void";               break;
+	case ATOMIC_TYPE_BOOL:        s = "bool";               break;
+	case ATOMIC_TYPE_CHAR:        s = "char";               break;
+	case ATOMIC_TYPE_SCHAR:       s = "signed char";        break;
+	case ATOMIC_TYPE_UCHAR:       s = "unsigned char";      break;
+	case ATOMIC_TYPE_INT:         s = "int";                break;
+	case ATOMIC_TYPE_UINT:        s = "unsigned int";       break;
+	case ATOMIC_TYPE_SHORT:       s = "short";              break;
+	case ATOMIC_TYPE_USHORT:      s = "unsigned short";     break;
+	case ATOMIC_TYPE_LONG:        s = "long";               break;
+	case ATOMIC_TYPE_ULONG:       s = "unsigned long";      break;
+	case ATOMIC_TYPE_LONGLONG:    s = "long long";          break;
+	case ATOMIC_TYPE_ULONGLONG:   s = "unsigned long long"; break;
+	case ATOMIC_TYPE_LONG_DOUBLE: s = "long double";        break;
+	case ATOMIC_TYPE_FLOAT:       s = "float";              break;
+	case ATOMIC_TYPE_DOUBLE:      s = "double";             break;
+	default:                      s = "UNKNOWNATOMIC";      break;
 	}
-	fputs("UNKNOWNATOMIC", out);
+	fputs(s, out);
 }
 
 static
