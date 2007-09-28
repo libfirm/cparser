@@ -1,6 +1,6 @@
 GOAL = cparser
 
-CFLAGS += -Wall -W -Wextra -Werror -O0 -g3 -std=c99 -pedantic
+CFLAGS += -Wall -W -Werror -O0 -g3 -std=c99 -pedantic
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
 
