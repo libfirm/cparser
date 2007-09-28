@@ -22,8 +22,6 @@ static char        buf[1024 + MAX_PUTBACK];
 static const char *bufend;
 static const char *bufpos;
 static strset_t    stringset;
-//static FILE      **input_stack;
-//static char      **buf_stack;
 
 static void error_prefix_at(const char *input_name, unsigned linenr)
 {
