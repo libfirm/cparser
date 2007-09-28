@@ -31,18 +31,10 @@ void type_set_output(FILE *stream)
 static
 void print_type_qualifiers(unsigned qualifiers)
 {
-	if(qualifiers & TYPE_QUALIFIER_CONST) {
-		fputs("const ", out);
-	}
-	if(qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		fputs("volatile ", out);
-	}
-	if(qualifiers & TYPE_QUALIFIER_RESTRICT) {
-		fputs("__restrict ", out);
-	}
-	if(qualifiers & TYPE_QUALIFIER_INLINE) {
-		fputs("inline ", out);
-	}
+	if(qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
+	if(qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
+	if(qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
+	if(qualifiers & TYPE_QUALIFIER_INLINE)   fputs("inline ",   out);
 }
 
 static
