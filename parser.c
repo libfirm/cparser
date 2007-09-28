@@ -30,11 +30,13 @@ static token_t               lookahead_buffer[MAX_LOOKAHEAD];
 static int                   lookahead_bufpos;
 static struct obstack        environment_obstack;
 static environment_entry_t **environment_stack = NULL;
+static context_t            *global_context    = NULL;
 static context_t            *context           = NULL;
 static declaration_t        *last_declaration  = NULL;
 static struct obstack        temp_obst;
 
 static type_t               *type_int        = NULL;
+static type_t               *type_double     = NULL;
 static type_t               *type_const_char = NULL;
 static type_t               *type_string     = NULL;
 static type_t               *type_void       = NULL;
@@ -1633,12 +1635,44 @@ static expression_t *parse_float_const(void)
 	const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 	cnst->expression.type     = EXPR_CONST;
-	cnst->expression.datatype = type_int;
+	cnst->expression.datatype = type_double;
 	cnst->v.float_value       = token.v.floatvalue;
 
 	next_token();
 
 	return (expression_t*) cnst;
+}
+
+static declaration_t *create_implicit_function(symbol_t *symbol,
+		const source_position_t source_position)
+{
+	method_type_t *method_type = allocate_type_zero(sizeof(method_type));
+
+	method_type->type.type              = TYPE_METHOD;
+	method_type->result_type            = type_int;
+	method_type->unspecified_parameters = true;
+
+	type_t *type = typehash_insert((type_t*) method_type);
+	if(type != (type_t*) method_type) {
+		obstack_free(type_obst, method_type);
+	}
+
+	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+
+	declaration->storage_class   = STORAGE_CLASS_EXTERN;
+	declaration->type            = type;
+	declaration->symbol          = symbol;
+	declaration->source_position = source_position;
+
+	/* we have to violate the environment push/pop rules here and assign
+	 * the declaration directly to its symbol and append it to the
+	 * global context */
+	assert(symbol->declaration == NULL);
+	symbol->declaration          = declaration;
+	declaration->next            = global_context->declarations;
+	global_context->declarations = declaration;
+
+	return declaration;
 }
 
 static expression_t *parse_reference(void)
@@ -1648,28 +1682,31 @@ static expression_t *parse_reference(void)
 	ref->expression.type = EXPR_REFERENCE;
 	ref->symbol          = token.v.symbol;
 
-	declaration_t *declaration = ref->symbol->declaration;
+	declaration_t     *declaration     = ref->symbol->declaration;
+	source_position_t  source_position = token.source_position;
 	next_token();
 
 	if(declaration == NULL) {
 #ifndef STRICT_C99
-		/* is it an implicitely defined function */
+		/* an implicitely defined function */
 		if(token.type == '(') {
 			parser_print_prefix_pos(token.source_position);
 			fprintf(stderr, "warning: implicit declaration of function '%s'\n",
 			        ref->symbol->string);
-			/* TODO: do this correctly */
+
+			declaration = create_implicit_function(ref->symbol,
+			                                       source_position);
+		} else
+#endif
+		{
+			parser_print_error_prefix();
+			fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
 			return (expression_t*) ref;
 		}
-#endif
-
-		parser_print_error_prefix();
-		fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
-	} else {
-		ref->declaration         = declaration;
-		ref->expression.datatype = declaration->type;
 	}
 
+	ref->declaration         = declaration;
+	ref->expression.datatype = declaration->type;
 
 	return (expression_t*) ref;
 }
@@ -2797,6 +2834,9 @@ static translation_unit_t *parse_translation_unit(void)
 {
 	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
 
+	assert(global_context == NULL);
+	global_context = &unit->context;
+
 	assert(context == NULL);
 	set_context(&unit->context);
 
@@ -2807,6 +2847,9 @@ static translation_unit_t *parse_translation_unit(void)
 	assert(context == &unit->context);
 	context          = NULL;
 	last_declaration = NULL;
+
+	assert(global_context == &unit->context);
+	global_context = NULL;
 
 	return unit;
 }
@@ -2836,6 +2879,7 @@ void init_parser(void)
 	obstack_init(&temp_obst);
 
 	type_int        = make_atomic_type(ATOMIC_TYPE_INT, 0);
+	type_double     = make_atomic_type(ATOMIC_TYPE_DOUBLE, 0);
 	type_size_t     = make_atomic_type(ATOMIC_TYPE_UINT, 0);
 	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
 	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, 0);

@@ -31,6 +31,8 @@ static void print_const(const const_t *cnst)
 
 	if(is_type_integer(cnst->expression.datatype)) {
 		fprintf(out, "%d", cnst->v.int_value);
+	} else if(is_type_floating(cnst->expression.datatype)) {
+		fprintf(out, "%Lf", cnst->v.float_value);
 	}
 }
 
@@ -195,6 +197,17 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 	fputs(expression->symbol->string, out);
 }
 
+static void print_conditional(const conditional_expression_t *expression)
+{
+	fputs("(", out);
+	print_expression(expression->condition);
+	fputs(" ? ", out);
+	print_expression(expression->true_expression);
+	fputs(" : ", out);
+	print_expression(expression->false_expression);
+	fputs(")", out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -230,8 +243,10 @@ void print_expression(const expression_t *expression)
 	case EXPR_BUILTIN_SYMBOL:
 		print_builtin_symbol((const builtin_symbol_expression_t*) expression);
 		break;
-
 	case EXPR_CONDITIONAL:
+		print_conditional((const conditional_expression_t*) expression);
+		break;
+
 	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
 	case EXPR_SELECT:
@@ -351,9 +366,27 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 	fputs(");\n", out);
 }
 
-static void print_for_statemenet(const for_statement_t *statement)
+static void print_for_statement(const for_statement_t *statement)
 {
-	fprintf(out, "for(TODO) ");
+	fputs("for(", out);
+	if(statement->context.declarations != NULL) {
+		assert(statement->initialisation == NULL);
+		print_declaration(statement->context.declarations);
+		if(statement->context.declarations->next != NULL) {
+			panic("multiple declarations in for statement not supported yet");
+		}
+	} else if(statement->initialisation) {
+		print_expression(statement->initialisation);
+	}
+	fputs("; ", out);
+	if(statement->condition != NULL) {
+		print_expression(statement->condition);
+	}
+	fputs("; ", out);
+	if(statement->step != NULL) {
+		print_expression(statement->step);
+	}
+	fputs(")", out);
 	print_statement(statement->body);
 }
 
@@ -400,7 +433,7 @@ void print_statement(const statement_t *statement)
 		print_do_while_statement((const do_while_statement_t*) statement);
 		break;
 	case STATEMENT_FOR:
-		print_for_statemenet((const for_statement_t*) statement);
+		print_for_statement((const for_statement_t*) statement);
 		break;
 	case STATEMENT_INVALID:
 		fprintf(out, "*invalid statement*");

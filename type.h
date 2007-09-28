@@ -38,6 +38,11 @@ void type_set_output(FILE *out);
 bool is_type_integer(const type_t *type);
 
 /**
+ * returns true if type contains floating point numbers
+ */
+bool is_type_floating(const type_t *type);
+
+/**
  * returns true if the type is valid. A type is valid if it contains no
  * unresolved references anymore and is not of TYPE_INVALID.
  */
