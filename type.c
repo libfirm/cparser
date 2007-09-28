@@ -46,7 +46,7 @@ void print_atomic_type(const atomic_type_t *type)
 	switch(type->atype) {
 	case ATOMIC_TYPE_INVALID:     s = "INVALIDATOMIC";      break;
 	case ATOMIC_TYPE_VOID:        s = "void";               break;
-	case ATOMIC_TYPE_BOOL:        s = "bool";               break;
+	case ATOMIC_TYPE_BOOL:        s = "_Bool";              break;
 	case ATOMIC_TYPE_CHAR:        s = "char";               break;
 	case ATOMIC_TYPE_SCHAR:       s = "signed char";        break;
 	case ATOMIC_TYPE_UCHAR:       s = "unsigned char";      break;
@@ -260,11 +260,15 @@ bool type_valid(const type_t *type)
 
 bool is_type_integer(const type_t *type)
 {
+	if(type->type == TYPE_ENUM)
+		return 1;
+
 	if(type->type != TYPE_ATOMIC)
 		return 0;
 
 	atomic_type_t *atomic_type = (atomic_type_t*) type;
 	switch(atomic_type->atype) {
+	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_UCHAR:
@@ -282,24 +286,13 @@ bool is_type_integer(const type_t *type)
 	}
 }
 
-bool is_type_arithmetic(const type_t *type)
+bool is_type_floating(const type_t *type)
 {
 	if(type->type != TYPE_ATOMIC)
 		return 0;
 
 	atomic_type_t *atomic_type = (atomic_type_t*) type;
 	switch(atomic_type->atype) {
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_UINT:
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_ULONGLONG:
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
@@ -314,11 +307,15 @@ bool is_type_arithmetic(const type_t *type)
 	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
 #endif
 		return 1;
-	case ATOMIC_TYPE_INVALID:
-	case ATOMIC_TYPE_VOID:
-	case ATOMIC_TYPE_BOOL:
+	default:
 		return 0;
 	}
+}
+
+bool is_type_arithmetic(const type_t *type)
+{
+	if(is_type_integer(type) || is_type_floating(type))
+		return 1;
 
 	return 0;
 }
@@ -340,7 +337,7 @@ static type_t *identify_new_type(type_t *type)
 	return result;
 }
 
-type_t *make_atomic_type(atomic_type_type_t type, unsigned qualifiers)
+type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers)
 {
 	atomic_type_t *atomic_type
 		= obstack_alloc(type_obst, sizeof(atomic_type[0]));
@@ -352,7 +349,7 @@ type_t *make_atomic_type(atomic_type_type_t type, unsigned qualifiers)
 	return identify_new_type((type_t*) atomic_type);
 }
 
-type_t *make_pointer_type(type_t *points_to, unsigned qualifiers)
+type_t *make_pointer_type(type_t *points_to, type_qualifier_t qualifiers)
 {
 	pointer_type_t *pointer_type
 		= obstack_alloc(type_obst, sizeof(pointer_type[0]));

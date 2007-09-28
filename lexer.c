@@ -281,6 +281,21 @@ static void parse_integer_suffix(void)
 	}
 }
 
+static void parse_floating_suffix(void)
+{
+	switch(c) {
+	/* TODO: do something usefull with the suffixes... */
+	case 'f':
+	case 'F':
+	case 'l':
+	case 'L':
+		next_char();
+		break;
+	default:
+		break;
+	}
+}
+
 static void parse_number_hex(void)
 {
 	assert(c == 'x' || c == 'X');
@@ -365,6 +380,8 @@ static void parse_floatingpoint_exponent(long double value)
 
 	lexer_token.type         = T_FLOATINGPOINT;
 	lexer_token.v.floatvalue = value;
+
+	parse_floating_suffix();
 }
 
 static void parse_floatingpoint_fract(int integer_part)
@@ -386,6 +403,8 @@ static void parse_floatingpoint_fract(int integer_part)
 
 	lexer_token.type         = T_FLOATINGPOINT;
 	lexer_token.v.floatvalue = value;
+
+	parse_floating_suffix();
 }
 
 static void parse_number_dec(void)
@@ -1019,10 +1038,12 @@ void init_lexer(void)
 void lexer_open_stream(FILE *stream, const char *input_name)
 {
 	input                                  = stream;
-	lexer_token.source_position.linenr     = 1;
+	lexer_token.source_position.linenr     = 0;
 	lexer_token.source_position.input_name = input_name;
 
-	next_char();
+	/* place a virtual \n at the beginning so the lexer knows that we're
+	 * at the beginning of a line */
+	c = '\n';
 }
 
 void exit_lexer(void)
