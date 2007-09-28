@@ -2283,7 +2283,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	if(false_type == NULL)
 		return (expression_t*) conditional;
 
-	/* 6.4.15.3 */
+	/* 6.5.15.3 */
 	if(true_type == false_type) {
 		conditional->expression.datatype = true_type;
 	} else if(is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
