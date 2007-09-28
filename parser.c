@@ -14,9 +14,10 @@
 #include "adt/error.h"
 #include "adt/array.h"
 
-//#define PRINT_TOKENS
+#define PRINT_TOKENS
 //#define ABORT_ON_ERROR
 #define MAX_LOOKAHEAD 2
+//#define STRICT_C99
 
 struct environment_entry_t {
 	symbol_t      *symbol;
@@ -151,26 +152,45 @@ static inline void eat(token_type_t type)
 	next_token();
 }
 
-void parser_print_error_prefix_pos(const source_position_t source_position)
+void error(void)
 {
-    fputs(source_position.input_name, stderr);
-    fputc(':', stderr);
-    fprintf(stderr, "%d", source_position.linenr);
-    fputs(": error: ", stderr);
 #ifdef ABORT_ON_ERROR
 	abort();
 #endif
 }
 
+void parser_print_prefix_pos(const source_position_t source_position)
+{
+    fputs(source_position.input_name, stderr);
+    fputc(':', stderr);
+    fprintf(stderr, "%d", source_position.linenr);
+    fputs(": ", stderr);
+}
+
+void parser_print_error_prefix_pos(const source_position_t source_position)
+{
+	parser_print_prefix_pos(source_position);
+	fputs("error: ", stderr);
+	error();
+}
+
 void parser_print_error_prefix(void)
 {
-	parser_print_error_prefix_pos(token.source_position);
+	parser_print_prefix_pos(token.source_position);
+	error();
 }
 
 static void parse_error(const char *message)
 {
 	parser_print_error_prefix();
 	fprintf(stderr, "parse error: %s\n", message);
+}
+
+__attribute__((unused))
+static void parse_warning(const char *message)
+{
+	parser_print_prefix_pos(token.source_position);
+	fprintf(stderr, "warning: %s\n", message);
 }
 
 static void parse_error_expected(const char *message, ...)
@@ -243,6 +263,13 @@ static void eat_brace(void)
 	while(token.type != ')') {
 		if(token.type == T_EOF)
 			return;
+		if(token.type == ')' || token.type == ';' || token.type == '}') {
+			return;
+		}
+		if(token.type == '(') {
+			eat_brace();
+			continue;
+		}
 		if(token.type == '{') {
 			eat_block();
 			continue;
@@ -313,6 +340,7 @@ static inline declaration_t *environment_push(declaration_t *declaration,
 				parser_print_error_prefix_pos(declaration->source_position);
 				fprintf(stderr, "definition of symbol '%s' with type ",
 				        declaration->symbol->string);
+				error();
 				print_type(declaration->type);
 				fputc('\n', stderr);
 				parser_print_error_prefix_pos(
@@ -946,7 +974,13 @@ finish_specifiers:
 		default:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
+#ifndef STRICT_C99
+				parse_warning("no type specifiers in declaration (using int)");
+				atomic_type = ATOMIC_TYPE_INT;
+				break;
+#else
 				parse_error("no type specifiers given in declaration");
+#endif
 			} else if((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
 				parse_error("signed and unsigned specifiers gives");
@@ -1276,28 +1310,6 @@ declarator_finished:
 	return result;
 }
 
-#if 0
-static type_t *make_pointers(type_t *type, parsed_pointer_t *pointer)
-{
-	for( ; pointer != NULL; pointer = pointer->next) {
-		pointer_type_t *pointer_type
-			= allocate_type_zero(sizeof(pointer_type[0]));
-		pointer_type->type.type       = TYPE_POINTER;
-		pointer_type->points_to       = type;
-		pointer_type->type.qualifiers = pointer->type_qualifiers;
-
-		type_t *result = typehash_insert((type_t*) pointer_type);
-		if(result != (type_t*) pointer_type) {
-			obstack_free(type_obst, pointer_type);
-		}
-
-		type = result;
-	}
-
-	return type;
-}
-#endif
-
 static type_t *construct_declarator_type(construct_type_t *construct_list,
                                          type_t *type)
 {
@@ -1412,6 +1424,7 @@ static void parser_error_multiple_definition(declaration_t *previous,
 	parser_print_error_prefix_pos(previous->source_position);
 	fprintf(stderr, "this is the location of the previous "
 	        "definition.\n");
+	error();
 }
 
 static void parse_init_declarators(const declaration_specifiers_t *specifiers)
@@ -1608,7 +1621,20 @@ static expression_t *parse_int_const(void)
 
 	cnst->expression.type     = EXPR_CONST;
 	cnst->expression.datatype = type_int;
-	cnst->value               = token.v.intvalue;
+	cnst->v.int_value         = token.v.intvalue;
+
+	next_token();
+
+	return (expression_t*) cnst;
+}
+
+static expression_t *parse_float_const(void)
+{
+	const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
+
+	cnst->expression.type     = EXPR_CONST;
+	cnst->expression.datatype = type_int;
+	cnst->v.float_value       = token.v.floatvalue;
 
 	next_token();
 
@@ -1622,14 +1648,28 @@ static expression_t *parse_reference(void)
 	ref->expression.type = EXPR_REFERENCE;
 	ref->symbol          = token.v.symbol;
 
-	if(ref->symbol->declaration == NULL) {
+	declaration_t *declaration = ref->symbol->declaration;
+	next_token();
+
+	if(declaration == NULL) {
+#ifndef STRICT_C99
+		/* is it an implicitely defined function */
+		if(token.type == '(') {
+			parser_print_prefix_pos(token.source_position);
+			fprintf(stderr, "warning: implicit declaration of function '%s'\n",
+			        ref->symbol->string);
+			/* TODO: do this correctly */
+			return (expression_t*) ref;
+		}
+#endif
+
 		parser_print_error_prefix();
 		fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
+	} else {
+		ref->declaration         = declaration;
+		ref->expression.datatype = declaration->type;
 	}
-	ref->declaration         = ref->symbol->declaration;
-	ref->expression.datatype = ref->declaration->type;
 
-	next_token();
 
 	return (expression_t*) ref;
 }
@@ -1834,6 +1874,8 @@ static expression_t *parse_primary_expression(void)
 	switch(token.type) {
 	case T_INTEGER:
 		return parse_int_const();
+	case T_FLOATINGPOINT:
+		return parse_float_const();
 	case T_STRING_LITERAL:
 		return parse_string_const();
 	case T_IDENTIFIER:
@@ -1859,7 +1901,12 @@ static expression_t *parse_primary_expression(void)
 	print_token(stderr, &token);
 	fprintf(stderr, "\n");
 	eat_statement();
-	return NULL;
+
+	expression_t *expression = allocate_ast_zero(sizeof(expression[0]));
+	expression->type     = EXPR_INVALID;
+	expression->datatype = type_void;
+
+	return expression;
 }
 
 static expression_t *parse_array_expression(unsigned precedence,
@@ -1891,7 +1938,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	if(token.type != ']') {
 		parse_error_expected("Problem while parsing array access", ']', 0);
-		return NULL;
+		return (expression_t*) array_access;
 	}
 	next_token();
 
@@ -1963,7 +2010,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("Problem while parsing select", T_IDENTIFIER, 0);
-		return NULL;
+		return (expression_t*) select;
 	}
 	select->symbol = token.v.symbol;
 	next_token();
@@ -2033,6 +2080,7 @@ static void type_error(const char *msg, const source_position_t source_position,
 	fprintf(stderr, "%s, but found type ", msg);
 	print_type(type);
 	fputc('\n', stderr);
+	error();
 }
 
 static void type_error_incompatible(const char *msg,
@@ -2045,6 +2093,7 @@ static void type_error_incompatible(const char *msg,
 	fprintf(stderr, " - ");
 	print_type(type2);
 	fprintf(stderr, ")\n");
+	error();
 }
 
 static type_t *get_type_after_conversion(const type_t *type1,
@@ -2231,7 +2280,6 @@ static expression_t *parse_sub_expression(unsigned precedence)
 		left = parse_primary_expression();
 	}
 	assert(left != NULL);
-	assert(left->type != EXPR_INVALID);
 	left->source_position = source_position;
 
 	while(true) {

@@ -98,9 +98,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	for(int i = 1; i < argc; ++i) {
-		translation_unit_t *unit = do_parsing(argv[i]);
+	if(argc > 2 && strcmp(argv[1], "--print-fluffy") == 0) {
+		translation_unit_t *unit = do_parsing(argv[2]);
+		ast_set_output(stdout);
 		write_fluffy_decls(unit);
+		return 0;
+	}
+
+	for(int i = 1; i < argc; ++i) {
+		do_parsing(argv[i]);
 	}
 
 	exit_parser();

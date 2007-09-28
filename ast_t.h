@@ -44,7 +44,10 @@ struct expression_t {
 
 struct const_t {
 	expression_t  expression;
-	int           value;
+	union {
+		int         int_value;
+		long double float_value;
+	} v;
 };
 
 struct string_literal_t {
@@ -53,8 +56,8 @@ struct string_literal_t {
 };
 
 struct builtin_symbol_expression_t {
-	symbol_t     *symbol;
 	expression_t  expression;
+	symbol_t     *symbol;
 };
 
 struct reference_expression_t {

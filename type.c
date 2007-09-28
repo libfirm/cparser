@@ -258,7 +258,7 @@ bool type_valid(const type_t *type)
 	return type->type != TYPE_INVALID;
 }
 
-bool is_type_int(const type_t *type)
+bool is_type_integer(const type_t *type)
 {
 	if(type->type != TYPE_ATOMIC)
 		return 0;

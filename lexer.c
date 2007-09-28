@@ -12,7 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 
-//#define DEBUG_CHARS
+#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 
 static int         c;
@@ -85,9 +85,16 @@ static inline void next_char(void);
 		lexer_token.source_position.linenr++; \
 		code;
 
+static inline void eat(char c_type)
+{
+	assert(c == c_type);
+	next_char();
+}
+
 static void maybe_concat_lines(void)
 {
-	next_char();
+	eat('\\');
+
 	switch(c) {
 	MATCH_NEWLINE(return;)
 
@@ -481,40 +488,40 @@ static int parse_hex_sequence(void)
 
 static int parse_escape_sequence(void)
 {
-	while(1) {
-		int ec = c;
-		next_char();
+	eat('\\');
 
-		switch(ec) {
-		case '"':  return '"';
-		case '\'': return'\'';
-		case '\\': return '\\';
-		case '?': return '\?';
-		case 'a': return '\a';
-		case 'b': return '\b';
-		case 'f': return '\f';
-		case 'n': return '\n';
-		case 'r': return '\r';
-		case 't': return '\t';
-		case 'v': return '\v';
-		case 'x':
-			return parse_hex_sequence();
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-			return parse_octal_sequence();
-		case EOF:
-			parse_error("reached end of file while parsing escape sequence");
-			return EOF;
-		default:
-			parse_error("unknown escape sequence");
-			return EOF;
-		}
+	int ec = c;
+	next_char();
+
+	switch(ec) {
+	case '"':  return '"';
+	case '\'': return'\'';
+	case '\\': return '\\';
+	case '?': return '\?';
+	case 'a': return '\a';
+	case 'b': return '\b';
+	case 'f': return '\f';
+	case 'n': return '\n';
+	case 'r': return '\r';
+	case 't': return '\t';
+	case 'v': return '\v';
+	case 'x':
+		return parse_hex_sequence();
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+		return parse_octal_sequence();
+	case EOF:
+		parse_error("reached end of file while parsing escape sequence");
+		return EOF;
+	default:
+		parse_error("unknown escape sequence");
+		return EOF;
 	}
 }
 
@@ -544,12 +551,12 @@ static void parse_string_literal(void)
 	assert(c == '"');
 	next_char();
 
+	int tc;
 	while(1) {
 		switch(c) {
 		case '\\':
-			next_char();
-			int ec = parse_escape_sequence();
-			obstack_1grow(&symbol_obstack, ec);
+			tc = parse_escape_sequence();
+			obstack_1grow(&symbol_obstack, tc);
 			break;
 
 		case EOF:
@@ -590,14 +597,12 @@ end_of_string:
 
 static void parse_character_constant(void)
 {
-	assert(c == '\'');
-	next_char();
+	eat('\'');
 
 	int found_char = 0;
 	while(1) {
 		switch(c) {
 		case '\\':
-			next_char();
 			found_char = parse_escape_sequence();
 			break;
 

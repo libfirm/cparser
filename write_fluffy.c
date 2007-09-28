@@ -5,6 +5,7 @@
 
 #include "ast_t.h"
 #include "type_t.h"
+#include "type.h"
 #include "adt/error.h"
 
 static const context_t *global_context;
@@ -216,7 +217,11 @@ static void write_expression(const expression_t *expression)
 	switch(expression->type) {
 	case EXPR_CONST:
 		constant = (const const_t*) expression;
-		fprintf(out, "%d", constant->value);
+		if(is_type_integer(expression->datatype)) {
+			fprintf(out, "%d", constant->v.int_value);
+		} else {
+			fprintf(out, "%Lf", constant->v.float_value);
+		}
 		break;
 	case EXPR_UNARY:
 		write_unary_expression((const unary_expression_t*) expression);

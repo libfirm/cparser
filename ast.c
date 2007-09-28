@@ -26,7 +26,12 @@ static void print_indent(void)
 
 static void print_const(const const_t *cnst)
 {
-	fprintf(out, "%d", cnst->value);
+	if(cnst->expression.datatype == NULL)
+		return;
+
+	if(is_type_integer(cnst->expression.datatype)) {
+		fprintf(out, "%d", cnst->v.int_value);
+	}
 }
 
 static void print_string_literal(const string_literal_t *string_literal)
