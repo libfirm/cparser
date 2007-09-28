@@ -24,6 +24,7 @@ typedef struct comma_expression_t           comma_expression_t;
 typedef struct statement_expression_t       statement_expression_t;
 typedef struct member_designator_t          member_designator_t;
 typedef struct offsetof_expression_t        offsetof_expression_t;
+typedef struct va_arg_expression_t          va_arg_expression_t;
 typedef struct builtin_symbol_expression_t  builtin_symbol_expression_t;
 
 typedef struct declaration_t                declaration_t;

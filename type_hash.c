@@ -75,7 +75,7 @@ static unsigned hash_enum_type(const enum_type_t *type)
 
 static unsigned hash_type(const type_t *type)
 {
-	unsigned hash;
+	unsigned hash = 0;
 
 	switch(type->type) {
 	case TYPE_INVALID:

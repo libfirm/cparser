@@ -1,10 +1,12 @@
 GOAL = cparser
 
-CFLAGS += -Wall -W -Werror -O0 -g3 -std=c99 -pedantic
+CFLAGS += -Wall -W -Werror -std=c99 -pedantic
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
+CFLAGS += -O0 -g3
+#CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 
-LFLAGS = -g3
+LFLAGS =
 
 SOURCES := \
 	adt/array.c \

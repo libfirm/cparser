@@ -26,6 +26,7 @@ typedef enum {
 	EXPR_PRETTY_FUNCTION,
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_OFFSETOF,
+	EXPR_VA_ARG,
 	EXPR_STATEMENT
 } expresion_type_t;
 
@@ -169,6 +170,12 @@ struct offsetof_expression_t {
 	expression_t         expression;
 	type_t              *type;
 	member_designator_t *member_designators;
+};
+
+struct va_arg_expression_t {
+	expression_t  expression;
+	expression_t *arg;
+	type_t       *type;
 };
 
 struct conditional_expression_t {

@@ -117,6 +117,11 @@ static inline void *allocate_type_zero(size_t size)
 	return res;
 }
 
+static inline void free_type(void *type)
+{
+	obstack_free(type_obst, type);
+}
+
 /**
  * returns the top element of the environment stack
  */
@@ -148,11 +153,7 @@ static inline const token_t *look_ahead(int num)
 	return & lookahead_buffer[pos];
 }
 
-static inline void eat(token_type_t type)
-{
-	assert(token.type == type);
-	next_token();
-}
+#define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
 
 void error(void)
 {
@@ -428,6 +429,70 @@ struct declaration_specifiers_t {
 	type_t          *type;
 };
 
+static const char *parse_string_literals(void)
+{
+	assert(token.type == T_STRING_LITERAL);
+	const char *result = token.v.string;
+
+	next_token();
+
+	while(token.type == T_STRING_LITERAL) {
+		result = concat_strings(result, token.v.string);
+		next_token();
+	}
+
+	return result;
+}
+
+static void parse_attributes(void)
+{
+	while(true) {
+		switch(token.type) {
+		case T___attribute__:
+			next_token();
+
+			expect_void('(');
+			int depth = 1;
+			while(depth > 0) {
+				switch(token.type) {
+				case T_EOF:
+					parse_error("EOF while parsing attribute");
+					break;
+				case '(':
+					next_token();
+					depth++;
+					break;
+				case ')':
+					next_token();
+					depth--;
+					break;
+				default:
+					next_token();
+				}
+			}
+			break;
+		case T_asm:
+			next_token();
+			expect_void('(');
+			if(token.type != T_STRING_LITERAL) {
+				parse_error_expected("while parsing assembler attribute",
+				                     T_STRING_LITERAL);
+				eat_brace();
+				break;
+			} else {
+				parse_string_literals();
+			}
+			expect_void(')');
+			break;
+		default:
+			goto attributes_finished;
+		}
+	}
+
+attributes_finished:
+	;
+}
+
 static compound_type_t *find_compound_type(compound_type_t *types,
                                            const symbol_t *symbol)
 {
@@ -500,6 +565,7 @@ static type_t *parse_compound_type_specifier(bool is_struct)
 		set_context(&compound_type->context);
 
 		parse_compound_type_entries();
+		parse_attributes();
 
 		assert(context == &compound_type->context);
 		set_context(last_context);
@@ -599,6 +665,7 @@ static type_t *parse_enum_specifier(void)
 		declaration_t *before = last_declaration;
 
 		parse_enum_entries();
+		parse_attributes();
 
 		if(before == NULL) {
 			enum_type->entries_begin = context->declarations;
@@ -658,70 +725,6 @@ restart:
 	return result;
 }
 
-static const char *parse_string_literals(void)
-{
-	assert(token.type == T_STRING_LITERAL);
-	const char *result = token.v.string;
-
-	next_token();
-
-	while(token.type == T_STRING_LITERAL) {
-		result = concat_strings(result, token.v.string);
-		next_token();
-	}
-
-	return result;
-}
-
-static void parse_attributes(void)
-{
-	while(true) {
-		switch(token.type) {
-		case T___attribute__:
-			next_token();
-
-			expect_void('(');
-			int depth = 1;
-			while(depth > 0) {
-				switch(token.type) {
-				case T_EOF:
-					parse_error("EOF while parsing attribute");
-					break;
-				case '(':
-					next_token();
-					depth++;
-					break;
-				case ')':
-					next_token();
-					depth--;
-					break;
-				default:
-					next_token();
-				}
-			}
-			break;
-		case T_asm:
-			next_token();
-			expect_void('(');
-			if(token.type != T_STRING_LITERAL) {
-				parse_error_expected("while parsing assembler attribute",
-				                     T_STRING_LITERAL);
-				eat_brace();
-				break;
-			} else {
-				parse_string_literals();
-			}
-			expect_void(')');
-			break;
-		default:
-			goto attributes_finished;
-		}
-	}
-
-attributes_finished:
-	;
-}
-
 typedef enum {
 	SPECIFIER_SIGNED    = 1 << 0,
 	SPECIFIER_UNSIGNED  = 1 << 1,
@@ -750,7 +753,7 @@ static type_t *create_builtin_type(symbol_t *symbol)
 
 	type_t *result = typehash_insert((type_t*) type);
 	if(result != (type_t*) type) {
-		obstack_free(type_obst, type);
+		free_type(type);
 	}
 
 	return result;
@@ -1010,7 +1013,7 @@ finish_specifiers:
 
 	type_t *result = typehash_insert(type);
 	if(newtype && result != (type_t*) type) {
-		obstack_free(type_obst, type);
+		free_type(type);
 	}
 
 	specifiers->type = result;
@@ -1359,7 +1362,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		type_t *hashed_type = typehash_insert((type_t*) type);
 		if(hashed_type != type) {
-			obstack_free(type_obst, type);
+			free_type(type);
 			type = hashed_type;
 		}
 	}
@@ -1429,6 +1432,66 @@ static void parser_error_multiple_definition(declaration_t *previous,
 	error();
 }
 
+static void parse_designation(void)
+{
+	if(token.type != '[' && token.type != '.')
+		return;
+
+	while(1) {
+		switch(token.type) {
+		case '[':
+			next_token();
+			parse_constant_expression();
+			expect_void(']');
+			break;
+		case '.':
+			next_token();
+			expect_void(T_IDENTIFIER);
+			break;
+		default:
+			expect_void('=');
+			return;
+		}
+	}
+}
+
+static void parse_initializer_list(void);
+
+static void parse_initializer(void)
+{
+	parse_designation();
+
+	if(token.type == '{') {
+		parse_initializer_list();
+	} else {
+		parse_assignment_expression();
+	}
+}
+
+static void parse_initializer_list(void)
+{
+	eat('{');
+
+	while(1) {
+		parse_initializer();
+		if(token.type == '}')
+			break;
+
+		if(token.type != ',') {
+			parse_error_expected("problem while parsing initializer list",
+			                     ',', '}', 0);
+			eat_block();
+			return;
+		}
+		eat(',');
+
+		if(token.type == '}')
+			break;
+	}
+
+	expect_void('}');
+}
+
 static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
 	while(true) {
@@ -1447,12 +1510,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
-			if(token.type == '{') {
-				// TODO
-				expect_void('}');
-			} else {
-				declaration->initializer = parse_assignment_expression();
-			}
+			parse_initializer();
 		} else if(token.type == '{') {
 			if(declaration->type->type != TYPE_METHOD) {
 				parser_print_error_prefix();
@@ -1654,7 +1712,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 
 	type_t *type = typehash_insert((type_t*) method_type);
 	if(type != (type_t*) method_type) {
-		obstack_free(type_obst, method_type);
+		free_type(method_type);
 	}
 
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
@@ -1891,6 +1949,22 @@ static expression_t *parse_offsetof(void)
 	return (expression_t*) expression;
 }
 
+static expression_t *parse_va_arg(void)
+{
+	eat(T___builtin_va_arg);
+
+	va_arg_expression_t *expression = allocate_ast_zero(sizeof(expression[0]));
+	expression->expression.type     = EXPR_VA_ARG;
+
+	expect('(');
+	expression->arg = parse_assignment_expression();
+	expect(',');
+	expression->expression.datatype = parse_typename();
+	expect(')');
+
+	return (expression_t*) expression;
+}
+
 static expression_t *parse_builtin_symbol(void)
 {
 	builtin_symbol_expression_t *expression
@@ -1923,9 +1997,10 @@ static expression_t *parse_primary_expression(void)
 		return parse_pretty_function_keyword();
 	case T___builtin_offsetof:
 		return parse_offsetof();
+	case T___builtin_va_arg:
+		return parse_va_arg();
 	case T___builtin_expect:
 	case T___builtin_va_start:
-	case T___builtin_va_arg:
 	case T___builtin_va_end:
 		return parse_builtin_symbol();
 

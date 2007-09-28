@@ -208,6 +208,15 @@ static void print_conditional(const conditional_expression_t *expression)
 	fputs(")", out);
 }
 
+static void print_va_arg(const va_arg_expression_t *expression)
+{
+	fputs("__builtin_va_arg(", out);
+	print_expression(expression->arg);
+	fputs(", ", out);
+	print_type(expression->expression.datatype);
+	fputs(")", out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -245,6 +254,9 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_CONDITIONAL:
 		print_conditional((const conditional_expression_t*) expression);
+		break;
+	case EXPR_VA_ARG:
+		print_va_arg((const va_arg_expression_t*) expression);
 		break;
 
 	case EXPR_OFFSETOF:

@@ -88,11 +88,7 @@ static inline void next_char(void);
 		lexer_token.source_position.linenr++; \
 		code;
 
-static inline void eat(char c_type)
-{
-	assert(c == c_type);
-	next_char();
-}
+#define eat(c_type)  do { assert(c == c_type); next_char(); } while(0)
 
 static void maybe_concat_lines(void)
 {
@@ -113,6 +109,7 @@ static inline void next_char(void)
 {
 	next_real_char();
 
+#if 0
 	/* filter trigraphs */
 	if(UNLIKELY(c == '\\')) {
 		maybe_concat_lines();
@@ -148,6 +145,8 @@ static inline void next_char(void)
 	}
 
 end_of_next_char:
+#endif
+	(void) maybe_concat_lines;
 #ifdef DEBUG_CHARS
 	printf("nchar '%c'\n", c);
 #else
