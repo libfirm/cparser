@@ -14,7 +14,6 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 	entry->ID          = T_IDENTIFIER;
 	entry->pp_ID       = 0;
 	entry->declaration = NULL;
-	entry->context     = NULL;
 }
 
 #define HashSet                    symbol_table_t

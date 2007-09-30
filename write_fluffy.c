@@ -73,9 +73,10 @@ static void write_compound_type(const compound_type_t *type)
 	}
 
 	/* does the struct have a name? */
-	if(type->symbol != NULL) {
+	symbol_t *symbol = type->declaration->symbol;
+	if(symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
-		fprintf(out, "%s", type->symbol->string);
+		fprintf(out, "%s", symbol->string);
 		return;
 	}
 	/* TODO: create a struct and use its name here... */
@@ -91,9 +92,10 @@ static void write_enum_type(const enum_type_t *type)
 	}
 
 	/* does the enum have a name? */
-	if(type->symbol != NULL) {
+	symbol_t *symbol = type->declaration->symbol;
+	if(symbol != NULL) {
 		/* TODO: make sure we create an enum for it... */
-		fprintf(out, "%s", type->symbol->string);
+		fprintf(out, "%s", symbol->string);
 		return;
 	}
 	/* TODO: create a struct and use its name here... */
@@ -171,7 +173,7 @@ static void write_struct(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "struct %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->context.declarations;
+	const declaration_t *declaration = type->declaration->context.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -184,7 +186,7 @@ static void write_union(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "union %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->context.declarations;
+	const declaration_t *declaration = type->declaration->context.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -244,12 +246,13 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	declaration_t *entry = type->entries_begin;
-	for ( ; entry != type->entries_end->next; entry = entry->next) {
+	declaration_t *entry = type->declaration->context_next;
+	for ( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
+			entry = entry->next) {
 		fprintf(out, "\t%s", entry->symbol->string);
-		if(entry->initializer != NULL) {
+		if(entry->init.initializer != NULL) {
 			fprintf(out, " <- ");
-			write_initializer(entry->initializer);
+			write_initializer(entry->init.initializer);
 		}
 		fputc('\n', out);
 	}
@@ -267,7 +270,7 @@ static void write_variable(const declaration_t *declaration)
 
 static void write_function(const declaration_t *declaration)
 {
-	if(declaration->statement != NULL) {
+	if(declaration->init.statement != NULL) {
 		fprintf(stderr, "Warning: can't convert function bodies (at %s)\n",
 		        declaration->symbol->string);
 	}

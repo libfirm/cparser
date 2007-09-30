@@ -32,9 +32,6 @@ typedef enum {
 
 struct context_t {
 	declaration_t   *declarations;
-	compound_type_t *structs;
-	compound_type_t *unions;
-	enum_type_t     *enums;
 };
 
 struct expression_t {
@@ -201,6 +198,13 @@ typedef enum {
 } storage_class_t;
 
 typedef enum {
+	NAMESPACE_NORMAL,
+	NAMESPACE_STRUCT,
+	NAMESPACE_UNION,
+	NAMESPACE_ENUM
+} namespace_t;
+
+typedef enum {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 } initializer_type_t;
@@ -216,14 +220,22 @@ struct initializer_t {
 };
 
 struct declaration_t {
-	storage_class_t     storage_class;
+	unsigned short      namespace;
+	unsigned short      storage_class;
 	type_t             *type;
 	symbol_t           *symbol;
-	statement_t        *statement;
-	initializer_t      *initializer;
 	source_position_t   source_position;
+	union {
+		bool            is_defined;
+		statement_t    *statement;
+		initializer_t  *initializer;
+	} init;
 	context_t           context;
+	context_t          *parent_context;
 
+	/** next declaration in a context */
+	declaration_t      *context_next;
+	/** next declaration with same symbol */
 	declaration_t      *next;
 };
 

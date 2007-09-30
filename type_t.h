@@ -20,7 +20,9 @@ typedef enum {
 	TYPE_METHOD,
 	TYPE_POINTER,
 	TYPE_ARRAY,
-	TYPE_BUILTIN
+	TYPE_BUILTIN,
+	TYPE_TYPEDEF,
+	TYPE_TYPEOF
 } type_type_t;
 
 typedef enum {
@@ -75,16 +77,6 @@ struct builtin_type_t {
 	symbol_t *symbol;
 };
 
-struct enum_type_t {
-	type_t             type;
-	symbol_t          *symbol;
-	source_position_t  source_position;
-	enum_type_t       *next;
-	declaration_t     *entries_begin;
-	declaration_t     *entries_end;
-	bool               defined;
-};
-
 struct pointer_type_t {
 	type_t   type;
 	type_t  *points_to;
@@ -112,12 +104,29 @@ struct method_type_t {
 };
 
 struct compound_type_t {
-	type_t             type;
-	symbol_t          *symbol;
-	context_t          context;
-	source_position_t  source_position;
-	bool               defined;
-	compound_type_t   *next;
+	type_t         type;
+	/** the declaration of the compound type, it's context field
+	 * contains the compound entries. */
+	declaration_t *declaration;
+};
+
+struct enum_type_t {
+	type_t         type;
+	/** the declaration of the enum type. You can find the enum entries by
+	 * walking the declaration->context_next list until you don't find
+	 * STORAGE_CLASS_ENUM_ENTRY declarations anymore */
+	declaration_t *declaration;
+};
+
+struct typedef_type_t {
+	type_t         type;
+	declaration_t *declaration;
+};
+
+struct typeof_type_t {
+	type_t        type;
+	expression_t *expression;
+	type_t       *typeof_type;
 };
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers);

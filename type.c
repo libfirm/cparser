@@ -9,9 +9,11 @@
 static struct obstack   _type_obst;
 struct obstack         *type_obst = &_type_obst;
 static FILE            *out;
+static int              type_visited = 0;
+static bool             print_compound_entries;
 
-static void intern_print_type_pre(const type_t *type);
-static void intern_print_type_post(const type_t *type);
+static void intern_print_type_pre(type_t *type);
+static void intern_print_type_post(type_t *type);
 
 void init_types(void)
 {
@@ -26,6 +28,16 @@ void exit_types(void)
 void type_set_output(FILE *stream)
 {
 	out = stream;
+}
+
+void set_print_compound_entries(bool enabled)
+{
+	print_compound_entries = enabled;
+}
+
+void inc_type_visited(void)
+{
+	type_visited++;
 }
 
 static
@@ -99,7 +111,7 @@ void print_method_type_post(const method_type_t *type, const context_t *context)
 		}
 	} else {
 		declaration_t *parameter = context->declarations;
-		for( ; parameter != NULL; parameter = parameter->next) {
+		for( ; parameter != NULL; parameter = parameter->context_next) {
 			if(first) {
 				first = 0;
 			} else {
@@ -149,64 +161,137 @@ static void print_array_type_post(const array_type_t *type)
 	fputc(']', out);
 }
 
+void print_enum_definition(const declaration_t *declaration)
+{
+	fputs("{\n", out);
+
+	change_indent(1);
+
+	declaration_t *entry = declaration->context_next;
+	for( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
+	       entry = entry->context_next) {
+
+		print_indent();
+		fprintf(out, "%s", entry->symbol->string);
+		if(entry->init.initializer != NULL) {
+			fprintf(out, " = ");
+			print_initializer(entry->init.initializer);
+		}
+		fprintf(out, ",\n");
+	}
+
+	change_indent(-1);
+	print_indent();
+	fputs("}", out);
+}
+
 static void print_type_enum(const enum_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
-	if(type->symbol != NULL) {
-		fprintf(out, "enum %s", type->symbol->string);
+	fputs("enum ", out);
+
+	declaration_t *declaration = type->declaration;
+	symbol_t      *symbol      = declaration->symbol;
+	if(symbol != NULL) {
+		fputs(symbol->string, out);
 	} else {
-		fprintf(out, "enum {\n");
-
-		declaration_t *entry = type->entries_begin;
-		for( ; entry != type->entries_end->next; entry = entry->next) {
-			fprintf(out, "\t%s", entry->symbol->string);
-			if(entry->initializer != NULL) {
-				fprintf(out, " = ");
-				print_initializer(entry->initializer);
-			}
-			fprintf(out, ",\n");
-		}
-
-		fprintf(out, "} ");
+		print_enum_definition(declaration);
 	}
 }
 
-static void intern_print_type_pre(const type_t *type)
+void print_compound_definition(const declaration_t *declaration)
+{
+	fputs("{\n", out);
+	change_indent(1);
+
+	declaration_t *iter = declaration->context.declarations;
+	for( ; iter != NULL; iter = iter->context_next) {
+		print_indent();
+		print_declaration(iter);
+		fputc('\n', out);
+	}
+
+	change_indent(-1);
+	print_indent();
+	fputs("}", out);
+}
+
+static void print_compound_type(const compound_type_t *type)
+{
+	print_type_qualifiers(type->type.qualifiers);
+
+	if(type->type.type == TYPE_COMPOUND_STRUCT) {
+		fputs("struct ", out);
+	} else {
+		assert(type->type.type == TYPE_COMPOUND_UNION);
+		fputs("union ", out);
+	}
+
+	declaration_t *declaration = type->declaration;
+	symbol_t      *symbol      = declaration->symbol;
+	if(symbol != NULL) {
+		fputs(symbol->string, out);
+	} else {
+		print_compound_definition(declaration);
+	}
+}
+
+static void print_typedef_type_pre(typedef_type_t *type)
+{
+	fputs(type->declaration->symbol->string, out);
+}
+
+static void print_typeof_type_pre(typeof_type_t *type)
+{
+	fputs("typeof(", out);
+	if(type->expression != NULL) {
+		assert(type->typeof_type == NULL);
+		print_expression(type->expression);
+	} else {
+		print_type(type->typeof_type);
+	}
+	fputc(')', out);
+}
+
+static void intern_print_type_pre(type_t *type)
 {
 	switch(type->type) {
 	case TYPE_INVALID:
 		fputs("invalid", out);
 		return;
 	case TYPE_ENUM:
-		print_type_enum((const enum_type_t*) type);
+		print_type_enum((enum_type_t*) type);
 		return;
 	case TYPE_ATOMIC:
-		print_atomic_type((const atomic_type_t*) type);
+		print_atomic_type((atomic_type_t*) type);
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		print_type_qualifiers(type->qualifiers);
-		if(((const compound_type_t*) type)->symbol != NULL) {
-			fprintf(out, "%s", ((const compound_type_t*) type)->symbol->string);
-		}
+		print_compound_type((compound_type_t*) type);
 		return;
 	case TYPE_BUILTIN:
 		fputs(((builtin_type_t*) type)->symbol->string, out);
 		return;
 	case TYPE_METHOD:
-		print_method_type_pre((const method_type_t*) type);
+		print_method_type_pre((method_type_t*) type);
 		return;
 	case TYPE_POINTER:
-		print_pointer_type_pre((const pointer_type_t*) type);
+		print_pointer_type_pre((pointer_type_t*) type);
 		return;
 	case TYPE_ARRAY:
+		return;
+	case TYPE_TYPEDEF:
+		print_typedef_type_pre((typedef_type_t*) type);
+		return;
+	case TYPE_TYPEOF:
+		print_typeof_type_pre((typeof_type_t*) type);
 		return;
 	}
 	fputs("unknown", out);
 }
 
 static
-void intern_print_type_post(const type_t *type)
+void intern_print_type_post(type_t *type)
 {
 	switch(type->type) {
 	case TYPE_METHOD:
@@ -224,16 +309,18 @@ void intern_print_type_post(const type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 	case TYPE_BUILTIN:
+	case TYPE_TYPEOF:
+	case TYPE_TYPEDEF:
 		break;
 	}
 }
 
-void print_type(const type_t *type)
+void print_type(type_t *type)
 {
 	print_type_ext(type, NULL, NULL);
 }
 
-void print_type_ext(const type_t *type, const symbol_t *symbol,
+void print_type_ext(type_t *type, const symbol_t *symbol,
                     const context_t *context)
 {
 	if(type == NULL) {
@@ -362,7 +449,7 @@ type_t *make_pointer_type(type_t *points_to, type_qualifier_t qualifiers)
 }
 
 static __attribute__((unused))
-void dbg_type(const type_t *type)
+void dbg_type(type_t *type)
 {
 	FILE *old_out = out;
 	out = stderr;

@@ -16,9 +16,14 @@ static FILE *out;
 static int   indent;
 
 static void print_statement(const statement_t *statement);
-static void print_declaration(const declaration_t *declaration);
 
-static void print_indent(void)
+void change_indent(int delta)
+{
+	indent += delta;
+	assert(indent >= 0);
+}
+
+void print_indent(void)
 {
 	for(int i = 0; i < indent; ++i)
 		fprintf(out, "\t");
@@ -217,6 +222,18 @@ static void print_va_arg(const va_arg_expression_t *expression)
 	fputs(")", out);
 }
 
+static void print_select(const select_expression_t *expression)
+{
+	print_expression(expression->compound);
+	if(expression->compound->datatype == NULL ||
+			expression->compound->datatype->type == TYPE_POINTER) {
+		fputs("->", out);
+	} else {
+		fputc('.', out);
+	}
+	fputs(expression->symbol->string, out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -258,10 +275,12 @@ void print_expression(const expression_t *expression)
 	case EXPR_VA_ARG:
 		print_va_arg((const va_arg_expression_t*) expression);
 		break;
+	case EXPR_SELECT:
+		print_select((const select_expression_t*) expression);
+		break;
 
 	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
-	case EXPR_SELECT:
 		/* TODO */
 		fprintf(out, "some expression of type %d", expression->type);
 		break;
@@ -353,10 +372,17 @@ static void print_case_label(const case_label_statement_t *statement)
 static void print_declaration_statement(
 		const declaration_statement_t *statement)
 {
+	int first = 1;
 	declaration_t *declaration = statement->declarations_begin;
-	for( ; declaration != statement->declarations_end->next;
-	       declaration = declaration->next) {
+	for( ; declaration != statement->declarations_end->context_next;
+	       declaration = declaration->context_next) {
+		if(!first) {
+			print_indent();
+		} else {
+			first = 0;
+		}
 		print_declaration(declaration);
+		fputc('\n', out);
 	}
 }
 
@@ -384,7 +410,7 @@ static void print_for_statement(const for_statement_t *statement)
 	if(statement->context.declarations != NULL) {
 		assert(statement->initialisation == NULL);
 		print_declaration(statement->context.declarations);
-		if(statement->context.declarations->next != NULL) {
+		if(statement->context.declarations->context_next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 	} else if(statement->initialisation) {
@@ -486,30 +512,74 @@ void print_initializer(const initializer_t *initializer)
 	fputs("}", out);
 }
 
-static void print_declaration(const declaration_t *declaration)
+static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
-	if(declaration->statement != NULL) {
-		fputs("\n", out);
-		print_statement(declaration->statement);
-	} else if(declaration->initializer != NULL) {
+	if(declaration->type->type == TYPE_METHOD) {
+		if(declaration->init.statement != NULL) {
+			fputs("\n", out);
+			print_statement(declaration->init.statement);
+			return;
+		}
+	} else if(declaration->init.initializer != NULL) {
 		fputs(" = ", out);
-		print_initializer(declaration->initializer);
-		fprintf(out, ";\n");
-	} else {
-		fprintf(out, ";\n");
+		print_initializer(declaration->init.initializer);
+	}
+	fputc(';', out);
+}
+
+void print_declaration(const declaration_t *declaration)
+{
+	if(declaration->namespace != NAMESPACE_NORMAL &&
+			declaration->symbol == NULL)
+		return;
+
+	switch(declaration->namespace) {
+	case NAMESPACE_NORMAL:
+		print_normal_declaration(declaration);
+		break;
+	case NAMESPACE_STRUCT:
+		fputs("struct ", out);
+		fputs(declaration->symbol->string, out);
+		fputc(' ', out);
+		print_compound_definition(declaration);
+		fputc(';', out);
+		break;
+	case NAMESPACE_UNION:
+		fputs("union ", out);
+		fputs(declaration->symbol->string, out);
+		fputc(' ', out);
+		print_compound_definition(declaration);
+		fputc(';', out);
+		break;
+	case NAMESPACE_ENUM:
+		fputs("enum ", out);
+		fputs(declaration->symbol->string, out);
+		fputc(' ', out);
+		print_enum_definition(declaration);
+		fputc(';', out);
+		break;
 	}
 }
 
 void print_ast(const translation_unit_t *unit)
 {
-	declaration_t *declaration = unit->context.declarations;
-	while(declaration != NULL) {
-		print_declaration(declaration);
+	inc_type_visited();
+	set_print_compound_entries(true);
 
-		declaration = declaration->next;
+	declaration_t *declaration = unit->context.declarations;
+	for( ; declaration != NULL; declaration = declaration->context_next) {
+		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+			continue;
+		if(declaration->namespace != NAMESPACE_NORMAL &&
+				declaration->symbol == NULL)
+			continue;
+
+		print_indent();
+		print_declaration(declaration);
+		fputc('\n', out);
 	}
 }
 

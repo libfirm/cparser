@@ -46,9 +46,7 @@ static unsigned hash_array_type(const array_type_t *type)
 
 static unsigned hash_compound_type(const compound_type_t *type)
 {
-	unsigned result = hash_ptr(type->symbol);
-
-	return result;
+	return hash_ptr(type->declaration);
 }
 
 static unsigned hash_type(const type_t *type);
@@ -68,7 +66,13 @@ static unsigned hash_method_type(const method_type_t *type)
 
 static unsigned hash_enum_type(const enum_type_t *type)
 {
-	unsigned result = hash_ptr(type->symbol);
+	return hash_ptr(type->declaration);
+}
+
+static unsigned hash_typeof_type(const typeof_type_t *type)
+{
+	unsigned result = hash_ptr(type->expression);
+	result         ^= hash_ptr(type->typeof_type);
 
 	return result;
 }
@@ -103,6 +107,12 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_BUILTIN:
 		hash = hash_ptr(((const builtin_type_t*) type)->symbol);
 		break;
+	case TYPE_TYPEDEF:
+		hash = hash_ptr(((const compound_type_t*) type)->declaration);
+		break;
+	case TYPE_TYPEOF:
+		hash = hash_typeof_type((const typeof_type_t*) type);
+		break;
 	}
 
 	unsigned some_prime = 99991;
@@ -115,43 +125,6 @@ static bool atomic_types_equal(const atomic_type_t *type1,
                                const atomic_type_t *type2)
 {
 	return type1->atype == type2->atype;
-}
-
-static bool compound_types_equal(const compound_type_t *type1,
-                                 const compound_type_t *type2)
-{
-	if(type1->type.type != type2->type.type)
-		return false;
-	if(type1->symbol != type2->symbol)
-		return false;
-
-	/* anonymous types? */
-	if(type1->symbol == NULL) {
-		/* previous tests should already have checked for this */
-		assert(type1 != type2);
-		/* anonymous types are only equal if they are the very same type */
-		return false;
-	}
-
-	/* non-anonymous types with same symbol are equal */
-	return true;
-}
-
-static bool enum_types_equal(const enum_type_t *type1, const enum_type_t *type2)
-{
-	if(type1->symbol != type2->symbol)
-		return false;
-
-	/* anonymous types? */
-	if(type1->symbol == NULL) {
-		/* previous tests should already have checked for this */
-		assert(type1 != type2);
-		/* 2 anonymous enums are never equal */
-		return false;
-	}
-
-	/* non-anonymous types with same symbol are equal */
-	return true;
 }
 
 static bool method_types_equal(const method_type_t *type1,
@@ -206,6 +179,35 @@ static bool builtin_types_equal(const builtin_type_t *type1,
 	return type1->symbol == type2->symbol;
 }
 
+static bool compound_types_equal(const compound_type_t *type1,
+                                 const compound_type_t *type2)
+{
+	return type1->declaration == type2->declaration;
+}
+
+static bool enum_types_equal(const enum_type_t *type1,
+                             const enum_type_t *type2)
+{
+	return type1->declaration == type2->declaration;
+}
+
+static bool typedef_types_equal(const typedef_type_t *type1,
+                                const typedef_type_t *type2)
+{
+	return type1->declaration == type2->declaration;
+}
+
+static bool typeof_types_equal(const typeof_type_t *type1,
+                               const typeof_type_t *type2)
+{
+	if(type1->expression != type2->expression)
+		return false;
+	if(type1->typeof_type != type2->typeof_type)
+		return false;
+
+	return true;
+}
+
 static bool types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
@@ -221,13 +223,13 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_ATOMIC:
 		return atomic_types_equal((const atomic_type_t*) type1,
 		                          (const atomic_type_t*) type2);
+	case TYPE_ENUM:
+		return enum_types_equal((const enum_type_t*) type1,
+		                        (const enum_type_t*) type2);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 		return compound_types_equal((const compound_type_t*) type1,
 		                            (const compound_type_t*) type2);
-	case TYPE_ENUM:
-		return enum_types_equal((const enum_type_t*) type1,
-		                        (const enum_type_t*) type2);
 	case TYPE_METHOD:
 		return method_types_equal((const method_type_t*) type1,
 		                          (const method_type_t*) type2);
@@ -240,6 +242,12 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_BUILTIN:
 		return builtin_types_equal((const builtin_type_t*) type1,
 		                           (const builtin_type_t*) type2);
+	case TYPE_TYPEOF:
+		return typeof_types_equal((const typeof_type_t*) type1,
+		                          (const typeof_type_t*) type2);
+	case TYPE_TYPEDEF:
+		return typedef_types_equal((const typedef_type_t*) type1,
+		                           (const typedef_type_t*) type2);
 	}
 
 	abort();

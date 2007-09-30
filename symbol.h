@@ -10,7 +10,6 @@ struct symbol_t {
 	unsigned short  ID;
 	unsigned short  pp_ID;
 	declaration_t  *declaration;
-	const void     *context;
 };
 
 #endif
