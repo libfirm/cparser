@@ -17,6 +17,7 @@
 
 static int         c;
 token_t            lexer_token;
+symbol_t          *symbol_L;
 static FILE       *input;
 static char        buf[1024 + MAX_PUTBACK];
 static const char *bufend;
@@ -862,6 +863,12 @@ void lexer_next_preprocessing_token(void)
 
 		SYMBOL_CHARS
 			parse_symbol();
+			/* might be a wide string ( L"string" ) */
+			if(c == '"' && (lexer_token.type == T_IDENTIFIER &&
+			   lexer_token.v.symbol == symbol_L)) {
+			   	parse_string_literal();
+			   	return;
+			}
 			return;
 
 		DIGITS
@@ -1039,6 +1046,8 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 	input                                  = stream;
 	lexer_token.source_position.linenr     = 0;
 	lexer_token.source_position.input_name = input_name;
+
+	symbol_L = symbol_table_insert("L");
 
 	/* place a virtual \n at the beginning so the lexer knows that we're
 	 * at the beginning of a line */
