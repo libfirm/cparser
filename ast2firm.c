@@ -992,18 +992,16 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 static void while_statement_to_firm(while_statement_t *statement)
 {
-	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 
 	/* create the header block */
 	ir_node *jmp          = new_Jmp();
 	ir_node *header_block = new_immBlock();
-	add_immBlock_pred(header, jmp);
+	add_immBlock_pred(header_block, jmp);
 
 	/* create the condition */
-	ir_node  *condition = expression_to_firm(statement->condition);
-	assert(condition != NULL);
-	/* make sure we have a mode_b condition */
-	condition = create_conv(dbgi, condition, mode_b);
+	ir_node *condition = expression_to_firm(statement->condition);
+	condition          = create_conv(dbgi, condition, mode_b);
 
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
@@ -1012,31 +1010,19 @@ static void while_statement_to_firm(while_statement_t *statement)
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
 	add_immBlock_pred(body_block, true_proj);
-	mature_immBlock(true_block);
+	mature_immBlock(body_block);
 
-	statement_to_firm(statement->true_statement);
+	statement_to_firm(statement->body);
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
-		add_immBlock_pred(fallthrough_block, jmp);
+		add_immBlock_pred(header_block, jmp);
 	}
+	mature_immBlock(header_block);
 
-	/* the false (blocks) */
-	if(statement->false_statement != NULL) {
-		ir_node *false_block = new_immBlock();
-		add_immBlock_pred(false_block, false_proj);
-		mature_immBlock(false_block);
-
-		statement_to_firm(statement->false_statement);
-		if(get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
-			add_immBlock_pred(fallthrough_block, jmp);
-		}
-	} else {
-		add_immBlock_pred(fallthrough_block, false_proj);
-	}
-	mature_immBlock(fallthrough_block);
-
-	set_cur_block(fallthrough_block);
+	/* the false block */
+	ir_node *false_block = new_immBlock();
+	add_immBlock_pred(false_block, false_proj);
+	mature_immBlock(false_block);
 }
 
 static void create_declaration_entity(declaration_t *declaration,
@@ -1140,6 +1126,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_IF:
 		if_statement_to_firm((if_statement_t*) statement);
+		return;
+	case STATEMENT_WHILE:
+		while_statement_to_firm((while_statement_t*) statement);
 		return;
 	case STATEMENT_DECLARATION:
 		declaration_statement_to_firm((declaration_statement_t*) statement);

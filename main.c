@@ -5,6 +5,10 @@
 #include <errno.h>
 #include <string.h>
 
+#ifndef WITH_LIBCORE
+#define WITH_LIBCORE
+#endif
+
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
