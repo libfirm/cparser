@@ -1,19 +1,25 @@
 GOAL = cparser
 
+FIRM_HOME = $(HOME)/projects/firm
+FIRM_BUILD = $(FIRM_HOME)/build/i686-pc-linux-gnu/debug/
+FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOME)/libcore -I$(FIRM_HOME)/libcore/libcore -I$(FIRM_HOME)
+FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -ldl
+
 CFLAGS += -Wall -W -Werror -std=c99 -pedantic
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
 CFLAGS += -O0 -g3
+CFLAGS += $(FIRM_CFLAGS)
 #CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 
-LFLAGS =
+LFLAGS = $(FIRM_LIBS)
 
 SOURCES := \
-	adt/array.c \
 	adt/hashset.c \
 	adt/strset.c \
 	adt/xmalloc.c \
 	ast.c \
+	ast2firm.c \
 	lexer.c \
 	main.c \
 	parser.c \
