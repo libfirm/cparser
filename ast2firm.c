@@ -68,11 +68,12 @@ void init_ast2firm(void)
 	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, 0);
 	type_int        = make_atomic_type(ATOMIC_TYPE_INT, 0);
 
+	ir_type_int        = get_ir_type(type_int);
 	ir_type_const_char = get_ir_type(type_const_char);
-	ir_type_void       = get_ir_type(type_void);
+	ir_type_void       = get_ir_type(type_int); /* we don't have a real void
+	                                               type in firm */
 	ir_type_void_ptr   = new_type_pointer(new_id_from_str("void_ptr"),
 	                                      ir_type_void, mode_P_data);
-	ir_type_int        = get_ir_type(type_int);
 }
 
 void exit_ast2firm(void)
