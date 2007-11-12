@@ -67,6 +67,7 @@ T(asm,                     "asm",)
 T(__asm__,             "__asm__", = T_asm)
 T(inline,               "inline",)
 T(__inline,           "__inline", = T_inline)
+T(__inline__,       "__inline__", = T_inline)
 
 T(MINUSGREATER,             "->",)
 T(PLUSPLUS,                 "++",)

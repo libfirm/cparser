@@ -224,6 +224,7 @@ struct initializer_t {
 struct declaration_t {
 	unsigned char       namespace;
 	unsigned char       storage_class;
+	unsigned int        address_taken : 1;
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;
@@ -286,9 +287,6 @@ struct declaration_statement_t {
 	statement_t    statement;
 	declaration_t *declarations_begin;
 	declaration_t *declarations_end;
-
-	int            value_number; /**< filled in by semantic phase */
-	int            refs;
 };
 
 struct if_statement_t {

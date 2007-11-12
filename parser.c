@@ -2460,55 +2460,103 @@ CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT,
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT,
                                        get_unexpr_arithmetic_type)
 
-#define CREATE_BINEXPR_PARSER(token_type, binexpression_type)    \
-static                                                           \
-expression_t *parse_##binexpression_type(unsigned precedence,    \
-                                         expression_t *left)     \
-{                                                                \
-	eat(token_type);                                             \
-                                                                 \
-	expression_t *right = parse_sub_expression(precedence);      \
-                                                                 \
-	binary_expression_t *binexpr                                 \
-		= allocate_ast_zero(sizeof(binexpr[0]));                 \
-	binexpr->expression.type = EXPR_BINARY;                      \
-	binexpr->type            = binexpression_type;               \
-	binexpr->left            = left;                             \
-	binexpr->right           = right;                            \
-                                                                 \
-	return (expression_t*) binexpr;                              \
+static type_t *get_binexpr_int_type(const expression_t *left,
+                                    const expression_t *right)
+{
+	(void) left;
+	(void) right;
+	return type_int;
 }
 
-CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA)
-CREATE_BINEXPR_PARSER('*', BINEXPR_MUL)
-CREATE_BINEXPR_PARSER('/', BINEXPR_DIV)
-CREATE_BINEXPR_PARSER('%', BINEXPR_MOD)
-CREATE_BINEXPR_PARSER('+', BINEXPR_ADD)
-CREATE_BINEXPR_PARSER('-', BINEXPR_SUB)
-CREATE_BINEXPR_PARSER('<', BINEXPR_LESS)
-CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER)
-CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN)
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL)
-CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, BINEXPR_NOTEQUAL)
-CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL)
-CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL)
-CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND)
-CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR)
-CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR)
-CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND)
-CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR)
-CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT)
-CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT)
-CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN)
-CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN)
-CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN)
-CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN)
-CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, BINEXPR_MOD_ASSIGN)
-CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, BINEXPR_SHIFTLEFT_ASSIGN)
-CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, BINEXPR_SHIFTRIGHT_ASSIGN)
-CREATE_BINEXPR_PARSER(T_ANDEQUAL, BINEXPR_BITWISE_AND_ASSIGN)
-CREATE_BINEXPR_PARSER(T_PIPEEQUAL, BINEXPR_BITWISE_OR_ASSIGN)
-CREATE_BINEXPR_PARSER(T_CARETEQUAL, BINEXPR_BITWISE_XOR_ASSIGN)
+static type_t *get_binexpr_arithmetic_type(const expression_t *left,
+                                            const expression_t *right)
+{
+	(void) right;
+	return left->datatype;
+}
+
+static type_t *get_binexpr_arithmetic_assign_type(const expression_t *left,
+                                                  const expression_t *right)
+{
+	(void) right;
+	/* TODO */
+	return left->datatype;
+}
+
+static type_t *get_binexpr_right_type(const expression_t *left,
+                                       const expression_t *right)
+{
+	(void) left;
+	return right->datatype;
+}
+
+#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, tfunc)    \
+static expression_t *parse_##binexpression_type(unsigned precedence,    \
+                                                expression_t *left)     \
+{                                                                       \
+	eat(token_type);                                                    \
+                                                                        \
+	expression_t *right = parse_sub_expression(precedence);             \
+                                                                        \
+	binary_expression_t *binexpr                                        \
+		= allocate_ast_zero(sizeof(binexpr[0]));                        \
+	binexpr->expression.type     = EXPR_BINARY;                         \
+	binexpr->type                = binexpression_type;                  \
+	binexpr->left                = left;                                \
+	binexpr->right               = right;                               \
+	binexpr->expression.datatype = tfunc(left, right);                  \
+                                                                        \
+	return (expression_t*) binexpr;                                     \
+}
+
+CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,   get_binexpr_right_type)
+CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,     get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,     get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,     get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,     get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,     get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,    get_binexpr_int_type)
+CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER, get_binexpr_int_type)
+CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,  get_binexpr_right_type)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, BINEXPR_NOTEQUAL,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND, get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,  get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR, get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR,
+                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
+                      get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,
+                      get_binexpr_arithmetic_type)
+CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, BINEXPR_MOD_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, BINEXPR_SHIFTLEFT_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, BINEXPR_SHIFTRIGHT_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_ANDEQUAL, BINEXPR_BITWISE_AND_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_PIPEEQUAL, BINEXPR_BITWISE_OR_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
+CREATE_BINEXPR_PARSER(T_CARETEQUAL, BINEXPR_BITWISE_XOR_ASSIGN,
+                      get_binexpr_arithmetic_assign_type)
 
 static expression_t *parse_sub_expression(unsigned precedence)
 {

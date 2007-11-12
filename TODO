@@ -7,3 +7,5 @@ Lexer:
 
 Parser:
 - proper handling of function pointer types
+- outermost typequalifiers can differ between function declarations and
+  implementations...

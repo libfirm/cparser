@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
@@ -24,12 +25,12 @@ static type_t *type_const_char;
 static type_t *type_void;
 static type_t *type_int;
 
+static int next_value_number_function;
+
 typedef enum declaration_type_t {
 	DECLARATION_TYPE_UNKNOWN,
 	DECLARATION_TYPE_FUNCTION,
 	DECLARATION_TYPE_GLOBAL_VARIABLE,
-	DECLARATION_TYPE_PARAMETER,
-	DECLARATION_TYPE_PARAMETER_ENTITY,
 	DECLARATION_TYPE_LOCAL_VARIABLE,
 	DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
 	DECLARATION_TYPE_COMPOUND_MEMBER
@@ -631,23 +632,17 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
 	declaration_t *declaration = ref->declaration;
+	type_t        *type        = declaration->type;
+	ir_mode       *mode        = get_ir_mode(type);
 
 	switch((declaration_type_t) declaration->declaration_type) {
 	case DECLARATION_TYPE_UNKNOWN:
 		break;
-	case DECLARATION_TYPE_PARAMETER: {
-		ir_node *args  = get_irg_args(current_ir_graph);
-		ir_mode *mode  = get_ir_mode(declaration->type);
-		ir_node *block = get_irg_start_block(current_ir_graph);
-		long     pn    = declaration->v.value_number;
-
-		return new_r_Proj(current_ir_graph, block, args, mode, pn);
-	}
+	case DECLARATION_TYPE_LOCAL_VARIABLE:
+		return get_value(declaration->v.value_number, mode);
 	case DECLARATION_TYPE_FUNCTION: {
 		return create_symconst(dbgi, declaration->v.entity);
 	}
-	case DECLARATION_TYPE_PARAMETER_ENTITY:
-	case DECLARATION_TYPE_LOCAL_VARIABLE:
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_TYPE_GLOBAL_VARIABLE:
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
@@ -751,8 +746,16 @@ static ir_node *expression_addr(const expression_t *expression)
 static void set_value_for_expression(const expression_t *expression,
                                      ir_node *value)
 {
-	(void) expression;
-	(void) value;
+	if(expression->type == EXPR_REFERENCE) {
+		reference_expression_t *ref = (reference_expression_t*) expression;
+
+		declaration_t *declaration = ref->declaration;
+		assert(declaration->declaration_type != DECLARATION_TYPE_UNKNOWN);
+		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
+			set_value(declaration->v.value_number, value);
+			return;
+		}
+	}
 	panic("set_value_for_expression not implemented yet");
 }
 
@@ -837,6 +840,50 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	panic("invalid UNEXPR type found");
 }
 
+static long get_pnc(binary_expression_type_t type)
+{
+	switch(type) {
+	case BINEXPR_EQUAL:        return pn_Cmp_Eq;
+	case BINEXPR_NOTEQUAL:     return pn_Cmp_Lg;
+	case BINEXPR_LESS:         return pn_Cmp_Lt;
+	case BINEXPR_LESSEQUAL:    return pn_Cmp_Le;
+	case BINEXPR_GREATER:      return pn_Cmp_Gt;
+	case BINEXPR_GREATEREQUAL: return pn_Cmp_Ge;
+	default:
+		break;
+	}
+	panic("trying to get pn_Cmp from non-comparison binexpr type");
+}
+
+static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	binary_expression_type_t type = expression->type;
+	switch(type) {
+	case BINEXPR_EQUAL:
+	case BINEXPR_NOTEQUAL:
+	case BINEXPR_LESS:
+	case BINEXPR_LESSEQUAL:
+	case BINEXPR_GREATER:
+	case BINEXPR_GREATEREQUAL: {
+		ir_node *left  = expression_to_firm(expression->left);
+		ir_node *right = expression_to_firm(expression->right);
+		ir_node *cmp   = new_d_Cmp(dbgi, left, right);
+		long     pnc   = get_pnc(type);
+		ir_node *proj  = new_d_Proj(dbgi, cmp, mode_b, pnc);
+		return proj;
+	}
+	case BINEXPR_ASSIGN: {
+		ir_node *right = expression_to_firm(expression->right);
+		set_value_for_expression(expression->left, right);
+		return right;
+	}
+	default:
+		panic("TODO binexpr type");
+	}
+}
+
 static ir_node *expression_to_firm(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -845,12 +892,15 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	case EXPR_STRING_LITERAL:
 		return string_literal_to_firm((const string_literal_t*) expression);
 	case EXPR_REFERENCE:
-		return reference_expression_to_firm((const reference_expression_t*)
-		                                    expression);
+		return reference_expression_to_firm(
+				(const reference_expression_t*) expression);
 	case EXPR_CALL:
 		return call_expression_to_firm((const call_expression_t*) expression);
 	case EXPR_UNARY:
 		return unary_expression_to_firm((const unary_expression_t*) expression);
+	case EXPR_BINARY:
+		return binary_expression_to_firm(
+				(const binary_expression_t*) expression);
 	default:
 		break;
 	}
@@ -900,7 +950,9 @@ static void if_statement_to_firm(if_statement_t *statement)
 	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
 	ir_node  *condition = expression_to_firm(statement->condition);
 	assert(condition != NULL);
-	assert(get_irn_mode(condition) == mode_b);
+
+	/* make sure we have a mode_b condition */
+	condition = create_conv(dbgi, condition, mode_b);
 
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
@@ -938,6 +990,142 @@ static void if_statement_to_firm(if_statement_t *statement)
 	set_cur_block(fallthrough_block);
 }
 
+static void while_statement_to_firm(while_statement_t *statement)
+{
+	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
+
+	/* create the header block */
+	ir_node *jmp          = new_Jmp();
+	ir_node *header_block = new_immBlock();
+	add_immBlock_pred(header, jmp);
+
+	/* create the condition */
+	ir_node  *condition = expression_to_firm(statement->condition);
+	assert(condition != NULL);
+	/* make sure we have a mode_b condition */
+	condition = create_conv(dbgi, condition, mode_b);
+
+	ir_node *cond       = new_d_Cond(dbgi, condition);
+	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	/* the loop body */
+	ir_node *body_block = new_immBlock();
+	add_immBlock_pred(body_block, true_proj);
+	mature_immBlock(true_block);
+
+	statement_to_firm(statement->true_statement);
+	if(get_cur_block() != NULL) {
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(fallthrough_block, jmp);
+	}
+
+	/* the false (blocks) */
+	if(statement->false_statement != NULL) {
+		ir_node *false_block = new_immBlock();
+		add_immBlock_pred(false_block, false_proj);
+		mature_immBlock(false_block);
+
+		statement_to_firm(statement->false_statement);
+		if(get_cur_block() != NULL) {
+			ir_node *jmp = new_Jmp();
+			add_immBlock_pred(fallthrough_block, jmp);
+		}
+	} else {
+		add_immBlock_pred(fallthrough_block, false_proj);
+	}
+	mature_immBlock(fallthrough_block);
+
+	set_cur_block(fallthrough_block);
+}
+
+static void create_declaration_entity(declaration_t *declaration,
+                                      declaration_type_t declaration_type,
+                                      ir_type *parent_type)
+{
+	ident     *id     = new_id_from_str(declaration->symbol->string);
+	ir_type   *irtype = get_ir_type(declaration->type);
+	ir_entity *entity = new_entity(parent_type, id, irtype);
+	set_entity_ld_ident(entity, id);
+
+	declaration->declaration_type = declaration_type;
+	declaration->v.entity         = entity;
+	set_entity_variability(entity, variability_uninitialized);
+	/* TODO: visibility? */
+}
+
+static void create_initializer(declaration_t *declaration)
+{
+	initializer_t *initializer = declaration->init.initializer;
+	if(initializer == NULL)
+		return;
+
+	if(initializer->type == INITIALIZER_VALUE) {
+		assert(initializer->designator == NULL);
+		assert(initializer->next == NULL);
+		ir_node *init_node = expression_to_firm(initializer->v.value);
+
+		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
+			set_value(declaration->v.value_number, init_node);
+		} else {
+			panic("initializer not completely implemented yet");
+		}
+	} else {
+		assert(initializer->type == INITIALIZER_LIST);
+		panic("list initializer not supported yet");
+	}
+}
+
+static void create_local_variable(declaration_t *declaration)
+{
+	bool needs_entity = declaration->address_taken;
+
+	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+
+	if(needs_entity) {
+		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
+		create_declaration_entity(declaration,
+		                          DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
+		                          frame_type);
+	} else {
+		declaration->declaration_type = DECLARATION_TYPE_LOCAL_VARIABLE;
+		declaration->v.value_number   = next_value_number_function;
+		++next_value_number_function;
+	}
+
+	create_initializer(declaration);
+}
+
+static void declaration_statement_to_firm(declaration_statement_t *statement)
+{
+	declaration_t *declaration = statement->declarations_begin;
+	declaration_t *end         = statement->declarations_end->next;
+	for( ; declaration != end; declaration = declaration->next) {
+		type_t *type = declaration->type;
+
+		switch(declaration->storage_class) {
+		case STORAGE_CLASS_TYPEDEF:
+			continue;
+		case STORAGE_CLASS_STATIC:
+			panic("static local vars not implemented yet");
+		case STORAGE_CLASS_ENUM_ENTRY:
+			panic("enum entry declaration in local block found");
+		case STORAGE_CLASS_EXTERN:
+			panic("extern declaration in local block found");
+		case STORAGE_CLASS_NONE:
+		case STORAGE_CLASS_AUTO:
+		case STORAGE_CLASS_REGISTER:
+			if(type->type == TYPE_FUNCTION) {
+				panic("nested functions not supported yet");
+			} else {
+				create_local_variable(declaration);
+			}
+			continue;
+		}
+		panic("invalid storage class found");
+	}
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
@@ -952,6 +1140,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_IF:
 		if_statement_to_firm((if_statement_t*) statement);
+		return;
+	case STATEMENT_DECLARATION:
+		declaration_statement_to_firm((declaration_statement_t*) statement);
 		return;
 	default:
 		break;
@@ -968,14 +1159,29 @@ static int get_function_n_local_vars(declaration_t *declaration)
 
 static void initialize_function_parameters(declaration_t *declaration)
 {
+	ir_graph *irg         = current_ir_graph;
+	ir_node  *args        = get_irg_args(irg);
+	ir_node  *start_block = get_irg_start_block(irg);
+
 	int            n         = 0;
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		assert(parameter->declaration_type == DECLARATION_TYPE_UNKNOWN);
 
-		parameter->declaration_type = DECLARATION_TYPE_PARAMETER;
-		parameter->v.value_number   = n;
+		if(parameter->address_taken) {
+			panic("address take from parameter not implemented yet");
+		}
+
+		ir_mode *mode = get_ir_mode(parameter->type);
+		long     pn   = n;
+		ir_node *proj = new_r_Proj(irg, start_block, args, mode, pn);
 		++n;
+
+		parameter->declaration_type = DECLARATION_TYPE_LOCAL_VARIABLE;
+		parameter->v.value_number   = next_value_number_function;
+		++next_value_number_function;
+
+		set_value(parameter->v.value_number, proj);
 	}
 }
 
@@ -986,11 +1192,12 @@ static void create_function(declaration_t *declaration)
 	if(declaration->init.statement == NULL)
 		return;
 
-	initialize_function_parameters(declaration);
-
 	int        n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph  *irg          = new_ir_graph(entity, n_local_vars);
 	ir_node   *first_block  = get_cur_block();
+
+	next_value_number_function = 0;
+	initialize_function_parameters(declaration);
 
 	statement_to_firm(declaration->init.statement);
 
