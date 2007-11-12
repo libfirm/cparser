@@ -8,6 +8,8 @@
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
 
+#include "ast2firm.h"
+
 #include "adt/error.h"
 #include "token_t.h"
 #include "type_t.h"
@@ -105,21 +107,6 @@ static ident *unique_ident(const char *tag)
 	unique_id++;
 	return new_id_from_str(buf);
 }
-
-#if 0
-static symbol_t *unique_symbol(const char *tag)
-{
-	obstack_printf(&symbol_obstack, "%s.%d", tag, unique_id);
-	unique_id++;
-
-	const char *string = obstack_finish(&symbol_obstack);
-	symbol_t   *symbol = symbol_table_insert(string);
-
-	assert(symbol->string == string);
-
-	return symbol;
-}
-#endif
 
 static type_t *skip_typeref(type_t *type)
 {
@@ -908,6 +895,49 @@ static void expression_statement_to_firm(expression_statement_t *statement)
 	expression_to_firm(statement->expression);
 }
 
+static void if_statement_to_firm(if_statement_t *statement)
+{
+	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
+	ir_node  *condition = expression_to_firm(statement->condition);
+	assert(condition != NULL);
+	assert(get_irn_mode(condition) == mode_b);
+
+	ir_node *cond       = new_d_Cond(dbgi, condition);
+	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	ir_node *fallthrough_block = new_immBlock();
+
+	/* the true (blocks) */
+	ir_node *true_block = new_immBlock();
+	add_immBlock_pred(true_block, true_proj);
+	mature_immBlock(true_block);
+
+	statement_to_firm(statement->true_statement);
+	if(get_cur_block() != NULL) {
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(fallthrough_block, jmp);
+	}
+
+	/* the false (blocks) */
+	if(statement->false_statement != NULL) {
+		ir_node *false_block = new_immBlock();
+		add_immBlock_pred(false_block, false_proj);
+		mature_immBlock(false_block);
+
+		statement_to_firm(statement->false_statement);
+		if(get_cur_block() != NULL) {
+			ir_node *jmp = new_Jmp();
+			add_immBlock_pred(fallthrough_block, jmp);
+		}
+	} else {
+		add_immBlock_pred(fallthrough_block, false_proj);
+	}
+	mature_immBlock(fallthrough_block);
+
+	set_cur_block(fallthrough_block);
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
@@ -919,6 +949,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_EXPRESSION:
 		expression_statement_to_firm((expression_statement_t*) statement);
+		return;
+	case STATEMENT_IF:
+		if_statement_to_firm((if_statement_t*) statement);
 		return;
 	default:
 		break;

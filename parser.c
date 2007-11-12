@@ -154,14 +154,14 @@ static inline const token_t *look_ahead(int num)
 
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
 
-void error(void)
+static void error(void)
 {
 #ifdef ABORT_ON_ERROR
 	abort();
 #endif
 }
 
-void parser_print_prefix_pos(const source_position_t source_position)
+static void parser_print_prefix_pos(const source_position_t source_position)
 {
     fputs(source_position.input_name, stderr);
     fputc(':', stderr);
@@ -169,14 +169,15 @@ void parser_print_prefix_pos(const source_position_t source_position)
     fputs(": ", stderr);
 }
 
-void parser_print_error_prefix_pos(const source_position_t source_position)
+static void parser_print_error_prefix_pos(
+		const source_position_t source_position)
 {
 	parser_print_prefix_pos(source_position);
 	fputs("error: ", stderr);
 	error();
 }
 
-void parser_print_error_prefix(void)
+static void parser_print_error_prefix(void)
 {
 	parser_print_prefix_pos(token.source_position);
 	error();
@@ -2556,8 +2557,8 @@ static expression_t *parse_expression(void)
 
 
 
-void register_expression_parser(parse_expression_function parser,
-                                int token_type, unsigned precedence)
+static void register_expression_parser(parse_expression_function parser,
+                                       int token_type, unsigned precedence)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
@@ -2571,8 +2572,9 @@ void register_expression_parser(parse_expression_function parser,
 	entry->precedence = precedence;
 }
 
-void register_expression_infix_parser(parse_expression_infix_function parser,
-                                      int token_type, unsigned precedence)
+static void register_expression_infix_parser(
+		parse_expression_infix_function parser, int token_type,
+		unsigned precedence)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 

@@ -171,6 +171,18 @@
 #error You have to redefine hashset_remove_iterator
 #endif
 
+/* prototypes to silence warnings */
+size_t hashset_size(const HashSet *this);
+void hashset_init(HashSet *this);
+void hashset_init_size(HashSet *this, size_t size);
+void hashset_destroy(HashSet *this);
+InsertReturnValue hashset_insert(HashSet *this, KeyType key);
+ValueType hashset_find(const HashSet *this, ConstKeyType key);
+void hashset_remove(HashSet *this, ConstKeyType key);
+void hashset_iterator_init(HashSetIterator *this, const HashSet *hashset);
+ValueType hashset_iterator_next(HashSetIterator *this);
+void hashset_remove_iterator(HashSet *this, const HashSetIterator *iter);
+
 /**
  * Returns the number of elements in the hashset
  */

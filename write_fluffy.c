@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include "write_fluffy.h"
 #include "ast_t.h"
 #include "type_t.h"
 #include "type.h"

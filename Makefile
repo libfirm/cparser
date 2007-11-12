@@ -5,7 +5,7 @@ FIRM_BUILD = $(FIRM_HOME)/build/i686-pc-linux-gnu/debug/
 FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOME)/libcore -I$(FIRM_HOME)/libcore/libcore -I$(FIRM_HOME)
 FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -ldl
 
-CFLAGS += -Wall -W -Werror -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
 CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
 CFLAGS += -O0 -g3

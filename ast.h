@@ -53,7 +53,7 @@ void  ast_set_output(FILE *out);
 void  print_expression(const expression_t *expression);
 void  print_initializer(const initializer_t *initializer);
 void  print_ast(const translation_unit_t *unit);
-void  print_indent();
+void  print_indent(void);
 void  print_declaration(const declaration_t *declaration);
 void  change_indent(int delta);
 void *allocate_ast(size_t size);

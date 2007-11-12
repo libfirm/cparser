@@ -804,7 +804,7 @@ static void parse_preprocessor_identifier(void)
 	}
 }
 
-static void parse_preprocessor_directive()
+static void parse_preprocessor_directive(void)
 {
 	next_pp_token();
 
