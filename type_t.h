@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include <libfirm/firm_types.h>
+
 #include "type.h"
 #include "symbol.h"
 #include "token_t.h"
@@ -65,6 +67,8 @@ typedef enum {
 struct type_t {
 	type_type_t       type;
 	type_qualifier_t  qualifiers;
+
+	ir_type          *firm_type;
 };
 
 struct atomic_type_t {
@@ -75,6 +79,7 @@ struct atomic_type_t {
 struct builtin_type_t {
 	type_t    type;
 	symbol_t *symbol;
+	type_t   *real_type;
 };
 
 struct pointer_type_t {

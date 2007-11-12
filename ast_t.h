@@ -1,6 +1,8 @@
 #ifndef AST_T_H
 #define AST_T_H
 
+#include <libfirm/firm_types.h>
+
 #include "ast.h"
 #include "symbol.h"
 #include "token_t.h"
@@ -237,6 +239,8 @@ struct declaration_t {
 	declaration_t      *context_next;
 	/** next declaration with same symbol */
 	declaration_t      *next;
+
+	ir_entity          *entity;
 };
 
 typedef enum {
