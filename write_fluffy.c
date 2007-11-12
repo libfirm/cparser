@@ -246,7 +246,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	declaration_t *entry = type->declaration->context_next;
+	declaration_t *entry = type->declaration->next;
 	for ( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
 			entry = entry->next) {
 		fprintf(out, "\t%s", entry->symbol->string);

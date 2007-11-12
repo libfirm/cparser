@@ -374,8 +374,8 @@ static void print_declaration_statement(
 {
 	int first = 1;
 	declaration_t *declaration = statement->declarations_begin;
-	for( ; declaration != statement->declarations_end->context_next;
-	       declaration = declaration->context_next) {
+	for( ; declaration != statement->declarations_end->next;
+	       declaration = declaration->next) {
 		if(!first) {
 			print_indent();
 		} else {
@@ -410,7 +410,7 @@ static void print_for_statement(const for_statement_t *statement)
 	if(statement->context.declarations != NULL) {
 		assert(statement->initialisation == NULL);
 		print_declaration(statement->context.declarations);
-		if(statement->context.declarations->context_next != NULL) {
+		if(statement->context.declarations->next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 	} else if(statement->initialisation) {
@@ -570,7 +570,7 @@ void print_ast(const translation_unit_t *unit)
 	set_print_compound_entries(true);
 
 	declaration_t *declaration = unit->context.declarations;
-	for( ; declaration != NULL; declaration = declaration->context_next) {
+	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
 		if(declaration->namespace != NAMESPACE_NORMAL &&

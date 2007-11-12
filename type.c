@@ -110,7 +110,7 @@ static void print_function_type_post(const function_type_t *type,
 		}
 	} else {
 		declaration_t *parameter = context->declarations;
-		for( ; parameter != NULL; parameter = parameter->context_next) {
+		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
 				first = 0;
 			} else {
@@ -166,9 +166,9 @@ void print_enum_definition(const declaration_t *declaration)
 
 	change_indent(1);
 
-	declaration_t *entry = declaration->context_next;
+	declaration_t *entry = declaration->next;
 	for( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
-	       entry = entry->context_next) {
+	       entry = entry->next) {
 
 		print_indent();
 		fprintf(out, "%s", entry->symbol->string);
@@ -204,7 +204,7 @@ void print_compound_definition(const declaration_t *declaration)
 	change_indent(1);
 
 	declaration_t *iter = declaration->context.declarations;
-	for( ; iter != NULL; iter = iter->context_next) {
+	for( ; iter != NULL; iter = iter->next) {
 		print_indent();
 		print_declaration(iter);
 		fputc('\n', out);

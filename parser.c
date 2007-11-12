@@ -303,8 +303,8 @@ static void set_context(context_t *new_context)
 
 	last_declaration = new_context->declarations;
 	if(last_declaration != NULL) {
-		while(last_declaration->context_next != NULL) {
-			last_declaration = last_declaration->context_next;
+		while(last_declaration->next != NULL) {
+			last_declaration = last_declaration->next;
 		}
 	}
 }
@@ -323,7 +323,7 @@ static bool is_compatible_declaration (declaration_t *declaration,
 static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespace)
 {
 	declaration_t *declaration = symbol->declaration;
-	for( ; declaration != NULL; declaration = declaration->next) {
+	for( ; declaration != NULL; declaration = declaration->symbol_next) {
 		if(declaration->namespace == namespace)
 			return declaration;
 	}
@@ -393,16 +393,16 @@ static declaration_t *environment_push(declaration_t *declaration)
 		symbol->declaration = declaration;
 	} else {
 		declaration_t *iter = symbol->declaration;
-		for( ; iter != NULL; iter = iter->next) {
-			declaration_t *next = iter->next;
-			if(next == NULL) {
-				iter->next = declaration;
-				assert(declaration->next == NULL);
+		for( ; iter != NULL; iter = iter->symbol_next) {
+			declaration_t *symbol_next = iter->symbol_next;
+			if(symbol_next == NULL) {
+				iter->symbol_next = declaration;
+				assert(declaration->symbol_next == NULL);
 				break;
 			}
-			if(next->namespace == namespace) {
-				iter->next        = declaration;
-				declaration->next = next->next;
+			if(symbol_next->namespace == namespace) {
+				iter->symbol_next        = declaration;
+				declaration->symbol_next = symbol_next->symbol_next;
 				break;
 			}
 		}
@@ -435,17 +435,19 @@ static void environment_pop_to(size_t new_top)
 		assert(declaration != NULL);
 		if(declaration->namespace == namespace) {
 			if(old_declaration == NULL) {
-				symbol->declaration = declaration->next;
+				symbol->declaration = declaration->symbol_next;
 			} else {
 				symbol->declaration = old_declaration;
-				assert(old_declaration->next == declaration->next);
+				assert(old_declaration->symbol_next ==
+				       declaration->symbol_next);
 			}
 		} else {
-			for( ; declaration != NULL; declaration = declaration->next) {
-				declaration_t *next = declaration->next;
-				if(next->namespace == namespace) {
-					declaration->next = old_declaration;
-					assert(old_declaration->next == next->next);
+			for(; declaration != NULL; declaration = declaration->symbol_next) {
+				declaration_t *symbol_next = declaration->symbol_next;
+				if(symbol_next->namespace == namespace) {
+					declaration->symbol_next = old_declaration;
+					assert(old_declaration->symbol_next
+					        == symbol_next->symbol_next);
 					break;
 				}
 			}
@@ -1272,8 +1274,8 @@ static declaration_t *parse_parameters(function_type_t *type)
 			parameter->type = declaration->type;
 
 			if(last_parameter != NULL) {
-				last_declaration->context_next = declaration;
-				last_parameter->next           = parameter;
+				last_declaration->next = declaration;
+				last_parameter->next   = parameter;
 			} else {
 				type->parameters = parameter;
 				declarations     = declaration;
@@ -1574,7 +1576,7 @@ static declaration_t *record_declaration(declaration_t *declaration)
 	}
 
 	if(last_declaration != NULL) {
-		last_declaration->context_next = declaration;
+		last_declaration->next = declaration;
 	} else {
 		context->declarations = declaration;
 	}
@@ -1636,7 +1638,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 
 			/* push function parameters */
 			declaration_t *parameter = declaration->context.declarations;
-			for( ; parameter != NULL; parameter = parameter->context_next) {
+			for( ; parameter != NULL; parameter = parameter->next) {
 				environment_push(parameter);
 			}
 
@@ -1841,8 +1843,8 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	context = global_context;
 
 	environment_push(declaration);
-	declaration->context_next = context->declarations;
-	context->declarations     = declaration;
+	declaration->next     = context->declarations;
+	context->declarations = declaration;
 
 	context = last_context;
 
@@ -2386,49 +2388,76 @@ static expression_t *parse_extension(unsigned precedence)
 	return parse_sub_expression(precedence);
 }
 
-#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type)     \
-static                                                                    \
-expression_t *parse_##unexpression_type(unsigned precedence)              \
-{                                                                         \
-	eat(token_type);                                                      \
-                                                                          \
-	unary_expression_t *unary_expression                                  \
-		= allocate_ast_zero(sizeof(unary_expression[0]));                 \
-	unary_expression->expression.type = EXPR_UNARY;                       \
-	unary_expression->type            = unexpression_type;                \
-	unary_expression->value           = parse_sub_expression(precedence); \
-                                                                          \
-	return (expression_t*) unary_expression;                              \
+static type_t *get_unexpr_arithmetic_type(const expression_t *expression)
+{
+	/* TODO */
+	return expression->datatype;
 }
 
-CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE)
-CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS)
-CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT)
-CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE)
-CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS)
-CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE)
-CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT)
-CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT)
+static type_t *get_unexpr_dereference_type(const expression_t *expression)
+{
+	(void) expression;
+	/* TODO... */
+	return NULL;
+}
 
-#define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type) \
-static                                                                        \
-expression_t *parse_##unexpression_type(unsigned precedence,                  \
-                                        expression_t *left)                   \
+static type_t *get_unexpr_take_addr_type(const expression_t *expression)
+{
+	type_t *type = expression->datatype;
+	return make_pointer_type(type, 0);
+}
+
+#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, tfunc)   \
+static expression_t *parse_##unexpression_type(unsigned precedence)            \
+{                                                                              \
+	eat(token_type);                                                           \
+                                                                               \
+	unary_expression_t *unary_expression                                       \
+		= allocate_ast_zero(sizeof(unary_expression[0]));                      \
+	unary_expression->expression.type     = EXPR_UNARY;                        \
+	unary_expression->type                = unexpression_type;                 \
+	unary_expression->value               = parse_sub_expression(precedence);  \
+	unary_expression->expression.datatype = tfunc(unary_expression->value);    \
+                                                                               \
+	return (expression_t*) unary_expression;                                   \
+}
+
+CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE, get_unexpr_arithmetic_type)
+CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS,   get_unexpr_arithmetic_type)
+CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT,    get_unexpr_arithmetic_type)
+CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE,
+                               get_unexpr_dereference_type)
+CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS,
+                               get_unexpr_take_addr_type)
+CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE,
+                               get_unexpr_arithmetic_type)
+CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT,
+                               get_unexpr_arithmetic_type)
+CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT,
+                               get_unexpr_arithmetic_type)
+
+#define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type, \
+                                               tfunc)                         \
+static expression_t *parse_##unexpression_type(unsigned precedence,           \
+                                               expression_t *left)            \
 {                                                                             \
 	(void) precedence;                                                        \
 	eat(token_type);                                                          \
                                                                               \
 	unary_expression_t *unary_expression                                      \
 		= allocate_ast_zero(sizeof(unary_expression[0]));                     \
-	unary_expression->expression.type = EXPR_UNARY;                           \
-	unary_expression->type            = unexpression_type;                    \
-	unary_expression->value           = left;                                 \
+	unary_expression->expression.type     = EXPR_UNARY;                       \
+	unary_expression->type                = unexpression_type;                \
+	unary_expression->value               = left;                             \
+	unary_expression->expression.datatype = tfunc(left);                      \
                                                                               \
 	return (expression_t*) unary_expression;                                  \
 }
 
-CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT)
-CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT)
+CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT,
+                                       get_unexpr_arithmetic_type)
+CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT,
+                                       get_unexpr_arithmetic_type)
 
 #define CREATE_BINEXPR_PARSER(token_type, binexpression_type)    \
 static                                                           \
@@ -2850,7 +2879,7 @@ static statement_t *parse_declaration_statement(void)
 	if(before == NULL) {
 		statement->declarations_begin = context->declarations;
 	} else {
-		statement->declarations_begin = before->context_next;
+		statement->declarations_begin = before->next;
 	}
 	statement->declarations_end = last_declaration;
 

@@ -222,8 +222,8 @@ struct initializer_t {
 };
 
 struct declaration_t {
-	unsigned short      namespace;
-	unsigned short      storage_class;
+	unsigned char       namespace;
+	unsigned char       storage_class;
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;
@@ -236,11 +236,15 @@ struct declaration_t {
 	context_t          *parent_context;
 
 	/** next declaration in a context */
-	declaration_t      *context_next;
-	/** next declaration with same symbol */
 	declaration_t      *next;
+	/** next declaration with same symbol */
+	declaration_t      *symbol_next;
 
-	ir_entity          *entity;
+	unsigned char       declaration_type; /* used in ast2firm module */
+	union {
+		unsigned int    value_number;     /* used in ast2firm module */
+		ir_entity      *entity;           /* used in ast2firm module */
+	} v;
 };
 
 typedef enum {
