@@ -3,6 +3,8 @@
 #define _GNU_SOURCE
 
 #include <assert.h>
+#include <string.h>
+
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
 
@@ -248,8 +250,8 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
 		return get_compound_type_size((compound_type_t*) type);
-	case TYPE_METHOD:
-		/* just a pointer to the method */
+	case TYPE_FUNCTION:
+		/* just a pointer to the function */
 		return get_mode_size_bytes(mode_P_code);
 	case TYPE_POINTER:
 		return get_mode_size_bytes(mode_P_data);
@@ -264,11 +266,11 @@ static unsigned get_type_size(type_t *type)
 	panic("Trying to determine size of invalid type");
 }
 
-static unsigned count_parameters(const method_type_t *method_type)
+static unsigned count_parameters(const function_type_t *function_type)
 {
 	unsigned count = 0;
 
-	method_parameter_t *parameter = method_type->parameters;
+	function_parameter_t *parameter = function_type->parameters;
 	for ( ; parameter != NULL; parameter = parameter->next) {
 		++count;
 	}
@@ -290,12 +292,12 @@ static ir_type *get_atomic_type(type2firm_env_t *env, const atomic_type_t *type)
 }
 
 static ir_type *get_method_type(type2firm_env_t *env,
-                                const method_type_t *method_type)
+                                const function_type_t *function_type)
 {
-	type_t  *result_type  = method_type->result_type;
+	type_t  *result_type  = function_type->result_type;
 
-	ident   *id           = unique_ident("methodtype");
-	int      n_parameters = count_parameters(method_type);
+	ident   *id           = unique_ident("functiontype");
+	int      n_parameters = count_parameters(function_type);
 	int      n_results    = result_type == type_void ? 0 : 1;
 	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
@@ -304,15 +306,15 @@ static ir_type *get_method_type(type2firm_env_t *env,
 		set_method_res_type(irtype, 0, restype);
 	}
 
-	method_parameter_t *parameter = method_type->parameters;
-	int                 n         = 0;
+	function_parameter_t *parameter = function_type->parameters;
+	int                   n         = 0;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		ir_type *p_irtype = _get_ir_type(env, parameter->type);
 		set_method_param_type(irtype, n, p_irtype);
 		++n;
 	}
 
-	if(method_type->variadic) {
+	if(function_type->variadic) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
@@ -475,8 +477,8 @@ static ir_type *_get_ir_type(type2firm_env_t *env, type_t *type)
 	case TYPE_ATOMIC:
 		firm_type = get_atomic_type(env, (atomic_type_t*) type);
 		break;
-	case TYPE_METHOD:
-		firm_type = get_method_type(env, (method_type_t*) type);
+	case TYPE_FUNCTION:
+		firm_type = get_method_type(env, (function_type_t*) type);
 		break;
 	case TYPE_POINTER:
 		firm_type = get_pointer_type(env, (pointer_type_t*) type);
@@ -553,11 +555,201 @@ static ir_entity* get_entity_function(declaration_t *declaration)
 	return entity;
 }
 
+
+
+static dbg_info *get_dbg_info(const source_position_t *pos)
+{
+	return (dbg_info*) pos;
+}
+
+static ir_node *const_to_firm(const const_t *cnst)
+{
+	dbg_info *dbgi = get_dbg_info(&cnst->expression.source_position);
+	ir_mode  *mode = get_ir_mode(cnst->expression.datatype);
+
+	tarval   *tv;
+	if(mode_is_float(mode)) {
+		tv = new_tarval_from_double(cnst->v.float_value, mode);
+	} else {
+		tv = new_tarval_from_long(cnst->v.int_value, mode);
+	}
+
+	return new_d_Const(dbgi, mode, tv);
+}
+
+static ir_node *string_literal_to_firm(const string_literal_t* literal)
+{
+	ir_type   *global_type = get_glob_type();
+	ir_type   *type        = new_type_array(unique_ident("strtype"), 1,
+	                                        ir_type_const_char);
+
+	ir_entity *ent = new_entity(global_type, unique_ident("Lstr"), type);
+	set_entity_variability(ent, variability_constant);
+
+	ir_type    *elem_type = ir_type_const_char;
+	ir_mode    *mode      = get_type_mode(elem_type);
+
+	const char *string = literal->value;
+	size_t      slen   = strlen(string) + 1;
+
+	set_array_lower_bound_int(type, 0, 0);
+	set_array_upper_bound_int(type, 0, slen);
+	set_type_size_bytes(type, slen);
+	set_type_state(type, layout_fixed);
+
+	tarval **tvs = xmalloc(slen * sizeof(tvs[0]));
+	for(size_t i = 0; i < slen; ++i) {
+		tvs[i] = new_tarval_from_long(string[i], mode);
+	}
+
+	set_array_entity_values(ent, tvs, slen);
+	free(tvs);
+
+	dbg_info *dbgi = get_dbg_info(&literal->expression.source_position);
+
+	union symconst_symbol sym;
+	sym.entity_p = ent;
+	return new_d_SymConst(dbgi, sym, symconst_addr_ent);
+}
+
+#if 0
+static ir_node *call_expression_to_firm(const call_expression_t *call)
+{
+	expression_t  *function = call->function;
+	ir_node       *callee   = expression_to_firm(function);
+
+	assert(function->datatype->type == TYPE_FUNCTION);
+	pointer_type_t *pointer_type = (pointer_type_t*) function->datatype;
+	type_t         *points_to    = pointer_type->points_to;
+
+	assert(points_to->type == TYPE_FUNCTION);
+	method_type_t *method_type     = (method_type_t*) points_to;
+	ir_type       *ir_method_type  = get_ir_type((type_t*) method_type);
+	ir_type       *new_method_type = NULL;
+
+	int              n_parameters = 0;
+	call_argument_t *argument     = call->arguments;
+	while(argument != NULL) {
+		n_parameters++;
+		argument = argument->next;
+	}
+
+	if(method_type->variable_arguments) {
+		/* we need to construct a new method type matching the call
+		 * arguments... */
+		new_method_type = new_type_method(unique_ident("calltype"),
+		                                  n_parameters,
+		                                  get_method_n_ress(ir_method_type));
+		set_method_calling_convention(new_method_type,
+		               get_method_calling_convention(ir_method_type));
+		set_method_additional_properties(new_method_type,
+		               get_method_additional_properties(ir_method_type));
+
+		for(int i = 0; i < get_method_n_ress(ir_method_type); ++i) {
+			set_method_res_type(new_method_type, i,
+			                    get_method_res_type(ir_method_type, i));
+		}
+	}
+	ir_node *in[n_parameters];
+
+	argument = call->arguments;
+	int n = 0;
+	while(argument != NULL) {
+		expression_t *expression = argument->expression;
+
+		ir_node *arg_node = expression_to_firm(expression);
+
+		in[n] = arg_node;
+		if(new_method_type != NULL) {
+			ir_type *irtype = get_ir_type(expression->datatype);
+			set_method_param_type(new_method_type, n, irtype);
+		}
+
+		argument = argument->next;
+		n++;
+	}
+
+	if(new_method_type != NULL)
+		ir_method_type = new_method_type;
+
+	dbg_info *dbgi  = get_dbg_info(&call->expression.source_position);
+	ir_node  *store = get_store();
+	ir_node  *node  = new_d_Call(dbgi, store, callee, n_parameters, in,
+	                             ir_method_type);
+	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
+	set_store(mem);
+
+	type_t  *result_type = method_type->result_type;
+	ir_node *result      = NULL;
+	if(result_type->type != TYPE_VOID) {
+		ir_mode *mode    = get_ir_mode(result_type);
+		ir_node *resproj = new_d_Proj(dbgi, node, mode_T, pn_Call_T_result);
+		result           = new_d_Proj(dbgi, resproj, mode, 0);
+	}
+
+	return result;
+}
+#endif
+
+static ir_node *expression_to_firm(expression_t *expression)
+{
+	switch(expression->type) {
+	case EXPR_CONST:
+		return const_to_firm((const const_t*) expression);
+	case EXPR_STRING_LITERAL:
+		return string_literal_to_firm((const string_literal_t*) expression);
+	default:
+		break;
+	}
+	panic("unsupported expression found");
+}
+
+
+
+static void statement_to_firm(statement_t *statement);
+
+static void return_statement_to_firm(return_statement_t *statement)
+{
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	ir_node  *ret;
+
+	if(statement->return_value != NULL) {
+		ir_node *retval = expression_to_firm(statement->return_value);
+		ir_node *in[1];
+
+		in[0] = retval;
+		ret   = new_d_Return(dbgi, get_store(), 1, in);
+	} else {
+		ret   = new_d_Return(dbgi, get_store(), 0, NULL);
+	}
+	ir_node *end_block = get_irg_end_block(current_ir_graph);
+	add_immBlock_pred(end_block, ret);
+
+	set_cur_block(NULL);
+}
+
+static void compound_statement_to_firm(compound_statement_t *compound)
+{
+	statement_t *statement = compound->statements;
+	for( ; statement != NULL; statement = statement->next) {
+		//context2firm(&statement->context);
+		statement_to_firm(statement);
+	}
+}
+
 static void statement_to_firm(statement_t *statement)
 {
-	(void) statement;
-	(void) get_type_size;
-	/* TODO */
+	switch(statement->type) {
+	case STATEMENT_COMPOUND:
+		compound_statement_to_firm((compound_statement_t*) statement);
+		return;
+	case STATEMENT_RETURN:
+		return_statement_to_firm((return_statement_t*) statement);
+		return;
+	default:
+		break;
+	}
+	panic("Statement not implemented\n");
 }
 
 static int get_function_n_local_vars(declaration_t *declaration)
@@ -573,24 +765,54 @@ static void create_function(declaration_t *declaration)
 
 	//context2firm(declaration->context);
 
-	if(declaration->init.statement) {
-		int        n_local_vars = get_function_n_local_vars(declaration);
-		ir_graph  *irg          = new_ir_graph(entity, n_local_vars);
-		ir_node   *first_block  = get_cur_block();
+	if(declaration->init.statement == NULL)
+		return;
 
-		statement_to_firm(declaration->init.statement);
+	int        n_local_vars = get_function_n_local_vars(declaration);
+	ir_graph  *irg          = new_ir_graph(entity, n_local_vars);
+	ir_node   *first_block  = get_cur_block();
 
-		ir_node *end_block = get_irg_end_block(irg);
+	statement_to_firm(declaration->init.statement);
 
-		/* do we have a return statement yet? */
-		if(get_cur_block() != NULL) {
-			ir_node *ret = new_Return(get_store(), 0, NULL);
-			add_immBlock_pred(end_block, ret);
+	ir_node *end_block = get_irg_end_block(irg);
+
+	/* do we have a return statement yet? */
+	if(get_cur_block() != NULL) {
+		ir_node *ret = new_Return(get_store(), 0, NULL);
+		add_immBlock_pred(end_block, ret);
+	}
+
+	mature_immBlock(first_block);
+	mature_immBlock(end_block);
+
+	irg_finalize_cons(irg);
+
+	/* finalize the frame type */
+	ir_type *frame_type = get_irg_frame_type(irg);
+	int      n          = get_compound_n_members(frame_type);
+	int      align_all  = 4;
+	int      offset     = 0;
+	for(int i = 0; i < n; ++i) {
+		ir_entity *entity      = get_compound_member(frame_type, i);
+		ir_type   *entity_type = get_entity_type(entity);
+
+		int align = get_type_alignment_bytes(entity_type);
+		if(align > align_all)
+			align_all = align;
+		int misalign = 0;
+		if(align > 0) {
+			misalign  = offset % align;
+			offset   += misalign;
 		}
 
-		mature_immBlock(first_block);
-		mature_immBlock(end_block);
+		set_entity_offset(entity, offset);
+		offset += get_type_size_bytes(entity_type);
 	}
+	set_type_size_bytes(frame_type, offset);
+	set_type_alignment_bytes(frame_type, align_all);
+	set_type_state(frame_type, layout_fixed);
+
+	irg_vrfy(irg);
 }
 
 static void context_to_firm(context_t *context)
@@ -598,7 +820,7 @@ static void context_to_firm(context_t *context)
 	declaration_t *declaration = context->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		type_t *type = declaration->type;
-		if(type->type == TYPE_METHOD) {
+		if(type->type == TYPE_FUNCTION) {
 			create_function(declaration);
 		} else {
 			/* TODO... */
@@ -608,5 +830,8 @@ static void context_to_firm(context_t *context)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	/* remove me later TODO FIXME */
+	(void) get_type_size;
+
 	context_to_firm(& unit->context);
 }

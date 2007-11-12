@@ -19,7 +19,7 @@ typedef enum {
 	TYPE_COMPOUND_STRUCT,
 	TYPE_COMPOUND_UNION,
 	TYPE_ENUM,
-	TYPE_METHOD,
+	TYPE_FUNCTION,
 	TYPE_POINTER,
 	TYPE_ARRAY,
 	TYPE_BUILTIN,
@@ -95,17 +95,17 @@ struct array_type_t {
 	expression_t *size;
 };
 
-struct method_parameter_t {
-	type_t             *type;
-	method_parameter_t *next;
+struct function_parameter_t {
+	type_t               *type;
+	function_parameter_t *next;
 };
 
-struct method_type_t {
-	type_t              type;
-	type_t             *result_type;
-	method_parameter_t *parameters;
-	bool                variadic;
-	bool                unspecified_parameters;
+struct function_type_t {
+	type_t               type;
+	type_t              *result_type;
+	function_parameter_t *parameters;
+	bool                 variadic;
+	bool                 unspecified_parameters;
 };
 
 struct compound_type_t {

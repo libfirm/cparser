@@ -78,8 +78,7 @@ void print_atomic_type(const atomic_type_t *type)
 	fputs(s, out);
 }
 
-static
-void print_method_type_pre(const method_type_t *type)
+static void print_function_type_pre(const function_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
@@ -89,8 +88,8 @@ void print_method_type_pre(const method_type_t *type)
 	fputc('(', out);
 }
 
-static
-void print_method_type_post(const method_type_t *type, const context_t *context)
+static void print_function_type_post(const function_type_t *type,
+                                     const context_t *context)
 {
 	/* TODO: don't emit braces if we're the toplevel type... */
 	intern_print_type_post(type->result_type);
@@ -100,7 +99,7 @@ void print_method_type_post(const method_type_t *type, const context_t *context)
 
 	int                 first     = 1;
 	if(context == NULL) {
-		method_parameter_t *parameter = type->parameters;
+		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
 				first = 0;
@@ -272,8 +271,8 @@ static void intern_print_type_pre(type_t *type)
 	case TYPE_BUILTIN:
 		fputs(((builtin_type_t*) type)->symbol->string, out);
 		return;
-	case TYPE_METHOD:
-		print_method_type_pre((method_type_t*) type);
+	case TYPE_FUNCTION:
+		print_function_type_pre((function_type_t*) type);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_pre((pointer_type_t*) type);
@@ -294,8 +293,8 @@ static
 void intern_print_type_post(type_t *type)
 {
 	switch(type->type) {
-	case TYPE_METHOD:
-		print_method_type_post((const method_type_t*) type, NULL);
+	case TYPE_FUNCTION:
+		print_function_type_post((const function_type_t*) type, NULL);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post((const pointer_type_t*) type);
@@ -333,8 +332,8 @@ void print_type_ext(type_t *type, const symbol_t *symbol,
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
-	if(type->type == TYPE_METHOD) {
-		print_method_type_post((const method_type_t*) type, context);
+	if(type->type == TYPE_FUNCTION) {
+		print_function_type_post((const function_type_t*) type, context);
 	} else {
 		intern_print_type_post(type);
 	}

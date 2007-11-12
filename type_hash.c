@@ -51,11 +51,11 @@ static unsigned hash_compound_type(const compound_type_t *type)
 
 static unsigned hash_type(const type_t *type);
 
-static unsigned hash_method_type(const method_type_t *type)
+static unsigned hash_function_type(const function_type_t *type)
 {
 	unsigned result = hash_ptr(type->result_type);
 
-	method_parameter_t *parameter = type->parameters;
+	function_parameter_t *parameter = type->parameters;
 	while(parameter != NULL) {
 		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
@@ -95,8 +95,8 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_COMPOUND_UNION:
 		hash = hash_compound_type((const compound_type_t*) type);
 		break;
-	case TYPE_METHOD:
-		hash = hash_method_type((const method_type_t*) type);
+	case TYPE_FUNCTION:
+		hash = hash_function_type((const function_type_t*) type);
 		break;
 	case TYPE_POINTER:
 		hash = hash_pointer_type((const pointer_type_t*) type);
@@ -127,8 +127,8 @@ static bool atomic_types_equal(const atomic_type_t *type1,
 	return type1->atype == type2->atype;
 }
 
-static bool method_types_equal(const method_type_t *type1,
-                               const method_type_t *type2)
+static bool function_types_equal(const function_type_t *type1,
+                                 const function_type_t *type2)
 {
 	if(type1->result_type != type2->result_type)
 		return false;
@@ -137,8 +137,8 @@ static bool method_types_equal(const method_type_t *type1,
 	if(type1->unspecified_parameters != type2->unspecified_parameters)
 		return false;
 
-	method_parameter_t *param1 = type1->parameters;
-	method_parameter_t *param2 = type2->parameters;
+	function_parameter_t *param1 = type1->parameters;
+	function_parameter_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
 		if(param1->type != param2->type)
 			return false;
@@ -230,9 +230,9 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_COMPOUND_UNION:
 		return compound_types_equal((const compound_type_t*) type1,
 		                            (const compound_type_t*) type2);
-	case TYPE_METHOD:
-		return method_types_equal((const method_type_t*) type1,
-		                          (const method_type_t*) type2);
+	case TYPE_FUNCTION:
+		return function_types_equal((const function_type_t*) type1,
+		                            (const function_type_t*) type2);
 	case TYPE_POINTER:
 		return pointer_types_equal((const pointer_type_t*) type1,
 		                           (const pointer_type_t*) type2);

@@ -1230,7 +1230,7 @@ static declaration_t *parse_parameter(void)
 	return declaration;
 }
 
-static declaration_t *parse_parameters(method_type_t *type)
+static declaration_t *parse_parameters(function_type_t *type)
 {
 	if(token.type == T_IDENTIFIER) {
 		symbol_t      *symbol = token.v.symbol;
@@ -1250,11 +1250,11 @@ static declaration_t *parse_parameters(method_type_t *type)
 		return NULL;
 	}
 
-	declaration_t      *declarations = NULL;
-	declaration_t      *declaration;
-	declaration_t      *last_declaration = NULL;
-	method_parameter_t *parameter;
-	method_parameter_t *last_parameter = NULL;
+	declaration_t        *declarations = NULL;
+	declaration_t        *declaration;
+	declaration_t        *last_declaration = NULL;
+	function_parameter_t *parameter;
+	function_parameter_t *last_parameter = NULL;
 
 	while(true) {
 		switch(token.type) {
@@ -1293,7 +1293,7 @@ static declaration_t *parse_parameters(method_type_t *type)
 
 typedef enum {
 	CONSTRUCT_POINTER,
-	CONSTRUCT_METHOD,
+	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
 } construct_type_type_t;
 
@@ -1309,10 +1309,10 @@ struct parsed_pointer_t {
 	type_qualifier_t  type_qualifiers;
 };
 
-typedef struct construct_method_type_t construct_method_type_t;
-struct construct_method_type_t {
-	construct_type_t  construct_type;
-	method_type_t    *method_type;
+typedef struct construct_function_type_t construct_function_type_t;
+struct construct_function_type_t {
+	construct_type_t    construct_type;
+	function_type_t    *function_type;
 };
 
 typedef struct parsed_array_t parsed_array_t;
@@ -1374,28 +1374,27 @@ static construct_type_t *parse_array_declarator(void)
 	return (construct_type_t*) array;
 }
 
-static construct_type_t *parse_method_declarator(declaration_t *declaration)
+static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	method_type_t *method_type
-		= allocate_type_zero(sizeof(method_type[0]));
-	method_type->type.type   = TYPE_METHOD;
+	function_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type       = TYPE_FUNCTION;
 
-	declaration_t *parameters = parse_parameters(method_type);
+	declaration_t *parameters = parse_parameters(type);
 	if(declaration != NULL) {
 		declaration->context.declarations = parameters;
 	}
 
-	construct_method_type_t *construct_method_type =
-		obstack_alloc(&temp_obst, sizeof(construct_method_type[0]));
-	memset(construct_method_type, 0, sizeof(construct_method_type[0]));
-	construct_method_type->construct_type.type = CONSTRUCT_METHOD;
-	construct_method_type->method_type         = method_type;
+	construct_function_type_t *construct_function_type =
+		obstack_alloc(&temp_obst, sizeof(construct_function_type[0]));
+	memset(construct_function_type, 0, sizeof(construct_function_type[0]));
+	construct_function_type->construct_type.type = CONSTRUCT_FUNCTION;
+	construct_function_type->function_type       = type;
 
 	expect(')');
 
-	return (construct_type_t*) construct_method_type;
+	return (construct_type_t*) construct_function_type;
 }
 
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
@@ -1445,7 +1444,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		construct_type_t *type;
 		switch(token.type) {
 		case '(':
-			type = parse_method_declarator(declaration);
+			type = parse_function_declarator(declaration);
 			break;
 		case '[':
 			type = parse_array_declarator();
@@ -1482,20 +1481,20 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 {
 	construct_type_t *iter = construct_list;
 	for( ; iter != NULL; iter = iter->next) {
-		parsed_pointer_t        *parsed_pointer;
-		parsed_array_t          *parsed_array;
-		construct_method_type_t *construct_method_type;
-		method_type_t           *method_type;
-		pointer_type_t          *pointer_type;
-		array_type_t            *array_type;
+		parsed_pointer_t          *parsed_pointer;
+		parsed_array_t            *parsed_array;
+		construct_function_type_t *construct_function_type;
+		function_type_t           *function_type;
+		pointer_type_t            *pointer_type;
+		array_type_t              *array_type;
 
 		switch(iter->type) {
-		case CONSTRUCT_METHOD:
-			construct_method_type = (construct_method_type_t*) iter;
-			method_type           = construct_method_type->method_type;
+		case CONSTRUCT_FUNCTION:
+			construct_function_type = (construct_function_type_t*) iter;
+			function_type           = construct_function_type->function_type;
 
-			method_type->result_type = type;
-			type                     = (type_t*) method_type;
+			function_type->result_type = type;
+			type                       = (type_t*) function_type;
 			break;
 
 		case CONSTRUCT_POINTER:
@@ -1606,7 +1605,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 		if(token.type == '=') {
 			next_token();
 
-			/* TODO: check that this is an allowed type (esp. no method type) */
+			/* TODO: check that this is an allowed type (no function type) */
 
 			if(declaration->init.initializer != NULL) {
 				parser_error_multiple_definition(declaration, ndeclaration);
@@ -1614,11 +1613,11 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 
 			ndeclaration->init.initializer = parse_initializer();
 		} else if(token.type == '{') {
-			if(declaration->type->type != TYPE_METHOD) {
+			if(declaration->type->type != TYPE_FUNCTION) {
 				parser_print_error_prefix();
 				fprintf(stderr, "Declarator ");
 				print_type_ext(declaration->type, declaration->symbol, NULL);
-				fprintf(stderr, " is not a method type.\n");
+				fprintf(stderr, " has a body but is not a function type.\n");
 				eat_block();
 				continue;
 			}
@@ -1815,15 +1814,15 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	method_type_t *method_type = allocate_type_zero(sizeof(method_type));
+	function_type_t *function_type = allocate_type_zero(sizeof(function_type));
 
-	method_type->type.type              = TYPE_METHOD;
-	method_type->result_type            = type_int;
-	method_type->unspecified_parameters = true;
+	function_type->type.type              = TYPE_FUNCTION;
+	function_type->result_type            = type_int;
+	function_type->unspecified_parameters = true;
 
-	type_t *type = typehash_insert((type_t*) method_type);
-	if(type != (type_t*) method_type) {
-		free_type(method_type);
+	type_t *type = typehash_insert((type_t*) function_type);
+	if(type != (type_t*) function_type) {
+		free_type(function_type);
 	}
 
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
@@ -2243,7 +2242,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	call_expression_t *call = allocate_ast_zero(sizeof(call[0]));
 
 	call->expression.type     = EXPR_CALL;
-	call->method              = expression;
+	call->function            = expression;
 
 	/* parse arguments */
 	eat('(');
@@ -2277,14 +2276,15 @@ static expression_t *parse_call_expression(unsigned precedence,
 			type = pointer->points_to;
 		}
 
-		if(type == NULL || type->type != TYPE_METHOD) {
+		if(type == NULL || type->type != TYPE_FUNCTION) {
 			parser_print_error_prefix();
-			fprintf(stderr, "expected a method type for call but found type ");
+			fprintf(stderr, "expected a function type for call but found "
+			        "type ");
 			print_type(expression->datatype);
 			fprintf(stderr, "\n");
 		} else {
-			method_type_t *method_type = (method_type_t*) type;
-			call->expression.datatype  = method_type->result_type;
+			function_type_t *function_type = (function_type_t*) type;
+			call->expression.datatype      = function_type->result_type;
 		}
 	}
 

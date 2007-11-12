@@ -102,12 +102,12 @@ static void write_enum_type(const enum_type_t *type)
 	fprintf(out, "/* TODO anonymous enum */byte");
 }
 
-static void write_method_type(const method_type_t *type)
+static void write_function_type(const function_type_t *type)
 {
 	fprintf(out, "(func(");
 
-	method_parameter_t *parameter = type->parameters;
-	int                 first     = 1;
+	function_parameter_t *parameter = type->parameters;
+	int                   first     = 1;
 	while(parameter != NULL) {
 		if(!first) {
 			fprintf(out, ", ");
@@ -150,8 +150,8 @@ static void write_type(const type_t *type)
 	case TYPE_ENUM:
 		write_enum_type((const enum_type_t*) type);
 		return;
-	case TYPE_METHOD:
-		write_method_type((const method_type_t*) type);
+	case TYPE_FUNCTION:
+		write_function_type((const function_type_t*) type);
 		return;
 	case TYPE_INVALID:
 		panic("invalid type found");
@@ -278,7 +278,8 @@ static void write_function(const declaration_t *declaration)
 	fprintf(out, "func extern %s(",
 	        declaration->symbol->string);
 
-	const method_type_t *method_type = (const method_type_t*) declaration->type;
+	const function_type_t *function_type
+		= (const function_type_t*) declaration->type;
 
 	declaration_t *parameter = declaration->context.declarations;
 	int            first     = 1;
@@ -295,7 +296,7 @@ static void write_function(const declaration_t *declaration)
 		}
 		write_type(parameter->type);
 	}
-	if(method_type->variadic) {
+	if(function_type->variadic) {
 		if(!first) {
 			fprintf(out, ", ");
 		} else {
@@ -305,7 +306,7 @@ static void write_function(const declaration_t *declaration)
 	}
 	fprintf(out, ")");
 
-	const type_t        *result_type = method_type->result_type;
+	const type_t *result_type = function_type->result_type;
 	if(result_type->type != TYPE_ATOMIC ||
 			((const atomic_type_t*) result_type)->atype != ATOMIC_TYPE_VOID) {
 		fprintf(out, " : ");
@@ -353,7 +354,7 @@ void write_fluffy_decls(const translation_unit_t *unit)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->type == TYPE_METHOD)
+		if(type->type == TYPE_FUNCTION)
 			continue;
 
 		write_variable(declaration);
@@ -367,7 +368,7 @@ void write_fluffy_decls(const translation_unit_t *unit)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->type != TYPE_METHOD)
+		if(type->type != TYPE_FUNCTION)
 			continue;
 
 		write_function(declaration);

@@ -73,7 +73,7 @@ struct call_argument_t {
 
 struct call_expression_t {
 	expression_t     expression;
-	expression_t    *method;
+	expression_t    *function;
 	call_argument_t *arguments;
 };
 

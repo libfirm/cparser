@@ -45,8 +45,6 @@ typedef struct do_while_statement_t         do_while_statement_t;
 typedef struct for_statement_t              for_statement_t;
 
 typedef struct translation_unit_t           translation_unit_t;
-typedef struct method_t                     method_t;
-typedef struct global_variable_t            global_variable_t;
 
 void  init_ast(void);
 void  exit_ast(void);

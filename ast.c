@@ -70,7 +70,7 @@ static void print_string_literal(const string_literal_t *string_literal)
 
 static void print_call_expression(const call_expression_t *call)
 {
-	print_expression(call->method);
+	print_expression(call->function);
 	fprintf(out, "(");
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
@@ -517,7 +517,7 @@ static void print_normal_declaration(const declaration_t *declaration)
 	print_storage_class(declaration->storage_class);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
-	if(declaration->type->type == TYPE_METHOD) {
+	if(declaration->type->type == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {
 			fputs("\n", out);
 			print_statement(declaration->init.statement);
