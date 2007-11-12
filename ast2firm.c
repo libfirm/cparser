@@ -524,7 +524,88 @@ static inline ir_mode *get_ir_mode(type_t *type)
 	return mode;
 }
 
-int dummy(void)
+static ir_entity* get_entity_function(declaration_t *declaration)
 {
-	return get_type_size(type_int);
+	if(declaration->entity != NULL)
+		return declaration->entity;
+
+	symbol_t *symbol = declaration->symbol;
+	ident    *id     = new_id_from_str(symbol->string);
+
+	ir_type  *global_type    = get_glob_type();
+	ir_type  *ir_type_method = get_ir_type(declaration->type);
+	assert(is_Method_type(ir_type_method));
+
+	type_t    *type   = declaration->type;
+	ir_entity *entity = new_entity(global_type, id, ir_type_method);
+	set_entity_ld_ident(entity, id);
+	if(declaration->storage_class & STORAGE_CLASS_STATIC
+			|| type->qualifiers & TYPE_QUALIFIER_INLINE) {
+		set_entity_visibility(entity, visibility_local);
+	} else if(declaration->init.statement != NULL) {
+		set_entity_visibility(entity, visibility_external_visible);
+	} else {
+		set_entity_visibility(entity, visibility_external_allocated);
+	}
+
+	declaration->entity = entity;
+	return entity;
+}
+
+static void statement_to_firm(statement_t *statement)
+{
+	(void) statement;
+	(void) get_type_size;
+	/* TODO */
+}
+
+static int get_function_n_local_vars(declaration_t *declaration)
+{
+	(void) declaration;
+	/* TODO */
+	return 30;
+}
+
+static void create_function(declaration_t *declaration)
+{
+	ir_entity *entity = get_entity_function(declaration);
+
+	//context2firm(declaration->context);
+
+	if(declaration->init.statement) {
+		int        n_local_vars = get_function_n_local_vars(declaration);
+		ir_graph  *irg          = new_ir_graph(entity, n_local_vars);
+		ir_node   *first_block  = get_cur_block();
+
+		statement_to_firm(declaration->init.statement);
+
+		ir_node *end_block = get_irg_end_block(irg);
+
+		/* do we have a return statement yet? */
+		if(get_cur_block() != NULL) {
+			ir_node *ret = new_Return(get_store(), 0, NULL);
+			add_immBlock_pred(end_block, ret);
+		}
+
+		mature_immBlock(first_block);
+		mature_immBlock(end_block);
+	}
+}
+
+static void context_to_firm(context_t *context)
+{
+	declaration_t *declaration = context->declarations;
+	for( ; declaration != NULL; declaration = declaration->next) {
+		type_t *type = declaration->type;
+		if(type->type == TYPE_METHOD) {
+			create_function(declaration);
+		} else {
+			/* TODO... */
+		}
+	}
+}
+
+void translation_unit_to_firm(translation_unit_t *unit)
+{
+	context_to_firm(& unit->context);
 }
