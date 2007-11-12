@@ -15,6 +15,10 @@
 #include "ast2firm.h"
 #include "adt/error.h"
 
+#define LINKER "gcc"
+
+static int verbose;
+
 static const ir_settings_if_conv_t *if_conv_info = NULL;
 
 static void initialize_firm(void)
@@ -68,6 +72,11 @@ static void initialize_firm(void)
 	set_opt_alias_analysis(1);
 
 	dump_consts_local(1);
+}
+
+static void dump(const char *suffix)
+{
+	dump_ir_block_graph(current_ir_graph, suffix);
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -143,17 +152,37 @@ static void backend(const char *inputname, const char *outname)
 	fclose(out);
 }
 
-static void emit(const char *input_name)
+static void emit(const char *input_name, const char *out_name)
 {
-	char outfname[4096];
-
-	get_output_name(outfname, sizeof(outfname), input_name, ".s");
-	backend(input_name, outfname);
+	backend(input_name, out_name);
 }
+
+static void link(const char *in, const char *out)
+{
+	char buf[4096];
+
+	snprintf(buf, sizeof(buf), "%s %s -o %s", LINKER, in, out);
+	if(verbose) {
+		puts(buf);
+	}
+	int err = system(buf);
+	if(err != 0) {
+		fprintf(stderr, "linker reported an error\n");
+		exit(1);
+	}
+}
+
+
 
 static void create_firm_prog(translation_unit_t *unit)
 {
 	translation_unit_to_firm(unit);
+
+	int n_irgs = get_irp_n_irgs();
+	for(int i = 0; i < n_irgs; ++i) {
+		current_ir_graph = get_irp_irg(i);
+		dump("-start");
+	}
 }
 
 void write_fluffy_decls(translation_unit_t *unit);
@@ -191,9 +220,15 @@ int main(int argc, char **argv)
 	}
 
 	for(int i = 1; i < argc; ++i) {
-		translation_unit_t *unit = do_parsing(argv[i]);
+		const char *input = argv[i];
+		char        outfname[4096];
+
+		get_output_name(outfname, sizeof(outfname), input, ".s");
+
+		translation_unit_t *unit = do_parsing(input);
 		create_firm_prog(unit);
-		emit(argv[i]);
+		emit(input, outfname);
+		link(outfname, "a.out");
 	}
 
 	exit_ast2firm();
