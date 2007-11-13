@@ -16,6 +16,8 @@
 #include "type_t.h"
 #include "ast_t.h"
 
+#define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
+
 static ir_type *ir_type_const_char;
 static ir_type *ir_type_void;
 static ir_type *ir_type_int;
@@ -26,6 +28,9 @@ static type_t *type_void;
 static type_t *type_int;
 
 static int next_value_number_function;
+static ir_node *continue_label;
+static ir_node *break_label;
+static ir_node *current_switch_cond;
 
 typedef enum declaration_type_t {
 	DECLARATION_TYPE_UNKNOWN,
@@ -564,6 +569,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 
 static ir_node *expression_to_firm(const expression_t *expression);
+static ir_node *_expression_to_firm(const expression_t *expression);
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
@@ -654,6 +660,8 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
+	assert(get_cur_block() != NULL);
+
 	expression_t  *function = call->function;
 	ir_node       *callee   = expression_to_firm(function);
 
@@ -736,12 +744,7 @@ static ir_node *load_from_expression_addr(type_t *type, ir_node *addr,
 	return load_res;
 }
 
-static ir_node *expression_addr(const expression_t *expression)
-{
-	(void) expression;
-	panic("expression_addr not implemented yet");
-	return NULL;
-}
+static ir_node *expression_to_addr(const expression_t *expression);
 
 static void set_value_for_expression(const expression_t *expression,
                                      ir_node *value)
@@ -756,7 +759,14 @@ static void set_value_for_expression(const expression_t *expression,
 			return;
 		}
 	}
-	panic("set_value_for_expression not implemented yet");
+
+	dbg_info *dbgi      = get_dbg_info(&expression->source_position);
+	ir_node  *addr      = expression_to_addr(expression);
+	assert(get_irn_mode(value) == get_ir_mode(expression->datatype));
+	ir_node  *memory    = get_store();
+	ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
+	ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+	set_store(store_mem);
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -783,7 +793,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	ir_mode  *mode = get_ir_mode(type);
 
 	if(expression->type == UNEXPR_TAKE_ADDRESS)
-		return expression_addr(expression->value);
+		return expression_to_addr(expression->value);
 
 	const expression_t *value      = expression->value;
 	ir_node            *value_node = expression_to_firm(value);
@@ -855,10 +865,78 @@ static long get_pnc(binary_expression_type_t type)
 	panic("trying to get pn_Cmp from non-comparison binexpr type");
 }
 
+static ir_node *create_lazy_op(const binary_expression_t *expression)
+{
+	bool is_or = (expression->type == BINEXPR_LOGICAL_OR);
+	assert(is_or || expression->type == BINEXPR_LOGICAL_AND);
+
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	ir_node  *val1 = expression_to_firm(expression->left);
+	val1           = create_conv(dbgi, val1, mode_b);
+
+	ir_node *cond       = new_d_Cond(dbgi, val1);
+	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	ir_node *fallthrough_block = new_immBlock();
+
+	/* the true case */
+	ir_node *calc_val2_block = new_immBlock();
+	if(is_or) {
+		add_immBlock_pred(calc_val2_block, false_proj);
+	} else {
+		add_immBlock_pred(calc_val2_block, true_proj);
+	}
+
+	mature_immBlock(calc_val2_block);
+
+	ir_node *val2 = expression_to_firm(expression->right);
+	val2          = create_conv(dbgi, val2, mode_b);
+	if(get_cur_block() != NULL) {
+		ir_node *jmp = new_d_Jmp(dbgi);
+		add_immBlock_pred(fallthrough_block, jmp);
+	}
+
+	/* fallthrough */
+	ir_node *constb;
+	if(is_or) {
+		constb = new_d_Const(dbgi, mode_b, get_tarval_b_true());
+		add_immBlock_pred(fallthrough_block, true_proj);
+	} else {
+		constb = new_d_Const(dbgi, mode_b, get_tarval_b_false());
+		add_immBlock_pred(fallthrough_block, false_proj);
+	}
+	mature_immBlock(fallthrough_block);
+
+	set_cur_block(fallthrough_block);
+
+	ir_node *in[2] = { val2, constb };
+	ir_node *val   = new_d_Phi(dbgi, 2, in, mode_b);
+
+	return val;
+}
+
+typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
+                                            ir_node *right, ir_mode *mode);
+
+static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
+                                        create_arithmetic_func func)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *left  = expression_to_firm(expression->left);
+	ir_node  *right = expression_to_firm(expression->right);
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+	/* TODO FIXME Hack for now */
+	right = create_conv(dbgi, right, get_irn_mode(left));
+
+	ir_node  *res   = func(dbgi, left, right, mode);
+
+	return res;
+}
+
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-
 	binary_expression_type_t type = expression->type;
 	switch(type) {
 	case BINEXPR_EQUAL:
@@ -867,6 +945,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case BINEXPR_LESSEQUAL:
 	case BINEXPR_GREATER:
 	case BINEXPR_GREATEREQUAL: {
+		dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 		ir_node *left  = expression_to_firm(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
 		ir_node *cmp   = new_d_Cmp(dbgi, left, right);
@@ -879,12 +958,85 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		set_value_for_expression(expression->left, right);
 		return right;
 	}
+	case BINEXPR_ADD:
+		return create_arithmetic_binop(expression, new_d_Add);
+	case BINEXPR_SUB:
+		return create_arithmetic_binop(expression, new_d_Sub);
+	case BINEXPR_MUL:
+		return create_arithmetic_binop(expression, new_d_Mul);
+	case BINEXPR_BITWISE_AND:
+		return create_arithmetic_binop(expression, new_d_And);
+	case BINEXPR_BITWISE_OR:
+		return create_arithmetic_binop(expression, new_d_Or);
+	case BINEXPR_BITWISE_XOR:
+		return create_arithmetic_binop(expression, new_d_Eor);
+	case BINEXPR_SHIFTLEFT:
+		return create_arithmetic_binop(expression, new_d_Shl);
+	case BINEXPR_SHIFTRIGHT:
+		return create_arithmetic_binop(expression, new_d_Shr);
+	case BINEXPR_LOGICAL_AND:
+	case BINEXPR_LOGICAL_OR:
+		return create_lazy_op(expression);
 	default:
 		panic("TODO binexpr type");
 	}
 }
 
-static ir_node *expression_to_firm(const expression_t *expression)
+static ir_node *array_access_addr(const array_access_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	ir_node *base_addr = expression_to_firm(expression->array_ref);
+	ir_node *offset    = expression_to_firm(expression->index);
+	offset             = create_conv(dbgi, offset, mode_Iu);
+
+	unsigned elem_size       = get_type_size(expression->expression.datatype);
+	ir_node *elem_size_const = new_Const_long(mode_Iu, elem_size);
+	ir_node *real_offset     = new_d_Mul(dbgi, offset, elem_size_const,
+	                                     mode_Iu);
+	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P);
+
+	return result;
+}
+
+static ir_node *array_access_to_firm(
+		const array_access_expression_t *expression)
+{
+
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	ir_node  *addr = array_access_addr(expression);
+	type_t   *type = expression->expression.datatype;
+
+	return load_from_expression_addr(type, addr, dbgi);
+}
+
+static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
+{
+	type_t *type = expression->type;
+	if(type == NULL) {
+		type = expression->size_expression->datatype;
+		assert(type != NULL);
+	}
+
+	ir_mode  *mode      = get_ir_mode(expression->expression.datatype);
+	unsigned  size      = get_type_size(type);
+	ir_node  *size_node = new_Const_long(mode, size);
+
+	return size_node;
+}
+
+static ir_node *expression_to_addr(const expression_t *expression)
+{
+	switch(expression->type) {
+	case EXPR_ARRAY_ACCESS:
+		return array_access_addr((const array_access_expression_t*) expression);
+	default:
+		break;
+	}
+	panic("trying to get address of non-lvalue");
+}
+
+static ir_node *_expression_to_firm(const expression_t *expression)
 {
 	switch(expression->type) {
 	case EXPR_CONST:
@@ -901,12 +1053,28 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	case EXPR_BINARY:
 		return binary_expression_to_firm(
 				(const binary_expression_t*) expression);
+	case EXPR_ARRAY_ACCESS:
+		return array_access_to_firm(
+				(const array_access_expression_t*) expression);
+	case EXPR_SIZEOF:
+		return sizeof_to_firm((const sizeof_expression_t*) expression);
 	default:
 		break;
 	}
 	panic("unsupported expression found");
 }
 
+static ir_node *expression_to_firm(const expression_t *expression)
+{
+	ir_node *res  = _expression_to_firm(expression);
+
+	if(expression->datatype == type_void)
+		return NULL;
+
+	ir_mode *mode = get_ir_mode(expression->datatype);
+	res           = create_conv(NULL, res, mode);
+	return res;
+}
 
 
 static void statement_to_firm(statement_t *statement);
@@ -948,7 +1116,7 @@ static void expression_statement_to_firm(expression_statement_t *statement)
 static void if_statement_to_firm(if_statement_t *statement)
 {
 	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
-	ir_node  *condition = expression_to_firm(statement->condition);
+	ir_node  *condition = _expression_to_firm(statement->condition);
 	assert(condition != NULL);
 
 	/* make sure we have a mode_b condition */
@@ -994,35 +1162,115 @@ static void while_statement_to_firm(while_statement_t *statement)
 {
 	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 
+	ir_node *jmp = NULL;
+	if(get_cur_block() != NULL) {
+		jmp = new_Jmp();
+	}
+
 	/* create the header block */
-	ir_node *jmp          = new_Jmp();
 	ir_node *header_block = new_immBlock();
-	add_immBlock_pred(header_block, jmp);
+	if(jmp != NULL) {
+		add_immBlock_pred(header_block, jmp);
+	}
 
 	/* create the condition */
-	ir_node *condition = expression_to_firm(statement->condition);
+	ir_node *condition = _expression_to_firm(statement->condition);
 	condition          = create_conv(dbgi, condition, mode_b);
 
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
+	/* the false block */
+	ir_node *false_block = new_immBlock();
+	add_immBlock_pred(false_block, false_proj);
+
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
 	add_immBlock_pred(body_block, true_proj);
 	mature_immBlock(body_block);
 
+	ir_node *old_continue_label = continue_label;
+	ir_node *old_break_label    = break_label;
+	continue_label              = header_block;
+	break_label                 = false_block;
+
 	statement_to_firm(statement->body);
+
+	assert(continue_label == header_block);
+	assert(break_label    == false_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
+
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
 		add_immBlock_pred(header_block, jmp);
 	}
+
 	mature_immBlock(header_block);
+	mature_immBlock(false_block);
+
+	set_cur_block(false_block);
+}
+
+static void do_while_statement_to_firm(do_while_statement_t *statement)
+{
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+
+	ir_node *jmp = NULL;
+	if(get_cur_block() != NULL) {
+		jmp = new_Jmp();
+	}
+
+	/* create the header block */
+	ir_node *header_block = new_immBlock();
 
 	/* the false block */
 	ir_node *false_block = new_immBlock();
+
+	/* the loop body */
+	ir_node *body_block = new_immBlock();
+	if(jmp != NULL) {
+		add_immBlock_pred(body_block, jmp);
+	}
+
+	ir_node *old_continue_label = continue_label;
+	ir_node *old_break_label    = break_label;
+	continue_label              = header_block;
+	break_label                 = false_block;
+
+	statement_to_firm(statement->body);
+
+	assert(continue_label == header_block);
+	assert(break_label    == false_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
+
+	if(get_cur_block() == NULL) {
+		mature_immBlock(header_block);
+		mature_immBlock(body_block);
+		return;
+	}
+
+	ir_node *body_jmp = new_Jmp();
+	add_immBlock_pred(header_block, body_jmp);
+	mature_immBlock(header_block);
+
+	/* create the condition */
+	ir_node *condition = _expression_to_firm(statement->condition);
+	condition          = create_conv(dbgi, condition, mode_b);
+
+	ir_node *cond       = new_d_Cond(dbgi, condition);
+	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	add_immBlock_pred(body_block, true_proj);
+	mature_immBlock(body_block);
+
 	add_immBlock_pred(false_block, false_proj);
 	mature_immBlock(false_block);
+
+	set_cur_block(false_block);
 }
 
 static void create_declaration_entity(declaration_t *declaration,
@@ -1112,6 +1360,81 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	}
 }
 
+static void create_jump_statement(const statement_t *statement,
+                                  ir_node *target_block)
+{
+	dbg_info *dbgi = get_dbg_info(&statement->source_position);
+	ir_node  *jump = new_d_Jmp(dbgi);
+	add_immBlock_pred(target_block, jump);
+
+	set_cur_block(NULL);
+}
+
+static void switch_statement_to_firm(const switch_statement_t *statement)
+{
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+
+	ir_node *expression  = expression_to_firm(statement->expression);
+	ir_node *cond        = new_d_Cond(dbgi, expression);
+	ir_node *break_block = new_immBlock();
+
+	set_cur_block(NULL);
+
+	ir_node *old_switch_cond = current_switch_cond;
+	ir_node *old_break_label = break_label;
+	current_switch_cond      = cond;
+	break_label              = break_block;
+
+	statement_to_firm(statement->body);
+
+	if(get_cur_block() != NULL) {
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(break_block, jmp);
+	}
+
+	assert(current_switch_cond == cond);
+	assert(break_label         == break_block);
+	current_switch_cond = old_switch_cond;
+	break_label         = old_break_label;
+
+	mature_immBlock(break_block);
+	set_cur_block(break_block);
+}
+
+static void case_label_to_firm(const case_label_statement_t *statement)
+{
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+
+	/* let's create a node and hope firm constant folding creates a Const
+	 * node... */
+	ir_node *proj;
+	set_cur_block(get_nodes_block(current_switch_cond));
+	if(statement->expression) {
+		ir_node *cnst = expression_to_firm(statement->expression);
+		if(!is_Const(cnst)) {
+			panic("couldn't fold constant for case label");
+		}
+		tarval *tv = get_Const_tarval(cnst);
+		if(!mode_is_int(get_tarval_mode(tv))) {
+			panic("case label not an integer");
+		}
+
+		long pn = get_tarval_long(tv);
+		if(pn == MAGIC_DEFAULT_PN_NUMBER) {
+			/* oops someone detected our cheating... */
+			panic("magic default pn used");
+		}
+		proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+	} else {
+		proj = new_d_defaultProj(dbgi, current_switch_cond,
+		                         MAGIC_DEFAULT_PN_NUMBER);
+	}
+
+	ir_node *block = new_immBlock();
+	add_immBlock_pred(block, proj);
+	mature_immBlock(block);
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
@@ -1130,8 +1453,23 @@ static void statement_to_firm(statement_t *statement)
 	case STATEMENT_WHILE:
 		while_statement_to_firm((while_statement_t*) statement);
 		return;
+	case STATEMENT_DO_WHILE:
+		do_while_statement_to_firm((do_while_statement_t*) statement);
+		return;
 	case STATEMENT_DECLARATION:
 		declaration_statement_to_firm((declaration_statement_t*) statement);
+		return;
+	case STATEMENT_BREAK:
+		create_jump_statement(statement, break_label);
+		return;
+	case STATEMENT_CONTINUE:
+		create_jump_statement(statement, continue_label);
+		return;
+	case STATEMENT_SWITCH:
+		switch_statement_to_firm((switch_statement_t*) statement);
+		return;
+	case STATEMENT_CASE_LABEL:
+		case_label_to_firm((case_label_statement_t*) statement);
 		return;
 	default:
 		break;
@@ -1248,6 +1586,11 @@ void translation_unit_to_firm(translation_unit_t *unit)
 {
 	/* remove me later TODO FIXME */
 	(void) get_type_size;
+
+	/* just to be sure */
+	continue_label      = NULL;
+	break_label         = NULL;
+	current_switch_cond = NULL;
 
 	context_to_firm(& unit->context);
 }

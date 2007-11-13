@@ -2397,8 +2397,13 @@ static type_t *get_unexpr_arithmetic_type(const expression_t *expression)
 
 static type_t *get_unexpr_dereference_type(const expression_t *expression)
 {
-	(void) expression;
-	/* TODO... */
+	type_t *expression_type = expression->datatype;
+
+	if(expression_type->type == TYPE_POINTER) {
+		pointer_type_t *pointer_type = (pointer_type_t*) expression_type;
+		return pointer_type->points_to;
+	}
+	panic("deref TODO...");
 	return NULL;
 }
 
