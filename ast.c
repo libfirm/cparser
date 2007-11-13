@@ -413,10 +413,11 @@ static void print_for_statement(const for_statement_t *statement)
 		if(statement->context.declarations->next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
+		fputc(' ', out);
 	} else if(statement->initialisation) {
 		print_expression(statement->initialisation);
+		fputs("; ", out);
 	}
-	fputs("; ", out);
 	if(statement->condition != NULL) {
 		print_expression(statement->condition);
 	}
