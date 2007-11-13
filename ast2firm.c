@@ -1519,9 +1519,9 @@ static void create_function(declaration_t *declaration)
 	if(declaration->init.statement == NULL)
 		return;
 
-	int        n_local_vars = get_function_n_local_vars(declaration);
-	ir_graph  *irg          = new_ir_graph(entity, n_local_vars);
-	ir_node   *first_block  = get_cur_block();
+	int       n_local_vars = get_function_n_local_vars(declaration);
+	ir_graph *irg          = new_ir_graph(entity, n_local_vars);
+	ir_node  *first_block  = get_cur_block();
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);
@@ -1573,6 +1573,9 @@ static void context_to_firm(context_t *context)
 {
 	declaration_t *declaration = context->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
+		if(declaration->namespace != NAMESPACE_NORMAL)
+			continue;
+
 		type_t *type = declaration->type;
 		if(type->type == TYPE_FUNCTION) {
 			create_function(declaration);
