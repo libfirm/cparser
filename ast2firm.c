@@ -1273,6 +1273,69 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	set_cur_block(false_block);
 }
 
+static void for_statement_to_firm(for_statement_t *statement)
+{
+	dbg_info *const dbgi = get_dbg_info(&statement->statement.source_position);
+
+	ir_node *jmp = NULL;
+	if (get_cur_block() != NULL) {
+		expression_to_firm(statement->initialisation);
+		jmp = new_Jmp();
+	}
+
+	/* create the step block */
+	ir_node *const step_block = new_immBlock();
+	expression_to_firm(statement->step);
+	ir_node *const step_jmp   = new_Jmp();
+
+	/* create the header block */
+	ir_node *const header_block = new_immBlock();
+	if (jmp != NULL) {
+		add_immBlock_pred(header_block, jmp);
+	}
+	add_immBlock_pred(header_block, step_jmp);
+
+	/* create the condition */
+	ir_node *const cond_expr = _expression_to_firm(statement->condition);
+	ir_node *const condition = create_conv(dbgi, cond_expr, mode_b);
+
+	ir_node *const cond       = new_d_Cond(dbgi, condition);
+	ir_node *const true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *const false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	/* the false block */
+	ir_node *const false_block = new_immBlock();
+	add_immBlock_pred(false_block, false_proj);
+
+	/* the loop body */
+	ir_node *const body_block = new_immBlock();
+	add_immBlock_pred(body_block, true_proj);
+	mature_immBlock(body_block);
+
+	ir_node *const old_continue_label = continue_label;
+	ir_node *const old_break_label    = break_label;
+	continue_label = step_block;
+	break_label    = false_block;
+
+	statement_to_firm(statement->body);
+
+	assert(continue_label == step_block);
+	assert(break_label    == false_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
+
+	if (get_cur_block() != NULL) {
+		ir_node *const jmp = new_Jmp();
+		add_immBlock_pred(step_block, jmp);
+	}
+
+	mature_immBlock(step_block);
+	mature_immBlock(header_block);
+	mature_immBlock(false_block);
+
+	set_cur_block(false_block);
+}
+
 static void create_declaration_entity(declaration_t *declaration,
                                       declaration_type_t declaration_type,
                                       ir_type *parent_type)
@@ -1470,6 +1533,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_CASE_LABEL:
 		case_label_to_firm((case_label_statement_t*) statement);
+		return;
+	case STATEMENT_FOR:
+		for_statement_to_firm((for_statement_t*) statement);
 		return;
 	default:
 		break;
