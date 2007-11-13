@@ -1532,7 +1532,22 @@ static void create_function(declaration_t *declaration)
 
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
-		ir_node *ret = new_Return(get_store(), 0, NULL);
+		assert(declaration->type->type == TYPE_FUNCTION);
+		const function_type_t* const func_type = (const function_type_t*)declaration->type;
+		ir_node *ret;
+		if (func_type->result_type == type_void) {
+			ret = new_Return(get_store(), 0, NULL);
+		} else {
+			ir_mode *const mode = get_ir_mode(func_type->result_type);
+			ir_node *      in[1];
+			// §5.1.2.2.3 main implicitly returns 0
+			if (strcmp(declaration->symbol->string, "main") == 0) {
+				in[0] = new_Const(mode, get_mode_null(mode));
+			} else {
+				in[0] = new_Unknown(mode);
+			}
+			ret = new_Return(get_store(), 1, in);
+		}
 		add_immBlock_pred(end_block, ret);
 	}
 
