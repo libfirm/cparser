@@ -929,6 +929,8 @@ static ir_node *create_arithmetic_assign_binop(
 	type_t   *type  = expression->expression.datatype;
 	ir_mode  *mode  = get_ir_mode(type);
 
+	assert(type->type != TYPE_POINTER);
+
 	value = create_conv(dbgi, value, mode);
 	set_value_for_expression(expression->left, value);
 
@@ -971,8 +973,9 @@ static ir_node *create_add(const binary_expression_t *expression)
 
 	assert(elem_size >= 1);
 	if(elem_size > 1) {
-		ir_node *cnst = new_Const_long(mode_Iu, elem_size);
-		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Iu);
+		integer       = create_conv(dbgi, integer, mode_Is);
+		ir_node *cnst = new_Const_long(mode_Is, (int) elem_size);
+		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Is);
 		integer = mul;
 	}
 
@@ -1546,7 +1549,10 @@ static void create_initializer(declaration_t *declaration)
 		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, init_node);
 		} else {
-			panic("initializer not completely implemented yet");
+			ir_entity *entity = declaration->v.entity;
+
+			set_entity_variability(entity, variability_initialized);
+			set_atomic_ent_value(entity, init_node);
 		}
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
@@ -1845,6 +1851,8 @@ static void create_global_variable(declaration_t *declaration)
 	} else {
 		set_entity_visibility(entity, visibility_external_visible);
 	}
+	current_ir_graph = get_const_code_irg();
+	create_initializer(declaration);
 }
 
 static void context_to_firm(context_t *context)
