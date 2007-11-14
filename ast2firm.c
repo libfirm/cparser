@@ -1484,14 +1484,24 @@ static void for_statement_to_firm(for_statement_t *statement)
 	add_immBlock_pred(header_block, step_jmp);
 
 	/* create the condition */
-	ir_node *const condition  = expression_to_modeb(statement->condition);
-	ir_node *const cond       = new_d_Cond(dbgi, condition);
-	ir_node *const true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *const false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	ir_node *true_proj;
+	ir_node *false_proj;
+	if (statement->condition != NULL) {
+		ir_node *const condition  = expression_to_modeb(statement->condition);
+		ir_node *const cond       = new_d_Cond(dbgi, condition);
+		true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+		false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	} else {
+		keep_alive(header_block);
+		true_proj  = new_Jmp();
+		false_proj = NULL;
+	}
 
 	/* the false block */
 	ir_node *const false_block = new_immBlock();
-	add_immBlock_pred(false_block, false_proj);
+	if (false_proj != NULL) {
+		add_immBlock_pred(false_block, false_proj);
+	}
 
 	/* the loop body */
 	ir_node *const body_block = new_immBlock();
