@@ -1552,8 +1552,6 @@ static void create_initializer(declaration_t *declaration)
 			set_value(declaration->v.value_number, init_node);
 		} else {
 			ir_entity *entity = declaration->v.entity;
-			ir_mode   *mode   = get_ir_mode(declaration->type);
-			init_node         = create_conv(NULL, init_node, mode);
 
 			set_entity_variability(entity, variability_initialized);
 			set_atomic_ent_value(entity, init_node);

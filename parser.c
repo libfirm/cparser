@@ -230,6 +230,28 @@ static void parse_error_expected(const char *message, ...)
 	fprintf(stderr, "\n");
 }
 
+static void type_error(const char *msg, const source_position_t source_position,
+                       type_t *type)
+{
+	parser_print_error_prefix_pos(source_position);
+	fprintf(stderr, "%s, but found type ", msg);
+	print_type(type);
+	fputc('\n', stderr);
+	error();
+}
+
+static void type_error_incompatible(const char *msg,
+		const source_position_t source_position, type_t *type1, type_t *type2)
+{
+	parser_print_error_prefix_pos(source_position);
+	fprintf(stderr, "%s, incompatible types: ", msg);
+	print_type(type1);
+	fprintf(stderr, " - ");
+	print_type(type2);
+	fprintf(stderr, ")\n");
+	error();
+}
+
 static void eat_block(void)
 {
 	if(token.type == '{')
@@ -465,6 +487,106 @@ static void environment_pop_to(size_t new_top)
 }
 
 
+static int get_rank(const type_t *type)
+{
+	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
+	 * and esp. footnote 108). However we can't fold constants (yet), so we
+	 * can't decide wether unsigned int is possible, while int always works.
+	 * (unsigned int would be preferable when possible... for stuff like
+	 *  struct { enum { ... } bla : 4; } ) */
+	if(type->type == TYPE_ENUM)
+		return ATOMIC_TYPE_INT;
+
+	assert(type->type == TYPE_ATOMIC);
+	atomic_type_t      *atomic_type = (atomic_type_t*) type;
+	atomic_type_type_t  atype       = atomic_type->atype;
+	return atype;
+}
+
+static type_t *promote_integer(type_t *type)
+{
+	if(get_rank(type) < ATOMIC_TYPE_INT)
+		type = type_int;
+
+	return type;
+}
+
+static expression_t *create_cast_expression(expression_t *expression,
+                                            type_t *dest_type)
+{
+	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
+
+	cast->expression.type     = EXPR_UNARY;
+	cast->type                = UNEXPR_CAST;
+	cast->value               = expression;
+	cast->expression.datatype = dest_type;
+
+	return (expression_t*) cast;
+}
+
+static expression_t *create_implicit_cast(expression_t *expression,
+                                          type_t *dest_type)
+{
+	assert(expression->datatype != NULL);
+	type_t *source_type = expression->datatype;
+
+	if(expression->datatype == dest_type)
+		return expression;
+
+	if(dest_type->type == TYPE_ATOMIC) {
+		if(source_type->type != TYPE_ATOMIC)
+			panic("casting of non-atomic types not implemented yet");
+
+		if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
+			type_error_incompatible("can't cast types",
+			                        expression->source_position,
+			                        source_type, dest_type);
+			return expression;
+		}
+
+		return create_cast_expression(expression, dest_type);
+	}
+	if(dest_type->type == TYPE_POINTER) {
+		if(source_type->type == TYPE_POINTER) {
+			if(!pointers_compatible(source_type, dest_type)) {
+				type_error_incompatible("can't implicitely cast types",
+			                        expression->source_position,
+			                        source_type, dest_type);
+			} else {
+				return create_cast_expression(expression, dest_type);
+			}
+		}
+	}
+
+	panic("casting of non-atomic types not implemented yet");
+}
+
+static void semantic_assign(type_t *orig_type_left, expression_t **right,
+                            const char *context)
+{
+	type_t *orig_type_right = (*right)->datatype;
+	type_t *type_left       = skip_typeref(orig_type_left);
+	type_t *type_right      = skip_typeref(orig_type_right);
+
+	if(type_left == type_right) {
+		/* fine */
+	} else if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		*right = create_implicit_cast(*right, type_left);
+	} else if(type_left->type == TYPE_POINTER
+			&& type_right->type == TYPE_POINTER) {
+		/* TODO */
+	} else {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "incompatible types in %s\n", context);
+		parser_print_error_prefix();
+		print_type(type_left);
+		fputs(" <- ", stderr);
+		print_type(type_right);
+		fputs("\n", stderr);
+	}
+
+}
 
 static expression_t *parse_constant_expression(void)
 {
@@ -596,35 +718,42 @@ static designator_t *parse_designation(void)
 	}
 }
 
-static initializer_t *parse_initializer_list(void);
+static initializer_t *parse_initializer_list(type_t *type);
 
-static initializer_t *parse_initializer(void)
+static initializer_t *parse_initializer(type_t *type)
 {
 	designator_t *designator = parse_designation();
 
 	initializer_t *result;
 	if(token.type == '{') {
-		result = parse_initializer_list();
+		result = parse_initializer_list(type);
 	} else {
 		result          = allocate_ast_zero(sizeof(result[0]));
 		result->type    = INITIALIZER_VALUE;
 		result->v.value = parse_assignment_expression();
+
+		if(type != NULL) {
+			semantic_assign(type, &result->v.value, "initializer");
+		}
 	}
 	result->designator = designator;
 
 	return result;
 }
 
-static initializer_t *parse_initializer_list(void)
+static initializer_t *parse_initializer_list(type_t *type)
 {
 	eat('{');
+
+	/* TODO: semantic */
+	(void) type;
 
 	initializer_t *result = allocate_ast_zero(sizeof(result[0]));
 	result->type = INITIALIZER_LIST;
 
 	initializer_t *last = NULL;
 	while(1) {
-		initializer_t *initializer = parse_initializer();
+		initializer_t *initializer = parse_initializer(NULL);
 		if(last != NULL) {
 			last->next = initializer;
 		} else {
@@ -748,7 +877,7 @@ static void parse_enum_entries(void)
 
 		if(token.type == '=') {
 			next_token();
-			entry->init.initializer = parse_initializer();
+			entry->init.initializer = parse_initializer(type_int);
 		}
 
 		record_declaration(entry);
@@ -1621,7 +1750,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
-			ndeclaration->init.initializer = parse_initializer();
+			ndeclaration->init.initializer = parse_initializer(declaration->type);
 		} else if(token.type == '{') {
 			if(declaration->type->type != TYPE_FUNCTION) {
 				parser_print_error_prefix();
@@ -2250,102 +2379,6 @@ static expression_t *parse_select_expression(unsigned precedence,
 	return (expression_t*) select;
 }
 
-static expression_t *create_cast_expression(expression_t *expression,
-                                            type_t *dest_type)
-{
-	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
-
-	cast->expression.type     = EXPR_UNARY;
-	cast->type                = UNEXPR_CAST;
-	cast->value               = expression;
-	cast->expression.datatype = dest_type;
-
-	return (expression_t*) cast;
-}
-
-static void type_error(const char *msg, const source_position_t source_position,
-                       type_t *type)
-{
-	parser_print_error_prefix_pos(source_position);
-	fprintf(stderr, "%s, but found type ", msg);
-	print_type(type);
-	fputc('\n', stderr);
-	error();
-}
-
-static void type_error_incompatible(const char *msg,
-		const source_position_t source_position, type_t *type1, type_t *type2)
-{
-	parser_print_error_prefix_pos(source_position);
-	fprintf(stderr, "%s, incompatible types: ", msg);
-	print_type(type1);
-	fprintf(stderr, " - ");
-	print_type(type2);
-	fprintf(stderr, ")\n");
-	error();
-}
-
-static int get_rank(const type_t *type)
-{
-	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
-	 * and esp. footnote 108). However we can't fold constants (yet), so we
-	 * can't decide wether unsigned int is possible, while int always works.
-	 * (unsigned int would be preferable when possible... for stuff like
-	 *  struct { enum { ... } bla : 4; } ) */
-	if(type->type == TYPE_ENUM)
-		return ATOMIC_TYPE_INT;
-
-	assert(type->type == TYPE_ATOMIC);
-	atomic_type_t      *atomic_type = (atomic_type_t*) type;
-	atomic_type_type_t  atype       = atomic_type->atype;
-	return atype;
-}
-
-static type_t *promote_integer(type_t *type)
-{
-	if(get_rank(type) < ATOMIC_TYPE_INT)
-		type = type_int;
-
-	return type;
-}
-
-static expression_t *create_implicit_cast(expression_t *expression,
-                                          type_t *dest_type)
-{
-	assert(expression->datatype != NULL);
-	type_t *source_type = expression->datatype;
-
-	if(expression->datatype == dest_type)
-		return expression;
-
-	if(dest_type->type == TYPE_ATOMIC) {
-		if(source_type->type != TYPE_ATOMIC)
-			panic("casting of non-atomic types not implemented yet");
-
-		if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
-			type_error_incompatible("can't cast types",
-			                        expression->source_position,
-			                        source_type, dest_type);
-			return expression;
-		}
-
-		return create_cast_expression(expression, dest_type);
-	}
-	if(dest_type->type == TYPE_POINTER) {
-		if(source_type->type == TYPE_POINTER) {
-			if(!pointers_compatible(source_type, dest_type)) {
-				type_error_incompatible("can't implicitely cast types",
-			                        expression->source_position,
-			                        source_type, dest_type);
-			} else {
-				return create_cast_expression(expression, dest_type);
-			}
-		}
-	}
-
-	panic("casting of non-atomic types not implemented yet");
-}
-
 static expression_t *parse_call_expression(unsigned precedence,
                                            expression_t *expression)
 {
@@ -2761,40 +2794,12 @@ static void semantic_logical_op(binary_expression_t *expression)
 	expression->expression.datatype = type_int;
 }
 
-static void semantic_assign(type_t *orig_type_left, expression_t **right,
-                            bool is_return)
-{
-	type_t *orig_type_right = (*right)->datatype;
-	type_t *type_left       = skip_typeref(orig_type_left);
-	type_t *type_right      = skip_typeref(orig_type_right);
-
-	if(type_left == type_right) {
-		/* fine */
-	} else if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		*right = create_implicit_cast(*right, type_left);
-	} else if(type_left->type == TYPE_POINTER
-			&& type_right->type == TYPE_POINTER) {
-		/* TODO */
-	} else {
-		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "incompatible types in %s\n",
-		        is_return ? "'return'" : "assignment");
-		parser_print_error_prefix();
-		print_type(type_left);
-		fputs(" <- ", stderr);
-		print_type(type_right);
-		fputs("\n", stderr);
-	}
-
-}
-
 static void semantic_binexpr_assign(binary_expression_t *expression)
 {
 	expression_t *left       = expression->left;
 	type_t       *type_left  = left->datatype;
 
-	semantic_assign(type_left, &expression->right, false);
+	semantic_assign(type_left, &expression->right, "assignment");
 
 	expression->expression.datatype = type_left;
 }
@@ -3223,7 +3228,7 @@ static statement_t *parse_return(void)
 			parse_warning("'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
-			semantic_assign(return_type, &return_value, true);
+			semantic_assign(return_type, &return_value, "'return'");
 		}
 	} else {
 		return_value = NULL;
