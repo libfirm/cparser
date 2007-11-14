@@ -592,6 +592,19 @@ static ir_node *string_literal_to_firm(const string_literal_t* literal)
 	return create_symconst(dbgi, entity);
 }
 
+static ir_node *load_from_expression_addr(type_t *type, ir_node *addr,
+                                          dbg_info *dbgi)
+{
+	ir_mode *mode     = get_ir_mode(type);
+	ir_node *memory   = get_store();
+	ir_node *load     = new_d_Load(dbgi, memory, addr, mode);
+	ir_node *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+	ir_node *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
+	set_store(load_mem);
+
+	return load_res;
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
@@ -607,8 +620,38 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_TYPE_FUNCTION: {
 		return create_symconst(dbgi, declaration->v.entity);
 	}
+	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
+		ir_entity *entity   = declaration->v.entity;
+		ir_node   *symconst = create_symconst(dbgi, entity);
+		return load_from_expression_addr(type, symconst, dbgi);
+	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
-	case DECLARATION_TYPE_GLOBAL_VARIABLE:
+	case DECLARATION_TYPE_COMPOUND_MEMBER:
+		panic("not implemented reference type");
+	}
+
+	panic("reference to declaration with unknown type found");
+}
+
+static ir_node *reference_addr(const reference_expression_t *ref)
+{
+	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
+	declaration_t *declaration = ref->declaration;
+
+	switch((declaration_type_t) declaration->declaration_type) {
+	case DECLARATION_TYPE_UNKNOWN:
+		break;
+	case DECLARATION_TYPE_LOCAL_VARIABLE:
+		panic("local variable without entity has no address");
+	case DECLARATION_TYPE_FUNCTION: {
+		return create_symconst(dbgi, declaration->v.entity);
+	}
+	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
+		ir_entity *entity   = declaration->v.entity;
+		ir_node   *symconst = create_symconst(dbgi, entity);
+		return symconst;
+	}
+	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
 		panic("not implemented reference type");
 	}
@@ -687,19 +730,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	}
 
 	return result;
-}
-
-static ir_node *load_from_expression_addr(type_t *type, ir_node *addr,
-                                          dbg_info *dbgi)
-{
-	ir_mode *mode     = get_ir_mode(type);
-	ir_node *memory   = get_store();
-	ir_node *load     = new_d_Load(dbgi, memory, addr, mode);
-	ir_node *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
-	ir_node *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
-	set_store(load_mem);
-
-	return load_res;
 }
 
 static ir_node *expression_to_addr(const expression_t *expression);
@@ -1070,6 +1100,8 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->type) {
+	case EXPR_REFERENCE:
+		return reference_addr((const reference_expression_t*) expression);
 	case EXPR_ARRAY_ACCESS:
 		return array_access_addr((const array_access_expression_t*) expression);
 	default:
@@ -1694,6 +1726,22 @@ static void create_function(declaration_t *declaration)
 	irg_vrfy(irg);
 }
 
+static void create_global_variable(declaration_t *declaration)
+{
+	ir_type   *global_type = get_glob_type();
+	create_declaration_entity(declaration, DECLARATION_TYPE_GLOBAL_VARIABLE,
+	                          global_type);
+
+	ir_entity *entity = declaration->v.entity;
+	if(declaration->storage_class == STORAGE_CLASS_STATIC) {
+		set_entity_visibility(entity, visibility_local);
+	} else if(declaration->storage_class == STORAGE_CLASS_EXTERN) {
+		set_entity_visibility(entity, visibility_external_allocated);
+	} else {
+		set_entity_visibility(entity, visibility_external_visible);
+	}
+}
+
 static void context_to_firm(context_t *context)
 {
 	declaration_t *declaration = context->declarations;
@@ -1708,7 +1756,7 @@ static void context_to_firm(context_t *context)
 		if(type->type == TYPE_FUNCTION) {
 			create_function(declaration);
 		} else {
-			/* TODO... */
+			create_global_variable(declaration);
 		}
 	}
 }
