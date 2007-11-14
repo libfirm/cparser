@@ -27,8 +27,10 @@ typedef enum {
 	TYPE_TYPEOF
 } type_type_t;
 
+/* note that the constant values represent the rank of the types as defined
+ * in § 6.3.1 */
 typedef enum {
-	ATOMIC_TYPE_INVALID,
+	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
 	ATOMIC_TYPE_CHAR,
 	ATOMIC_TYPE_SCHAR,

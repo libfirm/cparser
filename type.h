@@ -41,11 +41,15 @@ void inc_type_visited(void);
 
 void set_print_compound_entries(bool enabled);
 
-
 /**
  * returns true if type contains integer numbers
  */
 bool is_type_integer(const type_t *type);
+
+/**
+ * return true if type contains signed numbers
+ */
+bool is_type_signed(const type_t *type);
 
 /**
  * returns true if type contains floating point numbers
@@ -67,5 +71,7 @@ bool is_type_arithmetic(const type_t *type);
  * returns true if the type is a scalar type (6.2.21)
  */
 bool is_type_scalar(const type_t *type);
+
+type_t *skip_typeref(type_t *type);
 
 #endif

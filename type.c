@@ -289,8 +289,7 @@ static void intern_print_type_pre(type_t *type)
 	fputs("unknown", out);
 }
 
-static
-void intern_print_type_post(type_t *type)
+static void intern_print_type_post(type_t *type)
 {
 	switch(type->type) {
 	case TYPE_FUNCTION:
@@ -347,10 +346,10 @@ bool type_valid(const type_t *type)
 bool is_type_integer(const type_t *type)
 {
 	if(type->type == TYPE_ENUM)
-		return 1;
+		return true;
 
 	if(type->type != TYPE_ATOMIC)
-		return 0;
+		return false;
 
 	atomic_type_t *atomic_type = (atomic_type_t*) type;
 	switch(atomic_type->atype) {
@@ -366,16 +365,16 @@ bool is_type_integer(const type_t *type)
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_LONGLONG:
 	case ATOMIC_TYPE_ULONGLONG:
-		return 1;
+		return true;
 	default:
-		return 0;
+		return false;
 	}
 }
 
 bool is_type_floating(const type_t *type)
 {
 	if(type->type != TYPE_ATOMIC)
-		return 0;
+		return false;
 
 	atomic_type_t *atomic_type = (atomic_type_t*) type;
 	switch(atomic_type->atype) {
@@ -392,10 +391,59 @@ bool is_type_floating(const type_t *type)
 	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
 	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
 #endif
-		return 1;
+		return true;
 	default:
-		return 0;
+		return false;
 	}
+}
+
+bool is_type_signed(const type_t *type)
+{
+	/* enum types are int for now */
+	if(type->type == TYPE_ENUM)
+		return true;
+
+	if(type->type != TYPE_ATOMIC)
+		return false;
+
+	atomic_type_t *atomic_type = (atomic_type_t*) type;
+	switch(atomic_type->atype) {
+	case ATOMIC_TYPE_CHAR:
+	case ATOMIC_TYPE_SCHAR:
+	case ATOMIC_TYPE_SHORT:
+	case ATOMIC_TYPE_INT:
+	case ATOMIC_TYPE_LONG:
+	case ATOMIC_TYPE_LONGLONG:
+	case ATOMIC_TYPE_FLOAT:
+	case ATOMIC_TYPE_DOUBLE:
+	case ATOMIC_TYPE_LONG_DOUBLE:
+#ifdef PROVIDE_COMPLEX
+	case ATOMIC_TYPE_FLOAT_COMPLEX:
+	case ATOMIC_TYPE_DOUBLE_COMPLEX:
+	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
+#endif
+#ifdef PROVIDE_IMAGINARY
+	case ATOMIC_TYPE_FLOAT_IMAGINARY:
+	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
+	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
+#endif
+		return true;
+
+	case ATOMIC_TYPE_BOOL:
+	case ATOMIC_TYPE_UCHAR:
+	case ATOMIC_TYPE_USHORT:
+	case ATOMIC_TYPE_UINT:
+	case ATOMIC_TYPE_ULONG:
+	case ATOMIC_TYPE_ULONGLONG:
+		return false;
+
+	case ATOMIC_TYPE_INVALID:
+	case ATOMIC_TYPE_VOID:
+		return false;
+	}
+
+	panic("invalid atomic type found");
+	return false;
 }
 
 bool is_type_arithmetic(const type_t *type)
@@ -413,6 +461,40 @@ bool is_type_scalar(const type_t *type)
 
 	return is_type_arithmetic(type);
 }
+
+type_t *skip_typeref(type_t *type)
+{
+	while(1) {
+		switch(type->type) {
+		case TYPE_TYPEDEF: {
+			const typedef_type_t *typedef_type = (const typedef_type_t*) type;
+			type = typedef_type->declaration->type;
+			continue;
+		}
+		case TYPE_TYPEOF: {
+			const typeof_type_t *typeof_type = (const typeof_type_t *) type;
+			if(typeof_type->typeof_type != NULL) {
+				type = typeof_type->typeof_type;
+			} else {
+				type = typeof_type->expression->datatype;
+			}
+			continue;
+		}
+		case TYPE_BUILTIN: {
+			const builtin_type_t *builtin_type = (const builtin_type_t*) type;
+			type = builtin_type->real_type;
+			continue;
+		}
+		default:
+			break;
+		}
+		break;
+	}
+
+	return type;
+}
+
+
 
 static type_t *identify_new_type(type_t *type)
 {

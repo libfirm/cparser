@@ -114,33 +114,6 @@ static ident *unique_ident(const char *tag)
 	return new_id_from_str(buf);
 }
 
-static type_t *skip_typeref(type_t *type)
-{
-	while(1) {
-		switch(type->type) {
-		case TYPE_TYPEDEF: {
-			const typedef_type_t *typedef_type = (const typedef_type_t*) type;
-			type = typedef_type->declaration->type;
-			continue;
-		}
-		case TYPE_TYPEOF: {
-			const typeof_type_t *typeof_type = (const typeof_type_t *) type;
-			if(typeof_type->typeof_type != NULL) {
-				type = typeof_type->typeof_type;
-			} else {
-				type = typeof_type->expression->datatype;
-			}
-			continue;
-		}
-		default:
-			break;
-		}
-		break;
-	}
-
-	return type;
-}
-
 static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 {
 	switch(atomic_type->atype) {
@@ -184,8 +157,8 @@ static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 		break;
 #endif
 	case ATOMIC_TYPE_VOID:
-		panic("tried to get mode from void type");
-		break;
+		/* firm has no real void... */
+		return mode_Is;
 	case ATOMIC_TYPE_INVALID:
 		break;
 	}
@@ -389,6 +362,9 @@ static ir_type *create_struct_type(type2firm_env_t *env, compound_type_t *type)
 	int offset    = 0;
 	declaration_t *entry = type->declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
+		if(entry->namespace != NAMESPACE_NORMAL)
+			continue;
+
 		ident       *ident         = new_id_from_str(entry->symbol->string);
 		ir_type_ptr  entry_ir_type = _get_ir_type(env, entry->type);
 
@@ -439,6 +415,9 @@ static ir_type *create_union_type(type2firm_env_t *env, compound_type_t *type)
 	int size      = 0;
 	declaration_t *entry = declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
+		if(entry->namespace != NAMESPACE_NORMAL)
+			continue;
+
 		ident       *ident         = new_id_from_str(entry->symbol->string);
 		ir_type_ptr  entry_ir_type = _get_ir_type(env, entry->type);
 
@@ -1655,6 +1634,9 @@ static void context_to_firm(context_t *context)
 	declaration_t *declaration = context->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespace != NAMESPACE_NORMAL)
+			continue;
+		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
+				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 			continue;
 
 		type_t *type = declaration->type;

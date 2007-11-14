@@ -230,6 +230,9 @@ int main(int argc, char **argv)
 		get_output_name(outfname, sizeof(outfname), input, ".s");
 
 		translation_unit_t *unit = do_parsing(input);
+		if(unit == NULL) {
+			return 1;
+		}
 		create_firm_prog(unit);
 		emit(input, outfname);
 		link(outfname, "a.out");

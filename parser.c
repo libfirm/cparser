@@ -25,21 +25,26 @@ typedef struct {
 	unsigned short namespace;
 } stack_entry_t;
 
-static token_t               token;
-static token_t               lookahead_buffer[MAX_LOOKAHEAD];
-static int                   lookahead_bufpos;
-static stack_entry_t        *environment_stack = NULL;
-static context_t            *global_context    = NULL;
-static context_t            *context           = NULL;
-static declaration_t        *last_declaration  = NULL;
-static struct obstack        temp_obst;
+static token_t         token;
+static token_t         lookahead_buffer[MAX_LOOKAHEAD];
+static int             lookahead_bufpos;
+static stack_entry_t  *environment_stack = NULL;
+static context_t      *global_context    = NULL;
+static context_t      *context           = NULL;
+static declaration_t  *last_declaration  = NULL;
+static declaration_t  *current_function  = NULL;
+static struct obstack  temp_obst;
+static bool            found_error;
 
-static type_t               *type_int        = NULL;
-static type_t               *type_double     = NULL;
-static type_t               *type_const_char = NULL;
-static type_t               *type_string     = NULL;
-static type_t               *type_void       = NULL;
-static type_t               *type_size_t     = NULL;
+static type_t         *type_int         = NULL;
+static type_t         *type_uint        = NULL;
+static type_t         *type_long_double = NULL;
+static type_t         *type_double      = NULL;
+static type_t         *type_float       = NULL;
+static type_t         *type_const_char  = NULL;
+static type_t         *type_string      = NULL;
+static type_t         *type_void        = NULL;
+static type_t         *type_size_t      = NULL;
 
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
@@ -156,6 +161,7 @@ static inline const token_t *look_ahead(int num)
 
 static void error(void)
 {
+	found_error = true;
 #ifdef ABORT_ON_ERROR
 	abort();
 #endif
@@ -179,8 +185,7 @@ static void parser_print_error_prefix_pos(
 
 static void parser_print_error_prefix(void)
 {
-	parser_print_prefix_pos(token.source_position);
-	error();
+	parser_print_error_prefix_pos(token.source_position);
 }
 
 static void parse_error(const char *message)
@@ -189,7 +194,6 @@ static void parse_error(const char *message)
 	fprintf(stderr, "parse error: %s\n", message);
 }
 
-__attribute__((unused))
 static void parse_warning(const char *message)
 {
 	parser_print_prefix_pos(token.source_position);
@@ -888,6 +892,8 @@ static type_t *create_builtin_type(symbol_t *symbol)
 	builtin_type_t *type = allocate_type_zero(sizeof(type[0]));
 	type->type.type      = TYPE_BUILTIN;
 	type->symbol         = symbol;
+	/* TODO... */
+	type->real_type      = type_int;
 
 	return (type_t*) type;
 }
@@ -1642,8 +1648,13 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			for( ; parameter != NULL; parameter = parameter->next) {
 				environment_push(parameter);
 			}
+			declaration_t *old_current_function = current_function;
+			current_function                    = declaration;
 
 			statement_t *statement = parse_compound_statement();
+
+			assert(current_function == declaration);
+			old_current_function = current_function;
 
 			assert(context == &declaration->context);
 			set_context(last_context);
@@ -1893,7 +1904,7 @@ static void check_cast_allowed(expression_t *expression, type_t *dest_type)
 {
 	(void) expression;
 	(void) dest_type;
-	/* TODO check if cast is allowed and issue warnings/errors */
+	/* TODO check if explicit cast is allowed and issue warnings/errors */
 }
 
 static expression_t *parse_cast(void)
@@ -2243,9 +2254,24 @@ static expression_t *parse_call_expression(unsigned precedence,
 {
 	(void) precedence;
 	call_expression_t *call = allocate_ast_zero(sizeof(call[0]));
+	call->expression.type   = EXPR_CALL;
+	call->function          = expression;
 
-	call->expression.type     = EXPR_CALL;
-	call->function            = expression;
+	type_t *type = expression->datatype;
+	if(type->type != TYPE_FUNCTION) {
+		/* TODO calling pointers to functions is ok */
+		parser_print_error_prefix();
+		fputs("called object '", stderr);
+		print_expression(expression);
+		fputs("' (type ", stderr);
+		print_type(type);
+		fputs("is not a function\n", stderr);
+
+		call->expression.datatype = NULL;
+	} else {
+		function_type_t *function_type = (function_type_t*) type;
+		call->expression.datatype = function_type->result_type;
+	}
 
 	/* parse arguments */
 	eat('(');
@@ -2270,26 +2296,6 @@ static expression_t *parse_call_expression(unsigned precedence,
 		}
 	}
 	expect(')');
-
-	type_t *type = expression->datatype;
-	if(type != NULL) {
-		/* we can call pointer to function */
-		if(type->type == TYPE_POINTER) {
-			pointer_type_t *pointer = (pointer_type_t*) type;
-			type = pointer->points_to;
-		}
-
-		if(type == NULL || type->type != TYPE_FUNCTION) {
-			parser_print_error_prefix();
-			fprintf(stderr, "expected a function type for call but found "
-			        "type ");
-			print_type(expression->datatype);
-			fprintf(stderr, "\n");
-		} else {
-			function_type_t *function_type = (function_type_t*) type;
-			call->expression.datatype      = function_type->result_type;
-		}
-	}
 
 	return (expression_t*) call;
 }
@@ -2322,6 +2328,44 @@ static type_t *get_type_after_conversion(const type_t *type1,
 	/* TODO... */
 	(void) type2;
 	return (type_t*) type1;
+}
+
+static expression_t *create_cast_expression(expression_t *expression,
+                                            type_t *dest_type)
+{
+	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
+
+	cast->expression.type     = EXPR_UNARY;
+	cast->type                = UNEXPR_CAST;
+	cast->value               = expression;
+	cast->expression.datatype = dest_type;
+
+	return (expression_t*) cast;
+}
+
+static expression_t *create_cast(expression_t *expression, type_t *dest_type)
+{
+	assert(expression->datatype != NULL);
+	type_t *source_type = expression->datatype;
+
+	if(expression->datatype == dest_type)
+		return expression;
+
+	if(dest_type->type == TYPE_ATOMIC) {
+		if(source_type->type != TYPE_ATOMIC)
+			panic("casting of non-atomic types not implemented yet");
+
+		if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
+			type_error_incompatible("can't cast types",
+			                        expression->source_position,
+			                        source_type, dest_type);
+			return expression;
+		}
+
+		return create_cast_expression(expression, dest_type);
+	}
+
+	panic("casting of non-atomic types not implemented yet");
 }
 
 static expression_t *parse_conditional_expression(unsigned precedence,
@@ -2465,37 +2509,177 @@ CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT,
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT,
                                        get_unexpr_arithmetic_type)
 
-static type_t *get_binexpr_int_type(const expression_t *left,
-                                    const expression_t *right)
+static int get_rank(const type_t *type)
 {
-	(void) left;
-	(void) right;
-	return type_int;
+	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
+	 * and esp. footnote 108). However we can't fold constants (yet), so we
+	 * can't decide wether unsigned int is possible, while int always works.
+	 * (unsigned int would be preferable when possible... for stuff like
+	 *  struct { enum { ... } bla : 4; } ) */
+	if(type->type == TYPE_ENUM)
+		return ATOMIC_TYPE_INT;
+
+	assert(type->type == TYPE_ATOMIC);
+	atomic_type_t      *atomic_type = (atomic_type_t*) type;
+	atomic_type_type_t  atype       = atomic_type->atype;
+	return atype;
 }
 
-static type_t *get_binexpr_arithmetic_type(const expression_t *left,
-                                            const expression_t *right)
+static void semantic_arithmetic(expression_t **left, expression_t **right)
 {
-	(void) right;
-	return left->datatype;
+	type_t *type_left  = (*left)->datatype;
+	type_t *type_right = (*right)->datatype;
+	type_left  = skip_typeref(type_left);
+	type_right = skip_typeref(type_right);
+
+	/* TODO: handle complex + imaginary types */
+
+	/* § 6.3.1.8 Usual arithmetic conversions */
+	if(type_left == type_long_double || type_right == type_long_double) {
+		type_left  = type_long_double;
+		type_right = type_long_double;
+		goto finished;
+	} else if(type_left == type_double || type_right == type_double) {
+		type_left  = type_double;
+		type_right = type_double;
+		goto finished;
+	} else if(type_left == type_float || type_right == type_float) {
+		type_left  = type_float;
+		type_right = type_float;
+		goto finished;
+	}
+
+	/* integer promotion */
+	if(get_rank(type_left) < ATOMIC_TYPE_INT)
+		type_left = type_int;
+	if(get_rank(type_right) < ATOMIC_TYPE_INT)
+		type_right = type_int;
+
+	if(type_left == type_right)
+		goto finished;
+
+	bool signed_left  = is_type_signed(type_left);
+	bool signed_right = is_type_signed(type_right);
+	if(get_rank(type_left) < get_rank(type_right)) {
+		if(signed_left == signed_right || !signed_right) {
+			type_left = type_right;
+		} else {
+			type_right = type_left;
+		}
+	} else {
+		if(signed_left == signed_right || !signed_left) {
+			type_right = type_left;
+		} else {
+			type_left = type_right;
+		}
+	}
+
+finished:
+	assert(type_left == type_right);
+	*left  = create_cast(*left, type_left);
+	*right = create_cast(*right, type_right);
 }
 
-static type_t *get_binexpr_arithmetic_assign_type(const expression_t *left,
-                                                  const expression_t *right)
+static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 {
-	(void) right;
+	expression_t *left       = expression->left;
+	expression_t *right      = expression->right;
+	type_t       *type_left  = skip_typeref(left->datatype);
+	type_t       *type_right = skip_typeref(right->datatype);
+
+	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs arithmetic types\n");
+		return;
+	}
+
+	semantic_arithmetic(&expression->left, &expression->right);
+	expression->expression.datatype = expression->left->datatype;
+}
+
+static void semantic_comparison(binary_expression_t *expression)
+{
+	expression_t *left       = expression->left;
+	expression_t *right      = expression->right;
+	type_t       *type_left  = left->datatype;
+	type_t       *type_right = right->datatype;
+
+	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		semantic_arithmetic(&expression->left, &expression->right);
+	}
+	expression->expression.datatype = type_int;
+}
+
+static void semantic_arithmetic_assign(binary_expression_t *expression)
+{
+	expression_t *left       = expression->left;
+	expression_t *right      = expression->right;
+	type_t       *type_left  = left->datatype;
+	type_t       *type_right = right->datatype;
+
+	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs arithmetic types\n");
+		return;
+	}
+
+	semantic_arithmetic(&expression->left, &expression->right);
+	/* note that we assign the original type_left before casting */
+	expression->expression.datatype = type_left;
+}
+
+static void semantic_logical_op(binary_expression_t *expression)
+{
 	/* TODO */
-	return left->datatype;
+	expression->expression.datatype = type_int;
 }
 
-static type_t *get_binexpr_right_type(const expression_t *left,
-                                       const expression_t *right)
+static void semantic_assign(type_t *orig_type_left, expression_t **right,
+                            bool is_return)
 {
-	(void) left;
-	return right->datatype;
+	type_t *orig_type_right = (*right)->datatype;
+	type_t *type_left       = skip_typeref(orig_type_left);
+	type_t *type_right      = skip_typeref(orig_type_right);
+
+	if(type_left == type_right) {
+		/* fine */
+	} else if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		*right = create_cast(*right, type_left);
+	} else if(type_left->type == TYPE_POINTER
+			&& type_right->type == TYPE_POINTER) {
+		/* TODO */
+	} else {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "incompatible types in %s\n",
+		        is_return ? "'return'" : "assignment");
+		parser_print_error_prefix();
+		print_type(type_left);
+		fputs(" <- ", stderr);
+		print_type(type_right);
+		fputs("\n", stderr);
+	}
+
 }
 
-#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, tfunc)    \
+static void semantic_binexpr_assign(binary_expression_t *expression)
+{
+	expression_t *left       = expression->left;
+	type_t       *type_left  = left->datatype;
+
+	semantic_assign(type_left, &expression->right, false);
+
+	expression->expression.datatype = type_left;
+}
+
+static void semantic_comma(binary_expression_t *expression)
+{
+	expression->expression.datatype = expression->right->datatype;
+}
+
+#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, sfunc)    \
 static expression_t *parse_##binexpression_type(unsigned precedence,    \
                                                 expression_t *left)     \
 {                                                                       \
@@ -2509,59 +2693,56 @@ static expression_t *parse_##binexpression_type(unsigned precedence,    \
 	binexpr->type                = binexpression_type;                  \
 	binexpr->left                = left;                                \
 	binexpr->right               = right;                               \
-	binexpr->expression.datatype = tfunc(left, right);                  \
+	sfunc(binexpr);                                                     \
                                                                         \
 	return (expression_t*) binexpr;                                     \
 }
 
-CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,   get_binexpr_right_type)
-CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,     get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,     get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,     get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,     get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,     get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,    get_binexpr_int_type)
-CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER, get_binexpr_int_type)
-CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,  get_binexpr_right_type)
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL,
-                      get_binexpr_int_type)
+CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,          semantic_comma)
+CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,           semantic_comparison)
+CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER,        semantic_comparison)
+CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,         semantic_binexpr_assign)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL, semantic_comparison)
 CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, BINEXPR_NOTEQUAL,
-                      get_binexpr_int_type)
-CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL,
-                      get_binexpr_int_type)
+                      semantic_comparison)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL, semantic_comparison)
 CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL,
-                      get_binexpr_int_type)
-CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND, get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,  get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR, get_binexpr_arithmetic_type)
-CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,
-                      get_binexpr_int_type)
-CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR,
-                      get_binexpr_int_type)
+                      semantic_comparison)
+CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND,    semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,     semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR,    semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,  semantic_logical_op)
+CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR, semantic_logical_op)
+/* TODO shift has a bit special semantic */
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
-                      get_binexpr_arithmetic_type)
+                      semantic_binexpr_arithmetic)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,
-                      get_binexpr_arithmetic_type)
+                      semantic_binexpr_arithmetic)
 CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, BINEXPR_MOD_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, BINEXPR_SHIFTLEFT_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, BINEXPR_SHIFTRIGHT_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_ANDEQUAL, BINEXPR_BITWISE_AND_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_PIPEEQUAL, BINEXPR_BITWISE_OR_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_CARETEQUAL, BINEXPR_BITWISE_XOR_ASSIGN,
-                      get_binexpr_arithmetic_assign_type)
+                      semantic_arithmetic_assign)
 
 static expression_t *parse_sub_expression(unsigned precedence)
 {
@@ -2904,9 +3085,27 @@ static statement_t *parse_return(void)
 
 	statement->statement.type            = STATEMENT_RETURN;
 	statement->statement.source_position = token.source_position;
+
+	assert(current_function->type->type == TYPE_FUNCTION);
+	function_type_t *function_type = (function_type_t*) current_function->type;
+	type_t          *return_type   = function_type->result_type;
+
+	expression_t *return_value;
 	if(token.type != ';') {
-		statement->return_value = parse_expression();
+		return_value = parse_expression();
+
+		if(return_type == type_void && return_value->datatype != type_void) {
+			parse_warning("'return' with a value, in function returning void");
+			return_value = NULL;
+		} else {
+			semantic_assign(return_type, &return_value, true);
+		}
+	} else {
+		return_value = NULL;
+		parse_warning("'return' without value, in function retruning non-void");
 	}
+	statement->return_value = return_value;
+
 	expect(';');
 
 	return (statement_t*) statement;
@@ -3118,8 +3317,10 @@ static translation_unit_t *parse_translation_unit(void)
 translation_unit_t *parse(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
+	found_error       = false;
 
 	type_set_output(stderr);
+	ast_set_output(stderr);
 
 	lookahead_bufpos = 0;
 	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
@@ -3129,6 +3330,9 @@ translation_unit_t *parse(void)
 
 	DEL_ARR_F(environment_stack);
 
+	if(found_error)
+		return NULL;
+
 	return unit;
 }
 
@@ -3137,12 +3341,15 @@ void init_parser(void)
 	init_expression_parsers();
 	obstack_init(&temp_obst);
 
-	type_int        = make_atomic_type(ATOMIC_TYPE_INT, 0);
-	type_double     = make_atomic_type(ATOMIC_TYPE_DOUBLE, 0);
-	type_size_t     = make_atomic_type(ATOMIC_TYPE_UINT, 0);
-	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
-	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, 0);
-	type_string     = make_pointer_type(type_const_char, 0);
+	type_int         = make_atomic_type(ATOMIC_TYPE_INT, 0);
+	type_uint        = make_atomic_type(ATOMIC_TYPE_UINT, 0);
+	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, 0);
+	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, 0);
+	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, 0);
+	type_size_t      = make_atomic_type(ATOMIC_TYPE_UINT, 0);
+	type_const_char  = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
+	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, 0);
+	type_string      = make_pointer_type(type_const_char, 0);
 }
 
 void exit_parser(void)

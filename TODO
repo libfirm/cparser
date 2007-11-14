@@ -6,6 +6,8 @@ Lexer:
 - proper handling of different file encodings
 
 Parser:
+- the expect macros abort functions directly. This leads to some functions
+  not resetting the current context properly (parse_for)
 - proper handling of function pointer types
 - outermost typequalifiers can differ between function declarations and
   implementations...
