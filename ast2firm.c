@@ -41,13 +41,6 @@ typedef enum declaration_type_t {
 	DECLARATION_TYPE_COMPOUND_MEMBER
 } declaration_type_t;
 
-typedef struct type2firm_env_t type2firm_env_t;
-struct type2firm_env_t {
-	int can_cache;       /* nonzero if type can safely be cached because
-	                        no typevariables are in the hierarchy */
-};
-
-static ir_type *_get_ir_type(type2firm_env_t *env, type_t *type);
 static ir_type *get_ir_type(type_t *type);
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
@@ -260,10 +253,8 @@ static unsigned count_parameters(const function_type_t *function_type)
 
 
 
-static ir_type *create_atomic_type(type2firm_env_t *env,
-                                   const atomic_type_t *type)
+static ir_type *create_atomic_type(const atomic_type_t *type)
 {
-	(void) env;
 	ir_mode *mode   = get_atomic_mode(type);
 	ident   *id     = get_mode_ident(mode);
 	ir_type *irtype = new_type_primitive(id, mode);
@@ -271,8 +262,7 @@ static ir_type *create_atomic_type(type2firm_env_t *env,
 	return irtype;
 }
 
-static ir_type *create_method_type(type2firm_env_t *env,
-                                   const function_type_t *function_type)
+static ir_type *create_method_type(const function_type_t *function_type)
 {
 	type_t  *result_type  = function_type->result_type;
 
@@ -282,26 +272,26 @@ static ir_type *create_method_type(type2firm_env_t *env,
 	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
 	if(result_type != type_void) {
-		ir_type *restype = _get_ir_type(env, result_type);
+		ir_type *restype = get_ir_type(result_type);
 		set_method_res_type(irtype, 0, restype);
 	}
 
 	function_parameter_t *parameter = function_type->parameters;
 	int                   n         = 0;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		ir_type *p_irtype = _get_ir_type(env, parameter->type);
+		ir_type *p_irtype = get_ir_type(parameter->type);
 		set_method_param_type(irtype, n, p_irtype);
 		++n;
 	}
 
-	if(function_type->variadic) {
+	if(function_type->variadic || function_type->unspecified_parameters) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
 	return irtype;
 }
 
-static ir_type *create_pointer_type(type2firm_env_t *env, pointer_type_t *type)
+static ir_type *create_pointer_type(pointer_type_t *type)
 {
 	type_t  *points_to = type->points_to;
 	ir_type *ir_points_to;
@@ -313,16 +303,16 @@ static ir_type *create_pointer_type(type2firm_env_t *env, pointer_type_t *type)
 	                                    ir_type_void, mode_P_data);
 	type->type.firm_type  = ir_type;
 
-	ir_points_to = _get_ir_type(env, points_to);
+	ir_points_to = get_ir_type(points_to);
 	set_pointer_points_to_type(ir_type, ir_points_to);
 
 	return ir_type;
 }
 
-static ir_type *create_array_type(type2firm_env_t *env, array_type_t *type)
+static ir_type *create_array_type(array_type_t *type)
 {
 	type_t  *element_type    = type->element_type;
-	ir_type *ir_element_type = _get_ir_type(env, element_type);
+	ir_type *ir_element_type = get_ir_type(element_type);
 
 	/* TODO... */
 	int n_elements = 0;
@@ -345,7 +335,7 @@ static ir_type *create_array_type(type2firm_env_t *env, array_type_t *type)
 
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
-static ir_type *create_struct_type(type2firm_env_t *env, compound_type_t *type)
+static ir_type *create_struct_type(compound_type_t *type)
 {
 	symbol_t *symbol = type->declaration->symbol;
 	ident    *id;
@@ -366,7 +356,7 @@ static ir_type *create_struct_type(type2firm_env_t *env, compound_type_t *type)
 			continue;
 
 		ident       *ident         = new_id_from_str(entry->symbol->string);
-		ir_type_ptr  entry_ir_type = _get_ir_type(env, entry->type);
+		ir_type_ptr  entry_ir_type = get_ir_type(entry->type);
 
 		int entry_size      = get_type_size_bytes(entry_ir_type);
 		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
@@ -397,7 +387,7 @@ static ir_type *create_struct_type(type2firm_env_t *env, compound_type_t *type)
 	return ir_type;
 }
 
-static ir_type *create_union_type(type2firm_env_t *env, compound_type_t *type)
+static ir_type *create_union_type(compound_type_t *type)
 {
 	declaration_t *declaration = type->declaration;
 	symbol_t      *symbol      = declaration->symbol;
@@ -419,7 +409,7 @@ static ir_type *create_union_type(type2firm_env_t *env, compound_type_t *type)
 			continue;
 
 		ident       *ident         = new_id_from_str(entry->symbol->string);
-		ir_type_ptr  entry_ir_type = _get_ir_type(env, entry->type);
+		ir_type_ptr  entry_ir_type = get_ir_type(entry->type);
 
 		int entry_size      = get_type_size_bytes(entry_ir_type);
 		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
@@ -448,7 +438,7 @@ static ir_type *create_union_type(type2firm_env_t *env, compound_type_t *type)
 	return ir_type;
 }
 
-static ir_type *_get_ir_type(type2firm_env_t *env, type_t *type)
+static ir_type *get_ir_type(type_t *type)
 {
 	assert(type != NULL);
 
@@ -462,22 +452,22 @@ static ir_type *_get_ir_type(type2firm_env_t *env, type_t *type)
 	ir_type *firm_type = NULL;
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(env, (atomic_type_t*) type);
+		firm_type = create_atomic_type((atomic_type_t*) type);
 		break;
 	case TYPE_FUNCTION:
-		firm_type = create_method_type(env, (function_type_t*) type);
+		firm_type = create_method_type((function_type_t*) type);
 		break;
 	case TYPE_POINTER:
-		firm_type = create_pointer_type(env, (pointer_type_t*) type);
+		firm_type = create_pointer_type((pointer_type_t*) type);
 		break;
 	case TYPE_ARRAY:
-		firm_type = create_array_type(env, (array_type_t*) type);
+		firm_type = create_array_type((array_type_t*) type);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type(env, (compound_type_t*) type);
+		firm_type = create_struct_type((compound_type_t*) type);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type(env, (compound_type_t*) type);
+		firm_type = create_union_type((compound_type_t*) type);
 		break;
 	case TYPE_ENUM:
 		firm_type = ir_type_int;
@@ -491,19 +481,8 @@ static ir_type *_get_ir_type(type2firm_env_t *env, type_t *type)
 	if(firm_type == NULL)
 		panic("unknown type found");
 
-	if(env->can_cache) {
-		type->firm_type = firm_type;
-	}
+	type->firm_type = firm_type;
 	return firm_type;
-
-}
-
-static ir_type *get_ir_type(type_t *type)
-{
-	type2firm_env_t env;
-	env.can_cache = 1;
-
-	return _get_ir_type(&env, type);
 }
 
 static inline ir_mode *get_ir_mode(type_t *type)
@@ -655,7 +634,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
-	if(function_type->variadic) {
+	if(function_type->variadic || function_type->unspecified_parameters) {
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
@@ -906,13 +885,97 @@ static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
 	ir_node  *right = expression_to_firm(expression->right);
 	type_t   *type  = expression->expression.datatype;
 	ir_mode  *mode  = get_ir_mode(type);
-	/* TODO FIXME Hack for now */
-	right = create_conv(dbgi, right, get_irn_mode(left));
-
 	ir_node  *res   = func(dbgi, left, right, mode);
 
 	return res;
 }
+
+static ir_node *create_add(const binary_expression_t *expression)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *left  = expression_to_firm(expression->left);
+	ir_node  *right = expression_to_firm(expression->right);
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+
+	expression_t *expr_left  = expression->left;
+	expression_t *expr_right = expression->right;
+	type_t       *type_left  = skip_typeref(expr_left->datatype);
+	type_t       *type_right = skip_typeref(expr_right->datatype);
+
+	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		return new_d_Add(dbgi, left, right, mode);
+	}
+
+	ir_node        *pointer;
+	ir_node        *integer;
+	pointer_type_t *pointer_type;
+	if(type_left->type == TYPE_POINTER) {
+		pointer      = left;
+		integer      = right;
+		pointer_type = (pointer_type_t*) type_left;
+	} else {
+		assert(type_right->type == TYPE_POINTER);
+		pointer      = right;
+		integer      = left;
+		pointer_type = (pointer_type_t*) type_right;
+	}
+
+	type_t   *points_to = pointer_type->points_to;
+	unsigned  elem_size = get_type_size(points_to);
+
+	assert(elem_size >= 1);
+	if(elem_size > 1) {
+		ir_node *cnst = new_Const_long(mode_Iu, elem_size);
+		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Iu);
+		integer = mul;
+	}
+
+	ir_node *res = new_d_Add(dbgi, pointer, integer, mode);
+
+	return res;
+}
+
+static ir_node *create_sub(const binary_expression_t *expression)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *left  = expression_to_firm(expression->left);
+	ir_node  *right = expression_to_firm(expression->right);
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+
+	expression_t *expr_left  = expression->left;
+	expression_t *expr_right = expression->right;
+	type_t       *type_left  = skip_typeref(expr_left->datatype);
+	type_t       *type_right = skip_typeref(expr_right->datatype);
+
+	if((is_type_arithmetic(type_left) && is_type_arithmetic(type_right))
+			|| (type_left->type == TYPE_POINTER
+				&& type_right->type == TYPE_POINTER)) {
+		return new_d_Sub(dbgi, left, right, mode);
+	}
+
+	assert(type_right->type == TYPE_POINTER);
+	ir_node        *pointer      = left;
+	ir_node        *integer      = right;
+	pointer_type_t *pointer_type = (pointer_type_t*) type_right;
+
+	type_t   *points_to = pointer_type->points_to;
+	unsigned  elem_size = get_type_size(points_to);
+
+	assert(elem_size >= 1);
+	if(elem_size > 1) {
+		ir_node *cnst = new_Const_long(mode_Iu, elem_size);
+		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Iu);
+		integer = mul;
+	}
+
+	ir_node *res = new_d_Sub(dbgi, pointer, integer, mode);
+
+	return res;
+}
+
+
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 {
@@ -938,9 +1001,9 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return right;
 	}
 	case BINEXPR_ADD:
-		return create_arithmetic_binop(expression, new_d_Add);
+		return create_add(expression);
 	case BINEXPR_SUB:
-		return create_arithmetic_binop(expression, new_d_Sub);
+		return create_sub(expression);
 	case BINEXPR_MUL:
 		return create_arithmetic_binop(expression, new_d_Mul);
 	case BINEXPR_BITWISE_AND:
@@ -1258,7 +1321,9 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
-		expression_to_firm(statement->initialisation);
+		if(statement->initialisation != NULL) {
+			expression_to_firm(statement->initialisation);
+		}
 		jmp = new_Jmp();
 	}
 

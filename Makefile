@@ -10,7 +10,7 @@ CFLAGS += -DHAVE_CONFIG_H
 CFLAGS += -I .
 CFLAGS += -O0 -g3
 CFLAGS += $(FIRM_CFLAGS)
-#CFLAGS += -O3 -march=pentium3 -fomit-frame-pointer -DNDEBUG
+#CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 
 LFLAGS = $(FIRM_LIBS)
 

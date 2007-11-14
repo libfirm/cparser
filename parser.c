@@ -45,6 +45,7 @@ static type_t         *type_const_char  = NULL;
 static type_t         *type_string      = NULL;
 static type_t         *type_void        = NULL;
 static type_t         *type_size_t      = NULL;
+static type_t         *type_ptrdiff_t   = NULL;
 
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
@@ -2598,6 +2599,72 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	expression->expression.datatype = expression->left->datatype;
 }
 
+static void semantic_add(binary_expression_t *expression)
+{
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+	type_t       *type_left       = skip_typeref(orig_type_left);
+	type_t       *type_right      = skip_typeref(orig_type_right);
+
+	/* § 5.6.5 */
+	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		semantic_arithmetic(&expression->left, &expression->right);
+		expression->expression.datatype = expression->left->datatype;
+		return;
+	} else if(type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+		expression->expression.datatype = type_left;
+	} else if(type_right->type == TYPE_POINTER && is_type_integer(type_left)) {
+		expression->expression.datatype = type_right;
+	} else {
+		parser_print_error_prefix();
+		fprintf(stderr, "invalid operands to binary + (");
+		print_type(orig_type_left);
+		fprintf(stderr, ", ");
+		print_type(orig_type_right);
+		fprintf(stderr, ")\n");
+	}
+}
+
+static void semantic_sub(binary_expression_t *expression)
+{
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+	type_t       *type_left       = skip_typeref(orig_type_left);
+	type_t       *type_right      = skip_typeref(orig_type_right);
+
+	/* § 5.6.5 */
+	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		semantic_arithmetic(&expression->left, &expression->right);
+		expression->expression.datatype = expression->left->datatype;
+		return;
+	} else if(type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+		expression->expression.datatype = type_left;
+	} else if(type_left->type == TYPE_POINTER &&
+			type_right->type == TYPE_POINTER) {
+		if(!pointers_compatible(type_left, type_right)) {
+			parser_print_error_prefix();
+			fprintf(stderr, "pointers to incompatible objects to binary - (");
+			print_type(orig_type_left);
+			fprintf(stderr, ", ");
+			print_type(orig_type_right);
+			fprintf(stderr, ")\n");
+		} else {
+			expression->expression.datatype = type_ptrdiff_t;
+		}
+	} else {
+		parser_print_error_prefix();
+		fprintf(stderr, "invalid operands to binary - (");
+		print_type(orig_type_left);
+		fprintf(stderr, ", ");
+		print_type(orig_type_right);
+		fprintf(stderr, ")\n");
+	}
+}
+
 static void semantic_comparison(binary_expression_t *expression)
 {
 	expression_t *left       = expression->left;
@@ -2702,8 +2769,8 @@ CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,          semantic_comma)
 CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,            semantic_binexpr_arithmetic)
 CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,            semantic_binexpr_arithmetic)
 CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,            semantic_add)
+CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,            semantic_sub)
 CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,           semantic_comparison)
 CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER,        semantic_comparison)
 CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,         semantic_binexpr_assign)
@@ -3346,7 +3413,8 @@ void init_parser(void)
 	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, 0);
 	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, 0);
 	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, 0);
-	type_size_t      = make_atomic_type(ATOMIC_TYPE_UINT, 0);
+	type_size_t      = make_atomic_type(ATOMIC_TYPE_ULONG, 0);
+	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, 0);
 	type_const_char  = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, 0);
 	type_string      = make_pointer_type(type_const_char, 0);

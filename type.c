@@ -462,6 +462,13 @@ bool is_type_scalar(const type_t *type)
 	return is_type_arithmetic(type);
 }
 
+bool pointers_compatible(const type_t *type1, const type_t *type2)
+{
+	assert(type1->type == TYPE_POINTER);
+	assert(type2->type == TYPE_POINTER);
+	return true;
+}
+
 type_t *skip_typeref(type_t *type)
 {
 	while(1) {
