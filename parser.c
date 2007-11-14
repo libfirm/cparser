@@ -2331,6 +2331,17 @@ static expression_t *create_implicit_cast(expression_t *expression,
 
 		return create_cast_expression(expression, dest_type);
 	}
+	if(dest_type->type == TYPE_POINTER) {
+		if(source_type->type == TYPE_POINTER) {
+			if(!pointers_compatible(source_type, dest_type)) {
+				type_error_incompatible("can't implicitely cast types",
+			                        expression->source_position,
+			                        source_type, dest_type);
+			} else {
+				return create_cast_expression(expression, dest_type);
+			}
+		}
+	}
 
 	panic("casting of non-atomic types not implemented yet");
 }
@@ -3216,7 +3227,10 @@ static statement_t *parse_return(void)
 		}
 	} else {
 		return_value = NULL;
-		parse_warning("'return' without value, in function retruning non-void");
+		if(return_type != type_void) {
+			parse_warning("'return' without value, in function returning "
+			              "non-void");
+		}
 	}
 	statement->return_value = return_value;
 
