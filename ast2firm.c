@@ -527,7 +527,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 
 static ir_node *expression_to_firm(const expression_t *expression);
-static ir_node *_expression_to_firm(const expression_t *expression);
+static ir_node *expression_to_modeb(const expression_t *expression);
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
@@ -855,16 +855,15 @@ static long get_pnc(binary_expression_type_t type)
 
 static ir_node *create_lazy_op(const binary_expression_t *expression)
 {
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
 	bool is_or = (expression->type == BINEXPR_LOGICAL_OR);
 	assert(is_or || expression->type == BINEXPR_LOGICAL_AND);
 
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-	ir_node  *val1 = expression_to_firm(expression->left);
-	val1           = create_conv(dbgi, val1, mode_b);
-
-	ir_node *cond       = new_d_Cond(dbgi, val1);
-	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	ir_node  *val1       = expression_to_modeb(expression->left);
+	ir_node  *cond       = new_d_Cond(dbgi, val1);
+	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
 	ir_node *fallthrough_block = new_immBlock();
 
@@ -878,8 +877,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 
 	mature_immBlock(calc_val2_block);
 
-	ir_node *val2 = expression_to_firm(expression->right);
-	val2          = create_conv(dbgi, val2, mode_b);
+	ir_node *val2 = expression_to_modeb(expression->right);
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_d_Jmp(dbgi);
 		add_immBlock_pred(fallthrough_block, jmp);
@@ -1097,6 +1095,45 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 	return size_node;
 }
 
+static ir_node *conditional_to_firm(const conditional_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	ir_node *condition  = expression_to_modeb(expression->condition);
+	ir_node *cond       = new_d_Cond(dbgi, condition);
+	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	/* create the true block */
+	ir_node *true_block = new_immBlock();
+	add_immBlock_pred(true_block, true_proj);
+	mature_immBlock(true_block);
+
+	ir_node *true_val = expression_to_firm(expression->true_expression);
+	ir_node *true_jmp = new_Jmp();
+
+	/* create the false block */
+	ir_node *false_block = new_immBlock();
+	add_immBlock_pred(false_block, false_proj);
+	mature_immBlock(false_block);
+
+	ir_node *false_val = expression_to_firm(expression->false_expression);
+	ir_node *false_jmp = new_Jmp();
+
+	/* create the common block */
+	ir_node *common_block = new_immBlock();
+	add_immBlock_pred(common_block, true_jmp);
+	add_immBlock_pred(common_block, false_jmp);
+	mature_immBlock(common_block);
+
+	ir_node *in[2] = { true_val, false_val };
+	ir_mode *mode  = get_irn_mode(true_val);
+	assert(get_irn_mode(false_val) == mode);
+	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
+
+	return val;
+}
+
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -1132,6 +1169,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 				(const array_access_expression_t*) expression);
 	case EXPR_SIZEOF:
 		return sizeof_to_firm((const sizeof_expression_t*) expression);
+	case EXPR_CONDITIONAL:
+		return conditional_to_firm((const conditional_expression_t*)expression);
 	default:
 		break;
 	}
@@ -1150,6 +1189,13 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	return res;
 }
 
+static ir_node *expression_to_modeb(const expression_t *expression)
+{
+	ir_node *res = _expression_to_firm(expression);
+	res          = create_conv(NULL, res, mode_b);
+
+	return res;
+}
 
 static void statement_to_firm(statement_t *statement);
 
@@ -1190,12 +1236,9 @@ static void expression_statement_to_firm(expression_statement_t *statement)
 static void if_statement_to_firm(if_statement_t *statement)
 {
 	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
-	ir_node  *condition = _expression_to_firm(statement->condition);
-	assert(condition != NULL);
+	ir_node  *condition = expression_to_modeb(statement->condition);
 
 	/* make sure we have a mode_b condition */
-	condition = create_conv(dbgi, condition, mode_b);
-
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
@@ -1248,9 +1291,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	}
 
 	/* create the condition */
-	ir_node *condition = _expression_to_firm(statement->condition);
-	condition          = create_conv(dbgi, condition, mode_b);
-
+	ir_node *condition  = expression_to_modeb(statement->condition);
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
@@ -1331,9 +1372,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	mature_immBlock(header_block);
 
 	/* create the condition */
-	ir_node *condition = _expression_to_firm(statement->condition);
-	condition          = create_conv(dbgi, condition, mode_b);
-
+	ir_node *condition  = expression_to_modeb(statement->condition);
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
@@ -1372,9 +1411,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	add_immBlock_pred(header_block, step_jmp);
 
 	/* create the condition */
-	ir_node *const cond_expr = _expression_to_firm(statement->condition);
-	ir_node *const condition = create_conv(dbgi, cond_expr, mode_b);
-
+	ir_node *const condition  = expression_to_modeb(statement->condition);
 	ir_node *const cond       = new_d_Cond(dbgi, condition);
 	ir_node *const true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node *const false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
