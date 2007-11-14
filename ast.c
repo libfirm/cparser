@@ -414,8 +414,10 @@ static void print_for_statement(const for_statement_t *statement)
 			panic("multiple declarations in for statement not supported yet");
 		}
 		fputc(' ', out);
-	} else if(statement->initialisation) {
-		print_expression(statement->initialisation);
+	} else {
+		if(statement->initialisation) {
+			print_expression(statement->initialisation);
+		}
 		fputs("; ", out);
 	}
 	if(statement->condition != NULL) {

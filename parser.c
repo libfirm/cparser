@@ -2804,70 +2804,70 @@ static void semantic_comma(binary_expression_t *expression)
 	expression->expression.datatype = expression->right->datatype;
 }
 
-#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, sfunc)    \
-static expression_t *parse_##binexpression_type(unsigned precedence,    \
-                                                expression_t *left)     \
-{                                                                       \
-	eat(token_type);                                                    \
-                                                                        \
-	expression_t *right = parse_sub_expression(precedence);             \
-                                                                        \
-	binary_expression_t *binexpr                                        \
-		= allocate_ast_zero(sizeof(binexpr[0]));                        \
-	binexpr->expression.type     = EXPR_BINARY;                         \
-	binexpr->type                = binexpression_type;                  \
-	binexpr->left                = left;                                \
-	binexpr->right               = right;                               \
-	sfunc(binexpr);                                                     \
-                                                                        \
-	return (expression_t*) binexpr;                                     \
+#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, sfunc, lr) \
+static expression_t *parse_##binexpression_type(unsigned precedence,     \
+                                                expression_t *left)      \
+{                                                                        \
+	eat(token_type);                                                     \
+                                                                         \
+	expression_t *right = parse_sub_expression(precedence + lr);         \
+                                                                         \
+	binary_expression_t *binexpr                                         \
+		= allocate_ast_zero(sizeof(binexpr[0]));                         \
+	binexpr->expression.type     = EXPR_BINARY;                          \
+	binexpr->type                = binexpression_type;                   \
+	binexpr->left                = left;                                 \
+	binexpr->right               = right;                                \
+	sfunc(binexpr);                                                      \
+                                                                         \
+	return (expression_t*) binexpr;                                      \
 }
 
-CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,          semantic_comma)
-CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,            semantic_add)
-CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,            semantic_sub)
-CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,           semantic_comparison)
-CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER,        semantic_comparison)
-CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,         semantic_binexpr_assign)
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL, semantic_comparison)
+CREATE_BINEXPR_PARSER(',', BINEXPR_COMMA,          semantic_comma, 1)
+CREATE_BINEXPR_PARSER('*', BINEXPR_MUL,            semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('/', BINEXPR_DIV,            semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('%', BINEXPR_MOD,            semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('+', BINEXPR_ADD,            semantic_add, 1)
+CREATE_BINEXPR_PARSER('-', BINEXPR_SUB,            semantic_sub, 1)
+CREATE_BINEXPR_PARSER('<', BINEXPR_LESS,           semantic_comparison, 1)
+CREATE_BINEXPR_PARSER('>', BINEXPR_GREATER,        semantic_comparison, 1)
+CREATE_BINEXPR_PARSER('=', BINEXPR_ASSIGN,         semantic_binexpr_assign, 0)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL, BINEXPR_EQUAL, semantic_comparison, 1)
 CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, BINEXPR_NOTEQUAL,
-                      semantic_comparison)
-CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL, semantic_comparison)
+                      semantic_comparison, 1)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL, BINEXPR_LESSEQUAL, semantic_comparison, 1)
 CREATE_BINEXPR_PARSER(T_GREATEREQUAL, BINEXPR_GREATEREQUAL,
-                      semantic_comparison)
-CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND,    semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,     semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR,    semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,  semantic_logical_op)
-CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR, semantic_logical_op)
+                      semantic_comparison, 1)
+CREATE_BINEXPR_PARSER('&', BINEXPR_BITWISE_AND,    semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,     semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR,    semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,  semantic_logical_op, 1)
+CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR, semantic_logical_op, 1)
 /* TODO shift has a bit special semantic */
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
-                      semantic_binexpr_arithmetic)
+                      semantic_binexpr_arithmetic, 1)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,
-                      semantic_binexpr_arithmetic)
+                      semantic_binexpr_arithmetic, 1)
 CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, BINEXPR_MOD_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, BINEXPR_SHIFTLEFT_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, BINEXPR_SHIFTRIGHT_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_ANDEQUAL, BINEXPR_BITWISE_AND_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_PIPEEQUAL, BINEXPR_BITWISE_OR_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_CARETEQUAL, BINEXPR_BITWISE_XOR_ASSIGN,
-                      semantic_arithmetic_assign)
+                      semantic_arithmetic_assign, 0)
 
 static expression_t *parse_sub_expression(unsigned precedence)
 {
