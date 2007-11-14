@@ -1471,7 +1471,9 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* create the step block */
 	ir_node *const step_block = new_immBlock();
-	expression_to_firm(statement->step);
+	if (statement->step != NULL) {
+		expression_to_firm(statement->step);
+	}
 	ir_node *const step_jmp   = new_Jmp();
 
 	/* create the header block */
