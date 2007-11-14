@@ -103,11 +103,11 @@ struct function_parameter_t {
 };
 
 struct function_type_t {
-	type_t               type;
-	type_t              *result_type;
+	type_t                type;
+	type_t               *result_type;
 	function_parameter_t *parameters;
-	bool                 variadic;
-	bool                 unspecified_parameters;
+	bool                  variadic;
+	bool                  unspecified_parameters;
 };
 
 struct compound_type_t {

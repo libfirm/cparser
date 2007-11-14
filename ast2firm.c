@@ -911,11 +911,28 @@ static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
 	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
 	ir_node  *left  = expression_to_firm(expression->left);
 	ir_node  *right = expression_to_firm(expression->right);
-	type_t   *type  = expression->expression.datatype;
+	type_t   *type  = expression->right->datatype;
+	/* be careful with the modes, because in asithmetic assign nodes only
+	 * the right operand has the mode of the arithmetic alread */
 	ir_mode  *mode  = get_ir_mode(type);
+	left            = create_conv(dbgi, left, mode);
 	ir_node  *res   = func(dbgi, left, right, mode);
 
 	return res;
+}
+
+static ir_node *create_arithmetic_assign_binop(
+		const binary_expression_t *expression, create_arithmetic_func func)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *value = create_arithmetic_binop(expression, func);
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+
+	value = create_conv(dbgi, value, mode);
+	set_value_for_expression(expression->left, value);
+
+	return value;
 }
 
 static ir_node *create_add(const binary_expression_t *expression)
@@ -1003,6 +1020,35 @@ static ir_node *create_sub(const binary_expression_t *expression)
 	return res;
 }
 
+static ir_node *create_divmod(const binary_expression_t *expression)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *left  = expression_to_firm(expression->left);
+	ir_node  *right = expression_to_firm(expression->right);
+	ir_node  *pin   = new_Pin(new_NoMem());
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+	ir_node  *op;
+	ir_node  *res;
+
+	if(expression->type == BINEXPR_DIV) {
+		if(mode_is_float(mode)) {
+			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
+		} else {
+			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
+		}
+	} else {
+		assert(expression->type == BINEXPR_MOD);
+		assert(!mode_is_float(mode));
+		op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
+		res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+	}
+
+	return res;
+}
+
 
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
@@ -1044,9 +1090,31 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return create_arithmetic_binop(expression, new_d_Shl);
 	case BINEXPR_SHIFTRIGHT:
 		return create_arithmetic_binop(expression, new_d_Shr);
+	case BINEXPR_DIV:
+	case BINEXPR_MOD:
+		return create_divmod(expression);
 	case BINEXPR_LOGICAL_AND:
 	case BINEXPR_LOGICAL_OR:
 		return create_lazy_op(expression);
+	case BINEXPR_COMMA:
+		expression_to_firm(expression->left);
+		return expression_to_firm(expression->right);
+	case BINEXPR_ADD_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Add);
+	case BINEXPR_SUB_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Sub);
+	case BINEXPR_MUL_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Mul);
+	case BINEXPR_BITWISE_AND_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_And);
+	case BINEXPR_BITWISE_OR_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Or);
+	case BINEXPR_BITWISE_XOR_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Eor);
+	case BINEXPR_SHIFTLEFT_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Shl);
+	case BINEXPR_SHIFTRIGHT_ASSIGN:
+		return create_arithmetic_assign_binop(expression, new_d_Shr);
 	default:
 		panic("TODO binexpr type");
 	}
