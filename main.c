@@ -79,9 +79,9 @@ static void initialize_firm(void)
 	dump_keepalive_edges(1);
 }
 
-static void dump(const char *suffix)
+static void dump(ir_graph *irg, const char *suffix)
 {
-	dump_ir_block_graph(current_ir_graph, suffix);
+	dump_ir_block_graph(irg, suffix);
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -185,8 +185,10 @@ static void create_firm_prog(translation_unit_t *unit)
 
 	int n_irgs = get_irp_n_irgs();
 	for(int i = 0; i < n_irgs; ++i) {
-		current_ir_graph = get_irp_irg(i);
-		dump("-start");
+		ir_graph *const irg = get_irp_irg(i);
+		dump(irg, "-start");
+		optimize_cf(irg);
+		dump(irg, "-cf");
 	}
 }
 
