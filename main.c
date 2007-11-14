@@ -76,6 +76,7 @@ static void initialize_firm(void)
 	set_opt_alias_analysis(1);
 
 	dump_consts_local(1);
+	dump_keepalive_edges(1);
 }
 
 static void dump(const char *suffix)
