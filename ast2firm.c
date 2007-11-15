@@ -12,6 +12,7 @@
 #include "ast2firm.h"
 
 #include "adt/error.h"
+#include "adt/array.h"
 #include "token_t.h"
 #include "type_t.h"
 #include "ast_t.h"
@@ -27,10 +28,11 @@ static type_t *type_const_char;
 static type_t *type_void;
 static type_t *type_int;
 
-static int next_value_number_function;
-static ir_node *continue_label;
-static ir_node *break_label;
-static ir_node *current_switch_cond;
+static int       next_value_number_function;
+static ir_node  *continue_label;
+static ir_node  *break_label;
+static ir_node  *current_switch_cond;
+static ir_node **imature_blocks;
 
 typedef enum declaration_type_t {
 	DECLARATION_TYPE_UNKNOWN,
@@ -38,7 +40,8 @@ typedef enum declaration_type_t {
 	DECLARATION_TYPE_GLOBAL_VARIABLE,
 	DECLARATION_TYPE_LOCAL_VARIABLE,
 	DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
-	DECLARATION_TYPE_COMPOUND_MEMBER
+	DECLARATION_TYPE_COMPOUND_MEMBER,
+	DECLARATION_TYPE_LABEL_BLOCK,
 } declaration_type_t;
 
 static ir_type *get_ir_type(type_t *type);
@@ -627,6 +630,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
+	case DECLARATION_TYPE_LABEL_BLOCK:
 		panic("not implemented reference type");
 	}
 
@@ -653,6 +657,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
+	case DECLARATION_TYPE_LABEL_BLOCK:
 		panic("not implemented reference type");
 	}
 
@@ -1697,6 +1702,52 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	mature_immBlock(block);
 }
 
+static ir_node *get_label_block(declaration_t *label)
+{
+	assert(label->namespace == NAMESPACE_LABEL);
+
+	if(label->declaration_type == DECLARATION_TYPE_LABEL_BLOCK) {
+		return label->v.block;
+	}
+	assert(label->declaration_type == DECLARATION_TYPE_UNKNOWN);
+
+	ir_node *old_cur_block = get_cur_block();
+	ir_node *block         = new_immBlock();
+	set_cur_block(old_cur_block);
+
+	label->declaration_type = DECLARATION_TYPE_LABEL_BLOCK;
+	label->v.block          = block;
+
+	ARR_APP1(imature_blocks, block);
+
+	return block;
+}
+
+static void label_to_firm(const label_statement_t *statement)
+{
+	ir_node *block = get_label_block(statement->label);
+
+	if(get_cur_block() != NULL) {
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(block, jmp);
+	}
+
+	set_cur_block(block);
+	keep_alive(block);
+}
+
+static void goto_to_firm(const goto_statement_t *statement)
+{
+	if(get_cur_block() == NULL)
+		return;
+
+	ir_node *block = get_label_block(statement->label);
+	ir_node *jmp   = new_Jmp();
+	add_immBlock_pred(block, jmp);
+
+	set_cur_block(NULL);
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
@@ -1735,6 +1786,12 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_FOR:
 		for_statement_to_firm((for_statement_t*) statement);
+		return;
+	case STATEMENT_LABEL:
+		label_to_firm((label_statement_t*) statement);
+		return;
+	case STATEMENT_GOTO:
+		goto_to_firm((goto_statement_t*) statement);
 		return;
 	default:
 		break;
@@ -1784,6 +1841,9 @@ static void create_function(declaration_t *declaration)
 	if(declaration->init.statement == NULL)
 		return;
 
+	assert(imature_blocks == NULL);
+	imature_blocks = NEW_ARR_F(ir_node*, 0);
+
 	int       n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph *irg          = new_ir_graph(entity, n_local_vars);
 	ir_node  *first_block  = get_cur_block();
@@ -1798,7 +1858,8 @@ static void create_function(declaration_t *declaration)
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
-		const function_type_t* const func_type = (const function_type_t*)declaration->type;
+		const function_type_t* const func_type
+			= (const function_type_t*) declaration->type;
 		ir_node *ret;
 		if (func_type->result_type == type_void) {
 			ret = new_Return(get_store(), 0, NULL);
@@ -1815,6 +1876,12 @@ static void create_function(declaration_t *declaration)
 		}
 		add_immBlock_pred(end_block, ret);
 	}
+
+	for(int i = 0; i < ARR_LEN(imature_blocks); ++i) {
+		mature_immBlock(imature_blocks[i]);
+	}
+	DEL_ARR_F(imature_blocks);
+	imature_blocks = NULL;
 
 	mature_immBlock(first_block);
 	mature_immBlock(end_block);
