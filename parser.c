@@ -392,7 +392,6 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 {
 	symbol_t    *symbol    = declaration->symbol;
 	namespace_t  namespace = declaration->namespace;
-	assert(declaration->source_position.input_name != NULL);
 
 	/* a declaration should be only pushed once */
 	assert(declaration->parent_context == NULL);
@@ -430,19 +429,23 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	if(symbol->declaration == NULL) {
 		symbol->declaration = declaration;
 	} else {
-		declaration_t *iter = symbol->declaration;
-		for( ; iter != NULL; iter = iter->symbol_next) {
-			declaration_t *symbol_next = iter->symbol_next;
-			if(symbol_next == NULL) {
-				iter->symbol_next = declaration;
-				assert(declaration->symbol_next == NULL);
+		declaration_t *iter_last = NULL;
+		declaration_t *iter      = symbol->declaration;
+		for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
+			/* replace an entry? */
+			if(iter->namespace == namespace) {
+				if(iter_last == NULL) {
+					symbol->declaration = declaration;
+				} else {
+					iter_last->symbol_next = declaration;
+				}
+				declaration->symbol_next = iter->symbol_next;
 				break;
 			}
-			if(symbol_next->namespace == namespace) {
-				iter->symbol_next        = declaration;
-				declaration->symbol_next = symbol_next->symbol_next;
-				break;
-			}
+		}
+		if(iter == NULL) {
+			assert(iter_last->symbol_next == NULL);
+			iter_last->symbol_next = declaration;
 		}
 	}
 
@@ -451,6 +454,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 
 static declaration_t *environment_push(declaration_t *declaration)
 {
+	assert(declaration->source_position.input_name != NULL);
 	return stack_push(&environment_stack, declaration, context);
 }
 
@@ -3115,6 +3119,7 @@ static statement_t *parse_label_statement(void)
 {
 	assert(token.type == T_IDENTIFIER);
 	symbol_t *symbol = token.v.symbol;
+	next_token();
 
 	declaration_t *label = get_label(symbol);
 
@@ -3134,6 +3139,7 @@ static statement_t *parse_label_statement(void)
 
 	label_statement->statement.type            = STATEMENT_LABEL;
 	label_statement->statement.source_position = token.source_position;
+	label_statement->label                     = label;
 
 	expect(':');
 
@@ -3270,6 +3276,7 @@ static statement_t *parse_goto(void)
 		return NULL;
 	}
 	symbol_t *symbol = token.v.symbol;
+	next_token();
 
 	declaration_t *label = get_label(symbol);
 
@@ -3282,7 +3289,7 @@ static statement_t *parse_goto(void)
 
 	expect(';');
 
-	return NULL;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_continue(void)
