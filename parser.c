@@ -2111,13 +2111,23 @@ static expression_t *parse_statement_expression(void)
 	statement_expression_t *expression
 		= allocate_ast_zero(sizeof(expression[0]));
 	expression->expression.type = EXPR_STATEMENT;
-	expression->statement       = parse_compound_statement();
+
+	statement_t *statement = parse_compound_statement();
+	expression->statement  = statement;
+	if(statement == NULL) {
+		expect(')');
+		return NULL;
+	}
+
+	assert(statement->type == STATEMENT_COMPOUND);
+	compound_statement_t *compound_statement
+		= (compound_statement_t*) statement;
 
 	/* find last statement and use it's type */
 	const statement_t *last_statement = NULL;
-	const statement_t *statement      = expression->statement;
-	for( ; statement != NULL; statement = statement->next) {
-		last_statement = statement;
+	const statement_t *iter           = compound_statement->statements;
+	for( ; iter != NULL; iter = iter->next) {
+		last_statement = iter;
 	}
 
 	if(last_statement->type == STATEMENT_EXPRESSION) {
@@ -2597,6 +2607,23 @@ static expression_t *parse_extension(unsigned precedence)
 	return parse_sub_expression(precedence);
 }
 
+static void semantic_incdec(unary_expression_t *expression)
+{
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
+
+	type_t *type = skip_typeref(orig_type);
+	if(!is_type_arithmetic(type) && type->type != TYPE_POINTER) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs an arithmetic or pointer type\n");
+		return;
+	}
+
+	expression->expression.datatype = orig_type;
+}
+
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->datatype;
@@ -2665,9 +2692,9 @@ CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS, semantic_take_addr)
 CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE,
                                semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT,
-                               semantic_unexpr_arithmetic)
+                               semantic_incdec)
 CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT,
-                               semantic_unexpr_arithmetic)
+                               semantic_incdec)
 
 #define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type, \
                                                sfunc)                         \
@@ -2689,9 +2716,9 @@ static expression_t *parse_##unexpression_type(unsigned precedence,           \
 }
 
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT,
-                                       semantic_unexpr_arithmetic)
+                                       semantic_incdec)
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT,
-                                       semantic_unexpr_arithmetic)
+                                       semantic_incdec)
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 {
