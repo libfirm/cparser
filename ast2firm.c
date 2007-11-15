@@ -1876,6 +1876,8 @@ static void context_to_firm(context_t *context)
 		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
 				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 			continue;
+		if(declaration->symbol == NULL)
+			continue;
 
 		type_t *type = declaration->type;
 		if(type->type == TYPE_FUNCTION) {
