@@ -320,17 +320,19 @@ static void print_expression_statement(const expression_statement_t *statement)
 
 static void print_goto_statement(const goto_statement_t *statement)
 {
-	(void) statement;
 	fprintf(out, "goto ");
-	panic("TODO: print goto");
+	fputs(statement->label->symbol->string, out);
+	fprintf(stderr, "(%p)", (void*) statement->label);
 	fputs(";\n", out);
 }
 
 static void print_label_statement(const label_statement_t *statement)
 {
-	(void) statement;
-	panic("TODO: print label");
-	//fprintf(out, "%s:\n", statement->symbol->string);
+	fprintf(stderr, "(%p)", (void*) statement->label);
+	fprintf(out, "%s:\n", statement->label->symbol->string);
+	if(statement->label_statement != NULL) {
+		print_statement(statement->label_statement);
+	}
 }
 
 static void print_if_statement(const if_statement_t *statement)
