@@ -530,6 +530,9 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	assert(expression->datatype != NULL);
 	type_t *source_type = expression->datatype;
 
+	source_type = skip_typeref(source_type);
+	dest_type   = skip_typeref(dest_type);
+
 	if(expression->datatype == dest_type)
 		return expression;
 
@@ -1958,7 +1961,8 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	function_type_t *function_type = allocate_type_zero(sizeof(function_type));
+	function_type_t *function_type
+		= allocate_type_zero(sizeof(function_type[0]));
 
 	function_type->type.type              = TYPE_FUNCTION;
 	function_type->result_type            = type_int;
