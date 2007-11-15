@@ -203,7 +203,8 @@ typedef enum {
 	NAMESPACE_NORMAL,
 	NAMESPACE_STRUCT,
 	NAMESPACE_UNION,
-	NAMESPACE_ENUM
+	NAMESPACE_ENUM,
+	NAMESPACE_LABEL
 } namespace_t;
 
 typedef enum {
@@ -245,6 +246,7 @@ struct declaration_t {
 	union {
 		unsigned int    value_number;     /* used in ast2firm module */
 		ir_entity      *entity;           /* used in ast2firm module */
+		ir_node        *block;            /* used in ast2firm module */
 	} v;
 };
 
@@ -303,9 +305,8 @@ struct switch_statement_t {
 };
 
 struct goto_statement_t {
-	statement_t        statement;
-	symbol_t          *label_symbol;
-	label_statement_t *label;
+	statement_t    statement;
+	declaration_t *label;
 };
 
 struct case_label_statement_t {
@@ -314,8 +315,9 @@ struct case_label_statement_t {
 };
 
 struct label_statement_t {
-	statement_t        statement;
-	symbol_t          *symbol;
+	statement_t    statement;
+	declaration_t *label;
+	statement_t   *label_statement;
 };
 
 struct expression_statement_t {

@@ -187,6 +187,13 @@ static void create_firm_prog(translation_unit_t *unit)
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);
 		dump(irg, "-start");
+	}
+}
+
+static void optimize(void)
+{
+	for(int i = 0; i < get_irp_n_irgs(); ++i) {
+		ir_graph *irg = get_irp_irg(i);
 		optimize_cf(irg);
 		dump(irg, "-cf");
 	}
@@ -215,7 +222,9 @@ int main(int argc, char **argv)
 	if(argc > 2 && strcmp(argv[1], "--print-ast") == 0) {
 		translation_unit_t *unit = do_parsing(argv[2]);
 		ast_set_output(stdout);
-		print_ast(unit);
+		if(unit != NULL) {
+			print_ast(unit);
+		}
 		return 0;
 	}
 
@@ -237,6 +246,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		create_firm_prog(unit);
+		optimize();
 		emit(input, outfname);
 		link(outfname, "a.out");
 	}

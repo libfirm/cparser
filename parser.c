@@ -29,6 +29,7 @@ static token_t         token;
 static token_t         lookahead_buffer[MAX_LOOKAHEAD];
 static int             lookahead_bufpos;
 static stack_entry_t  *environment_stack = NULL;
+static stack_entry_t  *label_stack       = NULL;
 static context_t      *global_context    = NULL;
 static context_t      *context           = NULL;
 static declaration_t  *last_declaration  = NULL;
@@ -133,6 +134,11 @@ static inline void free_type(void *type)
 static inline size_t environment_top(void)
 {
 	return ARR_LEN(environment_stack);
+}
+
+static inline size_t label_top(void)
+{
+	return ARR_LEN(label_stack);
 }
 
 
@@ -370,6 +376,8 @@ static const char *get_namespace_prefix(namespace_t namespace)
 		return "struct ";
 	case NAMESPACE_ENUM:
 		return "enum ";
+	case NAMESPACE_LABEL:
+		return "label ";
 	}
 	panic("invalid namespace found");
 }
@@ -378,7 +386,9 @@ static const char *get_namespace_prefix(namespace_t namespace)
  * pushs an environment_entry on the environment stack and links the
  * corresponding symbol to the new entry
  */
-static declaration_t *environment_push(declaration_t *declaration)
+static declaration_t *stack_push(stack_entry_t **stack_ptr,
+                                 declaration_t *declaration,
+                                 context_t *parent_context)
 {
 	symbol_t    *symbol    = declaration->symbol;
 	namespace_t  namespace = declaration->namespace;
@@ -386,7 +396,7 @@ static declaration_t *environment_push(declaration_t *declaration)
 
 	/* a declaration should be only pushed once */
 	assert(declaration->parent_context == NULL);
-	declaration->parent_context = context;
+	declaration->parent_context = parent_context;
 
 	declaration_t *previous_declaration = get_declaration(symbol, namespace);
 	assert(declaration != previous_declaration);
@@ -414,7 +424,7 @@ static declaration_t *environment_push(declaration_t *declaration)
 	entry.symbol          = symbol;
 	entry.old_declaration = symbol->declaration;
 	entry.namespace       = namespace;
-	ARR_APP1(environment_stack, entry);
+	ARR_APP1(*stack_ptr, entry);
 
 	/* replace/add declaration into declaration list of the symbol */
 	if(symbol->declaration == NULL) {
@@ -439,20 +449,31 @@ static declaration_t *environment_push(declaration_t *declaration)
 	return declaration;
 }
 
+static declaration_t *environment_push(declaration_t *declaration)
+{
+	return stack_push(&environment_stack, declaration, context);
+}
+
+static declaration_t *label_push(declaration_t *declaration)
+{
+	return stack_push(&label_stack, declaration, &current_function->context);
+}
+
 /**
  * pops symbols from the environment stack until @p new_top is the top element
  */
-static void environment_pop_to(size_t new_top)
+static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 {
-	size_t top = ARR_LEN(environment_stack);
-	size_t i;
+	stack_entry_t *stack = *stack_ptr;
+	size_t         top   = ARR_LEN(stack);
+	size_t         i;
 
 	assert(new_top <= top);
 	if(new_top == top)
 		return;
 
 	for(i = top; i > new_top; --i) {
-		stack_entry_t *entry = & environment_stack[i - 1];
+		stack_entry_t *entry = & stack[i - 1];
 
 		declaration_t *old_declaration = entry->old_declaration;
 		symbol_t      *symbol          = entry->symbol;
@@ -483,7 +504,17 @@ static void environment_pop_to(size_t new_top)
 		}
 	}
 
-	ARR_SHRINKLEN(environment_stack, (int) new_top);
+	ARR_SHRINKLEN(*stack_ptr, (int) new_top);
+}
+
+static void environment_pop_to(size_t new_top)
+{
+	stack_pop_to(&environment_stack, new_top);
+}
+
+static void label_pop_to(size_t new_top)
+{
+	stack_pop_to(&label_stack, new_top);
 }
 
 
@@ -1781,13 +1812,16 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			for( ; parameter != NULL; parameter = parameter->next) {
 				environment_push(parameter);
 			}
+
+			int            label_stack_top      = label_top();
 			declaration_t *old_current_function = current_function;
 			current_function                    = declaration;
 
 			statement_t *statement = parse_compound_statement();
 
 			assert(current_function == declaration);
-			old_current_function = current_function;
+			current_function = old_current_function;
+			label_pop_to(label_stack_top);
 
 			assert(context == &declaration->context);
 			set_context(last_context);
@@ -3056,13 +3090,61 @@ static statement_t *parse_default_statement(void)
 	return (statement_t*) label;
 }
 
+static declaration_t *get_label(symbol_t *symbol)
+{
+	declaration_t *candidate = get_declaration(symbol, NAMESPACE_LABEL);
+	assert(current_function != NULL);
+	/* if we found a label in the same function, then we already created the
+	 * declaration */
+	if(candidate != NULL
+			&& candidate->parent_context == &current_function->context) {
+		return candidate;
+	}
+
+	/* otherwise we need to create a new one */
+	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+	declaration->namespace     = NAMESPACE_LABEL;
+	declaration->symbol        = symbol;
+
+	label_push(declaration);
+
+	return declaration;
+}
+
 static statement_t *parse_label_statement(void)
 {
-	eat(T_IDENTIFIER);
-	expect(':');
-	parse_statement();
+	assert(token.type == T_IDENTIFIER);
+	symbol_t *symbol = token.v.symbol;
 
-	return NULL;
+	declaration_t *label = get_label(symbol);
+
+	/* if source position is already set then the label is defined twice,
+	 * otherwise it was just mentioned in a goto so far */
+	if(label->source_position.input_name != NULL) {
+		parser_print_error_prefix();
+		fprintf(stderr, "duplicate label '%s'\n", symbol->string);
+		parser_print_error_prefix_pos(label->source_position);
+		fprintf(stderr, "previous definition of '%s' was here\n",
+		        symbol->string);
+	} else {
+		label->source_position = token.source_position;
+	}
+
+	label_statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
+
+	label_statement->statement.type            = STATEMENT_LABEL;
+	label_statement->statement.source_position = token.source_position;
+
+	expect(':');
+
+	if(token.type == '}') {
+		parse_error("label at end of compound statement");
+		return (statement_t*) label_statement;
+	} else {
+		label_statement->label_statement = parse_statement();
+	}
+
+	return (statement_t*) label_statement;
 }
 
 static statement_t *parse_if(void)
@@ -3181,7 +3263,23 @@ static statement_t *parse_for(void)
 static statement_t *parse_goto(void)
 {
 	eat(T_goto);
-	expect(T_IDENTIFIER);
+
+	if(token.type != T_IDENTIFIER) {
+		parse_error_expected("while parsing goto", T_IDENTIFIER, 0);
+		eat_statement();
+		return NULL;
+	}
+	symbol_t *symbol = token.v.symbol;
+
+	declaration_t *label = get_label(symbol);
+
+	goto_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+
+	statement->statement.type            = STATEMENT_GOTO;
+	statement->statement.source_position = token.source_position;
+
+	statement->label = label;
+
 	expect(';');
 
 	return NULL;
@@ -3193,8 +3291,8 @@ static statement_t *parse_continue(void)
 	expect(';');
 
 	statement_t *statement     = allocate_ast_zero(sizeof(statement[0]));
-	statement->source_position = token.source_position;
 	statement->type            = STATEMENT_CONTINUE;
+	statement->source_position = token.source_position;
 
 	return statement;
 }
@@ -3205,8 +3303,8 @@ static statement_t *parse_break(void)
 	expect(';');
 
 	statement_t *statement     = allocate_ast_zero(sizeof(statement[0]));
-	statement->source_position = token.source_position;
 	statement->type            = STATEMENT_BREAK;
+	statement->source_position = token.source_position;
 
 	return statement;
 }
@@ -3388,12 +3486,12 @@ static statement_t *parse_statement(void)
 
 static statement_t *parse_compound_statement(void)
 {
-	eat('{');
-
 	compound_statement_t *compound_statement
 		= allocate_ast_zero(sizeof(compound_statement[0]));
 	compound_statement->statement.type            = STATEMENT_COMPOUND;
 	compound_statement->statement.source_position = token.source_position;
+
+	eat('{');
 
 	int        top          = environment_top();
 	context_t *last_context = context;
@@ -3418,11 +3516,16 @@ static statement_t *parse_compound_statement(void)
 		last_statement = statement;
 	}
 
+	if(token.type != '}') {
+		parser_print_error_prefix_pos(
+				compound_statement->statement.source_position);
+		fprintf(stderr, "end of file while looking for closing '}'\n");
+	}
+	next_token();
+
 	assert(context == &compound_statement->context);
 	set_context(last_context);
 	environment_pop_to(top);
-
-	next_token();
 
 	return (statement_t*) compound_statement;
 }
@@ -3454,6 +3557,7 @@ static translation_unit_t *parse_translation_unit(void)
 translation_unit_t *parse(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
+	label_stack       = NEW_ARR_F(stack_entry_t, 0);
 	found_error       = false;
 
 	type_set_output(stderr);
@@ -3466,6 +3570,7 @@ translation_unit_t *parse(void)
 	translation_unit_t *unit = parse_translation_unit();
 
 	DEL_ARR_F(environment_stack);
+	DEL_ARR_F(label_stack);
 
 	if(found_error)
 		return NULL;
