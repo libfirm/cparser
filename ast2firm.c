@@ -1277,6 +1277,9 @@ static void statement_to_firm(statement_t *statement);
 
 static void return_statement_to_firm(return_statement_t *statement)
 {
+	if(get_cur_block() == NULL)
+		return;
+
 	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 	ir_node  *ret;
 
@@ -1306,6 +1309,9 @@ static void compound_statement_to_firm(compound_statement_t *compound)
 
 static void expression_statement_to_firm(expression_statement_t *statement)
 {
+	if(get_cur_block() == NULL)
+		return;
+
 	expression_to_firm(statement->expression);
 }
 
@@ -1734,6 +1740,8 @@ static void label_to_firm(const label_statement_t *statement)
 
 	set_cur_block(block);
 	keep_alive(block);
+
+	statement_to_firm(statement->label_statement);
 }
 
 static void goto_to_firm(const goto_statement_t *statement)

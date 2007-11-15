@@ -194,6 +194,10 @@ static void optimize(void)
 {
 	for(int i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
+		place_code(irg);
+		dump(irg, "-place");
+		optimize_graph_df(irg);
+		dump(irg, "-localopt");
 		optimize_cf(irg);
 		dump(irg, "-cf");
 	}
