@@ -562,13 +562,15 @@ static expression_t *create_cast_expression(expression_t *expression,
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
-	assert(expression->datatype != NULL);
 	type_t *source_type = expression->datatype;
+
+	if(source_type == NULL)
+		return expression;
 
 	source_type = skip_typeref(source_type);
 	dest_type   = skip_typeref(dest_type);
 
-	if(expression->datatype == dest_type)
+	if(source_type == dest_type)
 		return expression;
 
 	if(dest_type->type == TYPE_ATOMIC) {
@@ -603,6 +605,10 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
                             const char *context)
 {
 	type_t *orig_type_right = (*right)->datatype;
+
+	if(orig_type_right == NULL)
+		return;
+
 	type_t *type_left       = skip_typeref(orig_type_left);
 	type_t *type_right      = skip_typeref(orig_type_right);
 
@@ -2478,8 +2484,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 				parameter = parameter->next, argument = argument->next) {
 			type_t *expected_type = parameter->type;
 			/* TODO report context in error messages */
-			argument->expression  = create_implicit_cast(argument->expression,
-			                                             expected_type);
+			argument->expression = create_implicit_cast(argument->expression,
+			                                            expected_type);
 		}
 		/* too few parameters */
 		if(parameter != NULL) {
@@ -2499,6 +2505,9 @@ static expression_t *parse_call_expression(unsigned precedence,
 				/* do default promotion */
 				for( ; argument != NULL; argument = argument->next) {
 					type_t *type = argument->expression->datatype;
+
+					if(type == NULL)
+						continue;
 
 					if(is_type_integer(type)) {
 						type = promote_integer(type);
@@ -2588,31 +2597,51 @@ static expression_t *parse_extension(unsigned precedence)
 	return parse_sub_expression(precedence);
 }
 
-static type_t *get_unexpr_arithmetic_type(const expression_t *expression)
+static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
-	/* TODO */
-	return expression->datatype;
-}
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
 
-static type_t *get_unexpr_dereference_type(const expression_t *expression)
-{
-	type_t *expression_type = expression->datatype;
-
-	if(expression_type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type = (pointer_type_t*) expression_type;
-		return pointer_type->points_to;
+	type_t *type = skip_typeref(orig_type);
+	if(!is_type_arithmetic(type)) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs an arithmetic type\n");
+		return;
 	}
-	panic("deref TODO...");
-	return NULL;
+
+	expression->expression.datatype = orig_type;
 }
 
-static type_t *get_unexpr_take_addr_type(const expression_t *expression)
+static void semantic_dereference(unary_expression_t *expression)
 {
-	type_t *type = expression->datatype;
-	return make_pointer_type(type, 0);
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
+
+	type_t *type = skip_typeref(orig_type);
+	if(type->type != TYPE_POINTER) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs a pointer type\n");
+		return;
+	}
+
+	pointer_type_t *pointer_type    = (pointer_type_t*) type;
+	expression->expression.datatype = pointer_type->points_to;
 }
 
-#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, tfunc)   \
+static void semantic_take_addr(unary_expression_t *expression)
+{
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
+
+	expression->expression.datatype = make_pointer_type(orig_type, 0);
+}
+
+#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc)   \
 static expression_t *parse_##unexpression_type(unsigned precedence)            \
 {                                                                              \
 	eat(token_type);                                                           \
@@ -2622,27 +2651,26 @@ static expression_t *parse_##unexpression_type(unsigned precedence)            \
 	unary_expression->expression.type     = EXPR_UNARY;                        \
 	unary_expression->type                = unexpression_type;                 \
 	unary_expression->value               = parse_sub_expression(precedence);  \
-	unary_expression->expression.datatype = tfunc(unary_expression->value);    \
+	                                                                           \
+	sfunc(unary_expression);                                                   \
                                                                                \
 	return (expression_t*) unary_expression;                                   \
 }
 
-CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE, get_unexpr_arithmetic_type)
-CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS,   get_unexpr_arithmetic_type)
-CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT,    get_unexpr_arithmetic_type)
-CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE,
-                               get_unexpr_dereference_type)
-CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS,
-                               get_unexpr_take_addr_type)
+CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE, semantic_unexpr_arithmetic)
+CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS,   semantic_unexpr_arithmetic)
+CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT,    semantic_unexpr_arithmetic)
+CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE, semantic_dereference)
+CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS, semantic_take_addr)
 CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE,
-                               get_unexpr_arithmetic_type)
+                               semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT,
-                               get_unexpr_arithmetic_type)
+                               semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT,
-                               get_unexpr_arithmetic_type)
+                               semantic_unexpr_arithmetic)
 
 #define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type, \
-                                               tfunc)                         \
+                                               sfunc)                         \
 static expression_t *parse_##unexpression_type(unsigned precedence,           \
                                                expression_t *left)            \
 {                                                                             \
@@ -2654,15 +2682,16 @@ static expression_t *parse_##unexpression_type(unsigned precedence,           \
 	unary_expression->expression.type     = EXPR_UNARY;                       \
 	unary_expression->type                = unexpression_type;                \
 	unary_expression->value               = left;                             \
-	unary_expression->expression.datatype = tfunc(left);                      \
+	                                                                          \
+	sfunc(unary_expression);                                                  \
                                                                               \
 	return (expression_t*) unary_expression;                                  \
 }
 
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_POSTFIX_INCREMENT,
-                                       get_unexpr_arithmetic_type)
+                                       semantic_unexpr_arithmetic)
 CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_POSTFIX_DECREMENT,
-                                       get_unexpr_arithmetic_type)
+                                       semantic_unexpr_arithmetic)
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 {
@@ -2704,8 +2733,14 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 {
 	expression_t *left       = expression->left;
 	expression_t *right      = expression->right;
-	type_t       *type_left  = skip_typeref(left->datatype);
-	type_t       *type_right = skip_typeref(right->datatype);
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
@@ -2726,8 +2761,12 @@ static void semantic_add(binary_expression_t *expression)
 	expression_t *right           = expression->right;
 	type_t       *orig_type_left  = left->datatype;
 	type_t       *orig_type_right = right->datatype;
-	type_t       *type_left       = skip_typeref(orig_type_left);
-	type_t       *type_right      = skip_typeref(orig_type_right);
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
 
 	/* § 5.6.5 */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -2756,6 +2795,10 @@ static void semantic_sub(binary_expression_t *expression)
 	expression_t *right           = expression->right;
 	type_t       *orig_type_left  = left->datatype;
 	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
 	type_t       *type_left       = skip_typeref(orig_type_left);
 	type_t       *type_right      = skip_typeref(orig_type_right);
 
@@ -2792,10 +2835,16 @@ static void semantic_sub(binary_expression_t *expression)
 
 static void semantic_comparison(binary_expression_t *expression)
 {
-	expression_t *left       = expression->left;
-	expression_t *right      = expression->right;
-	type_t       *type_left  = left->datatype;
-	type_t       *type_right = right->datatype;
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
 
 	/* TODO non-arithmetic types */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -2809,10 +2858,16 @@ static void semantic_comparison(binary_expression_t *expression)
 
 static void semantic_arithmetic_assign(binary_expression_t *expression)
 {
-	expression_t *left       = expression->left;
-	expression_t *right      = expression->right;
-	type_t       *type_left  = left->datatype;
-	type_t       *type_right = right->datatype;
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
@@ -2832,7 +2887,24 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 
 static void semantic_logical_op(binary_expression_t *expression)
 {
-	/* TODO */
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
+
+	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs arithmetic types\n");
+		return;
+	}
+
 	expression->expression.datatype = type_int;
 }
 
@@ -2841,7 +2913,9 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression_t *left       = expression->left;
 	type_t       *type_left  = left->datatype;
 
-	semantic_assign(type_left, &expression->right, "assignment");
+	if(type_left != NULL) {
+		semantic_assign(type_left, &expression->right, "assignment");
+	}
 
 	expression->expression.datatype = type_left;
 }
@@ -3337,7 +3411,9 @@ static statement_t *parse_return(void)
 			parse_warning("'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
-			semantic_assign(return_type, &return_value, "'return'");
+			if(return_type != NULL) {
+				semantic_assign(return_type, &return_value, "'return'");
+			}
 		}
 	} else {
 		return_value = NULL;
