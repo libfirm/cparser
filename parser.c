@@ -505,19 +505,16 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 				symbol->declaration = declaration->symbol_next;
 			} else {
 				symbol->declaration = old_declaration;
-				assert(old_declaration->symbol_next ==
-				       declaration->symbol_next);
 			}
 		} else {
 			declaration_t *iter_last = declaration;
-			declaration_t *iter      = declaration->next;
+			declaration_t *iter      = declaration->symbol_next;
 			for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 				/* replace an entry? */
 				if(iter->namespace == namespace) {
 					assert(iter_last != NULL);
 					iter_last->symbol_next = old_declaration;
-					assert(old_declaration->symbol_next ==
-					       declaration->symbol_next);
+					old_declaration->symbol_next = iter->symbol_next;
 					break;
 				}
 			}
