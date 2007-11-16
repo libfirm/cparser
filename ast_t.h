@@ -12,7 +12,8 @@
 extern struct obstack ast_obstack;
 
 typedef enum {
-	EXPR_INVALID = 0,
+	EXPR_UNKNOWN = 0,
+	EXPR_INVALID,
 	EXPR_REFERENCE,
 	EXPR_CONST,
 	EXPR_STRING_LITERAL,

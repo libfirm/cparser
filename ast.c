@@ -237,6 +237,7 @@ static void print_select(const select_expression_t *expression)
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
+	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
 		fprintf(out, "*invalid expression*");
 		break;

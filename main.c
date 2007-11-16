@@ -220,6 +220,12 @@ static void create_firm_prog(translation_unit_t *unit)
 		ir_graph *const irg = get_irp_irg(i);
 		dump(irg, "-start");
 	}
+
+	lower_highlevel();
+	for(int i = 0; i < n_irgs; ++i) {
+		ir_graph *const irg = get_irp_irg(i);
+		dump(irg, "-lower");
+	}
 }
 
 static void optimize(void)
@@ -235,10 +241,11 @@ static void optimize(void)
 
 	for(int i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
-		place_code(irg);
-		dump(irg, "-place");
+
 		optimize_graph_df(irg);
 		dump(irg, "-localopt");
+		place_code(irg);
+		dump(irg, "-place");
 		optimize_cf(irg);
 		dump(irg, "-cf");
 	}

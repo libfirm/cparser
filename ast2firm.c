@@ -645,8 +645,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
-		ir_node   *store  = get_store();
-		ir_node   *sel    = new_d_simpleSel(dbgi, store, frame, entity);
+		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 
 		if(type->type == TYPE_ARRAY) {
 			return sel;
@@ -1270,6 +1269,32 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	return val;
 }
 
+static ir_node *select_addr(const select_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	ir_node *compound_addr = expression_to_firm(expression->compound);
+
+	declaration_t *entry = expression->compound_entry;
+	assert(entry->declaration_type == DECLARATION_TYPE_COMPOUND_MEMBER);
+	ir_entity     *entity = entry->v.entity;
+
+	assert(entity != NULL);
+
+	ir_node *sel = new_d_simpleSel(dbgi, new_NoMem(), compound_addr, entity);
+
+	return sel;
+}
+
+static ir_node *select_to_firm(const select_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	ir_node  *addr = select_addr(expression);
+	type_t   *type = expression->expression.datatype;
+
+	return load_from_expression_addr(type, addr, dbgi);
+}
+
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -1277,6 +1302,8 @@ static ir_node *expression_to_addr(const expression_t *expression)
 		return reference_addr((const reference_expression_t*) expression);
 	case EXPR_ARRAY_ACCESS:
 		return array_access_addr((const array_access_expression_t*) expression);
+	case EXPR_SELECT:
+		return select_addr((const select_expression_t*) expression);
 	default:
 		break;
 	}
@@ -1307,10 +1334,21 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return sizeof_to_firm((const sizeof_expression_t*) expression);
 	case EXPR_CONDITIONAL:
 		return conditional_to_firm((const conditional_expression_t*)expression);
-	default:
+	case EXPR_SELECT:
+		return select_to_firm((const select_expression_t*) expression);
+	case EXPR_FUNCTION:
+	case EXPR_OFFSETOF:
+	case EXPR_PRETTY_FUNCTION:
+	case EXPR_VA_ARG:
+	case EXPR_STATEMENT:
+	case EXPR_BUILTIN_SYMBOL:
+		panic("unimplemented expression found");
+
+	case EXPR_UNKNOWN:
+	case EXPR_INVALID:
 		break;
 	}
-	panic("unsupported expression found");
+	panic("invalid expression found");
 }
 
 static ir_node *expression_to_firm(const expression_t *expression)

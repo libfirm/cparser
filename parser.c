@@ -243,12 +243,19 @@ static void parse_error_expected(const char *message, ...)
 	fprintf(stderr, "\n");
 }
 
+static void print_type_quoted(type_t *type)
+{
+	fputc('\'', stderr);
+	print_type(type);
+	fputc('\'', stderr);
+}
+
 static void type_error(const char *msg, const source_position_t source_position,
                        type_t *type)
 {
 	parser_print_error_prefix_pos(source_position);
 	fprintf(stderr, "%s, but found type ", msg);
-	print_type(type);
+	print_type_quoted(type);
 	fputc('\n', stderr);
 	error();
 }
@@ -258,9 +265,9 @@ static void type_error_incompatible(const char *msg,
 {
 	parser_print_error_prefix_pos(source_position);
 	fprintf(stderr, "%s, incompatible types: ", msg);
-	print_type(type1);
+	print_type_quoted(type1);
 	fprintf(stderr, " - ");
-	print_type(type2);
+	print_type_quoted(type2);
 	fprintf(stderr, ")\n");
 	error();
 }
@@ -413,13 +420,13 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			fprintf(stderr, "definition of symbol %s%s with type ",
 					get_namespace_prefix(namespace), symbol->string);
 			error();
-			print_type(declaration->type);
+			print_type_quoted(declaration->type);
 			fputc('\n', stderr);
 			parser_print_error_prefix_pos(
 					previous_declaration->source_position);
 			fprintf(stderr, "is incompatible with previous declaration "
 					"of type ");
-			print_type(previous_declaration->type);
+			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
 		}
 		return previous_declaration;
@@ -502,16 +509,19 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 				       declaration->symbol_next);
 			}
 		} else {
-			for(; declaration != NULL; declaration = declaration->symbol_next) {
-				declaration_t *symbol_next = declaration->symbol_next;
-				if(symbol_next->namespace == namespace) {
-					declaration->symbol_next = old_declaration;
-					assert(old_declaration->symbol_next
-					        == symbol_next->symbol_next);
+			declaration_t *iter_last = declaration;
+			declaration_t *iter      = declaration->next;
+			for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
+				/* replace an entry? */
+				if(iter->namespace == namespace) {
+					assert(iter_last != NULL);
+					iter_last->symbol_next = old_declaration;
+					assert(old_declaration->symbol_next ==
+					       declaration->symbol_next);
 					break;
 				}
 			}
-			assert(declaration != NULL);
+			assert(iter != NULL);
 		}
 	}
 
@@ -644,9 +654,9 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		parser_print_error_prefix();
 		fprintf(stderr, "incompatible types in %s\n", context);
 		parser_print_error_prefix();
-		print_type(type_left);
+		print_type_quoted(type_left);
 		fputs(" <- ", stderr);
-		print_type(type_right);
+		print_type_quoted(type_right);
 		fputs("\n", stderr);
 	}
 
@@ -762,7 +772,7 @@ static designator_t *parse_designation(void)
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			next_token();
 			if(token.type != T_IDENTIFIER) {
-				parse_error_expected("problem while parsing designator",
+				parse_error_expected("while parsing designator",
 				                     T_IDENTIFIER, 0);
 				return NULL;
 			}
@@ -831,8 +841,7 @@ static initializer_t *parse_initializer_list(type_t *type)
 			break;
 
 		if(token.type != ',') {
-			parse_error_expected("problem while parsing initializer list",
-			                     ',', '}', 0);
+			parse_error_expected("while parsing initializer list", ',', '}', 0);
 			eat_block();
 			return result;
 		}
@@ -869,10 +878,10 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		}
 	} else if(token.type != '{') {
 		if(is_struct) {
-			parse_error_expected("problem while parsing struct type specifier",
+			parse_error_expected("while parsing struct type specifier",
 			                     T_IDENTIFIER, '{', 0);
 		} else {
-			parse_error_expected("problem while parsing union type specifier",
+			parse_error_expected("while parsing union type specifier",
 			                     T_IDENTIFIER, '{', 0);
 		}
 
@@ -889,6 +898,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		}
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
+		record_declaration(declaration);
 	}
 
 	if(token.type == '{') {
@@ -899,7 +909,6 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 					is_struct ? "struct" : "union", symbol->string);
 			declaration->context.declarations = NULL;
 		}
-		record_declaration(declaration);
 		declaration->init.is_defined = true;
 
 		int         top          = environment_top();
@@ -931,8 +940,7 @@ static void parse_enum_entries(void)
 		declaration_t *entry = allocate_ast_zero(sizeof(entry[0]));
 
 		if(token.type != T_IDENTIFIER) {
-			parse_error_expected("problem while parsing enum entry",
-			                     T_IDENTIFIER, 0);
+			parse_error_expected("while parsing enum entry", T_IDENTIFIER, 0);
 			eat_block();
 			return;
 		}
@@ -969,7 +977,7 @@ static declaration_t *parse_enum_specifier(void)
 
 		declaration = get_declaration(symbol, NAMESPACE_ENUM);
 	} else if(token.type != '{') {
-		parse_error_expected("problem while parsing enum type specifier",
+		parse_error_expected("while parsing enum type specifier",
 		                     T_IDENTIFIER, '{', 0);
 		return NULL;
 	} else {
@@ -1409,8 +1417,8 @@ static void parse_identifier_list(void)
 {
 	while(true) {
 		if(token.type != T_IDENTIFIER) {
-			parse_error_expected("problem while parsing parameter identifier "
-			                     "list", T_IDENTIFIER, 0);
+			parse_error_expected("while parsing parameter identifier list",
+			                     T_IDENTIFIER, 0);
 			return;
 		}
 		next_token();
@@ -1647,8 +1655,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	default:
 		if(may_be_abstract)
 			break;
-		parse_error_expected("problem while parsing declarator", T_IDENTIFIER,
-		                     '(', 0);
+		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', 0);
 	}
 
 	while(true) {
@@ -1990,6 +1997,14 @@ struct expression_parser_function_t {
 
 expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
+static expression_t *make_invalid_expression(void)
+{
+	expression_t *expression    = allocate_ast_zero(sizeof(expression[0]));
+	expression->type            = EXPR_INVALID;
+	expression->source_position = token.source_position;
+	return expression;
+}
+
 static expression_t *expected_expression_error(void)
 {
 	parser_print_error_prefix();
@@ -1997,11 +2012,9 @@ static expression_t *expected_expression_error(void)
 	print_token(stderr, & token);
 	fprintf(stderr, "\n");
 
-	expression_t *expression = allocate_ast_zero(sizeof(expression[0]));
-	expression->type = EXPR_INVALID;
 	next_token();
 
-	return expression;
+	return make_invalid_expression();
 }
 
 static expression_t *parse_string_const(void)
@@ -2238,7 +2251,7 @@ static designator_t *parse_designator(void)
 	designator_t *result = allocate_ast_zero(sizeof(result[0]));
 
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("problem while parsing member designator",
+		parse_error_expected("while parsing member designator",
 		                     T_IDENTIFIER, 0);
 		eat_brace();
 		return NULL;
@@ -2251,8 +2264,8 @@ static designator_t *parse_designator(void)
 		if(token.type == '.') {
 			next_token();
 			if(token.type != T_IDENTIFIER) {
-				parse_error_expected("problem while parsing member designator",
-					T_IDENTIFIER, 0);
+				parse_error_expected("while parsing member designator",
+				                     T_IDENTIFIER, 0);
 				eat_brace();
 				return NULL;
 			}
@@ -2367,11 +2380,7 @@ static expression_t *parse_primary_expression(void)
 	fprintf(stderr, "\n");
 	eat_statement();
 
-	expression_t *expression = allocate_ast_zero(sizeof(expression[0]));
-	expression->type     = EXPR_INVALID;
-	expression->datatype = type_void;
-
-	return expression;
+	return make_invalid_expression();
 }
 
 static expression_t *parse_array_expression(unsigned precedence,
@@ -2399,7 +2408,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 		} else {
 			parser_print_error_prefix();
 			fprintf(stderr, "array access on object with non-pointer type ");
-			print_type(type);
+			print_type_quoted(type);
 			fprintf(stderr, "\n");
 		}
 	}
@@ -2458,8 +2467,9 @@ static expression_t *parse_select_expression(unsigned precedence,
                                              expression_t *compound)
 {
 	(void) precedence;
-
 	assert(token.type == '.' || token.type == T_MINUSGREATER);
+
+	bool is_pointer = (token.type == T_MINUSGREATER);
 	next_token();
 
 	select_expression_t *select = allocate_ast_zero(sizeof(select[0]));
@@ -2467,15 +2477,69 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->expression.type = EXPR_SELECT;
 	select->compound        = compound;
 
-	/* TODO: datatype */
-
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("Problem while parsing select", T_IDENTIFIER, 0);
+		parse_error_expected("while parsing select", T_IDENTIFIER, 0);
 		return (expression_t*) select;
 	}
-	select->symbol = token.v.symbol;
+	symbol_t *symbol = token.v.symbol;
+	select->symbol   = symbol;
 	next_token();
 
+	type_t *type = compound->datatype;
+	if(type == NULL)
+		return make_invalid_expression();
+
+	type_t *type_left = type;
+	if(is_pointer) {
+		if(type->type != TYPE_POINTER) {
+			parser_print_error_prefix();
+			fprintf(stderr, "left hand side of '->' is not a pointer, but ");
+			print_type_quoted(type);
+			fputc('\n', stderr);
+			return make_invalid_expression();
+		}
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		type_left                    = pointer_type->points_to;
+	}
+	type_left = skip_typeref(type_left);
+
+	if(type_left->type != TYPE_COMPOUND_STRUCT
+			&& type_left->type != TYPE_COMPOUND_UNION) {
+		parser_print_error_prefix();
+		fprintf(stderr, "request for member '%s' in something not a struct or "
+		        "union, but ", symbol->string);
+		print_type_quoted(type_left);
+		fputc('\n', stderr);
+		return make_invalid_expression();
+	}
+
+	compound_type_t *compound_type = (compound_type_t*) type_left;
+	declaration_t   *declaration   = compound_type->declaration;
+
+	if(!declaration->init.is_defined) {
+		parser_print_error_prefix();
+		fprintf(stderr, "request for member '%s' of incomplete type ",
+		        symbol->string);
+		print_type_quoted(type_left);
+		fputc('\n', stderr);
+		return make_invalid_expression();
+	}
+
+	declaration_t *iter = declaration->context.declarations;
+	for( ; iter != NULL; iter = iter->next) {
+		if(iter->symbol == symbol) {
+			break;
+		}
+	}
+	if(iter == NULL) {
+		parser_print_error_prefix();
+		print_type_quoted(type_left);
+		fprintf(stderr, " has no memeber named '%s'\n", symbol->string);
+		return make_invalid_expression();
+	}
+
+	select->compound_entry      = iter;
+	select->expression.datatype = iter->type;
 	return (expression_t*) select;
 }
 
@@ -2495,7 +2559,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 		fputs("called object '", stderr);
 		print_expression(expression);
 		fputs("' (type ", stderr);
-		print_type(type);
+		print_type_quoted(type);
 		fputs("is not a function\n", stderr);
 
 		function_type             = NULL;
@@ -2632,7 +2696,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	} else if(/* 1 is pointer to object type, other is void* */ false) {
 		/* TODO */
 	} else {
-		type_error_incompatible("problem while parsing conditional",
+		type_error_incompatible("while parsing conditional",
 		                        expression->source_position, true_type,
 		                        false_type);
 	}
@@ -2879,9 +2943,9 @@ static void semantic_add(binary_expression_t *expression)
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary + (");
-		print_type(orig_type_left);
+		print_type_quoted(orig_type_left);
 		fprintf(stderr, ", ");
-		print_type(orig_type_right);
+		print_type_quoted(orig_type_right);
 		fprintf(stderr, ")\n");
 	}
 }
@@ -2913,9 +2977,9 @@ static void semantic_sub(binary_expression_t *expression)
 		if(!pointers_compatible(type_left, type_right)) {
 			parser_print_error_prefix();
 			fprintf(stderr, "pointers to incompatible objects to binary - (");
-			print_type(orig_type_left);
+			print_type_quoted(orig_type_left);
 			fprintf(stderr, ", ");
-			print_type(orig_type_right);
+			print_type_quoted(orig_type_right);
 			fprintf(stderr, ")\n");
 		} else {
 			expression->expression.datatype = type_ptrdiff_t;
@@ -2923,9 +2987,9 @@ static void semantic_sub(binary_expression_t *expression)
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary - (");
-		print_type(orig_type_left);
+		print_type_quoted(orig_type_left);
 		fprintf(stderr, ", ");
-		print_type(orig_type_right);
+		print_type_quoted(orig_type_right);
 		fprintf(stderr, ")\n");
 	}
 }
@@ -3120,7 +3184,7 @@ static expression_t *parse_sub_expression(unsigned precedence)
 		left = parser->infix_parser(parser->infix_precedence, left);
 
 		assert(left != NULL);
-		assert(left->type != EXPR_INVALID);
+		assert(left->type != EXPR_UNKNOWN);
 		left->source_position = source_position;
 	}
 
