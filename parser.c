@@ -594,14 +594,27 @@ static expression_t *create_implicit_cast(expression_t *expression,
 		return create_cast_expression(expression, dest_type);
 	}
 	if(dest_type->type == TYPE_POINTER) {
+		pointer_type_t *pointer_type
+			= (pointer_type_t*) dest_type;
 		if(source_type->type == TYPE_POINTER) {
 			if(!pointers_compatible(source_type, dest_type)) {
 				type_error_incompatible("can't implicitely cast types",
 			                        expression->source_position,
 			                        source_type, dest_type);
+			    return expression;
 			} else {
 				return create_cast_expression(expression, dest_type);
 			}
+		} else if(source_type->type == TYPE_ARRAY) {
+			array_type_t *array_type = (array_type_t*) source_type;
+			if(!types_compatible(array_type->element_type,
+			                     pointer_type->points_to)) {
+				type_error_incompatible("can't implicitely cast types",
+			                        expression->source_position,
+			                        source_type, dest_type);
+			    return expression;
+			}
+			return create_cast_expression(expression, dest_type);
 		}
 	}
 
@@ -2811,6 +2824,34 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	expression->expression.datatype = arithmetic_type;
 }
 
+static void semantic_shift_op(binary_expression_t *expression)
+{
+	expression_t *left       = expression->left;
+	expression_t *right      = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
+
+	if(!is_type_integer(type_left) || !is_type_integer(type_right)) {
+		/* TODO: improve error message */
+		parser_print_error_prefix();
+		fprintf(stderr, "operation needs integer types\n");
+		return;
+	}
+
+	type_left  = promote_integer(type_left);
+	type_right = promote_integer(type_right);
+
+	expression->left  = create_implicit_cast(left, type_left);
+	expression->right = create_implicit_cast(right, type_right);
+	expression->expression.datatype = type_left;
+}
+
 static void semantic_add(binary_expression_t *expression)
 {
 	expression_t *left            = expression->left;
@@ -3022,9 +3063,9 @@ CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,  semantic_logical_op, 1)
 CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR, semantic_logical_op, 1)
 /* TODO shift has a bit special semantic */
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
-                      semantic_binexpr_arithmetic, 1)
+                      semantic_shift_op, 1)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,
-                      semantic_binexpr_arithmetic, 1)
+                      semantic_shift_op, 1)
 CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN,
                       semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN,

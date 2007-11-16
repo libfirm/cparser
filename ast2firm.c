@@ -1042,6 +1042,42 @@ static ir_node *create_sub(const binary_expression_t *expression)
 	return res;
 }
 
+static ir_node *create_shift(const binary_expression_t *expression)
+{
+	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
+	ir_node  *left  = expression_to_firm(expression->left);
+	ir_node  *right = expression_to_firm(expression->right);
+	type_t   *type  = expression->expression.datatype;
+	ir_mode  *mode  = get_ir_mode(type);
+
+	/* firm always wants the shift count to be unsigned */
+	right = create_conv(dbgi, right, mode_Iu);
+
+	ir_node *res;
+
+	switch(expression->type) {
+	case BINEXPR_SHIFTLEFT:
+		res = new_d_Shl(dbgi, left, right, mode);
+		break;
+	case BINEXPR_SHIFTRIGHT: {
+	 	 expression_t *expr_left = expression->left;
+		 type_t       *type_left = skip_typeref(expr_left->datatype);
+
+		 if(is_type_signed(type_left)) {
+			res = new_d_Shrs(dbgi, left, right, mode);
+		 } else {
+		 	 res = new_d_Shr(dbgi, left, right, mode);
+		 }
+		 break;
+	}
+	default:
+		panic("create shift op called for non-shift op");
+	}
+
+	return res;
+}
+
+
 static ir_node *create_divmod(const binary_expression_t *expression)
 {
 	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
@@ -1109,9 +1145,8 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case BINEXPR_BITWISE_XOR:
 		return create_arithmetic_binop(expression, new_d_Eor);
 	case BINEXPR_SHIFTLEFT:
-		return create_arithmetic_binop(expression, new_d_Shl);
 	case BINEXPR_SHIFTRIGHT:
-		return create_arithmetic_binop(expression, new_d_Shr);
+		return create_shift(expression);
 	case BINEXPR_DIV:
 	case BINEXPR_MOD:
 		return create_divmod(expression);

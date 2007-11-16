@@ -461,11 +461,51 @@ bool is_type_scalar(const type_t *type)
 	return is_type_arithmetic(type);
 }
 
+bool is_type_incomplete(const type_t *type)
+{
+	switch(type->type) {
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION: {
+		const compound_type_t *compound_type
+			= (const compound_type_t*) type;
+		declaration_t *declaration = compound_type->declaration;
+		return !declaration->init.is_defined;
+	}
+	case TYPE_FUNCTION:
+		return true;
+
+	case TYPE_ARRAY:
+	case TYPE_ATOMIC:
+	case TYPE_POINTER:
+	case TYPE_ENUM:
+		return false;
+
+	case TYPE_TYPEDEF:
+	case TYPE_TYPEOF:
+	case TYPE_BUILTIN:
+		panic("is_type_incomplete called without typerefs skipped");
+	case TYPE_INVALID:
+		break;
+	}
+
+	panic("invalid type found");
+}
+
+bool types_compatible(const type_t *type1, const type_t *type2)
+{
+	(void) type1;
+	(void) type2;
+	return true;
+}
+
 bool pointers_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(type1->type == TYPE_POINTER);
 	assert(type2->type == TYPE_POINTER);
-	return true;
+	pointer_type_t *pointer_type1 = (pointer_type_t*) type1;
+	pointer_type_t *pointer_type2 = (pointer_type_t*) type2;
+	return types_compatible(pointer_type1->points_to,
+	                        pointer_type2->points_to);
 }
 
 type_t *skip_typeref(type_t *type)
