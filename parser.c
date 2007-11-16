@@ -405,7 +405,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
                                  context_t *parent_context)
 {
 	symbol_t    *symbol    = declaration->symbol;
-	namespace_t  namespace = declaration->namespace;
+	namespace_t  namespace = (namespace_t)declaration->namespace;
 
 	/* a declaration should be only pushed once */
 	assert(declaration->parent_context == NULL);
@@ -1383,7 +1383,7 @@ finish_specifiers:
 		}
 	}
 
-	type->qualifiers = type_qualifiers;
+	type->qualifiers = (type_qualifier_t)type_qualifiers;
 
 	type_t *result = typehash_insert(type);
 	if(newtype && result != (type_t*) type) {
@@ -1393,9 +1393,9 @@ finish_specifiers:
 	specifiers->type = result;
 }
 
-static type_qualifier_t parse_type_qualifiers(void)
+static unsigned parse_type_qualifiers(void)
 {
-	type_qualifier_t type_qualifiers = 0;
+	unsigned type_qualifiers = TYPE_QUALIFIER_NONE;
 
 	while(true) {
 		switch(token.type) {

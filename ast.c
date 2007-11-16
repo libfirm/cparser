@@ -519,7 +519,7 @@ void print_initializer(const initializer_t *initializer)
 
 static void print_normal_declaration(const declaration_t *declaration)
 {
-	print_storage_class(declaration->storage_class);
+	print_storage_class((storage_class_t)declaration->storage_class);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
 	if(declaration->is_inline) {

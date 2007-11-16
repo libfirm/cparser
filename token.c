@@ -91,7 +91,7 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "string '%s'", token->v.string);
 		break;
 	default:
-		print_token_type(f, token->type);
+		print_token_type(f, (token_type_t)token->type);
 		break;
 	}
 }
