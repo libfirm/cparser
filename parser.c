@@ -2771,6 +2771,15 @@ static void semantic_take_addr(unary_expression_t *expression)
 	if(orig_type == NULL)
 		return;
 
+	expression_t *value = expression->value;
+	if(value->type == EXPR_REFERENCE) {
+		reference_expression_t *reference   = (reference_expression_t*) value;
+		declaration_t          *declaration = reference->declaration;
+		if(declaration != NULL) {
+			declaration->address_taken = 1;
+		}
+	}
+
 	expression->expression.datatype = make_pointer_type(orig_type, 0);
 }
 
