@@ -476,16 +476,21 @@ static void parse_number(void)
 	}
 }
 
-static int parse_octal_sequence(void)
+static inline int is_octal_digit(int chr)
 {
-	int value = 0;
-	while(1) {
-		if(c < '0' || c > '7')
-			break;
-		value = 8 * value + c - '0';
-		next_char();
-	}
+	return '0' <= chr && chr <= '7';
+}
 
+static int parse_octal_sequence(const int first_digit)
+{
+	assert(is_octal_digit(first_digit));
+	int value = first_digit - '0';
+	if (!is_octal_digit(c)) return value;
+	value = 8 * value + c - '0';
+	next_char();
+	if (!is_octal_digit(c)) return value;
+	value = 8 * value + c - '0';
+	next_char();
 	return value;
 }
 
@@ -517,7 +522,7 @@ static int parse_escape_sequence(void)
 
 	switch(ec) {
 	case '"':  return '"';
-	case '\'': return'\'';
+	case '\'': return '\'';
 	case '\\': return '\\';
 	case '?': return '\?';
 	case 'a': return '\a';
@@ -537,7 +542,7 @@ static int parse_escape_sequence(void)
 	case '5':
 	case '6':
 	case '7':
-		return parse_octal_sequence();
+		return parse_octal_sequence(ec);
 	case EOF:
 		parse_error("reached end of file while parsing escape sequence");
 		return EOF;
