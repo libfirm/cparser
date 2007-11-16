@@ -1506,6 +1506,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	if(get_cur_block() == NULL) {
 		mature_immBlock(header_block);
 		mature_immBlock(body_block);
+		mature_immBlock(false_block);
 		return;
 	}
 
@@ -1514,6 +1515,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	mature_immBlock(header_block);
 
 	/* create the condition */
+	set_cur_block(header_block);
 	ir_node *condition  = expression_to_modeb(statement->condition);
 	ir_node *cond       = new_d_Cond(dbgi, condition);
 	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
@@ -1702,6 +1704,9 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 static void create_jump_statement(const statement_t *statement,
                                   ir_node *target_block)
 {
+	if(get_cur_block() == NULL)
+		return;
+
 	dbg_info *dbgi = get_dbg_info(&statement->source_position);
 	ir_node  *jump = new_d_Jmp(dbgi);
 	add_immBlock_pred(target_block, jump);
