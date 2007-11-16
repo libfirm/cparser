@@ -32,6 +32,7 @@ static int       next_value_number_function;
 static ir_node  *continue_label;
 static ir_node  *break_label;
 static ir_node  *current_switch_cond;
+static bool      saw_default_label;
 static ir_node **imature_blocks;
 
 typedef enum declaration_type_t {
@@ -1785,10 +1786,11 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 
 	set_cur_block(NULL);
 
-	ir_node *old_switch_cond = current_switch_cond;
-	ir_node *old_break_label = break_label;
-	current_switch_cond      = cond;
-	break_label              = break_block;
+	ir_node *const old_switch_cond       = current_switch_cond;
+	ir_node *const old_break_label       = break_label;
+	const bool     old_saw_default_label = saw_default_label;
+	current_switch_cond                  = cond;
+	break_label                          = break_block;
 
 	statement_to_firm(statement->body);
 
@@ -1797,10 +1799,18 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 		add_immBlock_pred(break_block, jmp);
 	}
 
+	if (!saw_default_label) {
+		set_cur_block(get_nodes_block(cond));
+		ir_node *const proj = new_d_defaultProj(dbgi, cond,
+		                                        MAGIC_DEFAULT_PN_NUMBER);
+		add_immBlock_pred(break_block, proj);
+	}
+
 	assert(current_switch_cond == cond);
 	assert(break_label         == break_block);
 	current_switch_cond = old_switch_cond;
 	break_label         = old_break_label;
+	saw_default_label   = old_saw_default_label;
 
 	mature_immBlock(break_block);
 	set_cur_block(break_block);
@@ -1842,6 +1852,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		}
 		proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
 	} else {
+		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
 		                         MAGIC_DEFAULT_PN_NUMBER);
 	}
