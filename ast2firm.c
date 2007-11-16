@@ -1840,6 +1840,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 {
 	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 
+	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
+
 	/* let's create a node and hope firm constant folding creates a Const
 	 * node... */
 	ir_node *proj;
@@ -1858,6 +1860,9 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	}
 
 	ir_node *block = new_immBlock();
+	if (fallthrough != NULL) {
+		add_immBlock_pred(block, fallthrough);
+	}
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
 }
