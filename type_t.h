@@ -60,6 +60,7 @@ typedef enum {
 } atomic_type_type_t;
 
 typedef enum {
+	TYPE_QUALIFIER_NONE     = 0,
 	TYPE_QUALIFIER_CONST    = 1 << 0,
 	TYPE_QUALIFIER_RESTRICT = 1 << 1,
 	TYPE_QUALIFIER_VOLATILE = 1 << 2,
