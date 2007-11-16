@@ -501,7 +501,7 @@ static inline ir_mode *get_ir_mode(type_t *type)
 		return mode_P;
 	}
 
-	ir_mode *mode   = get_type_mode(irtype);
+	ir_mode *mode = get_type_mode(irtype);
 	assert(mode != NULL);
 	return mode;
 }
@@ -622,13 +622,14 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
 	declaration_t *declaration = ref->declaration;
 	type_t        *type        = skip_typeref(declaration->type);
-	ir_mode       *mode        = get_ir_mode(type);
 
 	switch((declaration_type_t) declaration->declaration_type) {
 	case DECLARATION_TYPE_UNKNOWN:
 		break;
-	case DECLARATION_TYPE_LOCAL_VARIABLE:
+	case DECLARATION_TYPE_LOCAL_VARIABLE: {
+		ir_mode *mode = get_ir_mode(type);
 		return get_value(declaration->v.value_number, mode);
+	}
 	case DECLARATION_TYPE_FUNCTION: {
 		return create_symconst(dbgi, declaration->v.entity);
 	}
@@ -647,7 +648,8 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 
-		if(type->type == TYPE_ARRAY) {
+		if(type->type == TYPE_ARRAY || type->type == TYPE_COMPOUND_STRUCT
+				|| type->type == TYPE_COMPOUND_UNION) {
 			return sel;
 		} else {
 			return load_from_expression_addr(type, sel, dbgi);
@@ -1373,13 +1375,13 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 
 static ir_node *expression_to_firm(const expression_t *expression)
 {
-	ir_node *res  = _expression_to_firm(expression);
+	ir_node *res = _expression_to_firm(expression);
 
-	if(expression->datatype == type_void)
-		return NULL;
+	if(get_irn_mode(res) == mode_b) {
+		ir_mode *mode = get_ir_mode(expression->datatype);
+		res           = create_conv(NULL, res, mode);
+	}
 
-	ir_mode *mode = get_ir_mode(expression->datatype);
-	res           = create_conv(NULL, res, mode);
 	return res;
 }
 
@@ -1708,7 +1710,8 @@ static void create_local_variable(declaration_t *declaration)
 	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
 
 	bool needs_entity = declaration->address_taken;
-	type_t *type = declaration->type;
+	type_t *type = skip_typeref(declaration->type);
+
 	if(type->type == TYPE_ARRAY
 			|| type->type == TYPE_COMPOUND_STRUCT
 			|| type->type == TYPE_COMPOUND_UNION) {
@@ -1964,9 +1967,16 @@ static void initialize_function_parameters(declaration_t *declaration)
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		assert(parameter->declaration_type == DECLARATION_TYPE_UNKNOWN);
+		type_t *type = parameter->type;
 
-		if(parameter->address_taken) {
-			panic("address take from parameter not implemented yet");
+		bool needs_entity = parameter->address_taken;
+		if(type->type == TYPE_COMPOUND_STRUCT
+				|| type->type == TYPE_COMPOUND_UNION) {
+			needs_entity = true;
+		}
+
+		if(needs_entity) {
+			panic("entities for function parameters not implemented yet");
 		}
 
 		ir_mode *mode = get_ir_mode(parameter->type);
