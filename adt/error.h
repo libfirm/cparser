@@ -1,7 +1,6 @@
 // placeholder file...
 #include <stdio.h>
-
-void abort(void);
+#include <stdlib.h>
 
 static inline __attribute__((noreturn))
 void panic(const char *msg)
