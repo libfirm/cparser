@@ -1377,7 +1377,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 {
 	ir_node *res = _expression_to_firm(expression);
 
-	if(get_irn_mode(res) == mode_b) {
+	if(res != NULL && get_irn_mode(res) == mode_b) {
 		ir_mode *mode = get_ir_mode(expression->datatype);
 		res           = create_conv(NULL, res, mode);
 	}
