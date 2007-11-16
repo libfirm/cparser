@@ -680,7 +680,13 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_node   *symconst = create_symconst(dbgi, entity);
 		return symconst;
 	}
-	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
+	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
+		ir_entity *entity = declaration->v.entity;
+		ir_node   *frame  = get_irg_frame(current_ir_graph);
+		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+
+		return sel;
+	}
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
 	case DECLARATION_TYPE_LABEL_BLOCK:
 		panic("not implemented reference type");
