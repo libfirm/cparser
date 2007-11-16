@@ -16,3 +16,11 @@ Parser:
 ast2firm:
 - output source file positions for panics...
 - correctly handle pointer ++, --
+
+
+Coole Warnungen:
+
+	int x = 5;
+	x = bla():
+
+	-> dead assignment

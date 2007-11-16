@@ -642,7 +642,19 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 			return load_from_expression_addr(type, symconst, dbgi);
 		}
 	}
-	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
+	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
+		ir_entity *entity = declaration->v.entity;
+		ir_node   *frame  = get_irg_frame(current_ir_graph);
+		ir_node   *store  = get_store();
+		ir_node   *sel    = new_d_simpleSel(dbgi, store, frame, entity);
+
+		if(type->type == TYPE_ARRAY) {
+			return sel;
+		} else {
+			return load_from_expression_addr(type, sel, dbgi);
+		}
+	}
+
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
 	case DECLARATION_TYPE_LABEL_BLOCK:
 		panic("not implemented reference type");
@@ -1633,9 +1645,15 @@ static void create_initializer(declaration_t *declaration)
 
 static void create_local_variable(declaration_t *declaration)
 {
-	bool needs_entity = declaration->address_taken;
-
 	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+
+	bool needs_entity = declaration->address_taken;
+	type_t *type = declaration->type;
+	if(type->type == TYPE_ARRAY
+			|| type->type == TYPE_COMPOUND_STRUCT
+			|| type->type == TYPE_COMPOUND_UNION) {
+		needs_entity = true;
+	}
 
 	if(needs_entity) {
 		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
