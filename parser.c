@@ -201,6 +201,13 @@ static void parse_error(const char *message)
 	fprintf(stderr, "parse error: %s\n", message);
 }
 
+static void parser_print_warning_prefix_pos(
+		const source_position_t source_position)
+{
+	parser_print_prefix_pos(source_position);
+	fputs("warning: ", stderr);
+}
+
 static void parse_warning(const char *message)
 {
 	parser_print_prefix_pos(token.source_position);
@@ -644,16 +651,18 @@ static expression_t *parse_assignment_expression(void)
 	return parse_sub_expression(2);
 }
 
-static void parse_compound_type_entries(void);
-static declaration_t *parse_declarator(storage_class_t storage_class,
-		type_t *type, int may_be_abstract);
-static declaration_t *record_declaration(declaration_t *declaration);
-
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	storage_class_t  storage_class;
+	bool             is_inline;
 	type_t          *type;
 };
+
+static void parse_compound_type_entries(void);
+static declaration_t *parse_declarator(
+		const declaration_specifiers_t *specifiers, type_t *type,
+		bool may_be_abstract);
+static declaration_t *record_declaration(declaration_t *declaration);
 
 static const char *parse_string_literals(void)
 {
@@ -1123,7 +1132,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
 		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
-		MATCH_TYPE_QUALIFIER(T_inline,   TYPE_QUALIFIER_INLINE);
 
 		case T___extension__:
 			/* TODO */
@@ -1156,6 +1164,11 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 #ifdef PROVIDE_IMAGINARY
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
 #endif
+		case T_inline:
+			next_token();
+			specifiers->is_inline = true;
+			break;
+
 		case T_long:
 			next_token();
 			if(type_specifiers & SPECIFIER_LONG_LONG) {
@@ -1372,7 +1385,6 @@ static type_qualifier_t parse_type_qualifiers(void)
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
 		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
-		MATCH_TYPE_QUALIFIER(T_inline,   TYPE_QUALIFIER_INLINE);
 
 		default:
 			return type_qualifiers;
@@ -1402,8 +1414,8 @@ static declaration_t *parse_parameter(void)
 
 	parse_declaration_specifiers(&specifiers);
 
-	declaration_t *declaration = parse_declarator(specifiers.storage_class,
-	                                              specifiers.type, 1);
+	declaration_t *declaration
+		= parse_declarator(&specifiers, specifiers.type, true);
 
 	/* TODO check declaration constraints for parameters */
 	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
@@ -1719,11 +1731,13 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 	return type;
 }
 
-static declaration_t *parse_declarator(storage_class_t storage_class,
-		type_t *type, int may_be_abstract)
+static declaration_t *parse_declarator(
+		const declaration_specifiers_t *specifiers,
+		type_t *type, bool may_be_abstract)
 {
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-	declaration->storage_class = storage_class;
+	declaration->storage_class = specifiers->storage_class;
+	declaration->is_inline     = specifiers->is_inline;
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(declaration, may_be_abstract);
@@ -1787,9 +1801,17 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 {
 	while(true) {
 		declaration_t *ndeclaration
-			= parse_declarator(specifiers->storage_class, specifiers->type, 0);
+			= parse_declarator(specifiers, specifiers->type, false);
 
 		declaration_t *declaration = record_declaration(ndeclaration);
+
+		type_t *type = declaration->type;
+		if(type->type != TYPE_FUNCTION && declaration->is_inline) {
+			parser_print_warning_prefix_pos(declaration->source_position);
+			fprintf(stderr, "variable ‘%s’ declared ‘inline’\n",
+			        declaration->symbol->string);
+		}
+
 		if(token.type == '=') {
 			next_token();
 
@@ -1862,8 +1884,7 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			/* TODO (bitfields) */
 		} else {
 			declaration_t *declaration
-				= parse_declarator(specifiers->storage_class,
-				                   specifiers->type, 1);
+				= parse_declarator(specifiers, specifiers->type, true);
 
 			/* TODO: check constraints for struct declarations */
 			/* TODO: check for doubled fields */

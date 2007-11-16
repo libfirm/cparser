@@ -519,11 +519,10 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	ir_type  *ir_type_method = get_ir_type(declaration->type);
 	assert(is_Method_type(ir_type_method));
 
-	type_t    *type   = declaration->type;
 	ir_entity *entity = new_entity(global_type, id, ir_type_method);
 	set_entity_ld_ident(entity, id);
-	if(declaration->storage_class & STORAGE_CLASS_STATIC
-			|| type->qualifiers & TYPE_QUALIFIER_INLINE) {
+	if(declaration->storage_class == STORAGE_CLASS_STATIC
+			|| declaration->is_inline) {
 		set_entity_visibility(entity, visibility_local);
 	} else if(declaration->init.statement != NULL) {
 		set_entity_visibility(entity, visibility_external_visible);

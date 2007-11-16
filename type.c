@@ -46,7 +46,6 @@ void print_type_qualifiers(unsigned qualifiers)
 	if(qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
 	if(qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
 	if(qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
-	if(qualifiers & TYPE_QUALIFIER_INLINE)   fputs("inline ",   out);
 }
 
 static

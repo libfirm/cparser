@@ -226,6 +226,7 @@ struct declaration_t {
 	unsigned char       namespace;
 	unsigned char       storage_class;
 	unsigned int        address_taken : 1;
+	unsigned int        is_inline     : 1;
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;

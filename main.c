@@ -213,6 +213,8 @@ static void create_firm_prog(translation_unit_t *unit)
 {
 	translation_unit_to_firm(unit);
 
+	dump_globals_as_text(dump_verbosity_max, "-globals");
+
 	int n_irgs = get_irp_n_irgs();
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);

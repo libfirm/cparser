@@ -63,7 +63,6 @@ typedef enum {
 	TYPE_QUALIFIER_CONST    = 1 << 0,
 	TYPE_QUALIFIER_RESTRICT = 1 << 1,
 	TYPE_QUALIFIER_VOLATILE = 1 << 2,
-	TYPE_QUALIFIER_INLINE   = 1 << 3,
 } type_qualifier_t;
 
 struct type_t {

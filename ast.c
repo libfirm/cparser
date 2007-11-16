@@ -521,6 +521,10 @@ static void print_normal_declaration(const declaration_t *declaration)
 	print_storage_class(declaration->storage_class);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
+	if(declaration->is_inline) {
+		fputs("inline ", out);
+	}
+
 	if(declaration->type->type == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {
 			fputs("\n", out);
