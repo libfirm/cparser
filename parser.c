@@ -1475,6 +1475,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 }
 
 typedef enum {
+	CONSTRUCT_INVALID,
 	CONSTRUCT_POINTER,
 	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
@@ -1519,7 +1520,8 @@ static construct_type_t *parse_pointer_declarator(void)
 
 	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
 	memset(pointer, 0, sizeof(pointer[0]));
-	pointer->type_qualifiers = parse_type_qualifiers();
+	pointer->construct_type.type = CONSTRUCT_POINTER;
+	pointer->type_qualifiers     = parse_type_qualifiers();
 
 	return (construct_type_t*) pointer;
 }
@@ -1530,6 +1532,7 @@ static construct_type_t *parse_array_declarator(void)
 
 	parsed_array_t *array = obstack_alloc(&temp_obst, sizeof(array[0]));
 	memset(array, 0, sizeof(array[0]));
+	array->construct_type.type = CONSTRUCT_ARRAY;
 
 	if(token.type == T_static) {
 		array->is_static = true;
@@ -1672,6 +1675,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		array_type_t              *array_type;
 
 		switch(iter->type) {
+		case CONSTRUCT_INVALID:
+			panic("invalid type construction found");
 		case CONSTRUCT_FUNCTION:
 			construct_function_type = (construct_function_type_t*) iter;
 			function_type           = construct_function_type->function_type;
@@ -2349,15 +2354,18 @@ static expression_t *parse_array_expression(unsigned precedence,
 	array_access->array_ref           = array_ref;
 	array_access->index               = parse_expression();
 
-	type_t *array_type = array_ref->datatype;
-	if(array_type != NULL) {
-		if(array_type->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) array_type;
+	type_t *type = array_ref->datatype;
+	if(type != NULL) {
+		if(type->type == TYPE_POINTER) {
+			pointer_type_t *pointer           = (pointer_type_t*) type;
 			array_access->expression.datatype = pointer->points_to;
+		} else if(type->type == TYPE_ARRAY) {
+			array_type_t *array_type          = (array_type_t*) type;
+			array_access->expression.datatype = array_type->element_type;
 		} else {
 			parser_print_error_prefix();
 			fprintf(stderr, "array access on object with non-pointer type ");
-			print_type(array_type);
+			print_type(type);
 			fprintf(stderr, "\n");
 		}
 	}

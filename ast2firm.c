@@ -256,6 +256,8 @@ static unsigned count_parameters(const function_type_t *function_type)
 
 
 
+static long fold_constant(const expression_t *expression);
+
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
 	ir_mode *mode   = get_atomic_mode(type);
@@ -317,21 +319,23 @@ static ir_type *create_array_type(array_type_t *type)
 	type_t  *element_type    = type->element_type;
 	ir_type *ir_element_type = get_ir_type(element_type);
 
-	/* TODO... */
-	int n_elements = 0;
-	panic("TODO arraytpye size not implemented yet");
+	ident   *id      = unique_ident("array");
+	ir_type *ir_type = new_type_array(id, 1, ir_element_type);
 
-	ir_type *ir_type = new_type_array(unique_ident("array"), 1, ir_element_type);
-	set_array_bounds_int(ir_type, 0, 0, n_elements);
+	if(type->size != NULL) {
+		int n_elements = fold_constant(type->size);
 
-	size_t elemsize = get_type_size_bytes(ir_element_type);
-	int align = get_type_alignment_bytes(ir_element_type);
-	if(elemsize % align > 0) {
-		elemsize += align - (elemsize % align);
+		set_array_bounds_int(ir_type, 0, 0, n_elements);
+
+		size_t elemsize = get_type_size_bytes(ir_element_type);
+		int align = get_type_alignment_bytes(ir_element_type);
+		if(elemsize % align > 0) {
+			elemsize += align - (elemsize % align);
+		}
+		set_type_size_bytes(ir_type, n_elements * elemsize);
+		set_type_alignment_bytes(ir_type, align);
+		set_type_state(ir_type, layout_fixed);
 	}
-	set_type_size_bytes(ir_type, n_elements * elemsize);
-	set_type_alignment_bytes(ir_type, align);
-	set_type_state(ir_type, layout_fixed);
 
 	return ir_type;
 }
@@ -491,6 +495,12 @@ static ir_type *get_ir_type(type_t *type)
 static inline ir_mode *get_ir_mode(type_t *type)
 {
 	ir_type *irtype = get_ir_type(type);
+
+	/* firm doesn't report a mode for arrays somehow... */
+	if(is_Array_type(irtype)) {
+		return mode_P;
+	}
+
 	ir_mode *mode   = get_type_mode(irtype);
 	assert(mode != NULL);
 	return mode;
@@ -612,7 +622,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
 	declaration_t *declaration = ref->declaration;
-	type_t        *type        = declaration->type;
+	type_t        *type        = skip_typeref(declaration->type);
 	ir_mode       *mode        = get_ir_mode(type);
 
 	switch((declaration_type_t) declaration->declaration_type) {
@@ -626,7 +636,12 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
 		ir_entity *entity   = declaration->v.entity;
 		ir_node   *symconst = create_symconst(dbgi, entity);
-		return load_from_expression_addr(type, symconst, dbgi);
+
+		if(type->type == TYPE_ARRAY) {
+			return symconst;
+		} else {
+			return load_from_expression_addr(type, symconst, dbgi);
+		}
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
@@ -1148,7 +1163,6 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 static ir_node *array_access_to_firm(
 		const array_access_expression_t *expression)
 {
-
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	ir_node  *addr = array_access_addr(expression);
 	type_t   *type = expression->expression.datatype;
@@ -1674,6 +1688,26 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	set_cur_block(break_block);
 }
 
+static long fold_constant(const expression_t *expression)
+{
+	ir_graph *old_current_ir_graph = current_ir_graph;
+	current_ir_graph = get_const_code_irg();
+
+	ir_node *cnst = expression_to_firm(expression);
+	if(!is_Const(cnst)) {
+		panic("couldn't fold constantl");
+	}
+	tarval *tv = get_Const_tarval(cnst);
+	if(!tarval_is_long(tv)) {
+		panic("folded constant not an integer");
+	}
+
+	long res = get_tarval_long(tv);
+
+	current_ir_graph = old_current_ir_graph;
+	return res;
+}
+
 static void case_label_to_firm(const case_label_statement_t *statement)
 {
 	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
@@ -1683,16 +1717,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	ir_node *proj;
 	set_cur_block(get_nodes_block(current_switch_cond));
 	if(statement->expression) {
-		ir_node *cnst = expression_to_firm(statement->expression);
-		if(!is_Const(cnst)) {
-			panic("couldn't fold constant for case label");
-		}
-		tarval *tv = get_Const_tarval(cnst);
-		if(!mode_is_int(get_tarval_mode(tv))) {
-			panic("case label not an integer");
-		}
-
-		long pn = get_tarval_long(tv);
+		long pn = fold_constant(statement->expression);
 		if(pn == MAGIC_DEFAULT_PN_NUMBER) {
 			/* oops someone detected our cheating... */
 			panic("magic default pn used");

@@ -1,9 +1,10 @@
 #include <config.h>
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #ifndef WITH_LIBCORE
 #define WITH_LIBCORE
@@ -19,7 +20,8 @@
 #include "ast2firm.h"
 #include "adt/error.h"
 
-#define LINKER "gcc"
+#define PREPROCESSOR "gcc -E"
+#define LINKER       "gcc"
 
 static int verbose;
 
@@ -107,7 +109,7 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 	memcpy(buf+last_dot, newext, extlen);
 }
 
-static translation_unit_t *do_parsing(const char *fname)
+static translation_unit_t *do_parsing(const char *fname, const char *input)
 {
 	FILE *in = fopen(fname, "r");
 	if(in == NULL) {
@@ -115,7 +117,7 @@ static translation_unit_t *do_parsing(const char *fname)
 		exit(1);
 	}
 
-	lexer_open_stream(in, fname);
+	lexer_open_stream(in, input);
 
 	translation_unit_t *unit = parse();
 
@@ -162,6 +164,21 @@ static void emit(const char *input_name, const char *out_name)
 	backend(input_name, out_name);
 }
 
+static void preprocess(const char *in, const char *out)
+{
+	char buf[4096];
+
+	snprintf(buf, sizeof(buf), "%s %s -o %s", PREPROCESSOR, in, out);
+	if(verbose) {
+		puts(buf);
+	}
+	int err = system(buf);
+	if(err != 0) {
+		fprintf(stderr, "preprocessor reported an error\n");
+		exit(1);
+	}
+}
+
 static void link(const char *in, const char *out)
 {
 	char buf[4096];
@@ -177,7 +194,20 @@ static void link(const char *in, const char *out)
 	}
 }
 
+static void assemble(const char *in, const char *out)
+{
+	char buf[4096];
 
+	snprintf(buf, sizeof(buf), "%s %s -c -o %s", LINKER, in, out);
+	if(verbose) {
+		puts(buf);
+	}
+	int err = system(buf);
+	if(err != 0) {
+		fprintf(stderr, "assembler reported an error\n");
+		exit(1);
+	}
+}
 
 static void create_firm_prog(translation_unit_t *unit)
 {
@@ -192,6 +222,15 @@ static void create_firm_prog(translation_unit_t *unit)
 
 static void optimize(void)
 {
+	int         arr_len;
+	ir_entity **keep_methods;
+
+	cgana(&arr_len, &keep_methods);
+	gc_irgs(arr_len, keep_methods);
+	free(keep_methods);
+
+	optimize_funccalls(0);
+
 	for(int i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
 		place_code(irg);
@@ -204,6 +243,20 @@ static void optimize(void)
 }
 
 void write_fluffy_decls(translation_unit_t *unit);
+
+typedef enum compile_mode_t {
+	Compile,
+	CompileAssemble,
+	CompileAssembleLink,
+	LexTest,
+	PrintAst,
+	PrintFluffy
+} compile_mode_t;
+
+static void usage(const char *argv0)
+{
+	fprintf(stderr, "Usage %s input [-o output] [-c]\n", argv0);
+}
 
 int main(int argc, char **argv)
 {
@@ -218,41 +271,100 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 
-	if(argc > 2 && strcmp(argv[1], "--lextest") == 0) {
-		lextest(argv[2]);
-		return 0;
-	}
-
-	if(argc > 2 && strcmp(argv[1], "--print-ast") == 0) {
-		translation_unit_t *unit = do_parsing(argv[2]);
-		ast_set_output(stdout);
-		if(unit != NULL) {
-			print_ast(unit);
-		}
-		return 0;
-	}
-
-	if(argc > 2 && strcmp(argv[1], "--print-fluffy") == 0) {
-		translation_unit_t *unit = do_parsing(argv[2]);
-		ast_set_output(stdout);
-		write_fluffy_decls(unit);
-		return 0;
-	}
+	const char *input   = NULL;
+	const char *outname = NULL;
+	compile_mode_t mode = CompileAssembleLink;
 
 	for(int i = 1; i < argc; ++i) {
-		const char *input = argv[i];
-		char        outfname[4096];
-
-		get_output_name(outfname, sizeof(outfname), input, ".s");
-
-		translation_unit_t *unit = do_parsing(input);
-		if(unit == NULL) {
+		const char *arg = argv[i];
+		if(strcmp(arg, "-o") == 0) {
+			++i;
+			if(i >= argc) {
+				usage(argv[0]);
+				return 1;
+			}
+			outname = argv[i];
+		} else if(strcmp(arg, "-c") == 0) {
+			mode = CompileAssemble;
+		} else if(strcmp(arg, "-S") == 0) {
+			mode = Compile;
+		} else if(strcmp(arg, "--lextest") == 0) {
+			mode = LexTest;
+		} else if(strcmp(arg, "--print-ast") == 0) {
+			mode = PrintAst;
+		} else if(strcmp(arg, "--print-fluffy") == 0) {
+			mode = PrintFluffy;
+		} else if(strcmp(arg, "-v") == 0) {
+			verbose = 1;
+		} else if(arg[0] == '-') {
+			usage(argv[0]);
 			return 1;
+		} else {
+			if(input != NULL) {
+				fprintf(stderr, "Error: multiple input files specified\n");
+				usage(argv[0]);
+				return 1;
+			} else {
+				input = arg;
+			}
 		}
-		create_firm_prog(unit);
-		optimize();
-		emit(input, outfname);
-		link(outfname, "a.out");
+	}
+
+	if(input == NULL) {
+		fprintf(stderr, "%s: no input files\n", argv[0]);
+		return 1;
+	}
+
+	if(mode == LexTest) {
+		lextest(input);
+		return 0;
+	}
+
+	const char *tmpfile = tmpnam(NULL);
+	preprocess(input, tmpfile);
+
+	translation_unit_t *unit = do_parsing(tmpfile, input);
+	if(unit == NULL)
+		return 1;
+
+	if(mode == PrintAst) {
+		print_ast(unit);
+		return 0;
+	}
+	if(mode == PrintFluffy) {
+		ast_set_output(stdout);
+		write_fluffy_decls(unit);
+	}
+
+	char outsname[4096];
+	const char *sname = NULL;
+	if(mode == Compile) {
+		sname = outname;
+	}
+	if(sname == NULL) {
+		get_output_name(outsname, sizeof(outsname), input, ".s");
+		sname = outsname;
+	}
+
+	create_firm_prog(unit);
+	optimize();
+	emit(input, sname);
+
+	if(mode == CompileAssemble) {
+		char outoname[4096];
+		const char *oname = outname;
+		if(oname == NULL) {
+			get_output_name(outoname, sizeof(outoname), input, ".o");
+			oname = outoname;
+		}
+		assemble(sname, oname);
+	} else {
+		assert(mode == CompileAssembleLink);
+
+		if(outname == NULL)
+			outname = "a.out";
+
+		link(sname, outname);
 	}
 
 	exit_ast2firm();
