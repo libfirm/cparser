@@ -1295,6 +1295,12 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	return load_from_expression_addr(type, addr, dbgi);
 }
 
+static ir_node *dereference_addr(const unary_expression_t *const expression)
+{
+	assert(expression->type == UNEXPR_DEREFERENCE);
+	return expression_to_firm(expression->value);
+}
+
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -1304,6 +1310,14 @@ static ir_node *expression_to_addr(const expression_t *expression)
 		return array_access_addr((const array_access_expression_t*) expression);
 	case EXPR_SELECT:
 		return select_addr((const select_expression_t*) expression);
+	case EXPR_UNARY: {
+		const unary_expression_t *const unary_expr =
+			(const unary_expression_t*)expression;
+		if (unary_expr->type == UNEXPR_DEREFERENCE) {
+			return dereference_addr(unary_expr);
+		}
+		break;
+	}
 	default:
 		break;
 	}
