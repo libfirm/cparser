@@ -20,7 +20,7 @@
 #include "ast2firm.h"
 #include "adt/error.h"
 
-#define PREPROCESSOR "gcc -E"
+#define PREPROCESSOR "cpp"
 #define LINKER       "gcc"
 
 static int verbose;
@@ -109,20 +109,10 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 	memcpy(buf+last_dot, newext, extlen);
 }
 
-static translation_unit_t *do_parsing(const char *fname, const char *input)
+static translation_unit_t *do_parsing(FILE *const in, const char *const input)
 {
-	FILE *in = fopen(fname, "r");
-	if(in == NULL) {
-		fprintf(stderr, "Couldn't open '%s': %s\n", fname, strerror(errno));
-		exit(1);
-	}
-
 	lexer_open_stream(in, input);
-
 	translation_unit_t *unit = parse();
-
-	fclose(in);
-
 	return unit;
 }
 
@@ -164,19 +154,20 @@ static void emit(const char *input_name, const char *out_name)
 	backend(input_name, out_name);
 }
 
-static void preprocess(const char *in, const char *out)
+static FILE* preprocess(const char *in)
 {
 	char buf[4096];
 
-	snprintf(buf, sizeof(buf), "%s %s -o %s", PREPROCESSOR, in, out);
+	snprintf(buf, sizeof(buf), PREPROCESSOR " %s -o -",in);
 	if(verbose) {
 		puts(buf);
 	}
-	int err = system(buf);
-	if(err != 0) {
-		fprintf(stderr, "preprocessor reported an error\n");
+	FILE* f = popen(buf, "r");
+	if (f == NULL) {
+		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(1);
 	}
+	return f;
 }
 
 static void link(const char *in, const char *out)
@@ -329,10 +320,9 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	const char *tmpfile = tmpnam(NULL);
-	preprocess(input, tmpfile);
-
-	translation_unit_t *unit = do_parsing(tmpfile, input);
+	FILE *const in = preprocess(input);
+	translation_unit_t *const unit = do_parsing(in, input);
+	pclose(in);
 	if(unit == NULL)
 		return 1;
 
