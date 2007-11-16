@@ -83,8 +83,8 @@ const char *retrieve_dbg(const dbg_info *dbg, unsigned *line)
 void init_ast2firm(void)
 {
 	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
-	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, 0);
-	type_int        = make_atomic_type(ATOMIC_TYPE_INT, 0);
+	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
+	type_int        = make_atomic_type(ATOMIC_TYPE_INT,  TYPE_QUALIFIER_NONE);
 
 	ir_type_int        = get_ir_type(type_int);
 	ir_type_const_char = get_ir_type(type_const_char);
