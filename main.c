@@ -25,6 +25,12 @@
 #define PREPROCESSOR "cpp"
 #define LINKER       "gcc"
 
+#ifdef _WIN32
+/* remap some names */
+#define popen(cmd, mode)  _popen(cmd, mode)
+#define pclose(file)      _pclose(file)
+#endif /* _WIN32 */
+
 static int verbose;
 
 static const ir_settings_if_conv_t *if_conv_info = NULL;
