@@ -618,6 +618,20 @@ static ir_node *load_from_expression_addr(type_t *type, ir_node *addr,
 	return load_res;
 }
 
+static ir_node *deref_address(type_t *const type, ir_node *const addr,
+                              dbg_info *const dbgi)
+{
+	switch (type->type) {
+		case TYPE_ARRAY:
+		case TYPE_COMPOUND_STRUCT:
+		case TYPE_COMPOUND_UNION:
+			return addr;
+
+		default:
+			return load_from_expression_addr(type, addr, dbgi);
+	}
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
@@ -648,13 +662,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-
-		if(type->type == TYPE_ARRAY || type->type == TYPE_COMPOUND_STRUCT
-				|| type->type == TYPE_COMPOUND_UNION) {
-			return sel;
-		} else {
-			return load_from_expression_addr(type, sel, dbgi);
-		}
+		return deref_address(type, sel, dbgi);
 	}
 
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
@@ -1273,8 +1281,7 @@ static ir_node *array_access_to_firm(
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	ir_node  *addr = array_access_addr(expression);
 	type_t   *type = expression->expression.datatype;
-
-	return load_from_expression_addr(type, addr, dbgi);
+	return deref_address(type, addr, dbgi);
 }
 
 static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
