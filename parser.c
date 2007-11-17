@@ -2643,20 +2643,24 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 	function_type_t *function_type;
 	type_t          *type = expression->datatype;
-	if(type->type != TYPE_FUNCTION) {
-		/* TODO calling pointers to functions is ok */
+	if (type->type == TYPE_FUNCTION) {
+		function_type             = (function_type_t*) type;
+		call->expression.datatype = function_type->result_type;
+	} else if (type->type == TYPE_POINTER &&
+	           ((pointer_type_t*)type)->points_to->type == TYPE_FUNCTION) {
+		pointer_type_t *const ptr_type = (pointer_type_t*)type;
+		function_type                  = (function_type_t*)ptr_type->points_to;
+		call->expression.datatype      = function_type->result_type;
+	} else {
 		parser_print_error_prefix();
 		fputs("called object '", stderr);
 		print_expression(expression);
 		fputs("' (type ", stderr);
 		print_type_quoted(type);
-		fputs("is not a function\n", stderr);
+		fputs(") is not a function\n", stderr);
 
 		function_type             = NULL;
 		call->expression.datatype = NULL;
-	} else {
-		function_type             = (function_type_t*) type;
-		call->expression.datatype = function_type->result_type;
 	}
 
 	/* parse arguments */
