@@ -3201,7 +3201,9 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression_t *left       = expression->left;
 	type_t       *type_left  = left->datatype;
 
-	if(type_left != NULL) {
+	if (type_left->type == TYPE_ARRAY) {
+		parse_error_expected("Cannot assign to arrays.");
+	} else if (type_left != NULL) {
 		semantic_assign(type_left, &expression->right, "assignment");
 	}
 
