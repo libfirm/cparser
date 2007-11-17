@@ -2856,6 +2856,36 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 	expression->expression.datatype = orig_type;
 }
 
+static void semantic_unexpr_scalar(unary_expression_t *expression)
+{
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
+
+	type_t *type = skip_typeref(orig_type);
+	if (!is_type_scalar(type)) {
+		parse_error("operand of ! must be of scalar type\n");
+		return;
+	}
+
+	expression->expression.datatype = orig_type;
+}
+
+static void semantic_unexpr_integer(unary_expression_t *expression)
+{
+	type_t *orig_type = expression->value->datatype;
+	if(orig_type == NULL)
+		return;
+
+	type_t *type = skip_typeref(orig_type);
+	if (!is_type_integer(type)) {
+		parse_error("operand of ~ must be of integer type\n");
+		return;
+	}
+
+	expression->expression.datatype = orig_type;
+}
+
 static void semantic_dereference(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->datatype;
@@ -2921,11 +2951,11 @@ static expression_t *parse_##unexpression_type(unsigned precedence)            \
 
 CREATE_UNARY_EXPRESSION_PARSER('-', UNEXPR_NEGATE, semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER('+', UNEXPR_PLUS,   semantic_unexpr_arithmetic)
-CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT,    semantic_unexpr_arithmetic)
+CREATE_UNARY_EXPRESSION_PARSER('!', UNEXPR_NOT,    semantic_unexpr_scalar)
 CREATE_UNARY_EXPRESSION_PARSER('*', UNEXPR_DEREFERENCE, semantic_dereference)
 CREATE_UNARY_EXPRESSION_PARSER('&', UNEXPR_TAKE_ADDRESS, semantic_take_addr)
 CREATE_UNARY_EXPRESSION_PARSER('~', UNEXPR_BITWISE_NEGATE,
-                               semantic_unexpr_arithmetic)
+                               semantic_unexpr_integer)
 CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   UNEXPR_PREFIX_INCREMENT,
                                semantic_incdec)
 CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, UNEXPR_PREFIX_DECREMENT,
