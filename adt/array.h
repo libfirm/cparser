@@ -57,8 +57,13 @@
  * @return A pointer to the flexible array (can be used as a pointer to the
  *         first element of this array).
  */
-#define CLONE_ARR_F(arr)			\
+#ifdef __GNUC__
+#define CLONE_ARR_F(type, arr)			\
   NEW_ARR_F (__typeof__(arr[0]), ARR_LEN ((arr)))
+#else
+#define CLONE_ARR_F(type, arr)			\
+	NEW_ARR_F (type, ARR_LEN ((arr)))
+#endif
 
 /**
  * Duplicates an array and returns the new flexible one.
@@ -72,8 +77,13 @@
  * @return A pointer to the flexible array (can be used as a pointer to the
  *         first element of this array).
  */
-#define DUP_ARR_F(arr)							\
+#ifdef __GNUC__
+#define DUP_ARR_F(type, arr)							\
   memcpy (CLONE_ARR_F (__typeof__(arr[0]), (arr)), (arr), sizeof(__typeof__(arr[0])) * ARR_LEN((arr)))
+#else
+#define DUP_ARR_F(type, arr)							\
+	memcpy (CLONE_ARR_F (type, (arr)), (arr), sizeof(type) * ARR_LEN((arr)))
+#endif
 
 /**
  * Delete a flexible array.
@@ -97,7 +107,7 @@
  */
 #define NEW_ARR_D(type, obstack, nelts)					\
   (  nelts								\
-   ? (type *)_new_arr_d ((obstack), (nelts), sizeof(type) * (nelts))	\
+   ? (type *)_new_arr_d((obstack), (nelts), sizeof(type) * (nelts))	\
    : (type *)arr_mt_descr.v.elts)
 
 /**
@@ -114,8 +124,13 @@
  * @return A pointer to the dynamic array (can be used as a pointer to the
  *         first element of this array).
  */
-#define CLONE_ARR_D(obstack, arr)		\
-  NEW_ARR_D (__typeof__(arr[0]), (obstack), ARR_LEN ((arr)))
+#ifdef __GNUC__
+#define CLONE_ARR_D(type, obstack, arr)		\
+  NEW_ARR_D(__typeof__(arr[0]), (obstack), ARR_LEN((arr)))
+#else
+#define CLONE_ARR_D(type, obstack, arr)		\
+	NEW_ARR_D(type, (obstack), ARR_LEN((arr)))
+#endif
 
 /**
  * Duplicates an array and returns the new dynamic one.
@@ -130,8 +145,13 @@
  * @return A pointer to the dynamic array (can be used as a pointer to the
  *         first element of this array).
  */
-#define DUP_ARR_D(obstack, arr)							\
-  memcpy (CLONE_ARR_D (__typeof__(arr[0]), (obstack), (arr)), (arr), sizeof(__typeof__(arr[0])) * ARR_LEN ((arr)))
+#ifdef __GNUC__
+#define DUP_ARR_D(type, obstack, arr)							\
+  memcpy(CLONE_ARR_D(__typeof__(arr[0]), (obstack), (arr)), (arr), sizeof(__typeof__(arr[0])) * ARR_LEN((arr)))
+#else
+#define DUP_ARR_D(type, obstack, arr)							\
+	memcpy(CLONE_ARR_D(type, (obstack), (arr)), (arr), sizeof(type) * ARR_LEN((arr)))
+#endif
 
 /**
  * Create an automatic array which will be deleted at return from function.
@@ -157,6 +177,7 @@
  * Creates a new automatic array with the same number of elements as a
  * given one.
  *
+ * @param type     The element type of the array.
  * @param var      A lvalue of type (type *) which will hold the new array.
  * @param arr      An array from which the elements will be duplicated
  *
@@ -166,8 +187,13 @@
  * @return A pointer to the dynamic array (can be used as a pointer to the
  *         first element of this array).
  */
-#define CLONE_ARR_A(var, arr)		\
-  NEW_ARR_A (__typeof__(arr[0]), (var), ARR_LEN ((arr)))
+#ifdef __GNUC__
+#define CLONE_ARR_A(type, var, arr)		\
+  NEW_ARR_A(__typeof__(arr[0]), (var), ARR_LEN((arr)))
+#else
+#define CLONE_ARR_A(type, var, arr)		\
+	NEW_ARR_A(type, (var), ARR_LEN((arr)))
+#endif
 
 /**
  * Duplicates an array and returns a new automatic one.
@@ -182,10 +208,17 @@
  * @return A pointer to the dynamic array (can be used as a pointer to the
  *         first element of this array).
  */
-#define DUP_ARR_A(var, arr)					\
+#ifdef __GNUC__
+#define DUP_ARR_A(type, var, arr)					\
   do { CLONE_ARR_A(__typeof__(arr[0]), (var), (arr));					\
-       memcpy ((var), (arr), sizeof (__typeof__(arr[0])) * ARR_LEN ((arr))); }	\
+       memcpy((var), (arr), sizeof(__typeof__(arr[0])) * ARR_LEN((arr))); }	\
   while (0)
+#else
+#define DUP_ARR_A(type, var, arr)					\
+  do { CLONE_ARR_A(type, (var), (arr));					\
+    memcpy((var), (arr), sizeof(type) * ARR_LEN((arr))); }	\
+  while (0)
+#endif
 
 /**
  * Declare an initialized (zero'ed) array of fixed size.
@@ -212,24 +245,36 @@
  * Resize a flexible array, allocate more data if needed but do NOT
  * reduce.
  *
+ * @param type     The element type of the array.
  * @param arr      The array, which must be an lvalue.
  * @param n        The new size of the array.
  *
  * @remark  This macro may change arr, so update all references!
  */
-#define ARR_RESIZE(arr, n)					\
-  ((arr) = _arr_resize ((arr), (n), sizeof(__typeof__(arr[0]))))
+#ifdef __GNUC__
+#define ARR_RESIZE(type, arr, n)					\
+  ((arr) = _arr_resize((arr), (n), sizeof(__typeof__(arr[0]))))
+#else
+#define ARR_RESIZE(type, arr, n)					\
+	((arr) = _arr_resize((arr), (n), sizeof(type)))
+#endif
 
 /**
  * Resize a flexible array, always reallocate data.
  *
+ * @param type     The element type of the array.
  * @param arr      The array, which must be an lvalue.
  * @param n        The new size of the array.
  *
  * @remark  This macro may change arr, so update all references!
  */
-#define ARR_SETLEN(arr, n)					\
+#ifdef __GNUC__
+#define ARR_SETLEN(type, arr, n)					\
   ((arr) = _arr_setlen ((arr), (n), sizeof(__typeof__(arr[0])) * (n)))
+#else
+#define ARR_SETLEN(type, arr, n)					\
+  ((arr) = _arr_setlen ((arr), (n), sizeof(type) * (n)))
+#endif
 
 /** Set a length smaller than the current length of the array.  Do not
  *  resize. len must be <= ARR_LEN(arr). */
@@ -240,34 +285,37 @@
 /**
  * Resize a flexible array by growing it by delta elements.
  *
+ * @param type     The element type of the array.
  * @param arr      The array, which must be an lvalue.
  * @param delta    The delta number of elements.
  *
  * @remark  This macro may change arr, so update all references!
  */
-#define ARR_EXTEND(arr, delta)			\
-  ARR_RESIZE ((arr), ARR_LEN ((arr)) + (delta))
+#define ARR_EXTEND(type, arr, delta)			\
+  ARR_RESIZE(type, (arr), ARR_LEN((arr)) + (delta))
 
 /**
  * Resize a flexible array to hold n elements only if it is currently shorter
  * than n.
  *
+ * @param type     The element type of the array.
  * @param arr      The array, which must be an lvalue.
  * @param n        The new size of the array.
  *
  * @remark  This macro may change arr, so update all references!
  */
-#define ARR_EXTO(arr, n)						\
-  ((n) >= ARR_LEN ((arr)) ? ARR_RESIZE ((arr), (n)+1) : (arr))
+#define ARR_EXTO(type, arr, n)						\
+  ((n) >= ARR_LEN((arr)) ? ARR_RESIZE(type, (arr), (n)+1) : (arr))
 
 /**
  * Append one element to a flexible array.
  *
+ * @param type     The element type of the array.
  * @param arr      The array, which must be an lvalue.
  * @param elt      The new element, must be of type (type).
  */
-#define ARR_APP1(arr, elt)					\
-  (ARR_EXTEND ((arr), 1), (arr)[ARR_LEN ((arr))-1] = (elt))
+#define ARR_APP1(type, arr, elt)					\
+  (ARR_EXTEND(type, (arr), 1), (arr)[ARR_LEN((arr))-1] = (elt))
 
 
 #ifdef NDEBUG

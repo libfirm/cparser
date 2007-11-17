@@ -443,7 +443,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	entry.symbol          = symbol;
 	entry.old_declaration = symbol->declaration;
 	entry.namespace       = namespace;
-	ARR_APP1(*stack_ptr, entry);
+	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 
 	/* replace/add declaration into declaration list of the symbol */
 	if(symbol->declaration == NULL) {
@@ -501,7 +501,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 
 		declaration_t *old_declaration = entry->old_declaration;
 		symbol_t      *symbol          = entry->symbol;
-		namespace_t    namespace       = entry->namespace;
+		namespace_t    namespace       = (namespace_t)entry->namespace;
 
 		/* replace/remove declaration */
 		declaration_t *declaration = symbol->declaration;

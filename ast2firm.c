@@ -1883,7 +1883,7 @@ static ir_node *get_label_block(declaration_t *label)
 	label->declaration_type = DECLARATION_TYPE_LABEL_BLOCK;
 	label->v.block          = block;
 
-	ARR_APP1(imature_blocks, block);
+	ARR_APP1(ir_node *, imature_blocks, block);
 
 	return block;
 }
