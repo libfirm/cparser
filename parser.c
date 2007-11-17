@@ -2731,7 +2731,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	/* 6.5.15.2 */
 	type_t *condition_type = conditional->condition->datatype;
 	if(condition_type != NULL) {
-		if(!is_type_scalar(condition_type)) {
+		if(!is_type_scalar(skip_typeref(condition_type))) {
 			type_error("expected a scalar type", expression->source_position,
 			           condition_type);
 		}
@@ -2748,27 +2748,33 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	if(false_type == NULL)
 		return (expression_t*) conditional;
 
+	type_t *const skipped_true_type  = skip_typeref(true_type);
+	type_t *const skipped_false_type = skip_typeref(false_type);
+
 	/* 6.5.15.3 */
-	if(true_type == false_type) {
-		conditional->expression.datatype = true_type;
-	} else if(is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
-		type_t *result = get_type_after_conversion(true_type, false_type);
+	if (skipped_true_type == skipped_false_type) {
+		conditional->expression.datatype = skipped_true_type;
+	} else if (is_type_arithmetic(skipped_true_type) &&
+	           is_type_arithmetic(skipped_false_type)) {
+		type_t *const result = get_type_after_conversion(skipped_true_type,
+		                                                 skipped_false_type);
 		/* TODO: create implicit convs if necessary */
 		conditional->expression.datatype = result;
-	} else if(true_type->type == TYPE_POINTER &&
-	          false_type->type == TYPE_POINTER &&
+	} else if (skipped_true_type->type == TYPE_POINTER &&
+	           skipped_false_type->type == TYPE_POINTER &&
 			  true /* TODO compatible points_to types */) {
 		/* TODO */
-	} else if(/* (is_null_ptr_const(true_type) && false_type->type == TYPE_POINTER)
-	       || (is_null_ptr_const(false_type) &&
-	           true_type->type == TYPE_POINTER) TODO*/ false) {
+	} else if(/* (is_null_ptr_const(skipped_true_type) &&
+	              skipped_false_type->type == TYPE_POINTER)
+	       || (is_null_ptr_const(skipped_false_type) &&
+	           skipped_true_type->type == TYPE_POINTER) TODO*/ false) {
 		/* TODO */
 	} else if(/* 1 is pointer to object type, other is void* */ false) {
 		/* TODO */
 	} else {
 		type_error_incompatible("while parsing conditional",
 		                        expression->source_position, true_type,
-		                        false_type);
+		                        skipped_false_type);
 	}
 
 	return (expression_t*) conditional;
