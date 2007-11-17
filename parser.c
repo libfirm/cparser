@@ -263,7 +263,6 @@ static void type_error(const char *msg, const source_position_t source_position,
 	fprintf(stderr, "%s, but found type ", msg);
 	print_type_quoted(type);
 	fputc('\n', stderr);
-	error();
 }
 
 static void type_error_incompatible(const char *msg,
@@ -275,7 +274,6 @@ static void type_error_incompatible(const char *msg,
 	fprintf(stderr, " - ");
 	print_type_quoted(type2);
 	fprintf(stderr, ")\n");
-	error();
 }
 
 static void eat_block(void)
@@ -425,7 +423,6 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			parser_print_error_prefix_pos(declaration->source_position);
 			fprintf(stderr, "definition of symbol %s%s with type ",
 					get_namespace_prefix(namespace), symbol->string);
-			error();
 			print_type_quoted(declaration->type);
 			fputc('\n', stderr);
 			parser_print_error_prefix_pos(
@@ -1865,7 +1862,6 @@ static void parser_error_multiple_definition(declaration_t *previous,
 	parser_print_error_prefix_pos(previous->source_position);
 	fprintf(stderr, "this is the location of the previous "
 	        "definition.\n");
-	error();
 }
 
 static void parse_init_declarators(const declaration_specifiers_t *specifiers)
