@@ -3115,6 +3115,14 @@ static void semantic_add(binary_expression_t *expression)
 		expression->expression.datatype = type_left;
 	} else if(type_right->type == TYPE_POINTER && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
+	} else if (type_left->type == TYPE_ARRAY && is_type_integer(type_right)) {
+		const array_type_t *const arr_type = (const array_type_t*)type_left;
+		expression->expression.datatype =
+		  make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+	} else if (type_right->type == TYPE_ARRAY && is_type_integer(type_left)) {
+		const array_type_t *const arr_type = (const array_type_t*)type_right;
+		expression->expression.datatype =
+			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary + (");

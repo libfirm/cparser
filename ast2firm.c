@@ -1041,11 +1041,11 @@ static ir_node *create_add(const binary_expression_t *expression)
 		return new_d_Add(dbgi, left, right, mode);
 	}
 
-	if(type_left->type == TYPE_POINTER) {
-		return pointer_arithmetic(left, right, type_left, dbgi, new_d_Add);
+	if (type_left->type == TYPE_POINTER || type_left->type == TYPE_ARRAY) {
+		return pointer_arithmetic(left, right, type, dbgi, new_d_Add);
 	} else {
-		assert(type_right->type == TYPE_POINTER);
-		return pointer_arithmetic(right, left, type_right, dbgi, new_d_Add);
+		assert(type_right->type == TYPE_POINTER || type_right->type == TYPE_ARRAY);
+		return pointer_arithmetic(right, left, type, dbgi, new_d_Add);
 	}
 }
 
