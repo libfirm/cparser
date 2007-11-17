@@ -870,7 +870,6 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	type_t   *type = expression->expression.datatype;
-	ir_mode  *mode = get_ir_mode(type);
 
 	if(expression->type == UNEXPR_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
@@ -880,29 +879,31 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 
 	switch(expression->type) {
 	case UNEXPR_NEGATE:
-		return new_d_Minus(dbgi, value_node, mode);
+		return new_d_Minus(dbgi, value_node, get_ir_mode(type));
 	case UNEXPR_PLUS:
 		return value_node;
 	case UNEXPR_BITWISE_NEGATE:
-		return new_d_Not(dbgi, value_node, mode);
-	case UNEXPR_NOT:
+		return new_d_Not(dbgi, value_node, get_ir_mode(type));
+	case UNEXPR_NOT: {
 		if(get_irn_mode(value_node) != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode_b);
 		}
 		value_node = new_d_Not(dbgi, value_node, mode_b);
+		ir_mode *const mode = get_ir_mode(type);
 		if(mode != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode);
 		}
 		return value_node;
+	}
 	case UNEXPR_DEREFERENCE:
-		return load_from_expression_addr(type, value_node, dbgi);
+		return deref_address(type, value_node, dbgi);
 	case UNEXPR_POSTFIX_INCREMENT:
 	case UNEXPR_POSTFIX_DECREMENT:
 	case UNEXPR_PREFIX_INCREMENT:
 	case UNEXPR_PREFIX_DECREMENT:
 		return create_incdec(expression);
 	case UNEXPR_CAST:
-		return create_conv(dbgi, value_node, mode);
+		return create_conv(dbgi, value_node, get_ir_mode(type));
 
 	case UNEXPR_TAKE_ADDRESS:
 	case UNEXPR_INVALID:
