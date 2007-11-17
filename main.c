@@ -83,7 +83,11 @@ static void initialize_firm(void)
 
 static void dump(ir_graph *irg, const char *suffix)
 {
+#if 0
 	dump_ir_block_graph(irg, suffix);
+#else
+	(void)irg, (void)suffix;
+#endif
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -230,6 +234,22 @@ static void optimize(void)
 
 	optimize_funccalls(0);
 
+	const backend_params *const be_params = be_init();
+	create_intrinsic_fkt *const arch_create_intrinsic = be_params->arch_create_intrinsic_fkt;
+	void                 *const create_intrinsic_ctx  = be_params->create_intrinsic_ctx;
+	lwrdw_param_t lwrdw_param = {
+		1,
+		1,
+		mode_Ls, mode_Lu,
+		mode_Is, mode_Iu,
+		def_create_intrinsic_fkt,
+		NULL
+	};
+	if (arch_create_intrinsic) {
+		lwrdw_param.create_intrinsic = arch_create_intrinsic;
+		lwrdw_param.ctx              = create_intrinsic_ctx;
+	}
+
 	for(int i = 0; i < get_irp_n_irgs(); ++i) {
 		ir_graph *irg = get_irp_irg(i);
 
@@ -239,6 +259,8 @@ static void optimize(void)
 		dump(irg, "-place");
 		optimize_cf(irg);
 		dump(irg, "-cf");
+		lower_dw_ops(&lwrdw_param);
+		dump(irg, "-dw");
 	}
 }
 
