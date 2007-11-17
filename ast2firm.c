@@ -540,7 +540,6 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 
 static ir_node *expression_to_firm(const expression_t *expression);
-static ir_node *expression_to_modeb(const expression_t *expression);
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
@@ -775,6 +774,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 }
 
 static ir_node *expression_to_addr(const expression_t *expression);
+static void create_condition_evaluation(const expression_t *expression,
+                                        ir_node *true_block,
+                                        ir_node *false_block);
 
 static void set_value_for_expression(const expression_t *expression,
                                      ir_node *value)
@@ -927,48 +929,32 @@ static long get_pnc(binary_expression_type_t type)
 static ir_node *create_lazy_op(const binary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	type_t   *type = expression->expression.datatype;
+	ir_mode  *mode = get_ir_mode(type);
 
-	bool is_or = (expression->type == BINEXPR_LOGICAL_OR);
-	assert(is_or || expression->type == BINEXPR_LOGICAL_AND);
+	ir_node *cur_block = get_cur_block();
 
-	ir_node  *val1       = expression_to_modeb(expression->left);
-	ir_node  *cond       = new_d_Cond(dbgi, val1);
-	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	ir_node *one_block = new_immBlock();
+	ir_node *one       = new_Const(mode, get_mode_one(mode));
+	ir_node *jmp_one   = new_d_Jmp(dbgi);
 
-	ir_node *fallthrough_block = new_immBlock();
+	ir_node *zero_block = new_immBlock();
+	ir_node *zero       = new_Const(mode, get_mode_null(mode));
+	ir_node *jmp_zero   = new_d_Jmp(dbgi);
 
-	/* the true case */
-	ir_node *calc_val2_block = new_immBlock();
-	if(is_or) {
-		add_immBlock_pred(calc_val2_block, false_proj);
-	} else {
-		add_immBlock_pred(calc_val2_block, true_proj);
-	}
+	set_cur_block(cur_block);
+	create_condition_evaluation((const expression_t*) expression,
+	                            one_block, zero_block);
+	mature_immBlock(one_block);
+	mature_immBlock(zero_block);
 
-	mature_immBlock(calc_val2_block);
+	ir_node *common_block = new_immBlock();
+	add_immBlock_pred(common_block, jmp_one);
+	add_immBlock_pred(common_block, jmp_zero);
+	mature_immBlock(common_block);
 
-	ir_node *val2 = expression_to_modeb(expression->right);
-	if(get_cur_block() != NULL) {
-		ir_node *jmp = new_d_Jmp(dbgi);
-		add_immBlock_pred(fallthrough_block, jmp);
-	}
-
-	/* fallthrough */
-	ir_node *constb;
-	if(is_or) {
-		constb = new_d_Const(dbgi, mode_b, get_tarval_b_true());
-		add_immBlock_pred(fallthrough_block, true_proj);
-	} else {
-		constb = new_d_Const(dbgi, mode_b, get_tarval_b_false());
-		add_immBlock_pred(fallthrough_block, false_proj);
-	}
-	mature_immBlock(fallthrough_block);
-
-	set_cur_block(fallthrough_block);
-
-	ir_node *in[2] = { val2, constb };
-	ir_node *val   = new_d_Phi(dbgi, 2, in, mode_b);
+	ir_node *in[2] = { one, zero };
+	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
 
 	return val;
 }
@@ -1298,26 +1284,25 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 
-	ir_node *condition  = expression_to_modeb(expression->condition);
-	ir_node *cond       = new_d_Cond(dbgi, condition);
-	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	ir_node *cur_block   = get_cur_block();
 
 	/* create the true block */
-	ir_node *true_block = new_immBlock();
-	add_immBlock_pred(true_block, true_proj);
-	mature_immBlock(true_block);
+	ir_node *true_block  = new_immBlock();
 
 	ir_node *true_val = expression_to_firm(expression->true_expression);
 	ir_node *true_jmp = new_Jmp();
 
 	/* create the false block */
 	ir_node *false_block = new_immBlock();
-	add_immBlock_pred(false_block, false_proj);
-	mature_immBlock(false_block);
 
 	ir_node *false_val = expression_to_firm(expression->false_expression);
 	ir_node *false_jmp = new_Jmp();
+
+	/* create the condition evaluation */
+	set_cur_block(cur_block);
+	create_condition_evaluation(expression->condition, true_block, false_block);
+	mature_immBlock(true_block);
+	mature_immBlock(false_block);
 
 	/* create the common block */
 	ir_node *common_block = new_immBlock();
@@ -1448,6 +1433,69 @@ static ir_node *expression_to_modeb(const expression_t *expression)
 	return res;
 }
 
+/**
+ * create a short-circuit expression evaluation that tries to construct
+ * efficient control flow structures for &&, || and ! expressions
+ */
+static void create_condition_evaluation(const expression_t *expression,
+                                        ir_node *true_block,
+                                        ir_node *false_block)
+{
+	switch(expression->type) {
+	case EXPR_UNARY: {
+		unary_expression_t *unary_expression = (unary_expression_t*) expression;
+		if(unary_expression->type == UNEXPR_NOT) {
+			create_condition_evaluation(unary_expression->value, false_block,
+			                            true_block);
+			return;
+		}
+		break;
+	}
+	case EXPR_BINARY: {
+		binary_expression_t *binary_expression
+			= (binary_expression_t*) expression;
+		if(binary_expression->type == BINEXPR_LOGICAL_AND) {
+			ir_node *cur_block   = get_cur_block();
+			ir_node *extra_block = new_immBlock();
+			set_cur_block(cur_block);
+			create_condition_evaluation(binary_expression->left, extra_block,
+			                            false_block);
+			mature_immBlock(extra_block);
+			set_cur_block(extra_block);
+			create_condition_evaluation(binary_expression->right, true_block,
+			                            false_block);
+			return;
+		}
+		if(binary_expression->type == BINEXPR_LOGICAL_OR) {
+			ir_node *cur_block   = get_cur_block();
+			ir_node *extra_block = new_immBlock();
+			set_cur_block(cur_block);
+			create_condition_evaluation(binary_expression->left, true_block,
+			                            extra_block);
+			mature_immBlock(extra_block);
+			set_cur_block(extra_block);
+			create_condition_evaluation(binary_expression->right, true_block,
+			                            false_block);
+			return;
+		}
+		break;
+	}
+	default:
+		break;
+	}
+
+	dbg_info *dbgi       = get_dbg_info(&expression->source_position);
+	ir_node  *condition  = expression_to_modeb(expression);
+	ir_node  *cond       = new_d_Cond(dbgi, condition);
+	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+	add_immBlock_pred(true_block, true_proj);
+	add_immBlock_pred(false_block, false_proj);
+
+	set_cur_block(NULL);
+}
+
 static void statement_to_firm(statement_t *statement);
 
 static void return_statement_to_firm(return_statement_t *statement)
@@ -1492,20 +1540,12 @@ static void expression_statement_to_firm(expression_statement_t *statement)
 
 static void if_statement_to_firm(if_statement_t *statement)
 {
-	dbg_info *dbgi      = get_dbg_info(&statement->statement.source_position);
-	ir_node  *condition = expression_to_modeb(statement->condition);
-
-	/* make sure we have a mode_b condition */
-	ir_node *cond       = new_d_Cond(dbgi, condition);
-	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+	ir_node *cur_block = get_cur_block();
 
 	ir_node *fallthrough_block = new_immBlock();
 
 	/* the true (blocks) */
 	ir_node *true_block = new_immBlock();
-	add_immBlock_pred(true_block, true_proj);
-	mature_immBlock(true_block);
 
 	statement_to_firm(statement->true_statement);
 	if(get_cur_block() != NULL) {
@@ -1514,10 +1554,9 @@ static void if_statement_to_firm(if_statement_t *statement)
 	}
 
 	/* the false (blocks) */
+	ir_node *false_block;
 	if(statement->false_statement != NULL) {
-		ir_node *false_block = new_immBlock();
-		add_immBlock_pred(false_block, false_proj);
-		mature_immBlock(false_block);
+		false_block = new_immBlock();
 
 		statement_to_firm(statement->false_statement);
 		if(get_cur_block() != NULL) {
@@ -1525,7 +1564,19 @@ static void if_statement_to_firm(if_statement_t *statement)
 			add_immBlock_pred(fallthrough_block, jmp);
 		}
 	} else {
-		add_immBlock_pred(fallthrough_block, false_proj);
+		false_block = fallthrough_block;
+	}
+
+	/* create the condition */
+	if(cur_block != NULL) {
+		set_cur_block(cur_block);
+		create_condition_evaluation(statement->condition, true_block,
+		                            false_block);
+	}
+
+	mature_immBlock(true_block);
+	if(false_block != fallthrough_block) {
+		mature_immBlock(false_block);
 	}
 	mature_immBlock(fallthrough_block);
 
@@ -1534,8 +1585,6 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 static void while_statement_to_firm(while_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
-
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
 		jmp = new_Jmp();
@@ -1547,20 +1596,11 @@ static void while_statement_to_firm(while_statement_t *statement)
 		add_immBlock_pred(header_block, jmp);
 	}
 
-	/* create the condition */
-	ir_node *condition  = expression_to_modeb(statement->condition);
-	ir_node *cond       = new_d_Cond(dbgi, condition);
-	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
-
 	/* the false block */
 	ir_node *false_block = new_immBlock();
-	add_immBlock_pred(false_block, false_proj);
 
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	add_immBlock_pred(body_block, true_proj);
-	mature_immBlock(body_block);
 
 	ir_node *old_continue_label = continue_label;
 	ir_node *old_break_label    = break_label;
@@ -1579,16 +1619,19 @@ static void while_statement_to_firm(while_statement_t *statement)
 		add_immBlock_pred(header_block, jmp);
 	}
 
-	mature_immBlock(header_block);
+	/* create the condition */
+	set_cur_block(header_block);
+
+	create_condition_evaluation(statement->condition, body_block, false_block);
+	mature_immBlock(body_block);
 	mature_immBlock(false_block);
+	mature_immBlock(header_block);
 
 	set_cur_block(false_block);
 }
 
 static void do_while_statement_to_firm(do_while_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
-
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
 		jmp = new_Jmp();
@@ -1631,24 +1674,17 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 
 	/* create the condition */
 	set_cur_block(header_block);
-	ir_node *condition  = expression_to_modeb(statement->condition);
-	ir_node *cond       = new_d_Cond(dbgi, condition);
-	ir_node *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
-	add_immBlock_pred(body_block, true_proj);
+	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
-
-	add_immBlock_pred(false_block, false_proj);
 	mature_immBlock(false_block);
+	mature_immBlock(header_block);
 
 	set_cur_block(false_block);
 }
 
 static void for_statement_to_firm(for_statement_t *statement)
 {
-	dbg_info *const dbgi = get_dbg_info(&statement->statement.source_position);
-
 	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
 		if(statement->initialisation != NULL) {
@@ -1662,7 +1698,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	if (statement->step != NULL) {
 		expression_to_firm(statement->step);
 	}
-	ir_node *const step_jmp   = new_Jmp();
+	ir_node *const step_jmp = new_Jmp();
 
 	/* create the header block */
 	ir_node *const header_block = new_immBlock();
@@ -1671,30 +1707,11 @@ static void for_statement_to_firm(for_statement_t *statement)
 	}
 	add_immBlock_pred(header_block, step_jmp);
 
-	/* create the condition */
-	ir_node *true_proj;
-	ir_node *false_proj;
-	if (statement->condition != NULL) {
-		ir_node *const condition  = expression_to_modeb(statement->condition);
-		ir_node *const cond       = new_d_Cond(dbgi, condition);
-		true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-		false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
-	} else {
-		keep_alive(header_block);
-		true_proj  = new_Jmp();
-		false_proj = NULL;
-	}
-
 	/* the false block */
 	ir_node *const false_block = new_immBlock();
-	if (false_proj != NULL) {
-		add_immBlock_pred(false_block, false_proj);
-	}
 
 	/* the loop body */
 	ir_node *const body_block = new_immBlock();
-	add_immBlock_pred(body_block, true_proj);
-	mature_immBlock(body_block);
 
 	ir_node *const old_continue_label = continue_label;
 	ir_node *const old_break_label    = break_label;
@@ -1713,6 +1730,19 @@ static void for_statement_to_firm(for_statement_t *statement)
 		add_immBlock_pred(step_block, jmp);
 	}
 
+	/* create the condition */
+	set_cur_block(header_block);
+	if (statement->condition != NULL) {
+		create_condition_evaluation(statement->condition, body_block,
+		                            false_block);
+	} else {
+		keep_alive(header_block);
+		ir_node *jmp = new_Jmp();
+		add_immBlock_pred(body_block, jmp);
+	}
+
+	mature_immBlock(body_block);
+	mature_immBlock(false_block);
 	mature_immBlock(step_block);
 	mature_immBlock(header_block);
 	mature_immBlock(false_block);
