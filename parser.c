@@ -2851,7 +2851,12 @@ static void semantic_dereference(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	switch (type->type) {
-		case TYPE_ARRAY:
+		case TYPE_ARRAY: {
+			array_type_t *const array_type  = (array_type_t*)type;
+			expression->expression.datatype = array_type->element_type;
+			break;
+		}
+
 		case TYPE_POINTER: {
 			pointer_type_t *pointer_type    = (pointer_type_t*)type;
 			expression->expression.datatype = pointer_type->points_to;
