@@ -711,23 +711,32 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
 
-	if(type_left == type_right) {
-		/* fine */
-	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	           (type_left->type == TYPE_POINTER && is_null_expression(*right)) ||
-	           (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
-		*right = create_implicit_cast(*right, type_left);
-	} else {
-		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "incompatible types in %s\n", context);
-		parser_print_error_prefix();
-		print_type_quoted(type_left);
-		fputs(" <- ", stderr);
-		print_type_quoted(type_right);
-		fputs("\n", stderr);
+	if (type_left == type_right) {
+		return;
 	}
 
+	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
+	    (type_left->type == TYPE_POINTER && is_null_expression(*right)) ||
+	    (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
+		*right = create_implicit_cast(*right, type_left);
+		return;
+	}
+
+	if (type_left->type == TYPE_POINTER && type_right->type == TYPE_FUNCTION) {
+		pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
+		if (ptr_type->points_to == type_right) {
+			return;
+		}
+	}
+
+	/* TODO: improve error message */
+	parser_print_error_prefix();
+	fprintf(stderr, "incompatible types in %s\n", context);
+	parser_print_error_prefix();
+	print_type_quoted(type_left);
+	fputs(" <- ", stderr);
+	print_type_quoted(type_right);
+	fputs("\n", stderr);
 }
 
 static expression_t *parse_constant_expression(void)
