@@ -297,8 +297,14 @@ int main(int argc, char **argv)
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
 		} else if(arg[0] == '-') {
-			usage(argv[0]);
-			return 1;
+			if (arg[1] == 'D' ||
+					arg[1] == 'O' ||
+					arg[1] == 'f') {
+				fprintf(stderr, "Warning: Ignoring option '%s'\n", arg);
+			} else {
+				usage(argv[0]);
+				return 1;
+			}
 		} else {
 			if(input != NULL) {
 				fprintf(stderr, "Error: multiple input files specified\n");
