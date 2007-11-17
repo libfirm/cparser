@@ -1109,24 +1109,46 @@ static ir_node *create_divmod(const binary_expression_t *expression)
 	ir_node  *op;
 	ir_node  *res;
 
-	if(expression->type == BINEXPR_DIV) {
-		if(mode_is_float(mode)) {
-			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
-		} else {
-			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
-		}
-	} else {
-		assert(expression->type == BINEXPR_MOD);
-		assert(!mode_is_float(mode));
-		op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
-		res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+	switch (expression->type)  {
+		case BINEXPR_DIV:
+		case BINEXPR_DIV_ASSIGN:
+			if(mode_is_float(mode)) {
+				op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
+				res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
+			} else {
+				op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
+				res = new_d_Proj(dbgi, op, mode, pn_Div_res);
+			}
+			break;
+
+		case BINEXPR_MOD:
+		case BINEXPR_MOD_ASSIGN:
+			assert(!mode_is_float(mode));
+			op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+			break;
+
+		default: panic("unexpected binary expression type in create_divmod()");
 	}
 
 	return res;
 }
 
+static ir_node *create_arithmetic_assign_divmod(
+		const binary_expression_t *expression)
+{
+	ir_node  *      value = create_divmod(expression);
+	dbg_info *const dbgi  = get_dbg_info(&expression->expression.source_position);
+	type_t   *const type  = expression->expression.datatype;
+	ir_mode  *const mode  = get_ir_mode(type);
+
+	assert(type->type != TYPE_POINTER);
+
+	value = create_conv(dbgi, value, mode);
+	set_value_for_expression(expression->left, value);
+
+	return value;
+}
 
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
@@ -1182,6 +1204,8 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return create_arithmetic_assign_binop(expression, new_d_Sub);
 	case BINEXPR_MUL_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Mul);
+	case BINEXPR_DIV_ASSIGN:
+		return create_arithmetic_assign_divmod(expression);
 	case BINEXPR_BITWISE_AND_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_And);
 	case BINEXPR_BITWISE_OR_ASSIGN:
