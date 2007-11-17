@@ -1641,23 +1641,25 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 		add_immBlock_pred(body_block, jmp);
 	}
 
-	ir_node *old_continue_label = continue_label;
-	ir_node *old_break_label    = break_label;
-	continue_label              = header_block;
-	break_label                 = false_block;
+	if (statement->body != NULL) {
+		ir_node *old_continue_label = continue_label;
+		ir_node *old_break_label    = break_label;
+		continue_label              = header_block;
+		break_label                 = false_block;
 
-	statement_to_firm(statement->body);
+		statement_to_firm(statement->body);
 
-	assert(continue_label == header_block);
-	assert(break_label    == false_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
+		assert(continue_label == header_block);
+		assert(break_label    == false_block);
+		continue_label = old_continue_label;
+		break_label    = old_break_label;
 
-	if(get_cur_block() == NULL) {
-		mature_immBlock(header_block);
-		mature_immBlock(body_block);
-		mature_immBlock(false_block);
-		return;
+		if (get_cur_block() == NULL) {
+			mature_immBlock(header_block);
+			mature_immBlock(body_block);
+			mature_immBlock(false_block);
+			return;
+		}
 	}
 
 	ir_node *body_jmp = new_Jmp();
@@ -1705,17 +1707,19 @@ static void for_statement_to_firm(for_statement_t *statement)
 	/* the loop body */
 	ir_node *const body_block = new_immBlock();
 
-	ir_node *const old_continue_label = continue_label;
-	ir_node *const old_break_label    = break_label;
-	continue_label = step_block;
-	break_label    = false_block;
+	if (statement->body != NULL) {
+		ir_node *const old_continue_label = continue_label;
+		ir_node *const old_break_label    = break_label;
+		continue_label = step_block;
+		break_label    = false_block;
 
-	statement_to_firm(statement->body);
+		statement_to_firm(statement->body);
 
-	assert(continue_label == step_block);
-	assert(break_label    == false_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
+		assert(continue_label == step_block);
+		assert(break_label    == false_block);
+		continue_label = old_continue_label;
+		break_label    = old_break_label;
+	}
 
 	if (get_cur_block() != NULL) {
 		ir_node *const jmp = new_Jmp();
