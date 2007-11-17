@@ -1355,8 +1355,7 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	ir_node  *addr = select_addr(expression);
 	type_t   *type = expression->expression.datatype;
-
-	return load_from_expression_addr(type, addr, dbgi);
+	return deref_address(type, addr, dbgi);
 }
 
 static ir_node *dereference_addr(const unary_expression_t *const expression)
