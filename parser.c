@@ -3175,10 +3175,10 @@ static void semantic_logical_op(binary_expression_t *expression)
 	type_t *type_left  = skip_typeref(orig_type_left);
 	type_t *type_right = skip_typeref(orig_type_right);
 
-	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */
 		parser_print_error_prefix();
-		fprintf(stderr, "operation needs arithmetic types\n");
+		fprintf(stderr, "operation needs scalar types\n");
 		return;
 	}
 
