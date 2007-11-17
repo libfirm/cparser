@@ -604,19 +604,6 @@ static ir_node *string_literal_to_firm(const string_literal_t* literal)
 	return create_symconst(dbgi, entity);
 }
 
-static ir_node *load_from_expression_addr(type_t *type, ir_node *addr,
-                                          dbg_info *dbgi)
-{
-	ir_mode *mode     = get_ir_mode(type);
-	ir_node *memory   = get_store();
-	ir_node *load     = new_d_Load(dbgi, memory, addr, mode);
-	ir_node *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
-	ir_node *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
-	set_store(load_mem);
-
-	return load_res;
-}
-
 static ir_node *deref_address(type_t *const type, ir_node *const addr,
                               dbg_info *const dbgi)
 {
@@ -626,8 +613,15 @@ static ir_node *deref_address(type_t *const type, ir_node *const addr,
 		case TYPE_COMPOUND_UNION:
 			return addr;
 
-		default:
-			return load_from_expression_addr(type, addr, dbgi);
+		default: {
+			ir_mode *const mode     = get_ir_mode(type);
+			ir_node *const memory   = get_store();
+			ir_node *const load     = new_d_Load(dbgi, memory, addr, mode);
+			ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+			ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
+			set_store(load_mem);
+			return load_res;
+		}
 	}
 }
 
