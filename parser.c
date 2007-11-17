@@ -546,7 +546,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 
 		declaration_t *old_declaration = entry->old_declaration;
 		symbol_t      *symbol          = entry->symbol;
-		namespace_t    namespc       = (namespace_t)entry->namespc;
+		namespace_t    namespc         = (namespace_t)entry->namespc;
 
 		/* replace/remove declaration */
 		declaration_t *declaration = symbol->declaration;
@@ -691,7 +691,7 @@ static expression_t *create_implicit_cast(expression_t *expression,
 				panic("casting of non-atomic types not implemented yet");
 		}
 
-		type_error_incompatible("can't implicitely cast types",
+		type_error_incompatible("can't implicitly cast types",
 														expression->source_position,
 														source_type, dest_type);
 		return expression;
@@ -2222,7 +2222,7 @@ static expression_t *parse_reference(void)
 
 	if(declaration == NULL) {
 #ifndef STRICT_C99
-		/* an implicitely defined function */
+		/* an implicitly defined function */
 		if(token.type == '(') {
 			parser_print_prefix_pos(token.source_position);
 			fprintf(stderr, "warning: implicit declaration of function '%s'\n",
@@ -2649,7 +2649,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	if(iter == NULL) {
 		parser_print_error_prefix();
 		print_type_quoted(type_left);
-		fprintf(stderr, " has no memeber named '%s'\n", symbol->string);
+		fprintf(stderr, " has no member named '%s'\n", symbol->string);
 		return make_invalid_expression();
 	}
 
