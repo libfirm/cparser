@@ -434,6 +434,54 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 					"of type ");
 			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
+		} else {
+			const storage_class_t old_storage = previous_declaration->storage_class;
+			const storage_class_t new_storage = declaration->storage_class;
+			if (current_function == NULL) {
+				if (old_storage != STORAGE_CLASS_STATIC &&
+				    new_storage == STORAGE_CLASS_STATIC) {
+					parser_print_error_prefix_pos(declaration->source_position);
+					fprintf(stderr,
+					        "static declaration of '%s' follows non-static declaration\n",
+					        symbol->string);
+					parser_print_error_prefix_pos(previous_declaration->source_position);
+					fprintf(stderr, "previous declaration of '%s' was here\n",
+					        symbol->string);
+				} else {
+					if (old_storage == STORAGE_CLASS_EXTERN) {
+						if (new_storage == STORAGE_CLASS_NONE) {
+							previous_declaration->storage_class = STORAGE_CLASS_NONE;
+						}
+					} else {
+						parser_print_warning_prefix_pos(declaration->source_position);
+						fprintf(stderr, "redundant declaration for '%s'\n",
+										symbol->string);
+						parser_print_warning_prefix_pos(previous_declaration->source_position);
+						fprintf(stderr, "previous declaration of '%s' was here\n",
+										symbol->string);
+					}
+				}
+			} else {
+				if (old_storage == STORAGE_CLASS_EXTERN &&
+						new_storage == STORAGE_CLASS_EXTERN) {
+					parser_print_warning_prefix_pos(declaration->source_position);
+					fprintf(stderr, "redundant extern declaration for '%s'\n",
+					        symbol->string);
+					parser_print_warning_prefix_pos(previous_declaration->source_position);
+					fprintf(stderr, "previous declaration of '%s' was here\n",
+					        symbol->string);
+				} else {
+					parser_print_error_prefix_pos(declaration->source_position);
+					if (old_storage == new_storage) {
+						fprintf(stderr, "redeclaration of '%s'\n", symbol->string);
+					} else {
+						fprintf(stderr, "redeclaration of '%s' with different linkage\n", symbol->string);
+					}
+					parser_print_error_prefix_pos(previous_declaration->source_position);
+					fprintf(stderr, "previous declaration of '%s' was here\n",
+					        symbol->string);
+				}
+			}
 		}
 		return previous_declaration;
 	}
