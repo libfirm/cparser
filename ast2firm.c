@@ -651,12 +651,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
 		ir_entity *entity   = declaration->v.entity;
 		ir_node   *symconst = create_symconst(dbgi, entity);
-
-		if(type->type == TYPE_ARRAY) {
-			return symconst;
-		} else {
-			return load_from_expression_addr(type, symconst, dbgi);
-		}
+		return deref_address(type, symconst, dbgi);
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
