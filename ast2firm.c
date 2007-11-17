@@ -701,8 +701,15 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	expression_t  *function = call->function;
 	ir_node       *callee   = expression_to_firm(function);
 
-	assert(function->datatype->type == TYPE_FUNCTION);
-	function_type_t *function_type = (function_type_t*) function->datatype;
+	function_type_t *function_type;
+	if (function->datatype->type == TYPE_POINTER) {
+		pointer_type_t *const ptr_type = (pointer_type_t*)function->datatype;
+		assert(ptr_type->points_to->type == TYPE_FUNCTION);
+		function_type = (function_type_t*)ptr_type->points_to;
+	} else {
+		assert(function->datatype->type == TYPE_FUNCTION);
+		function_type = (function_type_t*)function->datatype;
+	}
 
 	int              n_parameters = 0;
 	call_argument_t *argument     = call->arguments;
