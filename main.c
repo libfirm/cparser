@@ -22,8 +22,13 @@
 #include "ast2firm.h"
 #include "adt/error.h"
 
+#ifndef PREPROCESSOR
 #define PREPROCESSOR "cpp"
+#endif
+
+#ifndef LINKER
 #define LINKER       "gcc"
+#endif
 
 #ifdef _WIN32
 /* remap some names */
@@ -162,7 +167,12 @@ static FILE* preprocess(const char *in)
 {
 	char buf[4096];
 
+#ifdef _WIN32
+	snprintf(buf, sizeof(buf), PREPROCESSOR " %s",in);
+#else
 	snprintf(buf, sizeof(buf), PREPROCESSOR " %s -o -",in);
+#endif
+
 	if(verbose) {
 		puts(buf);
 	}
