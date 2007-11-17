@@ -541,11 +541,11 @@ static void print_normal_declaration(const declaration_t *declaration)
 
 void print_declaration(const declaration_t *declaration)
 {
-	if(declaration->namespace != NAMESPACE_NORMAL &&
+	if(declaration->namespc != NAMESPACE_NORMAL &&
 			declaration->symbol == NULL)
 		return;
 
-	switch(declaration->namespace) {
+	switch(declaration->namespc) {
 	case NAMESPACE_NORMAL:
 		print_normal_declaration(declaration);
 		break;
@@ -582,7 +582,7 @@ void print_ast(const translation_unit_t *unit)
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
-		if(declaration->namespace != NAMESPACE_NORMAL &&
+		if(declaration->namespc != NAMESPACE_NORMAL &&
 				declaration->symbol == NULL)
 			continue;
 

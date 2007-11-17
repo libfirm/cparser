@@ -360,7 +360,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 	int offset    = 0;
 	declaration_t *entry = type->declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
-		if(entry->namespace != NAMESPACE_NORMAL)
+		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
 		ident       *ident         = new_id_from_str(entry->symbol->string);
@@ -413,7 +413,7 @@ static ir_type *create_union_type(compound_type_t *type)
 	int size      = 0;
 	declaration_t *entry = declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
-		if(entry->namespace != NAMESPACE_NORMAL)
+		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
 		ident       *ident         = new_id_from_str(entry->symbol->string);
@@ -1957,7 +1957,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 static ir_node *get_label_block(declaration_t *label)
 {
-	assert(label->namespace == NAMESPACE_LABEL);
+	assert(label->namespc == NAMESPACE_LABEL);
 
 	if(label->declaration_type == DECLARATION_TYPE_LABEL_BLOCK) {
 		return label->v.block;
@@ -2200,7 +2200,7 @@ static void context_to_firm(context_t *context)
 {
 	declaration_t *declaration = context->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespace != NAMESPACE_NORMAL)
+		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
 		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
 				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)

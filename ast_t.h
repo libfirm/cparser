@@ -224,7 +224,7 @@ struct initializer_t {
 };
 
 struct declaration_t {
-	unsigned char       namespace;
+	unsigned char       namespc;
 	unsigned char       storage_class;
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;

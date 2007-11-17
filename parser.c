@@ -22,7 +22,7 @@
 typedef struct {
 	declaration_t *old_declaration;
 	symbol_t      *symbol;
-	unsigned short namespace;
+	unsigned short namespc;
 } stack_entry_t;
 
 static token_t         token;
@@ -372,20 +372,20 @@ static bool is_compatible_declaration (declaration_t *declaration,
 	return declaration->type == previous->type;
 }
 
-static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespace)
+static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
 {
 	declaration_t *declaration = symbol->declaration;
 	for( ; declaration != NULL; declaration = declaration->symbol_next) {
-		if(declaration->namespace == namespace)
+		if(declaration->namespc == namespc)
 			return declaration;
 	}
 
 	return NULL;
 }
 
-static const char *get_namespace_prefix(namespace_t namespace)
+static const char *get_namespace_prefix(namespace_t namespc)
 {
-	switch(namespace) {
+	switch(namespc) {
 	case NAMESPACE_NORMAL:
 		return "";
 	case NAMESPACE_UNION:
@@ -409,20 +409,20 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
                                  context_t *parent_context)
 {
 	symbol_t    *symbol    = declaration->symbol;
-	namespace_t  namespace = (namespace_t)declaration->namespace;
+	namespace_t  namespc = (namespace_t)declaration->namespc;
 
 	/* a declaration should be only pushed once */
 	assert(declaration->parent_context == NULL);
 	declaration->parent_context = parent_context;
 
-	declaration_t *previous_declaration = get_declaration(symbol, namespace);
+	declaration_t *previous_declaration = get_declaration(symbol, namespc);
 	assert(declaration != previous_declaration);
 	if(previous_declaration != NULL
 			&& previous_declaration->parent_context == context) {
 		if(!is_compatible_declaration(declaration, previous_declaration)) {
 			parser_print_error_prefix_pos(declaration->source_position);
 			fprintf(stderr, "definition of symbol %s%s with type ",
-					get_namespace_prefix(namespace), symbol->string);
+					get_namespace_prefix(namespc), symbol->string);
 			print_type_quoted(declaration->type);
 			fputc('\n', stderr);
 			parser_print_error_prefix_pos(
@@ -487,7 +487,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	stack_entry_t entry;
 	entry.symbol          = symbol;
 	entry.old_declaration = symbol->declaration;
-	entry.namespace       = namespace;
+	entry.namespc       = namespc;
 	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 
 	/* replace/add declaration into declaration list of the symbol */
@@ -498,7 +498,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 		declaration_t *iter      = symbol->declaration;
 		for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 			/* replace an entry? */
-			if(iter->namespace == namespace) {
+			if(iter->namespc == namespc) {
 				if(iter_last == NULL) {
 					symbol->declaration = declaration;
 				} else {
@@ -546,12 +546,12 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 
 		declaration_t *old_declaration = entry->old_declaration;
 		symbol_t      *symbol          = entry->symbol;
-		namespace_t    namespace       = (namespace_t)entry->namespace;
+		namespace_t    namespc       = (namespace_t)entry->namespc;
 
 		/* replace/remove declaration */
 		declaration_t *declaration = symbol->declaration;
 		assert(declaration != NULL);
-		if(declaration->namespace == namespace) {
+		if(declaration->namespc == namespc) {
 			if(old_declaration == NULL) {
 				symbol->declaration = declaration->symbol_next;
 			} else {
@@ -562,7 +562,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 			declaration_t *iter      = declaration->symbol_next;
 			for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 				/* replace an entry? */
-				if(iter->namespace == namespace) {
+				if(iter->namespc == namespc) {
 					assert(iter_last != NULL);
 					iter_last->symbol_next = old_declaration;
 					old_declaration->symbol_next = iter->symbol_next;
@@ -985,9 +985,9 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		declaration = allocate_type_zero(sizeof(declaration[0]));
 
 		if(is_struct) {
-			declaration->namespace = NAMESPACE_STRUCT;
+			declaration->namespc = NAMESPACE_STRUCT;
 		} else {
-			declaration->namespace = NAMESPACE_UNION;
+			declaration->namespc = NAMESPACE_UNION;
 		}
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
@@ -1081,7 +1081,7 @@ static declaration_t *parse_enum_specifier(void)
 	if(declaration == NULL) {
 		declaration = allocate_type_zero(sizeof(declaration[0]));
 
-		declaration->namespace       = NAMESPACE_ENUM;
+		declaration->namespc       = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
 	}
@@ -3572,7 +3572,7 @@ static declaration_t *get_label(symbol_t *symbol)
 
 	/* otherwise we need to create a new one */
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-	declaration->namespace     = NAMESPACE_LABEL;
+	declaration->namespc     = NAMESPACE_LABEL;
 	declaration->symbol        = symbol;
 
 	label_push(declaration);
