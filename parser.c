@@ -722,10 +722,26 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		return;
 	}
 
-	if (type_left->type == TYPE_POINTER && type_right->type == TYPE_FUNCTION) {
-		pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
-		if (ptr_type->points_to == type_right) {
-			return;
+	if (type_left->type == TYPE_POINTER) {
+		switch (type_right->type) {
+			case TYPE_FUNCTION: {
+				pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
+				if (ptr_type->points_to == type_right) {
+					return;
+				}
+				break;
+			}
+
+			case TYPE_ARRAY: {
+				pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
+				array_type_t   *const arr_type = (array_type_t*)type_right;
+				if (ptr_type->points_to == arr_type->element_type) {
+					return;
+				}
+				break;
+			}
+
+			default: break;
 		}
 	}
 
