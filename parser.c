@@ -2850,15 +2850,21 @@ static void semantic_dereference(unary_expression_t *expression)
 		return;
 
 	type_t *type = skip_typeref(orig_type);
-	if(type->type != TYPE_POINTER) {
-		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs a pointer type\n");
-		return;
-	}
+	switch (type->type) {
+		case TYPE_ARRAY:
+		case TYPE_POINTER: {
+			pointer_type_t *pointer_type    = (pointer_type_t*)type;
+			expression->expression.datatype = pointer_type->points_to;
+			break;
+		}
 
-	pointer_type_t *pointer_type    = (pointer_type_t*) type;
-	expression->expression.datatype = pointer_type->points_to;
+		default:
+			parser_print_error_prefix();
+			fputs("'Unary *' needs pointer or arrray type, but type ", stderr);
+			print_type_quoted(orig_type);
+			fputs(" given.\n", stderr);
+			return;
+	}
 }
 
 static void semantic_take_addr(unary_expression_t *expression)
