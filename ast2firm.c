@@ -813,6 +813,54 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	return new_d_Conv(dbgi, value, dest_mode);
 }
 
+static ir_node *create_incdec(const unary_expression_t *expression)
+{
+	dbg_info     *dbgi  = get_dbg_info(&expression->expression.source_position);
+	type_t       *type  = expression->expression.datatype;
+	ir_mode      *mode  = get_ir_mode(type);
+	expression_t *value = expression->value;
+
+	ir_node *value_node = expression_to_firm(value);
+
+	ir_node *offset;
+	if(type->type == TYPE_POINTER) {
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		unsigned        elem_size    = get_type_size(pointer_type->points_to);
+		offset = new_Const_long(mode_Is, elem_size);
+	} else {
+		assert(is_type_arithmetic(type));
+		offset = new_Const(mode, get_mode_one(mode));
+	}
+
+	ir_node *new_value;
+	switch(expression->type) {
+	case UNEXPR_POSTFIX_INCREMENT: {
+		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
+		set_value_for_expression(value, new_value);
+		return value_node;
+	}
+	case UNEXPR_POSTFIX_DECREMENT: {
+		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
+		set_value_for_expression(value, new_value);
+		return value_node;
+	}
+	case UNEXPR_PREFIX_INCREMENT: {
+		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
+		set_value_for_expression(value, new_value);
+		return new_value;
+	}
+	case UNEXPR_PREFIX_DECREMENT: {
+		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
+		set_value_for_expression(value, new_value);
+		return new_value;
+	}
+	default:
+		panic("no incdec expr in create_incdec");
+	}
+
+	return new_value;
+}
+
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
@@ -843,30 +891,11 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return value_node;
 	case UNEXPR_DEREFERENCE:
 		return load_from_expression_addr(type, value_node, dbgi);
-	case UNEXPR_POSTFIX_INCREMENT: {
-		ir_node *one       = new_Const(mode, get_mode_one(mode));
-		ir_node *new_value = new_d_Add(dbgi, value_node, one, mode);
-		set_value_for_expression(value, new_value);
-		return value_node;
-	}
-	case UNEXPR_POSTFIX_DECREMENT: {
-		ir_node *one       = new_Const(mode, get_mode_one(mode));
-		ir_node *new_value = new_d_Sub(dbgi, value_node, one, mode);
-		set_value_for_expression(value, new_value);
-		return value_node;
-	}
-	case UNEXPR_PREFIX_INCREMENT: {
-		ir_node *one       = new_Const(mode, get_mode_one(mode));
-		ir_node *new_value = new_d_Add(dbgi, value_node, one, mode);
-		set_value_for_expression(value, new_value);
-		return new_value;
-	}
-	case UNEXPR_PREFIX_DECREMENT: {
-		ir_node *one       = new_Const(mode, get_mode_one(mode));
-		ir_node *new_value = new_d_Sub(dbgi, value_node, one, mode);
-		set_value_for_expression(value, new_value);
-		return new_value;
-	}
+	case UNEXPR_POSTFIX_INCREMENT:
+	case UNEXPR_POSTFIX_DECREMENT:
+	case UNEXPR_PREFIX_INCREMENT:
+	case UNEXPR_PREFIX_DECREMENT:
+		return create_incdec(expression);
 	case UNEXPR_CAST:
 		return create_conv(dbgi, value_node, mode);
 
