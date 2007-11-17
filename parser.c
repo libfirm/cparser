@@ -624,6 +624,17 @@ static expression_t *create_cast_expression(expression_t *expression,
 	return (expression_t*) cast;
 }
 
+static bool is_null_expression(const expression_t *const expr)
+{
+	if (expr->type != EXPR_CONST) return false;
+
+	type_t *const type = skip_typeref(expr->datatype);
+	if (!is_type_integer(type)) return false;
+
+	const const_t *const const_expr = (const const_t*)expr;
+	return const_expr->v.int_value == 0;
+}
+
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
@@ -654,26 +665,36 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	if(dest_type->type == TYPE_POINTER) {
 		pointer_type_t *pointer_type
 			= (pointer_type_t*) dest_type;
-		if(source_type->type == TYPE_POINTER) {
-			if(!pointers_compatible(source_type, dest_type)) {
-				type_error_incompatible("can't implicitely cast types",
-			                        expression->source_position,
-			                        source_type, dest_type);
-			    return expression;
-			} else {
-				return create_cast_expression(expression, dest_type);
+		switch (source_type->type) {
+			case TYPE_ATOMIC:
+				if (is_null_expression(expression)) {
+					return create_cast_expression(expression, dest_type);
+				}
+				break;
+
+			case TYPE_POINTER:
+				if (pointers_compatible(source_type, dest_type)) {
+					return create_cast_expression(expression, dest_type);
+				}
+				break;
+
+			case TYPE_ARRAY: {
+				array_type_t *const array_type = (array_type_t*) source_type;
+				if (types_compatible(array_type->element_type,
+														 pointer_type->points_to)) {
+					return create_cast_expression(expression, dest_type);
+				}
+				break;
 			}
-		} else if(source_type->type == TYPE_ARRAY) {
-			array_type_t *array_type = (array_type_t*) source_type;
-			if(!types_compatible(array_type->element_type,
-			                     pointer_type->points_to)) {
-				type_error_incompatible("can't implicitely cast types",
-			                        expression->source_position,
-			                        source_type, dest_type);
-			    return expression;
-			}
-			return create_cast_expression(expression, dest_type);
+
+			default:
+				panic("casting of non-atomic types not implemented yet");
 		}
+
+		type_error_incompatible("can't implicitely cast types",
+														expression->source_position,
+														source_type, dest_type);
+		return expression;
 	}
 
 	panic("casting of non-atomic types not implemented yet");
@@ -687,16 +708,15 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	if(orig_type_right == NULL)
 		return;
 
-	type_t *type_left       = skip_typeref(orig_type_left);
-	type_t *type_right      = skip_typeref(orig_type_right);
+	type_t *const type_left  = skip_typeref(orig_type_left);
+	type_t *const type_right = skip_typeref(orig_type_right);
 
 	if(type_left == type_right) {
 		/* fine */
-	} else if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
+	           (type_left->type == TYPE_POINTER && is_null_expression(*right)) ||
+	           (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
 		*right = create_implicit_cast(*right, type_left);
-	} else if(type_left->type == TYPE_POINTER
-			&& type_right->type == TYPE_POINTER) {
-		/* TODO */
 	} else {
 		/* TODO: improve error message */
 		parser_print_error_prefix();
