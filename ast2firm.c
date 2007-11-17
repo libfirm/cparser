@@ -1535,12 +1535,16 @@ static void if_statement_to_firm(if_statement_t *statement)
 	ir_node *fallthrough_block = new_immBlock();
 
 	/* the true (blocks) */
-	ir_node *true_block = new_immBlock();
-
-	statement_to_firm(statement->true_statement);
-	if(get_cur_block() != NULL) {
-		ir_node *jmp = new_Jmp();
-		add_immBlock_pred(fallthrough_block, jmp);
+	ir_node *true_block;
+	if (statement->true_statement != NULL) {
+		true_block = new_immBlock();
+		statement_to_firm(statement->true_statement);
+		if(get_cur_block() != NULL) {
+			ir_node *jmp = new_Jmp();
+			add_immBlock_pred(fallthrough_block, jmp);
+		}
+	} else {
+		true_block = fallthrough_block;
 	}
 
 	/* the false (blocks) */
