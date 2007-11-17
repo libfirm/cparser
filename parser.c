@@ -208,10 +208,16 @@ static void parser_print_warning_prefix_pos(
 	fputs("warning: ", stderr);
 }
 
+static void parse_warning_pos(const source_position_t source_position,
+                              const char *const message)
+{
+	parser_print_prefix_pos(source_position);
+	fprintf(stderr, "warning: %s\n", message);
+}
+
 static void parse_warning(const char *message)
 {
-	parser_print_prefix_pos(token.source_position);
-	fprintf(stderr, "warning: %s\n", message);
+	parse_warning_pos(token.source_position, message);
 }
 
 static void parse_error_expected(const char *message, ...)
@@ -1947,6 +1953,29 @@ static void parse_declaration(void)
 	parse_declaration_specifiers(&specifiers);
 
 	if(token.type == ';') {
+		if (specifiers.storage_class != STORAGE_CLASS_NONE) {
+			parse_warning_pos(source_position,
+			                  "useless keyword in empty declaration");
+		}
+		switch (specifiers.type->type) {
+			case TYPE_COMPOUND_STRUCT:
+			case TYPE_COMPOUND_UNION: {
+				const compound_type_t *const comp_type =
+					(const compound_type_t*)specifiers.type;
+				if (comp_type->declaration->symbol == NULL) {
+					parse_warning_pos(source_position,
+														"unnamed struct/union that defines no instances");
+				}
+				break;
+			}
+
+			case TYPE_ENUM: break;
+
+			default:
+				parse_warning_pos(source_position, "empty declaration");
+				break;
+		}
+
 		next_token();
 
 		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
