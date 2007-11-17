@@ -1329,7 +1329,7 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	ir_node  *addr = select_addr(expression);
-	type_t   *type = expression->expression.datatype;
+	type_t   *type = skip_typeref(expression->expression.datatype);
 	return deref_address(type, addr, dbgi);
 }
 
