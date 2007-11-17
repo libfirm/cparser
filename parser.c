@@ -3173,6 +3173,40 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	expression->expression.datatype = type_left;
 }
 
+static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
+{
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->datatype;
+	type_t       *orig_type_right = right->datatype;
+
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
+
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		/* combined instructions are tricky. We can't create an implicit cast on
+		 * the left side, because we need the uncasted form for the store.
+		 * The ast2firm pass has to know that left_type must be right_type
+		 * for the arithmeitc operation and create a cast by itself */
+		type_t *const arithmetic_type = semantic_arithmetic(type_left, type_right);
+		expression->right = create_implicit_cast(right, arithmetic_type);
+		expression->expression.datatype = type_left;
+	} else if (type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+		expression->expression.datatype = type_left;
+	} else {
+		parser_print_error_prefix();
+		fputs("Incompatible types ", stderr);
+		print_type_quoted(orig_type_left);
+		fputs(" and ", stderr);
+		print_type_quoted(orig_type_right);
+		fputs(" in assignment\n", stderr);
+		return;
+	}
+}
+
 static void semantic_logical_op(binary_expression_t *expression)
 {
 	expression_t *left            = expression->left;
@@ -3260,9 +3294,9 @@ CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,
                       semantic_shift_op, 1)
 CREATE_BINEXPR_PARSER(T_PLUSEQUAL, BINEXPR_ADD_ASSIGN,
-                      semantic_arithmetic_assign, 0)
+                      semantic_arithmetic_addsubb_assign, 0)
 CREATE_BINEXPR_PARSER(T_MINUSEQUAL, BINEXPR_SUB_ASSIGN,
-                      semantic_arithmetic_assign, 0)
+                      semantic_arithmetic_addsubb_assign, 0)
 CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, BINEXPR_MUL_ASSIGN,
                       semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_SLASHEQUAL, BINEXPR_DIV_ASSIGN,

@@ -973,16 +973,44 @@ static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
 	return res;
 }
 
+static ir_node *pointer_arithmetic(ir_node  *const pointer,
+                                   ir_node  *      integer,
+                                   type_t   *const type,
+                                   dbg_info *const dbgi,
+                                   const create_arithmetic_func func)
+{
+	pointer_type_t *const pointer_type = (pointer_type_t*)type;
+	type_t         *const points_to    = pointer_type->points_to;
+	const unsigned        elem_size    = get_type_size(points_to);
+
+	assert(elem_size >= 1);
+	if (elem_size > 1) {
+		integer             = create_conv(dbgi, integer, mode_Is);
+		ir_node *const cnst = new_Const_long(mode_Is, (long)elem_size);
+		ir_node *const mul  = new_d_Mul(dbgi, integer, cnst, mode_Is);
+		integer = mul;
+	}
+
+	ir_mode *const mode = get_ir_mode(type);
+	return func(dbgi, pointer, integer, mode);
+}
+
 static ir_node *create_arithmetic_assign_binop(
 		const binary_expression_t *expression, create_arithmetic_func func)
 {
-	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
-	ir_node  *value = create_arithmetic_binop(expression, func);
-	type_t   *type  = expression->expression.datatype;
-	ir_mode  *mode  = get_ir_mode(type);
+	dbg_info *const dbgi = get_dbg_info(&expression->expression.source_position);
+	type_t   *const type = expression->expression.datatype;
+	ir_node  *value;
 
-	assert(type->type != TYPE_POINTER);
+	if (type->type == TYPE_POINTER) {
+		ir_node        *const pointer = expression_to_firm(expression->left);
+		ir_node        *      integer = expression_to_firm(expression->right);
+		value = pointer_arithmetic(pointer, integer, type, dbgi, func);
+	} else {
+		value = create_arithmetic_binop(expression, func);
+	}
 
+	ir_mode  *const mode = get_ir_mode(type);
 	value = create_conv(dbgi, value, mode);
 	set_value_for_expression(expression->left, value);
 
@@ -995,7 +1023,6 @@ static ir_node *create_add(const binary_expression_t *expression)
 	ir_node  *left  = expression_to_firm(expression->left);
 	ir_node  *right = expression_to_firm(expression->right);
 	type_t   *type  = expression->expression.datatype;
-	ir_mode  *mode  = get_ir_mode(type);
 
 	expression_t *expr_left  = expression->left;
 	expression_t *expr_right = expression->right;
@@ -1003,76 +1030,37 @@ static ir_node *create_add(const binary_expression_t *expression)
 	type_t       *type_right = skip_typeref(expr_right->datatype);
 
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Add(dbgi, left, right, mode);
 	}
 
-	ir_node        *pointer;
-	ir_node        *integer;
-	pointer_type_t *pointer_type;
 	if(type_left->type == TYPE_POINTER) {
-		pointer      = left;
-		integer      = right;
-		pointer_type = (pointer_type_t*) type_left;
+		return pointer_arithmetic(left, right, type_left, dbgi, new_d_Add);
 	} else {
 		assert(type_right->type == TYPE_POINTER);
-		pointer      = right;
-		integer      = left;
-		pointer_type = (pointer_type_t*) type_right;
+		return pointer_arithmetic(right, left, type_right, dbgi, new_d_Add);
 	}
-
-	type_t   *points_to = pointer_type->points_to;
-	unsigned  elem_size = get_type_size(points_to);
-
-	assert(elem_size >= 1);
-	if(elem_size > 1) {
-		integer       = create_conv(dbgi, integer, mode_Is);
-		ir_node *cnst = new_Const_long(mode_Is, (int) elem_size);
-		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Is);
-		integer = mul;
-	}
-
-	ir_node *res = new_d_Add(dbgi, pointer, integer, mode);
-
-	return res;
 }
 
 static ir_node *create_sub(const binary_expression_t *expression)
 {
-	dbg_info *dbgi  = get_dbg_info(&expression->expression.source_position);
-	ir_node  *left  = expression_to_firm(expression->left);
-	ir_node  *right = expression_to_firm(expression->right);
-	type_t   *type  = expression->expression.datatype;
-	ir_mode  *mode  = get_ir_mode(type);
+	dbg_info *const dbgi  = get_dbg_info(&expression->expression.source_position);
+	expression_t *const expr_left  = expression->left;
+	expression_t *const expr_right = expression->right;
+	ir_node      *const left       = expression_to_firm(expr_left);
+	ir_node      *const right      = expression_to_firm(expr_right);
+	type_t       *const type       = expression->expression.datatype;
+	type_t       *const type_left  = skip_typeref(expr_left->datatype);
+	type_t       *const type_right = skip_typeref(expr_right->datatype);
 
-	expression_t *expr_left  = expression->left;
-	expression_t *expr_right = expression->right;
-	type_t       *type_left  = skip_typeref(expr_left->datatype);
-	type_t       *type_right = skip_typeref(expr_right->datatype);
-
-	if((is_type_arithmetic(type_left) && is_type_arithmetic(type_right))
-			|| (type_left->type == TYPE_POINTER
-				&& type_right->type == TYPE_POINTER)) {
+	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
+	    (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
+		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
 	}
 
-	assert(type_right->type == TYPE_POINTER);
-	ir_node        *pointer      = left;
-	ir_node        *integer      = right;
-	pointer_type_t *pointer_type = (pointer_type_t*) type_right;
-
-	type_t   *points_to = pointer_type->points_to;
-	unsigned  elem_size = get_type_size(points_to);
-
-	assert(elem_size >= 1);
-	if(elem_size > 1) {
-		ir_node *cnst = new_Const_long(mode_Iu, elem_size);
-		ir_node *mul  = new_d_Mul(dbgi, integer, cnst, mode_Iu);
-		integer = mul;
-	}
-
-	ir_node *res = new_d_Sub(dbgi, pointer, integer, mode);
-
-	return res;
+	assert(type_left->type == TYPE_POINTER);
+	return pointer_arithmetic(left, right, type_left, dbgi, new_d_Sub);
 }
 
 static ir_node *create_shift(const binary_expression_t *expression)
