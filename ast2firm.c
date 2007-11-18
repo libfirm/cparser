@@ -2054,11 +2054,112 @@ static void statement_to_firm(statement_t *statement)
 	panic("Statement not implemented\n");
 }
 
+static int count_local_declarations(const declaration_t *      decl,
+                                    const declaration_t *const end)
+{
+	int count = 0;
+	for (; decl != end; decl = decl->next) {
+		const type_t *type = skip_typeref(decl->type);
+		switch (type->type) {
+			case TYPE_ATOMIC:
+			case TYPE_ENUM:
+			case TYPE_POINTER:
+				if (!decl->address_taken) ++count;
+				break;
+
+			default: break;
+		}
+	}
+	return count;
+}
+
+static int count_decls_in_stmts(const statement_t *stmt)
+{
+	int count = 0;
+	for (; stmt != NULL; stmt = stmt->next) {
+		switch (stmt->type) {
+			case STATEMENT_DECLARATION: {
+				const declaration_statement_t *const decl_stmt =
+					(const declaration_statement_t*)stmt;
+				count += count_local_declarations(decl_stmt->declarations_begin,
+				                                  decl_stmt->declarations_end->next);
+				break;
+			}
+
+			case STATEMENT_COMPOUND: {
+				const compound_statement_t *const comp =
+					(const compound_statement_t*)stmt;
+				count += count_decls_in_stmts(comp->statements);
+				break;
+			}
+
+			case STATEMENT_IF: {
+				const if_statement_t *const if_stmt = (const if_statement_t*)stmt;
+				count += count_decls_in_stmts(if_stmt->true_statement);
+				count += count_decls_in_stmts(if_stmt->false_statement);
+				break;
+			}
+
+			case STATEMENT_SWITCH: {
+				const switch_statement_t *const switch_stmt =
+					(const switch_statement_t*)stmt;
+				count += count_decls_in_stmts(switch_stmt->body);
+				break;
+			}
+
+			case STATEMENT_LABEL: {
+				const label_statement_t *const label_stmt =
+					(const label_statement_t*)stmt;
+				count += count_decls_in_stmts(label_stmt->label_statement);
+				break;
+			}
+
+			case STATEMENT_WHILE: {
+				const while_statement_t *const while_stmt =
+					(const while_statement_t*)stmt;
+				count += count_decls_in_stmts(while_stmt->body);
+				break;
+			}
+
+			case STATEMENT_DO_WHILE: {
+				const do_while_statement_t *const do_while_stmt =
+					(const do_while_statement_t*)stmt;
+				count += count_decls_in_stmts(do_while_stmt->body);
+				break;
+			}
+
+			case STATEMENT_FOR: {
+				const for_statement_t *const for_stmt =
+					(const for_statement_t*)stmt;
+				/* TODO initialisation */
+				count += count_decls_in_stmts(for_stmt->body);
+				break;
+			}
+
+			case STATEMENT_BREAK:
+			case STATEMENT_CASE_LABEL:
+			case STATEMENT_CONTINUE:
+			case STATEMENT_EXPRESSION:
+			case STATEMENT_GOTO:
+			case STATEMENT_INVALID:
+			case STATEMENT_RETURN:
+				break;
+		}
+	}
+	return count;
+}
+
 static int get_function_n_local_vars(declaration_t *declaration)
 {
-	(void) declaration;
-	/* TODO */
-	return 30;
+	int count = 0;
+
+	/* count parameters */
+	count += count_local_declarations(declaration->context.declarations, NULL);
+
+	/* count local variables declared in body */
+	count += count_decls_in_stmts(declaration->init.statement);
+
+	return count;
 }
 
 static void initialize_function_parameters(declaration_t *declaration)
