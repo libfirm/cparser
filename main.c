@@ -264,13 +264,17 @@ static void optimize(void)
 		ir_graph *irg = get_irp_irg(i);
 
 		optimize_graph_df(irg);
-		dump(irg, "-localopt");
+		dump(irg, "-01-localopt");
 		place_code(irg);
-		dump(irg, "-place");
+		dump(irg, "-02-place");
 		optimize_cf(irg);
-		dump(irg, "-cf");
+		dump(irg, "-03-cf");
 		lower_dw_ops(&lwrdw_param);
-		dump(irg, "-dw");
+		dump(irg, "-04-dw");
+		optimize_graph_df(irg);
+		dump(irg, "-05-localopt");
+		optimize_cf(irg);
+		dump(irg, "-06-cf");
 	}
 }
 
