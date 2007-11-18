@@ -1251,7 +1251,7 @@ static ir_node *array_access_to_firm(
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	ir_node  *addr = array_access_addr(expression);
-	type_t   *type = expression->expression.datatype;
+	type_t   *type = skip_typeref(expression->expression.datatype);
 	return deref_address(type, addr, dbgi);
 }
 
