@@ -960,6 +960,11 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	symbol_t      *symbol      = NULL;
 	declaration_t *declaration = NULL;
 
+	if (token.type == T___attribute__) {
+		/* TODO */
+		parse_attributes();
+	}
+
 	if(token.type == T_IDENTIFIER) {
 		symbol = token.v.symbol;
 		next_token();
