@@ -1107,12 +1107,11 @@ static declaration_t *parse_enum_specifier(void)
  */
 static bool is_typedef_symbol(symbol_t *symbol)
 {
-	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
-	if(declaration == NULL
-			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
-		return false;
-
-	return true;
+	const declaration_t *const declaration =
+		get_declaration(symbol, NAMESPACE_NORMAL);
+	return
+		declaration != NULL &&
+		declaration->storage_class == STORAGE_CLASS_TYPEDEF;
 }
 
 static type_t *parse_typeof(void)
