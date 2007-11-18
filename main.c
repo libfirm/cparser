@@ -335,7 +335,8 @@ int main(int argc, char **argv)
 		} else if(arg[0] == '-') {
 			if (arg[1] == 'D' ||
 					arg[1] == 'O' ||
-					arg[1] == 'f') {
+					arg[1] == 'f' ||
+					strncmp(arg + 1, "std=", 4) == 0) {
 				fprintf(stderr, "Warning: Ignoring option '%s'\n", arg);
 			} else {
 				usage(argv[0]);
