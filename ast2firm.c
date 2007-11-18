@@ -2061,7 +2061,6 @@ static int count_local_declarations(const declaration_t *      decl,
 	for (; decl != end; decl = decl->next) {
 		const type_t *type = skip_typeref(decl->type);
 		switch (type->type) {
-			case TYPE_ARRAY: /* HACK for parameters declared in array style */
 			case TYPE_ATOMIC:
 			case TYPE_ENUM:
 			case TYPE_POINTER:

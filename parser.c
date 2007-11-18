@@ -1535,6 +1535,15 @@ static declaration_t *parse_parameter(void)
 		parse_error("typedef not allowed in parameter list");
 	}
 
+	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
+	 * into a pointer */
+	if (declaration->type->type == TYPE_ARRAY) {
+		const array_type_t *const arr_type =
+			(const array_type_t*)declaration->type;
+		declaration->type =
+			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+	}
+
 	return declaration;
 }
 
