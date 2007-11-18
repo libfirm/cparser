@@ -112,7 +112,7 @@ struct function_type_t {
 
 struct compound_type_t {
 	type_t         type;
-	/** the declaration of the compound type, it's context field
+	/** the declaration of the compound type, its context field
 	 * contains the compound entries. */
 	declaration_t *declaration;
 };
