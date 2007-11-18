@@ -2851,6 +2851,23 @@ static expression_t *parse_extension(unsigned precedence)
 	return parse_sub_expression(precedence);
 }
 
+static expression_t *parse_builtin_classify_type(const unsigned precedence)
+{
+	eat(T___builtin_classify_type);
+
+	classify_type_expression_t *const classify_type_expr =
+		allocate_ast_zero(sizeof(classify_type_expr[0]));
+	classify_type_expr->expression.type     = EXPR_CLASSIFY_TYPE;
+	classify_type_expr->expression.datatype = type_int;
+
+	expect('(');
+	expression_t *const expression = parse_sub_expression(precedence);
+	expect(')');
+	classify_type_expr->type_expression = expression;
+
+	return (expression_t*)classify_type_expr;
+}
+
 static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->datatype;
@@ -3540,6 +3557,8 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_UNEXPR_PREFIX_DECREMENT, T_MINUSMINUS, 25);
 	register_expression_parser(parse_sizeof,                  T_sizeof,     25);
 	register_expression_parser(parse_extension,            T___extension__, 25);
+	register_expression_parser(parse_builtin_classify_type,
+	                                             T___builtin_classify_type, 25);
 }
 
 

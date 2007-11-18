@@ -234,6 +234,14 @@ static void print_select(const select_expression_t *expression)
 	fputs(expression->symbol->string, out);
 }
 
+static void print_classify_type_expression(
+	const classify_type_expression_t *const expr)
+{
+	fputs("__builtin_classify_type(", out);
+	print_expression(expr->type_expression);
+	fputc(')', out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->type) {
@@ -278,6 +286,9 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_SELECT:
 		print_select((const select_expression_t*) expression);
+		break;
+	case EXPR_CLASSIFY_TYPE:
+		print_classify_type_expression((const classify_type_expression_t*)expression);
 		break;
 
 	case EXPR_OFFSETOF:

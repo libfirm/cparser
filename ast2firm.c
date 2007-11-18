@@ -1333,6 +1333,113 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	return deref_address(type, addr, dbgi);
 }
 
+/* Values returned by __builtin_classify_type. */
+typedef enum gcc_type_class
+{
+	no_type_class = -1,
+	void_type_class,
+	integer_type_class,
+	char_type_class,
+	enumeral_type_class,
+	boolean_type_class,
+	pointer_type_class,
+	reference_type_class,
+	offset_type_class,
+	real_type_class,
+	complex_type_class,
+	function_type_class,
+	method_type_class,
+	record_type_class,
+	union_type_class,
+	array_type_class,
+	string_type_class,
+	set_type_class,
+	file_type_class,
+	lang_type_class
+} gcc_type_class;
+
+static ir_node *classify_type_to_firm(const classify_type_expression_t *const expr)
+{
+	const type_t *const type = expr->type_expression->datatype;
+
+	gcc_type_class tc;
+	switch (type->type)
+	{
+		case TYPE_ATOMIC: {
+			const atomic_type_t *const atomic_type = (const atomic_type_t*)type;
+			switch (atomic_type->atype) {
+				// should not be reached
+				case ATOMIC_TYPE_INVALID:
+					tc = no_type_class;
+					break;
+
+				// gcc cannot do that
+				case ATOMIC_TYPE_VOID:
+					tc = void_type_class;
+					break;
+
+				case ATOMIC_TYPE_CHAR:      // gcc handles this as integer
+				case ATOMIC_TYPE_SCHAR:     // gcc handles this as integer
+				case ATOMIC_TYPE_UCHAR:     // gcc handles this as integer
+				case ATOMIC_TYPE_SHORT:
+				case ATOMIC_TYPE_USHORT:
+				case ATOMIC_TYPE_INT:
+				case ATOMIC_TYPE_UINT:
+				case ATOMIC_TYPE_LONG:
+				case ATOMIC_TYPE_ULONG:
+				case ATOMIC_TYPE_LONGLONG:
+				case ATOMIC_TYPE_ULONGLONG:
+				case ATOMIC_TYPE_BOOL:      // gcc handles this as integer
+					tc = integer_type_class;
+					break;
+
+				case ATOMIC_TYPE_FLOAT:
+				case ATOMIC_TYPE_DOUBLE:
+				case ATOMIC_TYPE_LONG_DOUBLE:
+					tc = real_type_class;
+					break;
+
+#ifdef PROVIDE_COMPLEX
+				case ATOMIC_TYPE_FLOAT_COMPLEX:
+				case ATOMIC_TYPE_DOUBLE_COMPLEX:
+				case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
+					tc = complex_type_class;
+					break;
+#endif
+
+#ifdef PROVIDE_IMAGINARY
+				case ATOMIC_TYPE_FLOAT_IMAGINARY:
+				case ATOMIC_TYPE_DOUBLE_IMAGINARY:
+				case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
+					tc = complex_type_class;
+					break;
+#endif
+
+				default:
+					panic("Unimplemented case in classify_type_to_firm().");
+			}
+			break;
+		}
+
+		case TYPE_ARRAY:           // gcc handles this as pointer
+		case TYPE_FUNCTION:        // gcc handles this as pointer
+		case TYPE_POINTER:         tc = pointer_type_class; break;
+		case TYPE_COMPOUND_STRUCT: tc = record_type_class;  break;
+		case TYPE_COMPOUND_UNION:  tc = union_type_class;   break;
+
+		// gcc handles this as integer
+		case TYPE_ENUM:            tc = integer_type_class; break;
+
+		default:
+			panic("Unimplemented case in classify_type_to_firm().");
+	}
+
+	dbg_info *const dbgi = get_dbg_info(&expr->expression.source_position);
+	ir_mode  *const mode = mode_Is;
+	tarval   *const tv   = new_tarval_from_long(tc, mode);
+	return new_d_Const(dbgi, mode, tv);
+}
+
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->type == UNEXPR_DEREFERENCE);
@@ -1388,6 +1495,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return conditional_to_firm((const conditional_expression_t*)expression);
 	case EXPR_SELECT:
 		return select_to_firm((const select_expression_t*) expression);
+	case EXPR_CLASSIFY_TYPE:
+		return classify_type_to_firm((const classify_type_expression_t*)expression);
 	case EXPR_FUNCTION:
 	case EXPR_OFFSETOF:
 	case EXPR_PRETTY_FUNCTION:

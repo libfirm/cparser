@@ -26,6 +26,7 @@ typedef struct designator_t                 designator_t;
 typedef struct offsetof_expression_t        offsetof_expression_t;
 typedef struct va_arg_expression_t          va_arg_expression_t;
 typedef struct builtin_symbol_expression_t  builtin_symbol_expression_t;
+typedef struct classify_type_expression_t   classify_type_expression_t;
 
 typedef struct initializer_t                initializer_t;
 typedef struct declaration_t                declaration_t;
