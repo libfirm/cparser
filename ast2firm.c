@@ -971,8 +971,8 @@ static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
 	ir_node  *left  = expression_to_firm(expression->left);
 	ir_node  *right = expression_to_firm(expression->right);
 	type_t   *type  = expression->right->datatype;
-	/* be careful with the modes, because in asithmetic assign nodes only
-	 * the right operand has the mode of the arithmetic alread */
+	/* be careful with the modes, because in arithmetic assign nodes only
+	 * the right operand has the mode of the arithmetic already */
 	ir_mode  *mode  = get_ir_mode(type);
 	left            = create_conv(dbgi, left, mode);
 	ir_node  *res   = func(dbgi, left, right, mode);
