@@ -325,6 +325,36 @@ int main(int argc, char **argv)
 			mode = PrintFluffy;
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
+		} else if(arg[0] == '-' && arg[1] == 'f') {
+			const char *opt = &arg[2];
+			if(opt[0] == 0) {
+				++i;
+				if(i >= argc) {
+					usage(argv[0]);
+					return 1;
+				}
+				opt = argv[i];
+				if(opt[0] == '-') {
+					usage(argv[0]);
+					return 1;
+				}
+			}
+			//firm_option(opt);
+		} else if(arg[0] == '-' && arg[1] == 'b') {
+			const char *opt = &arg[2];
+			if(opt[0] == 0) {
+				++i;
+				if(i >= argc) {
+					usage(argv[0]);
+					return 1;
+				}
+				opt = argv[i];
+				if(opt[0] == '-') {
+					usage(argv[0]);
+					return 1;
+				}
+			}
+			//firm_be_option(opt);
 		} else if(arg[0] == '-') {
 			if (arg[1] == 'D' ||
 					arg[1] == 'O' ||

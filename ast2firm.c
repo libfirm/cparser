@@ -106,7 +106,7 @@ static ident *unique_ident(const char *tag)
 {
 	char buf[256];
 
-	snprintf(buf, sizeof(buf), "%s.%d", tag, unique_id);
+	snprintf(buf, sizeof(buf), "%s.%u", tag, unique_id);
 	unique_id++;
 	return new_id_from_str(buf);
 }
@@ -1885,9 +1885,9 @@ static void create_initializer(declaration_t *declaration)
 		return;
 
 	if(initializer->type == INITIALIZER_VALUE) {
-		assert(initializer->designator == NULL);
-		assert(initializer->next == NULL);
-		ir_node *init_node = expression_to_firm(initializer->v.value);
+		initializer_value_t *value = (initializer_value_t*) initializer;
+
+		ir_node *init_node = expression_to_firm(value->value);
 
 		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, init_node);

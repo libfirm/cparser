@@ -29,6 +29,8 @@ typedef struct builtin_symbol_expression_t  builtin_symbol_expression_t;
 typedef struct classify_type_expression_t   classify_type_expression_t;
 
 typedef struct initializer_t                initializer_t;
+typedef struct initializer_list_t           initializer_list_t;
+typedef struct initializer_value_t          initializer_value_t;
 typedef struct declaration_t                declaration_t;
 
 typedef struct statement_t                  statement_t;

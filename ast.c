@@ -161,7 +161,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		fputs(")", out);
 		break;
 	case UNEXPR_INVALID:
-		fprintf(out, "unop%d", unexpr->type);
+		fprintf(out, "unop%d", (int) unexpr->type);
 		break;
 	}
 	fputs("(", out);
@@ -294,7 +294,7 @@ void print_expression(const expression_t *expression)
 	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
 		/* TODO */
-		fprintf(out, "some expression of type %d", expression->type);
+		fprintf(out, "some expression of type %d", (int) expression->type);
 		break;
 	}
 }
@@ -512,10 +512,11 @@ static void print_storage_class(storage_class_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer->type == INITIALIZER_VALUE) {
-		print_expression(initializer->v.value);
+		//print_expression(initializer->v.value);
 		return;
 	}
 
+#if 0
 	assert(initializer->type == INITIALIZER_LIST);
 	fputs("{ ", out);
 	initializer_t *iter = initializer->v.list;
@@ -526,6 +527,7 @@ void print_initializer(const initializer_t *initializer)
 		}
 	}
 	fputs("}", out);
+#endif
 }
 
 static void print_normal_declaration(const declaration_t *declaration)

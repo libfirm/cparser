@@ -9,6 +9,7 @@ int (* const (fip) (void))(void)
 }
 
 int main(void) {
-	int(*func)(void) = fip();
+	int(*func)(void);
+	func = fip();
 	return func() == 42 ? 0 : 1;
 }

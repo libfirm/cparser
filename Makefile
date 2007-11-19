@@ -6,7 +6,7 @@ FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOM
 FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -ldl
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
-CFLAGS += -DHAVE_CONFIG_H
+CFLAGS += -DHAVE_CONFIG_H -DFIRM_BACKEND
 CFLAGS += -I .
 CFLAGS += -O0 -g3
 CFLAGS += $(FIRM_CFLAGS)

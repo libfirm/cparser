@@ -22,18 +22,20 @@ struct foo {
 };
 
 struct foo f1 = { 1, 2 };
-struct foo f2 = { { 1, }, 2 }; /* produces a warning on icc and gcc... */
+struct foo f2 = { { 1,
+					}
+					, 2 }; /* produces a warning on icc and gcc... */
 struct foo f3 = { { { 1, } }, 2 }; /* produces a warning on icc and gcc... */
 
 struct foob {
 	int a;
 	struct foobb {
 		float c, d;
-	};
+	} f;
 	int e;
 };
 
-struct foob ff2 = { 1, 2.5, 4, 2 };
+struct foob ff2 = { 1, 2.5, 4.4, 2 };
 
 union foou {
 	int a;

@@ -12,6 +12,7 @@ Parser:
 - outermost typequalifiers can differ between function declarations and
   implementations...
 - fix semantic to ignore type qualifiers (const double is the same as double)
+- label: declaration; is no valid C99 but we parse it anyway
 
 ast2firm:
 - output source file positions for panics...

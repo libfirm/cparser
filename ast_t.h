@@ -220,13 +220,19 @@ typedef enum {
 } initializer_type_t;
 
 struct initializer_t {
-	initializer_type_t type;
-	designator_t      *designator;
-	union {
-		initializer_t *list;
-		expression_t  *value;
-	} v;
-	initializer_t *next;
+	initializer_type_t  type;
+	initializer_t      *next;
+};
+
+struct initializer_value_t {
+	initializer_t initializer;
+	expression_t *value;
+};
+
+struct initializer_list_t {
+	initializer_t  initializer;
+	size_t         len;
+	initializer_t *initializers[];
 };
 
 struct declaration_t {

@@ -240,7 +240,7 @@ static void write_initializer(const initializer_t *initializer)
 		panic("list initializers not supported yet");
 	}
 
-	write_expression(initializer->v.value);
+	//write_expression(initializer->v.value);
 }
 
 static void write_enum(const symbol_t *symbol, const enum_type_t *type)
