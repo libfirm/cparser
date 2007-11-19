@@ -39,13 +39,13 @@
 static int verbose;
 
 static const ir_settings_if_conv_t *if_conv_info = NULL;
+static const backend_params        *be_params    = NULL;
 
 static void initialize_firm(void)
 {
 	be_opt_register();
 	firm_init_options(NULL, 0, NULL);
 
-	const backend_params *be_params;
 	firm_parameter_t params;
 	memset(&params, 0, sizeof(params));
 
@@ -244,9 +244,6 @@ static void optimize(void)
 
 	optimize_funccalls(0);
 
-	const backend_params *const be_params = be_init();
-	create_intrinsic_fkt *const arch_create_intrinsic = be_params->arch_create_intrinsic_fkt;
-	void                 *const create_intrinsic_ctx  = be_params->create_intrinsic_ctx;
 	lwrdw_param_t lwrdw_param = {
 		1,
 		1,
@@ -255,9 +252,9 @@ static void optimize(void)
 		def_create_intrinsic_fkt,
 		NULL
 	};
-	if (arch_create_intrinsic) {
-		lwrdw_param.create_intrinsic = arch_create_intrinsic;
-		lwrdw_param.ctx              = create_intrinsic_ctx;
+	if (be_params->arch_create_intrinsic_fkt) {
+		lwrdw_param.create_intrinsic = be_params->arch_create_intrinsic_fkt;
+		lwrdw_param.ctx              = be_params->create_intrinsic_ctx;
 	}
 
 	for(int i = 0; i < get_irp_n_irgs(); ++i) {
