@@ -167,11 +167,7 @@ static FILE* preprocess(const char *in)
 {
 	char buf[4096];
 
-#ifdef _WIN32
-	snprintf(buf, sizeof(buf), PREPROCESSOR " %s",in);
-#else
-	snprintf(buf, sizeof(buf), PREPROCESSOR " %s -o -",in);
-#endif
+	snprintf(buf, sizeof(buf), PREPROCESSOR " %s", in);
 
 	if(verbose) {
 		puts(buf);
