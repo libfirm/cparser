@@ -57,7 +57,7 @@ static void initialize_firm(void)
 
 	/* initialize backend */
 	be_params = be_init();
-	be_set_debug_retrieve(retrieve_dbg);
+	ir_set_debug_retrieve(retrieve_dbg);
 	params.arch_op_settings = be_params->arch_op_settings;
 	if_conv_info            = be_params->if_conv_info;
 
