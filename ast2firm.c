@@ -806,7 +806,7 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 {
 	ir_mode *value_mode = get_irn_mode(value);
 
-	if(value_mode == dest_mode)
+	if (value_mode == dest_mode || is_Bad(value))
 		return value;
 
 	if(dest_mode == mode_b) {
