@@ -368,8 +368,9 @@ static ir_type *create_struct_type(compound_type_t *type)
 
 		int entry_size      = get_type_size_bytes(entry_ir_type);
 		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
-		int misalign = offset % entry_alignment;
-		offset += misalign;
+		int misalign        = offset % entry_alignment;
+		if (misalign != 0)
+			offset += entry_alignment - misalign;
 
 		ir_entity *entity = new_entity(ir_type, ident, entry_ir_type);
 		set_entity_offset(entity, offset);
@@ -1878,6 +1879,112 @@ static void create_declaration_entity(declaration_t *declaration,
 	/* TODO: visibility? */
 }
 
+typedef struct compound_graph_path_entry_t compound_graph_path_entry_t;
+
+enum compound_graph_entry_type_t {
+	COMPOUND_GRAPH_ENTRY_ARRAY,
+	COMPOUND_GRAPH_ENTRY_COMPOUND
+};
+
+struct compound_graph_path_entry_t {
+	int type;
+	union {
+		ir_entity *entity;
+		int        array_index;
+	} v;
+	compound_graph_path_entry_t *prev;
+};
+
+static void create_initializer_list(initializer_list_t *initializer,
+                                    type_t *type, ir_entity *entity,
+                                    compound_graph_path_entry_t *entry,
+                                    int len);
+
+static void create_initializer_value(initializer_value_t *initializer,
+                                     ir_entity *entity,
+                                     compound_graph_path_entry_t *entry,
+                                     int len)
+{
+	ir_node *node = expression_to_firm(initializer->value);
+
+	ir_type *type = get_entity_type(entity);
+	compound_graph_path *path = new_compound_graph_path(type, len);
+
+	int i = len - 1;
+	for( ; entry != NULL; entry = entry->prev, --i) {
+		assert(i >= 0);
+		if(entry->type == COMPOUND_GRAPH_ENTRY_COMPOUND) {
+			set_compound_graph_path_node(path, i, entry->v.entity);
+		} else {
+			assert(entry->type == COMPOUND_GRAPH_ENTRY_ARRAY);
+			set_compound_graph_path_array_index(path, i, entry->v.array_index);
+		}
+	}
+	assert(i == -1);
+
+	add_compound_ent_value_w_path(entity, node, path);
+}
+
+static void create_initializer_compound(initializer_list_t *initializer,
+                                        compound_type_t *type,
+                                        ir_entity *entity,
+                                        compound_graph_path_entry_t *last_entry,
+                                        int len)
+{
+	declaration_t *compound_declaration = type->declaration;
+
+	declaration_t *compound_entry = compound_declaration->context.declarations;
+
+	compound_graph_path_entry_t entry;
+	entry.type     = COMPOUND_GRAPH_ENTRY_COMPOUND;
+	entry.prev     = last_entry;
+	++len;
+
+	size_t i = 0;
+	for( ; compound_entry != NULL; compound_entry = compound_entry->next) {
+		if(compound_entry->symbol == NULL)
+			continue;
+		if(compound_entry->namespc != NAMESPACE_NORMAL)
+			continue;
+
+		if(i >= initializer->len)
+			break;
+
+		entry.v.entity = compound_entry->v.entity;
+
+		initializer_t *sub_initializer = initializer->initializers[i];
+
+		assert(compound_entry != NULL);
+		assert(compound_entry->declaration_type
+				== DECLARATION_TYPE_COMPOUND_MEMBER);
+
+		if(sub_initializer->type == INITIALIZER_VALUE) {
+			create_initializer_value((initializer_value_t*) sub_initializer,
+			                         entity, &entry, len);
+		} else {
+			assert(sub_initializer->type == INITIALIZER_LIST);
+			create_initializer_list((initializer_list_t*) sub_initializer,
+			                        compound_entry->type, entity, &entry, len);
+		}
+
+		++i;
+	}
+}
+
+static void create_initializer_list(initializer_list_t *initializer,
+                                    type_t *type, ir_entity *entity,
+                                    compound_graph_path_entry_t *entry, int len)
+{
+	if(type->type == TYPE_ARRAY) {
+		/* TODO */
+	} else {
+		assert(type->type == TYPE_COMPOUND_STRUCT
+				|| type->type == TYPE_COMPOUND_UNION);
+		create_initializer_compound(initializer, (compound_type_t*) type,
+		                            entity, entry, len);
+	}
+}
+
 static void create_initializer(declaration_t *declaration)
 {
 	initializer_t *initializer = declaration->init.initializer;
@@ -1885,21 +1992,30 @@ static void create_initializer(declaration_t *declaration)
 		return;
 
 	if(initializer->type == INITIALIZER_VALUE) {
-		initializer_value_t *value = (initializer_value_t*) initializer;
-
-		ir_node *init_node = expression_to_firm(value->value);
+		initializer_value_t *initializer_value
+			= (initializer_value_t*) initializer;
+		ir_node *value = expression_to_firm(initializer_value->value);
 
 		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
-			set_value(declaration->v.value_number, init_node);
+			set_value(declaration->v.value_number, value);
 		} else {
 			ir_entity *entity = declaration->v.entity;
 
 			set_entity_variability(entity, variability_initialized);
-			set_atomic_ent_value(entity, init_node);
+			set_atomic_ent_value(entity, value);
 		}
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
-		panic("list initializer not supported yet");
+		initializer_list_t *list = (initializer_list_t*) initializer;
+
+		declaration_type_t declaration_type = declaration->declaration_type;
+		assert(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY
+				|| declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+
+		ir_entity *entity = declaration->v.entity;
+		set_entity_variability(entity, variability_initialized);
+
+		create_initializer_list(list, declaration->type, entity, NULL, 0);
 	}
 }
 
@@ -2375,7 +2491,9 @@ static void create_function(declaration_t *declaration)
 		int misalign = 0;
 		if(align > 0) {
 			misalign  = offset % align;
-			offset   += misalign;
+			if(misalign > 0) {
+				offset += align - misalign;
+			}
 		}
 
 		set_entity_offset(entity, offset);
@@ -2429,9 +2547,6 @@ static void context_to_firm(context_t *context)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
-	/* remove me later TODO FIXME */
-	(void) get_type_size;
-
 	/* just to be sure */
 	continue_label      = NULL;
 	break_label         = NULL;
