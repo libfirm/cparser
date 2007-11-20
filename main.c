@@ -91,7 +91,8 @@ static void dump(ir_graph *irg, const char *suffix)
 #if 0
 	dump_ir_block_graph(irg, suffix);
 #else
-	(void)irg, (void)suffix;
+	(void)irg;
+	(void)suffix;
 #endif
 }
 
