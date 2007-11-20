@@ -2949,13 +2949,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	return (expression_t*) call;
 }
 
-static type_t *get_type_after_conversion(const type_t *type1,
-                                         const type_t *type2)
-{
-	/* TODO... */
-	(void) type2;
-	return (type_t*) type1;
-}
+static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);
 
 static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
@@ -2975,14 +2969,16 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		           condition_type_orig);
 	}
 
-	conditional->true_expression = parse_expression();
+	expression_t *const t_expr = parse_expression();
+	conditional->true_expression = t_expr;
 	expect(':');
-	conditional->false_expression = parse_sub_expression(precedence);
+	expression_t *const f_expr = parse_sub_expression(precedence);
+	conditional->false_expression = f_expr;
 
-	type_t *true_type  = conditional->true_expression->datatype;
+	type_t *const true_type  = t_expr->datatype;
 	if(true_type == NULL)
 		return (expression_t*) conditional;
-	type_t *false_type = conditional->false_expression->datatype;
+	type_t *const false_type = f_expr->datatype;
 	if(false_type == NULL)
 		return (expression_t*) conditional;
 
@@ -2994,9 +2990,10 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		conditional->expression.datatype = skipped_true_type;
 	} else if (is_type_arithmetic(skipped_true_type) &&
 	           is_type_arithmetic(skipped_false_type)) {
-		type_t *const result = get_type_after_conversion(skipped_true_type,
-		                                                 skipped_false_type);
-		/* TODO: create implicit convs if necessary */
+		type_t *const result = semantic_arithmetic(skipped_true_type,
+		                                           skipped_false_type);
+		conditional->true_expression  = create_implicit_cast(t_expr, result);
+		conditional->false_expression = create_implicit_cast(f_expr, result);
 		conditional->expression.datatype = result;
 	} else if (skipped_true_type->type == TYPE_POINTER &&
 	           skipped_false_type->type == TYPE_POINTER &&
