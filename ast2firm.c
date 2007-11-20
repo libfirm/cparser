@@ -1419,9 +1419,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 				case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
 					tc = complex_type_class;
 					break;
-#endif
-
-#ifdef PROVIDE_IMAGINARY
 				case ATOMIC_TYPE_FLOAT_IMAGINARY:
 				case ATOMIC_TYPE_DOUBLE_IMAGINARY:
 				case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
@@ -1962,8 +1959,8 @@ static void create_initializer_compound(initializer_list_t *initializer,
 	declaration_t *compound_entry = compound_declaration->context.declarations;
 
 	compound_graph_path_entry_t entry;
-	entry.type     = COMPOUND_GRAPH_ENTRY_COMPOUND;
-	entry.prev     = last_entry;
+	entry.type = COMPOUND_GRAPH_ENTRY_COMPOUND;
+	entry.prev = last_entry;
 	++len;
 
 	size_t i = 0;
@@ -1997,12 +1994,41 @@ static void create_initializer_compound(initializer_list_t *initializer,
 	}
 }
 
+static void create_initializer_array(initializer_list_t *initializer,
+                                     array_type_t *type, ir_entity *entity,
+                                     compound_graph_path_entry_t *last_entry,
+                                     int len)
+{
+	type_t *element_type = type->element_type;
+
+	compound_graph_path_entry_t entry;
+	entry.type = COMPOUND_GRAPH_ENTRY_ARRAY;
+	entry.prev = last_entry;
+	++len;
+
+	for(size_t i = 0; i < initializer->len; ++i) {
+		entry.v.array_index = i;
+
+		initializer_t *sub_initializer = initializer->initializers[i];
+
+		if(sub_initializer->type == INITIALIZER_VALUE) {
+			create_initializer_value((initializer_value_t*) sub_initializer,
+			                         entity, &entry, len);
+		} else {
+			assert(sub_initializer->type == INITIALIZER_LIST);
+			create_initializer_list((initializer_list_t*) sub_initializer,
+			                        element_type, entity, &entry, len);
+		}
+	}
+}
+
 static void create_initializer_list(initializer_list_t *initializer,
                                     type_t *type, ir_entity *entity,
                                     compound_graph_path_entry_t *entry, int len)
 {
 	if(type->type == TYPE_ARRAY) {
-		/* TODO */
+		create_initializer_array(initializer, (array_type_t*) type,
+		                         entity, entry, len);
 	} else {
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);

@@ -51,8 +51,6 @@ typedef enum {
 	ATOMIC_TYPE_FLOAT_COMPLEX,
 	ATOMIC_TYPE_DOUBLE_COMPLEX,
 	ATOMIC_TYPE_LONG_DOUBLE_COMPLEX,
-#endif
-#ifdef PROVIDE_IMAGINARY
 	ATOMIC_TYPE_FLOAT_IMAGINARY,
 	ATOMIC_TYPE_DOUBLE_IMAGINARY,
 	ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY,
@@ -120,7 +118,7 @@ struct compound_type_t {
 struct enum_type_t {
 	type_t         type;
 	/** the declaration of the enum type. You can find the enum entries by
-	 * walking the declaration->context_next list until you don't find
+	 * walking the declaration->next list until you don't find
 	 * STORAGE_CLASS_ENUM_ENTRY declarations anymore */
 	declaration_t *declaration;
 };

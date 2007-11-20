@@ -71,14 +71,10 @@ static type_t       *parse_typename(void);
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
 	case T__Complex:
-#else
-#define COMPLEX_SPECIFIERS
-#endif
-
-#ifdef PROVIDE_IMAGINARY
 #define IMAGINARY_SPECIFIERS \
 	case T__Imaginary:
 #else
+#define COMPLEX_SPECIFIERS
 #define IMAGINARY_SPECIFIERS
 #endif
 
@@ -980,15 +976,15 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	/* TODO: ignore qualifiers, comparing pointers is probably
 	 * not correct */
 	if(expression != NULL && expression_type == type) {
-		initializer_t *result = allocate_ast_zero(sizeof(result[0]));
-		result->type          = INITIALIZER_VALUE;
+		initializer_value_t *result = allocate_ast_zero(sizeof(result[0]));
+		result->initializer.type    = INITIALIZER_VALUE;
 
 		if(type != NULL) {
 			semantic_assign(type, &expression, "initializer");
 		}
-		//result->v.value = expression;
+		result->value = expression;
 
-		return result;
+		return (initializer_t*) result;
 	}
 
 	bool read_paren = false;
@@ -998,14 +994,46 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	}
 
 	/* descend into subtype */
-	initializer_t *result = NULL;
+	initializer_t  *result = NULL;
+	initializer_t **elems;
 	if(type->type == TYPE_ARRAY) {
 		array_type_t *array_type   = (array_type_t*) type;
 		type_t       *element_type = array_type->element_type;
 		element_type               = skip_typeref(element_type);
 
-		result
-			= parse_sub_initializer(element_type, expression, expression_type);
+		initializer_t *sub;
+		had_initializer_brace_warning = false;
+		if(expression == NULL) {
+			sub = parse_sub_initializer_elem(element_type);
+		} else {
+			sub = parse_sub_initializer(element_type, expression,
+			                            expression_type);
+		}
+
+		/* didn't match the subtypes -> try the parent type */
+		if(sub == NULL) {
+			assert(!read_paren);
+			return NULL;
+		}
+
+		elems = NEW_ARR_F(initializer_t*, 0);
+		ARR_APP1(initializer_t*, elems, sub);
+
+		while(true) {
+			if(token.type == '}')
+				break;
+			expect_block(',');
+
+			initializer_t *sub
+				= parse_sub_initializer(element_type, NULL, NULL);
+			if(sub == NULL) {
+				/* TODO error, do nicer cleanup */
+				parse_error("member initializer didn't match");
+				DEL_ARR_F(elems);
+				return NULL;
+			}
+			ARR_APP1(initializer_t*, elems, sub);
+		}
 	} else {
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
@@ -1032,7 +1060,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			return NULL;
 		}
 
-		initializer_t **elems = NEW_ARR_F(initializer_t*, 0);
+		elems = NEW_ARR_F(initializer_t*, 0);
 		ARR_APP1(initializer_t*, elems, sub);
 
 		declaration_t *iter  = first->next;
@@ -1049,7 +1077,6 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			type_t *iter_type = iter->type;
 			iter_type         = skip_typeref(iter_type);
 
-			/* read next token */
 			initializer_t *sub = parse_sub_initializer(iter_type, NULL, NULL);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup*/
@@ -1059,20 +1086,19 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			}
 			ARR_APP1(initializer_t*, elems, sub);
 		}
-
-		int    len        = ARR_LEN(elems);
-		size_t elems_size = sizeof(initializer_t*) * len;
-
-		initializer_list_t *init
-			= allocate_ast_zero(sizeof(init[0]) + elems_size);
-
-		init->initializer.type = INITIALIZER_LIST;
-		init->len              = len;
-		memcpy(init->initializers, elems, elems_size);
-		DEL_ARR_F(elems);
-
-		result = (initializer_t*) init;
 	}
+
+	int    len        = ARR_LEN(elems);
+	size_t elems_size = sizeof(initializer_t*) * len;
+
+	initializer_list_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
+
+	init->initializer.type = INITIALIZER_LIST;
+	init->len              = len;
+	memcpy(init->initializers, elems, elems_size);
+	DEL_ARR_F(elems);
+
+	result = (initializer_t*) init;
 
 	if(read_paren) {
 		if(token.type == ',')
@@ -1347,8 +1373,6 @@ typedef enum {
 	SPECIFIER_VOID      = 1 << 10,
 #ifdef PROVIDE_COMPLEX
 	SPECIFIER_COMPLEX   = 1 << 11,
-#endif
-#ifdef PROVIDE_IMAGINARY
 	SPECIFIER_IMAGINARY = 1 << 12,
 #endif
 } specifiers_t;
@@ -1443,8 +1467,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool")
 #ifdef PROVIDE_COMPLEX
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
-#endif
-#ifdef PROVIDE_IMAGINARY
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
 #endif
 		case T_inline:
@@ -1603,8 +1625,6 @@ finish_specifiers:
 		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_COMPLEX:
 			atomic_type = ATOMIC_TYPE_LONG_DOUBLE_COMPLEX;
 			break;
-#endif
-#ifdef PROVIDE_IMAGINARY
 		case SPECIFIER_FLOAT | SPECIFIER_IMAGINARY:
 			atomic_type = ATOMIC_TYPE_FLOAT_IMAGINARY;
 			break;
@@ -1722,7 +1742,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 	if(token.type == T_IDENTIFIER) {
 		symbol_t      *symbol = token.v.symbol;
 		if(!is_typedef_symbol(symbol)) {
-			/* TODO */
+			/* TODO: K&R style C parameters */
 			parse_identifier_list();
 			return NULL;
 		}
@@ -2118,7 +2138,8 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
-			ndeclaration->init.initializer = parse_initializer(declaration->type);
+			ndeclaration->init.initializer
+				= parse_initializer(declaration->type);
 		} else if(token.type == '{') {
 			if(declaration->type->type != TYPE_FUNCTION) {
 				parser_print_error_prefix();

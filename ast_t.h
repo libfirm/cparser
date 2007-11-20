@@ -221,7 +221,6 @@ typedef enum {
 
 struct initializer_t {
 	initializer_type_t  type;
-	initializer_t      *next;
 };
 
 struct initializer_value_t {
