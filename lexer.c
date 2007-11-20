@@ -145,13 +145,11 @@ static inline void next_char(void)
 		break;
 	}
 
-end_of_next_char:
+end_of_next_char:;
 #endif
 	(void) maybe_concat_lines;
 #ifdef DEBUG_CHARS
 	printf("nchar '%c'\n", c);
-#else
-	;
 #endif
 }
 
