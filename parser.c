@@ -2522,8 +2522,12 @@ static expression_t *parse_brace_expression(void)
 
 static expression_t *parse_function_keyword(void)
 {
-	eat(T___FUNCTION__);
+	next_token();
 	/* TODO */
+
+	if (current_function == NULL) {
+		parse_error("'__func__' used outside of a function");
+	}
 
 	string_literal_t *expression = allocate_ast_zero(sizeof(expression[0]));
 	expression->expression.type     = EXPR_FUNCTION;
@@ -2658,6 +2662,7 @@ static expression_t *parse_primary_expression(void)
 	case T_IDENTIFIER:
 		return parse_reference();
 	case T___FUNCTION__:
+	case T___func__:
 		return parse_function_keyword();
 	case T___PRETTY_FUNCTION__:
 		return parse_pretty_function_keyword();

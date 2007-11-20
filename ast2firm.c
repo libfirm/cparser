@@ -35,6 +35,9 @@ static ir_node  *current_switch_cond;
 static bool      saw_default_label;
 static ir_node **imature_blocks;
 
+static const declaration_t *current_function_decl;
+static ir_node             *current_function_name;
+
 typedef enum declaration_type_t {
 	DECLARATION_TYPE_UNKNOWN,
 	DECLARATION_TYPE_FUNCTION,
@@ -570,29 +573,30 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 	return new_d_SymConst(dbgi, sym, symconst_addr_ent);
 }
 
-static ir_node *string_literal_to_firm(const string_literal_t* literal)
+static ir_node *string_to_firm(const source_position_t *const src_pos,
+                               const char *const id_prefix,
+                               const char *const string)
 {
-	ir_type   *global_type = get_glob_type();
-	ir_type   *type        = new_type_array(unique_ident("strtype"), 1,
-	                                        ir_type_const_char);
+	ir_type *const global_type = get_glob_type();
+	ir_type *const type        = new_type_array(unique_ident("strtype"), 1,
+	                                            ir_type_const_char);
 
-	ident     *id     = unique_ident("Lstr");
-	ir_entity *entity = new_entity(global_type, id, type);
+	ident     *const id     = unique_ident(id_prefix);
+	ir_entity *const entity = new_entity(global_type, id, type);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
 
-	ir_type    *elem_type = ir_type_const_char;
-	ir_mode    *mode      = get_type_mode(elem_type);
+	ir_type *const elem_type = ir_type_const_char;
+	ir_mode *const mode      = get_type_mode(elem_type);
 
-	const char *string = literal->value;
-	size_t      slen   = strlen(string) + 1;
+	const size_t slen = strlen(string) + 1;
 
 	set_array_lower_bound_int(type, 0, 0);
 	set_array_upper_bound_int(type, 0, slen);
 	set_type_size_bytes(type, slen);
 	set_type_state(type, layout_fixed);
 
-	tarval **tvs = xmalloc(slen * sizeof(tvs[0]));
+	tarval **const tvs = xmalloc(slen * sizeof(tvs[0]));
 	for(size_t i = 0; i < slen; ++i) {
 		tvs[i] = new_tarval_from_long(string[i], mode);
 	}
@@ -600,9 +604,15 @@ static ir_node *string_literal_to_firm(const string_literal_t* literal)
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	dbg_info *dbgi = get_dbg_info(&literal->expression.source_position);
+	dbg_info *const dbgi = get_dbg_info(src_pos);
 
 	return create_symconst(dbgi, entity);
+}
+
+static ir_node *string_literal_to_firm(const string_literal_t* literal)
+{
+	return string_to_firm(&literal->expression.source_position, "Lstr",
+	                      literal->value);
 }
 
 static ir_node *deref_address(type_t *const type, ir_node *const addr,
@@ -1441,6 +1451,18 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	return new_d_Const(dbgi, mode, tv);
 }
 
+static ir_node *function_name_to_firm(const string_literal_t *const expr)
+{
+	if (current_function_name == NULL) {
+		const source_position_t *const src_pos =
+			&expr->expression.source_position;
+		const char *const name = current_function_decl->symbol->string;
+		current_function_name = string_to_firm(src_pos, "__func__", name);
+	}
+
+	return current_function_name;
+}
+
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->type == UNEXPR_DEREFERENCE);
@@ -1499,8 +1521,9 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_CLASSIFY_TYPE:
 		return classify_type_to_firm((const classify_type_expression_t*)expression);
 	case EXPR_FUNCTION:
-	case EXPR_OFFSETOF:
 	case EXPR_PRETTY_FUNCTION:
+		return function_name_to_firm((const string_literal_t*)expression);
+	case EXPR_OFFSETOF:
 	case EXPR_VA_ARG:
 	case EXPR_STATEMENT:
 	case EXPR_BUILTIN_SYMBOL:
@@ -2428,6 +2451,9 @@ static void create_function(declaration_t *declaration)
 
 	if(declaration->init.statement == NULL)
 		return;
+
+	current_function_decl = declaration;
+	current_function_name = NULL;
 
 	assert(imature_blocks == NULL);
 	imature_blocks = NEW_ARR_F(ir_node*, 0);
