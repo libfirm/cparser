@@ -1311,6 +1311,9 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	add_immBlock_pred(common_block, false_jmp);
 	mature_immBlock(common_block);
 
+	/* TODO improve static semantics, so either both or no values are NULL */
+	if (true_val == NULL || false_val == NULL) return NULL;
+
 	ir_node *in[2] = { true_val, false_val };
 	ir_mode *mode  = get_irn_mode(true_val);
 	assert(get_irn_mode(false_val) == mode);
