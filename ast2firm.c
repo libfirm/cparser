@@ -559,15 +559,15 @@ static ir_node *const_to_firm(const const_t *cnst)
 	tarval *tv;
 	size_t  len;
 	if(mode_is_float(mode)) {
-		len = snprintf(buf, sizeof(buf), "%LF", cnst->v.float_value);
+		tv = new_tarval_from_double(cnst->v.float_value, mode);
 	} else {
 		if(mode_is_signed(mode)) {
 			len = snprintf(buf, sizeof(buf), "%lld", cnst->v.int_value);
 		} else {
 			len = snprintf(buf, sizeof(buf), "%llu", cnst->v.int_value);
 		}
+		tv = new_tarval_from_str(buf, len, mode);
 	}
-	tv = new_tarval_from_str(buf, len, mode);
 
 	return new_d_Const(dbgi, mode, tv);
 }
