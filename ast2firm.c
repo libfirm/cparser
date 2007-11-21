@@ -28,6 +28,8 @@ static type_t *type_const_char;
 static type_t *type_void;
 static type_t *type_int;
 
+static symbol_t *symbol_alloca;
+
 static int       next_value_number_function;
 static ir_node  *continue_label;
 static ir_node  *break_label;
@@ -97,6 +99,8 @@ void init_ast2firm(void)
 	                                      ir_type_void, mode_P_data);
 
 	type_void->firm_type = ir_type_void;
+
+	symbol_alloca = symbol_table_insert("__builtin_alloca");
 }
 
 void exit_ast2firm(void)
@@ -712,11 +716,43 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	panic("reference to declaration with unknown type found");
 }
 
+static ir_node *process_builtin_call(const call_expression_t *call)
+{
+	dbg_info *dbgi = get_dbg_info(&call->expression.source_position);
+
+	assert(call->function->type == EXPR_BUILTIN_SYMBOL);
+	builtin_symbol_expression_t *builtin
+		= (builtin_symbol_expression_t*) call->function;
+	symbol_t *symbol = builtin->symbol;
+
+	if(symbol == symbol_alloca) {
+		if(call->arguments == NULL || call->arguments->next != NULL) {
+			panic("invalid number of parameters on __builtin_alloca");
+		}
+		expression_t *argument = call->arguments->expression;
+		ir_node      *size     = expression_to_firm(argument);
+
+		ir_node *store  = get_store();
+		ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+		                              stack_alloc);
+		ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+		set_store(proj_m);
+		ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+
+		return res;
+	} else {
+		panic("Unsupported builtin found\n");
+	}
+}
+
 static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
 	assert(get_cur_block() != NULL);
 
 	expression_t  *function = call->function;
+	if(function->type == EXPR_BUILTIN_SYMBOL) {
+		return process_builtin_call(call);
+	}
 	ir_node       *callee   = expression_to_firm(function);
 
 	function_type_t *function_type;

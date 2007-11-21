@@ -45,6 +45,7 @@ static type_t         *type_float       = NULL;
 static type_t         *type_const_char  = NULL;
 static type_t         *type_string      = NULL;
 static type_t         *type_void        = NULL;
+static type_t         *type_void_ptr    = NULL;
 static type_t         *type_size_t      = NULL;
 static type_t         *type_ptrdiff_t   = NULL;
 
@@ -2656,18 +2657,42 @@ static expression_t *parse_va_arg(void)
 	return (expression_t*) expression;
 }
 
+static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
+{
+	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
+	parameter->type = argument_type;
+
+	function_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type   = TYPE_FUNCTION;
+	type->result_type = result_type;
+	type->parameters  = parameter;
+
+	type_t *result = typehash_insert((type_t*) type);
+	if(result != (type_t*) type) {
+		free_type(type);
+	}
+
+	return result;
+}
+
 static expression_t *parse_builtin_symbol(void)
 {
 	builtin_symbol_expression_t *expression
 		= allocate_ast_zero(sizeof(expression[0]));
 	expression->expression.type = EXPR_BUILTIN_SYMBOL;
 
-	/* TODO: set datatype */
-
 	expression->symbol = token.v.symbol;
+
+	type_t *type;
+	switch(token.type) {
+	case T___builtin_alloca:
+		type = make_function_1_type(type_void_ptr, type_size_t);
+		break;
+	}
 
 	next_token();
 
+	expression->expression.datatype = type;
 	return (expression_t*) expression;
 }
 
@@ -2691,6 +2716,7 @@ static expression_t *parse_primary_expression(void)
 		return parse_offsetof();
 	case T___builtin_va_arg:
 		return parse_va_arg();
+	case T___builtin_alloca:
 	case T___builtin_expect:
 	case T___builtin_va_start:
 	case T___builtin_va_end:
@@ -4304,6 +4330,7 @@ void init_parser(void)
 	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, 0);
 	type_const_char  = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, 0);
+	type_void_ptr    = make_pointer_type(type_void, 0);
 	type_string      = make_pointer_type(type_const_char, 0);
 }
 
