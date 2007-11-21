@@ -82,10 +82,10 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "symbol '%s'", token->v.symbol->string);
 		break;
 	case T_INTEGER:
-		fprintf(f, "integer number %d", token->v.intvalue);
+		fprintf(f, "integer number %lld", token->v.intvalue);
 		break;
 	case T_FLOATINGPOINT:
-		fprintf(f, "floatingpointer number %f", token->v.floatvalue);
+		fprintf(f, "floatingpointer number %LF", token->v.floatvalue);
 		break;
 	case T_STRING_LITERAL:
 		fprintf(f, "string '%s'", token->v.string);

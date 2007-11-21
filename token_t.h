@@ -34,8 +34,8 @@ typedef struct {
 	int type;
 	union {
 		symbol_t   *symbol;
-		int         intvalue;
-		double      floatvalue;
+		long long   intvalue;
+		long double floatvalue;
 		const char *string;
 	} v;
 	source_position_t  source_position;

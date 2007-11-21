@@ -321,15 +321,12 @@ static void parse_number_hex(void)
 	}
 
 	char *endptr;
-	int value = strtol(string, &endptr, 16);
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = strtoll(string, &endptr, 16);
 	if(*endptr != '\0') {
 		parse_error("hex number literal too long");
 	}
 
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = value;
-
-	parse_integer_suffix();
 	obstack_free(&symbol_obstack, string);
 }
 
@@ -348,16 +345,14 @@ static void parse_number_oct(void)
 	char *string = obstack_finish(&symbol_obstack);
 
 	char *endptr;
-	int value = strtol(string, &endptr, 8);
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = strtoll(string, &endptr, 8);
 	if(*endptr != '\0') {
 		parse_error("octal number literal too long");
 	}
 
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = value;
-
-	parse_integer_suffix();
 	obstack_free(&symbol_obstack, string);
+	parse_integer_suffix();
 }
 
 static void parse_number_dec(void)
@@ -400,7 +395,7 @@ static void parse_number_dec(void)
 	char *endptr;
 	if(is_float) {
 		lexer_token.type         = T_FLOATINGPOINT;
-		lexer_token.v.floatvalue = strtod(string, &endptr);
+		lexer_token.v.floatvalue = strtold(string, &endptr);
 
 		if(*endptr != '\0') {
 			parse_error("invalid number literal");
@@ -409,7 +404,7 @@ static void parse_number_dec(void)
 		parse_floating_suffix();
 	} else {
 		lexer_token.type       = T_INTEGER;
-		lexer_token.v.intvalue = strtol(string, &endptr, 10);
+		lexer_token.v.intvalue = strtoll(string, &endptr, 10);
 
 		if(*endptr != '\0') {
 			parse_error("invalid number literal");
