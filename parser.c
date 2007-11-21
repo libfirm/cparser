@@ -2716,25 +2716,37 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	eat('[');
 
+	expression_t *index = parse_expression();
+
 	array_access_expression_t *array_access
 		= allocate_ast_zero(sizeof(array_access[0]));
 
-	array_access->expression.type     = EXPR_ARRAY_ACCESS;
-	array_access->array_ref           = array_ref;
-	array_access->index               = parse_expression();
+	array_access->expression.type = EXPR_ARRAY_ACCESS;
+	array_access->array_ref       = array_ref;
+	array_access->index           = index;
 
-	type_t *type = array_ref->datatype;
-	if(type != NULL) {
-		if(type->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) type;
+	type_t *type_left  = skip_typeref(array_ref->datatype);
+	type_t *type_right = skip_typeref(index->datatype);
+
+	if(type_left != NULL && type_right != NULL) {
+		if(type_left->type == TYPE_POINTER) {
+			pointer_type_t *pointer           = (pointer_type_t*) type_left;
 			array_access->expression.datatype = pointer->points_to;
-		} else if(type->type == TYPE_ARRAY) {
-			array_type_t *array_type          = (array_type_t*) type;
+		} else if(type_left->type == TYPE_ARRAY) {
+			array_type_t *array_type          = (array_type_t*) type_left;
+			array_access->expression.datatype = array_type->element_type;
+		} else if(type_right->type == TYPE_POINTER) {
+			pointer_type_t *pointer           = (pointer_type_t*) type_right;
+			array_access->expression.datatype = pointer->points_to;
+		} else if(type_right->type == TYPE_ARRAY) {
+			array_type_t *array_type          = (array_type_t*) type_right;
 			array_access->expression.datatype = array_type->element_type;
 		} else {
 			parser_print_error_prefix();
-			fprintf(stderr, "array access on object with non-pointer type ");
-			print_type_quoted(type);
+			fprintf(stderr, "array access on object with non-pointer types ");
+			print_type_quoted(type_left);
+			fprintf(stderr, ", ");
+			print_type_quoted(type_right);
 			fprintf(stderr, "\n");
 		}
 	}

@@ -1259,10 +1259,22 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 static ir_node *array_access_addr(const array_access_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	ir_node  *base_addr;
+	ir_node  *offset;
 
-	ir_node *base_addr = expression_to_firm(expression->array_ref);
-	ir_node *offset    = expression_to_firm(expression->index);
-	offset             = create_conv(dbgi, offset, mode_Iu);
+	type_t   *type_left  = skip_typeref(expression->array_ref->datatype);
+	type_t   *type_right = skip_typeref(expression->index->datatype);
+
+	if(type_left->type == TYPE_POINTER || type_left->type == TYPE_ARRAY) {
+		base_addr = expression_to_firm(expression->array_ref);
+		offset    = expression_to_firm(expression->index);
+	} else {
+		assert(type_right->type == TYPE_POINTER
+				|| type_right->type == TYPE_ARRAY);
+		base_addr = expression_to_firm(expression->index);
+		offset    = expression_to_firm(expression->array_ref);
+	}
+	offset    = create_conv(dbgi, offset, mode_Iu);
 
 	unsigned elem_size       = get_type_size(expression->expression.datatype);
 	ir_node *elem_size_const = new_Const_long(mode_Iu, elem_size);
