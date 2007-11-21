@@ -2471,9 +2471,10 @@ static int get_function_n_local_vars(declaration_t *declaration)
 
 static void initialize_function_parameters(declaration_t *declaration)
 {
-	ir_graph *irg         = current_ir_graph;
-	ir_node  *args        = get_irg_args(irg);
-	ir_node  *start_block = get_irg_start_block(irg);
+	ir_graph        *irg             = current_ir_graph;
+	ir_node         *args            = get_irg_args(irg);
+	ir_node         *start_block     = get_irg_start_block(irg);
+	ir_type         *function_irtype = get_ir_type(declaration->type);
 
 	int            n         = 0;
 	declaration_t *parameter = declaration->context.declarations;
@@ -2488,7 +2489,12 @@ static void initialize_function_parameters(declaration_t *declaration)
 		}
 
 		if(needs_entity) {
-			panic("entities for function parameters not implemented yet");
+			ir_entity *entity = get_method_value_param_ent(function_irtype, n);
+
+			parameter->declaration_type
+				= DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY;
+			parameter->v.entity = entity;
+			continue;
 		}
 
 		ir_mode *mode = get_ir_mode(parameter->type);
