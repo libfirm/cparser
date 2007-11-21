@@ -323,8 +323,8 @@ static void parse_floating_suffix(void)
 static inline bool is_hex_digit(int c)
 {
 	return (c >= '0' && c <= '9')
-			|| (c >= 'a' && c <= 'z')
-			|| (c >= 'A' && c <= 'Z');
+			|| (c >= 'a' && c <= 'f')
+			|| (c >= 'A' && c <= 'F');
 }
 
 static void parse_number_hex(void)
