@@ -356,6 +356,7 @@ static void parse_number_hex(void)
 	}
 
 	obstack_free(&symbol_obstack, string);
+	parse_integer_suffix();
 }
 
 static inline bool is_octal_digit(int chr)
