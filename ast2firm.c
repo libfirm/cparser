@@ -1078,10 +1078,19 @@ static ir_node *create_sub(const binary_expression_t *expression)
 	type_t       *const type_left  = skip_typeref(expr_left->datatype);
 	type_t       *const type_right = skip_typeref(expr_right->datatype);
 
-	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
+	} else if (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER) {
+		const pointer_type_t *const ptr_type = (const pointer_type_t*)type_left;
+		const unsigned elem_size             = get_type_size(ptr_type->points_to);
+		ir_mode *const mode   = get_ir_mode(type);
+		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
+		ir_node *const cnst   = new_Const_long(mode_Is, (long)elem_size);
+		ir_node *const no_mem = new_NoMem();
+		ir_node *const div    = new_d_Div(dbgi, no_mem, sub, cnst, mode,
+		                                  op_pin_state_floats);
+		return new_d_Proj(dbgi, div, mode, pn_Div_res);
 	}
 
 	assert(type_left->type == TYPE_POINTER);
