@@ -266,7 +266,7 @@ end_symbol:
 
 static void parse_integer_suffix(void)
 {
-	if(c == 'U' || c == 'U') {
+	if(c == 'U' || c == 'u') {
 		next_char();
 		if(c == 'L' || c == 'l') {
 			next_char();
