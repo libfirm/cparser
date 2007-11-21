@@ -3778,7 +3778,7 @@ static statement_t *parse_case_statement(void)
 	label->expression = parse_expression();
 
 	expect(':');
-	label->statement.next = parse_statement();
+	label->label_statement = parse_statement();
 
 	return (statement_t*) label;
 }
@@ -3792,7 +3792,7 @@ static statement_t *parse_default_statement(void)
 	label->statement.source_position = token.source_position;
 
 	expect(':');
-	label->statement.next = parse_statement();
+	label->label_statement = parse_statement();
 
 	return (statement_t*) label;
 }

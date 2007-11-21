@@ -325,6 +325,7 @@ struct goto_statement_t {
 struct case_label_statement_t {
 	statement_t   statement;
 	expression_t *expression;
+	statement_t  *label_statement;
 };
 
 struct label_statement_t {

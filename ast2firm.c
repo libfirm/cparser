@@ -2258,6 +2258,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	}
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
+
+	statement_to_firm(statement->label_statement);
 }
 
 static ir_node *get_label_block(declaration_t *label)

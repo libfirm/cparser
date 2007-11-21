@@ -380,6 +380,7 @@ static void print_case_label(const case_label_statement_t *statement)
 		print_expression(statement->expression);
 		fputs(":\n", out);
 	}
+	print_statement(statement->label_statement);
 }
 
 static void print_declaration_statement(

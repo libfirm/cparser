@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -36,7 +37,8 @@
 #define pclose(file)      _pclose(file)
 #endif /* _WIN32 */
 
-static int verbose;
+static int  verbose;
+static bool do_dump;
 
 static const ir_settings_if_conv_t *if_conv_info = NULL;
 static const backend_params        *be_params    = NULL;
@@ -88,12 +90,9 @@ static void initialize_firm(void)
 
 static void dump(ir_graph *irg, const char *suffix)
 {
-#if 0
-	dump_ir_block_graph(irg, suffix);
-#else
-	(void)irg;
-	(void)suffix;
-#endif
+	if(do_dump) {
+		dump_ir_block_graph(irg, suffix);
+	}
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -324,6 +323,8 @@ int main(int argc, char **argv)
 			mode = PrintAst;
 		} else if(strcmp(arg, "--print-fluffy") == 0) {
 			mode = PrintFluffy;
+		} else if(strcmp(arg, "--dump") == 0) {
+			do_dump = true;
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
 		} else if(arg[0] == '-' && arg[1] == 'f') {
