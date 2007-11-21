@@ -2478,7 +2478,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 
 	int            n         = 0;
 	declaration_t *parameter = declaration->context.declarations;
-	for( ; parameter != NULL; parameter = parameter->next) {
+	for( ; parameter != NULL; parameter = parameter->next, ++n) {
 		assert(parameter->declaration_type == DECLARATION_TYPE_UNKNOWN);
 		type_t *type = parameter->type;
 
@@ -2490,6 +2490,8 @@ static void initialize_function_parameters(declaration_t *declaration)
 
 		if(needs_entity) {
 			ir_entity *entity = get_method_value_param_ent(function_irtype, n);
+			ident     *id     = new_id_from_str(parameter->symbol->string);
+			set_entity_ident(entity, id);
 
 			parameter->declaration_type
 				= DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY;
@@ -2500,7 +2502,6 @@ static void initialize_function_parameters(declaration_t *declaration)
 		ir_mode *mode = get_ir_mode(parameter->type);
 		long     pn   = n;
 		ir_node *proj = new_r_Proj(irg, start_block, args, mode, pn);
-		++n;
 
 		parameter->declaration_type = DECLARATION_TYPE_LOCAL_VARIABLE;
 		parameter->v.value_number   = next_value_number_function;
