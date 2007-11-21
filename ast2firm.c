@@ -555,12 +555,19 @@ static ir_node *const_to_firm(const const_t *cnst)
 	dbg_info *dbgi = get_dbg_info(&cnst->expression.source_position);
 	ir_mode  *mode = get_ir_mode(cnst->expression.datatype);
 
-	tarval   *tv;
+	char    buf[128];
+	tarval *tv;
+	size_t  len;
 	if(mode_is_float(mode)) {
-		tv = new_tarval_from_double(cnst->v.float_value, mode);
+		len = snprintf(buf, sizeof(buf), "%LF", cnst->v.float_value);
 	} else {
-		tv = new_tarval_from_long(cnst->v.int_value, mode);
+		if(mode_is_signed(mode)) {
+			len = snprintf(buf, sizeof(buf), "%lld", cnst->v.int_value);
+		} else {
+			len = snprintf(buf, sizeof(buf), "%llu", cnst->v.int_value);
+		}
 	}
+	tv = new_tarval_from_str(buf, len, mode);
 
 	return new_d_Const(dbgi, mode, tv);
 }

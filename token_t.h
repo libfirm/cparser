@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "symbol.h"
 #include "symbol_table.h"
+#include "type.h"
 
 typedef enum {
 #define T(x,str,val) T_##x val,
@@ -38,6 +39,7 @@ typedef struct {
 		long double floatvalue;
 		const char *string;
 	} v;
+	type_t            *datatype;
 	source_position_t  source_position;
 } token_t;
 

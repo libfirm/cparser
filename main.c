@@ -294,9 +294,9 @@ int main(int argc, char **argv)
 
 	init_symbol_table();
 	init_tokens();
-	init_lexer();
 	init_types();
 	init_typehash();
+	init_lexer();
 	init_ast();
 	init_parser();
 	init_ast2firm();
@@ -436,9 +436,9 @@ int main(int argc, char **argv)
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();
+	exit_lexer();
 	exit_typehash();
 	exit_types();
-	exit_lexer();
 	exit_tokens();
 	exit_symbol_table();
 	return 0;

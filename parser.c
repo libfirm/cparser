@@ -2354,7 +2354,7 @@ static expression_t *parse_int_const(void)
 	const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 	cnst->expression.type     = EXPR_CONST;
-	cnst->expression.datatype = type_int;
+	cnst->expression.datatype = token.datatype;
 	cnst->v.int_value         = token.v.intvalue;
 
 	next_token();
@@ -2367,7 +2367,7 @@ static expression_t *parse_float_const(void)
 	const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 	cnst->expression.type     = EXPR_CONST;
-	cnst->expression.datatype = type_double;
+	cnst->expression.datatype = token.datatype;
 	cnst->v.float_value       = token.v.floatvalue;
 
 	next_token();

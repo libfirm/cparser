@@ -47,7 +47,7 @@ struct expression_t {
 struct const_t {
 	expression_t  expression;
 	union {
-		int         int_value;
+		long long   int_value;
 		long double float_value;
 	} v;
 };

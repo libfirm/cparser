@@ -221,7 +221,7 @@ static void write_expression(const expression_t *expression)
 	case EXPR_CONST:
 		constant = (const const_t*) expression;
 		if(is_type_integer(expression->datatype)) {
-			fprintf(out, "%d", constant->v.int_value);
+			fprintf(out, "%lld", constant->v.int_value);
 		} else {
 			fprintf(out, "%Lf", constant->v.float_value);
 		}

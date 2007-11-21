@@ -6,6 +6,7 @@
 #include "adt/error.h"
 #include "adt/strset.h"
 #include "adt/util.h"
+#include "type_t.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -24,6 +25,16 @@ static char        buf[1024 + MAX_PUTBACK];
 static const char *bufend;
 static const char *bufpos;
 static strset_t    stringset;
+
+static type_t     *type_int        = NULL;
+static type_t     *type_uint       = NULL;
+static type_t     *type_long       = NULL;
+static type_t     *type_ulong      = NULL;
+static type_t     *type_longlong   = NULL;
+static type_t     *type_ulonglong  = NULL;
+static type_t     *type_float      = NULL;
+static type_t     *type_double     = NULL;
+static type_t     *type_longdouble = NULL;
 
 static void error_prefix_at(const char *input_name, unsigned linenr)
 {
@@ -256,13 +267,17 @@ end_symbol:
 static void parse_integer_suffix(void)
 {
 	if(c == 'U' || c == 'U') {
-		/* TODO do something with the suffixes... */
 		next_char();
 		if(c == 'L' || c == 'l') {
 			next_char();
 			if(c == 'L' || c == 'l') {
 				next_char();
+				lexer_token.datatype = type_ulonglong;
+			} else {
+				lexer_token.datatype = type_ulong;
 			}
+		} else {
+			lexer_token.datatype = type_uint;
 		}
 	} else if(c == 'l' || c == 'L') {
 		next_char();
@@ -270,10 +285,18 @@ static void parse_integer_suffix(void)
 			next_char();
 			if(c == 'u' || c == 'U') {
 				next_char();
+				lexer_token.datatype = type_ulonglong;
+			} else {
+				lexer_token.datatype = type_longlong;
 			}
 		} else if(c == 'u' || c == 'U') {
 			next_char();
+			lexer_token.datatype = type_ulong;
+		} else {
+			lexer_token.datatype = type_int;
 		}
+	} else {
+		lexer_token.datatype = type_int;
 	}
 }
 
@@ -283,11 +306,16 @@ static void parse_floating_suffix(void)
 	/* TODO: do something usefull with the suffixes... */
 	case 'f':
 	case 'F':
+		next_char();
+		lexer_token.datatype = type_float;
+		break;
 	case 'l':
 	case 'L':
 		next_char();
+		lexer_token.datatype = type_longdouble;
 		break;
 	default:
+		lexer_token.datatype = type_double;
 		break;
 	}
 }
@@ -322,7 +350,7 @@ static void parse_number_hex(void)
 
 	char *endptr;
 	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = strtoll(string, &endptr, 16);
+	lexer_token.v.intvalue = strtoull(string, &endptr, 16);
 	if(*endptr != '\0') {
 		parse_error("hex number literal too long");
 	}
@@ -346,7 +374,7 @@ static void parse_number_oct(void)
 
 	char *endptr;
 	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = strtoll(string, &endptr, 8);
+	lexer_token.v.intvalue = strtoull(string, &endptr, 8);
 	if(*endptr != '\0') {
 		parse_error("octal number literal too long");
 	}
@@ -404,7 +432,7 @@ static void parse_number_dec(void)
 		parse_floating_suffix();
 	} else {
 		lexer_token.type       = T_INTEGER;
-		lexer_token.v.intvalue = strtoll(string, &endptr, 10);
+		lexer_token.v.intvalue = strtoull(string, &endptr, 10);
 
 		if(*endptr != '\0') {
 			parse_error("invalid number literal");
@@ -1016,6 +1044,21 @@ newline_found:
 void init_lexer(void)
 {
 	strset_init(&stringset);
+
+	type_int       = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_CONST);
+	type_uint      = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_CONST);
+	type_long      = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_CONST);
+	type_ulong     = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_CONST);
+	type_longlong  = make_atomic_type(ATOMIC_TYPE_LONGLONG,
+	                                  TYPE_QUALIFIER_CONST);
+	type_ulonglong = make_atomic_type(ATOMIC_TYPE_ULONGLONG,
+	                                  TYPE_QUALIFIER_CONST);
+
+	type_float      = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_CONST);
+	type_double     = make_atomic_type(ATOMIC_TYPE_DOUBLE,
+	                                   TYPE_QUALIFIER_CONST);
+	type_longdouble = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE,
+	                                   TYPE_QUALIFIER_CONST);
 }
 
 void lexer_open_stream(FILE *stream, const char *input_name)

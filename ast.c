@@ -35,7 +35,7 @@ static void print_const(const const_t *cnst)
 		return;
 
 	if(is_type_integer(cnst->expression.datatype)) {
-		fprintf(out, "%d", cnst->v.int_value);
+		fprintf(out, "%lld", cnst->v.int_value);
 	} else if(is_type_floating(cnst->expression.datatype)) {
 		fprintf(out, "%Lf", cnst->v.float_value);
 	}
