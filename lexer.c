@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 #include <ctype.h>
 
 //#define DEBUG_CHARS
@@ -60,7 +61,7 @@ static inline void next_real_char(void)
 static inline void put_back(int pc)
 {
 	assert(bufpos >= buf);
-	assert(bufpos < buf+MAX_PUTBACK || *bufpos == pc);
+	//assert(bufpos < buf+MAX_PUTBACK || *bufpos == pc);
 
 	char *p = buf + (bufpos - buf);
 	*p = pc;
@@ -110,7 +111,6 @@ static inline void next_char(void)
 {
 	next_real_char();
 
-#if 0
 	/* filter trigraphs */
 	if(UNLIKELY(c == '\\')) {
 		maybe_concat_lines();
@@ -146,8 +146,6 @@ static inline void next_char(void)
 	}
 
 end_of_next_char:;
-#endif
-	(void) maybe_concat_lines;
 #ifdef DEBUG_CHARS
 	printf("nchar '%c'\n", c);
 #endif
@@ -294,140 +292,132 @@ static void parse_floating_suffix(void)
 	}
 }
 
+static inline bool is_hex_digit(int c)
+{
+	return (c >= '0' && c <= '9')
+			|| (c >= 'a' && c <= 'z')
+			|| (c >= 'A' && c <= 'Z');
+}
+
 static void parse_number_hex(void)
 {
 	assert(c == 'x' || c == 'X');
 	next_char();
 
-	if (!isdigit(c) &&
-		!('A' <= c && c <= 'F') &&
-		!('a' <= c && c <= 'f')) {
-		parse_error("premature end of hex number literal");
-		lexer_token.type = T_ERROR;
-		return;
-	}
-
-	int value = 0;
-	while(1) {
-		if (isdigit(c)) {
-			value = 16 * value + c - '0';
-		} else if ('A' <= c && c <= 'F') {
-			value = 16 * value + c - 'A' + 10;
-		} else if ('a' <= c && c <= 'f') {
-			value = 16 * value + c - 'a' + 10;
-		} else {
-			parse_integer_suffix();
-
-			lexer_token.type       = T_INTEGER;
-			lexer_token.v.intvalue = value;
-			return;
-		}
+	while(is_hex_digit(c)) {
+		obstack_1grow(&symbol_obstack, c);
 		next_char();
 	}
+	obstack_1grow(&symbol_obstack, '\0');
+	char *string = obstack_finish(&symbol_obstack);
 
 	if(c == '.' || c == 'p' || c == 'P') {
 		next_char();
 		panic("Hex floating point numbers not implemented yet");
 	}
+	if(*string == '\0') {
+		parse_error("invalid hex number");
+		lexer_token.type = T_ERROR;
+	}
+
+	char *endptr;
+	int value = strtol(string, &endptr, 16);
+	if(*endptr != '\0') {
+		parse_error("hex number literal too long");
+	}
+
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = value;
+
+	parse_integer_suffix();
+	obstack_free(&symbol_obstack, string);
+}
+
+static inline bool is_octal_digit(int chr)
+{
+	return '0' <= chr && chr <= '7';
 }
 
 static void parse_number_oct(void)
 {
-	int value = 0;
-	while(c >= '0' && c <= '7') {
-		value = 8 * value + c - '0';
+	while(is_octal_digit(c)) {
+		obstack_1grow(&symbol_obstack, c);
 		next_char();
 	}
-	if (c == '8' || c == '9') {
-		parse_error("invalid octal number");
-		lexer_token.type = T_ERROR;
-		return;
+	obstack_1grow(&symbol_obstack, '\0');
+	char *string = obstack_finish(&symbol_obstack);
+
+	char *endptr;
+	int value = strtol(string, &endptr, 8);
+	if(*endptr != '\0') {
+		parse_error("octal number literal too long");
 	}
 
 	lexer_token.type       = T_INTEGER;
 	lexer_token.v.intvalue = value;
 
 	parse_integer_suffix();
-}
-
-static void parse_floatingpoint_exponent(long double value)
-{
-	unsigned int expo = 0;
-	long double  factor = 10.;
-
-	if(c == '-') {
-		next_char();
-		factor = 0.1;
-	} else if(c == '+') {
-		next_char();
-	}
-
-	while(c >= '0' && c <= '9') {
-		expo = 10 * expo + (c - '0');
-		next_char();
-	}
-
-	while(1) {
-		if(expo & 1)
-			value *= factor;
-		expo >>= 1;
-		if(expo == 0)
-			break;
-		factor *= factor;
-	}
-
-	lexer_token.type         = T_FLOATINGPOINT;
-	lexer_token.v.floatvalue = value;
-
-	parse_floating_suffix();
-}
-
-static void parse_floatingpoint_fract(int integer_part)
-{
-	long double value  = integer_part;
-	long double factor = 1.;
-
-	while(c >= '0' && c <= '9') {
-		factor *= 0.1;
-		value  += (c - '0') * factor;
-		next_char();
-	}
-
-	if(c == 'e' || c == 'E') {
-		next_char();
-		parse_floatingpoint_exponent(value);
-		return;
-	}
-
-	lexer_token.type         = T_FLOATINGPOINT;
-	lexer_token.v.floatvalue = value;
-
-	parse_floating_suffix();
+	obstack_free(&symbol_obstack, string);
 }
 
 static void parse_number_dec(void)
 {
-	int value = 0;
-
+	bool is_float = false;
 	while(isdigit(c)) {
-		value = 10 * value + c - '0';
+		obstack_1grow(&symbol_obstack, c);
 		next_char();
 	}
 
 	if(c == '.') {
+		obstack_1grow(&symbol_obstack, '.');
 		next_char();
-		parse_floatingpoint_fract(value);
-		return;
+
+		while(isdigit(c)) {
+			obstack_1grow(&symbol_obstack, c);
+			next_char();
+		}
+		is_float = true;
 	}
 	if(c == 'e' || c == 'E') {
+		obstack_1grow(&symbol_obstack, 'e');
 		next_char();
-		parse_floatingpoint_exponent(value);
-		return;
-	}
-	parse_integer_suffix();
 
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = value;
+		if(c == '-' || c == '+') {
+			obstack_1grow(&symbol_obstack, c);
+			next_char();
+		}
+
+		while(isdigit(c)) {
+			obstack_1grow(&symbol_obstack, c);
+			next_char();
+		}
+		is_float = true;
+	}
+
+	obstack_1grow(&symbol_obstack, '\0');
+	char *string = obstack_finish(&symbol_obstack);
+
+	char *endptr;
+	if(is_float) {
+		lexer_token.type         = T_FLOATINGPOINT;
+		lexer_token.v.floatvalue = strtod(string, &endptr);
+
+		if(*endptr != '\0') {
+			parse_error("invalid number literal");
+		}
+
+		parse_floating_suffix();
+	} else {
+		lexer_token.type       = T_INTEGER;
+		lexer_token.v.intvalue = strtol(string, &endptr, 10);
+
+		if(*endptr != '\0') {
+			parse_error("invalid number literal");
+		}
+
+		parse_integer_suffix();
+	}
+	obstack_free(&symbol_obstack, string);
 }
 
 static void parse_number(void)
@@ -449,34 +439,23 @@ static void parse_number(void)
 			case '7':
 				parse_number_oct();
 				break;
-			case '.':
-				next_char();
-				parse_floatingpoint_fract(0);
-				break;
-			case 'e':
-			case 'E':
-				parse_floatingpoint_exponent(0);
-				break;
 			case '8':
 			case '9':
 				next_char();
 				parse_error("invalid octal number");
 				lexer_token.type = T_ERROR;
 				return;
+			case '.':
+			case 'e':
+			case 'E':
 			default:
-				put_back(c);
-				c = '0';
+				obstack_1grow(&symbol_obstack, '0');
 				parse_number_dec();
 				return;
 		}
 	} else {
 		parse_number_dec();
 	}
-}
-
-static inline int is_octal_digit(int chr)
-{
-	return '0' <= chr && chr <= '7';
 }
 
 static int parse_octal_sequence(const int first_digit)
