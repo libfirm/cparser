@@ -1914,13 +1914,22 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		bool may_be_abstract)
 {
-	construct_type_t *result = NULL;
+	/* construct a single linked list of construct_type_t's which describe
+	 * how to construct the final declarator type */
+	construct_type_t *first = NULL;
+	construct_type_t *last  = NULL;
 
+	/* pointers */
 	while(token.type == '*') {
 		construct_type_t *type = parse_pointer_declarator();
 
-		type->next = result;
-		result     = type;
+		if(last == NULL) {
+			first = type;
+			last  = type;
+		} else {
+			last->next = type;
+			last       = type;
+		}
 	}
 
 	/* TODO: find out if this is correct */
@@ -1957,6 +1966,8 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		return NULL;
 	}
 
+	construct_type_t *p = last;
+
 	while(true) {
 		construct_type_t *type;
 		switch(token.type) {
@@ -1970,22 +1981,32 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 			goto declarator_finished;
 		}
 
-		type->next = result;
-		result     = type;
+		/* insert in the middle of the list (behind p) */
+		if(p != NULL) {
+			type->next = p->next;
+			p->next    = type;
+		} else {
+			type->next = first;
+			first      = type;
+		}
+		if(last == p) {
+			last = type;
+		}
 	}
 
 declarator_finished:
 	parse_attributes();
 
-	if(inner_types != NULL) {
-		construct_type_t *t = inner_types;
-		for( ; t->next != NULL; t = t->next) {
-		}
-		t->next = result;
-		result  = inner_types;
+	/* append inner_types at the end of the list, we don't to set last anymore
+	 * as it's not needed anymore */
+	if(last == NULL) {
+		assert(first == NULL);
+		first = inner_types;
+	} else {
+		last->next = inner_types;
 	}
 
-	return result;
+	return first;
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list,
