@@ -133,8 +133,7 @@ static void print_function_type_post(const function_type_t *type,
 	fputc(')', out);
 }
 
-static
-void print_pointer_type_pre(const pointer_type_t *type)
+static void print_pointer_type_pre(const pointer_type_t *type)
 {
 	intern_print_type_pre(type->points_to);
 	fputs("*", out);
@@ -146,8 +145,14 @@ static void print_pointer_type_post(const pointer_type_t *type)
 	intern_print_type_post(type->points_to);
 }
 
+static void print_array_type_pre(const array_type_t *type)
+{
+	intern_print_type_pre(type->element_type);
+}
+
 static void print_array_type_post(const array_type_t *type)
 {
+	intern_print_type_post(type->element_type);
 	fputc('[', out);
 	if(type->is_static) {
 		fputs("static ", out);
@@ -277,6 +282,7 @@ static void intern_print_type_pre(type_t *type)
 		print_pointer_type_pre((pointer_type_t*) type);
 		return;
 	case TYPE_ARRAY:
+		print_array_type_pre((array_type_t*) type);
 		return;
 	case TYPE_TYPEDEF:
 		print_typedef_type_pre((typedef_type_t*) type);

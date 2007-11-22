@@ -513,22 +513,22 @@ static void print_storage_class(storage_class_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer->type == INITIALIZER_VALUE) {
-		//print_expression(initializer->v.value);
+		initializer_value_t *value = (initializer_value_t*) initializer;
+		print_expression(value->value);
 		return;
 	}
 
-#if 0
 	assert(initializer->type == INITIALIZER_LIST);
 	fputs("{ ", out);
-	initializer_t *iter = initializer->v.list;
-	for( ; iter != NULL; iter = iter->next) {
-		print_initializer(iter);
-		if(iter->next != NULL) {
+	initializer_list_t *list = (initializer_list_t*) initializer;
+
+	for(size_t i = 0 ; i < list->len; ++i) {
+		if(i > 0) {
 			fputs(", ", out);
 		}
+		print_initializer(list->initializers[i]);
 	}
 	fputs("}", out);
-#endif
 }
 
 static void print_normal_declaration(const declaration_t *declaration)
