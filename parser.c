@@ -2849,16 +2849,18 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->symbol   = symbol;
 	next_token();
 
-	type_t *type = compound->datatype;
-	if(type == NULL)
+	type_t *orig_type = compound->datatype;
+	if(orig_type == NULL)
 		return make_invalid_expression();
+
+	type_t *type = skip_typeref(orig_type);
 
 	type_t *type_left = type;
 	if(is_pointer) {
 		if(type->type != TYPE_POINTER) {
 			parser_print_error_prefix();
 			fprintf(stderr, "left hand side of '->' is not a pointer, but ");
-			print_type_quoted(type);
+			print_type_quoted(orig_type);
 			fputc('\n', stderr);
 			return make_invalid_expression();
 		}
@@ -3018,14 +3020,16 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	conditional_expression_t *conditional
 		= allocate_ast_zero(sizeof(conditional[0]));
 	conditional->expression.type = EXPR_CONDITIONAL;
-	conditional->condition = expression;
+	conditional->condition       = expression;
 
 	/* 6.5.15.2 */
 	type_t *condition_type_orig = conditional->condition->datatype;
-	type_t *condition_type      = skip_typeref(condition_type_orig);
-	if(condition_type != NULL && !is_type_scalar(condition_type)) {
-		type_error("expected a scalar type", expression->source_position,
-		           condition_type_orig);
+	if(condition_type_orig != NULL) {
+		type_t *condition_type      = skip_typeref(condition_type_orig);
+		if(condition_type != NULL && !is_type_scalar(condition_type)) {
+			type_error("expected a scalar type", expression->source_position,
+					   condition_type_orig);
+		}
 	}
 
 	expression_t *const t_expr = parse_expression();
@@ -3467,8 +3471,7 @@ static void semantic_comparison(binary_expression_t *expression)
 		expression->left = create_implicit_cast(left, type_right);
 	} else {
 		type_error_incompatible("invalid operands in comparison",
-		                        expression->expression.source_position,
-		                        type_left, type_right);
+		                        token.source_position, type_left, type_right);
 	}
 	expression->expression.datatype = type_int;
 }
@@ -3563,6 +3566,9 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 {
 	expression_t *left       = expression->left;
 	type_t       *type_left  = left->datatype;
+
+	if(type_left == NULL)
+		return;
 
 	if (type_left->type == TYPE_ARRAY) {
 		parse_error("Cannot assign to arrays.");

@@ -828,6 +828,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	return result;
 }
 
+static void statement_to_firm(statement_t *statement);
+static ir_node *compound_statement_to_firm(compound_statement_t *compound);
+
 static ir_node *expression_to_addr(const expression_t *expression);
 static void create_condition_evaluation(const expression_t *expression,
                                         ir_node *true_block,
@@ -1147,9 +1150,11 @@ static ir_node *create_shift(const binary_expression_t *expression)
 	ir_node *res;
 
 	switch(expression->type) {
+	case BINEXPR_SHIFTLEFT_ASSIGN:
 	case BINEXPR_SHIFTLEFT:
 		res = new_d_Shl(dbgi, left, right, mode);
 		break;
+	case BINEXPR_SHIFTRIGHT_ASSIGN:
 	case BINEXPR_SHIFTRIGHT: {
 	 	 expression_t *expr_left = expression->left;
 		 type_t       *type_left = skip_typeref(expr_left->datatype);
@@ -1175,8 +1180,11 @@ static ir_node *create_divmod(const binary_expression_t *expression)
 	ir_node  *left  = expression_to_firm(expression->left);
 	ir_node  *right = expression_to_firm(expression->right);
 	ir_node  *pin   = new_Pin(new_NoMem());
-	type_t   *type  = expression->expression.datatype;
+	/* be careful with the modes, because in arithmetic assign nodes only
+	 * the right operand has the mode of the arithmetic already */
+	type_t   *type  = expression->right->datatype;
 	ir_mode  *mode  = get_ir_mode(type);
+	left            = create_conv(dbgi, left, mode);
 	ir_node  *op;
 	ir_node  *res;
 
@@ -1221,6 +1229,19 @@ static ir_node *create_arithmetic_assign_divmod(
 	return value;
 }
 
+static ir_node *create_arithmetic_assign_shift(
+		const binary_expression_t *expression)
+{
+	ir_node  *      value = create_shift(expression);
+	dbg_info *const dbgi  = get_dbg_info(&expression->expression.source_position);
+	type_t   *const type  = expression->expression.datatype;
+	ir_mode  *const mode  = get_ir_mode(type);
+
+	value = create_conv(dbgi, value, mode);
+	set_value_for_expression(expression->left, value);
+
+	return value;
+}
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 {
@@ -1284,9 +1305,8 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case BINEXPR_BITWISE_XOR_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Eor);
 	case BINEXPR_SHIFTLEFT_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Shl);
 	case BINEXPR_SHIFTRIGHT_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Shr);
+		return create_arithmetic_assign_shift(expression);
 	default:
 		panic("TODO binexpr type");
 	}
@@ -1527,6 +1547,14 @@ static ir_node *function_name_to_firm(const string_literal_t *const expr)
 	return current_function_name;
 }
 
+static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
+{
+	statement_t *statement = expr->statement;
+
+	assert(statement->type == STATEMENT_COMPOUND);
+	return compound_statement_to_firm((compound_statement_t*) statement);
+}
+
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->type == UNEXPR_DEREFERENCE);
@@ -1587,9 +1615,11 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
 		return function_name_to_firm((const string_literal_t*)expression);
+	case EXPR_STATEMENT:
+		return statement_expression_to_firm(
+				(const statement_expression_t*) expression);
 	case EXPR_OFFSETOF:
 	case EXPR_VA_ARG:
-	case EXPR_STATEMENT:
 	case EXPR_BUILTIN_SYMBOL:
 		panic("unimplemented expression found");
 
@@ -1683,7 +1713,6 @@ static void create_condition_evaluation(const expression_t *expression,
 	set_cur_block(NULL);
 }
 
-static void statement_to_firm(statement_t *statement);
 
 static void return_statement_to_firm(return_statement_t *statement)
 {
@@ -1708,21 +1737,30 @@ static void return_statement_to_firm(return_statement_t *statement)
 	set_cur_block(NULL);
 }
 
-static void compound_statement_to_firm(compound_statement_t *compound)
+static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 {
+	if(get_cur_block() == NULL)
+		return NULL;
+
+	return expression_to_firm(statement->expression);
+}
+
+static ir_node *compound_statement_to_firm(compound_statement_t *compound)
+{
+	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for( ; statement != NULL; statement = statement->next) {
 		//context2firm(&statement->context);
+
+		if(statement->next == NULL && statement->type == STATEMENT_EXPRESSION) {
+			result = expression_statement_to_firm(
+					(expression_statement_t*) statement);
+			break;
+		}
 		statement_to_firm(statement);
 	}
-}
 
-static void expression_statement_to_firm(expression_statement_t *statement)
-{
-	if(get_cur_block() == NULL)
-		return;
-
-	expression_to_firm(statement->expression);
+	return result;
 }
 
 static void if_statement_to_firm(if_statement_t *statement)
@@ -2050,8 +2088,9 @@ static void create_initializer_compound(initializer_list_t *initializer,
 			                         entity, &entry, len);
 		} else {
 			assert(sub_initializer->type == INITIALIZER_LIST);
+			type_t *type = skip_typeref(compound_entry->type);
 			create_initializer_list((initializer_list_t*) sub_initializer,
-			                        compound_entry->type, entity, &entry, len);
+			                        type, entity, &entry, len);
 		}
 
 		++i;
@@ -2064,6 +2103,7 @@ static void create_initializer_array(initializer_list_t *initializer,
                                      int len)
 {
 	type_t *element_type = type->element_type;
+	element_type         = skip_typeref(element_type);
 
 	compound_graph_path_entry_t entry;
 	entry.type = COMPOUND_GRAPH_ENTRY_ARRAY;
@@ -2112,9 +2152,22 @@ static void create_initializer(declaration_t *declaration)
 			= (initializer_value_t*) initializer;
 		ir_node *value = expression_to_firm(initializer_value->value);
 
-		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
+		declaration_type_t declaration_type = declaration->declaration_type;
+		if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
+		} else if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
+			ir_entity *entity    = declaration->v.entity;
+			dbg_info  *dbgi      = get_dbg_info(&declaration->source_position);
+			ir_node   *frame     = get_irg_frame(current_ir_graph);
+			ir_node   *addr      = new_d_simpleSel(dbgi, new_NoMem(), frame,
+			                       entity);
+			ir_node   *memory    = get_store();
+			ir_node   *store     = new_d_Store(dbgi, memory, addr, value);
+			ir_node   *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+			set_store(store_mem);
 		} else {
+			assert(declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+
 			ir_entity *entity = declaration->v.entity;
 
 			set_entity_variability(entity, variability_initialized);
@@ -2131,7 +2184,8 @@ static void create_initializer(declaration_t *declaration)
 		ir_entity *entity = declaration->v.entity;
 		set_entity_variability(entity, variability_initialized);
 
-		create_initializer_list(list, declaration->type, entity, NULL, 0);
+		type_t *type = skip_typeref(declaration->type);
+		create_initializer_list(list, type, entity, NULL, 0);
 	}
 }
 
@@ -2162,6 +2216,25 @@ static void create_local_variable(declaration_t *declaration)
 	create_initializer(declaration);
 }
 
+static void create_local_static_variable(declaration_t *declaration)
+{
+	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+
+	type_t    *type        = skip_typeref(declaration->type);
+	ir_type   *global_type = get_glob_type();
+	ident     *id          = unique_ident(declaration->symbol->string);
+	ir_type   *irtype      = get_ir_type(type);
+	ir_entity *entity      = new_entity(global_type, id, irtype);
+	set_entity_ld_ident(entity, id);
+
+	declaration->declaration_type = DECLARATION_TYPE_GLOBAL_VARIABLE;
+	declaration->v.entity         = entity;
+	set_entity_variability(entity, variability_uninitialized);
+	set_entity_visibility(entity, visibility_local);
+
+	create_initializer(declaration);
+}
+
 static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
 	declaration_t *declaration = statement->declarations_begin;
@@ -2173,7 +2246,8 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 		case STORAGE_CLASS_TYPEDEF:
 			continue;
 		case STORAGE_CLASS_STATIC:
-			panic("static local vars not implemented yet");
+			create_local_static_variable(declaration);
+			continue;
 		case STORAGE_CLASS_ENUM_ENTRY:
 			panic("enum entry declaration in local block found");
 		case STORAGE_CLASS_EXTERN:
@@ -2502,6 +2576,10 @@ static int get_function_n_local_vars(declaration_t *declaration)
 	/* count local variables declared in body */
 	count += count_decls_in_stmts(declaration->init.statement);
 
+	/* TODO FIXME: Matze: I'm lazy don't want to scan all expressions
+	 * for expression statements... */
+	count += 10;
+
 	return count;
 }
 
@@ -2516,7 +2594,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next, ++n) {
 		assert(parameter->declaration_type == DECLARATION_TYPE_UNKNOWN);
-		type_t *type = parameter->type;
+		type_t *type = skip_typeref(parameter->type);
 
 		bool needs_entity = parameter->address_taken;
 		if(type->type == TYPE_COMPOUND_STRUCT
@@ -2654,6 +2732,7 @@ static void create_global_variable(declaration_t *declaration)
 
 static void context_to_firm(context_t *context)
 {
+	/* first pass: create declarations */
 	declaration_t *declaration = context->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
@@ -2666,10 +2745,28 @@ static void context_to_firm(context_t *context)
 
 		type_t *type = declaration->type;
 		if(type->type == TYPE_FUNCTION) {
-			create_function(declaration);
+			get_function_entity(declaration);
 		} else {
 			create_global_variable(declaration);
 		}
+	}
+
+	/* second pass: create code */
+	declaration = context->declarations;
+	for( ; declaration != NULL; declaration = declaration->next) {
+		if(declaration->namespc != NAMESPACE_NORMAL)
+			continue;
+		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
+				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)
+			continue;
+		if(declaration->symbol == NULL)
+			continue;
+
+		type_t *type = declaration->type;
+		if(type->type != TYPE_FUNCTION)
+			continue;
+
+		create_function(declaration);
 	}
 }
 
