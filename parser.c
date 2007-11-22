@@ -697,8 +697,8 @@ static expression_t *create_implicit_cast(expression_t *expression,
 		}
 
 		type_error_incompatible("can't implicitly cast types",
-														expression->source_position,
-														source_type, dest_type);
+		                        expression->source_position,
+		                        source_type, dest_type);
 		return expression;
 	}
 
@@ -1216,7 +1216,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	return declaration;
 }
 
-static void parse_enum_entries(void)
+static void parse_enum_entries(type_t *enum_type)
 {
 	eat('{');
 
@@ -1235,6 +1235,7 @@ static void parse_enum_entries(void)
 			return;
 		}
 		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
+		entry->type            = enum_type;
 		entry->symbol          = token.v.symbol;
 		entry->source_position = token.source_position;
 		next_token();
@@ -1242,6 +1243,8 @@ static void parse_enum_entries(void)
 		if(token.type == '=') {
 			next_token();
 			entry->init.enum_value = parse_constant_expression();
+
+			/* TODO semantic */
 		}
 
 		record_declaration(entry);
@@ -1292,7 +1295,7 @@ static declaration_t *parse_enum_specifier(void)
 		record_declaration(declaration);
 		declaration->init.is_defined = 1;
 
-		parse_enum_entries();
+		parse_enum_entries(NULL);
 		parse_attributes();
 	}
 
@@ -1909,19 +1912,15 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 }
 
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
-		int may_be_abstract)
+		bool may_be_abstract)
 {
 	construct_type_t *result = NULL;
-	construct_type_t *last   = NULL;
 
 	while(token.type == '*') {
 		construct_type_t *type = parse_pointer_declarator();
-		if(last != NULL) {
-			last->next = type;
-		} else {
-			result = type;
-		}
-		last = type;
+
+		type->next = result;
+		result     = type;
 	}
 
 	/* TODO: find out if this is correct */
@@ -1971,24 +1970,19 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 			goto declarator_finished;
 		}
 
-		if(last != NULL) {
-			last->next = type;
-		} else {
-			result = type;
-		}
-		last = type;
+		type->next = result;
+		result     = type;
 	}
 
 declarator_finished:
 	parse_attributes();
 
 	if(inner_types != NULL) {
-		if(last != NULL) {
-			last->next = inner_types;
-		} else {
-			result = inner_types;
+		construct_type_t *t = inner_types;
+		for( ; t->next != NULL; t = t->next) {
 		}
-		last = inner_types;
+		t->next = result;
+		result  = inner_types;
 	}
 
 	return result;
@@ -2043,7 +2037,11 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		type_t *hashed_type = typehash_insert((type_t*) type);
 		if(hashed_type != type) {
-			free_type(type);
+			/* the function type was constructed earlier freeing it here will
+			 * destroy other types... */
+			if(iter->type != CONSTRUCT_FUNCTION) {
+				free_type(type);
+			}
 			type = hashed_type;
 		}
 	}
@@ -2938,21 +2936,23 @@ static expression_t *parse_call_expression(unsigned precedence,
 	call->function          = expression;
 
 	function_type_t *function_type;
-	type_t          *type = expression->datatype;
+	type_t          *orig_type     = expression->datatype;
+	type_t          *type          = skip_typeref(orig_type);
+
+	if(type->type == TYPE_POINTER) {
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+
+		type = skip_typeref(pointer_type->points_to);
+	}
 	if (type->type == TYPE_FUNCTION) {
 		function_type             = (function_type_t*) type;
 		call->expression.datatype = function_type->result_type;
-	} else if (type->type == TYPE_POINTER &&
-	           ((pointer_type_t*)type)->points_to->type == TYPE_FUNCTION) {
-		pointer_type_t *const ptr_type = (pointer_type_t*)type;
-		function_type                  = (function_type_t*)ptr_type->points_to;
-		call->expression.datatype      = function_type->result_type;
 	} else {
 		parser_print_error_prefix();
 		fputs("called object '", stderr);
 		print_expression(expression);
 		fputs("' (type ", stderr);
-		print_type_quoted(type);
+		print_type_quoted(orig_type);
 		fputs(") is not a function\n", stderr);
 
 		function_type             = NULL;
@@ -3643,7 +3643,6 @@ CREATE_BINEXPR_PARSER('|', BINEXPR_BITWISE_OR,     semantic_binexpr_arithmetic, 
 CREATE_BINEXPR_PARSER('^', BINEXPR_BITWISE_XOR,    semantic_binexpr_arithmetic, 1)
 CREATE_BINEXPR_PARSER(T_ANDAND, BINEXPR_LOGICAL_AND,  semantic_logical_op, 1)
 CREATE_BINEXPR_PARSER(T_PIPEPIPE, BINEXPR_LOGICAL_OR, semantic_logical_op, 1)
-/* TODO shift has a bit special semantic */
 CREATE_BINEXPR_PARSER(T_LESSLESS, BINEXPR_SHIFTLEFT,
                       semantic_shift_op, 1)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER, BINEXPR_SHIFTRIGHT,

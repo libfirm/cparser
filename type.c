@@ -152,7 +152,6 @@ static void print_array_type_pre(const array_type_t *type)
 
 static void print_array_type_post(const array_type_t *type)
 {
-	intern_print_type_post(type->element_type);
 	fputc('[', out);
 	if(type->is_static) {
 		fputs("static ", out);
@@ -162,6 +161,7 @@ static void print_array_type_post(const array_type_t *type)
 		print_expression(type->size);
 	}
 	fputc(']', out);
+	intern_print_type_post(type->element_type);
 }
 
 void print_enum_definition(const declaration_t *declaration)
@@ -476,7 +476,12 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_FUNCTION:
 		return true;
 
-	case TYPE_ARRAY:
+	case TYPE_ARRAY: {
+		const array_type_t *array_type = (const array_type_t*) type;
+
+		return array_type->size == NULL;
+	}
+
 	case TYPE_ATOMIC:
 	case TYPE_POINTER:
 	case TYPE_ENUM:
