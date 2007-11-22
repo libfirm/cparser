@@ -1241,7 +1241,7 @@ static void parse_enum_entries(void)
 
 		if(token.type == '=') {
 			next_token();
-			entry->init.initializer = parse_initializer(type_int);
+			entry->init.enum_value = parse_constant_expression();
 		}
 
 		record_declaration(entry);
@@ -2123,7 +2123,8 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 
 		declaration_t *declaration = record_declaration(ndeclaration);
 
-		type_t *type = declaration->type;
+		type_t *orig_type = declaration->type;
+		type_t *type      = skip_typeref(orig_type);
 		if(type->type != TYPE_FUNCTION && declaration->is_inline) {
 			parser_print_warning_prefix_pos(declaration->source_position);
 			fprintf(stderr, "variable '%s' declared 'inline'\n",
@@ -2139,14 +2140,33 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				parser_error_multiple_definition(declaration, ndeclaration);
 			}
 
-			ndeclaration->init.initializer
-				= parse_initializer(declaration->type);
+			initializer_t *initializer = parse_initializer(type);
+
+			if(type->type == TYPE_ARRAY && initializer != NULL) {
+				assert(initializer->type == INITIALIZER_LIST);
+
+				initializer_list_t *list = (initializer_list_t*) initializer;
+				array_type_t       *array_type = (array_type_t*) type;
+
+				if(array_type->size == NULL) {
+					const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
+
+					cnst->expression.type     = EXPR_CONST;
+					cnst->expression.datatype = type_size_t;
+					cnst->v.int_value         = list->len;
+
+					array_type->size = (expression_t*) cnst;
+				}
+			}
+
+
+			ndeclaration->init.initializer = initializer;
 		} else if(token.type == '{') {
-			if(declaration->type->type != TYPE_FUNCTION) {
+			if(type->type != TYPE_FUNCTION) {
 				parser_print_error_prefix();
-				fprintf(stderr, "Declarator ");
-				print_type_ext(declaration->type, declaration->symbol, NULL);
-				fprintf(stderr, " has a body but is not a function type.\n");
+				fprintf(stderr, "declarator '");
+				print_type_ext(orig_type, declaration->symbol, NULL);
+				fprintf(stderr, "' has a body but is not a function type.\n");
 				eat_block();
 				continue;
 			}

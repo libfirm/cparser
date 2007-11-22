@@ -246,6 +246,7 @@ struct declaration_t {
 		bool            is_defined;
 		statement_t    *statement;
 		initializer_t  *initializer;
+		expression_t   *enum_value;
 	} init;
 	context_t           context;
 	context_t          *parent_context;

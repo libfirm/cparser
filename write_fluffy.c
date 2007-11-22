@@ -234,15 +234,6 @@ static void write_expression(const expression_t *expression)
 	}
 }
 
-static void write_initializer(const initializer_t *initializer)
-{
-	if(initializer->type != INITIALIZER_VALUE) {
-		panic("list initializers not supported yet");
-	}
-
-	//write_expression(initializer->v.value);
-}
-
 static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
@@ -253,7 +244,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 		fprintf(out, "\t%s", entry->symbol->string);
 		if(entry->init.initializer != NULL) {
 			fprintf(out, " <- ");
-			write_initializer(entry->init.initializer);
+			write_expression(entry->init.enum_value);
 		}
 		fputc('\n', out);
 	}
@@ -350,6 +341,8 @@ void write_fluffy_decls(const translation_unit_t *unit)
 	/* write global variables */
 	declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
+		if(declaration->namespc != NAMESPACE_NORMAL)
+			continue;
 		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
 				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
@@ -364,6 +357,8 @@ void write_fluffy_decls(const translation_unit_t *unit)
 	/* write functions */
 	declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
+		if(declaration->namespc != NAMESPACE_NORMAL)
+			continue;
 		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
 				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;

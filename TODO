@@ -1,6 +1,5 @@
 Lexer:
 - proper support of preprocessor
-- parse float numbers
 - octal&hex escape sequences
 - wide string constants
 - proper handling of different file encodings
@@ -13,10 +12,12 @@ Parser:
   implementations...
 - fix semantic to ignore type qualifiers (const double is the same as double)
 - label: declaration; is no valid C99 but we parse it anyway
+- designator support for initializers
+- support string literals in intializers
 
 ast2firm:
 - output source file positions for panics...
-- correctly handle pointer ++, --
+- create strict convs where necessary
 
 
 Coole Warnungen:

@@ -173,7 +173,7 @@ void print_enum_definition(const declaration_t *declaration)
 		fprintf(out, "%s", entry->symbol->string);
 		if(entry->init.initializer != NULL) {
 			fprintf(out, " = ");
-			print_initializer(entry->init.initializer);
+			print_expression(entry->init.enum_value);
 		}
 		fprintf(out, ",\n");
 	}
