@@ -500,8 +500,9 @@ bool is_type_incomplete(const type_t *type)
 
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
-	(void) type1;
-	(void) type2;
+	if(type1 == type2)
+		return true;
+
 	return true;
 }
 

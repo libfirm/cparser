@@ -716,7 +716,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
 
-	if (type_left == type_right) {
+	if (types_compatible(type_left, type_right)) {
 		return;
 	}
 
@@ -894,10 +894,24 @@ static designator_t *parse_designation(void)
 }
 #endif
 
+static initializer_t *initializer_from_string(array_type_t *type,
+                                              const char *string)
+{
+	/* TODO: check len vs. size of array type */
+	(void) type;
+
+	initializer_string_t *initializer
+		= allocate_ast_zero(sizeof(initializer[0]));
+
+	initializer->initializer.type = INITIALIZER_STRING;
+	initializer->string           = string;
+
+	return (initializer_t*) initializer;
+}
+
 static initializer_t *initializer_from_expression(type_t *type,
                                                   expression_t *expression)
 {
-	initializer_value_t *result = allocate_ast_zero(sizeof(result[0]));
 
 	/* TODO check that expression is a constant expression */
 
@@ -914,15 +928,16 @@ static initializer_t *initializer_from_expression(type_t *type,
 			if(atype == ATOMIC_TYPE_CHAR
 					|| atype == ATOMIC_TYPE_SCHAR
 					|| atype == ATOMIC_TYPE_UCHAR) {
-				/* it's fine TODO: check for length of string array... */
-				goto initializer_from_expression_finished;
+
+				string_literal_t *literal = (string_literal_t*) expression;
+				return initializer_from_string(array_type, literal->value);
 			}
 		}
 	}
 
 	semantic_assign(type, &expression, "initializer");
 
-initializer_from_expression_finished:
+	initializer_value_t *result = allocate_ast_zero(sizeof(result[0]));
 	result->initializer.type = INITIALIZER_VALUE;
 	result->value            = expression;
 
@@ -2164,9 +2179,6 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			initializer_t *initializer = parse_initializer(type);
 
 			if(type->type == TYPE_ARRAY && initializer != NULL) {
-				assert(initializer->type == INITIALIZER_LIST);
-
-				initializer_list_t *list = (initializer_list_t*) initializer;
 				array_type_t       *array_type = (array_type_t*) type;
 
 				if(array_type->size == NULL) {
@@ -2174,7 +2186,17 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 
 					cnst->expression.type     = EXPR_CONST;
 					cnst->expression.datatype = type_size_t;
-					cnst->v.int_value         = list->len;
+
+					if(initializer->type == INITIALIZER_LIST) {
+						initializer_list_t *list
+							= (initializer_list_t*) initializer;
+						cnst->v.int_value = list->len;
+					} else {
+						assert(initializer->type == INITIALIZER_STRING);
+						initializer_string_t *string
+							= (initializer_string_t*) initializer;
+						cnst->v.int_value = strlen(string->string) + 1;
+					}
 
 					array_type->size = (expression_t*) cnst;
 				}
@@ -3607,19 +3629,31 @@ static void semantic_logical_op(binary_expression_t *expression)
 
 static void semantic_binexpr_assign(binary_expression_t *expression)
 {
-	expression_t *left       = expression->left;
-	type_t       *type_left  = left->datatype;
+	expression_t *left           = expression->left;
+	type_t       *orig_type_left = left->datatype;
 
-	if(type_left == NULL)
+	if(orig_type_left == NULL)
 		return;
+
+	type_t *type_left = skip_typeref(orig_type_left);
 
 	if (type_left->type == TYPE_ARRAY) {
 		parse_error("Cannot assign to arrays.");
-	} else if (type_left != NULL) {
-		semantic_assign(type_left, &expression->right, "assignment");
+		return;
 	}
 
-	expression->expression.datatype = type_left;
+	if(type_left->qualifiers & TYPE_QUALIFIER_CONST) {
+		parser_print_error_prefix();
+		fprintf(stderr, "assignment to readonly location '");
+		print_expression(left);
+		fprintf(stderr, "' (type ");
+		print_type_quoted(orig_type_left);
+		fprintf(stderr, ")\n");
+	}
+
+	semantic_assign(orig_type_left, &expression->right, "assignment");
+
+	expression->expression.datatype = orig_type_left;
 }
 
 static void semantic_comma(binary_expression_t *expression)

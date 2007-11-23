@@ -217,6 +217,7 @@ typedef enum {
 typedef enum {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
+	INITIALIZER_STRING
 } initializer_type_t;
 
 struct initializer_t {
@@ -232,6 +233,11 @@ struct initializer_list_t {
 	initializer_t  initializer;
 	size_t         len;
 	initializer_t *initializers[];
+};
+
+struct initializer_string_t {
+	initializer_t  initializer;
+	const char    *string;
 };
 
 struct declaration_t {
