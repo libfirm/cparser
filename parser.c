@@ -1024,6 +1024,8 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			if(token.type == '}')
 				break;
 			expect_block(',');
+			if(token.type == '}')
+				break;
 
 			initializer_t *sub
 				= parse_sub_initializer(element_type, NULL, NULL);
