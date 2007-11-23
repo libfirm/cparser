@@ -927,7 +927,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-	type_t   *type = expression->expression.datatype;
+	type_t   *type = skip_typeref(expression->expression.datatype);
 
 	if(expression->type == UNEXPR_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
