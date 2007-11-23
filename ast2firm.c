@@ -2141,30 +2141,76 @@ static void create_initializer_list(initializer_list_t *initializer,
 	}
 }
 
+static void create_initializer_local_variable_entity(declaration_t *declaration)
+{
+	initializer_t *initializer = declaration->init.initializer;
+	dbg_info      *dbgi        = get_dbg_info(&declaration->source_position);
+	ir_entity     *entity      = declaration->v.entity;
+	ir_node       *memory      = get_store();
+	ir_node       *nomem       = new_NoMem();
+	ir_node       *frame       = get_irg_frame(current_ir_graph);
+	ir_node       *addr        = new_d_simpleSel(dbgi, nomem, frame, entity);
+
+	if(is_atomic_entity(entity)) {
+		assert(initializer->type == INITIALIZER_VALUE);
+		initializer_value_t *initializer_value
+			= (initializer_value_t*) initializer;
+
+		ir_node *value     = expression_to_firm(initializer_value->value);
+		ir_node *store     = new_d_Store(dbgi, memory, addr, value);
+		ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+		set_store(store_mem);
+		return;
+	}
+
+	/* create a "template" entity which is copied to the entity on the stack */
+	ident     *id          = unique_ident("initializer");
+	ir_type   *irtype      = get_ir_type(declaration->type);
+	ir_type   *global_type = get_glob_type();
+	ir_entity *init_entity = new_entity(global_type, id, irtype);
+	set_entity_ld_ident(init_entity, id);
+
+	set_entity_variability(init_entity, variability_initialized);
+	set_entity_visibility(init_entity, visibility_local);
+
+	assert(initializer->type == INITIALIZER_LIST);
+	initializer_list_t *list = (initializer_list_t*) initializer;
+
+	ir_graph *old_current_ir_graph = current_ir_graph;
+	current_ir_graph = get_const_code_irg();
+
+	type_t *type = skip_typeref(declaration->type);
+	create_initializer_list(list, type, init_entity, NULL, 0);
+
+	assert(current_ir_graph == get_const_code_irg());
+	current_ir_graph = old_current_ir_graph;
+
+	ir_node *src_addr  = create_symconst(dbgi, init_entity);
+	ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
+
+	ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+	set_store(copyb_mem);
+}
+
 static void create_initializer(declaration_t *declaration)
 {
 	initializer_t *initializer = declaration->init.initializer;
 	if(initializer == NULL)
 		return;
 
+	declaration_type_t declaration_type = declaration->declaration_type;
+	if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
+		create_initializer_local_variable_entity(declaration);
+		return;
+	}
+
 	if(initializer->type == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value
 			= (initializer_value_t*) initializer;
 		ir_node *value = expression_to_firm(initializer_value->value);
 
-		declaration_type_t declaration_type = declaration->declaration_type;
 		if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
-		} else if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
-			ir_entity *entity    = declaration->v.entity;
-			dbg_info  *dbgi      = get_dbg_info(&declaration->source_position);
-			ir_node   *frame     = get_irg_frame(current_ir_graph);
-			ir_node   *addr      = new_d_simpleSel(dbgi, new_NoMem(), frame,
-			                       entity);
-			ir_node   *memory    = get_store();
-			ir_node   *store     = new_d_Store(dbgi, memory, addr, value);
-			ir_node   *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-			set_store(store_mem);
 		} else {
 			assert(declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
 
