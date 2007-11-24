@@ -705,6 +705,27 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	panic("casting of non-atomic types not implemented yet");
 }
 
+static bool is_atomic_type(const type_t *type, atomic_type_type_t atype)
+{
+	if(type->type != TYPE_ATOMIC)
+		return false;
+	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
+
+	return atomic_type->atype == atype;
+}
+
+static bool is_pointer(const type_t *type)
+{
+	return type->type == TYPE_POINTER;
+}
+
+static bool is_compound_type(const type_t *type)
+{
+	return type->type == TYPE_COMPOUND_STRUCT
+		|| type->type == TYPE_COMPOUND_UNION;
+}
+
+/** Implements the rules from § 6.5.16.1 */
 static void semantic_assign(type_t *orig_type_left, expression_t **right,
                             const char *context)
 {
@@ -716,40 +737,52 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
 
-	if (types_compatible(type_left, type_right)) {
-		return;
-	}
-
 	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (type_left->type == TYPE_POINTER && is_null_expression(*right)) ||
-	    (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER)) {
+	    (is_pointer(type_left) && is_null_expression(*right)) ||
+	    (is_atomic_type(type_left, ATOMIC_TYPE_BOOL)
+	     	&& is_pointer(type_right))) {
 		*right = create_implicit_cast(*right, type_left);
 		return;
 	}
 
-	if (type_left->type == TYPE_POINTER) {
-		switch (type_right->type) {
-			case TYPE_FUNCTION: {
-				pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
-				if (ptr_type->points_to == type_right) {
-					return;
-				}
-				break;
-			}
+	if (is_pointer(type_left) && is_pointer(type_right)) {
+		pointer_type_t *pointer_type_left  = (pointer_type_t*) type_left;
+		pointer_type_t *pointer_type_right = (pointer_type_t*) type_right;
+		type_t         *points_to_left     = pointer_type_left->points_to;
+		type_t         *points_to_right    = pointer_type_right->points_to;
 
-			case TYPE_ARRAY: {
-				pointer_type_t *const ptr_type = (pointer_type_t*)type_left;
-				array_type_t   *const arr_type = (array_type_t*)type_right;
-				if (ptr_type->points_to == arr_type->element_type) {
-					return;
-				}
-				break;
-			}
-
-			default: break;
+		if(!is_atomic_type(points_to_left, ATOMIC_TYPE_VOID)
+				&& !is_atomic_type(points_to_right, ATOMIC_TYPE_VOID)
+				&& !types_compatible(points_to_left, points_to_right)) {
+			goto incompatible_assign_types;
 		}
+
+		/* the left type has all qualifiers from the right type */
+		unsigned missing_qualifiers
+			= points_to_right->qualifiers & ~points_to_left->qualifiers;
+		if(missing_qualifiers != 0) {
+			parser_print_error_prefix();
+			fprintf(stderr, "destination type ");
+			print_type_quoted(type_left);
+			fprintf(stderr, " in %s from type ", context);
+			print_type_quoted(type_right);
+			fprintf(stderr, " lacks qualifiers '");
+			print_type_qualifiers(missing_qualifiers);
+			fprintf(stderr, "' in pointed-to type\n");
+			return;
+		}
+
+		*right = create_implicit_cast(*right, type_left);
+		return;
 	}
 
+	if (is_compound_type(type_left)
+			&& types_compatible(type_left, type_right)) {
+		*right = create_implicit_cast(*right, type_left);
+		return;
+	}
+
+incompatible_assign_types:
 	/* TODO: improve error message */
 	parser_print_error_prefix();
 	fprintf(stderr, "incompatible types in %s\n", context);

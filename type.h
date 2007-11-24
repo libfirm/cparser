@@ -29,6 +29,8 @@ void print_type(type_t *type);
 void print_type_ext(type_t *type, const symbol_t *symbol,
                     const context_t *context);
 
+void print_type_qualifiers(unsigned qualifiers);
+
 void print_enum_definition(const declaration_t *declaration);
 void print_compound_definition(const declaration_t *declaration);
 

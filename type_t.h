@@ -65,10 +65,10 @@ typedef enum {
 } type_qualifier_t;
 
 struct type_t {
-	type_type_t       type;
-	type_qualifier_t  qualifiers;
+	type_type_t  type;
+	unsigned     qualifiers;
 
-	ir_type          *firm_type;
+	ir_type     *firm_type;
 };
 
 struct atomic_type_t {
@@ -126,12 +126,14 @@ struct enum_type_t {
 struct typedef_type_t {
 	type_t         type;
 	declaration_t *declaration;
+	type_t        *resolved_type;
 };
 
 struct typeof_type_t {
 	type_t        type;
 	expression_t *expression;
 	type_t       *typeof_type;
+	type_t       *resolved_type;
 };
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers);

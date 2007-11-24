@@ -40,7 +40,6 @@ void inc_type_visited(void)
 	type_visited++;
 }
 
-static
 void print_type_qualifiers(unsigned qualifiers)
 {
 	if(qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
@@ -500,28 +499,80 @@ bool is_type_incomplete(const type_t *type)
 
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
+	/* TODO: really incomplete */
 	if(type1 == type2)
 		return true;
 
-	return true;
+	if(type1->type == TYPE_ATOMIC && type2->type == TYPE_ATOMIC) {
+		const atomic_type_t *atomic1 = (const atomic_type_t*) type1;
+		const atomic_type_t *atomic2 = (const atomic_type_t*) type2;
+
+		return atomic1->atype == atomic2->atype;
+	}
+
+	return false;
 }
 
 bool pointers_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(type1->type == TYPE_POINTER);
 	assert(type2->type == TYPE_POINTER);
+#if 0
 	pointer_type_t *pointer_type1 = (pointer_type_t*) type1;
 	pointer_type_t *pointer_type2 = (pointer_type_t*) type2;
 	return types_compatible(pointer_type1->points_to,
 	                        pointer_type2->points_to);
+#endif
+	return true;
+}
+
+static size_t get_type_size(type_t *type)
+{
+	switch(type->type) {
+	case TYPE_ATOMIC:          return sizeof(atomic_type_t); break;
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t); break;
+	case TYPE_ENUM:            return sizeof(enum_type_t); break;
+	case TYPE_FUNCTION:        return sizeof(function_type_t); break;
+	case TYPE_POINTER:         return sizeof(pointer_type_t); break;
+	case TYPE_ARRAY:           return sizeof(array_type_t); break;
+	case TYPE_BUILTIN:         return sizeof(builtin_type_t); break;
+	case TYPE_TYPEDEF:         return sizeof(typedef_type_t); break;
+	case TYPE_TYPEOF:          return sizeof(typeof_type_t); break;
+	case TYPE_INVALID:         panic("invalid type found"); break;
+	}
+	panic("unknown type found");
+}
+
+/**
+ * duplicates a type
+ * note that this does not produce a deep copy!
+ */
+static type_t *duplicate_type(type_t *type)
+{
+	size_t size = get_type_size(type);
+
+	type_t *copy = obstack_alloc(type_obst, size);
+	memcpy(copy, type, size);
+
+	(void) duplicate_type;
+
+	return type;
 }
 
 type_t *skip_typeref(type_t *type)
 {
+	unsigned qualifiers = type->qualifiers;
+
 	while(1) {
 		switch(type->type) {
 		case TYPE_TYPEDEF: {
+			qualifiers |= type->qualifiers;
 			const typedef_type_t *typedef_type = (const typedef_type_t*) type;
+			if(typedef_type->resolved_type != NULL) {
+				type = typedef_type->resolved_type;
+				break;
+			}
 			type = typedef_type->declaration->type;
 			continue;
 		}
