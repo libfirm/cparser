@@ -437,8 +437,8 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
 		} else {
-			const storage_class_t old_storage = previous_declaration->storage_class;
-			const storage_class_t new_storage = declaration->storage_class;
+			const storage_class_t old_storage = (storage_class_t)previous_declaration->storage_class;
+			const storage_class_t new_storage = (storage_class_t)declaration->storage_class;
 			if (current_function == NULL) {
 				if (old_storage != STORAGE_CLASS_STATIC &&
 				    new_storage == STORAGE_CLASS_STATIC) {
@@ -841,8 +841,7 @@ static void parse_attributes(void)
 			next_token();
 
 			expect_void('(');
-			int depth = 1;
-			while(depth > 0) {
+			for (int depth = 1; depth > 0;) {
 				switch(token.type) {
 				case T_EOF:
 					parse_error("EOF while parsing attribute");
@@ -933,13 +932,13 @@ static initializer_t *initializer_from_string(array_type_t *type,
 	/* TODO: check len vs. size of array type */
 	(void) type;
 
-	initializer_string_t *initializer
+	initializer_t *initializer
 		= allocate_ast_zero(sizeof(initializer[0]));
 
-	initializer->initializer.type = INITIALIZER_STRING;
-	initializer->string           = string;
+	initializer->type     = INITIALIZER_STRING;
+	initializer->v.string = string;
 
-	return (initializer_t*) initializer;
+	return initializer;
 }
 
 static initializer_t *initializer_from_expression(type_t *type,
@@ -970,11 +969,11 @@ static initializer_t *initializer_from_expression(type_t *type,
 
 	semantic_assign(type, &expression, "initializer");
 
-	initializer_value_t *result = allocate_ast_zero(sizeof(result[0]));
-	result->initializer.type = INITIALIZER_VALUE;
-	result->value            = expression;
+	initializer_t *result = allocate_ast_zero(sizeof(result[0]));
+	result->type    = INITIALIZER_VALUE;
+	result->v.value = expression;
 
-	return (initializer_t*) result;
+	return result;
 }
 
 static initializer_t *parse_sub_initializer(type_t *type,
@@ -1025,15 +1024,15 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	/* TODO: ignore qualifiers, comparing pointers is probably
 	 * not correct */
 	if(expression != NULL && expression_type == type) {
-		initializer_value_t *result = allocate_ast_zero(sizeof(result[0]));
-		result->initializer.type    = INITIALIZER_VALUE;
+		initializer_t *result = allocate_ast_zero(sizeof(result[0]));
+		result->type          = INITIALIZER_VALUE;
 
 		if(type != NULL) {
 			semantic_assign(type, &expression, "initializer");
 		}
-		result->value = expression;
+		result->v.value = expression;
 
-		return (initializer_t*) result;
+		return result;
 	}
 
 	bool read_paren = false;
@@ -1142,14 +1141,14 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	int    len        = ARR_LEN(elems);
 	size_t elems_size = sizeof(initializer_t*) * len;
 
-	initializer_list_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
+	initializer_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
 
-	init->initializer.type = INITIALIZER_LIST;
-	init->len              = len;
-	memcpy(init->initializers, elems, elems_size);
+	init->type       = INITIALIZER_LIST;
+	init->v.list.len = len;
+	memcpy(init->v.list.initializers, elems, elems_size);
 	DEL_ARR_F(elems);
 
-	result = (initializer_t*) init;
+	result = init;
 
 	if(read_paren) {
 		if(token.type == ',')
@@ -2221,14 +2220,10 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 					cnst->expression.datatype = type_size_t;
 
 					if(initializer->type == INITIALIZER_LIST) {
-						initializer_list_t *list
-							= (initializer_list_t*) initializer;
-						cnst->v.int_value = list->len;
+						cnst->v.int_value = initializer->v.list.len;
 					} else {
 						assert(initializer->type == INITIALIZER_STRING);
-						initializer_string_t *string
-							= (initializer_string_t*) initializer;
-						cnst->v.int_value = strlen(string->string) + 1;
+						cnst->v.int_value = strlen(initializer->v.string) + 1;
 					}
 
 					array_type->size = (expression_t*) cnst;

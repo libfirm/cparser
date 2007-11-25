@@ -222,22 +222,17 @@ typedef enum {
 
 struct initializer_t {
 	initializer_type_t  type;
-};
-
-struct initializer_value_t {
-	initializer_t initializer;
-	expression_t *value;
-};
-
-struct initializer_list_t {
-	initializer_t  initializer;
-	size_t         len;
-	initializer_t *initializers[];
-};
-
-struct initializer_string_t {
-	initializer_t  initializer;
-	const char    *string;
+	union {
+		/* if type == INITIALIZER_VALUE */
+		expression_t *value;
+		/* if type == INITIALIZER_LIST */
+		struct {
+			size_t         len;
+			initializer_t *initializers[];
+		} list;
+		/* if type == INITIALIZER_STRING */
+		const char    *string;
+	} v;
 };
 
 struct declaration_t {

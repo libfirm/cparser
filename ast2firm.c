@@ -2041,18 +2041,18 @@ static compound_graph_path *create_compound_path(ir_type *type,
 	return path;
 }
 
-static void create_initializer_value(initializer_value_t *initializer,
+static void create_initializer_value(initializer_t *initializer,
                                      ir_entity *entity,
                                      compound_graph_path_entry_t *entry,
                                      int len)
 {
-	ir_node             *node = expression_to_firm(initializer->value);
+	ir_node             *node = expression_to_firm(initializer->v.value);
 	ir_type             *type = get_entity_type(entity);
 	compound_graph_path *path = create_compound_path(type, entry, len);
 	add_compound_ent_value_w_path(entity, node, path);
 }
 
-static void create_initializer_compound(initializer_list_t *initializer,
+static void create_initializer_compound(initializer_t *initializer,
                                         compound_type_t *type,
                                         ir_entity *entity,
                                         compound_graph_path_entry_t *last_entry,
@@ -2074,20 +2074,19 @@ static void create_initializer_compound(initializer_list_t *initializer,
 		if(compound_entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		if(i >= initializer->len)
+		if(i >= initializer->v.list.len)
 			break;
 
 		entry.v.entity = compound_entry->v.entity;
 
-		initializer_t *sub_initializer = initializer->initializers[i];
+		initializer_t *sub_initializer = initializer->v.list.initializers[i];
 
 		assert(compound_entry != NULL);
 		assert(compound_entry->declaration_type
 				== DECLARATION_TYPE_COMPOUND_MEMBER);
 
 		if(sub_initializer->type == INITIALIZER_VALUE) {
-			create_initializer_value((initializer_value_t*) sub_initializer,
-			                         entity, &entry, len);
+			create_initializer_value(sub_initializer, entity, &entry, len);
 		} else {
 			type_t *type = skip_typeref(compound_entry->type);
 			create_initializer_object(sub_initializer, type, entity, &entry,
@@ -2098,7 +2097,7 @@ static void create_initializer_compound(initializer_list_t *initializer,
 	}
 }
 
-static void create_initializer_array(initializer_list_t *initializer,
+static void create_initializer_array(initializer_t *initializer,
                                      array_type_t *type, ir_entity *entity,
                                      compound_graph_path_entry_t *last_entry,
                                      int len)
@@ -2111,14 +2110,13 @@ static void create_initializer_array(initializer_list_t *initializer,
 	entry.prev = last_entry;
 	++len;
 
-	for(size_t i = 0; i < initializer->len; ++i) {
+	for(size_t i = 0; i < initializer->v.list.len; ++i) {
 		entry.v.array_index = i;
 
-		initializer_t *sub_initializer = initializer->initializers[i];
+		initializer_t *sub_initializer = initializer->v.list.initializers[i];
 
 		if(sub_initializer->type == INITIALIZER_VALUE) {
-			create_initializer_value((initializer_value_t*) sub_initializer,
-			                         entity, &entry, len);
+			create_initializer_value(sub_initializer, entity, &entry, len);
 		} else {
 			assert(sub_initializer->type == INITIALIZER_LIST);
 			create_initializer_object(sub_initializer, element_type, entity,
@@ -2127,7 +2125,7 @@ static void create_initializer_array(initializer_list_t *initializer,
 	}
 }
 
-static void create_initializer_string(initializer_string_t *initializer,
+static void create_initializer_string(initializer_t *initializer,
                                       array_type_t *type, ir_entity *entity,
                                       compound_graph_path_entry_t *last_entry,
                                       int len)
@@ -2142,7 +2140,7 @@ static void create_initializer_string(initializer_string_t *initializer,
 
 	ir_type    *irtype  = get_entity_type(entity);
 	size_t      arr_len = get_array_type_size(type);
-	const char *p       = initializer->string;
+	const char *p       = initializer->v.string;
 	size_t      i       = 0;
 	for(i = 0; i < arr_len; ++i, ++p) {
 		entry.v.array_index = i;
@@ -2163,21 +2161,18 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		array_type_t *array_type = (array_type_t*) type;
 
 		if(initializer->type == INITIALIZER_STRING) {
-			initializer_string_t *string = (initializer_string_t*) initializer;
-			create_initializer_string(string, array_type, entity, entry, len);
+			create_initializer_string(initializer, array_type, entity, entry, len);
 		} else {
 			assert(initializer->type == INITIALIZER_LIST);
-			initializer_list_t *list = (initializer_list_t*) initializer;
-			create_initializer_array(list, array_type, entity, entry, len);
+			create_initializer_array(initializer, array_type, entity, entry, len);
 		}
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
-		initializer_list_t *list = (initializer_list_t*) initializer;
 
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
 		compound_type_t *compound_type = (compound_type_t*) type;
-		create_initializer_compound(list, compound_type, entity, entry, len);
+		create_initializer_compound(initializer, compound_type, entity, entry, len);
 	}
 }
 
@@ -2193,10 +2188,8 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 
 	if(is_atomic_entity(entity)) {
 		assert(initializer->type == INITIALIZER_VALUE);
-		initializer_value_t *initializer_value
-			= (initializer_value_t*) initializer;
 
-		ir_node *value     = expression_to_firm(initializer_value->value);
+		ir_node *value     = expression_to_firm(initializer->v.value);
 		ir_node *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
@@ -2242,9 +2235,7 @@ static void create_initializer(declaration_t *declaration)
 	}
 
 	if(initializer->type == INITIALIZER_VALUE) {
-		initializer_value_t *initializer_value
-			= (initializer_value_t*) initializer;
-		ir_node *value = expression_to_firm(initializer_value->value);
+		ir_node *value = expression_to_firm(initializer->v.value);
 
 		if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);

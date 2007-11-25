@@ -513,20 +513,18 @@ static void print_storage_class(storage_class_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer->type == INITIALIZER_VALUE) {
-		initializer_value_t *value = (initializer_value_t*) initializer;
-		print_expression(value->value);
+		print_expression(initializer->v.value);
 		return;
 	}
 
 	assert(initializer->type == INITIALIZER_LIST);
 	fputs("{ ", out);
-	initializer_list_t *list = (initializer_list_t*) initializer;
 
-	for(size_t i = 0 ; i < list->len; ++i) {
+	for(size_t i = 0 ; i < initializer->v.list.len; ++i) {
 		if(i > 0) {
 			fputs(", ", out);
 		}
-		print_initializer(list->initializers[i]);
+		print_initializer(initializer->v.list.initializers[i]);
 	}
 	fputs("}", out);
 }
