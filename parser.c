@@ -2585,21 +2585,17 @@ static expression_t *parse_statement_expression(void)
 	}
 
 	assert(statement->type == STATEMENT_COMPOUND);
-	compound_statement_t *compound_statement
-		= (compound_statement_t*) statement;
 
 	/* find last statement and use it's type */
 	const statement_t *last_statement = NULL;
-	const statement_t *iter           = compound_statement->statements;
+	const statement_t *iter           = statement->v.compound_stmt.statements;
 	for( ; iter != NULL; iter = iter->next) {
 		last_statement = iter;
 	}
 
 	if(last_statement->type == STATEMENT_EXPRESSION) {
-		const expression_statement_t *expression_statement =
-			(const expression_statement_t*) last_statement;
 		expression->expression.datatype
-			= expression_statement->expression->datatype;
+			= last_statement->v.expression->datatype;
 	} else {
 		expression->expression.datatype = type_void;
 	}
@@ -3907,28 +3903,28 @@ static void init_expression_parsers(void)
 static statement_t *parse_case_statement(void)
 {
 	eat(T_case);
-	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->statement.type            = STATEMENT_CASE_LABEL;
-	label->statement.source_position = token.source_position;
+	statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->type            = STATEMENT_CASE_LABEL;
+	label->source_position = token.source_position;
 
-	label->expression = parse_expression();
+	label->v.case_label_stmt.expression = parse_expression();
 
 	expect(':');
-	label->label_statement = parse_statement();
+	label->v.case_label_stmt.label_statement = parse_statement();
 
-	return (statement_t*) label;
+	return label;
 }
 
 static statement_t *parse_default_statement(void)
 {
 	eat(T_default);
 
-	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->statement.type            = STATEMENT_CASE_LABEL;
-	label->statement.source_position = token.source_position;
+	statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->type            = STATEMENT_CASE_LABEL;
+	label->source_position = token.source_position;
 
 	expect(':');
-	label->label_statement = parse_statement();
+	label->v.case_label_stmt.label_statement = parse_statement();
 
 	return (statement_t*) label;
 }
@@ -3974,11 +3970,11 @@ static statement_t *parse_label_statement(void)
 		label->source_position = token.source_position;
 	}
 
-	label_statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
+	statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
 
-	label_statement->statement.type            = STATEMENT_LABEL;
-	label_statement->statement.source_position = token.source_position;
-	label_statement->label                     = label;
+	label_statement->type               = STATEMENT_LABEL;
+	label_statement->source_position    = token.source_position;
+	label_statement->v.label_stmt.label = label;
 
 	expect(':');
 
@@ -3986,102 +3982,102 @@ static statement_t *parse_label_statement(void)
 		parse_error("label at end of compound statement");
 		return (statement_t*) label_statement;
 	} else {
-		label_statement->label_statement = parse_statement();
+		label_statement->v.label_stmt.label_statement = parse_statement();
 	}
 
-	return (statement_t*) label_statement;
+	return label_statement;
 }
 
 static statement_t *parse_if(void)
 {
 	eat(T_if);
 
-	if_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_IF;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_IF;
+	statement->source_position = token.source_position;
 
 	expect('(');
-	statement->condition = parse_expression();
+	statement->v.if_stmt.condition = parse_expression();
 	expect(')');
 
-	statement->true_statement = parse_statement();
+	statement->v.if_stmt.true_statement = parse_statement();
 	if(token.type == T_else) {
 		next_token();
-		statement->false_statement = parse_statement();
+		statement->v.if_stmt.false_statement = parse_statement();
 	}
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_switch(void)
 {
 	eat(T_switch);
 
-	switch_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_SWITCH;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_SWITCH;
+	statement->source_position = token.source_position;
 
 	expect('(');
-	statement->expression = parse_expression();
+	statement->v.switch_stmt.expression = parse_expression();
 	expect(')');
-	statement->body = parse_statement();
+	statement->v.switch_stmt.body = parse_statement();
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_while(void)
 {
 	eat(T_while);
 
-	while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_WHILE;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_WHILE;
+	statement->source_position = token.source_position;
 
 	expect('(');
-	statement->condition = parse_expression();
+	statement->v.while_stmt.condition = parse_expression();
 	expect(')');
-	statement->body = parse_statement();
+	statement->v.while_stmt.body = parse_statement();
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_do(void)
 {
 	eat(T_do);
 
-	do_while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_DO_WHILE;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_DO_WHILE;
+	statement->source_position = token.source_position;
 
-	statement->body = parse_statement();
+	statement->v.while_stmt.body = parse_statement();
 	expect(T_while);
 	expect('(');
-	statement->condition = parse_expression();
+	statement->v.while_stmt.condition = parse_expression();
 	expect(')');
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_for(void)
 {
 	eat(T_for);
 
-	for_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_FOR;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_FOR;
+	statement->source_position = token.source_position;
 
 	expect('(');
 
 	int         top          = environment_top();
 	context_t  *last_context = context;
-	set_context(&statement->context);
+	set_context(&statement->v.for_stmt.context);
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
 			parse_declaration();
 		} else {
-			statement->initialisation = parse_expression();
+			statement->v.for_stmt.initialisation = parse_expression();
 			expect(';');
 		}
 	} else {
@@ -4089,20 +4085,20 @@ static statement_t *parse_for(void)
 	}
 
 	if(token.type != ';') {
-		statement->condition = parse_expression();
+		statement->v.for_stmt.condition = parse_expression();
 	}
 	expect(';');
 	if(token.type != ')') {
-		statement->step = parse_expression();
+		statement->v.for_stmt.step = parse_expression();
 	}
 	expect(')');
-	statement->body = parse_statement();
+	statement->v.for_stmt.body = parse_statement();
 
-	assert(context == &statement->context);
+	assert(context == &statement->v.for_stmt.context);
 	set_context(last_context);
 	environment_pop_to(top);
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_goto(void)
@@ -4119,16 +4115,16 @@ static statement_t *parse_goto(void)
 
 	declaration_t *label = get_label(symbol);
 
-	goto_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
 
-	statement->statement.type            = STATEMENT_GOTO;
-	statement->statement.source_position = token.source_position;
+	statement->type            = STATEMENT_GOTO;
+	statement->source_position = token.source_position;
 
-	statement->label = label;
+	statement->v.goto_label = label;
 
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_continue(void)
@@ -4159,10 +4155,10 @@ static statement_t *parse_return(void)
 {
 	eat(T_return);
 
-	return_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
 
-	statement->statement.type            = STATEMENT_RETURN;
-	statement->statement.source_position = token.source_position;
+	statement->type            = STATEMENT_RETURN;
+	statement->source_position = token.source_position;
 
 	assert(current_function->type->type == TYPE_FUNCTION);
 	function_type_t *function_type = (function_type_t*) current_function->type;
@@ -4187,21 +4183,21 @@ static statement_t *parse_return(void)
 			              "non-void");
 		}
 	}
-	statement->return_value = return_value;
+	statement->v.return_value = return_value;
 
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_declaration_statement(void)
 {
 	declaration_t *before = last_declaration;
 
-	declaration_statement_t *statement
+	statement_t *statement
 		= allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_DECLARATION;
-	statement->statement.source_position = token.source_position;
+	statement->type            = STATEMENT_DECLARATION;
+	statement->source_position = token.source_position;
 
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
@@ -4214,26 +4210,26 @@ static statement_t *parse_declaration_statement(void)
 	}
 
 	if(before == NULL) {
-		statement->declarations_begin = context->declarations;
+		statement->v.declaration_stmt.begin = context->declarations;
 	} else {
-		statement->declarations_begin = before->next;
+		statement->v.declaration_stmt.begin = before->next;
 	}
-	statement->declarations_end = last_declaration;
+	statement->v.declaration_stmt.end = last_declaration;
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_expression_statement(void)
 {
-	expression_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_EXPRESSION;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->type            = STATEMENT_EXPRESSION;
+	statement->source_position = token.source_position;
 
-	statement->expression = parse_expression();
+	statement->v.expression = parse_expression();
 
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_statement(void)
@@ -4334,16 +4330,16 @@ static statement_t *parse_statement(void)
 
 static statement_t *parse_compound_statement(void)
 {
-	compound_statement_t *compound_statement
+	statement_t *compound_statement
 		= allocate_ast_zero(sizeof(compound_statement[0]));
-	compound_statement->statement.type            = STATEMENT_COMPOUND;
-	compound_statement->statement.source_position = token.source_position;
+	compound_statement->type            = STATEMENT_COMPOUND;
+	compound_statement->source_position = token.source_position;
 
 	eat('{');
 
 	int        top          = environment_top();
 	context_t *last_context = context;
-	set_context(&compound_statement->context);
+	set_context(&compound_statement->v.compound_stmt.context);
 
 	statement_t *last_statement = NULL;
 
@@ -4355,7 +4351,7 @@ static statement_t *parse_compound_statement(void)
 		if(last_statement != NULL) {
 			last_statement->next = statement;
 		} else {
-			compound_statement->statements = statement;
+			compound_statement->v.compound_stmt.statements = statement;
 		}
 
 		while(statement->next != NULL)
@@ -4366,16 +4362,16 @@ static statement_t *parse_compound_statement(void)
 
 	if(token.type != '}') {
 		parser_print_error_prefix_pos(
-				compound_statement->statement.source_position);
+				compound_statement->source_position);
 		fprintf(stderr, "end of file while looking for closing '}'\n");
 	}
 	next_token();
 
-	assert(context == &compound_statement->context);
+	assert(context == &compound_statement->v.compound_stmt.context);
 	set_context(last_context);
 	environment_pop_to(top);
 
-	return (statement_t*) compound_statement;
+	return compound_statement;
 }
 
 static translation_unit_t *parse_translation_unit(void)

@@ -829,7 +829,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 }
 
 static void statement_to_firm(statement_t *statement);
-static ir_node *compound_statement_to_firm(compound_statement_t *compound);
+static ir_node *compound_statement_to_firm(statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
 static void create_condition_evaluation(const expression_t *expression,
@@ -1550,7 +1550,7 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	statement_t *statement = expr->statement;
 
 	assert(statement->type == STATEMENT_COMPOUND);
-	return compound_statement_to_firm((compound_statement_t*) statement);
+	return compound_statement_to_firm(statement);
 }
 
 static ir_node *dereference_addr(const unary_expression_t *const expression)
@@ -1712,16 +1712,16 @@ static void create_condition_evaluation(const expression_t *expression,
 }
 
 
-static void return_statement_to_firm(return_statement_t *statement)
+static void return_statement_to_firm(statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return;
 
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->source_position);
 	ir_node  *ret;
 
-	if(statement->return_value != NULL) {
-		ir_node *retval = expression_to_firm(statement->return_value);
+	if(statement->v.return_value != NULL) {
+		ir_node *retval = expression_to_firm(statement->v.return_value);
 		ir_node *in[1];
 
 		in[0] = retval;
@@ -1735,24 +1735,23 @@ static void return_statement_to_firm(return_statement_t *statement)
 	set_cur_block(NULL);
 }
 
-static ir_node *expression_statement_to_firm(expression_statement_t *statement)
+static ir_node *expression_statement_to_firm(statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return NULL;
 
-	return expression_to_firm(statement->expression);
+	return expression_to_firm(statement->v.expression);
 }
 
-static ir_node *compound_statement_to_firm(compound_statement_t *compound)
+static ir_node *compound_statement_to_firm(statement_t *compound)
 {
 	ir_node     *result    = NULL;
-	statement_t *statement = compound->statements;
+	statement_t *statement = compound->v.compound_stmt.statements;
 	for( ; statement != NULL; statement = statement->next) {
 		//context2firm(&statement->context);
 
 		if(statement->next == NULL && statement->type == STATEMENT_EXPRESSION) {
-			result = expression_statement_to_firm(
-					(expression_statement_t*) statement);
+			result = expression_statement_to_firm(statement);
 			break;
 		}
 		statement_to_firm(statement);
@@ -1761,7 +1760,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 	return result;
 }
 
-static void if_statement_to_firm(if_statement_t *statement)
+static void if_statement_to_firm(statement_t *statement)
 {
 	ir_node *cur_block = get_cur_block();
 
@@ -1769,9 +1768,9 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 	/* the true (blocks) */
 	ir_node *true_block;
-	if (statement->true_statement != NULL) {
+	if (statement->v.if_stmt.true_statement != NULL) {
 		true_block = new_immBlock();
-		statement_to_firm(statement->true_statement);
+		statement_to_firm(statement->v.if_stmt.true_statement);
 		if(get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
 			add_immBlock_pred(fallthrough_block, jmp);
@@ -1782,10 +1781,10 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 	/* the false (blocks) */
 	ir_node *false_block;
-	if(statement->false_statement != NULL) {
+	if(statement->v.if_stmt.false_statement != NULL) {
 		false_block = new_immBlock();
 
-		statement_to_firm(statement->false_statement);
+		statement_to_firm(statement->v.if_stmt.false_statement);
 		if(get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
 			add_immBlock_pred(fallthrough_block, jmp);
@@ -1797,7 +1796,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	/* create the condition */
 	if(cur_block != NULL) {
 		set_cur_block(cur_block);
-		create_condition_evaluation(statement->condition, true_block,
+		create_condition_evaluation(statement->v.if_stmt.condition, true_block,
 		                            false_block);
 	}
 
@@ -1810,7 +1809,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	set_cur_block(fallthrough_block);
 }
 
-static void while_statement_to_firm(while_statement_t *statement)
+static void while_statement_to_firm(statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
@@ -1828,14 +1827,14 @@ static void while_statement_to_firm(while_statement_t *statement)
 
 	/* the loop body */
 	ir_node *body_block;
-	if (statement->body != NULL) {
+	if (statement->v.while_stmt.body != NULL) {
 		ir_node *old_continue_label = continue_label;
 		ir_node *old_break_label    = break_label;
 		continue_label              = header_block;
 		break_label                 = false_block;
 
 		body_block = new_immBlock();
-		statement_to_firm(statement->body);
+		statement_to_firm(statement->v.while_stmt.body);
 
 		assert(continue_label == header_block);
 		assert(break_label    == false_block);
@@ -1853,7 +1852,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	/* create the condition */
 	set_cur_block(header_block);
 
-	create_condition_evaluation(statement->condition, body_block, false_block);
+	create_condition_evaluation(statement->v.while_stmt.condition, body_block, false_block);
 	mature_immBlock(body_block);
 	mature_immBlock(false_block);
 	mature_immBlock(header_block);
@@ -1861,7 +1860,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	set_cur_block(false_block);
 }
 
-static void do_while_statement_to_firm(do_while_statement_t *statement)
+static void do_while_statement_to_firm(statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
@@ -1880,13 +1879,13 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 		add_immBlock_pred(body_block, jmp);
 	}
 
-	if (statement->body != NULL) {
+	if (statement->v.while_stmt.body != NULL) {
 		ir_node *old_continue_label = continue_label;
 		ir_node *old_break_label    = break_label;
 		continue_label              = header_block;
 		break_label                 = false_block;
 
-		statement_to_firm(statement->body);
+		statement_to_firm(statement->v.while_stmt.body);
 
 		assert(continue_label == header_block);
 		assert(break_label    == false_block);
@@ -1908,7 +1907,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	/* create the condition */
 	set_cur_block(header_block);
 
-	create_condition_evaluation(statement->condition, body_block, false_block);
+	create_condition_evaluation(statement->v.while_stmt.condition, body_block, false_block);
 	mature_immBlock(body_block);
 	mature_immBlock(false_block);
 	mature_immBlock(header_block);
@@ -1916,20 +1915,20 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	set_cur_block(false_block);
 }
 
-static void for_statement_to_firm(for_statement_t *statement)
+static void for_statement_to_firm(statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
-		if(statement->initialisation != NULL) {
-			expression_to_firm(statement->initialisation);
+		if(statement->v.for_stmt.initialisation != NULL) {
+			expression_to_firm(statement->v.for_stmt.initialisation);
 		}
 		jmp = new_Jmp();
 	}
 
 	/* create the step block */
 	ir_node *const step_block = new_immBlock();
-	if (statement->step != NULL) {
-		expression_to_firm(statement->step);
+	if (statement->v.for_stmt.step != NULL) {
+		expression_to_firm(statement->v.for_stmt.step);
 	}
 	ir_node *const step_jmp = new_Jmp();
 
@@ -1945,14 +1944,14 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* the loop body */
 	ir_node * body_block;
-	if (statement->body != NULL) {
+	if (statement->v.for_stmt.body != NULL) {
 		ir_node *const old_continue_label = continue_label;
 		ir_node *const old_break_label    = break_label;
 		continue_label = step_block;
 		break_label    = false_block;
 
 		body_block = new_immBlock();
-		statement_to_firm(statement->body);
+		statement_to_firm(statement->v.for_stmt.body);
 
 		assert(continue_label == step_block);
 		assert(break_label    == false_block);
@@ -1969,8 +1968,8 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* create the condition */
 	set_cur_block(header_block);
-	if (statement->condition != NULL) {
-		create_condition_evaluation(statement->condition, body_block,
+	if (statement->v.for_stmt.condition != NULL) {
+		create_condition_evaluation(statement->v.for_stmt.condition, body_block,
 		                            false_block);
 	} else {
 		keep_alive(header_block);
@@ -2312,10 +2311,10 @@ static void create_local_static_variable(declaration_t *declaration)
 	current_ir_graph = old_current_ir_graph;
 }
 
-static void declaration_statement_to_firm(declaration_statement_t *statement)
+static void declaration_statement_to_firm(statement_t *statement)
 {
-	declaration_t *declaration = statement->declarations_begin;
-	declaration_t *end         = statement->declarations_end->next;
+	declaration_t *declaration = statement->v.declaration_stmt.begin;
+	declaration_t *end         = statement->v.declaration_stmt.end->next;
 	for( ; declaration != end; declaration = declaration->next) {
 		type_t *type = declaration->type;
 
@@ -2356,11 +2355,11 @@ static void create_jump_statement(const statement_t *statement,
 	set_cur_block(NULL);
 }
 
-static void switch_statement_to_firm(const switch_statement_t *statement)
+static void switch_statement_to_firm(const statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->source_position);
 
-	ir_node *expression  = expression_to_firm(statement->expression);
+	ir_node *expression  = expression_to_firm(statement->v.switch_stmt.expression);
 	ir_node *cond        = new_d_Cond(dbgi, expression);
 	ir_node *break_block = new_immBlock();
 
@@ -2372,7 +2371,7 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	current_switch_cond                  = cond;
 	break_label                          = break_block;
 
-	statement_to_firm(statement->body);
+	statement_to_firm(statement->v.switch_stmt.body);
 
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
@@ -2403,7 +2402,7 @@ static long fold_constant(const expression_t *expression)
 
 	ir_node *cnst = expression_to_firm(expression);
 	if(!is_Const(cnst)) {
-		panic("couldn't fold constantl");
+		panic("couldn't fold constant");
 	}
 	tarval *tv = get_Const_tarval(cnst);
 	if(!tarval_is_long(tv)) {
@@ -2416,9 +2415,9 @@ static long fold_constant(const expression_t *expression)
 	return res;
 }
 
-static void case_label_to_firm(const case_label_statement_t *statement)
+static void case_label_to_firm(const statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->source_position);
 
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
@@ -2426,8 +2425,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	 * node... */
 	ir_node *proj;
 	set_cur_block(get_nodes_block(current_switch_cond));
-	if(statement->expression) {
-		long pn = fold_constant(statement->expression);
+	if(statement->v.case_label_stmt.expression) {
+		long pn = fold_constant(statement->v.case_label_stmt.expression);
 		if(pn == MAGIC_DEFAULT_PN_NUMBER) {
 			/* oops someone detected our cheating... */
 			panic("magic default pn used");
@@ -2446,7 +2445,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
 
-	statement_to_firm(statement->label_statement);
+	statement_to_firm(statement->v.case_label_stmt.label_statement);
 }
 
 static ir_node *get_label_block(declaration_t *label)
@@ -2470,9 +2469,9 @@ static ir_node *get_label_block(declaration_t *label)
 	return block;
 }
 
-static void label_to_firm(const label_statement_t *statement)
+static void label_to_firm(const statement_t *statement)
 {
-	ir_node *block = get_label_block(statement->label);
+	ir_node *block = get_label_block(statement->v.label_stmt.label);
 
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
@@ -2482,15 +2481,15 @@ static void label_to_firm(const label_statement_t *statement)
 	set_cur_block(block);
 	keep_alive(block);
 
-	statement_to_firm(statement->label_statement);
+	statement_to_firm(statement->v.label_stmt.label_statement);
 }
 
-static void goto_to_firm(const goto_statement_t *statement)
+static void goto_to_firm(const statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return;
 
-	ir_node *block = get_label_block(statement->label);
+	ir_node *block = get_label_block(statement->v.goto_label);
 	ir_node *jmp   = new_Jmp();
 	add_immBlock_pred(block, jmp);
 
@@ -2501,25 +2500,25 @@ static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
-		compound_statement_to_firm((compound_statement_t*) statement);
+		compound_statement_to_firm(statement);
 		return;
 	case STATEMENT_RETURN:
-		return_statement_to_firm((return_statement_t*) statement);
+		return_statement_to_firm(statement);
 		return;
 	case STATEMENT_EXPRESSION:
-		expression_statement_to_firm((expression_statement_t*) statement);
+		expression_statement_to_firm(statement);
 		return;
 	case STATEMENT_IF:
-		if_statement_to_firm((if_statement_t*) statement);
+		if_statement_to_firm(statement);
 		return;
 	case STATEMENT_WHILE:
-		while_statement_to_firm((while_statement_t*) statement);
+		while_statement_to_firm(statement);
 		return;
 	case STATEMENT_DO_WHILE:
-		do_while_statement_to_firm((do_while_statement_t*) statement);
+		do_while_statement_to_firm(statement);
 		return;
 	case STATEMENT_DECLARATION:
-		declaration_statement_to_firm((declaration_statement_t*) statement);
+		declaration_statement_to_firm(statement);
 		return;
 	case STATEMENT_BREAK:
 		create_jump_statement(statement, break_label);
@@ -2528,19 +2527,19 @@ static void statement_to_firm(statement_t *statement)
 		create_jump_statement(statement, continue_label);
 		return;
 	case STATEMENT_SWITCH:
-		switch_statement_to_firm((switch_statement_t*) statement);
+		switch_statement_to_firm(statement);
 		return;
 	case STATEMENT_CASE_LABEL:
-		case_label_to_firm((case_label_statement_t*) statement);
+		case_label_to_firm(statement);
 		return;
 	case STATEMENT_FOR:
-		for_statement_to_firm((for_statement_t*) statement);
+		for_statement_to_firm(statement);
 		return;
 	case STATEMENT_LABEL:
-		label_to_firm((label_statement_t*) statement);
+		label_to_firm(statement);
 		return;
 	case STATEMENT_GOTO:
-		goto_to_firm((goto_statement_t*) statement);
+		goto_to_firm(statement);
 		return;
 	default:
 		break;
@@ -2572,61 +2571,39 @@ static int count_decls_in_stmts(const statement_t *stmt)
 	int count = 0;
 	for (; stmt != NULL; stmt = stmt->next) {
 		switch (stmt->type) {
-			case STATEMENT_DECLARATION: {
-				const declaration_statement_t *const decl_stmt =
-					(const declaration_statement_t*)stmt;
-				count += count_local_declarations(decl_stmt->declarations_begin,
-				                                  decl_stmt->declarations_end->next);
+			case STATEMENT_DECLARATION:
+				count += count_local_declarations(stmt->v.declaration_stmt.begin,
+				                                  stmt->v.declaration_stmt.end->next);
 				break;
-			}
 
-			case STATEMENT_COMPOUND: {
-				const compound_statement_t *const comp =
-					(const compound_statement_t*)stmt;
-				count += count_decls_in_stmts(comp->statements);
+			case STATEMENT_COMPOUND:
+				count += count_decls_in_stmts(stmt->v.compound_stmt.statements);
 				break;
-			}
 
-			case STATEMENT_IF: {
-				const if_statement_t *const if_stmt = (const if_statement_t*)stmt;
-				count += count_decls_in_stmts(if_stmt->true_statement);
-				count += count_decls_in_stmts(if_stmt->false_statement);
+			case STATEMENT_IF:
+				count += count_decls_in_stmts(stmt->v.if_stmt.true_statement);
+				count += count_decls_in_stmts(stmt->v.if_stmt.false_statement);
 				break;
-			}
 
-			case STATEMENT_SWITCH: {
-				const switch_statement_t *const switch_stmt =
-					(const switch_statement_t*)stmt;
-				count += count_decls_in_stmts(switch_stmt->body);
+			case STATEMENT_SWITCH:
+				count += count_decls_in_stmts(stmt->v.switch_stmt.body);
 				break;
-			}
 
-			case STATEMENT_LABEL: {
-				const label_statement_t *const label_stmt =
-					(const label_statement_t*)stmt;
-				count += count_decls_in_stmts(label_stmt->label_statement);
+			case STATEMENT_LABEL:
+				count += count_decls_in_stmts(stmt->v.label_stmt.label_statement);
 				break;
-			}
 
-			case STATEMENT_WHILE: {
-				const while_statement_t *const while_stmt =
-					(const while_statement_t*)stmt;
-				count += count_decls_in_stmts(while_stmt->body);
+			case STATEMENT_WHILE:
+				count += count_decls_in_stmts(stmt->v.while_stmt.body);
 				break;
-			}
 
-			case STATEMENT_DO_WHILE: {
-				const do_while_statement_t *const do_while_stmt =
-					(const do_while_statement_t*)stmt;
-				count += count_decls_in_stmts(do_while_stmt->body);
+			case STATEMENT_DO_WHILE:
+				count += count_decls_in_stmts(stmt->v.while_stmt.body);
 				break;
-			}
 
 			case STATEMENT_FOR: {
-				const for_statement_t *const for_stmt =
-					(const for_statement_t*)stmt;
 				/* TODO initialisation */
-				count += count_decls_in_stmts(for_stmt->body);
+				count += count_decls_in_stmts(stmt->v.for_stmt.body);
 				break;
 			}
 
