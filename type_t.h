@@ -64,11 +64,13 @@ typedef enum {
 	TYPE_QUALIFIER_VOLATILE = 1 << 2,
 } type_qualifier_t;
 
-struct type_t {
-	type_type_t  type;
-	unsigned     qualifiers;
+typedef unsigned int type_qualifiers_t;
 
-	ir_type     *firm_type;
+struct type_t {
+	type_type_t       type;
+	type_qualifiers_t qualifiers;
+
+	ir_type          *firm_type;
 };
 
 struct atomic_type_t {
@@ -136,7 +138,7 @@ struct typeof_type_t {
 	type_t       *resolved_type;
 };
 
-type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers);
-type_t *make_pointer_type(type_t *points_to, type_qualifier_t qualifiers);
+type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
+type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 
 #endif

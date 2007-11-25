@@ -1731,9 +1731,9 @@ finish_specifiers:
 	specifiers->type = result;
 }
 
-static unsigned parse_type_qualifiers(void)
+static type_qualifiers_t parse_type_qualifiers(void)
 {
-	unsigned type_qualifiers = TYPE_QUALIFIER_NONE;
+	type_qualifiers_t type_qualifiers = TYPE_QUALIFIER_NONE;
 
 	while(true) {
 		switch(token.type) {
@@ -1867,7 +1867,7 @@ struct construct_type_t {
 typedef struct parsed_pointer_t parsed_pointer_t;
 struct parsed_pointer_t {
 	construct_type_t  construct_type;
-	type_qualifier_t  type_qualifiers;
+	type_qualifiers_t type_qualifiers;
 };
 
 typedef struct construct_function_type_t construct_function_type_t;
@@ -1879,7 +1879,7 @@ struct construct_function_type_t {
 typedef struct parsed_array_t parsed_array_t;
 struct parsed_array_t {
 	construct_type_t  construct_type;
-	type_qualifier_t  type_qualifiers;
+	type_qualifiers_t type_qualifiers;
 	bool              is_static;
 	bool              is_variable;
 	expression_t     *size;
@@ -1916,7 +1916,7 @@ static construct_type_t *parse_array_declarator(void)
 		next_token();
 	}
 
-	type_qualifier_t type_qualifiers = parse_type_qualifiers();
+	type_qualifiers_t type_qualifiers = parse_type_qualifiers();
 	if(type_qualifiers != 0) {
 		if(token.type == T_static) {
 			array->is_static = true;
@@ -3301,7 +3301,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 		}
 	}
 
-	expression->expression.datatype = make_pointer_type(orig_type, 0);
+	expression->expression.datatype = make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 }
 
 #define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc)   \
@@ -4427,17 +4427,17 @@ void init_parser(void)
 	init_expression_parsers();
 	obstack_init(&temp_obst);
 
-	type_int         = make_atomic_type(ATOMIC_TYPE_INT, 0);
-	type_uint        = make_atomic_type(ATOMIC_TYPE_UINT, 0);
-	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, 0);
-	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, 0);
-	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, 0);
-	type_size_t      = make_atomic_type(ATOMIC_TYPE_ULONG, 0);
-	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, 0);
+	type_int         = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
+	type_uint        = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_NONE);
+	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, TYPE_QUALIFIER_NONE);
+	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, TYPE_QUALIFIER_NONE);
+	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
+	type_size_t      = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE);
+	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE);
 	type_const_char  = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
-	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, 0);
-	type_void_ptr    = make_pointer_type(type_void, 0);
-	type_string      = make_pointer_type(type_const_char, 0);
+	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
+	type_void_ptr    = make_pointer_type(type_void, TYPE_QUALIFIER_NONE);
+	type_string      = make_pointer_type(type_const_char, TYPE_QUALIFIER_NONE);
 }
 
 void exit_parser(void)

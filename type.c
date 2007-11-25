@@ -610,7 +610,7 @@ static type_t *identify_new_type(type_t *type)
 	return result;
 }
 
-type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers)
+type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers)
 {
 	atomic_type_t *atomic_type
 		= obstack_alloc(type_obst, sizeof(atomic_type[0]));
@@ -622,7 +622,7 @@ type_t *make_atomic_type(atomic_type_type_t type, type_qualifier_t qualifiers)
 	return identify_new_type((type_t*) atomic_type);
 }
 
-type_t *make_pointer_type(type_t *points_to, type_qualifier_t qualifiers)
+type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 {
 	pointer_type_t *pointer_type
 		= obstack_alloc(type_obst, sizeof(pointer_type[0]));
