@@ -17,6 +17,11 @@
 //#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 
+#ifdef _WIN32
+/* No strtold on windows and no replacement yet */
+#define strtold(s, e) strtod(s, e)
+#endif
+
 static int         c;
 token_t            lexer_token;
 symbol_t          *symbol_L;
@@ -320,11 +325,87 @@ static void parse_floating_suffix(void)
 	}
 }
 
-static inline bool is_hex_digit(int c)
-{
-	return (c >= '0' && c <= '9')
-			|| (c >= 'a' && c <= 'f')
-			|| (c >= 'A' && c <= 'F');
+/**
+ * A replacement for strtoull. Only those parts needed for
+ * our parser are implemented.
+ */
+static unsigned long long parse_int_string(const char *s, const char **endptr, int base) {
+	unsigned long long v = 0;
+
+	switch (base) {
+	case 16:
+		for (;; ++s) {
+			/* check for overrun */
+			if (v <= 0x1000000000000000ULL)
+				break;
+			switch (tolower(*s)) {
+			case '0': v <<= 4; break;
+			case '1': v <<= 4; v |= 0x1; break;
+			case '2': v <<= 4; v |= 0x2; break;
+			case '3': v <<= 4; v |= 0x3; break;
+			case '4': v <<= 4; v |= 0x4; break;
+			case '5': v <<= 4; v |= 0x5; break;
+			case '6': v <<= 4; v |= 0x6; break;
+			case '7': v <<= 4; v |= 0x7; break;
+			case '8': v <<= 4; v |= 0x8; break;
+			case '9': v <<= 4; v |= 0x9; break;
+			case 'a': v <<= 4; v |= 0xa; break;
+			case 'b': v <<= 4; v |= 0xb; break;
+			case 'c': v <<= 4; v |= 0xc; break;
+			case 'd': v <<= 4; v |= 0xd; break;
+			case 'e': v <<= 4; v |= 0xe; break;
+			case 'f': v <<= 4; v |= 0xf; break;
+			default:
+				break;
+			}
+		}
+		break;
+	case 8:
+		for (;; ++s) {
+			/* check for overrun */
+			if (v <= 0x2000000000000000ULL)
+				break;
+			switch (tolower(*s)) {
+			case '0': v <<= 3; break;
+			case '1': v <<= 3; v |= 1; break;
+			case '2': v <<= 3; v |= 2; break;
+			case '3': v <<= 3; v |= 3; break;
+			case '4': v <<= 3; v |= 4; break;
+			case '5': v <<= 3; v |= 5; break;
+			case '6': v <<= 3; v |= 6; break;
+			case '7': v <<= 3; v |= 7; break;
+			default:
+				break;
+			}
+		}
+		break;
+	case 10:
+		for (;; ++s) {
+			/* check for overrun */
+			if (v > 0x1999999999999999ULL)
+				break;
+			switch (tolower(*s)) {
+			case '0': v *= 10; break;
+			case '1': v *= 10; v += 1; break;
+			case '2': v *= 10; v += 2; break;
+			case '3': v *= 10; v += 3; break;
+			case '4': v *= 10; v += 4; break;
+			case '5': v *= 10; v += 5; break;
+			case '6': v *= 10; v += 6; break;
+			case '7': v *= 10; v += 7; break;
+			case '8': v *= 10; v += 8; break;
+			case '9': v *= 10; v += 9; break;
+			default:
+				break;
+			}
+		}
+		break;
+	default:
+		assert(0);
+		break;
+	}
+	*endptr = s;
+	return v;
 }
 
 static void parse_number_hex(void)
@@ -332,7 +413,7 @@ static void parse_number_hex(void)
 	assert(c == 'x' || c == 'X');
 	next_char();
 
-	while(is_hex_digit(c)) {
+	while(isxdigit(c)) {
 		obstack_1grow(&symbol_obstack, c);
 		next_char();
 	}
@@ -348,9 +429,9 @@ static void parse_number_hex(void)
 		lexer_token.type = T_ERROR;
 	}
 
-	char *endptr;
+	const char *endptr;
 	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = strtoull(string, &endptr, 16);
+	lexer_token.v.intvalue = parse_int_string(string, &endptr, 16);
 	if(*endptr != '\0') {
 		parse_error("hex number literal too long");
 	}
@@ -373,9 +454,9 @@ static void parse_number_oct(void)
 	obstack_1grow(&symbol_obstack, '\0');
 	char *string = obstack_finish(&symbol_obstack);
 
-	char *endptr;
+	const char *endptr;
 	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = strtoull(string, &endptr, 8);
+	lexer_token.v.intvalue = parse_int_string(string, &endptr, 8);
 	if(*endptr != '\0') {
 		parse_error("octal number literal too long");
 	}
@@ -421,7 +502,7 @@ static void parse_number_dec(void)
 	obstack_1grow(&symbol_obstack, '\0');
 	char *string = obstack_finish(&symbol_obstack);
 
-	char *endptr;
+	const char *endptr;
 	if(is_float) {
 		lexer_token.type         = T_FLOATINGPOINT;
 		lexer_token.v.floatvalue = strtold(string, &endptr);
@@ -433,7 +514,7 @@ static void parse_number_dec(void)
 		parse_floating_suffix();
 	} else {
 		lexer_token.type       = T_INTEGER;
-		lexer_token.v.intvalue = strtoull(string, &endptr, 10);
+		lexer_token.v.intvalue = parse_int_string(string, &endptr, 10);
 
 		if(*endptr != '\0') {
 			parse_error("invalid number literal");
@@ -763,7 +844,7 @@ static void parse_line_directive(void)
 	if(pp_token.type != T_INTEGER) {
 		parse_error("expected integer");
 	} else {
-		lexer_token.source_position.linenr = pp_token.v.intvalue - 1;
+		lexer_token.source_position.linenr = (unsigned int)(pp_token.v.intvalue - 1);
 		next_pp_token();
 	}
 	if(pp_token.type == T_STRING_LITERAL) {
