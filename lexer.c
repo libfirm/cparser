@@ -356,7 +356,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 			case 'e': v <<= 4; v |= 0xe; break;
 			case 'f': v <<= 4; v |= 0xf; break;
 			default:
-				break;
+				goto end;
 			}
 		}
 		break;
@@ -375,7 +375,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 			case '6': v <<= 3; v |= 6; break;
 			case '7': v <<= 3; v |= 7; break;
 			default:
-				break;
+				goto end;
 			}
 		}
 		break;
@@ -396,7 +396,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 			case '8': v *= 10; v += 8; break;
 			case '9': v *= 10; v += 9; break;
 			default:
-				break;
+				goto end;
 			}
 		}
 		break;
@@ -404,6 +404,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 		assert(0);
 		break;
 	}
+end:
 	*endptr = s;
 	return v;
 }
