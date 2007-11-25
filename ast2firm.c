@@ -895,7 +895,6 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		offset = new_Const(mode, get_mode_one(mode));
 	}
 
-	ir_node *new_value;
 	switch(expression->type) {
 	case UNEXPR_POSTFIX_INCREMENT: {
 		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
@@ -919,9 +918,8 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	}
 	default:
 		panic("no incdec expr in create_incdec");
+		return NULL;
 	}
-
-	return new_value;
 }
 
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
@@ -2237,7 +2235,7 @@ static void create_initializer(declaration_t *declaration)
 	if(initializer == NULL)
 		return;
 
-	declaration_type_t declaration_type = declaration->declaration_type;
+	declaration_type_t declaration_type = (declaration_type_t)declaration->declaration_type;
 	if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
 		create_initializer_local_variable_entity(declaration);
 		return;
@@ -2259,7 +2257,7 @@ static void create_initializer(declaration_t *declaration)
 			set_atomic_ent_value(entity, value);
 		}
 	} else {
-		declaration_type_t declaration_type = declaration->declaration_type;
+		declaration_type_t declaration_type = (declaration_type_t)declaration->declaration_type;
 		assert(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY
 				|| declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
 
