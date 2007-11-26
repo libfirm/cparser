@@ -6,16 +6,7 @@
 #include "symbol.h"
 
 typedef struct type_t                type_t;
-typedef struct atomic_type_t         atomic_type_t;
-typedef struct pointer_type_t        pointer_type_t;
 typedef struct function_parameter_t  function_parameter_t;
-typedef struct function_type_t       function_type_t;
-typedef struct compound_type_t       compound_type_t;
-typedef struct enum_type_t           enum_type_t;
-typedef struct builtin_type_t        builtin_type_t;
-typedef struct array_type_t          array_type_t;
-typedef struct typedef_type_t        typedef_type_t;
-typedef struct typeof_type_t         typeof_type_t;
 
 void init_types(void);
 void exit_types(void);

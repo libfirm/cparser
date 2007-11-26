@@ -596,15 +596,14 @@ static int get_rank(const type_t *type)
 {
 	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
 	 * and esp. footnote 108). However we can't fold constants (yet), so we
-	 * can't decide wether unsigned int is possible, while int always works.
+	 * can't decide whether unsigned int is possible, while int always works.
 	 * (unsigned int would be preferable when possible... for stuff like
 	 *  struct { enum { ... } bla : 4; } ) */
 	if(type->type == TYPE_ENUM)
 		return ATOMIC_TYPE_INT;
 
 	assert(type->type == TYPE_ATOMIC);
-	atomic_type_t      *atomic_type = (atomic_type_t*) type;
-	atomic_type_type_t  atype       = atomic_type->atype;
+	atomic_type_type_t atype = type->v.atomic_type.atype;
 	return atype;
 }
 
@@ -668,8 +667,7 @@ static expression_t *create_implicit_cast(expression_t *expression,
 		return create_cast_expression(expression, dest_type);
 	}
 	if(dest_type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type
-			= (pointer_type_t*) dest_type;
+		type_t *pointer_type = dest_type;
 		switch (source_type->type) {
 			case TYPE_ATOMIC:
 				if (is_null_expression(expression)) {
@@ -684,9 +682,9 @@ static expression_t *create_implicit_cast(expression_t *expression,
 				break;
 
 			case TYPE_ARRAY: {
-				array_type_t *const array_type = (array_type_t*) source_type;
-				if (types_compatible(array_type->element_type,
-														 pointer_type->points_to)) {
+				type_t *const array_type = source_type;
+				if (types_compatible(array_type->v.array_type.element_type,
+				                     pointer_type->v.pointer_type.points_to)) {
 					return create_cast_expression(expression, dest_type);
 				}
 				break;
@@ -709,9 +707,7 @@ static bool is_atomic_type(const type_t *type, atomic_type_type_t atype)
 {
 	if(type->type != TYPE_ATOMIC)
 		return false;
-	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
-
-	return atomic_type->atype == atype;
+	return type->v.atomic_type.atype == atype;
 }
 
 static bool is_pointer(const type_t *type)
@@ -746,10 +742,10 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	}
 
 	if (is_pointer(type_left) && is_pointer(type_right)) {
-		pointer_type_t *pointer_type_left  = (pointer_type_t*) type_left;
-		pointer_type_t *pointer_type_right = (pointer_type_t*) type_right;
-		type_t         *points_to_left     = pointer_type_left->points_to;
-		type_t         *points_to_right    = pointer_type_right->points_to;
+		type_t *pointer_type_left  = type_left;
+		type_t *pointer_type_right = type_right;
+		type_t *points_to_left     = pointer_type_left->v.pointer_type.points_to;
+		type_t *points_to_right    = pointer_type_right->v.pointer_type.points_to;
 
 		if(!is_atomic_type(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_atomic_type(points_to_right, ATOMIC_TYPE_VOID)
@@ -926,8 +922,7 @@ static designator_t *parse_designation(void)
 }
 #endif
 
-static initializer_t *initializer_from_string(array_type_t *type,
-                                              const char *string)
+static initializer_t *initializer_from_string(type_t *type, const char *string)
 {
 	/* TODO: check len vs. size of array type */
 	(void) type;
@@ -949,12 +944,10 @@ static initializer_t *initializer_from_expression(type_t *type,
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
 	if(type->type == TYPE_ARRAY && expression->type == EXPR_STRING_LITERAL) {
-		array_type_t *array_type   = (array_type_t*) type;
-		type_t       *element_type = array_type->element_type;
+		type_t *element_type = type->v.array_type.element_type;
 
 		if(element_type->type == TYPE_ATOMIC) {
-			atomic_type_t      *atomic_type = (atomic_type_t*) element_type;
-			atomic_type_type_t  atype       = atomic_type->atype;
+			atomic_type_type_t atype = element_type->v.atomic_type.atype;
 
 			/* TODO handle wide strings */
 			if(atype == ATOMIC_TYPE_CHAR
@@ -962,7 +955,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 					|| atype == ATOMIC_TYPE_UCHAR) {
 
 				string_literal_t *literal = (string_literal_t*) expression;
-				return initializer_from_string(array_type, literal->value);
+				return initializer_from_string(type, literal->value);
 			}
 		}
 	}
@@ -1045,9 +1038,8 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	initializer_t  *result = NULL;
 	initializer_t **elems;
 	if(type->type == TYPE_ARRAY) {
-		array_type_t *array_type   = (array_type_t*) type;
-		type_t       *element_type = array_type->element_type;
-		element_type               = skip_typeref(element_type);
+		type_t *element_type = type->v.array_type.element_type;
+		element_type         = skip_typeref(element_type);
 
 		initializer_t *sub;
 		had_initializer_brace_warning = false;
@@ -1087,8 +1079,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	} else {
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
-		compound_type_t *compound_type = (compound_type_t*) type;
-		context_t       *context       = & compound_type->declaration->context;
+		context_t *context = &type->v.compound_type.declaration->context;
 
 		declaration_t *first = context->declarations;
 		if(first == NULL)
@@ -1404,12 +1395,12 @@ restart:
 
 	expect(')');
 
-	typeof_type_t *typeof = allocate_type_zero(sizeof(typeof[0]));
-	typeof->type.type     = TYPE_TYPEOF;
-	typeof->expression    = expression;
-	typeof->typeof_type   = type;
+	type_t *typeof = allocate_type_zero(sizeof(typeof[0]));
+	typeof->type   = TYPE_TYPEOF;
+	typeof->v.typeof_type.expression  = expression;
+	typeof->v.typeof_type.typeof_type = type;
 
-	return (type_t*) typeof;
+	return typeof;
 }
 
 typedef enum {
@@ -1432,13 +1423,13 @@ typedef enum {
 
 static type_t *create_builtin_type(symbol_t *symbol)
 {
-	builtin_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type      = TYPE_BUILTIN;
-	type->symbol         = symbol;
+	type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type   = TYPE_BUILTIN;
+	type->v.builtin_type.symbol    = symbol;
 	/* TODO... */
-	type->real_type      = type_int;
+	type->v.builtin_type.real_type = type_int;
 
-	return (type_t*) type;
+	return type;
 }
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -1448,19 +1439,19 @@ static type_t *get_typedef_type(symbol_t *symbol)
 			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
-	typedef_type_t *typedef_type = allocate_type_zero(sizeof(typedef_type[0]));
-	typedef_type->type.type    = TYPE_TYPEDEF;
-	typedef_type->declaration  = declaration;
+	type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type   = TYPE_TYPEDEF;
+	type->v.typedef_type.declaration = declaration;
 
-	return (type_t*) typedef_type;
+	return type;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t        *type            = NULL;
-	unsigned       type_qualifiers = 0;
-	unsigned       type_specifiers = 0;
-	int            newtype         = 0;
+	type_t            *type            = NULL;
+	type_qualifiers_t type_qualifiers = TYPE_QUALIFIER_NONE;
+	unsigned          type_specifiers = 0;
+	int               newtype         = 0;
 
 	while(true) {
 		switch(token.type) {
@@ -1540,32 +1531,24 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		/* TODO: if type != NULL for the following rules should issue
 		 * an error */
-		case T_struct: {
-			compound_type_t *compound_type
-				= allocate_type_zero(sizeof(compound_type[0]));
-			compound_type->type.type = TYPE_COMPOUND_STRUCT;
-			compound_type->declaration = parse_compound_type_specifier(true);
+		case T_struct:
+			type       = allocate_type_zero(sizeof(type[0]));
+			type->type = TYPE_COMPOUND_STRUCT;
+			type->v.compound_type.declaration = parse_compound_type_specifier(true);
 
-			type = (type_t*) compound_type;
 			break;
-		}
-		case T_union: {
-			compound_type_t *compound_type
-				= allocate_type_zero(sizeof(compound_type[0]));
-			compound_type->type.type = TYPE_COMPOUND_UNION;
-			compound_type->declaration = parse_compound_type_specifier(false);
+		case T_union:
+			type       = allocate_type_zero(sizeof(type[0]));
+			type->type = TYPE_COMPOUND_UNION;
+			type->v.compound_type.declaration = parse_compound_type_specifier(false);
 
-			type = (type_t*) compound_type;
 			break;
-		}
-		case T_enum: {
-			enum_type_t *enum_type = allocate_type_zero(sizeof(enum_type[0]));
-			enum_type->type.type   = TYPE_ENUM;
-			enum_type->declaration = parse_enum_specifier();
+		case T_enum:
+			type       = allocate_type_zero(sizeof(type[0]));
+			type->type = TYPE_ENUM;
+			type->v.enum_type.declaration = parse_enum_specifier();
 
-			type = (type_t*) enum_type;
 			break;
-		}
 		case T___typeof__:
 			type = parse_typeof();
 			break;
@@ -1709,22 +1692,20 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		atomic_type_t *atype = allocate_type_zero(sizeof(atype[0]));
-		atype->type.type     = TYPE_ATOMIC;
-		atype->atype         = atomic_type;
-		newtype              = 1;
-
-		type = (type_t*) atype;
+		type       = allocate_type_zero(sizeof(type[0]));
+		type->type = TYPE_ATOMIC;
+		type->v.atomic_type.atype = atomic_type;
+		newtype = 1;
 	} else {
 		if(type_specifiers != 0) {
 			parse_error("multiple datatypes in declaration");
 		}
 	}
 
-	type->qualifiers = (type_qualifier_t)type_qualifiers;
+	type->qualifiers = type_qualifiers;
 
 	type_t *result = typehash_insert(type);
-	if(newtype && result != (type_t*) type) {
+	if(newtype && result != type) {
 		free_type(type);
 	}
 
@@ -1778,19 +1759,18 @@ static declaration_t *parse_parameter(void)
 		parse_error("typedef not allowed in parameter list");
 	}
 
-	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
+	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
 	 * into a pointer */
 	if (declaration->type->type == TYPE_ARRAY) {
-		const array_type_t *const arr_type =
-			(const array_type_t*)declaration->type;
+		const type_t *const arr_type = declaration->type;
 		declaration->type =
-			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+			make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
 	}
 
 	return declaration;
 }
 
-static declaration_t *parse_parameters(function_type_t *type)
+static declaration_t *parse_parameters(type_t *type)
 {
 	if(token.type == T_IDENTIFIER) {
 		symbol_t      *symbol = token.v.symbol;
@@ -1802,7 +1782,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 	}
 
 	if(token.type == ')') {
-		type->unspecified_parameters = 1;
+		type->v.function_type.unspecified_parameters = 1;
 		return NULL;
 	}
 	if(token.type == T_void && look_ahead(1)->type == ')') {
@@ -1820,7 +1800,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 		switch(token.type) {
 		case T_DOTDOTDOT:
 			next_token();
-			type->variadic = 1;
+			type->v.function_type.variadic = 1;
 			return declarations;
 
 		case T_IDENTIFIER:
@@ -1835,7 +1815,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 				last_declaration->next = declaration;
 				last_parameter->next   = parameter;
 			} else {
-				type->parameters = parameter;
+				type->v.function_type.parameters = parameter;
 				declarations     = declaration;
 			}
 			last_parameter   = parameter;
@@ -1873,7 +1853,7 @@ struct parsed_pointer_t {
 typedef struct construct_function_type_t construct_function_type_t;
 struct construct_function_type_t {
 	construct_type_t    construct_type;
-	function_type_t    *function_type;
+	type_t             *function_type;
 };
 
 typedef struct parsed_array_t parsed_array_t;
@@ -1941,8 +1921,8 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	function_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type       = TYPE_FUNCTION;
+	type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type   = TYPE_FUNCTION;
 
 	declaration_t *parameters = parse_parameters(type);
 	if(declaration != NULL) {
@@ -2066,46 +2046,46 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		parsed_pointer_t          *parsed_pointer;
 		parsed_array_t            *parsed_array;
 		construct_function_type_t *construct_function_type;
-		function_type_t           *function_type;
-		pointer_type_t            *pointer_type;
-		array_type_t              *array_type;
+		type_t                    *ftype;
+		type_t                    *ptype;
+		type_t                    *atype;
 
 		switch(iter->type) {
 		case CONSTRUCT_INVALID:
 			panic("invalid type construction found");
 		case CONSTRUCT_FUNCTION:
 			construct_function_type = (construct_function_type_t*) iter;
-			function_type           = construct_function_type->function_type;
+			ftype                   = construct_function_type->function_type;
 
-			function_type->result_type = type;
-			type                       = (type_t*) function_type;
+			ftype->v.function_type.result_type = type;
+			type                               = ftype;
 			break;
 
 		case CONSTRUCT_POINTER:
 			parsed_pointer = (parsed_pointer_t*) iter;
-			pointer_type   = allocate_type_zero(sizeof(pointer_type[0]));
+			ptype          = allocate_type_zero(sizeof(ptype[0]));
 
-			pointer_type->type.type       = TYPE_POINTER;
-			pointer_type->points_to       = type;
-			pointer_type->type.qualifiers = parsed_pointer->type_qualifiers;
-			type                          = (type_t*) pointer_type;
+			ptype->type                     = TYPE_POINTER;
+			ptype->v.pointer_type.points_to = type;
+			ptype->qualifiers               = parsed_pointer->type_qualifiers;
+			type                            = ptype;
 			break;
 
 		case CONSTRUCT_ARRAY:
-			parsed_array  = (parsed_array_t*) iter;
-			array_type    = allocate_type_zero(sizeof(array_type[0]));
+			parsed_array = (parsed_array_t*) iter;
+			atype        = allocate_type_zero(sizeof(atype[0]));
 
-			array_type->type.type       = TYPE_ARRAY;
-			array_type->element_type    = type;
-			array_type->type.qualifiers = parsed_array->type_qualifiers;
-			array_type->is_static       = parsed_array->is_static;
-			array_type->is_variable     = parsed_array->is_variable;
-			array_type->size            = parsed_array->size;
-			type                        = (type_t*) array_type;
+			atype->type                      = TYPE_ARRAY;
+			atype->v.array_type.element_type = type;
+			atype->qualifiers                = parsed_array->type_qualifiers;
+			atype->v.array_type.is_static    = parsed_array->is_static;
+			atype->v.array_type.is_variable  = parsed_array->is_variable;
+			atype->v.array_type.size         = parsed_array->size;
+			type                             = atype;
 			break;
 		}
 
-		type_t *hashed_type = typehash_insert((type_t*) type);
+		type_t *hashed_type = typehash_insert(type);
 		if(hashed_type != type) {
 			/* the function type was constructed earlier freeing it here will
 			 * destroy other types... */
@@ -2211,9 +2191,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			initializer_t *initializer = parse_initializer(type);
 
 			if(type->type == TYPE_ARRAY && initializer != NULL) {
-				array_type_t       *array_type = (array_type_t*) type;
-
-				if(array_type->size == NULL) {
+				if(type->v.array_type.size == NULL) {
 					const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 					cnst->expression.type     = EXPR_CONST;
@@ -2226,10 +2204,9 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 						cnst->v.int_value = strlen(initializer->v.string) + 1;
 					}
 
-					array_type->size = (expression_t*) cnst;
+					type->v.array_type.size = (expression_t*) cnst;
 				}
 			}
-
 
 			ndeclaration->init.initializer = initializer;
 		} else if(token.type == '{') {
@@ -2347,9 +2324,8 @@ static void parse_declaration(void)
 		switch (specifiers.type->type) {
 			case TYPE_COMPOUND_STRUCT:
 			case TYPE_COMPOUND_UNION: {
-				const compound_type_t *const comp_type =
-					(const compound_type_t*)specifiers.type;
-				if (comp_type->declaration->symbol == NULL) {
+				const type_t *const comp_type = specifiers.type;
+				if (comp_type->v.compound_type.declaration->symbol == NULL) {
 					parse_warning_pos(source_position,
 														"unnamed struct/union that defines no instances");
 				}
@@ -2470,16 +2446,15 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	function_type_t *function_type
-		= allocate_type_zero(sizeof(function_type[0]));
+	type_t *ftype = allocate_type_zero(sizeof(ftype[0]));
 
-	function_type->type.type              = TYPE_FUNCTION;
-	function_type->result_type            = type_int;
-	function_type->unspecified_parameters = true;
+	ftype->type                                   = TYPE_FUNCTION;
+	ftype->v.function_type.result_type            = type_int;
+	ftype->v.function_type.unspecified_parameters = true;
 
-	type_t *type = typehash_insert((type_t*) function_type);
-	if(type != (type_t*) function_type) {
-		free_type(function_type);
+	type_t *type = typehash_insert(ftype);
+	if(type != ftype) {
+		free_type(ftype);
 	}
 
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
@@ -2749,13 +2724,13 @@ static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
 	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
 	parameter->type = argument_type;
 
-	function_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type   = TYPE_FUNCTION;
-	type->result_type = result_type;
-	type->parameters  = parameter;
+	type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type                        = TYPE_FUNCTION;
+	type->v.function_type.result_type = result_type;
+	type->v.function_type.parameters  = parameter;
 
-	type_t *result = typehash_insert((type_t*) type);
-	if(result != (type_t*) type) {
+	type_t *result = typehash_insert(type);
+	if(result != type) {
 		free_type(type);
 	}
 
@@ -2843,17 +2818,17 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	if(type_left != NULL && type_right != NULL) {
 		if(type_left->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) type_left;
-			array_access->expression.datatype = pointer->points_to;
+			type_t *pointer = type_left;
+			array_access->expression.datatype = pointer->v.pointer_type.points_to;
 		} else if(type_left->type == TYPE_ARRAY) {
-			array_type_t *array_type          = (array_type_t*) type_left;
-			array_access->expression.datatype = array_type->element_type;
+			type_t *array_type = type_left;
+			array_access->expression.datatype = array_type->v.array_type.element_type;
 		} else if(type_right->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) type_right;
-			array_access->expression.datatype = pointer->points_to;
+			type_t *pointer = type_right;
+			array_access->expression.datatype = pointer->v.pointer_type.points_to;
 		} else if(type_right->type == TYPE_ARRAY) {
-			array_type_t *array_type          = (array_type_t*) type_right;
-			array_access->expression.datatype = array_type->element_type;
+			type_t *array_type = type_right;
+			array_access->expression.datatype = array_type->v.array_type.element_type;
 		} else {
 			parser_print_error_prefix();
 			fprintf(stderr, "array access on object with non-pointer types ");
@@ -2951,8 +2926,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 			fputc('\n', stderr);
 			return make_invalid_expression();
 		}
-		pointer_type_t *pointer_type = (pointer_type_t*) type;
-		type_left                    = pointer_type->points_to;
+		type_left = type->v.pointer_type.points_to;
 	}
 	type_left = skip_typeref(type_left);
 
@@ -2966,8 +2940,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return make_invalid_expression();
 	}
 
-	compound_type_t *compound_type = (compound_type_t*) type_left;
-	declaration_t   *declaration   = compound_type->declaration;
+	type_t        *compound_type = type_left;
+	declaration_t *declaration   = compound_type->v.compound_type.declaration;
 
 	if(!declaration->init.is_defined) {
 		parser_print_error_prefix();
@@ -3004,18 +2978,16 @@ static expression_t *parse_call_expression(unsigned precedence,
 	call->expression.type   = EXPR_CALL;
 	call->function          = expression;
 
-	function_type_t *function_type;
-	type_t          *orig_type     = expression->datatype;
-	type_t          *type          = skip_typeref(orig_type);
+	type_t *function_type;
+	type_t *orig_type     = expression->datatype;
+	type_t *type          = skip_typeref(orig_type);
 
 	if(type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type = (pointer_type_t*) type;
-
-		type = skip_typeref(pointer_type->points_to);
+		type = skip_typeref(type->v.pointer_type.points_to);
 	}
 	if (type->type == TYPE_FUNCTION) {
-		function_type             = (function_type_t*) type;
-		call->expression.datatype = function_type->result_type;
+		function_type             = type;
+		call->expression.datatype = type->v.function_type.result_type;
 	} else {
 		parser_print_error_prefix();
 		fputs("called object '", stderr);
@@ -3053,7 +3025,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	expect(')');
 
 	if(function_type != NULL) {
-		function_parameter_t *parameter = function_type->parameters;
+		function_parameter_t *parameter = function_type->v.function_type.parameters;
 		call_argument_t      *argument  = call->arguments;
 		for( ; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
@@ -3070,8 +3042,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 			fprintf(stderr, "'\n");
 		} else if(argument != NULL) {
 			/* too many parameters */
-			if(!function_type->variadic
-					&& !function_type->unspecified_parameters) {
+			if(!function_type->v.function_type.variadic
+					&& !function_type->v.function_type.unspecified_parameters) {
 				parser_print_error_prefix();
 				fprintf(stderr, "too many arguments to function '");
 				print_expression(expression);
@@ -3265,21 +3237,17 @@ static void semantic_dereference(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	switch (type->type) {
-		case TYPE_ARRAY: {
-			array_type_t *const array_type  = (array_type_t*)type;
-			expression->expression.datatype = array_type->element_type;
+		case TYPE_ARRAY:
+			expression->expression.datatype = type->v.array_type.element_type;
 			break;
-		}
 
-		case TYPE_POINTER: {
-			pointer_type_t *pointer_type    = (pointer_type_t*)type;
-			expression->expression.datatype = pointer_type->points_to;
+		case TYPE_POINTER:
+			expression->expression.datatype = type->v.pointer_type.points_to;
 			break;
-		}
 
 		default:
 			parser_print_error_prefix();
-			fputs("'Unary *' needs pointer or arrray type, but type ", stderr);
+			fputs("'Unary *' needs pointer or array type, but type ", stderr);
 			print_type_quoted(orig_type);
 			fputs(" given.\n", stderr);
 			return;
@@ -3471,13 +3439,13 @@ static void semantic_add(binary_expression_t *expression)
 	} else if(type_right->type == TYPE_POINTER && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
 	} else if (type_left->type == TYPE_ARRAY && is_type_integer(type_right)) {
-		const array_type_t *const arr_type = (const array_type_t*)type_left;
+		const type_t *const arr_type = type_left;
 		expression->expression.datatype =
-		  make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+		  make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
 	} else if (type_right->type == TYPE_ARRAY && is_type_integer(type_left)) {
-		const array_type_t *const arr_type = (const array_type_t*)type_right;
+		const type_t *const arr_type = type_right;
 		expression->expression.datatype =
-			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+			make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary + (");
@@ -4161,8 +4129,8 @@ static statement_t *parse_return(void)
 	statement->source_position = token.source_position;
 
 	assert(current_function->type->type == TYPE_FUNCTION);
-	function_type_t *function_type = (function_type_t*) current_function->type;
-	type_t          *return_type   = function_type->result_type;
+	type_t *function_type = current_function->type;
+	type_t *return_type   = function_type->v.function_type.result_type;
 
 	expression_t *return_value;
 	if(token.type != ';') {

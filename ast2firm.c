@@ -118,9 +118,9 @@ static ident *unique_ident(const char *tag)
 	return new_id_from_str(buf);
 }
 
-static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
+static ir_mode *get_atomic_mode(const type_t* atomic_type)
 {
-	switch(atomic_type->atype) {
+	switch(atomic_type->v.atomic_type.atype) {
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_CHAR:
 		return mode_Bs;
@@ -172,9 +172,9 @@ static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 
 static unsigned get_type_size(type_t *type);
 
-static unsigned get_atomic_type_size(const atomic_type_t *type)
+static unsigned get_atomic_type_size(const type_t *type)
 {
-	switch(type->atype) {
+	switch(type->v.atomic_type.atype) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_UCHAR:
@@ -209,15 +209,15 @@ static unsigned get_atomic_type_size(const atomic_type_t *type)
 	panic("Trying to determine size of invalid atomic type");
 }
 
-static unsigned get_compound_type_size(compound_type_t *type)
+static unsigned get_compound_type_size(type_t *type)
 {
-	ir_type *irtype = get_ir_type(&type->type);
+	ir_type *irtype = get_ir_type(type);
 	return get_type_size_bytes(irtype);
 }
 
-static unsigned get_array_type_size(array_type_t *type)
+static unsigned get_array_type_size(type_t *type)
 {
-	ir_type *irtype = get_ir_type(&type->type);
+	ir_type *irtype = get_ir_type(type);
 	return get_type_size_bytes(irtype);
 }
 
@@ -227,19 +227,19 @@ static unsigned get_type_size(type_t *type)
 
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		return get_atomic_type_size((const atomic_type_t*) type);
+		return get_atomic_type_size(type);
 	case TYPE_ENUM:
 		return get_mode_size_bytes(mode_Is);
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
-		return get_compound_type_size((compound_type_t*) type);
+		return get_compound_type_size(type);
 	case TYPE_FUNCTION:
 		/* just a pointer to the function */
 		return get_mode_size_bytes(mode_P_code);
 	case TYPE_POINTER:
 		return get_mode_size_bytes(mode_P_data);
 	case TYPE_ARRAY:
-		return get_array_type_size((array_type_t*) type);
+		return get_array_type_size(type);
 	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
@@ -249,11 +249,11 @@ static unsigned get_type_size(type_t *type)
 	panic("Trying to determine size of invalid type");
 }
 
-static unsigned count_parameters(const function_type_t *function_type)
+static unsigned count_parameters(const type_t *type)
 {
 	unsigned count = 0;
 
-	function_parameter_t *parameter = function_type->parameters;
+	function_parameter_t *parameter = type->v.function_type.parameters;
 	for ( ; parameter != NULL; parameter = parameter->next) {
 		++count;
 	}
@@ -266,7 +266,7 @@ static unsigned count_parameters(const function_type_t *function_type)
 
 static long fold_constant(const expression_t *expression);
 
-static ir_type *create_atomic_type(const atomic_type_t *type)
+static ir_type *create_atomic_type(const type_t *type)
 {
 	ir_mode *mode   = get_atomic_mode(type);
 	ident   *id     = get_mode_ident(mode);
@@ -275,12 +275,12 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 	return irtype;
 }
 
-static ir_type *create_method_type(const function_type_t *function_type)
+static ir_type *create_method_type(const type_t *type)
 {
-	type_t  *result_type  = function_type->result_type;
+	type_t  *result_type  = type->v.function_type.result_type;
 
 	ident   *id           = unique_ident("functiontype");
-	int      n_parameters = count_parameters(function_type);
+	int      n_parameters = count_parameters(type);
 	int      n_results    = result_type == type_void ? 0 : 1;
 	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
@@ -289,7 +289,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		set_method_res_type(irtype, 0, restype);
 	}
 
-	function_parameter_t *parameter = function_type->parameters;
+	function_parameter_t *parameter = type->v.function_type.parameters;
 	int                   n         = 0;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		ir_type *p_irtype = get_ir_type(parameter->type);
@@ -297,16 +297,16 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		++n;
 	}
 
-	if(function_type->variadic || function_type->unspecified_parameters) {
+	if(type->v.function_type.variadic || type->v.function_type.unspecified_parameters) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
 	return irtype;
 }
 
-static ir_type *create_pointer_type(pointer_type_t *type)
+static ir_type *create_pointer_type(type_t *type)
 {
-	type_t  *points_to = type->points_to;
+	type_t  *points_to = type->v.pointer_type.points_to;
 	ir_type *ir_points_to;
 	/* Avoid endless recursion if the points_to type contains this poiner type
 	 * again (might be a struct). We therefore first create a void* pointer
@@ -314,7 +314,7 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	 */
 	ir_type *ir_type = new_type_pointer(unique_ident("pointer"),
 	                                    ir_type_void, mode_P_data);
-	type->type.firm_type  = ir_type;
+	type->firm_type  = ir_type;
 
 	ir_points_to = get_ir_type(points_to);
 	set_pointer_points_to_type(ir_type, ir_points_to);
@@ -322,16 +322,16 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	return ir_type;
 }
 
-static ir_type *create_array_type(array_type_t *type)
+static ir_type *create_array_type(type_t *type)
 {
-	type_t  *element_type    = type->element_type;
+	type_t  *element_type    = type->v.array_type.element_type;
 	ir_type *ir_element_type = get_ir_type(element_type);
 
 	ident   *id      = unique_ident("array");
 	ir_type *ir_type = new_type_array(id, 1, ir_element_type);
 
-	if(type->size != NULL) {
-		int n_elements = fold_constant(type->size);
+	if(type->v.array_type.size != NULL) {
+		int n_elements = fold_constant(type->v.array_type.size);
 
 		set_array_bounds_int(ir_type, 0, 0, n_elements);
 
@@ -350,9 +350,9 @@ static ir_type *create_array_type(array_type_t *type)
 
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
-static ir_type *create_struct_type(compound_type_t *type)
+static ir_type *create_struct_type(type_t *type)
 {
-	symbol_t *symbol = type->declaration->symbol;
+	symbol_t *symbol = type->v.compound_type.declaration->symbol;
 	ident    *id;
 	if(symbol != NULL) {
 		id = unique_ident(symbol->string);
@@ -361,11 +361,11 @@ static ir_type *create_struct_type(compound_type_t *type)
 	}
 	ir_type *ir_type = new_type_struct(id);
 
-	type->type.firm_type = ir_type;
+	type->firm_type = ir_type;
 
 	int align_all = 1;
 	int offset    = 0;
-	declaration_t *entry = type->declaration->context.declarations;
+	declaration_t *entry = type->v.compound_type.declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -403,9 +403,9 @@ static ir_type *create_struct_type(compound_type_t *type)
 	return ir_type;
 }
 
-static ir_type *create_union_type(compound_type_t *type)
+static ir_type *create_union_type(type_t *type)
 {
-	declaration_t *declaration = type->declaration;
+	declaration_t *declaration = type->v.compound_type.declaration;
 	symbol_t      *symbol      = declaration->symbol;
 	ident         *id;
 	if(symbol != NULL) {
@@ -415,7 +415,7 @@ static ir_type *create_union_type(compound_type_t *type)
 	}
 	ir_type  *ir_type = new_type_union(id);
 
-	type->type.firm_type = ir_type;
+	type->firm_type = ir_type;
 
 	int align_all = 1;
 	int size      = 0;
@@ -468,22 +468,22 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type((atomic_type_t*) type);
+		firm_type = create_atomic_type(type);
 		break;
 	case TYPE_FUNCTION:
-		firm_type = create_method_type((function_type_t*) type);
+		firm_type = create_method_type(type);
 		break;
 	case TYPE_POINTER:
-		firm_type = create_pointer_type((pointer_type_t*) type);
+		firm_type = create_pointer_type(type);
 		break;
 	case TYPE_ARRAY:
-		firm_type = create_array_type((array_type_t*) type);
+		firm_type = create_array_type(type);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type((compound_type_t*) type);
+		firm_type = create_struct_type(type);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type((compound_type_t*) type);
+		firm_type = create_union_type(type);
 		break;
 	case TYPE_ENUM:
 		firm_type = ir_type_int;
@@ -755,14 +755,14 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	}
 	ir_node       *callee   = expression_to_firm(function);
 
-	function_type_t *function_type;
+	type_t *type;
 	if (function->datatype->type == TYPE_POINTER) {
-		pointer_type_t *const ptr_type = (pointer_type_t*)function->datatype;
-		assert(ptr_type->points_to->type == TYPE_FUNCTION);
-		function_type = (function_type_t*)ptr_type->points_to;
+		type_t *const ptr_type = function->datatype;
+		assert(ptr_type->v.pointer_type.points_to->type == TYPE_FUNCTION);
+		type = ptr_type->v.pointer_type.points_to;
 	} else {
 		assert(function->datatype->type == TYPE_FUNCTION);
-		function_type = (function_type_t*)function->datatype;
+		type = function->datatype;
 	}
 
 	int              n_parameters = 0;
@@ -771,9 +771,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		++n_parameters;
 	}
 
-	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
+	ir_type *ir_method_type  = get_ir_type((type_t*) type);
 	ir_type *new_method_type = NULL;
-	if(function_type->variadic || function_type->unspecified_parameters) {
+	if(type->v.function_type.variadic || type->v.function_type.unspecified_parameters) {
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
@@ -817,7 +817,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
 	set_store(mem);
 
-	type_t  *result_type = function_type->result_type;
+	type_t  *result_type = type->v.function_type.result_type;
 	ir_node *result      = NULL;
 	if(result_type != type_void) {
 		ir_mode *mode    = get_ir_mode(result_type);
@@ -887,8 +887,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 
 	ir_node *offset;
 	if(type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type = (pointer_type_t*) type;
-		unsigned        elem_size    = get_type_size(pointer_type->points_to);
+		unsigned elem_size = get_type_size(type->v.pointer_type.points_to);
 		offset = new_Const_long(mode_Is, elem_size);
 	} else {
 		assert(is_type_arithmetic(type));
@@ -1041,9 +1040,8 @@ static ir_node *pointer_arithmetic(ir_node  *const pointer,
                                    dbg_info *const dbgi,
                                    const create_arithmetic_func func)
 {
-	pointer_type_t *const pointer_type = (pointer_type_t*)type;
-	type_t         *const points_to    = pointer_type->points_to;
-	const unsigned        elem_size    = get_type_size(points_to);
+	type_t         *const points_to = type->v.pointer_type.points_to;
+	const unsigned        elem_size = get_type_size(points_to);
 
 	assert(elem_size >= 1);
 	if (elem_size > 1) {
@@ -1119,8 +1117,8 @@ static ir_node *create_sub(const binary_expression_t *expression)
 		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
 	} else if (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER) {
-		const pointer_type_t *const ptr_type = (const pointer_type_t*)type_left;
-		const unsigned elem_size             = get_type_size(ptr_type->points_to);
+		const type_t *const ptr_type = type_left;
+		const unsigned elem_size     = get_type_size(ptr_type->v.pointer_type.points_to);
 		ir_mode *const mode   = get_ir_mode(type);
 		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
 		ir_node *const cnst   = new_Const_long(mode_Is, (long)elem_size);
@@ -1461,9 +1459,8 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	gcc_type_class tc;
 	switch (type->type)
 	{
-		case TYPE_ATOMIC: {
-			const atomic_type_t *const atomic_type = (const atomic_type_t*)type;
-			switch (atomic_type->atype) {
+		case TYPE_ATOMIC:
+			switch (type->v.atomic_type.atype) {
 				// should not be reached
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;
@@ -1512,7 +1509,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 					panic("Unimplemented case in classify_type_to_firm().");
 			}
 			break;
-		}
 
 		case TYPE_ARRAY:           // gcc handles this as pointer
 		case TYPE_FUNCTION:        // gcc handles this as pointer
@@ -2052,12 +2048,12 @@ static void create_initializer_value(initializer_t *initializer,
 }
 
 static void create_initializer_compound(initializer_t *initializer,
-                                        compound_type_t *type,
+                                        type_t *type,
                                         ir_entity *entity,
                                         compound_graph_path_entry_t *last_entry,
                                         int len)
 {
-	declaration_t *compound_declaration = type->declaration;
+	declaration_t *compound_declaration = type->v.compound_type.declaration;
 
 	declaration_t *compound_entry = compound_declaration->context.declarations;
 
@@ -2097,11 +2093,11 @@ static void create_initializer_compound(initializer_t *initializer,
 }
 
 static void create_initializer_array(initializer_t *initializer,
-                                     array_type_t *type, ir_entity *entity,
+                                     type_t *type, ir_entity *entity,
                                      compound_graph_path_entry_t *last_entry,
                                      int len)
 {
-	type_t *element_type = type->element_type;
+	type_t *element_type = type->v.array_type.element_type;
 	element_type         = skip_typeref(element_type);
 
 	compound_graph_path_entry_t entry;
@@ -2125,11 +2121,11 @@ static void create_initializer_array(initializer_t *initializer,
 }
 
 static void create_initializer_string(initializer_t *initializer,
-                                      array_type_t *type, ir_entity *entity,
+                                      type_t *type, ir_entity *entity,
                                       compound_graph_path_entry_t *last_entry,
                                       int len)
 {
-	type_t *element_type = type->element_type;
+	type_t *element_type = type->v.array_type.element_type;
 	element_type         = skip_typeref(element_type);
 
 	compound_graph_path_entry_t entry;
@@ -2157,21 +2153,18 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
 {
 	if(type->type == TYPE_ARRAY) {
-		array_type_t *array_type = (array_type_t*) type;
-
 		if(initializer->type == INITIALIZER_STRING) {
-			create_initializer_string(initializer, array_type, entity, entry, len);
+			create_initializer_string(initializer, type, entity, entry, len);
 		} else {
 			assert(initializer->type == INITIALIZER_LIST);
-			create_initializer_array(initializer, array_type, entity, entry, len);
+			create_initializer_array(initializer, type, entity, entry, len);
 		}
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
 
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
-		compound_type_t *compound_type = (compound_type_t*) type;
-		create_initializer_compound(initializer, compound_type, entity, entry, len);
+		create_initializer_compound(initializer, type, entity, entry, len);
 	}
 }
 
@@ -2706,13 +2699,12 @@ static void create_function(declaration_t *declaration)
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
-		const function_type_t* const func_type
-			= (const function_type_t*) declaration->type;
+		const type_t* const type = declaration->type;
 		ir_node *ret;
-		if (func_type->result_type == type_void) {
+		if (type->v.function_type.result_type == type_void) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
-			ir_mode *const mode = get_ir_mode(func_type->result_type);
+			ir_mode *const mode = get_ir_mode(type->v.function_type.result_type);
 			ir_node *      in[1];
 			// §5.1.2.2.3 main implicitly returns 0
 			if (strcmp(declaration->symbol->string, "main") == 0) {
