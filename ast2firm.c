@@ -229,19 +229,19 @@ static unsigned get_type_size(type_t *type)
 
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		return get_atomic_type_size((const atomic_type_t*) type);
+		return get_atomic_type_size(&type->atomic);
 	case TYPE_ENUM:
 		return get_mode_size_bytes(mode_Is);
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
-		return get_compound_type_size((compound_type_t*) type);
+		return get_compound_type_size(&type->compound);
 	case TYPE_FUNCTION:
 		/* just a pointer to the function */
 		return get_mode_size_bytes(mode_P_code);
 	case TYPE_POINTER:
 		return get_mode_size_bytes(mode_P_data);
 	case TYPE_ARRAY:
-		return get_array_type_size((array_type_t*) type);
+		return get_array_type_size(&type->array);
 	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
@@ -504,25 +504,25 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type((atomic_type_t*) type);
+		firm_type = create_atomic_type(&type->atomic);
 		break;
 	case TYPE_FUNCTION:
-		firm_type = create_method_type((function_type_t*) type);
+		firm_type = create_method_type(&type->function);
 		break;
 	case TYPE_POINTER:
-		firm_type = create_pointer_type((pointer_type_t*) type);
+		firm_type = create_pointer_type(&type->pointer);
 		break;
 	case TYPE_ARRAY:
-		firm_type = create_array_type((array_type_t*) type);
+		firm_type = create_array_type(&type->array);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type((compound_type_t*) type);
+		firm_type = create_struct_type(&type->compound);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type((compound_type_t*) type);
+		firm_type = create_union_type(&type->compound);
 		break;
 	case TYPE_ENUM:
-		firm_type = create_enum_type((enum_type_t*) type);
+		firm_type = create_enum_type(&type->enumt);
 		break;
 	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
@@ -800,14 +800,10 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	ir_node       *callee   = expression_to_firm(function);
 
 	function_type_t *function_type;
-	if (function->datatype->type == TYPE_POINTER) {
-		pointer_type_t *const ptr_type = (pointer_type_t*)function->datatype;
-		assert(ptr_type->points_to->type == TYPE_FUNCTION);
-		function_type = (function_type_t*)ptr_type->points_to;
-	} else {
-		assert(function->datatype->type == TYPE_FUNCTION);
-		function_type = (function_type_t*)function->datatype;
-	}
+	assert(function->datatype->type == TYPE_POINTER);
+	pointer_type_t *const ptr_type = &function->datatype->pointer;
+	assert(ptr_type->points_to->type == TYPE_FUNCTION);
+	function_type = &ptr_type->points_to->function;
 
 	int              n_parameters = 0;
 	call_argument_t *argument     = call->arguments;
@@ -931,7 +927,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 
 	ir_node *offset;
 	if(type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		pointer_type_t *pointer_type = &type->pointer;
 		unsigned        elem_size    = get_type_size(pointer_type->points_to);
 		offset = new_Const_long(mode_Is, elem_size);
 	} else {
@@ -1164,8 +1160,9 @@ static ir_node *create_sub(const binary_expression_t *expression)
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
-	} else if (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER) {
-		const pointer_type_t *const ptr_type = (const pointer_type_t*)type_left;
+	} else if (type_left->type == TYPE_POINTER
+			&& type_right->type == TYPE_POINTER) {
+		const pointer_type_t *const ptr_type = &type_left->pointer;
 		const unsigned elem_size             = get_type_size(ptr_type->points_to);
 		ir_mode *const mode   = get_ir_mode(type);
 		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
@@ -1507,7 +1504,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	switch (type->type)
 	{
 		case TYPE_ATOMIC: {
-			const atomic_type_t *const atomic_type = (const atomic_type_t*)type;
+			const atomic_type_t *const atomic_type = &type->atomic;
 			switch (atomic_type->atype) {
 				// should not be reached
 				case ATOMIC_TYPE_INVALID:
@@ -2230,7 +2227,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
 {
 	if(type->type == TYPE_ARRAY) {
-		array_type_t *array_type = (array_type_t*) type;
+		array_type_t *array_type = &type->array;
 
 		if(initializer->type == INITIALIZER_STRING) {
 			initializer_string_t *string = &initializer->string;
@@ -2246,7 +2243,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
-		compound_type_t *compound_type = (compound_type_t*) type;
+		compound_type_t *compound_type = &type->compound;
 		create_initializer_compound(list, compound_type, entity, entry, len);
 	}
 }
@@ -2636,7 +2633,8 @@ static int count_local_declarations(const declaration_t *      decl,
 			case TYPE_ATOMIC:
 			case TYPE_ENUM:
 			case TYPE_POINTER:
-				if (!decl->address_taken) ++count;
+				if (!decl->address_taken)
+					++count;
 				break;
 
 			default: break;
@@ -2807,8 +2805,8 @@ static void create_function(declaration_t *declaration)
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
-		const function_type_t* const func_type
-			= (const function_type_t*) declaration->type;
+		const function_type_t* const func_type = &declaration->type->function;
+
 		ir_node *ret;
 		if (func_type->result_type == type_void) {
 			ret = new_Return(get_store(), 0, NULL);
