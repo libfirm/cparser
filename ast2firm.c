@@ -48,6 +48,7 @@ typedef enum declaration_type_t {
 	DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
 	DECLARATION_TYPE_COMPOUND_MEMBER,
 	DECLARATION_TYPE_LABEL_BLOCK,
+	DECLARATION_TYPE_ENUM_ENTRY
 } declaration_type_t;
 
 static ir_type *get_ir_type(type_t *type);
@@ -454,6 +455,39 @@ static ir_type *create_union_type(type_t *type)
 	return ir_type;
 }
 
+static ir_node *expression_to_firm(const expression_t *expression);
+static inline ir_mode *get_ir_mode(type_t *type);
+
+static ir_type *create_enum_type(type_t *const type)
+{
+	type->firm_type = ir_type_int;
+
+	ir_mode *const mode    = get_ir_mode(type);
+	tarval  *const one     = get_mode_one(mode);
+	tarval  *      tv_next = get_tarval_null(mode);
+
+	for (declaration_t *decl = type->v.enum_type.declaration;;) {
+		decl = decl->next;
+		if (decl == NULL || decl->storage_class != STORAGE_CLASS_ENUM_ENTRY)
+			break;
+
+		decl->declaration_type = DECLARATION_TYPE_ENUM_ENTRY;
+
+		expression_t *const init = decl->init.enum_value;
+		if (init != NULL) {
+			ir_node *const cnst = expression_to_firm(init);
+			if (!is_Const(cnst)) {
+				panic("couldn't fold constant");
+			}
+			tv_next = get_Const_tarval(cnst);
+		}
+		decl->v.enum_val = tv_next;
+		tv_next = tarval_add(tv_next, one);
+	}
+
+	return ir_type_int;
+}
+
 static ir_type *get_ir_type(type_t *type)
 {
 	assert(type != NULL);
@@ -486,7 +520,7 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_union_type(type);
 		break;
 	case TYPE_ENUM:
-		firm_type = ir_type_int;
+		firm_type = create_enum_type(type);
 		break;
 	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
@@ -544,10 +578,6 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 	return entity;
 }
-
-
-
-static ir_node *expression_to_firm(const expression_t *expression);
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
@@ -655,7 +685,17 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 	switch((declaration_type_t) declaration->declaration_type) {
 	case DECLARATION_TYPE_UNKNOWN:
-		break;
+		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY) {
+			break;
+		}
+		get_ir_type(type);
+		/* FALLTHROUGH */
+
+	case DECLARATION_TYPE_ENUM_ENTRY: {
+		ir_mode *const mode = get_ir_mode(type);
+		return new_Const(mode, declaration->v.enum_val);
+	}
+
 	case DECLARATION_TYPE_LOCAL_VARIABLE: {
 		ir_mode *mode = get_ir_mode(type);
 		return get_value(declaration->v.value_number, mode);
@@ -708,6 +748,10 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 
 		return sel;
 	}
+
+	case DECLARATION_TYPE_ENUM_ENTRY:
+		panic("trying to reference enum entry");
+
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
 	case DECLARATION_TYPE_LABEL_BLOCK:
 		panic("not implemented reference type");

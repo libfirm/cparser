@@ -653,54 +653,59 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	if(source_type == dest_type)
 		return expression;
 
-	if(dest_type->type == TYPE_ATOMIC) {
-		if(source_type->type != TYPE_ATOMIC)
-			panic("casting of non-atomic types not implemented yet");
-
-		if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
-			type_error_incompatible("can't cast types",
-			                        expression->source_position,
-			                        source_type, dest_type);
-			return expression;
-		}
-
-		return create_cast_expression(expression, dest_type);
-	}
-	if(dest_type->type == TYPE_POINTER) {
-		type_t *pointer_type = dest_type;
-		switch (source_type->type) {
-			case TYPE_ATOMIC:
-				if (is_null_expression(expression)) {
-					return create_cast_expression(expression, dest_type);
-				}
-				break;
-
-			case TYPE_POINTER:
-				if (pointers_compatible(source_type, dest_type)) {
-					return create_cast_expression(expression, dest_type);
-				}
-				break;
-
-			case TYPE_ARRAY: {
-				type_t *const array_type = source_type;
-				if (types_compatible(array_type->v.array_type.element_type,
-				                     pointer_type->v.pointer_type.points_to)) {
-					return create_cast_expression(expression, dest_type);
-				}
-				break;
+	switch (dest_type->type) {
+		case TYPE_ENUM:
+			/* TODO warning for implicitly converting to enum */
+		case TYPE_ATOMIC:
+			if (source_type->type != TYPE_ATOMIC &&
+					source_type->type != TYPE_ENUM) {
+				panic("casting of non-atomic types not implemented yet");
 			}
 
-			default:
-				panic("casting of non-atomic types not implemented yet");
-		}
+			if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
+				type_error_incompatible("can't cast types",
+																expression->source_position,
+																source_type, dest_type);
+				return expression;
+			}
 
-		type_error_incompatible("can't implicitly cast types",
-		                        expression->source_position,
-		                        source_type, dest_type);
-		return expression;
+			return create_cast_expression(expression, dest_type);
+
+		case TYPE_POINTER:
+			switch (source_type->type) {
+				case TYPE_ATOMIC:
+					if (is_null_expression(expression)) {
+						return create_cast_expression(expression, dest_type);
+					}
+					break;
+
+				case TYPE_POINTER:
+					if (pointers_compatible(source_type, dest_type)) {
+						return create_cast_expression(expression, dest_type);
+					}
+					break;
+
+				case TYPE_ARRAY: {
+					type_t *const array_type = source_type;
+					if (types_compatible(array_type->v.array_type.element_type,
+															 dest_type->v.pointer_type.points_to)) {
+						return create_cast_expression(expression, dest_type);
+					}
+					break;
+				}
+
+				default:
+					panic("casting of non-atomic types not implemented yet");
+			}
+
+			type_error_incompatible("can't implicitly cast types",
+															expression->source_position,
+															source_type, dest_type);
+			return expression;
+
+		default:
+			panic("casting of non-atomic types not implemented yet");
 	}
-
-	panic("casting of non-atomic types not implemented yet");
 }
 
 static bool is_atomic_type(const type_t *type, atomic_type_type_t atype)
@@ -1256,7 +1261,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	return declaration;
 }
 
-static void parse_enum_entries(type_t *enum_type)
+static void parse_enum_entries(type_t *const enum_type)
 {
 	eat('{');
 
@@ -1297,7 +1302,7 @@ static void parse_enum_entries(type_t *enum_type)
 	expect_void('}');
 }
 
-static declaration_t *parse_enum_specifier(void)
+static type_t *parse_enum_specifier(void)
 {
 	eat(T_enum);
 
@@ -1326,6 +1331,10 @@ static declaration_t *parse_enum_specifier(void)
 		declaration->symbol          = symbol;
 	}
 
+	type_t *const enum_type = allocate_type_zero(sizeof(enum_type[0]));
+	enum_type->type        = TYPE_ENUM;
+	enum_type->v.enum_type.declaration = declaration;
+
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
 			parser_print_error_prefix();
@@ -1335,11 +1344,11 @@ static declaration_t *parse_enum_specifier(void)
 		record_declaration(declaration);
 		declaration->init.is_defined = 1;
 
-		parse_enum_entries(NULL);
+		parse_enum_entries(enum_type);
 		parse_attributes();
 	}
 
-	return declaration;
+	return enum_type;
 }
 
 /**
@@ -1544,10 +1553,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 			break;
 		case T_enum:
-			type       = allocate_type_zero(sizeof(type[0]));
-			type->type = TYPE_ENUM;
-			type->v.enum_type.declaration = parse_enum_specifier();
-
+			type = parse_enum_specifier();
 			break;
 		case T___typeof__:
 			type = parse_typeof();

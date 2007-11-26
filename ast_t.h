@@ -262,6 +262,7 @@ struct declaration_t {
 		unsigned int    value_number;     /* used in ast2firm module */
 		ir_entity      *entity;           /* used in ast2firm module */
 		ir_node        *block;            /* used in ast2firm module */
+		tarval         *enum_val;         /* used in ast2firm module */
 	} v;
 };
 
