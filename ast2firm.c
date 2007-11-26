@@ -1769,18 +1769,33 @@ static void return_statement_to_firm(return_statement_t *statement)
 	if(get_cur_block() == NULL)
 		return;
 
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
-	ir_node  *ret;
 
+	ir_type *func_irtype = get_ir_type(current_function_decl->type);
+
+	ir_node *value = NULL;
 	if(statement->return_value != NULL) {
-		ir_node *retval = expression_to_firm(statement->return_value);
-		ir_node *in[1];
-
-		in[0] = retval;
-		ret   = new_d_Return(dbgi, get_store(), 1, in);
-	} else {
-		ret   = new_d_Return(dbgi, get_store(), 0, NULL);
+		value = expression_to_firm(statement->return_value);
 	}
+
+	ir_node *in[1];
+	int      in_len;
+	if(get_method_n_ress(func_irtype) > 0) {
+		if(value == NULL) {
+			ir_type *res_type = get_method_res_type(func_irtype, 0);
+			ir_mode *mode     = get_type_mode(res_type);
+			value             = new_Unknown(mode);
+		}
+
+		in[0]  = value;
+		in_len = 1;
+	} else {
+		in_len = 0;
+	}
+
+	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
+	ir_node  *store = get_store();
+	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
+
 	ir_node *end_block = get_irg_end_block(current_ir_graph);
 	add_immBlock_pred(end_block, ret);
 
