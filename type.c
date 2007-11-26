@@ -40,7 +40,7 @@ void inc_type_visited(void)
 	type_visited++;
 }
 
-void print_type_qualifiers(unsigned qualifiers)
+void print_type_qualifiers(type_qualifiers_t qualifiers)
 {
 	if(qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
 	if(qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
@@ -262,32 +262,32 @@ static void intern_print_type_pre(type_t *type)
 		fputs("invalid", out);
 		return;
 	case TYPE_ENUM:
-		print_type_enum((enum_type_t*) type);
+		print_type_enum(&type->enumt);
 		return;
 	case TYPE_ATOMIC:
-		print_atomic_type((atomic_type_t*) type);
+		print_atomic_type(&type->atomic);
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		print_compound_type((compound_type_t*) type);
+		print_compound_type(&type->compound);
 		return;
 	case TYPE_BUILTIN:
-		fputs(((builtin_type_t*) type)->symbol->string, out);
+		fputs(type->builtin.symbol->string, out);
 		return;
 	case TYPE_FUNCTION:
-		print_function_type_pre((function_type_t*) type);
+		print_function_type_pre(&type->function);
 		return;
 	case TYPE_POINTER:
-		print_pointer_type_pre((pointer_type_t*) type);
+		print_pointer_type_pre(&type->pointer);
 		return;
 	case TYPE_ARRAY:
-		print_array_type_pre((array_type_t*) type);
+		print_array_type_pre(&type->array);
 		return;
 	case TYPE_TYPEDEF:
-		print_typedef_type_pre((typedef_type_t*) type);
+		print_typedef_type_pre(&type->typedeft);
 		return;
 	case TYPE_TYPEOF:
-		print_typeof_type_pre((typeof_type_t*) type);
+		print_typeof_type_pre(&type->typeoft);
 		return;
 	}
 	fputs("unknown", out);
@@ -297,13 +297,13 @@ static void intern_print_type_post(type_t *type)
 {
 	switch(type->type) {
 	case TYPE_FUNCTION:
-		print_function_type_post((const function_type_t*) type, NULL);
+		print_function_type_post(&type->function, NULL);
 		return;
 	case TYPE_POINTER:
-		print_pointer_type_post((const pointer_type_t*) type);
+		print_pointer_type_post(&type->pointer);
 		return;
 	case TYPE_ARRAY:
-		print_array_type_post((const array_type_t*) type);
+		print_array_type_post(&type->array);
 		return;
 	case TYPE_INVALID:
 	case TYPE_ATOMIC:
@@ -357,8 +357,7 @@ bool is_type_integer(const type_t *type)
 	if(type->type != TYPE_ATOMIC)
 		return false;
 
-	atomic_type_t *atomic_type = (atomic_type_t*) type;
-	switch(atomic_type->atype) {
+	switch(type->atomic.atype) {
 	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
@@ -384,8 +383,7 @@ bool is_type_floating(const type_t *type)
 	if(type->type != TYPE_ATOMIC)
 		return false;
 
-	atomic_type_t *atomic_type = (atomic_type_t*) type;
-	switch(atomic_type->atype) {
+	switch(type->atomic.atype) {
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
@@ -414,8 +412,7 @@ bool is_type_signed(const type_t *type)
 	if(type->type != TYPE_ATOMIC)
 		return false;
 
-	atomic_type_t *atomic_type = (atomic_type_t*) type;
-	switch(atomic_type->atype) {
+	switch(type->atomic.atype) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_SHORT:
@@ -479,19 +476,15 @@ bool is_type_incomplete(const type_t *type)
 	switch(type->type) {
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
-		const compound_type_t *compound_type
-			= (const compound_type_t*) type;
-		declaration_t *declaration = compound_type->declaration;
+		const compound_type_t *compound_type = &type->compound;
+		declaration_t         *declaration   = compound_type->declaration;
 		return !declaration->init.is_defined;
 	}
 	case TYPE_FUNCTION:
 		return true;
 
-	case TYPE_ARRAY: {
-		const array_type_t *array_type = (const array_type_t*) type;
-
-		return array_type->size == NULL;
-	}
+	case TYPE_ARRAY:
+		return type->array.size == NULL;
 
 	case TYPE_ATOMIC:
 	case TYPE_POINTER:
@@ -519,10 +512,7 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		return true;
 
 	if(type1->type == TYPE_ATOMIC && type2->type == TYPE_ATOMIC) {
-		const atomic_type_t *atomic1 = (const atomic_type_t*) type1;
-		const atomic_type_t *atomic2 = (const atomic_type_t*) type2;
-
-		return atomic1->atype == atomic2->atype;
+		return type1->atomic.atype == type2->atomic.atype;
 	}
 
 	return false;
@@ -535,12 +525,7 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 
 	assert(type1->type == TYPE_POINTER);
 	assert(type2->type == TYPE_POINTER);
-#if 0
-	pointer_type_t *pointer_type1 = (pointer_type_t*) type1;
-	pointer_type_t *pointer_type2 = (pointer_type_t*) type2;
-	return types_compatible(pointer_type1->points_to,
-	                        pointer_type2->points_to);
-#endif
+	/* TODO */
 	return true;
 }
 
@@ -580,13 +565,13 @@ static type_t *duplicate_type(type_t *type)
 
 type_t *skip_typeref(type_t *type)
 {
-	unsigned qualifiers = type->qualifiers;
+	unsigned qualifiers = type->base.qualifiers;
 
 	while(1) {
 		switch(type->type) {
 		case TYPE_TYPEDEF: {
-			qualifiers |= type->qualifiers;
-			const typedef_type_t *typedef_type = (const typedef_type_t*) type;
+			qualifiers |= type->base.qualifiers;
+			const typedef_type_t *typedef_type = &type->typedeft;
 			if(typedef_type->resolved_type != NULL) {
 				type = typedef_type->resolved_type;
 				break;
@@ -595,7 +580,7 @@ type_t *skip_typeref(type_t *type)
 			continue;
 		}
 		case TYPE_TYPEOF: {
-			const typeof_type_t *typeof_type = (const typeof_type_t *) type;
+			const typeof_type_t *typeof_type = &type->typeoft;
 			if(typeof_type->typeof_type != NULL) {
 				type = typeof_type->typeof_type;
 			} else {
@@ -604,7 +589,7 @@ type_t *skip_typeref(type_t *type)
 			continue;
 		}
 		case TYPE_BUILTIN: {
-			const builtin_type_t *builtin_type = (const builtin_type_t*) type;
+			const builtin_type_t *builtin_type = &type->builtin;
 			type = builtin_type->real_type;
 			continue;
 		}
@@ -628,28 +613,28 @@ static type_t *identify_new_type(type_t *type)
 	return result;
 }
 
-type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers)
+type_t *make_atomic_type(atomic_type_type_t atype, type_qualifiers_t qualifiers)
 {
-	atomic_type_t *atomic_type
-		= obstack_alloc(type_obst, sizeof(atomic_type[0]));
-	memset(atomic_type, 0, sizeof(atomic_type[0]));
-	atomic_type->type.type       = TYPE_ATOMIC;
-	atomic_type->type.qualifiers = qualifiers;
-	atomic_type->atype           = type;
+	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
+	memset(type, 0, sizeof(atomic_type_t));
 
-	return identify_new_type((type_t*) atomic_type);
+	type->type            = TYPE_ATOMIC;
+	type->base.qualifiers = qualifiers;
+	type->atomic.atype    = atype;
+
+	return identify_new_type(type);
 }
 
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 {
-	pointer_type_t *pointer_type
-		= obstack_alloc(type_obst, sizeof(pointer_type[0]));
-	memset(pointer_type, 0, sizeof(pointer_type[0]));
-	pointer_type->type.type       = TYPE_POINTER;
-	pointer_type->type.qualifiers = qualifiers;
-	pointer_type->points_to       = points_to;
+	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
+	memset(type, 0, sizeof(pointer_type_t));
 
-	return identify_new_type((type_t*) pointer_type);
+	type->type              = TYPE_POINTER;
+	type->base.qualifiers   = qualifiers;
+	type->pointer.points_to = points_to;
+
+	return identify_new_type(type);
 }
 
 static __attribute__((unused))

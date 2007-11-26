@@ -100,7 +100,7 @@ void init_ast2firm(void)
 	ir_type_void_ptr   = new_type_pointer(new_id_from_str("void_ptr"),
 	                                      ir_type_void, mode_P_data);
 
-	type_void->firm_type = ir_type_void;
+	type_void->base.firm_type = ir_type_void;
 
 	symbol_alloca = symbol_table_insert("__builtin_alloca");
 }
@@ -213,7 +213,7 @@ static unsigned get_atomic_type_size(const atomic_type_t *type)
 
 static unsigned get_compound_type_size(compound_type_t *type)
 {
-	ir_type *irtype = get_ir_type(&type->type);
+	ir_type *irtype = get_ir_type((type_t*) type);
 	return get_type_size_bytes(irtype);
 }
 
@@ -495,9 +495,9 @@ static ir_type *get_ir_type(type_t *type)
 
 	type = skip_typeref(type);
 
-	if(type->firm_type != NULL) {
-		assert(type->firm_type != INVALID_TYPE);
-		return type->firm_type;
+	if(type->base.firm_type != NULL) {
+		assert(type->base.firm_type != INVALID_TYPE);
+		return type->base.firm_type;
 	}
 
 	ir_type *firm_type = NULL;
@@ -532,7 +532,7 @@ static ir_type *get_ir_type(type_t *type)
 	if(firm_type == NULL)
 		panic("unknown type found");
 
-	type->firm_type = firm_type;
+	type->base.firm_type = firm_type;
 	return firm_type;
 }
 

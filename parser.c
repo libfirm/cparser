@@ -623,8 +623,8 @@ static int get_rank(const type_t *type)
 		return ATOMIC_TYPE_INT;
 
 	assert(type->type == TYPE_ATOMIC);
-	atomic_type_t      *atomic_type = (atomic_type_t*) type;
-	atomic_type_type_t  atype       = atomic_type->atype;
+	const atomic_type_t *atomic_type = &type->atomic;
+	atomic_type_type_t   atype       = atomic_type->atype;
 	return atype;
 }
 
@@ -706,9 +706,8 @@ static expression_t *create_implicit_cast(expression_t *expression,
 					break;
 
 				case TYPE_ARRAY: {
-					array_type_t   *array_type = (array_type_t*) source_type;
-					pointer_type_t *pointer_type
-						= (pointer_type_t*) dest_type;
+					array_type_t   *array_type   = &source_type->array;
+					pointer_type_t *pointer_type = &dest_type->pointer;
 					if (types_compatible(array_type->element_type,
 										 pointer_type->points_to)) {
 						return create_cast_expression(expression, dest_type);
@@ -766,7 +765,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 
 		/* the left type has all qualifiers from the right type */
 		unsigned missing_qualifiers
-			= points_to_right->qualifiers & ~points_to_left->qualifiers;
+			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 		if(missing_qualifiers != 0) {
 			parser_print_error_prefix();
 			fprintf(stderr, "destination type ");
@@ -953,11 +952,11 @@ static initializer_t *initializer_from_expression(type_t *type,
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
 	if(type->type == TYPE_ARRAY && expression->type == EXPR_STRING_LITERAL) {
-		array_type_t *array_type   = (array_type_t*) type;
+		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
 
 		if(element_type->type == TYPE_ATOMIC) {
-			atomic_type_t      *atomic_type = (atomic_type_t*) element_type;
+			atomic_type_t      *atomic_type = &element_type->atomic;
 			atomic_type_type_t  atype       = atomic_type->atype;
 
 			/* TODO handle wide strings */
@@ -1722,7 +1721,7 @@ finish_specifiers:
 		}
 	}
 
-	type->qualifiers = (type_qualifier_t)type_qualifiers;
+	type->base.qualifiers = (type_qualifier_t)type_qualifiers;
 
 	type_t *result = typehash_insert(type);
 	if(newtype && result != (type_t*) type) {
@@ -3774,7 +3773,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		fprintf(stderr, "')\n");
 		return;
 	}
-	if(type_left->qualifiers & TYPE_QUALIFIER_CONST) {
+	if(type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
 		parser_print_error_prefix();
 		fprintf(stderr, "assignment to readonly location '");
 		print_expression(left);

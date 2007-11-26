@@ -67,7 +67,7 @@ typedef enum {
 
 typedef unsigned int type_qualifiers_t;
 
-struct type_t {
+struct type_base_t {
 	type_type_t       type;
 	type_qualifiers_t qualifiers;
 
@@ -75,23 +75,23 @@ struct type_t {
 };
 
 struct atomic_type_t {
-	type_t              type;
+	type_base_t         type;
 	atomic_type_type_t  atype;
 };
 
 struct builtin_type_t {
-	type_t    type;
-	symbol_t *symbol;
-	type_t   *real_type;
+	type_base_t  type;
+	symbol_t    *symbol;
+	type_t      *real_type;
 };
 
 struct pointer_type_t {
-	type_t   type;
-	type_t  *points_to;
+	type_base_t  type;
+	type_t      *points_to;
 };
 
 struct array_type_t {
-	type_t        type;
+	type_base_t   type;
 	type_t       *element_type;
 	expression_t *size;
 	bool          is_static;
@@ -104,7 +104,7 @@ struct function_parameter_t {
 };
 
 struct function_type_t {
-	type_t                type;
+	type_base_t           type;
 	type_t               *result_type;
 	function_parameter_t *parameters;
 	bool                  variadic;
@@ -112,31 +112,45 @@ struct function_type_t {
 };
 
 struct compound_type_t {
-	type_t         type;
+	type_base_t    type;
 	/** the declaration of the compound type, its context field
-	 * contains the compound entries. */
+	 *  contains the compound entries. */
 	declaration_t *declaration;
 };
 
 struct enum_type_t {
-	type_t         type;
+	type_base_t    type;
 	/** the declaration of the enum type. You can find the enum entries by
-	 * walking the declaration->next list until you don't find
-	 * STORAGE_CLASS_ENUM_ENTRY declarations anymore */
+	 *  walking the declaration->next list until you don't find
+	 *  STORAGE_CLASS_ENUM_ENTRY declarations anymore */
 	declaration_t *declaration;
 };
 
 struct typedef_type_t {
-	type_t         type;
+	type_base_t    type;
 	declaration_t *declaration;
 	type_t        *resolved_type;
 };
 
 struct typeof_type_t {
-	type_t        type;
+	type_base_t   type;
 	expression_t *expression;
 	type_t       *typeof_type;
 	type_t       *resolved_type;
+};
+
+union type_t {
+	type_type_t      type;
+	type_base_t      base;
+	atomic_type_t    atomic;
+	builtin_type_t   builtin;
+	pointer_type_t   pointer;
+	array_type_t     array;
+	function_type_t  function;
+	compound_type_t  compound;
+	enum_type_t      enumt;
+	typedef_type_t   typedeft;
+	typeof_type_t    typeoft;
 };
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
@@ -153,7 +167,7 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 
 	if(type->type != TYPE_ATOMIC)
 		return false;
-	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
+	const atomic_type_t *atomic_type = &type->atomic;
 
 	return atomic_type->atype == atype;
 }
