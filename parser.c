@@ -777,6 +777,9 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		type_t         *points_to_left     = pointer_type_left->points_to;
 		type_t         *points_to_right    = pointer_type_right->points_to;
 
+		points_to_left  = skip_typeref(points_to_left);
+		points_to_right = skip_typeref(points_to_right);
+
 		if(!is_atomic_type(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_atomic_type(points_to_right, ATOMIC_TYPE_VOID)
 				&& !types_compatible(points_to_left, points_to_right)) {
