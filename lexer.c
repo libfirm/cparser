@@ -336,7 +336,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 	case 16:
 		for (;; ++s) {
 			/* check for overrun */
-			if (v <= 0x1000000000000000ULL)
+			if (v >= 0x1000000000000000ULL)
 				break;
 			switch (tolower(*s)) {
 			case '0': v <<= 4; break;
@@ -363,7 +363,7 @@ static unsigned long long parse_int_string(const char *s, const char **endptr, i
 	case 8:
 		for (;; ++s) {
 			/* check for overrun */
-			if (v <= 0x2000000000000000ULL)
+			if (v >= 0x2000000000000000ULL)
 				break;
 			switch (tolower(*s)) {
 			case '0': v <<= 3; break;
