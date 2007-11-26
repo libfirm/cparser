@@ -3188,6 +3188,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 				/* do default promotion */
 				for( ; argument != NULL; argument = argument->next) {
 					type_t *type = argument->expression->datatype;
+					type = skip_typeref(type);
 
 					if(type == NULL)
 						continue;
@@ -3197,6 +3198,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 					} else if(type == type_float) {
 						type = type_double;
 					}
+
 					argument->expression
 						= create_implicit_cast(argument->expression, type);
 				}

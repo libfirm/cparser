@@ -161,4 +161,9 @@ static inline bool is_type_compound(const type_t *type)
 		|| type->type == TYPE_COMPOUND_UNION;
 }
 
+static inline bool is_typeref(const type_t *type)
+{
+	return type->type == TYPE_TYPEDEF || type->type == TYPE_TYPEOF;
+}
+
 #endif

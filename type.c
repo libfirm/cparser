@@ -349,6 +349,8 @@ bool type_valid(const type_t *type)
 
 bool is_type_integer(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	if(type->type == TYPE_ENUM)
 		return true;
 
@@ -377,6 +379,8 @@ bool is_type_integer(const type_t *type)
 
 bool is_type_floating(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	if(type->type != TYPE_ATOMIC)
 		return false;
 
@@ -401,6 +405,8 @@ bool is_type_floating(const type_t *type)
 
 bool is_type_signed(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	/* enum types are int for now */
 	if(type->type == TYPE_ENUM)
 		return true;
@@ -448,6 +454,8 @@ bool is_type_signed(const type_t *type)
 
 bool is_type_arithmetic(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	if(is_type_integer(type) || is_type_floating(type))
 		return 1;
 
@@ -456,6 +464,8 @@ bool is_type_arithmetic(const type_t *type)
 
 bool is_type_scalar(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	if(type->type == TYPE_POINTER)
 		return 1;
 
@@ -464,6 +474,8 @@ bool is_type_scalar(const type_t *type)
 
 bool is_type_incomplete(const type_t *type)
 {
+	assert(!is_typeref(type));
+
 	switch(type->type) {
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
@@ -499,6 +511,9 @@ bool is_type_incomplete(const type_t *type)
 
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
+	assert(!is_typeref(type1));
+	assert(!is_typeref(type2));
+
 	/* TODO: really incomplete */
 	if(type1 == type2)
 		return true;
@@ -515,6 +530,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 
 bool pointers_compatible(const type_t *type1, const type_t *type2)
 {
+	assert(!is_typeref(type1));
+	assert(!is_typeref(type2));
+
 	assert(type1->type == TYPE_POINTER);
 	assert(type2->type == TYPE_POINTER);
 #if 0
