@@ -92,9 +92,9 @@ struct pointer_type_t {
 struct array_type_t {
 	type_t        type;
 	type_t       *element_type;
+	expression_t *size;
 	bool          is_static;
 	bool          is_variable;
-	expression_t *size;
 };
 
 struct function_parameter_t {
@@ -140,5 +140,25 @@ struct typeof_type_t {
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
+
+static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
+{
+	if(type->type != TYPE_ATOMIC)
+		return false;
+	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
+
+	return atomic_type->atype == atype;
+}
+
+static inline bool is_type_pointer(const type_t *type)
+{
+	return type->type == TYPE_POINTER;
+}
+
+static inline bool is_type_compound(const type_t *type)
+{
+	return type->type == TYPE_COMPOUND_STRUCT
+		|| type->type == TYPE_COMPOUND_UNION;
+}
 
 #endif

@@ -16,6 +16,7 @@
 #include "token_t.h"
 #include "type_t.h"
 #include "ast_t.h"
+#include "parser.h"
 
 #define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
 
@@ -218,7 +219,7 @@ static unsigned get_compound_type_size(compound_type_t *type)
 
 static unsigned get_array_type_size(array_type_t *type)
 {
-	ir_type *irtype = get_ir_type(&type->type);
+	ir_type *irtype = get_ir_type((type_t*) type);
 	return get_type_size_bytes(irtype);
 }
 
@@ -656,25 +657,20 @@ static ir_node *string_literal_to_firm(const string_literal_t* literal)
 	                      literal->value);
 }
 
-static ir_node *deref_address(type_t *const type, ir_node *const addr,
+static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
                               dbg_info *const dbgi)
 {
-	switch (type->type) {
-		case TYPE_ARRAY:
-		case TYPE_COMPOUND_STRUCT:
-		case TYPE_COMPOUND_UNION:
-			return addr;
-
-		default: {
-			ir_mode *const mode     = get_ir_mode(type);
-			ir_node *const memory   = get_store();
-			ir_node *const load     = new_d_Load(dbgi, memory, addr, mode);
-			ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
-			ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
-			set_store(load_mem);
-			return load_res;
-		}
+	if(is_compound_type(irtype) || is_Array_type(irtype)) {
+		return addr;
 	}
+
+	ir_mode *const mode     = get_type_mode(irtype);
+	ir_node *const memory   = get_store();
+	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode);
+	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
+	set_store(load_mem);
+	return load_res;
 }
 
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
@@ -706,13 +702,15 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
 		ir_entity *entity   = declaration->v.entity;
 		ir_node   *symconst = create_symconst(dbgi, entity);
-		return deref_address(type, symconst, dbgi);
+		ir_type   *irtype   = get_entity_type(entity);
+		return deref_address(irtype, symconst, dbgi);
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-		return deref_address(type, sel, dbgi);
+		ir_type   *irtype = get_entity_type(entity);
+		return deref_address(irtype, sel, dbgi);
 	}
 
 	case DECLARATION_TYPE_COMPOUND_MEMBER:
@@ -995,8 +993,10 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		}
 		return value_node;
 	}
-	case UNEXPR_DEREFERENCE:
-		return deref_address(type, value_node, dbgi);
+	case UNEXPR_DEREFERENCE: {
+		ir_type *irtype = get_ir_type(type);
+		return deref_address(irtype, value_node, dbgi);
+	}
 	case UNEXPR_POSTFIX_INCREMENT:
 	case UNEXPR_POSTFIX_DECREMENT:
 	case UNEXPR_PREFIX_INCREMENT:
@@ -1360,8 +1360,8 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	ir_node  *base_addr;
 	ir_node  *offset;
 
-	type_t   *type_left  = skip_typeref(expression->array_ref->datatype);
-	type_t   *type_right = skip_typeref(expression->index->datatype);
+	type_t *type_left  = skip_typeref(expression->array_ref->datatype);
+	type_t *type_right = skip_typeref(expression->index->datatype);
 
 	if(type_left->type == TYPE_POINTER || type_left->type == TYPE_ARRAY) {
 		base_addr = expression_to_firm(expression->array_ref);
@@ -1372,7 +1372,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 		base_addr = expression_to_firm(expression->index);
 		offset    = expression_to_firm(expression->array_ref);
 	}
-	offset    = create_conv(dbgi, offset, mode_Iu);
+	offset = create_conv(dbgi, offset, mode_Iu);
 
 	unsigned elem_size       = get_type_size(expression->expression.datatype);
 	ir_node *elem_size_const = new_Const_long(mode_Iu, elem_size);
@@ -1386,10 +1386,14 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 static ir_node *array_access_to_firm(
 		const array_access_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-	ir_node  *addr = array_access_addr(expression);
-	type_t   *type = skip_typeref(expression->expression.datatype);
-	return deref_address(type, addr, dbgi);
+	dbg_info *dbgi   = get_dbg_info(&expression->expression.source_position);
+	ir_node  *addr   = array_access_addr(expression);
+	type_t   *type   = revert_automatic_type_conversion(
+			(const expression_t*) expression);
+	type             = skip_typeref(type);
+	ir_type  *irtype = get_ir_type(type);
+
+	return deref_address(irtype, addr, dbgi);
 }
 
 static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
@@ -1467,10 +1471,14 @@ static ir_node *select_addr(const select_expression_t *expression)
 
 static ir_node *select_to_firm(const select_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-	ir_node  *addr = select_addr(expression);
-	type_t   *type = skip_typeref(expression->expression.datatype);
-	return deref_address(type, addr, dbgi);
+	dbg_info *dbgi   = get_dbg_info(&expression->expression.source_position);
+	ir_node  *addr   = select_addr(expression);
+	type_t   *type   = revert_automatic_type_conversion(
+			(const expression_t*) expression);
+	type             = skip_typeref(type);
+	ir_type  *irtype = get_ir_type(type);
+
+	return deref_address(irtype, addr, dbgi);
 }
 
 /* Values returned by __builtin_classify_type. */
@@ -2155,7 +2163,8 @@ static void create_initializer_array(initializer_list_t *initializer,
 	entry.prev = last_entry;
 	++len;
 
-	for(size_t i = 0; i < initializer->len; ++i) {
+	size_t i;
+	for(i = 0; i < initializer->len; ++i) {
 		entry.v.array_index = i;
 
 		initializer_t *sub_initializer = initializer->initializers[i];
@@ -2168,6 +2177,16 @@ static void create_initializer_array(initializer_list_t *initializer,
 			                          &entry, len);
 		}
 	}
+
+#if 0
+	/* TODO: initializer rest... */
+	if(type->size_expression != NULL) {
+		size_t array_len = fold_constant(type->size_expression);
+		for( ; i < array_len; ++i) {
+
+		}
+	}
+#endif
 }
 
 static void create_initializer_string(initializer_string_t *initializer,

@@ -42,7 +42,7 @@ static type_t         *type_uint        = NULL;
 static type_t         *type_long_double = NULL;
 static type_t         *type_double      = NULL;
 static type_t         *type_float       = NULL;
-static type_t         *type_const_char  = NULL;
+static type_t         *type_char        = NULL;
 static type_t         *type_string      = NULL;
 static type_t         *type_void        = NULL;
 static type_t         *type_void_ptr    = NULL;
@@ -685,8 +685,7 @@ static expression_t *create_implicit_cast(expression_t *expression,
 
 			if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
 				type_error_incompatible("can't cast types",
-																expression->source_position,
-																source_type, dest_type);
+						expression->source_position, source_type, dest_type);
 				return expression;
 			}
 
@@ -722,33 +721,12 @@ static expression_t *create_implicit_cast(expression_t *expression,
 			}
 
 			type_error_incompatible("can't implicitly cast types",
-															expression->source_position,
-															source_type, dest_type);
+					expression->source_position, source_type, dest_type);
 			return expression;
 
 		default:
 			panic("casting of non-atomic types not implemented yet");
 	}
-}
-
-static bool is_atomic_type(const type_t *type, atomic_type_type_t atype)
-{
-	if(type->type != TYPE_ATOMIC)
-		return false;
-	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
-
-	return atomic_type->atype == atype;
-}
-
-static bool is_pointer(const type_t *type)
-{
-	return type->type == TYPE_POINTER;
-}
-
-static bool is_compound_type(const type_t *type)
-{
-	return type->type == TYPE_COMPOUND_STRUCT
-		|| type->type == TYPE_COMPOUND_UNION;
 }
 
 /** Implements the rules from § 6.5.16.1 */
@@ -764,14 +742,14 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	type_t *const type_right = skip_typeref(orig_type_right);
 
 	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (is_pointer(type_left) && is_null_expression(*right)) ||
-	    (is_atomic_type(type_left, ATOMIC_TYPE_BOOL)
-	     	&& is_pointer(type_right))) {
+	    (is_type_pointer(type_left) && is_null_expression(*right)) ||
+	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
+	     	&& is_type_pointer(type_right))) {
 		*right = create_implicit_cast(*right, type_left);
 		return;
 	}
 
-	if (is_pointer(type_left) && is_pointer(type_right)) {
+	if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		pointer_type_t *pointer_type_left  = (pointer_type_t*) type_left;
 		pointer_type_t *pointer_type_right = (pointer_type_t*) type_right;
 		type_t         *points_to_left     = pointer_type_left->points_to;
@@ -780,8 +758,8 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		points_to_left  = skip_typeref(points_to_left);
 		points_to_right = skip_typeref(points_to_right);
 
-		if(!is_atomic_type(points_to_left, ATOMIC_TYPE_VOID)
-				&& !is_atomic_type(points_to_right, ATOMIC_TYPE_VOID)
+		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
+				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
 				&& !types_compatible(points_to_left, points_to_right)) {
 			goto incompatible_assign_types;
 		}
@@ -805,7 +783,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		return;
 	}
 
-	if (is_compound_type(type_left)
+	if (is_type_compound(type_left)
 			&& types_compatible(type_left, type_right)) {
 		*right = create_implicit_cast(*right, type_left);
 		return;
@@ -971,7 +949,6 @@ static initializer_t *initializer_from_string(array_type_t *type,
 static initializer_t *initializer_from_expression(type_t *type,
                                                   expression_t *expression)
 {
-
 	/* TODO check that expression is a constant expression */
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
@@ -1148,6 +1125,8 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			if(token.type == '}')
 				break;
 			expect_block(',');
+			if(token.type == '}')
+				break;
 
 			type_t *iter_type = iter->type;
 			iter_type         = skip_typeref(iter_type);
@@ -1805,8 +1784,8 @@ static declaration_t *parse_parameter(void)
 	if (declaration->type->type == TYPE_ARRAY) {
 		const array_type_t *const arr_type =
 			(const array_type_t*)declaration->type;
-		declaration->type =
-			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
+		type_t *element_type = arr_type->element_type;
+		declaration->type = make_pointer_type(element_type, TYPE_QUALIFIER_NONE);
 	}
 
 	return declaration;
@@ -2530,6 +2509,110 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	return declaration;
 }
 
+static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
+{
+	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
+	parameter->type = argument_type;
+
+	function_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type   = TYPE_FUNCTION;
+	type->result_type = result_type;
+	type->parameters  = parameter;
+
+	type_t *result = typehash_insert((type_t*) type);
+	if(result != (type_t*) type) {
+		free_type(type);
+	}
+
+	return result;
+}
+
+static type_t *get_builtin_symbol_type(symbol_t *symbol)
+{
+	switch(symbol->ID) {
+	case T___builtin_alloca:
+		return make_function_1_type(type_void_ptr, type_size_t);
+	default:
+		panic("not implemented builtin symbol found");
+	}
+}
+
+/**
+ * performs automatic type cast as described in § 6.3.2.1
+ */
+static type_t *automatic_type_conversion(type_t *type)
+{
+	if(type == NULL)
+		return NULL;
+
+	if(type->type == TYPE_ARRAY) {
+		array_type_t *array_type   = (array_type_t*) type;
+		type_t       *element_type = array_type->element_type;
+		unsigned      qualifiers   = array_type->type.qualifiers;
+
+		return make_pointer_type(element_type, qualifiers);
+	}
+
+	if(type->type == TYPE_FUNCTION) {
+		return make_pointer_type(type, TYPE_QUALIFIER_NONE);
+	}
+
+	return type;
+}
+
+/**
+ * reverts the automatic casts of array to pointer types and function
+ * to function-pointer types as defined § 6.3.2.1
+ */
+type_t *revert_automatic_type_conversion(const expression_t *expression)
+{
+	if(expression->datatype == NULL)
+		return NULL;
+
+	switch(expression->type) {
+	case EXPR_REFERENCE: {
+		const reference_expression_t *ref
+			= (const reference_expression_t*) expression;
+		return ref->declaration->type;
+	}
+	case EXPR_SELECT: {
+		const select_expression_t *select
+			= (const select_expression_t*) expression;
+		return select->compound_entry->type;
+	}
+	case EXPR_UNARY: {
+		const unary_expression_t *unary
+			= (const unary_expression_t*) expression;
+		if(unary->type == UNEXPR_DEREFERENCE) {
+			expression_t   *value        = unary->value;
+			type_t         *type         = skip_typeref(value->datatype);
+			pointer_type_t *pointer_type = (pointer_type_t*) type;
+
+			return pointer_type->points_to;
+		}
+		break;
+	}
+	case EXPR_BUILTIN_SYMBOL: {
+		const builtin_symbol_expression_t *builtin
+			= (const builtin_symbol_expression_t*) expression;
+		return get_builtin_symbol_type(builtin->symbol);
+	}
+	case EXPR_ARRAY_ACCESS: {
+		const array_access_expression_t *array_access
+			= (const array_access_expression_t*) expression;
+		type_t *type_left  = skip_typeref(array_access->array_ref->datatype);
+		assert(is_type_pointer(type_left));
+		pointer_type_t *pointer_type = (pointer_type_t*) type_left;
+		return pointer_type->points_to;
+	}
+
+	default:
+		break;
+	}
+
+	return expression->datatype;
+}
+
 static expression_t *parse_reference(void)
 {
 	reference_expression_t *ref = allocate_ast_zero(sizeof(ref[0]));
@@ -2561,8 +2644,13 @@ static expression_t *parse_reference(void)
 		}
 	}
 
+	type_t *type = declaration->type;
+	/* we always do the auto-type conversions; the & and sizeof parser contains
+	 * code to revert this! */
+	type = automatic_type_conversion(type);
+
 	ref->declaration         = declaration;
-	ref->expression.datatype = declaration->type;
+	ref->expression.datatype = type;
 
 	return (expression_t*) ref;
 }
@@ -2772,24 +2860,6 @@ static expression_t *parse_va_arg(void)
 	return (expression_t*) expression;
 }
 
-static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
-{
-	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
-	parameter->type = argument_type;
-
-	function_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type   = TYPE_FUNCTION;
-	type->result_type = result_type;
-	type->parameters  = parameter;
-
-	type_t *result = typehash_insert((type_t*) type);
-	if(result != (type_t*) type) {
-		free_type(type);
-	}
-
-	return result;
-}
-
 static expression_t *parse_builtin_symbol(void)
 {
 	builtin_symbol_expression_t *expression
@@ -2797,15 +2867,10 @@ static expression_t *parse_builtin_symbol(void)
 	expression->expression.type = EXPR_BUILTIN_SYMBOL;
 
 	expression->symbol = token.v.symbol;
-
-	type_t *type;
-	switch(token.type) {
-	case T___builtin_alloca:
-		type = make_function_1_type(type_void_ptr, type_size_t);
-		break;
-	}
-
 	next_token();
+
+	type_t *type = get_builtin_symbol_type(expression->symbol);
+	type = automatic_type_conversion(type);
 
 	expression->expression.datatype = type;
 	return (expression_t*) expression;
@@ -2851,45 +2916,46 @@ static expression_t *parse_primary_expression(void)
 }
 
 static expression_t *parse_array_expression(unsigned precedence,
-                                            expression_t *array_ref)
+                                            expression_t *left)
 {
 	(void) precedence;
 
 	eat('[');
 
-	expression_t *index = parse_expression();
+	expression_t *inside = parse_expression();
 
 	array_access_expression_t *array_access
 		= allocate_ast_zero(sizeof(array_access[0]));
 
 	array_access->expression.type = EXPR_ARRAY_ACCESS;
-	array_access->array_ref       = array_ref;
-	array_access->index           = index;
 
-	type_t *type_left  = skip_typeref(array_ref->datatype);
-	type_t *type_right = skip_typeref(index->datatype);
+	type_t *type_left   = skip_typeref(left->datatype);
+	type_t *type_inside = skip_typeref(inside->datatype);
+	type_t *result_type;
 
-	if(type_left != NULL && type_right != NULL) {
-		if(type_left->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) type_left;
-			array_access->expression.datatype = pointer->points_to;
-		} else if(type_left->type == TYPE_ARRAY) {
-			array_type_t *array_type          = (array_type_t*) type_left;
-			array_access->expression.datatype = array_type->element_type;
-		} else if(type_right->type == TYPE_POINTER) {
-			pointer_type_t *pointer           = (pointer_type_t*) type_right;
-			array_access->expression.datatype = pointer->points_to;
-		} else if(type_right->type == TYPE_ARRAY) {
-			array_type_t *array_type          = (array_type_t*) type_right;
-			array_access->expression.datatype = array_type->element_type;
+	if(type_left != NULL && type_inside != NULL) {
+		if(is_type_pointer(type_left)) {
+			pointer_type_t *pointer = (pointer_type_t*) type_left;
+			result_type             = pointer->points_to;
+			array_access->array_ref = left;
+			array_access->index     = inside;
+		} else if(is_type_pointer(type_inside)) {
+			pointer_type_t *pointer = (pointer_type_t*) type_inside;
+			result_type             = pointer->points_to;
+			array_access->array_ref = inside;
+			array_access->index     = left;
+			array_access->flipped   = true;
 		} else {
 			parser_print_error_prefix();
 			fprintf(stderr, "array access on object with non-pointer types ");
 			print_type_quoted(type_left);
 			fprintf(stderr, ", ");
-			print_type_quoted(type_right);
+			print_type_quoted(type_inside);
 			fprintf(stderr, "\n");
 		}
+	} else {
+		array_access->array_ref = left;
+		array_access->index     = inside;
 	}
 
 	if(token.type != ']') {
@@ -2897,6 +2963,9 @@ static expression_t *parse_array_expression(unsigned precedence,
 		return (expression_t*) array_access;
 	}
 	next_token();
+
+	result_type = automatic_type_conversion(result_type);
+	array_access->expression.datatype = result_type;
 
 	return (expression_t*) array_access;
 }
@@ -2934,7 +3003,9 @@ static expression_t *parse_sizeof(unsigned precedence)
 		sizeof_expression->type = parse_typename();
 		expect(')');
 	} else {
-		expression_t *expression           = parse_sub_expression(precedence);
+		expression_t *expression = parse_sub_expression(precedence);
+		expression->datatype     = revert_automatic_type_conversion(expression);
+
 		sizeof_expression->type            = expression->datatype;
 		sizeof_expression->size_expression = expression;
 	}
@@ -3019,8 +3090,12 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return make_invalid_expression();
 	}
 
+	/* we always do the auto-type conversions; the & and sizeof parser contains
+	 * code to revert this! */
+	type_t *expression_type = automatic_type_conversion(iter->type);
+
 	select->compound_entry      = iter;
-	select->expression.datatype = iter->type;
+	select->expression.datatype = expression_type;
 	return (expression_t*) select;
 }
 
@@ -3034,26 +3109,31 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 	function_type_t *function_type;
 	type_t          *orig_type     = expression->datatype;
-	type_t          *type          = skip_typeref(orig_type);
+	if(orig_type != NULL) {
+		function_type = NULL;
+		type_t *type  = skip_typeref(orig_type);
 
-	if(type->type == TYPE_POINTER) {
-		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		if(is_type_pointer(type)) {
+			pointer_type_t *pointer_type = (pointer_type_t*) type;
 
-		type = skip_typeref(pointer_type->points_to);
-	}
-	if (type->type == TYPE_FUNCTION) {
-		function_type             = (function_type_t*) type;
-		call->expression.datatype = function_type->result_type;
-	} else {
-		parser_print_error_prefix();
-		fputs("called object '", stderr);
-		print_expression(expression);
-		fputs("' (type ", stderr);
-		print_type_quoted(orig_type);
-		fputs(") is not a function\n", stderr);
+			type = skip_typeref(pointer_type->points_to);
 
-		function_type             = NULL;
-		call->expression.datatype = NULL;
+			if (type->type == TYPE_FUNCTION) {
+				function_type             = (function_type_t*) type;
+				call->expression.datatype = function_type->result_type;
+			}
+		}
+		if(function_type == NULL) {
+			parser_print_error_prefix();
+			fputs("called object '", stderr);
+			print_expression(expression);
+			fputs("' (type ", stderr);
+			print_type_quoted(orig_type);
+			fputs(") is not a pointer to a function\n", stderr);
+
+			function_type             = NULL;
+			call->expression.datatype = NULL;
+		}
 	}
 
 	/* parse arguments */
@@ -3292,35 +3372,30 @@ static void semantic_dereference(unary_expression_t *expression)
 		return;
 
 	type_t *type = skip_typeref(orig_type);
-	switch (type->type) {
-		case TYPE_ARRAY: {
-			array_type_t *const array_type  = (array_type_t*)type;
-			expression->expression.datatype = array_type->element_type;
-			break;
-		}
-
-		case TYPE_POINTER: {
-			pointer_type_t *pointer_type    = (pointer_type_t*)type;
-			expression->expression.datatype = pointer_type->points_to;
-			break;
-		}
-
-		default:
-			parser_print_error_prefix();
-			fputs("'Unary *' needs pointer or arrray type, but type ", stderr);
-			print_type_quoted(orig_type);
-			fputs(" given.\n", stderr);
-			return;
+	if(!is_type_pointer(type)) {
+		parser_print_error_prefix();
+		fputs("'Unary *' needs pointer or arrray type, but type ", stderr);
+		print_type_quoted(orig_type);
+		fputs(" given.\n", stderr);
+		return;
 	}
+
+	pointer_type_t *pointer_type = (pointer_type_t*)type;
+	type_t         *result_type  = pointer_type->points_to;
+
+	result_type = automatic_type_conversion(result_type);
+	expression->expression.datatype = result_type;
 }
 
 static void semantic_take_addr(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->datatype;
+	expression_t *value = expression->value;
+	value->datatype     = revert_automatic_type_conversion(value);
+
+	type_t *orig_type = value->datatype;
 	if(orig_type == NULL)
 		return;
 
-	expression_t *value = expression->value;
 	if(value->type == EXPR_REFERENCE) {
 		reference_expression_t *reference   = (reference_expression_t*) value;
 		declaration_t          *declaration = reference->declaration;
@@ -3494,18 +3569,10 @@ static void semantic_add(binary_expression_t *expression)
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = arithmetic_type;
 		return;
-	} else if(type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+	} else if(is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->expression.datatype = type_left;
-	} else if(type_right->type == TYPE_POINTER && is_type_integer(type_left)) {
+	} else if(is_type_pointer(type_right) && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
-	} else if (type_left->type == TYPE_ARRAY && is_type_integer(type_right)) {
-		const array_type_t *const arr_type = (const array_type_t*)type_left;
-		expression->expression.datatype =
-		  make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
-	} else if (type_right->type == TYPE_ARRAY && is_type_integer(type_left)) {
-		const array_type_t *const arr_type = (const array_type_t*)type_right;
-		expression->expression.datatype =
-			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary + (");
@@ -3679,6 +3746,13 @@ static void semantic_logical_op(binary_expression_t *expression)
 	expression->expression.datatype = type_int;
 }
 
+static bool has_const_fields(type_t *type)
+{
+	(void) type;
+	/* TODO */
+	return false;
+}
+
 static void semantic_binexpr_assign(binary_expression_t *expression)
 {
 	expression_t *left           = expression->left;
@@ -3687,13 +3761,17 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	if(orig_type_left == NULL)
 		return;
 
-	type_t *type_left = skip_typeref(orig_type_left);
+	type_t *type_left = revert_automatic_type_conversion(left);
+	type_left = skip_typeref(orig_type_left);
 
+	/* must be a modifiable lvalue */
 	if (type_left->type == TYPE_ARRAY) {
-		parse_error("Cannot assign to arrays.");
+		parser_print_error_prefix();
+		fprintf(stderr, "Cannot assign to arrays ('");
+		print_expression(left);
+		fprintf(stderr, "')\n");
 		return;
 	}
-
 	if(type_left->qualifiers & TYPE_QUALIFIER_CONST) {
 		parser_print_error_prefix();
 		fprintf(stderr, "assignment to readonly location '");
@@ -3701,6 +3779,25 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		fprintf(stderr, "' (type ");
 		print_type_quoted(orig_type_left);
 		fprintf(stderr, ")\n");
+		return;
+	}
+	if(is_type_incomplete(type_left)) {
+		parser_print_error_prefix();
+		fprintf(stderr, "left-hand side of assignment '");
+		print_expression(left);
+		fprintf(stderr, "' has incomplete type ");
+		print_type_quoted(orig_type_left);
+		fprintf(stderr, "\n");
+		return;
+	}
+	if(is_type_compound(type_left) && has_const_fields(type_left)) {
+		parser_print_error_prefix();
+		fprintf(stderr, "can't assign to '");
+		print_expression(left);
+		fprintf(stderr, "' because compound type ");
+		print_type_quoted(orig_type_left);
+		fprintf(stderr, " has readonly fields\n");
+		return;
 	}
 
 	semantic_assign(orig_type_left, &expression->right, "assignment");
@@ -4462,10 +4559,10 @@ void init_parser(void)
 	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
 	type_size_t      = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE);
 	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE);
-	type_const_char  = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
+	type_char        = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_NONE);
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
 	type_void_ptr    = make_pointer_type(type_void, TYPE_QUALIFIER_NONE);
-	type_string      = make_pointer_type(type_const_char, TYPE_QUALIFIER_NONE);
+	type_string      = make_pointer_type(type_char, TYPE_QUALIFIER_NONE);
 }
 
 void exit_parser(void)

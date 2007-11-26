@@ -154,6 +154,7 @@ struct array_access_expression_t {
 	expression_t  expression;
 	expression_t *array_ref;
 	expression_t *index;
+	bool          flipped; /* index/ref was written in a 5[a] way */
 };
 
 struct sizeof_expression_t {

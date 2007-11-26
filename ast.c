@@ -176,11 +176,19 @@ static void print_reference_expression(const reference_expression_t *ref)
 
 static void print_array_expression(const array_access_expression_t *expression)
 {
-	fputs("(", out);
-	print_expression(expression->array_ref);
-	fputs(")[", out);
-	print_expression(expression->index);
-	fputs("]", out);
+	if(!expression->flipped) {
+		fputs("(", out);
+		print_expression(expression->array_ref);
+		fputs(")[", out);
+		print_expression(expression->index);
+		fputs("]", out);
+	} else {
+		fputs("(", out);
+		print_expression(expression->index);
+		fputs(")[", out);
+		print_expression(expression->array_ref);
+		fputs("]", out);
+	}
 }
 
 static void print_sizeof_expression(const sizeof_expression_t *expression)
