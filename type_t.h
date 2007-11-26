@@ -25,7 +25,8 @@ typedef enum {
 	TYPE_ARRAY,
 	TYPE_BUILTIN,
 	TYPE_TYPEDEF,
-	TYPE_TYPEOF
+	TYPE_TYPEOF,
+	TYPE_COUNT
 } type_type_t;
 
 /* note that the constant values represent the rank of the types as defined

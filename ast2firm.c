@@ -245,6 +245,7 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
+	case TYPE_COUNT:
 	case TYPE_INVALID:
 		break;
 	}
@@ -526,6 +527,7 @@ static ir_type *get_ir_type(type_t *type)
 	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
+	case TYPE_COUNT:
 	case TYPE_INVALID:
 		break;
 	}

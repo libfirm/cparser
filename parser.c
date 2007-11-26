@@ -106,33 +106,55 @@ static type_t       *parse_typename(void);
 	TYPE_QUALIFIERS         \
 	TYPE_SPECIFIERS
 
-static inline void *allocate_ast_zero(size_t size)
+static void *allocate_ast_zero(size_t size)
 {
 	void *res = allocate_ast(size);
 	memset(res, 0, size);
 	return res;
 }
 
-static inline void *allocate_type_zero(size_t size)
+static size_t get_type_struct_size(type_type_t type)
 {
-	void *res = obstack_alloc(type_obst, size);
+	static const size_t sizes[] = {
+		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
+		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
+		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
+		[TYPE_ENUM]            = sizeof(enum_type_t),
+		[TYPE_FUNCTION]        = sizeof(function_type_t),
+		[TYPE_POINTER]         = sizeof(pointer_type_t),
+		[TYPE_ARRAY]           = sizeof(array_type_t),
+		[TYPE_BUILTIN]         = sizeof(builtin_type_t),
+		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
+		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
+	};
+	assert(type < TYPE_COUNT);
+	assert(sizes[type] != 0);
+	return sizes[type];
+}
+
+static type_t *allocate_type_zero(type_type_t type)
+{
+	size_t  size = get_type_struct_size(type);
+	type_t *res  = obstack_alloc(type_obst, size);
 	memset(res, 0, size);
+
+	res->base.type = type;
 	return res;
 }
 
-static inline size_t get_initializer_size(initializer_type_t type)
+static size_t get_initializer_size(initializer_type_t type)
 {
-	static const size_t size[] = {
+	static const size_t sizes[] = {
 		[INITIALIZER_VALUE]  = sizeof(initializer_value_t),
 		[INITIALIZER_STRING] = sizeof(initializer_string_t),
 		[INITIALIZER_LIST]   = sizeof(initializer_list_t)
 	};
 	assert(type < INITIALIZER_COUNT);
-	assert(size[type] != 0);
-	return size[type];
+	assert(sizes[type] != 0);
+	return sizes[type];
 }
 
-static inline initializer_t *allocate_initializer(initializer_type_t type)
+static initializer_t *allocate_initializer(initializer_type_t type)
 {
 	initializer_t *result = allocate_ast_zero(get_initializer_size(type));
 	result->type          = type;
@@ -140,7 +162,7 @@ static inline initializer_t *allocate_initializer(initializer_type_t type)
 	return result;
 }
 
-static inline void free_type(void *type)
+static void free_type(void *type)
 {
 	obstack_free(type_obst, type);
 }
@@ -148,12 +170,12 @@ static inline void free_type(void *type)
 /**
  * returns the top element of the environment stack
  */
-static inline size_t environment_top(void)
+static size_t environment_top(void)
 {
 	return ARR_LEN(environment_stack);
 }
 
-static inline size_t label_top(void)
+static size_t label_top(void)
 {
 	return ARR_LEN(label_stack);
 }
@@ -1231,7 +1253,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if(declaration == NULL) {
-		declaration = allocate_type_zero(sizeof(declaration[0]));
+		declaration = allocate_ast_zero(sizeof(declaration[0]));
 
 		if(is_struct) {
 			declaration->namespc = NAMESPACE_STRUCT;
@@ -1331,16 +1353,15 @@ static type_t *parse_enum_specifier(void)
 	}
 
 	if(declaration == NULL) {
-		declaration = allocate_type_zero(sizeof(declaration[0]));
+		declaration = allocate_ast_zero(sizeof(declaration[0]));
 
 		declaration->namespc       = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
 	}
 
-	enum_type_t *const enum_type = allocate_type_zero(sizeof(enum_type[0]));
-	enum_type->type.type         = TYPE_ENUM;
-	enum_type->declaration       = declaration;
+	type_t *const type      = allocate_type_zero(TYPE_ENUM);
+	type->enumt.declaration = declaration;
 
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
@@ -1351,11 +1372,11 @@ static type_t *parse_enum_specifier(void)
 		record_declaration(declaration);
 		declaration->init.is_defined = 1;
 
-		parse_enum_entries(enum_type);
+		parse_enum_entries(&type->enumt);
 		parse_attributes();
 	}
 
-	return (type_t*) enum_type;
+	return type;
 }
 
 /**
@@ -1411,12 +1432,11 @@ restart:
 
 	expect(')');
 
-	typeof_type_t *typeof = allocate_type_zero(sizeof(typeof[0]));
-	typeof->type.type     = TYPE_TYPEOF;
-	typeof->expression    = expression;
-	typeof->typeof_type   = type;
+	type_t *typeof              = allocate_type_zero(TYPE_TYPEOF);
+	typeof->typeoft.expression  = expression;
+	typeof->typeoft.typeof_type = type;
 
-	return (type_t*) typeof;
+	return typeof;
 }
 
 typedef enum {
@@ -1439,13 +1459,12 @@ typedef enum {
 
 static type_t *create_builtin_type(symbol_t *symbol)
 {
-	builtin_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type      = TYPE_BUILTIN;
-	type->symbol         = symbol;
+	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
+	type->builtin.symbol    = symbol;
 	/* TODO... */
-	type->real_type      = type_int;
+	type->builtin.real_type = type_int;
 
-	return (type_t*) type;
+	return type;
 }
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -1455,19 +1474,18 @@ static type_t *get_typedef_type(symbol_t *symbol)
 			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
-	typedef_type_t *typedef_type = allocate_type_zero(sizeof(typedef_type[0]));
-	typedef_type->type.type    = TYPE_TYPEDEF;
-	typedef_type->declaration  = declaration;
+	type_t *type               = allocate_type_zero(TYPE_TYPEDEF);
+	type->typedeft.declaration = declaration;
 
-	return (type_t*) typedef_type;
+	return type;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t        *type            = NULL;
-	unsigned       type_qualifiers = 0;
-	unsigned       type_specifiers = 0;
-	int            newtype         = 0;
+	type_t   *type            = NULL;
+	unsigned  type_qualifiers = 0;
+	unsigned  type_specifiers = 0;
+	int       newtype         = 0;
 
 	while(true) {
 		switch(token.type) {
@@ -1548,19 +1566,15 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* TODO: if type != NULL for the following rules should issue
 		 * an error */
 		case T_struct: {
-			type = allocate_type_zero(sizeof(struct compound_type_t));
+			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
 
-			compound_type_t *compound_type = (compound_type_t*) type;
-			compound_type->type.type   = TYPE_COMPOUND_STRUCT;
-			compound_type->declaration = parse_compound_type_specifier(true);
+			type->compound.declaration = parse_compound_type_specifier(true);
 			break;
 		}
 		case T_union: {
-			type = allocate_type_zero(sizeof(compound_type_t));
+			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
 
-			compound_type_t *compound_type = (compound_type_t*) type;
-			compound_type->type.type   = TYPE_COMPOUND_UNION;
-			compound_type->declaration = parse_compound_type_specifier(false);
+			type->compound.declaration = parse_compound_type_specifier(false);
 			break;
 		}
 		case T_enum:
@@ -1709,22 +1723,19 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		atomic_type_t *atype = allocate_type_zero(sizeof(atype[0]));
-		atype->type.type     = TYPE_ATOMIC;
-		atype->atype         = atomic_type;
-		newtype              = 1;
-
-		type = (type_t*) atype;
+		type               = allocate_type_zero(TYPE_ATOMIC);
+		type->atomic.atype = atomic_type;
+		newtype            = 1;
 	} else {
 		if(type_specifiers != 0) {
 			parse_error("multiple datatypes in declaration");
 		}
 	}
 
-	type->base.qualifiers = (type_qualifier_t)type_qualifiers;
+	type->base.qualifiers = type_qualifiers;
 
 	type_t *result = typehash_insert(type);
-	if(newtype && result != (type_t*) type) {
+	if(newtype && result != type) {
 		free_type(type);
 	}
 
@@ -1828,7 +1839,8 @@ static declaration_t *parse_parameters(function_type_t *type)
 		DECLARATION_START
 			declaration = parse_parameter();
 
-			parameter       = allocate_type_zero(sizeof(parameter[0]));
+			parameter       = obstack_alloc(type_obst, sizeof(parameter[0]));
+			memset(parameter, 0, sizeof(parameter[0]));
 			parameter->type = declaration->type;
 
 			if(last_parameter != NULL) {
@@ -1872,8 +1884,8 @@ struct parsed_pointer_t {
 
 typedef struct construct_function_type_t construct_function_type_t;
 struct construct_function_type_t {
-	construct_type_t    construct_type;
-	function_type_t    *function_type;
+	construct_type_t  construct_type;
+	type_t           *function_type;
 };
 
 typedef struct parsed_array_t parsed_array_t;
@@ -1941,10 +1953,9 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	function_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type       = TYPE_FUNCTION;
+	type_t *type = allocate_type_zero(TYPE_FUNCTION);
 
-	declaration_t *parameters = parse_parameters(type);
+	declaration_t *parameters = parse_parameters(&type->function);
 	if(declaration != NULL) {
 		declaration->context.declarations = parameters;
 	}
@@ -2063,49 +2074,47 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 {
 	construct_type_t *iter = construct_list;
 	for( ; iter != NULL; iter = iter->next) {
-		parsed_pointer_t          *parsed_pointer;
-		parsed_array_t            *parsed_array;
-		construct_function_type_t *construct_function_type;
-		function_type_t           *function_type;
-		pointer_type_t            *pointer_type;
-		array_type_t              *array_type;
-
 		switch(iter->type) {
 		case CONSTRUCT_INVALID:
 			panic("invalid type construction found");
-		case CONSTRUCT_FUNCTION:
-			construct_function_type = (construct_function_type_t*) iter;
-			function_type           = construct_function_type->function_type;
+		case CONSTRUCT_FUNCTION: {
+			construct_function_type_t *construct_function_type
+				= (construct_function_type_t*) iter;
 
-			function_type->result_type = type;
-			type                       = (type_t*) function_type;
-			break;
+			type_t *function_type = construct_function_type->function_type;
 
-		case CONSTRUCT_POINTER:
-			parsed_pointer = (parsed_pointer_t*) iter;
-			pointer_type   = allocate_type_zero(sizeof(pointer_type[0]));
+			function_type->function.result_type = type;
 
-			pointer_type->type.type       = TYPE_POINTER;
-			pointer_type->points_to       = type;
-			pointer_type->type.qualifiers = parsed_pointer->type_qualifiers;
-			type                          = (type_t*) pointer_type;
-			break;
-
-		case CONSTRUCT_ARRAY:
-			parsed_array  = (parsed_array_t*) iter;
-			array_type    = allocate_type_zero(sizeof(array_type[0]));
-
-			array_type->type.type       = TYPE_ARRAY;
-			array_type->element_type    = type;
-			array_type->type.qualifiers = parsed_array->type_qualifiers;
-			array_type->is_static       = parsed_array->is_static;
-			array_type->is_variable     = parsed_array->is_variable;
-			array_type->size            = parsed_array->size;
-			type                        = (type_t*) array_type;
+			type = function_type;
 			break;
 		}
 
-		type_t *hashed_type = typehash_insert((type_t*) type);
+		case CONSTRUCT_POINTER: {
+			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
+			type_t           *pointer_type   = allocate_type_zero(TYPE_POINTER);
+			pointer_type->pointer.points_to  = type;
+			pointer_type->base.qualifiers    = parsed_pointer->type_qualifiers;
+
+			type = pointer_type;
+			break;
+		}
+
+		case CONSTRUCT_ARRAY: {
+			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
+			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY);
+
+			array_type->base.qualifiers    = parsed_array->type_qualifiers;
+			array_type->array.element_type = type;
+			array_type->array.is_static    = parsed_array->is_static;
+			array_type->array.is_variable  = parsed_array->is_variable;
+			array_type->array.size         = parsed_array->size;
+
+			type = array_type;
+			break;
+		}
+		}
+
+		type_t *hashed_type = typehash_insert(type);
 		if(hashed_type != type) {
 			/* the function type was constructed earlier freeing it here will
 			 * destroy other types... */
@@ -2472,16 +2481,13 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	function_type_t *function_type
-		= allocate_type_zero(sizeof(function_type[0]));
+	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
+	ntype->function.result_type            = type_int;
+	ntype->function.unspecified_parameters = true;
 
-	function_type->type.type              = TYPE_FUNCTION;
-	function_type->result_type            = type_int;
-	function_type->unspecified_parameters = true;
-
-	type_t *type = typehash_insert((type_t*) function_type);
-	if(type != (type_t*) function_type) {
-		free_type(function_type);
+	type_t *type = typehash_insert(ntype);
+	if(type != ntype) {
+		free_type(ntype);
 	}
 
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
@@ -2510,16 +2516,17 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 
 static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
 {
-	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
+	function_parameter_t *parameter
+		= obstack_alloc(type_obst, sizeof(parameter[0]));
+	memset(parameter, 0, sizeof(parameter[0]));
 	parameter->type = argument_type;
 
-	function_type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type.type   = TYPE_FUNCTION;
-	type->result_type = result_type;
-	type->parameters  = parameter;
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.result_type = result_type;
+	type->function.parameters  = parameter;
 
-	type_t *result = typehash_insert((type_t*) type);
-	if(result != (type_t*) type) {
+	type_t *result = typehash_insert(type);
+	if(result != type) {
 		free_type(type);
 	}
 
