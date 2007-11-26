@@ -87,32 +87,32 @@ static unsigned hash_type(const type_t *type)
 		panic("internalizing void or invalid types not possible");
 		return 0;
 	case TYPE_ATOMIC:
-		hash = hash_atomic_type((const atomic_type_t*) type);
+		hash = hash_atomic_type(&type->atomic);
 		break;
 	case TYPE_ENUM:
-		hash = hash_enum_type((const enum_type_t*) type);
+		hash = hash_enum_type(&type->enumt);
 		break;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		hash = hash_compound_type((const compound_type_t*) type);
+		hash = hash_compound_type(&type->compound);
 		break;
 	case TYPE_FUNCTION:
-		hash = hash_function_type((const function_type_t*) type);
+		hash = hash_function_type(&type->function);
 		break;
 	case TYPE_POINTER:
-		hash = hash_pointer_type((const pointer_type_t*) type);
+		hash = hash_pointer_type(&type->pointer);
 		break;
 	case TYPE_ARRAY:
-		hash = hash_array_type((const array_type_t*) type);
+		hash = hash_array_type(&type->array);
 		break;
 	case TYPE_BUILTIN:
-		hash = hash_ptr(((const builtin_type_t*) type)->symbol);
+		hash = hash_ptr(type->builtin.symbol);
 		break;
 	case TYPE_TYPEDEF:
-		hash = hash_ptr(((const compound_type_t*) type)->declaration);
+		hash = hash_ptr(type->typedeft.declaration);
 		break;
 	case TYPE_TYPEOF:
-		hash = hash_typeof_type((const typeof_type_t*) type);
+		hash = hash_typeof_type(&type->typeoft);
 		break;
 	}
 
@@ -223,33 +223,24 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_INVALID:
 		return false;
 	case TYPE_ATOMIC:
-		return atomic_types_equal((const atomic_type_t*) type1,
-		                          (const atomic_type_t*) type2);
+		return atomic_types_equal(&type1->atomic, &type2->atomic);
 	case TYPE_ENUM:
-		return enum_types_equal((const enum_type_t*) type1,
-		                        (const enum_type_t*) type2);
+		return enum_types_equal(&type1->enumt, &type2->enumt);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		return compound_types_equal((const compound_type_t*) type1,
-		                            (const compound_type_t*) type2);
+		return compound_types_equal(&type1->compound, &type2->compound);
 	case TYPE_FUNCTION:
-		return function_types_equal((const function_type_t*) type1,
-		                            (const function_type_t*) type2);
+		return function_types_equal(&type1->function, &type2->function);
 	case TYPE_POINTER:
-		return pointer_types_equal((const pointer_type_t*) type1,
-		                           (const pointer_type_t*) type2);
+		return pointer_types_equal(&type1->pointer, &type2->pointer);
 	case TYPE_ARRAY:
-		return array_types_equal((const array_type_t*) type1,
-		                         (const array_type_t*) type2);
+		return array_types_equal(&type1->array, &type2->array);
 	case TYPE_BUILTIN:
-		return builtin_types_equal((const builtin_type_t*) type1,
-		                           (const builtin_type_t*) type2);
+		return builtin_types_equal(&type1->builtin, &type2->builtin);
 	case TYPE_TYPEOF:
-		return typeof_types_equal((const typeof_type_t*) type1,
-		                          (const typeof_type_t*) type2);
+		return typeof_types_equal(&type1->typeoft, &type2->typeoft);
 	case TYPE_TYPEDEF:
-		return typedef_types_equal((const typedef_type_t*) type1,
-		                           (const typedef_type_t*) type2);
+		return typedef_types_equal(&type1->typedeft, &type2->typedeft);
 	}
 
 	abort();
