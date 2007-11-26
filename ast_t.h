@@ -228,7 +228,7 @@ struct initializer_t {
 		/* if type == INITIALIZER_LIST */
 		struct {
 			size_t         len;
-			initializer_t *initializers[];
+			initializer_t *initializers[1];
 		} list;
 		/* if type == INITIALIZER_STRING */
 		const char    *string;
