@@ -503,8 +503,8 @@ static void parse_number_dec(void)
 	obstack_1grow(&symbol_obstack, '\0');
 	char *string = obstack_finish(&symbol_obstack);
 
-	const char *endptr;
 	if(is_float) {
+		char *endptr;
 		lexer_token.type         = T_FLOATINGPOINT;
 		lexer_token.v.floatvalue = strtold(string, &endptr);
 
@@ -514,6 +514,7 @@ static void parse_number_dec(void)
 
 		parse_floating_suffix();
 	} else {
+		const char *endptr;
 		lexer_token.type       = T_INTEGER;
 		lexer_token.v.intvalue = parse_int_string(string, &endptr, 10);
 
