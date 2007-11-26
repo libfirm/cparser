@@ -26,36 +26,36 @@ static unsigned hash_ptr(const void *ptr)
 	return ptr_int >> 3;
 }
 
-static unsigned hash_atomic_type(const type_t *type)
+static unsigned hash_atomic_type(const atomic_type_t *type)
 {
 	unsigned some_prime = 27644437;
-	unsigned result     = type->v.atomic_type.atype * some_prime;
+	unsigned result     = type->atype * some_prime;
 
 	return result;
 }
 
-static unsigned hash_pointer_type(const type_t *type)
+static unsigned hash_pointer_type(const pointer_type_t *type)
 {
-	return hash_ptr(type->v.pointer_type.points_to);
+	return hash_ptr(type->points_to);
 }
 
-static unsigned hash_array_type(const type_t *type)
+static unsigned hash_array_type(const array_type_t *type)
 {
-	return hash_ptr(type->v.array_type.element_type);
+	return hash_ptr(type->element_type);
 }
 
-static unsigned hash_compound_type(const type_t *type)
+static unsigned hash_compound_type(const compound_type_t *type)
 {
-	return hash_ptr(type->v.compound_type.declaration);
+	return hash_ptr(type->declaration);
 }
 
 static unsigned hash_type(const type_t *type);
 
-static unsigned hash_function_type(const type_t *type)
+static unsigned hash_function_type(const function_type_t *type)
 {
-	unsigned result = hash_ptr(type->v.function_type.result_type);
+	unsigned result = hash_ptr(type->result_type);
 
-	function_parameter_t *parameter = type->v.function_type.parameters;
+	function_parameter_t *parameter = type->parameters;
 	while(parameter != NULL) {
 		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
@@ -64,15 +64,15 @@ static unsigned hash_function_type(const type_t *type)
 	return result;
 }
 
-static unsigned hash_enum_type(const type_t *type)
+static unsigned hash_enum_type(const enum_type_t *type)
 {
-	return hash_ptr(type->v.enum_type.declaration);
+	return hash_ptr(type->declaration);
 }
 
-static unsigned hash_typeof_type(const type_t *type)
+static unsigned hash_typeof_type(const typeof_type_t *type)
 {
-	unsigned result = hash_ptr(type->v.typeof_type.expression);
-	result         ^= hash_ptr(type->v.typeof_type.typeof_type);
+	unsigned result = hash_ptr(type->expression);
+	result         ^= hash_ptr(type->typeof_type);
 
 	return result;
 }
@@ -86,32 +86,32 @@ static unsigned hash_type(const type_t *type)
 		panic("internalizing void or invalid types not possible");
 		return 0;
 	case TYPE_ATOMIC:
-		hash = hash_atomic_type(type);
+		hash = hash_atomic_type((const atomic_type_t*) type);
 		break;
 	case TYPE_ENUM:
-		hash = hash_enum_type(type);
+		hash = hash_enum_type((const enum_type_t*) type);
 		break;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		hash = hash_compound_type(type);
+		hash = hash_compound_type((const compound_type_t*) type);
 		break;
 	case TYPE_FUNCTION:
-		hash = hash_function_type(type);
+		hash = hash_function_type((const function_type_t*) type);
 		break;
 	case TYPE_POINTER:
-		hash = hash_pointer_type(type);
+		hash = hash_pointer_type((const pointer_type_t*) type);
 		break;
 	case TYPE_ARRAY:
-		hash = hash_array_type(type);
+		hash = hash_array_type((const array_type_t*) type);
 		break;
 	case TYPE_BUILTIN:
-		hash = hash_ptr(type->v.builtin_type.symbol);
+		hash = hash_ptr(((const builtin_type_t*) type)->symbol);
 		break;
 	case TYPE_TYPEDEF:
-		hash = hash_ptr(type->v.typedef_type.declaration);
+		hash = hash_ptr(((const compound_type_t*) type)->declaration);
 		break;
 	case TYPE_TYPEOF:
-		hash = hash_typeof_type(type);
+		hash = hash_typeof_type((const typeof_type_t*) type);
 		break;
 	}
 
@@ -121,25 +121,24 @@ static unsigned hash_type(const type_t *type)
 	return hash;
 }
 
-static bool atomic_types_equal(const type_t *type1,
-                               const type_t *type2)
+static bool atomic_types_equal(const atomic_type_t *type1,
+                               const atomic_type_t *type2)
 {
-	return type1->v.atomic_type.atype == type2->v.atomic_type.atype;
+	return type1->atype == type2->atype;
 }
 
-static bool function_types_equal(const type_t *type1,
-                                 const type_t *type2)
+static bool function_types_equal(const function_type_t *type1,
+                                 const function_type_t *type2)
 {
-	if(type1->v.function_type.result_type != type2->v.function_type.result_type)
+	if(type1->result_type != type2->result_type)
 		return false;
-	if(type1->v.function_type.variadic != type2->v.function_type.variadic)
+	if(type1->variadic != type2->variadic)
 		return false;
-	if(type1->v.function_type.unspecified_parameters !=
-	   type2->v.function_type.unspecified_parameters)
+	if(type1->unspecified_parameters != type2->unspecified_parameters)
 		return false;
 
-	function_parameter_t *param1 = type1->v.function_type.parameters;
-	function_parameter_t *param2 = type2->v.function_type.parameters;
+	function_parameter_t *param1 = type1->parameters;
+	function_parameter_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
 		if(param1->type != param2->type)
 			return false;
@@ -152,58 +151,58 @@ static bool function_types_equal(const type_t *type1,
 	return true;
 }
 
-static bool pointer_types_equal(const type_t *type1,
-                                const type_t *type2)
+static bool pointer_types_equal(const pointer_type_t *type1,
+                                const pointer_type_t *type2)
 {
-	return type1->v.pointer_type.points_to == type2->v.pointer_type.points_to;
+	return type1->points_to == type2->points_to;
 }
 
-static bool array_types_equal(const type_t *type1,
-                              const type_t *type2)
+static bool array_types_equal(const array_type_t *type1,
+                              const array_type_t *type2)
 {
-	if(type1->v.array_type.element_type != type2->v.array_type.element_type)
+	if(type1->element_type != type2->element_type)
 		return false;
-	if(type1->v.array_type.is_variable != type2->v.array_type.is_variable)
+	if(type1->is_variable != type2->is_variable)
 		return false;
-	if(type1->v.array_type.is_static != type2->v.array_type.is_static)
+	if(type1->is_static != type2->is_static)
 		return false;
 	/* TODO: compare expressions for equality... */
-	if(type1->v.array_type.size != type2->v.array_type.size)
+	if(type1->size != type2->size)
 		return false;
 
 	return true;
 }
 
-static bool builtin_types_equal(const type_t *type1,
-                                const type_t *type2)
+static bool builtin_types_equal(const builtin_type_t *type1,
+                                const builtin_type_t *type2)
 {
-	return type1->v.builtin_type.symbol == type2->v.builtin_type.symbol;
+	return type1->symbol == type2->symbol;
 }
 
-static bool compound_types_equal(const type_t *type1,
-                                 const type_t *type2)
+static bool compound_types_equal(const compound_type_t *type1,
+                                 const compound_type_t *type2)
 {
-	return type1->v.compound_type.declaration == type2->v.compound_type.declaration;
+	return type1->declaration == type2->declaration;
 }
 
-static bool enum_types_equal(const type_t *type1,
-                             const type_t *type2)
+static bool enum_types_equal(const enum_type_t *type1,
+                             const enum_type_t *type2)
 {
-	return type1->v.enum_type.declaration == type2->v.enum_type.declaration;
+	return type1->declaration == type2->declaration;
 }
 
-static bool typedef_types_equal(const type_t *type1,
-                                const type_t *type2)
+static bool typedef_types_equal(const typedef_type_t *type1,
+                                const typedef_type_t *type2)
 {
-	return type1->v.typedef_type.declaration == type2->v.typedef_type.declaration;
+	return type1->declaration == type2->declaration;
 }
 
-static bool typeof_types_equal(const type_t *type1,
-                               const type_t *type2)
+static bool typeof_types_equal(const typeof_type_t *type1,
+                               const typeof_type_t *type2)
 {
-	if(type1->v.typeof_type.expression != type2->v.typeof_type.expression)
+	if(type1->expression != type2->expression)
 		return false;
-	if(type1->v.typeof_type.typeof_type != type2->v.typeof_type.typeof_type)
+	if(type1->typeof_type != type2->typeof_type)
 		return false;
 
 	return true;
@@ -222,24 +221,33 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	case TYPE_INVALID:
 		return false;
 	case TYPE_ATOMIC:
-		return atomic_types_equal(type1, type2);
+		return atomic_types_equal((const atomic_type_t*) type1,
+		                          (const atomic_type_t*) type2);
 	case TYPE_ENUM:
-		return enum_types_equal(type1, type2);
+		return enum_types_equal((const enum_type_t*) type1,
+		                        (const enum_type_t*) type2);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		return compound_types_equal(type1, type2);
+		return compound_types_equal((const compound_type_t*) type1,
+		                            (const compound_type_t*) type2);
 	case TYPE_FUNCTION:
-		return function_types_equal(type1, type2);
+		return function_types_equal((const function_type_t*) type1,
+		                            (const function_type_t*) type2);
 	case TYPE_POINTER:
-		return pointer_types_equal(type1, type2);
+		return pointer_types_equal((const pointer_type_t*) type1,
+		                           (const pointer_type_t*) type2);
 	case TYPE_ARRAY:
-		return array_types_equal(type1, type2);
+		return array_types_equal((const array_type_t*) type1,
+		                         (const array_type_t*) type2);
 	case TYPE_BUILTIN:
-		return builtin_types_equal(type1, type2);
+		return builtin_types_equal((const builtin_type_t*) type1,
+		                           (const builtin_type_t*) type2);
 	case TYPE_TYPEOF:
-		return typeof_types_equal(type1, type2);
+		return typeof_types_equal((const typeof_type_t*) type1,
+		                          (const typeof_type_t*) type2);
 	case TYPE_TYPEDEF:
-		return typedef_types_equal(type1, type2);
+		return typedef_types_equal((const typedef_type_t*) type1,
+		                           (const typedef_type_t*) type2);
 	}
 
 	abort();

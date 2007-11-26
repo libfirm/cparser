@@ -120,6 +120,26 @@ static inline void *allocate_type_zero(size_t size)
 	return res;
 }
 
+static inline size_t get_initializer_size(initializer_type_t type)
+{
+	static const size_t size[] = {
+		[INITIALIZER_VALUE]  = sizeof(initializer_value_t),
+		[INITIALIZER_STRING] = sizeof(initializer_string_t),
+		[INITIALIZER_LIST]   = sizeof(initializer_list_t)
+	};
+	assert(type < INITIALIZER_COUNT);
+	assert(size[type] != 0);
+	return size[type];
+}
+
+static inline initializer_t *allocate_initializer(initializer_type_t type)
+{
+	initializer_t *result = allocate_ast_zero(get_initializer_size(type));
+	result->type          = type;
+
+	return result;
+}
+
 static inline void free_type(void *type)
 {
 	obstack_free(type_obst, type);
@@ -437,8 +457,8 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
 		} else {
-			const storage_class_t old_storage = (storage_class_t)previous_declaration->storage_class;
-			const storage_class_t new_storage = (storage_class_t)declaration->storage_class;
+			const storage_class_t old_storage = previous_declaration->storage_class;
+			const storage_class_t new_storage = declaration->storage_class;
 			if (current_function == NULL) {
 				if (old_storage != STORAGE_CLASS_STATIC &&
 				    new_storage == STORAGE_CLASS_STATIC) {
@@ -596,14 +616,15 @@ static int get_rank(const type_t *type)
 {
 	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
 	 * and esp. footnote 108). However we can't fold constants (yet), so we
-	 * can't decide whether unsigned int is possible, while int always works.
+	 * can't decide wether unsigned int is possible, while int always works.
 	 * (unsigned int would be preferable when possible... for stuff like
 	 *  struct { enum { ... } bla : 4; } ) */
 	if(type->type == TYPE_ENUM)
 		return ATOMIC_TYPE_INT;
 
 	assert(type->type == TYPE_ATOMIC);
-	atomic_type_type_t atype = type->v.atomic_type.atype;
+	atomic_type_t      *atomic_type = (atomic_type_t*) type;
+	atomic_type_type_t  atype       = atomic_type->atype;
 	return atype;
 }
 
@@ -686,9 +707,11 @@ static expression_t *create_implicit_cast(expression_t *expression,
 					break;
 
 				case TYPE_ARRAY: {
-					type_t *const array_type = source_type;
-					if (types_compatible(array_type->v.array_type.element_type,
-															 dest_type->v.pointer_type.points_to)) {
+					array_type_t   *array_type = (array_type_t*) source_type;
+					pointer_type_t *pointer_type
+						= (pointer_type_t*) dest_type;
+					if (types_compatible(array_type->element_type,
+										 pointer_type->points_to)) {
 						return create_cast_expression(expression, dest_type);
 					}
 					break;
@@ -712,7 +735,9 @@ static bool is_atomic_type(const type_t *type, atomic_type_type_t atype)
 {
 	if(type->type != TYPE_ATOMIC)
 		return false;
-	return type->v.atomic_type.atype == atype;
+	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
+
+	return atomic_type->atype == atype;
 }
 
 static bool is_pointer(const type_t *type)
@@ -747,10 +772,10 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	}
 
 	if (is_pointer(type_left) && is_pointer(type_right)) {
-		type_t *pointer_type_left  = type_left;
-		type_t *pointer_type_right = type_right;
-		type_t *points_to_left     = pointer_type_left->v.pointer_type.points_to;
-		type_t *points_to_right    = pointer_type_right->v.pointer_type.points_to;
+		pointer_type_t *pointer_type_left  = (pointer_type_t*) type_left;
+		pointer_type_t *pointer_type_right = (pointer_type_t*) type_right;
+		type_t         *points_to_left     = pointer_type_left->points_to;
+		type_t         *points_to_right    = pointer_type_right->points_to;
 
 		if(!is_atomic_type(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_atomic_type(points_to_right, ATOMIC_TYPE_VOID)
@@ -842,7 +867,8 @@ static void parse_attributes(void)
 			next_token();
 
 			expect_void('(');
-			for (int depth = 1; depth > 0;) {
+			int depth = 1;
+			while(depth > 0) {
 				switch(token.type) {
 				case T_EOF:
 					parse_error("EOF while parsing attribute");
@@ -927,16 +953,14 @@ static designator_t *parse_designation(void)
 }
 #endif
 
-static initializer_t *initializer_from_string(type_t *type, const char *string)
+static initializer_t *initializer_from_string(array_type_t *type,
+                                              const char *string)
 {
 	/* TODO: check len vs. size of array type */
 	(void) type;
 
-	initializer_t *initializer
-		= allocate_ast_zero(sizeof(initializer[0]));
-
-	initializer->type     = INITIALIZER_STRING;
-	initializer->v.string = string;
+	initializer_t *initializer = allocate_initializer(INITIALIZER_STRING);
+	initializer->string.string = string;
 
 	return initializer;
 }
@@ -949,10 +973,12 @@ static initializer_t *initializer_from_expression(type_t *type,
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
 	if(type->type == TYPE_ARRAY && expression->type == EXPR_STRING_LITERAL) {
-		type_t *element_type = type->v.array_type.element_type;
+		array_type_t *array_type   = (array_type_t*) type;
+		type_t       *element_type = array_type->element_type;
 
 		if(element_type->type == TYPE_ATOMIC) {
-			atomic_type_type_t atype = element_type->v.atomic_type.atype;
+			atomic_type_t      *atomic_type = (atomic_type_t*) element_type;
+			atomic_type_type_t  atype       = atomic_type->atype;
 
 			/* TODO handle wide strings */
 			if(atype == ATOMIC_TYPE_CHAR
@@ -960,16 +986,15 @@ static initializer_t *initializer_from_expression(type_t *type,
 					|| atype == ATOMIC_TYPE_UCHAR) {
 
 				string_literal_t *literal = (string_literal_t*) expression;
-				return initializer_from_string(type, literal->value);
+				return initializer_from_string(array_type, literal->value);
 			}
 		}
 	}
 
 	semantic_assign(type, &expression, "initializer");
 
-	initializer_t *result = allocate_ast_zero(sizeof(result[0]));
-	result->type    = INITIALIZER_VALUE;
-	result->v.value = expression;
+	initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
+	result->value.value   = expression;
 
 	return result;
 }
@@ -1022,13 +1047,12 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	/* TODO: ignore qualifiers, comparing pointers is probably
 	 * not correct */
 	if(expression != NULL && expression_type == type) {
-		initializer_t *result = allocate_ast_zero(sizeof(result[0]));
-		result->type          = INITIALIZER_VALUE;
+		initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
 
 		if(type != NULL) {
 			semantic_assign(type, &expression, "initializer");
 		}
-		result->v.value = expression;
+		result->value.value = expression;
 
 		return result;
 	}
@@ -1043,8 +1067,9 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	initializer_t  *result = NULL;
 	initializer_t **elems;
 	if(type->type == TYPE_ARRAY) {
-		type_t *element_type = type->v.array_type.element_type;
-		element_type         = skip_typeref(element_type);
+		array_type_t *array_type   = (array_type_t*) type;
+		type_t       *element_type = array_type->element_type;
+		element_type               = skip_typeref(element_type);
 
 		initializer_t *sub;
 		had_initializer_brace_warning = false;
@@ -1084,7 +1109,8 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	} else {
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
-		context_t *context = &type->v.compound_type.declaration->context;
+		compound_type_t *compound_type = (compound_type_t*) type;
+		context_t       *context       = & compound_type->declaration->context;
 
 		declaration_t *first = context->declarations;
 		if(first == NULL)
@@ -1137,14 +1163,14 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	int    len        = ARR_LEN(elems);
 	size_t elems_size = sizeof(initializer_t*) * len;
 
-	initializer_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
+	initializer_list_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
 
-	init->type       = INITIALIZER_LIST;
-	init->v.list.len = len;
-	memcpy(init->v.list.initializers, elems, elems_size);
+	init->initializer.type = INITIALIZER_LIST;
+	init->len              = len;
+	memcpy(init->initializers, elems, elems_size);
 	DEL_ARR_F(elems);
 
-	result = init;
+	result = (initializer_t*) init;
 
 	if(read_paren) {
 		if(token.type == ',')
@@ -1261,7 +1287,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	return declaration;
 }
 
-static void parse_enum_entries(type_t *const enum_type)
+static void parse_enum_entries(enum_type_t *const enum_type)
 {
 	eat('{');
 
@@ -1280,7 +1306,7 @@ static void parse_enum_entries(type_t *const enum_type)
 			return;
 		}
 		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
-		entry->type            = enum_type;
+		entry->type            = (type_t*) enum_type;
 		entry->symbol          = token.v.symbol;
 		entry->source_position = token.source_position;
 		next_token();
@@ -1331,9 +1357,9 @@ static type_t *parse_enum_specifier(void)
 		declaration->symbol          = symbol;
 	}
 
-	type_t *const enum_type = allocate_type_zero(sizeof(enum_type[0]));
-	enum_type->type        = TYPE_ENUM;
-	enum_type->v.enum_type.declaration = declaration;
+	enum_type_t *const enum_type = allocate_type_zero(sizeof(enum_type[0]));
+	enum_type->type.type         = TYPE_ENUM;
+	enum_type->declaration       = declaration;
 
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
@@ -1348,7 +1374,7 @@ static type_t *parse_enum_specifier(void)
 		parse_attributes();
 	}
 
-	return enum_type;
+	return (type_t*) enum_type;
 }
 
 /**
@@ -1404,12 +1430,12 @@ restart:
 
 	expect(')');
 
-	type_t *typeof = allocate_type_zero(sizeof(typeof[0]));
-	typeof->type   = TYPE_TYPEOF;
-	typeof->v.typeof_type.expression  = expression;
-	typeof->v.typeof_type.typeof_type = type;
+	typeof_type_t *typeof = allocate_type_zero(sizeof(typeof[0]));
+	typeof->type.type     = TYPE_TYPEOF;
+	typeof->expression    = expression;
+	typeof->typeof_type   = type;
 
-	return typeof;
+	return (type_t*) typeof;
 }
 
 typedef enum {
@@ -1432,13 +1458,13 @@ typedef enum {
 
 static type_t *create_builtin_type(symbol_t *symbol)
 {
-	type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type   = TYPE_BUILTIN;
-	type->v.builtin_type.symbol    = symbol;
+	builtin_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type      = TYPE_BUILTIN;
+	type->symbol         = symbol;
 	/* TODO... */
-	type->v.builtin_type.real_type = type_int;
+	type->real_type      = type_int;
 
-	return type;
+	return (type_t*) type;
 }
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -1448,19 +1474,19 @@ static type_t *get_typedef_type(symbol_t *symbol)
 			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
-	type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type   = TYPE_TYPEDEF;
-	type->v.typedef_type.declaration = declaration;
+	typedef_type_t *typedef_type = allocate_type_zero(sizeof(typedef_type[0]));
+	typedef_type->type.type    = TYPE_TYPEDEF;
+	typedef_type->declaration  = declaration;
 
-	return type;
+	return (type_t*) typedef_type;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t            *type            = NULL;
-	type_qualifiers_t type_qualifiers = TYPE_QUALIFIER_NONE;
-	unsigned          type_specifiers = 0;
-	int               newtype         = 0;
+	type_t        *type            = NULL;
+	unsigned       type_qualifiers = 0;
+	unsigned       type_specifiers = 0;
+	int            newtype         = 0;
 
 	while(true) {
 		switch(token.type) {
@@ -1540,18 +1566,22 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		/* TODO: if type != NULL for the following rules should issue
 		 * an error */
-		case T_struct:
-			type       = allocate_type_zero(sizeof(type[0]));
-			type->type = TYPE_COMPOUND_STRUCT;
-			type->v.compound_type.declaration = parse_compound_type_specifier(true);
+		case T_struct: {
+			type = allocate_type_zero(sizeof(struct compound_type_t));
 
+			compound_type_t *compound_type = (compound_type_t*) type;
+			compound_type->type.type   = TYPE_COMPOUND_STRUCT;
+			compound_type->declaration = parse_compound_type_specifier(true);
 			break;
-		case T_union:
-			type       = allocate_type_zero(sizeof(type[0]));
-			type->type = TYPE_COMPOUND_UNION;
-			type->v.compound_type.declaration = parse_compound_type_specifier(false);
+		}
+		case T_union: {
+			type = allocate_type_zero(sizeof(compound_type_t));
 
+			compound_type_t *compound_type = (compound_type_t*) type;
+			compound_type->type.type   = TYPE_COMPOUND_UNION;
+			compound_type->declaration = parse_compound_type_specifier(false);
 			break;
+		}
 		case T_enum:
 			type = parse_enum_specifier();
 			break;
@@ -1698,20 +1728,22 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		type       = allocate_type_zero(sizeof(type[0]));
-		type->type = TYPE_ATOMIC;
-		type->v.atomic_type.atype = atomic_type;
-		newtype = 1;
+		atomic_type_t *atype = allocate_type_zero(sizeof(atype[0]));
+		atype->type.type     = TYPE_ATOMIC;
+		atype->atype         = atomic_type;
+		newtype              = 1;
+
+		type = (type_t*) atype;
 	} else {
 		if(type_specifiers != 0) {
 			parse_error("multiple datatypes in declaration");
 		}
 	}
 
-	type->qualifiers = type_qualifiers;
+	type->qualifiers = (type_qualifier_t)type_qualifiers;
 
 	type_t *result = typehash_insert(type);
-	if(newtype && result != type) {
+	if(newtype && result != (type_t*) type) {
 		free_type(type);
 	}
 
@@ -1765,18 +1797,19 @@ static declaration_t *parse_parameter(void)
 		parse_error("typedef not allowed in parameter list");
 	}
 
-	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
+	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
 	 * into a pointer */
 	if (declaration->type->type == TYPE_ARRAY) {
-		const type_t *const arr_type = declaration->type;
+		const array_type_t *const arr_type =
+			(const array_type_t*)declaration->type;
 		declaration->type =
-			make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
+			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
 	}
 
 	return declaration;
 }
 
-static declaration_t *parse_parameters(type_t *type)
+static declaration_t *parse_parameters(function_type_t *type)
 {
 	if(token.type == T_IDENTIFIER) {
 		symbol_t      *symbol = token.v.symbol;
@@ -1788,7 +1821,7 @@ static declaration_t *parse_parameters(type_t *type)
 	}
 
 	if(token.type == ')') {
-		type->v.function_type.unspecified_parameters = 1;
+		type->unspecified_parameters = 1;
 		return NULL;
 	}
 	if(token.type == T_void && look_ahead(1)->type == ')') {
@@ -1806,7 +1839,7 @@ static declaration_t *parse_parameters(type_t *type)
 		switch(token.type) {
 		case T_DOTDOTDOT:
 			next_token();
-			type->v.function_type.variadic = 1;
+			type->variadic = 1;
 			return declarations;
 
 		case T_IDENTIFIER:
@@ -1821,7 +1854,7 @@ static declaration_t *parse_parameters(type_t *type)
 				last_declaration->next = declaration;
 				last_parameter->next   = parameter;
 			} else {
-				type->v.function_type.parameters = parameter;
+				type->parameters = parameter;
 				declarations     = declaration;
 			}
 			last_parameter   = parameter;
@@ -1859,7 +1892,7 @@ struct parsed_pointer_t {
 typedef struct construct_function_type_t construct_function_type_t;
 struct construct_function_type_t {
 	construct_type_t    construct_type;
-	type_t             *function_type;
+	function_type_t    *function_type;
 };
 
 typedef struct parsed_array_t parsed_array_t;
@@ -1927,8 +1960,8 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type   = TYPE_FUNCTION;
+	function_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type       = TYPE_FUNCTION;
 
 	declaration_t *parameters = parse_parameters(type);
 	if(declaration != NULL) {
@@ -2052,46 +2085,46 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		parsed_pointer_t          *parsed_pointer;
 		parsed_array_t            *parsed_array;
 		construct_function_type_t *construct_function_type;
-		type_t                    *ftype;
-		type_t                    *ptype;
-		type_t                    *atype;
+		function_type_t           *function_type;
+		pointer_type_t            *pointer_type;
+		array_type_t              *array_type;
 
 		switch(iter->type) {
 		case CONSTRUCT_INVALID:
 			panic("invalid type construction found");
 		case CONSTRUCT_FUNCTION:
 			construct_function_type = (construct_function_type_t*) iter;
-			ftype                   = construct_function_type->function_type;
+			function_type           = construct_function_type->function_type;
 
-			ftype->v.function_type.result_type = type;
-			type                               = ftype;
+			function_type->result_type = type;
+			type                       = (type_t*) function_type;
 			break;
 
 		case CONSTRUCT_POINTER:
 			parsed_pointer = (parsed_pointer_t*) iter;
-			ptype          = allocate_type_zero(sizeof(ptype[0]));
+			pointer_type   = allocate_type_zero(sizeof(pointer_type[0]));
 
-			ptype->type                     = TYPE_POINTER;
-			ptype->v.pointer_type.points_to = type;
-			ptype->qualifiers               = parsed_pointer->type_qualifiers;
-			type                            = ptype;
+			pointer_type->type.type       = TYPE_POINTER;
+			pointer_type->points_to       = type;
+			pointer_type->type.qualifiers = parsed_pointer->type_qualifiers;
+			type                          = (type_t*) pointer_type;
 			break;
 
 		case CONSTRUCT_ARRAY:
-			parsed_array = (parsed_array_t*) iter;
-			atype        = allocate_type_zero(sizeof(atype[0]));
+			parsed_array  = (parsed_array_t*) iter;
+			array_type    = allocate_type_zero(sizeof(array_type[0]));
 
-			atype->type                      = TYPE_ARRAY;
-			atype->v.array_type.element_type = type;
-			atype->qualifiers                = parsed_array->type_qualifiers;
-			atype->v.array_type.is_static    = parsed_array->is_static;
-			atype->v.array_type.is_variable  = parsed_array->is_variable;
-			atype->v.array_type.size         = parsed_array->size;
-			type                             = atype;
+			array_type->type.type       = TYPE_ARRAY;
+			array_type->element_type    = type;
+			array_type->type.qualifiers = parsed_array->type_qualifiers;
+			array_type->is_static       = parsed_array->is_static;
+			array_type->is_variable     = parsed_array->is_variable;
+			array_type->size            = parsed_array->size;
+			type                        = (type_t*) array_type;
 			break;
 		}
 
-		type_t *hashed_type = typehash_insert(type);
+		type_t *hashed_type = typehash_insert((type_t*) type);
 		if(hashed_type != type) {
 			/* the function type was constructed earlier freeing it here will
 			 * destroy other types... */
@@ -2197,22 +2230,27 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			initializer_t *initializer = parse_initializer(type);
 
 			if(type->type == TYPE_ARRAY && initializer != NULL) {
-				if(type->v.array_type.size == NULL) {
+				array_type_t       *array_type = (array_type_t*) type;
+
+				if(array_type->size == NULL) {
 					const_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
 
 					cnst->expression.type     = EXPR_CONST;
 					cnst->expression.datatype = type_size_t;
 
 					if(initializer->type == INITIALIZER_LIST) {
-						cnst->v.int_value = initializer->v.list.len;
+						initializer_list_t *list = &initializer->list;
+						cnst->v.int_value = list->len;
 					} else {
 						assert(initializer->type == INITIALIZER_STRING);
-						cnst->v.int_value = strlen(initializer->v.string) + 1;
+						initializer_string_t *string = &initializer->string;
+						cnst->v.int_value = strlen(string->string) + 1;
 					}
 
-					type->v.array_type.size = (expression_t*) cnst;
+					array_type->size = (expression_t*) cnst;
 				}
 			}
+
 
 			ndeclaration->init.initializer = initializer;
 		} else if(token.type == '{') {
@@ -2330,8 +2368,9 @@ static void parse_declaration(void)
 		switch (specifiers.type->type) {
 			case TYPE_COMPOUND_STRUCT:
 			case TYPE_COMPOUND_UNION: {
-				const type_t *const comp_type = specifiers.type;
-				if (comp_type->v.compound_type.declaration->symbol == NULL) {
+				const compound_type_t *const comp_type =
+					(const compound_type_t*)specifiers.type;
+				if (comp_type->declaration->symbol == NULL) {
 					parse_warning_pos(source_position,
 														"unnamed struct/union that defines no instances");
 				}
@@ -2452,15 +2491,16 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	type_t *ftype = allocate_type_zero(sizeof(ftype[0]));
+	function_type_t *function_type
+		= allocate_type_zero(sizeof(function_type[0]));
 
-	ftype->type                                   = TYPE_FUNCTION;
-	ftype->v.function_type.result_type            = type_int;
-	ftype->v.function_type.unspecified_parameters = true;
+	function_type->type.type              = TYPE_FUNCTION;
+	function_type->result_type            = type_int;
+	function_type->unspecified_parameters = true;
 
-	type_t *type = typehash_insert(ftype);
-	if(type != ftype) {
-		free_type(ftype);
+	type_t *type = typehash_insert((type_t*) function_type);
+	if(type != (type_t*) function_type) {
+		free_type(function_type);
 	}
 
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
@@ -2566,17 +2606,21 @@ static expression_t *parse_statement_expression(void)
 	}
 
 	assert(statement->type == STATEMENT_COMPOUND);
+	compound_statement_t *compound_statement
+		= (compound_statement_t*) statement;
 
 	/* find last statement and use it's type */
 	const statement_t *last_statement = NULL;
-	const statement_t *iter           = statement->v.compound_stmt.statements;
+	const statement_t *iter           = compound_statement->statements;
 	for( ; iter != NULL; iter = iter->next) {
 		last_statement = iter;
 	}
 
 	if(last_statement->type == STATEMENT_EXPRESSION) {
+		const expression_statement_t *expression_statement =
+			(const expression_statement_t*) last_statement;
 		expression->expression.datatype
-			= last_statement->v.expression->datatype;
+			= expression_statement->expression->datatype;
 	} else {
 		expression->expression.datatype = type_void;
 	}
@@ -2730,13 +2774,13 @@ static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
 	function_parameter_t *parameter = allocate_type_zero(sizeof(parameter[0]));
 	parameter->type = argument_type;
 
-	type_t *type = allocate_type_zero(sizeof(type[0]));
-	type->type                        = TYPE_FUNCTION;
-	type->v.function_type.result_type = result_type;
-	type->v.function_type.parameters  = parameter;
+	function_type_t *type = allocate_type_zero(sizeof(type[0]));
+	type->type.type   = TYPE_FUNCTION;
+	type->result_type = result_type;
+	type->parameters  = parameter;
 
-	type_t *result = typehash_insert(type);
-	if(result != type) {
+	type_t *result = typehash_insert((type_t*) type);
+	if(result != (type_t*) type) {
 		free_type(type);
 	}
 
@@ -2824,17 +2868,17 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	if(type_left != NULL && type_right != NULL) {
 		if(type_left->type == TYPE_POINTER) {
-			type_t *pointer = type_left;
-			array_access->expression.datatype = pointer->v.pointer_type.points_to;
+			pointer_type_t *pointer           = (pointer_type_t*) type_left;
+			array_access->expression.datatype = pointer->points_to;
 		} else if(type_left->type == TYPE_ARRAY) {
-			type_t *array_type = type_left;
-			array_access->expression.datatype = array_type->v.array_type.element_type;
+			array_type_t *array_type          = (array_type_t*) type_left;
+			array_access->expression.datatype = array_type->element_type;
 		} else if(type_right->type == TYPE_POINTER) {
-			type_t *pointer = type_right;
-			array_access->expression.datatype = pointer->v.pointer_type.points_to;
+			pointer_type_t *pointer           = (pointer_type_t*) type_right;
+			array_access->expression.datatype = pointer->points_to;
 		} else if(type_right->type == TYPE_ARRAY) {
-			type_t *array_type = type_right;
-			array_access->expression.datatype = array_type->v.array_type.element_type;
+			array_type_t *array_type          = (array_type_t*) type_right;
+			array_access->expression.datatype = array_type->element_type;
 		} else {
 			parser_print_error_prefix();
 			fprintf(stderr, "array access on object with non-pointer types ");
@@ -2932,7 +2976,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 			fputc('\n', stderr);
 			return make_invalid_expression();
 		}
-		type_left = type->v.pointer_type.points_to;
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		type_left                    = pointer_type->points_to;
 	}
 	type_left = skip_typeref(type_left);
 
@@ -2946,8 +2991,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return make_invalid_expression();
 	}
 
-	type_t        *compound_type = type_left;
-	declaration_t *declaration   = compound_type->v.compound_type.declaration;
+	compound_type_t *compound_type = (compound_type_t*) type_left;
+	declaration_t   *declaration   = compound_type->declaration;
 
 	if(!declaration->init.is_defined) {
 		parser_print_error_prefix();
@@ -2984,16 +3029,18 @@ static expression_t *parse_call_expression(unsigned precedence,
 	call->expression.type   = EXPR_CALL;
 	call->function          = expression;
 
-	type_t *function_type;
-	type_t *orig_type     = expression->datatype;
-	type_t *type          = skip_typeref(orig_type);
+	function_type_t *function_type;
+	type_t          *orig_type     = expression->datatype;
+	type_t          *type          = skip_typeref(orig_type);
 
 	if(type->type == TYPE_POINTER) {
-		type = skip_typeref(type->v.pointer_type.points_to);
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+
+		type = skip_typeref(pointer_type->points_to);
 	}
 	if (type->type == TYPE_FUNCTION) {
-		function_type             = type;
-		call->expression.datatype = type->v.function_type.result_type;
+		function_type             = (function_type_t*) type;
+		call->expression.datatype = function_type->result_type;
 	} else {
 		parser_print_error_prefix();
 		fputs("called object '", stderr);
@@ -3031,7 +3078,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	expect(')');
 
 	if(function_type != NULL) {
-		function_parameter_t *parameter = function_type->v.function_type.parameters;
+		function_parameter_t *parameter = function_type->parameters;
 		call_argument_t      *argument  = call->arguments;
 		for( ; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
@@ -3048,8 +3095,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 			fprintf(stderr, "'\n");
 		} else if(argument != NULL) {
 			/* too many parameters */
-			if(!function_type->v.function_type.variadic
-					&& !function_type->v.function_type.unspecified_parameters) {
+			if(!function_type->variadic
+					&& !function_type->unspecified_parameters) {
 				parser_print_error_prefix();
 				fprintf(stderr, "too many arguments to function '");
 				print_expression(expression);
@@ -3243,17 +3290,21 @@ static void semantic_dereference(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	switch (type->type) {
-		case TYPE_ARRAY:
-			expression->expression.datatype = type->v.array_type.element_type;
+		case TYPE_ARRAY: {
+			array_type_t *const array_type  = (array_type_t*)type;
+			expression->expression.datatype = array_type->element_type;
 			break;
+		}
 
-		case TYPE_POINTER:
-			expression->expression.datatype = type->v.pointer_type.points_to;
+		case TYPE_POINTER: {
+			pointer_type_t *pointer_type    = (pointer_type_t*)type;
+			expression->expression.datatype = pointer_type->points_to;
 			break;
+		}
 
 		default:
 			parser_print_error_prefix();
-			fputs("'Unary *' needs pointer or array type, but type ", stderr);
+			fputs("'Unary *' needs pointer or arrray type, but type ", stderr);
 			print_type_quoted(orig_type);
 			fputs(" given.\n", stderr);
 			return;
@@ -3445,13 +3496,13 @@ static void semantic_add(binary_expression_t *expression)
 	} else if(type_right->type == TYPE_POINTER && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
 	} else if (type_left->type == TYPE_ARRAY && is_type_integer(type_right)) {
-		const type_t *const arr_type = type_left;
+		const array_type_t *const arr_type = (const array_type_t*)type_left;
 		expression->expression.datatype =
-		  make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
+		  make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
 	} else if (type_right->type == TYPE_ARRAY && is_type_integer(type_left)) {
-		const type_t *const arr_type = type_right;
+		const array_type_t *const arr_type = (const array_type_t*)type_right;
 		expression->expression.datatype =
-			make_pointer_type(arr_type->v.array_type.element_type, TYPE_QUALIFIER_NONE);
+			make_pointer_type(arr_type->element_type, TYPE_QUALIFIER_NONE);
 	} else {
 		parser_print_error_prefix();
 		fprintf(stderr, "invalid operands to binary + (");
@@ -3877,28 +3928,28 @@ static void init_expression_parsers(void)
 static statement_t *parse_case_statement(void)
 {
 	eat(T_case);
-	statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->type            = STATEMENT_CASE_LABEL;
-	label->source_position = token.source_position;
+	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->statement.type            = STATEMENT_CASE_LABEL;
+	label->statement.source_position = token.source_position;
 
-	label->v.case_label_stmt.expression = parse_expression();
+	label->expression = parse_expression();
 
 	expect(':');
-	label->v.case_label_stmt.label_statement = parse_statement();
+	label->label_statement = parse_statement();
 
-	return label;
+	return (statement_t*) label;
 }
 
 static statement_t *parse_default_statement(void)
 {
 	eat(T_default);
 
-	statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->type            = STATEMENT_CASE_LABEL;
-	label->source_position = token.source_position;
+	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
+	label->statement.type            = STATEMENT_CASE_LABEL;
+	label->statement.source_position = token.source_position;
 
 	expect(':');
-	label->v.case_label_stmt.label_statement = parse_statement();
+	label->label_statement = parse_statement();
 
 	return (statement_t*) label;
 }
@@ -3944,11 +3995,11 @@ static statement_t *parse_label_statement(void)
 		label->source_position = token.source_position;
 	}
 
-	statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
+	label_statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
 
-	label_statement->type               = STATEMENT_LABEL;
-	label_statement->source_position    = token.source_position;
-	label_statement->v.label_stmt.label = label;
+	label_statement->statement.type            = STATEMENT_LABEL;
+	label_statement->statement.source_position = token.source_position;
+	label_statement->label                     = label;
 
 	expect(':');
 
@@ -3956,102 +4007,102 @@ static statement_t *parse_label_statement(void)
 		parse_error("label at end of compound statement");
 		return (statement_t*) label_statement;
 	} else {
-		label_statement->v.label_stmt.label_statement = parse_statement();
+		label_statement->label_statement = parse_statement();
 	}
 
-	return label_statement;
+	return (statement_t*) label_statement;
 }
 
 static statement_t *parse_if(void)
 {
 	eat(T_if);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_IF;
-	statement->source_position = token.source_position;
+	if_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_IF;
+	statement->statement.source_position = token.source_position;
 
 	expect('(');
-	statement->v.if_stmt.condition = parse_expression();
+	statement->condition = parse_expression();
 	expect(')');
 
-	statement->v.if_stmt.true_statement = parse_statement();
+	statement->true_statement = parse_statement();
 	if(token.type == T_else) {
 		next_token();
-		statement->v.if_stmt.false_statement = parse_statement();
+		statement->false_statement = parse_statement();
 	}
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_switch(void)
 {
 	eat(T_switch);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_SWITCH;
-	statement->source_position = token.source_position;
+	switch_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_SWITCH;
+	statement->statement.source_position = token.source_position;
 
 	expect('(');
-	statement->v.switch_stmt.expression = parse_expression();
+	statement->expression = parse_expression();
 	expect(')');
-	statement->v.switch_stmt.body = parse_statement();
+	statement->body = parse_statement();
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_while(void)
 {
 	eat(T_while);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_WHILE;
-	statement->source_position = token.source_position;
+	while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_WHILE;
+	statement->statement.source_position = token.source_position;
 
 	expect('(');
-	statement->v.while_stmt.condition = parse_expression();
+	statement->condition = parse_expression();
 	expect(')');
-	statement->v.while_stmt.body = parse_statement();
+	statement->body = parse_statement();
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_do(void)
 {
 	eat(T_do);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_DO_WHILE;
-	statement->source_position = token.source_position;
+	do_while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_DO_WHILE;
+	statement->statement.source_position = token.source_position;
 
-	statement->v.while_stmt.body = parse_statement();
+	statement->body = parse_statement();
 	expect(T_while);
 	expect('(');
-	statement->v.while_stmt.condition = parse_expression();
+	statement->condition = parse_expression();
 	expect(')');
 	expect(';');
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_for(void)
 {
 	eat(T_for);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_FOR;
-	statement->source_position = token.source_position;
+	for_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_FOR;
+	statement->statement.source_position = token.source_position;
 
 	expect('(');
 
 	int         top          = environment_top();
 	context_t  *last_context = context;
-	set_context(&statement->v.for_stmt.context);
+	set_context(&statement->context);
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
 			parse_declaration();
 		} else {
-			statement->v.for_stmt.initialisation = parse_expression();
+			statement->initialisation = parse_expression();
 			expect(';');
 		}
 	} else {
@@ -4059,20 +4110,20 @@ static statement_t *parse_for(void)
 	}
 
 	if(token.type != ';') {
-		statement->v.for_stmt.condition = parse_expression();
+		statement->condition = parse_expression();
 	}
 	expect(';');
 	if(token.type != ')') {
-		statement->v.for_stmt.step = parse_expression();
+		statement->step = parse_expression();
 	}
 	expect(')');
-	statement->v.for_stmt.body = parse_statement();
+	statement->body = parse_statement();
 
-	assert(context == &statement->v.for_stmt.context);
+	assert(context == &statement->context);
 	set_context(last_context);
 	environment_pop_to(top);
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_goto(void)
@@ -4089,16 +4140,16 @@ static statement_t *parse_goto(void)
 
 	declaration_t *label = get_label(symbol);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	goto_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
 
-	statement->type            = STATEMENT_GOTO;
-	statement->source_position = token.source_position;
+	statement->statement.type            = STATEMENT_GOTO;
+	statement->statement.source_position = token.source_position;
 
-	statement->v.goto_label = label;
+	statement->label = label;
 
 	expect(';');
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_continue(void)
@@ -4129,14 +4180,14 @@ static statement_t *parse_return(void)
 {
 	eat(T_return);
 
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	return_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
 
-	statement->type            = STATEMENT_RETURN;
-	statement->source_position = token.source_position;
+	statement->statement.type            = STATEMENT_RETURN;
+	statement->statement.source_position = token.source_position;
 
 	assert(current_function->type->type == TYPE_FUNCTION);
-	type_t *function_type = current_function->type;
-	type_t *return_type   = function_type->v.function_type.result_type;
+	function_type_t *function_type = (function_type_t*) current_function->type;
+	type_t          *return_type   = function_type->result_type;
 
 	expression_t *return_value;
 	if(token.type != ';') {
@@ -4157,21 +4208,21 @@ static statement_t *parse_return(void)
 			              "non-void");
 		}
 	}
-	statement->v.return_value = return_value;
+	statement->return_value = return_value;
 
 	expect(';');
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_declaration_statement(void)
 {
 	declaration_t *before = last_declaration;
 
-	statement_t *statement
+	declaration_statement_t *statement
 		= allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_DECLARATION;
-	statement->source_position = token.source_position;
+	statement->statement.type            = STATEMENT_DECLARATION;
+	statement->statement.source_position = token.source_position;
 
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
@@ -4184,26 +4235,26 @@ static statement_t *parse_declaration_statement(void)
 	}
 
 	if(before == NULL) {
-		statement->v.declaration_stmt.begin = context->declarations;
+		statement->declarations_begin = context->declarations;
 	} else {
-		statement->v.declaration_stmt.begin = before->next;
+		statement->declarations_begin = before->next;
 	}
-	statement->v.declaration_stmt.end = last_declaration;
+	statement->declarations_end = last_declaration;
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_expression_statement(void)
 {
-	statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->type            = STATEMENT_EXPRESSION;
-	statement->source_position = token.source_position;
+	expression_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement->statement.type            = STATEMENT_EXPRESSION;
+	statement->statement.source_position = token.source_position;
 
-	statement->v.expression = parse_expression();
+	statement->expression = parse_expression();
 
 	expect(';');
 
-	return statement;
+	return (statement_t*) statement;
 }
 
 static statement_t *parse_statement(void)
@@ -4304,16 +4355,16 @@ static statement_t *parse_statement(void)
 
 static statement_t *parse_compound_statement(void)
 {
-	statement_t *compound_statement
+	compound_statement_t *compound_statement
 		= allocate_ast_zero(sizeof(compound_statement[0]));
-	compound_statement->type            = STATEMENT_COMPOUND;
-	compound_statement->source_position = token.source_position;
+	compound_statement->statement.type            = STATEMENT_COMPOUND;
+	compound_statement->statement.source_position = token.source_position;
 
 	eat('{');
 
 	int        top          = environment_top();
 	context_t *last_context = context;
-	set_context(&compound_statement->v.compound_stmt.context);
+	set_context(&compound_statement->context);
 
 	statement_t *last_statement = NULL;
 
@@ -4325,7 +4376,7 @@ static statement_t *parse_compound_statement(void)
 		if(last_statement != NULL) {
 			last_statement->next = statement;
 		} else {
-			compound_statement->v.compound_stmt.statements = statement;
+			compound_statement->statements = statement;
 		}
 
 		while(statement->next != NULL)
@@ -4336,16 +4387,16 @@ static statement_t *parse_compound_statement(void)
 
 	if(token.type != '}') {
 		parser_print_error_prefix_pos(
-				compound_statement->source_position);
+				compound_statement->statement.source_position);
 		fprintf(stderr, "end of file while looking for closing '}'\n");
 	}
 	next_token();
 
-	assert(context == &compound_statement->v.compound_stmt.context);
+	assert(context == &compound_statement->context);
 	set_context(last_context);
 	environment_pop_to(top);
 
-	return compound_statement;
+	return (statement_t*) compound_statement;
 }
 
 static translation_unit_t *parse_translation_unit(void)

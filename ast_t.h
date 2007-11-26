@@ -2,6 +2,7 @@
 #define AST_T_H
 
 #include <libfirm/firm_types.h>
+#include <assert.h>
 
 #include "ast.h"
 #include "symbol.h"
@@ -217,22 +218,36 @@ typedef enum {
 typedef enum {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
-	INITIALIZER_STRING
+	INITIALIZER_STRING,
+	INITIALIZER_COUNT
 } initializer_type_t;
 
-struct initializer_t {
-	initializer_type_t  type;
-	union {
-		/* if type == INITIALIZER_VALUE */
-		expression_t *value;
-		/* if type == INITIALIZER_LIST */
-		struct {
-			size_t         len;
-			initializer_t *initializers[1];
-		} list;
-		/* if type == INITIALIZER_STRING */
-		const char    *string;
-	} v;
+struct initializer_base_t {
+	initializer_type_t type;
+};
+
+struct initializer_value_t {
+	initializer_base_t  initializer;
+	expression_t       *value;
+};
+
+struct initializer_list_t {
+	initializer_base_t  initializer;
+	size_t              len;
+	initializer_t      *initializers[];
+};
+
+struct initializer_string_t {
+	initializer_base_t  initializer;
+	const char         *string;
+};
+
+union initializer_t {
+	initializer_type_t   type;
+	initializer_base_t   base;
+	initializer_value_t  value;
+	initializer_list_t   list;
+	initializer_string_t string;
 };
 
 struct declaration_t {
@@ -288,58 +303,79 @@ struct statement_t {
 	statement_type_t   type;
 	statement_t       *next;
 	source_position_t  source_position;
-	union {
-		/* if type == STATEMENT_COMPOUND */
-		struct {
-			statement_t *statements;
-			context_t    context;
-		} compound_stmt;
-		/* if type == STATEMENT_RETURN */
-		expression_t *return_value;
-		/* if type == STATEMENT_DECLARATION */
-		struct {
-			declaration_t *begin;
-			declaration_t *end;
-		} declaration_stmt;
-		/* if type == STATEMENT_IF */
-		struct {
-			expression_t *condition;
-			statement_t  *true_statement;
-			statement_t  *false_statement;
-		} if_stmt;
-		/* if type == STATEMENT_SWITCH */
-		struct {
-			expression_t *expression;
-			statement_t  *body;
-		} switch_stmt;
-		/* if type == STATEMENT_EXPRESSION */
-		expression_t *expression;
-		/* if type == STATEMENT_GOTO */
-		declaration_t *goto_label;
-		/* if type == STATEMENT_LABEL */
-		struct {
-			declaration_t *label;
-			statement_t   *label_statement;
-		} label_stmt;
-		/* if type == STATEMENT_CASE_LABEL */
-		struct {
-			expression_t *expression;
-			statement_t  *label_statement;
-		} case_label_stmt;
-		/* if type == STATEMENT_WHILE or STATEMENT_DO_WHILE */
-		struct {
-			expression_t *condition;
-			statement_t  *body;
-		} while_stmt;
-		/* if type == STATEMENT_FOR */
-		struct {
-			expression_t  *initialisation;
-			expression_t  *condition;
-			expression_t  *step;
-			statement_t   *body;
-			context_t      context;
-		} for_stmt;
-	} v;
+};
+
+struct return_statement_t {
+	statement_t   statement;
+	expression_t *return_value;
+};
+
+struct compound_statement_t {
+	statement_t  statement;
+	statement_t *statements;
+	context_t    context;
+};
+
+struct declaration_statement_t {
+	statement_t    statement;
+	declaration_t *declarations_begin;
+	declaration_t *declarations_end;
+};
+
+struct if_statement_t {
+	statement_t   statement;
+	expression_t *condition;
+	statement_t  *true_statement;
+	statement_t  *false_statement;
+};
+
+struct switch_statement_t {
+	statement_t   statement;
+	expression_t *expression;
+	statement_t  *body;
+};
+
+struct goto_statement_t {
+	statement_t    statement;
+	declaration_t *label;
+};
+
+struct case_label_statement_t {
+	statement_t   statement;
+	expression_t *expression;
+	statement_t  *label_statement;
+};
+
+struct label_statement_t {
+	statement_t    statement;
+	declaration_t *label;
+	statement_t   *label_statement;
+};
+
+struct expression_statement_t {
+	statement_t   statement;
+	expression_t *expression;
+};
+
+struct while_statement_t {
+	statement_t   statement;
+	expression_t *condition;
+	statement_t  *body;
+};
+
+struct do_while_statement_t {
+	statement_t   statement;
+	expression_t *condition;
+	statement_t  *body;
+};
+
+struct for_statement_t {
+	statement_t   statement;
+	expression_t  *initialisation;
+	expression_t  *condition;
+	expression_t  *step;
+	statement_t   *body;
+	context_t      context;
 };
 
 struct translation_unit_t {

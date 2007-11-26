@@ -66,70 +66,76 @@ typedef enum {
 
 typedef unsigned int type_qualifiers_t;
 
+struct type_t {
+	type_type_t       type;
+	type_qualifiers_t qualifiers;
+
+	ir_type          *firm_type;
+};
+
+struct atomic_type_t {
+	type_t              type;
+	atomic_type_type_t  atype;
+};
+
+struct builtin_type_t {
+	type_t    type;
+	symbol_t *symbol;
+	type_t   *real_type;
+};
+
+struct pointer_type_t {
+	type_t   type;
+	type_t  *points_to;
+};
+
+struct array_type_t {
+	type_t        type;
+	type_t       *element_type;
+	bool          is_static;
+	bool          is_variable;
+	expression_t *size;
+};
+
 struct function_parameter_t {
 	type_t               *type;
 	function_parameter_t *next;
 };
 
-struct type_t {
-	type_type_t       type;
-	type_qualifiers_t qualifiers;
+struct function_type_t {
+	type_t                type;
+	type_t               *result_type;
+	function_parameter_t *parameters;
+	bool                  variadic;
+	bool                  unspecified_parameters;
+};
 
-	union {
-		/* if type == TYPE_ATOMIC */
-		struct {
-			atomic_type_type_t  atype;
-		} atomic_type;
-		/* if type == TYPE_COMPOUND_STRUCT or type == TYPE_COMPOUND_UNION */
-		struct {
-			/** the declaration of the compound type, its context field
-			 * contains the compound entries. */
-			declaration_t *declaration;
-		} compound_type;
-		/* if type == TYPE_ENUM */
-		struct {
-			/** the declaration of the enum type. You can find the enum entries by
-			 * walking the declaration->next list until you don't find
-			 * STORAGE_CLASS_ENUM_ENTRY declarations anymore */
-			declaration_t *declaration;
-		} enum_type;
-		/* if type == TYPE_FUNCTION */
-		struct  {
-			type_t               *result_type;
-			function_parameter_t *parameters;
-			bool                  variadic;
-			bool                  unspecified_parameters;
-		} function_type;
-		/* if type == TYPE_POINTER */
-		struct {
-			type_t  *points_to;
-		} pointer_type;
-		/* if type == TYPE_ARRAY */
-		struct {
-			type_t       *element_type;
-			bool          is_static;
-			bool          is_variable;
-			expression_t *size;
-		} array_type;
-		/* if type == TYPE_BUILTIN */
-		struct {
-			symbol_t *symbol;
-			type_t   *real_type;
-		} builtin_type;
-		/* if type == TYPE_TYPEDEF */
-		struct {
-			declaration_t *declaration;
-			type_t        *resolved_type;
-		} typedef_type;
-		/* if type == TYPE_TYPEOF */
-		struct {
-			expression_t *expression;
-			type_t       *typeof_type;
-			type_t       *resolved_type;
-		} typeof_type;
-	} v;
+struct compound_type_t {
+	type_t         type;
+	/** the declaration of the compound type, its context field
+	 * contains the compound entries. */
+	declaration_t *declaration;
+};
 
-	ir_type          *firm_type;
+struct enum_type_t {
+	type_t         type;
+	/** the declaration of the enum type. You can find the enum entries by
+	 * walking the declaration->next list until you don't find
+	 * STORAGE_CLASS_ENUM_ENTRY declarations anymore */
+	declaration_t *declaration;
+};
+
+struct typedef_type_t {
+	type_t         type;
+	declaration_t *declaration;
+	type_t        *resolved_type;
+};
+
+struct typeof_type_t {
+	type_t        type;
+	expression_t *expression;
+	type_t       *typeof_type;
+	type_t       *resolved_type;
 };
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);

@@ -37,14 +37,14 @@ static const char *get_atomic_type_string(const atomic_type_type_t type)
 	}
 }
 
-static void write_atomic_type(const type_t *type)
+static void write_atomic_type(const atomic_type_t *type)
 {
-	fprintf(out, "%s", get_atomic_type_string(type->v.atomic_type.atype));
+	fprintf(out, "%s", get_atomic_type_string(type->atype));
 }
 
-static void write_pointer_type(const type_t *type)
+static void write_pointer_type(const pointer_type_t *type)
 {
-	write_type(type->v.pointer_type.points_to);
+	write_type(type->points_to);
 	fputc('*', out);
 }
 
@@ -65,16 +65,16 @@ static declaration_t *find_typedef(const type_t *type)
 	return declaration;
 }
 
-static void write_compound_type(const type_t *type)
+static void write_compound_type(const compound_type_t *type)
 {
-	declaration_t *declaration = find_typedef(type);
+	declaration_t *declaration = find_typedef((const type_t*) type);
 	if(declaration != NULL) {
 		fprintf(out, "%s", declaration->symbol->string);
 		return;
 	}
 
 	/* does the struct have a name? */
-	symbol_t *symbol = type->v.compound_type.declaration->symbol;
+	symbol_t *symbol = type->declaration->symbol;
 	if(symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
 		fprintf(out, "%s", symbol->string);
@@ -84,16 +84,16 @@ static void write_compound_type(const type_t *type)
 	fprintf(out, "/* TODO anonymous struct */byte");
 }
 
-static void write_enum_type(const type_t *type)
+static void write_enum_type(const enum_type_t *type)
 {
-	declaration_t *declaration = find_typedef(type);
+	declaration_t *declaration = find_typedef((const type_t*) type);
 	if(declaration != NULL) {
 		fprintf(out, "%s", declaration->symbol->string);
 		return;
 	}
 
 	/* does the enum have a name? */
-	symbol_t *symbol = type->v.enum_type.declaration->symbol;
+	symbol_t *symbol = type->declaration->symbol;
 	if(symbol != NULL) {
 		/* TODO: make sure we create an enum for it... */
 		fprintf(out, "%s", symbol->string);
@@ -103,11 +103,11 @@ static void write_enum_type(const type_t *type)
 	fprintf(out, "/* TODO anonymous enum */byte");
 }
 
-static void write_function_type(const type_t *type)
+static void write_function_type(const function_type_t *type)
 {
 	fprintf(out, "(func(");
 
-	function_parameter_t *parameter = type->v.function_type.parameters;
+	function_parameter_t *parameter = type->parameters;
 	int                   first     = 1;
 	while(parameter != NULL) {
 		if(!first) {
@@ -131,7 +131,7 @@ static void write_function_type(const type_t *type)
 	}
 
 	fprintf(out, ") : ");
-	write_type(type->v.function_type.result_type);
+	write_type(type->result_type);
 	fprintf(out, ")");
 }
 
@@ -139,20 +139,20 @@ static void write_type(const type_t *type)
 {
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		write_atomic_type(type);
+		write_atomic_type((const atomic_type_t*) type);
 		return;
 	case TYPE_POINTER:
-		write_pointer_type(type);
+		write_pointer_type((const pointer_type_t*) type);
 		return;
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
-		write_compound_type(type);
+		write_compound_type((const compound_type_t*) type);
 		return;
 	case TYPE_ENUM:
-		write_enum_type(type);
+		write_enum_type((const enum_type_t*) type);
 		return;
 	case TYPE_FUNCTION:
-		write_function_type(type);
+		write_function_type((const function_type_t*) type);
 		return;
 	case TYPE_INVALID:
 		panic("invalid type found");
@@ -170,11 +170,11 @@ static void write_struct_entry(const declaration_t *declaration)
 	fprintf(out, "\n");
 }
 
-static void write_struct(const symbol_t *symbol, const type_t *type)
+static void write_struct(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "struct %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->v.compound_type.declaration->context.declarations;
+	const declaration_t *declaration = type->declaration->context.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -183,11 +183,11 @@ static void write_struct(const symbol_t *symbol, const type_t *type)
 	fprintf(out, "\n");
 }
 
-static void write_union(const symbol_t *symbol, const type_t *type)
+static void write_union(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "union %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->v.compound_type.declaration->context.declarations;
+	const declaration_t *declaration = type->declaration->context.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -208,7 +208,7 @@ static void write_unary_expression(const unary_expression_t *expression)
 		fputc('!', out);
 		break;
 	default:
-		panic("unimplemented unary expression found");
+		panic("unimeplemented unary expression found");
 	}
 	write_expression(expression->value);
 }
@@ -234,11 +234,11 @@ static void write_expression(const expression_t *expression)
 	}
 }
 
-static void write_enum(const symbol_t *symbol, const type_t *type)
+static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	declaration_t *entry = type->v.enum_type.declaration->next;
+	declaration_t *entry = type->declaration->next;
 	for ( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
 			entry = entry->next) {
 		fprintf(out, "\t%s", entry->symbol->string);
@@ -270,7 +270,8 @@ static void write_function(const declaration_t *declaration)
 	fprintf(out, "func extern %s(",
 	        declaration->symbol->string);
 
-	const type_t *function_type = declaration->type;
+	const function_type_t *function_type
+		= (const function_type_t*) declaration->type;
 
 	declaration_t *parameter = declaration->context.declarations;
 	int            first     = 1;
@@ -287,7 +288,7 @@ static void write_function(const declaration_t *declaration)
 		}
 		write_type(parameter->type);
 	}
-	if(function_type->v.function_type.variadic) {
+	if(function_type->variadic) {
 		if(!first) {
 			fprintf(out, ", ");
 		} else {
@@ -297,9 +298,9 @@ static void write_function(const declaration_t *declaration)
 	}
 	fprintf(out, ")");
 
-	const type_t *result_type = function_type->v.function_type.result_type;
+	const type_t *result_type = function_type->result_type;
 	if(result_type->type != TYPE_ATOMIC ||
-	   result_type->v.atomic_type.atype != ATOMIC_TYPE_VOID) {
+			((const atomic_type_t*) result_type)->atype != ATOMIC_TYPE_VOID) {
 		fprintf(out, " : ");
 		write_type(result_type);
 	}
@@ -320,7 +321,7 @@ void write_fluffy_decls(const translation_unit_t *unit)
 
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
-	/* write structs, unions + enums */
+	/* write structs,unions + enums */
 	declaration_t *declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
@@ -329,11 +330,11 @@ void write_fluffy_decls(const translation_unit_t *unit)
 		}
 		type_t *type = declaration->type;
 		if(type->type == TYPE_COMPOUND_STRUCT) {
-			write_struct(declaration->symbol, type);
+			write_struct(declaration->symbol, (compound_type_t*) type);
 		} else if(type->type == TYPE_COMPOUND_UNION) {
-			write_union(declaration->symbol, type);
+			write_union(declaration->symbol, (compound_type_t*) type);
 		} else if(type->type == TYPE_ENUM) {
-			write_enum(declaration->symbol, type);
+			write_enum(declaration->symbol, (enum_type_t*) type);
 		}
 	}
 

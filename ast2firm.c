@@ -119,9 +119,9 @@ static ident *unique_ident(const char *tag)
 	return new_id_from_str(buf);
 }
 
-static ir_mode *get_atomic_mode(const type_t* atomic_type)
+static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 {
-	switch(atomic_type->v.atomic_type.atype) {
+	switch(atomic_type->atype) {
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_CHAR:
 		return mode_Bs;
@@ -173,9 +173,9 @@ static ir_mode *get_atomic_mode(const type_t* atomic_type)
 
 static unsigned get_type_size(type_t *type);
 
-static unsigned get_atomic_type_size(const type_t *type)
+static unsigned get_atomic_type_size(const atomic_type_t *type)
 {
-	switch(type->v.atomic_type.atype) {
+	switch(type->atype) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_UCHAR:
@@ -210,15 +210,15 @@ static unsigned get_atomic_type_size(const type_t *type)
 	panic("Trying to determine size of invalid atomic type");
 }
 
-static unsigned get_compound_type_size(type_t *type)
+static unsigned get_compound_type_size(compound_type_t *type)
 {
-	ir_type *irtype = get_ir_type(type);
+	ir_type *irtype = get_ir_type(&type->type);
 	return get_type_size_bytes(irtype);
 }
 
-static unsigned get_array_type_size(type_t *type)
+static unsigned get_array_type_size(array_type_t *type)
 {
-	ir_type *irtype = get_ir_type(type);
+	ir_type *irtype = get_ir_type(&type->type);
 	return get_type_size_bytes(irtype);
 }
 
@@ -228,19 +228,19 @@ static unsigned get_type_size(type_t *type)
 
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		return get_atomic_type_size(type);
+		return get_atomic_type_size((const atomic_type_t*) type);
 	case TYPE_ENUM:
 		return get_mode_size_bytes(mode_Is);
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
-		return get_compound_type_size(type);
+		return get_compound_type_size((compound_type_t*) type);
 	case TYPE_FUNCTION:
 		/* just a pointer to the function */
 		return get_mode_size_bytes(mode_P_code);
 	case TYPE_POINTER:
 		return get_mode_size_bytes(mode_P_data);
 	case TYPE_ARRAY:
-		return get_array_type_size(type);
+		return get_array_type_size((array_type_t*) type);
 	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
@@ -250,11 +250,11 @@ static unsigned get_type_size(type_t *type)
 	panic("Trying to determine size of invalid type");
 }
 
-static unsigned count_parameters(const type_t *type)
+static unsigned count_parameters(const function_type_t *function_type)
 {
 	unsigned count = 0;
 
-	function_parameter_t *parameter = type->v.function_type.parameters;
+	function_parameter_t *parameter = function_type->parameters;
 	for ( ; parameter != NULL; parameter = parameter->next) {
 		++count;
 	}
@@ -267,7 +267,7 @@ static unsigned count_parameters(const type_t *type)
 
 static long fold_constant(const expression_t *expression);
 
-static ir_type *create_atomic_type(const type_t *type)
+static ir_type *create_atomic_type(const atomic_type_t *type)
 {
 	ir_mode *mode   = get_atomic_mode(type);
 	ident   *id     = get_mode_ident(mode);
@@ -276,12 +276,12 @@ static ir_type *create_atomic_type(const type_t *type)
 	return irtype;
 }
 
-static ir_type *create_method_type(const type_t *type)
+static ir_type *create_method_type(const function_type_t *function_type)
 {
-	type_t  *result_type  = type->v.function_type.result_type;
+	type_t  *result_type  = function_type->result_type;
 
 	ident   *id           = unique_ident("functiontype");
-	int      n_parameters = count_parameters(type);
+	int      n_parameters = count_parameters(function_type);
 	int      n_results    = result_type == type_void ? 0 : 1;
 	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
@@ -290,7 +290,7 @@ static ir_type *create_method_type(const type_t *type)
 		set_method_res_type(irtype, 0, restype);
 	}
 
-	function_parameter_t *parameter = type->v.function_type.parameters;
+	function_parameter_t *parameter = function_type->parameters;
 	int                   n         = 0;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		ir_type *p_irtype = get_ir_type(parameter->type);
@@ -298,16 +298,16 @@ static ir_type *create_method_type(const type_t *type)
 		++n;
 	}
 
-	if(type->v.function_type.variadic || type->v.function_type.unspecified_parameters) {
+	if(function_type->variadic || function_type->unspecified_parameters) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
 	return irtype;
 }
 
-static ir_type *create_pointer_type(type_t *type)
+static ir_type *create_pointer_type(pointer_type_t *type)
 {
-	type_t  *points_to = type->v.pointer_type.points_to;
+	type_t  *points_to = type->points_to;
 	ir_type *ir_points_to;
 	/* Avoid endless recursion if the points_to type contains this poiner type
 	 * again (might be a struct). We therefore first create a void* pointer
@@ -315,7 +315,7 @@ static ir_type *create_pointer_type(type_t *type)
 	 */
 	ir_type *ir_type = new_type_pointer(unique_ident("pointer"),
 	                                    ir_type_void, mode_P_data);
-	type->firm_type  = ir_type;
+	type->type.firm_type  = ir_type;
 
 	ir_points_to = get_ir_type(points_to);
 	set_pointer_points_to_type(ir_type, ir_points_to);
@@ -323,16 +323,16 @@ static ir_type *create_pointer_type(type_t *type)
 	return ir_type;
 }
 
-static ir_type *create_array_type(type_t *type)
+static ir_type *create_array_type(array_type_t *type)
 {
-	type_t  *element_type    = type->v.array_type.element_type;
+	type_t  *element_type    = type->element_type;
 	ir_type *ir_element_type = get_ir_type(element_type);
 
 	ident   *id      = unique_ident("array");
 	ir_type *ir_type = new_type_array(id, 1, ir_element_type);
 
-	if(type->v.array_type.size != NULL) {
-		int n_elements = fold_constant(type->v.array_type.size);
+	if(type->size != NULL) {
+		int n_elements = fold_constant(type->size);
 
 		set_array_bounds_int(ir_type, 0, 0, n_elements);
 
@@ -351,9 +351,9 @@ static ir_type *create_array_type(type_t *type)
 
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
-static ir_type *create_struct_type(type_t *type)
+static ir_type *create_struct_type(compound_type_t *type)
 {
-	symbol_t *symbol = type->v.compound_type.declaration->symbol;
+	symbol_t *symbol = type->declaration->symbol;
 	ident    *id;
 	if(symbol != NULL) {
 		id = unique_ident(symbol->string);
@@ -362,11 +362,11 @@ static ir_type *create_struct_type(type_t *type)
 	}
 	ir_type *ir_type = new_type_struct(id);
 
-	type->firm_type = ir_type;
+	type->type.firm_type = ir_type;
 
 	int align_all = 1;
 	int offset    = 0;
-	declaration_t *entry = type->v.compound_type.declaration->context.declarations;
+	declaration_t *entry = type->declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -404,9 +404,9 @@ static ir_type *create_struct_type(type_t *type)
 	return ir_type;
 }
 
-static ir_type *create_union_type(type_t *type)
+static ir_type *create_union_type(compound_type_t *type)
 {
-	declaration_t *declaration = type->v.compound_type.declaration;
+	declaration_t *declaration = type->declaration;
 	symbol_t      *symbol      = declaration->symbol;
 	ident         *id;
 	if(symbol != NULL) {
@@ -416,7 +416,7 @@ static ir_type *create_union_type(type_t *type)
 	}
 	ir_type  *ir_type = new_type_union(id);
 
-	type->firm_type = ir_type;
+	type->type.firm_type = ir_type;
 
 	int align_all = 1;
 	int size      = 0;
@@ -458,22 +458,22 @@ static ir_type *create_union_type(type_t *type)
 static ir_node *expression_to_firm(const expression_t *expression);
 static inline ir_mode *get_ir_mode(type_t *type);
 
-static ir_type *create_enum_type(type_t *const type)
+static ir_type *create_enum_type(enum_type_t *const type)
 {
-	type->firm_type = ir_type_int;
+	type->type.firm_type = ir_type_int;
 
-	ir_mode *const mode    = get_ir_mode(type);
+	ir_mode *const mode    = get_ir_mode((type_t*) type);
 	tarval  *const one     = get_mode_one(mode);
 	tarval  *      tv_next = get_tarval_null(mode);
 
-	for (declaration_t *decl = type->v.enum_type.declaration;;) {
-		decl = decl->next;
-		if (decl == NULL || decl->storage_class != STORAGE_CLASS_ENUM_ENTRY)
+	declaration_t *declaration = type->declaration->next;
+	for (; declaration != NULL; declaration = declaration->next) {
+		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY)
 			break;
 
-		decl->declaration_type = DECLARATION_TYPE_ENUM_ENTRY;
+		declaration->declaration_type = DECLARATION_TYPE_ENUM_ENTRY;
 
-		expression_t *const init = decl->init.enum_value;
+		expression_t *const init = declaration->init.enum_value;
 		if (init != NULL) {
 			ir_node *const cnst = expression_to_firm(init);
 			if (!is_Const(cnst)) {
@@ -481,7 +481,7 @@ static ir_type *create_enum_type(type_t *const type)
 			}
 			tv_next = get_Const_tarval(cnst);
 		}
-		decl->v.enum_val = tv_next;
+		declaration->v.enum_val = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
 
@@ -502,25 +502,25 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch(type->type) {
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(type);
+		firm_type = create_atomic_type((atomic_type_t*) type);
 		break;
 	case TYPE_FUNCTION:
-		firm_type = create_method_type(type);
+		firm_type = create_method_type((function_type_t*) type);
 		break;
 	case TYPE_POINTER:
-		firm_type = create_pointer_type(type);
+		firm_type = create_pointer_type((pointer_type_t*) type);
 		break;
 	case TYPE_ARRAY:
-		firm_type = create_array_type(type);
+		firm_type = create_array_type((array_type_t*) type);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type(type);
+		firm_type = create_struct_type((compound_type_t*) type);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type(type);
+		firm_type = create_union_type((compound_type_t*) type);
 		break;
 	case TYPE_ENUM:
-		firm_type = create_enum_type(type);
+		firm_type = create_enum_type((enum_type_t*) type);
 		break;
 	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
@@ -799,14 +799,14 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	}
 	ir_node       *callee   = expression_to_firm(function);
 
-	type_t *type;
+	function_type_t *function_type;
 	if (function->datatype->type == TYPE_POINTER) {
-		type_t *const ptr_type = function->datatype;
-		assert(ptr_type->v.pointer_type.points_to->type == TYPE_FUNCTION);
-		type = ptr_type->v.pointer_type.points_to;
+		pointer_type_t *const ptr_type = (pointer_type_t*)function->datatype;
+		assert(ptr_type->points_to->type == TYPE_FUNCTION);
+		function_type = (function_type_t*)ptr_type->points_to;
 	} else {
 		assert(function->datatype->type == TYPE_FUNCTION);
-		type = function->datatype;
+		function_type = (function_type_t*)function->datatype;
 	}
 
 	int              n_parameters = 0;
@@ -815,9 +815,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		++n_parameters;
 	}
 
-	ir_type *ir_method_type  = get_ir_type((type_t*) type);
+	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
-	if(type->v.function_type.variadic || type->v.function_type.unspecified_parameters) {
+	if(function_type->variadic || function_type->unspecified_parameters) {
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
@@ -861,7 +861,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
 	set_store(mem);
 
-	type_t  *result_type = type->v.function_type.result_type;
+	type_t  *result_type = function_type->result_type;
 	ir_node *result      = NULL;
 	if(result_type != type_void) {
 		ir_mode *mode    = get_ir_mode(result_type);
@@ -873,7 +873,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 }
 
 static void statement_to_firm(statement_t *statement);
-static ir_node *compound_statement_to_firm(statement_t *compound);
+static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
 static void create_condition_evaluation(const expression_t *expression,
@@ -931,7 +931,8 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 
 	ir_node *offset;
 	if(type->type == TYPE_POINTER) {
-		unsigned elem_size = get_type_size(type->v.pointer_type.points_to);
+		pointer_type_t *pointer_type = (pointer_type_t*) type;
+		unsigned        elem_size    = get_type_size(pointer_type->points_to);
 		offset = new_Const_long(mode_Is, elem_size);
 	} else {
 		assert(is_type_arithmetic(type));
@@ -1084,8 +1085,9 @@ static ir_node *pointer_arithmetic(ir_node  *const pointer,
                                    dbg_info *const dbgi,
                                    const create_arithmetic_func func)
 {
-	type_t         *const points_to = type->v.pointer_type.points_to;
-	const unsigned        elem_size = get_type_size(points_to);
+	pointer_type_t *const pointer_type = (pointer_type_t*)type;
+	type_t         *const points_to    = pointer_type->points_to;
+	const unsigned        elem_size    = get_type_size(points_to);
 
 	assert(elem_size >= 1);
 	if (elem_size > 1) {
@@ -1161,8 +1163,8 @@ static ir_node *create_sub(const binary_expression_t *expression)
 		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
 	} else if (type_left->type == TYPE_POINTER && type_right->type == TYPE_POINTER) {
-		const type_t *const ptr_type = type_left;
-		const unsigned elem_size     = get_type_size(ptr_type->v.pointer_type.points_to);
+		const pointer_type_t *const ptr_type = (const pointer_type_t*)type_left;
+		const unsigned elem_size             = get_type_size(ptr_type->points_to);
 		ir_mode *const mode   = get_ir_mode(type);
 		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
 		ir_node *const cnst   = new_Const_long(mode_Is, (long)elem_size);
@@ -1503,8 +1505,9 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	gcc_type_class tc;
 	switch (type->type)
 	{
-		case TYPE_ATOMIC:
-			switch (type->v.atomic_type.atype) {
+		case TYPE_ATOMIC: {
+			const atomic_type_t *const atomic_type = (const atomic_type_t*)type;
+			switch (atomic_type->atype) {
 				// should not be reached
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;
@@ -1553,6 +1556,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 					panic("Unimplemented case in classify_type_to_firm().");
 			}
 			break;
+		}
 
 		case TYPE_ARRAY:           // gcc handles this as pointer
 		case TYPE_FUNCTION:        // gcc handles this as pointer
@@ -1590,7 +1594,7 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	statement_t *statement = expr->statement;
 
 	assert(statement->type == STATEMENT_COMPOUND);
-	return compound_statement_to_firm(statement);
+	return compound_statement_to_firm((compound_statement_t*) statement);
 }
 
 static ir_node *dereference_addr(const unary_expression_t *const expression)
@@ -1752,16 +1756,16 @@ static void create_condition_evaluation(const expression_t *expression,
 }
 
 
-static void return_statement_to_firm(statement_t *statement)
+static void return_statement_to_firm(return_statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return;
 
-	dbg_info *dbgi = get_dbg_info(&statement->source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 	ir_node  *ret;
 
-	if(statement->v.return_value != NULL) {
-		ir_node *retval = expression_to_firm(statement->v.return_value);
+	if(statement->return_value != NULL) {
+		ir_node *retval = expression_to_firm(statement->return_value);
 		ir_node *in[1];
 
 		in[0] = retval;
@@ -1775,23 +1779,24 @@ static void return_statement_to_firm(statement_t *statement)
 	set_cur_block(NULL);
 }
 
-static ir_node *expression_statement_to_firm(statement_t *statement)
+static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return NULL;
 
-	return expression_to_firm(statement->v.expression);
+	return expression_to_firm(statement->expression);
 }
 
-static ir_node *compound_statement_to_firm(statement_t *compound)
+static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
 	ir_node     *result    = NULL;
-	statement_t *statement = compound->v.compound_stmt.statements;
+	statement_t *statement = compound->statements;
 	for( ; statement != NULL; statement = statement->next) {
 		//context2firm(&statement->context);
 
 		if(statement->next == NULL && statement->type == STATEMENT_EXPRESSION) {
-			result = expression_statement_to_firm(statement);
+			result = expression_statement_to_firm(
+					(expression_statement_t*) statement);
 			break;
 		}
 		statement_to_firm(statement);
@@ -1800,7 +1805,7 @@ static ir_node *compound_statement_to_firm(statement_t *compound)
 	return result;
 }
 
-static void if_statement_to_firm(statement_t *statement)
+static void if_statement_to_firm(if_statement_t *statement)
 {
 	ir_node *cur_block = get_cur_block();
 
@@ -1808,9 +1813,9 @@ static void if_statement_to_firm(statement_t *statement)
 
 	/* the true (blocks) */
 	ir_node *true_block;
-	if (statement->v.if_stmt.true_statement != NULL) {
+	if (statement->true_statement != NULL) {
 		true_block = new_immBlock();
-		statement_to_firm(statement->v.if_stmt.true_statement);
+		statement_to_firm(statement->true_statement);
 		if(get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
 			add_immBlock_pred(fallthrough_block, jmp);
@@ -1821,10 +1826,10 @@ static void if_statement_to_firm(statement_t *statement)
 
 	/* the false (blocks) */
 	ir_node *false_block;
-	if(statement->v.if_stmt.false_statement != NULL) {
+	if(statement->false_statement != NULL) {
 		false_block = new_immBlock();
 
-		statement_to_firm(statement->v.if_stmt.false_statement);
+		statement_to_firm(statement->false_statement);
 		if(get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
 			add_immBlock_pred(fallthrough_block, jmp);
@@ -1836,7 +1841,7 @@ static void if_statement_to_firm(statement_t *statement)
 	/* create the condition */
 	if(cur_block != NULL) {
 		set_cur_block(cur_block);
-		create_condition_evaluation(statement->v.if_stmt.condition, true_block,
+		create_condition_evaluation(statement->condition, true_block,
 		                            false_block);
 	}
 
@@ -1849,7 +1854,7 @@ static void if_statement_to_firm(statement_t *statement)
 	set_cur_block(fallthrough_block);
 }
 
-static void while_statement_to_firm(statement_t *statement)
+static void while_statement_to_firm(while_statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
@@ -1867,14 +1872,14 @@ static void while_statement_to_firm(statement_t *statement)
 
 	/* the loop body */
 	ir_node *body_block;
-	if (statement->v.while_stmt.body != NULL) {
+	if (statement->body != NULL) {
 		ir_node *old_continue_label = continue_label;
 		ir_node *old_break_label    = break_label;
 		continue_label              = header_block;
 		break_label                 = false_block;
 
 		body_block = new_immBlock();
-		statement_to_firm(statement->v.while_stmt.body);
+		statement_to_firm(statement->body);
 
 		assert(continue_label == header_block);
 		assert(break_label    == false_block);
@@ -1892,7 +1897,7 @@ static void while_statement_to_firm(statement_t *statement)
 	/* create the condition */
 	set_cur_block(header_block);
 
-	create_condition_evaluation(statement->v.while_stmt.condition, body_block, false_block);
+	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
 	mature_immBlock(false_block);
 	mature_immBlock(header_block);
@@ -1900,7 +1905,7 @@ static void while_statement_to_firm(statement_t *statement)
 	set_cur_block(false_block);
 }
 
-static void do_while_statement_to_firm(statement_t *statement)
+static void do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if(get_cur_block() != NULL) {
@@ -1919,13 +1924,13 @@ static void do_while_statement_to_firm(statement_t *statement)
 		add_immBlock_pred(body_block, jmp);
 	}
 
-	if (statement->v.while_stmt.body != NULL) {
+	if (statement->body != NULL) {
 		ir_node *old_continue_label = continue_label;
 		ir_node *old_break_label    = break_label;
 		continue_label              = header_block;
 		break_label                 = false_block;
 
-		statement_to_firm(statement->v.while_stmt.body);
+		statement_to_firm(statement->body);
 
 		assert(continue_label == header_block);
 		assert(break_label    == false_block);
@@ -1947,7 +1952,7 @@ static void do_while_statement_to_firm(statement_t *statement)
 	/* create the condition */
 	set_cur_block(header_block);
 
-	create_condition_evaluation(statement->v.while_stmt.condition, body_block, false_block);
+	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
 	mature_immBlock(false_block);
 	mature_immBlock(header_block);
@@ -1955,20 +1960,20 @@ static void do_while_statement_to_firm(statement_t *statement)
 	set_cur_block(false_block);
 }
 
-static void for_statement_to_firm(statement_t *statement)
+static void for_statement_to_firm(for_statement_t *statement)
 {
 	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
-		if(statement->v.for_stmt.initialisation != NULL) {
-			expression_to_firm(statement->v.for_stmt.initialisation);
+		if(statement->initialisation != NULL) {
+			expression_to_firm(statement->initialisation);
 		}
 		jmp = new_Jmp();
 	}
 
 	/* create the step block */
 	ir_node *const step_block = new_immBlock();
-	if (statement->v.for_stmt.step != NULL) {
-		expression_to_firm(statement->v.for_stmt.step);
+	if (statement->step != NULL) {
+		expression_to_firm(statement->step);
 	}
 	ir_node *const step_jmp = new_Jmp();
 
@@ -1984,14 +1989,14 @@ static void for_statement_to_firm(statement_t *statement)
 
 	/* the loop body */
 	ir_node * body_block;
-	if (statement->v.for_stmt.body != NULL) {
+	if (statement->body != NULL) {
 		ir_node *const old_continue_label = continue_label;
 		ir_node *const old_break_label    = break_label;
 		continue_label = step_block;
 		break_label    = false_block;
 
 		body_block = new_immBlock();
-		statement_to_firm(statement->v.for_stmt.body);
+		statement_to_firm(statement->body);
 
 		assert(continue_label == step_block);
 		assert(break_label    == false_block);
@@ -2008,8 +2013,8 @@ static void for_statement_to_firm(statement_t *statement)
 
 	/* create the condition */
 	set_cur_block(header_block);
-	if (statement->v.for_stmt.condition != NULL) {
-		create_condition_evaluation(statement->v.for_stmt.condition, body_block,
+	if (statement->condition != NULL) {
+		create_condition_evaluation(statement->condition, body_block,
 		                            false_block);
 	} else {
 		keep_alive(header_block);
@@ -2080,24 +2085,24 @@ static compound_graph_path *create_compound_path(ir_type *type,
 	return path;
 }
 
-static void create_initializer_value(initializer_t *initializer,
+static void create_initializer_value(initializer_value_t *initializer,
                                      ir_entity *entity,
                                      compound_graph_path_entry_t *entry,
                                      int len)
 {
-	ir_node             *node = expression_to_firm(initializer->v.value);
+	ir_node             *node = expression_to_firm(initializer->value);
 	ir_type             *type = get_entity_type(entity);
 	compound_graph_path *path = create_compound_path(type, entry, len);
 	add_compound_ent_value_w_path(entity, node, path);
 }
 
-static void create_initializer_compound(initializer_t *initializer,
-                                        type_t *type,
+static void create_initializer_compound(initializer_list_t *initializer,
+                                        compound_type_t *type,
                                         ir_entity *entity,
                                         compound_graph_path_entry_t *last_entry,
                                         int len)
 {
-	declaration_t *compound_declaration = type->v.compound_type.declaration;
+	declaration_t *compound_declaration = type->declaration;
 
 	declaration_t *compound_entry = compound_declaration->context.declarations;
 
@@ -2113,19 +2118,20 @@ static void create_initializer_compound(initializer_t *initializer,
 		if(compound_entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		if(i >= initializer->v.list.len)
+		if(i >= initializer->len)
 			break;
 
 		entry.v.entity = compound_entry->v.entity;
 
-		initializer_t *sub_initializer = initializer->v.list.initializers[i];
+		initializer_t *sub_initializer = initializer->initializers[i];
 
 		assert(compound_entry != NULL);
 		assert(compound_entry->declaration_type
 				== DECLARATION_TYPE_COMPOUND_MEMBER);
 
 		if(sub_initializer->type == INITIALIZER_VALUE) {
-			create_initializer_value(sub_initializer, entity, &entry, len);
+			create_initializer_value(&sub_initializer->value,
+			                         entity, &entry, len);
 		} else {
 			type_t *type = skip_typeref(compound_entry->type);
 			create_initializer_object(sub_initializer, type, entity, &entry,
@@ -2136,12 +2142,12 @@ static void create_initializer_compound(initializer_t *initializer,
 	}
 }
 
-static void create_initializer_array(initializer_t *initializer,
-                                     type_t *type, ir_entity *entity,
+static void create_initializer_array(initializer_list_t *initializer,
+                                     array_type_t *type, ir_entity *entity,
                                      compound_graph_path_entry_t *last_entry,
                                      int len)
 {
-	type_t *element_type = type->v.array_type.element_type;
+	type_t *element_type = type->element_type;
 	element_type         = skip_typeref(element_type);
 
 	compound_graph_path_entry_t entry;
@@ -2149,27 +2155,27 @@ static void create_initializer_array(initializer_t *initializer,
 	entry.prev = last_entry;
 	++len;
 
-	for(size_t i = 0; i < initializer->v.list.len; ++i) {
+	for(size_t i = 0; i < initializer->len; ++i) {
 		entry.v.array_index = i;
 
-		initializer_t *sub_initializer = initializer->v.list.initializers[i];
+		initializer_t *sub_initializer = initializer->initializers[i];
 
 		if(sub_initializer->type == INITIALIZER_VALUE) {
-			create_initializer_value(sub_initializer, entity, &entry, len);
+			create_initializer_value(&sub_initializer->value,
+			                         entity, &entry, len);
 		} else {
-			assert(sub_initializer->type == INITIALIZER_LIST);
 			create_initializer_object(sub_initializer, element_type, entity,
 			                          &entry, len);
 		}
 	}
 }
 
-static void create_initializer_string(initializer_t *initializer,
-                                      type_t *type, ir_entity *entity,
+static void create_initializer_string(initializer_string_t *initializer,
+                                      array_type_t *type, ir_entity *entity,
                                       compound_graph_path_entry_t *last_entry,
                                       int len)
 {
-	type_t *element_type = type->v.array_type.element_type;
+	type_t *element_type = type->element_type;
 	element_type         = skip_typeref(element_type);
 
 	compound_graph_path_entry_t entry;
@@ -2179,7 +2185,7 @@ static void create_initializer_string(initializer_t *initializer,
 
 	ir_type    *irtype  = get_entity_type(entity);
 	size_t      arr_len = get_array_type_size(type);
-	const char *p       = initializer->v.string;
+	const char *p       = initializer->string;
 	size_t      i       = 0;
 	for(i = 0; i < arr_len; ++i, ++p) {
 		entry.v.array_index = i;
@@ -2197,18 +2203,24 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
 {
 	if(type->type == TYPE_ARRAY) {
+		array_type_t *array_type = (array_type_t*) type;
+
 		if(initializer->type == INITIALIZER_STRING) {
-			create_initializer_string(initializer, type, entity, entry, len);
+			initializer_string_t *string = &initializer->string;
+			create_initializer_string(string, array_type, entity, entry, len);
 		} else {
 			assert(initializer->type == INITIALIZER_LIST);
-			create_initializer_array(initializer, type, entity, entry, len);
+			initializer_list_t *list = &initializer->list;
+			create_initializer_array(list, array_type, entity, entry, len);
 		}
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
+		initializer_list_t *list = &initializer->list;
 
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
-		create_initializer_compound(initializer, type, entity, entry, len);
+		compound_type_t *compound_type = (compound_type_t*) type;
+		create_initializer_compound(list, compound_type, entity, entry, len);
 	}
 }
 
@@ -2224,8 +2236,9 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 
 	if(is_atomic_entity(entity)) {
 		assert(initializer->type == INITIALIZER_VALUE);
+		initializer_value_t *initializer_value = &initializer->value;
 
-		ir_node *value     = expression_to_firm(initializer->v.value);
+		ir_node *value     = expression_to_firm(initializer_value->value);
 		ir_node *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
@@ -2271,7 +2284,9 @@ static void create_initializer(declaration_t *declaration)
 	}
 
 	if(initializer->type == INITIALIZER_VALUE) {
-		ir_node *value = expression_to_firm(initializer->v.value);
+		initializer_value_t *initializer_value = &initializer->value;
+
+		ir_node *value = expression_to_firm(initializer_value->value);
 
 		if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
@@ -2348,10 +2363,10 @@ static void create_local_static_variable(declaration_t *declaration)
 	current_ir_graph = old_current_ir_graph;
 }
 
-static void declaration_statement_to_firm(statement_t *statement)
+static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
-	declaration_t *declaration = statement->v.declaration_stmt.begin;
-	declaration_t *end         = statement->v.declaration_stmt.end->next;
+	declaration_t *declaration = statement->declarations_begin;
+	declaration_t *end         = statement->declarations_end->next;
 	for( ; declaration != end; declaration = declaration->next) {
 		type_t *type = declaration->type;
 
@@ -2392,11 +2407,11 @@ static void create_jump_statement(const statement_t *statement,
 	set_cur_block(NULL);
 }
 
-static void switch_statement_to_firm(const statement_t *statement)
+static void switch_statement_to_firm(const switch_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 
-	ir_node *expression  = expression_to_firm(statement->v.switch_stmt.expression);
+	ir_node *expression  = expression_to_firm(statement->expression);
 	ir_node *cond        = new_d_Cond(dbgi, expression);
 	ir_node *break_block = new_immBlock();
 
@@ -2408,7 +2423,7 @@ static void switch_statement_to_firm(const statement_t *statement)
 	current_switch_cond                  = cond;
 	break_label                          = break_block;
 
-	statement_to_firm(statement->v.switch_stmt.body);
+	statement_to_firm(statement->body);
 
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
@@ -2439,7 +2454,7 @@ static long fold_constant(const expression_t *expression)
 
 	ir_node *cnst = expression_to_firm(expression);
 	if(!is_Const(cnst)) {
-		panic("couldn't fold constant");
+		panic("couldn't fold constantl");
 	}
 	tarval *tv = get_Const_tarval(cnst);
 	if(!tarval_is_long(tv)) {
@@ -2452,9 +2467,9 @@ static long fold_constant(const expression_t *expression)
 	return res;
 }
 
-static void case_label_to_firm(const statement_t *statement)
+static void case_label_to_firm(const case_label_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
 
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
@@ -2462,8 +2477,8 @@ static void case_label_to_firm(const statement_t *statement)
 	 * node... */
 	ir_node *proj;
 	set_cur_block(get_nodes_block(current_switch_cond));
-	if(statement->v.case_label_stmt.expression) {
-		long pn = fold_constant(statement->v.case_label_stmt.expression);
+	if(statement->expression) {
+		long pn = fold_constant(statement->expression);
 		if(pn == MAGIC_DEFAULT_PN_NUMBER) {
 			/* oops someone detected our cheating... */
 			panic("magic default pn used");
@@ -2482,7 +2497,7 @@ static void case_label_to_firm(const statement_t *statement)
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
 
-	statement_to_firm(statement->v.case_label_stmt.label_statement);
+	statement_to_firm(statement->label_statement);
 }
 
 static ir_node *get_label_block(declaration_t *label)
@@ -2506,9 +2521,9 @@ static ir_node *get_label_block(declaration_t *label)
 	return block;
 }
 
-static void label_to_firm(const statement_t *statement)
+static void label_to_firm(const label_statement_t *statement)
 {
-	ir_node *block = get_label_block(statement->v.label_stmt.label);
+	ir_node *block = get_label_block(statement->label);
 
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
@@ -2518,15 +2533,15 @@ static void label_to_firm(const statement_t *statement)
 	set_cur_block(block);
 	keep_alive(block);
 
-	statement_to_firm(statement->v.label_stmt.label_statement);
+	statement_to_firm(statement->label_statement);
 }
 
-static void goto_to_firm(const statement_t *statement)
+static void goto_to_firm(const goto_statement_t *statement)
 {
 	if(get_cur_block() == NULL)
 		return;
 
-	ir_node *block = get_label_block(statement->v.goto_label);
+	ir_node *block = get_label_block(statement->label);
 	ir_node *jmp   = new_Jmp();
 	add_immBlock_pred(block, jmp);
 
@@ -2537,25 +2552,25 @@ static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
-		compound_statement_to_firm(statement);
+		compound_statement_to_firm((compound_statement_t*) statement);
 		return;
 	case STATEMENT_RETURN:
-		return_statement_to_firm(statement);
+		return_statement_to_firm((return_statement_t*) statement);
 		return;
 	case STATEMENT_EXPRESSION:
-		expression_statement_to_firm(statement);
+		expression_statement_to_firm((expression_statement_t*) statement);
 		return;
 	case STATEMENT_IF:
-		if_statement_to_firm(statement);
+		if_statement_to_firm((if_statement_t*) statement);
 		return;
 	case STATEMENT_WHILE:
-		while_statement_to_firm(statement);
+		while_statement_to_firm((while_statement_t*) statement);
 		return;
 	case STATEMENT_DO_WHILE:
-		do_while_statement_to_firm(statement);
+		do_while_statement_to_firm((do_while_statement_t*) statement);
 		return;
 	case STATEMENT_DECLARATION:
-		declaration_statement_to_firm(statement);
+		declaration_statement_to_firm((declaration_statement_t*) statement);
 		return;
 	case STATEMENT_BREAK:
 		create_jump_statement(statement, break_label);
@@ -2564,19 +2579,19 @@ static void statement_to_firm(statement_t *statement)
 		create_jump_statement(statement, continue_label);
 		return;
 	case STATEMENT_SWITCH:
-		switch_statement_to_firm(statement);
+		switch_statement_to_firm((switch_statement_t*) statement);
 		return;
 	case STATEMENT_CASE_LABEL:
-		case_label_to_firm(statement);
+		case_label_to_firm((case_label_statement_t*) statement);
 		return;
 	case STATEMENT_FOR:
-		for_statement_to_firm(statement);
+		for_statement_to_firm((for_statement_t*) statement);
 		return;
 	case STATEMENT_LABEL:
-		label_to_firm(statement);
+		label_to_firm((label_statement_t*) statement);
 		return;
 	case STATEMENT_GOTO:
-		goto_to_firm(statement);
+		goto_to_firm((goto_statement_t*) statement);
 		return;
 	default:
 		break;
@@ -2608,39 +2623,61 @@ static int count_decls_in_stmts(const statement_t *stmt)
 	int count = 0;
 	for (; stmt != NULL; stmt = stmt->next) {
 		switch (stmt->type) {
-			case STATEMENT_DECLARATION:
-				count += count_local_declarations(stmt->v.declaration_stmt.begin,
-				                                  stmt->v.declaration_stmt.end->next);
+			case STATEMENT_DECLARATION: {
+				const declaration_statement_t *const decl_stmt =
+					(const declaration_statement_t*)stmt;
+				count += count_local_declarations(decl_stmt->declarations_begin,
+				                                  decl_stmt->declarations_end->next);
 				break;
+			}
 
-			case STATEMENT_COMPOUND:
-				count += count_decls_in_stmts(stmt->v.compound_stmt.statements);
+			case STATEMENT_COMPOUND: {
+				const compound_statement_t *const comp =
+					(const compound_statement_t*)stmt;
+				count += count_decls_in_stmts(comp->statements);
 				break;
+			}
 
-			case STATEMENT_IF:
-				count += count_decls_in_stmts(stmt->v.if_stmt.true_statement);
-				count += count_decls_in_stmts(stmt->v.if_stmt.false_statement);
+			case STATEMENT_IF: {
+				const if_statement_t *const if_stmt = (const if_statement_t*)stmt;
+				count += count_decls_in_stmts(if_stmt->true_statement);
+				count += count_decls_in_stmts(if_stmt->false_statement);
 				break;
+			}
 
-			case STATEMENT_SWITCH:
-				count += count_decls_in_stmts(stmt->v.switch_stmt.body);
+			case STATEMENT_SWITCH: {
+				const switch_statement_t *const switch_stmt =
+					(const switch_statement_t*)stmt;
+				count += count_decls_in_stmts(switch_stmt->body);
 				break;
+			}
 
-			case STATEMENT_LABEL:
-				count += count_decls_in_stmts(stmt->v.label_stmt.label_statement);
+			case STATEMENT_LABEL: {
+				const label_statement_t *const label_stmt =
+					(const label_statement_t*)stmt;
+				count += count_decls_in_stmts(label_stmt->label_statement);
 				break;
+			}
 
-			case STATEMENT_WHILE:
-				count += count_decls_in_stmts(stmt->v.while_stmt.body);
+			case STATEMENT_WHILE: {
+				const while_statement_t *const while_stmt =
+					(const while_statement_t*)stmt;
+				count += count_decls_in_stmts(while_stmt->body);
 				break;
+			}
 
-			case STATEMENT_DO_WHILE:
-				count += count_decls_in_stmts(stmt->v.while_stmt.body);
+			case STATEMENT_DO_WHILE: {
+				const do_while_statement_t *const do_while_stmt =
+					(const do_while_statement_t*)stmt;
+				count += count_decls_in_stmts(do_while_stmt->body);
 				break;
+			}
 
 			case STATEMENT_FOR: {
+				const for_statement_t *const for_stmt =
+					(const for_statement_t*)stmt;
 				/* TODO initialisation */
-				count += count_decls_in_stmts(stmt->v.for_stmt.body);
+				count += count_decls_in_stmts(for_stmt->body);
 				break;
 			}
 
@@ -2743,12 +2780,13 @@ static void create_function(declaration_t *declaration)
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
-		const type_t* const type = declaration->type;
+		const function_type_t* const func_type
+			= (const function_type_t*) declaration->type;
 		ir_node *ret;
-		if (type->v.function_type.result_type == type_void) {
+		if (func_type->result_type == type_void) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
-			ir_mode *const mode = get_ir_mode(type->v.function_type.result_type);
+			ir_mode *const mode = get_ir_mode(func_type->result_type);
 			ir_node *      in[1];
 			// §5.1.2.2.3 main implicitly returns 0
 			if (strcmp(declaration->symbol->string, "main") == 0) {

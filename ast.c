@@ -299,12 +299,12 @@ void print_expression(const expression_t *expression)
 	}
 }
 
-static void print_compound_statement(const statement_t *block)
+static void print_compound_statement(const compound_statement_t *block)
 {
 	fputs("{\n", out);
 	indent++;
 
-	statement_t *statement = block->v.compound_stmt.statements;
+	statement_t *statement = block->statements;
 	while(statement != NULL) {
 		print_indent();
 		print_statement(statement);
@@ -316,78 +316,79 @@ static void print_compound_statement(const statement_t *block)
 	fputs("}\n", out);
 }
 
-static void print_return_statement(const statement_t *statement)
+static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
-	if(statement->v.return_value != NULL)
-		print_expression(statement->v.return_value);
+	if(statement->return_value != NULL)
+		print_expression(statement->return_value);
 	fputs(";\n", out);
 }
 
-static void print_expression_statement(const statement_t *statement)
+static void print_expression_statement(const expression_statement_t *statement)
 {
-	print_expression(statement->v.expression);
+	print_expression(statement->expression);
 	fputs(";\n", out);
 }
 
-static void print_goto_statement(const statement_t *statement)
+static void print_goto_statement(const goto_statement_t *statement)
 {
 	fprintf(out, "goto ");
-	fputs(statement->v.goto_label->symbol->string, out);
-	fprintf(stderr, "(%p)", (void*) statement->v.goto_label);
+	fputs(statement->label->symbol->string, out);
+	fprintf(stderr, "(%p)", (void*) statement->label);
 	fputs(";\n", out);
 }
 
-static void print_label_statement(const statement_t *statement)
+static void print_label_statement(const label_statement_t *statement)
 {
-	fprintf(stderr, "(%p)", (void*) statement->v.label_stmt.label);
-	fprintf(out, "%s:\n", statement->v.label_stmt.label->symbol->string);
-	if(statement->v.label_stmt.label_statement != NULL) {
-		print_statement(statement->v.label_stmt.label_statement);
+	fprintf(stderr, "(%p)", (void*) statement->label);
+	fprintf(out, "%s:\n", statement->label->symbol->string);
+	if(statement->label_statement != NULL) {
+		print_statement(statement->label_statement);
 	}
 }
 
-static void print_if_statement(const statement_t *statement)
+static void print_if_statement(const if_statement_t *statement)
 {
 	fputs("if(", out);
-	print_expression(statement->v.if_stmt.condition);
+	print_expression(statement->condition);
 	fputs(") ", out);
-	if(statement->v.if_stmt.true_statement != NULL) {
-		print_statement(statement->v.if_stmt.true_statement);
+	if(statement->true_statement != NULL) {
+		print_statement(statement->true_statement);
 	}
 
-	if(statement->v.if_stmt.false_statement != NULL) {
+	if(statement->false_statement != NULL) {
 		print_indent();
 		fputs("else ", out);
-		print_statement(statement->v.if_stmt.false_statement);
+		print_statement(statement->false_statement);
 	}
 }
 
-static void print_switch_statement(const statement_t *statement)
+static void print_switch_statement(const switch_statement_t *statement)
 {
 	fputs("switch(", out);
-	print_expression(statement->v.switch_stmt.expression);
+	print_expression(statement->expression);
 	fputs(") ", out);
-	print_statement(statement->v.switch_stmt.body);
+	print_statement(statement->body);
 }
 
-static void print_case_label(const statement_t *statement)
+static void print_case_label(const case_label_statement_t *statement)
 {
-	if(statement->v.case_label_stmt.expression == NULL) {
+	if(statement->expression == NULL) {
 		fputs("default:\n", out);
 	} else {
 		fputs("case ", out);
-		print_expression(statement->v.case_label_stmt.expression);
+		print_expression(statement->expression);
 		fputs(":\n", out);
 	}
-	print_statement(statement->v.case_label_stmt.label_statement);
+	print_statement(statement->label_statement);
 }
 
-static void print_declaration_statement(const statement_t *statement)
+static void print_declaration_statement(
+		const declaration_statement_t *statement)
 {
 	int first = 1;
-	declaration_t *declaration = statement->v.declaration_stmt.begin;
-	for( ; declaration != statement->v.declaration_stmt.end->next;
+	declaration_t *declaration = statement->declarations_begin;
+	for( ; declaration != statement->declarations_end->next;
 	       declaration = declaration->next) {
 		if(!first) {
 			print_indent();
@@ -399,68 +400,68 @@ static void print_declaration_statement(const statement_t *statement)
 	}
 }
 
-static void print_while_statement(const statement_t *statement)
+static void print_while_statement(const while_statement_t *statement)
 {
 	fputs("while(", out);
-	print_expression(statement->v.while_stmt.condition);
+	print_expression(statement->condition);
 	fputs(") ", out);
-	print_statement(statement->v.while_stmt.body);
+	print_statement(statement->body);
 }
 
-static void print_do_while_statement(const statement_t *statement)
+static void print_do_while_statement(const do_while_statement_t *statement)
 {
 	fputs("do ", out);
-	print_statement(statement->v.while_stmt.body);
+	print_statement(statement->body);
 	print_indent();
 	fputs("while(", out);
-	print_expression(statement->v.while_stmt.condition);
+	print_expression(statement->condition);
 	fputs(");\n", out);
 }
 
-static void print_for_statement(const statement_t *statement)
+static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for(", out);
-	if(statement->v.for_stmt.context.declarations != NULL) {
-		assert(statement->v.for_stmt.initialisation == NULL);
-		print_declaration(statement->v.for_stmt.context.declarations);
-		if(statement->v.for_stmt.context.declarations->next != NULL) {
+	if(statement->context.declarations != NULL) {
+		assert(statement->initialisation == NULL);
+		print_declaration(statement->context.declarations);
+		if(statement->context.declarations->next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 		fputc(' ', out);
 	} else {
-		if(statement->v.for_stmt.initialisation) {
-			print_expression(statement->v.for_stmt.initialisation);
+		if(statement->initialisation) {
+			print_expression(statement->initialisation);
 		}
 		fputs("; ", out);
 	}
-	if(statement->v.for_stmt.condition != NULL) {
-		print_expression(statement->v.for_stmt.condition);
+	if(statement->condition != NULL) {
+		print_expression(statement->condition);
 	}
 	fputs("; ", out);
-	if(statement->v.for_stmt.step != NULL) {
-		print_expression(statement->v.for_stmt.step);
+	if(statement->step != NULL) {
+		print_expression(statement->step);
 	}
 	fputs(")", out);
-	print_statement(statement->v.for_stmt.body);
+	print_statement(statement->body);
 }
 
 void print_statement(const statement_t *statement)
 {
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
-		print_compound_statement(statement);
+		print_compound_statement((const compound_statement_t*) statement);
 		break;
 	case STATEMENT_RETURN:
-		print_return_statement(statement);
+		print_return_statement((const return_statement_t*) statement);
 		break;
 	case STATEMENT_EXPRESSION:
-		print_expression_statement(statement);
+		print_expression_statement((const expression_statement_t*) statement);
 		break;
 	case STATEMENT_LABEL:
-		print_label_statement(statement);
+		print_label_statement((const label_statement_t*) statement);
 		break;
 	case STATEMENT_GOTO:
-		print_goto_statement(statement);
+		print_goto_statement((const goto_statement_t*) statement);
 		break;
 	case STATEMENT_CONTINUE:
 		fputs("continue;\n", out);
@@ -469,25 +470,25 @@ void print_statement(const statement_t *statement)
 		fputs("break;\n", out);
 		break;
 	case STATEMENT_IF:
-		print_if_statement(statement);
+		print_if_statement((const if_statement_t*) statement);
 		break;
 	case STATEMENT_SWITCH:
-		print_switch_statement(statement);
+		print_switch_statement((const switch_statement_t*) statement);
 		break;
 	case STATEMENT_CASE_LABEL:
-		print_case_label(statement);
+		print_case_label((const case_label_statement_t*) statement);
 		break;
 	case STATEMENT_DECLARATION:
-		print_declaration_statement(statement);
+		print_declaration_statement((const declaration_statement_t*) statement);
 		break;
 	case STATEMENT_WHILE:
-		print_while_statement(statement);
+		print_while_statement((const while_statement_t*) statement);
 		break;
 	case STATEMENT_DO_WHILE:
-		print_do_while_statement(statement);
+		print_do_while_statement((const do_while_statement_t*) statement);
 		break;
 	case STATEMENT_FOR:
-		print_for_statement(statement);
+		print_for_statement((const for_statement_t*) statement);
 		break;
 	case STATEMENT_INVALID:
 		fprintf(out, "*invalid statement*");
@@ -512,18 +513,20 @@ static void print_storage_class(storage_class_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer->type == INITIALIZER_VALUE) {
-		print_expression(initializer->v.value);
+		const initializer_value_t *value = &initializer->value;
+		print_expression(value->value);
 		return;
 	}
 
 	assert(initializer->type == INITIALIZER_LIST);
 	fputs("{ ", out);
+	const initializer_list_t *list = &initializer->list;
 
-	for(size_t i = 0 ; i < initializer->v.list.len; ++i) {
+	for(size_t i = 0 ; i < list->len; ++i) {
 		if(i > 0) {
 			fputs(", ", out);
 		}
-		print_initializer(initializer->v.list.initializers[i]);
+		print_initializer(list->initializers[i]);
 	}
 	fputs("}", out);
 }
