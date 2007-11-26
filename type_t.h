@@ -2,6 +2,7 @@
 #define TYPE_T_H
 
 #include <stdbool.h>
+#include <assert.h>
 
 #include <libfirm/firm_types.h>
 
@@ -141,8 +142,15 @@ struct typeof_type_t {
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 
+static inline bool is_typeref(const type_t *type)
+{
+	return type->type == TYPE_TYPEDEF || type->type == TYPE_TYPEOF;
+}
+
 static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 {
+	assert(!is_typeref(type));
+
 	if(type->type != TYPE_ATOMIC)
 		return false;
 	const atomic_type_t *atomic_type = (const atomic_type_t*) type;
@@ -152,18 +160,15 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 
 static inline bool is_type_pointer(const type_t *type)
 {
+	assert(!is_typeref(type));
 	return type->type == TYPE_POINTER;
 }
 
 static inline bool is_type_compound(const type_t *type)
 {
+	assert(!is_typeref(type));
 	return type->type == TYPE_COMPOUND_STRUCT
 		|| type->type == TYPE_COMPOUND_UNION;
-}
-
-static inline bool is_typeref(const type_t *type)
-{
-	return type->type == TYPE_TYPEDEF || type->type == TYPE_TYPEOF;
 }
 
 #endif
