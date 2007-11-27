@@ -320,7 +320,8 @@ typedef enum {
 	STATEMENT_CASE_LABEL,
 	STATEMENT_WHILE,
 	STATEMENT_DO_WHILE,
-	STATEMENT_FOR
+	STATEMENT_FOR,
+	STATEMENT_ASM
 } statement_type_t;
 
 struct statement_base_t {
@@ -402,6 +403,27 @@ struct for_statement_t {
 	context_t         context;
 };
 
+struct asm_constraint_t {
+	const char       *constraints;
+	expression_t     *expression;
+	symbol_t         *symbol;
+	asm_constraint_t *next;
+};
+
+struct asm_clobber_t {
+	const char    *clobber;
+	asm_clobber_t *next;
+};
+
+struct asm_statement_t {
+	statement_base_t  statement;
+	const char       *asm_text;
+	asm_constraint_t *inputs;
+	asm_constraint_t *outputs;
+	asm_clobber_t    *clobbers;
+	bool              is_volatile;
+};
+
 union statement_t {
 	statement_type_t         type;
 	statement_base_t         base;
@@ -417,6 +439,7 @@ union statement_t {
 	while_statement_t        whiles;
 	do_while_statement_t     do_while;
 	for_statement_t          fors;
+	asm_statement_t          asms;
 };
 
 struct translation_unit_t {

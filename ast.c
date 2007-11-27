@@ -41,11 +41,10 @@ static void print_const(const const_expression_t *cnst)
 	}
 }
 
-static void print_string_literal(
-		const string_literal_expression_t *string_literal)
+static void print_quoted_string(const char *string)
 {
 	fputc('"', out);
-	for(const char *c = string_literal->value; *c != '\0'; ++c) {
+	for(const char *c = string; *c != '\0'; ++c) {
 		switch(*c) {
 		case '\"':  fputs("\\\"", out); break;
 		case '\\':  fputs("\\\\", out); break;
@@ -67,6 +66,12 @@ static void print_string_literal(
 		}
 	}
 	fputc('"', out);
+}
+
+static void print_string_literal(
+		const string_literal_expression_t *string_literal)
+{
+	print_quoted_string(string_literal->value);
 }
 
 static void print_call_expression(const call_expression_t *call)
@@ -454,23 +459,80 @@ static void print_for_statement(const for_statement_t *statement)
 	print_statement(statement->body);
 }
 
+static void print_asm_constraints(asm_constraint_t *constraints)
+{
+	asm_constraint_t *constraint = constraints;
+	for( ; constraint != NULL; constraint = constraint->next) {
+		if(constraint != constraints)
+			fputs(", ", out);
+
+		if(constraint->symbol) {
+			fprintf(out, "[%s] ", constraint->symbol->string);
+		}
+		print_quoted_string(constraint->constraints);
+		fputs(" (", out);
+		print_expression(constraint->expression);
+		fputs(")", out);
+	}
+}
+
+static void print_asm_clobbers(asm_clobber_t *clobbers)
+{
+	asm_clobber_t *clobber = clobbers;
+	for( ; clobber != NULL; clobber = clobber->next) {
+		if(clobber != clobbers)
+			fputs(", ", out);
+
+		print_quoted_string(clobber->clobber);
+	}
+}
+
+static void print_asm_statement(const asm_statement_t *statement)
+{
+	fputs("asm", out);
+	if(statement->is_volatile) {
+		fputs(" volatile", out);
+	}
+	fputs("(", out);
+	print_quoted_string(statement->asm_text);
+	if(statement->inputs == NULL && statement->outputs == NULL
+			&& statement->clobbers == NULL)
+		goto end_of_print_asm_statement;
+
+	fputs(" : ", out);
+	print_asm_constraints(statement->inputs);
+	if(statement->outputs == NULL && statement->clobbers == NULL)
+		goto end_of_print_asm_statement;
+
+	fputs(": ", out);
+	print_asm_constraints(statement->outputs);
+	if(statement->clobbers == NULL)
+		goto end_of_print_asm_statement;
+
+	fputs(": ", out);
+	print_asm_clobbers(statement->clobbers);
+
+end_of_print_asm_statement:
+	fputs(");\n", out);
+}
+
 void print_statement(const statement_t *statement)
 {
 	switch(statement->type) {
 	case STATEMENT_COMPOUND:
-		print_compound_statement((const compound_statement_t*) statement);
+		print_compound_statement(&statement->compound);
 		break;
 	case STATEMENT_RETURN:
-		print_return_statement((const return_statement_t*) statement);
+		print_return_statement(&statement->returns);
 		break;
 	case STATEMENT_EXPRESSION:
-		print_expression_statement((const expression_statement_t*) statement);
+		print_expression_statement(&statement->expression);
 		break;
 	case STATEMENT_LABEL:
-		print_label_statement((const label_statement_t*) statement);
+		print_label_statement(&statement->label);
 		break;
 	case STATEMENT_GOTO:
-		print_goto_statement((const goto_statement_t*) statement);
+		print_goto_statement(&statement->gotos);
 		break;
 	case STATEMENT_CONTINUE:
 		fputs("continue;\n", out);
@@ -479,25 +541,28 @@ void print_statement(const statement_t *statement)
 		fputs("break;\n", out);
 		break;
 	case STATEMENT_IF:
-		print_if_statement((const if_statement_t*) statement);
+		print_if_statement(&statement->ifs);
 		break;
 	case STATEMENT_SWITCH:
-		print_switch_statement((const switch_statement_t*) statement);
+		print_switch_statement(&statement->switchs);
 		break;
 	case STATEMENT_CASE_LABEL:
-		print_case_label((const case_label_statement_t*) statement);
+		print_case_label(&statement->case_label);
 		break;
 	case STATEMENT_DECLARATION:
-		print_declaration_statement((const declaration_statement_t*) statement);
+		print_declaration_statement(&statement->declaration);
 		break;
 	case STATEMENT_WHILE:
-		print_while_statement((const while_statement_t*) statement);
+		print_while_statement(&statement->whiles);
 		break;
 	case STATEMENT_DO_WHILE:
-		print_do_while_statement((const do_while_statement_t*) statement);
+		print_do_while_statement(&statement->do_while);
 		break;
 	case STATEMENT_FOR:
-		print_for_statement((const for_statement_t*) statement);
+		print_for_statement(&statement->fors);
+		break;
+	case STATEMENT_ASM:
+		print_asm_statement(&statement->asms);
 		break;
 	case STATEMENT_INVALID:
 		fprintf(out, "*invalid statement*");
@@ -546,11 +611,11 @@ void print_initializer(const initializer_t *initializer)
 static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
-	print_type_ext(declaration->type, declaration->symbol,
-	               &declaration->context);
 	if(declaration->is_inline) {
 		fputs("inline ", out);
 	}
+	print_type_ext(declaration->type, declaration->symbol,
+	               &declaration->context);
 
 	if(declaration->type->type == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {

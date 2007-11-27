@@ -2614,6 +2614,8 @@ static void goto_to_firm(const goto_statement_t *statement)
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
+	case STATEMENT_INVALID:
+		panic("invalid statement found");
 	case STATEMENT_COMPOUND:
 		compound_statement_to_firm((compound_statement_t*) statement);
 		return;
@@ -2656,7 +2658,7 @@ static void statement_to_firm(statement_t *statement)
 	case STATEMENT_GOTO:
 		goto_to_firm((goto_statement_t*) statement);
 		return;
-	default:
+	case STATEMENT_ASM:
 		break;
 	}
 	panic("Statement not implemented\n");
@@ -2745,6 +2747,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 				break;
 			}
 
+			case STATEMENT_ASM:
 			case STATEMENT_BREAK:
 			case STATEMENT_CASE_LABEL:
 			case STATEMENT_CONTINUE:

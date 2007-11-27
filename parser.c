@@ -112,6 +112,41 @@ static void *allocate_ast_zero(size_t size)
 	return res;
 }
 
+static size_t get_statement_struct_size(statement_type_t type)
+{
+	static const size_t sizes[] = {
+		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
+		[STATEMENT_RETURN]      = sizeof(return_statement_t),
+		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
+		[STATEMENT_IF]          = sizeof(if_statement_t),
+		[STATEMENT_SWITCH]      = sizeof(switch_statement_t),
+		[STATEMENT_EXPRESSION]  = sizeof(expression_statement_t),
+		[STATEMENT_CONTINUE]    = sizeof(statement_base_t),
+		[STATEMENT_BREAK]       = sizeof(statement_base_t),
+		[STATEMENT_GOTO]        = sizeof(goto_statement_t),
+		[STATEMENT_LABEL]       = sizeof(label_statement_t),
+		[STATEMENT_CASE_LABEL]  = sizeof(case_label_statement_t),
+		[STATEMENT_WHILE]       = sizeof(while_statement_t),
+		[STATEMENT_DO_WHILE]    = sizeof(do_while_statement_t),
+		[STATEMENT_FOR]         = sizeof(for_statement_t),
+		[STATEMENT_ASM]         = sizeof(asm_statement_t)
+	};
+	assert(sizeof(sizes) / sizeof(sizes[0]) == STATEMENT_ASM + 1);
+	assert(type <= STATEMENT_ASM);
+	assert(sizes[type] != 0);
+	return sizes[type];
+}
+
+static statement_t *allocate_statement_zero(statement_type_t type)
+{
+	size_t       size = get_statement_struct_size(type);
+	statement_t *res  = allocate_ast_zero(size);
+
+	res->base.type = type;
+	return res;
+}
+
+
 static size_t get_expression_struct_size(expression_type_t type)
 {
 	static const size_t sizes[] = {
@@ -4108,6 +4143,109 @@ static void init_expression_parsers(void)
 	                                             T___builtin_classify_type, 25);
 }
 
+static asm_constraint_t *parse_asm_constraints(void)
+{
+	asm_constraint_t *result = NULL;
+	asm_constraint_t *last   = NULL;
+
+	while(token.type == T_STRING_LITERAL || token.type == '[') {
+		asm_constraint_t *constraint = allocate_ast_zero(sizeof(constraint[0]));
+		memset(constraint, 0, sizeof(constraint[0]));
+
+		if(token.type == '[') {
+			eat('[');
+			if(token.type != T_IDENTIFIER) {
+				parse_error_expected("while parsing asm constraint",
+				                     T_IDENTIFIER, 0);
+				return NULL;
+			}
+			constraint->symbol = token.v.symbol;
+
+			expect(']');
+		}
+
+		constraint->constraints = parse_string_literals();
+		expect('(');
+		constraint->expression = parse_expression();
+		expect(')');
+
+		if(last != NULL) {
+			last->next = constraint;
+		} else {
+			result = constraint;
+		}
+		last = constraint;
+
+		if(token.type != ',')
+			break;
+		eat(',');
+	}
+
+	return result;
+}
+
+static asm_clobber_t *parse_asm_clobbers(void)
+{
+	asm_clobber_t *result = NULL;
+	asm_clobber_t *last   = NULL;
+
+	while(token.type == T_STRING_LITERAL) {
+		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
+		clobber->clobber       = parse_string_literals();
+
+		if(last != NULL) {
+			last->next = clobber;
+		} else {
+			result = clobber;
+		}
+		last = clobber;
+
+		if(token.type != ',')
+			break;
+		eat(',');
+	}
+
+	return result;
+}
+
+static statement_t *parse_asm_statement(void)
+{
+	eat(T_asm);
+
+	statement_t *statement          = allocate_statement_zero(STATEMENT_ASM);
+	statement->base.source_position = token.source_position;
+
+	asm_statement_t *asm_statement = &statement->asms;
+
+	if(token.type == T_volatile) {
+		next_token();
+		asm_statement->is_volatile = true;
+	}
+
+	expect('(');
+	asm_statement->asm_text = parse_string_literals();
+
+	if(token.type != ':')
+		goto end_of_asm;
+	eat(':');
+
+	asm_statement->inputs = parse_asm_constraints();
+	if(token.type != ':')
+		goto end_of_asm;
+	eat(':');
+
+	asm_statement->outputs = parse_asm_constraints();
+	if(token.type != ':')
+		goto end_of_asm;
+	eat(':');
+
+	asm_statement->clobbers = parse_asm_clobbers();
+
+end_of_asm:
+	expect(')');
+	expect(';');
+	return statement;
+}
 
 static statement_t *parse_case_statement(void)
 {
@@ -4455,6 +4593,10 @@ static statement_t *parse_statement(void)
 
 	/* declaration or statement */
 	switch(token.type) {
+	case T_asm:
+		statement = parse_asm_statement();
+		break;
+
 	case T_case:
 		statement = parse_case_statement();
 		break;
