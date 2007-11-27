@@ -264,40 +264,40 @@ void print_expression(const expression_t *expression)
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_STRING_LITERAL:
-		print_string_literal(&expression->string_literal);
+		print_string_literal(&expression->string);
 		break;
 	case EXPR_CALL:
-		print_call_expression((const call_expression_t*) expression);
+		print_call_expression(&expression->call);
 		break;
 	case EXPR_BINARY:
-		print_binary_expression((const binary_expression_t*) expression);
+		print_binary_expression(&expression->binary);
 		break;
 	case EXPR_REFERENCE:
-		print_reference_expression((const reference_expression_t*) expression);
+		print_reference_expression(&expression->reference);
 		break;
 	case EXPR_ARRAY_ACCESS:
-		print_array_expression((const array_access_expression_t*) expression);
+		print_array_expression(&expression->array_access);
 		break;
 	case EXPR_UNARY:
-		print_unary_expression((const unary_expression_t*) expression);
+		print_unary_expression(&expression->unary);
 		break;
 	case EXPR_SIZEOF:
-		print_sizeof_expression((const sizeof_expression_t*) expression);
+		print_sizeof_expression(&expression->sizeofe);
 		break;
 	case EXPR_BUILTIN_SYMBOL:
-		print_builtin_symbol((const builtin_symbol_expression_t*) expression);
+		print_builtin_symbol(&expression->builtin_symbol);
 		break;
 	case EXPR_CONDITIONAL:
-		print_conditional((const conditional_expression_t*) expression);
+		print_conditional(&expression->conditional);
 		break;
 	case EXPR_VA_ARG:
-		print_va_arg((const va_arg_expression_t*) expression);
+		print_va_arg(&expression->va_arge);
 		break;
 	case EXPR_SELECT:
-		print_select((const select_expression_t*) expression);
+		print_select(&expression->select);
 		break;
 	case EXPR_CLASSIFY_TYPE:
-		print_classify_type_expression((const classify_type_expression_t*)expression);
+		print_classify_type_expression(&expression->classify_type);
 		break;
 
 	case EXPR_OFFSETOF:

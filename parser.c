@@ -115,6 +115,7 @@ static void *allocate_ast_zero(size_t size)
 static size_t get_expression_struct_size(expression_type_t type)
 {
 	static const size_t sizes[] = {
+		[EXPR_INVALID]         = sizeof(expression_base_t),
 		[EXPR_REFERENCE]       = sizeof(reference_expression_t),
 		[EXPR_CONST]           = sizeof(const_expression_t),
 		[EXPR_STRING_LITERAL]  = sizeof(string_literal_expression_t),
@@ -136,8 +137,16 @@ static size_t get_expression_struct_size(expression_type_t type)
 	assert(sizeof(sizes) / sizeof(sizes[0]) == EXPR_STATEMENT + 1);
 	assert(type <= EXPR_STATEMENT);
 	assert(sizes[type] != 0);
-	(void) get_expression_struct_size;
 	return sizes[type];
+}
+
+static expression_t *allocate_expression_zero(expression_type_t type)
+{
+	size_t        size = get_expression_struct_size(type);
+	expression_t *res  = allocate_ast_zero(size);
+
+	res->base.type = type;
+	return res;
 }
 
 static size_t get_type_struct_size(type_type_t type)
@@ -700,14 +709,13 @@ static type_t *promote_integer(type_t *type)
 static expression_t *create_cast_expression(expression_t *expression,
                                             type_t *dest_type)
 {
-	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
+	expression_t *cast = allocate_expression_zero(EXPR_UNARY);
 
-	cast->expression.type     = EXPR_UNARY;
-	cast->type                = UNEXPR_CAST;
-	cast->value               = expression;
-	cast->expression.datatype = dest_type;
+	cast->unary.type    = UNEXPR_CAST;
+	cast->unary.value   = expression;
+	cast->base.datatype = dest_type;
 
-	return (expression_t*) cast;
+	return cast;
 }
 
 static bool is_null_expression(const expression_t *const expression)
@@ -1028,8 +1036,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 					|| atype == ATOMIC_TYPE_SCHAR
 					|| atype == ATOMIC_TYPE_UCHAR) {
 
-				string_literal_expression_t *literal
-					= &expression->string_literal;
+				string_literal_expression_t *literal = &expression->string;
 				return initializer_from_string(array_type, literal->value);
 			}
 		}
@@ -1809,7 +1816,11 @@ static void parse_identifier_list(void)
 			                     T_IDENTIFIER, 0);
 			return;
 		}
+		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+		declaration->symbol        = token.v.symbol;
+
 		next_token();
+
 		if(token.type != ',')
 			break;
 		next_token();
@@ -2264,22 +2275,20 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				array_type_t *array_type = &type->array;
 
 				if(array_type->size == NULL) {
-					const_expression_t
-						*cnst = allocate_ast_zero(sizeof(cnst[0]));
+					expression_t *cnst = allocate_expression_zero(EXPR_CONST);
 
-					cnst->expression.type     = EXPR_CONST;
-					cnst->expression.datatype = type_size_t;
+					cnst->base.datatype = type_size_t;
 
 					if(initializer->type == INITIALIZER_LIST) {
 						initializer_list_t *list = &initializer->list;
-						cnst->v.int_value = list->len;
+						cnst->conste.v.int_value = list->len;
 					} else {
 						assert(initializer->type == INITIALIZER_STRING);
 						initializer_string_t *string = &initializer->string;
-						cnst->v.int_value = strlen(string->string) + 1;
+						cnst->conste.v.int_value = strlen(string->string) + 1;
 					}
 
-					array_type->size = (expression_t*) cnst;
+					array_type->size = cnst;
 				}
 			}
 
@@ -2293,6 +2302,18 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				fprintf(stderr, "' has a body but is not a function type.\n");
 				eat_block();
 				continue;
+			}
+			function_type_t *function_type = &type->function;
+			/* § 6.7.5.3 (14) a function definition with () */
+			if(function_type->unspecified_parameters) {
+				type_t *duplicate = duplicate_type(type);
+				duplicate->function.unspecified_parameters = true;
+
+				type = typehash_insert(duplicate);
+				if(type != duplicate) {
+					obstack_free(type_obst, duplicate);
+				}
+				function_type = &type->function;
 			}
 
 			if(declaration->init.statement != NULL) {
@@ -2465,8 +2486,7 @@ expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
 static expression_t *make_invalid_expression(void)
 {
-	expression_t *expression         = allocate_ast_zero(sizeof(expression[0]));
-	expression->type                 = EXPR_INVALID;
+	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
 	expression->base.source_position = token.source_position;
 	return expression;
 }
@@ -2485,39 +2505,33 @@ static expression_t *expected_expression_error(void)
 
 static expression_t *parse_string_const(void)
 {
-	string_literal_expression_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
+	expression_t *cnst  = allocate_expression_zero(EXPR_STRING_LITERAL);
+	cnst->base.datatype = type_string;
+	cnst->string.value  = parse_string_literals();
 
-	cnst->expression.type     = EXPR_STRING_LITERAL;
-	cnst->expression.datatype = type_string;
-	cnst->value               = parse_string_literals();
-
-	return (expression_t*) cnst;
+	return cnst;
 }
 
 static expression_t *parse_int_const(void)
 {
-	const_expression_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
-
-	cnst->expression.type     = EXPR_CONST;
-	cnst->expression.datatype = token.datatype;
-	cnst->v.int_value         = token.v.intvalue;
+	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
+	cnst->base.datatype      = token.datatype;
+	cnst->conste.v.int_value = token.v.intvalue;
 
 	next_token();
 
-	return (expression_t*) cnst;
+	return cnst;
 }
 
 static expression_t *parse_float_const(void)
 {
-	const_expression_t *cnst = allocate_ast_zero(sizeof(cnst[0]));
-
-	cnst->expression.type     = EXPR_CONST;
-	cnst->expression.datatype = token.datatype;
-	cnst->v.float_value       = token.v.floatvalue;
+	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
+	cnst->base.datatype        = token.datatype;
+	cnst->conste.v.float_value = token.v.floatvalue;
 
 	next_token();
 
-	return (expression_t*) cnst;
+	return cnst;
 }
 
 static declaration_t *create_implicit_function(symbol_t *symbol,
@@ -2619,18 +2633,15 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 
 	switch(expression->type) {
 	case EXPR_REFERENCE: {
-		const reference_expression_t *ref
-			= (const reference_expression_t*) expression;
+		const reference_expression_t *ref = &expression->reference;
 		return ref->declaration->type;
 	}
 	case EXPR_SELECT: {
-		const select_expression_t *select
-			= (const select_expression_t*) expression;
+		const select_expression_t *select = &expression->select;
 		return select->compound_entry->type;
 	}
 	case EXPR_UNARY: {
-		const unary_expression_t *unary
-			= (const unary_expression_t*) expression;
+		const unary_expression_t *unary = &expression->unary;
 		if(unary->type == UNEXPR_DEREFERENCE) {
 			expression_t   *value        = unary->value;
 			type_t         *type         = skip_typeref(value->base.datatype);
@@ -2642,7 +2653,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 	case EXPR_BUILTIN_SYMBOL: {
 		const builtin_symbol_expression_t *builtin
-			= (const builtin_symbol_expression_t*) expression;
+			= &expression->builtin_symbol;
 		return get_builtin_symbol_type(builtin->symbol);
 	}
 	case EXPR_ARRAY_ACCESS: {
@@ -2664,10 +2675,10 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 
 static expression_t *parse_reference(void)
 {
-	reference_expression_t *ref = allocate_ast_zero(sizeof(ref[0]));
+	expression_t *expression = allocate_expression_zero(EXPR_REFERENCE);
 
-	ref->expression.type = EXPR_REFERENCE;
-	ref->symbol          = token.v.symbol;
+	reference_expression_t *ref = &expression->reference;
+	ref->symbol = token.v.symbol;
 
 	declaration_t *declaration = get_declaration(ref->symbol, NAMESPACE_NORMAL);
 
@@ -2689,7 +2700,7 @@ static expression_t *parse_reference(void)
 		{
 			parser_print_error_prefix();
 			fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
-			return (expression_t*) ref;
+			return expression;
 		}
 	}
 
@@ -2701,7 +2712,7 @@ static expression_t *parse_reference(void)
 	ref->declaration         = declaration;
 	ref->expression.datatype = type;
 
-	return (expression_t*) ref;
+	return expression;
 }
 
 static void check_cast_allowed(expression_t *expression, type_t *dest_type)
@@ -2713,11 +2724,10 @@ static void check_cast_allowed(expression_t *expression, type_t *dest_type)
 
 static expression_t *parse_cast(void)
 {
-	unary_expression_t *cast = allocate_ast_zero(sizeof(cast[0]));
+	expression_t *cast = allocate_expression_zero(EXPR_UNARY);
 
-	cast->expression.type            = EXPR_UNARY;
-	cast->type                       = UNEXPR_CAST;
-	cast->expression.source_position = token.source_position;
+	cast->unary.type           = UNEXPR_CAST;
+	cast->base.source_position = token.source_position;
 
 	type_t *type  = parse_typename();
 
@@ -2726,28 +2736,25 @@ static expression_t *parse_cast(void)
 
 	check_cast_allowed(value, type);
 
-	cast->expression.datatype = type;
-	cast->value               = value;
+	cast->base.datatype = type;
+	cast->unary.value   = value;
 
-	return (expression_t*) cast;
+	return cast;
 }
 
 static expression_t *parse_statement_expression(void)
 {
-	statement_expression_t *expression
-		= allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type = EXPR_STATEMENT;
+	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
-	statement_t *statement = parse_compound_statement();
-	expression->statement  = statement;
+	statement_t *statement          = parse_compound_statement();
+	expression->statement.statement = statement;
 	if(statement == NULL) {
 		expect(')');
 		return NULL;
 	}
 
 	assert(statement->type == STATEMENT_COMPOUND);
-	compound_statement_t *compound_statement
-		= (compound_statement_t*) statement;
+	compound_statement_t *compound_statement = &statement->compound;
 
 	/* find last statement and use it's type */
 	const statement_t *last_statement = NULL;
@@ -2757,17 +2764,17 @@ static expression_t *parse_statement_expression(void)
 	}
 
 	if(last_statement->type == STATEMENT_EXPRESSION) {
-		const expression_statement_t *expression_statement =
-			(const expression_statement_t*) last_statement;
-		expression->expression.datatype
+		const expression_statement_t *expression_statement
+			= &last_statement->expression;
+		expression->base.datatype
 			= expression_statement->expression->base.datatype;
 	} else {
-		expression->expression.datatype = type_void;
+		expression->base.datatype = type_void;
 	}
 
 	expect(')');
 
-	return (expression_t*) expression;
+	return expression;
 }
 
 static expression_t *parse_brace_expression(void)
@@ -2883,50 +2890,47 @@ static expression_t *parse_offsetof(void)
 {
 	eat(T___builtin_offsetof);
 
-	offsetof_expression_t *expression
-		= allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type     = EXPR_OFFSETOF;
-	expression->expression.datatype = type_size_t;
+	expression_t *expression  = allocate_expression_zero(EXPR_OFFSETOF);
+	expression->base.datatype = type_size_t;
 
 	expect('(');
-	expression->type = parse_typename();
+	expression->offsetofe.type = parse_typename();
 	expect(',');
-	expression->designator = parse_designator();
+	expression->offsetofe.designator = parse_designator();
 	expect(')');
 
-	return (expression_t*) expression;
+	return expression;
 }
 
 static expression_t *parse_va_arg(void)
 {
 	eat(T___builtin_va_arg);
 
-	va_arg_expression_t *expression = allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type     = EXPR_VA_ARG;
+	expression_t *expression = allocate_expression_zero(EXPR_VA_ARG);
 
 	expect('(');
-	expression->arg = parse_assignment_expression();
+	expression->va_arge.arg = parse_assignment_expression();
 	expect(',');
-	expression->expression.datatype = parse_typename();
+	expression->base.datatype = parse_typename();
 	expect(')');
 
-	return (expression_t*) expression;
+	return expression;
 }
 
 static expression_t *parse_builtin_symbol(void)
 {
-	builtin_symbol_expression_t *expression
-		= allocate_ast_zero(sizeof(expression[0]));
-	expression->expression.type = EXPR_BUILTIN_SYMBOL;
+	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_SYMBOL);
 
-	expression->symbol = token.v.symbol;
+	symbol_t *symbol = token.v.symbol;
+
+	expression->builtin_symbol.symbol = symbol;
 	next_token();
 
-	type_t *type = get_builtin_symbol_type(expression->symbol);
+	type_t *type = get_builtin_symbol_type(symbol);
 	type = automatic_type_conversion(type);
 
-	expression->expression.datatype = type;
-	return (expression_t*) expression;
+	expression->base.datatype = type;
+	return expression;
 }
 
 static expression_t *parse_primary_expression(void)
@@ -3078,17 +3082,15 @@ static expression_t *parse_select_expression(unsigned precedence,
 	bool is_pointer = (token.type == T_MINUSGREATER);
 	next_token();
 
-	select_expression_t *select = allocate_ast_zero(sizeof(select[0]));
-
-	select->expression.type = EXPR_SELECT;
-	select->compound        = compound;
+	expression_t *select    = allocate_expression_zero(EXPR_SELECT);
+	select->select.compound = compound;
 
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, 0);
-		return (expression_t*) select;
+		return select;
 	}
-	symbol_t *symbol = token.v.symbol;
-	select->symbol   = symbol;
+	symbol_t *symbol      = token.v.symbol;
+	select->select.symbol = symbol;
 	next_token();
 
 	type_t *orig_type = compound->base.datatype;
@@ -3150,18 +3152,19 @@ static expression_t *parse_select_expression(unsigned precedence,
 	 * code to revert this! */
 	type_t *expression_type = automatic_type_conversion(iter->type);
 
-	select->compound_entry      = iter;
-	select->expression.datatype = expression_type;
-	return (expression_t*) select;
+	select->select.compound_entry = iter;
+	select->base.datatype         = expression_type;
+	return select;
 }
 
 static expression_t *parse_call_expression(unsigned precedence,
                                            expression_t *expression)
 {
 	(void) precedence;
-	call_expression_t *call = allocate_ast_zero(sizeof(call[0]));
-	call->expression.type   = EXPR_CALL;
-	call->function          = expression;
+	expression_t *result = allocate_expression_zero(EXPR_CALL);
+
+	call_expression_t *call  = &result->call;
+	call->function           = expression;
 
 	function_type_t *function_type = NULL;
 	type_t          *orig_type     = expression->base.datatype;
@@ -3261,7 +3264,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 		}
 	}
 
-	return (expression_t*) call;
+	return result;
 }
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);

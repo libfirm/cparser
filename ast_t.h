@@ -202,7 +202,7 @@ union expression_t {
 	expression_type_t            type;
 	expression_base_t            base;
 	const_expression_t           conste;
-	string_literal_expression_t  string_literal;
+	string_literal_expression_t  string;
 	builtin_symbol_expression_t  builtin_symbol;
 	reference_expression_t       reference;
 	call_expression_t            call;
@@ -233,7 +233,7 @@ typedef enum {
 	NAMESPACE_STRUCT,
 	NAMESPACE_UNION,
 	NAMESPACE_ENUM,
-	NAMESPACE_LABEL
+	NAMESPACE_LABEL,
 } namespace_t;
 
 typedef enum {

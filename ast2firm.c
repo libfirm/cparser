@@ -242,7 +242,6 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
-	case TYPE_COUNT:
 	case TYPE_INVALID:
 		break;
 	}
@@ -524,7 +523,6 @@ static ir_type *get_ir_type(type_t *type)
 	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
-	case TYPE_COUNT:
 	case TYPE_INVALID:
 		break;
 	}
@@ -1646,7 +1644,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_CONST:
 		return const_to_firm(&expression->conste);
 	case EXPR_STRING_LITERAL:
-		return string_literal_to_firm(&expression->string_literal);
+		return string_literal_to_firm(&expression->string);
 	case EXPR_REFERENCE:
 		return reference_expression_to_firm(&expression->reference);
 	case EXPR_CALL:
@@ -1667,7 +1665,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return classify_type_to_firm(&expression->classify_type);
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
-		return function_name_to_firm(&expression->string_literal);
+		return function_name_to_firm(&expression->string);
 	case EXPR_STATEMENT:
 		return statement_expression_to_firm(&expression->statement);
 	case EXPR_OFFSETOF:

@@ -26,7 +26,6 @@ typedef enum {
 	TYPE_BUILTIN,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
-	TYPE_COUNT
 } type_type_t;
 
 /* note that the constant values represent the rank of the types as defined
@@ -156,6 +155,8 @@ union type_t {
 
 type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
+
+type_t *duplicate_type(type_t *type);
 
 static inline bool is_typeref(const type_t *type)
 {

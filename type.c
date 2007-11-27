@@ -252,7 +252,6 @@ static void print_typeof_type_pre(typeof_type_t *type)
 static void intern_print_type_pre(type_t *type)
 {
 	switch(type->type) {
-	case TYPE_COUNT:
 	case TYPE_INVALID:
 		fputs("invalid", out);
 		return;
@@ -301,7 +300,6 @@ static void intern_print_type_post(type_t *type)
 		print_array_type_post(&type->array);
 		return;
 	case TYPE_INVALID:
-	case TYPE_COUNT:
 	case TYPE_ATOMIC:
 	case TYPE_ENUM:
 	case TYPE_COMPOUND_STRUCT:
@@ -491,7 +489,6 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_TYPEOF:
 	case TYPE_BUILTIN:
 		panic("is_type_incomplete called without typerefs skipped");
-	case TYPE_COUNT:
 	case TYPE_INVALID:
 		break;
 	}
@@ -539,7 +536,6 @@ static size_t get_type_size(type_t *type)
 	case TYPE_BUILTIN:         return sizeof(builtin_type_t); break;
 	case TYPE_TYPEDEF:         return sizeof(typedef_type_t); break;
 	case TYPE_TYPEOF:          return sizeof(typeof_type_t); break;
-	case TYPE_COUNT:
 	case TYPE_INVALID:         panic("invalid type found"); break;
 	}
 	panic("unknown type found");
@@ -549,7 +545,7 @@ static size_t get_type_size(type_t *type)
  * duplicates a type
  * note that this does not produce a deep copy!
  */
-static type_t *duplicate_type(type_t *type)
+type_t *duplicate_type(type_t *type)
 {
 	size_t size = get_type_size(type);
 
