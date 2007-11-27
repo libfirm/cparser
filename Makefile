@@ -5,11 +5,13 @@ FIRM_BUILD = $(FIRM_HOME)/build/i686-pc-linux-gnu/debug/
 FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOME)/libcore -I$(FIRM_HOME)/libcore/libcore -I$(FIRM_HOME)
 FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -ldl -lz
 
+CPPFLAGS  = -DHAVE_CONFIG_H -DFIRM_BACKEND
+CPPFLAGS += -I.
+CPPFLAGS += $(FIRM_CFLAGS)
+
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
-CFLAGS += -DHAVE_CONFIG_H -DFIRM_BACKEND
-CFLAGS += -I .
 CFLAGS += -O0 -g3
-CFLAGS += $(FIRM_CFLAGS)
+ICC_CFLAGS = -O0 -g3 -std=c99 -Wall -Werror
 #CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 
 LFLAGS = $(FIRM_LIBS)
@@ -31,6 +33,8 @@ SOURCES := \
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
 
+SPLINTS = $(addsuffix .splint, $(SOURCES))
+
 Q = @
 
 .PHONY : all clean dirs
@@ -43,11 +47,17 @@ endif
 
 .depend: $(SOURCES)
 	@echo "===> DEPEND"
-	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
+	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
 $(GOAL): build/adt $(OBJECTS)
 	@echo "===> LD $@"
-	$(Q)$(CC) -rdynamic $(OBJECTS) $(LFLAGS) -o $(GOAL)
+	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
+
+splint: $(SPLINTS)
+
+%.c.splint: %.c
+	@echo '===> SPLINT $<'
+	$(Q)splint $(CPPFLAGS) $<
 
 build/adt:
 	@echo "===> MKDIR $@"
@@ -55,7 +65,8 @@ build/adt:
 
 build/%.o: %.c
 	@echo '===> CC $<'
-	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+	$(Q)icc $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
 	@echo '===> CLEAN'
