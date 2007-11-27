@@ -2328,7 +2328,7 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 			/* § 6.7.5.3 (14) a function definition with () */
 			if(function_type->unspecified_parameters) {
 				type_t *duplicate = duplicate_type(type);
-				duplicate->function.unspecified_parameters = true;
+				duplicate->function.unspecified_parameters = false;
 
 				type = typehash_insert(duplicate);
 				if(type != duplicate) {
