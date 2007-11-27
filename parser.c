@@ -443,6 +443,17 @@ static void set_context(context_t *new_context)
 static bool is_compatible_declaration (declaration_t *declaration,
                                       declaration_t *previous)
 {
+	if (declaration->type->type == TYPE_FUNCTION &&
+			previous->type->type    == TYPE_FUNCTION &&
+			previous->type->function.unspecified_parameters) {
+		function_type_t* const prev_func = &previous->type->function;
+		function_type_t* const decl_func = &declaration->type->function;
+		if (prev_func->unspecified_parameters &&
+				prev_func->result_type == decl_func->result_type) {
+			declaration->type = previous->type;
+			return true;
+		}
+	}
 	/* TODO: not correct yet */
 	return declaration->type == previous->type;
 }
