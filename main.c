@@ -235,6 +235,7 @@ static void create_firm_prog(translation_unit_t *unit)
 	lower_calls_with_compounds(&params);
 
 	lower_highlevel();
+
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);
 		dump(irg, "-lower");

@@ -1797,32 +1797,18 @@ static void return_statement_to_firm(return_statement_t *statement)
 	if(get_method_n_ress(func_irtype) > 0) {
 		ir_type *res_type = get_method_res_type(func_irtype, 0);
 
-		if(is_compound_type(res_type)) {
-			ir_entity *entity = get_method_value_res_ent(func_irtype, 0);
-
-			ir_node *frame       = get_irg_frame(current_ir_graph);
-			ir_node *nomem       = new_NoMem();
-			ir_node *source_addr = expression_to_addr(statement->return_value);
-			ir_node *dest_addr   = new_simpleSel(nomem, frame, entity);
-
-			ir_node *store = get_store();
-			ir_node *copyb = new_d_CopyB(dbgi, store, dest_addr, source_addr,
-			                             res_type);
-
-			ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
-			set_store(copyb_mem);
-
-			in[0]  = dest_addr;
-			in_len = 1;
+		if(statement->return_value != NULL) {
+			in[0] = expression_to_firm(statement->return_value);
 		} else {
-			in_len = 1;
-			if(statement->return_value != NULL) {
-				in[0] = expression_to_firm(statement->return_value);
+			ir_mode *mode;
+			if(is_compound_type(res_type)) {
+				mode = mode_P_data;
 			} else {
-				ir_mode *mode = get_type_mode(res_type);
-				in[0]         = new_Unknown(mode);
+				mode = get_type_mode(res_type);
 			}
+			in[0] = new_Unknown(mode);
 		}
+		in_len = 1;
 	} else {
 		/* build return_value for its side effects */
 		if(statement->return_value != NULL) {
@@ -2859,13 +2845,20 @@ static void create_function(declaration_t *declaration)
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
 		const function_type_t* const func_type = &declaration->type->function;
+		const type_t *result_type = skip_typeref(func_type->result_type);
 
 		ir_node *ret;
-		if (func_type->result_type == type_void) {
+		if (is_type_atomic(result_type, ATOMIC_TYPE_VOID)) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
-			ir_mode *const mode = get_ir_mode(func_type->result_type);
-			ir_node *      in[1];
+			ir_mode *mode;
+			if(is_type_scalar(result_type)) {
+				mode = get_ir_mode(func_type->result_type);
+			} else {
+				mode = mode_P_data;
+			}
+
+			ir_node *in[1];
 			// §5.1.2.2.3 main implicitly returns 0
 			if (strcmp(declaration->symbol->string, "main") == 0) {
 				in[0] = new_Const(mode, get_mode_null(mode));

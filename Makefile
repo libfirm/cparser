@@ -3,7 +3,7 @@ GOAL = cparser
 FIRM_HOME = $(HOME)/projects/firm
 FIRM_BUILD = $(FIRM_HOME)/build/i686-pc-linux-gnu/debug/
 FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOME)/libcore -I$(FIRM_HOME)/libcore/libcore -I$(FIRM_HOME)
-FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -lz
+FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -lz -ldl
 
 CPPFLAGS  = -DHAVE_CONFIG_H -DFIRM_BACKEND
 CPPFLAGS += -I.
