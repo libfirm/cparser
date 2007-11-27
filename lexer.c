@@ -44,7 +44,6 @@ static strset_t    stringset;
 
 static type_t     *type_int        = NULL;
 static type_t     *type_uint       = NULL;
-static type_t     *type_long       = NULL;
 static type_t     *type_ulong      = NULL;
 static type_t     *type_longlong   = NULL;
 static type_t     *type_ulonglong  = NULL;
@@ -91,7 +90,7 @@ static inline void put_back(int pc)
 	//assert(bufpos < buf+MAX_PUTBACK || *bufpos == pc);
 
 	char *p = buf + (bufpos - buf);
-	*p = pc;
+	*p = (char) pc;
 
 	/* going backwards in the buffer is legal as long as it's not more often
 	 * than MAX_PUTBACK */
@@ -250,14 +249,14 @@ static void parse_symbol(void)
 	symbol_t *symbol;
 	char     *string;
 
-	obstack_1grow(&symbol_obstack, c);
+	obstack_1grow(&symbol_obstack, (char) c);
 	next_char();
 
 	while(1) {
 		switch(c) {
 		DIGITS
 		SYMBOL_CHARS
-			obstack_1grow(&symbol_obstack, c);
+			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 			break;
 
@@ -426,7 +425,7 @@ static void parse_number_hex(void)
 	next_char();
 
 	while(isxdigit(c)) {
-		obstack_1grow(&symbol_obstack, c);
+		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 	}
 	obstack_1grow(&symbol_obstack, '\0');
@@ -460,7 +459,7 @@ static inline bool is_octal_digit(int chr)
 static void parse_number_oct(void)
 {
 	while(is_octal_digit(c)) {
-		obstack_1grow(&symbol_obstack, c);
+		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 	}
 	obstack_1grow(&symbol_obstack, '\0');
@@ -481,7 +480,7 @@ static void parse_number_dec(void)
 {
 	bool is_float = false;
 	while(isdigit(c)) {
-		obstack_1grow(&symbol_obstack, c);
+		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 	}
 
@@ -490,7 +489,7 @@ static void parse_number_dec(void)
 		next_char();
 
 		while(isdigit(c)) {
-			obstack_1grow(&symbol_obstack, c);
+			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 		}
 		is_float = true;
@@ -500,12 +499,12 @@ static void parse_number_dec(void)
 		next_char();
 
 		if(c == '-' || c == '+') {
-			obstack_1grow(&symbol_obstack, c);
+			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 		}
 
 		while(isdigit(c)) {
-			obstack_1grow(&symbol_obstack, c);
+			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 		}
 		is_float = true;
@@ -678,7 +677,7 @@ static void parse_string_literal(void)
 		switch(c) {
 		case '\\':
 			tc = parse_escape_sequence();
-			obstack_1grow(&symbol_obstack, tc);
+			obstack_1grow(&symbol_obstack, (char) tc);
 			break;
 
 		case EOF:
@@ -693,7 +692,7 @@ static void parse_string_literal(void)
 			goto end_of_string;
 
 		default:
-			obstack_1grow(&symbol_obstack, c);
+			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 			break;
 		}
@@ -1142,7 +1141,6 @@ void init_lexer(void)
 
 	type_int       = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_CONST);
 	type_uint      = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_CONST);
-	type_long      = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_CONST);
 	type_ulong     = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_CONST);
 	type_longlong  = make_atomic_type(ATOMIC_TYPE_LONGLONG,
 	                                  TYPE_QUALIFIER_CONST);
@@ -1177,7 +1175,7 @@ void exit_lexer(void)
 static __attribute__((unused))
 void dbg_pos(const source_position_t source_position)
 {
-	fprintf(stdout, "%s:%d\n", source_position.input_name,
+	fprintf(stdout, "%s:%u\n", source_position.input_name,
 	        source_position.linenr);
 	fflush(stdout);
 }

@@ -10,7 +10,6 @@ static struct obstack   _type_obst;
 struct obstack         *type_obst = &_type_obst;
 static FILE            *out;
 static int              type_visited = 0;
-static bool             print_compound_entries;
 
 static void intern_print_type_pre(type_t *type);
 static void intern_print_type_post(type_t *type);
@@ -28,11 +27,6 @@ void exit_types(void)
 void type_set_output(FILE *stream)
 {
 	out = stream;
-}
-
-void set_print_compound_entries(bool enabled)
-{
-	print_compound_entries = enabled;
 }
 
 void inc_type_visited(void)

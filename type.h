@@ -42,8 +42,6 @@ void type_set_output(FILE *out);
 
 void inc_type_visited(void);
 
-void set_print_compound_entries(bool enabled);
-
 /**
  * returns true if type contains integer numbers
  */

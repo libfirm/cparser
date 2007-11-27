@@ -33,16 +33,16 @@ typedef enum {
 	EXPR_OFFSETOF,
 	EXPR_VA_ARG,
 	EXPR_STATEMENT
-} expresion_type_t;
+} expression_type_t;
 
 struct context_t {
 	declaration_t   *declarations;
 };
 
 struct expression_base_t {
-	expresion_type_t   type;
-	type_t            *datatype;
-	source_position_t  source_position;
+	expression_type_t   type;
+	type_t             *datatype;
+	source_position_t   source_position;
 };
 
 struct const_expression_t {
@@ -199,7 +199,7 @@ struct classify_type_expression_t {
 };
 
 union expression_t {
-	expresion_type_t             type;
+	expression_type_t            type;
 	expression_base_t            base;
 	const_expression_t           conste;
 	string_literal_expression_t  string_literal;
@@ -212,7 +212,7 @@ union expression_t {
 	array_access_expression_t    array_access;
 	sizeof_expression_t          sizeofe;
 	offsetof_expression_t        offsetofe;
-	va_arg_expression_t          va_arg;
+	va_arg_expression_t          va_arge;
 	conditional_expression_t     conditional;
 	statement_expression_t       statement;
 	classify_type_expression_t   classify_type;
@@ -226,7 +226,7 @@ typedef enum {
 	STORAGE_CLASS_AUTO,
 	STORAGE_CLASS_REGISTER,
 	STORAGE_CLASS_ENUM_ENTRY
-} storage_class_t;
+} storage_class_tag_t;
 
 typedef enum {
 	NAMESPACE_NORMAL,

@@ -23,7 +23,6 @@
 static ir_type *ir_type_const_char;
 static ir_type *ir_type_void;
 static ir_type *ir_type_int;
-static ir_type *ir_type_void_ptr;
 
 static type_t *type_const_char;
 static type_t *type_void;
@@ -97,8 +96,6 @@ void init_ast2firm(void)
 	ir_type_const_char = get_ir_type(type_const_char);
 	ir_type_void       = get_ir_type(type_int); /* we don't have a real void
 	                                               type in firm */
-	ir_type_void_ptr   = new_type_pointer(new_id_from_str("void_ptr"),
-	                                      ir_type_void, mode_P_data);
 
 	type_void->base.firm_type = ir_type_void;
 
@@ -601,7 +598,8 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 		if(mode_is_signed(mode)) {
 			len = snprintf(buf, sizeof(buf), "%lld", cnst->v.int_value);
 		} else {
-			len = snprintf(buf, sizeof(buf), "%llu", cnst->v.int_value);
+			len = snprintf(buf, sizeof(buf), "%llu",
+			               (unsigned long long) cnst->v.int_value);
 		}
 		tv = new_tarval_from_str(buf, len, mode);
 	}
@@ -903,8 +901,6 @@ static void set_value_for_expression(const expression_t *expression,
 
 	type_t *type = skip_typeref(expression->base.datatype);
 	if(is_type_scalar(type)) {
-		assert(get_irn_mode(value) == get_ir_mode(type));
-
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
@@ -1936,7 +1932,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 		break_label    = old_break_label;
 
 		if(get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
+			jmp = new_Jmp();
 			add_immBlock_pred(header_block, jmp);
 		}
 	} else {
@@ -2053,7 +2049,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		break_label    = old_break_label;
 
 		if (get_cur_block() != NULL) {
-			ir_node *const jmp = new_Jmp();
+			jmp = new_Jmp();
 			add_immBlock_pred(step_block, jmp);
 		}
 	} else {
@@ -2067,7 +2063,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		                            false_block);
 	} else {
 		keep_alive(header_block);
-		ir_node *jmp = new_Jmp();
+		jmp = new_Jmp();
 		add_immBlock_pred(body_block, jmp);
 	}
 
@@ -2089,7 +2085,7 @@ static void create_declaration_entity(declaration_t *declaration,
 	ir_entity *entity = new_entity(parent_type, id, irtype);
 	set_entity_ld_ident(entity, id);
 
-	declaration->declaration_type = declaration_type;
+	declaration->declaration_type = (unsigned char) declaration_type;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
 	/* TODO: visibility? */
@@ -2182,9 +2178,9 @@ static void create_initializer_compound(initializer_list_t *initializer,
 			create_initializer_value(&sub_initializer->value,
 			                         entity, &entry, len);
 		} else {
-			type_t *type = skip_typeref(compound_entry->type);
-			create_initializer_object(sub_initializer, type, entity, &entry,
-			                          len);
+			type_t *entry_type = skip_typeref(compound_entry->type);
+			create_initializer_object(sub_initializer, entry_type, entity,
+			                          &entry, len);
 		}
 
 		++i;
@@ -2337,7 +2333,8 @@ static void create_initializer(declaration_t *declaration)
 	if(initializer == NULL)
 		return;
 
-	declaration_type_t declaration_type = (declaration_type_t)declaration->declaration_type;
+	declaration_type_t declaration_type
+		= (declaration_type_t) declaration->declaration_type;
 	if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
 		create_initializer_local_variable_entity(declaration);
 		return;
@@ -2359,7 +2356,6 @@ static void create_initializer(declaration_t *declaration)
 			set_atomic_ent_value(entity, value);
 		}
 	} else {
-		declaration_type_t declaration_type = (declaration_type_t)declaration->declaration_type;
 		assert(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY
 				|| declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
 
@@ -2816,7 +2812,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 
 static void create_function(declaration_t *declaration)
 {
-	ir_entity *entity = get_function_entity(declaration);
+	ir_entity *function_entity = get_function_entity(declaration);
 
 	if(declaration->init.statement == NULL)
 		return;
@@ -2828,7 +2824,7 @@ static void create_function(declaration_t *declaration)
 	imature_blocks = NEW_ARR_F(ir_node*, 0);
 
 	int       n_local_vars = get_function_n_local_vars(declaration);
-	ir_graph *irg          = new_ir_graph(entity, n_local_vars);
+	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
 	ir_node  *first_block  = get_cur_block();
 
 	next_value_number_function = 0;

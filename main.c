@@ -22,6 +22,7 @@
 #include "parser.h"
 #include "ast2firm.h"
 #include "adt/error.h"
+#include "write_fluffy.h"
 
 #ifndef PREPROCESSOR
 #define PREPROCESSOR "cpp"
@@ -62,6 +63,8 @@ static void initialize_firm(void)
 	ir_set_debug_retrieve(retrieve_dbg);
 	params.arch_op_settings = be_params->arch_op_settings;
 	if_conv_info            = be_params->if_conv_info;
+
+	(void) if_conv_info; /* avoid unused warning */
 
 	/* intialize firm itself */
 	init_firm(&params);
@@ -279,8 +282,6 @@ static void optimize(void)
 		dump(irg, "-06-cf");
 	}
 }
-
-void write_fluffy_decls(translation_unit_t *unit);
 
 typedef enum compile_mode_t {
 	Compile,

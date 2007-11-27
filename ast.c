@@ -505,9 +505,9 @@ void print_statement(const statement_t *statement)
 	}
 }
 
-static void print_storage_class(storage_class_t storage_class)
+static void print_storage_class(unsigned storage_class)
 {
-	switch(storage_class) {
+	switch((storage_class_tag_t) storage_class) {
 	case STORAGE_CLASS_ENUM_ENTRY:
 	case STORAGE_CLASS_NONE:
 		break;
@@ -542,7 +542,7 @@ void print_initializer(const initializer_t *initializer)
 
 static void print_normal_declaration(const declaration_t *declaration)
 {
-	print_storage_class((storage_class_t)declaration->storage_class);
+	print_storage_class(declaration->storage_class);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
 	if(declaration->is_inline) {
@@ -599,7 +599,6 @@ void print_declaration(const declaration_t *declaration)
 void print_ast(const translation_unit_t *unit)
 {
 	inc_type_visited();
-	set_print_compound_entries(true);
 
 	declaration_t *declaration = unit->context.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {

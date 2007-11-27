@@ -7,5 +7,7 @@
 #define __attribute__(x)
 #else
 #define NORETURN
+#ifndef __attribute__
 #define __attribute__(x)
+#endif
 #endif

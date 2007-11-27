@@ -38,7 +38,6 @@ static struct obstack  temp_obst;
 static bool            found_error;
 
 static type_t         *type_int         = NULL;
-static type_t         *type_uint        = NULL;
 static type_t         *type_long_double = NULL;
 static type_t         *type_double      = NULL;
 static type_t         *type_float       = NULL;
@@ -113,6 +112,34 @@ static void *allocate_ast_zero(size_t size)
 	return res;
 }
 
+static size_t get_expression_struct_size(expression_type_t type)
+{
+	static const size_t sizes[] = {
+		[EXPR_REFERENCE]       = sizeof(reference_expression_t),
+		[EXPR_CONST]           = sizeof(const_expression_t),
+		[EXPR_STRING_LITERAL]  = sizeof(string_literal_expression_t),
+		[EXPR_CALL]            = sizeof(call_expression_t),
+		[EXPR_UNARY]           = sizeof(unary_expression_t),
+		[EXPR_BINARY]          = sizeof(binary_expression_t),
+		[EXPR_CONDITIONAL]     = sizeof(conditional_expression_t),
+		[EXPR_SELECT]          = sizeof(select_expression_t),
+		[EXPR_ARRAY_ACCESS]    = sizeof(array_access_expression_t),
+		[EXPR_SIZEOF]          = sizeof(sizeof_expression_t),
+		[EXPR_CLASSIFY_TYPE]   = sizeof(classify_type_expression_t),
+		[EXPR_FUNCTION]        = sizeof(string_literal_expression_t),
+		[EXPR_PRETTY_FUNCTION] = sizeof(string_literal_expression_t),
+		[EXPR_BUILTIN_SYMBOL]  = sizeof(builtin_symbol_expression_t),
+		[EXPR_OFFSETOF]        = sizeof(offsetof_expression_t),
+		[EXPR_VA_ARG]          = sizeof(va_arg_expression_t),
+		[EXPR_STATEMENT]       = sizeof(statement_expression_t)
+	};
+	assert(sizeof(sizes) / sizeof(sizes[0]) == EXPR_STATEMENT + 1);
+	assert(type <= EXPR_STATEMENT);
+	assert(sizes[type] != 0);
+	(void) get_expression_struct_size;
+	return sizes[type];
+}
+
 static size_t get_type_struct_size(type_type_t type)
 {
 	static const size_t sizes[] = {
@@ -127,7 +154,8 @@ static size_t get_type_struct_size(type_type_t type)
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
 	};
-	assert(type < TYPE_COUNT);
+	assert(sizeof(sizes) / sizeof(sizes[0]) == (int) TYPE_TYPEOF + 1);
+	assert(type <= TYPE_TYPEOF);
 	assert(sizes[type] != 0);
 	return sizes[type];
 }
@@ -217,7 +245,7 @@ static void parser_print_prefix_pos(const source_position_t source_position)
 {
     fputs(source_position.input_name, stderr);
     fputc(':', stderr);
-    fprintf(stderr, "%d", source_position.linenr);
+    fprintf(stderr, "%u", source_position.linenr);
     fputs(": ", stderr);
 }
 
@@ -479,11 +507,11 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
 		} else {
-			const storage_class_t old_storage = previous_declaration->storage_class;
-			const storage_class_t new_storage = declaration->storage_class;
+			unsigned old_storage_class = previous_declaration->storage_class;
+			unsigned new_storage_class = declaration->storage_class;
 			if (current_function == NULL) {
-				if (old_storage != STORAGE_CLASS_STATIC &&
-				    new_storage == STORAGE_CLASS_STATIC) {
+				if (old_storage_class != STORAGE_CLASS_STATIC &&
+				    new_storage_class == STORAGE_CLASS_STATIC) {
 					parser_print_error_prefix_pos(declaration->source_position);
 					fprintf(stderr,
 					        "static declaration of '%s' follows non-static declaration\n",
@@ -492,8 +520,8 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 					fprintf(stderr, "previous declaration of '%s' was here\n",
 					        symbol->string);
 				} else {
-					if (old_storage == STORAGE_CLASS_EXTERN) {
-						if (new_storage == STORAGE_CLASS_NONE) {
+					if (old_storage_class == STORAGE_CLASS_EXTERN) {
+						if (new_storage_class == STORAGE_CLASS_NONE) {
 							previous_declaration->storage_class = STORAGE_CLASS_NONE;
 						}
 					} else {
@@ -506,8 +534,8 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 					}
 				}
 			} else {
-				if (old_storage == STORAGE_CLASS_EXTERN &&
-						new_storage == STORAGE_CLASS_EXTERN) {
+				if (old_storage_class == STORAGE_CLASS_EXTERN &&
+						new_storage_class == STORAGE_CLASS_EXTERN) {
 					parser_print_warning_prefix_pos(declaration->source_position);
 					fprintf(stderr, "redundant extern declaration for '%s'\n",
 					        symbol->string);
@@ -516,7 +544,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 					        symbol->string);
 				} else {
 					parser_print_error_prefix_pos(declaration->source_position);
-					if (old_storage == new_storage) {
+					if (old_storage_class == new_storage_class) {
 						fprintf(stderr, "redeclaration of '%s'\n", symbol->string);
 					} else {
 						fprintf(stderr, "redeclaration of '%s' with different linkage\n", symbol->string);
@@ -534,7 +562,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	stack_entry_t entry;
 	entry.symbol          = symbol;
 	entry.old_declaration = symbol->declaration;
-	entry.namespc       = namespc;
+	entry.namespc         = (unsigned short) namespc;
 	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 
 	/* replace/add declaration into declaration list of the symbol */
@@ -837,9 +865,9 @@ static expression_t *parse_assignment_expression(void)
 
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
-	storage_class_t  storage_class;
-	bool             is_inline;
-	type_t          *type;
+	unsigned char storage_class;
+	bool          is_inline;
+	type_t       *type;
 };
 
 static void parse_compound_type_entries(void);
@@ -867,7 +895,7 @@ static void parse_attributes(void)
 {
 	while(true) {
 		switch(token.type) {
-		case T___attribute__:
+		case T___attribute__: {
 			next_token();
 
 			expect_void('(');
@@ -890,6 +918,7 @@ static void parse_attributes(void)
 				}
 			}
 			break;
+		}
 		case T_asm:
 			next_token();
 			expect_void('(');
@@ -1100,8 +1129,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			if(token.type == '}')
 				break;
 
-			initializer_t *sub
-				= parse_sub_initializer(element_type, NULL, NULL);
+			sub = parse_sub_initializer(element_type, NULL, NULL);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup */
 				parse_error("member initializer didn't match");
@@ -1155,7 +1183,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			type_t *iter_type = iter->type;
 			iter_type         = skip_typeref(iter_type);
 
-			initializer_t *sub = parse_sub_initializer(iter_type, NULL, NULL);
+			sub = parse_sub_initializer(iter_type, NULL, NULL);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup*/
 				parse_error("member initializer didn't match");
@@ -1435,11 +1463,11 @@ restart:
 
 	expect(')');
 
-	type_t *typeof              = allocate_type_zero(TYPE_TYPEOF);
-	typeof->typeoft.expression  = expression;
-	typeof->typeoft.typeof_type = type;
+	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF);
+	typeof_type->typeoft.expression  = expression;
+	typeof_type->typeoft.typeof_type = type;
 
-	return typeof;
+	return typeof_type;
 }
 
 typedef enum {
@@ -3498,7 +3526,9 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 
 	bool signed_left  = is_type_signed(type_left);
 	bool signed_right = is_type_signed(type_right);
-	if(get_rank(type_left) < get_rank(type_right)) {
+	int  rank_left    = get_rank(type_left);
+	int  rank_right   = get_rank(type_right);
+	if(rank_left < rank_right) {
 		if(signed_left == signed_right || !signed_right) {
 			return type_right;
 		} else {
@@ -3946,7 +3976,7 @@ static void register_expression_parser(parse_expression_function parser,
 
 	if(entry->parser != NULL) {
 		fprintf(stderr, "for token ");
-		print_token_type(stderr, token_type);
+		print_token_type(stderr, (token_type_t) token_type);
 		fprintf(stderr, "\n");
 		panic("trying to register multiple expression parsers for a token");
 	}
@@ -3962,7 +3992,7 @@ static void register_expression_infix_parser(
 
 	if(entry->infix_parser != NULL) {
 		fprintf(stderr, "for token ");
-		print_token_type(stderr, token_type);
+		print_token_type(stderr, (token_type_t) token_type);
 		fprintf(stderr, "\n");
 		panic("trying to register multiple infix expression parsers for a "
 		      "token");
@@ -4580,7 +4610,6 @@ void init_parser(void)
 	obstack_init(&temp_obst);
 
 	type_int         = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
-	type_uint        = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_NONE);
 	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, TYPE_QUALIFIER_NONE);
 	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, TYPE_QUALIFIER_NONE);
 	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
