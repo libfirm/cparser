@@ -2325,14 +2325,15 @@ static void parse_init_declarators(const declaration_specifiers_t *specifiers)
 				continue;
 			}
 			function_type_t *function_type = &type->function;
-			/* § 6.7.5.3 (14) a function definition with () */
+			/* § 6.7.5.3 (14) a function definition with () means no
+			 * parameters */
 			if(function_type->unspecified_parameters) {
 				type_t *duplicate = duplicate_type(type);
 				duplicate->function.unspecified_parameters = false;
 
 				type = typehash_insert(duplicate);
 				if(type != duplicate) {
-					obstack_free(type_obst, duplicate);
+					//obstack_free(type_obst, duplicate);
 				}
 				function_type = &type->function;
 			}

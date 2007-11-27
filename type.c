@@ -526,17 +526,17 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 static size_t get_type_size(type_t *type)
 {
 	switch(type->type) {
-	case TYPE_ATOMIC:          return sizeof(atomic_type_t); break;
+	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t); break;
-	case TYPE_ENUM:            return sizeof(enum_type_t); break;
-	case TYPE_FUNCTION:        return sizeof(function_type_t); break;
-	case TYPE_POINTER:         return sizeof(pointer_type_t); break;
-	case TYPE_ARRAY:           return sizeof(array_type_t); break;
-	case TYPE_BUILTIN:         return sizeof(builtin_type_t); break;
-	case TYPE_TYPEDEF:         return sizeof(typedef_type_t); break;
-	case TYPE_TYPEOF:          return sizeof(typeof_type_t); break;
-	case TYPE_INVALID:         panic("invalid type found"); break;
+	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
+	case TYPE_ENUM:            return sizeof(enum_type_t);
+	case TYPE_FUNCTION:        return sizeof(function_type_t);
+	case TYPE_POINTER:         return sizeof(pointer_type_t);
+	case TYPE_ARRAY:           return sizeof(array_type_t);
+	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
+	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
+	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
+	case TYPE_INVALID:         panic("invalid type found");
 	}
 	panic("unknown type found");
 }
@@ -552,9 +552,7 @@ type_t *duplicate_type(type_t *type)
 	type_t *copy = obstack_alloc(type_obst, size);
 	memcpy(copy, type, size);
 
-	(void) duplicate_type;
-
-	return type;
+	return copy;
 }
 
 type_t *skip_typeref(type_t *type)
