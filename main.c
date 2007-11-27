@@ -222,6 +222,15 @@ static void create_firm_prog(translation_unit_t *unit)
 		dump(irg, "-start");
 	}
 
+	lower_params_t params;
+
+	params.def_ptr_alignment    = 4;
+	params.flags                = LF_COMPOUND_RETURN | LF_RETURN_HIDDEN;
+	params.hidden_params        = ADD_HIDDEN_ALWAYS_IN_FRONT;
+	params.find_pointer_type    = NULL;
+	params.ret_compound_in_regs = NULL;
+	lower_calls_with_compounds(&params);
+
 	lower_highlevel();
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);

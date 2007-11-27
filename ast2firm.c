@@ -794,11 +794,11 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
 	assert(get_cur_block() != NULL);
 
-	expression_t  *function = call->function;
+	expression_t *function = call->function;
 	if(function->type == EXPR_BUILTIN_SYMBOL) {
 		return process_builtin_call(call);
 	}
-	ir_node       *callee   = expression_to_firm(function);
+	ir_node *callee = expression_to_firm(function);
 
 	type_t *type = function->base.datatype;
 	assert(type->type == TYPE_POINTER);
@@ -858,10 +858,16 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
 	set_store(mem);
 
-	type_t  *result_type = function_type->result_type;
+	type_t  *result_type = skip_typeref(function_type->result_type);
 	ir_node *result      = NULL;
-	if(result_type != type_void) {
-		ir_mode *mode    = get_ir_mode(result_type);
+
+	if(!is_type_atomic(result_type, ATOMIC_TYPE_VOID)) {
+		ir_mode *mode;
+		if(is_type_scalar(result_type)) {
+			mode = get_ir_mode(result_type);
+		} else {
+			mode = mode_P_data;
+		}
 		ir_node *resproj = new_d_Proj(dbgi, node, mode_T, pn_Call_T_result);
 		result           = new_d_Proj(dbgi, resproj, mode, 0);
 	}
@@ -891,13 +897,23 @@ static void set_value_for_expression(const expression_t *expression,
 		}
 	}
 
-	dbg_info *dbgi      = get_dbg_info(&expression->base.source_position);
-	ir_node  *addr      = expression_to_addr(expression);
-	assert(get_irn_mode(value) == get_ir_mode(expression->base.datatype));
-	ir_node  *memory    = get_store();
-	ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
-	ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-	set_store(store_mem);
+	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
+	ir_node  *addr   = expression_to_addr(expression);
+	ir_node  *memory = get_store();
+
+	type_t *type = skip_typeref(expression->base.datatype);
+	if(is_type_scalar(type)) {
+		assert(get_irn_mode(value) == get_ir_mode(type));
+
+		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
+		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+		set_store(store_mem);
+	} else {
+		ir_type *irtype    = get_ir_type(type);
+		ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, value, irtype);
+		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+		set_store(copyb_mem);
+	}
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -1306,6 +1322,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case BINEXPR_ASSIGN: {
 		ir_node *right = expression_to_firm(expression->right);
 		set_value_for_expression(expression->left, right);
+
 		return right;
 	}
 	case BINEXPR_ADD:
@@ -1607,14 +1624,15 @@ static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->type) {
 	case EXPR_REFERENCE:
-		return reference_addr((const reference_expression_t*) expression);
+		return reference_addr(&expression->reference);
 	case EXPR_ARRAY_ACCESS:
-		return array_access_addr((const array_access_expression_t*) expression);
+		return array_access_addr(&expression->array_access);
 	case EXPR_SELECT:
-		return select_addr((const select_expression_t*) expression);
+		return select_addr(&expression->select);
+	case EXPR_CALL:
+		return call_expression_to_firm(&expression->call);
 	case EXPR_UNARY: {
-		const unary_expression_t *const unary_expr =
-			(const unary_expression_t*)expression;
+		const unary_expression_t *const unary_expr = &expression->unary;
 		if (unary_expr->type == UNEXPR_DEREFERENCE) {
 			return dereference_addr(unary_expr);
 		}
@@ -1757,30 +1775,49 @@ static void return_statement_to_firm(return_statement_t *statement)
 	if(get_cur_block() == NULL)
 		return;
 
-
 	ir_type *func_irtype = get_ir_type(current_function_decl->type);
 
-	ir_node *value = NULL;
-	if(statement->return_value != NULL) {
-		value = expression_to_firm(statement->return_value);
-	}
+	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
 
 	ir_node *in[1];
 	int      in_len;
 	if(get_method_n_ress(func_irtype) > 0) {
-		if(value == NULL) {
-			ir_type *res_type = get_method_res_type(func_irtype, 0);
-			ir_mode *mode     = get_type_mode(res_type);
-			value             = new_Unknown(mode);
-		}
+		ir_type *res_type = get_method_res_type(func_irtype, 0);
 
-		in[0]  = value;
-		in_len = 1;
+		if(is_compound_type(res_type)) {
+			ir_entity *entity = get_method_value_res_ent(func_irtype, 0);
+
+			ir_node *frame       = get_irg_frame(current_ir_graph);
+			ir_node *nomem       = new_NoMem();
+			ir_node *source_addr = expression_to_addr(statement->return_value);
+			ir_node *dest_addr   = new_simpleSel(nomem, frame, entity);
+
+			ir_node *store = get_store();
+			ir_node *copyb = new_d_CopyB(dbgi, store, dest_addr, source_addr,
+			                             res_type);
+
+			ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+			set_store(copyb_mem);
+
+			in[0]  = dest_addr;
+			in_len = 1;
+		} else {
+			in_len = 1;
+			if(statement->return_value != NULL) {
+				in[0] = expression_to_firm(statement->return_value);
+			} else {
+				ir_mode *mode = get_type_mode(res_type);
+				in[0]         = new_Unknown(mode);
+			}
+		}
 	} else {
+		/* build return_value for its side effects */
+		if(statement->return_value != NULL) {
+			expression_to_firm(statement->return_value);
+		}
 		in_len = 0;
 	}
 
-	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
 	ir_node  *store = get_store();
 	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
 
@@ -2183,7 +2220,7 @@ static void create_initializer_array(initializer_list_t *initializer,
 	}
 
 #if 0
-	/* TODO: initializer rest... */
+	/* TODO: initialize rest... */
 	if(type->size_expression != NULL) {
 		size_t array_len = fold_constant(type->size_expression);
 		for( ; i < array_len; ++i) {
