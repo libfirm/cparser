@@ -215,12 +215,12 @@ static void write_unary_expression(const unary_expression_t *expression)
 
 static void write_expression(const expression_t *expression)
 {
-	const const_t *constant;
+	const const_expression_t *constant;
 	/* TODO */
 	switch(expression->type) {
 	case EXPR_CONST:
-		constant = (const const_t*) expression;
-		if(is_type_integer(expression->datatype)) {
+		constant = &expression->conste;
+		if(is_type_integer(expression->base.datatype)) {
 			fprintf(out, "%lld", constant->v.int_value);
 		} else {
 			fprintf(out, "%Lf", constant->v.float_value);

@@ -39,34 +39,34 @@ struct context_t {
 	declaration_t   *declarations;
 };
 
-struct expression_t {
+struct expression_base_t {
 	expresion_type_t   type;
 	type_t            *datatype;
 	source_position_t  source_position;
 };
 
-struct const_t {
-	expression_t  expression;
+struct const_expression_t {
+	expression_base_t  expression;
 	union {
 		long long   int_value;
 		long double float_value;
 	} v;
 };
 
-struct string_literal_t {
-	expression_t  expression;
-	const char   *value;
+struct string_literal_expression_t {
+	expression_base_t  expression;
+	const char        *value;
 };
 
 struct builtin_symbol_expression_t {
-	expression_t  expression;
-	symbol_t     *symbol;
+	expression_base_t  expression;
+	symbol_t          *symbol;
 };
 
 struct reference_expression_t {
-	expression_t   expression;
-	symbol_t      *symbol;
-	declaration_t *declaration;
+	expression_base_t  expression;
+	symbol_t          *symbol;
+	declaration_t     *declaration;
 };
 
 struct call_argument_t {
@@ -75,9 +75,9 @@ struct call_argument_t {
 };
 
 struct call_expression_t {
-	expression_t     expression;
-	expression_t    *function;
-	call_argument_t *arguments;
+	expression_base_t  expression;
+	expression_t      *function;
+	call_argument_t   *arguments;
 };
 
 typedef enum {
@@ -96,7 +96,7 @@ typedef enum {
 } unary_expression_type_t;
 
 struct unary_expression_t {
-	expression_t             expression;
+	expression_base_t        expression;
 	unary_expression_type_t  type;
 	expression_t            *value;
 };
@@ -136,31 +136,31 @@ typedef enum {
 } binary_expression_type_t;
 
 struct binary_expression_t {
-	expression_t              expression;
+	expression_base_t         expression;
 	binary_expression_type_t  type;
 	expression_t             *left;
 	expression_t             *right;
 };
 
 struct select_expression_t {
-	expression_t   expression;
-	expression_t  *compound;
-	symbol_t      *symbol;
+	expression_base_t  expression;
+	expression_t      *compound;
+	symbol_t          *symbol;
 
-	declaration_t *compound_entry;
+	declaration_t     *compound_entry;
 };
 
 struct array_access_expression_t {
-	expression_t  expression;
-	expression_t *array_ref;
-	expression_t *index;
-	bool          flipped; /* index/ref was written in a 5[a] way */
+	expression_base_t  expression;
+	expression_t      *array_ref;
+	expression_t      *index;
+	bool               flipped; /* index/ref was written in a 5[a] way */
 };
 
 struct sizeof_expression_t {
-	expression_t  expression;
-	type_t       *type;
-	expression_t *size_expression;
+	expression_base_t  expression;
+	type_t            *type;
+	expression_t      *size_expression;
 };
 
 struct designator_t {
@@ -170,32 +170,52 @@ struct designator_t {
 };
 
 struct offsetof_expression_t {
-	expression_t  expression;
-	type_t       *type;
-	designator_t *designator;
+	expression_base_t  expression;
+	type_t            *type;
+	designator_t      *designator;
 };
 
 struct va_arg_expression_t {
-	expression_t  expression;
-	expression_t *arg;
-	type_t       *type;
+	expression_base_t  expression;
+	expression_t      *arg;
+	type_t            *type;
 };
 
 struct conditional_expression_t {
-	expression_t  expression;
-	expression_t *condition;
-	expression_t *true_expression;
-	expression_t *false_expression;
+	expression_base_t  expression;
+	expression_t      *condition;
+	expression_t      *true_expression;
+	expression_t      *false_expression;
 };
 
 struct statement_expression_t {
-	expression_t  expression;
-	statement_t  *statement;
+	expression_base_t  expression;
+	statement_t       *statement;
 };
 
 struct classify_type_expression_t {
-	expression_t  expression;
-	expression_t *type_expression;
+	expression_base_t  expression;
+	expression_t      *type_expression;
+};
+
+union expression_t {
+	expresion_type_t             type;
+	expression_base_t            base;
+	const_expression_t           conste;
+	string_literal_expression_t  string_literal;
+	builtin_symbol_expression_t  builtin_symbol;
+	reference_expression_t       reference;
+	call_expression_t            call;
+	unary_expression_t           unary;
+	binary_expression_t          binary;
+	select_expression_t          select;
+	array_access_expression_t    array_access;
+	sizeof_expression_t          sizeofe;
+	offsetof_expression_t        offsetofe;
+	va_arg_expression_t          va_arg;
+	conditional_expression_t     conditional;
+	statement_expression_t       statement;
+	classify_type_expression_t   classify_type;
 };
 
 typedef enum {
@@ -300,83 +320,100 @@ typedef enum {
 	STATEMENT_FOR
 } statement_type_t;
 
-struct statement_t {
+struct statement_base_t {
 	statement_type_t   type;
 	statement_t       *next;
 	source_position_t  source_position;
 };
 
 struct return_statement_t {
-	statement_t   statement;
-	expression_t *return_value;
+	statement_base_t  statement;
+	expression_t     *return_value;
 };
 
 struct compound_statement_t {
-	statement_t  statement;
-	statement_t *statements;
-	context_t    context;
+	statement_base_t  statement;
+	statement_t      *statements;
+	context_t         context;
 };
 
 struct declaration_statement_t {
-	statement_t    statement;
-	declaration_t *declarations_begin;
-	declaration_t *declarations_end;
+	statement_base_t  statement;
+	declaration_t    *declarations_begin;
+	declaration_t    *declarations_end;
 };
 
 struct if_statement_t {
-	statement_t   statement;
-	expression_t *condition;
-	statement_t  *true_statement;
-	statement_t  *false_statement;
+	statement_base_t  statement;
+	expression_t     *condition;
+	statement_t      *true_statement;
+	statement_t      *false_statement;
 };
 
 struct switch_statement_t {
-	statement_t   statement;
-	expression_t *expression;
-	statement_t  *body;
+	statement_base_t  statement;
+	expression_t     *expression;
+	statement_t      *body;
 };
 
 struct goto_statement_t {
-	statement_t    statement;
-	declaration_t *label;
+	statement_base_t  statement;
+	declaration_t    *label;
 };
 
 struct case_label_statement_t {
-	statement_t   statement;
-	expression_t *expression;
-	statement_t  *label_statement;
+	statement_base_t  statement;
+	expression_t     *expression;
+	statement_t      *label_statement;
 };
 
 struct label_statement_t {
-	statement_t    statement;
-	declaration_t *label;
-	statement_t   *label_statement;
+	statement_base_t  statement;
+	declaration_t    *label;
+	statement_t      *label_statement;
 };
 
 struct expression_statement_t {
-	statement_t   statement;
-	expression_t *expression;
+	statement_base_t  statement;
+	expression_t     *expression;
 };
 
 struct while_statement_t {
-	statement_t   statement;
-	expression_t *condition;
-	statement_t  *body;
+	statement_base_t  statement;
+	expression_t     *condition;
+	statement_t      *body;
 };
 
 struct do_while_statement_t {
-	statement_t   statement;
-	expression_t *condition;
-	statement_t  *body;
+	statement_base_t  statement;
+	expression_t     *condition;
+	statement_t      *body;
 };
 
 struct for_statement_t {
-	statement_t   statement;
-	expression_t  *initialisation;
-	expression_t  *condition;
-	expression_t  *step;
-	statement_t   *body;
-	context_t      context;
+	statement_base_t  statement;
+	expression_t     *initialisation;
+	expression_t     *condition;
+	expression_t     *step;
+	statement_t      *body;
+	context_t         context;
+};
+
+union statement_t {
+	statement_type_t         type;
+	statement_base_t         base;
+	return_statement_t       returns;
+	compound_statement_t     compound;
+	declaration_statement_t  declaration;
+	if_statement_t           ifs;
+	switch_statement_t       switchs;
+	goto_statement_t         gotos;
+	case_label_statement_t   case_label;
+	label_statement_t        label;
+	expression_statement_t   expression;
+	while_statement_t        whiles;
+	do_while_statement_t     do_while;
+	for_statement_t          fors;
 };
 
 struct translation_unit_t {

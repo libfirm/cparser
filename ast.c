@@ -29,7 +29,7 @@ void print_indent(void)
 		fprintf(out, "\t");
 }
 
-static void print_const(const const_t *cnst)
+static void print_const(const const_expression_t *cnst)
 {
 	if(cnst->expression.datatype == NULL)
 		return;
@@ -41,7 +41,8 @@ static void print_const(const const_t *cnst)
 	}
 }
 
-static void print_string_literal(const string_literal_t *string_literal)
+static void print_string_literal(
+		const string_literal_expression_t *string_literal)
 {
 	fputc('"', out);
 	for(const char *c = string_literal->value; *c != '\0'; ++c) {
@@ -233,8 +234,8 @@ static void print_va_arg(const va_arg_expression_t *expression)
 static void print_select(const select_expression_t *expression)
 {
 	print_expression(expression->compound);
-	if(expression->compound->datatype == NULL ||
-			expression->compound->datatype->type == TYPE_POINTER) {
+	if(expression->compound->base.datatype == NULL ||
+			expression->compound->base.datatype->type == TYPE_POINTER) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);
@@ -258,12 +259,12 @@ void print_expression(const expression_t *expression)
 		fprintf(out, "*invalid expression*");
 		break;
 	case EXPR_CONST:
-		print_const((const const_t*) expression);
+		print_const(&expression->conste);
 		break;
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_STRING_LITERAL:
-		print_string_literal((const string_literal_t*) expression);
+		print_string_literal(&expression->string_literal);
 		break;
 	case EXPR_CALL:
 		print_call_expression((const call_expression_t*) expression);
@@ -317,7 +318,7 @@ static void print_compound_statement(const compound_statement_t *block)
 		print_indent();
 		print_statement(statement);
 
-		statement = statement->next;
+		statement = statement->base.next;
 	}
 	indent--;
 	print_indent();

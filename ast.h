@@ -5,9 +5,9 @@
 
 typedef struct context_t                    context_t;
 
-typedef struct expression_t                 expression_t;
-typedef struct const_t                      const_t;
-typedef struct string_literal_t             string_literal_t;
+typedef struct expression_base_t            expression_base_t;
+typedef struct const_expression_t           const_expression_t;
+typedef struct string_literal_expression_t  string_literal_expression_t;
 typedef struct reference_expression_t       reference_expression_t;
 typedef struct cast_expression_t            cast_expression_t;
 typedef struct call_argument_t              call_argument_t;
@@ -27,6 +27,7 @@ typedef struct offsetof_expression_t        offsetof_expression_t;
 typedef struct va_arg_expression_t          va_arg_expression_t;
 typedef struct builtin_symbol_expression_t  builtin_symbol_expression_t;
 typedef struct classify_type_expression_t   classify_type_expression_t;
+typedef union  expression_t                 expression_t;
 
 typedef struct initializer_base_t           initializer_base_t;
 typedef struct initializer_list_t           initializer_list_t;
@@ -36,7 +37,7 @@ typedef union  initializer_t                initializer_t;
 
 typedef struct declaration_t                declaration_t;
 
-typedef struct statement_t                  statement_t;
+typedef struct statement_base_t             statement_base_t;
 typedef struct compound_statement_t         compound_statement_t;
 typedef struct return_statement_t           return_statement_t;
 typedef struct if_statement_t               if_statement_t;
@@ -49,6 +50,7 @@ typedef struct case_label_statement_t       case_label_statement_t;
 typedef struct while_statement_t            while_statement_t;
 typedef struct do_while_statement_t         do_while_statement_t;
 typedef struct for_statement_t              for_statement_t;
+typedef union  statement_t                  statement_t;
 
 typedef struct translation_unit_t           translation_unit_t;
 

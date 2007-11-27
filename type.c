@@ -588,7 +588,7 @@ type_t *skip_typeref(type_t *type)
 			if(typeof_type->typeof_type != NULL) {
 				type = typeof_type->typeof_type;
 			} else {
-				type = typeof_type->expression->datatype;
+				type = typeof_type->expression->base.datatype;
 			}
 			continue;
 		}
