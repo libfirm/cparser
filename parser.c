@@ -1556,6 +1556,27 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_STORAGE_CLASS(T_auto,     STORAGE_CLASS_AUTO)
 		MATCH_STORAGE_CLASS(T_register, STORAGE_CLASS_REGISTER)
 
+		case T___thread:
+			switch (specifiers->storage_class) {
+				case STORAGE_CLASS_NONE:
+					specifiers->storage_class = STORAGE_CLASS_THREAD;
+					break;
+
+				case STORAGE_CLASS_EXTERN:
+					specifiers->storage_class = STORAGE_CLASS_THREAD_EXTERN;
+					break;
+
+				case STORAGE_CLASS_STATIC:
+					specifiers->storage_class = STORAGE_CLASS_THREAD_STATIC;
+					break;
+
+				default:
+					parse_error("multiple storage classes in declaration specifiers");
+					break;
+			}
+			next_token();
+			break;
+
 		/* type qualifiers */
 #define MATCH_TYPE_QUALIFIER(token, qualifier)                          \
 		case token:                                                     \

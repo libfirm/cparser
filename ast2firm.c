@@ -672,6 +672,26 @@ static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
 	return load_res;
 }
 
+static ir_node *get_global_var_address(dbg_info *const dbgi,
+                                       const declaration_t *const decl)
+{
+	assert(decl->declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+
+	ir_entity *const entity = decl->v.entity;
+	switch ((storage_class_tag_t)decl->storage_class) {
+		case STORAGE_CLASS_THREAD:
+		case STORAGE_CLASS_THREAD_EXTERN:
+		case STORAGE_CLASS_THREAD_STATIC: {
+			ir_node *const no_mem = new_NoMem();
+			ir_node *const tls    = get_irg_tls(current_ir_graph);
+			return new_d_simpleSel(dbgi, no_mem, tls, entity);
+		}
+
+		default:
+			return create_symconst(dbgi, entity);
+	}
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
@@ -699,11 +719,11 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		return create_symconst(dbgi, declaration->v.entity);
 	}
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
-		ir_entity *entity   = declaration->v.entity;
-		ir_node   *symconst = create_symconst(dbgi, entity);
-		ir_type   *irtype   = get_entity_type(entity);
-		return deref_address(irtype, symconst, dbgi);
+		ir_node *const addr   = get_global_var_address(dbgi, declaration);
+		ir_type *const irtype = get_entity_type(declaration->v.entity);
+		return deref_address(irtype, addr, dbgi);
 	}
+
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
@@ -734,9 +754,8 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		return create_symconst(dbgi, declaration->v.entity);
 	}
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
-		ir_entity *entity   = declaration->v.entity;
-		ir_node   *symconst = create_symconst(dbgi, entity);
-		return symconst;
+		ir_node *const addr = get_global_var_address(dbgi, declaration);
+		return addr;
 	}
 	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
@@ -2424,7 +2443,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	for( ; declaration != end; declaration = declaration->next) {
 		type_t *type = declaration->type;
 
-		switch(declaration->storage_class) {
+		switch ((storage_class_tag_t)declaration->storage_class) {
 		case STORAGE_CLASS_TYPEDEF:
 			continue;
 		case STORAGE_CLASS_STATIC:
@@ -2443,6 +2462,10 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 				create_local_variable(declaration);
 			}
 			continue;
+		case STORAGE_CLASS_THREAD:
+		case STORAGE_CLASS_THREAD_EXTERN:
+		case STORAGE_CLASS_THREAD_STATIC:
+			break;
 		}
 		panic("invalid storage class found");
 	}
@@ -2897,20 +2920,57 @@ static void create_function(declaration_t *declaration)
 
 static void create_global_variable(declaration_t *declaration)
 {
-	ir_type   *global_type = get_glob_type();
-	create_declaration_entity(declaration, DECLARATION_TYPE_GLOBAL_VARIABLE,
-	                          global_type);
+	ir_visibility  vis;
+	ir_type       *var_type;
+	switch ((storage_class_tag_t)declaration->storage_class) {
+		case STORAGE_CLASS_STATIC:
+			vis = visibility_local;
+			goto global_var;
 
-	ir_entity *entity = declaration->v.entity;
-	if(declaration->storage_class == STORAGE_CLASS_STATIC) {
-		set_entity_visibility(entity, visibility_local);
-	} else if(declaration->storage_class == STORAGE_CLASS_EXTERN) {
-		set_entity_visibility(entity, visibility_external_allocated);
-	} else {
-		set_entity_visibility(entity, visibility_external_visible);
+		case STORAGE_CLASS_EXTERN:
+			vis = visibility_external_allocated;
+			goto global_var;
+
+		case STORAGE_CLASS_NONE:
+			vis = visibility_external_visible;
+			goto global_var;
+
+		case STORAGE_CLASS_THREAD:
+			vis = visibility_external_visible;
+			goto tls_var;
+
+		case STORAGE_CLASS_THREAD_EXTERN:
+			vis = visibility_external_allocated;
+			goto tls_var;
+
+		case STORAGE_CLASS_THREAD_STATIC:
+			vis = visibility_local;
+			goto tls_var;
+
+tls_var:
+			var_type = get_tls_type();
+			goto create_var;
+
+global_var:
+			var_type = get_glob_type();
+			goto create_var;
+
+create_var:
+			create_declaration_entity(declaration, DECLARATION_TYPE_GLOBAL_VARIABLE,
+			                          var_type);
+			set_entity_visibility(declaration->v.entity, vis);
+
+			current_ir_graph = get_const_code_irg();
+			create_initializer(declaration);
+			return;
+
+		case STORAGE_CLASS_TYPEDEF:
+		case STORAGE_CLASS_AUTO:
+		case STORAGE_CLASS_REGISTER:
+		case STORAGE_CLASS_ENUM_ENTRY:
+			break;
 	}
-	current_ir_graph = get_const_code_irg();
-	create_initializer(declaration);
+	panic("Invalid storage class for global variable");
 }
 
 static void context_to_firm(context_t *context)

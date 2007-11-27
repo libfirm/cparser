@@ -511,11 +511,14 @@ static void print_storage_class(unsigned storage_class)
 	case STORAGE_CLASS_ENUM_ENTRY:
 	case STORAGE_CLASS_NONE:
 		break;
-	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ", out); break;
-	case STORAGE_CLASS_EXTERN:   fputs("extern ", out); break;
-	case STORAGE_CLASS_STATIC:   fputs("static ", out); break;
-	case STORAGE_CLASS_AUTO:     fputs("auto ", out); break;
-	case STORAGE_CLASS_REGISTER: fputs("register ", out); break;
+	case STORAGE_CLASS_TYPEDEF:       fputs("typedef ",        out); break;
+	case STORAGE_CLASS_EXTERN:        fputs("extern ",         out); break;
+	case STORAGE_CLASS_STATIC:        fputs("static ",         out); break;
+	case STORAGE_CLASS_AUTO:          fputs("auto ",           out); break;
+	case STORAGE_CLASS_REGISTER:      fputs("register ",       out); break;
+	case STORAGE_CLASS_THREAD:        fputs("__thread",        out); break;
+	case STORAGE_CLASS_THREAD_EXTERN: fputs("extern __thread", out); break;
+	case STORAGE_CLASS_THREAD_STATIC: fputs("static __thread", out); break;
 	}
 }
 
