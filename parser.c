@@ -45,8 +45,11 @@ static type_t         *type_char        = NULL;
 static type_t         *type_string      = NULL;
 static type_t         *type_void        = NULL;
 static type_t         *type_void_ptr    = NULL;
-static type_t         *type_size_t      = NULL;
-static type_t         *type_ptrdiff_t   = NULL;
+
+type_t *type_size_t      = NULL;
+type_t *type_ptrdiff_t   = NULL;
+type_t *type_wchar_t     = NULL;
+type_t *type_wchar_ptr_t = NULL;
 
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
@@ -899,9 +902,9 @@ incompatible_assign_types:
 	parser_print_error_prefix();
 	fprintf(stderr, "incompatible types in %s\n", context);
 	parser_print_error_prefix();
-	print_type_quoted(type_left);
+	print_type_quoted(orig_type_left);
 	fputs(" <- ", stderr);
-	print_type_quoted(type_right);
+	print_type_quoted(orig_type_right);
 	fputs("\n", stderr);
 }
 
@@ -929,6 +932,25 @@ static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, type_t *type,
 		bool may_be_abstract);
 static declaration_t *record_declaration(declaration_t *declaration);
+
+static type_t *make_global_typedef(const char *name, type_t *type)
+{
+	symbol_t *symbol       = symbol_table_insert(name);
+
+	declaration_t *declaration   = allocate_ast_zero(sizeof(declaration[0]));
+	declaration->namespc         = NAMESPACE_NORMAL;
+	declaration->storage_class   = STORAGE_CLASS_TYPEDEF;
+	declaration->type            = type;
+	declaration->symbol          = symbol;
+	declaration->source_position = builtin_source_position;
+
+	record_declaration(declaration);
+
+	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF);
+	typedef_type->typedeft.declaration = declaration;
+
+	return typedef_type;
+}
 
 static const char *parse_string_literals(void)
 {
@@ -4741,6 +4763,16 @@ static statement_t *parse_compound_statement(void)
 	return (statement_t*) compound_statement;
 }
 
+static void initialize_builtins(void)
+{
+	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__", type_int);
+	type_wchar_ptr_t = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
+	type_size_t      = make_global_typedef("__SIZE_TYPE__",
+			make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE));
+	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",
+			make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE));
+}
+
 static translation_unit_t *parse_translation_unit(void)
 {
 	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
@@ -4750,6 +4782,8 @@ static translation_unit_t *parse_translation_unit(void)
 
 	assert(context == NULL);
 	set_context(&unit->context);
+
+	initialize_builtins();
 
 	while(token.type != T_EOF) {
 		parse_declaration();
@@ -4798,8 +4832,6 @@ void init_parser(void)
 	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, TYPE_QUALIFIER_NONE);
 	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, TYPE_QUALIFIER_NONE);
 	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
-	type_size_t      = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE);
-	type_ptrdiff_t   = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE);
 	type_char        = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_NONE);
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
 	type_void_ptr    = make_pointer_type(type_void, TYPE_QUALIFIER_NONE);

@@ -10,6 +10,8 @@
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
 
+source_position_t builtin_source_position = { "<built-in>", 0 };
+
 void init_tokens(void)
 {
 	symbol_t *symbol;
