@@ -1,0 +1,27 @@
+'newline'
+integer number 0
+'newline'
+integer number 1
+'newline'
+integer number 12
+'newline'
+integer number 42
+'newline'
+integer number 12345
+'newline'
+integer number 123456789
+'newline'
+integer number 1
+'newline'
+integer number 66
+'newline'
+integer number 255
+'newline'
+integer number 83
+'newline'
+integer number 83
+'newline'
+floatingpointer number 1234567890000000000.000000
+'newline'
+'newline'
+end of file
