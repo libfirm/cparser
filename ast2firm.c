@@ -28,9 +28,6 @@ static type_t *type_const_char;
 static type_t *type_void;
 static type_t *type_int;
 
-static symbol_t *symbol_builtin_alloca;
-static symbol_t *symbol_builtin_nanf;
-
 static int       next_value_number_function;
 static ir_node  *continue_label;
 static ir_node  *break_label;
@@ -99,9 +96,6 @@ void init_ast2firm(void)
 	                                               type in firm */
 
 	type_void->base.firm_type = ir_type_void;
-
-	symbol_builtin_alloca = symbol_table_insert("__builtin_alloca");
-	symbol_builtin_nanf   = symbol_table_insert("__builtin_nanf");
 }
 
 void exit_ast2firm(void)
@@ -803,11 +797,13 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	dbg_info *dbgi = get_dbg_info(&call->expression.source_position);
 
 	assert(call->function->type == EXPR_BUILTIN_SYMBOL);
-	builtin_symbol_expression_t *builtin
-		= (builtin_symbol_expression_t*) call->function;
-	symbol_t *symbol = builtin->symbol;
+	builtin_symbol_expression_t *builtin = &call->function->builtin_symbol;
+	symbol_t                    *symbol  = builtin->symbol;
+	type_t                      *type    = builtin->expression.datatype;
+	type                                 = skip_typeref(type);
 
-	if(symbol == symbol_builtin_alloca) {
+	switch(symbol->ID) {
+	case T___builtin_alloca: {
 		if(call->arguments == NULL || call->arguments->next != NULL) {
 			panic("invalid number of parameters on __builtin_alloca");
 		}
@@ -822,13 +818,18 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
 
 		return res;
-	} else if(symbol == symbol_builtin_nanf) {
+	}
+	case T___builtin_nan:
+	case T___builtin_nanf:
+	case T___builtin_nand: {
 		/* Ignore string for now... */
-		ir_mode *mode = mode_D;
+		assert(type->type == TYPE_FUNCTION);
+		ir_mode *mode = get_ir_mode(type->function.result_type);
 		tarval  *tv   = get_mode_NAN(mode);
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
-	} else {
+	}
+	default:
 		panic("Unsupported builtin found\n");
 	}
 }

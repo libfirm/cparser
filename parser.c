@@ -2651,8 +2651,12 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	switch(symbol->ID) {
 	case T___builtin_alloca:
 		return make_function_1_type(type_void_ptr, type_size_t);
-	case T___builtin_nanf:
+	case T___builtin_nan:
 		return make_function_1_type(type_double, type_string);
+	case T___builtin_nanf:
+		return make_function_1_type(type_float, type_string);
+	case T___builtin_nand:
+		return make_function_1_type(type_long_double, type_string);
 	default:
 		panic("not implemented builtin symbol found");
 	}
