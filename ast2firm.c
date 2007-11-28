@@ -798,9 +798,12 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 	assert(call->function->type == EXPR_BUILTIN_SYMBOL);
 	builtin_symbol_expression_t *builtin = &call->function->builtin_symbol;
-	symbol_t                    *symbol  = builtin->symbol;
-	type_t                      *type    = builtin->expression.datatype;
-	type                                 = skip_typeref(type);
+
+	type_t *type = skip_typeref(builtin->expression.datatype);
+	assert(type->type == TYPE_POINTER);
+
+	type_t   *function_type = skip_typeref(type->pointer.points_to);
+	symbol_t *symbol        = builtin->symbol;
 
 	switch(symbol->ID) {
 	case T___builtin_alloca: {
@@ -823,8 +826,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case T___builtin_nanf:
 	case T___builtin_nand: {
 		/* Ignore string for now... */
-		assert(type->type == TYPE_FUNCTION);
-		ir_mode *mode = get_ir_mode(type->function.result_type);
+		assert(function_type->type == TYPE_FUNCTION);
+		ir_mode *mode = get_ir_mode(function_type->function.result_type);
 		tarval  *tv   = get_mode_NAN(mode);
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
