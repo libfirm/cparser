@@ -25,7 +25,7 @@
 #include "write_fluffy.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "cpp"
+#define PREPROCESSOR "cpp -std=c99"
 #endif
 
 #ifndef LINKER

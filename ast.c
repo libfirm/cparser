@@ -166,6 +166,8 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		print_type(unexpr->expression.datatype);
 		fputs(")", out);
 		break;
+	case UNEXPR_CAST_IMPLICIT:
+		break;
 	case UNEXPR_INVALID:
 		fprintf(out, "unop%d", (int) unexpr->type);
 		break;
@@ -489,9 +491,9 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 
 static void print_asm_statement(const asm_statement_t *statement)
 {
-	fputs("asm", out);
+	fputs("asm ", out);
 	if(statement->is_volatile) {
-		fputs(" volatile", out);
+		fputs("volatile ", out);
 	}
 	fputs("(", out);
 	print_quoted_string(statement->asm_text);
@@ -504,12 +506,12 @@ static void print_asm_statement(const asm_statement_t *statement)
 	if(statement->outputs == NULL && statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
-	fputs(": ", out);
+	fputs(" : ", out);
 	print_asm_constraints(statement->outputs);
 	if(statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
-	fputs(": ", out);
+	fputs(" : ", out);
 	print_asm_clobbers(statement->clobbers);
 
 end_of_print_asm_statement:

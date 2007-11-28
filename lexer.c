@@ -7,6 +7,7 @@
 #include "adt/strset.h"
 #include "adt/util.h"
 #include "type_t.h"
+#include "target_architecture.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -21,9 +22,6 @@
 /* No strtold on windows and no replacement yet */
 #define strtold(s, e) strtod(s, e)
 #endif
-
-#define HAS_SIGNED_CHAR
-//#define HAS_UNSIGNED_CHAR
 
 #if defined HAS_SIGNED_CHAR
 typedef signed char char_type;
@@ -44,6 +42,7 @@ static strset_t    stringset;
 
 static type_t     *type_int        = NULL;
 static type_t     *type_uint       = NULL;
+static type_t     *type_long       = NULL;
 static type_t     *type_ulong      = NULL;
 static type_t     *type_longlong   = NULL;
 static type_t     *type_ulonglong  = NULL;
@@ -279,39 +278,78 @@ end_symbol:
 	}
 }
 
-static void parse_integer_suffix(void)
+static void parse_integer_suffix(bool is_oct_hex)
 {
+	bool is_unsigned  = false;
+	bool min_long     = false;
+	bool min_longlong = false;
+
 	if(c == 'U' || c == 'u') {
+		is_unsigned = true;
 		next_char();
 		if(c == 'L' || c == 'l') {
+			min_long = true;
 			next_char();
 			if(c == 'L' || c == 'l') {
+				min_longlong = true;
 				next_char();
-				lexer_token.datatype = type_ulonglong;
-			} else {
-				lexer_token.datatype = type_ulong;
 			}
-		} else {
-			lexer_token.datatype = type_uint;
 		}
 	} else if(c == 'l' || c == 'L') {
+		min_long = true;
 		next_char();
 		if(c == 'l' || c == 'L') {
+			min_longlong = true;
 			next_char();
 			if(c == 'u' || c == 'U') {
+				is_unsigned = true;
 				next_char();
-				lexer_token.datatype = type_ulonglong;
-			} else {
-				lexer_token.datatype = type_longlong;
 			}
 		} else if(c == 'u' || c == 'U') {
+			is_unsigned = true;
 			next_char();
 			lexer_token.datatype = type_ulong;
-		} else {
-			lexer_token.datatype = type_int;
 		}
+	}
+
+	if(!is_unsigned) {
+		long long v = lexer_token.v.intvalue;
+		if(!min_long) {
+			if(v >= TARGET_INT_MIN && v <= TARGET_INT_MAX) {
+				lexer_token.datatype = type_int;
+				return;
+			} else if(is_oct_hex && v >= 0 && v <= TARGET_UINT_MAX) {
+				lexer_token.datatype = type_uint;
+				return;
+			}
+		}
+		if(!min_longlong) {
+			if(v >= TARGET_LONG_MIN && v <= TARGET_LONG_MAX) {
+				lexer_token.datatype = type_long;
+				return;
+			} else if(is_oct_hex && v >= 0 && v <= TARGET_ULONG_MAX) {
+				lexer_token.datatype = type_ulong;
+				return;
+			}
+		}
+		unsigned long long uv = (unsigned long long) v;
+		if(is_oct_hex && uv > (unsigned long long) TARGET_LONGLONG_MAX) {
+			lexer_token.datatype = type_ulonglong;
+			return;
+		}
+
+		lexer_token.datatype = type_longlong;
 	} else {
-		lexer_token.datatype = type_int;
+		unsigned long long v = (unsigned long long) lexer_token.v.intvalue;
+		if(!min_long && v <= TARGET_UINT_MAX) {
+			lexer_token.datatype = type_uint;
+			return;
+		}
+		if(!min_longlong && v <= TARGET_ULONG_MAX) {
+			lexer_token.datatype = type_ulong;
+			return;
+		}
+		lexer_token.datatype = type_ulonglong;
 	}
 }
 
@@ -448,7 +486,7 @@ static void parse_number_hex(void)
 	}
 
 	obstack_free(&symbol_obstack, string);
-	parse_integer_suffix();
+	parse_integer_suffix(true);
 }
 
 static inline bool is_octal_digit(int chr)
@@ -473,7 +511,7 @@ static void parse_number_oct(void)
 	}
 
 	obstack_free(&symbol_obstack, string);
-	parse_integer_suffix();
+	parse_integer_suffix(true);
 }
 
 static void parse_number_dec(void)
@@ -532,7 +570,7 @@ static void parse_number_dec(void)
 			parse_error("invalid number literal");
 		}
 
-		parse_integer_suffix();
+		parse_integer_suffix(false);
 	}
 	obstack_free(&symbol_obstack, string);
 }
@@ -1139,13 +1177,14 @@ void init_lexer(void)
 {
 	strset_init(&stringset);
 
-	type_int       = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_CONST);
-	type_uint      = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_CONST);
-	type_ulong     = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_CONST);
+	type_int       = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
+	type_uint      = make_atomic_type(ATOMIC_TYPE_UINT, TYPE_QUALIFIER_NONE);
+	type_long      = make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE);
+	type_ulong     = make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE);
 	type_longlong  = make_atomic_type(ATOMIC_TYPE_LONGLONG,
-	                                  TYPE_QUALIFIER_CONST);
+	                                  TYPE_QUALIFIER_NONE);
 	type_ulonglong = make_atomic_type(ATOMIC_TYPE_ULONGLONG,
-	                                  TYPE_QUALIFIER_CONST);
+	                                  TYPE_QUALIFIER_NONE);
 
 	type_float      = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_CONST);
 	type_double     = make_atomic_type(ATOMIC_TYPE_DOUBLE,

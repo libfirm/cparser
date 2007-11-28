@@ -92,7 +92,8 @@ typedef enum {
 	UNEXPR_POSTFIX_DECREMENT,
 	UNEXPR_PREFIX_INCREMENT,
 	UNEXPR_PREFIX_DECREMENT,
-	UNEXPR_CAST
+	UNEXPR_CAST,
+	UNEXPR_CAST_IMPLICIT /* compiler generated cast */
 } unary_expression_type_t;
 
 struct unary_expression_t {

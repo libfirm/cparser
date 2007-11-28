@@ -746,7 +746,7 @@ static expression_t *create_cast_expression(expression_t *expression,
 {
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY);
 
-	cast->unary.type    = UNEXPR_CAST;
+	cast->unary.type    = UNEXPR_CAST_IMPLICIT;
 	cast->unary.value   = expression;
 	cast->base.datatype = dest_type;
 
@@ -2651,6 +2651,8 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	switch(symbol->ID) {
 	case T___builtin_alloca:
 		return make_function_1_type(type_void_ptr, type_size_t);
+	case T___builtin_nanf:
+		return make_function_1_type(type_double, type_string);
 	default:
 		panic("not implemented builtin symbol found");
 	}
@@ -3010,6 +3012,7 @@ static expression_t *parse_primary_expression(void)
 		return parse_offsetof();
 	case T___builtin_va_arg:
 		return parse_va_arg();
+	case T___builtin_nanf:
 	case T___builtin_alloca:
 	case T___builtin_expect:
 	case T___builtin_va_start:

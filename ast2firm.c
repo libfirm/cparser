@@ -28,7 +28,8 @@ static type_t *type_const_char;
 static type_t *type_void;
 static type_t *type_int;
 
-static symbol_t *symbol_alloca;
+static symbol_t *symbol_builtin_alloca;
+static symbol_t *symbol_builtin_nanf;
 
 static int       next_value_number_function;
 static ir_node  *continue_label;
@@ -99,7 +100,8 @@ void init_ast2firm(void)
 
 	type_void->base.firm_type = ir_type_void;
 
-	symbol_alloca = symbol_table_insert("__builtin_alloca");
+	symbol_builtin_alloca = symbol_table_insert("__builtin_alloca");
+	symbol_builtin_nanf   = symbol_table_insert("__builtin_nanf");
 }
 
 void exit_ast2firm(void)
@@ -672,6 +674,26 @@ static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
 	return load_res;
 }
 
+static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
+{
+	ir_mode *mode = get_irn_mode(node);
+
+	if(!(get_irg_fp_model(current_ir_graph) & fp_explicit_rounding))
+		return node;
+	if(!mode_is_float(mode))
+		return node;
+
+	/* check if there is already a Conv */
+	if (get_irn_op(node) == op_Conv) {
+		/* convert it into a strict Conv */
+		set_Conv_strict(node, 1);
+		return node;
+	}
+
+	/* otherwise create a new one */
+	return new_d_strictConv(dbgi, node, mode);
+}
+
 static ir_node *get_global_var_address(dbg_info *const dbgi,
                                        const declaration_t *const decl)
 {
@@ -785,7 +807,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		= (builtin_symbol_expression_t*) call->function;
 	symbol_t *symbol = builtin->symbol;
 
-	if(symbol == symbol_alloca) {
+	if(symbol == symbol_builtin_alloca) {
 		if(call->arguments == NULL || call->arguments->next != NULL) {
 			panic("invalid number of parameters on __builtin_alloca");
 		}
@@ -799,6 +821,12 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		set_store(proj_m);
 		ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
 
+		return res;
+	} else if(symbol == symbol_builtin_nanf) {
+		/* Ignore string for now... */
+		ir_mode *mode = mode_D;
+		tarval  *tv   = get_mode_NAN(mode);
+		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
 	} else {
 		panic("Unsupported builtin found\n");
@@ -827,6 +855,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		++n_parameters;
 	}
 
+	dbg_info *dbgi  = get_dbg_info(&call->expression.source_position);
+
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
 	if(function_type->variadic || function_type->unspecified_parameters) {
@@ -853,6 +883,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		expression_t *expression = argument->expression;
 		ir_node      *arg_node   = expression_to_firm(expression);
 
+		arg_node = do_strict_conv(dbgi, arg_node);
+
 		in[n] = arg_node;
 		if(new_method_type != NULL) {
 			ir_type *irtype = get_ir_type(expression->base.datatype);
@@ -866,7 +898,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	if(new_method_type != NULL)
 		ir_method_type = new_method_type;
 
-	dbg_info *dbgi  = get_dbg_info(&call->expression.source_position);
 	ir_node  *store = get_store();
 	ir_node  *node  = new_d_Call(dbgi, store, callee, n_parameters, in,
 	                             ir_method_type);
@@ -901,6 +932,9 @@ static void create_condition_evaluation(const expression_t *expression,
 static void set_value_for_expression(const expression_t *expression,
                                      ir_node *value)
 {
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	value          = do_strict_conv(dbgi, value);
+
 	if(expression->type == EXPR_REFERENCE) {
 		reference_expression_t *ref = (reference_expression_t*) expression;
 
@@ -912,7 +946,6 @@ static void set_value_for_expression(const expression_t *expression,
 		}
 	}
 
-	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
 	ir_node  *addr   = expression_to_addr(expression);
 	ir_node  *memory = get_store();
 
@@ -1030,7 +1063,12 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case UNEXPR_PREFIX_INCREMENT:
 	case UNEXPR_PREFIX_DECREMENT:
 		return create_incdec(expression);
-	case UNEXPR_CAST:
+	case UNEXPR_CAST: {
+		ir_node *node = create_conv(dbgi, value_node, get_ir_mode(type));
+		node = do_strict_conv(dbgi, node);
+		return node;
+	}
+	case UNEXPR_CAST_IMPLICIT:
 		return create_conv(dbgi, value_node, get_ir_mode(type));
 
 	case UNEXPR_TAKE_ADDRESS:
@@ -1782,7 +1820,6 @@ static void create_condition_evaluation(const expression_t *expression,
 	set_cur_block(NULL);
 }
 
-
 static void return_statement_to_firm(return_statement_t *statement)
 {
 	if(get_cur_block() == NULL)
@@ -1798,7 +1835,9 @@ static void return_statement_to_firm(return_statement_t *statement)
 		ir_type *res_type = get_method_res_type(func_irtype, 0);
 
 		if(statement->return_value != NULL) {
-			in[0] = expression_to_firm(statement->return_value);
+			ir_node *node = expression_to_firm(statement->return_value);
+			node  = do_strict_conv(dbgi, node);
+			in[0] = node;
 		} else {
 			ir_mode *mode;
 			if(is_compound_type(res_type)) {
@@ -2617,25 +2656,25 @@ static void statement_to_firm(statement_t *statement)
 	case STATEMENT_INVALID:
 		panic("invalid statement found");
 	case STATEMENT_COMPOUND:
-		compound_statement_to_firm((compound_statement_t*) statement);
+		compound_statement_to_firm(&statement->compound);
 		return;
 	case STATEMENT_RETURN:
-		return_statement_to_firm((return_statement_t*) statement);
+		return_statement_to_firm(&statement->returns);
 		return;
 	case STATEMENT_EXPRESSION:
-		expression_statement_to_firm((expression_statement_t*) statement);
+		expression_statement_to_firm(&statement->expression);
 		return;
 	case STATEMENT_IF:
-		if_statement_to_firm((if_statement_t*) statement);
+		if_statement_to_firm(&statement->ifs);
 		return;
 	case STATEMENT_WHILE:
-		while_statement_to_firm((while_statement_t*) statement);
+		while_statement_to_firm(&statement->whiles);
 		return;
 	case STATEMENT_DO_WHILE:
-		do_while_statement_to_firm((do_while_statement_t*) statement);
+		do_while_statement_to_firm(&statement->do_while);
 		return;
 	case STATEMENT_DECLARATION:
-		declaration_statement_to_firm((declaration_statement_t*) statement);
+		declaration_statement_to_firm(&statement->declaration);
 		return;
 	case STATEMENT_BREAK:
 		create_jump_statement(statement, break_label);
@@ -2644,19 +2683,19 @@ static void statement_to_firm(statement_t *statement)
 		create_jump_statement(statement, continue_label);
 		return;
 	case STATEMENT_SWITCH:
-		switch_statement_to_firm((switch_statement_t*) statement);
+		switch_statement_to_firm(&statement->switchs);
 		return;
 	case STATEMENT_CASE_LABEL:
-		case_label_to_firm((case_label_statement_t*) statement);
+		case_label_to_firm(&statement->case_label);
 		return;
 	case STATEMENT_FOR:
-		for_statement_to_firm((for_statement_t*) statement);
+		for_statement_to_firm(&statement->fors);
 		return;
 	case STATEMENT_LABEL:
-		label_to_firm((label_statement_t*) statement);
+		label_to_firm(&statement->label);
 		return;
 	case STATEMENT_GOTO:
-		goto_to_firm((goto_statement_t*) statement);
+		goto_to_firm(&statement->gotos);
 		return;
 	case STATEMENT_ASM:
 		break;
