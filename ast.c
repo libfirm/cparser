@@ -167,7 +167,8 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		fputs(")", out);
 		break;
 	case UNEXPR_CAST_IMPLICIT:
-		break;
+		print_expression(unexpr->value);
+		return;
 	case UNEXPR_INVALID:
 		fprintf(out, "unop%d", (int) unexpr->type);
 		break;

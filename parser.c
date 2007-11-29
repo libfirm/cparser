@@ -25,6 +25,16 @@ typedef struct {
 	unsigned short namespc;
 } stack_entry_t;
 
+typedef struct declaration_specifiers_t  declaration_specifiers_t;
+struct declaration_specifiers_t {
+	source_position_t  source_position;
+	unsigned char      storage_class;
+	bool               is_inline;
+	type_t            *type;
+};
+
+typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration);
+
 static token_t         token;
 static token_t         lookahead_buffer[MAX_LOOKAHEAD];
 static int             lookahead_bufpos;
@@ -57,6 +67,11 @@ static statement_t *parse_statement(void);
 static expression_t *parse_sub_expression(unsigned precedence);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
+
+static void parse_compound_type_entries(void);
+static declaration_t *parse_declarator(
+		const declaration_specifiers_t *specifiers, bool may_be_abstract);
+static declaration_t *record_declaration(declaration_t *declaration);
 
 #define STORAGE_CLASSES     \
 	case T_typedef:         \
@@ -275,7 +290,7 @@ static inline const token_t *look_ahead(int num)
 {
 	assert(num > 0 && num <= MAX_LOOKAHEAD);
 	int pos = (lookahead_bufpos+num-1) % MAX_LOOKAHEAD;
-	return & lookahead_buffer[pos];
+	return &lookahead_buffer[pos];
 }
 
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
@@ -320,6 +335,11 @@ static void parser_print_warning_prefix_pos(
 {
 	parser_print_prefix_pos(source_position);
 	fputs("warning: ", stderr);
+}
+
+static void parser_print_warning_prefix(void)
+{
+	parser_print_warning_prefix_pos(token.source_position);
 }
 
 static void parse_warning_pos(const source_position_t source_position,
@@ -487,9 +507,15 @@ static void set_context(context_t *new_context)
  * called when we find a 2nd declarator for an identifier we already have a
  * declarator for
  */
-static bool is_compatible_declaration (declaration_t *declaration,
+static bool is_compatible_declaration(declaration_t *declaration,
                                       declaration_t *previous)
 {
+	/* happens for K&R style function parameters */
+	if(previous->type == NULL) {
+		previous->type = declaration->type;
+		return true;
+	}
+
 	if (declaration->type->type == TYPE_FUNCTION &&
 			previous->type->type    == TYPE_FUNCTION &&
 			previous->type->function.unspecified_parameters) {
@@ -545,7 +571,6 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	namespace_t  namespc = (namespace_t)declaration->namespc;
 
 	/* a declaration should be only pushed once */
-	assert(declaration->parent_context == NULL);
 	declaration->parent_context = parent_context;
 
 	declaration_t *previous_declaration = get_declaration(symbol, namespc);
@@ -675,7 +700,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 		return;
 
 	for(i = top; i > new_top; --i) {
-		stack_entry_t *entry = & stack[i - 1];
+		stack_entry_t *entry = &stack[i - 1];
 
 		declaration_t *old_declaration = entry->old_declaration;
 		symbol_t      *symbol          = entry->symbol;
@@ -756,8 +781,19 @@ static expression_t *create_cast_expression(expression_t *expression,
 	return cast;
 }
 
-static bool is_null_expression(const expression_t *const expression)
+static bool is_null_pointer_constant(const expression_t *expression)
 {
+	/* skip void* cast */
+	if(expression->type == EXPR_UNARY) {
+		const unary_expression_t *unary = &expression->unary;
+		if(unary->type == UNEXPR_CAST
+				&& expression->base.datatype == type_void_ptr) {
+			expression = unary->value;
+		}
+	}
+
+	/* TODO: not correct yet, should be any constant integer expression
+	 * which evaluates to 0 */
 	if (expression->type != EXPR_CONST)
 		return false;
 
@@ -803,7 +839,7 @@ static expression_t *create_implicit_cast(expression_t *expression,
 		case TYPE_POINTER:
 			switch (source_type->type) {
 				case TYPE_ATOMIC:
-					if (is_null_expression(expression)) {
+					if (is_null_pointer_constant(expression)) {
 						return create_cast_expression(expression, dest_type);
 					}
 					break;
@@ -850,7 +886,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 	type_t *const type_right = skip_typeref(orig_type_right);
 
 	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (is_type_pointer(type_left) && is_null_expression(*right)) ||
+	    (is_type_pointer(type_left) && is_null_pointer_constant(*right)) ||
 	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
 	     	&& is_type_pointer(type_right))) {
 		*right = create_implicit_cast(*right, type_left);
@@ -919,19 +955,6 @@ static expression_t *parse_assignment_expression(void)
 	/* start parsing at precedence 2 (assignment expression) */
 	return parse_sub_expression(2);
 }
-
-typedef struct declaration_specifiers_t  declaration_specifiers_t;
-struct declaration_specifiers_t {
-	unsigned char storage_class;
-	bool          is_inline;
-	type_t       *type;
-};
-
-static void parse_compound_type_entries(void);
-static declaration_t *parse_declarator(
-		const declaration_specifiers_t *specifiers, type_t *type,
-		bool may_be_abstract);
-static declaration_t *record_declaration(declaration_t *declaration);
 
 static type_t *make_global_typedef(const char *name, type_t *type)
 {
@@ -1217,7 +1240,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		assert(type->type == TYPE_COMPOUND_STRUCT
 				|| type->type == TYPE_COMPOUND_UNION);
 		compound_type_t *compound_type = &type->compound;
-		context_t       *context       = & compound_type->declaration->context;
+		context_t       *context       = &compound_type->declaration->context;
 
 		declaration_t *first = context->declarations;
 		if(first == NULL)
@@ -1383,12 +1406,12 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 
 		int         top          = environment_top();
 		context_t  *last_context = context;
-		set_context(& declaration->context);
+		set_context(&declaration->context);
 
 		parse_compound_type_entries();
 		parse_attributes();
 
-		assert(context == & declaration->context);
+		assert(context == &declaration->context);
 		set_context(last_context);
 		environment_pop_to(top);
 	}
@@ -1592,6 +1615,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	unsigned  type_qualifiers = 0;
 	unsigned  type_specifiers = 0;
 	int       newtype         = 0;
+
+	specifiers->source_position = token.source_position;
 
 	while(true) {
 		switch(token.type) {
@@ -1833,7 +1858,7 @@ finish_specifiers:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
 #ifndef STRICT_C99
-				parse_warning("no type specifiers in declaration (using int)");
+				parse_warning("no type specifiers in declaration, using int");
 				atomic_type = ATOMIC_TYPE_INT;
 				break;
 #else
@@ -1886,23 +1911,30 @@ static type_qualifiers_t parse_type_qualifiers(void)
 	}
 }
 
-static void parse_identifier_list(void)
+static declaration_t *parse_identifier_list(void)
 {
-	while(true) {
-		if(token.type != T_IDENTIFIER) {
-			parse_error_expected("while parsing parameter identifier list",
-			                     T_IDENTIFIER, 0);
-			return;
-		}
+	declaration_t *declarations     = NULL;
+	declaration_t *last_declaration = NULL;
+	do {
 		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-		declaration->symbol        = token.v.symbol;
 
+		declaration->source_position = token.source_position;
+		declaration->symbol          = token.v.symbol;
 		next_token();
+
+		if(last_declaration != NULL) {
+			last_declaration->next = declaration;
+		} else {
+			declarations = declaration;
+		}
+		last_declaration = declaration;
 
 		if(token.type != ',')
 			break;
 		next_token();
-	}
+	} while(token.type == T_IDENTIFIER);
+
+	return declarations;
 }
 
 static declaration_t *parse_parameter(void)
@@ -1912,8 +1944,7 @@ static declaration_t *parse_parameter(void)
 
 	parse_declaration_specifiers(&specifiers);
 
-	declaration_t *declaration
-		= parse_declarator(&specifiers, specifiers.type, true);
+	declaration_t *declaration = parse_declarator(&specifiers, true);
 
 	/* TODO check declaration constraints for parameters */
 	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
@@ -1934,11 +1965,10 @@ static declaration_t *parse_parameter(void)
 static declaration_t *parse_parameters(function_type_t *type)
 {
 	if(token.type == T_IDENTIFIER) {
-		symbol_t      *symbol = token.v.symbol;
+		symbol_t *symbol = token.v.symbol;
 		if(!is_typedef_symbol(symbol)) {
-			/* TODO: K&R style C parameters */
-			parse_identifier_list();
-			return NULL;
+			type->kr_style_parameters = true;
+			return parse_identifier_list();
 		}
 	}
 
@@ -2259,9 +2289,9 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 }
 
 static declaration_t *parse_declarator(
-		const declaration_specifiers_t *specifiers,
-		type_t *type, bool may_be_abstract)
+		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
+	type_t        *type        = specifiers->type;
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
 	declaration->storage_class = specifiers->storage_class;
 	declaration->is_inline     = specifiers->is_inline;
@@ -2291,6 +2321,7 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 
 static declaration_t *record_declaration(declaration_t *declaration)
 {
+	assert(declaration->parent_context == NULL);
 	assert(context != NULL);
 
 	symbol_t *symbol = declaration->symbol;
@@ -2312,130 +2343,357 @@ static declaration_t *record_declaration(declaration_t *declaration)
 	return declaration;
 }
 
-static void parser_error_multiple_definition(declaration_t *previous,
-                                             declaration_t *declaration)
+static void parser_error_multiple_definition(declaration_t *declaration,
+		const source_position_t source_position)
 {
-	parser_print_error_prefix_pos(declaration->source_position);
+	parser_print_error_prefix_pos(source_position);
 	fprintf(stderr, "multiple definition of symbol '%s'\n",
 	        declaration->symbol->string);
-	parser_print_error_prefix_pos(previous->source_position);
+	parser_print_error_prefix_pos(declaration->source_position);
 	fprintf(stderr, "this is the location of the previous definition.\n");
 }
 
-static void parse_init_declarators(const declaration_specifiers_t *specifiers)
+static bool is_declaration_specifier(const token_t *token,
+                                     bool only_type_specifiers)
+{
+	switch(token->type) {
+		TYPE_SPECIFIERS
+			return true;
+		case T_IDENTIFIER:
+			return is_typedef_symbol(token->v.symbol);
+
+		case T___extension__:
+		STORAGE_CLASSES
+		TYPE_QUALIFIERS
+			return !only_type_specifiers;
+
+		default:
+			return false;
+	}
+}
+
+static void parse_init_declarator_rest(declaration_t *declaration)
+{
+	eat('=');
+
+	type_t *orig_type = declaration->type;
+	type_t *type      = NULL;
+	if(orig_type != NULL)
+		type = skip_typeref(orig_type);
+
+	if(declaration->init.initializer != NULL) {
+		parser_error_multiple_definition(declaration, token.source_position);
+	}
+
+	initializer_t *initializer = parse_initializer(type);
+
+	/* § 6.7.5 (22)  array intializers for arrays with unknown size determine
+	 * the array type size */
+	if(type != NULL && type->type == TYPE_ARRAY && initializer != NULL) {
+		array_type_t *array_type = &type->array;
+
+		if(array_type->size == NULL) {
+			expression_t *cnst = allocate_expression_zero(EXPR_CONST);
+
+			cnst->base.datatype = type_size_t;
+
+			if(initializer->type == INITIALIZER_LIST) {
+				initializer_list_t *list = &initializer->list;
+				cnst->conste.v.int_value = list->len;
+			} else {
+				assert(initializer->type == INITIALIZER_STRING);
+				initializer_string_t *string = &initializer->string;
+				cnst->conste.v.int_value = strlen(string->string) + 1;
+			}
+
+			array_type->size = cnst;
+		}
+	}
+
+	if(type != NULL && type->type == TYPE_FUNCTION) {
+		parser_print_error_prefix_pos(declaration->source_position);
+		fprintf(stderr, "initializers not allowed for function types at "
+				"declator '%s' (type ", declaration->symbol->string);
+		print_type_quoted(orig_type);
+		fprintf(stderr, ")\n");
+	} else {
+		declaration->init.initializer = initializer;
+	}
+}
+
+/* parse rest of a declaration without any declarator */
+static void parse_anonymous_declaration_rest(
+		const declaration_specifiers_t *specifiers,
+		parsed_declaration_func finished_declaration)
+{
+	eat(';');
+
+	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+
+	declaration->type            = specifiers->type;
+	declaration->storage_class   = specifiers->storage_class;
+	declaration->source_position = specifiers->source_position;
+
+	if (declaration->storage_class != STORAGE_CLASS_NONE) {
+		parse_warning_pos(declaration->source_position,
+				"useless storage class in empty declaration");
+	}
+
+	type_t *type = declaration->type;
+	switch (type->type) {
+		case TYPE_COMPOUND_STRUCT:
+		case TYPE_COMPOUND_UNION: {
+			const compound_type_t *compound_type = &type->compound;
+			if (compound_type->declaration->symbol == NULL) {
+				parse_warning_pos(declaration->source_position,
+						"unnamed struct/union that defines no instances");
+			}
+			break;
+		}
+
+		case TYPE_ENUM:
+			break;
+
+		default:
+			parse_warning_pos(declaration->source_position,
+			                  "empty declaration");
+			break;
+	}
+
+	finished_declaration(declaration);
+}
+
+static void parse_declaration_rest(declaration_t *ndeclaration,
+		const declaration_specifiers_t *specifiers,
+		parsed_declaration_func finished_declaration)
 {
 	while(true) {
-		declaration_t *ndeclaration
-			= parse_declarator(specifiers, specifiers->type, false);
-
-		declaration_t *declaration = record_declaration(ndeclaration);
+		declaration_t *declaration = finished_declaration(ndeclaration);
 
 		type_t *orig_type = declaration->type;
 		type_t *type      = skip_typeref(orig_type);
+
 		if(type->type != TYPE_FUNCTION && declaration->is_inline) {
 			parser_print_warning_prefix_pos(declaration->source_position);
 			fprintf(stderr, "variable '%s' declared 'inline'\n",
-			        declaration->symbol->string);
+					declaration->symbol->string);
 		}
 
 		if(token.type == '=') {
-			next_token();
-
-			/* TODO: check that this is an allowed type (no function type) */
-
-			if(declaration->init.initializer != NULL) {
-				parser_error_multiple_definition(declaration, ndeclaration);
-			}
-
-			initializer_t *initializer = parse_initializer(type);
-
-			if(type->type == TYPE_ARRAY && initializer != NULL) {
-				array_type_t *array_type = &type->array;
-
-				if(array_type->size == NULL) {
-					expression_t *cnst = allocate_expression_zero(EXPR_CONST);
-
-					cnst->base.datatype = type_size_t;
-
-					if(initializer->type == INITIALIZER_LIST) {
-						initializer_list_t *list = &initializer->list;
-						cnst->conste.v.int_value = list->len;
-					} else {
-						assert(initializer->type == INITIALIZER_STRING);
-						initializer_string_t *string = &initializer->string;
-						cnst->conste.v.int_value = strlen(string->string) + 1;
-					}
-
-					array_type->size = cnst;
-				}
-			}
-
-
-			ndeclaration->init.initializer = initializer;
-		} else if(token.type == '{') {
-			if(type->type != TYPE_FUNCTION) {
-				parser_print_error_prefix();
-				fprintf(stderr, "declarator '");
-				print_type_ext(orig_type, declaration->symbol, NULL);
-				fprintf(stderr, "' has a body but is not a function type.\n");
-				eat_block();
-				continue;
-			}
-			function_type_t *function_type = &type->function;
-			/* § 6.7.5.3 (14) a function definition with () means no
-			 * parameters */
-			if(function_type->unspecified_parameters) {
-				type_t *duplicate = duplicate_type(type);
-				duplicate->function.unspecified_parameters = false;
-
-				type = typehash_insert(duplicate);
-				if(type != duplicate) {
-					//obstack_free(type_obst, duplicate);
-				}
-				function_type = &type->function;
-			}
-
-			if(declaration->init.statement != NULL) {
-				parser_error_multiple_definition(declaration, ndeclaration);
-			}
-			if(ndeclaration != declaration) {
-				memcpy(&declaration->context, &ndeclaration->context,
-				       sizeof(declaration->context));
-			}
-
-			int         top          = environment_top();
-			context_t  *last_context = context;
-			set_context(&declaration->context);
-
-			/* push function parameters */
-			declaration_t *parameter = declaration->context.declarations;
-			for( ; parameter != NULL; parameter = parameter->next) {
-				environment_push(parameter);
-			}
-
-			int            label_stack_top      = label_top();
-			declaration_t *old_current_function = current_function;
-			current_function                    = declaration;
-
-			statement_t *statement = parse_compound_statement();
-
-			assert(current_function == declaration);
-			current_function = old_current_function;
-			label_pop_to(label_stack_top);
-
-			assert(context == &declaration->context);
-			set_context(last_context);
-			environment_pop_to(top);
-
-			declaration->init.statement = statement;
-			return;
+			parse_init_declarator_rest(declaration);
 		}
 
 		if(token.type != ',')
 			break;
-		next_token();
+		eat(',');
+
+		ndeclaration = parse_declarator(specifiers, false);
 	}
 	expect_void(';');
+}
+
+static declaration_t *finished_kr_declaration(declaration_t *declaration)
+{
+	/* TODO: check that it was actually a parameter that gets a type */
+
+	/* we should have a declaration for the parameter in the current
+	 * scope */
+	return record_declaration(declaration);
+}
+
+static void parse_declaration(parsed_declaration_func finished_declaration)
+{
+	declaration_specifiers_t specifiers;
+	memset(&specifiers, 0, sizeof(specifiers));
+	parse_declaration_specifiers(&specifiers);
+
+	if(token.type == ';') {
+		parse_anonymous_declaration_rest(&specifiers, finished_declaration);
+	} else {
+		declaration_t *declaration = parse_declarator(&specifiers, false);
+		parse_declaration_rest(declaration, &specifiers, finished_declaration);
+	}
+}
+
+static void parse_kr_declaration_list(declaration_t *declaration)
+{
+	type_t *type = skip_typeref(declaration->type);
+	assert(type->type == TYPE_FUNCTION);
+
+	if(!type->function.kr_style_parameters)
+		return;
+
+	/* push function parameters */
+	int         top          = environment_top();
+	context_t  *last_context = context;
+	set_context(&declaration->context);
+
+	declaration_t *parameter = declaration->context.declarations;
+	for( ; parameter != NULL; parameter = parameter->next) {
+		environment_push(parameter);
+	}
+
+	/* parse declaration list */
+	while(is_declaration_specifier(&token, false)) {
+		parse_declaration(finished_kr_declaration);
+	}
+
+	/* pop function parameters */
+	assert(context == &declaration->context);
+	set_context(last_context);
+	environment_pop_to(top);
+
+	/* update function type */
+	type_t *new_type = duplicate_type(type);
+	new_type->function.kr_style_parameters = false;
+
+	function_parameter_t *parameters     = NULL;
+	function_parameter_t *last_parameter = NULL;
+
+	declaration_t *parameter_declaration = declaration->context.declarations;
+	for( ; parameter_declaration != NULL;
+			parameter_declaration = parameter_declaration->next) {
+		type_t *parameter_type = parameter_declaration->type;
+		if(parameter_type == NULL) {
+#ifdef STRICT_C99
+			parser_print_error_prefix();
+			fprintf(stderr, "no type specified for function parameter '%s'\n",
+			        parameter_declaration->symbol->string);
+#else
+			parser_print_warning_prefix();
+			fprintf(stderr, "no type specified for function parameter '%s', "
+			        "using int\n", parameter_declaration->symbol->string);
+			parameter_type              = type_int;
+			parameter_declaration->type = parameter_type;
+#endif
+		}
+
+		function_parameter_t *function_parameter
+			= obstack_alloc(type_obst, sizeof(function_parameter[0]));
+		memset(function_parameter, 0, sizeof(function_parameter[0]));
+
+		function_parameter->type = parameter_type;
+		if(last_parameter != NULL) {
+			last_parameter->next = function_parameter;
+		} else {
+			parameters = function_parameter;
+		}
+		last_parameter = function_parameter;
+	}
+	new_type->function.parameters = parameters;
+
+	type = typehash_insert(new_type);
+	if(type != new_type) {
+		obstack_free(type_obst, new_type);
+	}
+
+	declaration->type = type;
+}
+
+static void parse_external_declaration(void)
+{
+	/* function-definitions and declarations both start with declaration
+	 * specifiers */
+	declaration_specifiers_t specifiers;
+	memset(&specifiers, 0, sizeof(specifiers));
+	parse_declaration_specifiers(&specifiers);
+
+	/* must be a declaration */
+	if(token.type == ';') {
+		parse_anonymous_declaration_rest(&specifiers, record_declaration);
+		return;
+	}
+
+	/* declarator is common to both function-definitions and declarations */
+	declaration_t *ndeclaration = parse_declarator(&specifiers, false);
+
+	/* must be a declaration */
+	if(token.type == ',' || token.type == '=' || token.type == ';') {
+		parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
+		return;
+	}
+
+	/* must be a function definition */
+	parse_kr_declaration_list(ndeclaration);
+
+	declaration_t *declaration = record_declaration(ndeclaration);
+	if(ndeclaration != declaration) {
+		memcpy(&declaration->context, &ndeclaration->context,
+				sizeof(declaration->context));
+	}
+
+	/* push function parameters and switch context */
+	int         top          = environment_top();
+	context_t  *last_context = context;
+	set_context(&declaration->context);
+
+	declaration_t *parameter = declaration->context.declarations;
+	for( ; parameter != NULL; parameter = parameter->next) {
+		environment_push(parameter);
+	}
+
+	type_t *orig_type;
+	type_t *type;
+
+	if(token.type != '{') {
+		parse_error_expected("while parsing function definition", '{', 0);
+		eat_statement();
+		goto end_of_parse_external_declaration;
+	}
+
+	orig_type = declaration->type;
+	if(orig_type == NULL) {
+		eat_block();
+		goto end_of_parse_external_declaration;
+	}
+
+	type = skip_typeref(orig_type);
+
+	if(type->type != TYPE_FUNCTION) {
+		parser_print_error_prefix();
+		fprintf(stderr, "declarator '");
+		print_type_ext(orig_type, declaration->symbol, NULL);
+		fprintf(stderr, "' has a body but is not a function type.\n");
+		eat_block();
+		goto end_of_parse_external_declaration;
+	}
+
+	/* § 6.7.5.3 (14) a function definition with () means no
+	 * parameters (and not unspecified parameters) */
+	if(type->function.unspecified_parameters) {
+		type_t *duplicate = duplicate_type(type);
+		duplicate->function.unspecified_parameters = false;
+
+		type = typehash_insert(duplicate);
+		if(type != duplicate) {
+			obstack_free(type_obst, duplicate);
+		}
+		declaration->type = type;
+	}
+
+	if(declaration->init.statement != NULL) {
+		parser_error_multiple_definition(declaration, token.source_position);
+		eat_block();
+		goto end_of_parse_external_declaration;
+	}
+
+	/* parse function body */
+	{
+		int            label_stack_top      = label_top();
+		declaration_t *old_current_function = current_function;
+		current_function                    = declaration;
+
+		declaration->init.statement = parse_compound_statement();
+
+		assert(current_function == declaration);
+		current_function = old_current_function;
+		label_pop_to(label_stack_top);
+	}
+
+end_of_parse_external_declaration:
+	assert(context == &declaration->context);
+	set_context(last_context);
+	environment_pop_to(top);
 }
 
 static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
@@ -2446,8 +2704,7 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			parse_constant_expression();
 			/* TODO (bitfields) */
 		} else {
-			declaration_t *declaration
-				= parse_declarator(specifiers, specifiers->type, true);
+			declaration_t *declaration = parse_declarator(specifiers, true);
 
 			/* TODO: check constraints for struct declarations */
 			/* TODO: check for doubled fields */
@@ -2479,54 +2736,9 @@ static void parse_compound_type_entries(void)
 		parse_struct_declarators(&specifiers);
 	}
 	if(token.type == T_EOF) {
-		parse_error("unexpected error while parsing struct");
+		parse_error("EOF while parsing struct");
 	}
 	next_token();
-}
-
-static void parse_declaration(void)
-{
-	source_position_t source_position = token.source_position;
-
-	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-	parse_declaration_specifiers(&specifiers);
-
-	if(token.type == ';') {
-		if (specifiers.storage_class != STORAGE_CLASS_NONE) {
-			parse_warning_pos(source_position,
-			                  "useless keyword in empty declaration");
-		}
-		switch (specifiers.type->type) {
-			case TYPE_COMPOUND_STRUCT:
-			case TYPE_COMPOUND_UNION: {
-				const compound_type_t *const comp_type
-					= &specifiers.type->compound;
-				if (comp_type->declaration->symbol == NULL) {
-					parse_warning_pos(source_position,
-														"unnamed struct/union that defines no instances");
-				}
-				break;
-			}
-
-			case TYPE_ENUM: break;
-
-			default:
-				parse_warning_pos(source_position, "empty declaration");
-				break;
-		}
-
-		next_token();
-
-		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-
-		declaration->type            = specifiers.type;
-		declaration->storage_class   = specifiers.storage_class;
-		declaration->source_position = source_position;
-		record_declaration(declaration);
-		return;
-	}
-	parse_init_declarators(&specifiers);
 }
 
 static type_t *parse_typename(void)
@@ -2574,7 +2786,7 @@ static expression_t *expected_expression_error(void)
 {
 	parser_print_error_prefix();
 	fprintf(stderr, "expected expression, got token ");
-	print_token(stderr, & token);
+	print_token(stderr, &token);
 	fprintf(stderr, "\n");
 
 	next_token();
@@ -3116,25 +3328,6 @@ static expression_t *parse_array_expression(unsigned precedence,
 	return (expression_t*) array_access;
 }
 
-static bool is_declaration_specifier(const token_t *token,
-                                     bool only_type_specifiers)
-{
-	switch(token->type) {
-		TYPE_SPECIFIERS
-			return 1;
-		case T_IDENTIFIER:
-			return is_typedef_symbol(token->v.symbol);
-		STORAGE_CLASSES
-		TYPE_QUALIFIERS
-			if(only_type_specifiers)
-				return 0;
-			return 1;
-
-		default:
-			return 0;
-	}
-}
-
 static expression_t *parse_sizeof(unsigned precedence)
 {
 	eat(T_sizeof);
@@ -3332,11 +3525,11 @@ static expression_t *parse_call_expression(unsigned precedence,
 				/* do default promotion */
 				for( ; argument != NULL; argument = argument->next) {
 					type_t *type = argument->expression->base.datatype;
-					type = skip_typeref(type);
 
 					if(type == NULL)
 						continue;
 
+					type = skip_typeref(type);
 					if(is_type_integer(type)) {
 						type = promote_integer(type);
 					} else if(type == type_float) {
@@ -3355,70 +3548,83 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);
 
+static bool same_compound_type(const type_t *type1, const type_t *type2)
+{
+	if(!is_type_compound(type1))
+		return false;
+	if(type1->type != type2->type)
+		return false;
+
+	const compound_type_t *compound1 = &type1->compound;
+	const compound_type_t *compound2 = &type2->compound;
+
+	return compound1->declaration == compound2->declaration;
+}
+
 static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
 {
 	eat('?');
 
-	conditional_expression_t *conditional
-		= allocate_ast_zero(sizeof(conditional[0]));
-	conditional->expression.type = EXPR_CONDITIONAL;
-	conditional->condition       = expression;
+	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
+
+	conditional_expression_t *conditional = &result->conditional;
+	conditional->condition = expression;
 
 	/* 6.5.15.2 */
-	type_t *condition_type_orig = conditional->condition->base.datatype;
+	type_t *condition_type_orig = expression->base.datatype;
 	if(condition_type_orig != NULL) {
-		type_t *condition_type      = skip_typeref(condition_type_orig);
+		type_t *condition_type = skip_typeref(condition_type_orig);
 		if(condition_type != NULL && !is_type_scalar(condition_type)) {
-			type_error("expected a scalar type",
+			type_error("expected a scalar type in conditional condition",
 			           expression->base.source_position, condition_type_orig);
 		}
 	}
 
-	expression_t *const t_expr = parse_expression();
-	conditional->true_expression = t_expr;
+	expression_t *true_expression = parse_expression();
 	expect(':');
-	expression_t *const f_expr = parse_sub_expression(precedence);
-	conditional->false_expression = f_expr;
+	expression_t *false_expression = parse_sub_expression(precedence);
 
-	type_t *const true_type  = t_expr->base.datatype;
-	if(true_type == NULL)
-		return (expression_t*) conditional;
-	type_t *const false_type = f_expr->base.datatype;
-	if(false_type == NULL)
-		return (expression_t*) conditional;
+	conditional->true_expression  = true_expression;
+	conditional->false_expression = false_expression;
 
-	type_t *const skipped_true_type  = skip_typeref(true_type);
-	type_t *const skipped_false_type = skip_typeref(false_type);
+	type_t *orig_true_type  = true_expression->base.datatype;
+	type_t *orig_false_type = false_expression->base.datatype;
+	if(orig_true_type == NULL || orig_false_type == NULL)
+		return result;
+
+	type_t *true_type  = skip_typeref(orig_true_type);
+	type_t *false_type = skip_typeref(orig_false_type);
 
 	/* 6.5.15.3 */
-	if (skipped_true_type == skipped_false_type) {
-		conditional->expression.datatype = skipped_true_type;
-	} else if (is_type_arithmetic(skipped_true_type) &&
-	           is_type_arithmetic(skipped_false_type)) {
-		type_t *const result = semantic_arithmetic(skipped_true_type,
-		                                           skipped_false_type);
-		conditional->true_expression  = create_implicit_cast(t_expr, result);
-		conditional->false_expression = create_implicit_cast(f_expr, result);
-		conditional->expression.datatype = result;
-	} else if (skipped_true_type->type == TYPE_POINTER &&
-	           skipped_false_type->type == TYPE_POINTER &&
-			  true /* TODO compatible points_to types */) {
-		/* TODO */
-	} else if(/* (is_null_ptr_const(skipped_true_type) &&
-	              skipped_false_type->type == TYPE_POINTER)
-	       || (is_null_ptr_const(skipped_false_type) &&
-	           skipped_true_type->type == TYPE_POINTER) TODO*/ false) {
-		/* TODO */
-	} else if(/* 1 is pointer to object type, other is void* */ false) {
-		/* TODO */
+	type_t *result_type = NULL;
+	if (is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
+		result_type = semantic_arithmetic(true_type, false_type);
+
+		true_expression  = create_implicit_cast(true_expression, result_type);
+		false_expression = create_implicit_cast(false_expression, result_type);
+
+		conditional->true_expression     = true_expression;
+		conditional->false_expression    = false_expression;
+		conditional->expression.datatype = result_type;
+	} else if (same_compound_type(true_type, false_type)
+			|| (is_type_atomic(true_type, ATOMIC_TYPE_VOID) &&
+				is_type_atomic(false_type, ATOMIC_TYPE_VOID))) {
+		/* just take 1 of the 2 types */
+		result_type = true_type;
+	} else if (is_type_pointer(true_type) && is_type_pointer(false_type)
+			&& pointers_compatible(true_type, false_type)) {
+		/* ok */
+		result_type = true_type;
 	} else {
+		/* TODO */
 		type_error_incompatible("while parsing conditional",
 		                        expression->base.source_position, true_type,
-		                        skipped_false_type);
+		                        false_type);
 	}
 
-	return (expression_t*) conditional;
+	conditional->expression.datatype = result_type;
+	return result;
 }
 
 static expression_t *parse_extension(unsigned precedence)
@@ -3434,17 +3640,15 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 {
 	eat(T___builtin_classify_type);
 
-	classify_type_expression_t *const classify_type_expr =
-		allocate_ast_zero(sizeof(classify_type_expr[0]));
-	classify_type_expr->expression.type     = EXPR_CLASSIFY_TYPE;
-	classify_type_expr->expression.datatype = type_int;
+	expression_t *result  = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
+	result->base.datatype = type_int;
 
 	expect('(');
-	expression_t *const expression = parse_sub_expression(precedence);
+	expression_t *expression = parse_sub_expression(precedence);
 	expect(')');
-	classify_type_expr->type_expression = expression;
+	result->classify_type.type_expression = expression;
 
-	return (expression_t*)classify_type_expr;
+	return result;
 }
 
 static void semantic_incdec(unary_expression_t *expression)
@@ -4279,30 +4483,30 @@ end_of_asm:
 static statement_t *parse_case_statement(void)
 {
 	eat(T_case);
-	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->statement.type            = STATEMENT_CASE_LABEL;
-	label->statement.source_position = token.source_position;
 
-	label->expression = parse_expression();
+	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
+
+	statement->base.source_position  = token.source_position;
+	statement->case_label.expression = parse_expression();
 
 	expect(':');
-	label->label_statement = parse_statement();
+	statement->case_label.label_statement = parse_statement();
 
-	return (statement_t*) label;
+	return statement;
 }
 
 static statement_t *parse_default_statement(void)
 {
 	eat(T_default);
 
-	case_label_statement_t *label = allocate_ast_zero(sizeof(label[0]));
-	label->statement.type            = STATEMENT_CASE_LABEL;
-	label->statement.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
+
+	statement->base.source_position = token.source_position;
 
 	expect(':');
-	label->label_statement = parse_statement();
+	statement->label.label_statement = parse_statement();
 
-	return (statement_t*) label;
+	return statement;
 }
 
 static declaration_t *get_label(symbol_t *symbol)
@@ -4318,7 +4522,7 @@ static declaration_t *get_label(symbol_t *symbol)
 
 	/* otherwise we need to create a new one */
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-	declaration->namespc     = NAMESPACE_LABEL;
+	declaration->namespc       = NAMESPACE_LABEL;
 	declaration->symbol        = symbol;
 
 	label_push(declaration);
@@ -4451,7 +4655,7 @@ static statement_t *parse_for(void)
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
-			parse_declaration();
+			parse_declaration(record_declaration);
 		} else {
 			statement->initialisation = parse_expression();
 			expect(';');
@@ -4576,44 +4780,33 @@ static statement_t *parse_return(void)
 
 static statement_t *parse_declaration_statement(void)
 {
+	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
+
+	statement->base.source_position = token.source_position;
+
 	declaration_t *before = last_declaration;
-
-	declaration_statement_t *statement
-		= allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_DECLARATION;
-	statement->statement.source_position = token.source_position;
-
-	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-	parse_declaration_specifiers(&specifiers);
-
-	if(token.type == ';') {
-		eat(';');
-	} else {
-		parse_init_declarators(&specifiers);
-	}
+	parse_declaration(record_declaration);
 
 	if(before == NULL) {
-		statement->declarations_begin = context->declarations;
+		statement->declaration.declarations_begin = context->declarations;
 	} else {
-		statement->declarations_begin = before->next;
+		statement->declaration.declarations_begin = before->next;
 	}
-	statement->declarations_end = last_declaration;
+	statement->declaration.declarations_end = last_declaration;
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_expression_statement(void)
 {
-	expression_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.type            = STATEMENT_EXPRESSION;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_EXPRESSION);
 
-	statement->expression = parse_expression();
+	statement->base.source_position  = token.source_position;
+	statement->expression.expression = parse_expression();
 
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_statement(void)
@@ -4786,7 +4979,7 @@ static translation_unit_t *parse_translation_unit(void)
 	initialize_builtins();
 
 	while(token.type != T_EOF) {
-		parse_declaration();
+		parse_external_declaration();
 	}
 
 	assert(context == &unit->context);
@@ -4829,8 +5022,10 @@ void init_parser(void)
 	obstack_init(&temp_obst);
 
 	type_int         = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
-	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE, TYPE_QUALIFIER_NONE);
-	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE, TYPE_QUALIFIER_NONE);
+	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE,
+	                                    TYPE_QUALIFIER_NONE);
+	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE,
+	                                    TYPE_QUALIFIER_NONE);
 	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
 	type_char        = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_NONE);
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);

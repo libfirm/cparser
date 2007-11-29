@@ -107,8 +107,9 @@ struct function_type_t {
 	type_base_t           type;
 	type_t               *result_type;
 	function_parameter_t *parameters;
-	bool                  variadic;
-	bool                  unspecified_parameters;
+	unsigned              variadic : 1;
+	unsigned              unspecified_parameters : 1;
+	unsigned              kr_style_parameters : 1;
 };
 
 struct compound_type_t {

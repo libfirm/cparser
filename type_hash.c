@@ -136,6 +136,8 @@ static bool function_types_equal(const function_type_t *type1,
 		return false;
 	if(type1->unspecified_parameters != type2->unspecified_parameters)
 		return false;
+	if(type1->kr_style_parameters != type2->kr_style_parameters)
+		return false;
 
 	function_parameter_t *param1 = type1->parameters;
 	function_parameter_t *param2 = type2->parameters;
