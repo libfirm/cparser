@@ -517,19 +517,26 @@ static bool is_compatible_declaration(declaration_t *declaration,
 		return true;
 	}
 
+	/* shortcur, same types are always compatible */
+	if(declaration->type == previous->type)
+		return true;
+
 	if (declaration->type->type == TYPE_FUNCTION &&
-			previous->type->type    == TYPE_FUNCTION &&
-			previous->type->function.unspecified_parameters) {
+			previous->type->type == TYPE_FUNCTION) {
 		function_type_t* const prev_func = &previous->type->function;
 		function_type_t* const decl_func = &declaration->type->function;
-		if (prev_func->unspecified_parameters &&
-				prev_func->result_type == decl_func->result_type) {
+
+		/* 1 of the 2 declarations might have unspecified parameters */
+		if(decl_func->unspecified_parameters) {
+			return true;
+		} else if(prev_func->unspecified_parameters) {
 			declaration->type = previous->type;
 			return true;
 		}
 	}
-	/* TODO: not correct yet */
-	return declaration->type == previous->type;
+
+	/* TODO: not correct/complete yet */
+	return false;
 }
 
 static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
