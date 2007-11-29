@@ -1130,12 +1130,16 @@ static initializer_t *initializer_from_expression(type_t *type,
 		}
 	}
 
-	semantic_assign(type, &expression, "initializer");
+	if(is_type_scalar(type)) {
+		semantic_assign(type, &expression, "initializer");
 
-	initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
-	result->value.value   = expression;
+		initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
+		result->value.value   = expression;
 
-	return result;
+		return result;
+	}
+
+	return NULL;
 }
 
 static initializer_t *parse_sub_initializer(type_t *type,
@@ -1183,17 +1187,11 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		return initializer_from_expression(type, expression);
 	}
 
-	/* TODO: ignore qualifiers, comparing pointers is probably
-	 * not correct */
-	if(expression != NULL && expression_type == type) {
-		initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
-
-		if(type != NULL) {
-			semantic_assign(type, &expression, "initializer");
-		}
-		result->value.value = expression;
-
-		return result;
+	/* does the expression match the currently looked at object to initalize */
+	if(expression != NULL) {
+		initializer_t *result = initializer_from_expression(type, expression);
+		if(result != NULL)
+			return result;
 	}
 
 	bool read_paren = false;
@@ -1235,7 +1233,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			if(token.type == '}')
 				break;
 
-			sub = parse_sub_initializer(element_type, NULL, NULL);
+			sub = parse_sub_initializer_elem(element_type);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup */
 				parse_error("member initializer didn't match");
@@ -1289,7 +1287,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			type_t *iter_type = iter->type;
 			iter_type         = skip_typeref(iter_type);
 
-			sub = parse_sub_initializer(iter_type, NULL, NULL);
+			sub = parse_sub_initializer_elem(iter_type);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup*/
 				parse_error("member initializer didn't match");
