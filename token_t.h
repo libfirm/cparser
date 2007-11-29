@@ -2,6 +2,7 @@
 #define TOKEN_T_H
 
 #include <stdio.h>
+#include "string_rep.h"
 #include "symbol.h"
 #include "symbol_table.h"
 #include "type.h"
@@ -37,10 +38,11 @@ extern source_position_t builtin_source_position;
 typedef struct {
 	int type;
 	union {
-		symbol_t   *symbol;
-		long long   intvalue;
-		long double floatvalue;
-		const char *string;
+		symbol_t      *symbol;
+		long long      intvalue;
+		long double    floatvalue;
+		const char    *string;
+		wide_string_t  wide_string;
 	} v;
 	type_t            *datatype;
 	source_position_t  source_position;

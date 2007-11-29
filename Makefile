@@ -1,6 +1,6 @@
 GOAL = cparser
 
-FIRM_HOME = $(HOME)/projects/firm
+FIRM_HOME = $(HOME)/jambuild/
 FIRM_BUILD = $(FIRM_HOME)/build/i686-pc-linux-gnu/debug/
 FIRM_CFLAGS = -I$(FIRM_HOME)/libfirm/include -I$(FIRM_HOME)/obstack -I$(FIRM_HOME)/libcore -I$(FIRM_HOME)/libcore/libcore -I$(FIRM_HOME)
 FIRM_LIBS = -L$(FIRM_BUILD) -lfirm -llpp -lcore -lm -lz -ldl
@@ -65,7 +65,7 @@ build/adt:
 
 build/%.o: %.c
 	@echo '===> CC $<'
-	$(Q)icc $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+#	$(Q)icc $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -74,6 +74,51 @@ static void print_string_literal(
 	print_quoted_string(string_literal->value);
 }
 
+static void print_wide_string_literal(
+	const wide_string_literal_expression_t *const wstr)
+{
+	fputs("L\"", out);
+	for (const wchar_rep_t *c   = wstr->value.begin,
+	                       *end = c + wstr->value.size;
+	     c != end; ++c) {
+		switch (*c) {
+			case L'\"':  fputs("\\\"", out); break;
+			case L'\\':  fputs("\\\\", out); break;
+			case L'\a':  fputs("\\a",  out); break;
+			case L'\b':  fputs("\\b",  out); break;
+			case L'\f':  fputs("\\f",  out); break;
+			case L'\n':  fputs("\\n",  out); break;
+			case L'\r':  fputs("\\r",  out); break;
+			case L'\t':  fputs("\\t",  out); break;
+			case L'\v':  fputs("\\v",  out); break;
+			case L'\?':  fputs("\\?",  out); break;
+			default: {
+				const unsigned tc = *c;
+				if (tc < 0x80U) {
+					if (!isprint(*c))  {
+						fprintf(out, "\\%03o", (char)*c);
+					} else {
+						fputc(*c, out);
+					}
+				} else if (tc < 0x800) {
+					fputc(0xC0 | (tc >> 6),   out);
+					fputc(0x80 | (tc & 0x3F), out);
+				} else if (tc < 0x10000) {
+					fputc(0xE0 | ( tc >> 12),         out);
+					fputc(0x80 | ((tc >>  6) & 0x3F), out);
+					fputc(0x80 | ( tc        & 0x3F), out);
+				} else {
+					fputc(0xF0 | ( tc >> 18),         out);
+					fputc(0x80 | ((tc >> 12) & 0x3F), out);
+					fputc(0x80 | ((tc >>  6) & 0x3F), out);
+					fputc(0x80 | ( tc        & 0x3F), out);
+				}
+			}
+		}
+	}
+	fputc('"', out);
+}
+
 static void print_call_expression(const call_expression_t *call)
 {
 	print_expression(call->function);
@@ -273,6 +318,9 @@ void print_expression(const expression_t *expression)
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_STRING_LITERAL:
 		print_string_literal(&expression->string);
+		break;
+	case EXPR_WIDE_STRING_LITERAL:
+		print_wide_string_literal(&expression->wide_string);
 		break;
 	case EXPR_CALL:
 		print_call_expression(&expression->call);

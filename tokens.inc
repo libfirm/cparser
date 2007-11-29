@@ -2,10 +2,11 @@
 #define TS(x,str,val)
 #endif
 
-TS(IDENTIFIER,     "identifier", = 256)
-TS(INTEGER,        "integer number",)
-TS(FLOATINGPOINT,  "floatingpoint number",)
-TS(STRING_LITERAL, "string literal",)
+TS(IDENTIFIER,          "identifier", = 256)
+TS(INTEGER,             "integer number",)
+TS(FLOATINGPOINT,       "floatingpoint number",)
+TS(STRING_LITERAL,      "string literal",)
+TS(WIDE_STRING_LITERAL, "wide string literal",)
 
 #define S(x)   T(x,#x,)
 S(auto)

@@ -754,6 +754,66 @@ end_of_string:
 	lexer_token.v.string = result;
 }
 
+static void parse_wide_string_literal(void)
+{
+	const unsigned start_linenr = lexer_token.source_position.linenr;
+
+	assert(c == '"');
+	next_char();
+
+	while(1) {
+		switch(c) {
+			case '\\': {
+				wchar_rep_t tc = parse_escape_sequence();
+				obstack_grow(&symbol_obstack, &tc, sizeof(tc));
+				break;
+			}
+
+			case EOF:
+				error_prefix_at(lexer_token.source_position.input_name,
+				                start_linenr);
+				fprintf(stderr, "string has no end\n");
+				lexer_token.type = T_ERROR;
+				return;
+
+			case '"':
+				next_char();
+				goto end_of_string;
+
+			default: {
+				wchar_rep_t tc = c;
+				obstack_grow(&symbol_obstack, &tc, sizeof(tc));
+				next_char();
+				break;
+			}
+		}
+	}
+
+end_of_string:;
+
+	/* TODO: concatenate multiple strings separated by whitespace... */
+
+	/* add finishing 0 to the string */
+	wchar_rep_t nul = L'\0';
+	obstack_grow(&symbol_obstack, &nul, sizeof(nul));
+	const size_t             size   = (size_t)obstack_object_size(&symbol_obstack) / sizeof(wchar_rep_t);
+	const wchar_rep_t *const string = obstack_finish(&symbol_obstack);
+
+#if 0 /* TODO hash */
+	/* check if there is already a copy of the string */
+	const wchar_rep_t *const result = strset_insert(&stringset, string);
+	if(result != string) {
+		obstack_free(&symbol_obstack, string);
+	}
+#else
+	const wchar_rep_t *const result = string;
+#endif
+
+	lexer_token.type                = T_WIDE_STRING_LITERAL;
+	lexer_token.v.wide_string.begin = result;
+	lexer_token.v.wide_string.size  = size;
+}
+
 static void parse_character_constant(void)
 {
 	eat('\'');
@@ -1003,8 +1063,7 @@ void lexer_next_preprocessing_token(void)
 			/* might be a wide string ( L"string" ) */
 			if(c == '"' && (lexer_token.type == T_IDENTIFIER &&
 			   lexer_token.v.symbol == symbol_L)) {
-			   	parse_string_literal();
-			   	return;
+				parse_wide_string_literal();
 			}
 			return;
 

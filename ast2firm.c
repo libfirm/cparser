@@ -21,6 +21,7 @@
 #define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
 
 static ir_type *ir_type_const_char;
+static ir_type *ir_type_wchar_t;
 static ir_type *ir_type_void;
 static ir_type *ir_type_int;
 
@@ -86,16 +87,6 @@ const char *retrieve_dbg(const dbg_info *dbg, unsigned *line)
 
 void init_ast2firm(void)
 {
-	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
-	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
-	type_int        = make_atomic_type(ATOMIC_TYPE_INT,  TYPE_QUALIFIER_NONE);
-
-	ir_type_int        = get_ir_type(type_int);
-	ir_type_const_char = get_ir_type(type_const_char);
-	ir_type_void       = get_ir_type(type_int); /* we don't have a real void
-	                                               type in firm */
-
-	type_void->base.firm_type = ir_type_void;
 }
 
 void exit_ast2firm(void)
@@ -650,6 +641,42 @@ static ir_node *string_literal_to_firm(
 {
 	return string_to_firm(&literal->expression.source_position, "Lstr",
 	                      literal->value);
+}
+
+static ir_node *wide_string_literal_to_firm(
+	const wide_string_literal_expression_t* const literal)
+{
+	ir_type *const global_type = get_glob_type();
+	ir_type *const elem_type   = ir_type_wchar_t;
+	ir_type *const type        = new_type_array(unique_ident("strtype"), 1,
+	                                            elem_type);
+
+	ident     *const id     = unique_ident("Lstr");
+	ir_entity *const entity = new_entity(global_type, id, type);
+	set_entity_ld_ident(entity, id);
+	set_entity_variability(entity, variability_constant);
+
+	ir_mode *const mode      = get_type_mode(elem_type);
+
+	const wchar_rep_t *const string = literal->value.begin;
+	const size_t             slen   = literal->value.size;
+
+	set_array_lower_bound_int(type, 0, 0);
+	set_array_upper_bound_int(type, 0, slen);
+	set_type_size_bytes(type, slen);
+	set_type_state(type, layout_fixed);
+
+	tarval **const tvs = xmalloc(slen * sizeof(tvs[0]));
+	for(size_t i = 0; i < slen; ++i) {
+		tvs[i] = new_tarval_from_long(string[i], mode);
+	}
+
+	set_array_entity_values(entity, tvs, slen);
+	free(tvs);
+
+	dbg_info *const dbgi = get_dbg_info(&literal->expression.source_position);
+
+	return create_symconst(dbgi, entity);
 }
 
 static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
@@ -1707,6 +1734,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return const_to_firm(&expression->conste);
 	case EXPR_STRING_LITERAL:
 		return string_literal_to_firm(&expression->string);
+	case EXPR_WIDE_STRING_LITERAL:
+		return wide_string_literal_to_firm(&expression->wide_string);
 	case EXPR_REFERENCE:
 		return reference_expression_to_firm(&expression->reference);
 	case EXPR_CALL:
@@ -3055,6 +3084,18 @@ static void context_to_firm(context_t *context)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
+	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
+	type_int        = make_atomic_type(ATOMIC_TYPE_INT,  TYPE_QUALIFIER_NONE);
+
+	ir_type_int        = get_ir_type(type_int);
+	ir_type_const_char = get_ir_type(type_const_char);
+	ir_type_wchar_t    = get_ir_type(type_wchar_t);
+	ir_type_void       = get_ir_type(type_int); /* we don't have a real void
+	                                               type in firm */
+
+	type_void->base.firm_type = ir_type_void;
+
 	/* just to be sure */
 	continue_label      = NULL;
 	break_label         = NULL;

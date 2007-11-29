@@ -59,7 +59,7 @@ static type_t         *type_void_ptr    = NULL;
 type_t *type_size_t      = NULL;
 type_t *type_ptrdiff_t   = NULL;
 type_t *type_wchar_t     = NULL;
-type_t *type_wchar_ptr_t = NULL;
+type_t *type_wchar_t_ptr = NULL;
 
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
@@ -168,24 +168,25 @@ static statement_t *allocate_statement_zero(statement_type_t type)
 static size_t get_expression_struct_size(expression_type_t type)
 {
 	static const size_t sizes[] = {
-		[EXPR_INVALID]         = sizeof(expression_base_t),
-		[EXPR_REFERENCE]       = sizeof(reference_expression_t),
-		[EXPR_CONST]           = sizeof(const_expression_t),
-		[EXPR_STRING_LITERAL]  = sizeof(string_literal_expression_t),
-		[EXPR_CALL]            = sizeof(call_expression_t),
-		[EXPR_UNARY]           = sizeof(unary_expression_t),
-		[EXPR_BINARY]          = sizeof(binary_expression_t),
-		[EXPR_CONDITIONAL]     = sizeof(conditional_expression_t),
-		[EXPR_SELECT]          = sizeof(select_expression_t),
-		[EXPR_ARRAY_ACCESS]    = sizeof(array_access_expression_t),
-		[EXPR_SIZEOF]          = sizeof(sizeof_expression_t),
-		[EXPR_CLASSIFY_TYPE]   = sizeof(classify_type_expression_t),
-		[EXPR_FUNCTION]        = sizeof(string_literal_expression_t),
-		[EXPR_PRETTY_FUNCTION] = sizeof(string_literal_expression_t),
-		[EXPR_BUILTIN_SYMBOL]  = sizeof(builtin_symbol_expression_t),
-		[EXPR_OFFSETOF]        = sizeof(offsetof_expression_t),
-		[EXPR_VA_ARG]          = sizeof(va_arg_expression_t),
-		[EXPR_STATEMENT]       = sizeof(statement_expression_t)
+		[EXPR_INVALID]             = sizeof(expression_base_t),
+		[EXPR_REFERENCE]           = sizeof(reference_expression_t),
+		[EXPR_CONST]               = sizeof(const_expression_t),
+		[EXPR_STRING_LITERAL]      = sizeof(string_literal_expression_t),
+		[EXPR_WIDE_STRING_LITERAL] = sizeof(wide_string_literal_expression_t),
+		[EXPR_CALL]                = sizeof(call_expression_t),
+		[EXPR_UNARY]               = sizeof(unary_expression_t),
+		[EXPR_BINARY]              = sizeof(binary_expression_t),
+		[EXPR_CONDITIONAL]         = sizeof(conditional_expression_t),
+		[EXPR_SELECT]              = sizeof(select_expression_t),
+		[EXPR_ARRAY_ACCESS]        = sizeof(array_access_expression_t),
+		[EXPR_SIZEOF]              = sizeof(sizeof_expression_t),
+		[EXPR_CLASSIFY_TYPE]       = sizeof(classify_type_expression_t),
+		[EXPR_FUNCTION]            = sizeof(string_literal_expression_t),
+		[EXPR_PRETTY_FUNCTION]     = sizeof(string_literal_expression_t),
+		[EXPR_BUILTIN_SYMBOL]      = sizeof(builtin_symbol_expression_t),
+		[EXPR_OFFSETOF]            = sizeof(offsetof_expression_t),
+		[EXPR_VA_ARG]              = sizeof(va_arg_expression_t),
+		[EXPR_STATEMENT]           = sizeof(statement_expression_t)
 	};
 	assert(sizeof(sizes) / sizeof(sizes[0]) == EXPR_STATEMENT + 1);
 	assert(type <= EXPR_STATEMENT);
@@ -2803,6 +2804,15 @@ static expression_t *parse_string_const(void)
 	return cnst;
 }
 
+static expression_t *parse_wide_string_const(void)
+{
+	expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
+	cnst->base.datatype      = type_wchar_t_ptr;
+	cnst->wide_string.value  = token.v.wide_string; /* TODO concatenate */
+	next_token();
+	return cnst;
+}
+
 static expression_t *parse_int_const(void)
 {
 	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
@@ -3237,8 +3247,10 @@ static expression_t *parse_primary_expression(void)
 		return parse_int_const();
 	case T_FLOATINGPOINT:
 		return parse_float_const();
-	case T_STRING_LITERAL:
+	case T_STRING_LITERAL: /* TODO merge */
 		return parse_string_const();
+	case T_WIDE_STRING_LITERAL:
+		return parse_wide_string_const();
 	case T_IDENTIFIER:
 		return parse_reference();
 	case T___FUNCTION__:
@@ -4959,7 +4971,7 @@ static statement_t *parse_compound_statement(void)
 static void initialize_builtins(void)
 {
 	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__", type_int);
-	type_wchar_ptr_t = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
+	type_wchar_t_ptr = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
 	type_size_t      = make_global_typedef("__SIZE_TYPE__",
 			make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE));
 	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",

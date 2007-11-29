@@ -18,6 +18,7 @@ typedef enum {
 	EXPR_REFERENCE,
 	EXPR_CONST,
 	EXPR_STRING_LITERAL,
+	EXPR_WIDE_STRING_LITERAL,
 	EXPR_CALL,
 	EXPR_UNARY,
 	EXPR_BINARY,
@@ -56,6 +57,11 @@ struct const_expression_t {
 struct string_literal_expression_t {
 	expression_base_t  expression;
 	const char        *value;
+};
+
+struct wide_string_literal_expression_t {
+	expression_base_t  expression;
+	wide_string_t      value;
 };
 
 struct builtin_symbol_expression_t {
@@ -200,23 +206,24 @@ struct classify_type_expression_t {
 };
 
 union expression_t {
-	expression_type_t            type;
-	expression_base_t            base;
-	const_expression_t           conste;
-	string_literal_expression_t  string;
-	builtin_symbol_expression_t  builtin_symbol;
-	reference_expression_t       reference;
-	call_expression_t            call;
-	unary_expression_t           unary;
-	binary_expression_t          binary;
-	select_expression_t          select;
-	array_access_expression_t    array_access;
-	sizeof_expression_t          sizeofe;
-	offsetof_expression_t        offsetofe;
-	va_arg_expression_t          va_arge;
-	conditional_expression_t     conditional;
-	statement_expression_t       statement;
-	classify_type_expression_t   classify_type;
+	expression_type_t                type;
+	expression_base_t                base;
+	const_expression_t               conste;
+	string_literal_expression_t      string;
+	wide_string_literal_expression_t wide_string;
+	builtin_symbol_expression_t      builtin_symbol;
+	reference_expression_t           reference;
+	call_expression_t                call;
+	unary_expression_t               unary;
+	binary_expression_t              binary;
+	select_expression_t              select;
+	array_access_expression_t        array_access;
+	sizeof_expression_t              sizeofe;
+	offsetof_expression_t            offsetofe;
+	va_arg_expression_t              va_arge;
+	conditional_expression_t         conditional;
+	statement_expression_t           statement;
+	classify_type_expression_t       classify_type;
 };
 
 typedef enum {
