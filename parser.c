@@ -2624,46 +2624,26 @@ static void parse_external_declaration(void)
 	/* must be a function definition */
 	parse_kr_declaration_list(ndeclaration);
 
-	declaration_t *declaration = record_declaration(ndeclaration);
-	if(ndeclaration != declaration) {
-		memcpy(&declaration->context, &ndeclaration->context,
-				sizeof(declaration->context));
-	}
-
-	/* push function parameters and switch context */
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&declaration->context);
-
-	declaration_t *parameter = declaration->context.declarations;
-	for( ; parameter != NULL; parameter = parameter->next) {
-		environment_push(parameter);
-	}
-
-	type_t *orig_type;
-	type_t *type;
-
 	if(token.type != '{') {
 		parse_error_expected("while parsing function definition", '{', 0);
 		eat_statement();
-		goto end_of_parse_external_declaration;
+		return;
 	}
 
-	orig_type = declaration->type;
+	type_t *orig_type = ndeclaration->type;
 	if(orig_type == NULL) {
 		eat_block();
-		goto end_of_parse_external_declaration;
+		return;
 	}
 
-	type = skip_typeref(orig_type);
-
+	type_t *type = skip_typeref(orig_type);
 	if(type->type != TYPE_FUNCTION) {
 		parser_print_error_prefix();
 		fprintf(stderr, "declarator '");
-		print_type_ext(orig_type, declaration->symbol, NULL);
+		print_type_ext(orig_type, ndeclaration->symbol, NULL);
 		fprintf(stderr, "' has a body but is not a function type.\n");
 		eat_block();
-		goto end_of_parse_external_declaration;
+		return;
 	}
 
 	/* § 6.7.5.3 (14) a function definition with () means no
@@ -2676,17 +2656,32 @@ static void parse_external_declaration(void)
 		if(type != duplicate) {
 			obstack_free(type_obst, duplicate);
 		}
-		declaration->type = type;
+		ndeclaration->type = type;
+	}
+
+	declaration_t *declaration = record_declaration(ndeclaration);
+	if(ndeclaration != declaration) {
+		memcpy(&declaration->context, &ndeclaration->context,
+				sizeof(declaration->context));
+	}
+	type = skip_typeref(declaration->type);
+
+	/* push function parameters and switch context */
+	int         top          = environment_top();
+	context_t  *last_context = context;
+	set_context(&declaration->context);
+
+	declaration_t *parameter = declaration->context.declarations;
+	for( ; parameter != NULL; parameter = parameter->next) {
+		environment_push(parameter);
 	}
 
 	if(declaration->init.statement != NULL) {
 		parser_error_multiple_definition(declaration, token.source_position);
 		eat_block();
 		goto end_of_parse_external_declaration;
-	}
-
-	/* parse function body */
-	{
+	} else {
+		/* parse function body */
 		int            label_stack_top      = label_top();
 		declaration_t *old_current_function = current_function;
 		current_function                    = declaration;

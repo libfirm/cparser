@@ -1,4 +1,4 @@
-void bi_windup(void);
+void bi_windup(int k);
 
 void bi_windup();
 
