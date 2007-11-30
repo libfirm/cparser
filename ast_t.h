@@ -32,6 +32,7 @@ typedef enum {
 	EXPR_PRETTY_FUNCTION,
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_OFFSETOF,
+	EXPR_VA_START,
 	EXPR_VA_ARG,
 	EXPR_STATEMENT
 } expression_type_t;
@@ -182,10 +183,15 @@ struct offsetof_expression_t {
 	designator_t      *designator;
 };
 
+struct va_start_expression_t {
+	expression_base_t  expression;
+	expression_t      *ap;
+	declaration_t     *parameter;
+};
+
 struct va_arg_expression_t {
 	expression_base_t  expression;
-	expression_t      *arg;
-	type_t            *type;
+	expression_t      *ap;
 };
 
 struct conditional_expression_t {
@@ -220,6 +226,7 @@ union expression_t {
 	array_access_expression_t        array_access;
 	sizeof_expression_t              sizeofe;
 	offsetof_expression_t            offsetofe;
+	va_start_expression_t            va_starte;
 	va_arg_expression_t              va_arge;
 	conditional_expression_t         conditional;
 	statement_expression_t           statement;

@@ -496,17 +496,20 @@ bool is_type_arithmetic(const type_t *type)
 	assert(!is_typeref(type));
 
 	if(is_type_integer(type) || is_type_floating(type))
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }
 
 bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->type == TYPE_POINTER)
-		return 1;
+	switch (type->type) {
+		case TYPE_POINTER: return true;
+		case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
+		default:           break;
+	}
 
 	return is_type_arithmetic(type);
 }
@@ -531,11 +534,11 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_ATOMIC:
 	case TYPE_POINTER:
 	case TYPE_ENUM:
+	case TYPE_BUILTIN:
 		return false;
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
-	case TYPE_BUILTIN:
 		panic("is_type_incomplete called without typerefs skipped");
 	case TYPE_INVALID:
 		break;
@@ -672,11 +675,6 @@ type_t *skip_typeref(type_t *type)
 			} else {
 				type = typeof_type->expression->base.datatype;
 			}
-			continue;
-		}
-		case TYPE_BUILTIN: {
-			const builtin_type_t *builtin_type = &type->builtin;
-			type = builtin_type->real_type;
 			continue;
 		}
 		default:

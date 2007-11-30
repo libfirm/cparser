@@ -275,10 +275,19 @@ static void print_conditional(const conditional_expression_t *expression)
 	fputs(")", out);
 }
 
+static void print_va_start(const va_start_expression_t *const expression)
+{
+	fputs("__builtin_va_start(", out);
+	print_expression(expression->ap);
+	fputs(", ", out);
+	fputs(expression->parameter->symbol->string, out);
+	fputs(")", out);
+}
+
 static void print_va_arg(const va_arg_expression_t *expression)
 {
 	fputs("__builtin_va_arg(", out);
-	print_expression(expression->arg);
+	print_expression(expression->ap);
 	fputs(", ", out);
 	print_type(expression->expression.datatype);
 	fputs(")", out);
@@ -346,6 +355,8 @@ void print_expression(const expression_t *expression)
 	case EXPR_CONDITIONAL:
 		print_conditional(&expression->conditional);
 		break;
+	case EXPR_VA_START:
+		print_va_start(&expression->va_starte);
 	case EXPR_VA_ARG:
 		print_va_arg(&expression->va_arge);
 		break;

@@ -55,6 +55,7 @@ static type_t         *type_char        = NULL;
 static type_t         *type_string      = NULL;
 static type_t         *type_void        = NULL;
 static type_t         *type_void_ptr    = NULL;
+static type_t         *type_valist      = NULL;
 
 type_t *type_size_t      = NULL;
 type_t *type_ptrdiff_t   = NULL;
@@ -96,22 +97,23 @@ static declaration_t *record_declaration(declaration_t *declaration);
 #define IMAGINARY_SPECIFIERS
 #endif
 
-#define TYPE_SPECIFIERS     \
-	case T_void:            \
-	case T_char:            \
-	case T_short:           \
-	case T_int:             \
-	case T_long:            \
-	case T_float:           \
-	case T_double:          \
-	case T_signed:          \
-	case T_unsigned:        \
-	case T__Bool:           \
-	case T_struct:          \
-	case T_union:           \
-	case T_enum:            \
-	case T___typeof__:      \
-	COMPLEX_SPECIFIERS      \
+#define TYPE_SPECIFIERS       \
+	case T_void:              \
+	case T_char:              \
+	case T_short:             \
+	case T_int:               \
+	case T_long:              \
+	case T_float:             \
+	case T_double:            \
+	case T_signed:            \
+	case T_unsigned:          \
+	case T__Bool:             \
+	case T_struct:            \
+	case T_union:             \
+	case T_enum:              \
+	case T___typeof__:        \
+	case T___builtin_va_list: \
+	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
 #define DECLARATION_START   \
@@ -185,6 +187,7 @@ static size_t get_expression_struct_size(expression_type_t type)
 		[EXPR_PRETTY_FUNCTION]     = sizeof(string_literal_expression_t),
 		[EXPR_BUILTIN_SYMBOL]      = sizeof(builtin_symbol_expression_t),
 		[EXPR_OFFSETOF]            = sizeof(offsetof_expression_t),
+		[EXPR_VA_START]            = sizeof(va_start_expression_t),
 		[EXPR_VA_ARG]              = sizeof(va_arg_expression_t),
 		[EXPR_STATEMENT]           = sizeof(statement_expression_t)
 	};
@@ -445,7 +448,7 @@ static void eat_statement(void)
 	eat(';');
 }
 
-static void eat_brace(void)
+static void eat_paren(void)
 {
 	if(token.type == '(')
 		next_token();
@@ -457,7 +460,7 @@ static void eat_brace(void)
 			return;
 		}
 		if(token.type == '(') {
-			eat_brace();
+			eat_paren();
 			continue;
 		}
 		if(token.type == '{') {
@@ -1021,7 +1024,7 @@ static void parse_attributes(void)
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
 				                     T_STRING_LITERAL);
-				eat_brace();
+				eat_paren();
 				break;
 			} else {
 				parse_string_literals();
@@ -1610,14 +1613,19 @@ typedef enum {
 #endif
 } specifiers_t;
 
-static type_t *create_builtin_type(symbol_t *symbol)
+static type_t *create_builtin_type(symbol_t *const symbol,
+                                   type_t *const real_type)
 {
 	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
 	type->builtin.symbol    = symbol;
-	/* TODO... */
-	type->builtin.real_type = type_int;
+	type->builtin.real_type = real_type;
 
-	return type;
+	type_t *result = typehash_insert(type);
+	if (type != result) {
+		free_type(type);
+	}
+
+	return result;
 }
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -1760,7 +1768,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			type = parse_typeof();
 			break;
 		case T___builtin_va_list:
-			type = create_builtin_type(token.v.symbol);
+			type = duplicate_type(type_valist);
 			next_token();
 			break;
 
@@ -2837,7 +2845,7 @@ struct expression_parser_function_t {
 
 expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
-static expression_t *make_invalid_expression(void)
+static expression_t *create_invalid_expression(void)
 {
 	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
 	expression->base.source_position = token.source_position;
@@ -2853,7 +2861,7 @@ static expression_t *expected_expression_error(void)
 
 	next_token();
 
-	return make_invalid_expression();
+	return create_invalid_expression();
 }
 
 static expression_t *parse_string_const(void)
@@ -2962,6 +2970,8 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 		return make_function_1_type(type_float, type_string);
 	case T___builtin_nand:
 		return make_function_1_type(type_long_double, type_string);
+	case T___builtin_va_end:
+		return make_function_1_type(type_void, type_valist);
 	default:
 		panic("not implemented builtin symbol found");
 	}
@@ -3211,7 +3221,7 @@ static designator_t *parse_designator(void)
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
 		                     T_IDENTIFIER, 0);
-		eat_brace();
+		eat_paren();
 		return NULL;
 	}
 	result->symbol = token.v.symbol;
@@ -3224,7 +3234,7 @@ static designator_t *parse_designator(void)
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
 				                     T_IDENTIFIER, 0);
-				eat_brace();
+				eat_paren();
 				return NULL;
 			}
 			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
@@ -3240,7 +3250,7 @@ static designator_t *parse_designator(void)
 			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
 			designator->array_access = parse_expression();
 			if(designator->array_access == NULL) {
-				eat_brace();
+				eat_paren();
 				return NULL;
 			}
 			expect(']');
@@ -3271,6 +3281,38 @@ static expression_t *parse_offsetof(void)
 	return expression;
 }
 
+static expression_t *parse_va_start(void)
+{
+	eat(T___builtin_va_start);
+
+	expression_t *expression = allocate_expression_zero(EXPR_VA_START);
+
+	expect('(');
+	expression->va_starte.ap = parse_assignment_expression();
+	expect(',');
+	if (token.type != T_IDENTIFIER) {
+		parse_error_expected("while parsing va_start", T_IDENTIFIER, 0);
+		eat_paren();
+		return create_invalid_expression();
+	}
+	expression_t *const expr = parse_reference();
+	if (expr->type == EXPR_INVALID) {
+		return create_invalid_expression();
+	}
+	assert(expr->type == EXPR_REFERENCE);
+	declaration_t *const decl = expr->reference.declaration;
+	if (decl->parent_context != &current_function->context ||
+	    decl->next != NULL) {
+		parser_print_error_prefix_pos(decl->source_position);
+		fprintf(stderr, "second argument of 'va_start' must be last parameter "
+		                "of the current function\n");
+	}
+	expression->va_starte.parameter = decl;
+	expect(')');
+
+	return expression;
+}
+
 static expression_t *parse_va_arg(void)
 {
 	eat(T___builtin_va_arg);
@@ -3278,7 +3320,7 @@ static expression_t *parse_va_arg(void)
 	expression_t *expression = allocate_expression_zero(EXPR_VA_ARG);
 
 	expect('(');
-	expression->va_arge.arg = parse_assignment_expression();
+	expression->va_arge.ap = parse_assignment_expression();
 	expect(',');
 	expression->base.datatype = parse_typename();
 	expect(')');
@@ -3322,12 +3364,13 @@ static expression_t *parse_primary_expression(void)
 		return parse_pretty_function_keyword();
 	case T___builtin_offsetof:
 		return parse_offsetof();
+	case T___builtin_va_start:
+		return parse_va_start();
 	case T___builtin_va_arg:
 		return parse_va_arg();
 	case T___builtin_nanf:
 	case T___builtin_alloca:
 	case T___builtin_expect:
-	case T___builtin_va_start:
 	case T___builtin_va_end:
 		return parse_builtin_symbol();
 
@@ -3341,7 +3384,7 @@ static expression_t *parse_primary_expression(void)
 	fprintf(stderr, "\n");
 	eat_statement();
 
-	return make_invalid_expression();
+	return create_invalid_expression();
 }
 
 static expression_t *parse_array_expression(unsigned precedence,
@@ -3448,7 +3491,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	type_t *orig_type = compound->base.datatype;
 	if(orig_type == NULL)
-		return make_invalid_expression();
+		return create_invalid_expression();
 
 	type_t *type = skip_typeref(orig_type);
 
@@ -3459,7 +3502,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 			fprintf(stderr, "left hand side of '->' is not a pointer, but ");
 			print_type_quoted(orig_type);
 			fputc('\n', stderr);
-			return make_invalid_expression();
+			return create_invalid_expression();
 		}
 		pointer_type_t *pointer_type = &type->pointer;
 		type_left                    = pointer_type->points_to;
@@ -3473,7 +3516,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		        "union, but ", symbol->string);
 		print_type_quoted(type_left);
 		fputc('\n', stderr);
-		return make_invalid_expression();
+		return create_invalid_expression();
 	}
 
 	compound_type_t *compound_type = &type_left->compound;
@@ -3485,7 +3528,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		        symbol->string);
 		print_type_quoted(type_left);
 		fputc('\n', stderr);
-		return make_invalid_expression();
+		return create_invalid_expression();
 	}
 
 	declaration_t *iter = declaration->context.declarations;
@@ -3498,7 +3541,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		parser_print_error_prefix();
 		print_type_quoted(type_left);
 		fprintf(stderr, " has no member named '%s'\n", symbol->string);
-		return make_invalid_expression();
+		return create_invalid_expression();
 	}
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
@@ -5103,6 +5146,9 @@ void init_parser(void)
 	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
 	type_void_ptr    = make_pointer_type(type_void, TYPE_QUALIFIER_NONE);
 	type_string      = make_pointer_type(type_char, TYPE_QUALIFIER_NONE);
+
+	symbol_t *const va_list_sym = symbol_table_insert("__builtin_va_list");
+	type_valist = create_builtin_type(va_list_sym, type_void_ptr);
 }
 
 void exit_parser(void)

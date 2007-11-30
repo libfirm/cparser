@@ -227,6 +227,7 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_ARRAY:
 		return get_array_type_size(&type->array);
 	case TYPE_BUILTIN:
+		return get_type_size(type->builtin.real_type);
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 	case TYPE_INVALID:
@@ -508,6 +509,8 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_enum_type(&type->enumt);
 		break;
 	case TYPE_BUILTIN:
+		firm_type = get_ir_type(type->builtin.real_type);
+		break;
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 	case TYPE_INVALID:
@@ -859,6 +862,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
 	}
+	case T___builtin_va_end:
+		return NULL;
 	default:
 		panic("Unsupported builtin found\n");
 	}
@@ -1708,6 +1713,42 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	return compound_statement_to_firm((compound_statement_t*) statement);
 }
 
+static ir_node *va_start_expression_to_firm(
+	const va_start_expression_t *const expr)
+{
+	ir_type   *const method_type = get_ir_type(current_function_decl->type);
+	int        const n           = get_method_n_params(method_type) - 1;
+	ir_entity *const parm_ent    = get_method_value_param_ent(method_type, n);
+	ir_node   *const arg_base    = get_irg_value_param_base(current_ir_graph);
+	dbg_info  *const dbgi        =
+		get_dbg_info(&expr->expression.source_position);
+	ir_node   *const no_mem      = new_NoMem();
+	ir_node   *const arg_sel     =
+		new_d_simpleSel(dbgi, no_mem, arg_base, parm_ent);
+
+	size_t     const parm_size   = get_type_size(expr->parameter->type);
+	ir_node   *const cnst        = new_Const_long(mode_Iu, parm_size);
+	ir_node   *const add         = new_d_Add(dbgi, arg_sel, cnst, mode_P_data);
+	set_value_for_expression(expr->ap, add);
+
+	return NULL;
+}
+
+static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
+{
+	ir_type  *const irtype = get_ir_type(expr->expression.datatype);
+	ir_node  *const ap     = expression_to_firm(expr->ap);
+	dbg_info *const dbgi   = get_dbg_info(&expr->expression.source_position);
+	ir_node  *const res    = deref_address(irtype, ap, dbgi);
+
+	size_t     const parm_size   = get_type_size(expr->expression.datatype);
+	ir_node   *const cnst        = new_Const_long(mode_Iu, parm_size);
+	ir_node   *const add         = new_d_Add(dbgi, ap, cnst, mode_P_data);
+	set_value_for_expression(expr->ap, add);
+
+	return res;
+}
+
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->type == UNEXPR_DEREFERENCE);
@@ -1770,8 +1811,11 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return function_name_to_firm(&expression->string);
 	case EXPR_STATEMENT:
 		return statement_expression_to_firm(&expression->statement);
-	case EXPR_OFFSETOF:
+	case EXPR_VA_START:
+		return va_start_expression_to_firm(&expression->va_starte);
 	case EXPR_VA_ARG:
+		return va_arg_expression_to_firm(&expression->va_arge);
+	case EXPR_OFFSETOF:
 	case EXPR_BUILTIN_SYMBOL:
 		panic("unimplemented expression found");
 
