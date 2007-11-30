@@ -144,7 +144,7 @@ typedef enum {
 	case EXPR_UNARY_CAST_IMPLICIT:
 
 struct context_t {
-	declaration_t   *declarations;
+	declaration_t *declarations;
 };
 
 struct expression_base_t {

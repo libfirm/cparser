@@ -74,6 +74,8 @@ static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract);
 static declaration_t *record_declaration(declaration_t *declaration);
 
+static void semantic_comparison(binary_expression_t *expression);
+
 #define STORAGE_CLASSES     \
 	case T_typedef:         \
 	case T_extern:          \
@@ -1129,11 +1131,13 @@ static initializer_t *initializer_from_expression(type_t *type,
 							expression->string.value);
 					}
 
-				case EXPR_WIDE_STRING_LITERAL:
-					if (get_unqualified_type(element_type) == skip_typeref(type_wchar_t)) {
+				case EXPR_WIDE_STRING_LITERAL: {
+					type_t *bare_wchar_type = skip_typeref(type_wchar_t);
+					if (get_unqualified_type(element_type) == bare_wchar_type) {
 						return initializer_from_wide_string(array_type,
 							&expression->wide_string.value);
 					}
+				}
 
 				default: break;
 			}
@@ -3358,7 +3362,9 @@ static expression_t *parse_compare_builtin(void)
 		break;
 	default:
 		panic("invalid compare builtin found");
+		break;
 	}
+	next_token();
 
 	expect('(');
 	expression->binary.left = parse_assignment_expression();
@@ -3366,7 +3372,19 @@ static expression_t *parse_compare_builtin(void)
 	expression->binary.right = parse_assignment_expression();
 	expect(')');
 
-	/* TODO: semantic */
+	type_t *orig_type_left  = expression->binary.left->base.datatype;
+	type_t *orig_type_right = expression->binary.right->base.datatype;
+	if(orig_type_left == NULL || orig_type_right == NULL)
+		return expression;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
+	if(!is_type_floating(type_left) && !is_type_floating(type_right)) {
+		type_error_incompatible("invalid operands in comparison",
+		                        token.source_position, type_left, type_right);
+	} else {
+		semantic_comparison(&expression->binary);
+	}
 
 	return expression;
 }

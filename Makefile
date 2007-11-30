@@ -15,6 +15,8 @@ CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pe
 CFLAGS += -O0 -g3
 ICC_CFLAGS = -O0 -g3 -std=c99 -Wall -Werror
 #CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
+ICC    ?= true
+GCCO1  ?= true
 
 LFLAGS = $(FIRM_LIBS)
 
@@ -67,7 +69,8 @@ build/adt:
 
 build/%.o: %.c
 	@echo '===> CC $<'
-#	$(Q)icc $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+	$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:

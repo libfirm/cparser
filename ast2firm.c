@@ -1125,15 +1125,22 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	panic("invalid UNEXPR type found");
 }
 
-static long get_pnc(expression_type_t type)
+static long get_pnc(const expression_type_t type)
 {
 	switch(type) {
-	case EXPR_BINARY_EQUAL:        return pn_Cmp_Eq;
-	case EXPR_BINARY_NOTEQUAL:     return pn_Cmp_Lg;
-	case EXPR_BINARY_LESS:         return pn_Cmp_Lt;
-	case EXPR_BINARY_LESSEQUAL:    return pn_Cmp_Le;
-	case EXPR_BINARY_GREATER:      return pn_Cmp_Gt;
-	case EXPR_BINARY_GREATEREQUAL: return pn_Cmp_Ge;
+	case EXPR_BINARY_EQUAL:         return pn_Cmp_Eq;
+	case EXPR_BINARY_ISLESSGREATER: return pn_Cmp_Lg;
+	case EXPR_BINARY_NOTEQUAL:      return pn_Cmp_Ne;
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_LESS:          return pn_Cmp_Lt;
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_LESSEQUAL:     return pn_Cmp_Le;
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_GREATER:       return pn_Cmp_Gt;
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_GREATEREQUAL:  return pn_Cmp_Ge;
+	case EXPR_BINARY_ISUNORDERED:   return pn_Cmp_Uo;
+
 	default:
 		break;
 	}
@@ -1408,7 +1415,13 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_LESS:
 	case EXPR_BINARY_LESSEQUAL:
 	case EXPR_BINARY_GREATER:
-	case EXPR_BINARY_GREATEREQUAL: {
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED: {
 		dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 		ir_node *left  = expression_to_firm(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
