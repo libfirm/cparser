@@ -1088,7 +1088,9 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	}
 	case UNEXPR_DEREFERENCE: {
 		ir_type *irtype = get_ir_type(type);
-		return deref_address(irtype, value_node, dbgi);
+		assert(is_Pointer_type(irtype));
+		ir_type *points_to = get_pointer_points_to_type(irtype);
+		return deref_address(points_to, value_node, dbgi);
 	}
 	case UNEXPR_POSTFIX_INCREMENT:
 	case UNEXPR_POSTFIX_DECREMENT:
