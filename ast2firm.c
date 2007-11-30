@@ -961,6 +961,25 @@ static void create_condition_evaluation(const expression_t *expression,
                                         ir_node *true_block,
                                         ir_node *false_block);
 
+static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
+                         ir_node *value)
+{
+	value = do_strict_conv(dbgi, value);
+
+	ir_node  *memory = get_store();
+
+	if(is_type_scalar(type)) {
+		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
+		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+		set_store(store_mem);
+	} else {
+		ir_type *irtype    = get_ir_type(type);
+		ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, value, irtype);
+		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+		set_store(copyb_mem);
+	}
+}
+
 static void set_value_for_expression(const expression_t *expression,
                                      ir_node *value)
 {
@@ -978,20 +997,9 @@ static void set_value_for_expression(const expression_t *expression,
 		}
 	}
 
-	ir_node  *addr   = expression_to_addr(expression);
-	ir_node  *memory = get_store();
-
-	type_t *type = skip_typeref(expression->base.datatype);
-	if(is_type_scalar(type)) {
-		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
-		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-		set_store(store_mem);
-	} else {
-		ir_type *irtype    = get_ir_type(type);
-		ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, value, irtype);
-		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
-		set_store(copyb_mem);
-	}
+	ir_node *addr = expression_to_addr(expression);
+	type_t  *type = skip_typeref(expression->base.datatype);
+	assign_value(dbgi, addr, type, value);
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -2368,14 +2376,12 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	ir_node       *frame       = get_irg_frame(current_ir_graph);
 	ir_node       *addr        = new_d_simpleSel(dbgi, nomem, frame, entity);
 
-	if(is_atomic_entity(entity)) {
-		assert(initializer->type == INITIALIZER_VALUE);
+	if(initializer->type == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
-		ir_node *value     = expression_to_firm(initializer_value->value);
-		ir_node *store     = new_d_Store(dbgi, memory, addr, value);
-		ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-		set_store(store_mem);
+		ir_node *value = expression_to_firm(initializer_value->value);
+		type_t  *type  = skip_typeref(declaration->type);
+		assign_value(dbgi, addr, type, value);
 		return;
 	}
 

@@ -1118,7 +1118,8 @@ static initializer_t *initializer_from_expression(type_t *type,
 		}
 	}
 
-	if(is_type_scalar(type)) {
+	type_t *expression_type = skip_typeref(expression->base.datatype);
+	if(is_type_scalar(type) || types_compatible(type, expression_type)) {
 		semantic_assign(type, &expression, "initializer");
 
 		initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
@@ -1312,8 +1313,19 @@ static initializer_t *parse_initializer(type_t *type)
 	type = skip_typeref(type);
 
 	if(token.type != '{') {
-		expression_t *expression = parse_assignment_expression();
-		return initializer_from_expression(type, expression);
+		expression_t  *expression  = parse_assignment_expression();
+		initializer_t *initializer = initializer_from_expression(type, expression);
+		if(initializer == NULL) {
+			parser_print_error_prefix();
+			fprintf(stderr, "initializer expression '");
+			print_expression(expression);
+			fprintf(stderr, "', type ");
+			print_type_quoted(expression->base.datatype);
+			fprintf(stderr, " is incompatible with type ");
+			print_type_quoted(type);
+			fprintf(stderr, "\n");
+		}
+		return initializer;
 	}
 
 	if(is_type_scalar(type)) {
