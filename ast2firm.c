@@ -827,7 +827,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	builtin_symbol_expression_t *builtin = &call->function->builtin_symbol;
 
 	type_t *type = skip_typeref(builtin->expression.datatype);
-	assert(type->type == TYPE_POINTER);
+	assert(is_type_pointer(type));
 
 	type_t   *function_type = skip_typeref(type->pointer.points_to);
 	symbol_t *symbol        = builtin->symbol;
@@ -853,7 +853,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case T___builtin_nanf:
 	case T___builtin_nand: {
 		/* Ignore string for now... */
-		assert(function_type->type == TYPE_FUNCTION);
+		assert(is_type_function(function_type));
 		ir_mode *mode = get_ir_mode(function_type->function.return_type);
 		tarval  *tv   = get_mode_NAN(mode);
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
@@ -874,11 +874,12 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	}
 	ir_node *callee = expression_to_firm(function);
 
-	type_t *type = function->base.datatype;
-	assert(type->type == TYPE_POINTER);
-	pointer_type_t *const ptr_type = &type->pointer;
-	assert(ptr_type->points_to->type == TYPE_FUNCTION);
-	function_type_t *function_type = &ptr_type->points_to->function;
+	type_t *type = skip_typeref(function->base.datatype);
+	assert(is_type_pointer(type));
+	pointer_type_t *pointer_type = &type->pointer;
+	type_t         *points_to    = skip_typeref(pointer_type->points_to);
+	assert(is_type_function(points_to));
+	function_type_t *function_type = &points_to->function;
 
 	int              n_parameters = 0;
 	call_argument_t *argument     = call->arguments;
@@ -1013,14 +1014,14 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 static ir_node *create_incdec(const unary_expression_t *expression)
 {
 	dbg_info     *dbgi  = get_dbg_info(&expression->expression.source_position);
-	type_t       *type  = expression->expression.datatype;
+	type_t       *type  = skip_typeref(expression->expression.datatype);
 	ir_mode      *mode  = get_ir_mode(type);
 	expression_t *value = expression->value;
 
 	ir_node *value_node = expression_to_firm(value);
 
 	ir_node *offset;
-	if(type->type == TYPE_POINTER) {
+	if(is_type_pointer(type)) {
 		pointer_type_t *pointer_type = &type->pointer;
 		unsigned        elem_size    = get_type_size(pointer_type->points_to);
 		offset = new_Const_long(mode_Is, elem_size);
@@ -1202,10 +1203,10 @@ static ir_node *create_arithmetic_assign_binop(
 		const binary_expression_t *expression, create_arithmetic_func func)
 {
 	dbg_info *const dbgi = get_dbg_info(&expression->expression.source_position);
-	type_t   *const type = expression->expression.datatype;
+	type_t   *const type = skip_typeref(expression->expression.datatype);
 	ir_node  *value;
 
-	if (type->type == TYPE_POINTER) {
+	if (is_type_pointer(type)) {
 		ir_node        *const pointer = expression_to_firm(expression->left);
 		ir_node        *      integer = expression_to_firm(expression->right);
 		value = pointer_arithmetic(pointer, integer, type, dbgi, func);
@@ -1237,10 +1238,10 @@ static ir_node *create_add(const binary_expression_t *expression)
 		return new_d_Add(dbgi, left, right, mode);
 	}
 
-	if (type_left->type == TYPE_POINTER || type_left->type == TYPE_ARRAY) {
+	if (is_type_pointer(type_left)) {
 		return pointer_arithmetic(left, right, type, dbgi, new_d_Add);
 	} else {
-		assert(type_right->type == TYPE_POINTER || type_right->type == TYPE_ARRAY);
+		assert(is_type_pointer(type_right));
 		return pointer_arithmetic(right, left, type, dbgi, new_d_Add);
 	}
 }
@@ -1259,8 +1260,7 @@ static ir_node *create_sub(const binary_expression_t *expression)
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		ir_mode *const mode = get_ir_mode(type);
 		return new_d_Sub(dbgi, left, right, mode);
-	} else if (type_left->type == TYPE_POINTER
-			&& type_right->type == TYPE_POINTER) {
+	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		const pointer_type_t *const ptr_type = &type_left->pointer;
 		const unsigned elem_size             = get_type_size(ptr_type->points_to);
 		ir_mode *const mode   = get_ir_mode(type);
@@ -1272,7 +1272,7 @@ static ir_node *create_sub(const binary_expression_t *expression)
 		return new_d_Proj(dbgi, div, mode, pn_Div_res);
 	}
 
-	assert(type_left->type == TYPE_POINTER);
+	assert(is_type_pointer(type_left));
 	return pointer_arithmetic(left, right, type_left, dbgi, new_d_Sub);
 }
 
@@ -2334,7 +2334,7 @@ static void create_initializer_string(initializer_string_t *initializer,
 static void create_initializer_object(initializer_t *initializer, type_t *type,
 		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
 {
-	if(type->type == TYPE_ARRAY) {
+	if(is_type_array(type)) {
 		array_type_t *array_type = &type->array;
 
 		if(initializer->type == INITIALIZER_STRING) {
@@ -2349,8 +2349,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		assert(initializer->type == INITIALIZER_LIST);
 		initializer_list_t *list = &initializer->list;
 
-		assert(type->type == TYPE_COMPOUND_STRUCT
-				|| type->type == TYPE_COMPOUND_UNION);
+		assert(is_type_compound(type));
 		compound_type_t *compound_type = &type->compound;
 		create_initializer_compound(list, compound_type, entity, entry, len);
 	}
@@ -2450,9 +2449,7 @@ static void create_local_variable(declaration_t *declaration)
 	bool needs_entity = declaration->address_taken;
 	type_t *type = skip_typeref(declaration->type);
 
-	if(type->type == TYPE_ARRAY
-			|| type->type == TYPE_COMPOUND_STRUCT
-			|| type->type == TYPE_COMPOUND_UNION) {
+	if(is_type_array(type) || is_type_compound(type)) {
 		needs_entity = true;
 	}
 
@@ -2500,9 +2497,9 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	declaration_t *declaration = statement->declarations_begin;
 	declaration_t *end         = statement->declarations_end->next;
 	for( ; declaration != end; declaration = declaration->next) {
-		type_t *type = declaration->type;
+		type_t *type = skip_typeref(declaration->type);
 
-		switch ((storage_class_tag_t)declaration->storage_class) {
+		switch ((storage_class_tag_t) declaration->storage_class) {
 		case STORAGE_CLASS_TYPEDEF:
 			continue;
 		case STORAGE_CLASS_STATIC:
@@ -2515,7 +2512,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 		case STORAGE_CLASS_NONE:
 		case STORAGE_CLASS_AUTO:
 		case STORAGE_CLASS_REGISTER:
-			if(type->type == TYPE_FUNCTION) {
+			if(is_type_function(type)) {
 				panic("nested functions not supported yet");
 			} else {
 				create_local_variable(declaration);
@@ -2865,8 +2862,8 @@ static void initialize_function_parameters(declaration_t *declaration)
 		type_t *type = skip_typeref(parameter->type);
 
 		bool needs_entity = parameter->address_taken;
-		if(type->type == TYPE_COMPOUND_STRUCT
-				|| type->type == TYPE_COMPOUND_UNION) {
+		assert(!is_type_array(type));
+		if(is_type_compound(type)) {
 			needs_entity = true;
 		}
 
@@ -2919,9 +2916,11 @@ static void create_function(declaration_t *declaration)
 
 	/* do we have a return statement yet? */
 	if(get_cur_block() != NULL) {
-		assert(declaration->type->type == TYPE_FUNCTION);
-		const function_type_t* const func_type = &declaration->type->function;
-		const type_t *return_type = skip_typeref(func_type->return_type);
+		type_t *type = skip_typeref(declaration->type);
+		assert(is_type_function(type));
+		const function_type_t *func_type   = &type->function;
+		const type_t          *return_type
+			= skip_typeref(func_type->return_type);
 
 		ir_node *ret;
 		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
@@ -3055,8 +3054,8 @@ static void context_to_firm(context_t *context)
 		if(declaration->symbol == NULL)
 			continue;
 
-		type_t *type = declaration->type;
-		if(type->type == TYPE_FUNCTION) {
+		type_t *type = skip_typeref(declaration->type);
+		if(is_type_function(type)) {
 			get_function_entity(declaration);
 		} else {
 			create_global_variable(declaration);

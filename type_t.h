@@ -181,6 +181,18 @@ static inline bool is_type_pointer(const type_t *type)
 	return type->type == TYPE_POINTER;
 }
 
+static inline bool is_type_array(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->type == TYPE_ARRAY;
+}
+
+static inline bool is_type_function(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->type == TYPE_FUNCTION;
+}
+
 static inline bool is_type_compound(const type_t *type)
 {
 	assert(!is_typeref(type));

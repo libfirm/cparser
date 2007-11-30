@@ -739,6 +739,7 @@ static void label_pop_to(size_t new_top)
 
 static int get_rank(const type_t *type)
 {
+	assert(!is_typeref(type));
 	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
 	 * and esp. footnote 108). However we can't fold constants (yet), so we
 	 * can't decide wether unsigned int is possible, while int always works.
@@ -1098,7 +1099,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 	/* TODO check that expression is a constant expression */
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
-	if(type->type == TYPE_ARRAY && expression->type == EXPR_STRING_LITERAL) {
+	if(is_type_array(type) && expression->type == EXPR_STRING_LITERAL) {
 		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
 
@@ -1190,7 +1191,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	/* descend into subtype */
 	initializer_t  *result = NULL;
 	initializer_t **elems;
-	if(type->type == TYPE_ARRAY) {
+	if(is_type_array(type)) {
 		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
 		element_type               = skip_typeref(element_type);
@@ -1230,8 +1231,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			ARR_APP1(initializer_t*, elems, sub);
 		}
 	} else {
-		assert(type->type == TYPE_COMPOUND_STRUCT
-				|| type->type == TYPE_COMPOUND_UNION);
+		assert(is_type_compound(type));
 		compound_type_t *compound_type = &type->compound;
 		context_t       *context       = &compound_type->declaration->context;
 
@@ -1948,7 +1948,7 @@ static void semantic_parameter(declaration_t *declaration)
 
 	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
 	 * into a pointer. § 6.7.5.3 (7) */
-	if (type->type == TYPE_ARRAY) {
+	if (is_type_array(type)) {
 		const array_type_t *arr_type     = &type->array;
 		type_t             *element_type = arr_type->element_type;
 
@@ -2407,7 +2407,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	/* § 6.7.5 (22)  array intializers for arrays with unknown size determine
 	 * the array type size */
-	if(type != NULL && type->type == TYPE_ARRAY && initializer != NULL) {
+	if(type != NULL && is_type_array(type) && initializer != NULL) {
 		array_type_t *array_type = &type->array;
 
 		if(array_type->size == NULL) {
@@ -2428,7 +2428,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		}
 	}
 
-	if(type != NULL && type->type == TYPE_FUNCTION) {
+	if(type != NULL && is_type_function(type)) {
 		parser_print_error_prefix_pos(declaration->source_position);
 		fprintf(stderr, "initializers not allowed for function types at "
 				"declator '%s' (type ", declaration->symbol->string);
@@ -2536,7 +2536,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 static void parse_kr_declaration_list(declaration_t *declaration)
 {
 	type_t *type = skip_typeref(declaration->type);
-	assert(type->type == TYPE_FUNCTION);
+	assert(is_type_function(type));
 
 	if(!type->function.kr_style_parameters)
 		return;
@@ -2587,6 +2587,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		}
 
 		semantic_parameter(parameter_declaration);
+		parameter_type = parameter_declaration->type;
 
 		function_parameter_t *function_parameter
 			= obstack_alloc(type_obst, sizeof(function_parameter[0]));
@@ -2642,17 +2643,18 @@ static void parse_external_declaration(void)
 		return;
 	}
 
-	type_t *orig_type = ndeclaration->type;
-	if(orig_type == NULL) {
+	type_t *type = ndeclaration->type;
+	if(type == NULL) {
 		eat_block();
 		return;
 	}
 
-	type_t *type = skip_typeref(orig_type);
+	/* note that we don't skip typerefs: the standard doesn't allow them here
+	 * (so we can't use is_type_function here) */
 	if(type->type != TYPE_FUNCTION) {
 		parser_print_error_prefix();
 		fprintf(stderr, "declarator '");
-		print_type_ext(orig_type, ndeclaration->symbol, NULL);
+		print_type_ext(type, ndeclaration->symbol, NULL);
 		fprintf(stderr, "' has a body but is not a function type.\n");
 		eat_block();
 		return;
@@ -2923,12 +2925,13 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 /**
  * performs automatic type cast as described in § 6.3.2.1
  */
-static type_t *automatic_type_conversion(type_t *type)
+static type_t *automatic_type_conversion(type_t *orig_type)
 {
-	if(type == NULL)
+	if(orig_type == NULL)
 		return NULL;
 
-	if(type->type == TYPE_ARRAY) {
+	type_t *type = skip_typeref(orig_type);
+	if(is_type_array(type)) {
 		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
 		unsigned      qualifiers   = array_type->type.qualifiers;
@@ -2936,11 +2939,11 @@ static type_t *automatic_type_conversion(type_t *type)
 		return make_pointer_type(element_type, qualifiers);
 	}
 
-	if(type->type == TYPE_FUNCTION) {
-		return make_pointer_type(type, TYPE_QUALIFIER_NONE);
+	if(is_type_function(type)) {
+		return make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 	}
 
-	return type;
+	return orig_type;
 }
 
 /**
@@ -3481,7 +3484,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 			type = skip_typeref(pointer_type->points_to);
 
-			if (type->type == TYPE_FUNCTION) {
+			if (is_type_function(type)) {
 				function_type             = &type->function;
 				call->expression.datatype = function_type->return_type;
 			}
@@ -3981,10 +3984,9 @@ static void semantic_sub(binary_expression_t *expression)
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = arithmetic_type;
 		return;
-	} else if(type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+	} else if(is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->expression.datatype = type_left;
-	} else if(type_left->type == TYPE_POINTER &&
-			type_right->type == TYPE_POINTER) {
+	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		if(!pointers_compatible(type_left, type_right)) {
 			parser_print_error_prefix();
 			fprintf(stderr, "pointers to incompatible objects to binary - (");
@@ -4024,12 +4026,11 @@ static void semantic_comparison(binary_expression_t *expression)
 		expression->left  = create_implicit_cast(left, arithmetic_type);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = arithmetic_type;
-	} else if (type_left->type  == TYPE_POINTER &&
-	           type_right->type == TYPE_POINTER) {
+	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		/* TODO check compatibility */
-	} else if (type_left->type == TYPE_POINTER) {
+	} else if (is_type_pointer(type_left)) {
 		expression->right = create_implicit_cast(right, type_left);
-	} else if (type_right->type == TYPE_POINTER) {
+	} else if (is_type_pointer(type_right)) {
 		expression->left = create_implicit_cast(left, type_right);
 	} else {
 		type_error_incompatible("invalid operands in comparison",
@@ -4088,7 +4089,7 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 		type_t *const arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = type_left;
-	} else if (type_left->type == TYPE_POINTER && is_type_integer(type_right)) {
+	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->expression.datatype = type_left;
 	} else {
 		parser_print_error_prefix();
@@ -4140,10 +4141,10 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		return;
 
 	type_t *type_left = revert_automatic_type_conversion(left);
-	type_left = skip_typeref(orig_type_left);
+	type_left         = skip_typeref(orig_type_left);
 
 	/* must be a modifiable lvalue */
-	if (type_left->type == TYPE_ARRAY) {
+	if (is_type_array(type_left)) {
 		parser_print_error_prefix();
 		fprintf(stderr, "Cannot assign to arrays ('");
 		print_expression(left);
@@ -4766,7 +4767,7 @@ static statement_t *parse_return(void)
 	statement->statement.type            = STATEMENT_RETURN;
 	statement->statement.source_position = token.source_position;
 
-	assert(current_function->type->type == TYPE_FUNCTION);
+	assert(is_type_function(current_function->type));
 	function_type_t *function_type = &current_function->type->function;
 	type_t          *return_type   = function_type->return_type;
 
