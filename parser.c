@@ -3290,27 +3290,21 @@ static expression_t *parse_va_start(void)
 	expect('(');
 	expression->va_starte.ap = parse_assignment_expression();
 	expect(',');
-	if (token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing va_start", T_IDENTIFIER, 0);
-		eat_paren();
-		return create_invalid_expression();
+	expression_t *const expr = parse_assignment_expression();
+	if (expr->type == EXPR_REFERENCE) {
+		declaration_t *const decl = expr->reference.declaration;
+		if (decl->parent_context == &current_function->context &&
+		    decl->next == NULL) {
+			expression->va_starte.parameter = decl;
+			expect(')');
+			return expression;
+		}
 	}
-	expression_t *const expr = parse_reference();
-	if (expr->type == EXPR_INVALID) {
-		return create_invalid_expression();
-	}
-	assert(expr->type == EXPR_REFERENCE);
-	declaration_t *const decl = expr->reference.declaration;
-	if (decl->parent_context != &current_function->context ||
-	    decl->next != NULL) {
-		parser_print_error_prefix_pos(decl->source_position);
-		fprintf(stderr, "second argument of 'va_start' must be last parameter "
-		                "of the current function\n");
-	}
-	expression->va_starte.parameter = decl;
-	expect(')');
+	parser_print_error_prefix_pos(expr->base.source_position);
+	fprintf(stderr, "second argument of 'va_start' must be last parameter "
+	                "of the current function\n");
 
-	return expression;
+	return create_invalid_expression();
 }
 
 static expression_t *parse_va_arg(void)
