@@ -143,39 +143,39 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	fprintf(out, "(");
 	print_expression(binexpr->left);
 	fprintf(out, " ");
-	switch(binexpr->type) {
-	case BINEXPR_INVALID:	         fputs("INVOP", out); break;
-	case BINEXPR_COMMA:              fputs(",", out);     break;
-	case BINEXPR_ASSIGN:             fputs("=", out);     break;
-	case BINEXPR_ADD:                fputs("+", out);     break;
-	case BINEXPR_SUB:                fputs("-", out);     break;
-	case BINEXPR_MUL:                fputs("*", out);     break;
-	case BINEXPR_MOD:                fputs("%", out);     break;
-	case BINEXPR_DIV:                fputs("/", out);     break;
-	case BINEXPR_BITWISE_OR:         fputs("|", out);     break;
-	case BINEXPR_BITWISE_AND:        fputs("&", out);     break;
-	case BINEXPR_BITWISE_XOR:        fputs("^", out);     break;
-	case BINEXPR_LOGICAL_OR:         fputs("||", out);    break;
-	case BINEXPR_LOGICAL_AND:        fputs("&&", out);    break;
-	case BINEXPR_NOTEQUAL:           fputs("!=", out);    break;
-	case BINEXPR_EQUAL:              fputs("==", out);    break;
-	case BINEXPR_LESS:               fputs("<", out);     break;
-	case BINEXPR_LESSEQUAL:          fputs("<=", out);    break;
-	case BINEXPR_GREATER:            fputs(">", out);     break;
-	case BINEXPR_GREATEREQUAL:       fputs(">=", out);    break;
-	case BINEXPR_SHIFTLEFT:          fputs("<<", out);    break;
-	case BINEXPR_SHIFTRIGHT:         fputs(">>", out);    break;
+	switch(binexpr->expression.type) {
+	case EXPR_BINARY_COMMA:              fputs(",", out);     break;
+	case EXPR_BINARY_ASSIGN:             fputs("=", out);     break;
+	case EXPR_BINARY_ADD:                fputs("+", out);     break;
+	case EXPR_BINARY_SUB:                fputs("-", out);     break;
+	case EXPR_BINARY_MUL:                fputs("*", out);     break;
+	case EXPR_BINARY_MOD:                fputs("%", out);     break;
+	case EXPR_BINARY_DIV:                fputs("/", out);     break;
+	case EXPR_BINARY_BITWISE_OR:         fputs("|", out);     break;
+	case EXPR_BINARY_BITWISE_AND:        fputs("&", out);     break;
+	case EXPR_BINARY_BITWISE_XOR:        fputs("^", out);     break;
+	case EXPR_BINARY_LOGICAL_OR:         fputs("||", out);    break;
+	case EXPR_BINARY_LOGICAL_AND:        fputs("&&", out);    break;
+	case EXPR_BINARY_NOTEQUAL:           fputs("!=", out);    break;
+	case EXPR_BINARY_EQUAL:              fputs("==", out);    break;
+	case EXPR_BINARY_LESS:               fputs("<", out);     break;
+	case EXPR_BINARY_LESSEQUAL:          fputs("<=", out);    break;
+	case EXPR_BINARY_GREATER:            fputs(">", out);     break;
+	case EXPR_BINARY_GREATEREQUAL:       fputs(">=", out);    break;
+	case EXPR_BINARY_SHIFTLEFT:          fputs("<<", out);    break;
+	case EXPR_BINARY_SHIFTRIGHT:         fputs(">>", out);    break;
 
-	case BINEXPR_ADD_ASSIGN:         fputs("+=", out);    break;
-	case BINEXPR_SUB_ASSIGN:         fputs("-=", out);    break;
-	case BINEXPR_MUL_ASSIGN:         fputs("*=", out);    break;
-	case BINEXPR_MOD_ASSIGN:         fputs("%=", out);    break;
-	case BINEXPR_DIV_ASSIGN:         fputs("/=", out);    break;
-	case BINEXPR_BITWISE_OR_ASSIGN:  fputs("|=", out);    break;
-	case BINEXPR_BITWISE_AND_ASSIGN: fputs("&=", out);    break;
-	case BINEXPR_BITWISE_XOR_ASSIGN: fputs("^=", out);    break;
-	case BINEXPR_SHIFTLEFT_ASSIGN:   fputs("<<=", out);   break;
-	case BINEXPR_SHIFTRIGHT_ASSIGN:  fputs(">>=", out);   break;
+	case EXPR_BINARY_ADD_ASSIGN:         fputs("+=", out);    break;
+	case EXPR_BINARY_SUB_ASSIGN:         fputs("-=", out);    break;
+	case EXPR_BINARY_MUL_ASSIGN:         fputs("*=", out);    break;
+	case EXPR_BINARY_MOD_ASSIGN:         fputs("%=", out);    break;
+	case EXPR_BINARY_DIV_ASSIGN:         fputs("/=", out);    break;
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:  fputs("|=", out);    break;
+	case EXPR_BINARY_BITWISE_AND_ASSIGN: fputs("&=", out);    break;
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN: fputs("^=", out);    break;
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:   fputs("<<=", out);   break;
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  fputs(">>=", out);   break;
+	default: panic("invalid binexpression found");
 	}
 	fprintf(out, " ");
 	print_expression(binexpr->right);
@@ -184,39 +184,38 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
-	switch(unexpr->type) {
-	case UNEXPR_NEGATE:           fputs("-", out);  break;
-	case UNEXPR_PLUS:             fputs("+", out);  break;
-	case UNEXPR_NOT:              fputs("!", out);  break;
-	case UNEXPR_BITWISE_NEGATE:   fputs("~", out);  break;
-	case UNEXPR_PREFIX_INCREMENT: fputs("++", out); break;
-	case UNEXPR_PREFIX_DECREMENT: fputs("--", out); break;
-	case UNEXPR_DEREFERENCE:      fputs("*", out);  break;
-	case UNEXPR_TAKE_ADDRESS:     fputs("&", out);  break;
+	switch(unexpr->expression.type) {
+	case EXPR_UNARY_NEGATE:           fputs("-", out);  break;
+	case EXPR_UNARY_PLUS:             fputs("+", out);  break;
+	case EXPR_UNARY_NOT:              fputs("!", out);  break;
+	case EXPR_UNARY_BITWISE_NEGATE:   fputs("~", out);  break;
+	case EXPR_UNARY_PREFIX_INCREMENT: fputs("++", out); break;
+	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--", out); break;
+	case EXPR_UNARY_DEREFERENCE:      fputs("*", out);  break;
+	case EXPR_UNARY_TAKE_ADDRESS:     fputs("&", out);  break;
 
-	case UNEXPR_POSTFIX_INCREMENT:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
 		fputs("(", out);
 		print_expression(unexpr->value);
 		fputs(")", out);
 		fputs("++", out);
 		return;
-	case UNEXPR_POSTFIX_DECREMENT:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
 		fputs("(", out);
 		print_expression(unexpr->value);
 		fputs(")", out);
 		fputs("--", out);
 		return;
-	case UNEXPR_CAST:
+	case EXPR_UNARY_CAST:
 		fputs("(", out);
 		print_type(unexpr->expression.datatype);
 		fputs(")", out);
 		break;
-	case UNEXPR_CAST_IMPLICIT:
+	case EXPR_UNARY_CAST_IMPLICIT:
 		print_expression(unexpr->value);
 		return;
-	case UNEXPR_INVALID:
-		fprintf(out, "unop%d", (int) unexpr->type);
-		break;
+	default:
+		panic("invalid unary expression found");
 	}
 	fputs("(", out);
 	print_expression(unexpr->value);
@@ -334,7 +333,7 @@ void print_expression(const expression_t *expression)
 	case EXPR_CALL:
 		print_call_expression(&expression->call);
 		break;
-	case EXPR_BINARY:
+	EXPR_BINARY_CASES
 		print_binary_expression(&expression->binary);
 		break;
 	case EXPR_REFERENCE:
@@ -343,7 +342,7 @@ void print_expression(const expression_t *expression)
 	case EXPR_ARRAY_ACCESS:
 		print_array_expression(&expression->array_access);
 		break;
-	case EXPR_UNARY:
+	EXPR_UNARY_CASES
 		print_unary_expression(&expression->unary);
 		break;
 	case EXPR_SIZEOF:

@@ -200,11 +200,11 @@ static void write_expression(const expression_t *expression);
 
 static void write_unary_expression(const unary_expression_t *expression)
 {
-	switch(expression->type) {
-	case UNEXPR_NEGATE:
+	switch(expression->expression.type) {
+	case EXPR_UNARY_NEGATE:
 		fputc('-', out);
 		break;
-	case UNEXPR_NOT:
+	case EXPR_UNARY_NOT:
 		fputc('!', out);
 		break;
 	default:
@@ -226,7 +226,7 @@ static void write_expression(const expression_t *expression)
 			fprintf(out, "%Lf", constant->v.float_value);
 		}
 		break;
-	case EXPR_UNARY:
+	EXPR_UNARY_CASES
 		write_unary_expression((const unary_expression_t*) expression);
 		break;
 	default:

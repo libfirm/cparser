@@ -1043,23 +1043,23 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		offset = new_Const(mode, get_mode_one(mode));
 	}
 
-	switch(expression->type) {
-	case UNEXPR_POSTFIX_INCREMENT: {
+	switch(expression->expression.type) {
+	case EXPR_UNARY_POSTFIX_INCREMENT: {
 		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
 		set_value_for_expression(value, new_value);
 		return value_node;
 	}
-	case UNEXPR_POSTFIX_DECREMENT: {
+	case EXPR_UNARY_POSTFIX_DECREMENT: {
 		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
 		set_value_for_expression(value, new_value);
 		return value_node;
 	}
-	case UNEXPR_PREFIX_INCREMENT: {
+	case EXPR_UNARY_PREFIX_INCREMENT: {
 		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
 		set_value_for_expression(value, new_value);
 		return new_value;
 	}
-	case UNEXPR_PREFIX_DECREMENT: {
+	case EXPR_UNARY_PREFIX_DECREMENT: {
 		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
 		set_value_for_expression(value, new_value);
 		return new_value;
@@ -1076,20 +1076,20 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	type_t   *type = skip_typeref(expression->expression.datatype);
 	ir_mode  *mode = get_ir_mode(type);
 
-	if(expression->type == UNEXPR_TAKE_ADDRESS)
+	if(expression->expression.type == EXPR_UNARY_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
 
 	const expression_t *value      = expression->value;
 	ir_node            *value_node = expression_to_firm(value);
 
-	switch(expression->type) {
-	case UNEXPR_NEGATE:
+	switch(expression->expression.type) {
+	case EXPR_UNARY_NEGATE:
 		return new_d_Minus(dbgi, value_node, mode);
-	case UNEXPR_PLUS:
+	case EXPR_UNARY_PLUS:
 		return value_node;
-	case UNEXPR_BITWISE_NEGATE:
+	case EXPR_UNARY_BITWISE_NEGATE:
 		return new_d_Not(dbgi, value_node, mode);
-	case UNEXPR_NOT: {
+	case EXPR_UNARY_NOT: {
 		if(get_irn_mode(value_node) != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode_b);
 		}
@@ -1099,42 +1099,41 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		}
 		return value_node;
 	}
-	case UNEXPR_DEREFERENCE: {
+	case EXPR_UNARY_DEREFERENCE: {
 		type_t  *value_type = skip_typeref(value->base.datatype);
 		ir_type *irtype     = get_ir_type(value_type);
 		assert(is_Pointer_type(irtype));
 		ir_type *points_to  = get_pointer_points_to_type(irtype);
 		return deref_address(points_to, value_node, dbgi);
 	}
-	case UNEXPR_POSTFIX_INCREMENT:
-	case UNEXPR_POSTFIX_DECREMENT:
-	case UNEXPR_PREFIX_INCREMENT:
-	case UNEXPR_PREFIX_DECREMENT:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
 		return create_incdec(expression);
-	case UNEXPR_CAST: {
+	case EXPR_UNARY_CAST: {
 		ir_node *node = create_conv(dbgi, value_node, get_ir_mode(type));
 		node = do_strict_conv(dbgi, node);
 		return node;
 	}
-	case UNEXPR_CAST_IMPLICIT:
+	case EXPR_UNARY_CAST_IMPLICIT:
 		return create_conv(dbgi, value_node, get_ir_mode(type));
 
-	case UNEXPR_TAKE_ADDRESS:
-	case UNEXPR_INVALID:
+	default:
 		break;
 	}
 	panic("invalid UNEXPR type found");
 }
 
-static long get_pnc(binary_expression_type_t type)
+static long get_pnc(expression_type_t type)
 {
 	switch(type) {
-	case BINEXPR_EQUAL:        return pn_Cmp_Eq;
-	case BINEXPR_NOTEQUAL:     return pn_Cmp_Lg;
-	case BINEXPR_LESS:         return pn_Cmp_Lt;
-	case BINEXPR_LESSEQUAL:    return pn_Cmp_Le;
-	case BINEXPR_GREATER:      return pn_Cmp_Gt;
-	case BINEXPR_GREATEREQUAL: return pn_Cmp_Ge;
+	case EXPR_BINARY_EQUAL:        return pn_Cmp_Eq;
+	case EXPR_BINARY_NOTEQUAL:     return pn_Cmp_Lg;
+	case EXPR_BINARY_LESS:         return pn_Cmp_Lt;
+	case EXPR_BINARY_LESSEQUAL:    return pn_Cmp_Le;
+	case EXPR_BINARY_GREATER:      return pn_Cmp_Gt;
+	case EXPR_BINARY_GREATEREQUAL: return pn_Cmp_Ge;
 	default:
 		break;
 	}
@@ -1305,13 +1304,13 @@ static ir_node *create_shift(const binary_expression_t *expression)
 
 	ir_node *res;
 
-	switch(expression->type) {
-	case BINEXPR_SHIFTLEFT_ASSIGN:
-	case BINEXPR_SHIFTLEFT:
+	switch(expression->expression.type) {
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT:
 		res = new_d_Shl(dbgi, left, right, mode);
 		break;
-	case BINEXPR_SHIFTRIGHT_ASSIGN:
-	case BINEXPR_SHIFTRIGHT: {
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT: {
 	 	 expression_t *expr_left = expression->left;
 		 type_t       *type_left = skip_typeref(expr_left->base.datatype);
 
@@ -1344,26 +1343,26 @@ static ir_node *create_divmod(const binary_expression_t *expression)
 	ir_node  *op;
 	ir_node  *res;
 
-	switch (expression->type)  {
-		case BINEXPR_DIV:
-		case BINEXPR_DIV_ASSIGN:
-			if(mode_is_float(mode)) {
-				op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
-				res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
-			} else {
-				op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
-				res = new_d_Proj(dbgi, op, mode, pn_Div_res);
-			}
-			break;
+	switch (expression->expression.type) {
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_DIV_ASSIGN:
+		if(mode_is_float(mode)) {
+			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
+		} else {
+			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
+		}
+		break;
 
-		case BINEXPR_MOD:
-		case BINEXPR_MOD_ASSIGN:
-			assert(!mode_is_float(mode));
-			op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
-			break;
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_MOD_ASSIGN:
+		assert(!mode_is_float(mode));
+		op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
+		res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+		break;
 
-		default: panic("unexpected binary expression type in create_divmod()");
+	default: panic("unexpected binary expression type in create_divmod()");
 	}
 
 	return res;
@@ -1401,14 +1400,15 @@ static ir_node *create_arithmetic_assign_shift(
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 {
-	binary_expression_type_t type = expression->type;
+	expression_type_t type = expression->expression.type;
+
 	switch(type) {
-	case BINEXPR_EQUAL:
-	case BINEXPR_NOTEQUAL:
-	case BINEXPR_LESS:
-	case BINEXPR_LESSEQUAL:
-	case BINEXPR_GREATER:
-	case BINEXPR_GREATEREQUAL: {
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL: {
 		dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 		ir_node *left  = expression_to_firm(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
@@ -1417,52 +1417,52 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		ir_node *proj  = new_d_Proj(dbgi, cmp, mode_b, pnc);
 		return proj;
 	}
-	case BINEXPR_ASSIGN: {
+	case EXPR_BINARY_ASSIGN: {
 		ir_node *right = expression_to_firm(expression->right);
 		set_value_for_expression(expression->left, right);
 
 		return right;
 	}
-	case BINEXPR_ADD:
+	case EXPR_BINARY_ADD:
 		return create_add(expression);
-	case BINEXPR_SUB:
+	case EXPR_BINARY_SUB:
 		return create_sub(expression);
-	case BINEXPR_MUL:
+	case EXPR_BINARY_MUL:
 		return create_arithmetic_binop(expression, new_d_Mul);
-	case BINEXPR_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_AND:
 		return create_arithmetic_binop(expression, new_d_And);
-	case BINEXPR_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_OR:
 		return create_arithmetic_binop(expression, new_d_Or);
-	case BINEXPR_BITWISE_XOR:
+	case EXPR_BINARY_BITWISE_XOR:
 		return create_arithmetic_binop(expression, new_d_Eor);
-	case BINEXPR_SHIFTLEFT:
-	case BINEXPR_SHIFTRIGHT:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
 		return create_shift(expression);
-	case BINEXPR_DIV:
-	case BINEXPR_MOD:
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD:
 		return create_divmod(expression);
-	case BINEXPR_LOGICAL_AND:
-	case BINEXPR_LOGICAL_OR:
+	case EXPR_BINARY_LOGICAL_AND:
+	case EXPR_BINARY_LOGICAL_OR:
 		return create_lazy_op(expression);
-	case BINEXPR_COMMA:
+	case EXPR_BINARY_COMMA:
 		expression_to_firm(expression->left);
 		return expression_to_firm(expression->right);
-	case BINEXPR_ADD_ASSIGN:
+	case EXPR_BINARY_ADD_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Add);
-	case BINEXPR_SUB_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Sub);
-	case BINEXPR_MUL_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Mul);
-	case BINEXPR_DIV_ASSIGN:
+	case EXPR_BINARY_DIV_ASSIGN:
 		return create_arithmetic_assign_divmod(expression);
-	case BINEXPR_BITWISE_AND_ASSIGN:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_And);
-	case BINEXPR_BITWISE_OR_ASSIGN:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Or);
-	case BINEXPR_BITWISE_XOR_ASSIGN:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Eor);
-	case BINEXPR_SHIFTLEFT_ASSIGN:
-	case BINEXPR_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		return create_arithmetic_assign_shift(expression);
 	default:
 		panic("TODO binexpr type");
@@ -1751,7 +1751,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
-	assert(expression->type == UNEXPR_DEREFERENCE);
+	assert(expression->expression.type == EXPR_UNARY_DEREFERENCE);
 	return expression_to_firm(expression->value);
 }
 
@@ -1766,12 +1766,8 @@ static ir_node *expression_to_addr(const expression_t *expression)
 		return select_addr(&expression->select);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
-	case EXPR_UNARY: {
-		const unary_expression_t *const unary_expr = &expression->unary;
-		if (unary_expr->type == UNEXPR_DEREFERENCE) {
-			return dereference_addr(unary_expr);
-		}
-		break;
+	case EXPR_UNARY_DEREFERENCE: {
+		return dereference_addr(&expression->unary);
 	}
 	default:
 		break;
@@ -1792,9 +1788,9 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return reference_expression_to_firm(&expression->reference);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
-	case EXPR_UNARY:
+	EXPR_UNARY_CASES
 		return unary_expression_to_firm(&expression->unary);
-	case EXPR_BINARY:
+	EXPR_BINARY_CASES
 		return binary_expression_to_firm(&expression->binary);
 	case EXPR_ARRAY_ACCESS:
 		return array_access_to_firm(&expression->array_access);
@@ -1855,43 +1851,39 @@ static void create_condition_evaluation(const expression_t *expression,
                                         ir_node *false_block)
 {
 	switch(expression->type) {
-	case EXPR_UNARY: {
-		unary_expression_t *unary_expression = (unary_expression_t*) expression;
-		if(unary_expression->type == UNEXPR_NOT) {
-			create_condition_evaluation(unary_expression->value, false_block,
-			                            true_block);
-			return;
-		}
-		break;
+	case EXPR_UNARY_NOT: {
+		const unary_expression_t *unary_expression = &expression->unary;
+		create_condition_evaluation(unary_expression->value, false_block,
+		                            true_block);
+		return;
 	}
-	case EXPR_BINARY: {
-		binary_expression_t *binary_expression
-			= (binary_expression_t*) expression;
-		if(binary_expression->type == BINEXPR_LOGICAL_AND) {
-			ir_node *cur_block   = get_cur_block();
-			ir_node *extra_block = new_immBlock();
-			set_cur_block(cur_block);
-			create_condition_evaluation(binary_expression->left, extra_block,
-			                            false_block);
-			mature_immBlock(extra_block);
-			set_cur_block(extra_block);
-			create_condition_evaluation(binary_expression->right, true_block,
-			                            false_block);
-			return;
-		}
-		if(binary_expression->type == BINEXPR_LOGICAL_OR) {
-			ir_node *cur_block   = get_cur_block();
-			ir_node *extra_block = new_immBlock();
-			set_cur_block(cur_block);
-			create_condition_evaluation(binary_expression->left, true_block,
-			                            extra_block);
-			mature_immBlock(extra_block);
-			set_cur_block(extra_block);
-			create_condition_evaluation(binary_expression->right, true_block,
-			                            false_block);
-			return;
-		}
-		break;
+	case EXPR_BINARY_LOGICAL_AND: {
+		const binary_expression_t *binary_expression = &expression->binary;
+
+		ir_node *cur_block   = get_cur_block();
+		ir_node *extra_block = new_immBlock();
+		set_cur_block(cur_block);
+		create_condition_evaluation(binary_expression->left, extra_block,
+		                            false_block);
+		mature_immBlock(extra_block);
+		set_cur_block(extra_block);
+		create_condition_evaluation(binary_expression->right, true_block,
+		                            false_block);
+		return;
+	}
+	case EXPR_BINARY_LOGICAL_OR: {
+		const binary_expression_t *binary_expression = &expression->binary;
+
+		ir_node *cur_block   = get_cur_block();
+		ir_node *extra_block = new_immBlock();
+		set_cur_block(cur_block);
+		create_condition_evaluation(binary_expression->left, true_block,
+		                            extra_block);
+		mature_immBlock(extra_block);
+		set_cur_block(extra_block);
+		create_condition_evaluation(binary_expression->right, true_block,
+		                            false_block);
+		return;
 	}
 	default:
 		break;
