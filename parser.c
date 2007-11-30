@@ -517,26 +517,10 @@ static bool is_compatible_declaration(declaration_t *declaration,
 		return true;
 	}
 
-	/* shortcur, same types are always compatible */
-	if(declaration->type == previous->type)
-		return true;
+	type_t *type1 = skip_typeref(declaration->type);
+	type_t *type2 = skip_typeref(previous->type);
 
-	if (declaration->type->type == TYPE_FUNCTION &&
-			previous->type->type == TYPE_FUNCTION) {
-		function_type_t* const prev_func = &previous->type->function;
-		function_type_t* const decl_func = &declaration->type->function;
-
-		/* 1 of the 2 declarations might have unspecified parameters */
-		if(decl_func->unspecified_parameters) {
-			return true;
-		} else if(prev_func->unspecified_parameters) {
-			declaration->type = previous->type;
-			return true;
-		}
-	}
-
-	/* TODO: not correct/complete yet */
-	return false;
+	return types_compatible(type1, type2);
 }
 
 static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
@@ -587,7 +571,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			&& previous_declaration->parent_context == context) {
 		if(!is_compatible_declaration(declaration, previous_declaration)) {
 			parser_print_error_prefix_pos(declaration->source_position);
-			fprintf(stderr, "definition of symbol %s%s with type ",
+			fprintf(stderr, "definition of symbol '%s%s' with type ",
 					get_namespace_prefix(namespc), symbol->string);
 			print_type_quoted(declaration->type);
 			fputc('\n', stderr);
@@ -910,12 +894,6 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		points_to_left  = skip_typeref(points_to_left);
 		points_to_right = skip_typeref(points_to_right);
 
-		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
-				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
-				&& !types_compatible(points_to_left, points_to_right)) {
-			goto incompatible_assign_types;
-		}
-
 		/* the left type has all qualifiers from the right type */
 		unsigned missing_qualifiers
 			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
@@ -929,6 +907,15 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 			print_type_qualifiers(missing_qualifiers);
 			fprintf(stderr, "' in pointed-to type\n");
 			return;
+		}
+
+		points_to_left  = get_unqualified_type(points_to_left);
+		points_to_right = get_unqualified_type(points_to_right);
+
+		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
+				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
+				&& !types_compatible(points_to_left, points_to_right)) {
+			goto incompatible_assign_types;
 		}
 
 		*right = create_implicit_cast(*right, type_left);
@@ -1943,6 +1930,42 @@ static declaration_t *parse_identifier_list(void)
 	return declarations;
 }
 
+static void semantic_parameter(declaration_t *declaration)
+{
+	/* TODO: improve error messages */
+
+	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
+		parse_error("typedef not allowed in parameter list");
+	} else if(declaration->storage_class != STORAGE_CLASS_NONE
+			&& declaration->storage_class != STORAGE_CLASS_REGISTER) {
+		parse_error("parameter may only have none or register storage class");
+	}
+
+	type_t *orig_type = declaration->type;
+	if(orig_type == NULL)
+		return;
+	type_t *type = skip_typeref(orig_type);
+
+	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
+	 * into a pointer. § 6.7.5.3 (7) */
+	if (type->type == TYPE_ARRAY) {
+		const array_type_t *arr_type     = &type->array;
+		type_t             *element_type = arr_type->element_type;
+
+		type = make_pointer_type(element_type, type->base.qualifiers);
+
+		declaration->type = type;
+	}
+
+	if(is_type_incomplete(type)) {
+		parser_print_error_prefix();
+		fprintf(stderr, "incomplete type (");
+		print_type_quoted(orig_type);
+		fprintf(stderr, ") not allowed for parameter '%s'\n",
+		        declaration->symbol->string);
+	}
+}
+
 static declaration_t *parse_parameter(void)
 {
 	declaration_specifiers_t specifiers;
@@ -1952,18 +1975,7 @@ static declaration_t *parse_parameter(void)
 
 	declaration_t *declaration = parse_declarator(&specifiers, true);
 
-	/* TODO check declaration constraints for parameters */
-	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
-		parse_error("typedef not allowed in parameter list");
-	}
-
-	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
-	 * into a pointer */
-	if (declaration->type->type == TYPE_ARRAY) {
-		const array_type_t *const arr_type = &declaration->type->array;
-		type_t *element_type = arr_type->element_type;
-		declaration->type = make_pointer_type(element_type, TYPE_QUALIFIER_NONE);
-	}
+	semantic_parameter(declaration);
 
 	return declaration;
 }
@@ -2249,7 +2261,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 			type_t *function_type = construct_function_type->function_type;
 
-			function_type->function.result_type = type;
+			function_type->function.return_type = type;
 
 			type = function_type;
 			break;
@@ -2574,6 +2586,8 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 #endif
 		}
 
+		semantic_parameter(parameter_declaration);
+
 		function_parameter_t *function_parameter
 			= obstack_alloc(type_obst, sizeof(function_parameter[0]));
 		memset(function_parameter, 0, sizeof(function_parameter[0]));
@@ -2839,7 +2853,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
 	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
-	ntype->function.result_type            = type_int;
+	ntype->function.return_type            = type_int;
 	ntype->function.unspecified_parameters = true;
 
 	type_t *type = typehash_insert(ntype);
@@ -2871,7 +2885,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	return declaration;
 }
 
-static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
+static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 {
 	function_parameter_t *parameter
 		= obstack_alloc(type_obst, sizeof(parameter[0]));
@@ -2879,7 +2893,7 @@ static type_t *make_function_1_type(type_t *result_type, type_t *argument_type)
 	parameter->type = argument_type;
 
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.result_type = result_type;
+	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 
 	type_t *result = typehash_insert(type);
@@ -3298,7 +3312,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	type_t *type_left   = left->base.datatype;
 	type_t *type_inside = inside->base.datatype;
-	type_t *result_type = NULL;
+	type_t *return_type = NULL;
 
 	if(type_left != NULL && type_inside != NULL) {
 		type_left   = skip_typeref(type_left);
@@ -3306,12 +3320,12 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 		if(is_type_pointer(type_left)) {
 			pointer_type_t *pointer = &type_left->pointer;
-			result_type             = pointer->points_to;
+			return_type             = pointer->points_to;
 			array_access->array_ref = left;
 			array_access->index     = inside;
 		} else if(is_type_pointer(type_inside)) {
 			pointer_type_t *pointer = &type_inside->pointer;
-			result_type             = pointer->points_to;
+			return_type             = pointer->points_to;
 			array_access->array_ref = inside;
 			array_access->index     = left;
 			array_access->flipped   = true;
@@ -3334,8 +3348,8 @@ static expression_t *parse_array_expression(unsigned precedence,
 	}
 	next_token();
 
-	result_type = automatic_type_conversion(result_type);
-	array_access->expression.datatype = result_type;
+	return_type = automatic_type_conversion(return_type);
+	array_access->expression.datatype = return_type;
 
 	return (expression_t*) array_access;
 }
@@ -3469,7 +3483,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 			if (type->type == TYPE_FUNCTION) {
 				function_type             = &type->function;
-				call->expression.datatype = function_type->result_type;
+				call->expression.datatype = function_type->return_type;
 			}
 		}
 		if(function_type == NULL) {
@@ -4754,7 +4768,7 @@ static statement_t *parse_return(void)
 
 	assert(current_function->type->type == TYPE_FUNCTION);
 	function_type_t *function_type = &current_function->type->function;
-	type_t          *return_type   = function_type->result_type;
+	type_t          *return_type   = function_type->return_type;
 
 	expression_t *return_value = NULL;
 	if(token.type != ';') {

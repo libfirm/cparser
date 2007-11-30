@@ -79,6 +79,7 @@ bool types_compatible(const type_t *type1, const type_t *type2);
 
 bool pointers_compatible(const type_t *type1, const type_t *type2);
 
+type_t *get_unqualified_type(type_t *type);
 type_t *skip_typeref(type_t *type);
 
 #endif

@@ -131,7 +131,7 @@ static void write_function_type(const function_type_t *type)
 	}
 
 	fprintf(out, ") : ");
-	write_type(type->result_type);
+	write_type(type->return_type);
 	fprintf(out, ")");
 }
 
@@ -298,11 +298,10 @@ static void write_function(const declaration_t *declaration)
 	}
 	fprintf(out, ")");
 
-	const type_t *result_type = function_type->result_type;
-	if(result_type->type != TYPE_ATOMIC ||
-			((const atomic_type_t*) result_type)->atype != ATOMIC_TYPE_VOID) {
+	const type_t *return_type = function_type->return_type;
+	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 		fprintf(out, " : ");
-		write_type(result_type);
+		write_type(return_type);
 	}
 	fputc('\n', out);
 }

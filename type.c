@@ -74,7 +74,7 @@ static void print_function_type_pre(const function_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
-	intern_print_type_pre(type->result_type);
+	intern_print_type_pre(type->return_type);
 
 	/* TODO: don't emit braces if we're the toplevel type... */
 	fputc('(', out);
@@ -84,7 +84,7 @@ static void print_function_type_post(const function_type_t *type,
                                      const context_t *context)
 {
 	/* TODO: don't emit braces if we're the toplevel type... */
-	intern_print_type_post(type->result_type);
+	intern_print_type_post(type->return_type);
 	fputc(')', out);
 
 	fputc('(', out);
@@ -336,6 +336,54 @@ void print_type_ext(type_t *type, const symbol_t *symbol,
 	}
 }
 
+static size_t get_type_size(type_t *type)
+{
+	switch(type->type) {
+	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
+	case TYPE_ENUM:            return sizeof(enum_type_t);
+	case TYPE_FUNCTION:        return sizeof(function_type_t);
+	case TYPE_POINTER:         return sizeof(pointer_type_t);
+	case TYPE_ARRAY:           return sizeof(array_type_t);
+	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
+	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
+	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
+	case TYPE_INVALID:         panic("invalid type found");
+	}
+	panic("unknown type found");
+}
+
+/**
+ * duplicates a type
+ * note that this does not produce a deep copy!
+ */
+type_t *duplicate_type(type_t *type)
+{
+	size_t size = get_type_size(type);
+
+	type_t *copy = obstack_alloc(type_obst, size);
+	memcpy(copy, type, size);
+
+	return copy;
+}
+
+type_t *get_unqualified_type(type_t *type)
+{
+	if(type->base.qualifiers == TYPE_QUALIFIER_NONE)
+		return type;
+
+	type_t *unqualified_type          = duplicate_type(type);
+	unqualified_type->base.qualifiers = TYPE_QUALIFIER_NONE;
+
+	type_t *result = typehash_insert(unqualified_type);
+	if(result != unqualified_type) {
+		obstack_free(type_obst, unqualified_type);
+	}
+
+	return result;
+}
+
 bool type_valid(const type_t *type)
 {
 	return type->type != TYPE_INVALID;
@@ -496,19 +544,97 @@ bool is_type_incomplete(const type_t *type)
 	panic("invalid type found");
 }
 
+static bool function_types_compatible(const function_type_t *func1,
+                                      const function_type_t *func2)
+{
+	if(!types_compatible(func1->return_type, func2->return_type))
+		return false;
+
+	/* can parameters be compared? */
+	if(func1->unspecified_parameters || func2->unspecified_parameters)
+		return true;
+
+	if(func1->variadic != func2->variadic)
+		return false;
+
+	/* TODO: handling of unspecified parameters not correct yet */
+
+	/* all argument types must be compatible */
+	function_parameter_t *parameter1 = func1->parameters;
+	function_parameter_t *parameter2 = func2->parameters;
+	for( ; parameter1 != NULL && parameter2 != NULL;
+			parameter1 = parameter1->next, parameter2 = parameter2->next) {
+		type_t *parameter1_type = skip_typeref(parameter1->type);
+		type_t *parameter2_type = skip_typeref(parameter2->type);
+
+		parameter1_type = get_unqualified_type(parameter1_type);
+		parameter2_type = get_unqualified_type(parameter2_type);
+
+		if(!types_compatible(parameter1_type, parameter2_type))
+			return false;
+	}
+	/* same number of arguments? */
+	if(parameter1 != NULL || parameter2 != NULL)
+		return false;
+
+	return true;
+}
+
+static bool array_types_compatible(const array_type_t *array1,
+                                   const array_type_t *array2)
+{
+	type_t *element_type1 = skip_typeref(array1->element_type);
+	type_t *element_type2 = skip_typeref(array2->element_type);
+	if(!types_compatible(element_type1, element_type2))
+		return false;
+
+	if(array1->size != NULL && array2->size != NULL) {
+		/* TODO: check if size expression evaulate to the same value
+		 * if they are constant */
+	}
+
+	return true;
+}
+
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(!is_typeref(type1));
 	assert(!is_typeref(type2));
 
-	/* TODO: really incomplete */
+	/* shortcut: the same type is always compatible */
 	if(type1 == type2)
 		return true;
 
-	if(type1->type == TYPE_ATOMIC && type2->type == TYPE_ATOMIC) {
+	if(type1->base.qualifiers != type2->base.qualifiers)
+		return false;
+	if(type1->type != type2->type)
+		return false;
+
+	switch(type1->type) {
+	case TYPE_FUNCTION:
+		return function_types_compatible(&type1->function, &type2->function);
+	case TYPE_ATOMIC:
 		return type1->atomic.atype == type2->atomic.atype;
+	case TYPE_ARRAY:
+		return array_types_compatible(&type1->array, &type2->array);
+	case TYPE_POINTER:
+		return types_compatible(type1->pointer.points_to,
+		                        type2->pointer.points_to);
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+	case TYPE_ENUM:
+	case TYPE_BUILTIN:
+		/* TODO: not implemented */
+		break;
+
+	case TYPE_INVALID:
+		panic("invalid type found in compatible types");
+	case TYPE_TYPEDEF:
+	case TYPE_TYPEOF:
+		panic("typerefs not skipped in compatible types?!?");
 	}
 
+	/* TODO: incomplete */
 	return false;
 }
 
@@ -521,38 +647,6 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 	assert(type2->type == TYPE_POINTER);
 	/* TODO */
 	return true;
-}
-
-static size_t get_type_size(type_t *type)
-{
-	switch(type->type) {
-	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
-	case TYPE_ENUM:            return sizeof(enum_type_t);
-	case TYPE_FUNCTION:        return sizeof(function_type_t);
-	case TYPE_POINTER:         return sizeof(pointer_type_t);
-	case TYPE_ARRAY:           return sizeof(array_type_t);
-	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
-	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
-	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
-	case TYPE_INVALID:         panic("invalid type found");
-	}
-	panic("unknown type found");
-}
-
-/**
- * duplicates a type
- * note that this does not produce a deep copy!
- */
-type_t *duplicate_type(type_t *type)
-{
-	size_t size = get_type_size(type);
-
-	type_t *copy = obstack_alloc(type_obst, size);
-	memcpy(copy, type, size);
-
-	return copy;
 }
 
 type_t *skip_typeref(type_t *type)

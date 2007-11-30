@@ -53,7 +53,7 @@ static unsigned hash_type(const type_t *type);
 
 static unsigned hash_function_type(const function_type_t *type)
 {
-	unsigned result = hash_ptr(type->result_type);
+	unsigned result = hash_ptr(type->return_type);
 
 	function_parameter_t *parameter = type->parameters;
 	while(parameter != NULL) {
@@ -130,7 +130,7 @@ static bool atomic_types_equal(const atomic_type_t *type1,
 static bool function_types_equal(const function_type_t *type1,
                                  const function_type_t *type2)
 {
-	if(type1->result_type != type2->result_type)
+	if(type1->return_type != type2->return_type)
 		return false;
 	if(type1->variadic != type2->variadic)
 		return false;

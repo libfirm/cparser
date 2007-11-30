@@ -105,7 +105,7 @@ struct function_parameter_t {
 
 struct function_type_t {
 	type_base_t           type;
-	type_t               *result_type;
+	type_t               *return_type;
 	function_parameter_t *parameters;
 	unsigned              variadic : 1;
 	unsigned              unspecified_parameters : 1;

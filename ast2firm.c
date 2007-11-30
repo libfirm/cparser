@@ -263,15 +263,15 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 
 static ir_type *create_method_type(const function_type_t *function_type)
 {
-	type_t  *result_type  = function_type->result_type;
+	type_t  *return_type  = function_type->return_type;
 
 	ident   *id           = unique_ident("functiontype");
 	int      n_parameters = count_parameters(function_type);
-	int      n_results    = result_type == type_void ? 0 : 1;
+	int      n_results    = return_type == type_void ? 0 : 1;
 	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
-	if(result_type != type_void) {
-		ir_type *restype = get_ir_type(result_type);
+	if(return_type != type_void) {
+		ir_type *restype = get_ir_type(return_type);
 		set_method_res_type(irtype, 0, restype);
 	}
 
@@ -854,7 +854,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case T___builtin_nand: {
 		/* Ignore string for now... */
 		assert(function_type->type == TYPE_FUNCTION);
-		ir_mode *mode = get_ir_mode(function_type->function.result_type);
+		ir_mode *mode = get_ir_mode(function_type->function.return_type);
 		tarval  *tv   = get_mode_NAN(mode);
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
@@ -935,13 +935,13 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
 	set_store(mem);
 
-	type_t  *result_type = skip_typeref(function_type->result_type);
+	type_t  *return_type = skip_typeref(function_type->return_type);
 	ir_node *result      = NULL;
 
-	if(!is_type_atomic(result_type, ATOMIC_TYPE_VOID)) {
+	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 		ir_mode *mode;
-		if(is_type_scalar(result_type)) {
-			mode = get_ir_mode(result_type);
+		if(is_type_scalar(return_type)) {
+			mode = get_ir_mode(return_type);
 		} else {
 			mode = mode_P_data;
 		}
@@ -2921,15 +2921,15 @@ static void create_function(declaration_t *declaration)
 	if(get_cur_block() != NULL) {
 		assert(declaration->type->type == TYPE_FUNCTION);
 		const function_type_t* const func_type = &declaration->type->function;
-		const type_t *result_type = skip_typeref(func_type->result_type);
+		const type_t *return_type = skip_typeref(func_type->return_type);
 
 		ir_node *ret;
-		if (is_type_atomic(result_type, ATOMIC_TYPE_VOID)) {
+		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
 			ir_mode *mode;
-			if(is_type_scalar(result_type)) {
-				mode = get_ir_mode(func_type->result_type);
+			if(is_type_scalar(return_type)) {
+				mode = get_ir_mode(func_type->return_type);
 			} else {
 				mode = mode_P_data;
 			}
