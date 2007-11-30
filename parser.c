@@ -236,11 +236,12 @@ static type_t *allocate_type_zero(type_type_t type)
 static size_t get_initializer_size(initializer_type_t type)
 {
 	static const size_t sizes[] = {
-		[INITIALIZER_VALUE]  = sizeof(initializer_value_t),
-		[INITIALIZER_STRING] = sizeof(initializer_string_t),
-		[INITIALIZER_LIST]   = sizeof(initializer_list_t)
+		[INITIALIZER_VALUE]       = sizeof(initializer_value_t),
+		[INITIALIZER_STRING]      = sizeof(initializer_string_t),
+		[INITIALIZER_WIDE_STRING] = sizeof(initializer_wide_string_t),
+		[INITIALIZER_LIST]        = sizeof(initializer_list_t)
 	};
-	assert(type < INITIALIZER_COUNT);
+	assert(type < sizeof(sizes) / sizeof(*sizes));
 	assert(sizes[type] != 0);
 	return sizes[type];
 }
@@ -1093,27 +1094,45 @@ static initializer_t *initializer_from_string(array_type_t *type,
 	return initializer;
 }
 
+static initializer_t *initializer_from_wide_string(array_type_t *const type,
+                                                   wide_string_t *const string)
+{
+	/* TODO: check len vs. size of array type */
+	(void) type;
+
+	initializer_t *const initializer =
+		allocate_initializer(INITIALIZER_WIDE_STRING);
+	initializer->wide_string.string = *string;
+
+	return initializer;
+}
+
 static initializer_t *initializer_from_expression(type_t *type,
                                                   expression_t *expression)
 {
 	/* TODO check that expression is a constant expression */
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
-	if(is_type_array(type) && expression->type == EXPR_STRING_LITERAL) {
-		array_type_t *array_type   = &type->array;
-		type_t       *element_type = array_type->element_type;
+	type_t *const expr_type = expression->base.datatype;
+	if (is_type_array(type) && expr_type->type == TYPE_POINTER) {
+		array_type_t *const array_type     = &type->array;
+		type_t       *const element_type   = skip_typeref(array_type->element_type);
 
-		if(element_type->type == TYPE_ATOMIC) {
-			atomic_type_t      *atomic_type = &element_type->atomic;
-			atomic_type_type_t  atype       = atomic_type->atype;
+		if (element_type->type == TYPE_ATOMIC) {
+			switch (expression->type) {
+				case EXPR_STRING_LITERAL:
+					if (element_type->atomic.atype == ATOMIC_TYPE_CHAR) {
+						return initializer_from_string(array_type,
+							expression->string.value);
+					}
 
-			/* TODO handle wide strings */
-			if(atype == ATOMIC_TYPE_CHAR
-					|| atype == ATOMIC_TYPE_SCHAR
-					|| atype == ATOMIC_TYPE_UCHAR) {
+				case EXPR_WIDE_STRING_LITERAL:
+					if (get_unqualified_type(element_type) == skip_typeref(type_wchar_t)) {
+						return initializer_from_wide_string(array_type,
+							&expression->wide_string.value);
+					}
 
-				string_literal_expression_t *literal = &expression->string;
-				return initializer_from_string(array_type, literal->value);
+				default: break;
 			}
 		}
 	}
@@ -2427,13 +2446,27 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 			cnst->base.datatype = type_size_t;
 
-			if(initializer->type == INITIALIZER_LIST) {
-				initializer_list_t *list = &initializer->list;
-				cnst->conste.v.int_value = list->len;
-			} else {
-				assert(initializer->type == INITIALIZER_STRING);
-				initializer_string_t *string = &initializer->string;
-				cnst->conste.v.int_value = strlen(string->string) + 1;
+			switch (initializer->type) {
+				case INITIALIZER_LIST: {
+					initializer_list_t *const list = &initializer->list;
+					cnst->conste.v.int_value = list->len;
+					break;
+				}
+
+				case INITIALIZER_STRING: {
+					initializer_string_t *const string = &initializer->string;
+					cnst->conste.v.int_value = strlen(string->string) + 1;
+					break;
+				}
+
+				case INITIALIZER_WIDE_STRING: {
+					initializer_wide_string_t *const string = &initializer->wide_string;
+					cnst->conste.v.int_value = string->string.size;
+					break;
+				}
+
+				default:
+					panic("invalid initializer type");
 			}
 
 			array_type->size = cnst;

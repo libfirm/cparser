@@ -251,7 +251,7 @@ typedef enum {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
-	INITIALIZER_COUNT
+	INITIALIZER_WIDE_STRING
 } initializer_type_t;
 
 struct initializer_base_t {
@@ -274,12 +274,18 @@ struct initializer_string_t {
 	const char         *string;
 };
 
+struct initializer_wide_string_t {
+	initializer_base_t  initializer;
+	wide_string_t       string;
+};
+
 union initializer_t {
-	initializer_type_t   type;
-	initializer_base_t   base;
-	initializer_value_t  value;
-	initializer_list_t   list;
-	initializer_string_t string;
+	initializer_type_t        type;
+	initializer_base_t        base;
+	initializer_value_t       value;
+	initializer_list_t        list;
+	initializer_string_t      string;
+	initializer_wide_string_t wide_string;
 };
 
 struct declaration_t {

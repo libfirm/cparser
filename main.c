@@ -25,7 +25,7 @@
 #include "write_fluffy.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "cpp -std=c99"
+#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int"
 #endif
 
 #ifndef LINKER

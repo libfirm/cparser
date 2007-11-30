@@ -2342,20 +2342,61 @@ static void create_initializer_string(initializer_string_t *initializer,
 	}
 }
 
+static void create_initializer_wide_string(
+	const initializer_wide_string_t *const initializer, array_type_t *const type,
+	ir_entity *const entity, compound_graph_path_entry_t *const last_entry,
+	int len)
+{
+	type_t *element_type = type->element_type;
+	element_type         = skip_typeref(element_type);
+
+	compound_graph_path_entry_t entry;
+	entry.type = COMPOUND_GRAPH_ENTRY_ARRAY;
+	entry.prev = last_entry;
+	++len;
+
+	ir_type           *const irtype  = get_entity_type(entity);
+	const size_t             arr_len = get_array_type_size(type);
+	const wchar_rep_t *      p       = initializer->string.begin;
+	const wchar_rep_t *const end     = p + initializer->string.size;
+	for (size_t i = 0; i < arr_len && p != end; ++i, ++p) {
+		entry.v.array_index = i;
+
+		ir_node             *node = new_Const_long(mode_Is, *p);
+		compound_graph_path *path = create_compound_path(irtype, &entry, len);
+		add_compound_ent_value_w_path(entity, node, path);
+	}
+}
+
 static void create_initializer_object(initializer_t *initializer, type_t *type,
 		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
 {
 	if(is_type_array(type)) {
 		array_type_t *array_type = &type->array;
 
-		if(initializer->type == INITIALIZER_STRING) {
-			initializer_string_t *string = &initializer->string;
-			create_initializer_string(string, array_type, entity, entry, len);
-		} else {
-			assert(initializer->type == INITIALIZER_LIST);
-			initializer_list_t *list = &initializer->list;
-			create_initializer_array(list, array_type, entity, entry, len);
+		switch (initializer->type) {
+			case INITIALIZER_STRING: {
+				initializer_string_t *const string = &initializer->string;
+				create_initializer_string(string, array_type, entity, entry, len);
+				return;
+			}
+
+			case INITIALIZER_WIDE_STRING: {
+				initializer_wide_string_t *const string = &initializer->wide_string;
+				create_initializer_wide_string(string, array_type, entity, entry, len);
+				return;
+			}
+
+			case INITIALIZER_LIST: {
+				initializer_list_t *const list = &initializer->list;
+				create_initializer_array(list, array_type, entity, entry, len);
+				return;
+			}
+
+			case INITIALIZER_VALUE:
+				break;
 		}
+		panic("Unhandled initializer");
 	} else {
 		assert(initializer->type == INITIALIZER_LIST);
 		initializer_list_t *list = &initializer->list;

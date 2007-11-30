@@ -34,6 +34,7 @@ typedef struct initializer_base_t           initializer_base_t;
 typedef struct initializer_list_t           initializer_list_t;
 typedef struct initializer_value_t          initializer_value_t;
 typedef struct initializer_string_t         initializer_string_t;
+typedef struct initializer_wide_string_t    initializer_wide_string_t;
 typedef union  initializer_t                initializer_t;
 
 typedef struct declaration_t                declaration_t;
