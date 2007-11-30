@@ -373,6 +373,7 @@ int main(int argc, char **argv)
 					arg[1] == 'O' ||
 					arg[1] == 'f' ||
 					arg[1] == 'W' ||
+					arg[1] == 'g' ||
 					strncmp(arg + 1, "std=", 4) == 0) {
 				fprintf(stderr, "Warning: Ignoring option '%s'\n", arg);
 			} else {
