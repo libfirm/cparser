@@ -1061,6 +1061,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	type_t   *type = skip_typeref(expression->expression.datatype);
+	ir_mode  *mode = get_ir_mode(type);
 
 	if(expression->type == UNEXPR_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
@@ -1070,26 +1071,26 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 
 	switch(expression->type) {
 	case UNEXPR_NEGATE:
-		return new_d_Minus(dbgi, value_node, get_ir_mode(type));
+		return new_d_Minus(dbgi, value_node, mode);
 	case UNEXPR_PLUS:
 		return value_node;
 	case UNEXPR_BITWISE_NEGATE:
-		return new_d_Not(dbgi, value_node, get_ir_mode(type));
+		return new_d_Not(dbgi, value_node, mode);
 	case UNEXPR_NOT: {
 		if(get_irn_mode(value_node) != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode_b);
 		}
 		value_node = new_d_Not(dbgi, value_node, mode_b);
-		ir_mode *const mode = get_ir_mode(type);
 		if(mode != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode);
 		}
 		return value_node;
 	}
 	case UNEXPR_DEREFERENCE: {
-		ir_type *irtype = get_ir_type(type);
+		type_t  *value_type = skip_typeref(value->base.datatype);
+		ir_type *irtype     = get_ir_type(value_type);
 		assert(is_Pointer_type(irtype));
-		ir_type *points_to = get_pointer_points_to_type(irtype);
+		ir_type *points_to  = get_pointer_points_to_type(irtype);
 		return deref_address(points_to, value_node, dbgi);
 	}
 	case UNEXPR_POSTFIX_INCREMENT:
