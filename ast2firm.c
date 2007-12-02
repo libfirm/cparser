@@ -2928,8 +2928,8 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_ASM:
 		//asm_statement_to_firm(&statement->asms);
+		//return;
 		break;
-		return;
 	}
 	panic("Statement not implemented\n");
 }

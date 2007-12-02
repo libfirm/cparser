@@ -352,6 +352,7 @@ static void optimize(void)
 
 typedef enum compile_mode_t {
 	Compile,
+	CompileDump,
 	CompileAssemble,
 	CompileAssembleLink,
 	LexTest,
@@ -377,8 +378,9 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 
-	const char *input   = NULL;
-	const char *outname = NULL;
+	const char *input        = NULL;
+	const char *outname      = NULL;
+	const char *dumpfunction = NULL;
 	compile_mode_t mode = CompileAssembleLink;
 
 	for(int i = 1; i < argc; ++i) {
@@ -402,6 +404,14 @@ int main(int argc, char **argv)
 			mode = PrintFluffy;
 		} else if(strcmp(arg, "--dump") == 0) {
 			do_dump = true;
+		} else if(strcmp(arg, "--dump-function") == 0) {
+			++i;
+			if(i >= argc) {
+				usage(argv[0]);
+				return 1;
+			}
+			dumpfunction = argv[i];
+			mode         = CompileDump;
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
 		} else if(arg[0] == '-' && arg[1] == 'f') {
@@ -475,6 +485,11 @@ int main(int argc, char **argv)
 			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".o");
 			outname = outnamebuf;
 			break;
+		case CompileDump:
+			get_output_name(outnamebuf, sizeof(outnamebuf), dumpfunction,
+			                ".vcg");
+			outname = outnamebuf;
+			break;
 		case CompileAssembleLink:
 			outname = "a.out";
 			break;
@@ -529,6 +544,34 @@ int main(int argc, char **argv)
 		write_fluffy_decls(out, unit);
 	}
 
+	create_firm_prog(unit);
+	optimize();
+
+	if(mode == CompileDump) {
+		/* find irg */
+		ident    *id     = new_id_from_str(dumpfunction);
+		ir_graph *irg    = NULL;
+		int       n_irgs = get_irp_n_irgs();
+		for(int i = 0; i < n_irgs; ++i) {
+			ir_graph *tirg   = get_irp_irg(i);
+			ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
+			if(irg_id == id) {
+				irg = tirg;
+				break;
+			}
+		}
+
+		if(irg == NULL) {
+			fprintf(stderr, "No graph for function '%s' found\n", dumpfunction);
+			return 1;
+		}
+
+		dump_ir_block_graph_file(irg, out);
+		fclose(out);
+		return 0;
+	}
+
+	/* generate code and emit assembler */
 	FILE *asm_out;
 	char  asm_tempfile[1024];
 	if(mode == Compile) {
@@ -537,12 +580,10 @@ int main(int argc, char **argv)
 		asm_out
 			= make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
 	}
-
-	create_firm_prog(unit);
-	optimize();
 	emit(asm_out, input);
 	fclose(asm_out);
 
+	/* assemble assembler and create object file */
 	char obj_tfile[1024];
 	if(mode == CompileAssemble || mode == CompileAssembleLink) {
 		const char *obj_outfile;
@@ -559,6 +600,7 @@ int main(int argc, char **argv)
 		assemble(obj_outfile, asm_tempfile);
 	}
 
+	/* link object file */
 	if(mode == CompileAssembleLink) {
 		do_link(outname, obj_tfile);
 	}
