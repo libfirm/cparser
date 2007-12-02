@@ -1,23 +1,18 @@
 Lexer:
-- proper support of preprocessor
-- octal&hex escape sequences
-- wide string constants
-- proper handling of different file encodings
+- Add preprocessor code
+- proper handling of different file encodings, parsing non-ascii strings
 
 Parser:
 - the expect macros abort functions directly. This leads to some functions
   not resetting the current context properly (parse_for)
-- proper handling of function pointer types
-- outermost typequalifiers can differ between function declarations and
-  implementations...
-- fix semantic to ignore type qualifiers (const double is the same as double)
 - label: declaration; is no valid C99 but we parse it anyway
 - designator support for initializers
-- support string literals in intializers
+- add constant folding code
+- Refactor code, so code to handle number values and strings is
+  an own module and replacable
 
 ast2firm:
 - output source file positions for panics...
-- create strict convs where necessary
 
 
 Coole Warnungen:

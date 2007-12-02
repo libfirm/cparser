@@ -3,6 +3,6 @@
 
 #include "ast.h"
 
-void write_fluffy_decls(const translation_unit_t *unit);
+void write_fluffy_decls(FILE *out, const translation_unit_t *unit);
 
 #endif

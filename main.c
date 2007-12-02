@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <assert.h>
 
 #ifndef WITH_LIBCORE
@@ -30,6 +31,10 @@
 
 #ifndef LINKER
 #define LINKER       "gcc"
+#endif
+
+#ifndef ASSEMBLER
+#define ASSEMBLER "as"
 #endif
 
 #ifdef _WIN32
@@ -103,6 +108,12 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 {
 	size_t last_dot = 0xffffffff;
 	size_t i = 0;
+
+	if(inputname == NULL) {
+		snprintf(buf, buflen, "a%s", newext);
+		return;
+	}
+
 	for(const char *c = inputname; *c != 0; ++c) {
 		if(*c == '.')
 			last_dot = i;
@@ -128,14 +139,8 @@ static translation_unit_t *do_parsing(FILE *const in, const char *const input)
 	return unit;
 }
 
-static void lextest(const char *fname)
+static void lextest(FILE *in, const char *fname)
 {
-	FILE *in = fopen(fname, "r");
-	if(in == NULL) {
-		fprintf(stderr, "Couldn't open '%s': %s\n", fname, strerror(errno));
-		exit(1);
-	}
-
 	lexer_open_stream(in, fname);
 
 	do {
@@ -143,34 +148,23 @@ static void lextest(const char *fname)
 		print_token(stdout, &lexer_token);
 		puts("");
 	} while(lexer_token.type != T_EOF);
-
-	fclose(in);
 }
 
-static void backend(const char *inputname, const char *outname)
+static void emit(FILE *out, const char *input_name)
 {
-	FILE *out = fopen(outname, "w");
-	if(out == NULL) {
-		fprintf(stderr, "couldn't open '%s' for writing: %s\n", outname,
-				strerror(errno));
-		exit(1);
-	}
-
-	be_main(out, inputname);
-
-	fclose(out);
+	be_main(out, input_name);
 }
 
-static void emit(const char *input_name, const char *out_name)
-{
-	backend(input_name, out_name);
-}
-
-static FILE* preprocess(const char *in)
+static FILE* preprocess(FILE* in, const char *fname)
 {
 	char buf[4096];
 
-	snprintf(buf, sizeof(buf), PREPROCESSOR " %s", in);
+	if(in != stdin) {
+		snprintf(buf, sizeof(buf), PREPROCESSOR " %s", fname);
+	} else {
+		/* read from stdin */
+		snprintf(buf, sizeof(buf), PREPROCESSOR " -");
+	}
 
 	if(verbose) {
 		puts(buf);
@@ -183,7 +177,7 @@ static FILE* preprocess(const char *in)
 	return f;
 }
 
-static void link(const char *in, const char *out)
+static void do_link(const char *out, const char *in)
 {
 	char buf[4096];
 
@@ -198,19 +192,91 @@ static void link(const char *in, const char *out)
 	}
 }
 
-static void assemble(const char *in, const char *out)
+static void assemble(const char *out, const char *in)
 {
 	char buf[4096];
 
-	snprintf(buf, sizeof(buf), "%s %s -c -o %s", LINKER, in, out);
+	snprintf(buf, sizeof(buf), "%s %s -o %s", ASSEMBLER, in, out);
 	if(verbose) {
 		puts(buf);
 	}
+
 	int err = system(buf);
 	if(err != 0) {
 		fprintf(stderr, "assembler reported an error\n");
 		exit(1);
 	}
+}
+
+static const char *try_dir(const char *dir)
+{
+	if(dir == NULL)
+		return dir;
+	if(access(dir, R_OK | W_OK | X_OK) == 0)
+		return dir;
+	return NULL;
+}
+
+static const char *get_tempdir(void)
+{
+	static const char *tmpdir = NULL;
+
+	if(tmpdir != NULL)
+		return tmpdir;
+
+	if(tmpdir == NULL)
+		tmpdir = try_dir(getenv("TMPDIR"));
+	if(tmpdir == NULL)
+		tmpdir = try_dir(getenv("TMP"));
+	if(tmpdir == NULL)
+		tmpdir = try_dir(getenv("TEMP"));
+
+#ifdef P_tmpdir
+	if(tmpdir == NULL)
+		tmpdir = try_dir(P_tmpdir);
+#endif
+
+	if(tmpdir == NULL)
+		tmpdir = try_dir("/var/tmp");
+	if(tmpdir == NULL)
+		tmpdir = try_dir("/usr/tmp");
+	if(tmpdir == NULL)
+		tmpdir = try_dir("/tmp");
+
+	if(tmpdir == NULL)
+		tmpdir = ".";
+
+	return tmpdir;
+}
+
+/**
+ * an own version of tmpnam, which: writes in a buffer, appends a user specified
+ * suffix, emits no warnings during linking (like glibc/gnu ld do for tmpnam)...
+ */
+static FILE *make_temp_file(char *buffer, size_t buflen,
+                            const char *prefix, const char *suffix)
+{
+	const char *tempdir = get_tempdir();
+
+	/* oh well... mkstemp doesn't accept a suffix after XXXXXX... */
+	(void) suffix;
+	suffix = "";
+
+	snprintf(buffer, buflen, "%s/%sXXXXXX%s", tempdir, prefix, suffix);
+
+	int fd = mkstemp(buffer);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't create temporary file: %s\n",
+		        strerror(errno));
+		exit(1);
+	}
+	FILE *out = fdopen(fd, "w");
+	if(out == NULL) {
+		fprintf(stderr, "couldn't create temporary file FILE*\n");
+		exit(1);
+	}
+
+	return out;
 }
 
 static void create_firm_prog(translation_unit_t *unit)
@@ -367,9 +433,11 @@ int main(int argc, char **argv)
 					return 1;
 				}
 			}
-			//firm_be_option(opt);
+			//be_parse_arg(opt);
 		} else if(arg[0] == '-') {
-			if (arg[1] == 'D' ||
+			if (arg[1] == '\0') {
+				input = "-";
+			} else if (arg[1] == 'D' ||
 					arg[1] == 'O' ||
 					arg[1] == 'f' ||
 					arg[1] == 'W' ||
@@ -391,60 +459,108 @@ int main(int argc, char **argv)
 		}
 	}
 
+	FILE *out;
+	char  outnamebuf[4096];
+	if(outname == NULL) {
+		switch(mode) {
+		case PrintAst:
+		case PrintFluffy:
+		case LexTest:
+			break;
+		case Compile:
+			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".s");
+			outname = outnamebuf;
+			break;
+		case CompileAssemble:
+			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".o");
+			outname = outnamebuf;
+			break;
+		case CompileAssembleLink:
+			outname = "a.out";
+			break;
+		}
+		assert(outname != NULL);
+	}
+
+	if(strcmp(outname, "-") == 0) {
+		out = stdout;
+	} else {
+		out = fopen(outname, "w");
+		if(out == NULL) {
+			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
+			        strerror(errno));
+			return 1;
+		}
+	}
+
+	FILE *in;
 	if(input == NULL) {
 		fprintf(stderr, "%s: no input files\n", argv[0]);
 		return 1;
+	} else if(strcmp(input, "-") == 0) {
+		in    = stdin;
+		input = "<stdin>";
+	} else {
+		in = fopen(input, "r");
+		if(in == NULL) {
+			fprintf(stderr, "Couldn't open '%s': %s\n", input, strerror(errno));
+			return 1;
+		}
 	}
 
 	if(mode == LexTest) {
-		lextest(input);
+		lextest(in, input);
+		fclose(in);
 		return 0;
 	}
 
-	FILE *const in = preprocess(input);
-	translation_unit_t *const unit = do_parsing(in, input);
-	pclose(in);
+	FILE *preprocessed_in = preprocess(in, input);
+	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
+	pclose(preprocessed_in);
 	if(unit == NULL)
 		return 1;
 
 	if(mode == PrintAst) {
+		ast_set_output(out);
 		print_ast(unit);
 		return 0;
 	}
 	if(mode == PrintFluffy) {
-		ast_set_output(stdout);
-		write_fluffy_decls(unit);
+		write_fluffy_decls(out, unit);
 	}
 
-	char outsname[4096];
-	const char *sname = NULL;
+	FILE *asm_out;
+	char  asm_tempfile[1024];
 	if(mode == Compile) {
-		sname = outname;
-	}
-	if(sname == NULL) {
-		get_output_name(outsname, sizeof(outsname), input, ".s");
-		sname = outsname;
+		asm_out = out;
+	} else {
+		asm_out
+			= make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
 	}
 
 	create_firm_prog(unit);
 	optimize();
-	emit(input, sname);
+	emit(asm_out, input);
+	fclose(asm_out);
 
-	if(mode == CompileAssemble) {
-		char outoname[4096];
-		const char *oname = outname;
-		if(oname == NULL) {
-			get_output_name(outoname, sizeof(outoname), input, ".o");
-			oname = outoname;
+	char obj_tfile[1024];
+	if(mode == CompileAssemble || mode == CompileAssembleLink) {
+		const char *obj_outfile;
+		if(mode == CompileAssemble) {
+			fclose(out);
+			obj_outfile = outname;
+		} else {
+			FILE *tempf
+				= make_temp_file(obj_tfile, sizeof(obj_tfile), "cc", ".o");
+			fclose(tempf);
+			obj_outfile = obj_tfile;
 		}
-		assemble(sname, oname);
-	} else {
-		assert(mode == CompileAssembleLink);
 
-		if(outname == NULL)
-			outname = "a.out";
+		assemble(obj_outfile, asm_tempfile);
+	}
 
-		link(sname, outname);
+	if(mode == CompileAssembleLink) {
+		do_link(outname, obj_tfile);
 	}
 
 	exit_ast2firm();

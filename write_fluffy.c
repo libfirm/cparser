@@ -306,18 +306,12 @@ static void write_function(const declaration_t *declaration)
 	fputc('\n', out);
 }
 
-void write_fluffy_decls(const translation_unit_t *unit)
+void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 {
-#if 0
-	out = fopen("out.fluffy", "w");
-	if(out == NULL) {
-		fprintf(stderr, "Couldn't open out.fluffy: %s\n", strerror(errno));
-		exit(1);
-	}
-#endif
-	out            = stdout;
+	out            = output;
 	global_context = &unit->context;
 
+	ast_set_output(out);
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
 	/* write structs,unions + enums */
@@ -368,6 +362,4 @@ void write_fluffy_decls(const translation_unit_t *unit)
 
 		write_function(declaration);
 	}
-
-	//fclose(out);
 }

@@ -39,6 +39,8 @@ static ir_node **imature_blocks;
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
 
+static struct obstack asm_obst;
+
 typedef enum declaration_type_t {
 	DECLARATION_TYPE_UNKNOWN,
 	DECLARATION_TYPE_FUNCTION,
@@ -87,10 +89,12 @@ const char *retrieve_dbg(const dbg_info *dbg, unsigned *line)
 
 void init_ast2firm(void)
 {
+	obstack_init(&asm_obst);
 }
 
 void exit_ast2firm(void)
 {
+	obstack_free(&asm_obst, NULL);
 }
 
 static unsigned unique_id = 0;
@@ -2780,6 +2784,101 @@ static void goto_to_firm(const goto_statement_t *statement)
 	set_cur_block(NULL);
 }
 
+typedef enum modifier_t {
+	ASM_MODIFIER_WRITE_ONLY   = 1 << 0,
+	ASM_MODIFIER_READ_WRITE   = 1 << 1,
+	ASM_MODIFIER_COMMUTATIVE  = 1 << 2,
+	ASM_MODIFIER_EARLYCLOBBER = 1 << 3,
+} modifier_t;
+
+#if 0
+static void asm_statement_to_firm(const asm_statement_t *statement)
+{
+	bool needs_memory = false;
+
+	size_t         n_clobbers = 0;
+	asm_clobber_t *clobber    = statement->clobbers;
+	for( ; clobber != NULL; clobber = clobber->next) {
+		if(strcmp(clobber->clobber, "memory") == 0) {
+			needs_memory = true;
+			continue;
+		}
+
+		ident *id = new_id_from_str(clobber->clobber);
+		obstack_ptr_grow(&asm_obst, id);
+		++n_clobbers;
+	}
+	assert(obstack_object_size(&asm_obst) == n_clobbers * sizeof(ident*));
+	ident **clobbers = NULL;
+	if(n_clobbers > 0) {
+		clobbers = obstack_finish(&asm_obst);
+	}
+
+	/* find and count input and output constraints */
+	asm_constraint_t *constraint = statement->inputs;
+	for( ; constraint != NULL; constraint = constraint->next) {
+		int  modifiers      = 0;
+		bool supports_memop = false;
+		for(const char *c = constraint->constraints; *c != 0; ++c) {
+			/* TODO: improve error messages */
+			switch(*c) {
+			case '?':
+			case '!':
+				panic("multiple alternative assembler constraints not "
+				      "supported");
+			case 'm':
+			case 'o':
+			case 'V':
+			case '<':
+			case '>':
+			case 'X':
+				supports_memop = true;
+				obstack_1grow(&asm_obst, *c);
+				break;
+			case '=':
+				if(modifiers & ASM_MODIFIER_READ_WRITE)
+					panic("inconsistent register constraints");
+				modifiers |= ASM_MODIFIER_WRITE_ONLY;
+				break;
+			case '+':
+				if(modifiers & ASM_MODIFIER_WRITE_ONLY)
+					panic("inconsistent register constraints");
+				modifiers |= ASM_MODIFIER_READ_WRITE;
+				break;
+			case '&':
+				modifiers |= ASM_MODIFIER_EARLYCLOBBER;
+				panic("early clobber assembler constraint not supported yet");
+				break;
+			case '%':
+				modifiers |= ASM_MODIFIER_COMMUTATIVE;
+				panic("commutative assembler constraint not supported yet");
+				break;
+			case '#':
+				/* skip register preferences stuff... */
+				while(*c != 0 && *c != ',')
+					++c;
+				break;
+			case '*':
+				/* skip register preferences stuff... */
+				++c;
+				break;
+			default:
+				obstack_1grow(&asm_obst, *c);
+				break;
+			}
+		}
+		obstack_1grow(&asm_obst, '\0');
+		const char *constraint_string = obstack_finish(&asm_obst);
+
+		needs_memory |= supports_memop;
+		if(supports_memop) {
+
+		}
+	}
+
+}
+#endif
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->type) {
@@ -2828,7 +2927,9 @@ static void statement_to_firm(statement_t *statement)
 		goto_to_firm(&statement->gotos);
 		return;
 	case STATEMENT_ASM:
+		//asm_statement_to_firm(&statement->asms);
 		break;
+		return;
 	}
 	panic("Statement not implemented\n");
 }
