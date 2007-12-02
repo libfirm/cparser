@@ -4,8 +4,8 @@ GOAL = $(BUILDDIR)/cparser
 
 BUILDDIR ?= build
 
-FIRM_CFLAGS ?= `pkg-config --cflags firm`
-FIRM_LIBS   ?= `pkg-config --libs firm`
+FIRM_CFLAGS ?= `pkg-config --cflags libfirm`
+FIRM_LIBS   ?= `pkg-config --libs libfirm`
 
 CPPFLAGS  = -DHAVE_CONFIG_H -DFIRM_BACKEND
 CPPFLAGS += -I.

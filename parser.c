@@ -2593,7 +2593,8 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 static void parse_kr_declaration_list(declaration_t *declaration)
 {
 	type_t *type = skip_typeref(declaration->type);
-	assert(is_type_function(type));
+	if(!is_type_function(type))
+		return;
 
 	if(!type->function.kr_style_parameters)
 		return;
@@ -4923,6 +4924,8 @@ static statement_t *parse_return(void)
 	expect(';');
 
 	if(return_type == NULL)
+		return (statement_t*) statement;
+	if(return_value != NULL && return_value->base.datatype == NULL)
 		return (statement_t*) statement;
 
 	return_type = skip_typeref(return_type);
