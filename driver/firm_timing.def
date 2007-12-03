@@ -1,0 +1,39 @@
+/**
+ * @file firm_timing.def -- timing for the Firm compiler
+ *
+ * (C) 2006  Michael Beck   beck@ipd.info.uni-karlsruhe.de
+ *
+ * $Id: firm_timing.def 14048 2007-05-26 10:43:19Z mallon $
+ */
+DEFTIMEVAR(TV_ALL_OPT          , "allopt",     "Firm: all optimizations")
+DEFTIMEVAR(TV_VALUE_NUM        , "valnum",     "Firm: value numbers")
+DEFTIMEVAR(TV_CREATE           , "create",     "Firm: creation")
+DEFTIMEVAR(TV_INLINE           , "inline",     "Firm: inlining")
+DEFTIMEVAR(TV_TAIL_REC         , "tailrec",    "Firm: tail-recursion")
+DEFTIMEVAR(TV_COMP_DOMS        , "doms",       "Firm: compute doms")
+DEFTIMEVAR(TV_LOCAL_OPT        , "locopt",     "Firm: local opt")
+DEFTIMEVAR(TV_REASSOCIATION    , "reassoc",    "Firm: reassociation")
+DEFTIMEVAR(TV_CF_OPT           , "cfopt",      "Firm: CF opt")
+DEFTIMEVAR(TV_LOAD_STORE       , "ldst",       "Firm: load/store opt")
+DEFTIMEVAR(TV_LOAD_STORE_2     , "ldst2",      "Firm: enhanced load/store opt")
+DEFTIMEVAR(TV_STRENGTH_REDUCT  , "strength",   "Firm: strength red")
+DEFTIMEVAR(TV_DEAD_NODE        , "deadnode",   "Firm: dead node elim")
+DEFTIMEVAR(TV_DECONV           , "deconv",     "Firm: conv node opt")
+DEFTIMEVAR(TV_COND_EVAL        , "condeval",   "Firm: conditional evaluation")
+DEFTIMEVAR(TV_CODE_PLACE       , "codeplace",  "Firm: code placement")
+DEFTIMEVAR(TV_IF_CONV          , "ifconv",     "Firm: if conversion")
+DEFTIMEVAR(TV_OSR              , "osr",        "Firm: operator strenght reduce")
+DEFTIMEVAR(TV_LOOP_UNROLL      , "lunroll",    "Firm: loop unrolling")
+DEFTIMEVAR(TV_REAL_FUNC_CALL   , "realfunc",   "Firm: real func call")
+DEFTIMEVAR(TV_CGANA            , "cgana",      "Firm: CG analysis")
+DEFTIMEVAR(TV_CONFIRM_CREATE   , "confirm",    "Firm: Confirm creation")
+DEFTIMEVAR(TV_SCALAR_REPLACE   , "scalar",     "Firm: scalar replace")
+DEFTIMEVAR(TV_OPT              , "other",      "Firm: other opt")
+DEFTIMEVAR(TV_VERIFY           , "verify",     "Firm: verify pass")
+DEFTIMEVAR(TV_LOWER            , "lower",      "Firm: lowering")
+DEFTIMEVAR(TV_DW_LOWER         , "dwlower",    "Firm: double word lowering")
+DEFTIMEVAR(TV_FIRM_BE          , "firmbe",     "Firm: backend")
+DEFTIMEVAR(TV_FIRM2C_BE        , "firm2c",     "Firm: C-generating backend")
+DEFTIMEVAR(TV_FIRM_ASM         , "firmasm",    "Firm: Firm assembler")
+DEFTIMEVAR(TV_STAT_OUT         , "statistics", "Firm: statistic output")
+DEFTIMEVAR(TV_VCG_DUMP         , "vcg",        "Firm: vcg dumping")

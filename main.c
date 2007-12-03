@@ -22,8 +22,10 @@
 #include "type_hash.h"
 #include "parser.h"
 #include "ast2firm.h"
+#include "driver/firm_cmdline.h"
 #include "adt/error.h"
 #include "write_fluffy.h"
+#include "driver/firm_opt.h"
 
 #ifndef PREPROCESSOR
 #define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int"
@@ -46,51 +48,10 @@
 static int  verbose;
 static bool do_dump;
 
-static const ir_settings_if_conv_t *if_conv_info = NULL;
-static const backend_params        *be_params    = NULL;
-
 static void initialize_firm(void)
 {
-	be_opt_register();
-	firm_init_options(NULL, 0, NULL);
-
-	firm_parameter_t params;
-	memset(&params, 0, sizeof(params));
-
-	params.size = sizeof(params);
-	params.enable_statistics = 0;
-	params.initialize_local_func = uninitialized_local_var;
-	params.cc_mask = 0;
-	params.builtin_dbg = NULL;
-
-	/* initialize backend */
-	be_params = be_init();
-	be_set_debug_retrieve(retrieve_dbg);
-	params.arch_op_settings = be_params->arch_op_settings;
-	if_conv_info            = be_params->if_conv_info;
-
-	(void) if_conv_info; /* avoid unused warning */
-
-	/* intialize firm itself */
-	init_firm(&params);
-	dbg_init(NULL, NULL, dbg_snprint);
-
-	set_opt_constant_folding(1);
-	set_opt_unreachable_code(1);
-	set_opt_control_flow_straightening(1);
-	set_opt_control_flow_weak_simplification(1);
-	set_opt_control_flow_strong_simplification(1);
-	set_opt_dyn_meth_dispatch(1);
-	set_opt_normalize(1);
-	set_opt_precise_exc_context(0);
-	set_opt_strength_red(0);
-	set_opt_fragile_ops(0);
-	set_opt_optimize_class_casts(0);
-	set_opt_suppress_downcast_optimization(0);
-	set_opt_remove_confirm(1);
-	set_opt_scalar_replacement(1);
-	set_opt_ldst_only_null_ptr_exceptions(1);
-	set_opt_alias_analysis(1);
+	firm_early_init();
+	gen_firm_init();
 
 	dump_consts_local(1);
 	dump_keepalive_edges(1);
@@ -148,11 +109,6 @@ static void lextest(FILE *in, const char *fname)
 		print_token(stdout, &lexer_token);
 		puts("");
 	} while(lexer_token.type != T_EOF);
-}
-
-static void emit(FILE *out, const char *input_name)
-{
-	be_main(out, input_name);
 }
 
 static FILE* preprocess(FILE* in, const char *fname)
@@ -279,6 +235,21 @@ static FILE *make_temp_file(char *buffer, size_t buflen,
 	return out;
 }
 
+/**
+ * Do the necessary lowering for compound parameters.
+ */
+void lower_compound_params(void)
+{
+	lower_params_t params;
+
+	params.def_ptr_alignment    = 4;
+	params.flags                = LF_COMPOUND_RETURN | LF_RETURN_HIDDEN;
+	params.hidden_params        = ADD_HIDDEN_ALWAYS_IN_FRONT;
+	params.find_pointer_type    = NULL;
+	params.ret_compound_in_regs = NULL;
+	lower_calls_with_compounds(&params);
+}
+
 static void create_firm_prog(translation_unit_t *unit)
 {
 	translation_unit_to_firm(unit);
@@ -291,62 +262,12 @@ static void create_firm_prog(translation_unit_t *unit)
 		dump(irg, "-start");
 	}
 
-	lower_params_t params;
-
-	params.def_ptr_alignment    = 4;
-	params.flags                = LF_COMPOUND_RETURN | LF_RETURN_HIDDEN;
-	params.hidden_params        = ADD_HIDDEN_ALWAYS_IN_FRONT;
-	params.find_pointer_type    = NULL;
-	params.ret_compound_in_regs = NULL;
-	lower_calls_with_compounds(&params);
-
+	lower_compound_params();
 	lower_highlevel();
 
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);
 		dump(irg, "-lower");
-	}
-}
-
-static void optimize(void)
-{
-	int         arr_len;
-	ir_entity **keep_methods;
-
-	cgana(&arr_len, &keep_methods);
-	gc_irgs(arr_len, keep_methods);
-	free(keep_methods);
-
-	optimize_funccalls(0);
-
-	lwrdw_param_t lwrdw_param = {
-		1,
-		1,
-		mode_Ls, mode_Lu,
-		mode_Is, mode_Iu,
-		def_create_intrinsic_fkt,
-		NULL
-	};
-	if (be_params->arch_create_intrinsic_fkt) {
-		lwrdw_param.create_intrinsic = be_params->arch_create_intrinsic_fkt;
-		lwrdw_param.ctx              = be_params->create_intrinsic_ctx;
-	}
-
-	for(int i = 0; i < get_irp_n_irgs(); ++i) {
-		ir_graph *irg = get_irp_irg(i);
-
-		optimize_graph_df(irg);
-		dump(irg, "-01-localopt");
-		place_code(irg);
-		dump(irg, "-02-place");
-		optimize_cf(irg);
-		dump(irg, "-03-cf");
-		lower_dw_ops(&lwrdw_param);
-		dump(irg, "-04-dw");
-		optimize_graph_df(irg);
-		dump(irg, "-05-localopt");
-		optimize_cf(irg);
-		dump(irg, "-06-cf");
 	}
 }
 
@@ -428,7 +349,13 @@ int main(int argc, char **argv)
 					return 1;
 				}
 			}
-			//firm_option(opt);
+			int res = firm_option(opt);
+			if (res == 0) {
+				fprintf(stderr, "Error: unknown Firm option %s\n", opt);
+				usage(argv[0]);
+				return 1;
+			} else if (res == -1) /* help option */
+				exit(0);
 		} else if(arg[0] == '-' && arg[1] == 'b') {
 			const char *opt = &arg[2];
 			if(opt[0] == 0) {
@@ -443,7 +370,13 @@ int main(int argc, char **argv)
 					return 1;
 				}
 			}
-			//be_parse_arg(opt);
+			int res = firm_be_option(opt);
+			if (res == 0) {
+				fprintf(stderr, "Error: unknown Firm backend option %s\n", opt);
+				usage(argv[0]);
+				return 1;
+			} else if (res == -1) /* help option */
+				exit(0);
 		} else if(arg[0] == '-') {
 			if (arg[1] == '\0') {
 				input = "-";
@@ -545,7 +478,19 @@ int main(int argc, char **argv)
 	}
 
 	create_firm_prog(unit);
-	optimize();
+
+	FILE *asm_out;
+	char  asm_tempfile[1024];
+	if(mode == CompileDump) {
+		asm_out = NULL;
+		firm_be_opt.selection = BE_NONE;
+	} else if(mode == Compile) {
+		asm_out = out;
+	} else {
+		asm_out
+			= make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
+	}
+	gen_firm_finish(asm_out, input, /*c_mode=*/1, /*firm_const_exists=*/0);
 
 	if(mode == CompileDump) {
 		/* find irg */
@@ -571,16 +516,6 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	/* generate code and emit assembler */
-	FILE *asm_out;
-	char  asm_tempfile[1024];
-	if(mode == Compile) {
-		asm_out = out;
-	} else {
-		asm_out
-			= make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
-	}
-	emit(asm_out, input);
 	fclose(asm_out);
 
 	/* assemble assembler and create object file */

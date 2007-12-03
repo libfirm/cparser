@@ -33,7 +33,12 @@ SOURCES := \
 	token.c \
 	type.c \
 	type_hash.c \
-	write_fluffy.c
+	write_fluffy.c \
+	driver/firm_cmdline.c \
+	driver/firm_timing.c \
+	driver/firm_codegen.c \
+	driver/firm_opt.c \
+	driver/gen_firm_asm.c \
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
 
@@ -53,7 +58,7 @@ endif
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
-$(GOAL): build/adt $(OBJECTS)
+$(GOAL): build/adt build/driver $(OBJECTS)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
 
@@ -63,7 +68,7 @@ splint: $(SPLINTS)
 	@echo '===> SPLINT $<'
 	$(Q)splint $(CPPFLAGS) $<
 
-build/adt:
+build/adt build/driver:
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 

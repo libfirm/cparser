@@ -77,7 +77,7 @@ unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg)
 	                           pos->linenr);
 }
 
-const char *retrieve_dbg(const dbg_info *dbg, unsigned *line)
+const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 {
 	const source_position_t *pos = (const source_position_t*) dbg;
 	if(pos == NULL)
@@ -564,6 +564,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	} else {
 		set_entity_visibility(entity, visibility_external_allocated);
 	}
+	set_entity_allocation(entity, allocation_static);
 
 	declaration->declaration_type = DECLARATION_TYPE_FUNCTION;
 	declaration->v.entity         = entity;
@@ -619,6 +620,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	ir_entity *const entity = new_entity(global_type, id, type);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
+	set_entity_allocation(entity, allocation_static);
 
 	ir_type *const elem_type = ir_type_const_char;
 	ir_mode *const mode      = get_type_mode(elem_type);
@@ -662,6 +664,7 @@ static ir_node *wide_string_literal_to_firm(
 	ir_entity *const entity = new_entity(global_type, id, type);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
+	set_entity_allocation(entity, allocation_static);
 
 	ir_mode *const mode      = get_type_mode(elem_type);
 
@@ -2228,6 +2231,10 @@ static void create_declaration_entity(declaration_t *declaration,
 	declaration->declaration_type = (unsigned char) declaration_type;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
+	if(parent_type == get_tls_type())
+		set_entity_allocation(entity, allocation_automatic);
+	else if(declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE)
+		set_entity_allocation(entity, allocation_static);
 	/* TODO: visibility? */
 }
 
@@ -2488,6 +2495,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 
 	set_entity_variability(init_entity, variability_initialized);
 	set_entity_visibility(init_entity, visibility_local);
+	set_entity_allocation(init_entity, allocation_static);
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
@@ -2585,6 +2593,7 @@ static void create_local_static_variable(declaration_t *declaration)
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
 	set_entity_visibility(entity, visibility_local);
+	set_entity_allocation(entity, allocation_static);
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
