@@ -45,8 +45,9 @@
 #define pclose(file)      _pclose(file)
 #endif /* _WIN32 */
 
-static int  verbose;
-static bool do_dump;
+static int            verbose;
+static bool           do_dump;
+static struct obstack cppflags_obst;
 
 static void initialize_firm(void)
 {
@@ -113,12 +114,13 @@ static void lextest(FILE *in, const char *fname)
 static FILE* preprocess(FILE* in, const char *fname)
 {
 	char buf[4096];
+	const char *flags = obstack_finish(&cppflags_obst);
 
 	if(in != stdin) {
-		snprintf(buf, sizeof(buf), PREPROCESSOR " %s", fname);
+		snprintf(buf, sizeof(buf), PREPROCESSOR " %s %s", flags, fname);
 	} else {
 		/* read from stdin */
-		snprintf(buf, sizeof(buf), PREPROCESSOR " -");
+		snprintf(buf, sizeof(buf), PREPROCESSOR " %s -", flags);
 	}
 
 	if(verbose) {
@@ -253,8 +255,6 @@ static void create_firm_prog(translation_unit_t *unit)
 {
 	translation_unit_to_firm(unit);
 
-	//dump_globals_as_text(dump_verbosity_max, "-globals");
-
 	int n_irgs = get_irp_n_irgs();
 	for(int i = 0; i < n_irgs; ++i) {
 		ir_graph *const irg = get_irp_irg(i);
@@ -271,6 +271,7 @@ static void create_firm_prog(translation_unit_t *unit)
 }
 
 typedef enum compile_mode_t {
+	ParseOnly,
 	Compile,
 	CompileDump,
 	CompileAssemble,
@@ -298,23 +299,36 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 
-	const char *input        = NULL;
-	const char *outname      = NULL;
-	const char *dumpfunction = NULL;
-	compile_mode_t mode = CompileAssembleLink;
+	const char     *input        = NULL;
+	const char     *outname      = NULL;
+	const char     *dumpfunction = NULL;
+	compile_mode_t  mode         = CompileAssembleLink;
 
+	obstack_init(&cppflags_obst);
+
+#define GET_ARG_AFTER(def, args)                                             \
+	def = &arg[sizeof(args)-1];                                              \
+	if(def[0] == '\0') {                                                     \
+		++i;                                                                 \
+		if(i >= argc) {                                                      \
+			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			argument_errors = true;                                          \
+			break;                                                           \
+		}                                                                    \
+		def = argv[i];                                                       \
+		if(def[0] == '-' && def[1] != '\0') {                                \
+			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			argument_errors = true;                                          \
+			continue;                                                        \
+		}                                                                    \
+	}
+
+	bool help_displayed  = false;
+	bool argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if(strncmp(arg, "-o", 2) == 0) {
-			outname = &arg[2];
-			if(outname[0] == '\0') {
-				++i;
-				if(i >= argc) {
-					usage(argv[0]);
-					return 1;
-				}
-				outname = argv[i];
-			}
+			GET_ARG_AFTER(outname, "-o");
 		} else if(strcmp(arg, "-c") == 0) {
 			mode = CompileAssemble;
 		} else if(strcmp(arg, "-S") == 0) {
@@ -325,85 +339,86 @@ int main(int argc, char **argv)
 			mode = PrintAst;
 		} else if(strcmp(arg, "--print-fluffy") == 0) {
 			mode = PrintFluffy;
+		} else if(strcmp(arg, "-fsyntax-only") == 0) {
+			mode = ParseOnly;
+		} else if(strncmp(arg, "-I", 2) == 0) {
+			const char *opt;
+			GET_ARG_AFTER(opt, "-I");
+			obstack_printf(&cppflags_obst, " -I%s", opt);
+		} else if(strncmp(arg, "-D", 2) == 0) {
+			const char *opt;
+			GET_ARG_AFTER(opt, "-D");
+			obstack_printf(&cppflags_obst, " -D%s", opt);
 		} else if(strcmp(arg, "--dump") == 0) {
 			do_dump = true;
 		} else if(strcmp(arg, "--dump-function") == 0) {
 			++i;
 			if(i >= argc) {
-				usage(argv[0]);
-				return 1;
+				fprintf(stderr, "error: "
+				        "expected argument after '--dump-function'\n");
+				argument_errors = true;
+				break;
 			}
 			dumpfunction = argv[i];
 			mode         = CompileDump;
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
 		} else if(arg[0] == '-' && arg[1] == 'f') {
-			const char *opt = &arg[2];
-			if(opt[0] == 0) {
-				++i;
-				if(i >= argc) {
-					usage(argv[0]);
-					return 1;
-				}
-				opt = argv[i];
-				if(opt[0] == '-') {
-					usage(argv[0]);
-					return 1;
-				}
-			}
+			const char *opt;
+			GET_ARG_AFTER(opt, "-f");
 			int res = firm_option(opt);
 			if (res == 0) {
-				fprintf(stderr, "Error: unknown Firm option %s\n", opt);
-				usage(argv[0]);
-				return 1;
-			} else if (res == -1) { /* help option */
-				exit(0);
+				fprintf(stderr, "error: unknown Firm option '-f %s'\n", opt);
+				argument_errors = true;
+				continue;
+			} else if (res == -1) {
+				help_displayed = true;
 			}
 		} else if(arg[0] == '-' && arg[1] == 'b') {
-			const char *opt = &arg[2];
-			if(opt[0] == 0) {
-				++i;
-				if(i >= argc) {
-					usage(argv[0]);
-					return 1;
-				}
-				opt = argv[i];
-				if(opt[0] == '-') {
-					usage(argv[0]);
-					return 1;
-				}
-			}
+			const char *opt;
+			GET_ARG_AFTER(opt, "-b");
 			int res = firm_be_option(opt);
 			if (res == 0) {
-				fprintf(stderr, "Error: unknown Firm backend option %s\n", opt);
-				usage(argv[0]);
-				return 1;
-			} else if (res == -1) { /* help option */
-				exit(0);
+				fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
+				        opt);
+				argument_errors = true;
+			} else if (res == -1) {
+				help_displayed = true;
 			}
 		} else if(arg[0] == '-') {
 			if (arg[1] == '\0') {
-				input = "-";
-			} else if (arg[1] == 'D' ||
-					arg[1] == 'O' ||
+				if(input != NULL) {
+					fprintf(stderr, "error: multiple input files specified\n");
+					argument_errors = true;
+				} else {
+					input = arg;
+				}
+			} else if (arg[1] == 'O' ||
 					arg[1] == 'f' ||
 					arg[1] == 'W' ||
 					arg[1] == 'g' ||
 					strncmp(arg + 1, "std=", 4) == 0) {
-				fprintf(stderr, "Warning: Ignoring option '%s'\n", arg);
+				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else {
-				usage(argv[0]);
-				return 1;
+				fprintf(stderr, "error: unknown argument '%s'\n", arg);
+				argument_errors = true;
 			}
 		} else {
 			if(input != NULL) {
-				fprintf(stderr, "Error: multiple input files specified\n");
-				usage(argv[0]);
-				return 1;
+				fprintf(stderr, "error: multiple input files specified\n");
+				argument_errors = true;
 			} else {
 				input = arg;
 			}
 		}
+	}
+
+	if(help_displayed) {
+		return !argument_errors;
+	}
+	if(argument_errors) {
+		usage(argv[0]);
+		return 1;
 	}
 
 	FILE *out;
@@ -413,6 +428,7 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case LexTest:
+		case ParseOnly:
 			break;
 		case Compile:
 			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".s");
@@ -431,17 +447,18 @@ int main(int argc, char **argv)
 			outname = "a.out";
 			break;
 		}
-		assert(outname != NULL);
 	}
 
-	if(strcmp(outname, "-") == 0) {
-		out = stdout;
-	} else {
-		out = fopen(outname, "w");
-		if(out == NULL) {
-			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
-			        strerror(errno));
-			return 1;
+	if(outname != NULL) {
+		if(strcmp(outname, "-") == 0) {
+			out = stdout;
+		} else {
+			out = fopen(outname, "w");
+			if(out == NULL) {
+				fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
+				        strerror(errno));
+				return 1;
+			}
 		}
 	}
 
@@ -483,6 +500,10 @@ int main(int argc, char **argv)
 
 	gen_firm_init();
 	create_firm_prog(unit);
+
+	if(mode == ParseOnly) {
+		return 0;
+	}
 
 	FILE *asm_out;
 	char  asm_tempfile[1024];
@@ -544,6 +565,8 @@ int main(int argc, char **argv)
 	if(mode == CompileAssembleLink) {
 		do_link(outname, obj_tfile);
 	}
+
+	obstack_free(&cppflags_obst, NULL);
 
 	exit_ast2firm();
 	exit_parser();
