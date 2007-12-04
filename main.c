@@ -430,6 +430,9 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case LexTest:
+			if(outname == NULL)
+				outname = "-";
+			break;
 		case ParseOnly:
 			break;
 		case Compile:
@@ -492,11 +495,14 @@ int main(int argc, char **argv)
 		return 1;
 
 	if(mode == PrintAst) {
+		type_set_output(out);
 		ast_set_output(out);
 		print_ast(unit);
 		return 0;
 	}
 	if(mode == PrintFluffy) {
+		type_set_output(out);
+		ast_set_output(out);
 		write_fluffy_decls(out, unit);
 	}
 
