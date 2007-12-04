@@ -337,6 +337,8 @@ static ir_type *create_array_type(array_type_t *type)
 		set_type_size_bytes(ir_type, n_elements * elemsize);
 		set_type_alignment_bytes(ir_type, align);
 		set_type_state(ir_type, layout_fixed);
+	} else {
+		set_array_lower_bound_int(ir_type, 0, 0);
 	}
 
 	return ir_type;
