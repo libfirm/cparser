@@ -3150,6 +3150,41 @@ static void initialize_function_parameters(declaration_t *declaration)
 	}
 }
 
+/**
+ * Handle additional decl modifiers for IR-graphs
+ *
+ * @param irg            the IR-graph
+ * @param dec_modifiers  additional modifiers
+ */
+static void handle_decl_modifier_irg(ir_graph_ptr irg, decl_modifiers_t decl_modifiers)
+{
+	if (decl_modifiers & DM_NORETURN) {
+		/* TRUE if the declaration includes the Microsoft
+		   __declspec(noreturn) specifier. */
+		set_irg_additional_property(irg, mtp_property_noreturn);
+	}
+	if (decl_modifiers & DM_NOTHROW) {
+		/* TRUE if the declaration includes the Microsoft
+		   __declspec(nothrow) specifier. */
+		set_irg_additional_property(irg, mtp_property_nothrow);
+	}
+	if (decl_modifiers & DM_NAKED) {
+		/* TRUE if the declaration includes the Microsoft
+		   __declspec(naked) specifier. */
+		set_irg_additional_property(irg, mtp_property_naked);
+	}
+	if (decl_modifiers & DM_FORCEINLINE) {
+		/* TRUE if the declaration includes the
+		   Microsoft __forceinline specifier. */
+		set_irg_inline_property(irg, irg_inline_forced);
+	}
+	if (decl_modifiers & DM_NOINLINE) {
+		/* TRUE if the declaration includes the Microsoft
+		   __declspec(noinline) specifier. */
+		set_irg_inline_property(irg, irg_inline_forbidden);
+	}
+}
+
 static void create_function(declaration_t *declaration)
 {
 	ir_entity *function_entity = get_function_entity(declaration);
@@ -3166,6 +3201,11 @@ static void create_function(declaration_t *declaration)
 	int       n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
 	ir_node  *first_block  = get_cur_block();
+
+	/* set inline flags */
+	if (declaration->is_inline)
+    	set_irg_inline_property(irg, irg_inline_recomended);
+    handle_decl_modifier_irg(irg, declaration->decl_modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);

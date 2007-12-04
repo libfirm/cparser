@@ -30,6 +30,7 @@ struct declaration_specifiers_t {
 	source_position_t  source_position;
 	unsigned char      storage_class;
 	bool               is_inline;
+	decl_modifiers_t   decl_modifiers;
 	type_t            *type;
 };
 
@@ -87,7 +88,8 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_const:           \
 	case T_restrict:        \
 	case T_volatile:        \
-	case T_inline:
+	case T_inline:          \
+	case T_forceinline:
 
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
@@ -1738,6 +1740,10 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
 #endif
+		case T_forceinline:
+			/* only in microsoft mode */
+			specifiers->decl_modifiers |= DM_FORCEINLINE;
+
 		case T_inline:
 			next_token();
 			specifiers->is_inline = true;
@@ -2019,7 +2025,7 @@ static declaration_t *parse_parameter(void)
 
 	parse_declaration_specifiers(&specifiers);
 
-	declaration_t *declaration = parse_declarator(&specifiers, true);
+	declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/true);
 
 	semantic_parameter(declaration);
 
@@ -2355,10 +2361,11 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
-	type_t        *type        = specifiers->type;
-	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-	declaration->storage_class = specifiers->storage_class;
-	declaration->is_inline     = specifiers->is_inline;
+	type_t        *type         = specifiers->type;
+	declaration_t *declaration  = allocate_ast_zero(sizeof(declaration[0]));
+	declaration->storage_class  = specifiers->storage_class;
+	declaration->decl_modifiers = specifiers->decl_modifiers;
+	declaration->is_inline      = specifiers->is_inline;
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(declaration, may_be_abstract);
@@ -2565,7 +2572,7 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 			break;
 		eat(',');
 
-		ndeclaration = parse_declarator(specifiers, false);
+		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false);
 	}
 	expect_void(';');
 }
@@ -2588,7 +2595,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	if(token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers, finished_declaration);
 	} else {
-		declaration_t *declaration = parse_declarator(&specifiers, false);
+		declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
 		parse_declaration_rest(declaration, &specifiers, finished_declaration);
 	}
 }
@@ -2687,7 +2694,7 @@ static void parse_external_declaration(void)
 	}
 
 	/* declarator is common to both function-definitions and declarations */
-	declaration_t *ndeclaration = parse_declarator(&specifiers, false);
+	declaration_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
 
 	/* must be a declaration */
 	if(token.type == ',' || token.type == '=' || token.type == ';') {
@@ -2782,7 +2789,7 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			parse_constant_expression();
 			/* TODO (bitfields) */
 		} else {
-			declaration_t *declaration = parse_declarator(specifiers, true);
+			declaration_t *declaration = parse_declarator(specifiers, /*may_be_abstract=*/true);
 
 			/* TODO: check constraints for struct declarations */
 			/* TODO: check for doubled fields */

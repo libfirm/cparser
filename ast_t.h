@@ -349,9 +349,23 @@ union initializer_t {
 	initializer_wide_string_t wide_string;
 };
 
+typedef enum {
+	DM_DLLIMPORT   = (1 << 0),
+	DM_DLLEXPORT   = (1 << 1),
+	DM_THREAD      = (1 << 2),
+	DM_NAKED       = (1 << 3),
+	DM_FORCEINLINE = (1 << 4),
+	DM_NOTHROW     = (1 << 5),
+	DM_NORETURN    = (1 << 6),
+	DM_NOINLINE    = (1 << 7)
+} decl_modifier_t;
+
+typedef unsigned short decl_modifiers_t;
+
 struct declaration_t {
 	unsigned char       namespc;
 	unsigned char       storage_class;
+	decl_modifiers_t    decl_modifiers;
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	type_t             *type;

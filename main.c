@@ -294,15 +294,6 @@ int main(int argc, char **argv)
 {
 	initialize_firm();
 
-	init_symbol_table();
-	init_tokens();
-	init_types();
-	init_typehash();
-	init_lexer();
-	init_ast();
-	init_parser();
-	init_ast2firm();
-
 	const char     *input        = NULL;
 	const char     *outname      = NULL;
 	const char     *dumpfunction = NULL;
@@ -434,6 +425,15 @@ int main(int argc, char **argv)
 		usage(argv[0]);
 		return 1;
 	}
+
+	init_symbol_table();
+	init_tokens();
+	init_types();
+	init_typehash();
+	init_lexer();
+	init_ast();
+	init_parser();
+	init_ast2firm();
 
 	FILE *out;
 	char  outnamebuf[4096];
