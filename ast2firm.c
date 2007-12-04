@@ -1084,7 +1084,6 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	type_t   *type = skip_typeref(expression->expression.datatype);
-	ir_mode  *mode = get_ir_mode(type);
 
 	if(expression->expression.type == EXPR_UNARY_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
@@ -1093,13 +1092,18 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	ir_node            *value_node = expression_to_firm(value);
 
 	switch(expression->expression.type) {
-	case EXPR_UNARY_NEGATE:
+	case EXPR_UNARY_NEGATE: {
+		ir_mode *mode = get_ir_mode(type);
 		return new_d_Minus(dbgi, value_node, mode);
+	}
 	case EXPR_UNARY_PLUS:
 		return value_node;
-	case EXPR_UNARY_BITWISE_NEGATE:
+	case EXPR_UNARY_BITWISE_NEGATE: {
+		ir_mode *mode = get_ir_mode(type);
 		return new_d_Not(dbgi, value_node, mode);
+	}
 	case EXPR_UNARY_NOT: {
+		ir_mode *mode = get_ir_mode(type);
 		if(get_irn_mode(value_node) != mode_b) {
 			value_node = create_conv(dbgi, value_node, mode_b);
 		}
@@ -1122,12 +1126,15 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 		return create_incdec(expression);
 	case EXPR_UNARY_CAST: {
-		ir_node *node = create_conv(dbgi, value_node, get_ir_mode(type));
+		ir_mode *mode = get_ir_mode(type);
+		ir_node *node = create_conv(dbgi, value_node, mode);
 		node = do_strict_conv(dbgi, node);
 		return node;
 	}
-	case EXPR_UNARY_CAST_IMPLICIT:
-		return create_conv(dbgi, value_node, get_ir_mode(type));
+	case EXPR_UNARY_CAST_IMPLICIT: {
+		ir_mode *mode = get_ir_mode(type);
+		return create_conv(dbgi, value_node, mode);
+	}
 
 	default:
 		break;
