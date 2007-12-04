@@ -306,13 +306,16 @@ int main(int argc, char **argv)
 
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
-		if(strcmp(arg, "-o") == 0) {
-			++i;
-			if(i >= argc) {
-				usage(argv[0]);
-				return 1;
+		if(strncmp(arg, "-o", 2) == 0) {
+			outname = &arg[2];
+			if(outname[0] == '\0') {
+				++i;
+				if(i >= argc) {
+					usage(argv[0]);
+					return 1;
+				}
+				outname = argv[i];
 			}
-			outname = argv[i];
 		} else if(strcmp(arg, "-c") == 0) {
 			mode = CompileAssemble;
 		} else if(strcmp(arg, "-S") == 0) {
