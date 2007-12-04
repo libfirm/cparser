@@ -1,4 +1,4 @@
-#define S(x)   T(x,#x,)
+#define S(x)   T(_ALL,x,#x,)
 
 S(if)
 S(else)

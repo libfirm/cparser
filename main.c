@@ -22,6 +22,7 @@
 #include "type_hash.h"
 #include "parser.h"
 #include "ast2firm.h"
+#include "lang_features.h"
 #include "driver/firm_cmdline.h"
 #include "adt/error.h"
 #include "write_fluffy.h"
@@ -32,11 +33,11 @@
 #endif
 
 #ifndef LINKER
-#define LINKER       "gcc"
+#define LINKER       "gcc -m32"
 #endif
 
 #ifndef ASSEMBLER
-#define ASSEMBLER "as"
+#define ASSEMBLER "as --32"
 #endif
 
 #ifdef _WIN32
@@ -44,6 +45,9 @@
 #define popen(cmd, mode)  _popen(cmd, mode)
 #define pclose(file)      _pclose(file)
 #endif /* _WIN32 */
+
+/** The current c mode/dialect */
+unsigned int c_mode = _C99|_GNUC;
 
 static int            verbose;
 static bool           do_dump;
@@ -333,6 +337,14 @@ int main(int argc, char **argv)
 			mode = CompileAssemble;
 		} else if(strcmp(arg, "-S") == 0) {
 			mode = Compile;
+		} else if(strcmp(arg, "--gcc") == 0) {
+			c_mode |= _GNUC;
+		} else if(strcmp(arg, "--no-gcc") == 0) {
+			c_mode &= ~_GNUC;
+		} else if(strcmp(arg, "--ms") == 0) {
+			c_mode |= _MS;
+		} else if(strcmp(arg, "--no-ms") == 0) {
+			c_mode &= ~_MS;
 		} else if(strcmp(arg, "--lextest") == 0) {
 			mode = LexTest;
 		} else if(strcmp(arg, "--print-ast") == 0) {

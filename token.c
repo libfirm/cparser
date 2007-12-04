@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "symbol.h"
+#include "lang_features.h"
 #include "adt/array.h"
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
@@ -18,11 +19,13 @@ void init_tokens(void)
 
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
-#define T(x,str,val)                                               \
-	assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                    \
-	symbol               = symbol_table_insert(str);               \
-	symbol->ID           = T_##x;                                  \
-	token_symbols[T_##x] = symbol;
+#define T(mode,x,str,val)                                          \
+	if (c_mode & (mode)) {                                         \
+		assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                \
+		symbol               = symbol_table_insert(str);           \
+		symbol->ID           = T_##x;                              \
+		token_symbols[T_##x] = symbol;                             \
+	}
 
 #define TS(x,str,val)                                              \
 	assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                    \
@@ -34,7 +37,7 @@ void init_tokens(void)
 #undef TS
 #undef T
 
-#define T(x,str,val)                                               \
+#define T(mode,x,str,val)                                          \
 	assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);                 \
 	symbol               = symbol_table_insert(str);               \
 	symbol->pp_ID        = TP_##x;

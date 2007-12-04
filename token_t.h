@@ -8,7 +8,7 @@
 #include "type.h"
 
 typedef enum {
-#define T(x,str,val) T_##x val,
+#define T(mode,x,str,val) T_##x val,
 #define TS(x,str,val) T_##x val,
 #include "tokens.inc"
 #undef TS
@@ -19,7 +19,7 @@ typedef enum {
 } token_type_t;
 
 typedef enum {
-#define T(x,str,val) TP_##x val,
+#define T(mode,x,str,val) TP_##x val,
 #define TS(x,str,val) TP_##x val,
 #include "tokens_preprocessor.inc"
 #undef TS
