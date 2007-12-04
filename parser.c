@@ -3197,7 +3197,7 @@ static expression_t *parse_function_keyword(void)
 
 	expression->expression.type     = EXPR_FUNCTION;
 	expression->expression.datatype = type_string;
-	expression->value               = "TODO: FUNCTION";
+	expression->value               = current_function->symbol->string;
 
 	return (expression_t*) expression;
 }
@@ -3207,12 +3207,16 @@ static expression_t *parse_pretty_function_keyword(void)
 	eat(T___PRETTY_FUNCTION__);
 	/* TODO */
 
+	if (current_function == NULL) {
+		parse_error("'__PRETTY_FUNCTION__' used outside of a function");
+	}
+
 	string_literal_expression_t *expression
 		= allocate_ast_zero(sizeof(expression[0]));
 
 	expression->expression.type     = EXPR_PRETTY_FUNCTION;
 	expression->expression.datatype = type_string;
-	expression->value               = "TODO: PRETTY FUNCTION";
+	expression->value               = current_function->symbol->string;
 
 	return (expression_t*) expression;
 }
