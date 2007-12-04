@@ -8,6 +8,7 @@
 #include "adt/util.h"
 #include "type_t.h"
 #include "target_architecture.h"
+#include "parser.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -754,6 +755,50 @@ end_of_string:
 	lexer_token.v.string = result;
 }
 
+static void parse_wide_character_constant(void)
+{
+	eat('\'');
+
+	int found_char = 0;
+	while(1) {
+		switch(c) {
+		case '\\':
+			found_char = parse_escape_sequence();
+			break;
+
+		MATCH_NEWLINE(
+			parse_error("newline while parsing character constant");
+			break;
+		)
+
+		case '\'':
+			next_char();
+			goto end_of_wide_char_constant;
+
+		case EOF:
+			parse_error("EOF while parsing character constant");
+			lexer_token.type = T_ERROR;
+			return;
+
+		default:
+			if(found_char != 0) {
+				parse_error("more than 1 characters in character "
+				            "constant");
+				goto end_of_wide_char_constant;
+			} else {
+				found_char = c;
+				next_char();
+			}
+			break;
+		}
+	}
+
+end_of_wide_char_constant:
+	lexer_token.type       = T_INTEGER;
+	lexer_token.v.intvalue = found_char;
+	lexer_token.datatype   = type_wchar_t;
+}
+
 static void parse_wide_string_literal(void)
 {
 	const unsigned start_linenr = lexer_token.source_position.linenr;
@@ -855,6 +900,7 @@ static void parse_character_constant(void)
 end_of_char_constant:
 	lexer_token.type       = T_INTEGER;
 	lexer_token.v.intvalue = found_char;
+	lexer_token.datatype   = type_int;
 }
 
 static void skip_multiline_comment(void)
@@ -1061,9 +1107,13 @@ void lexer_next_preprocessing_token(void)
 		SYMBOL_CHARS
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
-			if(c == '"' && (lexer_token.type == T_IDENTIFIER &&
-			   lexer_token.v.symbol == symbol_L)) {
-				parse_wide_string_literal();
+			if(lexer_token.type == T_IDENTIFIER &&
+			    lexer_token.v.symbol == symbol_L) {
+			    if(c == '"') {
+					parse_wide_string_literal();
+				} else if(c == '\'') {
+					parse_wide_character_constant();
+				}
 			}
 			return;
 

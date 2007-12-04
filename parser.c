@@ -592,8 +592,11 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			print_type_quoted(previous_declaration->type);
 			fputc('\n', stderr);
 		} else {
-			unsigned old_storage_class = previous_declaration->storage_class;
-			unsigned new_storage_class = declaration->storage_class;
+			unsigned  old_storage_class = previous_declaration->storage_class;
+			unsigned  new_storage_class = declaration->storage_class;
+			type_t   *type              = previous_declaration->type;
+			type = skip_typeref(type);
+
 			if (current_function == NULL) {
 				if (old_storage_class != STORAGE_CLASS_STATIC &&
 				    new_storage_class == STORAGE_CLASS_STATIC) {
@@ -609,7 +612,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 						if (new_storage_class == STORAGE_CLASS_NONE) {
 							previous_declaration->storage_class = STORAGE_CLASS_NONE;
 						}
-					} else {
+					} else if(!is_type_function(type)) {
 						parser_print_warning_prefix_pos(declaration->source_position);
 						fprintf(stderr, "redundant declaration for '%s'\n",
 										symbol->string);

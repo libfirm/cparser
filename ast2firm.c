@@ -120,6 +120,7 @@ static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 		return mode_Hs;
 	case ATOMIC_TYPE_USHORT:
 		return mode_Hu;
+	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_LONG:
 	case ATOMIC_TYPE_INT:
 		return mode_Is;
@@ -136,8 +137,6 @@ static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 		return mode_D;
 	case ATOMIC_TYPE_LONG_DOUBLE:
 		return mode_E;
-	case ATOMIC_TYPE_BOOL:
-		return mode_b;
 #ifdef PROVIDE_COMPLEX
 	case ATOMIC_TYPE_FLOAT_COMPLEX:
 	case ATOMIC_TYPE_DOUBLE_COMPLEX:
@@ -262,6 +261,10 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 	ir_mode *mode   = get_atomic_mode(type);
 	ident   *id     = get_mode_ident(mode);
 	ir_type *irtype = new_type_primitive(id, mode);
+
+	if(type->atype == ATOMIC_TYPE_LONG_DOUBLE) {
+		set_type_alignment_bytes(irtype, 4);
+	}
 
 	return irtype;
 }
@@ -1537,9 +1540,52 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 	return size_node;
 }
 
+static tarval *try_fold_constant(const expression_t *expression)
+{
+	ir_graph *old_current_ir_graph = current_ir_graph;
+	if(current_ir_graph == NULL) {
+		current_ir_graph = get_const_code_irg();
+	}
+
+	ir_node *cnst = expression_to_firm(expression);
+	current_ir_graph = old_current_ir_graph;
+
+	if(!is_Const(cnst)) {
+		return NULL;
+	}
+
+	tarval *tv = get_Const_tarval(cnst);
+	if(!tarval_is_long(tv)) {
+		return NULL;
+	}
+
+	return tv;
+}
+
+static long fold_constant(const expression_t *expression)
+{
+	tarval *tv = try_fold_constant(expression);
+	if(tv == NULL) {
+		panic("couldn't fold constantl");
+	}
+
+	return get_tarval_long(tv);
+}
+
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	/* first try to fold a constant condition */
+	tarval *tv = try_fold_constant(expression->condition);
+	if(tv != NULL) {
+		long val = get_tarval_long(tv);
+		if(val) {
+			return expression_to_firm(expression->true_expression);
+		} else {
+			return expression_to_firm(expression->false_expression);
+		}
+	}
 
 	ir_node *cur_block   = get_cur_block();
 
@@ -1921,303 +1967,7 @@ static void create_condition_evaluation(const expression_t *expression,
 	set_cur_block(NULL);
 }
 
-static void return_statement_to_firm(return_statement_t *statement)
-{
-	if(get_cur_block() == NULL)
-		return;
 
-	ir_type *func_irtype = get_ir_type(current_function_decl->type);
-
-	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
-
-	ir_node *in[1];
-	int      in_len;
-	if(get_method_n_ress(func_irtype) > 0) {
-		ir_type *res_type = get_method_res_type(func_irtype, 0);
-
-		if(statement->return_value != NULL) {
-			ir_node *node = expression_to_firm(statement->return_value);
-			node  = do_strict_conv(dbgi, node);
-			in[0] = node;
-		} else {
-			ir_mode *mode;
-			if(is_compound_type(res_type)) {
-				mode = mode_P_data;
-			} else {
-				mode = get_type_mode(res_type);
-			}
-			in[0] = new_Unknown(mode);
-		}
-		in_len = 1;
-	} else {
-		/* build return_value for its side effects */
-		if(statement->return_value != NULL) {
-			expression_to_firm(statement->return_value);
-		}
-		in_len = 0;
-	}
-
-	ir_node  *store = get_store();
-	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
-
-	ir_node *end_block = get_irg_end_block(current_ir_graph);
-	add_immBlock_pred(end_block, ret);
-
-	set_cur_block(NULL);
-}
-
-static ir_node *expression_statement_to_firm(expression_statement_t *statement)
-{
-	if(get_cur_block() == NULL)
-		return NULL;
-
-	return expression_to_firm(statement->expression);
-}
-
-static ir_node *compound_statement_to_firm(compound_statement_t *compound)
-{
-	ir_node     *result    = NULL;
-	statement_t *statement = compound->statements;
-	for( ; statement != NULL; statement = statement->base.next) {
-		//context2firm(&statement->context);
-
-		if(statement->base.next == NULL
-				&& statement->type == STATEMENT_EXPRESSION) {
-			result = expression_statement_to_firm(
-					(expression_statement_t*) statement);
-			break;
-		}
-		statement_to_firm(statement);
-	}
-
-	return result;
-}
-
-static void if_statement_to_firm(if_statement_t *statement)
-{
-	ir_node *cur_block = get_cur_block();
-
-	ir_node *fallthrough_block = new_immBlock();
-
-	/* the true (blocks) */
-	ir_node *true_block;
-	if (statement->true_statement != NULL) {
-		true_block = new_immBlock();
-		statement_to_firm(statement->true_statement);
-		if(get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
-			add_immBlock_pred(fallthrough_block, jmp);
-		}
-	} else {
-		true_block = fallthrough_block;
-	}
-
-	/* the false (blocks) */
-	ir_node *false_block;
-	if(statement->false_statement != NULL) {
-		false_block = new_immBlock();
-
-		statement_to_firm(statement->false_statement);
-		if(get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
-			add_immBlock_pred(fallthrough_block, jmp);
-		}
-	} else {
-		false_block = fallthrough_block;
-	}
-
-	/* create the condition */
-	if(cur_block != NULL) {
-		set_cur_block(cur_block);
-		create_condition_evaluation(statement->condition, true_block,
-		                            false_block);
-	}
-
-	mature_immBlock(true_block);
-	if(false_block != fallthrough_block) {
-		mature_immBlock(false_block);
-	}
-	mature_immBlock(fallthrough_block);
-
-	set_cur_block(fallthrough_block);
-}
-
-static void while_statement_to_firm(while_statement_t *statement)
-{
-	ir_node *jmp = NULL;
-	if(get_cur_block() != NULL) {
-		jmp = new_Jmp();
-	}
-
-	/* create the header block */
-	ir_node *header_block = new_immBlock();
-	if(jmp != NULL) {
-		add_immBlock_pred(header_block, jmp);
-	}
-
-	/* the false block */
-	ir_node *false_block = new_immBlock();
-
-	/* the loop body */
-	ir_node *body_block;
-	if (statement->body != NULL) {
-		ir_node *old_continue_label = continue_label;
-		ir_node *old_break_label    = break_label;
-		continue_label              = header_block;
-		break_label                 = false_block;
-
-		body_block = new_immBlock();
-		statement_to_firm(statement->body);
-
-		assert(continue_label == header_block);
-		assert(break_label    == false_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
-
-		if(get_cur_block() != NULL) {
-			jmp = new_Jmp();
-			add_immBlock_pred(header_block, jmp);
-		}
-	} else {
-		body_block = header_block;
-	}
-
-	/* create the condition */
-	set_cur_block(header_block);
-
-	create_condition_evaluation(statement->condition, body_block, false_block);
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-	mature_immBlock(header_block);
-
-	set_cur_block(false_block);
-}
-
-static void do_while_statement_to_firm(do_while_statement_t *statement)
-{
-	ir_node *jmp = NULL;
-	if(get_cur_block() != NULL) {
-		jmp = new_Jmp();
-	}
-
-	/* create the header block */
-	ir_node *header_block = new_immBlock();
-
-	/* the false block */
-	ir_node *false_block = new_immBlock();
-
-	/* the loop body */
-	ir_node *body_block = new_immBlock();
-	if(jmp != NULL) {
-		add_immBlock_pred(body_block, jmp);
-	}
-
-	if (statement->body != NULL) {
-		ir_node *old_continue_label = continue_label;
-		ir_node *old_break_label    = break_label;
-		continue_label              = header_block;
-		break_label                 = false_block;
-
-		statement_to_firm(statement->body);
-
-		assert(continue_label == header_block);
-		assert(break_label    == false_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
-
-		if (get_cur_block() == NULL) {
-			mature_immBlock(header_block);
-			mature_immBlock(body_block);
-			mature_immBlock(false_block);
-			return;
-		}
-	}
-
-	ir_node *body_jmp = new_Jmp();
-	add_immBlock_pred(header_block, body_jmp);
-	mature_immBlock(header_block);
-
-	/* create the condition */
-	set_cur_block(header_block);
-
-	create_condition_evaluation(statement->condition, body_block, false_block);
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-	mature_immBlock(header_block);
-
-	set_cur_block(false_block);
-}
-
-static void for_statement_to_firm(for_statement_t *statement)
-{
-	ir_node *jmp = NULL;
-	if (get_cur_block() != NULL) {
-		if(statement->initialisation != NULL) {
-			expression_to_firm(statement->initialisation);
-		}
-		jmp = new_Jmp();
-	}
-
-	/* create the step block */
-	ir_node *const step_block = new_immBlock();
-	if (statement->step != NULL) {
-		expression_to_firm(statement->step);
-	}
-	ir_node *const step_jmp = new_Jmp();
-
-	/* create the header block */
-	ir_node *const header_block = new_immBlock();
-	if (jmp != NULL) {
-		add_immBlock_pred(header_block, jmp);
-	}
-	add_immBlock_pred(header_block, step_jmp);
-
-	/* the false block */
-	ir_node *const false_block = new_immBlock();
-
-	/* the loop body */
-	ir_node * body_block;
-	if (statement->body != NULL) {
-		ir_node *const old_continue_label = continue_label;
-		ir_node *const old_break_label    = break_label;
-		continue_label = step_block;
-		break_label    = false_block;
-
-		body_block = new_immBlock();
-		statement_to_firm(statement->body);
-
-		assert(continue_label == step_block);
-		assert(break_label    == false_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
-
-		if (get_cur_block() != NULL) {
-			jmp = new_Jmp();
-			add_immBlock_pred(step_block, jmp);
-		}
-	} else {
-		body_block = step_block;
-	}
-
-	/* create the condition */
-	set_cur_block(header_block);
-	if (statement->condition != NULL) {
-		create_condition_evaluation(statement->condition, body_block,
-		                            false_block);
-	} else {
-		keep_alive(header_block);
-		jmp = new_Jmp();
-		add_immBlock_pred(body_block, jmp);
-	}
-
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-	mature_immBlock(step_block);
-	mature_immBlock(header_block);
-	mature_immBlock(false_block);
-
-	set_cur_block(false_block);
-}
 
 static void create_declaration_entity(declaration_t *declaration,
                                       declaration_type_t declaration_type,
@@ -2604,39 +2354,351 @@ static void create_local_static_variable(declaration_t *declaration)
 	current_ir_graph = old_current_ir_graph;
 }
 
+
+
+static void return_statement_to_firm(return_statement_t *statement)
+{
+	if(get_cur_block() == NULL)
+		return;
+
+	ir_type *func_irtype = get_ir_type(current_function_decl->type);
+
+	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
+
+	ir_node *in[1];
+	int      in_len;
+	if(get_method_n_ress(func_irtype) > 0) {
+		ir_type *res_type = get_method_res_type(func_irtype, 0);
+
+		if(statement->return_value != NULL) {
+			ir_node *node = expression_to_firm(statement->return_value);
+			node  = do_strict_conv(dbgi, node);
+			in[0] = node;
+		} else {
+			ir_mode *mode;
+			if(is_compound_type(res_type)) {
+				mode = mode_P_data;
+			} else {
+				mode = get_type_mode(res_type);
+			}
+			in[0] = new_Unknown(mode);
+		}
+		in_len = 1;
+	} else {
+		/* build return_value for its side effects */
+		if(statement->return_value != NULL) {
+			expression_to_firm(statement->return_value);
+		}
+		in_len = 0;
+	}
+
+	ir_node  *store = get_store();
+	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
+
+	ir_node *end_block = get_irg_end_block(current_ir_graph);
+	add_immBlock_pred(end_block, ret);
+
+	set_cur_block(NULL);
+}
+
+static ir_node *expression_statement_to_firm(expression_statement_t *statement)
+{
+	if(get_cur_block() == NULL)
+		return NULL;
+
+	return expression_to_firm(statement->expression);
+}
+
+static ir_node *compound_statement_to_firm(compound_statement_t *compound)
+{
+	ir_node     *result    = NULL;
+	statement_t *statement = compound->statements;
+	for( ; statement != NULL; statement = statement->base.next) {
+		//context2firm(&statement->context);
+
+		if(statement->base.next == NULL
+				&& statement->type == STATEMENT_EXPRESSION) {
+			result = expression_statement_to_firm(
+					(expression_statement_t*) statement);
+			break;
+		}
+		statement_to_firm(statement);
+	}
+
+	return result;
+}
+
+static void create_local_declaration(declaration_t *declaration)
+{
+	type_t *type = skip_typeref(declaration->type);
+
+	switch ((storage_class_tag_t) declaration->storage_class) {
+	case STORAGE_CLASS_STATIC:
+		create_local_static_variable(declaration);
+		return;
+	case STORAGE_CLASS_ENUM_ENTRY:
+		panic("enum entry declaration in local block found");
+	case STORAGE_CLASS_EXTERN:
+		panic("extern declaration in local block found");
+	case STORAGE_CLASS_NONE:
+	case STORAGE_CLASS_AUTO:
+	case STORAGE_CLASS_REGISTER:
+		if(is_type_function(type)) {
+			panic("nested functions not supported yet");
+		} else {
+			create_local_variable(declaration);
+		}
+		return;
+	case STORAGE_CLASS_TYPEDEF:
+	case STORAGE_CLASS_THREAD:
+	case STORAGE_CLASS_THREAD_EXTERN:
+	case STORAGE_CLASS_THREAD_STATIC:
+		return;
+	}
+	panic("invalid storage class found");
+}
+
 static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
 	declaration_t *declaration = statement->declarations_begin;
 	declaration_t *end         = statement->declarations_end->next;
 	for( ; declaration != end; declaration = declaration->next) {
-		type_t *type = skip_typeref(declaration->type);
-
-		switch ((storage_class_tag_t) declaration->storage_class) {
-		case STORAGE_CLASS_TYPEDEF:
-			continue;
-		case STORAGE_CLASS_STATIC:
-			create_local_static_variable(declaration);
-			continue;
-		case STORAGE_CLASS_ENUM_ENTRY:
-			panic("enum entry declaration in local block found");
-		case STORAGE_CLASS_EXTERN:
-			panic("extern declaration in local block found");
-		case STORAGE_CLASS_NONE:
-		case STORAGE_CLASS_AUTO:
-		case STORAGE_CLASS_REGISTER:
-			if(is_type_function(type)) {
-				panic("nested functions not supported yet");
-			} else {
-				create_local_variable(declaration);
-			}
-			continue;
-		case STORAGE_CLASS_THREAD:
-		case STORAGE_CLASS_THREAD_EXTERN:
-		case STORAGE_CLASS_THREAD_STATIC:
-			break;
-		}
-		panic("invalid storage class found");
+		create_local_variable(declaration);
 	}
+}
+
+static void if_statement_to_firm(if_statement_t *statement)
+{
+	ir_node *cur_block = get_cur_block();
+
+	ir_node *fallthrough_block = new_immBlock();
+
+	/* the true (blocks) */
+	ir_node *true_block;
+	if (statement->true_statement != NULL) {
+		true_block = new_immBlock();
+		statement_to_firm(statement->true_statement);
+		if(get_cur_block() != NULL) {
+			ir_node *jmp = new_Jmp();
+			add_immBlock_pred(fallthrough_block, jmp);
+		}
+	} else {
+		true_block = fallthrough_block;
+	}
+
+	/* the false (blocks) */
+	ir_node *false_block;
+	if(statement->false_statement != NULL) {
+		false_block = new_immBlock();
+
+		statement_to_firm(statement->false_statement);
+		if(get_cur_block() != NULL) {
+			ir_node *jmp = new_Jmp();
+			add_immBlock_pred(fallthrough_block, jmp);
+		}
+	} else {
+		false_block = fallthrough_block;
+	}
+
+	/* create the condition */
+	if(cur_block != NULL) {
+		set_cur_block(cur_block);
+		create_condition_evaluation(statement->condition, true_block,
+		                            false_block);
+	}
+
+	mature_immBlock(true_block);
+	if(false_block != fallthrough_block) {
+		mature_immBlock(false_block);
+	}
+	mature_immBlock(fallthrough_block);
+
+	set_cur_block(fallthrough_block);
+}
+
+static void while_statement_to_firm(while_statement_t *statement)
+{
+	ir_node *jmp = NULL;
+	if(get_cur_block() != NULL) {
+		jmp = new_Jmp();
+	}
+
+	/* create the header block */
+	ir_node *header_block = new_immBlock();
+	if(jmp != NULL) {
+		add_immBlock_pred(header_block, jmp);
+	}
+
+	/* the false block */
+	ir_node *false_block = new_immBlock();
+
+	/* the loop body */
+	ir_node *body_block;
+	if (statement->body != NULL) {
+		ir_node *old_continue_label = continue_label;
+		ir_node *old_break_label    = break_label;
+		continue_label              = header_block;
+		break_label                 = false_block;
+
+		body_block = new_immBlock();
+		statement_to_firm(statement->body);
+
+		assert(continue_label == header_block);
+		assert(break_label    == false_block);
+		continue_label = old_continue_label;
+		break_label    = old_break_label;
+
+		if(get_cur_block() != NULL) {
+			jmp = new_Jmp();
+			add_immBlock_pred(header_block, jmp);
+		}
+	} else {
+		body_block = header_block;
+	}
+
+	/* create the condition */
+	set_cur_block(header_block);
+
+	create_condition_evaluation(statement->condition, body_block, false_block);
+	mature_immBlock(body_block);
+	mature_immBlock(false_block);
+	mature_immBlock(header_block);
+
+	set_cur_block(false_block);
+}
+
+static void do_while_statement_to_firm(do_while_statement_t *statement)
+{
+	ir_node *jmp = NULL;
+	if(get_cur_block() != NULL) {
+		jmp = new_Jmp();
+	}
+
+	/* create the header block */
+	ir_node *header_block = new_immBlock();
+
+	/* the false block */
+	ir_node *false_block = new_immBlock();
+
+	/* the loop body */
+	ir_node *body_block = new_immBlock();
+	if(jmp != NULL) {
+		add_immBlock_pred(body_block, jmp);
+	}
+
+	if (statement->body != NULL) {
+		ir_node *old_continue_label = continue_label;
+		ir_node *old_break_label    = break_label;
+		continue_label              = header_block;
+		break_label                 = false_block;
+
+		statement_to_firm(statement->body);
+
+		assert(continue_label == header_block);
+		assert(break_label    == false_block);
+		continue_label = old_continue_label;
+		break_label    = old_break_label;
+
+		if (get_cur_block() == NULL) {
+			mature_immBlock(header_block);
+			mature_immBlock(body_block);
+			mature_immBlock(false_block);
+			return;
+		}
+	}
+
+	ir_node *body_jmp = new_Jmp();
+	add_immBlock_pred(header_block, body_jmp);
+	mature_immBlock(header_block);
+
+	/* create the condition */
+	set_cur_block(header_block);
+
+	create_condition_evaluation(statement->condition, body_block, false_block);
+	mature_immBlock(body_block);
+	mature_immBlock(false_block);
+	mature_immBlock(header_block);
+
+	set_cur_block(false_block);
+}
+
+static void for_statement_to_firm(for_statement_t *statement)
+{
+	ir_node *jmp = NULL;
+	if (get_cur_block() != NULL) {
+		if(statement->initialisation != NULL) {
+			expression_to_firm(statement->initialisation);
+		}
+
+		/* create declarations */
+		declaration_t *declaration = statement->context.declarations;
+		for( ; declaration != NULL; declaration = declaration->next) {
+			create_local_declaration(declaration);
+		}
+
+		jmp = new_Jmp();
+	}
+
+
+	/* create the step block */
+	ir_node *const step_block = new_immBlock();
+	if (statement->step != NULL) {
+		expression_to_firm(statement->step);
+	}
+	ir_node *const step_jmp = new_Jmp();
+
+	/* create the header block */
+	ir_node *const header_block = new_immBlock();
+	if (jmp != NULL) {
+		add_immBlock_pred(header_block, jmp);
+	}
+	add_immBlock_pred(header_block, step_jmp);
+
+	/* the false block */
+	ir_node *const false_block = new_immBlock();
+
+	/* the loop body */
+	ir_node * body_block;
+	if (statement->body != NULL) {
+		ir_node *const old_continue_label = continue_label;
+		ir_node *const old_break_label    = break_label;
+		continue_label = step_block;
+		break_label    = false_block;
+
+		body_block = new_immBlock();
+		statement_to_firm(statement->body);
+
+		assert(continue_label == step_block);
+		assert(break_label    == false_block);
+		continue_label = old_continue_label;
+		break_label    = old_break_label;
+
+		if (get_cur_block() != NULL) {
+			jmp = new_Jmp();
+			add_immBlock_pred(step_block, jmp);
+		}
+	} else {
+		body_block = step_block;
+	}
+
+	/* create the condition */
+	set_cur_block(header_block);
+	if (statement->condition != NULL) {
+		create_condition_evaluation(statement->condition, body_block,
+		                            false_block);
+	} else {
+		keep_alive(header_block);
+		jmp = new_Jmp();
+		add_immBlock_pred(body_block, jmp);
+	}
+
+	mature_immBlock(body_block);
+	mature_immBlock(false_block);
+	mature_immBlock(step_block);
+	mature_immBlock(header_block);
+	mature_immBlock(false_block);
+
+	set_cur_block(false_block);
 }
 
 static void create_jump_statement(const statement_t *statement,
@@ -2690,26 +2752,6 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 
 	mature_immBlock(break_block);
 	set_cur_block(break_block);
-}
-
-static long fold_constant(const expression_t *expression)
-{
-	ir_graph *old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
-	ir_node *cnst = expression_to_firm(expression);
-	if(!is_Const(cnst)) {
-		panic("couldn't fold constantl");
-	}
-	tarval *tv = get_Const_tarval(cnst);
-	if(!tarval_is_long(tv)) {
-		panic("folded constant not an integer");
-	}
-
-	long res = get_tarval_long(tv);
-
-	current_ir_graph = old_current_ir_graph;
-	return res;
 }
 
 static void case_label_to_firm(const case_label_statement_t *statement)

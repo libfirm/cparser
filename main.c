@@ -393,7 +393,9 @@ int main(int argc, char **argv)
 				} else {
 					input = arg;
 				}
-			} else if (arg[1] == 'O' ||
+			} else if(strcmp(arg, "-pedantic") == 0) {
+				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+			} else if(arg[1] == 'O' ||
 					arg[1] == 'f' ||
 					arg[1] == 'W' ||
 					arg[1] == 'g' ||
