@@ -51,7 +51,6 @@ static bool do_dump;
 static void initialize_firm(void)
 {
 	firm_early_init();
-	gen_firm_init();
 
 	dump_consts_local(1);
 	dump_keepalive_edges(1);
@@ -357,8 +356,9 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Error: unknown Firm option %s\n", opt);
 				usage(argv[0]);
 				return 1;
-			} else if (res == -1) /* help option */
+			} else if (res == -1) { /* help option */
 				exit(0);
+			}
 		} else if(arg[0] == '-' && arg[1] == 'b') {
 			const char *opt = &arg[2];
 			if(opt[0] == 0) {
@@ -378,8 +378,9 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Error: unknown Firm backend option %s\n", opt);
 				usage(argv[0]);
 				return 1;
-			} else if (res == -1) /* help option */
+			} else if (res == -1) { /* help option */
 				exit(0);
+			}
 		} else if(arg[0] == '-') {
 			if (arg[1] == '\0') {
 				input = "-";
@@ -480,6 +481,7 @@ int main(int argc, char **argv)
 		write_fluffy_decls(out, unit);
 	}
 
+	gen_firm_init();
 	create_firm_prog(unit);
 
 	FILE *asm_out;
