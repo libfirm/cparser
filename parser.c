@@ -954,7 +954,16 @@ incompatible_assign_types:
 static expression_t *parse_constant_expression(void)
 {
 	/* start parsing at precedence 7 (conditional expression) */
-	return parse_sub_expression(7);
+	expression_t *result = parse_sub_expression(7);
+
+	if(!is_constant_expression(result)) {
+		parser_print_error_prefix_pos(result->base.source_position);
+		fprintf(stderr, "expression '");
+		print_expression(result);
+		fprintf(stderr, "' is not constant\n");
+	}
+
+	return result;
 }
 
 static expression_t *parse_assignment_expression(void)

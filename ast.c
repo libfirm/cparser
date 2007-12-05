@@ -746,6 +746,102 @@ void print_ast(const translation_unit_t *unit)
 	}
 }
 
+bool is_constant_expression(const expression_t *expression)
+{
+	switch(expression->type) {
+
+	case EXPR_CONST:
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_SIZEOF:
+	case EXPR_CLASSIFY_TYPE:
+	case EXPR_FUNCTION:
+	case EXPR_PRETTY_FUNCTION:
+	case EXPR_OFFSETOF:
+		return true;
+
+	case EXPR_BUILTIN_SYMBOL:
+	case EXPR_CALL:
+	case EXPR_REFERENCE:
+	case EXPR_SELECT:
+	case EXPR_VA_START:
+	case EXPR_VA_ARG:
+	case EXPR_STATEMENT:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
+	case EXPR_BINARY_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_DIV_ASSIGN:
+	case EXPR_BINARY_MOD_ASSIGN:
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:
+	case EXPR_BINARY_COMMA:
+		return false;
+
+	case EXPR_UNARY_NEGATE:
+	case EXPR_UNARY_PLUS:
+	case EXPR_UNARY_BITWISE_NEGATE:
+	case EXPR_UNARY_NOT:
+	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_TAKE_ADDRESS:
+	case EXPR_UNARY_CAST:
+	case EXPR_UNARY_CAST_IMPLICIT:
+		return is_constant_expression(expression->unary.value);
+
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_SUB:
+	case EXPR_BINARY_MUL:
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_LOGICAL_AND:
+	case EXPR_BINARY_LOGICAL_OR:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED:
+		return is_constant_expression(expression->binary.left)
+			&& is_constant_expression(expression->binary.right);
+
+	case EXPR_CONDITIONAL:
+		/* TODO: not correct, we only have to test expressions which are
+		 * evaluated, which means either the true or false part might be not
+		 * constant */
+		return is_constant_expression(expression->conditional.condition)
+			&& is_constant_expression(expression->conditional.true_expression)
+			&& is_constant_expression(expression->conditional.false_expression);
+
+	case EXPR_ARRAY_ACCESS:
+		return is_constant_expression(expression->array_access.array_ref)
+			&& is_constant_expression(expression->array_access.index);
+
+	case EXPR_UNKNOWN:
+	case EXPR_INVALID:
+		break;
+	}
+	panic("invalid expression found (is constant expression)");
+}
+
+
 void init_ast(void)
 {
 	obstack_init(&ast_obstack);

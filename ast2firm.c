@@ -1643,8 +1643,10 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 	return size_node;
 }
 
-static tarval *try_fold_constant(const expression_t *expression)
+static long fold_constant(const expression_t *expression)
 {
+	assert(is_constant_expression(expression));
+
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	if(current_ir_graph == NULL) {
 		current_ir_graph = get_const_code_irg();
@@ -1654,22 +1656,12 @@ static tarval *try_fold_constant(const expression_t *expression)
 	current_ir_graph = old_current_ir_graph;
 
 	if(!is_Const(cnst)) {
-		return NULL;
+		panic("couldn't fold constant\n");
 	}
 
 	tarval *tv = get_Const_tarval(cnst);
 	if(!tarval_is_long(tv)) {
-		return NULL;
-	}
-
-	return tv;
-}
-
-static long fold_constant(const expression_t *expression)
-{
-	tarval *tv = try_fold_constant(expression);
-	if(tv == NULL) {
-		panic("couldn't fold constantl");
+		panic("result of constant folding is not integer\n");
 	}
 
 	return get_tarval_long(tv);
@@ -1680,9 +1672,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 
 	/* first try to fold a constant condition */
-	tarval *tv = try_fold_constant(expression->condition);
-	if(tv != NULL) {
-		long val = get_tarval_long(tv);
+	if(is_constant_expression(expression->condition)) {
+		long val = fold_constant(expression->condition);
 		if(val) {
 			return expression_to_firm(expression->true_expression);
 		} else {
