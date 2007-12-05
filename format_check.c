@@ -6,7 +6,7 @@
 #include "types.h"
 
 
-typedef enum format_flags_t {
+typedef enum format_flag_t {
 	FMT_FLAG_NONE  = 0,
 	FMT_FLAG_HASH  = 1U << 0,
 	FMT_FLAG_ZERO  = 1U << 1,
@@ -14,7 +14,9 @@ typedef enum format_flags_t {
 	FMT_FLAG_SPACE = 1U << 3,
 	FMT_FLAG_PLUS  = 1U << 4,
 	FMT_FLAG_TICK  = 1U << 5
-} format_flags_t;
+} format_flag_t;
+
+typedef unsigned format_flags_t;
 
 typedef enum format_length_modifier_t {
 	FMT_MOD_NONE,
