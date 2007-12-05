@@ -46,6 +46,7 @@
 
 #include "lexer.h"
 #include "token_t.h"
+#include "types.h"
 #include "type_hash.h"
 #include "parser.h"
 #include "ast2firm.h"
@@ -497,6 +498,7 @@ int main(int argc, char **argv)
 	init_tokens();
 	init_types();
 	init_typehash();
+	init_basic_types();
 	init_lexer();
 	init_ast();
 	init_parser();

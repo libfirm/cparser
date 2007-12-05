@@ -7,6 +7,7 @@
 #include "parser.h"
 #include "lexer.h"
 #include "token_t.h"
+#include "types.h"
 #include "type_t.h"
 #include "type_hash.h"
 #include "ast_t.h"
@@ -48,20 +49,7 @@ static declaration_t  *current_function  = NULL;
 static struct obstack  temp_obst;
 static bool            found_error;
 
-static type_t         *type_int         = NULL;
-static type_t         *type_long_double = NULL;
-static type_t         *type_double      = NULL;
-static type_t         *type_float       = NULL;
-static type_t         *type_char        = NULL;
-static type_t         *type_string      = NULL;
-static type_t         *type_void        = NULL;
-static type_t         *type_void_ptr    = NULL;
-static type_t         *type_valist      = NULL;
-
-type_t *type_size_t      = NULL;
-type_t *type_ptrdiff_t   = NULL;
-type_t *type_wchar_t     = NULL;
-type_t *type_wchar_t_ptr = NULL;
+static type_t *type_valist;
 
 static statement_t *parse_compound_statement(void);
 static statement_t *parse_statement(void);
@@ -5175,12 +5163,19 @@ static statement_t *parse_compound_statement(void)
 
 static void initialize_builtins(void)
 {
-	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__", type_int);
-	type_wchar_t_ptr = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
-	type_size_t      = make_global_typedef("__SIZE_TYPE__",
-			make_atomic_type(ATOMIC_TYPE_ULONG, TYPE_QUALIFIER_NONE));
-	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",
-			make_atomic_type(ATOMIC_TYPE_LONG, TYPE_QUALIFIER_NONE));
+	type_intmax_t    = make_global_typedef("__intmax_t__",      type_long_long);
+	type_size_t      = make_global_typedef("__SIZE_TYPE__",     type_unsigned_long);
+	type_ssize_t     = make_global_typedef("__SSIZE_TYPE__",    type_long);
+	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",  type_long);
+	type_uintmax_t   = make_global_typedef("__uintmax_t__",     type_unsigned_long_long);
+	type_uptrdiff_t  = make_global_typedef("__UPTRDIFF_TYPE__", type_unsigned_long);
+	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__",    type_int);
+	type_wint_t      = make_global_typedef("__WINT_TYPE__",     type_int);
+
+	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);
+	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
+	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
+	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
 }
 
 static translation_unit_t *parse_translation_unit(void)
@@ -5237,17 +5232,6 @@ void init_parser(void)
 {
 	init_expression_parsers();
 	obstack_init(&temp_obst);
-
-	type_int         = make_atomic_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
-	type_long_double = make_atomic_type(ATOMIC_TYPE_LONG_DOUBLE,
-	                                    TYPE_QUALIFIER_NONE);
-	type_double      = make_atomic_type(ATOMIC_TYPE_DOUBLE,
-	                                    TYPE_QUALIFIER_NONE);
-	type_float       = make_atomic_type(ATOMIC_TYPE_FLOAT, TYPE_QUALIFIER_NONE);
-	type_char        = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_NONE);
-	type_void        = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
-	type_void_ptr    = make_pointer_type(type_void, TYPE_QUALIFIER_NONE);
-	type_string      = make_pointer_type(type_char, TYPE_QUALIFIER_NONE);
 
 	symbol_t *const va_list_sym = symbol_table_insert("__builtin_va_list");
 	type_valist = create_builtin_type(va_list_sym, type_void_ptr);

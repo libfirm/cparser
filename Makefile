@@ -32,6 +32,7 @@ SOURCES := \
 	symbol_table.c \
 	token.c \
 	type.c \
+	types.c \
 	type_hash.c \
 	write_fluffy.c \
 	driver/firm_cmdline.c \
