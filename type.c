@@ -11,8 +11,8 @@ struct obstack         *type_obst = &_type_obst;
 static FILE            *out;
 static int              type_visited = 0;
 
-static void intern_print_type_pre(type_t *type, bool top);
-static void intern_print_type_post(type_t *type, bool top);
+static void intern_print_type_pre(const type_t *type, bool top);
+static void intern_print_type_post(const type_t *type, bool top);
 
 void init_types(void)
 {
@@ -234,12 +234,12 @@ static void print_compound_type(const compound_type_t *type)
 	}
 }
 
-static void print_typedef_type_pre(typedef_type_t *type)
+static void print_typedef_type_pre(const typedef_type_t *const type)
 {
 	fputs(type->declaration->symbol->string, out);
 }
 
-static void print_typeof_type_pre(typeof_type_t *type)
+static void print_typeof_type_pre(const typeof_type_t *const type)
 {
 	fputs("typeof(", out);
 	if(type->expression != NULL) {
@@ -251,7 +251,7 @@ static void print_typeof_type_pre(typeof_type_t *type)
 	fputc(')', out);
 }
 
-static void intern_print_type_pre(type_t *type, bool top)
+static void intern_print_type_pre(const type_t *const type, const bool top)
 {
 	switch(type->type) {
 	case TYPE_INVALID:
@@ -289,7 +289,7 @@ static void intern_print_type_pre(type_t *type, bool top)
 	fputs("unknown", out);
 }
 
-static void intern_print_type_post(type_t *type, bool top)
+static void intern_print_type_post(const type_t *const type, const bool top)
 {
 	switch(type->type) {
 	case TYPE_FUNCTION:
@@ -313,12 +313,12 @@ static void intern_print_type_post(type_t *type, bool top)
 	}
 }
 
-void print_type(type_t *type)
+void print_type(const type_t *const type)
 {
 	print_type_ext(type, NULL, NULL);
 }
 
-void print_type_ext(type_t *type, const symbol_t *symbol,
+void print_type_ext(const type_t *const type, const symbol_t *symbol,
                     const context_t *context)
 {
 	if(type == NULL) {

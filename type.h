@@ -21,13 +21,13 @@ typedef union  type_t                type_t;
 void init_types(void);
 void exit_types(void);
 
-void print_type(type_t *type);
+void print_type(const type_t *type);
 
 /**
  * prints a human readable form of @p type. prints an abstract typename
  * if symbol is NULL
  */
-void print_type_ext(type_t *type, const symbol_t *symbol,
+void print_type_ext(const type_t *type, const symbol_t *symbol,
                     const context_t *context);
 
 void print_type_qualifiers(unsigned qualifiers);
