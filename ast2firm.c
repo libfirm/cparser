@@ -53,6 +53,7 @@ typedef enum declaration_type_t {
 } declaration_type_t;
 
 static ir_type *get_ir_type(type_t *type);
+static int count_decls_in_stmts(const statement_t *stmt);
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
@@ -3017,14 +3018,19 @@ static int count_local_declarations(const declaration_t *      decl,
 	return count;
 }
 
+static int count_decls_in_expr(const expression_t *expr) {
+	if (expr->base.type == EXPR_STATEMENT)
+		return count_decls_in_stmts(expr->statement.statement);
+	return 0;
+}
+
 static int count_decls_in_stmts(const statement_t *stmt)
 {
 	int count = 0;
 	for (; stmt != NULL; stmt = stmt->base.next) {
 		switch (stmt->type) {
 			case STATEMENT_DECLARATION: {
-				const declaration_statement_t *const decl_stmt =
-					(const declaration_statement_t*)stmt;
+				const declaration_statement_t *const decl_stmt = &stmt->declaration;
 				count += count_local_declarations(decl_stmt->declarations_begin,
 				                                  decl_stmt->declarations_end->next);
 				break;
@@ -3038,44 +3044,46 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			}
 
 			case STATEMENT_IF: {
-				const if_statement_t *const if_stmt = (const if_statement_t*)stmt;
+				const if_statement_t *const if_stmt = &stmt->ifs;
+				count += count_decls_in_expr(if_stmt->condition);
 				count += count_decls_in_stmts(if_stmt->true_statement);
 				count += count_decls_in_stmts(if_stmt->false_statement);
 				break;
 			}
 
 			case STATEMENT_SWITCH: {
-				const switch_statement_t *const switch_stmt =
-					(const switch_statement_t*)stmt;
+				const switch_statement_t *const switch_stmt = &stmt->switchs;
+				count += count_decls_in_expr(switch_stmt->expression);
 				count += count_decls_in_stmts(switch_stmt->body);
 				break;
 			}
 
 			case STATEMENT_LABEL: {
-				const label_statement_t *const label_stmt =
-					(const label_statement_t*)stmt;
+				const label_statement_t *const label_stmt = &stmt->label;
 				count += count_decls_in_stmts(label_stmt->label_statement);
 				break;
 			}
 
 			case STATEMENT_WHILE: {
-				const while_statement_t *const while_stmt =
-					(const while_statement_t*)stmt;
+				const while_statement_t *const while_stmt = &stmt->whiles;
+				count += count_decls_in_expr(while_stmt->condition);
 				count += count_decls_in_stmts(while_stmt->body);
 				break;
 			}
 
 			case STATEMENT_DO_WHILE: {
-				const do_while_statement_t *const do_while_stmt =
-					(const do_while_statement_t*)stmt;
+				const do_while_statement_t *const do_while_stmt = &stmt->do_while;
+				count += count_decls_in_expr(do_while_stmt->condition);
 				count += count_decls_in_stmts(do_while_stmt->body);
 				break;
 			}
 
 			case STATEMENT_FOR: {
-				const for_statement_t *const for_stmt =
-					(const for_statement_t*)stmt;
-				/* TODO initialisation */
+				const for_statement_t *const for_stmt = &stmt->fors;
+				count += count_local_declarations(for_stmt->context.declarations, NULL);
+				count += count_decls_in_expr(for_stmt->initialisation);
+				count += count_decls_in_expr(for_stmt->condition);
+				count += count_decls_in_expr(for_stmt->step);
 				count += count_decls_in_stmts(for_stmt->body);
 				break;
 			}
@@ -3084,11 +3092,23 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_BREAK:
 			case STATEMENT_CASE_LABEL:
 			case STATEMENT_CONTINUE:
-			case STATEMENT_EXPRESSION:
+				break;
+
+			case STATEMENT_EXPRESSION: {
+				const expression_statement_t *expr_stmt = &stmt->expression;
+				count += count_decls_in_expr(expr_stmt->expression);
+				break;
+			}
+
 			case STATEMENT_GOTO:
 			case STATEMENT_INVALID:
-			case STATEMENT_RETURN:
 				break;
+
+			case STATEMENT_RETURN: {
+				const return_statement_t *ret_stmt = &stmt->returns;
+				count += count_decls_in_expr(ret_stmt->return_value);
+				break;
+			}
 		}
 	}
 	return count;
@@ -3103,10 +3123,6 @@ static int get_function_n_local_vars(declaration_t *declaration)
 
 	/* count local variables declared in body */
 	count += count_decls_in_stmts(declaration->init.statement);
-
-	/* TODO FIXME: Matze: I'm lazy don't want to scan all expressions
-	 * for expression statements... */
-	count += 10;
 
 	return count;
 }
