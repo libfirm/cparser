@@ -13,4 +13,10 @@ enum lang_features {
 /* the current C mode/dialect */
 extern unsigned int c_mode;
 
+/* the 'machine size', 16, 32 or 64 bit */
+extern unsigned int machine_size;
+
+/* true if the char type is signed */
+extern bool char_is_signed;
+
 #endif

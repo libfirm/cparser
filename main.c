@@ -70,6 +70,12 @@
 /** The current c mode/dialect. */
 unsigned int c_mode = _C99|_GNUC;
 
+/** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
+unsigned int machine_size = 32;
+
+/** true if the char type is signed. */
+bool char_is_signed = true;
+
 static int            verbose;
 static struct obstack cppflags_obst;
 
@@ -355,6 +361,10 @@ int main(int argc, char **argv)
 			c_mode &= ~_GNUC;
 		} else if(strcmp(arg, "--ms") == 0) {
 			c_mode |= _MS;
+		} else if(strcmp(arg, "--signed-chars") == 0) {
+			char_is_signed = true;
+		} else if(strcmp(arg, "--unsigned-chars") == 0) {
+			char_is_signed = false;
 		} else if(strcmp(arg, "--no-ms") == 0) {
 			c_mode &= ~_MS;
 		} else if(strcmp(arg, "--lextest") == 0) {
@@ -407,6 +417,20 @@ int main(int argc, char **argv)
 			} else if (res == -1) {
 				help_displayed = true;
 			}
+		} else if(arg[0] == '-' && arg[1] == 'm') {
+			const char *opt;
+			GET_ARG_AFTER(opt, "-m");
+			char *endptr;
+			long int value = strtol(opt, &endptr, 10);
+			if (*endptr != '\0') {
+				fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
+				argument_errors = true;
+			}
+			if (value != 16 && value != 32 && value != 64) {
+				fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
+				argument_errors = true;
+			} else
+				machine_size = (unsigned int)value;
 		} else if(arg[0] == '-') {
 			if (arg[1] == '\0') {
 				if(input != NULL) {
@@ -445,6 +469,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	gen_firm_init();
 	init_symbol_table();
 	init_tokens();
 	init_types();
@@ -537,7 +562,6 @@ int main(int argc, char **argv)
 		write_fluffy_decls(out, unit);
 	}
 
-	gen_firm_init();
 	translation_unit_to_firm(unit);
 
 	if(mode == ParseOnly) {

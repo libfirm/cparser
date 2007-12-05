@@ -17,6 +17,7 @@
 #include "type_t.h"
 #include "ast_t.h"
 #include "parser.h"
+#include "lang_features.h"
 
 #define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
 
@@ -88,16 +89,6 @@ const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 	return pos->input_name;
 }
 
-void init_ast2firm(void)
-{
-	obstack_init(&asm_obst);
-}
-
-void exit_ast2firm(void)
-{
-	obstack_free(&asm_obst, NULL);
-}
-
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
 	return (dbg_info*) pos;
@@ -114,56 +105,149 @@ static ident *unique_ident(const char *tag)
 	return new_id_from_str(buf);
 }
 
-static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
+/**
+ * Return the signed integer mode of size bytes.
+ *
+ * @param size   the size
+ */
+static ir_mode *get_smode(unsigned size)
 {
-	switch(atomic_type->atype) {
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_CHAR:
-		return mode_Bs;
-	case ATOMIC_TYPE_UCHAR:
-		return mode_Bu;
-	case ATOMIC_TYPE_SHORT:
-		return mode_Hs;
-	case ATOMIC_TYPE_USHORT:
-		return mode_Hu;
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_INT:
-		return mode_Is;
-	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_UINT:
-		return mode_Iu;
-	case ATOMIC_TYPE_LONGLONG:
-		return mode_Ls;
-	case ATOMIC_TYPE_ULONGLONG:
-		return mode_Lu;
-	case ATOMIC_TYPE_FLOAT:
-		return mode_F;
-	case ATOMIC_TYPE_DOUBLE:
-		return mode_D;
-	case ATOMIC_TYPE_LONG_DOUBLE:
-		return mode_E;
-#ifdef PROVIDE_COMPLEX
-	case ATOMIC_TYPE_FLOAT_COMPLEX:
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-		panic("complex lowering not implemented yet");
-		break;
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-		panic("imaginary lowering not implemented yet");
-		break;
-#endif
-	case ATOMIC_TYPE_VOID:
-		/* firm has no real void... */
-		return mode_Is;
-	case ATOMIC_TYPE_INVALID:
-		break;
+	static ir_mode *s_modes[16 + 1] = {0, };
+	ir_mode *res;
+
+	if (size <= 0 || size > 16)
+		return NULL;
+
+	res = s_modes[size];
+	if (res == NULL) {
+		unsigned bits;
+    	char name[32];
+
+    	bits = size * 8;
+    	snprintf(name, sizeof(name), "i%u", bits);
+    	res = new_ir_mode(name, irms_int_number, bits, 1, irma_twos_complement,
+    					bits <= machine_size ? machine_size : bits );
+
+		s_modes[size] = res;
 	}
-	panic("Encountered unknown atomic type");
+	return res;
 }
 
+/**
+ * Return the unsigned integer mode of size bytes.
+ *
+ * @param size  the size
+ */
+static ir_mode *get_umode(unsigned size)
+{
+	static ir_mode *u_modes[16 + 1] = {0, };
+	ir_mode *res;
+
+	if (size <= 0 || size > 16)
+		return NULL;
+
+	res = u_modes[size];
+	if (res == NULL) {
+		unsigned bits;
+		char name[32];
+
+		bits = size * 8;
+		snprintf(name, sizeof(name), "u%u", bits);
+		res = new_ir_mode(name, irms_int_number, bits, 0, irma_twos_complement,
+						bits <= machine_size ? machine_size : bits );
+
+		u_modes[size] = res;
+	}
+	return res;
+}
+
+/**
+ * Return the pointer mode of size bytes.
+ *
+ * @param size  the size
+ */
+static ir_mode *get_ptrmode(unsigned size, char *name)
+{
+	static ir_mode *p_modes[16 + 1] = {0, };
+	ir_mode *res;
+
+	if (size <= 0 || size > 16)
+		return NULL;
+
+	res = p_modes[size];
+	if (res == NULL) {
+		unsigned bits;
+		char buf[32];
+
+		bits = size * 8;
+		if (name == NULL) {
+			snprintf(buf, sizeof(buf), "p%u", bits);
+			name = buf;
+		}
+		res = new_ir_mode(name, irms_reference, bits, 0, irma_twos_complement,
+						bits <= machine_size ? machine_size : bits);
+
+		p_modes[size] = res;
+
+		set_reference_mode_signed_eq(res, get_smode(size));
+		set_reference_mode_unsigned_eq(res, get_umode(size));
+	}
+	return res;
+}
+
+static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST];
+
+static ir_mode *mode_int, *mode_uint;
+
+/**
+ * Initialises the atomic modes depending on the machine size.
+ */
+static void init_atomic_modes(void) {
+	unsigned int_size   = machine_size < 32 ? 2 : 4;
+	unsigned long_size  = machine_size < 64 ? 4 : 8;
+	unsigned llong_size = machine_size < 32 ? 4 : 8;
+
+	/* firm has no real void... */
+	_atomic_modes[ATOMIC_TYPE_VOID]        = mode_T;
+	_atomic_modes[ATOMIC_TYPE_CHAR]        = char_is_signed ? get_smode(1) : get_umode(1);
+	_atomic_modes[ATOMIC_TYPE_SCHAR]       = get_smode(1);
+	_atomic_modes[ATOMIC_TYPE_UCHAR]       = get_umode(1);
+	_atomic_modes[ATOMIC_TYPE_SHORT]       = get_smode(2);
+	_atomic_modes[ATOMIC_TYPE_USHORT]      = get_umode(2);
+	_atomic_modes[ATOMIC_TYPE_INT]         = get_smode(int_size);
+	_atomic_modes[ATOMIC_TYPE_UINT]        = get_umode(int_size);
+	_atomic_modes[ATOMIC_TYPE_LONG]        = get_smode(long_size);
+	_atomic_modes[ATOMIC_TYPE_ULONG]       = get_umode(long_size);
+	_atomic_modes[ATOMIC_TYPE_LONGLONG]    = get_smode(llong_size);
+	_atomic_modes[ATOMIC_TYPE_ULONGLONG]   = get_umode(llong_size);
+	_atomic_modes[ATOMIC_TYPE_FLOAT]       = mode_F;
+	_atomic_modes[ATOMIC_TYPE_DOUBLE]      = mode_D;
+	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = mode_E;
+
+#ifdef PROVIDE_COMPLEX
+	_atomic_modes[ATOMIC_TYPE_BOOL]                  = _atomic_modes[ATOMIC_TYPE_INT];
+	_atomic_modes[ATOMIC_TYPE_FLOAT_IMAGINARY]       = _atomic_modes[ATOMIC_TYPE_FLOAT];
+	_atomic_modes[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = _atomic_modes[ATOMIC_TYPE_DOUBLE];
+	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY] = _atomic_modes[ATOMIC_TYPE_LONG_DOUBLE];
+#endif
+
+	/* Hmm, pointers should be machine size */
+	set_modeP_data(get_ptrmode(machine_size >> 3, NULL));
+	set_modeP_code(get_ptrmode(machine_size >> 3, NULL));
+
+	mode_int  = _atomic_modes[ATOMIC_TYPE_INT];
+	mode_uint = _atomic_modes[ATOMIC_TYPE_UINT];
+}
+
+static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
+{
+	ir_mode *res = NULL;
+	if ((unsigned)atomic_type->atype < (unsigned)ATOMIC_TYPE_LAST)
+		res = _atomic_modes[(unsigned)atomic_type->atype];
+	if (res == NULL)
+		panic("Encountered unknown atomic type");
+	return res;
+}
 
 static unsigned get_type_size(type_t *type);
 
@@ -182,13 +266,19 @@ static unsigned get_atomic_type_size(const atomic_type_t *type)
 	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_INT:
 	case ATOMIC_TYPE_UINT:
+		return machine_size >> 3;
+
 	case ATOMIC_TYPE_LONG:
 	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_FLOAT:
-		return 4;
+		return machine_size > 16 ? machine_size >> 3 : 4;
 
 	case ATOMIC_TYPE_LONGLONG:
 	case ATOMIC_TYPE_ULONGLONG:
+		return machine_size > 16 ? 8 : 4;
+
+	case ATOMIC_TYPE_FLOAT:
+		return 4;
+
 	case ATOMIC_TYPE_DOUBLE:
 		return 8;
 
@@ -199,6 +289,7 @@ static unsigned get_atomic_type_size(const atomic_type_t *type)
 		return 1;
 
 	case ATOMIC_TYPE_INVALID:
+	case ATOMIC_TYPE_LAST:
 		break;
 	}
 	panic("Trying to determine size of invalid atomic type");
@@ -216,6 +307,7 @@ static unsigned get_array_type_size(array_type_t *type)
 	return get_type_size_bytes(irtype);
 }
 
+
 static unsigned get_type_size(type_t *type)
 {
 	type = skip_typeref(type);
@@ -224,7 +316,7 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_ATOMIC:
 		return get_atomic_type_size(&type->atomic);
 	case TYPE_ENUM:
-		return get_mode_size_bytes(mode_Is);
+		return get_mode_size_bytes(mode_int);
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
 		return get_compound_type_size(&type->compound);
@@ -546,7 +638,7 @@ static inline ir_mode *get_ir_mode(type_t *type)
 
 	/* firm doesn't report a mode for arrays somehow... */
 	if(is_Array_type(irtype)) {
-		return mode_P;
+		return mode_P_data;
 	}
 
 	ir_mode *mode = get_type_mode(irtype);
@@ -1051,7 +1143,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	if(is_type_pointer(type)) {
 		pointer_type_t *pointer_type = &type->pointer;
 		unsigned        elem_size    = get_type_size(pointer_type->points_to);
-		offset = new_Const_long(mode_Is, elem_size);
+		offset = new_Const_long(mode_int, elem_size);
 	} else {
 		assert(is_type_arithmetic(type));
 		offset = new_Const(mode, get_mode_one(mode));
@@ -1232,9 +1324,9 @@ static ir_node *pointer_arithmetic(ir_node  *const pointer,
 
 	assert(elem_size >= 1);
 	if (elem_size > 1) {
-		integer             = create_conv(dbgi, integer, mode_Is);
-		ir_node *const cnst = new_Const_long(mode_Is, (long)elem_size);
-		ir_node *const mul  = new_d_Mul(dbgi, integer, cnst, mode_Is);
+		integer             = create_conv(dbgi, integer, mode_int);
+		ir_node *const cnst = new_Const_long(mode_int, (long)elem_size);
+		ir_node *const mul  = new_d_Mul(dbgi, integer, cnst, mode_int);
 		integer = mul;
 	}
 
@@ -1308,7 +1400,7 @@ static ir_node *create_sub(const binary_expression_t *expression)
 		const unsigned elem_size             = get_type_size(ptr_type->points_to);
 		ir_mode *const mode   = get_ir_mode(type);
 		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
-		ir_node *const cnst   = new_Const_long(mode_Is, (long)elem_size);
+		ir_node *const cnst   = new_Const_long(mode_int, (long)elem_size);
 		ir_node *const no_mem = new_NoMem();
 		ir_node *const div    = new_d_Div(dbgi, no_mem, sub, cnst, mode,
 		                                  op_pin_state_floats);
@@ -1328,7 +1420,7 @@ static ir_node *create_shift(const binary_expression_t *expression)
 	ir_mode  *mode  = get_ir_mode(type);
 
 	/* firm always wants the shift count to be unsigned */
-	right = create_conv(dbgi, right, mode_Iu);
+	right = create_conv(dbgi, right, mode_uint);
 
 	ir_node *res;
 
@@ -1508,17 +1600,17 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	dbg_info *dbgi      = get_dbg_info(&expression->expression.source_position);
 	ir_node  *base_addr = expression_to_firm(expression->array_ref);
 	ir_node  *offset    = expression_to_firm(expression->index);
-	offset              = create_conv(dbgi, offset, mode_Iu);
+	offset              = create_conv(dbgi, offset, mode_uint);
 
 	type_t *ref_type = skip_typeref(expression->array_ref->base.datatype);
 	assert(is_type_pointer(ref_type));
 	pointer_type_t *pointer_type = (pointer_type_t*) ref_type;
 
 	unsigned elem_size       = get_type_size(pointer_type->points_to);
-	ir_node *elem_size_const = new_Const_long(mode_Iu, elem_size);
+	ir_node *elem_size_const = new_Const_long(mode_uint, elem_size);
 	ir_node *real_offset     = new_d_Mul(dbgi, offset, elem_size_const,
-	                                     mode_Iu);
-	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P);
+	                                     mode_uint);
+	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
 
 	return result;
 }
@@ -1700,19 +1792,19 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 		case TYPE_ATOMIC: {
 			const atomic_type_t *const atomic_type = &type->atomic;
 			switch (atomic_type->atype) {
-				// should not be reached
+				/* should not be reached */
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;
 					break;
 
-				// gcc cannot do that
+				/* gcc cannot do that */
 				case ATOMIC_TYPE_VOID:
 					tc = void_type_class;
 					break;
 
-				case ATOMIC_TYPE_CHAR:      // gcc handles this as integer
-				case ATOMIC_TYPE_SCHAR:     // gcc handles this as integer
-				case ATOMIC_TYPE_UCHAR:     // gcc handles this as integer
+				case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
+				case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
+				case ATOMIC_TYPE_UCHAR:     /* gcc handles this as integer */
 				case ATOMIC_TYPE_SHORT:
 				case ATOMIC_TYPE_USHORT:
 				case ATOMIC_TYPE_INT:
@@ -1721,7 +1813,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 				case ATOMIC_TYPE_ULONG:
 				case ATOMIC_TYPE_LONGLONG:
 				case ATOMIC_TYPE_ULONGLONG:
-				case ATOMIC_TYPE_BOOL:      // gcc handles this as integer
+				case ATOMIC_TYPE_BOOL:      /* gcc handles this as integer */
 					tc = integer_type_class;
 					break;
 
@@ -1750,13 +1842,13 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			break;
 		}
 
-		case TYPE_ARRAY:           // gcc handles this as pointer
-		case TYPE_FUNCTION:        // gcc handles this as pointer
+		case TYPE_ARRAY:           /* gcc handles this as pointer */
+		case TYPE_FUNCTION:        /* gcc handles this as pointer */
 		case TYPE_POINTER:         tc = pointer_type_class; break;
 		case TYPE_COMPOUND_STRUCT: tc = record_type_class;  break;
 		case TYPE_COMPOUND_UNION:  tc = union_type_class;   break;
 
-		// gcc handles this as integer
+		/* gcc handles this as integer */
 		case TYPE_ENUM:            tc = integer_type_class; break;
 
 		default:
@@ -1764,7 +1856,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	}
 
 	dbg_info *const dbgi = get_dbg_info(&expr->expression.source_position);
-	ir_mode  *const mode = mode_Is;
+	ir_mode  *const mode = mode_int;
 	tarval   *const tv   = new_tarval_from_long(tc, mode);
 	return new_d_Const(dbgi, mode, tv);
 }
@@ -1804,7 +1896,7 @@ static ir_node *va_start_expression_to_firm(
 		new_d_simpleSel(dbgi, no_mem, arg_base, parm_ent);
 
 	size_t     const parm_size   = get_type_size(expr->parameter->type);
-	ir_node   *const cnst        = new_Const_long(mode_Iu, parm_size);
+	ir_node   *const cnst        = new_Const_long(mode_uint, parm_size);
 	ir_node   *const add         = new_d_Add(dbgi, arg_sel, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
@@ -1819,7 +1911,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	ir_node  *const res    = deref_address(irtype, ap, dbgi);
 
 	size_t     const parm_size   = get_type_size(expr->expression.datatype);
-	ir_node   *const cnst        = new_Const_long(mode_Iu, parm_size);
+	ir_node   *const cnst        = new_Const_long(mode_uint, parm_size);
 	ir_node   *const add         = new_d_Add(dbgi, ap, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
@@ -2184,7 +2276,7 @@ static void create_initializer_wide_string(
 	for (size_t i = 0; i < arr_len && p != end; ++i, ++p) {
 		entry.v.array_index = i;
 
-		ir_node             *node = new_Const_long(mode_Is, *p);
+		ir_node             *node = new_Const_long(mode_int, *p);
 		compound_graph_path *path = create_compound_path(irtype, &entry, len);
 		add_compound_ent_value_w_path(entity, node, path);
 	}
@@ -3253,7 +3345,7 @@ static void create_function(declaration_t *declaration)
 			}
 
 			ir_node *in[1];
-			// §5.1.2.2.3 main implicitly returns 0
+			/* §5.1.2.2.3 main implicitly returns 0 */
 			if (strcmp(declaration->symbol->string, "main") == 0) {
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
@@ -3398,6 +3490,17 @@ static void context_to_firm(context_t *context)
 
 		create_function(declaration);
 	}
+}
+
+void init_ast2firm(void)
+{
+	obstack_init(&asm_obst);
+	init_atomic_modes();
+}
+
+void exit_ast2firm(void)
+{
+	obstack_free(&asm_obst, NULL);
 }
 
 void translation_unit_to_firm(translation_unit_t *unit)

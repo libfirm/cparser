@@ -56,6 +56,7 @@ typedef enum {
 	ATOMIC_TYPE_DOUBLE_IMAGINARY,
 	ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY,
 #endif
+	ATOMIC_TYPE_LAST
 } atomic_type_type_t;
 
 typedef enum {

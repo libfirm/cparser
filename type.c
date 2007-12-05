@@ -482,8 +482,9 @@ bool is_type_signed(const type_t *type)
 	case ATOMIC_TYPE_ULONGLONG:
 		return false;
 
-	case ATOMIC_TYPE_INVALID:
 	case ATOMIC_TYPE_VOID:
+	case ATOMIC_TYPE_INVALID:
+	case ATOMIC_TYPE_LAST:
 		return false;
 	}
 
