@@ -7,8 +7,35 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
 #include <assert.h>
+
+#ifdef _WIN32
+
+#include <fcntl.h>
+#include <io.h>
+
+/* no eXecute on Win32 */
+#define X_OK 0
+#define W_OK 2
+#define R_OK 4
+
+#define O_RDWR          _O_RDWR
+#define O_CREAT         _O_CREAT
+#define O_EXCL          _O_EXCL
+#define O_BINARY        _O_BINARY
+
+/* remap some names, we are not in the POSIX world */
+#define access(fname, mode)      _access(fname, mode)
+#define mktemp(tmpl)             _mktemp(tmpl)
+#define open(fname, oflag, mode) _open(fname, oflag, mode)
+#define fdopen(fd, mode)         _fdopen(fd, mode)
+#define popen(cmd, mode)         _popen(cmd, mode)
+#define pclose(file)             _pclose(file)
+
+#else
+#include <unistd.h>
+#define HAVE_MKSTEMP
+#endif
 
 #ifndef WITH_LIBCORE
 #define WITH_LIBCORE
@@ -33,25 +60,36 @@
 #endif
 
 #ifndef LINKER
-#define LINKER       "gcc -m32"
+#define LINKER    "gcc -m32"
 #endif
 
 #ifndef ASSEMBLER
 #define ASSEMBLER "as --32"
 #endif
 
-#ifdef _WIN32
-/* remap some names */
-#define popen(cmd, mode)  _popen(cmd, mode)
-#define pclose(file)      _pclose(file)
-#endif /* _WIN32 */
-
-/** The current c mode/dialect */
+/** The current c mode/dialect. */
 unsigned int c_mode = _C99|_GNUC;
 
 static int            verbose;
-static bool           do_dump;
 static struct obstack cppflags_obst;
+
+#if defined(_DEBUG) || defined(FIRM_DEBUG)
+/**
+ * Debug printf implementation.
+ *
+ * @param fmt  printf style format parameter
+ */
+void dbg_printf(const char *fmt, ...)
+{
+	va_list list;
+
+	if (firm_dump.debug_print) {
+		va_start(list, fmt);
+		vprintf(fmt, list);
+		va_end(list);
+	}  /* if */
+}
+#endif /* defined(_DEBUG) || defined(FIRM_DEBUG) */
 
 static void initialize_firm(void)
 {
@@ -59,13 +97,6 @@ static void initialize_firm(void)
 
 	dump_consts_local(1);
 	dump_keepalive_edges(1);
-}
-
-static void dump(ir_graph *irg, const char *suffix)
-{
-	if(do_dump) {
-		dump_ir_block_graph(irg, suffix);
-	}
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -210,6 +241,15 @@ static const char *get_tempdir(void)
 	return tmpdir;
 }
 
+#ifndef HAVE_MKSTEMP
+/* cheap and nasty mkstemp replacement */
+static int mkstemp(char *templ)
+{
+	mktemp(templ);
+	return open(templ, O_RDWR|O_CREAT|O_EXCL|O_BINARY, 0600);
+}
+#endif
+
 /**
  * an own version of tmpnam, which: writes in a buffer, appends a user specified
  * suffix, emits no warnings during linking (like glibc/gnu ld do for tmpnam)...
@@ -253,25 +293,6 @@ void lower_compound_params(void)
 	params.find_pointer_type    = NULL;
 	params.ret_compound_in_regs = NULL;
 	lower_calls_with_compounds(&params);
-}
-
-static void create_firm_prog(translation_unit_t *unit)
-{
-	translation_unit_to_firm(unit);
-
-	int n_irgs = get_irp_n_irgs();
-	for(int i = 0; i < n_irgs; ++i) {
-		ir_graph *const irg = get_irp_irg(i);
-		dump(irg, "-start");
-	}
-
-	lower_compound_params();
-	lower_highlevel();
-
-	for(int i = 0; i < n_irgs; ++i) {
-		ir_graph *const irg = get_irp_irg(i);
-		dump(irg, "-lower");
-	}
 }
 
 typedef enum compile_mode_t {
@@ -352,8 +373,6 @@ int main(int argc, char **argv)
 			const char *opt;
 			GET_ARG_AFTER(opt, "-D");
 			obstack_printf(&cppflags_obst, " -D%s", opt);
-		} else if(strcmp(arg, "--dump") == 0) {
-			do_dump = true;
 		} else if(strcmp(arg, "--dump-function") == 0) {
 			++i;
 			if(i >= argc) {
@@ -519,7 +538,7 @@ int main(int argc, char **argv)
 	}
 
 	gen_firm_init();
-	create_firm_prog(unit);
+	translation_unit_to_firm(unit);
 
 	if(mode == ParseOnly) {
 		return 0;
