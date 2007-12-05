@@ -18,7 +18,7 @@ ICC_CFLAGS = -O0 -g3 -std=c99 -Wall -Werror
 ICC    ?= true
 GCCO1  ?= true
 
-LFLAGS = $(FIRM_LIBS)
+LFLAGS += $(FIRM_LIBS)
 
 SOURCES := \
 	adt/hashset.c \
@@ -46,7 +46,7 @@ SPLINTS = $(addsuffix .splint, $(SOURCES))
 
 Q = @
 
-.PHONY : all clean dirs revision
+.PHONY : all clean dirs
 
 all: $(GOAL)
 
@@ -54,7 +54,17 @@ ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
 endif
 
-.depend: $(SOURCES) revision
+%.h:
+	@true
+
+.depend: $(SOURCES)
+	@echo "#define cparser_REVISION \"`svnversion -n .`\"" > .revision.h
+	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
+	      rm .revision.h;                                    \
+	    else                                                 \
+	      echo "===> UPDATING revision.h";                   \
+	      mv .revision.h revision.h;                         \
+	    fi
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
@@ -78,15 +88,6 @@ build/%.o: %.c
 #$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
 #	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
-revision:
-	@echo "#define cparser_REVISION \"`svnversion -n .`\"" > .revision.h
-	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
-	      rm .revision.h;                                    \
-	    else                                                 \
-	      echo "===> UPDATING revision.h";                   \
-	      mv .revision.h revision.h;                         \
-	    fi
 
 clean:
 	@echo '===> CLEAN'
