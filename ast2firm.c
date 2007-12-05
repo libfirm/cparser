@@ -3088,6 +3088,8 @@ static void statement_to_firm(statement_t *statement)
 	panic("Statement not implemented\n");
 }
 
+static int count_decls_in_expression(const expression_t *expression);
+
 static int count_local_declarations(const declaration_t *      decl,
                                     const declaration_t *const end)
 {
@@ -3103,6 +3105,11 @@ static int count_local_declarations(const declaration_t *      decl,
 				break;
 
 			default: break;
+		}
+		const initializer_t *initializer = decl->init.initializer;
+		/* FIXME: should walk initializer hierarchies... */
+		if(initializer != NULL && initializer->type == INITIALIZER_VALUE) {
+			count += count_decls_in_expression(initializer->value.value);
 		}
 	}
 	return count;
