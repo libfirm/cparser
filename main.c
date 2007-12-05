@@ -50,10 +50,11 @@
 #include "parser.h"
 #include "ast2firm.h"
 #include "lang_features.h"
+#include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 #include "adt/error.h"
 #include "write_fluffy.h"
-#include "driver/firm_opt.h"
+#include "revision.h"
 
 #ifndef PREPROCESSOR
 #define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int"
@@ -373,6 +374,20 @@ int main(int argc, char **argv)
 			mode = PrintAst;
 		} else if(strcmp(arg, "--print-fluffy") == 0) {
 			mode = PrintFluffy;
+		} else if(strcmp(arg, "--version") == 0) {
+			firm_version_t ver;
+			firm_get_version(&ver);
+			printf("cparser (%d.%d %s) using libFirm (%d.%d", 0, 1, cparser_REVISION, ver.major, ver.minor);
+			if(ver.revision[0] != 0) {
+				putchar(' ');
+				fputs(ver.revision, stdout);
+			}
+			if(ver.build[0] != 0) {
+				putchar(' ');
+				fputs(ver.build, stdout);
+			}
+			puts(")\n");
+			exit(EXIT_SUCCESS);
 		} else if(strcmp(arg, "-fsyntax-only") == 0) {
 			mode = ParseOnly;
 		} else if(strncmp(arg, "-I", 2) == 0) {

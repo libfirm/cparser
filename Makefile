@@ -79,6 +79,11 @@ build/%.o: %.c
 #	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+revision.h:
+	@echo "#define cparser_REVISION \"`svnversion -n .`\"" > .revision.h
+	$(Q)[ -n "`diff -Nq .revision.h revision.h`" ] && echo "===> Updating revision.h" && cp .revision.h revision.h
+	$(Q)rm .revision.h
+
 clean:
 	@echo '===> CLEAN'
 	$(Q)rm -rf build $(GOAL) .depend
