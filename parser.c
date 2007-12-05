@@ -3413,6 +3413,24 @@ static expression_t *parse_compare_builtin(void)
 	return expression;
 }
 
+static expression_t *parse_builtin_expect(void)
+{
+	eat(T___builtin_expect);
+
+	expression_t *expression
+		= allocate_expression_zero(EXPR_BINARY_BUILTIN_EXPECT);
+
+	expect('(');
+	expression->binary.left = parse_assignment_expression();
+	expect(',');
+	expression->binary.right = parse_constant_expression();
+	expect(')');
+
+	expression->base.datatype = expression->binary.left->base.datatype;
+
+	return expression;
+}
+
 static expression_t *parse_primary_expression(void)
 {
 	switch(token.type) {
@@ -3437,9 +3455,10 @@ static expression_t *parse_primary_expression(void)
 		return parse_va_start();
 	case T___builtin_va_arg:
 		return parse_va_arg();
+	case T___builtin_expect:
+		return parse_builtin_expect();
 	case T___builtin_nanf:
 	case T___builtin_alloca:
-	case T___builtin_expect:
 	case T___builtin_va_end:
 		return parse_builtin_symbol();
 	case T___builtin_isgreater:

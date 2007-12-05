@@ -140,6 +140,15 @@ static void print_call_expression(const call_expression_t *call)
 
 static void print_binary_expression(const binary_expression_t *binexpr)
 {
+	if(binexpr->expression.type == EXPR_BINARY_BUILTIN_EXPECT) {
+		fputs("__builtin_expect(", out);
+		print_expression(binexpr->left);
+		fputs(", ", out);
+		print_expression(binexpr->right);
+		fputs(")", out);
+		return;
+	}
+
 	fprintf(out, "(");
 	print_expression(binexpr->left);
 	fprintf(out, " ");
@@ -812,6 +821,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_LOGICAL_OR:
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_BUILTIN_EXPECT:
 	case EXPR_BINARY_ISGREATER:
 	case EXPR_BINARY_ISGREATEREQUAL:
 	case EXPR_BINARY_ISLESS:

@@ -223,6 +223,7 @@ static void init_atomic_modes(void) {
 	_atomic_modes[ATOMIC_TYPE_FLOAT]       = mode_F;
 	_atomic_modes[ATOMIC_TYPE_DOUBLE]      = mode_D;
 	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = mode_E;
+	_atomic_modes[ATOMIC_TYPE_BOOL]        = get_umode(int_size);
 
 #ifdef PROVIDE_COMPLEX
 	_atomic_modes[ATOMIC_TYPE_BOOL]                  = _atomic_modes[ATOMIC_TYPE_INT];
@@ -1590,6 +1591,8 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		return create_arithmetic_assign_shift(expression);
+	case EXPR_BINARY_BUILTIN_EXPECT:
+		return expression_to_firm(expression->left);
 	default:
 		panic("TODO binexpr type");
 	}
@@ -2880,7 +2883,9 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
 
-	statement_to_firm(statement->label_statement);
+	if(statement->label_statement != NULL) {
+		statement_to_firm(statement->label_statement);
+	}
 }
 
 static ir_node *get_label_block(declaration_t *label)
@@ -2916,7 +2921,9 @@ static void label_to_firm(const label_statement_t *statement)
 	set_cur_block(block);
 	keep_alive(block);
 
-	statement_to_firm(statement->label_statement);
+	if(statement->label_statement != NULL) {
+		statement_to_firm(statement->label_statement);
+	}
 }
 
 static void goto_to_firm(const goto_statement_t *statement)
@@ -3101,9 +3108,27 @@ static int count_local_declarations(const declaration_t *      decl,
 	return count;
 }
 
-static int count_decls_in_expr(const expression_t *expr) {
-	if (expr != NULL && expr->base.type == EXPR_STATEMENT)
-		return count_decls_in_stmts(expr->statement.statement);
+static int count_decls_in_expression(const expression_t *expression) {
+	if(expression == NULL)
+		return 0;
+
+	switch(expression->base.type) {
+	case EXPR_STATEMENT:
+		return count_decls_in_stmts(expression->statement.statement);
+	EXPR_BINARY_CASES
+		return count_decls_in_expression(expression->binary.left)
+			+ count_decls_in_expression(expression->binary.right);
+	EXPR_UNARY_CASES
+		return count_decls_in_expression(expression->unary.value);
+
+	default:
+		break;
+	}
+
+	/* TODO FIXME: finish/fix that firm patch that allows dynamic value numbers
+	 * (or implement all the missing expressions here/implement a walker)
+	 */
+
 	return 0;
 }
 
@@ -3128,7 +3153,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_IF: {
 				const if_statement_t *const if_stmt = &stmt->ifs;
-				count += count_decls_in_expr(if_stmt->condition);
+				count += count_decls_in_expression(if_stmt->condition);
 				count += count_decls_in_stmts(if_stmt->true_statement);
 				count += count_decls_in_stmts(if_stmt->false_statement);
 				break;
@@ -3136,7 +3161,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_SWITCH: {
 				const switch_statement_t *const switch_stmt = &stmt->switchs;
-				count += count_decls_in_expr(switch_stmt->expression);
+				count += count_decls_in_expression(switch_stmt->expression);
 				count += count_decls_in_stmts(switch_stmt->body);
 				break;
 			}
@@ -3149,14 +3174,14 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_WHILE: {
 				const while_statement_t *const while_stmt = &stmt->whiles;
-				count += count_decls_in_expr(while_stmt->condition);
+				count += count_decls_in_expression(while_stmt->condition);
 				count += count_decls_in_stmts(while_stmt->body);
 				break;
 			}
 
 			case STATEMENT_DO_WHILE: {
 				const do_while_statement_t *const do_while_stmt = &stmt->do_while;
-				count += count_decls_in_expr(do_while_stmt->condition);
+				count += count_decls_in_expression(do_while_stmt->condition);
 				count += count_decls_in_stmts(do_while_stmt->body);
 				break;
 			}
@@ -3164,22 +3189,28 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_FOR: {
 				const for_statement_t *const for_stmt = &stmt->fors;
 				count += count_local_declarations(for_stmt->context.declarations, NULL);
-				count += count_decls_in_expr(for_stmt->initialisation);
-				count += count_decls_in_expr(for_stmt->condition);
-				count += count_decls_in_expr(for_stmt->step);
+				count += count_decls_in_expression(for_stmt->initialisation);
+				count += count_decls_in_expression(for_stmt->condition);
+				count += count_decls_in_expression(for_stmt->step);
 				count += count_decls_in_stmts(for_stmt->body);
+				break;
+			}
+
+			case STATEMENT_CASE_LABEL: {
+				const case_label_statement_t *label = &stmt->case_label;
+				count += count_decls_in_expression(label->expression);
+				count += count_decls_in_stmts(label->label_statement);
 				break;
 			}
 
 			case STATEMENT_ASM:
 			case STATEMENT_BREAK:
-			case STATEMENT_CASE_LABEL:
 			case STATEMENT_CONTINUE:
 				break;
 
 			case STATEMENT_EXPRESSION: {
 				const expression_statement_t *expr_stmt = &stmt->expression;
-				count += count_decls_in_expr(expr_stmt->expression);
+				count += count_decls_in_expression(expr_stmt->expression);
 				break;
 			}
 
@@ -3189,7 +3220,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_RETURN: {
 				const return_statement_t *ret_stmt = &stmt->returns;
-				count += count_decls_in_expr(ret_stmt->return_value);
+				count += count_decls_in_expression(ret_stmt->return_value);
 				break;
 			}
 		}
