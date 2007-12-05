@@ -3111,7 +3111,7 @@ static int count_local_declarations(const declaration_t *      decl,
 }
 
 static int count_decls_in_expr(const expression_t *expr) {
-	if (expr->base.type == EXPR_STATEMENT)
+	if (expr != NULL && expr->base.type == EXPR_STATEMENT)
 		return count_decls_in_stmts(expr->statement.statement);
 	return 0;
 }
