@@ -1267,6 +1267,19 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	type_t   *type = expression->expression.datatype;
 	ir_mode  *mode = get_ir_mode(type);
 
+	if(is_constant_expression(expression->left)) {
+		long val = fold_constant(expression->left);
+		expression_type_t etype = expression->expression.type;
+		if((etype == EXPR_BINARY_LOGICAL_AND && val != 0)
+				|| (etype == EXPR_BINARY_LOGICAL_OR && val == 0)) {
+			return expression_to_firm(expression->right);
+		} else {
+			assert((etype == EXPR_BINARY_LOGICAL_AND && val == 0)
+					|| (etype == EXPR_BINARY_LOGICAL_OR && val != 0));
+			return new_Const(mode, get_mode_one(mode));
+		}
+	}
+
 	ir_node *cur_block = get_cur_block();
 
 	ir_node *one_block = new_immBlock();
