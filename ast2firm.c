@@ -97,6 +97,11 @@ void exit_ast2firm(void)
 	obstack_free(&asm_obst, NULL);
 }
 
+static dbg_info *get_dbg_info(const source_position_t *pos)
+{
+	return (dbg_info*) pos;
+}
+
 static unsigned unique_id = 0;
 
 static ident *unique_ident(const char *tag)
@@ -375,7 +380,8 @@ static ir_type *create_struct_type(compound_type_t *type)
 		if (misalign != 0)
 			offset += entry_alignment - misalign;
 
-		ir_entity *entity = new_entity(ir_type, ident, entry_ir_type);
+		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
+		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
 		set_entity_offset(entity, offset);
 		add_struct_member(ir_type, entity);
 		entry->declaration_type = DECLARATION_TYPE_COMPOUND_MEMBER;
@@ -426,7 +432,8 @@ static ir_type *create_union_type(compound_type_t *type)
 		int entry_size      = get_type_size_bytes(entry_ir_type);
 		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
 
-		ir_entity *entity = new_entity(ir_type, ident, entry_ir_type);
+		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
+		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
 		add_union_member(ir_type, entity);
 		set_entity_offset(entity, 0);
 		entry->declaration_type = DECLARATION_TYPE_COMPOUND_MEMBER;
@@ -559,7 +566,8 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	ir_type  *ir_type_method = get_ir_type(declaration->type);
 	assert(is_Method_type(ir_type_method));
 
-	ir_entity *entity = new_entity(global_type, id, ir_type_method);
+	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
+	ir_entity *const entity = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, id);
 	if(declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
@@ -575,11 +583,6 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	declaration->v.entity         = entity;
 
 	return entity;
-}
-
-static dbg_info *get_dbg_info(const source_position_t *pos)
-{
-	return (dbg_info*) pos;
 }
 
 static ir_node *const_to_firm(const const_expression_t *cnst)
@@ -622,7 +625,8 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	                                            ir_type_const_char);
 
 	ident     *const id     = unique_ident(id_prefix);
-	ir_entity *const entity = new_entity(global_type, id, type);
+	dbg_info  *const dbgi   = get_dbg_info(src_pos);
+	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
 	set_entity_allocation(entity, allocation_static);
@@ -645,8 +649,6 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	dbg_info *const dbgi = get_dbg_info(src_pos);
-
 	return create_symconst(dbgi, entity);
 }
 
@@ -666,7 +668,8 @@ static ir_node *wide_string_literal_to_firm(
 	                                            elem_type);
 
 	ident     *const id     = unique_ident("Lstr");
-	ir_entity *const entity = new_entity(global_type, id, type);
+	dbg_info  *const dbgi   = get_dbg_info(&literal->expression.source_position);
+	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
 	set_entity_allocation(entity, allocation_static);
@@ -688,8 +691,6 @@ static ir_node *wide_string_literal_to_firm(
 
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
-
-	dbg_info *const dbgi = get_dbg_info(&literal->expression.source_position);
 
 	return create_symconst(dbgi, entity);
 }
@@ -1982,9 +1983,10 @@ static void create_declaration_entity(declaration_t *declaration,
                                       declaration_type_t declaration_type,
                                       ir_type *parent_type)
 {
-	ident     *id     = new_id_from_str(declaration->symbol->string);
-	ir_type   *irtype = get_ir_type(declaration->type);
-	ir_entity *entity = new_entity(parent_type, id, irtype);
+	ident     *const id     = new_id_from_str(declaration->symbol->string);
+	ir_type   *const irtype = get_ir_type(declaration->type);
+	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
+	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
 
 	declaration->declaration_type = (unsigned char) declaration_type;
@@ -2246,29 +2248,29 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	}
 
 	/* create a "template" entity which is copied to the entity on the stack */
-	ident     *id          = unique_ident("initializer");
-	ir_type   *irtype      = get_ir_type(declaration->type);
-	ir_type   *global_type = get_glob_type();
-	ir_entity *init_entity = new_entity(global_type, id, irtype);
+	ident     *const id          = unique_ident("initializer");
+	ir_type   *const irtype      = get_ir_type(declaration->type);
+	ir_type   *const global_type = get_glob_type();
+	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(init_entity, id);
 
 	set_entity_variability(init_entity, variability_initialized);
 	set_entity_visibility(init_entity, visibility_local);
 	set_entity_allocation(init_entity, allocation_static);
 
-	ir_graph *old_current_ir_graph = current_ir_graph;
+	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
-	type_t *type = skip_typeref(declaration->type);
+	type_t *const type = skip_typeref(declaration->type);
 	create_initializer_object(initializer, type, init_entity, NULL, 0);
 
 	assert(current_ir_graph == get_const_code_irg());
 	current_ir_graph = old_current_ir_graph;
 
-	ir_node *src_addr  = create_symconst(dbgi, init_entity);
-	ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
+	ir_node *const src_addr  = create_symconst(dbgi, init_entity);
+	ir_node *const copyb     = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
-	ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
 	set_store(copyb_mem);
 }
 
@@ -2341,11 +2343,12 @@ static void create_local_static_variable(declaration_t *declaration)
 {
 	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
 
-	type_t    *type        = skip_typeref(declaration->type);
-	ir_type   *global_type = get_glob_type();
-	ident     *id          = unique_ident(declaration->symbol->string);
-	ir_type   *irtype      = get_ir_type(type);
-	ir_entity *entity      = new_entity(global_type, id, irtype);
+	type_t    *const type        = skip_typeref(declaration->type);
+	ir_type   *const global_type = get_glob_type();
+	ident     *const id          = unique_ident(declaration->symbol->string);
+	ir_type   *const irtype      = get_ir_type(type);
+	dbg_info  *const dbgi        = get_dbg_info(&declaration->source_position);
+	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
 
 	declaration->declaration_type = DECLARATION_TYPE_GLOBAL_VARIABLE;
@@ -2354,7 +2357,7 @@ static void create_local_static_variable(declaration_t *declaration)
 	set_entity_visibility(entity, visibility_local);
 	set_entity_allocation(entity, allocation_static);
 
-	ir_graph *old_current_ir_graph = current_ir_graph;
+	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
 	create_initializer(declaration);
