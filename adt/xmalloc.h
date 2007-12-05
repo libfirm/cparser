@@ -11,6 +11,7 @@
 #define _XMALLOC_H_
 
 #include <stdlib.h>
+#include "config.h"
 
 __attribute__((malloc))
 void *xmalloc(size_t size);
