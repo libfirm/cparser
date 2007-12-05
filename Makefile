@@ -26,6 +26,7 @@ SOURCES := \
 	adt/xmalloc.c \
 	ast.c \
 	ast2firm.c \
+	diagnostic.c \
 	lexer.c \
 	main.c \
 	parser.c \

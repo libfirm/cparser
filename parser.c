@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include "diagnostic.h"
 #include "parser.h"
 #include "lexer.h"
 #include "token_t.h"
@@ -304,14 +305,6 @@ static void error(void)
 #endif
 }
 
-static void parser_print_prefix_pos(const source_position_t source_position)
-{
-    fputs(source_position.input_name, stderr);
-    fputc(':', stderr);
-    fprintf(stderr, "%u", source_position.linenr);
-    fputs(": ", stderr);
-}
-
 static void parser_print_error_prefix_pos(
 		const source_position_t source_position)
 {
@@ -331,23 +324,9 @@ static void parse_error(const char *message)
 	fprintf(stderr, "parse error: %s\n", message);
 }
 
-static void parser_print_warning_prefix_pos(
-		const source_position_t source_position)
-{
-	parser_print_prefix_pos(source_position);
-	fputs("warning: ", stderr);
-}
-
 static void parser_print_warning_prefix(void)
 {
 	parser_print_warning_prefix_pos(token.source_position);
-}
-
-static void parse_warning_pos(const source_position_t source_position,
-                              const char *const message)
-{
-	parser_print_prefix_pos(source_position);
-	fprintf(stderr, "warning: %s\n", message);
 }
 
 static void parse_warning(const char *message)
