@@ -762,7 +762,6 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_CALL:
-	case EXPR_REFERENCE:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
@@ -833,6 +832,14 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_ARRAY_ACCESS:
 		return is_constant_expression(expression->array_access.array_ref)
 			&& is_constant_expression(expression->array_access.index);
+
+	case EXPR_REFERENCE: {
+		declaration_t *declaration = expression->reference.declaration;
+		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+			return true;
+
+		return false;
+	}
 
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:

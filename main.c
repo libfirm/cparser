@@ -413,13 +413,21 @@ int main(int argc, char **argv)
 		} else if(arg[0] == '-' && arg[1] == 'f') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-f");
-			int res = firm_option(opt);
-			if (res == 0) {
-				fprintf(stderr, "error: unknown Firm option '-f %s'\n", opt);
-				argument_errors = true;
-				continue;
-			} else if (res == -1) {
-				help_displayed = true;
+
+			if(strcmp(opt, "omit-frame-pointer") == 0) {
+				firm_be_option("omitfp");
+			} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
+				firm_be_option("omitfp=no");
+			} else {
+				int res = firm_option(opt);
+				if (res == 0) {
+					fprintf(stderr, "error: unknown Firm option '-f %s'\n",
+					        opt);
+					argument_errors = true;
+					continue;
+				} else if (res == -1) {
+					help_displayed = true;
+				}
 			}
 		} else if(arg[0] == '-' && arg[1] == 'b') {
 			const char *opt;
@@ -444,8 +452,9 @@ int main(int argc, char **argv)
 			if (value != 16 && value != 32 && value != 64) {
 				fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
 				argument_errors = true;
-			} else
+			} else {
 				machine_size = (unsigned int)value;
+			}
 		} else if(arg[0] == '-') {
 			if (arg[1] == '\0') {
 				if(input != NULL) {
@@ -457,7 +466,6 @@ int main(int argc, char **argv)
 			} else if(strcmp(arg, "-pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(arg[1] == 'O' ||
-					arg[1] == 'f' ||
 					arg[1] == 'W' ||
 					arg[1] == 'g' ||
 					strncmp(arg + 1, "std=", 4) == 0) {
