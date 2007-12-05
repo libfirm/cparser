@@ -27,6 +27,7 @@ SOURCES := \
 	ast.c \
 	ast2firm.c \
 	diagnostic.c \
+	format_check.c \
 	lexer.c \
 	main.c \
 	parser.c \

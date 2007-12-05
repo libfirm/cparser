@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "diagnostic.h"
+#include "format_check.h"
 #include "parser.h"
 #include "lexer.h"
 #include "token_t.h"
@@ -3718,7 +3719,11 @@ static expression_t *parse_call_expression(unsigned precedence,
 					argument->expression
 						= create_implicit_cast(argument->expression, type);
 				}
+
+				check_format(&result->call);
 			}
+		} else {
+			check_format(&result->call);
 		}
 	}
 
