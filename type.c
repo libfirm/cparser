@@ -11,8 +11,8 @@ struct obstack         *type_obst = &_type_obst;
 static FILE            *out;
 static int              type_visited = 0;
 
-static void intern_print_type_pre(type_t *type);
-static void intern_print_type_post(type_t *type);
+static void intern_print_type_pre(type_t *type, bool top);
+static void intern_print_type_post(type_t *type, bool top);
 
 void init_types(void)
 {
@@ -70,22 +70,24 @@ void print_atomic_type(const atomic_type_t *type)
 	fputs(s, out);
 }
 
-static void print_function_type_pre(const function_type_t *type)
+static void print_function_type_pre(const function_type_t *type, bool top)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
-	intern_print_type_pre(type->return_type);
+	intern_print_type_pre(type->return_type, false);
 
-	/* TODO: don't emit braces if we're the toplevel type... */
-	fputc('(', out);
+	/* don't emit braces if we're the toplevel type... */
+	if(!top)
+		fputc('(', out);
 }
 
 static void print_function_type_post(const function_type_t *type,
-                                     const context_t *context)
+                                     const context_t *context, bool top)
 {
-	/* TODO: don't emit braces if we're the toplevel type... */
-	intern_print_type_post(type->return_type);
-	fputc(')', out);
+	intern_print_type_post(type->return_type, false);
+	/* don't emit braces if we're the toplevel type... */
+	if(!top)
+		fputc(')', out);
 
 	fputc('(', out);
 
@@ -128,19 +130,19 @@ static void print_function_type_post(const function_type_t *type,
 
 static void print_pointer_type_pre(const pointer_type_t *type)
 {
-	intern_print_type_pre(type->points_to);
+	intern_print_type_pre(type->points_to, false);
 	fputs("*", out);
 	print_type_qualifiers(type->type.qualifiers);
 }
 
 static void print_pointer_type_post(const pointer_type_t *type)
 {
-	intern_print_type_post(type->points_to);
+	intern_print_type_post(type->points_to, false);
 }
 
 static void print_array_type_pre(const array_type_t *type)
 {
-	intern_print_type_pre(type->element_type);
+	intern_print_type_pre(type->element_type, false);
 }
 
 static void print_array_type_post(const array_type_t *type)
@@ -154,7 +156,7 @@ static void print_array_type_post(const array_type_t *type)
 		print_expression(type->size);
 	}
 	fputc(']', out);
-	intern_print_type_post(type->element_type);
+	intern_print_type_post(type->element_type, false);
 }
 
 void print_enum_definition(const declaration_t *declaration)
@@ -249,7 +251,7 @@ static void print_typeof_type_pre(typeof_type_t *type)
 	fputc(')', out);
 }
 
-static void intern_print_type_pre(type_t *type)
+static void intern_print_type_pre(type_t *type, bool top)
 {
 	switch(type->type) {
 	case TYPE_INVALID:
@@ -269,7 +271,7 @@ static void intern_print_type_pre(type_t *type)
 		fputs(type->builtin.symbol->string, out);
 		return;
 	case TYPE_FUNCTION:
-		print_function_type_pre(&type->function);
+		print_function_type_pre(&type->function, top);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_pre(&type->pointer);
@@ -287,11 +289,11 @@ static void intern_print_type_pre(type_t *type)
 	fputs("unknown", out);
 }
 
-static void intern_print_type_post(type_t *type)
+static void intern_print_type_post(type_t *type, bool top)
 {
 	switch(type->type) {
 	case TYPE_FUNCTION:
-		print_function_type_post(&type->function, NULL);
+		print_function_type_post(&type->function, NULL, top);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post(&type->pointer);
@@ -324,15 +326,15 @@ void print_type_ext(type_t *type, const symbol_t *symbol,
 		return;
 	}
 
-	intern_print_type_pre(type);
+	intern_print_type_pre(type, true);
 	if(symbol != NULL) {
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
 	if(type->type == TYPE_FUNCTION) {
-		print_function_type_post((const function_type_t*) type, context);
+		print_function_type_post(&type->function, context, true);
 	} else {
-		intern_print_type_post(type);
+		intern_print_type_post(type, true);
 	}
 }
 
