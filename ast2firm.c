@@ -18,6 +18,8 @@
 #include "ast_t.h"
 #include "parser.h"
 #include "lang_features.h"
+#include "driver/firm_opt.h"
+#include "driver/firm_cmdline.h"
 
 #define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
 
@@ -647,6 +649,89 @@ static inline ir_mode *get_ir_mode(type_t *type)
 	return mode;
 }
 
+static ident *predef_idents[rts_max];
+
+/** Names of the runtime functions. */
+static const struct {
+	int        id;           /**< the rts id */
+	int        n_res;        /**< number of return values */
+	const char *name;        /**< the name of the rts function */
+	int        n_params;     /**< number of parameters */
+	unsigned   flags;        /**< language flags */
+} rts_data[] = {
+	{ rts_debugbreak, 0, "__debugbreak", 0, _MS },
+	{ rts_abort,      0, "abort",        0, _C89 },
+	{ rts_abs,        1, "abs",          1, _C89 },
+	{ rts_labs,       1, "labs",         1, _C89 },
+	{ rts_llabs,      1, "llabs",        1, _C99 },
+	{ rts_imaxabs,    1, "imaxabs",      1, _C99 },
+
+	{ rts_fabs,       1, "fabs",         1, _C89 },
+	{ rts_sqrt,       1, "sqrt",         1, _C89 },
+	{ rts_cbrt,       1, "cbrt",         1, _C99 },
+	{ rts_exp,        1, "exp",          1, _C89 },
+	{ rts_exp2,       1, "exp2",         1, _C89 },
+	{ rts_exp10,      1, "exp10",        1, _GNUC },
+	{ rts_log,        1, "log",          1, _C89 },
+	{ rts_log2,       1, "log2",         1, _C89 },
+	{ rts_log10,      1, "log10",        1, _C89 },
+	{ rts_pow,        1, "pow",          2, _C89 },
+	{ rts_sin,        1, "sin",          1, _C89 },
+	{ rts_cos,        1, "cos",          1, _C89 },
+	{ rts_tan,        1, "tan",          1, _C89 },
+	{ rts_asin,       1, "asin",         1, _C89 },
+	{ rts_acos,       1, "acos",         1, _C89 },
+	{ rts_atan,       1, "atan",         1, _C89 },
+	{ rts_sinh,       1, "sinh",         1, _C89 },
+	{ rts_cosh,       1, "cosh",         1, _C89 },
+	{ rts_tanh,       1, "tanh",         1, _C89 },
+
+	{ rts_fabsf,      1, "fabsf",        1, _C99 },
+	{ rts_sqrtf,      1, "sqrtf",        1, _C99 },
+	{ rts_cbrtf,      1, "cbrtf",        1, _C99 },
+	{ rts_expf,       1, "expf",         1, _C99 },
+	{ rts_exp2f,      1, "exp2f",        1, _C99 },
+	{ rts_exp10f,     1, "exp10f",       1, _GNUC },
+	{ rts_logf,       1, "logf",         1, _C99 },
+	{ rts_log2f,      1, "log2f",        1, _C99 },
+	{ rts_log10f,     1, "log10f",       1, _C99 },
+	{ rts_powf,       1, "powf",         2, _C99 },
+	{ rts_sinf,       1, "sinf",         1, _C99 },
+	{ rts_cosf,       1, "cosf",         1, _C99 },
+	{ rts_tanf,       1, "tanf",         1, _C99 },
+	{ rts_asinf,      1, "asinf",        1, _C99 },
+	{ rts_acosf,      1, "acosf",        1, _C99 },
+	{ rts_atanf,      1, "atanf",        1, _C99 },
+	{ rts_sinhf,      1, "sinhf",        1, _C99 },
+	{ rts_coshf,      1, "coshf",        1, _C99 },
+	{ rts_tanhf,      1, "tanhf",        1, _C99 },
+
+	{ rts_fabsl,      1, "fabsl",        1, _C99 },
+	{ rts_sqrtl,      1, "sqrtl",        1, _C99 },
+	{ rts_cbrtl,      1, "cbrtl",        1, _C99 },
+	{ rts_expl,       1, "expl",         1, _C99 },
+	{ rts_exp2l,      1, "exp2l",        1, _C99 },
+	{ rts_exp10l,     1, "exp10l",       1, _GNUC },
+	{ rts_logl,       1, "logl",         1, _C99 },
+	{ rts_log2l,      1, "log2l",        1, _C99 },
+	{ rts_log10l,     1, "log10l",       1, _C99 },
+	{ rts_powl,       1, "powl",         2, _C99 },
+	{ rts_sinl,       1, "sinl",         1, _C99 },
+	{ rts_cosl,       1, "cosl",         1, _C99 },
+	{ rts_tanl,       1, "tanl",         1, _C99 },
+	{ rts_asinl,      1, "asinl",        1, _C99 },
+	{ rts_acosl,      1, "acosl",        1, _C99 },
+	{ rts_atanl,      1, "atanl",        1, _C99 },
+	{ rts_sinhl,      1, "sinhl",        1, _C99 },
+	{ rts_coshl,      1, "coshl",        1, _C99 },
+	{ rts_tanhl,      1, "tanhl",        1, _C99 },
+
+	{ rts_memcpy,     1, "memcpy",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_memset,     1, "memset",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_strcmp,     1, "strcmp",       2, _C89 },
+	{ rts_strncmp,    1, "strncmp",      3, _C89 }
+};
+
 static ir_entity* get_function_entity(declaration_t *declaration)
 {
 	if(declaration->declaration_type == DECLARATION_TYPE_FUNCTION)
@@ -670,6 +755,31 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 		set_entity_visibility(entity, visibility_external_visible);
 	} else {
 		set_entity_visibility(entity, visibility_external_allocated);
+
+		/* We should check for file scope here, but as long as we compile C only
+		   this is not needed. */
+		int n_params     = get_method_n_params(ir_type_method);
+		int n_res        = get_method_n_ress(ir_type_method);
+		ir_ident_ptr id  = get_entity_ident(entity);
+		int i;
+
+		if (n_params == 0 && n_res == 0 && id == predef_idents[rts_abort]) {
+			/* found abort(), store for later */
+			//abort_ent = ent;
+			//abort_tp  = ftype;
+		} else {
+			if (! firm_opt.freestanding) {
+				/* check for a known runtime function */
+				for (i = 0; i < rts_max; ++i) {
+					/* ignore those rts functions not necessary needed for current mode */
+					if ((c_mode & rts_data[i].flags) == 0)
+						continue;
+					if (n_params == rts_data[i].n_params && n_res == rts_data[i].n_res &&
+						id == predef_idents[rts_data[i].id])
+						rts_entities[rts_data[i].id] = entity;
+				}
+			}
+		}
 	}
 	set_entity_allocation(entity, allocation_static);
 
@@ -3538,6 +3648,11 @@ void init_ast2firm(void)
 {
 	obstack_init(&asm_obst);
 	init_atomic_modes();
+
+	/* create idents for all known runtime functions */
+	for (int i = 0; i < sizeof(rts_data)/sizeof(rts_data[0]); ++i) {
+		predef_idents[rts_data[i].id] = new_id_from_str(rts_data[i].name);
+	}
 }
 
 void exit_ast2firm(void)
@@ -3564,5 +3679,5 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	break_label         = NULL;
 	current_switch_cond = NULL;
 
-	context_to_firm(& unit->context);
+	context_to_firm(&unit->context);
 }

@@ -70,7 +70,7 @@
 #endif
 
 /** The current c mode/dialect. */
-unsigned int c_mode = _C99|_GNUC;
+unsigned int c_mode = _C89|_C99|_GNUC;
 
 /** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
 unsigned int machine_size = 32;
