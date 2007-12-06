@@ -1209,7 +1209,7 @@ static void set_value_for_expression(const expression_t *expression,
 	value          = do_strict_conv(dbgi, value);
 
 	if(expression->type == EXPR_REFERENCE) {
-		reference_expression_t *ref = (reference_expression_t*) expression;
+		const reference_expression_t *ref = &expression->reference;
 
 		declaration_t *declaration = ref->declaration;
 		assert(declaration->declaration_type != DECLARATION_TYPE_UNKNOWN);
@@ -1543,7 +1543,7 @@ static ir_node *pointer_arithmetic(ir_node  *const pointer,
                                    dbg_info *const dbgi,
                                    const create_arithmetic_func func)
 {
-	pointer_type_t *const pointer_type = (pointer_type_t*)type;
+	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = pointer_type->points_to;
 	const unsigned        elem_size    = get_type_size(points_to);
 
@@ -1831,7 +1831,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 
 	type_t *ref_type = skip_typeref(expression->array_ref->base.datatype);
 	assert(is_type_pointer(ref_type));
-	pointer_type_t *pointer_type = (pointer_type_t*) ref_type;
+	pointer_type_t *pointer_type = &ref_type->pointer;
 
 	unsigned elem_size       = get_type_size(pointer_type->points_to);
 	ir_node *elem_size_const = new_Const_long(mode_uint, elem_size);
@@ -2097,7 +2097,7 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 	statement_t *statement = expr->statement;
 
 	assert(statement->type == STATEMENT_COMPOUND);
-	return compound_statement_to_firm((compound_statement_t*) statement);
+	return compound_statement_to_firm(&statement->compound);
 }
 
 static ir_node *va_start_expression_to_firm(
@@ -2742,7 +2742,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 		if(statement->base.next == NULL
 				&& statement->type == STATEMENT_EXPRESSION) {
 			result = expression_statement_to_firm(
-					(expression_statement_t*) statement);
+					&statement->expression);
 			break;
 		}
 		statement_to_firm(statement);
@@ -3377,7 +3377,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_COMPOUND: {
 				const compound_statement_t *const comp =
-					(const compound_statement_t*)stmt;
+					&stmt->compound;
 				count += count_decls_in_stmts(comp->statements);
 				break;
 			}
