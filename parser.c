@@ -3149,7 +3149,7 @@ static expression_t *parse_brace_expression(void)
 
 	switch(token.type) {
 	case '{':
-		/* gcc extension: a stement expression */
+		/* gcc extension: a statement expression */
 		return parse_statement_expression();
 
 	TYPE_QUALIFIERS
