@@ -942,7 +942,7 @@ static expression_t *parse_assignment_expression(void)
 
 static type_t *make_global_typedef(const char *name, type_t *type)
 {
-	symbol_t *symbol       = symbol_table_insert(name);
+	symbol_t *const symbol       = symbol_table_insert(name);
 
 	declaration_t *declaration   = allocate_ast_zero(sizeof(declaration[0]));
 	declaration->namespc         = NAMESPACE_NORMAL;
@@ -1184,7 +1184,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		return initializer_from_expression(type, expression);
 	}
 
-	/* does the expression match the currently looked at object to initalize */
+	/* does the expression match the currently looked at object to initialize */
 	if(expression != NULL) {
 		initializer_t *result = initializer_from_expression(type, expression);
 		if(result != NULL)
@@ -1285,7 +1285,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 
 			sub = parse_sub_initializer_elem(iter_type);
 			if(sub == NULL) {
-				/* TODO error, do nicer cleanup*/
+				/* TODO error, do nicer cleanup */
 				parse_error("member initializer didn't match");
 				DEL_ARR_F(elems);
 				return NULL;
@@ -1975,7 +1975,7 @@ static void semantic_parameter(declaration_t *declaration)
 		return;
 	type_t *type = skip_typeref(orig_type);
 
-	/* Array as last part of a paramter type is just syntactic sugar.  Turn it
+	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
 	 * into a pointer. § 6.7.5.3 (7) */
 	if (is_type_array(type)) {
 		const array_type_t *arr_type     = &type->array;

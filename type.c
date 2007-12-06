@@ -595,7 +595,7 @@ static bool array_types_compatible(const array_type_t *array1,
 		return false;
 
 	if(array1->size != NULL && array2->size != NULL) {
-		/* TODO: check if size expression evaulate to the same value
+		/* TODO: check if size expression evaluate to the same value
 		 * if they are constant */
 	}
 
@@ -659,7 +659,7 @@ type_t *skip_typeref(type_t *type)
 {
 	unsigned qualifiers = type->base.qualifiers;
 
-	while(1) {
+	while(true) {
 		switch(type->kind) {
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
