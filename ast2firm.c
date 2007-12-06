@@ -1334,7 +1334,6 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
 {
 	expression_t  *op1 = expression->left;
 	expression_t  *op2 = expression->right;
-	expression_t  *con;
 	declaration_t *var2, *var = NULL;
 	ir_node       *res = NULL;
 	pn_Cmp         cmp_val;
@@ -1345,11 +1344,11 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
     	var  = op1->reference.declaration;
 	    var2 = op2->reference.declaration;
 
-		type_t  *type       = skip_typeref(var->type);
+		type_t  *const type = skip_typeref(var->type);
 		ir_mode *const mode = get_ir_mode(type);
 
-		ir_node *irn1       = get_value(var->v.value_number, mode);
-		ir_node *irn2       = get_value(var2->v.value_number, mode);
+		ir_node *const irn1 = get_value(var->v.value_number, mode);
+		ir_node *const irn2 = get_value(var2->v.value_number, mode);
 
 		res = new_d_Confirm(dbi, irn2, irn1, get_inversed_pnc(cmp_val));
 		set_value(var2->v.value_number, res);
@@ -1360,6 +1359,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
 		return res;
 	}
 
+	expression_t *con;
 	if (is_local_variable(op1) && is_constant_expression(op2)) {
 		var = op1->reference.declaration;
 		con = op2;
@@ -1370,7 +1370,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
 	}
 
 	if (var != NULL) {
-		type_t  *type       = skip_typeref(var->type);
+		type_t  *const type = skip_typeref(var->type);
 		ir_mode *const mode = get_ir_mode(type);
 
 		res = get_value(var->v.value_number, mode);
@@ -1567,14 +1567,14 @@ static ir_node *create_arithmetic_assign_binop(
 	ir_node  *value;
 
 	if (is_type_pointer(type)) {
-		ir_node        *const pointer = expression_to_firm(expression->left);
-		ir_node        *      integer = expression_to_firm(expression->right);
+		ir_node *const pointer = expression_to_firm(expression->left);
+		ir_node *      integer = expression_to_firm(expression->right);
 		value = pointer_arithmetic(pointer, integer, type, dbgi, func);
 	} else {
 		value = create_arithmetic_binop(expression, func);
 	}
 
-	ir_mode  *const mode = get_ir_mode(type);
+	ir_mode *const mode = get_ir_mode(type);
 	value = create_conv(dbgi, value, mode);
 	set_value_for_expression(expression->left, value);
 
@@ -1896,7 +1896,7 @@ static long fold_constant(const expression_t *expression)
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	dbg_info *const dbgi = get_dbg_info(&expression->expression.source_position);
 
 	/* first try to fold a constant condition */
 	if(is_constant_expression(expression->condition)) {
@@ -2128,9 +2128,9 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	dbg_info *const dbgi   = get_dbg_info(&expr->expression.source_position);
 	ir_node  *const res    = deref_address(irtype, ap, dbgi);
 
-	size_t     const parm_size   = get_type_size(expr->expression.datatype);
-	ir_node   *const cnst        = new_Const_long(mode_uint, parm_size);
-	ir_node   *const add         = new_d_Add(dbgi, ap, cnst, mode_P_data);
+	size_t    const parm_size = get_type_size(expr->expression.datatype);
+	ir_node  *const cnst      = new_Const_long(mode_uint, parm_size);
+	ir_node  *const add       = new_d_Add(dbgi, ap, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
 	return res;
