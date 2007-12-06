@@ -2393,7 +2393,7 @@ static void create_initializer_compound(initializer_list_t *initializer,
 		assert(compound_entry->declaration_type
 				== DECLARATION_TYPE_COMPOUND_MEMBER);
 
-		if(sub_initializer->type == INITIALIZER_VALUE) {
+		if(sub_initializer->kind == INITIALIZER_VALUE) {
 			create_initializer_value(&sub_initializer->value,
 			                         entity, &entry, len);
 		} else {
@@ -2425,7 +2425,7 @@ static void create_initializer_array(initializer_list_t *initializer,
 
 		initializer_t *sub_initializer = initializer->initializers[i];
 
-		if(sub_initializer->type == INITIALIZER_VALUE) {
+		if(sub_initializer->kind == INITIALIZER_VALUE) {
 			create_initializer_value(&sub_initializer->value,
 			                         entity, &entry, len);
 		} else {
@@ -2506,7 +2506,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 	if(is_type_array(type)) {
 		array_type_t *array_type = &type->array;
 
-		switch (initializer->type) {
+		switch (initializer->kind) {
 			case INITIALIZER_STRING: {
 				initializer_string_t *const string = &initializer->string;
 				create_initializer_string(string, array_type, entity, entry, len);
@@ -2530,7 +2530,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		}
 		panic("Unhandled initializer");
 	} else {
-		assert(initializer->type == INITIALIZER_LIST);
+		assert(initializer->kind == INITIALIZER_LIST);
 		initializer_list_t *list = &initializer->list;
 
 		assert(is_type_compound(type));
@@ -2549,7 +2549,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	ir_node       *frame       = get_irg_frame(current_ir_graph);
 	ir_node       *addr        = new_d_simpleSel(dbgi, nomem, frame, entity);
 
-	if(initializer->type == INITIALIZER_VALUE) {
+	if(initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
 		ir_node *value = expression_to_firm(initializer_value->value);
@@ -2598,7 +2598,7 @@ static void create_initializer(declaration_t *declaration)
 		return;
 	}
 
-	if(initializer->type == INITIALIZER_VALUE) {
+	if(initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
 		ir_node *value = expression_to_firm(initializer_value->value);
@@ -3332,7 +3332,7 @@ static int count_local_declarations(const declaration_t *      decl,
 		}
 		const initializer_t *initializer = decl->init.initializer;
 		/* FIXME: should walk initializer hierarchies... */
-		if(initializer != NULL && initializer->type == INITIALIZER_VALUE) {
+		if(initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
 			count += count_decls_in_expression(initializer->value.value);
 		}
 	}

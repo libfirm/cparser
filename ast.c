@@ -662,13 +662,13 @@ static void print_storage_class(unsigned storage_class)
 
 void print_initializer(const initializer_t *initializer)
 {
-	if(initializer->type == INITIALIZER_VALUE) {
+	if(initializer->kind == INITIALIZER_VALUE) {
 		const initializer_value_t *value = &initializer->value;
 		print_expression(value->value);
 		return;
 	}
 
-	assert(initializer->type == INITIALIZER_LIST);
+	assert(initializer->kind == INITIALIZER_LIST);
 	fputs("{ ", out);
 	const initializer_list_t *list = &initializer->list;
 

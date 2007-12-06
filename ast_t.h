@@ -317,10 +317,10 @@ typedef enum {
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
 	INITIALIZER_WIDE_STRING
-} initializer_type_t;
+} initializer_kind_t;
 
 struct initializer_base_t {
-	initializer_type_t type;
+	initializer_kind_t kind;
 };
 
 struct initializer_value_t {
@@ -345,7 +345,7 @@ struct initializer_wide_string_t {
 };
 
 union initializer_t {
-	initializer_type_t        type;
+	initializer_kind_t        kind;
 	initializer_base_t        base;
 	initializer_value_t       value;
 	initializer_list_t        list;

@@ -234,7 +234,7 @@ static type_t *allocate_type_zero(type_kind_t kind)
 	return res;
 }
 
-static size_t get_initializer_size(initializer_type_t type)
+static size_t get_initializer_size(initializer_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[INITIALIZER_VALUE]       = sizeof(initializer_value_t),
@@ -242,15 +242,15 @@ static size_t get_initializer_size(initializer_type_t type)
 		[INITIALIZER_WIDE_STRING] = sizeof(initializer_wide_string_t),
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t)
 	};
-	assert(type < sizeof(sizes) / sizeof(*sizes));
-	assert(sizes[type] != 0);
-	return sizes[type];
+	assert(kind < sizeof(sizes) / sizeof(*sizes));
+	assert(sizes[kind] != 0);
+	return sizes[kind];
 }
 
-static initializer_t *allocate_initializer(initializer_type_t type)
+static initializer_t *allocate_initializer(initializer_kind_t kind)
 {
-	initializer_t *result = allocate_ast_zero(get_initializer_size(type));
-	result->type          = type;
+	initializer_t *result = allocate_ast_zero(get_initializer_size(kind));
+	result->kind          = kind;
 
 	return result;
 }
@@ -1299,7 +1299,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 
 	initializer_list_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
 
-	init->initializer.type = INITIALIZER_LIST;
+	init->initializer.kind = INITIALIZER_LIST;
 	init->len              = len;
 	memcpy(init->initializers, elems, elems_size);
 	DEL_ARR_F(elems);
@@ -2435,7 +2435,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	initializer_t *initializer = parse_initializer(type);
 
-	/* § 6.7.5 (22)  array intializers for arrays with unknown size determine
+	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
 	 * the array type size */
 	if(type != NULL && is_type_array(type) && initializer != NULL) {
 		array_type_t *array_type = &type->array;
@@ -2445,7 +2445,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 			cnst->base.datatype = type_size_t;
 
-			switch (initializer->type) {
+			switch (initializer->kind) {
 				case INITIALIZER_LIST: {
 					initializer_list_t *const list = &initializer->list;
 					cnst->conste.v.int_value = list->len;
