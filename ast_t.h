@@ -46,8 +46,9 @@ typedef enum {
 	EXPR_UNARY_PREFIX_INCREMENT,
 	EXPR_UNARY_PREFIX_DECREMENT,
 	EXPR_UNARY_CAST,
-	EXPR_UNARY_CAST_IMPLICIT, /* compiler generated cast */
-	EXPR_UNARY_LAST = EXPR_UNARY_CAST_IMPLICIT,
+	EXPR_UNARY_CAST_IMPLICIT, /**< compiler generated cast */
+	EXPR_UNARY_ASSUME,        /**< MS __assume() */
+	EXPR_UNARY_LAST = EXPR_UNARY_ASSUME,
 
 	EXPR_BINARY_FIRST,
 	EXPR_BINARY_ADD = EXPR_BINARY_FIRST,
@@ -143,7 +144,8 @@ typedef enum {
 	case EXPR_UNARY_PREFIX_INCREMENT:      \
 	case EXPR_UNARY_PREFIX_DECREMENT:      \
 	case EXPR_UNARY_CAST:                  \
-	case EXPR_UNARY_CAST_IMPLICIT:
+	case EXPR_UNARY_CAST_IMPLICIT:         \
+	case EXPR_UNARY_ASSUME:
 
 struct context_t {
 	declaration_t *declarations;

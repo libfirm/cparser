@@ -223,6 +223,9 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 	case EXPR_UNARY_CAST_IMPLICIT:
 		print_expression(unexpr->value);
 		return;
+	case EXPR_UNARY_ASSUME:
+		fputs("__assume", out);
+		break;
 	default:
 		panic("invalid unary expression found");
 	}
@@ -779,6 +782,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_POSTFIX_DECREMENT:
 	case EXPR_UNARY_PREFIX_INCREMENT:
 	case EXPR_UNARY_PREFIX_DECREMENT:
+	case EXPR_UNARY_ASSUME: /* has VOID type */
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:
