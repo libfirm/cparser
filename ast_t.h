@@ -389,12 +389,13 @@ struct declaration_t {
 	/** next declaration with same symbol */
 	declaration_t      *symbol_next;
 
-	unsigned char       declaration_type; /* used in ast2firm module */
+	/* the following fields are used in ast2firm module */
+	unsigned char       declaration_type;
 	union {
-		unsigned int    value_number;     /* used in ast2firm module */
-		ir_entity      *entity;           /* used in ast2firm module */
-		ir_node        *block;            /* used in ast2firm module */
-		tarval         *enum_val;         /* used in ast2firm module */
+		unsigned int    value_number;
+		ir_entity      *entity;
+		ir_node        *block;
+		tarval         *enum_val;
 	} v;
 };
 

@@ -3399,6 +3399,20 @@ static expression_t *parse_builtin_expect(void)
 	return expression;
 }
 
+static expression_t *parse_assume(void) {
+	eat(T_assume);
+
+	expression_t *expression
+		= allocate_expression_zero(EXPR_UNARY_ASSUME);
+
+	expect('(');
+	expression->unary.value = parse_expression();
+	expect(')');
+
+	expression->base.datatype = type_void;
+	return expression;
+}
+
 static expression_t *parse_primary_expression(void)
 {
 	switch(token.type) {
@@ -3436,6 +3450,8 @@ static expression_t *parse_primary_expression(void)
 	case T___builtin_islessgreater:
 	case T___builtin_isunordered:
 		return parse_compare_builtin();
+	case T_assume:
+		return parse_assume();
 
 	case '(':
 		return parse_brace_expression();

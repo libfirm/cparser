@@ -1287,66 +1287,13 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	}
 }
 
-static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
+static bool is_local_variable(expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
-	type_t   *type = skip_typeref(expression->expression.datatype);
-
-	if(expression->expression.type == EXPR_UNARY_TAKE_ADDRESS)
-		return expression_to_addr(expression->value);
-
-	const expression_t *value      = expression->value;
-	ir_node            *value_node = expression_to_firm(value);
-
-	switch(expression->expression.type) {
-	case EXPR_UNARY_NEGATE: {
-		ir_mode *mode = get_ir_mode(type);
-		return new_d_Minus(dbgi, value_node, mode);
-	}
-	case EXPR_UNARY_PLUS:
-		return value_node;
-	case EXPR_UNARY_BITWISE_NEGATE: {
-		ir_mode *mode = get_ir_mode(type);
-		return new_d_Not(dbgi, value_node, mode);
-	}
-	case EXPR_UNARY_NOT: {
-		ir_mode *mode = get_ir_mode(type);
-		if(get_irn_mode(value_node) != mode_b) {
-			value_node = create_conv(dbgi, value_node, mode_b);
-		}
-		value_node = new_d_Not(dbgi, value_node, mode_b);
-		if(mode != mode_b) {
-			value_node = create_conv(dbgi, value_node, mode);
-		}
-		return value_node;
-	}
-	case EXPR_UNARY_DEREFERENCE: {
-		type_t  *value_type = skip_typeref(value->base.datatype);
-		ir_type *irtype     = get_ir_type(value_type);
-		assert(is_Pointer_type(irtype));
-		ir_type *points_to  = get_pointer_points_to_type(irtype);
-		return deref_address(points_to, value_node, dbgi);
-	}
-	case EXPR_UNARY_POSTFIX_INCREMENT:
-	case EXPR_UNARY_POSTFIX_DECREMENT:
-	case EXPR_UNARY_PREFIX_INCREMENT:
-	case EXPR_UNARY_PREFIX_DECREMENT:
-		return create_incdec(expression);
-	case EXPR_UNARY_CAST: {
-		ir_mode *mode = get_ir_mode(type);
-		ir_node *node = create_conv(dbgi, value_node, mode);
-		node = do_strict_conv(dbgi, node);
-		return node;
-	}
-	case EXPR_UNARY_CAST_IMPLICIT: {
-		ir_mode *mode = get_ir_mode(type);
-		return create_conv(dbgi, value_node, mode);
-	}
-
-	default:
-		break;
-	}
-	panic("invalid UNEXPR type found");
+	if (expression->type != EXPR_REFERENCE)
+		return false;
+	reference_expression_t *ref_expr    = &expression->reference;
+	declaration_t          *declaration = ref_expr->declaration;
+	return declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE;
 }
 
 static long get_pnc(const expression_type_t type)
@@ -1369,6 +1316,157 @@ static long get_pnc(const expression_type_t type)
 		break;
 	}
 	panic("trying to get pn_Cmp from non-comparison binexpr type");
+}
+
+/**
+ * Handle the assume optimizer hint: check if a Confirm
+ * node can be created.
+ *
+ * @param dbi    debug info
+ * @param expr   the IL assume expression
+ *
+ * we support here only some simple cases:
+ *  - var rel const
+ *  - const rel val
+ *  - var rel var
+ */
+static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *expression)
+{
+	expression_t  *op1 = expression->left;
+	expression_t  *op2 = expression->right;
+	expression_t  *con;
+	declaration_t *var2, *var = NULL;
+	ir_node       *res = NULL;
+	pn_Cmp         cmp_val;
+
+	cmp_val = get_pnc(expression->expression.type);
+
+	if (is_local_variable(op1) && is_local_variable(op2)) {
+    	var  = op1->reference.declaration;
+	    var2 = op2->reference.declaration;
+
+		type_t  *type       = skip_typeref(var->type);
+		ir_mode *const mode = get_ir_mode(type);
+
+		ir_node *irn1       = get_value(var->v.value_number, mode);
+		ir_node *irn2       = get_value(var2->v.value_number, mode);
+
+		res = new_d_Confirm(dbi, irn2, irn1, get_inversed_pnc(cmp_val));
+		set_value(var2->v.value_number, res);
+
+		res = new_d_Confirm(dbi, irn1, irn2, cmp_val);
+		set_value(var->v.value_number, res);
+
+		return res;
+	}
+
+	if (is_local_variable(op1) && is_constant_expression(op2)) {
+		var = op1->reference.declaration;
+		con = op2;
+	} else if (is_constant_expression(op1) && is_local_variable(op2)) {
+		cmp_val = get_inversed_pnc(cmp_val);
+		var = op2->reference.declaration;
+		con = op1;
+	}
+
+	if (var != NULL) {
+		type_t  *type       = skip_typeref(var->type);
+		ir_mode *const mode = get_ir_mode(type);
+
+		res = get_value(var->v.value_number, mode);
+		res = new_d_Confirm(dbi, res, expression_to_firm(con), cmp_val);
+		set_value(var->v.value_number, res);
+	}
+	return res;
+}
+
+/**
+ * Handle the assume optimizer hint.
+ *
+ * @param dbi    debug info
+ * @param expr   the IL assume expression
+ */
+static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression) {
+	switch(expression->type) {
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+		return handle_assume_compare(dbi, &expression->binary);
+	default:
+		return NULL;
+	}
+}
+
+static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+	type_t   *type = skip_typeref(expression->expression.datatype);
+
+	if(expression->expression.type == EXPR_UNARY_TAKE_ADDRESS)
+		return expression_to_addr(expression->value);
+
+	const expression_t *value = expression->value;
+
+	switch(expression->expression.type) {
+	case EXPR_UNARY_NEGATE: {
+		ir_node *value_node = expression_to_firm(value);
+		ir_mode *mode = get_ir_mode(type);
+		return new_d_Minus(dbgi, value_node, mode);
+	}
+	case EXPR_UNARY_PLUS:
+		return expression_to_firm(value);
+	case EXPR_UNARY_BITWISE_NEGATE: {
+		ir_node *value_node = expression_to_firm(value);
+		ir_mode *mode = get_ir_mode(type);
+		return new_d_Not(dbgi, value_node, mode);
+	}
+	case EXPR_UNARY_NOT: {
+		ir_node *value_node = expression_to_firm(value);
+		ir_mode *mode = get_ir_mode(type);
+		if(get_irn_mode(value_node) != mode_b) {
+			value_node = create_conv(dbgi, value_node, mode_b);
+		}
+		value_node = new_d_Not(dbgi, value_node, mode_b);
+		if(mode != mode_b) {
+			value_node = create_conv(dbgi, value_node, mode);
+		}
+		return value_node;
+	}
+	case EXPR_UNARY_DEREFERENCE: {
+		ir_node *value_node = expression_to_firm(value);
+		type_t  *value_type = skip_typeref(value->base.datatype);
+		ir_type *irtype     = get_ir_type(value_type);
+		assert(is_Pointer_type(irtype));
+		ir_type *points_to  = get_pointer_points_to_type(irtype);
+		return deref_address(points_to, value_node, dbgi);
+	}
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
+		return create_incdec(expression);
+	case EXPR_UNARY_CAST: {
+		ir_node *value_node = expression_to_firm(value);
+		ir_mode *mode = get_ir_mode(type);
+		ir_node *node = create_conv(dbgi, value_node, mode);
+		node = do_strict_conv(dbgi, node);
+		return node;
+	}
+	case EXPR_UNARY_CAST_IMPLICIT: {
+		ir_node *value_node = expression_to_firm(value);
+		ir_mode *mode = get_ir_mode(type);
+		return create_conv(dbgi, value_node, mode);
+	}
+	case EXPR_UNARY_ASSUME:
+		return handle_assume(dbgi, value);
+
+	default:
+		break;
+	}
+	panic("invalid UNEXPR type found");
 }
 
 static ir_node *create_lazy_op(const binary_expression_t *expression)
