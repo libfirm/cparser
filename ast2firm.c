@@ -3650,7 +3650,7 @@ void init_ast2firm(void)
 	init_atomic_modes();
 
 	/* create idents for all known runtime functions */
-	for (int i = 0; i < sizeof(rts_data)/sizeof(rts_data[0]); ++i) {
+	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
 		predef_idents[rts_data[i].id] = new_id_from_str(rts_data[i].name);
 	}
 }
