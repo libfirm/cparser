@@ -1461,7 +1461,10 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return create_conv(dbgi, value_node, mode);
 	}
 	case EXPR_UNARY_ASSUME:
-		return handle_assume(dbgi, value);
+		if(firm_opt.confirm)
+			return handle_assume(dbgi, value);
+		else
+			return NULL;
 
 	default:
 		break;
