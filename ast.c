@@ -324,6 +324,38 @@ static void print_classify_type_expression(
 	fputc(')', out);
 }
 
+static void print_designator(const designator_t *designator)
+{
+	fputs(designator->symbol->string, out);
+	for (designator = designator->next; designator != NULL; designator = designator->next) {
+		if (designator->array_access) {
+			fputc('[', out);
+			print_expression(designator->array_access);
+			fputc(']', out);
+		} else {
+			fputc('.', out);
+			fputs(designator->symbol->string, out);
+		}
+	}
+}
+
+static void print_offsetof_expression(const offsetof_expression_t *expression)
+{
+	fputs("__builtin_offsetof", out);
+	fputc('(', out);
+	print_type(expression->type);
+	fputc(',', out);
+	print_designator(expression->designator);
+	fputc(')', out);
+}
+
+static void print_statement_expression(const statement_expression_t *expression)
+{
+	fputc('(', out);
+	print_statement(expression->statement);
+	fputc(')', out);
+}
+
 void print_expression(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -368,6 +400,7 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_VA_START:
 		print_va_start(&expression->va_starte);
+		break;
 	case EXPR_VA_ARG:
 		print_va_arg(&expression->va_arge);
 		break;
@@ -377,9 +410,14 @@ void print_expression(const expression_t *expression)
 	case EXPR_CLASSIFY_TYPE:
 		print_classify_type_expression(&expression->classify_type);
 		break;
-
 	case EXPR_OFFSETOF:
+		print_offsetof_expression(&expression->offsetofe);
+		break;
 	case EXPR_STATEMENT:
+		print_statement_expression(&expression->statement);
+		break;
+
+	default:
 		/* TODO */
 		fprintf(out, "some expression of type %d", (int) expression->kind);
 		break;
