@@ -218,10 +218,10 @@ static void print_compound_type(const compound_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
-	if(type->type.type == TYPE_COMPOUND_STRUCT) {
+	if(type->type.kind == TYPE_COMPOUND_STRUCT) {
 		fputs("struct ", out);
 	} else {
-		assert(type->type.type == TYPE_COMPOUND_UNION);
+		assert(type->type.kind == TYPE_COMPOUND_UNION);
 		fputs("union ", out);
 	}
 
@@ -253,7 +253,7 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 
 static void intern_print_type_pre(const type_t *const type, const bool top)
 {
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_INVALID:
 		fputs("invalid", out);
 		return;
@@ -291,7 +291,7 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 
 static void intern_print_type_post(const type_t *const type, const bool top)
 {
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_FUNCTION:
 		print_function_type_post(&type->function, NULL, top);
 		return;
@@ -331,7 +331,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
-	if(type->type == TYPE_FUNCTION) {
+	if(type->kind == TYPE_FUNCTION) {
 		print_function_type_post(&type->function, context, true);
 	} else {
 		intern_print_type_post(type, true);
@@ -340,7 +340,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 
 static size_t get_type_size(type_t *type)
 {
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
@@ -388,17 +388,17 @@ type_t *get_unqualified_type(type_t *type)
 
 bool type_valid(const type_t *type)
 {
-	return type->type != TYPE_INVALID;
+	return type->kind != TYPE_INVALID;
 }
 
 bool is_type_integer(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->type == TYPE_ENUM)
+	if(type->kind == TYPE_ENUM)
 		return true;
 
-	if(type->type != TYPE_ATOMIC)
+	if(type->kind != TYPE_ATOMIC)
 		return false;
 
 	switch(type->atomic.atype) {
@@ -424,7 +424,7 @@ bool is_type_floating(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->type != TYPE_ATOMIC)
+	if(type->kind != TYPE_ATOMIC)
 		return false;
 
 	switch(type->atomic.atype) {
@@ -450,10 +450,10 @@ bool is_type_signed(const type_t *type)
 	assert(!is_typeref(type));
 
 	/* enum types are int for now */
-	if(type->type == TYPE_ENUM)
+	if(type->kind == TYPE_ENUM)
 		return true;
 
-	if(type->type != TYPE_ATOMIC)
+	if(type->kind != TYPE_ATOMIC)
 		return false;
 
 	switch(type->atomic.atype) {
@@ -508,7 +508,7 @@ bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch (type->type) {
+	switch (type->kind) {
 		case TYPE_POINTER: return true;
 		case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
 		default:           break;
@@ -521,7 +521,7 @@ bool is_type_incomplete(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
 		const compound_type_t *compound_type = &type->compound;
@@ -613,10 +613,10 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 
 	if(type1->base.qualifiers != type2->base.qualifiers)
 		return false;
-	if(type1->type != type2->type)
+	if(type1->kind != type2->kind)
 		return false;
 
-	switch(type1->type) {
+	switch(type1->kind) {
 	case TYPE_FUNCTION:
 		return function_types_compatible(&type1->function, &type2->function);
 	case TYPE_ATOMIC:
@@ -649,8 +649,8 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 	assert(!is_typeref(type1));
 	assert(!is_typeref(type2));
 
-	assert(type1->type == TYPE_POINTER);
-	assert(type2->type == TYPE_POINTER);
+	assert(type1->kind == TYPE_POINTER);
+	assert(type2->kind == TYPE_POINTER);
 	/* TODO */
 	return true;
 }
@@ -660,7 +660,7 @@ type_t *skip_typeref(type_t *type)
 	unsigned qualifiers = type->base.qualifiers;
 
 	while(1) {
-		switch(type->type) {
+		switch(type->kind) {
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
 			const typedef_type_t *typedef_type = &type->typedeft;
@@ -705,7 +705,7 @@ type_t *make_atomic_type(atomic_type_type_t atype, type_qualifiers_t qualifiers)
 	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
 	memset(type, 0, sizeof(atomic_type_t));
 
-	type->type            = TYPE_ATOMIC;
+	type->kind            = TYPE_ATOMIC;
 	type->base.qualifiers = qualifiers;
 	type->atomic.atype    = atype;
 
@@ -717,7 +717,7 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
 	memset(type, 0, sizeof(pointer_type_t));
 
-	type->type              = TYPE_POINTER;
+	type->kind              = TYPE_POINTER;
 	type->base.qualifiers   = qualifiers;
 	type->pointer.points_to = points_to;
 

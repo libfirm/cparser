@@ -315,7 +315,7 @@ static unsigned get_type_size(type_t *type)
 {
 	type = skip_typeref(type);
 
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_ATOMIC:
 		return get_atomic_type_size(&type->atomic);
 	case TYPE_ENUM:
@@ -598,7 +598,7 @@ static ir_type *get_ir_type(type_t *type)
 	}
 
 	ir_type *firm_type = NULL;
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(&type->atomic);
 		break;
@@ -1043,7 +1043,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 {
 	dbg_info *dbgi = get_dbg_info(&call->expression.source_position);
 
-	assert(call->function->type == EXPR_BUILTIN_SYMBOL);
+	assert(call->function->kind == EXPR_BUILTIN_SYMBOL);
 	builtin_symbol_expression_t *builtin = &call->function->builtin_symbol;
 
 	type_t *type = skip_typeref(builtin->expression.datatype);
@@ -1091,7 +1091,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	assert(get_cur_block() != NULL);
 
 	expression_t *function = call->function;
-	if(function->type == EXPR_BUILTIN_SYMBOL) {
+	if(function->kind == EXPR_BUILTIN_SYMBOL) {
 		return process_builtin_call(call);
 	}
 	ir_node *callee = expression_to_firm(function);
@@ -1208,7 +1208,7 @@ static void set_value_for_expression(const expression_t *expression,
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 	value          = do_strict_conv(dbgi, value);
 
-	if(expression->type == EXPR_REFERENCE) {
+	if(expression->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref = &expression->reference;
 
 		declaration_t *declaration = ref->declaration;
@@ -1260,7 +1260,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		offset = new_Const(mode, get_mode_one(mode));
 	}
 
-	switch(expression->expression.type) {
+	switch(expression->expression.kind) {
 	case EXPR_UNARY_POSTFIX_INCREMENT: {
 		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
 		set_value_for_expression(value, new_value);
@@ -1289,16 +1289,16 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 
 static bool is_local_variable(expression_t *expression)
 {
-	if (expression->type != EXPR_REFERENCE)
+	if (expression->kind != EXPR_REFERENCE)
 		return false;
 	reference_expression_t *ref_expr    = &expression->reference;
 	declaration_t          *declaration = ref_expr->declaration;
 	return declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE;
 }
 
-static long get_pnc(const expression_type_t type)
+static pn_Cmp get_pnc(const expression_kind_t kind)
 {
-	switch(type) {
+	switch(kind) {
 	case EXPR_BINARY_EQUAL:         return pn_Cmp_Eq;
 	case EXPR_BINARY_ISLESSGREATER: return pn_Cmp_Lg;
 	case EXPR_BINARY_NOTEQUAL:      return pn_Cmp_Ne;
@@ -1339,7 +1339,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
 	ir_node       *res = NULL;
 	pn_Cmp         cmp_val;
 
-	cmp_val = get_pnc(expression->expression.type);
+	cmp_val = get_pnc(expression->expression.kind);
 
 	if (is_local_variable(op1) && is_local_variable(op2)) {
     	var  = op1->reference.declaration;
@@ -1387,7 +1387,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *
  * @param expr   the IL assume expression
  */
 static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression) {
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_BINARY_LESS:
@@ -1405,12 +1405,12 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
 	type_t   *type = skip_typeref(expression->expression.datatype);
 
-	if(expression->expression.type == EXPR_UNARY_TAKE_ADDRESS)
+	if(expression->expression.kind == EXPR_UNARY_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
 
 	const expression_t *value = expression->value;
 
-	switch(expression->expression.type) {
+	switch(expression->expression.kind) {
 	case EXPR_UNARY_NEGATE: {
 		ir_node *value_node = expression_to_firm(value);
 		ir_mode *mode = get_ir_mode(type);
@@ -1480,13 +1480,13 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 
 	if(is_constant_expression(expression->left)) {
 		long val = fold_constant(expression->left);
-		expression_type_t etype = expression->expression.type;
-		if((etype == EXPR_BINARY_LOGICAL_AND && val != 0)
-				|| (etype == EXPR_BINARY_LOGICAL_OR && val == 0)) {
+		expression_kind_t ekind = expression->expression.kind;
+		if((ekind == EXPR_BINARY_LOGICAL_AND && val != 0)
+				|| (ekind == EXPR_BINARY_LOGICAL_OR && val == 0)) {
 			return expression_to_firm(expression->right);
 		} else {
-			assert((etype == EXPR_BINARY_LOGICAL_AND && val == 0)
-					|| (etype == EXPR_BINARY_LOGICAL_OR && val != 0));
+			assert((ekind == EXPR_BINARY_LOGICAL_AND && val == 0)
+					|| (ekind == EXPR_BINARY_LOGICAL_OR && val != 0));
 			return new_Const(mode, get_mode_one(mode));
 		}
 	}
@@ -1649,7 +1649,7 @@ static ir_node *create_shift(const binary_expression_t *expression)
 
 	ir_node *res;
 
-	switch(expression->expression.type) {
+	switch(expression->expression.kind) {
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTLEFT:
 		res = new_d_Shl(dbgi, left, right, mode);
@@ -1688,7 +1688,7 @@ static ir_node *create_divmod(const binary_expression_t *expression)
 	ir_node  *op;
 	ir_node  *res;
 
-	switch (expression->expression.type) {
+	switch (expression->expression.kind) {
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_DIV_ASSIGN:
 		if(mode_is_float(mode)) {
@@ -1721,7 +1721,7 @@ static ir_node *create_arithmetic_assign_divmod(
 	type_t   *const type  = expression->expression.datatype;
 	ir_mode  *const mode  = get_ir_mode(type);
 
-	assert(type->type != TYPE_POINTER);
+	assert(type->kind != TYPE_POINTER);
 
 	value = create_conv(dbgi, value, mode);
 	set_value_for_expression(expression->left, value);
@@ -1745,9 +1745,9 @@ static ir_node *create_arithmetic_assign_shift(
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 {
-	expression_type_t type = expression->expression.type;
+	expression_kind_t kind = expression->expression.kind;
 
-	switch(type) {
+	switch(kind) {
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_BINARY_LESS:
@@ -1764,7 +1764,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		ir_node *left  = expression_to_firm(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
 		ir_node *cmp   = new_d_Cmp(dbgi, left, right);
-		long     pnc   = get_pnc(type);
+		long     pnc   = get_pnc(kind);
 		ir_node *proj  = new_d_Proj(dbgi, cmp, mode_b, pnc);
 		return proj;
 	}
@@ -2005,7 +2005,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	const type_t *const type = expr->type_expression->base.datatype;
 
 	gcc_type_class tc;
-	switch (type->type)
+	switch (type->kind)
 	{
 		case TYPE_ATOMIC: {
 			const atomic_type_t *const atomic_type = &type->atomic;
@@ -2096,7 +2096,7 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 {
 	statement_t *statement = expr->statement;
 
-	assert(statement->type == STATEMENT_COMPOUND);
+	assert(statement->kind == STATEMENT_COMPOUND);
 	return compound_statement_to_firm(&statement->compound);
 }
 
@@ -2138,13 +2138,13 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
-	assert(expression->expression.type == EXPR_UNARY_DEREFERENCE);
+	assert(expression->expression.kind == EXPR_UNARY_DEREFERENCE);
 	return expression_to_firm(expression->value);
 }
 
 static ir_node *expression_to_addr(const expression_t *expression)
 {
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_REFERENCE:
 		return reference_addr(&expression->reference);
 	case EXPR_ARRAY_ACCESS:
@@ -2164,7 +2164,7 @@ static ir_node *expression_to_addr(const expression_t *expression)
 
 static ir_node *_expression_to_firm(const expression_t *expression)
 {
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_CONST:
 		return const_to_firm(&expression->conste);
 	case EXPR_STRING_LITERAL:
@@ -2237,7 +2237,7 @@ static void create_condition_evaluation(const expression_t *expression,
                                         ir_node *true_block,
                                         ir_node *false_block)
 {
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_UNARY_NOT: {
 		const unary_expression_t *unary_expression = &expression->unary;
 		create_condition_evaluation(unary_expression->value, false_block,
@@ -2740,7 +2740,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 		//context2firm(&statement->context);
 
 		if(statement->base.next == NULL
-				&& statement->type == STATEMENT_EXPRESSION) {
+				&& statement->kind == STATEMENT_EXPRESSION) {
 			result = expression_statement_to_firm(
 					&statement->expression);
 			break;
@@ -3259,7 +3259,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 static void statement_to_firm(statement_t *statement)
 {
-	switch(statement->type) {
+	switch(statement->kind) {
 	case STATEMENT_INVALID:
 		panic("invalid statement found");
 	case STATEMENT_COMPOUND:
@@ -3320,7 +3320,7 @@ static int count_local_declarations(const declaration_t *      decl,
 	int count = 0;
 	for (; decl != end; decl = decl->next) {
 		const type_t *type = skip_typeref(decl->type);
-		switch (type->type) {
+		switch (type->kind) {
 			case TYPE_ATOMIC:
 			case TYPE_ENUM:
 			case TYPE_POINTER:
@@ -3343,7 +3343,7 @@ static int count_decls_in_expression(const expression_t *expression) {
 	if(expression == NULL)
 		return 0;
 
-	switch(expression->base.type) {
+	switch(expression->base.kind) {
 	case EXPR_STATEMENT:
 		return count_decls_in_stmts(expression->statement.statement);
 	EXPR_BINARY_CASES
@@ -3367,7 +3367,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 {
 	int count = 0;
 	for (; stmt != NULL; stmt = stmt->base.next) {
-		switch (stmt->type) {
+		switch (stmt->kind) {
 			case STATEMENT_DECLARATION: {
 				const declaration_statement_t *const decl_stmt = &stmt->declaration;
 				count += count_local_declarations(decl_stmt->declarations_begin,
@@ -3738,7 +3738,7 @@ static void context_to_firm(context_t *context)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->type != TYPE_FUNCTION)
+		if(type->kind != TYPE_FUNCTION)
 			continue;
 
 		create_function(declaration);

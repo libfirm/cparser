@@ -26,7 +26,7 @@ typedef enum {
 	TYPE_BUILTIN,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
-} type_type_t;
+} type_kind_t;
 
 /* note that the constant values represent the rank of the types as defined
  * in § 6.3.1 */
@@ -69,7 +69,7 @@ typedef enum {
 typedef unsigned int type_qualifiers_t;
 
 struct type_base_t {
-	type_type_t       type;
+	type_kind_t       kind;
 	type_qualifiers_t qualifiers;
 
 	ir_type          *firm_type;
@@ -142,7 +142,7 @@ struct typeof_type_t {
 };
 
 union type_t {
-	type_type_t      type;
+	type_kind_t      kind;
 	type_base_t      base;
 	atomic_type_t    atomic;
 	builtin_type_t   builtin;
@@ -162,14 +162,14 @@ type_t *duplicate_type(type_t *type);
 
 static inline bool is_typeref(const type_t *type)
 {
-	return type->type == TYPE_TYPEDEF || type->type == TYPE_TYPEOF;
+	return type->kind == TYPE_TYPEDEF || type->kind == TYPE_TYPEOF;
 }
 
 static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 {
 	assert(!is_typeref(type));
 
-	if(type->type != TYPE_ATOMIC)
+	if(type->kind != TYPE_ATOMIC)
 		return false;
 	const atomic_type_t *atomic_type = &type->atomic;
 
@@ -179,26 +179,26 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 static inline bool is_type_pointer(const type_t *type)
 {
 	assert(!is_typeref(type));
-	return type->type == TYPE_POINTER;
+	return type->kind == TYPE_POINTER;
 }
 
 static inline bool is_type_array(const type_t *type)
 {
 	assert(!is_typeref(type));
-	return type->type == TYPE_ARRAY;
+	return type->kind == TYPE_ARRAY;
 }
 
 static inline bool is_type_function(const type_t *type)
 {
 	assert(!is_typeref(type));
-	return type->type == TYPE_FUNCTION;
+	return type->kind == TYPE_FUNCTION;
 }
 
 static inline bool is_type_compound(const type_t *type)
 {
 	assert(!is_typeref(type));
-	return type->type == TYPE_COMPOUND_STRUCT
-		|| type->type == TYPE_COMPOUND_UNION;
+	return type->kind == TYPE_COMPOUND_STRUCT
+		|| type->kind == TYPE_COMPOUND_UNION;
 }
 
 #endif

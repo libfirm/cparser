@@ -81,7 +81,7 @@ static unsigned hash_type(const type_t *type)
 {
 	unsigned hash = 0;
 
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_INVALID:
 		panic("internalizing void or invalid types not possible");
 		return 0;
@@ -214,12 +214,12 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
 		return true;
-	if(type1->type != type2->type)
+	if(type1->kind != type2->kind)
 		return false;
 	if(type1->base.qualifiers != type2->base.qualifiers)
 		return false;
 
-	switch(type1->type) {
+	switch(type1->kind) {
 	case TYPE_INVALID:
 		return false;
 	case TYPE_ATOMIC:

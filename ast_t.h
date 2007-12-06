@@ -90,7 +90,7 @@ typedef enum {
 	EXPR_BINARY_ISLESSGREATER,
 	EXPR_BINARY_ISUNORDERED,
 	EXPR_BINARY_LAST = EXPR_BINARY_ISUNORDERED,
-} expression_type_t;
+} expression_kind_t;
 
 /* convenience macros */
 #define EXPR_BINARY_CASES                  \
@@ -152,7 +152,7 @@ struct context_t {
 };
 
 struct expression_base_t {
-	expression_type_t   type;
+	expression_kind_t   kind;
 	type_t             *datatype;
 	source_position_t   source_position;
 };
@@ -270,7 +270,7 @@ struct classify_type_expression_t {
 };
 
 union expression_t {
-	expression_type_t                type;
+	expression_kind_t                kind;
 	expression_base_t                base;
 	const_expression_t               conste;
 	string_literal_expression_t      string;
@@ -416,10 +416,10 @@ typedef enum {
 	STATEMENT_DO_WHILE,
 	STATEMENT_FOR,
 	STATEMENT_ASM
-} statement_type_t;
+} statement_kind_t;
 
 struct statement_base_t {
-	statement_type_t   type;
+	statement_kind_t   kind;
 	statement_t       *next;
 	source_position_t  source_position;
 };
@@ -519,7 +519,7 @@ struct asm_statement_t {
 };
 
 union statement_t {
-	statement_type_t         type;
+	statement_kind_t         kind;
 	statement_base_t         base;
 	return_statement_t       returns;
 	compound_statement_t     compound;

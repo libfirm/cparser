@@ -137,22 +137,22 @@ static void write_function_type(const function_type_t *type)
 
 static void write_type(const type_t *type)
 {
-	switch(type->type) {
+	switch(type->kind) {
 	case TYPE_ATOMIC:
-		write_atomic_type((const atomic_type_t*) type);
+		write_atomic_type(&type->atomic);
 		return;
 	case TYPE_POINTER:
-		write_pointer_type((const pointer_type_t*) type);
+		write_pointer_type(&type->pointer);
 		return;
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
-		write_compound_type((const compound_type_t*) type);
+		write_compound_type(&type->compound);
 		return;
 	case TYPE_ENUM:
-		write_enum_type((const enum_type_t*) type);
+		write_enum_type(&type->enumt);
 		return;
 	case TYPE_FUNCTION:
-		write_function_type((const function_type_t*) type);
+		write_function_type(&type->function);
 		return;
 	case TYPE_INVALID:
 		panic("invalid type found");
@@ -200,7 +200,7 @@ static void write_expression(const expression_t *expression);
 
 static void write_unary_expression(const unary_expression_t *expression)
 {
-	switch(expression->expression.type) {
+	switch(expression->expression.kind) {
 	case EXPR_UNARY_NEGATE:
 		fputc('-', out);
 		break;
@@ -217,7 +217,7 @@ static void write_expression(const expression_t *expression)
 {
 	const const_expression_t *constant;
 	/* TODO */
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_CONST:
 		constant = &expression->conste;
 		if(is_type_integer(expression->base.datatype)) {
@@ -322,12 +322,12 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 			continue;
 		}
 		type_t *type = declaration->type;
-		if(type->type == TYPE_COMPOUND_STRUCT) {
-			write_struct(declaration->symbol, (compound_type_t*) type);
-		} else if(type->type == TYPE_COMPOUND_UNION) {
-			write_union(declaration->symbol, (compound_type_t*) type);
-		} else if(type->type == TYPE_ENUM) {
-			write_enum(declaration->symbol, (enum_type_t*) type);
+		if(type->kind == TYPE_COMPOUND_STRUCT) {
+			write_struct(declaration->symbol, &type->compound);
+		} else if(type->kind == TYPE_COMPOUND_UNION) {
+			write_union(declaration->symbol, &type->compound);
+		} else if(type->kind == TYPE_ENUM) {
+			write_enum(declaration->symbol, &type->enumt);
 		}
 	}
 
@@ -341,7 +341,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->type == TYPE_FUNCTION)
+		if(type->kind == TYPE_FUNCTION)
 			continue;
 
 		write_variable(declaration);
@@ -357,7 +357,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->type != TYPE_FUNCTION)
+		if(type->kind != TYPE_FUNCTION)
 			continue;
 
 		write_function(declaration);

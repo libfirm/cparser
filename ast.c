@@ -140,7 +140,7 @@ static void print_call_expression(const call_expression_t *call)
 
 static void print_binary_expression(const binary_expression_t *binexpr)
 {
-	if(binexpr->expression.type == EXPR_BINARY_BUILTIN_EXPECT) {
+	if(binexpr->expression.kind == EXPR_BINARY_BUILTIN_EXPECT) {
 		fputs("__builtin_expect(", out);
 		print_expression(binexpr->left);
 		fputs(", ", out);
@@ -152,7 +152,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	fprintf(out, "(");
 	print_expression(binexpr->left);
 	fprintf(out, " ");
-	switch(binexpr->expression.type) {
+	switch(binexpr->expression.kind) {
 	case EXPR_BINARY_COMMA:              fputs(",", out);     break;
 	case EXPR_BINARY_ASSIGN:             fputs("=", out);     break;
 	case EXPR_BINARY_ADD:                fputs("+", out);     break;
@@ -193,7 +193,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
-	switch(unexpr->expression.type) {
+	switch(unexpr->expression.kind) {
 	case EXPR_UNARY_NEGATE:           fputs("-", out);  break;
 	case EXPR_UNARY_PLUS:             fputs("+", out);  break;
 	case EXPR_UNARY_NOT:              fputs("!", out);  break;
@@ -308,7 +308,7 @@ static void print_select(const select_expression_t *expression)
 {
 	print_expression(expression->compound);
 	if(expression->compound->base.datatype == NULL ||
-			expression->compound->base.datatype->type == TYPE_POINTER) {
+			expression->compound->base.datatype->kind == TYPE_POINTER) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);
@@ -326,7 +326,7 @@ static void print_classify_type_expression(
 
 void print_expression(const expression_t *expression)
 {
-	switch(expression->type) {
+	switch(expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
 		fprintf(out, "*invalid expression*");
@@ -381,7 +381,7 @@ void print_expression(const expression_t *expression)
 	case EXPR_OFFSETOF:
 	case EXPR_STATEMENT:
 		/* TODO */
-		fprintf(out, "some expression of type %d", (int) expression->type);
+		fprintf(out, "some expression of type %d", (int) expression->kind);
 		break;
 	}
 }
@@ -591,7 +591,7 @@ end_of_print_asm_statement:
 
 void print_statement(const statement_t *statement)
 {
-	switch(statement->type) {
+	switch(statement->kind) {
 	case STATEMENT_COMPOUND:
 		print_compound_statement(&statement->compound);
 		break;
@@ -693,7 +693,7 @@ static void print_normal_declaration(const declaration_t *declaration)
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->context);
 
-	if(declaration->type->type == TYPE_FUNCTION) {
+	if(declaration->type->kind == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {
 			fputs("\n", out);
 			print_statement(declaration->init.statement);
@@ -760,7 +760,7 @@ void print_ast(const translation_unit_t *unit)
 
 bool is_constant_expression(const expression_t *expression)
 {
-	switch(expression->type) {
+	switch(expression->kind) {
 
 	case EXPR_CONST:
 	case EXPR_STRING_LITERAL:

@@ -58,11 +58,11 @@ static void warn_invalid_length_modifier(const source_position_t pos,
 static void check_format_arguments(const call_argument_t *const fmt_arg, const call_argument_t* arg)
 {
 	const expression_t *fmt_expr = fmt_arg->expression;
-	if (fmt_expr->type == EXPR_UNARY_CAST_IMPLICIT) {
+	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 
-	if (fmt_expr->type != EXPR_WIDE_STRING_LITERAL)
+	if (fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
 		return;
 
 	const source_position_t    pos     = fmt_expr->base.source_position;
@@ -381,7 +381,7 @@ eval_fmt_mod_unsigned:
 void check_format(const call_expression_t *const call)
 {
 	const expression_t *const func_expr = call->function;
-	if (func_expr->type != EXPR_REFERENCE)
+	if (func_expr->kind != EXPR_REFERENCE)
 		return;
 
 	const char            *const name = func_expr->reference.symbol->string;
