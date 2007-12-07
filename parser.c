@@ -3186,7 +3186,7 @@ static expression_t *parse_builtin_constant(void)
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
 
 	expect('(');
-	expression->builtin_constant.value = parse_expression();
+	expression->builtin_constant.value = parse_assignment_expression();
 	expect(')');
 	expression->base.datatype = type_int;
 
@@ -3200,14 +3200,14 @@ static expression_t *parse_builtin_prefetch(void)
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_PREFETCH);
 
 	expect('(');
-	expression->builtin_prefetch.adr = parse_expression();
+	expression->builtin_prefetch.adr = parse_assignment_expression();
 	if (token.type == ',') {
 		next_token();
-		expression->builtin_prefetch.rw = parse_expression();
+		expression->builtin_prefetch.rw = parse_assignment_expression();
 	}
 	if (token.type == ',') {
 		next_token();
-		expression->builtin_prefetch.locality = parse_expression();
+		expression->builtin_prefetch.locality = parse_assignment_expression();
 	}
 	expect(')');
 	expression->base.datatype = type_void;
@@ -3292,7 +3292,7 @@ static expression_t *parse_assume(void) {
 		= allocate_expression_zero(EXPR_UNARY_ASSUME);
 
 	expect('(');
-	expression->unary.value = parse_expression();
+	expression->unary.value = parse_assignment_expression();
 	expect(')');
 
 	expression->base.datatype = type_void;
