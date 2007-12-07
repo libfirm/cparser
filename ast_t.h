@@ -397,7 +397,7 @@ struct declaration_t {
 	declaration_t      *symbol_next;
 
 	/* the following fields are used in ast2firm module */
-	unsigned char       declaration_type;
+	unsigned char       declaration_kind;
 	union {
 		unsigned int    value_number;
 		ir_entity      *entity;

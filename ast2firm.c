@@ -44,16 +44,16 @@ static ir_node             *current_function_name;
 
 static struct obstack asm_obst;
 
-typedef enum declaration_type_t {
-	DECLARATION_TYPE_UNKNOWN,
-	DECLARATION_TYPE_FUNCTION,
-	DECLARATION_TYPE_GLOBAL_VARIABLE,
-	DECLARATION_TYPE_LOCAL_VARIABLE,
-	DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
-	DECLARATION_TYPE_COMPOUND_MEMBER,
-	DECLARATION_TYPE_LABEL_BLOCK,
-	DECLARATION_TYPE_ENUM_ENTRY
-} declaration_type_t;
+typedef enum declaration_kind_t {
+	DECLARATION_KIND_UNKNOWN,
+	DECLARATION_KIND_FUNCTION,
+	DECLARATION_KIND_GLOBAL_VARIABLE,
+	DECLARATION_KIND_LOCAL_VARIABLE,
+	DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
+	DECLARATION_KIND_COMPOUND_MEMBER,
+	DECLARATION_KIND_LABEL_BLOCK,
+	DECLARATION_KIND_ENUM_ENTRY
+} declaration_kind_t;
 
 static ir_type *get_ir_type(type_t *type);
 static int count_decls_in_stmts(const statement_t *stmt);
@@ -480,7 +480,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
 		set_entity_offset(entity, offset);
 		add_struct_member(ir_type, entity);
-		entry->declaration_type = DECLARATION_TYPE_COMPOUND_MEMBER;
+		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
 		entry->v.entity         = entity;
 
 		offset += entry_size;
@@ -532,7 +532,7 @@ static ir_type *create_union_type(compound_type_t *type)
 		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
 		add_union_member(ir_type, entity);
 		set_entity_offset(entity, 0);
-		entry->declaration_type = DECLARATION_TYPE_COMPOUND_MEMBER;
+		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
 		entry->v.entity         = entity;
 
 		if(entry_size > size) {
@@ -569,7 +569,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY)
 			break;
 
-		declaration->declaration_type = DECLARATION_TYPE_ENUM_ENTRY;
+		declaration->declaration_kind = DECLARATION_KIND_ENUM_ENTRY;
 
 		expression_t *const init = declaration->init.enum_value;
 		if (init != NULL) {
@@ -734,9 +734,9 @@ static const struct {
 
 static ir_entity* get_function_entity(declaration_t *declaration)
 {
-	if(declaration->declaration_type == DECLARATION_TYPE_FUNCTION)
+	if(declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
 		return declaration->v.entity;
-	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
 	symbol_t *symbol = declaration->symbol;
 	ident    *id     = new_id_from_str(symbol->string);
@@ -783,7 +783,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	}
 	set_entity_allocation(entity, allocation_static);
 
-	declaration->declaration_type = DECLARATION_TYPE_FUNCTION;
+	declaration->declaration_kind = DECLARATION_KIND_FUNCTION;
 	declaration->v.entity         = entity;
 
 	return entity;
@@ -938,7 +938,7 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 static ir_node *get_global_var_address(dbg_info *const dbgi,
                                        const declaration_t *const decl)
 {
-	assert(decl->declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+	assert(decl->declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 	ir_entity *const entity = decl->v.entity;
 	switch ((storage_class_tag_t)decl->storage_class) {
@@ -961,34 +961,34 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	declaration_t *declaration = ref->declaration;
 	type_t        *type        = skip_typeref(declaration->type);
 
-	switch((declaration_type_t) declaration->declaration_type) {
-	case DECLARATION_TYPE_UNKNOWN:
+	switch((declaration_kind_t) declaration->declaration_kind) {
+	case DECLARATION_KIND_UNKNOWN:
 		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY) {
 			break;
 		}
 		get_ir_type(type);
 		/* FALLTHROUGH */
 
-	case DECLARATION_TYPE_ENUM_ENTRY: {
+	case DECLARATION_KIND_ENUM_ENTRY: {
 		ir_mode *const mode = get_ir_mode(type);
 		return new_Const(mode, declaration->v.enum_val);
 	}
 
-	case DECLARATION_TYPE_LOCAL_VARIABLE: {
+	case DECLARATION_KIND_LOCAL_VARIABLE: {
 		ir_mode *const mode = get_ir_mode(type);
 		return get_value(declaration->v.value_number, mode);
 	}
-	case DECLARATION_TYPE_FUNCTION: {
+	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode(type);
 		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
-	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
+	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
 		ir_type *const irtype = get_entity_type(declaration->v.entity);
 		return deref_address(irtype, addr, dbgi);
 	}
 
-	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
@@ -996,8 +996,8 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		return deref_address(irtype, sel, dbgi);
 	}
 
-	case DECLARATION_TYPE_COMPOUND_MEMBER:
-	case DECLARATION_TYPE_LABEL_BLOCK:
+	case DECLARATION_KIND_COMPOUND_MEMBER:
+	case DECLARATION_KIND_LABEL_BLOCK:
 		panic("not implemented reference type");
 	}
 
@@ -1009,21 +1009,21 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
 	declaration_t *declaration = ref->declaration;
 
-	switch((declaration_type_t) declaration->declaration_type) {
-	case DECLARATION_TYPE_UNKNOWN:
+	switch((declaration_kind_t) declaration->declaration_kind) {
+	case DECLARATION_KIND_UNKNOWN:
 		break;
-	case DECLARATION_TYPE_LOCAL_VARIABLE:
+	case DECLARATION_KIND_LOCAL_VARIABLE:
 		panic("local variable without entity has no address");
-	case DECLARATION_TYPE_FUNCTION: {
+	case DECLARATION_KIND_FUNCTION: {
 		type_t *const  type = skip_typeref(ref->expression.datatype);
 		ir_mode *const mode = get_ir_mode(type);
 		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
-	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
+	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr = get_global_var_address(dbgi, declaration);
 		return addr;
 	}
-	case DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY: {
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_irg_frame(current_ir_graph);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
@@ -1031,11 +1031,11 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		return sel;
 	}
 
-	case DECLARATION_TYPE_ENUM_ENTRY:
+	case DECLARATION_KIND_ENUM_ENTRY:
 		panic("trying to reference enum entry");
 
-	case DECLARATION_TYPE_COMPOUND_MEMBER:
-	case DECLARATION_TYPE_LABEL_BLOCK:
+	case DECLARATION_KIND_COMPOUND_MEMBER:
+	case DECLARATION_KIND_LABEL_BLOCK:
 		panic("not implemented reference type");
 	}
 
@@ -1215,8 +1215,8 @@ static void set_value_for_expression(const expression_t *expression,
 		const reference_expression_t *ref = &expression->reference;
 
 		declaration_t *declaration = ref->declaration;
-		assert(declaration->declaration_type != DECLARATION_TYPE_UNKNOWN);
-		if(declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
+		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
+		if(declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
 			return;
 		}
@@ -1296,7 +1296,7 @@ static bool is_local_variable(expression_t *expression)
 		return false;
 	reference_expression_t *ref_expr    = &expression->reference;
 	declaration_t          *declaration = ref_expr->declaration;
-	return declaration->declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE;
+	return declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE;
 }
 
 static pn_Cmp get_pnc(const expression_kind_t kind)
@@ -1964,7 +1964,7 @@ static ir_node *select_addr(const select_expression_t *expression)
 	ir_node *compound_addr = expression_to_firm(expression->compound);
 
 	declaration_t *entry = expression->compound_entry;
-	assert(entry->declaration_type == DECLARATION_TYPE_COMPOUND_MEMBER);
+	assert(entry->declaration_kind == DECLARATION_KIND_COMPOUND_MEMBER);
 	ir_entity     *entity = entry->v.entity;
 
 	assert(entity != NULL);
@@ -2317,7 +2317,7 @@ static void create_condition_evaluation(const expression_t *expression,
 
 
 static void create_declaration_entity(declaration_t *declaration,
-                                      declaration_type_t declaration_type,
+                                      declaration_kind_t declaration_kind,
                                       ir_type *parent_type)
 {
 	ident     *const id     = new_id_from_str(declaration->symbol->string);
@@ -2326,12 +2326,12 @@ static void create_declaration_entity(declaration_t *declaration,
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
 
-	declaration->declaration_type = (unsigned char) declaration_type;
+	declaration->declaration_kind = (unsigned char) declaration_kind;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
 	if(parent_type == get_tls_type())
 		set_entity_allocation(entity, allocation_automatic);
-	else if(declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE)
+	else if(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
 		set_entity_allocation(entity, allocation_static);
 	/* TODO: visibility? */
 }
@@ -2416,8 +2416,8 @@ static void create_initializer_compound(initializer_list_t *initializer,
 		initializer_t *sub_initializer = initializer->initializers[i];
 
 		assert(compound_entry != NULL);
-		assert(compound_entry->declaration_type
-				== DECLARATION_TYPE_COMPOUND_MEMBER);
+		assert(compound_entry->declaration_kind
+				== DECLARATION_KIND_COMPOUND_MEMBER);
 
 		if(sub_initializer->kind == INITIALIZER_VALUE) {
 			create_initializer_value(&sub_initializer->value,
@@ -2617,9 +2617,9 @@ static void create_initializer(declaration_t *declaration)
 	if(initializer == NULL)
 		return;
 
-	declaration_type_t declaration_type
-		= (declaration_type_t) declaration->declaration_type;
-	if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY) {
+	declaration_kind_t declaration_kind
+		= (declaration_kind_t) declaration->declaration_kind;
+	if(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY) {
 		create_initializer_local_variable_entity(declaration);
 		return;
 	}
@@ -2629,10 +2629,10 @@ static void create_initializer(declaration_t *declaration)
 
 		ir_node *value = expression_to_firm(initializer_value->value);
 
-		if(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE) {
+		if(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
 		} else {
-			assert(declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+			assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 			ir_entity *entity = declaration->v.entity;
 
@@ -2640,8 +2640,8 @@ static void create_initializer(declaration_t *declaration)
 			set_atomic_ent_value(entity, value);
 		}
 	} else {
-		assert(declaration_type == DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY
-				|| declaration_type == DECLARATION_TYPE_GLOBAL_VARIABLE);
+		assert(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY
+				|| declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 		ir_entity *entity = declaration->v.entity;
 		set_entity_variability(entity, variability_initialized);
@@ -2653,7 +2653,7 @@ static void create_initializer(declaration_t *declaration)
 
 static void create_local_variable(declaration_t *declaration)
 {
-	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
 	bool needs_entity = declaration->address_taken;
 	type_t *type = skip_typeref(declaration->type);
@@ -2665,10 +2665,10 @@ static void create_local_variable(declaration_t *declaration)
 	if(needs_entity) {
 		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
 		create_declaration_entity(declaration,
-		                          DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY,
+		                          DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
 		                          frame_type);
 	} else {
-		declaration->declaration_type = DECLARATION_TYPE_LOCAL_VARIABLE;
+		declaration->declaration_kind = DECLARATION_KIND_LOCAL_VARIABLE;
 		declaration->v.value_number   = next_value_number_function;
 		++next_value_number_function;
 	}
@@ -2678,7 +2678,7 @@ static void create_local_variable(declaration_t *declaration)
 
 static void create_local_static_variable(declaration_t *declaration)
 {
-	assert(declaration->declaration_type == DECLARATION_TYPE_UNKNOWN);
+	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
 	type_t    *const type        = skip_typeref(declaration->type);
 	ir_type   *const global_type = get_glob_type();
@@ -2688,7 +2688,7 @@ static void create_local_static_variable(declaration_t *declaration)
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
 
-	declaration->declaration_type = DECLARATION_TYPE_GLOBAL_VARIABLE;
+	declaration->declaration_kind = DECLARATION_KIND_GLOBAL_VARIABLE;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
 	set_entity_visibility(entity, visibility_local);
@@ -3142,16 +3142,16 @@ static ir_node *get_label_block(declaration_t *label)
 {
 	assert(label->namespc == NAMESPACE_LABEL);
 
-	if(label->declaration_type == DECLARATION_TYPE_LABEL_BLOCK) {
+	if(label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
 		return label->v.block;
 	}
-	assert(label->declaration_type == DECLARATION_TYPE_UNKNOWN);
+	assert(label->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
 	ir_node *old_cur_block = get_cur_block();
 	ir_node *block         = new_immBlock();
 	set_cur_block(old_cur_block);
 
-	label->declaration_type = DECLARATION_TYPE_LABEL_BLOCK;
+	label->declaration_kind = DECLARATION_KIND_LABEL_BLOCK;
 	label->v.block          = block;
 
 	ARR_APP1(ir_node *, imature_blocks, block);
@@ -3508,7 +3508,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 	int            n         = 0;
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next, ++n) {
-		assert(parameter->declaration_type == DECLARATION_TYPE_UNKNOWN);
+		assert(parameter->declaration_kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->type);
 
 		bool needs_entity = parameter->address_taken;
@@ -3522,8 +3522,8 @@ static void initialize_function_parameters(declaration_t *declaration)
 			ident     *id     = new_id_from_str(parameter->symbol->string);
 			set_entity_ident(entity, id);
 
-			parameter->declaration_type
-				= DECLARATION_TYPE_LOCAL_VARIABLE_ENTITY;
+			parameter->declaration_kind
+				= DECLARATION_KIND_LOCAL_VARIABLE_ENTITY;
 			parameter->v.entity = entity;
 			continue;
 		}
@@ -3532,7 +3532,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 		long     pn   = n;
 		ir_node *proj = new_r_Proj(irg, start_block, args, mode, pn);
 
-		parameter->declaration_type = DECLARATION_TYPE_LOCAL_VARIABLE;
+		parameter->declaration_kind = DECLARATION_KIND_LOCAL_VARIABLE;
 		parameter->v.value_number   = next_value_number_function;
 		++next_value_number_function;
 
@@ -3714,7 +3714,7 @@ global_var:
 			goto create_var;
 
 create_var:
-			create_declaration_entity(declaration, DECLARATION_TYPE_GLOBAL_VARIABLE,
+			create_declaration_entity(declaration, DECLARATION_KIND_GLOBAL_VARIABLE,
 			                          var_type);
 			set_entity_visibility(declaration->v.entity, vis);
 
