@@ -180,6 +180,7 @@ static size_t get_expression_struct_size(expression_kind_t type)
 		[EXPR_FUNCTION]            = sizeof(string_literal_expression_t),
 		[EXPR_PRETTY_FUNCTION]     = sizeof(string_literal_expression_t),
 		[EXPR_BUILTIN_SYMBOL]      = sizeof(builtin_symbol_expression_t),
+		[EXPR_BUILTIN_CONSTANT_P]  = sizeof(builtin_constant_expression_t),
 		[EXPR_OFFSETOF]            = sizeof(offsetof_expression_t),
 		[EXPR_VA_START]            = sizeof(va_start_expression_t),
 		[EXPR_VA_ARG]              = sizeof(va_arg_expression_t),
@@ -3177,6 +3178,20 @@ static expression_t *parse_builtin_symbol(void)
 	return expression;
 }
 
+static expression_t *parse_builtin_constant(void)
+{
+	eat(T___builtin_constant_p);
+
+	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
+
+	expect('(');
+	expression->builtin_constant.value = parse_expression();
+	expect(')');
+	expression->base.datatype = type_int;
+
+	return expression;
+}
+
 static expression_t *parse_compare_builtin(void)
 {
 	expression_t *expression;
@@ -3312,6 +3327,8 @@ static expression_t *parse_primary_expression(void)
 	case T___builtin_islessgreater:
 	case T___builtin_isunordered:
 		return parse_compare_builtin();
+	case T___builtin_constant_p:
+		return parse_builtin_constant();
 	case T___alignof__:
 		return parse_alignof();
 	case T_assume:

@@ -282,6 +282,13 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 	fputs(expression->symbol->string, out);
 }
 
+static void print_builtin_constant(const builtin_constant_expression_t *expression)
+{
+	fputs("__builtin_constant_p(", out);
+	print_expression(expression->value);
+	fputs(")", out);
+}
+
 static void print_conditional(const conditional_expression_t *expression)
 {
 	fputs("(", out);
@@ -404,6 +411,9 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_BUILTIN_SYMBOL:
 		print_builtin_symbol(&expression->builtin_symbol);
+		break;
+	case EXPR_BUILTIN_CONSTANT_P:
+		print_builtin_constant(&expression->builtin_constant);
 		break;
 	case EXPR_CONDITIONAL:
 		print_conditional(&expression->conditional);
@@ -819,6 +829,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
+	case EXPR_BUILTIN_CONSTANT_P:
 		return true;
 
 	case EXPR_BUILTIN_SYMBOL:

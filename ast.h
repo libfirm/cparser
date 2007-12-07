@@ -30,6 +30,7 @@ typedef struct offsetof_expression_t            offsetof_expression_t;
 typedef struct va_start_expression_t            va_start_expression_t;
 typedef struct va_arg_expression_t              va_arg_expression_t;
 typedef struct builtin_symbol_expression_t      builtin_symbol_expression_t;
+typedef struct builtin_constant_expression_t    builtin_constant_expression_t;
 typedef struct classify_type_expression_t       classify_type_expression_t;
 typedef union  expression_t                     expression_t;
 

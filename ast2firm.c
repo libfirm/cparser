@@ -2173,6 +2173,19 @@ static ir_node *expression_to_addr(const expression_t *expression)
 	panic("trying to get address of non-lvalue");
 }
 
+static ir_node *builtin_constant_to_firm(const builtin_constant_expression_t *expression)
+{
+	ir_mode *mode = get_ir_mode(expression->expression.datatype);
+	long     v;
+
+	if (is_constant_expression(expression->value)) {
+		v = 1;
+	} else {
+		v = 0;
+	}
+	return new_Const_long(mode, v);
+}
+
 static ir_node *_expression_to_firm(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -2214,6 +2227,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_OFFSETOF:
 	case EXPR_BUILTIN_SYMBOL:
 		panic("unimplemented expression found");
+	case EXPR_BUILTIN_CONSTANT_P:
+		return builtin_constant_to_firm(&expression->builtin_constant);
 
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:

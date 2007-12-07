@@ -30,6 +30,7 @@ typedef enum {
 	EXPR_FUNCTION,
 	EXPR_PRETTY_FUNCTION,
 	EXPR_BUILTIN_SYMBOL,
+	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_OFFSETOF,
 	EXPR_VA_START,
 	EXPR_VA_ARG,
@@ -181,6 +182,11 @@ struct builtin_symbol_expression_t {
 	symbol_t          *symbol;
 };
 
+struct builtin_constant_expression_t {
+	expression_base_t  expression;
+	expression_t      *value;
+};
+
 struct reference_expression_t {
 	expression_base_t  expression;
 	symbol_t          *symbol;
@@ -282,6 +288,7 @@ union expression_t {
 	string_literal_expression_t      string;
 	wide_string_literal_expression_t wide_string;
 	builtin_symbol_expression_t      builtin_symbol;
+	builtin_constant_expression_t    builtin_constant;
 	reference_expression_t           reference;
 	call_expression_t                call;
 	unary_expression_t               unary;
