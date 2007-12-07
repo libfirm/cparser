@@ -39,11 +39,14 @@ typedef struct fix_ctx {
  */
 static void name(FILE *f, const char *prefix, ir_node *n, const char *suffix)
 {
-  fprintf(f, "%s%s_%u%s",
-    prefix ? prefix : "",
-    get_op_name(get_irn_op(n)),
-    get_irn_idx(n),
-    suffix ? suffix : "");
+  const char *op_name = get_op_name(get_irn_op(n));
+  unsigned    index   = get_irn_idx(n);
+  if(prefix == NULL)
+    prefix = "";
+  if(suffix == NULL)
+    suffix = "";
+
+  fprintf(f, "%s%s_%u%s", prefix, op_name, index, suffix);
 }
 
 /**
@@ -507,7 +510,7 @@ static void generate_code_Const(FILE *f, ir_node *n)
     else {
 def_mode:
       tarval_snprintf(buf, sizeof(buf), tv);
-      fprintf(f, "new_tarval_from_str(\"%s\", %d, ", buf, strlen(buf));
+      fprintf(f, "new_tarval_from_str(\"%s\", %u, ", buf, strlen(buf));
       fprintf(f, "mode_%s)", get_mode_name(mode));
     }
   }
@@ -531,6 +534,7 @@ static void generate_code_SymConst(FILE *f, ir_node *n)
   ir_label_t label;
   symconst_kind kind = get_SymConst_kind(n);
   const char *k_name = "NULL";
+  const char *str;
 
   switch (kind) {
   case symconst_addr_ent:
@@ -539,7 +543,8 @@ static void generate_code_SymConst(FILE *f, ir_node *n)
     break;
   case symconst_addr_name:
     id = get_SymConst_name(n);
-    fprintf(f, "  sym.ident_p = new_id_from_chars(\"%s\", %d);\n", get_id_str(id), get_id_strlen(id));
+    str = get_id_str(id);
+    fprintf(f, "  sym.ident_p = new_id_from_chars(\"%s\", %d);\n", str, get_id_strlen(id));
     k_name = "symconst_addr_name";
     break;
   case symconst_type_size:
@@ -564,7 +569,8 @@ static void generate_code_SymConst(FILE *f, ir_node *n)
     break;
   case symconst_enum_const:
     id = get_SymConst_name(n);
-    fprintf(f, "  sym.ident_p = new_id_from_chars(\"%s\", %d);\n", get_id_str(id), get_id_strlen(id));
+    str = get_id_str(id);
+    fprintf(f, "  sym.ident_p = new_id_from_chars(\"%s\", %d);\n", str, get_id_strlen(id));
     k_name = "symconst_enum_const";
     break;
   case symconst_label:
@@ -965,11 +971,13 @@ static void generate_code_Proj(FILE *f, ir_node *n)
   case iro_Cond:
     generate_code_Proj_Cond(f, n);
     break;
-  default:
+  default: {
+    const char *mode_name = get_mode_name(get_irn_mode(n));
     name(f, "  ", n, " = new_r_Proj(irg, ");
     name(f, NULL, get_nodes_block(n), ", ");
     name(f, NULL, get_Proj_pred(n), ", ");
-    fprintf(f, "mode_%s, %ld);\n", get_mode_name(get_irn_mode(n)), get_Proj_proj(n));
+    fprintf(f, "mode_%s, %ld);\n", mode_name, get_Proj_proj(n));
+  }
   }
 }
 

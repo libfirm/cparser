@@ -56,10 +56,10 @@
 #define CHECK_ALL(cond)                                 \
   do {                                                  \
     if (cond) {                                         \
-      int i;                                            \
+      int ii;                                           \
       timer_push(TV_VERIFY);                            \
-      for (i = get_irp_n_irgs() - 1; i >= 0; --i)       \
-        irg_verify(get_irp_irg(i), VRFY_ENFORCE_SSA);   \
+      for (ii = get_irp_n_irgs() - 1; ii >= 0; --ii)    \
+        irg_verify(get_irp_irg(ii), VRFY_ENFORCE_SSA);  \
       timer_pop();                                      \
     }                                                   \
   } while (0)
@@ -107,7 +107,6 @@ static const ir_settings_arch_dep_t *ad_param = NULL;
 static create_intrinsic_fkt *arch_create_intrinsic = NULL;
 static void *create_intrinsic_ctx = NULL;
 static const ir_settings_if_conv_t *if_conv_info = NULL;
-static unsigned char be_support_inline_asm = FALSE;
 
 /* entities of runtime functions */
 ir_entity_ptr rts_entities[rts_max];
@@ -285,8 +284,7 @@ static void dump_all_count(const char *const suffix)
  */
 static void do_firm_optimizations(const char *input_filename, int firm_const_exists)
 {
-  ir_entity **keep_methods;
-  int i, arr_len;
+  int      i;
   ir_graph *irg;
   unsigned aa_opt;
 
@@ -308,6 +306,9 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   timer_start(TV_ALL_OPT);
 
   if (firm_opt.remove_unused) {
+  	ir_entity **keep_methods;
+  	int         arr_len;
+
     /* Analysis that finds the free methods,
        i.e. methods that are dereferenced.
        Optimizes polymorphic calls :-). */
@@ -664,6 +665,7 @@ static int compute_type_size(ir_type *ty)
       ir_node *upper   = get_array_upper_bound(ty, i);
       ir_graph *rem    = current_ir_graph;
       tarval  *tv_lower, *tv_upper;
+      long     val_lower, val_upper;
 
       current_ir_graph = get_const_code_irg();
       local_optimize_node(lower);
@@ -682,7 +684,9 @@ static int compute_type_size(ir_type *ty)
         return 0;
       }
 
-      size *= get_tarval_long(tv_upper) - get_tarval_long(tv_lower);
+      val_upper = get_tarval_long(tv_upper);
+      val_lower = get_tarval_long(tv_lower);
+      size     *= val_upper - val_lower;
     }
     restore_optimization_state(&state);
 
@@ -914,9 +918,7 @@ void gen_firm_init(void)
   if (firm_be_opt.selection == BE_FIRM_BE) {
     const backend_params *be_params = be_init();
 
-    be_support_inline_asm   = be_params->support_inline_asm;
-
-    firm_opt.lower_ll       = be_params->do_dw_lowering;
+    firm_opt.lower_ll       = (a_byte) be_params->do_dw_lowering;
     params.arch_op_settings = be_params->arch_op_settings;
 
     arch_create_intrinsic   = be_params->arch_create_intrinsic_fkt;
@@ -950,7 +952,7 @@ void gen_firm_init(void)
   /* do not run architecture dependent optimizations in building phase */
   arch_dep_set_opts(arch_dep_none);
 
-  do_node_verification(firm_opt.vrfy);
+  do_node_verification((firm_verification_t) firm_opt.vrfy);
   if (firm_dump.filter)
     only_dump_method_with_name(new_id_from_str(firm_dump.filter));
 
@@ -995,7 +997,8 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
   int i;
 
   /* the general for dumping option must be set, or the others will not work */
-  firm_dump.ir_graph |= firm_dump.all_phases | firm_dump.extbb;
+  firm_dump.ir_graph
+      = (a_byte) (firm_dump.ir_graph | firm_dump.all_phases | firm_dump.extbb);
 
   dump_keepalive_edges(1);
   dump_consts_local(1);
@@ -1078,9 +1081,10 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
 #endif
 
   /* enable architecture dependent optimizations */
-  arch_dep_set_opts((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
+  arch_dep_set_opts((arch_dep_opts_t)
+                    ((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
                     (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
-                    (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) );
+                    (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
 
 
   if (firm_dump.statistic & STAT_FINAL_IR)

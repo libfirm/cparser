@@ -23,8 +23,6 @@
 #include "firm_opt.h"
 #include "firm_timing.h"
 
-extern void be_main(FILE *f, const char *asm_file_name);
-
 /**
  * Substitutes '.c' for '.s'.
  */

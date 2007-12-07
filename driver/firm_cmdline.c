@@ -104,7 +104,7 @@ static const struct params {
   const char *option;      /**< name of the option */
   int        opt_len;      /**< length of the option string */
   a_byte     *flag;        /**< address of variable to set/reset */
-  int        set;          /**< iff true, variable will be set, else reset */
+  a_byte     set;          /**< iff true, variable will be set, else reset */
   const char *description; /**< description of this option */
 } firm_options[] = {
   /* this must be first */
@@ -358,7 +358,7 @@ int firm_option(const char *opt)
       }
       /* statistic options do accumulate */
       if (firm_options[i].flag == &firm_dump.statistic)
-        *firm_options[i].flag |= firm_options[i].set;
+        *firm_options[i].flag = (a_byte) (*firm_options[i].flag | firm_options[i].set);
       else
         *firm_options[i].flag = firm_options[i].set;
 
@@ -409,7 +409,7 @@ void print_firm_version(FILE *f) {
 
   firm_get_version(&version);
 
-  fprintf(f, "Firm C-Compiler using libFirm (%d.%d", version.major, version.minor);
+  fprintf(f, "Firm C-Compiler using libFirm (%u.%u", version.major, version.minor);
   if(version.revision[0] != 0) {
   	fputc(' ', f);
     fputs(version.revision, f);
