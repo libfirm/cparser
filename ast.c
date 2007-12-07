@@ -818,6 +818,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_OFFSETOF:
+	case EXPR_ALIGNOF:
 		return true;
 
 	case EXPR_BUILTIN_SYMBOL:
