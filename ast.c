@@ -286,7 +286,22 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 {
 	fputs("__builtin_constant_p(", out);
 	print_expression(expression->value);
-	fputs(")", out);
+	fputc(')', out);
+}
+
+static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
+{
+	fputs("__builtin_prefetch(", out);
+	print_expression(expression->adr);
+	if (expression->rw) {
+		fputc(',', out);
+		print_expression(expression->rw);
+	}
+	if (expression->locality) {
+		fputc(',', out);
+		print_expression(expression->locality);
+	}
+	fputc(')', out);
 }
 
 static void print_conditional(const conditional_expression_t *expression)
@@ -414,6 +429,9 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_BUILTIN_CONSTANT_P:
 		print_builtin_constant(&expression->builtin_constant);
+		break;
+	case EXPR_BUILTIN_PREFETCH:
+		print_builtin_prefetch(&expression->builtin_prefetch);
 		break;
 	case EXPR_CONDITIONAL:
 		print_conditional(&expression->conditional);
@@ -833,6 +851,7 @@ bool is_constant_expression(const expression_t *expression)
 		return true;
 
 	case EXPR_BUILTIN_SYMBOL:
+	case EXPR_BUILTIN_PREFETCH:
 	case EXPR_CALL:
 	case EXPR_SELECT:
 	case EXPR_VA_START:

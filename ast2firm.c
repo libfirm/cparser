@@ -2186,6 +2186,14 @@ static ir_node *builtin_constant_to_firm(const builtin_constant_expression_t *ex
 	return new_Const_long(mode, v);
 }
 
+static ir_node *builtin_prefetch_to_firm(const builtin_prefetch_expression_t *expression)
+{
+	ir_node *adr = expression_to_firm(expression->adr);
+	/* no Firm support for prefetch yet */
+	(void) adr;
+	return NULL;
+}
+
 static ir_node *_expression_to_firm(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -2229,6 +2237,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		panic("unimplemented expression found");
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
+	case EXPR_BUILTIN_PREFETCH:
+		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
 
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
