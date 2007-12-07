@@ -49,7 +49,8 @@ static context_t      *context           = NULL;
 static declaration_t  *last_declaration  = NULL;
 static declaration_t  *current_function  = NULL;
 static struct obstack  temp_obst;
-static bool            found_error;
+
+#define HERE token.source_position
 
 static type_t *type_valist;
 
@@ -298,97 +299,27 @@ static inline const token_t *look_ahead(int num)
 
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
 
-static void error(void)
-{
-	found_error = true;
-#ifdef ABORT_ON_ERROR
-	abort();
-#endif
-}
-
-static void parser_print_error_prefix_pos(
-		const source_position_t source_position)
-{
-	parser_print_prefix_pos(source_position);
-	fputs("error: ", stderr);
-	error();
-}
-
-static void parser_print_error_prefix(void)
-{
-	parser_print_error_prefix_pos(token.source_position);
-}
-
-static void parse_error(const char *message)
-{
-	parser_print_error_prefix();
-	fprintf(stderr, "parse error: %s\n", message);
-}
-
-static void parser_print_warning_prefix(void)
-{
-	parser_print_warning_prefix_pos(token.source_position);
-}
-
-static void parse_warning(const char *message)
-{
-	parse_warning_pos(token.source_position, message);
-}
-
 static void parse_error_expected(const char *message, ...)
 {
-	va_list args;
-	int first = 1;
-
 	if(message != NULL) {
-		parser_print_error_prefix();
-		fprintf(stderr, "%s\n", message);
+		errorf(HERE, "%s", message);
 	}
-	parser_print_error_prefix();
-	fputs("Parse error: got ", stderr);
-	print_token(stderr, &token);
-	fputs(", expected ", stderr);
-
-	va_start(args, message);
-	token_type_t token_type = va_arg(args, token_type_t);
-	while(token_type != 0) {
-		if(first == 1) {
-			first = 0;
-		} else {
-			fprintf(stderr, ", ");
-		}
-		print_token_type(stderr, token_type);
-		token_type = va_arg(args, token_type_t);
-	}
-	va_end(args);
-	fprintf(stderr, "\n");
-}
-
-static void print_type_quoted(type_t *type)
-{
-	fputc('\'', stderr);
-	print_type(type);
-	fputc('\'', stderr);
+	va_list ap;
+	va_start(ap, message);
+	errorf(HERE, "got '%K', expected %#k", &token, &ap, ", ");
+	va_end(ap);
 }
 
 static void type_error(const char *msg, const source_position_t source_position,
                        type_t *type)
 {
-	parser_print_error_prefix_pos(source_position);
-	fprintf(stderr, "%s, but found type ", msg);
-	print_type_quoted(type);
-	fputc('\n', stderr);
+	errorf(source_position, "%s, but found type '%T'", msg, type);
 }
 
 static void type_error_incompatible(const char *msg,
 		const source_position_t source_position, type_t *type1, type_t *type2)
 {
-	parser_print_error_prefix_pos(source_position);
-	fprintf(stderr, "%s, incompatible types: ", msg);
-	print_type_quoted(type1);
-	fprintf(stderr, " - ");
-	print_type_quoted(type2);
-	fprintf(stderr, ")\n");
+	errorf(source_position, "%s, incompatible types: '%T' - '%T'", msg, type1, type2);
 }
 
 static void eat_block(void)
@@ -550,17 +481,8 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	if(previous_declaration != NULL
 			&& previous_declaration->parent_context == context) {
 		if(!is_compatible_declaration(declaration, previous_declaration)) {
-			parser_print_error_prefix_pos(declaration->source_position);
-			fprintf(stderr, "definition of symbol '%s%s' with type ",
-					get_namespace_prefix(namespc), symbol->string);
-			print_type_quoted(declaration->type);
-			fputc('\n', stderr);
-			parser_print_error_prefix_pos(
-					previous_declaration->source_position);
-			fprintf(stderr, "is incompatible with previous declaration "
-					"of type ");
-			print_type_quoted(previous_declaration->type);
-			fputc('\n', stderr);
+			errorf(declaration->source_position, "definition of symbol '%s%s' with type '%T'", get_namespace_prefix(namespc), symbol->string, declaration->type);
+			errorf(previous_declaration->source_position, "is incompatible with previous declaration of type '%T'", previous_declaration->type);
 		} else {
 			unsigned  old_storage_class = previous_declaration->storage_class;
 			unsigned  new_storage_class = declaration->storage_class;
@@ -570,46 +492,30 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			if (current_function == NULL) {
 				if (old_storage_class != STORAGE_CLASS_STATIC &&
 				    new_storage_class == STORAGE_CLASS_STATIC) {
-					parser_print_error_prefix_pos(declaration->source_position);
-					fprintf(stderr,
-					        "static declaration of '%s' follows non-static declaration\n",
-					        symbol->string);
-					parser_print_error_prefix_pos(previous_declaration->source_position);
-					fprintf(stderr, "previous declaration of '%s' was here\n",
-					        symbol->string);
+					errorf(declaration->source_position, "static declaration of '%s' follows non-static declaration", symbol->string);
+					errorf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
 				} else {
 					if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						if (new_storage_class == STORAGE_CLASS_NONE) {
 							previous_declaration->storage_class = STORAGE_CLASS_NONE;
 						}
 					} else if(!is_type_function(type)) {
-						parser_print_warning_prefix_pos(declaration->source_position);
-						fprintf(stderr, "redundant declaration for '%s'\n",
-										symbol->string);
-						parser_print_warning_prefix_pos(previous_declaration->source_position);
-						fprintf(stderr, "previous declaration of '%s' was here\n",
-										symbol->string);
+						warningf(declaration->source_position, "redundant declaration for '%s'\n", symbol->string);
+						warningf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
 					}
 				}
 			} else {
 				if (old_storage_class == STORAGE_CLASS_EXTERN &&
 						new_storage_class == STORAGE_CLASS_EXTERN) {
-					parser_print_warning_prefix_pos(declaration->source_position);
-					fprintf(stderr, "redundant extern declaration for '%s'\n",
-					        symbol->string);
-					parser_print_warning_prefix_pos(previous_declaration->source_position);
-					fprintf(stderr, "previous declaration of '%s' was here\n",
-					        symbol->string);
+					warningf(declaration->source_position, "redundant extern declaration for '%s'\n", symbol->string);
+					warningf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
 				} else {
-					parser_print_error_prefix_pos(declaration->source_position);
 					if (old_storage_class == new_storage_class) {
-						fprintf(stderr, "redeclaration of '%s'\n", symbol->string);
+						errorf(declaration->source_position, "redeclaration of '%s'\n", symbol->string);
 					} else {
-						fprintf(stderr, "redeclaration of '%s' with different linkage\n", symbol->string);
+						errorf(declaration->source_position, "redeclaration of '%s' with different linkage\n", symbol->string);
 					}
-					parser_print_error_prefix_pos(previous_declaration->source_position);
-					fprintf(stderr, "previous declaration of '%s' was here\n",
-					        symbol->string);
+					errorf(previous_declaration->source_position, "previous declaration of '%s' was here", symbol->string);
 				}
 			}
 		}
@@ -878,14 +784,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		unsigned missing_qualifiers
 			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 		if(missing_qualifiers != 0) {
-			parser_print_error_prefix();
-			fprintf(stderr, "destination type ");
-			print_type_quoted(type_left);
-			fprintf(stderr, " in %s from type ", context);
-			print_type_quoted(type_right);
-			fprintf(stderr, " lacks qualifiers '");
-			print_type_qualifiers(missing_qualifiers);
-			fprintf(stderr, "' in pointed-to type\n");
+			errorf(HERE, "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type", type_left, context, type_right, missing_qualifiers);
 			return;
 		}
 
@@ -910,13 +809,8 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 
 incompatible_assign_types:
 	/* TODO: improve error message */
-	parser_print_error_prefix();
-	fprintf(stderr, "incompatible types in %s\n", context);
-	parser_print_error_prefix();
-	print_type_quoted(orig_type_left);
-	fputs(" <- ", stderr);
-	print_type_quoted(orig_type_right);
-	fputs("\n", stderr);
+	errorf(HERE, "incompatible types in %s", context);
+	errorf(HERE, "'%T' <- '%T'", orig_type_left, orig_type_right);
 }
 
 static expression_t *parse_constant_expression(void)
@@ -925,10 +819,7 @@ static expression_t *parse_constant_expression(void)
 	expression_t *result = parse_sub_expression(7);
 
 	if(!is_constant_expression(result)) {
-		parser_print_error_prefix_pos(result->base.source_position);
-		fprintf(stderr, "expression '");
-		print_expression(result);
-		fprintf(stderr, "' is not constant\n");
+		errorf(result->base.source_position, "expression '%E' is not constant\n", result);
 	}
 
 	return result;
@@ -986,7 +877,7 @@ static void parse_attributes(void)
 			while(depth > 0) {
 				switch(token.type) {
 				case T_EOF:
-					parse_error("EOF while parsing attribute");
+					errorf(HERE, "EOF while parsing attribute");
 					break;
 				case '(':
 					next_token();
@@ -1166,7 +1057,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		if(token.type == '{') {
 			next_token();
 			if(!had_initializer_brace_warning) {
-				parse_warning("braces around scalar initializer");
+				warningf(HERE, "braces around scalar initializer");
 				had_initializer_brace_warning = true;
 			}
 			initializer_t *result = parse_sub_initializer(type, NULL, NULL);
@@ -1233,7 +1124,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			sub = parse_sub_initializer_elem(element_type);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup */
-				parse_error("member initializer didn't match");
+				errorf(HERE, "member initializer didn't match");
 				DEL_ARR_F(elems);
 				return NULL;
 			}
@@ -1286,7 +1177,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			sub = parse_sub_initializer_elem(iter_type);
 			if(sub == NULL) {
 				/* TODO error, do nicer cleanup */
-				parse_error("member initializer didn't match");
+				errorf(HERE, "member initializer didn't match");
 				DEL_ARR_F(elems);
 				return NULL;
 			}
@@ -1324,14 +1215,7 @@ static initializer_t *parse_initializer(type_t *type)
 		expression_t  *expression  = parse_assignment_expression();
 		initializer_t *initializer = initializer_from_expression(type, expression);
 		if(initializer == NULL) {
-			parser_print_error_prefix();
-			fprintf(stderr, "initializer expression '");
-			print_expression(expression);
-			fprintf(stderr, "', type ");
-			print_type_quoted(expression->base.datatype);
-			fprintf(stderr, " is incompatible with type ");
-			print_type_quoted(type);
-			fprintf(stderr, "\n");
+			errorf(HERE, "initializer expression '%E', type '%T' is incompatible with type '%T'", expression, expression->base.datatype, type);
 		}
 		return initializer;
 	}
@@ -1410,9 +1294,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
 			assert(symbol != NULL);
-			parser_print_error_prefix();
-			fprintf(stderr, "multiple definition of %s %s\n",
-					is_struct ? "struct" : "union", symbol->string);
+			errorf(HERE, "multiple definition of %s %s", is_struct ? "struct" : "union", symbol->string);
 			declaration->context.declarations = NULL;
 		}
 		declaration->init.is_defined = true;
@@ -1438,7 +1320,7 @@ static void parse_enum_entries(enum_type_t *const enum_type)
 
 	if(token.type == '}') {
 		next_token();
-		parse_error("empty enum not allowed");
+		errorf(HERE, "empty enum not allowed");
 		return;
 	}
 
@@ -1507,9 +1389,7 @@ static type_t *parse_enum_specifier(void)
 
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
-			parser_print_error_prefix();
-			fprintf(stderr, "multiple definitions of enum %s\n",
-			        symbol->string);
+			errorf(HERE, "multiple definitions of enum %s", symbol->string);
 		}
 		record_declaration(declaration);
 		declaration->init.is_defined = 1;
@@ -1643,8 +1523,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 #define MATCH_STORAGE_CLASS(token, class)                                \
 		case token:                                                      \
 			if(specifiers->storage_class != STORAGE_CLASS_NONE) {        \
-				parse_error("multiple storage classes in declaration "   \
-				            "specifiers");                               \
+				errorf(HERE, "multiple storage classes in declaration specifiers"); \
 			}                                                            \
 			specifiers->storage_class = class;                           \
 			next_token();                                                \
@@ -1671,7 +1550,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 					break;
 
 				default:
-					parse_error("multiple storage classes in declaration specifiers");
+					errorf(HERE, "multiple storage classes in declaration specifiers");
 					break;
 			}
 			next_token();
@@ -1698,7 +1577,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case token:                                                     \
 			next_token();                                               \
 			if(type_specifiers & specifier) {                           \
-				parse_error("multiple " name " type specifiers given"); \
+				errorf(HERE, "multiple " name " type specifiers given"); \
 			} else {                                                    \
 				type_specifiers |= specifier;                           \
 			}                                                           \
@@ -1729,7 +1608,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T_long:
 			next_token();
 			if(type_specifiers & SPECIFIER_LONG_LONG) {
-				parse_error("multiple type specifiers given");
+				errorf(HERE, "multiple type specifiers given");
 			} else if(type_specifiers & SPECIFIER_LONG) {
 				type_specifiers |= SPECIFIER_LONG_LONG;
 			} else {
@@ -1880,19 +1759,19 @@ finish_specifiers:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
 #ifndef STRICT_C99
-				parse_warning("no type specifiers in declaration, using int");
+				warningf(HERE, "no type specifiers in declaration, using int");
 				atomic_type = ATOMIC_TYPE_INT;
 				break;
 #else
-				parse_error("no type specifiers given in declaration");
+				errorf(HERE, "no type specifiers given in declaration");
 #endif
 			} else if((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
-				parse_error("signed and unsigned specifiers gives");
+				errorf(HERE, "signed and unsigned specifiers gives");
 			} else if(type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
-				parse_error("only integer types can be signed or unsigned");
+				errorf(HERE, "only integer types can be signed or unsigned");
 			} else {
-				parse_error("multiple datatypes in declaration");
+				errorf(HERE, "multiple datatypes in declaration");
 			}
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
@@ -1902,7 +1781,7 @@ finish_specifiers:
 		newtype            = 1;
 	} else {
 		if(type_specifiers != 0) {
-			parse_error("multiple datatypes in declaration");
+			errorf(HERE, "multiple datatypes in declaration");
 		}
 	}
 
@@ -1964,10 +1843,10 @@ static void semantic_parameter(declaration_t *declaration)
 	/* TODO: improve error messages */
 
 	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
-		parse_error("typedef not allowed in parameter list");
+		errorf(HERE, "typedef not allowed in parameter list");
 	} else if(declaration->storage_class != STORAGE_CLASS_NONE
 			&& declaration->storage_class != STORAGE_CLASS_REGISTER) {
-		parse_error("parameter may only have none or register storage class");
+		errorf(HERE, "parameter may only have none or register storage class");
 	}
 
 	type_t *orig_type = declaration->type;
@@ -1987,11 +1866,7 @@ static void semantic_parameter(declaration_t *declaration)
 	}
 
 	if(is_type_incomplete(type)) {
-		parser_print_error_prefix();
-		fprintf(stderr, "incomplete type (");
-		print_type_quoted(orig_type);
-		fprintf(stderr, ") not allowed for parameter '%s'\n",
-		        declaration->symbol->string);
+		errorf(HERE, "incomplete type ('%T') not allowed for parameter '%s'", orig_type, declaration->symbol->string);
 	}
 }
 
@@ -2207,7 +2082,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	switch(token.type) {
 	case T_IDENTIFIER:
 		if(declaration == NULL) {
-			parse_error("no identifier expected in typename");
+			errorf(HERE, "no identifier expected in typename");
 		} else {
 			declaration->symbol          = token.v.symbol;
 			declaration->source_position = token.source_position;
@@ -2394,11 +2269,8 @@ static declaration_t *record_declaration(declaration_t *declaration)
 static void parser_error_multiple_definition(declaration_t *declaration,
 		const source_position_t source_position)
 {
-	parser_print_error_prefix_pos(source_position);
-	fprintf(stderr, "multiple definition of symbol '%s'\n",
-	        declaration->symbol->string);
-	parser_print_error_prefix_pos(declaration->source_position);
-	fprintf(stderr, "this is the location of the previous definition.\n");
+	errorf(source_position, "multiple definition of symbol '%s'", declaration->symbol->string);
+	errorf(declaration->source_position, "this is the location of the previous definition.");
 }
 
 static bool is_declaration_specifier(const token_t *token,
@@ -2473,11 +2345,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	}
 
 	if(type != NULL && is_type_function(type)) {
-		parser_print_error_prefix_pos(declaration->source_position);
-		fprintf(stderr, "initializers not allowed for function types at "
-				"declator '%s' (type ", declaration->symbol->string);
-		print_type_quoted(orig_type);
-		fprintf(stderr, ")\n");
+		errorf(declaration->source_position, "initializers not allowed for function types at declator '%s' (type '%T')", declaration->symbol->string, orig_type);
 	} else {
 		declaration->init.initializer = initializer;
 	}
@@ -2497,8 +2365,7 @@ static void parse_anonymous_declaration_rest(
 	declaration->source_position = specifiers->source_position;
 
 	if (declaration->storage_class != STORAGE_CLASS_NONE) {
-		parse_warning_pos(declaration->source_position,
-				"useless storage class in empty declaration");
+		warningf(declaration->source_position, "useless storage class in empty declaration");
 	}
 
 	type_t *type = declaration->type;
@@ -2507,8 +2374,7 @@ static void parse_anonymous_declaration_rest(
 		case TYPE_COMPOUND_UNION: {
 			const compound_type_t *compound_type = &type->compound;
 			if (compound_type->declaration->symbol == NULL) {
-				parse_warning_pos(declaration->source_position,
-						"unnamed struct/union that defines no instances");
+				warningf(declaration->source_position, "unnamed struct/union that defines no instances");
 			}
 			break;
 		}
@@ -2517,8 +2383,7 @@ static void parse_anonymous_declaration_rest(
 			break;
 
 		default:
-			parse_warning_pos(declaration->source_position,
-			                  "empty declaration");
+			warningf(declaration->source_position, "empty declaration");
 			break;
 	}
 
@@ -2536,9 +2401,7 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		type_t *type      = skip_typeref(orig_type);
 
 		if(type->kind != TYPE_FUNCTION && declaration->is_inline) {
-			parser_print_warning_prefix_pos(declaration->source_position);
-			fprintf(stderr, "variable '%s' declared 'inline'\n",
-					declaration->symbol->string);
+			warningf(declaration->source_position, "variable '%s' declared 'inline'\n", declaration->symbol->string);
 		}
 
 		if(token.type == '=') {
@@ -2619,13 +2482,9 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		type_t *parameter_type = parameter_declaration->type;
 		if(parameter_type == NULL) {
 #ifdef STRICT_C99
-			parser_print_error_prefix();
-			fprintf(stderr, "no type specified for function parameter '%s'\n",
-			        parameter_declaration->symbol->string);
+			errorf(HERE, "no type specified for function parameter '%s'", parameter_declaration->symbol->string);
 #else
-			parser_print_warning_prefix();
-			fprintf(stderr, "no type specified for function parameter '%s', "
-			        "using int\n", parameter_declaration->symbol->string);
+			warningf(HERE, "no type specified for function parameter '%s', using int", parameter_declaration->symbol->string);
 			parameter_type              = type_int;
 			parameter_declaration->type = parameter_type;
 #endif
@@ -2697,10 +2556,7 @@ static void parse_external_declaration(void)
 	/* note that we don't skip typerefs: the standard doesn't allow them here
 	 * (so we can't use is_type_function here) */
 	if(type->kind != TYPE_FUNCTION) {
-		parser_print_error_prefix();
-		fprintf(stderr, "declarator '");
-		print_type_ext(type, ndeclaration->symbol, NULL);
-		fprintf(stderr, "' has a body but is not a function type.\n");
+		errorf(HERE, "declarator '%#T' has a body but is not a function type", type, ndeclaration->symbol);
 		eat_block();
 		return;
 	}
@@ -2798,7 +2654,7 @@ static void parse_compound_type_entries(void)
 		parse_struct_declarators(&specifiers);
 	}
 	if(token.type == T_EOF) {
-		parse_error("EOF while parsing struct");
+		errorf(HERE, "EOF while parsing struct");
 	}
 	next_token();
 }
@@ -2812,7 +2668,7 @@ static type_t *parse_typename(void)
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
-		parse_error("typename may not have a storage class");
+		errorf(HERE, "typename may not have a storage class");
 	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
@@ -2846,10 +2702,7 @@ static expression_t *create_invalid_expression(void)
 
 static expression_t *expected_expression_error(void)
 {
-	parser_print_error_prefix();
-	fprintf(stderr, "expected expression, got token ");
-	print_token(stderr, &token);
-	fprintf(stderr, "\n");
+	errorf(HERE, "expected expression, got token '%K'", &token);
 
 	next_token();
 
@@ -3056,17 +2909,14 @@ static expression_t *parse_reference(void)
 #ifndef STRICT_C99
 		/* an implicitly defined function */
 		if(token.type == '(') {
-			parser_print_prefix_pos(token.source_position);
-			fprintf(stderr, "warning: implicit declaration of function '%s'\n",
-			        ref->symbol->string);
+			warningf(HERE, "implicit declaration of function '%s'\n", ref->symbol->string);
 
 			declaration = create_implicit_function(ref->symbol,
 			                                       source_position);
 		} else
 #endif
 		{
-			parser_print_error_prefix();
-			fprintf(stderr, "unknown symbol '%s' found.\n", ref->symbol->string);
+			errorf(HERE, "unknown symbol '%s' found.\n", ref->symbol->string);
 			return expression;
 		}
 	}
@@ -3173,7 +3023,7 @@ static expression_t *parse_function_keyword(void)
 	/* TODO */
 
 	if (current_function == NULL) {
-		parse_error("'__func__' used outside of a function");
+		errorf(HERE, "'__func__' used outside of a function");
 	}
 
 	string_literal_expression_t *expression
@@ -3192,7 +3042,7 @@ static expression_t *parse_pretty_function_keyword(void)
 	/* TODO */
 
 	if (current_function == NULL) {
-		parse_error("'__PRETTY_FUNCTION__' used outside of a function");
+		errorf(HERE, "'__PRETTY_FUNCTION__' used outside of a function");
 	}
 
 	string_literal_expression_t *expression
@@ -3291,9 +3141,7 @@ static expression_t *parse_va_start(void)
 			return expression;
 		}
 	}
-	parser_print_error_prefix_pos(expr->base.source_position);
-	fprintf(stderr, "second argument of 'va_start' must be last parameter "
-	                "of the current function\n");
+	errorf(expr->base.source_position, "second argument of 'va_start' must be last parameter of the current function");
 
 	return create_invalid_expression();
 }
@@ -3473,10 +3321,7 @@ static expression_t *parse_primary_expression(void)
 		return parse_brace_expression();
 	}
 
-	parser_print_error_prefix();
-	fprintf(stderr, "unexpected token ");
-	print_token(stderr, &token);
-	fprintf(stderr, "\n");
+	errorf(HERE, "unexpected token '%K'", &token);
 	eat_statement();
 
 	return create_invalid_expression();
@@ -3516,12 +3361,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 			array_access->index     = left;
 			array_access->flipped   = true;
 		} else {
-			parser_print_error_prefix();
-			fprintf(stderr, "array access on object with non-pointer types ");
-			print_type_quoted(type_left);
-			fprintf(stderr, ", ");
-			print_type_quoted(type_inside);
-			fprintf(stderr, "\n");
+			errorf(HERE, "array access on object with non-pointer types '%T', '%T'", type_left, type_inside);
 		}
 	} else {
 		array_access->array_ref = left;
@@ -3593,10 +3433,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	type_t *type_left = type;
 	if(is_pointer) {
 		if(type->kind != TYPE_POINTER) {
-			parser_print_error_prefix();
-			fprintf(stderr, "left hand side of '->' is not a pointer, but ");
-			print_type_quoted(orig_type);
-			fputc('\n', stderr);
+			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
 			return create_invalid_expression();
 		}
 		pointer_type_t *pointer_type = &type->pointer;
@@ -3606,11 +3443,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	if(type_left->kind != TYPE_COMPOUND_STRUCT
 			&& type_left->kind != TYPE_COMPOUND_UNION) {
-		parser_print_error_prefix();
-		fprintf(stderr, "request for member '%s' in something not a struct or "
-		        "union, but ", symbol->string);
-		print_type_quoted(type_left);
-		fputc('\n', stderr);
+		errorf(HERE, "request for member '%s' in something not a struct or union, but '%T'", symbol->string, type_left);
 		return create_invalid_expression();
 	}
 
@@ -3618,11 +3451,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	declaration_t   *declaration   = compound_type->declaration;
 
 	if(!declaration->init.is_defined) {
-		parser_print_error_prefix();
-		fprintf(stderr, "request for member '%s' of incomplete type ",
-		        symbol->string);
-		print_type_quoted(type_left);
-		fputc('\n', stderr);
+		errorf(HERE, "request for member '%s' of incomplete type '%T'", symbol->string, type_left);
 		return create_invalid_expression();
 	}
 
@@ -3633,9 +3462,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		}
 	}
 	if(iter == NULL) {
-		parser_print_error_prefix();
-		print_type_quoted(type_left);
-		fprintf(stderr, " has no member named '%s'\n", symbol->string);
+		errorf(HERE, "'%T' has no member names '%s'", type_left, symbol->string);
 		return create_invalid_expression();
 	}
 
@@ -3673,12 +3500,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 			}
 		}
 		if(function_type == NULL) {
-			parser_print_error_prefix();
-			fputs("called object '", stderr);
-			print_expression(expression);
-			fputs("' (type ", stderr);
-			print_type_quoted(orig_type);
-			fputs(") is not a pointer to a function\n", stderr);
+			errorf(HERE, "called object '%E' (type '%T') is not a pointer to a function", expression, orig_type);
 
 			function_type             = NULL;
 			call->expression.datatype = NULL;
@@ -3721,18 +3543,12 @@ static expression_t *parse_call_expression(unsigned precedence,
 		}
 		/* too few parameters */
 		if(parameter != NULL) {
-			parser_print_error_prefix();
-			fprintf(stderr, "too few arguments to function '");
-			print_expression(expression);
-			fprintf(stderr, "'\n");
+			errorf(HERE, "too few arguments to function '%E'", expression);
 		} else if(argument != NULL) {
 			/* too many parameters */
 			if(!function_type->variadic
 					&& !function_type->unspecified_parameters) {
-				parser_print_error_prefix();
-				fprintf(stderr, "too many arguments to function '");
-				print_expression(expression);
-				fprintf(stderr, "'\n");
+				errorf(HERE, "too many arguments to function '%E'", expression);
 			} else {
 				/* do default promotion */
 				for( ; argument != NULL; argument = argument->next) {
@@ -3876,8 +3692,7 @@ static void semantic_incdec(unary_expression_t *expression)
 	type_t *type = skip_typeref(orig_type);
 	if(!is_type_arithmetic(type) && type->kind != TYPE_POINTER) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs an arithmetic or pointer type\n");
+		errorf(HERE, "operation needs an arithmetic or pointer type");
 		return;
 	}
 
@@ -3893,8 +3708,7 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 	type_t *type = skip_typeref(orig_type);
 	if(!is_type_arithmetic(type)) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs an arithmetic type\n");
+		errorf(HERE, "operation needs an arithmetic type");
 		return;
 	}
 
@@ -3909,7 +3723,7 @@ static void semantic_unexpr_scalar(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	if (!is_type_scalar(type)) {
-		parse_error("operand of ! must be of scalar type\n");
+		errorf(HERE, "operand of ! must be of scalar type");
 		return;
 	}
 
@@ -3924,7 +3738,7 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	if (!is_type_integer(type)) {
-		parse_error("operand of ~ must be of integer type\n");
+		errorf(HERE, "operand of ~ must be of integer type");
 		return;
 	}
 
@@ -3939,10 +3753,7 @@ static void semantic_dereference(unary_expression_t *expression)
 
 	type_t *type = skip_typeref(orig_type);
 	if(!is_type_pointer(type)) {
-		parser_print_error_prefix();
-		fputs("Unary '*' needs pointer or arrray type, but type ", stderr);
-		print_type_quoted(orig_type);
-		fputs(" given.\n", stderr);
+		errorf(HERE, "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
 		return;
 	}
 
@@ -4081,8 +3892,7 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs arithmetic types\n");
+		errorf(HERE, "operation needs arithmetic types");
 		return;
 	}
 
@@ -4107,8 +3917,7 @@ static void semantic_shift_op(binary_expression_t *expression)
 
 	if(!is_type_integer(type_left) || !is_type_integer(type_right)) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs integer types\n");
+		errorf(HERE, "operation needs integer types");
 		return;
 	}
 
@@ -4145,12 +3954,7 @@ static void semantic_add(binary_expression_t *expression)
 	} else if(is_type_pointer(type_right) && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
 	} else {
-		parser_print_error_prefix();
-		fprintf(stderr, "invalid operands to binary + (");
-		print_type_quoted(orig_type_left);
-		fprintf(stderr, ", ");
-		print_type_quoted(orig_type_right);
-		fprintf(stderr, ")\n");
+		errorf(HERE, "invalid operands to binary + ('%T', '%T')", orig_type_left, orig_type_right);
 	}
 }
 
@@ -4178,22 +3982,12 @@ static void semantic_sub(binary_expression_t *expression)
 		expression->expression.datatype = type_left;
 	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		if(!pointers_compatible(type_left, type_right)) {
-			parser_print_error_prefix();
-			fprintf(stderr, "pointers to incompatible objects to binary - (");
-			print_type_quoted(orig_type_left);
-			fprintf(stderr, ", ");
-			print_type_quoted(orig_type_right);
-			fprintf(stderr, ")\n");
+			errorf(HERE, "pointers to incompatible objects to binary - ('%T', '%T')", orig_type_left, orig_type_right);
 		} else {
 			expression->expression.datatype = type_ptrdiff_t;
 		}
 	} else {
-		parser_print_error_prefix();
-		fprintf(stderr, "invalid operands to binary - (");
-		print_type_quoted(orig_type_left);
-		fprintf(stderr, ", ");
-		print_type_quoted(orig_type_right);
-		fprintf(stderr, ")\n");
+		errorf(HERE, "invalid operands to binary - ('%T', '%T')", orig_type_left, orig_type_right);
 	}
 }
 
@@ -4244,8 +4038,7 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs arithmetic types\n");
+		errorf(HERE, "operation needs arithmetic types");
 		return;
 	}
 
@@ -4282,12 +4075,7 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->expression.datatype = type_left;
 	} else {
-		parser_print_error_prefix();
-		fputs("Incompatible types ", stderr);
-		print_type_quoted(orig_type_left);
-		fputs(" and ", stderr);
-		print_type_quoted(orig_type_right);
-		fputs(" in assignment\n", stderr);
+		errorf(HERE, "incompatible types '%T' and '%T' in assignment", orig_type_left, orig_type_right);
 		return;
 	}
 }
@@ -4307,8 +4095,7 @@ static void semantic_logical_op(binary_expression_t *expression)
 
 	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */
-		parser_print_error_prefix();
-		fprintf(stderr, "operation needs scalar types\n");
+		errorf(HERE, "operation needs scalar types");
 		return;
 	}
 
@@ -4335,37 +4122,19 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 
 	/* must be a modifiable lvalue */
 	if (is_type_array(type_left)) {
-		parser_print_error_prefix();
-		fprintf(stderr, "Cannot assign to arrays ('");
-		print_expression(left);
-		fprintf(stderr, "')\n");
+		errorf(HERE, "cannot assign to arrays ('%E')", left);
 		return;
 	}
 	if(type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
-		parser_print_error_prefix();
-		fprintf(stderr, "assignment to readonly location '");
-		print_expression(left);
-		fprintf(stderr, "' (type ");
-		print_type_quoted(orig_type_left);
-		fprintf(stderr, ")\n");
+		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left, orig_type_left);
 		return;
 	}
 	if(is_type_incomplete(type_left)) {
-		parser_print_error_prefix();
-		fprintf(stderr, "left-hand side of assignment '");
-		print_expression(left);
-		fprintf(stderr, "' has incomplete type ");
-		print_type_quoted(orig_type_left);
-		fprintf(stderr, "\n");
+		errorf(HERE, "left-hand side of assignment '%E' has incomplete type '%T'", left, orig_type_left);
 		return;
 	}
 	if(is_type_compound(type_left) && has_const_fields(type_left)) {
-		parser_print_error_prefix();
-		fprintf(stderr, "can't assign to '");
-		print_expression(left);
-		fprintf(stderr, "' because compound type ");
-		print_type_quoted(orig_type_left);
-		fprintf(stderr, " has readonly fields\n");
+		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields", left, orig_type_left);
 		return;
 	}
 
@@ -4502,9 +4271,7 @@ static void register_expression_parser(parse_expression_function parser,
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
 	if(entry->parser != NULL) {
-		fprintf(stderr, "for token ");
-		print_token_type(stderr, (token_type_t) token_type);
-		fprintf(stderr, "\n");
+		diagnosticf("for token '%k'\n", (token_type_t)token_type);
 		panic("trying to register multiple expression parsers for a token");
 	}
 	entry->parser     = parser;
@@ -4517,9 +4284,7 @@ static void register_infix_parser(parse_expression_infix_function parser,
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
 	if(entry->infix_parser != NULL) {
-		fprintf(stderr, "for token ");
-		print_token_type(stderr, (token_type_t) token_type);
-		fprintf(stderr, "\n");
+		diagnosticf("for token '%k'\n", (token_type_t)token_type);
 		panic("trying to register multiple infix expression parsers for a "
 		      "token");
 	}
@@ -4760,11 +4525,8 @@ static statement_t *parse_label_statement(void)
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
 	if(label->source_position.input_name != NULL) {
-		parser_print_error_prefix();
-		fprintf(stderr, "duplicate label '%s'\n", symbol->string);
-		parser_print_error_prefix_pos(label->source_position);
-		fprintf(stderr, "previous definition of '%s' was here\n",
-		        symbol->string);
+		errorf(HERE, "duplicate label '%s'\n", symbol->string);
+		errorf(label->source_position, "previous definition of '%s' was here\n", symbol->string);
 	} else {
 		label->source_position = token.source_position;
 	}
@@ -4778,7 +4540,8 @@ static statement_t *parse_label_statement(void)
 	expect(':');
 
 	if(token.type == '}') {
-		parse_error("label at end of compound statement");
+		/* TODO only warn? */
+		errorf(HERE, "label at end of compound statement");
 		return (statement_t*) label_statement;
 	} else {
 		label_statement->label_statement = parse_statement();
@@ -4981,7 +4744,7 @@ static statement_t *parse_return(void)
 
 		if(is_type_atomic(return_type, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
-			parse_warning("'return' with a value, in function returning void");
+			warningf(HERE, "'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
 			if(return_type != NULL) {
@@ -4990,8 +4753,7 @@ static statement_t *parse_return(void)
 		}
 	} else {
 		if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			parse_warning("'return' without value, in function returning "
-			              "non-void");
+			warningf(HERE, "'return' without value, in function returning non-void");
 		}
 	}
 	statement->return_value = return_value;
@@ -5164,9 +4926,7 @@ static statement_t *parse_compound_statement(void)
 	}
 
 	if(token.type != '}') {
-		parser_print_error_prefix_pos(
-				compound_statement->statement.source_position);
-		fprintf(stderr, "end of file while looking for closing '}'\n");
+		errorf(compound_statement->statement.source_position, "end of file while looking for closing '}'");
 	}
 	next_token();
 

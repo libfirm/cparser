@@ -49,7 +49,7 @@ static void warn_invalid_length_modifier(const source_position_t pos,
 	};
 	assert(mod < sizeof(names) / sizeof(*names));
 
-	parse_warning_posf(pos,
+	warningf(pos,
 		"invalid length modifier '%s' for conversion specifier '%%%c'",
 		names[mod], conversion
 	);
@@ -108,14 +108,14 @@ static void check_format_arguments(const call_argument_t *const fmt_arg, const c
 
 					case ' ':
 						if (fmt_flags & FMT_FLAG_PLUS) {
-							parse_warning_pos(pos, "' ' is overridden by prior '+' in conversion specification");
+							warningf(pos, "' ' is overridden by prior '+' in conversion specification");
 						}
 						flag = FMT_FLAG_SPACE;
 						break;
 
 					case '+':
 						if (fmt_flags & FMT_FLAG_SPACE) {
-							parse_warning_pos(pos, "'+' overrides prior ' ' in conversion specification");
+							warningf(pos, "'+' overrides prior ' ' in conversion specification");
 						}
 						flag = FMT_FLAG_PLUS;
 						break;
@@ -123,7 +123,7 @@ static void check_format_arguments(const call_argument_t *const fmt_arg, const c
 					default: goto break_fmt_flags;
 				}
 				if (fmt_flags & flag) {
-					parse_warning_posf(pos, "repeated flag '%c' in conversion specification", (char)*fmt);
+					warningf(pos, "repeated flag '%c' in conversion specification", (char)*fmt);
 				}
 				fmt_flags |= flag;
 				++fmt;
@@ -133,14 +133,12 @@ break_fmt_flags:
 			/* minimum field width */
 			if (*fmt == '*') {
 				if (arg == NULL) {
-					parse_warning_pos(pos, "missing argument for '*' field width in conversion specification");
+					warningf(pos, "missing argument for '*' field width in conversion specification");
 					return;
 				}
 				const type_t *const arg_type = arg->expression->base.datatype;
 				if (arg_type != type_int) {
-					parse_warning_pos(pos, "argument for '*' field width in conversion specification is not an 'int', but an '");
-					print_type(arg_type);
-					fputc('\'', stderr);
+					warningf(pos, "argument for '*' field width in conversion specification is not an 'int', but an '%T'", arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -155,14 +153,12 @@ break_fmt_flags:
 			++fmt;
 			if (*fmt == '*') {
 				if (arg == NULL) {
-					parse_warning_pos(pos, "missing argument for '*' precision in conversion specification");
+					warningf(pos, "missing argument for '*' precision in conversion specification");
 					return;
 				}
 				const type_t *const arg_type = arg->expression->base.datatype;
 				if (arg_type != type_int) {
-					parse_warning_pos(pos, "argument for '*' precision in conversion specification is not an 'int', but an '");
-					print_type(arg_type);
-					fputc('\'', stderr);
+					warningf(pos, "argument for '*' precision in conversion specification is not an 'int', but an '%T'", arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -205,7 +201,7 @@ break_fmt_flags:
 		}
 
 		if (*fmt == '\0') {
-			parse_warning_pos(pos, "dangling % in format string");
+			warningf(pos, "dangling %% in format string");
 			break;
 		}
 
@@ -345,36 +341,33 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				parse_warning_posf(pos, "encountered unknown conversion specifier '%%%C'", (wint_t)*fmt);
+				warningf(pos, "encountered unknown conversion specifier '%%%C'", (wint_t)*fmt);
 				arg = arg->next;
 				continue;
 		}
 
 		if ((fmt_flags & ~allowed_flags) != 0) {
 			/* TODO better warning message text */
-			parse_warning_pos(pos, "invalid format flags in conversion specification");
+			warningf(pos, "invalid format flags in conversion specification");
 		}
 
 		if (arg == NULL) {
-			parse_warning_pos(pos, "too few arguments for format string");
+			warningf(pos, "too few arguments for format string");
 			return;
 		}
 
 		const type_t *const arg_type = arg->expression->base.datatype;
 		if (arg_type != expected_type) {
-			parser_print_warning_prefix_pos(pos);
-			fputs("argument type '", stderr);
-			print_type(arg_type);
-			fprintf(stderr, "' does not match conversion specifier '%%%c'\n", (char)*fmt);
+			warningf(pos, "argument type '%T' does not match conversion specifier '%%%c'\n", arg_type, (char)*fmt);
 		}
 
 		arg = arg->next;
 	}
 	if (fmt + 1 != wstring->begin + wstring->size) {
-		parse_warning_pos(pos, "format string contains NUL");
+		warningf(pos, "format string contains NUL");
 	}
 	if (arg != NULL) {
-		parse_warning_pos(pos, "too many arguments for format string");
+		warningf(pos, "too many arguments for format string");
 	}
 }
 

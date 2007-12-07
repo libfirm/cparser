@@ -4,9 +4,10 @@
 #include "token_t.h"
 
 
-void parser_print_prefix_pos(source_position_t);
-void parser_print_warning_prefix_pos(source_position_t);
-void parse_warning_pos(source_position_t, const char *message);
-void parse_warning_posf(source_position_t, const char *fmt, ...);
+void diagnosticf(const char *fmt, ...);
+void errorf(source_position_t pos, const char *fmt, ...);
+void warningf(source_position_t pos, const char *fmt, ...);
+
+extern bool found_error;
 
 #endif
