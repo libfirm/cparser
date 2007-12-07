@@ -2295,6 +2295,19 @@ static void create_condition_evaluation(const expression_t *expression,
 	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
+	/* set branch prediction info based on __builtin_expect */
+	if(expression->kind == EXPR_BINARY_BUILTIN_EXPECT) {
+		long               cnst = fold_constant(expression->binary.right);
+		cond_jmp_predicate pred;
+
+		if(cnst == 0) {
+			pred = COND_JMP_PRED_FALSE;
+		} else {
+			pred = COND_JMP_PRED_TRUE;
+		}
+		set_Cond_jmp_pred(cond, pred);
+	}
+
 	add_immBlock_pred(true_block, true_proj);
 	add_immBlock_pred(false_block, false_proj);
 
