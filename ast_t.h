@@ -25,6 +25,7 @@ typedef enum {
 	EXPR_ARRAY_ACCESS,
 	EXPR_SIZEOF,
 	EXPR_CLASSIFY_TYPE,
+	EXPR_ALIGNOF,
 
 	EXPR_FUNCTION,
 	EXPR_PRETTY_FUNCTION,
@@ -229,6 +230,11 @@ struct sizeof_expression_t {
 	expression_t      *size_expression;
 };
 
+struct alignof_expression_t {
+	expression_base_t  expression;
+	type_t            *type;
+};
+
 struct designator_t {
 	symbol_t     *symbol;
 	expression_t *array_access;
@@ -289,6 +295,7 @@ union expression_t {
 	conditional_expression_t         conditional;
 	statement_expression_t           statement;
 	classify_type_expression_t       classify_type;
+	alignof_expression_t             alignofe;
 };
 
 typedef enum {

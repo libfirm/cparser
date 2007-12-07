@@ -20,6 +20,7 @@ typedef struct unary_expression_t               unary_expression_t;
 typedef struct select_expression_t              select_expression_t;
 typedef struct array_access_expression_t        array_access_expression_t;
 typedef struct sizeof_expression_t              sizeof_expression_t;
+typedef struct alignof_expression_t             alignof_expression_t;
 typedef struct conditional_expression_t         conditional_expression_t;
 typedef struct expression_list_element_t        expression_list_element_t;
 typedef struct comma_expression_t               comma_expression_t;

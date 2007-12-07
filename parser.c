@@ -3413,6 +3413,20 @@ static expression_t *parse_assume(void) {
 	return expression;
 }
 
+static expression_t *parse_alignof(void) {
+	eat(T___alignof__);
+
+	expression_t *expression
+		= allocate_expression_zero(EXPR_ALIGNOF);
+
+	expect('(');
+	expression->alignofe.type = parse_typename();
+	expect(')');
+
+	expression->base.datatype = type_size_t;
+	return expression;
+}
+
 static expression_t *parse_primary_expression(void)
 {
 	switch(token.type) {
@@ -3450,6 +3464,8 @@ static expression_t *parse_primary_expression(void)
 	case T___builtin_islessgreater:
 	case T___builtin_isunordered:
 		return parse_compare_builtin();
+	case T___alignof__:
+		return parse_alignof();
 	case T_assume:
 		return parse_assume();
 

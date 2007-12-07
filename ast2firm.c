@@ -812,12 +812,12 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
-static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
+static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode, ir_entity *entity)
 {
 	assert(entity != NULL);
 	union symconst_symbol sym;
 	sym.entity_p = entity;
-	return new_d_SymConst(dbgi, sym, symconst_addr_ent);
+	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
 }
 
 static ir_node *string_to_firm(const source_position_t *const src_pos,
@@ -853,7 +853,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_symconst(dbgi, entity);
+	return create_symconst(dbgi, mode_P_data, entity);
 }
 
 static ir_node *string_literal_to_firm(
@@ -896,7 +896,7 @@ static ir_node *wide_string_literal_to_firm(
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_symconst(dbgi, entity);
+	return create_symconst(dbgi, mode_P_data, entity);
 }
 
 static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
@@ -951,7 +951,7 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 		}
 
 		default:
-			return create_symconst(dbgi, entity);
+			return create_symconst(dbgi, mode_P_data, entity);
 	}
 }
 
@@ -975,11 +975,12 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 
 	case DECLARATION_TYPE_LOCAL_VARIABLE: {
-		ir_mode *mode = get_ir_mode(type);
+		ir_mode *const mode = get_ir_mode(type);
 		return get_value(declaration->v.value_number, mode);
 	}
 	case DECLARATION_TYPE_FUNCTION: {
-		return create_symconst(dbgi, declaration->v.entity);
+		ir_mode *const mode = get_ir_mode(type);
+		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
@@ -1014,7 +1015,9 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_TYPE_LOCAL_VARIABLE:
 		panic("local variable without entity has no address");
 	case DECLARATION_TYPE_FUNCTION: {
-		return create_symconst(dbgi, declaration->v.entity);
+		type_t *const  type = skip_typeref(ref->expression.datatype);
+		ir_mode *const mode = get_ir_mode(type);
+		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_TYPE_GLOBAL_VARIABLE: {
 		ir_node *const addr = get_global_var_address(dbgi, declaration);
@@ -1863,11 +1866,19 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 		assert(type != NULL);
 	}
 
-	ir_mode  *mode      = get_ir_mode(expression->expression.datatype);
-	unsigned  size      = get_type_size(type);
-	ir_node  *size_node = new_Const_long(mode, size);
+	ir_mode *const mode = get_ir_mode(expression->expression.datatype);
+	symconst_symbol sym;
+	sym.type_p = get_ir_type(type);
+	return new_SymConst(mode, sym, symconst_type_size);
+}
 
-	return size_node;
+static ir_node *alignof_to_firm(const alignof_expression_t *expression)
+{
+	type_t *const  type = expression->type;
+	ir_mode *const mode = get_ir_mode(expression->expression.datatype);
+	symconst_symbol sym;
+	sym.type_p = get_ir_type(type);
+	return new_SymConst(mode, sym, symconst_type_align);
 }
 
 static long fold_constant(const expression_t *expression)
@@ -2183,6 +2194,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return array_access_to_firm(&expression->array_access);
 	case EXPR_SIZEOF:
 		return sizeof_to_firm(&expression->sizeofe);
+	case EXPR_ALIGNOF:
+		return alignof_to_firm(&expression->alignofe);
 	case EXPR_CONDITIONAL:
 		return conditional_to_firm(&expression->conditional);
 	case EXPR_SELECT:
@@ -2578,7 +2591,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	assert(current_ir_graph == get_const_code_irg());
 	current_ir_graph = old_current_ir_graph;
 
-	ir_node *const src_addr  = create_symconst(dbgi, init_entity);
+	ir_node *const src_addr  = create_symconst(dbgi, mode_P_data, init_entity);
 	ir_node *const copyb     = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);

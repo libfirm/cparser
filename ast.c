@@ -270,6 +270,13 @@ static void print_sizeof_expression(const sizeof_expression_t *expression)
 	}
 }
 
+static void print_alignof_expression(const alignof_expression_t *expression)
+{
+	fputs("__alignof__(", out);
+	print_type(expression->type);
+	fputc(')', out);
+}
+
 static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 {
 	fputs(expression->symbol->string, out);
@@ -391,6 +398,9 @@ void print_expression(const expression_t *expression)
 		break;
 	case EXPR_SIZEOF:
 		print_sizeof_expression(&expression->sizeofe);
+		break;
+	case EXPR_ALIGNOF:
+		print_alignof_expression(&expression->alignofe);
 		break;
 	case EXPR_BUILTIN_SYMBOL:
 		print_builtin_symbol(&expression->builtin_symbol);
