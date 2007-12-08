@@ -10,10 +10,16 @@
 
 //#define ABORT_ON_ERROR
 
+/** Number of occurred diagnostics. */
+unsigned diagnostic_count = 0;
+/** Number of occurred errors. */
+unsigned error_count      = 0;
+/** Number of occurred warnings. */
+unsigned warning_count    = 0;
 
-bool found_error;
-
-
+/**
+ * Issue a diagnostic message.
+ */
 static void diagnosticvf(const char *const fmt, va_list ap)
 {
 	for (const char* f = fmt; *f != '\0'; ++f) {
@@ -119,13 +125,14 @@ void diagnosticf(const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
+	++diagnostic_count;
 	diagnosticvf(fmt, ap);
 	va_end(ap);
 }
 
 void errorf(const source_position_t pos, const char *const fmt, ...)
 {
-	found_error = true;
+	++error_count;
 	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
 	va_list ap;
 	va_start(ap, fmt);
@@ -140,6 +147,7 @@ void errorf(const source_position_t pos, const char *const fmt, ...)
 
 void warningf(const source_position_t pos, const char *const fmt, ...)
 {
+	++warning_count;
 	fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
 	va_list ap;
 	va_start(ap, fmt);

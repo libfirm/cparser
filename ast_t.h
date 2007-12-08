@@ -151,7 +151,7 @@ typedef enum {
 	case EXPR_UNARY_ASSUME:
 
 struct context_t {
-	declaration_t *declarations;
+	declaration_t *declarations;  /**< List of declarations in this context. */
 };
 
 struct expression_base_t {

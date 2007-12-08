@@ -50,6 +50,7 @@
 #include "type_hash.h"
 #include "parser.h"
 #include "ast2firm.h"
+#include "diagnostic.h"
 #include "lang_features.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
@@ -572,8 +573,14 @@ int main(int argc, char **argv)
 	FILE *preprocessed_in = preprocess(in, input);
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
 	pclose(preprocessed_in);
-	if(unit == NULL)
-		return 1;
+	if(unit == NULL) {
+		/* parsing failed because of errors */
+		fprintf(stderr, "%u error(s), %u warnings\n", error_count, warning_count);
+		return EXIT_FAILURE;
+	}
+	if (warning_count > 0) {
+		fprintf(stderr, "%u warnings\n", warning_count);
+	}
 
 	if(mode == PrintAst) {
 		type_set_output(out);

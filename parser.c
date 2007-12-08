@@ -120,6 +120,10 @@ static void semantic_comparison(binary_expression_t *expression);
 	TYPE_QUALIFIERS         \
 	TYPE_SPECIFIERS
 
+/**
+ * Allocate an AST node with given size and
+ * initialize all fields with zero.
+ */
 static void *allocate_ast_zero(size_t size)
 {
 	void *res = allocate_ast(size);
@@ -127,6 +131,11 @@ static void *allocate_ast_zero(size_t size)
 	return res;
 }
 
+/**
+ * Returns the size of a statement node.
+ *
+ * @param kind  the statement kind
+ */
 static size_t get_statement_struct_size(statement_kind_t kind)
 {
 	static const size_t sizes[] = {
@@ -151,6 +160,10 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 	return sizes[kind];
 }
 
+/**
+ * Allocate a statement node of given kind and initialize all
+ * fields with zero.
+ */
 static statement_t *allocate_statement_zero(statement_kind_t kind)
 {
 	size_t       size = get_statement_struct_size(kind);
@@ -160,8 +173,12 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 	return res;
 }
 
-
-static size_t get_expression_struct_size(expression_kind_t type)
+/**
+ * Returns the size of an expression node.
+ *
+ * @param kind  the expression kind
+ */
+static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[EXPR_INVALID]             = sizeof(expression_base_t),
@@ -187,17 +204,21 @@ static size_t get_expression_struct_size(expression_kind_t type)
 		[EXPR_VA_ARG]              = sizeof(va_arg_expression_t),
 		[EXPR_STATEMENT]           = sizeof(statement_expression_t),
 	};
-	if(type >= EXPR_UNARY_FIRST && type <= EXPR_UNARY_LAST) {
+	if(kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
 		return sizes[EXPR_UNARY_FIRST];
 	}
-	if(type >= EXPR_BINARY_FIRST && type <= EXPR_BINARY_LAST) {
+	if(kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
-	assert(type <= sizeof(sizes) / sizeof(sizes[0]));
-	assert(sizes[type] != 0);
-	return sizes[type];
+	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
+	assert(sizes[kind] != 0);
+	return sizes[kind];
 }
 
+/**
+ * Allocate an expression node of given kind and initialize all
+ * fields with zero.
+ */
 static expression_t *allocate_expression_zero(expression_kind_t kind)
 {
 	size_t        size = get_expression_struct_size(kind);
@@ -207,6 +228,11 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 	return res;
 }
 
+/**
+ * Returns the size of a type node.
+ *
+ * @param kind  the type kind
+ */
 static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
@@ -227,6 +253,10 @@ static size_t get_type_struct_size(type_kind_t kind)
 	return sizes[kind];
 }
 
+/**
+ * Allocate a type node of given kind and initialize all
+ * fields with zero.
+ */
 static type_t *allocate_type_zero(type_kind_t kind)
 {
 	size_t  size = get_type_struct_size(kind);
@@ -237,6 +267,11 @@ static type_t *allocate_type_zero(type_kind_t kind)
 	return res;
 }
 
+/**
+ * Returns the size of an initializer node.
+ *
+ * @param kind  the initializer kind
+ */
 static size_t get_initializer_size(initializer_kind_t kind)
 {
 	static const size_t sizes[] = {
@@ -250,7 +285,11 @@ static size_t get_initializer_size(initializer_kind_t kind)
 	return sizes[kind];
 }
 
-static initializer_t *allocate_initializer(initializer_kind_t kind)
+/**
+ * Allocate an initializer node of given kind and initialize all
+ * fields with zero.
+ */
+static initializer_t *allocate_initializer_zero(initializer_kind_t kind)
 {
 	initializer_t *result = allocate_ast_zero(get_initializer_size(kind));
 	result->kind          = kind;
@@ -258,26 +297,34 @@ static initializer_t *allocate_initializer(initializer_kind_t kind)
 	return result;
 }
 
+/**
+ * Free a type from the type obstack.
+ */
 static void free_type(void *type)
 {
 	obstack_free(type_obst, type);
 }
 
 /**
- * returns the top element of the environment stack
+ * Returns the index of the top element of the environment stack.
  */
 static size_t environment_top(void)
 {
 	return ARR_LEN(environment_stack);
 }
 
+/**
+ * Returns the index of the top element of the label stack.
+ */
 static size_t label_top(void)
 {
 	return ARR_LEN(label_stack);
 }
 
 
-
+/**
+ * Return the next token.
+ */
 static inline void next_token(void)
 {
 	token                              = lookahead_buffer[lookahead_bufpos];
@@ -292,6 +339,9 @@ static inline void next_token(void)
 #endif
 }
 
+/**
+ * Return the next token with a given lookahead.
+ */
 static inline const token_t *look_ahead(int num)
 {
 	assert(num > 0 && num <= MAX_LOOKAHEAD);
@@ -301,6 +351,9 @@ static inline const token_t *look_ahead(int num)
 
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
 
+/**
+ * Report a parse error because an expected token was not found.
+ */
 static void parse_error_expected(const char *message, ...)
 {
 	if(message != NULL) {
@@ -312,18 +365,27 @@ static void parse_error_expected(const char *message, ...)
 	va_end(ap);
 }
 
+/**
+ * Report a type error.
+ */
 static void type_error(const char *msg, const source_position_t source_position,
                        type_t *type)
 {
 	errorf(source_position, "%s, but found type '%T'", msg, type);
 }
 
+/**
+ * Report an incompatible type.
+ */
 static void type_error_incompatible(const char *msg,
 		const source_position_t source_position, type_t *type1, type_t *type2)
 {
 	errorf(source_position, "%s, incompatible types: '%T' - '%T'", msg, type1, type2);
 }
 
+/**
+ * Eat an complete block, ie. '{ ... }'.
+ */
 static void eat_block(void)
 {
 	if(token.type == '{')
@@ -341,6 +403,9 @@ static void eat_block(void)
 	eat('}');
 }
 
+/**
+ * Eat a statement until an ';' token.
+ */
 static void eat_statement(void)
 {
 	while(token.type != ';') {
@@ -357,6 +422,9 @@ static void eat_statement(void)
 	eat(';');
 }
 
+/**
+ * Eat a parenthesed term, ie. '( ... )'.
+ */
 static void eat_paren(void)
 {
 	if(token.type == '(')
@@ -418,8 +486,8 @@ static void set_context(context_t *new_context)
 }
 
 /**
- * called when we find a 2nd declarator for an identifier we already have a
- * declarator for
+ * Called when we find a 2nd declarator for an identifier we already have a
+ * declarator for.
  */
 static bool is_compatible_declaration(declaration_t *declaration,
                                       declaration_t *previous)
@@ -436,6 +504,10 @@ static bool is_compatible_declaration(declaration_t *declaration,
 	return types_compatible(type1, type2);
 }
 
+/**
+ * Search a symbol in a given namespace and returns its declaration or
+ * NULL if this symbol was not found.
+ */
 static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
 {
 	declaration_t *declaration = symbol->declaration;
@@ -447,6 +519,9 @@ static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
 	return NULL;
 }
 
+/**
+ * Return the "prefix" of a given namespace.
+ */
 static const char *get_namespace_prefix(namespace_t namespc)
 {
 	switch(namespc) {
@@ -653,6 +728,12 @@ static type_t *promote_integer(type_t *type)
 	return type;
 }
 
+/**
+ * Create a cast expression.
+ *
+ * @param expression  the expression to cast
+ * @param dest_type   the destination type
+ */
 static expression_t *create_cast_expression(expression_t *expression,
                                             type_t *dest_type)
 {
@@ -664,6 +745,9 @@ static expression_t *create_cast_expression(expression_t *expression,
 	return cast;
 }
 
+/**
+ * Check if a given expression represents the 0 pointer constant.
+ */
 static bool is_null_pointer_constant(const expression_t *expression)
 {
 	/* skip void* cast */
@@ -684,6 +768,12 @@ static bool is_null_pointer_constant(const expression_t *expression)
 	return expression->conste.v.int_value == 0;
 }
 
+/**
+ * Create an implicit cast expression.
+ *
+ * @param expression  the expression to cast
+ * @param dest_type   the destination type
+ */
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
@@ -968,7 +1058,7 @@ static initializer_t *initializer_from_string(array_type_t *type,
 	/* TODO: check len vs. size of array type */
 	(void) type;
 
-	initializer_t *initializer = allocate_initializer(INITIALIZER_STRING);
+	initializer_t *initializer = allocate_initializer_zero(INITIALIZER_STRING);
 	initializer->string.string = string;
 
 	return initializer;
@@ -981,7 +1071,7 @@ static initializer_t *initializer_from_wide_string(array_type_t *const type,
 	(void) type;
 
 	initializer_t *const initializer =
-		allocate_initializer(INITIALIZER_WIDE_STRING);
+		allocate_initializer_zero(INITIALIZER_WIDE_STRING);
 	initializer->wide_string.string = *string;
 
 	return initializer;
@@ -1023,7 +1113,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 	if(is_type_scalar(type) || types_compatible(type, expression_type)) {
 		semantic_assign(type, &expression, "initializer");
 
-		initializer_t *result = allocate_initializer(INITIALIZER_VALUE);
+		initializer_t *result = allocate_initializer_zero(INITIALIZER_VALUE);
 		result->value.value   = expression;
 
 		return result;
@@ -2695,6 +2785,9 @@ struct expression_parser_function_t {
 
 expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
+/**
+ * Creates a new invalid expression.
+ */
 static expression_t *create_invalid_expression(void)
 {
 	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
@@ -2711,6 +2804,9 @@ static expression_t *expected_expression_error(void)
 	return create_invalid_expression();
 }
 
+/**
+ * Parse a string constant.
+ */
 static expression_t *parse_string_const(void)
 {
 	expression_t *cnst  = allocate_expression_zero(EXPR_STRING_LITERAL);
@@ -2720,6 +2816,9 @@ static expression_t *parse_string_const(void)
 	return cnst;
 }
 
+/**
+ * Parse a wide string constant.
+ */
 static expression_t *parse_wide_string_const(void)
 {
 	expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
@@ -2729,6 +2828,9 @@ static expression_t *parse_wide_string_const(void)
 	return cnst;
 }
 
+/**
+ * Parse an integer constant.
+ */
 static expression_t *parse_int_const(void)
 {
 	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
@@ -2740,6 +2842,9 @@ static expression_t *parse_int_const(void)
 	return cnst;
 }
 
+/**
+ * Parse a float constant.
+ */
 static expression_t *parse_float_const(void)
 {
 	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
@@ -2787,6 +2892,13 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	return declaration;
 }
 
+/**
+ * Creates a return_type (func)(argument_type) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ * @param argument_type  the argument type
+ */
 static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 {
 	function_parameter_t *parameter
@@ -2806,6 +2918,11 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	return result;
 }
 
+/**
+ * Creates a function type for some function like builtins.
+ *
+ * @param symbol   the symbol describing the builtin
+ */
 static type_t *get_builtin_symbol_type(symbol_t *symbol)
 {
 	switch(symbol->ID) {
@@ -2825,7 +2942,9 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 }
 
 /**
- * performs automatic type cast as described in § 6.3.2.1
+ * Performs automatic type cast as described in § 6.3.2.1.
+ *
+ * @param orig_type  the original type
  */
 static type_t *automatic_type_conversion(type_t *orig_type)
 {
@@ -3517,6 +3636,11 @@ static expression_t *parse_select_expression(unsigned precedence,
 	return select;
 }
 
+/**
+ * Parse a call expression, ie. expression '( ... )'.
+ *
+ * @param expression  the function address
+ */
 static expression_t *parse_call_expression(unsigned precedence,
                                            expression_t *expression)
 {
@@ -3635,6 +3759,11 @@ static bool same_compound_type(const type_t *type1, const type_t *type2)
 	return compound1->declaration == compound2->declaration;
 }
 
+/**
+ * Parse a conditional expression, ie. 'expression ? ... : ...'.
+ *
+ * @param expression  the conditional expression
+ */
 static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
 {
@@ -3701,13 +3830,17 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	return result;
 }
 
+/**
+ * Parse an extension expression.
+ */
 static expression_t *parse_extension(unsigned precedence)
 {
 	eat(T___extension__);
 
 	/* TODO enable extensions */
-
-	return parse_sub_expression(precedence);
+	expression_t *expression = parse_sub_expression(precedence);
+	/* TODO disable extensions */
+	return expression;
 }
 
 static expression_t *parse_builtin_classify_type(const unsigned precedence)
@@ -3919,6 +4052,9 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	}
 }
 
+/**
+ * Check the semantic restrictions for a binary expression.
+ */
 static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 {
 	expression_t *left       = expression->left;
@@ -4087,7 +4223,7 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	/* combined instructions are tricky. We can't create an implicit cast on
 	 * the left side, because we need the uncasted form for the store.
 	 * The ast2firm pass has to know that left_type must be right_type
-	 * for the arithmeitc operation and create a cast by itself */
+	 * for the arithmetic operation and create a cast by itself */
 	type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 	expression->right       = create_implicit_cast(right, arithmetic_type);
 	expression->expression.datatype = type_left;
@@ -4110,7 +4246,7 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 		/* combined instructions are tricky. We can't create an implicit cast on
 		 * the left side, because we need the uncasted form for the store.
 		 * The ast2firm pass has to know that left_type must be right_type
-		 * for the arithmeitc operation and create a cast by itself */
+		 * for the arithmetic operation and create a cast by itself */
 		type_t *const arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = type_left;
@@ -4122,6 +4258,9 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 	}
 }
 
+/**
+ * Check the semantic restrictions of a logical expression.
+ */
 static void semantic_logical_op(binary_expression_t *expression)
 {
 	expression_t *left            = expression->left;
@@ -4144,13 +4283,26 @@ static void semantic_logical_op(binary_expression_t *expression)
 	expression->expression.datatype = type_int;
 }
 
-static bool has_const_fields(type_t *type)
+/**
+ * Checks if a compound type has constant fields.
+ */
+static bool has_const_fields(const compound_type_t *type)
 {
-	(void) type;
+	const context_t     *context = &type->declaration->context;
+	const declaration_t *declaration = context->declarations;
+
+	for (; declaration != NULL; declaration = declaration->next) {
+		const type_t *decl_type = skip_typeref(declaration->type);
+		if (decl_type->base.qualifiers & TYPE_QUALIFIER_CONST)
+			return true;
+	}
 	/* TODO */
 	return false;
 }
 
+/**
+ * Check the semantic restrictions of a binary assign expression.
+ */
 static void semantic_binexpr_assign(binary_expression_t *expression)
 {
 	expression_t *left           = expression->left;
@@ -4175,7 +4327,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		errorf(HERE, "left-hand side of assignment '%E' has incomplete type '%T'", left, orig_type_left);
 		return;
 	}
-	if(is_type_compound(type_left) && has_const_fields(type_left)) {
+	if(is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
 		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields", left, orig_type_left);
 		return;
 	}
@@ -4300,13 +4452,21 @@ static expression_t *parse_sub_expression(unsigned precedence)
 	return left;
 }
 
+/**
+ * Parse an expression.
+ */
 static expression_t *parse_expression(void)
 {
 	return parse_sub_expression(1);
 }
 
-
-
+/**
+ * Register a parser for a prefix-like operator with given precedence.
+ *
+ * @param parser      the parser function
+ * @param token_type  the token type of the prefix token
+ * @param precedence  the precedence of the operator
+ */
 static void register_expression_parser(parse_expression_function parser,
                                        int token_type, unsigned precedence)
 {
@@ -4320,6 +4480,13 @@ static void register_expression_parser(parse_expression_function parser,
 	entry->precedence = precedence;
 }
 
+/**
+ * Register a parser for an infix operator with given precedence.
+ *
+ * @param parser      the parser function
+ * @param token_type  the token type of the infix operator
+ * @param precedence  the precedence of the operator
+ */
 static void register_infix_parser(parse_expression_infix_function parser,
 		int token_type,	unsigned precedence)
 {
@@ -4334,6 +4501,9 @@ static void register_infix_parser(parse_expression_infix_function parser,
 	entry->infix_precedence = precedence;
 }
 
+/**
+ * Initialize the expression parsers.
+ */
 static void init_expression_parsers(void)
 {
 	memset(&expression_parsers, 0, sizeof(expression_parsers));
@@ -4402,6 +4572,9 @@ static void init_expression_parsers(void)
 	                                             T___builtin_classify_type, 25);
 }
 
+/**
+ * Parse a asm statement constraints specification.
+ */
 static asm_constraint_t *parse_asm_constraints(void)
 {
 	asm_constraint_t *result = NULL;
@@ -4443,6 +4616,9 @@ static asm_constraint_t *parse_asm_constraints(void)
 	return result;
 }
 
+/**
+ * Parse a asm statement clobber specification.
+ */
 static asm_clobber_t *parse_asm_clobbers(void)
 {
 	asm_clobber_t *result = NULL;
@@ -4467,6 +4643,9 @@ static asm_clobber_t *parse_asm_clobbers(void)
 	return result;
 }
 
+/**
+ * Parse an asm statement.
+ */
 static statement_t *parse_asm_statement(void)
 {
 	eat(T_asm);
@@ -4506,6 +4685,9 @@ end_of_asm:
 	return statement;
 }
 
+/**
+ * Parse a case statement.
+ */
 static statement_t *parse_case_statement(void)
 {
 	eat(T_case);
@@ -4521,6 +4703,9 @@ static statement_t *parse_case_statement(void)
 	return statement;
 }
 
+/**
+ * Parse a default statement.
+ */
 static statement_t *parse_default_statement(void)
 {
 	eat(T_default);
@@ -4535,6 +4720,9 @@ static statement_t *parse_default_statement(void)
 	return statement;
 }
 
+/**
+ * Return the declaration for a given label symbol or create a new one.
+ */
 static declaration_t *get_label(symbol_t *symbol)
 {
 	declaration_t *candidate = get_declaration(symbol, NAMESPACE_LABEL);
@@ -4556,6 +4744,9 @@ static declaration_t *get_label(symbol_t *symbol)
 	return declaration;
 }
 
+/**
+ * Parse a label statement.
+ */
 static statement_t *parse_label_statement(void)
 {
 	assert(token.type == T_IDENTIFIER);
@@ -4592,6 +4783,9 @@ static statement_t *parse_label_statement(void)
 	return (statement_t*) label_statement;
 }
 
+/**
+ * Parse an if statement.
+ */
 static statement_t *parse_if(void)
 {
 	eat(T_if);
@@ -4613,6 +4807,9 @@ static statement_t *parse_if(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a switch statement.
+ */
 static statement_t *parse_switch(void)
 {
 	eat(T_switch);
@@ -4629,6 +4826,9 @@ static statement_t *parse_switch(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a while statement.
+ */
 static statement_t *parse_while(void)
 {
 	eat(T_while);
@@ -4645,6 +4845,9 @@ static statement_t *parse_while(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a do statement.
+ */
 static statement_t *parse_do(void)
 {
 	eat(T_do);
@@ -4663,6 +4866,9 @@ static statement_t *parse_do(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a for statement.
+ */
 static statement_t *parse_for(void)
 {
 	eat(T_for);
@@ -4705,6 +4911,9 @@ static statement_t *parse_for(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a goto statement.
+ */
 static statement_t *parse_goto(void)
 {
 	eat(T_goto);
@@ -4731,6 +4940,9 @@ static statement_t *parse_goto(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a continue statement.
+ */
 static statement_t *parse_continue(void)
 {
 	eat(T_continue);
@@ -4743,6 +4955,9 @@ static statement_t *parse_continue(void)
 	return statement;
 }
 
+/**
+ * Parse a break statement.
+ */
 static statement_t *parse_break(void)
 {
 	eat(T_break);
@@ -4755,6 +4970,9 @@ static statement_t *parse_break(void)
 	return statement;
 }
 
+/**
+ * Parse a return statement.
+ */
 static statement_t *parse_return(void)
 {
 	eat(T_return);
@@ -4803,6 +5021,9 @@ static statement_t *parse_return(void)
 	return (statement_t*) statement;
 }
 
+/**
+ * Parse a declaration statement.
+ */
 static statement_t *parse_declaration_statement(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
@@ -4822,6 +5043,9 @@ static statement_t *parse_declaration_statement(void)
 	return statement;
 }
 
+/**
+ * Parse an expression statement, ie. expr ';'.
+ */
 static statement_t *parse_expression_statement(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_EXPRESSION);
@@ -4834,6 +5058,9 @@ static statement_t *parse_expression_statement(void)
 	return statement;
 }
 
+/**
+ * Parse a statement.
+ */
 static statement_t *parse_statement(void)
 {
 	statement_t   *statement = NULL;
@@ -4935,6 +5162,9 @@ static statement_t *parse_statement(void)
 	return statement;
 }
 
+/**
+ * Parse a compound statement.
+ */
 static statement_t *parse_compound_statement(void)
 {
 	compound_statement_t *compound_statement
@@ -4967,10 +5197,11 @@ static statement_t *parse_compound_statement(void)
 		last_statement = statement;
 	}
 
-	if(token.type != '}') {
+	if(token.type == '}') {
+		next_token();
+	} else {
 		errorf(compound_statement->statement.source_position, "end of file while looking for closing '}'");
 	}
-	next_token();
 
 	assert(context == &compound_statement->context);
 	set_context(last_context);
@@ -4979,7 +5210,10 @@ static statement_t *parse_compound_statement(void)
 	return (statement_t*) compound_statement;
 }
 
-static void initialize_builtins(void)
+/**
+ * Initialize builtin types.
+ */
+static void initialize_builtin_types(void)
 {
 	type_intmax_t    = make_global_typedef("__intmax_t__",      type_long_long);
 	type_size_t      = make_global_typedef("__SIZE_TYPE__",     type_unsigned_long);
@@ -4996,6 +5230,9 @@ static void initialize_builtins(void)
 	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
 }
 
+/**
+ * Parse a translation unit.
+ */
 static translation_unit_t *parse_translation_unit(void)
 {
 	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
@@ -5006,7 +5243,7 @@ static translation_unit_t *parse_translation_unit(void)
 	assert(context == NULL);
 	set_context(&unit->context);
 
-	initialize_builtins();
+	initialize_builtin_types();
 
 	while(token.type != T_EOF) {
 		parse_external_declaration();
@@ -5022,11 +5259,18 @@ static translation_unit_t *parse_translation_unit(void)
 	return unit;
 }
 
+/**
+ * Parse the input.
+ *
+ * @return  the translation unit or NULL if errors occurred.
+ */
 translation_unit_t *parse(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
-	found_error       = false;
+	diagnostic_count  = 0;
+	error_count       = 0;
+	warning_count     = 0;
 
 	type_set_output(stderr);
 	ast_set_output(stderr);
@@ -5040,12 +5284,15 @@ translation_unit_t *parse(void)
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
 
-	if(found_error)
+	if(error_count > 0)
 		return NULL;
 
 	return unit;
 }
 
+/**
+ * Initialize the parser.
+ */
 void init_parser(void)
 {
 	init_expression_parsers();
@@ -5055,6 +5302,9 @@ void init_parser(void)
 	type_valist = create_builtin_type(va_list_sym, type_void_ptr);
 }
 
+/**
+ * Terminate the parser.
+ */
 void exit_parser(void)
 {
 	obstack_free(&temp_obst, NULL);
