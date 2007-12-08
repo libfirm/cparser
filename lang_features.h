@@ -19,4 +19,7 @@ extern unsigned int machine_size;
 /* true if the char type is signed */
 extern bool char_is_signed;
 
+/* true for strict language checking. */
+extern bool strict_mode;
+
 #endif

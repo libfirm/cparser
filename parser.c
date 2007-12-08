@@ -13,6 +13,7 @@
 #include "type_t.h"
 #include "type_hash.h"
 #include "ast_t.h"
+#include "lang_features.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
 #include "adt/array.h"
@@ -20,7 +21,6 @@
 //#define PRINT_TOKENS
 //#define ABORT_ON_ERROR
 #define MAX_LOOKAHEAD 2
-//#define STRICT_C99
 
 typedef struct {
 	declaration_t *old_declaration;
@@ -1850,13 +1850,13 @@ finish_specifiers:
 		default:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
-#ifndef STRICT_C99
-				warningf(HERE, "no type specifiers in declaration, using int");
-				atomic_type = ATOMIC_TYPE_INT;
-				break;
-#else
-				errorf(HERE, "no type specifiers given in declaration");
-#endif
+				if (! strict_mode) {
+					warningf(HERE, "no type specifiers in declaration, using int");
+					atomic_type = ATOMIC_TYPE_INT;
+					break;
+				} else {
+					errorf(HERE, "no type specifiers given in declaration");
+				}
 			} else if((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
 				errorf(HERE, "signed and unsigned specifiers gives");
@@ -2573,13 +2573,13 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 			parameter_declaration = parameter_declaration->next) {
 		type_t *parameter_type = parameter_declaration->type;
 		if(parameter_type == NULL) {
-#ifdef STRICT_C99
-			errorf(HERE, "no type specified for function parameter '%s'", parameter_declaration->symbol->string);
-#else
-			warningf(HERE, "no type specified for function parameter '%s', using int", parameter_declaration->symbol->string);
-			parameter_type              = type_int;
-			parameter_declaration->type = parameter_type;
-#endif
+			if (strict_mode) {
+				errorf(HERE, "no type specified for function parameter '%s'", parameter_declaration->symbol->string);
+			} else {
+				warningf(HERE, "no type specified for function parameter '%s', using int", parameter_declaration->symbol->string);
+				parameter_type              = type_int;
+				parameter_declaration->type = parameter_type;
+			}
 		}
 
 		semantic_parameter(parameter_declaration);
@@ -3027,16 +3027,13 @@ static expression_t *parse_reference(void)
 	next_token();
 
 	if(declaration == NULL) {
-#ifndef STRICT_C99
-		/* an implicitly defined function */
-		if(token.type == '(') {
+		if (! strict_mode && token.type == '(') {
+			/* an implicitly defined function */
 			warningf(HERE, "implicit declaration of function '%s'\n", ref->symbol->string);
 
 			declaration = create_implicit_function(ref->symbol,
 			                                       source_position);
-		} else
-#endif
-		{
+		} else {
 			errorf(HERE, "unknown symbol '%s' found.\n", ref->symbol->string);
 			return expression;
 		}

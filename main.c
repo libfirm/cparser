@@ -79,6 +79,9 @@ unsigned int machine_size = 32;
 /** true if the char type is signed. */
 bool char_is_signed = true;
 
+/** true for strict language checking. */
+bool strict_mode = false;
+
 static int            verbose;
 static struct obstack cppflags_obst;
 
@@ -368,6 +371,8 @@ int main(int argc, char **argv)
 			char_is_signed = true;
 		} else if(strcmp(arg, "--unsigned-chars") == 0) {
 			char_is_signed = false;
+		} else if(strcmp(arg, "--strict") == 0) {
+			strict_mode = true;
 		} else if(strcmp(arg, "--no-ms") == 0) {
 			c_mode &= ~_MS;
 		} else if(strcmp(arg, "--lextest") == 0) {
