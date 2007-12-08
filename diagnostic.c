@@ -61,6 +61,12 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					break;
 				}
 
+				case 'Y': {
+					const symbol_t *const symbol = va_arg(ap, const symbol_t*);
+					fputs(symbol->string, stderr);
+					break;
+				}
+
 				case 'E': {
 					const expression_t* const expr = va_arg(ap, const expression_t*);
 					print_expression(expr);

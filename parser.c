@@ -559,7 +559,7 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 	if(previous_declaration != NULL
 			&& previous_declaration->parent_context == context) {
 		if(!is_compatible_declaration(declaration, previous_declaration)) {
-			errorf(declaration->source_position, "definition of symbol '%s%s' with type '%T'", get_namespace_prefix(namespc), symbol->string, declaration->type);
+			errorf(declaration->source_position, "definition of symbol '%s%Y' with type '%T'", get_namespace_prefix(namespc), symbol, declaration->type);
 			errorf(previous_declaration->source_position, "is incompatible with previous declaration of type '%T'", previous_declaration->type);
 		} else {
 			unsigned  old_storage_class = previous_declaration->storage_class;
@@ -570,30 +570,30 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			if (current_function == NULL) {
 				if (old_storage_class != STORAGE_CLASS_STATIC &&
 				    new_storage_class == STORAGE_CLASS_STATIC) {
-					errorf(declaration->source_position, "static declaration of '%s' follows non-static declaration", symbol->string);
-					errorf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
+					errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
+					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
 				} else {
 					if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						if (new_storage_class == STORAGE_CLASS_NONE) {
 							previous_declaration->storage_class = STORAGE_CLASS_NONE;
 						}
 					} else if(!is_type_function(type)) {
-						warningf(declaration->source_position, "redundant declaration for '%s'\n", symbol->string);
-						warningf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
+						warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
+						warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
 					}
 				}
 			} else {
 				if (old_storage_class == STORAGE_CLASS_EXTERN &&
 						new_storage_class == STORAGE_CLASS_EXTERN) {
-					warningf(declaration->source_position, "redundant extern declaration for '%s'\n", symbol->string);
-					warningf(previous_declaration->source_position, "previous declaration of '%s' was here\n", symbol->string);
+					warningf(declaration->source_position, "redundant extern declaration for '%Y'\n", symbol);
+					warningf(previous_declaration->source_position, "previous declaration of '%Y' was here\n", symbol);
 				} else {
 					if (old_storage_class == new_storage_class) {
-						errorf(declaration->source_position, "redeclaration of '%s'\n", symbol->string);
+						errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
 					} else {
-						errorf(declaration->source_position, "redeclaration of '%s' with different linkage\n", symbol->string);
+						errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
 					}
-					errorf(previous_declaration->source_position, "previous declaration of '%s' was here", symbol->string);
+					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
 				}
 			}
 		}
@@ -1392,7 +1392,8 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
 			assert(symbol != NULL);
-			errorf(HERE, "multiple definition of %s %s", is_struct ? "struct" : "union", symbol->string);
+			errorf(HERE, "multiple definition of %s %Y",
+			       is_struct ? "struct" : "union", symbol);
 			declaration->context.declarations = NULL;
 		}
 		declaration->init.is_defined = true;
@@ -1487,7 +1488,7 @@ static type_t *parse_enum_specifier(void)
 
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
-			errorf(HERE, "multiple definitions of enum %s", symbol->string);
+			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
 		record_declaration(declaration);
 		declaration->init.is_defined = 1;
@@ -1964,7 +1965,8 @@ static void semantic_parameter(declaration_t *declaration)
 	}
 
 	if(is_type_incomplete(type)) {
-		errorf(HERE, "incomplete type ('%T') not allowed for parameter '%s'", orig_type, declaration->symbol->string);
+		errorf(HERE, "incomplete type ('%T') not allowed for parameter '%Y'",
+		       orig_type, declaration->symbol);
 	}
 }
 
@@ -2367,8 +2369,10 @@ static declaration_t *record_declaration(declaration_t *declaration)
 static void parser_error_multiple_definition(declaration_t *declaration,
 		const source_position_t source_position)
 {
-	errorf(source_position, "multiple definition of symbol '%s'", declaration->symbol->string);
-	errorf(declaration->source_position, "this is the location of the previous definition.");
+	errorf(source_position, "multiple definition of symbol '%Y'",
+	       declaration->symbol);
+	errorf(declaration->source_position,
+	       "this is the location of the previous definition.");
 }
 
 static bool is_declaration_specifier(const token_t *token,
@@ -2443,7 +2447,9 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	}
 
 	if(type != NULL && is_type_function(type)) {
-		errorf(declaration->source_position, "initializers not allowed for function types at declator '%s' (type '%T')", declaration->symbol->string, orig_type);
+		errorf(declaration->source_position,
+		       "initializers not allowed for function types at declator '%Y' (type '%T')",
+		       declaration->symbol, orig_type);
 	} else {
 		declaration->init.initializer = initializer;
 	}
@@ -2499,7 +2505,8 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		type_t *type      = skip_typeref(orig_type);
 
 		if(type->kind != TYPE_FUNCTION && declaration->is_inline) {
-			warningf(declaration->source_position, "variable '%s' declared 'inline'\n", declaration->symbol->string);
+			warningf(declaration->source_position,
+			         "variable '%Y' declared 'inline'\n", declaration->symbol);
 		}
 
 		if(token.type == '=') {
@@ -2580,9 +2587,11 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		type_t *parameter_type = parameter_declaration->type;
 		if(parameter_type == NULL) {
 			if (strict_mode) {
-				errorf(HERE, "no type specified for function parameter '%s'", parameter_declaration->symbol->string);
+				errorf(HERE, "no type specified for function parameter '%Y'",
+				       parameter_declaration->symbol);
 			} else {
-				warningf(HERE, "no type specified for function parameter '%s', using int", parameter_declaration->symbol->string);
+				warningf(HERE, "no type specified for function parameter '%Y', using int",
+				         parameter_declaration->symbol);
 				parameter_type              = type_int;
 				parameter_declaration->type = parameter_type;
 			}
@@ -3059,12 +3068,13 @@ static expression_t *parse_reference(void)
 	if(declaration == NULL) {
 		if (! strict_mode && token.type == '(') {
 			/* an implicitly defined function */
-			warningf(HERE, "implicit declaration of function '%s'\n", ref->symbol->string);
+			warningf(HERE, "implicit declaration of function '%Y'",
+			         ref->symbol);
 
 			declaration = create_implicit_function(ref->symbol,
 			                                       source_position);
 		} else {
-			errorf(HERE, "unknown symbol '%s' found.\n", ref->symbol->string);
+			errorf(HERE, "unknown symbol '%Y' found.", ref->symbol);
 			return expression;
 		}
 	}
@@ -3631,7 +3641,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	if(type_left->kind != TYPE_COMPOUND_STRUCT
 			&& type_left->kind != TYPE_COMPOUND_UNION) {
-		errorf(HERE, "request for member '%s' in something not a struct or union, but '%T'", symbol->string, type_left);
+		errorf(HERE, "request for member '%Y' in something not a struct or "
+		       "union, but '%T'", symbol, type_left);
 		return create_invalid_expression();
 	}
 
@@ -3639,7 +3650,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 	declaration_t   *declaration   = compound_type->declaration;
 
 	if(!declaration->init.is_defined) {
-		errorf(HERE, "request for member '%s' of incomplete type '%T'", symbol->string, type_left);
+		errorf(HERE, "request for member '%Y' of incomplete type '%T'",
+		       symbol, type_left);
 		return create_invalid_expression();
 	}
 
@@ -3650,7 +3662,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		}
 	}
 	if(iter == NULL) {
-		errorf(HERE, "'%T' has no member names '%s'", type_left, symbol->string);
+		errorf(HERE, "'%T' has no member names '%Y'", type_left, symbol);
 		return create_invalid_expression();
 	}
 
@@ -4785,8 +4797,9 @@ static statement_t *parse_label_statement(void)
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
 	if(label->source_position.input_name != NULL) {
-		errorf(HERE, "duplicate label '%s'\n", symbol->string);
-		errorf(label->source_position, "previous definition of '%s' was here\n", symbol->string);
+		errorf(HERE, "duplicate label '%Y'\n", symbol);
+		errorf(label->source_position, "previous definition of '%Y' was here\n",
+		       symbol);
 	} else {
 		label->source_position = token.source_position;
 	}
