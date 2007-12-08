@@ -12,7 +12,7 @@
 #include "ast_t.h"
 #include "adt/obst.h"
 
-struct obstack *type_obst;
+extern struct obstack *type_obst;
 
 typedef enum {
 	TYPE_INVALID,
@@ -23,6 +23,7 @@ typedef enum {
 	TYPE_FUNCTION,
 	TYPE_POINTER,
 	TYPE_ARRAY,
+	TYPE_BITFIELD,
 	TYPE_BUILTIN,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
@@ -141,6 +142,12 @@ struct typeof_type_t {
 	type_t       *resolved_type;
 };
 
+struct bitfield_type_t {
+	type_base_t   type;
+	type_t       *base;
+	expression_t *size;
+};
+
 union type_t {
 	type_kind_t      kind;
 	type_base_t      base;
@@ -152,6 +159,7 @@ union type_t {
 	compound_type_t  compound;
 	enum_type_t      enumt;
 	typedef_type_t   typedeft;
+	bitfield_type_t  bitfield;
 	typeof_type_t    typeoft;
 };
 

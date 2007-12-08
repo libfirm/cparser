@@ -392,7 +392,7 @@ typedef unsigned short decl_modifiers_t;
 struct declaration_t {
 	unsigned char       namespc;
 	unsigned char       storage_class;
-	decl_modifiers_t    decl_modifiers;
+	decl_modifiers_t    modifiers;
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	type_t             *type;

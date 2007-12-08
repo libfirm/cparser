@@ -332,6 +332,8 @@ static unsigned get_type_size(type_t *type)
 		return get_array_type_size(&type->array);
 	case TYPE_BUILTIN:
 		return get_type_size(type->builtin.real_type);
+	case TYPE_BITFIELD:
+		panic("type size of bitfield request");
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 	case TYPE_INVALID:
@@ -456,49 +458,100 @@ static ir_type *create_struct_type(compound_type_t *type)
 	} else {
 		id = unique_ident("__anonymous_struct");
 	}
-	ir_type *ir_type = new_type_struct(id);
+	ir_type *irtype = new_type_struct(id);
 
-	type->type.firm_type = ir_type;
+	type->type.firm_type = irtype;
 
-	int align_all = 1;
-	int offset    = 0;
+	size_t align_all  = 1;
+	size_t offset     = 0;
+	size_t bit_offset = 0;
 	declaration_t *entry = type->declaration->context.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		ident       *ident         = new_id_from_str(entry->symbol->string);
-		ir_type_ptr  entry_ir_type = get_ir_type(entry->type);
+		type_t *entry_type = skip_typeref(entry->type);
 
-		int entry_size      = get_type_size_bytes(entry_ir_type);
-		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
-		int misalign        = offset % entry_alignment;
-		if (misalign != 0)
-			offset += entry_alignment - misalign;
+		ir_type *base_irtype;
+		if(entry_type->kind == TYPE_BITFIELD) {
+			base_irtype = get_ir_type(entry_type->bitfield.base);
+		} else {
+			base_irtype = get_ir_type(entry_type);
+		}
 
-		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
-		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
-		set_entity_offset(entity, offset);
-		add_struct_member(ir_type, entity);
-		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
-		entry->v.entity         = entity;
+		size_t entry_alignment = get_type_alignment_bytes(base_irtype);
+		size_t misalign        = offset % entry_alignment;
 
-		offset += entry_size;
+		dbg_info  *dbgi   = get_dbg_info(&entry->source_position);
+		ir_entity *entity = NULL;
+		if(entry->symbol != NULL) {
+			ident   *ident        = new_id_from_str(entry->symbol->string);
+			ir_type *entry_irtype = get_ir_type(entry_type);
+
+			entity = new_d_entity(irtype, ident, entry_irtype, dbgi);
+		} else {
+			/* only bitfields are allowed to be anonymous */
+			assert(entry_type->kind == TYPE_BITFIELD);
+		}
+
+		size_t base;
+		size_t bits_remainder;
+		if(entry_type->kind == TYPE_BITFIELD) {
+			size_t size_bits      = fold_constant(entry_type->bitfield.size);
+			size_t rest_size_bits = (entry_alignment - misalign)*8 - bit_offset;
+
+			if(size_bits > rest_size_bits) {
+				/* start a new bucket */
+				offset     += entry_alignment - misalign;
+				bit_offset  = 0;
+
+				base           = offset;
+				bits_remainder = 0;
+			} else {
+				/* put into current bucket */
+				base           = offset - misalign;
+				bits_remainder = misalign * 8 + bit_offset;
+			}
+
+			offset     += size_bits / 8;
+			bit_offset  = bit_offset + (size_bits % 8);
+		} else {
+			size_t entry_size = get_type_size_bytes(base_irtype);
+			if(misalign > 0)
+				offset += entry_size - misalign;
+
+			base           = offset;
+			bits_remainder = 0;
+			offset        += entry_size;
+			bit_offset     = 0;
+		}
+
 		if(entry_alignment > align_all) {
 			if(entry_alignment % align_all != 0) {
-				panic("Uneven alignments not supported yet");
+				panic("uneven alignments not supported yet");
 			}
 			align_all = entry_alignment;
 		}
+
+		if(entity != NULL) {
+			set_entity_offset(entity, base);
+			set_entity_offset_bits_remainder(entity,
+			                                 (unsigned char) bits_remainder);
+			add_struct_member(irtype, entity);
+			entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
+			entry->v.entity         = entity;
+		}
 	}
 
-	int misalign = offset % align_all;
-	offset += misalign;
-	set_type_alignment_bytes(ir_type, align_all);
-	set_type_size_bytes(ir_type, offset);
-	set_type_state(ir_type, layout_fixed);
+	size_t misalign = offset % align_all;
+	if(misalign > 0) {
+		offset += align_all - misalign;
+	}
+	set_type_alignment_bytes(irtype, align_all);
+	set_type_size_bytes(irtype, offset);
+	set_type_state(irtype, layout_fixed);
 
-	return ir_type;
+	return irtype;
 }
 
 static ir_type *create_union_type(compound_type_t *type)
@@ -511,9 +564,9 @@ static ir_type *create_union_type(compound_type_t *type)
 	} else {
 		id = unique_ident("__anonymous_union");
 	}
-	ir_type  *ir_type = new_type_union(id);
+	ir_type *irtype = new_type_union(id);
 
-	type->type.firm_type = ir_type;
+	type->type.firm_type = irtype;
 
 	int align_all = 1;
 	int size      = 0;
@@ -522,15 +575,16 @@ static ir_type *create_union_type(compound_type_t *type)
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		ident       *ident         = new_id_from_str(entry->symbol->string);
-		ir_type_ptr  entry_ir_type = get_ir_type(entry->type);
+		ident   *ident         = new_id_from_str(entry->symbol->string);
+		ir_type *entry_ir_type = get_ir_type(entry->type);
 
 		int entry_size      = get_type_size_bytes(entry_ir_type);
 		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
 
 		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
-		ir_entity *const entity = new_d_entity(ir_type, ident, entry_ir_type, dbgi);
-		add_union_member(ir_type, entity);
+		ir_entity *const entity = new_d_entity(irtype, ident, entry_ir_type,
+		                                       dbgi);
+		add_union_member(irtype, entity);
 		set_entity_offset(entity, 0);
 		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
 		entry->v.entity         = entity;
@@ -546,11 +600,11 @@ static ir_type *create_union_type(compound_type_t *type)
 		}
 	}
 
-	set_type_alignment_bytes(ir_type, align_all);
-	set_type_size_bytes(ir_type, size);
-	set_type_state(ir_type, layout_fixed);
+	set_type_alignment_bytes(irtype, align_all);
+	set_type_size_bytes(irtype, size);
+	set_type_state(irtype, layout_fixed);
 
-	return ir_type;
+	return irtype;
 }
 
 static ir_node *expression_to_firm(const expression_t *expression);
@@ -584,6 +638,92 @@ static ir_type *create_enum_type(enum_type_t *const type)
 	}
 
 	return ir_type_int;
+}
+
+/**
+ * Return the signed integer type of size bits.
+ *
+ * @param size   the size
+ */
+static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
+                                                 unsigned size)
+{
+	static ir_mode *s_modes[64 + 1] = {NULL, };
+	ir_type *res;
+	ir_mode *mode;
+
+	if (size <= 0 || size > 64)
+		return NULL;
+
+	mode = s_modes[size];
+	if (mode == NULL) {
+		char name[32];
+
+		snprintf(name, sizeof(name), "bf_I%u", size);
+		mode = new_ir_mode(name, irms_int_number, size, 1, irma_twos_complement,
+		                   size <= 32 ? 32 : size );
+		s_modes[size] = mode;
+	}
+
+	char name[32];
+	snprintf(name, sizeof(name), "I%u", size);
+	ident *id = new_id_from_str(name);
+	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	set_primitive_base_type(res, base_tp);
+
+	return res;
+}
+
+/**
+ * Return the unsigned integer type of size bits.
+ *
+ * @param size   the size
+ */
+static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
+                                                   unsigned size)
+{
+	static ir_mode *u_modes[64 + 1] = {NULL, };
+	ir_type *res;
+	ir_mode *mode;
+
+	if (size <= 0 || size > 64)
+		return NULL;
+
+	mode = u_modes[size];
+	if (mode == NULL) {
+		char name[32];
+
+		snprintf(name, sizeof(name), "bf_U%u", size);
+		mode = new_ir_mode(name, irms_int_number, size, 0, irma_twos_complement,
+		                   size <= 32 ? 32 : size );
+		u_modes[size] = mode;
+	}
+
+	char name[32];
+
+	snprintf(name, sizeof(name), "U%u", size);
+	ident *id = new_id_from_str(name);
+	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	set_primitive_base_type(res, base_tp);
+
+	return res;
+}
+
+static ir_type *create_bitfield_type(bitfield_type_t *const type)
+{
+	type_t *base = skip_typeref(type->base);
+	assert(base->kind == TYPE_ATOMIC);
+
+	ir_type *irbase = get_ir_type(base);
+
+	unsigned size = fold_constant(type->size);
+
+	assert(!is_type_floating(base));
+	if(is_type_signed(base)) {
+		return get_signed_int_type_for_bit_size(irbase, size);
+	} else {
+		return get_unsigned_int_type_for_bit_size(irbase, size);
+	}
 }
 
 static ir_type *get_ir_type(type_t *type)
@@ -623,6 +763,10 @@ static ir_type *get_ir_type(type_t *type)
 	case TYPE_BUILTIN:
 		firm_type = get_ir_type(type->builtin.real_type);
 		break;
+	case TYPE_BITFIELD:
+		firm_type = create_bitfield_type(&type->bitfield);
+		break;
+
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 	case TYPE_INVALID:
@@ -758,10 +902,9 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 		/* We should check for file scope here, but as long as we compile C only
 		   this is not needed. */
-		int n_params     = get_method_n_params(ir_type_method);
-		int n_res        = get_method_n_ress(ir_type_method);
-		ir_ident_ptr id  = get_entity_ident(entity);
-		int i;
+		int    n_params = get_method_n_params(ir_type_method);
+		int    n_res    = get_method_n_ress(ir_type_method);
+		int    i;
 
 		if (n_params == 0 && n_res == 0 && id == predef_idents[rts_abort]) {
 			/* found abort(), store for later */
@@ -812,7 +955,8 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
-static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode, ir_entity *entity)
+static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
+                                ir_entity *entity)
 {
 	assert(entity != NULL);
 	union symconst_symbol sym;
@@ -1333,7 +1477,8 @@ static pn_Cmp get_pnc(const expression_kind_t kind)
  *  - const rel val
  *  - var rel var
  */
-static ir_node *handle_assume_compare(dbg_info *dbi, const binary_expression_t *expression)
+static ir_node *handle_assume_compare(dbg_info *dbi,
+                                      const binary_expression_t *expression)
 {
 	expression_t  *op1 = expression->left;
 	expression_t  *op2 = expression->right;
@@ -3397,9 +3542,11 @@ static int count_decls_in_expression(const expression_t *expression) {
 	switch(expression->base.kind) {
 	case EXPR_STATEMENT:
 		return count_decls_in_stmts(expression->statement.statement);
-	EXPR_BINARY_CASES
-		return count_decls_in_expression(expression->binary.left)
-			+ count_decls_in_expression(expression->binary.right);
+	EXPR_BINARY_CASES {
+		int count_left  = count_decls_in_expression(expression->binary.left);
+		int count_right = count_decls_in_expression(expression->binary.right);
+		return count_left + count_right;
+	}
 	EXPR_UNARY_CASES
 		return count_decls_in_expression(expression->unary.value);
 
@@ -3620,7 +3767,7 @@ static void create_function(declaration_t *declaration)
 	/* set inline flags */
 	if (declaration->is_inline)
     	set_irg_inline_property(irg, irg_inline_recomended);
-    handle_decl_modifier_irg(irg, declaration->decl_modifiers);
+    handle_decl_modifier_irg(irg, declaration->modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);
@@ -3739,7 +3886,8 @@ global_var:
 			goto create_var;
 
 create_var:
-			create_declaration_entity(declaration, DECLARATION_KIND_GLOBAL_VARIABLE,
+			create_declaration_entity(declaration,
+			                          DECLARATION_KIND_GLOBAL_VARIABLE,
 			                          var_type);
 			set_entity_visibility(declaration->v.entity, vis);
 

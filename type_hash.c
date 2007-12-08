@@ -77,6 +77,14 @@ static unsigned hash_typeof_type(const typeof_type_t *type)
 	return result;
 }
 
+static unsigned hash_bitfield_type(const bitfield_type_t *type)
+{
+	unsigned result  = hash_ptr(type->base);
+	result          ^= 27172145;
+
+	return result;
+}
+
 static unsigned hash_type(const type_t *type)
 {
 	unsigned hash = 0;
@@ -112,6 +120,9 @@ static unsigned hash_type(const type_t *type)
 		break;
 	case TYPE_TYPEOF:
 		hash = hash_typeof_type(&type->typeoft);
+		break;
+	case TYPE_BITFIELD:
+		hash = hash_bitfield_type(&type->bitfield);
 		break;
 	}
 
@@ -168,11 +179,10 @@ static bool array_types_equal(const array_type_t *type1,
 		return false;
 	if(type1->is_static != type2->is_static)
 		return false;
-	/* TODO: compare expressions for equality... */
-	if(type1->size != type2->size)
-		return false;
 
-	return true;
+	/* TODO: compare size expressions for equality... */
+
+	return false;
 }
 
 static bool builtin_types_equal(const builtin_type_t *type1,
@@ -210,6 +220,15 @@ static bool typeof_types_equal(const typeof_type_t *type1,
 	return true;
 }
 
+static bool bitfield_types_equal(const bitfield_type_t *type1,
+                                 const bitfield_type_t *type2)
+{
+	if(type1->base != type2->base)
+		return false;
+	/* TODO: compare size expression */
+	return false;
+}
+
 static bool types_equal(const type_t *type1, const type_t *type2)
 {
 	if(type1 == type2)
@@ -241,6 +260,8 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 		return typeof_types_equal(&type1->typeoft, &type2->typeoft);
 	case TYPE_TYPEDEF:
 		return typedef_types_equal(&type1->typedeft, &type2->typedeft);
+	case TYPE_BITFIELD:
+		return bitfield_types_equal(&type1->bitfield, &type2->bitfield);
 	}
 
 	abort();

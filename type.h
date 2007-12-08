@@ -15,6 +15,7 @@ typedef struct enum_type_t           enum_type_t;
 typedef struct builtin_type_t        builtin_type_t;
 typedef struct array_type_t          array_type_t;
 typedef struct typedef_type_t        typedef_type_t;
+typedef struct bitfield_type_t       bitfield_type_t;
 typedef struct typeof_type_t         typeof_type_t;
 typedef union  type_t                type_t;
 

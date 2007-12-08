@@ -44,7 +44,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 				}
 
 				case 'c': {
-					const unsigned char val = va_arg(ap, int);
+					const unsigned char val = (unsigned char) va_arg(ap, int);
 					fputc(val, stderr);
 					break;
 				}

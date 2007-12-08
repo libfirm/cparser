@@ -33,7 +33,7 @@ typedef enum format_length_modifier_t {
 
 static void warn_invalid_length_modifier(const source_position_t pos,
                                          const format_length_modifier_t mod,
-                                         const char conversion)
+                                         const wchar_rep_t conversion)
 {
 	static const char* const names[] = {
 		[FMT_MOD_NONE] = "",
@@ -205,7 +205,7 @@ break_fmt_flags:
 			break;
 		}
 
-		const type_t   *expected_type;
+		const type_t   *expected_type = NULL;
 		format_flags_t  allowed_flags;
 		switch (*fmt) {
 			case 'd':

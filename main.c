@@ -384,7 +384,7 @@ int main(int argc, char **argv)
 		} else if(strcmp(arg, "--version") == 0) {
 			firm_version_t ver;
 			firm_get_version(&ver);
-			printf("cparser (%d.%d %s) using libFirm (%d.%d", 0, 1, cparser_REVISION, ver.major, ver.minor);
+			printf("cparser (%d.%d %s) using libFirm (%u.%u", 0, 1, cparser_REVISION, ver.major, ver.minor);
 			if(ver.revision[0] != 0) {
 				putchar(' ');
 				fputs(ver.revision, stdout);
@@ -514,7 +514,7 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 
-	FILE *out;
+	FILE *out = NULL;
 	char  outnamebuf[4096];
 	if(outname == NULL) {
 		switch(mode) {

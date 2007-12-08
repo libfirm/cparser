@@ -237,6 +237,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
+		[TYPE_BITFIELD]        = sizeof(bitfield_type_t),
 		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
 		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
 		[TYPE_ENUM]            = sizeof(enum_type_t),
@@ -722,6 +723,9 @@ static int get_rank(const type_t *type)
 
 static type_t *promote_integer(type_t *type)
 {
+	if(type->kind == TYPE_BITFIELD)
+		return promote_integer(type->bitfield.base);
+
 	if(get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
 
@@ -791,9 +795,11 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	switch (dest_type->kind) {
 		case TYPE_ENUM:
 			/* TODO warning for implicitly converting to enum */
+		case TYPE_BITFIELD:
 		case TYPE_ATOMIC:
 			if (source_type->kind != TYPE_ATOMIC &&
-					source_type->kind != TYPE_ENUM) {
+					source_type->kind != TYPE_ENUM &&
+					source_type->kind != TYPE_BITFIELD) {
 				panic("casting of non-atomic types not implemented yet");
 			}
 
@@ -2308,7 +2314,7 @@ static declaration_t *parse_declarator(
 	type_t        *type         = specifiers->type;
 	declaration_t *declaration  = allocate_ast_zero(sizeof(declaration[0]));
 	declaration->storage_class  = specifiers->storage_class;
-	declaration->decl_modifiers = specifiers->decl_modifiers;
+	declaration->modifiers      = specifiers->decl_modifiers;
 	declaration->is_inline      = specifiers->is_inline;
 
 	construct_type_t *construct_type
@@ -2706,26 +2712,50 @@ end_of_parse_external_declaration:
 	environment_pop_to(top);
 }
 
+static type_t *make_bitfield_type(type_t *base, expression_t *size)
+{
+	type_t *type        = allocate_type_zero(TYPE_BITFIELD);
+	type->bitfield.base = base;
+	type->bitfield.size = size;
+
+	return type;
+}
+
 static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 {
+	/* TODO: check constraints for struct declarations (in specifiers) */
 	while(1) {
+		declaration_t *declaration;
+
 		if(token.type == ':') {
 			next_token();
-			parse_constant_expression();
-			/* TODO (bitfields) */
-		} else {
-			declaration_t *declaration = parse_declarator(specifiers, /*may_be_abstract=*/true);
 
-			/* TODO: check constraints for struct declarations */
-			/* TODO: check for doubled fields */
+			type_t *base_type = specifiers->type;
+			expression_t *size = parse_constant_expression();
+
+			type_t *type = make_bitfield_type(base_type, size);
+
+			declaration = allocate_ast_zero(sizeof(declaration[0]));
+
+			declaration->namespc         = NAMESPACE_NORMAL;
+			declaration->storage_class   = STORAGE_CLASS_NONE;
+			declaration->source_position = token.source_position;
+			declaration->modifiers       = specifiers->decl_modifiers;
+			declaration->type            = type;
+
 			record_declaration(declaration);
+		} else {
+			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);
 
 			if(token.type == ':') {
 				next_token();
-				parse_constant_expression();
-				/* TODO (bitfields) */
+				expression_t *size = parse_constant_expression();
+
+				type_t *type = make_bitfield_type(declaration->type, size);
+				declaration->type = type;
 			}
 		}
+		record_declaration(declaration);
 
 		if(token.type != ',')
 			break;
@@ -3436,7 +3466,7 @@ static expression_t *parse_primary_expression(void)
 		return parse_int_const();
 	case T_FLOATINGPOINT:
 		return parse_float_const();
-	case T_STRING_LITERAL: /* TODO merge */
+	case T_STRING_LITERAL:
 		return parse_string_const();
 	case T_WIDE_STRING_LITERAL:
 		return parse_wide_string_const();

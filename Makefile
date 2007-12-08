@@ -88,8 +88,8 @@ build/adt build/driver:
 build/%.o: %.c
 	@echo '===> CC $<'
 #-$(Q)build/cparser $(CPPFLAGS) $(CFLAGS) -fsyntax-only $<
-#$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
-#	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
+	$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:

@@ -159,6 +159,13 @@ static void print_array_type_post(const array_type_t *type)
 	intern_print_type_post(type->element_type, false);
 }
 
+static void print_bitfield_type_post(const bitfield_type_t *type)
+{
+	fputs(" : ", out);
+	print_expression(type->size);
+	intern_print_type_post(type->base, false);
+}
+
 void print_enum_definition(const declaration_t *declaration)
 {
 	fputs("{\n", out);
@@ -276,6 +283,9 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 	case TYPE_POINTER:
 		print_pointer_type_pre(&type->pointer);
 		return;
+	case TYPE_BITFIELD:
+		intern_print_type_pre(type->bitfield.base, top);
+		return;
 	case TYPE_ARRAY:
 		print_array_type_pre(&type->array);
 		return;
@@ -300,6 +310,9 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 		return;
 	case TYPE_ARRAY:
 		print_array_type_post(&type->array);
+		return;
+	case TYPE_BITFIELD:
+		print_bitfield_type_post(&type->bitfield);
 		return;
 	case TYPE_INVALID:
 	case TYPE_ATOMIC:
@@ -351,6 +364,7 @@ static size_t get_type_size(type_t *type)
 	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
 	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
 	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
+	case TYPE_BITFIELD:        return sizeof(bitfield_type_t);
 	case TYPE_INVALID:         panic("invalid type found");
 	}
 	panic("unknown type found");
@@ -498,6 +512,9 @@ bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
 
+	if(type->kind == TYPE_BITFIELD)
+		return true;
+
 	if(is_type_integer(type) || is_type_floating(type))
 		return true;
 
@@ -511,7 +528,7 @@ bool is_type_scalar(const type_t *type)
 	switch (type->kind) {
 		case TYPE_POINTER: return true;
 		case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
-		default:           break;
+		default:            break;
 	}
 
 	return is_type_arithmetic(type);
@@ -528,6 +545,7 @@ bool is_type_incomplete(const type_t *type)
 		declaration_t         *declaration   = compound_type->declaration;
 		return !declaration->init.is_defined;
 	}
+	case TYPE_BITFIELD:
 	case TYPE_FUNCTION:
 		return true;
 
@@ -535,6 +553,8 @@ bool is_type_incomplete(const type_t *type)
 		return type->array.size == NULL;
 
 	case TYPE_ATOMIC:
+		return type->atomic.atype == ATOMIC_TYPE_VOID;
+
 	case TYPE_POINTER:
 	case TYPE_ENUM:
 	case TYPE_BUILTIN:
@@ -632,6 +652,11 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_BUILTIN:
 		/* TODO: not implemented */
 		break;
+
+	case TYPE_BITFIELD:
+		/* not sure if this makes sense or is even needed, implement it if you
+		 * really need it! */
+		panic("type compatibility check for bitfield type");
 
 	case TYPE_INVALID:
 		panic("invalid type found in compatible types");

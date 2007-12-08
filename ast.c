@@ -761,7 +761,7 @@ static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
 	if(declaration->is_inline) {
-		if (declaration->decl_modifiers & DM_FORCEINLINE)
+		if (declaration->modifiers & DM_FORCEINLINE)
 			fputs("__forceinline ", out);
 		else
 			fputs("inline ", out);
