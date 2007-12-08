@@ -405,6 +405,10 @@ int main(int argc, char **argv)
 			const char *opt;
 			GET_ARG_AFTER(opt, "-D");
 			obstack_printf(&cppflags_obst, " -D%s", opt);
+		} else if(strncmp(arg, "-U", 2) == 0) {
+			const char *opt;
+			GET_ARG_AFTER(opt, "-U");
+			obstack_printf(&cppflags_obst, " -U%s", opt);
 		} else if(strcmp(arg, "--dump-function") == 0) {
 			++i;
 			if(i >= argc) {
