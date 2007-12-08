@@ -1099,6 +1099,20 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 	}
 }
 
+/* Returns the correct base address depending on whether it is a parameter or a
+ * normal local variable */
+static ir_node *get_local_frame(ir_entity *const ent)
+{
+	ir_graph      *const irg   = current_ir_graph;
+	const ir_type *const owner = get_entity_owner(ent);
+	if (owner == get_irg_frame_type(irg)) {
+		return get_irg_frame(irg);
+	} else {
+		assert(owner == get_method_value_param_type(get_entity_type(get_irg_entity(irg))));
+		return get_irg_value_param_base(irg);
+	}
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->expression.source_position);
@@ -1134,7 +1148,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
-		ir_node   *frame  = get_irg_frame(current_ir_graph);
+		ir_node   *frame  = get_local_frame(entity);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 		ir_type   *irtype = get_entity_type(entity);
 		return deref_address(irtype, sel, dbgi);
@@ -1169,7 +1183,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
-		ir_node   *frame  = get_irg_frame(current_ir_graph);
+		ir_node   *frame  = get_local_frame(entity);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 
 		return sel;
