@@ -3706,7 +3706,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		}
 	}
 	if(iter == NULL) {
-		errorf(HERE, "'%T' has no member names '%Y'", type_left, symbol);
+		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
 		return create_invalid_expression();
 	}
 
