@@ -62,8 +62,8 @@ static void parse_error(const char *msg)
 
 static inline void next_real_char(void)
 {
-	bufpos++;
-	if(bufpos >= bufend) {
+	assert(bufpos <= bufend);
+	if (bufpos >= bufend) {
 		size_t s = fread(buf + MAX_PUTBACK, 1, sizeof(buf) - MAX_PUTBACK,
 		                 input);
 		if(s == 0) {
@@ -73,20 +73,13 @@ static inline void next_real_char(void)
 		bufpos = buf + MAX_PUTBACK;
 		bufend = buf + MAX_PUTBACK + s;
 	}
-	c = *(bufpos);
+	c = *bufpos++;
 }
 
 static inline void put_back(int pc)
 {
-	assert(bufpos >= buf);
-	//assert(bufpos < buf+MAX_PUTBACK || *bufpos == pc);
-
-	char *p = buf + (bufpos - buf);
-	*p = (char) pc;
-
-	/* going backwards in the buffer is legal as long as it's not more often
-	 * than MAX_PUTBACK */
-	bufpos--;
+	assert(bufpos > buf);
+	*(--bufpos - buf + buf) = pc;
 
 #ifdef DEBUG_CHARS
 	printf("putback '%c'\n", pc);
@@ -1303,6 +1296,8 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 	lexer_token.source_position.input_name = input_name;
 
 	symbol_L = symbol_table_insert("L");
+	bufpos = NULL;
+	bufend = NULL;
 
 	/* place a virtual \n at the beginning so the lexer knows that we're
 	 * at the beginning of a line */
