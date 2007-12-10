@@ -1,5 +1,6 @@
 #include <config.h>
 
+#include "diagnostic.h"
 #include "lexer.h"
 #include "token_t.h"
 #include "symbol_table_t.h"
@@ -1035,6 +1036,8 @@ static void parse_preprocessor_identifier(void)
 		error_directive();
 		break;
 	case TP_pragma:
+		warningf(lexer_token.source_position, "encountered unknown #pragma");
+		eat_until_newline();
 		break;
 	}
 }
