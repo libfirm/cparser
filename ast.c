@@ -14,6 +14,7 @@ struct obstack ast_obstack;
 
 static FILE *out;
 static int   indent;
+static int   print_implicit_casts = 1;
 
 static void print_statement(const statement_t *statement);
 
@@ -215,14 +216,17 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		fputs(")", out);
 		fputs("--", out);
 		return;
+	case EXPR_UNARY_CAST_IMPLICIT:
+		if(!print_implicit_casts) {
+			print_expression(unexpr->value);
+			return;
+		}
+		/* fallthrough */
 	case EXPR_UNARY_CAST:
 		fputs("(", out);
 		print_type(unexpr->expression.datatype);
 		fputs(")", out);
 		break;
-	case EXPR_UNARY_CAST_IMPLICIT:
-		print_expression(unexpr->value);
-		return;
 	case EXPR_UNARY_ASSUME:
 		fputs("__assume", out);
 		break;

@@ -1091,8 +1091,8 @@ static initializer_t *initializer_from_expression(type_t *type,
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
 	type_t *const expr_type = expression->base.datatype;
 	if (is_type_array(type) && expr_type->kind == TYPE_POINTER) {
-		array_type_t *const array_type     = &type->array;
-		type_t       *const element_type   = skip_typeref(array_type->element_type);
+		array_type_t *const array_type   = &type->array;
+		type_t       *const element_type = skip_typeref(array_type->element_type);
 
 		if (element_type->kind == TYPE_ATOMIC) {
 			switch (expression->kind) {
@@ -1110,7 +1110,8 @@ static initializer_t *initializer_from_expression(type_t *type,
 					}
 				}
 
-				default: break;
+				default:
+					break;
 			}
 		}
 	}
@@ -1145,6 +1146,24 @@ static initializer_t *parse_sub_initializer_elem(type_t *type)
 }
 
 static bool had_initializer_brace_warning;
+
+static void skip_designator(void)
+{
+	while(1) {
+		if(token.type == '.') {
+			next_token();
+			if(token.type == T_IDENTIFIER)
+				next_token();
+		} else if(token.type == '[') {
+			next_token();
+			parse_constant_expression();
+			if(token.type == ']')
+				next_token();
+		} else {
+			break;
+		}
+	}
+}
 
 static initializer_t *parse_sub_initializer(type_t *type,
                                             expression_t *expression,
@@ -1194,6 +1213,13 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		type_t       *element_type = array_type->element_type;
 		element_type               = skip_typeref(element_type);
 
+		if(token.type == '.') {
+			errorf(HERE,
+			       "compound designator in initializer for array type '%T'",
+			       type);
+			skip_designator();
+		}
+
 		initializer_t *sub;
 		had_initializer_brace_warning = false;
 		if(expression == NULL) {
@@ -1232,6 +1258,13 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		assert(is_type_compound(type));
 		compound_type_t *compound_type = &type->compound;
 		context_t       *context       = &compound_type->declaration->context;
+
+		if(token.type == '[') {
+			errorf(HERE,
+			       "array designator in initializer for compound type '%T'",
+			       type);
+			skip_designator();
+		}
 
 		declaration_t *first = context->declarations;
 		if(first == NULL)
@@ -3022,7 +3055,13 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 	case EXPR_SELECT: {
 		const select_expression_t *select = &expression->select;
-		return select->compound_entry->type;
+		type_t *orig_type = select->compound_entry->type;
+		type_t *type      = skip_typeref(orig_type);
+		if(type->kind == TYPE_BITFIELD) {
+			return type->bitfield.base;
+		} else {
+			return orig_type;
+		}
 	}
 	case EXPR_UNARY_DEREFERENCE: {
 		expression_t   *value        = expression->unary.value;
@@ -3079,7 +3118,12 @@ static expression_t *parse_reference(void)
 		}
 	}
 
-	type_t *type = declaration->type;
+	type_t *type         = declaration->type;
+	type_t *skipped_type = skip_typeref(type);
+	if(skipped_type->kind == TYPE_BITFIELD) {
+		type = skipped_type->bitfield.base;
+	}
+
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
 	type = automatic_type_conversion(type);
@@ -3669,9 +3713,13 @@ static expression_t *parse_select_expression(unsigned precedence,
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
 	type_t *expression_type = automatic_type_conversion(iter->type);
+	if(expression_type->kind == TYPE_BITFIELD) {
+		expression_type = expression_type->bitfield.base;
+	}
 
 	select->select.compound_entry = iter;
 	select->base.datatype         = expression_type;
+
 	return select;
 }
 
@@ -3686,8 +3734,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 	(void) precedence;
 	expression_t *result = allocate_expression_zero(EXPR_CALL);
 
-	call_expression_t *call  = &result->call;
-	call->function           = expression;
+	call_expression_t *call = &result->call;
+	call->function          = expression;
 
 	function_type_t *function_type = NULL;
 	type_t          *orig_type     = expression->base.datatype;

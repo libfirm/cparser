@@ -10,9 +10,12 @@ Parser:
 - add constant folding code
 - Refactor code, so code to handle number values and strings is
   an own module and replacable
+- Support some attributes. noreturn, unused, printf, scanf, packed would be
+  interesting candidates
 
 ast2firm:
 - output source file positions for panics...
+- output variable names for uninitialized variable warnings
 
 Missing Warnings:
 * dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)

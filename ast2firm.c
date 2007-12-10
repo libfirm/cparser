@@ -365,7 +365,8 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 	ident   *id     = get_mode_ident(mode);
 	ir_type *irtype = new_type_primitive(id, mode);
 
-	if(type->atype == ATOMIC_TYPE_LONG_DOUBLE) {
+	if(type->atype == ATOMIC_TYPE_LONG_DOUBLE
+			|| type->atype == ATOMIC_TYPE_DOUBLE) {
 		set_type_alignment_bytes(irtype, 4);
 	}
 
@@ -447,6 +448,91 @@ static ir_type *create_array_type(array_type_t *type)
 	return ir_type;
 }
 
+/**
+ * Return the signed integer type of size bits.
+ *
+ * @param size   the size
+ */
+static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
+                                                 unsigned size)
+{
+	static ir_mode *s_modes[64 + 1] = {NULL, };
+	ir_type *res;
+	ir_mode *mode;
+
+	if (size <= 0 || size > 64)
+		return NULL;
+
+	mode = s_modes[size];
+	if (mode == NULL) {
+		char name[32];
+
+		snprintf(name, sizeof(name), "bf_I%u", size);
+		mode = new_ir_mode(name, irms_int_number, size, 1, irma_twos_complement,
+		                   size <= 32 ? 32 : size );
+		s_modes[size] = mode;
+	}
+
+	char name[32];
+	snprintf(name, sizeof(name), "I%u", size);
+	ident *id = new_id_from_str(name);
+	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	set_primitive_base_type(res, base_tp);
+
+	return res;
+}
+
+/**
+ * Return the unsigned integer type of size bits.
+ *
+ * @param size   the size
+ */
+static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
+                                                   unsigned size)
+{
+	static ir_mode *u_modes[64 + 1] = {NULL, };
+	ir_type *res;
+	ir_mode *mode;
+
+	if (size <= 0 || size > 64)
+		return NULL;
+
+	mode = u_modes[size];
+	if (mode == NULL) {
+		char name[32];
+
+		snprintf(name, sizeof(name), "bf_U%u", size);
+		mode = new_ir_mode(name, irms_int_number, size, 0, irma_twos_complement,
+		                   size <= 32 ? 32 : size );
+		u_modes[size] = mode;
+	}
+
+	char name[32];
+
+	snprintf(name, sizeof(name), "U%u", size);
+	ident *id = new_id_from_str(name);
+	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	set_primitive_base_type(res, base_tp);
+
+	return res;
+}
+
+static ir_type *create_bitfield_type(bitfield_type_t *const type)
+{
+	type_t *base = skip_typeref(type->base);
+	assert(base->kind == TYPE_ATOMIC);
+	ir_type *irbase = get_ir_type(base);
+
+	unsigned size = fold_constant(type->size);
+
+	assert(!is_type_floating(base));
+	if(is_type_signed(base)) {
+		return get_signed_int_type_for_bit_size(irbase, size);
+	} else {
+		return get_unsigned_int_type_for_bit_size(irbase, size);
+	}
+}
+
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
 static ir_type *create_struct_type(compound_type_t *type)
@@ -470,8 +556,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		type_t *entry_type = skip_typeref(entry->type);
-
+		type_t  *entry_type  = skip_typeref(entry->type);
 		ir_type *base_irtype;
 		if(entry_type->kind == TYPE_BITFIELD) {
 			base_irtype = get_ir_type(entry_type->bitfield.base);
@@ -487,7 +572,6 @@ static ir_type *create_struct_type(compound_type_t *type)
 		if(entry->symbol != NULL) {
 			ident   *ident        = new_id_from_str(entry->symbol->string);
 			ir_type *entry_irtype = get_ir_type(entry_type);
-
 			entity = new_d_entity(irtype, ident, entry_irtype, dbgi);
 		} else {
 			/* only bitfields are allowed to be anonymous */
@@ -499,6 +583,9 @@ static ir_type *create_struct_type(compound_type_t *type)
 		if(entry_type->kind == TYPE_BITFIELD) {
 			size_t size_bits      = fold_constant(entry_type->bitfield.size);
 			size_t rest_size_bits = (entry_alignment - misalign)*8 - bit_offset;
+
+			printf("Offs: %u OffsB: %u Misa: %u RestS: %u Size: %u\n",
+			       offset, bit_offset, misalign, rest_size_bits, size_bits);
 
 			if(size_bits > rest_size_bits) {
 				/* start a new bucket */
@@ -517,9 +604,10 @@ static ir_type *create_struct_type(compound_type_t *type)
 			bit_offset  = bit_offset + (size_bits % 8);
 		} else {
 			size_t entry_size = get_type_size_bytes(base_irtype);
-			if(misalign > 0)
-				offset += entry_size - misalign;
+			if(misalign > 0 || bit_offset > 0)
+				offset += entry_alignment - misalign;
 
+			printf("Alignment: %u Size: %u\n", entry_alignment, entry_size);
 			base           = offset;
 			bits_remainder = 0;
 			offset        += entry_size;
@@ -534,6 +622,10 @@ static ir_type *create_struct_type(compound_type_t *type)
 		}
 
 		if(entity != NULL) {
+			printf("%s.%s %u:%u (O: %u BP: %u)\n",
+					type->declaration->symbol ? type->declaration->symbol->string : "",
+			       entry->symbol->string, base, bits_remainder,
+			       offset, bit_offset);
 			set_entity_offset(entity, base);
 			set_entity_offset_bits_remainder(entity,
 			                                 (unsigned char) bits_remainder);
@@ -638,92 +730,6 @@ static ir_type *create_enum_type(enum_type_t *const type)
 	}
 
 	return ir_type_int;
-}
-
-/**
- * Return the signed integer type of size bits.
- *
- * @param size   the size
- */
-static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
-                                                 unsigned size)
-{
-	static ir_mode *s_modes[64 + 1] = {NULL, };
-	ir_type *res;
-	ir_mode *mode;
-
-	if (size <= 0 || size > 64)
-		return NULL;
-
-	mode = s_modes[size];
-	if (mode == NULL) {
-		char name[32];
-
-		snprintf(name, sizeof(name), "bf_I%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 1, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
-		s_modes[size] = mode;
-	}
-
-	char name[32];
-	snprintf(name, sizeof(name), "I%u", size);
-	ident *id = new_id_from_str(name);
-	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
-	set_primitive_base_type(res, base_tp);
-
-	return res;
-}
-
-/**
- * Return the unsigned integer type of size bits.
- *
- * @param size   the size
- */
-static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
-                                                   unsigned size)
-{
-	static ir_mode *u_modes[64 + 1] = {NULL, };
-	ir_type *res;
-	ir_mode *mode;
-
-	if (size <= 0 || size > 64)
-		return NULL;
-
-	mode = u_modes[size];
-	if (mode == NULL) {
-		char name[32];
-
-		snprintf(name, sizeof(name), "bf_U%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 0, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
-		u_modes[size] = mode;
-	}
-
-	char name[32];
-
-	snprintf(name, sizeof(name), "U%u", size);
-	ident *id = new_id_from_str(name);
-	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
-	set_primitive_base_type(res, base_tp);
-
-	return res;
-}
-
-static ir_type *create_bitfield_type(bitfield_type_t *const type)
-{
-	type_t *base = skip_typeref(type->base);
-	assert(base->kind == TYPE_ATOMIC);
-
-	ir_type *irbase = get_ir_type(base);
-
-	unsigned size = fold_constant(type->size);
-
-	assert(!is_type_floating(base));
-	if(is_type_signed(base)) {
-		return get_signed_int_type_for_bit_size(irbase, size);
-	} else {
-		return get_unsigned_int_type_for_bit_size(irbase, size);
-	}
 }
 
 static ir_type *get_ir_type(type_t *type)
