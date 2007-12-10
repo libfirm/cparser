@@ -16,10 +16,15 @@ source_position_t builtin_source_position = { "<built-in>", 0 };
 void init_tokens(void)
 {
 	symbol_t *symbol;
+	int       last_id = -2;
 
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
 #define T(mode,x,str,val)                                          \
+	if (T_##x > 255) {                                             \
+		assert(T_##x >= last_id);                                  \
+		last_id = T_##x;                                           \
+	}                                                              \
 	if (c_mode & (mode)) {                                         \
 		assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                \
 		symbol               = symbol_table_insert(str);           \
