@@ -584,9 +584,6 @@ static ir_type *create_struct_type(compound_type_t *type)
 			size_t size_bits      = fold_constant(entry_type->bitfield.size);
 			size_t rest_size_bits = (entry_alignment - misalign)*8 - bit_offset;
 
-			printf("Offs: %u OffsB: %u Misa: %u RestS: %u Size: %u\n",
-			       offset, bit_offset, misalign, rest_size_bits, size_bits);
-
 			if(size_bits > rest_size_bits) {
 				/* start a new bucket */
 				offset     += entry_alignment - misalign;
@@ -607,7 +604,6 @@ static ir_type *create_struct_type(compound_type_t *type)
 			if(misalign > 0 || bit_offset > 0)
 				offset += entry_alignment - misalign;
 
-			printf("Alignment: %u Size: %u\n", entry_alignment, entry_size);
 			base           = offset;
 			bits_remainder = 0;
 			offset        += entry_size;
@@ -622,10 +618,6 @@ static ir_type *create_struct_type(compound_type_t *type)
 		}
 
 		if(entity != NULL) {
-			printf("%s.%s %u:%u (O: %u BP: %u)\n",
-					type->declaration->symbol ? type->declaration->symbol->string : "",
-			       entry->symbol->string, base, bits_remainder,
-			       offset, bit_offset);
 			set_entity_offset(entity, base);
 			set_entity_offset_bits_remainder(entity,
 			                                 (unsigned char) bits_remainder);
