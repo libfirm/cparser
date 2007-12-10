@@ -4379,6 +4379,9 @@ static bool has_const_fields(const compound_type_t *type)
 	const declaration_t *declaration = context->declarations;
 
 	for (; declaration != NULL; declaration = declaration->next) {
+		if (declaration->namespc != NAMESPACE_NORMAL)
+			continue;
+
 		const type_t *decl_type = skip_typeref(declaration->type);
 		if (decl_type->base.qualifiers & TYPE_QUALIFIER_CONST)
 			return true;
