@@ -4,6 +4,7 @@
 #include "diagnostic.h"
 #include "format_check.h"
 #include "types.h"
+#include "type_t.h"
 
 
 typedef enum format_flag_t {
@@ -31,9 +32,7 @@ typedef enum format_length_modifier_t {
 	FMT_MOD_q
 } format_length_modifier_t;
 
-static void warn_invalid_length_modifier(const source_position_t pos,
-                                         const format_length_modifier_t mod,
-                                         const wchar_rep_t conversion)
+static const char* get_length_modifier_name(const format_length_modifier_t mod)
 {
 	static const char* const names[] = {
 		[FMT_MOD_NONE] = "",
@@ -48,10 +47,16 @@ static void warn_invalid_length_modifier(const source_position_t pos,
 		[FMT_MOD_q]    = "q"
 	};
 	assert(mod < sizeof(names) / sizeof(*names));
+	return names[mod];
+}
 
+static void warn_invalid_length_modifier(const source_position_t pos,
+                                         const format_length_modifier_t mod,
+                                         const wchar_rep_t conversion)
+{
 	warningf(pos,
 		"invalid length modifier '%s' for conversion specifier '%%%c'",
-		names[mod], conversion
+		get_length_modifier_name(mod), conversion
 	);
 }
 
@@ -356,10 +361,25 @@ eval_fmt_mod_unsigned:
 			return;
 		}
 
-		const type_t *const arg_type = arg->expression->base.datatype;
-		if (arg_type != expected_type) {
-			warningf(pos, "argument type '%T' does not match conversion specifier '%%%c'\n", arg_type, (char)*fmt);
+		type_t *const arg_type = arg->expression->base.datatype;
+		if (is_type_pointer(expected_type)) {
+			type_t *const arg_skip = skip_typeref(arg_type);
+			if (is_type_pointer(arg_skip)) {
+				type_t *const exp_to = skip_typeref(expected_type->pointer.points_to);
+				type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
+				if (arg_to == exp_to) {
+					goto arg_type_ok;
+				}
+			}
+		} else {
+			if (get_unqualified_type(skip_typeref(arg_type)) == expected_type) {
+				goto arg_type_ok;
+			}
 		}
+		warningf(pos,
+			"argument type '%T' does not match conversion specifier '%%%s%c'\n",
+			arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
+arg_type_ok:
 
 		arg = arg->next;
 	}
