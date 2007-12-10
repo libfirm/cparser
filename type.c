@@ -573,7 +573,9 @@ bool is_type_incomplete(const type_t *type)
 static bool function_types_compatible(const function_type_t *func1,
                                       const function_type_t *func2)
 {
-	if(!types_compatible(func1->return_type, func2->return_type))
+	const type_t* const ret1 = skip_typeref(func1->return_type);
+	const type_t* const ret2 = skip_typeref(func2->return_type);
+	if (!types_compatible(ret1, ret2))
 		return false;
 
 	/* can parameters be compared? */
@@ -643,9 +645,13 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		return type1->atomic.atype == type2->atomic.atype;
 	case TYPE_ARRAY:
 		return array_types_compatible(&type1->array, &type2->array);
-	case TYPE_POINTER:
-		return types_compatible(type1->pointer.points_to,
-		                        type2->pointer.points_to);
+
+	case TYPE_POINTER: {
+		const type_t *const to1 = skip_typeref(type1->pointer.points_to);
+		const type_t *const to2 = skip_typeref(type2->pointer.points_to);
+		return types_compatible(to1, to2);
+	}
+
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 	case TYPE_ENUM:
