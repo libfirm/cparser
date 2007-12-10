@@ -3528,16 +3528,8 @@ static int count_local_declarations(const declaration_t *      decl,
 	int count = 0;
 	for (; decl != end; decl = decl->next) {
 		const type_t *type = skip_typeref(decl->type);
-		switch (type->kind) {
-			case TYPE_ATOMIC:
-			case TYPE_ENUM:
-			case TYPE_POINTER:
-				if (!decl->address_taken)
-					++count;
-				break;
-
-			default: break;
-		}
+		if (!decl->address_taken && is_type_scalar(type))
+			++count;
 		const initializer_t *initializer = decl->init.initializer;
 		/* FIXME: should walk initializer hierarchies... */
 		if(initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
