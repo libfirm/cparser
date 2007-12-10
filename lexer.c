@@ -156,8 +156,8 @@ static inline void next_char(void)
 	case '>': c = '}'; break;
 	case '-': c = '~'; break;
 	default:
-		put_back('?');
 		put_back(c);
+		put_back('?');
 		c = '?';
 		break;
 	}
