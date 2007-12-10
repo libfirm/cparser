@@ -229,7 +229,7 @@ break_fmt_flags:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
 						break;
 				}
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_PLUS | FMT_FLAG_ZERO;
+				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_ZERO;
 				break;
 
 			case 'o':
@@ -275,7 +275,7 @@ eval_fmt_mod_unsigned:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
 						break;
 				}
-				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_PLUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
+				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
 				break;
 
 			case 'C':
