@@ -11,7 +11,13 @@ extern unsigned diagnostic_count;
 extern unsigned error_count;
 extern unsigned warning_count;
 
+/* true if warnings should be inhibited */
+extern bool inhibit_all_warnings;
+
 /* true if warnings should be treated as errors */
 extern bool warnings_are_errors;
+
+/* true if the first error should stop the compilation */
+extern bool fatal_errors;
 
 #endif

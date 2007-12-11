@@ -7,16 +7,18 @@
 #include "token_t.h"
 #include "type.h"
 
-//#define ABORT_ON_ERROR
-
 /** Number of occurred diagnostics. */
 unsigned diagnostic_count = 0;
 /** Number of occurred errors. */
 unsigned error_count      = 0;
 /** Number of occurred warnings. */
 unsigned warning_count    = 0;
-/* true if warnings should be treated as errors */
+/** true if warnings should be inhibited */
+bool inhibit_all_warnings = false;
+/** true if warnings should be treated as errors */
 bool warnings_are_errors  = false;
+/** true if the first error should stop the compilation */
+bool fatal_errors = false;
 
 /**
  * Issue a diagnostic message.
@@ -137,33 +139,48 @@ void diagnosticf(const char *const fmt, ...)
 	va_end(ap);
 }
 
+static void errorvf(const source_position_t pos,
+                    const char *const fmt, va_list ap)
+{
+	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
+	++error_count;
+	diagnosticvf(fmt, ap);
+	fputc('\n', stderr);
+
+	if (fatal_errors)
+		abort();
+}
 void errorf(const source_position_t pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
-	++error_count;
-	diagnosticvf(fmt, ap);
+	errorvf(pos, fmt, ap);
 	va_end(ap);
-	fputc('\n', stderr);
 
-#ifdef ABORT_ON_ERROR
-	abort();
-#endif
+	if (fatal_errors)
+		exit(1);
+}
+
+static void warningvf(const source_position_t pos,
+                      const char *const fmt, va_list ap)
+{
+	fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
+	++warning_count;
+	diagnosticvf(fmt, ap);
+	fputc('\n', stderr);
 }
 
 void warningf(const source_position_t pos, const char *const fmt, ...)
 {
+	if (inhibit_all_warnings)
+		return;
+
 	va_list ap;
 	va_start(ap, fmt);
 	if (warnings_are_errors) {
-		fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
-		++error_count;
+		errorvf(pos, fmt, ap);
 	} else {
-		fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
-		++warning_count;
+		warningvf(pos, fmt, ap);
 	}
-	diagnosticvf(fmt, ap);
 	va_end(ap);
-	fputc('\n', stderr);
 }

@@ -421,6 +421,8 @@ int main(int argc, char **argv)
 			mode         = CompileDump;
 		} else if(strcmp(arg, "-v") == 0) {
 			verbose = 1;
+		} else if(strcmp(arg, "-w") == 0) {
+			inhibit_all_warnings = true;
 		} else if(arg[0] == '-' && arg[1] == 'f') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-f");
@@ -456,6 +458,8 @@ int main(int argc, char **argv)
 			GET_ARG_AFTER(opt, "-W");
 			if (strcmp(opt, "error") == 0) {
 				warnings_are_errors = true;
+			} else if (strcmp(opt, "fatal-errors") == 0) {
+				fatal_errors = true;
 			} else {
 				fprintf(stderr, "warning: ignoring gcc option -W%s\n", opt);
 			}
