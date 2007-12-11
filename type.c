@@ -243,6 +243,7 @@ static void print_compound_type(const compound_type_t *type)
 
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
+	print_type_qualifiers(type->type.qualifiers);
 	fputs(type->declaration->symbol->string, out);
 }
 
