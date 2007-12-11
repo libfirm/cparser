@@ -689,7 +689,7 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 
 type_t *skip_typeref(type_t *type)
 {
-	unsigned qualifiers = type->base.qualifiers;
+	unsigned qualifiers = TYPE_QUALIFIER_NONE;
 
 	while(true) {
 		switch(type->kind) {
@@ -716,6 +716,16 @@ type_t *skip_typeref(type_t *type)
 			break;
 		}
 		break;
+	}
+
+	if (qualifiers != TYPE_QUALIFIER_NONE) {
+		type_t *const copy     = duplicate_type(type);
+		copy->base.qualifiers |= qualifiers;
+
+		type = typehash_insert(copy);
+		if (type != copy) {
+			obstack_free(type_obst, copy);
+		}
 	}
 
 	return type;
