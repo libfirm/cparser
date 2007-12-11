@@ -5064,6 +5064,38 @@ static statement_t *parse_break(void)
 }
 
 /**
+ * Check if a given declaration represents a local variable.
+ */
+static bool is_local_var_declaration(const declaration_t *declaration) {
+	switch ((storage_class_tag_t) declaration->storage_class) {
+	case STORAGE_CLASS_NONE:
+	case STORAGE_CLASS_AUTO:
+	case STORAGE_CLASS_REGISTER: {
+		const type_t *type = skip_typeref(declaration->type);
+		if(is_type_function(type)) {
+			return false;
+		} else {
+			return true;
+		}
+	}
+	default:
+		return false;
+	}
+}
+
+/**
+ * Check if a given expression represents a local variable.
+ */
+static bool is_local_variable(const expression_t *expression)
+{
+	if (expression->base.kind != EXPR_REFERENCE) {
+		return false;
+	}
+	const declaration_t *declaration = expression->reference.declaration;
+	return is_local_var_declaration(declaration);
+}
+
+/**
  * Parse a return statement.
  */
 static statement_t *parse_return(void)
@@ -5097,16 +5129,26 @@ static statement_t *parse_return(void)
 
 		if(is_type_atomic(return_type, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
-			warningf(HERE, "'return' with a value, in function returning void");
+			warningf(statement->statement.source_position,
+				"'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
 			if(return_type != NULL) {
 				semantic_assign(return_type, &return_value, "'return'");
 			}
 		}
+		/* check for returning address of a local var */
+		if (return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
+			const expression_t *expression = return_value->unary.value;
+			if (is_local_variable(expression)) {
+				warningf(statement->statement.source_position,
+					"function returns address of local variable");
+			}
+		}
 	} else {
 		if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			warningf(HERE, "'return' without value, in function returning non-void");
+			warningf(statement->statement.source_position,
+				"'return' without value, in function returning non-void");
 		}
 	}
 	statement->return_value = return_value;
