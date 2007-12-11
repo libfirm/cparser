@@ -5337,7 +5337,13 @@ static translation_unit_t *parse_translation_unit(void)
 	initialize_builtin_types();
 
 	while(token.type != T_EOF) {
-		parse_external_declaration();
+		if (token.type == ';') {
+			/* TODO error in strict mode */
+			warningf(HERE, "stray ';' outside of function");
+			next_token();
+		} else {
+			parse_external_declaration();
+		}
 	}
 
 	assert(context == &unit->context);
