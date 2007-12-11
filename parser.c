@@ -4915,7 +4915,7 @@ static statement_t *parse_switch(void)
 
 	expect('(');
 	expression_t *const expr = parse_expression();
-	type_t       *const type = promote_integer(expr->base.datatype);
+	type_t       *const type = promote_integer(skip_typeref(expr->base.datatype));
 	statement->expression = create_implicit_cast(expr, type);
 	expect(')');
 	statement->body = parse_statement();
