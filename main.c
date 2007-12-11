@@ -587,11 +587,11 @@ int main(int argc, char **argv)
 	pclose(preprocessed_in);
 	if(unit == NULL) {
 		/* parsing failed because of errors */
-		fprintf(stderr, "%u error(s), %u warnings\n", error_count, warning_count);
+		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count, warning_count);
 		return EXIT_FAILURE;
 	}
 	if (warning_count > 0) {
-		fprintf(stderr, "%u warnings\n", warning_count);
+		fprintf(stderr, "%u warning(s)\n", warning_count);
 	}
 
 	if(mode == PrintAst) {
