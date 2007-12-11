@@ -2947,6 +2947,9 @@ static void create_initializer(declaration_t *declaration)
 	}
 }
 
+/**
+ * Creates a Firm local variable from a declaration.
+ */
 static void create_local_variable(declaration_t *declaration)
 {
 	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
