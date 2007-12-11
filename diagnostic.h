@@ -11,4 +11,7 @@ extern unsigned diagnostic_count;
 extern unsigned error_count;
 extern unsigned warning_count;
 
+/* true if warnings should be treated as errors */
+extern bool warnings_are_errors;
+
 #endif

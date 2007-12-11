@@ -7,7 +7,6 @@
 #include "token_t.h"
 #include "type.h"
 
-
 //#define ABORT_ON_ERROR
 
 /** Number of occurred diagnostics. */
@@ -16,6 +15,8 @@ unsigned diagnostic_count = 0;
 unsigned error_count      = 0;
 /** Number of occurred warnings. */
 unsigned warning_count    = 0;
+/* true if warnings should be treated as errors */
+bool warnings_are_errors  = false;
 
 /**
  * Issue a diagnostic message.
@@ -138,10 +139,10 @@ void diagnosticf(const char *const fmt, ...)
 
 void errorf(const source_position_t pos, const char *const fmt, ...)
 {
-	++error_count;
-	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
 	va_list ap;
 	va_start(ap, fmt);
+	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
+	++error_count;
 	diagnosticvf(fmt, ap);
 	va_end(ap);
 	fputc('\n', stderr);
@@ -153,10 +154,15 @@ void errorf(const source_position_t pos, const char *const fmt, ...)
 
 void warningf(const source_position_t pos, const char *const fmt, ...)
 {
-	++warning_count;
-	fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
 	va_list ap;
 	va_start(ap, fmt);
+	if (warnings_are_errors) {
+		fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
+		++error_count;
+	} else {
+		fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
+		++warning_count;
+	}
 	diagnosticvf(fmt, ap);
 	va_end(ap);
 	fputc('\n', stderr);

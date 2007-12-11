@@ -451,6 +451,14 @@ int main(int argc, char **argv)
 			} else if (res == -1) {
 				help_displayed = true;
 			}
+		} else if(arg[0] == '-' && arg[1] == 'W') {
+			const char *opt;
+			GET_ARG_AFTER(opt, "-W");
+			if (strcmp(opt, "error") == 0) {
+				warnings_are_errors = true;
+			} else {
+				fprintf(stderr, "warning: ignoring gcc option -W%s\n", opt);
+			}
 		} else if(arg[0] == '-' && arg[1] == 'm') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-m");
@@ -477,7 +485,6 @@ int main(int argc, char **argv)
 			} else if(strcmp(arg, "-pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(arg[1] == 'O' ||
-					arg[1] == 'W' ||
 					arg[1] == 'g' ||
 					strncmp(arg + 1, "std=", 4) == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
