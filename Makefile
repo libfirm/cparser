@@ -94,4 +94,4 @@ build/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf build $(GOAL) .depend
+	$(Q)rm -rf build/* $(GOAL) .depend

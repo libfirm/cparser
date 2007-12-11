@@ -79,7 +79,7 @@ static inline void next_real_char(void)
 static inline void put_back(int pc)
 {
 	assert(bufpos > buf);
-	*(--bufpos - buf + buf) = pc;
+	*(--bufpos - buf + buf) = (char) pc;
 
 #ifdef DEBUG_CHARS
 	printf("putback '%c'\n", pc);

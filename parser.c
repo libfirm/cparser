@@ -3055,13 +3055,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 	case EXPR_SELECT: {
 		const select_expression_t *select = &expression->select;
-		type_t *orig_type = select->compound_entry->type;
-		type_t *type      = skip_typeref(orig_type);
-		if(type->kind == TYPE_BITFIELD) {
-			return type->bitfield.base;
-		} else {
-			return orig_type;
-		}
+		return select->compound_entry->type;
 	}
 	case EXPR_UNARY_DEREFERENCE: {
 		expression_t   *value        = expression->unary.value;
@@ -3119,10 +3113,6 @@ static expression_t *parse_reference(void)
 	}
 
 	type_t *type         = declaration->type;
-	type_t *skipped_type = skip_typeref(type);
-	if(skipped_type->kind == TYPE_BITFIELD) {
-		type = skipped_type->bitfield.base;
-	}
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
@@ -3713,12 +3703,18 @@ static expression_t *parse_select_expression(unsigned precedence,
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
 	type_t *expression_type = automatic_type_conversion(iter->type);
-	if(expression_type->kind == TYPE_BITFIELD) {
-		expression_type = expression_type->bitfield.base;
-	}
 
 	select->select.compound_entry = iter;
 	select->base.datatype         = expression_type;
+
+	if(expression_type->kind == TYPE_BITFIELD) {
+		expression_t *extract
+			= allocate_expression_zero(EXPR_UNARY_BITFIELD_EXTRACT);
+		extract->unary.value   = select;
+		extract->base.datatype = expression_type->bitfield.base;
+
+		return extract;
+	}
 
 	return select;
 }
@@ -4410,15 +4406,19 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		return;
 	}
 	if(type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
-		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left, orig_type_left);
+		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left,
+		       orig_type_left);
 		return;
 	}
 	if(is_type_incomplete(type_left)) {
-		errorf(HERE, "left-hand side of assignment '%E' has incomplete type '%T'", left, orig_type_left);
+		errorf(HERE,
+		       "left-hand side of assignment '%E' has incomplete type '%T'",
+		       left, orig_type_left);
 		return;
 	}
 	if(is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
-		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields", left, orig_type_left);
+		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields",
+		       left, orig_type_left);
 		return;
 	}
 

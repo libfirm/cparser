@@ -464,7 +464,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       CHECK_ONE(firm_opt.check_all, irg);
 	}
 
-    lower_highlevel_graph(irg);
+    lower_highlevel_graph(irg, firm_opt.lower_bitfields);
 
     if (firm_opt.deconv) {
       timer_push(TV_DECONV);

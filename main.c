@@ -495,6 +495,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* we do the lowering in ast2firm */
+	firm_opt.lower_bitfields = FALSE;
+
 	if(help_displayed) {
 		return !argument_errors;
 	}

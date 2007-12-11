@@ -59,6 +59,7 @@ struct a_firm_opt firm_opt = {
   /* lower           = */ TRUE,
   /* os_support      = */ OS_SUPPORT_LINUX,
   /* honor_restrict  = */ TRUE,
+  /* lower_bitfields = */ TRUE,
   /* ycomp_dbg       = */ FALSE,
   /* ycomp_host      = */ FIRM_YCOMP_DEFAULT_HOST,
   /* ycomp_port      = */ FIRM_YCOMP_DEFAULT_PORT,

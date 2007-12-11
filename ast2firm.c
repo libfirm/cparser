@@ -628,7 +628,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 	}
 
 	size_t misalign = offset % align_all;
-	if(misalign > 0) {
+	if(misalign > 0 || bit_offset > 0) {
 		offset += align_all - misalign;
 	}
 	set_type_alignment_bytes(irtype, align_all);
@@ -1347,7 +1347,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 {
 	value = do_strict_conv(dbgi, value);
 
-	ir_node  *memory = get_store();
+	ir_node *memory = get_store();
 
 	if(is_type_scalar(type)) {
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
@@ -1359,6 +1359,71 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
 		set_store(copyb_mem);
 	}
+}
+
+static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
+{
+	tarval *all_one   = get_mode_all_one(mode);
+	int     mode_size = get_mode_size_bits(mode);
+
+	assert(offset >= 0 && size >= 0);
+	assert(offset + size <= mode_size);
+	if(size == mode_size) {
+		return all_one;
+	}
+
+	long    shiftr    = get_mode_size_bits(mode) - size;
+	long    shiftl    = offset;
+	tarval *tv_shiftr = new_tarval_from_long(shiftr, mode_uint);
+	tarval *tv_shiftl = new_tarval_from_long(shiftl, mode_uint);
+	tarval *mask0     = tarval_shr(all_one, tv_shiftr);
+	tarval *mask1     = tarval_shl(mask0, tv_shiftl);
+
+	return mask1;
+}
+
+static void bitfield_store_to_firm(const unary_expression_t *expression,
+                                   ir_node *value)
+{
+	expression_t *select = expression->value;
+	assert(select->kind == EXPR_SELECT);
+	type_t       *type   = select->base.datatype;
+	assert(type->kind == TYPE_BITFIELD);
+	ir_mode      *mode   = get_ir_mode(type->bitfield.base);
+	ir_node      *addr   = expression_to_addr(select);
+
+	assert(get_irn_mode(value) == mode);
+
+	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
+
+	/* kill upper bits of value and shift to right position */
+	ir_entity *entity       = select->select.compound_entry->v.entity;
+	int        bitoffset    = get_entity_offset_bits_remainder(entity);
+	ir_type   *entity_type  = get_entity_type(entity);
+	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
+
+	tarval  *mask            = create_bitfield_mask(mode, 0, bitsize);
+	ir_node *mask_node       = new_d_Const(dbgi, mode, mask);
+	ir_node *value_masked    = new_d_And(dbgi, value, mask_node, mode);
+	tarval  *shiftl          = new_tarval_from_long(bitoffset, mode_uint);
+	ir_node *shiftcount      = new_d_Const(dbgi, mode_uint, shiftl);
+	ir_node *value_maskshift = new_d_Shl(dbgi, value_masked, shiftcount, mode);
+
+	/* load current value */
+	ir_node  *mem             = get_store();
+	ir_node  *load            = new_d_Load(dbgi, mem, addr, mode);
+	ir_node  *load_mem        = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+	ir_node  *load_res        = new_d_Proj(dbgi, load, mode, pn_Load_res);
+	tarval   *shift_mask      = create_bitfield_mask(mode, bitoffset, bitsize);
+	tarval   *inv_mask        = tarval_not(shift_mask);
+	ir_node  *inv_mask_node   = new_d_Const(dbgi, mode, inv_mask);
+	ir_node  *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node, mode);
+
+	/* construct new value and store */
+	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, value_maskshift, mode);
+	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val);
+	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+	set_store(store_mem);
 }
 
 static void set_value_for_expression(const expression_t *expression,
@@ -1376,6 +1441,11 @@ static void set_value_for_expression(const expression_t *expression,
 			set_value(declaration->v.value_number, value);
 			return;
 		}
+	}
+
+	if(expression->kind == EXPR_UNARY_BITFIELD_EXTRACT) {
+		bitfield_store_to_firm(&expression->unary, value);
+		return;
 	}
 
 	ir_node *addr = expression_to_addr(expression);
@@ -1560,6 +1630,50 @@ static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression) {
 	}
 }
 
+static ir_node *bitfield_extract_to_firm(const unary_expression_t *expression)
+{
+	expression_t *select = expression->value;
+	assert(select->kind == EXPR_SELECT);
+
+	type_t   *type     = select->base.datatype;
+	assert(type->kind == TYPE_BITFIELD);
+	ir_mode  *mode     = get_ir_mode(type->bitfield.base);
+	dbg_info *dbgi     = get_dbg_info(&expression->expression.source_position);
+	ir_node  *addr     = expression_to_addr(select);
+	ir_node  *mem      = get_store();
+	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode);
+	ir_node  *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+	ir_node  *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
+
+	load_res           = create_conv(dbgi, load_res, mode_int);
+
+	set_store(load_mem);
+
+	/* kill upper bits */
+	ir_entity *entity       = select->select.compound_entry->v.entity;
+	int        bitoffset    = get_entity_offset_bits_remainder(entity);
+	ir_type   *entity_type  = get_entity_type(entity);
+	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
+	long       shift_bitsl  = machine_size - bitoffset - bitsize;
+	assert(shift_bitsl >= 0);
+	tarval    *tvl          = new_tarval_from_long(shift_bitsl, mode_uint);
+	ir_node   *countl       = new_d_Const(dbgi, mode_uint, tvl);
+	ir_node   *shiftl       = new_d_Shl(dbgi, load_res, countl, mode_int);
+
+	long       shift_bitsr  = bitoffset + shift_bitsl;
+	assert(shift_bitsr <= (long) machine_size);
+	tarval    *tvr          = new_tarval_from_long(shift_bitsr, mode_uint);
+	ir_node   *countr       = new_d_Const(dbgi, mode_uint, tvr);
+	ir_node   *shiftr;
+	if(mode_is_signed(mode)) {
+		shiftr = new_d_Shrs(dbgi, shiftl, countr, mode_int);
+	} else {
+		shiftr = new_d_Shr(dbgi, shiftl, countr, mode_int);
+	}
+
+	return create_conv(dbgi, shiftr, mode);
+}
+
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->expression.source_position);
@@ -1625,6 +1739,8 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 			return handle_assume(dbgi, value);
 		else
 			return NULL;
+	case EXPR_UNARY_BITFIELD_EXTRACT:
+		return bitfield_extract_to_firm(expression);
 
 	default:
 		break;
@@ -2330,7 +2446,8 @@ static ir_node *expression_to_addr(const expression_t *expression)
 	panic("trying to get address of non-lvalue");
 }
 
-static ir_node *builtin_constant_to_firm(const builtin_constant_expression_t *expression)
+static ir_node *builtin_constant_to_firm(
+		const builtin_constant_expression_t *expression)
 {
 	ir_mode *mode = get_ir_mode(expression->expression.datatype);
 	long     v;
@@ -2343,7 +2460,8 @@ static ir_node *builtin_constant_to_firm(const builtin_constant_expression_t *ex
 	return new_Const_long(mode, v);
 }
 
-static ir_node *builtin_prefetch_to_firm(const builtin_prefetch_expression_t *expression)
+static ir_node *builtin_prefetch_to_firm(
+		const builtin_prefetch_expression_t *expression)
 {
 	ir_node *adr = expression_to_firm(expression->adr);
 	/* no Firm support for prefetch yet */

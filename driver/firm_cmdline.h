@@ -72,6 +72,7 @@ struct a_firm_opt {
   a_byte   lower;           /**< enable Firm lowering */
   a_byte   os_support;      /**< current os support */
   a_byte   honor_restrict;  /**< enable restrict keyword */
+  a_byte   lower_bitfields; /**< lower bitfield access */
   a_byte   ycomp_dbg;       /**< yComp debugger extension */
   char     *ycomp_host;     /**< The host, yComp is running on */
   int      ycomp_port;      /**< The port, yComp is listening on */
