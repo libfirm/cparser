@@ -487,29 +487,10 @@ static void set_context(context_t *new_context)
 }
 
 /**
- * Called when we find a 2nd declarator for an identifier we already have a
- * declarator for.
- */
-static bool is_compatible_declaration(declaration_t *declaration,
-                                      declaration_t *previous)
-{
-	/* happens for K&R style function parameters */
-	if(previous->type == NULL) {
-		previous->type = declaration->type;
-		return true;
-	}
-
-	type_t *type1 = skip_typeref(declaration->type);
-	type_t *type2 = skip_typeref(previous->type);
-
-	return types_compatible(type1, type2);
-}
-
-/**
  * Search a symbol in a given namespace and returns its declaration or
  * NULL if this symbol was not found.
  */
-static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
+static declaration_t *get_declaration(const symbol_t *const symbol, const namespace_t namespc)
 {
 	declaration_t *declaration = symbol->declaration;
 	for( ; declaration != NULL; declaration = declaration->symbol_next) {
@@ -521,84 +502,13 @@ static declaration_t *get_declaration(symbol_t *symbol, namespace_t namespc)
 }
 
 /**
- * Return the "prefix" of a given namespace.
- */
-static const char *get_namespace_prefix(namespace_t namespc)
-{
-	switch(namespc) {
-	case NAMESPACE_NORMAL:
-		return "";
-	case NAMESPACE_UNION:
-		return "union ";
-	case NAMESPACE_STRUCT:
-		return "struct ";
-	case NAMESPACE_ENUM:
-		return "enum ";
-	case NAMESPACE_LABEL:
-		return "label ";
-	}
-	panic("invalid namespace found");
-}
-
-/**
  * pushs an environment_entry on the environment stack and links the
  * corresponding symbol to the new entry
  */
-static declaration_t *stack_push(stack_entry_t **stack_ptr,
-                                 declaration_t *declaration,
-                                 context_t *parent_context)
+static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 {
 	symbol_t    *symbol    = declaration->symbol;
 	namespace_t  namespc = (namespace_t)declaration->namespc;
-
-	/* a declaration should be only pushed once */
-	declaration->parent_context = parent_context;
-
-	declaration_t *previous_declaration = get_declaration(symbol, namespc);
-	assert(declaration != previous_declaration);
-	if(previous_declaration != NULL
-			&& previous_declaration->parent_context == context) {
-		if(!is_compatible_declaration(declaration, previous_declaration)) {
-			errorf(declaration->source_position, "definition of symbol '%s%Y' with type '%T'", get_namespace_prefix(namespc), symbol, declaration->type);
-			errorf(previous_declaration->source_position, "is incompatible with previous declaration of type '%T'", previous_declaration->type);
-		} else {
-			unsigned  old_storage_class = previous_declaration->storage_class;
-			unsigned  new_storage_class = declaration->storage_class;
-			type_t   *type              = previous_declaration->type;
-			type = skip_typeref(type);
-
-			if (current_function == NULL) {
-				if (old_storage_class != STORAGE_CLASS_STATIC &&
-				    new_storage_class == STORAGE_CLASS_STATIC) {
-					errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
-					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-				} else {
-					if (old_storage_class == STORAGE_CLASS_EXTERN) {
-						if (new_storage_class == STORAGE_CLASS_NONE) {
-							previous_declaration->storage_class = STORAGE_CLASS_NONE;
-						}
-					} else if(!is_type_function(type)) {
-						warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
-						warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-					}
-				}
-			} else {
-				if (old_storage_class == STORAGE_CLASS_EXTERN &&
-						new_storage_class == STORAGE_CLASS_EXTERN) {
-					warningf(declaration->source_position, "redundant extern declaration for '%Y'\n", symbol);
-					warningf(previous_declaration->source_position, "previous declaration of '%Y' was here\n", symbol);
-				} else {
-					if (old_storage_class == new_storage_class) {
-						errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
-					} else {
-						errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
-					}
-					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-				}
-			}
-		}
-		return previous_declaration;
-	}
 
 	/* remember old declaration */
 	stack_entry_t entry;
@@ -630,19 +540,19 @@ static declaration_t *stack_push(stack_entry_t **stack_ptr,
 			iter_last->symbol_next = declaration;
 		}
 	}
-
-	return declaration;
 }
 
-static declaration_t *environment_push(declaration_t *declaration)
+static void environment_push(declaration_t *declaration)
 {
 	assert(declaration->source_position.input_name != NULL);
-	return stack_push(&environment_stack, declaration, context);
+	assert(declaration->parent_context != NULL);
+	stack_push(&environment_stack, declaration);
 }
 
-static declaration_t *label_push(declaration_t *declaration)
+static void label_push(declaration_t *declaration)
 {
-	return stack_push(&label_stack, declaration, &current_function->context);
+	declaration->parent_context = &current_function->context;
+	stack_push(&label_stack, declaration);
 }
 
 /**
@@ -1425,7 +1335,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
 			assert(symbol != NULL);
-			errorf(HERE, "multiple definition of %s %Y",
+			errorf(HERE, "multiple definition of '%s %Y'",
 			       is_struct ? "struct" : "union", symbol);
 			declaration->context.declarations = NULL;
 		}
@@ -2375,28 +2285,110 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 	return result;
 }
 
-static declaration_t *record_declaration(declaration_t *declaration)
+static declaration_t *append_declaration(declaration_t* const declaration)
 {
-	assert(declaration->parent_context == NULL);
-	assert(context != NULL);
-
-	symbol_t *symbol = declaration->symbol;
-	if(symbol != NULL) {
-		declaration_t *alias = environment_push(declaration);
-		if(alias != declaration)
-			return alias;
-	} else {
-		declaration->parent_context = context;
-	}
-
-	if(last_declaration != NULL) {
+	if (last_declaration != NULL) {
 		last_declaration->next = declaration;
 	} else {
 		context->declarations = declaration;
 	}
 	last_declaration = declaration;
-
 	return declaration;
+}
+
+static declaration_t *internal_record_declaration(
+	declaration_t *const declaration,
+	const bool is_function_definition)
+{
+	const symbol_t *const symbol  = declaration->symbol;
+	const namespace_t     namespc = (namespace_t)declaration->namespc;
+
+	const type_t *const type = skip_typeref(declaration->type);
+	if (is_type_function(type) && type->function.unspecified_parameters) {
+		warningf(declaration->source_position,
+		         "function declaration '%#T' is not a prototype",
+		         type, declaration->symbol);
+	}
+
+	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
+	assert(declaration != previous_declaration);
+	if (previous_declaration != NULL
+			&& previous_declaration->parent_context == context) {
+		const type_t *const prev_type = skip_typeref(previous_declaration->type);
+		if (!types_compatible(type, prev_type)) {
+			errorf(declaration->source_position,
+				"declaration '%#T' is incompatible with previous declaration '%#T'",
+				type, symbol, previous_declaration->type, symbol);
+			errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+		} else {
+			unsigned old_storage_class = previous_declaration->storage_class;
+			unsigned new_storage_class = declaration->storage_class;
+
+			/* pretend no storage class means extern for function declarations
+			 * (except if the previous declaration is neither none nor extern) */
+			if (is_type_function(type)) {
+				switch (old_storage_class) {
+					case STORAGE_CLASS_NONE:
+						old_storage_class = STORAGE_CLASS_EXTERN;
+
+					case STORAGE_CLASS_EXTERN:
+						if (new_storage_class == STORAGE_CLASS_NONE && !is_function_definition) {
+							new_storage_class = STORAGE_CLASS_EXTERN;
+						}
+						break;
+
+					default: break;
+				}
+			}
+
+			if (old_storage_class == STORAGE_CLASS_EXTERN &&
+			    new_storage_class == STORAGE_CLASS_EXTERN) {
+warn_redundant_declaration:
+					warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
+					warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+			} else if (current_function == NULL) {
+				if (old_storage_class != STORAGE_CLASS_STATIC &&
+				    new_storage_class == STORAGE_CLASS_STATIC) {
+					errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
+					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+				} else {
+					if (old_storage_class != STORAGE_CLASS_EXTERN) {
+						goto warn_redundant_declaration;
+					}
+					if (new_storage_class == STORAGE_CLASS_NONE) {
+						previous_declaration->storage_class = STORAGE_CLASS_NONE;
+					}
+				}
+			} else {
+				if (old_storage_class == new_storage_class) {
+					errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
+				} else {
+					errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
+				}
+				errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+			}
+		}
+		return previous_declaration;
+	}
+
+	assert(declaration->parent_context == NULL);
+	assert(declaration->symbol != NULL);
+	assert(context != NULL);
+
+	declaration->parent_context = context;
+
+	environment_push(declaration);
+	return append_declaration(declaration);
+}
+
+static declaration_t *record_declaration(declaration_t *declaration)
+{
+	return internal_record_declaration(declaration, false);
+}
+
+static declaration_t *record_function_definition(declaration_t *const declaration)
+{
+	return internal_record_declaration(declaration, true);
 }
 
 static void parser_error_multiple_definition(declaration_t *declaration,
@@ -2594,6 +2586,8 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
+		assert(parameter->parent_context == NULL);
+		parameter->parent_context = context;
 		environment_push(parameter);
 	}
 
@@ -2665,7 +2659,7 @@ static void parse_external_declaration(void)
 
 	/* must be a declaration */
 	if(token.type == ';') {
-		parse_anonymous_declaration_rest(&specifiers, record_declaration);
+		parse_anonymous_declaration_rest(&specifiers, append_declaration);
 		return;
 	}
 
@@ -2714,10 +2708,9 @@ static void parse_external_declaration(void)
 		ndeclaration->type = type;
 	}
 
-	declaration_t *declaration = record_declaration(ndeclaration);
+	declaration_t *const declaration = record_function_definition(ndeclaration);
 	if(ndeclaration != declaration) {
-		memcpy(&declaration->context, &ndeclaration->context,
-				sizeof(declaration->context));
+		declaration->context = ndeclaration->context;
 	}
 	type = skip_typeref(declaration->type);
 
@@ -2728,6 +2721,8 @@ static void parse_external_declaration(void)
 
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
+		assert(parameter->parent_context == NULL || parameter->parent_context == context);
+		parameter->parent_context = context;
 		environment_push(parameter);
 	}
 
@@ -2946,20 +2941,11 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	declaration->type            = type;
 	declaration->symbol          = symbol;
 	declaration->source_position = source_position;
-
-	/* prepend the implicit definition to the global context
-	 * this is safe since the symbol wasn't declared as anything else yet
-	 */
-	assert(symbol->declaration == NULL);
-
-	context_t *last_context = context;
-	context = global_context;
+	declaration->parent_context  = global_context;
 
 	environment_push(declaration);
 	declaration->next     = context->declarations;
 	context->declarations = declaration;
-
-	context = last_context;
 
 	return declaration;
 }
@@ -4848,8 +4834,8 @@ static statement_t *parse_label_statement(void)
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
 	if(label->source_position.input_name != NULL) {
-		errorf(HERE, "duplicate label '%Y'\n", symbol);
-		errorf(label->source_position, "previous definition of '%Y' was here\n",
+		errorf(HERE, "duplicate label '%Y'", symbol);
+		errorf(label->source_position, "previous definition of '%Y' was here",
 		       symbol);
 	} else {
 		label->source_position = token.source_position;
