@@ -50,6 +50,7 @@ static declaration_t  *last_declaration  = NULL;
 static declaration_t  *current_function  = NULL;
 static struct obstack  temp_obst;
 
+/** The current source position. */
 #define HERE token.source_position
 
 static type_t *type_valist;
@@ -4008,6 +4009,9 @@ static void semantic_dereference(unary_expression_t *expression)
 	expression->expression.datatype = result_type;
 }
 
+/**
+ * Check the semantic of the address taken expression.
+ */
 static void semantic_take_addr(unary_expression_t *expression)
 {
 	expression_t *value  = expression->value;
@@ -4021,6 +4025,11 @@ static void semantic_take_addr(unary_expression_t *expression)
 		reference_expression_t *reference   = (reference_expression_t*) value;
 		declaration_t          *declaration = reference->declaration;
 		if(declaration != NULL) {
+			if (declaration->storage_class == STORAGE_CLASS_REGISTER) {
+				errorf(expression->expression.source_position,
+					"address of register variable '%Y' requested",
+					declaration->symbol);
+			}
 			declaration->address_taken = 1;
 		}
 	}
@@ -4032,13 +4041,14 @@ static void semantic_take_addr(unary_expression_t *expression)
 static expression_t *parse_##unexpression_type(unsigned precedence)            \
 {                                                                              \
 	eat(token_type);                                                           \
-                                                                               \
+	                                                                           \
 	expression_t *unary_expression                                             \
 		= allocate_expression_zero(unexpression_type);                         \
+	unary_expression->base.source_position = HERE;                             \
 	unary_expression->unary.value = parse_sub_expression(precedence);          \
 	                                                                           \
 	sfunc(&unary_expression->unary);                                           \
-                                                                               \
+	                                                                           \
 	return unary_expression;                                                   \
 }
 
