@@ -241,8 +241,8 @@ static void init_atomic_modes(void) {
 static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 {
 	ir_mode *res = NULL;
-	if ((unsigned)atomic_type->atype < (unsigned)ATOMIC_TYPE_LAST)
-		res = _atomic_modes[(unsigned)atomic_type->atype];
+	if ((unsigned)atomic_type->akind < (unsigned)ATOMIC_TYPE_LAST)
+		res = _atomic_modes[(unsigned)atomic_type->akind];
 	if (res == NULL)
 		panic("Encountered unknown atomic type");
 	return res;
@@ -252,7 +252,7 @@ static unsigned get_type_size(type_t *type);
 
 static unsigned get_atomic_type_size(const atomic_type_t *type)
 {
-	switch(type->atype) {
+	switch(type->akind) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_UCHAR:
@@ -361,8 +361,8 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 	ident   *id     = get_mode_ident(mode);
 	ir_type *irtype = new_type_primitive(id, mode);
 
-	if(type->atype == ATOMIC_TYPE_LONG_DOUBLE
-			|| type->atype == ATOMIC_TYPE_DOUBLE) {
+	if(type->akind == ATOMIC_TYPE_LONG_DOUBLE
+			|| type->akind == ATOMIC_TYPE_DOUBLE) {
 		set_type_alignment_bytes(irtype, 4);
 	}
 
@@ -2289,7 +2289,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	{
 		case TYPE_ATOMIC: {
 			const atomic_type_t *const atomic_type = &type->atomic;
-			switch (atomic_type->atype) {
+			switch (atomic_type->akind) {
 				/* should not be reached */
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;

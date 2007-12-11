@@ -628,7 +628,7 @@ static int get_rank(const type_t *type)
 
 	assert(type->kind == TYPE_ATOMIC);
 	const atomic_type_t *atomic_type = &type->atomic;
-	atomic_type_type_t   atype       = atomic_type->atype;
+	atomic_type_kind_t   atype       = atomic_type->akind;
 	return atype;
 }
 
@@ -1008,7 +1008,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 		if (element_type->kind == TYPE_ATOMIC) {
 			switch (expression->kind) {
 				case EXPR_STRING_LITERAL:
-					if (element_type->atomic.atype == ATOMIC_TYPE_CHAR) {
+					if (element_type->atomic.akind == ATOMIC_TYPE_CHAR) {
 						return initializer_from_string(array_type,
 							expression->string.value);
 					}
@@ -1717,7 +1717,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 finish_specifiers:
 
 	if(type == NULL) {
-		atomic_type_type_t atomic_type;
+		atomic_type_kind_t atomic_type;
 
 		/* match valid basic types */
 		switch(type_specifiers) {
@@ -1828,7 +1828,7 @@ finish_specifiers:
 		}
 
 		type               = allocate_type_zero(TYPE_ATOMIC);
-		type->atomic.atype = atomic_type;
+		type->atomic.akind = atomic_type;
 		newtype            = 1;
 	} else {
 		if(type_specifiers != 0) {
@@ -3554,6 +3554,21 @@ static expression_t *parse_primary_expression(void)
 	return create_invalid_expression();
 }
 
+/**
+ * Check if the expression has the character type and issue a warning then.
+ */
+static void check_for_char_index_type(const expression_t *expression) {
+	type_t *type      = expression->base.datatype;
+	type_t *base_type = skip_typeref(type);
+
+	if (base_type->base.kind == TYPE_ATOMIC) {
+		if (base_type->atomic.akind == ATOMIC_TYPE_CHAR) {
+			warningf(expression->base.source_position,
+				"array subscript has type '%T'", type);
+		}
+	}
+}
+
 static expression_t *parse_array_expression(unsigned precedence,
                                             expression_t *left)
 {
@@ -3581,12 +3596,14 @@ static expression_t *parse_array_expression(unsigned precedence,
 			return_type             = pointer->points_to;
 			array_access->array_ref = left;
 			array_access->index     = inside;
+			check_for_char_index_type(inside);
 		} else if(is_type_pointer(type_inside)) {
 			pointer_type_t *pointer = &type_inside->pointer;
 			return_type             = pointer->points_to;
 			array_access->array_ref = inside;
 			array_access->index     = left;
 			array_access->flipped   = true;
+			check_for_char_index_type(left);
 		} else {
 			errorf(HERE, "array access on object with non-pointer types '%T', '%T'", type_left, type_inside);
 		}

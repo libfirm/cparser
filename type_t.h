@@ -58,7 +58,7 @@ typedef enum {
 	ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY,
 #endif
 	ATOMIC_TYPE_LAST
-} atomic_type_type_t;
+} atomic_type_kind_t;
 
 typedef enum {
 	TYPE_QUALIFIER_NONE     = 0,
@@ -78,7 +78,7 @@ struct type_base_t {
 
 struct atomic_type_t {
 	type_base_t         type;
-	atomic_type_type_t  atype;
+	atomic_type_kind_t  akind;
 };
 
 struct builtin_type_t {
@@ -163,7 +163,7 @@ union type_t {
 	typeof_type_t    typeoft;
 };
 
-type_t *make_atomic_type(atomic_type_type_t type, type_qualifiers_t qualifiers);
+type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 
 type_t *duplicate_type(type_t *type);
@@ -173,7 +173,7 @@ static inline bool is_typeref(const type_t *type)
 	return type->kind == TYPE_TYPEDEF || type->kind == TYPE_TYPEOF;
 }
 
-static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
+static inline bool is_type_atomic(const type_t *type, atomic_type_kind_t atype)
 {
 	assert(!is_typeref(type));
 
@@ -181,7 +181,7 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_type_t atype)
 		return false;
 	const atomic_type_t *atomic_type = &type->atomic;
 
-	return atomic_type->atype == atype;
+	return atomic_type->akind == atype;
 }
 
 static inline bool is_type_pointer(const type_t *type)

@@ -14,7 +14,7 @@ static FILE            *out;
 
 static void write_type(const type_t *type);
 
-static const char *get_atomic_type_string(const atomic_type_type_t type)
+static const char *get_atomic_type_string(const atomic_type_kind_t type)
 {
 	switch(type) {
 	case ATOMIC_TYPE_VOID:       return "void";
@@ -39,7 +39,7 @@ static const char *get_atomic_type_string(const atomic_type_type_t type)
 
 static void write_atomic_type(const atomic_type_t *type)
 {
-	fprintf(out, "%s", get_atomic_type_string(type->atype));
+	fprintf(out, "%s", get_atomic_type_string(type->akind));
 }
 
 static void write_pointer_type(const pointer_type_t *type)

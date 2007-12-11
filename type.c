@@ -47,7 +47,7 @@ void print_atomic_type(const atomic_type_t *type)
 	print_type_qualifiers(type->type.qualifiers);
 
 	const char *s;
-	switch(type->atype) {
+	switch(type->akind) {
 	case ATOMIC_TYPE_INVALID:     s = "INVALIDATOMIC";      break;
 	case ATOMIC_TYPE_VOID:        s = "void";               break;
 	case ATOMIC_TYPE_BOOL:        s = "_Bool";              break;
@@ -416,7 +416,7 @@ bool is_type_integer(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.atype) {
+	switch(type->atomic.akind) {
 	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
@@ -442,7 +442,7 @@ bool is_type_floating(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.atype) {
+	switch(type->atomic.akind) {
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
@@ -471,7 +471,7 @@ bool is_type_signed(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.atype) {
+	switch(type->atomic.akind) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_SHORT:
@@ -554,7 +554,7 @@ bool is_type_incomplete(const type_t *type)
 		return type->array.size == NULL;
 
 	case TYPE_ATOMIC:
-		return type->atomic.atype == ATOMIC_TYPE_VOID;
+		return type->atomic.akind == ATOMIC_TYPE_VOID;
 
 	case TYPE_POINTER:
 	case TYPE_ENUM:
@@ -643,7 +643,7 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_FUNCTION:
 		return function_types_compatible(&type1->function, &type2->function);
 	case TYPE_ATOMIC:
-		return type1->atomic.atype == type2->atomic.atype;
+		return type1->atomic.akind == type2->atomic.akind;
 	case TYPE_ARRAY:
 		return array_types_compatible(&type1->array, &type2->array);
 
@@ -742,14 +742,14 @@ static type_t *identify_new_type(type_t *type)
 	return result;
 }
 
-type_t *make_atomic_type(atomic_type_type_t atype, type_qualifiers_t qualifiers)
+type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 {
 	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
 	memset(type, 0, sizeof(atomic_type_t));
 
 	type->kind            = TYPE_ATOMIC;
 	type->base.qualifiers = qualifiers;
-	type->atomic.atype    = atype;
+	type->atomic.akind    = atype;
 
 	return identify_new_type(type);
 }

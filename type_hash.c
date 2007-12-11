@@ -29,7 +29,7 @@ static unsigned hash_ptr(const void *ptr)
 static unsigned hash_atomic_type(const atomic_type_t *type)
 {
 	unsigned some_prime = 27644437;
-	unsigned result     = type->atype * some_prime;
+	unsigned result     = type->akind * some_prime;
 
 	return result;
 }
@@ -135,7 +135,7 @@ static unsigned hash_type(const type_t *type)
 static bool atomic_types_equal(const atomic_type_t *type1,
                                const atomic_type_t *type2)
 {
-	return type1->atype == type2->atype;
+	return type1->akind == type2->akind;
 }
 
 static bool function_types_equal(const function_type_t *type1,
