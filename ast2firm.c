@@ -17,6 +17,7 @@
 #include "type_t.h"
 #include "ast_t.h"
 #include "parser.h"
+#include "diagnostic.h"
 #include "lang_features.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
@@ -60,15 +61,10 @@ static int count_decls_in_stmts(const statement_t *stmt);
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
-	(void) pos;
-#if 0
-	const declaration_t *declaration = & value_numbers[pos]->declaration;
+	const declaration_t *declaration = get_irg_loc_description(irg, pos);
 
-	print_warning_prefix(declaration->source_position);
-	fprintf(stderr, "variable '%s' might be used uninitialized\n",
-			declaration->symbol->string);
-#endif
-	fprintf(stderr, "Some variable might be used uninitialized\n");
+	warningf(declaration->source_position, "variable '%#T' might be used uninitialized\n",
+			declaration->type, declaration->symbol);
 	return new_r_Unknown(irg, mode);
 }
 
@@ -2970,6 +2966,7 @@ static void create_local_variable(declaration_t *declaration)
 	} else {
 		declaration->declaration_kind = DECLARATION_KIND_LOCAL_VARIABLE;
 		declaration->v.value_number   = next_value_number_function;
+		set_irg_loc_description(current_ir_graph, next_value_number_function, declaration);
 		++next_value_number_function;
 	}
 
@@ -3828,6 +3825,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 
 		parameter->declaration_kind = DECLARATION_KIND_LOCAL_VARIABLE;
 		parameter->v.value_number   = next_value_number_function;
+		set_irg_loc_description(current_ir_graph, next_value_number_function, parameter);
 		++next_value_number_function;
 
 		set_value(parameter->v.value_number, proj);
