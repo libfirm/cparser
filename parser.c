@@ -4847,7 +4847,7 @@ static statement_t *parse_label_statement(void)
 	label_statement->statement.source_position = token.source_position;
 	label_statement->label                     = label;
 
-	expect(':');
+	eat(':');
 
 	if(token.type == '}') {
 		/* TODO only warn? */
