@@ -1439,7 +1439,9 @@ static type_t *parse_enum_specifier(void)
 		if(declaration->init.is_defined) {
 			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
-		environment_push(declaration);
+		if (symbol != NULL) {
+			environment_push(declaration);
+		}
 		append_declaration(declaration);
 		declaration->init.is_defined = 1;
 
