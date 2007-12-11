@@ -4914,7 +4914,9 @@ static statement_t *parse_switch(void)
 	statement->statement.source_position = token.source_position;
 
 	expect('(');
-	statement->expression = parse_expression();
+	expression_t *const expr = parse_expression();
+	type_t       *const type = promote_integer(expr->base.datatype);
+	statement->expression = create_implicit_cast(expr, type);
 	expect(')');
 	statement->body = parse_statement();
 
