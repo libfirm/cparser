@@ -3112,6 +3112,8 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	declaration_t *declaration = statement->declarations_begin;
 	declaration_t *end         = statement->declarations_end->next;
 	for( ; declaration != end; declaration = declaration->next) {
+		if(declaration->namespc != NAMESPACE_NORMAL)
+			continue;
 		create_local_variable(declaration);
 	}
 }
@@ -3645,6 +3647,8 @@ static int count_local_declarations(const declaration_t *      decl,
 {
 	int count = 0;
 	for (; decl != end; decl = decl->next) {
+		if(decl->namespc != NAMESPACE_NORMAL)
+			continue;
 		const type_t *type = skip_typeref(decl->type);
 		if (!decl->address_taken && is_type_scalar(type))
 			++count;
