@@ -1281,7 +1281,7 @@ static initializer_t *parse_initializer(type_t *type)
 	return result;
 }
 
-
+static declaration_t *append_declaration(declaration_t *declaration);
 
 static declaration_t *parse_compound_type_specifier(bool is_struct)
 {
@@ -1330,7 +1330,11 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		}
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
-		record_declaration(declaration);
+		declaration->parent_context  = context;
+		if (symbol != NULL) {
+			environment_push(declaration);
+		}
+		append_declaration(declaration);
 	}
 
 	if(token.type == '{') {
@@ -1425,6 +1429,7 @@ static type_t *parse_enum_specifier(void)
 		declaration->namespc       = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
+		declaration->parent_context  = context;
 	}
 
 	type_t *const type      = allocate_type_zero(TYPE_ENUM);
@@ -1434,7 +1439,8 @@ static type_t *parse_enum_specifier(void)
 		if(declaration->init.is_defined) {
 			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
-		record_declaration(declaration);
+		environment_push(declaration);
+		append_declaration(declaration);
 		declaration->init.is_defined = 1;
 
 		parse_enum_entries(&type->enumt);
