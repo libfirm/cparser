@@ -49,6 +49,7 @@ static context_t          *context           = NULL;
 static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
+static statement_t        *current_loop      = NULL;
 static struct obstack  temp_obst;
 
 /** The current source position. */
@@ -457,6 +458,14 @@ static void eat_paren(void)
         parse_error_expected(NULL, (expected), 0); \
         eat_statement();                           \
         return NULL;                               \
+    }                                              \
+    next_token();
+
+#define expect_fail(expected)                      \
+    if(UNLIKELY(token.type != (expected))) {       \
+        parse_error_expected(NULL, (expected), 0); \
+        eat_statement();                           \
+        goto fail;                                 \
     }                                              \
     next_token();
 
@@ -5007,12 +5016,18 @@ static statement_t *parse_while(void)
 	statement->statement.kind            = STATEMENT_WHILE;
 	statement->statement.source_position = token.source_position;
 
-	expect('(');
+	statement_t *rem = current_loop;
+	expect_fail('(');
 	statement->condition = parse_expression();
-	expect(')');
+	expect_fail(')');
+
 	statement->body = parse_statement();
+	current_loop = rem;
 
 	return (statement_t*) statement;
+fail:
+	current_loop = rem;
+	return NULL;
 }
 
 /**
@@ -5026,14 +5041,19 @@ static statement_t *parse_do(void)
 	statement->statement.kind            = STATEMENT_DO_WHILE;
 	statement->statement.source_position = token.source_position;
 
+	statement_t *rem = current_loop;
 	statement->body = parse_statement();
-	expect(T_while);
-	expect('(');
+	expect_fail(T_while);
+	expect_fail('(');
 	statement->condition = parse_expression();
-	expect(')');
+	expect_fail(')');
+	current_loop = rem;
 	expect(';');
 
 	return (statement_t*) statement;
+fail:
+	current_loop = rem;
+	return NULL;
 }
 
 /**
@@ -5049,6 +5069,7 @@ static statement_t *parse_for(void)
 
 	expect('(');
 
+	statement_t *rem = current_loop;
 	int         top          = environment_top();
 	context_t  *last_context = context;
 	set_context(&statement->context);
@@ -5058,27 +5079,31 @@ static statement_t *parse_for(void)
 			parse_declaration(record_declaration);
 		} else {
 			statement->initialisation = parse_expression();
-			expect(';');
+			expect_fail(';');
 		}
 	} else {
-		expect(';');
+		expect_fail(';');
 	}
 
 	if(token.type != ';') {
 		statement->condition = parse_expression();
 	}
-	expect(';');
+	expect_fail(';');
 	if(token.type != ')') {
 		statement->step = parse_expression();
 	}
-	expect(')');
+	expect_fail(')');
 	statement->body = parse_statement();
 
 	assert(context == &statement->context);
 	set_context(last_context);
 	environment_pop_to(top);
+	current_loop = rem;
 
 	return (statement_t*) statement;
+fail:
+	current_loop = rem;
+	return NULL;
 }
 
 /**
@@ -5122,6 +5147,11 @@ static statement_t *parse_continue(void)
 	statement->kind                 = STATEMENT_CONTINUE;
 	statement->base.source_position = token.source_position;
 
+	if (current_loop == NULL) {
+		errorf(HERE, "continue statement not within loop");
+		return NULL;
+	}
+
 	return statement;
 }
 
@@ -5137,6 +5167,10 @@ static statement_t *parse_break(void)
 	statement->kind                 = STATEMENT_BREAK;
 	statement->base.source_position = token.source_position;
 
+	if (current_switch == NULL && current_loop == NULL) {
+		errorf(HERE, "break statement not within loop or switch");
+		return NULL;
+	}
 	return statement;
 }
 
