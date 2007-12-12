@@ -822,8 +822,8 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 
 incompatible_assign_types:
 	/* TODO: improve error message */
-	errorf(HERE, "incompatible types in %s", context);
-	errorf(HERE, "'%T' <- '%T'", orig_type_left, orig_type_right);
+	errorf(HERE, "incompatible types in %s: '%T' <- '%T'",
+	       context, orig_type_left, orig_type_right);
 }
 
 static expression_t *parse_constant_expression(void)
@@ -1261,7 +1261,9 @@ static initializer_t *parse_initializer(type_t *type)
 		expression_t  *expression  = parse_assignment_expression();
 		initializer_t *initializer = initializer_from_expression(type, expression);
 		if(initializer == NULL) {
-			errorf(HERE, "initializer expression '%E', type '%T' is incompatible with type '%T'", expression, expression->base.datatype, type);
+			errorf(HERE,
+				"initializer expression '%E' of type '%T' is incompatible with type '%T'",
+				expression, expression->base.datatype, type);
 		}
 		return initializer;
 	}
