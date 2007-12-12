@@ -4989,7 +4989,7 @@ static statement_t *parse_switch(void)
 	expect(')');
 
 	switch_statement_t *rem = current_switch;
-	current_switch  = &statement;
+	current_switch  = statement;
 	statement->body = parse_statement();
 	current_switch  = rem;
 
