@@ -820,7 +820,7 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
 				&& !types_compatible(points_to_left, points_to_right)) {
-			return NULL;
+			return type_error_type;
 		}
 
 		return orig_type_left;
@@ -834,7 +834,7 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		}
 	}
 
-	return NULL;
+	return type_error_type;
 }
 
 static expression_t *parse_constant_expression(void)
@@ -1043,7 +1043,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 	}
 
 	type_t *const res_type = semantic_assign(type, expression, "initializer");
-	if (res_type == NULL)
+	if (!is_type_valid(res_type))
 		return NULL;
 
 	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
@@ -4563,7 +4563,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 
 	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
 	                                         "assignment");
-	if (res_type == NULL) {
+	if (!is_type_valid(res_type)) {
 		errorf(expression->expression.source_position,
 			"cannot assign to '%T' from '%T'",
 			orig_type_left, expression->right->base.datatype);
@@ -4571,7 +4571,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		expression->right = create_implicit_cast(expression->right, res_type);
 	}
 
-	expression->expression.datatype = orig_type_left;
+	expression->expression.datatype = res_type;
 }
 
 static void semantic_comma(binary_expression_t *expression)
@@ -5350,9 +5350,9 @@ static statement_t *parse_return(void)
 	}
 	expect(';');
 
-	if(return_type == NULL)
+	if(!is_type_valid(return_type))
 		return (statement_t*) statement;
-	if(return_value != NULL && return_value->base.datatype == NULL)
+	if(!is_type_valid(return_value->base.datatype))
 		return (statement_t*) statement;
 
 	return_type = skip_typeref(return_type);
@@ -5372,7 +5372,7 @@ static statement_t *parse_return(void)
 
 				type_t *const res_type = semantic_assign(return_type,
 					return_value, "'return'");
-				if (res_type == NULL) {
+				if (!is_type_valid(res_type)) {
 					errorf(statement->statement.source_position,
 						"cannot assign to '%T' from '%T'",
 						"cannot return something of type '%T' in function returning '%T'",
