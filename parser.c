@@ -2848,8 +2848,6 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			declaration->source_position = token.source_position;
 			declaration->modifiers       = specifiers->decl_modifiers;
 			declaration->type            = type;
-
-			record_declaration(declaration);
 		} else {
 			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);
 
