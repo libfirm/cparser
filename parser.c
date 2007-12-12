@@ -1378,13 +1378,13 @@ static void parse_enum_entries(type_t *const enum_type)
 	}
 
 	do {
-		declaration_t *entry = allocate_ast_zero(sizeof(entry[0]));
-
 		if(token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing enum entry", T_IDENTIFIER, 0);
 			eat_block();
 			return;
 		}
+
+		declaration_t *const entry = allocate_ast_zero(sizeof(entry[0]));
 		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
 		entry->type            = enum_type;
 		entry->symbol          = token.v.symbol;
