@@ -1367,7 +1367,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	return declaration;
 }
 
-static void parse_enum_entries(enum_type_t *const enum_type)
+static void parse_enum_entries(type_t *const enum_type)
 {
 	eat('{');
 
@@ -1386,7 +1386,7 @@ static void parse_enum_entries(enum_type_t *const enum_type)
 			return;
 		}
 		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
-		entry->type            = (type_t*) enum_type;
+		entry->type            = enum_type;
 		entry->symbol          = token.v.symbol;
 		entry->source_position = token.source_position;
 		next_token();
@@ -1451,7 +1451,7 @@ static type_t *parse_enum_specifier(void)
 		append_declaration(declaration);
 		declaration->init.is_defined = 1;
 
-		parse_enum_entries(&type->enumt);
+		parse_enum_entries(type);
 		parse_attributes();
 	}
 
