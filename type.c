@@ -539,6 +539,9 @@ bool is_type_scalar(const type_t *type)
 	return is_type_arithmetic(type);
 }
 
+/**
+ * Check if a given type is incomplete
+ */
 bool is_type_incomplete(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -548,6 +551,11 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_COMPOUND_UNION: {
 		const compound_type_t *compound_type = &type->compound;
 		declaration_t         *declaration   = compound_type->declaration;
+		return !declaration->init.is_defined;
+	}
+	case TYPE_ENUM: {
+		const enum_type_t *enum_type   = &type->enumt;
+		declaration_t     *declaration = enum_type->declaration;
 		return !declaration->init.is_defined;
 	}
 	case TYPE_BITFIELD:
@@ -561,7 +569,6 @@ bool is_type_incomplete(const type_t *type)
 		return type->atomic.akind == ATOMIC_TYPE_VOID;
 
 	case TYPE_POINTER:
-	case TYPE_ENUM:
 	case TYPE_BUILTIN:
 		return false;
 

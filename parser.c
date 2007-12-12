@@ -2443,6 +2443,10 @@ static declaration_t *record_declaration(declaration_t *declaration)
 			errorf(declaration->source_position, "'%Y' declared as function returning a function",
 				declaration->symbol);
 			declaration->type = type_error_type;
+		} else if (ret_type->kind == TYPE_ARRAY) {
+			errorf(declaration->source_position, "'%Y' declared as function returning an array",
+				declaration->symbol);
+			declaration->type = type_error_type;
 		}
 	}
 	if (! is_valid_array_type(type)) {
