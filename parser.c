@@ -2274,7 +2274,6 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
-	type_t        *type         = specifiers->type;
 	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->storage_class  = specifiers->storage_class;
 	declaration->modifiers      = specifiers->decl_modifiers;
@@ -2282,6 +2281,7 @@ static declaration_t *parse_declarator(
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(declaration, may_be_abstract);
+	type_t *const type = specifiers->type;
 	declaration->type = construct_declarator_type(construct_type, type);
 
 	if(construct_type != NULL) {
