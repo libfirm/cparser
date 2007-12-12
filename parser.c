@@ -2231,7 +2231,16 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 			function_type->function.return_type = type;
 
-			type = function_type;
+			type_t *skipped_return_type = skip_typeref(type);
+			if (is_type_function(skipped_return_type)) {
+				errorf(HERE, "function returning function is not allowed");
+				type = type_error_type;
+			} else if (is_type_array(skipped_return_type)) {
+				errorf(HERE, "function returning array is not allowed");
+				type = type_error_type;
+			} else {
+				type = function_type;
+			}
 			break;
 		}
 
@@ -2255,7 +2264,13 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			array_type->array.is_variable  = parsed_array->is_variable;
 			array_type->array.size         = parsed_array->size;
 
-			type = array_type;
+			type_t *skipped_type = skip_typeref(type);
+			if (is_type_atomic(skipped_type, ATOMIC_TYPE_VOID)) {
+				errorf(HERE, "array of void is not allowed");
+				type = type_error_type;
+			} else {
+				type = array_type;
+			}
 			break;
 		}
 		}
@@ -2407,57 +2422,12 @@ warn_redundant_declaration:
 	return append_declaration(declaration);
 }
 
-/**
- * Check if a given type is a vilid array type.
- */
-static bool is_valid_array_type(const type_t *type) {
-	if (type->kind == TYPE_ARRAY) {
-		const array_type_t *array = &type->array;
-		const type_t       *etype = skip_typeref(array->element_type);
-
-		if (! is_valid_array_type(etype))
-			return false;
-
-		if (etype->kind == TYPE_ATOMIC) {
-			const atomic_type_t *atype = &etype->atomic;
-
-			if (atype->akind == ATOMIC_TYPE_VOID) {
-				return false;
-			}
-		}
-	}
-	return true;
-}
-
 static declaration_t *record_declaration(declaration_t *declaration)
 {
-	declaration = internal_record_declaration(declaration, false);
-	const type_t *type = skip_typeref(declaration->type);
-
-	/* check the type here for several not allowed combinations */
-	if (type->kind == TYPE_FUNCTION) {
-		const function_type_t* function_type = &type->function;
-		const type_t*          ret_type      = skip_typeref(function_type->return_type);
-
-		if (ret_type->kind == TYPE_FUNCTION) {
-			errorf(declaration->source_position, "'%Y' declared as function returning a function",
-				declaration->symbol);
-			declaration->type = type_error_type;
-		} else if (ret_type->kind == TYPE_ARRAY) {
-			errorf(declaration->source_position, "'%Y' declared as function returning an array",
-				declaration->symbol);
-			declaration->type = type_error_type;
-		}
-	}
-	if (! is_valid_array_type(type)) {
-		errorf(declaration->source_position, "declaration of '%Y' as array of voids",
-				declaration->symbol);
-		declaration->type = type_error_type;
-	}
-	return declaration;
+	return internal_record_declaration(declaration, false);
 }
 
-static declaration_t *record_function_definition(declaration_t *const declaration)
+static declaration_t *record_function_definition(declaration_t *declaration)
 {
 	return internal_record_declaration(declaration, true);
 }
