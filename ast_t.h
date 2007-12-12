@@ -172,7 +172,7 @@ struct const_expression_t {
 
 struct string_literal_expression_t {
 	expression_base_t  expression;
-	const char        *value;
+	string_t           value;
 };
 
 struct wide_string_literal_expression_t {
@@ -360,8 +360,8 @@ struct initializer_list_t {
 };
 
 struct initializer_string_t {
-	initializer_base_t  initializer;
-	const char         *string;
+	initializer_base_t initializer;
+	string_t           string;
 };
 
 struct initializer_wide_string_t {
@@ -526,20 +526,20 @@ struct for_statement_t {
 };
 
 struct asm_constraint_t {
-	const char       *constraints;
+	string_t          constraints;
 	expression_t     *expression;
 	symbol_t         *symbol;
 	asm_constraint_t *next;
 };
 
 struct asm_clobber_t {
-	const char    *clobber;
+	string_t       clobber;
 	asm_clobber_t *next;
 };
 
 struct asm_statement_t {
 	statement_base_t  statement;
-	const char       *asm_text;
+	string_t          asm_text;
 	asm_constraint_t *inputs;
 	asm_constraint_t *outputs;
 	asm_clobber_t    *clobbers;

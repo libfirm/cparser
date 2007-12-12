@@ -42,10 +42,10 @@ static void print_const(const const_expression_t *cnst)
 	}
 }
 
-static void print_quoted_string(const char *string)
+static void print_quoted_string(const string_t *const string)
 {
 	fputc('"', out);
-	for(const char *c = string; *c != '\0'; ++c) {
+	for (const char *c = string->begin, *const end = c + string->size; c != end; ++c) {
 		switch(*c) {
 		case '\"':  fputs("\\\"", out); break;
 		case '\\':  fputs("\\\\", out); break;
@@ -59,7 +59,7 @@ static void print_quoted_string(const char *string)
 		case '\?':  fputs("\\?", out); break;
 		default:
 			if(!isprint(*c)) {
-				fprintf(out, "\\x%x", *c);
+				fprintf(out, "\\%03o", *c);
 				break;
 			}
 			fputc(*c, out);
@@ -72,7 +72,7 @@ static void print_quoted_string(const char *string)
 static void print_string_literal(
 		const string_literal_expression_t *string_literal)
 {
-	print_quoted_string(string_literal->value);
+	print_quoted_string(&string_literal->value);
 }
 
 static void print_wide_string_literal(
@@ -626,7 +626,7 @@ static void print_asm_constraints(asm_constraint_t *constraints)
 		if(constraint->symbol) {
 			fprintf(out, "[%s] ", constraint->symbol->string);
 		}
-		print_quoted_string(constraint->constraints);
+		print_quoted_string(&constraint->constraints);
 		fputs(" (", out);
 		print_expression(constraint->expression);
 		fputs(")", out);
@@ -640,7 +640,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 		if(clobber != clobbers)
 			fputs(", ", out);
 
-		print_quoted_string(clobber->clobber);
+		print_quoted_string(&clobber->clobber);
 	}
 }
 
@@ -651,7 +651,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 		fputs("volatile ", out);
 	}
 	fputs("(", out);
-	print_quoted_string(statement->asm_text);
+	print_quoted_string(&statement->asm_text);
 	if(statement->inputs == NULL && statement->outputs == NULL
 			&& statement->clobbers == NULL)
 		goto end_of_print_asm_statement;

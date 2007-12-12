@@ -868,15 +868,15 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 	return typedef_type;
 }
 
-static const char *parse_string_literals(void)
+static string_t parse_string_literals(void)
 {
 	assert(token.type == T_STRING_LITERAL);
-	const char *result = token.v.string;
+	string_t result = token.v.string;
 
 	next_token();
 
-	while(token.type == T_STRING_LITERAL) {
-		result = concat_strings(result, token.v.string);
+	while (token.type == T_STRING_LITERAL) {
+		result = concat_strings(&result, &token.v.string);
 		next_token();
 	}
 
@@ -979,13 +979,13 @@ static designator_t *parse_designation(void)
 #endif
 
 static initializer_t *initializer_from_string(array_type_t *type,
-                                              const char *string)
+                                              const string_t *const string)
 {
 	/* TODO: check len vs. size of array type */
 	(void) type;
 
 	initializer_t *initializer = allocate_initializer_zero(INITIALIZER_STRING);
-	initializer->string.string = string;
+	initializer->string.string = *string;
 
 	return initializer;
 }
@@ -1019,7 +1019,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 				case EXPR_STRING_LITERAL:
 					if (element_type->atomic.akind == ATOMIC_TYPE_CHAR) {
 						return initializer_from_string(array_type,
-							expression->string.value);
+							&expression->string.value);
 					}
 
 				case EXPR_WIDE_STRING_LITERAL: {
@@ -2472,7 +2472,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 				case INITIALIZER_STRING: {
 					initializer_string_t *const string = &initializer->string;
-					cnst->conste.v.int_value = strlen(string->string) + 1;
+					cnst->conste.v.int_value = string->string.size;
 					break;
 				}
 
@@ -3284,7 +3284,6 @@ static expression_t *parse_function_keyword(void)
 
 	expression->expression.kind     = EXPR_FUNCTION;
 	expression->expression.datatype = type_string;
-	expression->value               = current_function->symbol->string;
 
 	return (expression_t*) expression;
 }
@@ -3303,7 +3302,6 @@ static expression_t *parse_pretty_function_keyword(void)
 
 	expression->expression.kind     = EXPR_PRETTY_FUNCTION;
 	expression->expression.datatype = type_string;
-	expression->value               = current_function->symbol->string;
 
 	return (expression_t*) expression;
 }

@@ -670,28 +670,30 @@ static int parse_escape_sequence(void)
 	}
 }
 
-const char *concat_strings(const char *s1, const char *s2)
+string_t concat_strings(const string_t *const s1, const string_t *const s2)
 {
-	size_t  len1   = strlen(s1);
-	size_t  len2   = strlen(s2);
+	const size_t len1 = s1->size - 1;
+	const size_t len2 = s2->size - 1;
 
-	char   *concat = obstack_alloc(&symbol_obstack, len1 + len2 + 1);
-	memcpy(concat, s1, len1);
-	memcpy(concat + len1, s2, len2 + 1);
+	char *const concat = obstack_alloc(&symbol_obstack, len1 + len2 + 1);
+	memcpy(concat, s1->begin, len1);
+	memcpy(concat + len1, s2->begin, len2 + 1);
 
+#if 0 /* TODO hash */
 	const char *result = strset_insert(&stringset, concat);
 	if(result != concat) {
 		obstack_free(&symbol_obstack, concat);
 	}
 
 	return result;
+#else
+	return (string_t){ concat, len1 + len2 + 1 };
+#endif
 }
 
 static void parse_string_literal(void)
 {
-	unsigned    start_linenr = lexer_token.source_position.linenr;
-	char       *string;
-	const char *result;
+	const unsigned start_linenr = lexer_token.source_position.linenr;
 
 	assert(c == '"');
 	next_char();
@@ -728,16 +730,22 @@ end_of_string:
 
 	/* add finishing 0 to the string */
 	obstack_1grow(&symbol_obstack, '\0');
-	string = obstack_finish(&symbol_obstack);
+	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
+	const char *const string = obstack_finish(&symbol_obstack);
 
+#if 0 /* TODO hash */
 	/* check if there is already a copy of the string */
 	result = strset_insert(&stringset, string);
 	if(result != string) {
 		obstack_free(&symbol_obstack, string);
 	}
+#else
+	const char *const result = string;
+#endif
 
-	lexer_token.type     = T_STRING_LITERAL;
-	lexer_token.v.string = result;
+	lexer_token.type           = T_STRING_LITERAL;
+	lexer_token.v.string.begin = result;
+	lexer_token.v.string.size  = size;
 }
 
 static void parse_wide_character_constant(void)
@@ -989,7 +997,7 @@ static void parse_line_directive(void)
 		next_pp_token();
 	}
 	if(pp_token.type == T_STRING_LITERAL) {
-		lexer_token.source_position.input_name = pp_token.v.string;
+		lexer_token.source_position.input_name = pp_token.v.string.begin;
 		next_pp_token();
 	}
 

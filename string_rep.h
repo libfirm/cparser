@@ -5,12 +5,10 @@
 
 typedef wchar_t wchar_rep_t;
 
-#if 0 /* TODO */
 typedef struct string_t {
 	const char *begin;
-	const char *end;
+	size_t      size;
 } string_t;
-#endif
 
 typedef struct wide_string_t {
 	const wchar_rep_t *begin;

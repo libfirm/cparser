@@ -960,7 +960,7 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
 
 static ir_node *string_to_firm(const source_position_t *const src_pos,
                                const char *const id_prefix,
-                               const char *const string)
+                               const string_t *const value)
 {
 	ir_type *const global_type = get_glob_type();
 	ir_type *const type        = new_type_array(unique_ident("strtype"), 1,
@@ -976,7 +976,8 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	ir_type *const elem_type = ir_type_const_char;
 	ir_mode *const mode      = get_type_mode(elem_type);
 
-	const size_t slen = strlen(string) + 1;
+	const char* const string = value->begin;
+	const size_t      slen   = value->size;
 
 	set_array_lower_bound_int(type, 0, 0);
 	set_array_upper_bound_int(type, 0, slen);
@@ -998,7 +999,7 @@ static ir_node *string_literal_to_firm(
 		const string_literal_expression_t* literal)
 {
 	return string_to_firm(&literal->expression.source_position, "Lstr",
-	                      literal->value);
+	                      &literal->value);
 }
 
 static ir_node *wide_string_literal_to_firm(
@@ -2366,7 +2367,8 @@ static ir_node *function_name_to_firm(
 		const source_position_t *const src_pos =
 			&expr->expression.source_position;
 		const char *const name = current_function_decl->symbol->string;
-		current_function_name = string_to_firm(src_pos, "__func__", name);
+		const string_t string = { name, strlen(name) + 1 };
+		current_function_name = string_to_firm(src_pos, "__func__", &string);
 	}
 
 	return current_function_name;
@@ -2780,19 +2782,18 @@ static void create_initializer_string(initializer_string_t *initializer,
 	entry.prev = last_entry;
 	++len;
 
-	ir_type    *irtype  = get_entity_type(entity);
-	size_t      arr_len = get_array_type_size(type);
-	const char *p       = initializer->string;
-	size_t      i       = 0;
-	for(i = 0; i < arr_len; ++i, ++p) {
+	ir_type    *const irtype  = get_entity_type(entity);
+	size_t            arr_len = get_array_type_size(type);
+	const char *const p       = initializer->string.begin;
+	if (initializer->string.size < arr_len) {
+		arr_len = initializer->string.size;
+	}
+	for (size_t i = 0; i < arr_len; ++i) {
 		entry.v.array_index = i;
 
-		ir_node             *node = new_Const_long(mode_Bs, *p);
+		ir_node             *node = new_Const_long(mode_Bs, p[i]);
 		compound_graph_path *path = create_compound_path(irtype, &entry, len);
 		add_compound_ent_value_w_path(entity, node, path);
-
-		if(*p == '\0')
-			break;
 	}
 }
 

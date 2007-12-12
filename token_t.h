@@ -41,7 +41,7 @@ typedef struct {
 		symbol_t      *symbol;
 		long long      intvalue;
 		long double    floatvalue;
-		const char    *string;
+		string_t       string;
 		wide_string_t  wide_string;
 	} v;
 	type_t            *datatype;

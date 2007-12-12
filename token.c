@@ -98,7 +98,7 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "floatingpointer number %LF", token->v.floatvalue);
 		break;
 	case T_STRING_LITERAL:
-		fprintf(f, "string '%s'", token->v.string);
+		fprintf(f, "string '%s'", token->v.string.begin); /* TODO suboptimal */
 		break;
 	default:
 		print_token_type(f, (token_type_t)token->type);
