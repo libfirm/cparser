@@ -2375,7 +2375,7 @@ warn_redundant_declaration:
 					errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
 					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
 				} else {
-					if (old_storage_class != STORAGE_CLASS_EXTERN) {
+					if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
 						goto warn_redundant_declaration;
 					}
 					if (new_storage_class == STORAGE_CLASS_NONE) {
