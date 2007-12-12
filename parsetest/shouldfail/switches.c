@@ -10,6 +10,8 @@ int main(int argc) {
 	}
 	case 1:
 		break;
+	default: continue;
+
 
 	switch (argc) {
 	case 1:
