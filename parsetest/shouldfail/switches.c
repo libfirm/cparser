@@ -16,6 +16,10 @@ int main(int argc) {
 	switch (argc) {
 	case 1:
 		break;
+	case argc:
+	default:
+	default:
+		break;
 	}
 	return 0;
 }

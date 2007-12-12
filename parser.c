@@ -50,7 +50,8 @@ static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
-static goto_statement_t   *goto_list         = NULL;
+static goto_statement_t   *goto_first        = NULL;
+static goto_statement_t   *goto_last         = NULL;
 static struct obstack  temp_obst;
 
 /** The current source position. */
@@ -2700,19 +2701,24 @@ static void parse_kr_declaration_list(declaration_t *declaration)
  */
 static void check_for_missing_labels(void)
 {
-	const goto_statement_t *goto_statement, *next;
-
-	for (goto_statement = goto_list;
+	bool first_err = true;
+	for (const goto_statement_t *goto_statement = goto_first;
 	     goto_statement != NULL;
-	     goto_statement = next) {
+	     goto_statement = goto_statement->next) {
 		 const declaration_t *label = goto_statement->label;
 
 		 if (label->source_position.input_name == NULL) {
+			 if (first_err) {
+				 first_err = false;
+				 diagnosticf("%s: In function '%Y':\n",
+					 current_function->source_position.input_name,
+					 current_function->symbol);
+			 }
 			 errorf(goto_statement->statement.source_position,
 				 "label '%Y' used but not defined", label->symbol);
 		 }
 	}
-	goto_list = NULL;
+	goto_first = goto_last = NULL;
 }
 
 static void parse_external_declaration(void)
@@ -5193,8 +5199,11 @@ static statement_t *parse_goto(void)
 	statement->label = label;
 
 	/* remember the goto's in a list for later checking */
-	statement->next = goto_list;
-	goto_list       = statement;
+	if (goto_last == NULL) {
+		goto_first = goto_last = statement;
+	} else {
+		goto_last->next = statement;
+	}
 
 	expect(';');
 
