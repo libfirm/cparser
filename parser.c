@@ -1264,6 +1264,10 @@ static initializer_t *parse_initializer(type_t *type)
 
 	if(token.type != '{') {
 		expression_t  *expression  = parse_assignment_expression();
+		if (expression->base.datatype == NULL) {
+			/* something bad happens, don't produce further errors */
+			return NULL;
+		}
 		initializer_t *initializer = initializer_from_expression(type, expression);
 		if(initializer == NULL) {
 			errorf(HERE,
@@ -2929,10 +2933,15 @@ static expression_t *create_invalid_expression(void)
 	return expression;
 }
 
+/**
+ * Prints an error message if an expression was expected but not read
+ */
 static expression_t *expected_expression_error(void)
 {
-	errorf(HERE, "expected expression, got token '%K'", &token);
-
+	/* skip the error message if the error token was read */
+	if (token.type != T_ERROR) {
+		errorf(HERE, "expected expression, got token '%K'", &token);
+	}
 	next_token();
 
 	return create_invalid_expression();

@@ -1,0 +1,1 @@
+char s[] = "unclosed string
