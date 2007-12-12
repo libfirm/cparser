@@ -5201,17 +5201,18 @@ static statement_t *parse_goto(void)
  */
 static statement_t *parse_continue(void)
 {
-	eat(T_continue);
-	expect(';');
-
-	statement_t *statement          = allocate_ast_zero(sizeof(statement[0]));
-	statement->kind                 = STATEMENT_CONTINUE;
-	statement->base.source_position = token.source_position;
-
+	statement_t *statement;
 	if (current_loop == NULL) {
 		errorf(HERE, "continue statement not within loop");
-		return NULL;
+		statement = NULL;
+	} else {
+		statement                       = allocate_ast_zero(sizeof(statement[0]));
+		statement->kind                 = STATEMENT_CONTINUE;
+		statement->base.source_position = token.source_position;
 	}
+
+	eat(T_continue);
+	expect(';');
 
 	return statement;
 }
@@ -5221,17 +5222,19 @@ static statement_t *parse_continue(void)
  */
 static statement_t *parse_break(void)
 {
+	statement_t *statement;
+	if (current_switch == NULL && current_loop == NULL) {
+		errorf(HERE, "break statement not within loop or switch");
+		statement = NULL;
+	} else {
+		statement                       = allocate_ast_zero(sizeof(statement[0]));
+		statement->kind                 = STATEMENT_BREAK;
+		statement->base.source_position = token.source_position;
+	}
+
 	eat(T_break);
 	expect(';');
 
-	statement_t *statement          = allocate_ast_zero(sizeof(statement[0]));
-	statement->kind                 = STATEMENT_BREAK;
-	statement->base.source_position = token.source_position;
-
-	if (current_switch == NULL && current_loop == NULL) {
-		errorf(HERE, "break statement not within loop or switch");
-		return NULL;
-	}
 	return statement;
 }
 
