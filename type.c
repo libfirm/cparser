@@ -262,8 +262,10 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 static void intern_print_type_pre(const type_t *const type, const bool top)
 {
 	switch(type->kind) {
+	case TYPE_ERROR:
+		fputs("<error>", out);
 	case TYPE_INVALID:
-		fputs("invalid", out);
+		fputs("<invalid>", out);
 		return;
 	case TYPE_ENUM:
 		print_type_enum(&type->enumt);
@@ -315,6 +317,7 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 	case TYPE_BITFIELD:
 		print_bitfield_type_post(&type->bitfield);
 		return;
+	case TYPE_ERROR:
 	case TYPE_INVALID:
 	case TYPE_ATOMIC:
 	case TYPE_ENUM:
@@ -366,6 +369,7 @@ static size_t get_type_size(type_t *type)
 	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
 	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
 	case TYPE_BITFIELD:        return sizeof(bitfield_type_t);
+	case TYPE_ERROR:           panic("error type found");
 	case TYPE_INVALID:         panic("invalid type found");
 	}
 	panic("unknown type found");
@@ -564,6 +568,8 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("is_type_incomplete called without typerefs skipped");
+	case TYPE_ERROR:
+		panic("error type found");
 	case TYPE_INVALID:
 		break;
 	}
@@ -665,6 +671,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		 * really need it! */
 		panic("type compatibility check for bitfield type");
 
+	case TYPE_ERROR:
+		/* Hmm, the error type should be compatible to all other types */
+		return true;
 	case TYPE_INVALID:
 		panic("invalid type found in compatible types");
 	case TYPE_TYPEDEF:
@@ -687,12 +696,17 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 	return true;
 }
 
+/**
+ * Skip all typerefs and return the underlying type.
+ */
 type_t *skip_typeref(type_t *type)
 {
 	unsigned qualifiers = TYPE_QUALIFIER_NONE;
 
 	while(true) {
 		switch(type->kind) {
+		case TYPE_ERROR:
+			return type;
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
 			const typedef_type_t *typedef_type = &type->typedeft;

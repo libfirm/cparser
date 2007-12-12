@@ -138,7 +138,9 @@ static void *allocate_ast_zero(size_t size)
 
 static declaration_t *allocate_declaration_zero(void)
 {
-	return allocate_ast_zero(sizeof(*allocate_declaration_zero()));
+	declaration_t *declaration = allocate_ast_zero(sizeof(*allocate_declaration_zero()));
+	declaration->type = type_error_type;
+	return declaration;
 }
 
 /**
@@ -234,7 +236,8 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 	size_t        size = get_expression_struct_size(kind);
 	expression_t *res  = allocate_ast_zero(size);
 
-	res->base.kind = kind;
+	res->base.kind     = kind;
+	res->base.datatype = type_error_type;
 	return res;
 }
 
@@ -1677,7 +1680,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}
 			break;
 
-		/* TODO: if type != NULL for the following rules should issue
+		/* TODO: if is_type_valid(type) for the following rules should issue
 		 * an error */
 		case T_struct: {
 			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
@@ -2408,18 +2411,14 @@ warn_redundant_declaration:
  * Check if a given type is a vilid array type.
  */
 static bool is_valid_array_type(const type_t *type) {
-	if (type == NULL) {
-		/* the error type should be already handled */
-		return true;
-	}
 	if (type->kind == TYPE_ARRAY) {
 		const array_type_t *array = &type->array;
-		const type_t       *etype = array->element_type;
+		const type_t       *etype = skip_typeref(array->element_type);
 
 		if (! is_valid_array_type(etype))
 			return false;
 
-		if (etype != NULL && etype->kind == TYPE_ATOMIC) {
+		if (etype->kind == TYPE_ATOMIC) {
 			const atomic_type_t *atype = &etype->atomic;
 
 			if (atype->akind == ATOMIC_TYPE_VOID) {
@@ -2433,13 +2432,23 @@ static bool is_valid_array_type(const type_t *type) {
 static declaration_t *record_declaration(declaration_t *declaration)
 {
 	declaration = internal_record_declaration(declaration, false);
-	const type_t *type = declaration->type;
-	if (type != NULL) {
-		/* check the type here for several not allowed combinations */
-		if (! is_valid_array_type(type)) {
-			errorf(declaration->source_position, "declaration of '%Y' as array of voids",
-					declaration->symbol);
+	const type_t *type = skip_typeref(declaration->type);
+
+	/* check the type here for several not allowed combinations */
+	if (type->kind == TYPE_FUNCTION) {
+		const function_type_t* function_type = &type->function;
+		const type_t*          ret_type      = skip_typeref(function_type->return_type);
+
+		if (ret_type->kind == TYPE_FUNCTION) {
+			errorf(declaration->source_position, "'%Y' declared as function returning a function",
+				declaration->symbol);
+			declaration->type = type_error_type;
 		}
+	}
+	if (! is_valid_array_type(type)) {
+		errorf(declaration->source_position, "declaration of '%Y' as array of voids",
+				declaration->symbol);
+		declaration->type = type_error_type;
 	}
 	return declaration;
 }
@@ -2482,9 +2491,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	eat('=');
 
 	type_t *orig_type = declaration->type;
-	type_t *type      = NULL;
-	if(orig_type != NULL)
-		type = skip_typeref(orig_type);
+	type_t *type      = type = skip_typeref(orig_type);
 
 	if(declaration->init.initializer != NULL) {
 		parser_error_multiple_definition(declaration, token.source_position);
@@ -2494,7 +2501,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
 	 * the array type size */
-	if(type != NULL && is_type_array(type) && initializer != NULL) {
+	if(is_type_array(type) && initializer != NULL) {
 		array_type_t *array_type = &type->array;
 
 		if(array_type->size == NULL) {
@@ -2529,7 +2536,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		}
 	}
 
-	if(type != NULL && is_type_function(type)) {
+	if(is_type_function(type)) {
 		errorf(declaration->source_position,
 		       "initializers not allowed for function types at declator '%Y' (type '%T')",
 		       declaration->symbol, orig_type);
@@ -2586,7 +2593,8 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		type_t *orig_type = declaration->type;
 		type_t *type      = skip_typeref(orig_type);
 
-		if(type->kind != TYPE_FUNCTION && declaration->is_inline) {
+		if(is_type_valid(type) &&
+		   type->kind != TYPE_FUNCTION && declaration->is_inline) {
 			warningf(declaration->source_position,
 			         "variable '%Y' declared 'inline'\n", declaration->symbol);
 		}
@@ -3853,7 +3861,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 	function_type_t *function_type = NULL;
 	type_t          *orig_type     = expression->base.datatype;
-	if(orig_type != NULL) {
+	if(is_type_valid(orig_type)) {
 		type_t *type  = skip_typeref(orig_type);
 
 		if(is_type_pointer(type)) {
@@ -3977,9 +3985,9 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	/* 6.5.15.2 */
 	type_t *condition_type_orig = expression->base.datatype;
-	if(condition_type_orig != NULL) {
+	if(is_type_valid(condition_type_orig)) {
 		type_t *condition_type = skip_typeref(condition_type_orig);
-		if(condition_type != NULL && !is_type_scalar(condition_type)) {
+		if(condition_type->kind != TYPE_ERROR && !is_type_scalar(condition_type)) {
 			type_error("expected a scalar type in conditional condition",
 			           expression->base.source_position, condition_type_orig);
 		}
@@ -3994,7 +4002,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	type_t *orig_true_type  = true_expression->base.datatype;
 	type_t *orig_false_type = false_expression->base.datatype;
-	if(orig_true_type == NULL || orig_false_type == NULL)
+	if(!is_type_valid(orig_true_type) || !is_type_valid(orig_false_type))
 		return result;
 
 	type_t *true_type  = skip_typeref(orig_true_type);
@@ -4062,7 +4070,7 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	type_t *type = skip_typeref(orig_type);
@@ -4078,7 +4086,7 @@ static void semantic_incdec(unary_expression_t *expression)
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	type_t *type = skip_typeref(orig_type);
@@ -4094,7 +4102,7 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 static void semantic_unexpr_scalar(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	type_t *type = skip_typeref(orig_type);
@@ -4109,7 +4117,7 @@ static void semantic_unexpr_scalar(unary_expression_t *expression)
 static void semantic_unexpr_integer(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	type_t *type = skip_typeref(orig_type);
@@ -4124,7 +4132,7 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 static void semantic_dereference(unary_expression_t *expression)
 {
 	type_t *orig_type = expression->value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	type_t *type = skip_typeref(orig_type);
@@ -4149,7 +4157,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 	value->base.datatype = revert_automatic_type_conversion(value);
 
 	type_t *orig_type = value->base.datatype;
-	if(orig_type == NULL)
+	if(!is_type_valid(orig_type))
 		return;
 
 	if(value->kind == EXPR_REFERENCE) {
@@ -5346,7 +5354,7 @@ static statement_t *parse_return(void)
 				"'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
-			if(return_type != NULL) {
+			if(is_type_valid(return_type)) {
 				semantic_assign(return_type, &return_value, "'return'");
 			}
 		}

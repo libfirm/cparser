@@ -16,6 +16,7 @@ extern struct obstack *type_obst;
 
 typedef enum {
 	TYPE_INVALID,
+	TYPE_ERROR,
 	TYPE_ATOMIC,
 	TYPE_COMPOUND_STRUCT,
 	TYPE_COMPOUND_UNION,

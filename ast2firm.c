@@ -312,6 +312,8 @@ static unsigned get_type_size(type_t *type)
 	type = skip_typeref(type);
 
 	switch(type->kind) {
+	case TYPE_ERROR:
+		panic("error type occured");
 	case TYPE_ATOMIC:
 		return get_atomic_type_size(&type->atomic);
 	case TYPE_ENUM:
@@ -733,6 +735,8 @@ static ir_type *get_ir_type(type_t *type)
 
 	ir_type *firm_type = NULL;
 	switch(type->kind) {
+	case TYPE_ERROR:
+		panic("error type occured");
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(&type->atomic);
 		break;

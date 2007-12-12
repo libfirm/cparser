@@ -3,6 +3,8 @@
 
 #include "type.h"
 
+extern type_t *type_error_type;
+
 extern type_t *type_char;
 extern type_t *type_double;
 extern type_t *type_float;
@@ -40,5 +42,7 @@ extern type_t *type_ssize_t_ptr;
 extern type_t *type_wchar_t_ptr;
 
 void init_basic_types(void);
+
+#define is_type_valid(type) ((type)->kind != TYPE_ERROR)
 
 #endif

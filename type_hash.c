@@ -93,6 +93,8 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_INVALID:
 		panic("internalizing void or invalid types not possible");
 		return 0;
+	case TYPE_ERROR:
+		return 0;
 	case TYPE_ATOMIC:
 		hash = hash_atomic_type(&type->atomic);
 		break;
@@ -239,6 +241,9 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 		return false;
 
 	switch(type1->kind) {
+	case TYPE_ERROR:
+		/* Hmm, the error type is never equal */
+		return false;
 	case TYPE_INVALID:
 		return false;
 	case TYPE_ATOMIC:

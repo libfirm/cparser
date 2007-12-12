@@ -1,6 +1,8 @@
 #include "type_t.h"
 #include "types.h"
 
+/** The error type. */
+type_t *type_error_type;
 
 type_t *type_char;
 type_t *type_double;
@@ -41,6 +43,8 @@ type_t *type_wchar_t_ptr;
 
 void init_basic_types(void)
 {
+	static const type_kind_t error = TYPE_ERROR;
+	type_error_type         = (type_t *)&error;
 	type_signed_char        = make_atomic_type(ATOMIC_TYPE_SCHAR,       TYPE_QUALIFIER_NONE);
 	type_short              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
 	type_int                = make_atomic_type(ATOMIC_TYPE_INT,         TYPE_QUALIFIER_NONE);
