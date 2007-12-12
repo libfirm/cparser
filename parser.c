@@ -136,6 +136,11 @@ static void *allocate_ast_zero(size_t size)
 	return res;
 }
 
+static declaration_t *allocate_declaration_zero(void)
+{
+	return allocate_ast_zero(sizeof(*allocate_declaration_zero()));
+}
+
 /**
  * Returns the size of a statement node.
  *
@@ -848,7 +853,7 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 {
 	symbol_t *const symbol       = symbol_table_insert(name);
 
-	declaration_t *declaration   = allocate_ast_zero(sizeof(declaration[0]));
+	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->namespc         = NAMESPACE_NORMAL;
 	declaration->storage_class   = STORAGE_CLASS_TYPEDEF;
 	declaration->type            = type;
@@ -1327,13 +1332,9 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if(declaration == NULL) {
-		declaration = allocate_ast_zero(sizeof(declaration[0]));
-
-		if(is_struct) {
-			declaration->namespc = NAMESPACE_STRUCT;
-		} else {
-			declaration->namespc = NAMESPACE_UNION;
-		}
+		declaration = allocate_declaration_zero();
+		declaration->namespc         =
+			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
 		declaration->parent_context  = context;
@@ -1384,7 +1385,7 @@ static void parse_enum_entries(type_t *const enum_type)
 			return;
 		}
 
-		declaration_t *const entry = allocate_ast_zero(sizeof(entry[0]));
+		declaration_t *const entry = allocate_declaration_zero();
 		entry->storage_class   = STORAGE_CLASS_ENUM_ENTRY;
 		entry->type            = enum_type;
 		entry->symbol          = token.v.symbol;
@@ -1430,9 +1431,8 @@ static type_t *parse_enum_specifier(void)
 	}
 
 	if(declaration == NULL) {
-		declaration = allocate_ast_zero(sizeof(declaration[0]));
-
-		declaration->namespc       = NAMESPACE_ENUM;
+		declaration = allocate_declaration_zero();
+		declaration->namespc         = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
 		declaration->parent_context  = context;
@@ -1874,8 +1874,7 @@ static declaration_t *parse_identifier_list(void)
 	declaration_t *declarations     = NULL;
 	declaration_t *last_declaration = NULL;
 	do {
-		declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-
+		declaration_t *const declaration = allocate_declaration_zero();
 		declaration->source_position = token.source_position;
 		declaration->symbol          = token.v.symbol;
 		next_token();
@@ -2272,7 +2271,7 @@ static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
 	type_t        *type         = specifiers->type;
-	declaration_t *declaration  = allocate_ast_zero(sizeof(declaration[0]));
+	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->storage_class  = specifiers->storage_class;
 	declaration->modifiers      = specifiers->decl_modifiers;
 	declaration->is_inline      = specifiers->is_inline;
@@ -2507,8 +2506,7 @@ static void parse_anonymous_declaration_rest(
 {
 	eat(';');
 
-	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-
+	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->type            = specifiers->type;
 	declaration->storage_class   = specifiers->storage_class;
 	declaration->source_position = specifiers->source_position;
@@ -2844,8 +2842,7 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 
 			type_t *type = make_bitfield_type(base_type, size);
 
-			declaration = allocate_ast_zero(sizeof(declaration[0]));
-
+			declaration = allocate_declaration_zero();
 			declaration->namespc         = NAMESPACE_NORMAL;
 			declaration->storage_class   = STORAGE_CLASS_NONE;
 			declaration->source_position = token.source_position;
@@ -3007,8 +3004,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 		free_type(ntype);
 	}
 
-	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
-
+	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->storage_class   = STORAGE_CLASS_EXTERN;
 	declaration->type            = type;
 	declaration->symbol          = symbol;
@@ -4969,7 +4965,7 @@ static declaration_t *get_label(symbol_t *symbol)
 	}
 
 	/* otherwise we need to create a new one */
-	declaration_t *declaration = allocate_ast_zero(sizeof(declaration[0]));
+	declaration_t *const declaration = allocate_declaration_zero();
 	declaration->namespc       = NAMESPACE_LABEL;
 	declaration->symbol        = symbol;
 
