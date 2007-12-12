@@ -595,7 +595,10 @@ int main(int argc, char **argv)
 
 	FILE *preprocessed_in = preprocess(in, input);
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
-	pclose(preprocessed_in);
+	int result = pclose(preprocessed_in);
+	if(result != 0) {
+		return result;
+	}
 	if(unit == NULL) {
 		/* parsing failed because of errors */
 		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count, warning_count);
