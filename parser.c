@@ -2323,6 +2323,11 @@ static declaration_t *internal_record_declaration(
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL
 			&& previous_declaration->parent_context == context) {
+		/* can happen for K&R style declarations */
+		if(previous_declaration->type == NULL) {
+			previous_declaration->type = declaration->type;
+		}
+
 		const type_t *const prev_type = skip_typeref(previous_declaration->type);
 		if (!types_compatible(type, prev_type)) {
 			errorf(declaration->source_position,
@@ -2558,11 +2563,32 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 
 static declaration_t *finished_kr_declaration(declaration_t *declaration)
 {
-	/* TODO: check that it was actually a parameter that gets a type */
+	symbol_t *symbol  = declaration->symbol;
+	if(symbol == NULL) {
+		errorf(HERE, "anonymous declaration not valid as function parameter");
+		return declaration;
+	}
+	namespace_t namespc = (namespace_t) declaration->namespc;
+	if(namespc != NAMESPACE_NORMAL) {
+		return record_declaration(declaration);
+	}
 
-	/* we should have a declaration for the parameter in the current
-	 * scope */
-	return record_declaration(declaration);
+	declaration_t *previous_declaration = get_declaration(symbol, namespc);
+	if(previous_declaration == NULL ||
+			previous_declaration->parent_context != context) {
+		errorf(HERE, "expected declaration of a function parameter, found '%Y'",
+		       symbol);
+		return declaration;
+	}
+
+	if(previous_declaration->type == NULL) {
+		previous_declaration->type           = declaration->type;
+		previous_declaration->storage_class  = declaration->storage_class;
+		previous_declaration->parent_context = context;
+		return previous_declaration;
+	} else {
+		return record_declaration(declaration);
+	}
 }
 
 static void parse_declaration(parsed_declaration_func finished_declaration)
@@ -2699,7 +2725,8 @@ static void parse_external_declaration(void)
 	/* note that we don't skip typerefs: the standard doesn't allow them here
 	 * (so we can't use is_type_function here) */
 	if(type->kind != TYPE_FUNCTION) {
-		errorf(HERE, "declarator '%#T' has a body but is not a function type", type, ndeclaration->symbol);
+		errorf(HERE, "declarator '%#T' has a body but is not a function type",
+		       type, ndeclaration->symbol);
 		eat_block();
 		return;
 	}
@@ -2730,7 +2757,11 @@ static void parse_external_declaration(void)
 
 	declaration_t *parameter = declaration->context.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		assert(parameter->parent_context == NULL || parameter->parent_context == context);
+		if(parameter->parent_context == &ndeclaration->context) {
+			parameter->parent_context = context;
+		}
+		assert(parameter->parent_context == NULL
+				|| parameter->parent_context == context);
 		parameter->parent_context = context;
 		environment_push(parameter);
 	}
@@ -2952,9 +2983,16 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	declaration->source_position = source_position;
 	declaration->parent_context  = global_context;
 
+	context_t *old_context = context;
+	set_context(global_context);
+
 	environment_push(declaration);
+	/* prepend the declaration to the global declarations list */
 	declaration->next     = context->declarations;
 	context->declarations = declaration;
+
+	assert(context == global_context);
+	set_context(old_context);
 
 	return declaration;
 }
