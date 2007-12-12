@@ -483,6 +483,7 @@ struct switch_statement_t {
 struct goto_statement_t {
 	statement_base_t  statement;
 	declaration_t    *label;
+	goto_statement_t *next; /**< link all goto statements in a function */
 };
 
 struct case_label_statement_t {

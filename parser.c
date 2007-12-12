@@ -50,6 +50,7 @@ static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
+static goto_statement_t   *goto_list         = NULL;
 static struct obstack  temp_obst;
 
 /** The current source position. */
@@ -2694,6 +2695,26 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	declaration->type = type;
 }
 
+/**
+ * Check if all labels are defined in the current function.
+ */
+static void check_for_missing_labels(void)
+{
+	const goto_statement_t *goto_statement, *next;
+
+	for (goto_statement = goto_list;
+	     goto_statement != NULL;
+	     goto_statement = next) {
+		 const declaration_t *label = goto_statement->label;
+
+		 if (label->source_position.input_name == NULL) {
+			 errorf(goto_statement->statement.source_position,
+				 "label '%Y' used but not defined", label->symbol);
+		 }
+	}
+	goto_list = NULL;
+}
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -2787,6 +2808,7 @@ static void parse_external_declaration(void)
 		current_function                    = declaration;
 
 		declaration->init.statement = parse_compound_statement();
+		check_for_missing_labels();
 
 		assert(current_function == declaration);
 		current_function = old_current_function;
@@ -4858,21 +4880,42 @@ static statement_t *parse_case_statement(void)
 
 	expect(':');
 
-	if (current_switch != NULL) {
-		/* link all cases into the switch statement */
-		if (current_switch->last_case == NULL) {
-			current_switch->first_case =
-			current_switch->last_case  = &statement->case_label;
-		} else {
-			current_switch->last_case->next = &statement->case_label;
-		}
-	} else {
+	if (! is_constant_expression(statement->case_label.expression)) {
 		errorf(statement->base.source_position,
-			"case label not within a switch statement");
+			"case label does not reduce to an integer constant");
+	} else {
+		/* TODO: check if the case label is already known */
+		if (current_switch != NULL) {
+			/* link all cases into the switch statement */
+			if (current_switch->last_case == NULL) {
+				current_switch->first_case =
+				current_switch->last_case  = &statement->case_label;
+			} else {
+				current_switch->last_case->next = &statement->case_label;
+			}
+		} else {
+			errorf(statement->base.source_position,
+				"case label not within a switch statement");
+		}
 	}
 	statement->case_label.label_statement = parse_statement();
 
 	return statement;
+}
+
+/**
+ * Finds an existing default label of a switch statement.
+ */
+static case_label_statement_t *
+find_default_label(const switch_statement_t *statement)
+{
+	for (case_label_statement_t *label = statement->first_case;
+	     label != NULL;
+		 label = label->next) {
+		if (label->expression == NULL)
+			return label;
+	}
+	return NULL;
 }
 
 /**
@@ -4888,12 +4931,19 @@ static statement_t *parse_default_statement(void)
 
 	expect(':');
 	if (current_switch != NULL) {
-		/* link all cases into the switch statement */
-		if (current_switch->last_case == NULL) {
-			current_switch->first_case =
-				current_switch->last_case  = &statement->case_label;
+		const case_label_statement_t *def_label = find_default_label(current_switch);
+		if (def_label != NULL) {
+			errorf(HERE, "multiple default labels in one switch");
+			errorf(def_label->statement.source_position,
+				"this is the first default label");
 		} else {
-			current_switch->last_case->next = &statement->case_label;
+			/* link all cases into the switch statement */
+			if (current_switch->last_case == NULL) {
+				current_switch->first_case =
+					current_switch->last_case  = &statement->case_label;
+			} else {
+				current_switch->last_case->next = &statement->case_label;
+			}
 		}
 	} else {
 		errorf(statement->base.source_position,
@@ -5141,6 +5191,10 @@ static statement_t *parse_goto(void)
 	statement->statement.source_position = token.source_position;
 
 	statement->label = label;
+
+	/* remember the goto's in a list for later checking */
+	statement->next = goto_list;
+	goto_list       = statement;
 
 	expect(';');
 
