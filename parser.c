@@ -463,14 +463,6 @@ static void eat_paren(void)
     }                                              \
     next_token();
 
-#define expect_fail(expected)                      \
-    if(UNLIKELY(token.type != (expected))) {       \
-        parse_error_expected(NULL, (expected), 0); \
-        eat_statement();                           \
-        goto fail;                                 \
-    }                                              \
-    next_token();
-
 #define expect_block(expected)                     \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
@@ -5073,6 +5065,15 @@ static statement_t *parse_switch(void)
 	return (statement_t*) statement;
 }
 
+static statement_t *parse_loop_body(statement_t *const loop)
+{
+	statement_t *const rem = current_loop;
+	current_loop = loop;
+	statement_t *const body = parse_statement();
+	current_loop = rem;
+	return body;
+}
+
 /**
  * Parse a while statement.
  */
@@ -5084,18 +5085,13 @@ static statement_t *parse_while(void)
 	statement->statement.kind            = STATEMENT_WHILE;
 	statement->statement.source_position = token.source_position;
 
-	statement_t *rem = current_loop;
-	expect_fail('(');
+	expect('(');
 	statement->condition = parse_expression();
-	expect_fail(')');
+	expect(')');
 
-	statement->body = parse_statement();
-	current_loop = rem;
+	statement->body = parse_loop_body((statement_t*)statement);
 
 	return (statement_t*) statement;
-fail:
-	current_loop = rem;
-	return NULL;
 }
 
 /**
@@ -5109,19 +5105,14 @@ static statement_t *parse_do(void)
 	statement->statement.kind            = STATEMENT_DO_WHILE;
 	statement->statement.source_position = token.source_position;
 
-	statement_t *rem = current_loop;
-	statement->body = parse_statement();
-	expect_fail(T_while);
-	expect_fail('(');
+	statement->body = parse_loop_body((statement_t*)statement);
+	expect(T_while);
+	expect('(');
 	statement->condition = parse_expression();
-	expect_fail(')');
-	current_loop = rem;
+	expect(')');
 	expect(';');
 
 	return (statement_t*) statement;
-fail:
-	current_loop = rem;
-	return NULL;
 }
 
 /**
@@ -5137,7 +5128,6 @@ static statement_t *parse_for(void)
 
 	expect('(');
 
-	statement_t *rem = current_loop;
 	int         top          = environment_top();
 	context_t  *last_context = context;
 	set_context(&statement->context);
@@ -5147,31 +5137,27 @@ static statement_t *parse_for(void)
 			parse_declaration(record_declaration);
 		} else {
 			statement->initialisation = parse_expression();
-			expect_fail(';');
+			expect(';');
 		}
 	} else {
-		expect_fail(';');
+		expect(';');
 	}
 
 	if(token.type != ';') {
 		statement->condition = parse_expression();
 	}
-	expect_fail(';');
+	expect(';');
 	if(token.type != ')') {
 		statement->step = parse_expression();
 	}
-	expect_fail(')');
-	statement->body = parse_statement();
+	expect(')');
+	statement->body = parse_loop_body((statement_t*)statement);
 
 	assert(context == &statement->context);
 	set_context(last_context);
 	environment_pop_to(top);
-	current_loop = rem;
 
 	return (statement_t*) statement;
-fail:
-	current_loop = rem;
-	return NULL;
 }
 
 /**
