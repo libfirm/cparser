@@ -4887,6 +4887,18 @@ static statement_t *parse_default_statement(void)
 	statement->base.source_position = token.source_position;
 
 	expect(':');
+	if (current_switch != NULL) {
+		/* link all cases into the switch statement */
+		if (current_switch->last_case == NULL) {
+			current_switch->first_case =
+				current_switch->last_case  = &statement->case_label;
+		} else {
+			current_switch->last_case->next = &statement->case_label;
+		}
+	} else {
+		errorf(statement->base.source_position,
+			"'default' label not within a switch statement");
+	}
 	statement->label.label_statement = parse_statement();
 
 	return statement;
