@@ -2404,9 +2404,44 @@ warn_redundant_declaration:
 	return append_declaration(declaration);
 }
 
+/**
+ * Check if a given type is a vilid array type.
+ */
+static bool is_valid_array_type(const type_t *type) {
+	if (type == NULL) {
+		/* the error type should be already handled */
+		return true;
+	}
+	if (type->kind == TYPE_ARRAY) {
+		const array_type_t *array = &type->array;
+		const type_t       *etype = array->element_type;
+
+		if (! is_valid_array_type(etype))
+			return false;
+
+		if (etype != NULL && etype->kind == TYPE_ATOMIC) {
+			const atomic_type_t *atype = &etype->atomic;
+
+			if (atype->akind == ATOMIC_TYPE_VOID) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 static declaration_t *record_declaration(declaration_t *declaration)
 {
-	return internal_record_declaration(declaration, false);
+	declaration = internal_record_declaration(declaration, false);
+	const type_t *type = declaration->type;
+	if (type != NULL) {
+		/* check the type here for several not allowed combinations */
+		if (! is_valid_array_type(type)) {
+			errorf(declaration->source_position, "declaration of '%Y' as array of voids",
+					declaration->symbol);
+		}
+	}
+	return declaration;
 }
 
 static declaration_t *record_function_definition(declaration_t *const declaration)
@@ -3633,7 +3668,7 @@ static void check_for_char_index_type(const expression_t *expression) {
 	type_t *base_type = skip_typeref(type);
 
 	if (base_type->base.kind == TYPE_ATOMIC) {
-		if (base_type->atomic.akind == ATOMIC_TYPE_CHAR) {
+		switch (base_type->atomic.akind == ATOMIC_TYPE_CHAR) {
 			warningf(expression->base.source_position,
 				"array subscript has type '%T'", type);
 		}
