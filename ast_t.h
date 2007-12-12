@@ -474,9 +474,10 @@ struct if_statement_t {
 };
 
 struct switch_statement_t {
-	statement_base_t  statement;
-	expression_t     *expression;
-	statement_t      *body;
+	statement_base_t       statement;
+	expression_t           *expression;
+	statement_t            *body;
+	case_label_statement_t *first_case, *last_case;
 };
 
 struct goto_statement_t {
@@ -485,9 +486,10 @@ struct goto_statement_t {
 };
 
 struct case_label_statement_t {
-	statement_base_t  statement;
-	expression_t     *expression;
-	statement_t      *label_statement;
+	statement_base_t        statement;
+	expression_t           *expression;
+	statement_t            *label_statement;
+	case_label_statement_t *next; /**< link to the next case label in the switch */
 };
 
 struct label_statement_t {

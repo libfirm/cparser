@@ -39,15 +39,16 @@ struct declaration_specifiers_t {
 
 typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration);
 
-static token_t         token;
-static token_t         lookahead_buffer[MAX_LOOKAHEAD];
-static int             lookahead_bufpos;
-static stack_entry_t  *environment_stack = NULL;
-static stack_entry_t  *label_stack       = NULL;
-static context_t      *global_context    = NULL;
-static context_t      *context           = NULL;
-static declaration_t  *last_declaration  = NULL;
-static declaration_t  *current_function  = NULL;
+static token_t             token;
+static token_t             lookahead_buffer[MAX_LOOKAHEAD];
+static int                 lookahead_bufpos;
+static stack_entry_t      *environment_stack = NULL;
+static stack_entry_t      *label_stack       = NULL;
+static context_t          *global_context    = NULL;
+static context_t          *context           = NULL;
+static declaration_t      *last_declaration  = NULL;
+static declaration_t      *current_function  = NULL;
+static switch_statement_t *current_switch    = NULL;
 static struct obstack  temp_obst;
 
 /** The current source position. */
@@ -4847,6 +4848,19 @@ static statement_t *parse_case_statement(void)
 	statement->case_label.expression = parse_expression();
 
 	expect(':');
+
+	if (current_switch != NULL) {
+		/* link all cases into the switch statement */
+		if (current_switch->last_case == NULL) {
+			current_switch->first_case =
+			current_switch->last_case  = &statement->case_label;
+		} else {
+			current_switch->last_case->next = &statement->case_label;
+		}
+	} else {
+		errorf(statement->base.source_position,
+			"case label not within a switch statement");
+	}
 	statement->case_label.label_statement = parse_statement();
 
 	return statement;
@@ -4973,7 +4987,11 @@ static statement_t *parse_switch(void)
 	type_t       *const type = promote_integer(skip_typeref(expr->base.datatype));
 	statement->expression = create_implicit_cast(expr, type);
 	expect(')');
+
+	switch_statement_t *rem = current_switch;
+	current_switch  = &statement;
 	statement->body = parse_statement();
+	current_switch  = rem;
 
 	return (statement_t*) statement;
 }
