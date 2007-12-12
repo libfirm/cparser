@@ -767,29 +767,34 @@ static expression_t *create_implicit_cast(expression_t *expression,
 					expression->base.source_position, source_type, dest_type);
 			return expression;
 
+		case TYPE_COMPOUND_STRUCT:
+		case TYPE_COMPOUND_UNION:
+		case TYPE_ERROR:
+			return expression;
+
 		default:
 			panic("casting of non-atomic types not implemented yet");
 	}
 }
 
 /** Implements the rules from § 6.5.16.1 */
-static void semantic_assign(type_t *orig_type_left, expression_t **right,
+static type_t *semantic_assign(type_t *orig_type_left,
+                            const expression_t *const right,
                             const char *context)
 {
-	type_t *orig_type_right = (*right)->base.datatype;
+	type_t *const orig_type_right = right->base.datatype;
 
-	if(orig_type_right == NULL)
-		return;
+	if (!is_type_valid(orig_type_right))
+		return orig_type_right;
 
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
 
 	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (is_type_pointer(type_left) && is_null_pointer_constant(*right)) ||
+	    (is_type_pointer(type_left) && is_null_pointer_constant(right)) ||
 	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
 	     	&& is_type_pointer(type_right))) {
-		*right = create_implicit_cast(*right, type_left);
-		return;
+		return orig_type_left;
 	}
 
 	if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
@@ -806,7 +811,7 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 		if(missing_qualifiers != 0) {
 			errorf(HERE, "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type", type_left, context, type_right, missing_qualifiers);
-			return;
+			return orig_type_left;
 		}
 
 		points_to_left  = get_unqualified_type(points_to_left);
@@ -815,23 +820,21 @@ static void semantic_assign(type_t *orig_type_left, expression_t **right,
 		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
 				&& !types_compatible(points_to_left, points_to_right)) {
-			goto incompatible_assign_types;
+			return NULL;
 		}
 
-		*right = create_implicit_cast(*right, type_left);
-		return;
+		return orig_type_left;
 	}
 
-	if (is_type_compound(type_left)
-			&& types_compatible(type_left, type_right)) {
-		*right = create_implicit_cast(*right, type_left);
-		return;
+	if (is_type_compound(type_left)  && is_type_compound(type_right)) {
+		type_t *const unqual_type_left  = get_unqualified_type(type_left);
+		type_t *const unqual_type_right = get_unqualified_type(type_right);
+		if (types_compatible(unqual_type_left, unqual_type_right)) {
+			return orig_type_left;
+		}
 	}
 
-incompatible_assign_types:
-	/* TODO: improve error message */
-	errorf(HERE, "incompatible types in %s: '%T' <- '%T'",
-	       context, orig_type_left, orig_type_right);
+	return NULL;
 }
 
 static expression_t *parse_constant_expression(void)
@@ -1039,17 +1042,14 @@ static initializer_t *initializer_from_expression(type_t *type,
 		}
 	}
 
-	type_t *expression_type = skip_typeref(expression->base.datatype);
-	if(is_type_scalar(type) || types_compatible(type, expression_type)) {
-		semantic_assign(type, &expression, "initializer");
+	type_t *const res_type = semantic_assign(type, expression, "initializer");
+	if (res_type == NULL)
+		return NULL;
 
-		initializer_t *result = allocate_initializer_zero(INITIALIZER_VALUE);
-		result->value.value   = expression;
+	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
+	result->value.value = create_implicit_cast(expression, res_type);
 
-		return result;
-	}
-
-	return NULL;
+	return result;
 }
 
 static initializer_t *parse_sub_initializer(type_t *type,
@@ -4561,7 +4561,15 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		return;
 	}
 
-	semantic_assign(orig_type_left, &expression->right, "assignment");
+	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
+	                                         "assignment");
+	if (res_type == NULL) {
+		errorf(expression->expression.source_position,
+			"cannot assign to '%T' from '%T'",
+			orig_type_left, expression->right->base.datatype);
+	} else {
+		expression->right = create_implicit_cast(expression->right, res_type);
+	}
 
 	expression->expression.datatype = orig_type_left;
 }
@@ -5359,7 +5367,19 @@ static statement_t *parse_return(void)
 			return_value = NULL;
 		} else {
 			if(is_type_valid(return_type)) {
-				semantic_assign(return_type, &return_value, "'return'");
+				if (return_value->base.datatype == NULL)
+					return (statement_t*)statement;
+
+				type_t *const res_type = semantic_assign(return_type,
+					return_value, "'return'");
+				if (res_type == NULL) {
+					errorf(statement->statement.source_position,
+						"cannot assign to '%T' from '%T'",
+						"cannot return something of type '%T' in function returning '%T'",
+						return_value->base.datatype, return_type);
+				} else {
+					return_value = create_implicit_cast(return_value, res_type);
+				}
 			}
 		}
 		/* check for returning address of a local var */
