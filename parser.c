@@ -1256,11 +1256,11 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	return result;
 }
 
-static initializer_t *parse_initializer(type_t *type)
+static initializer_t *parse_initializer(type_t *const orig_type)
 {
 	initializer_t *result;
 
-	type = skip_typeref(type);
+	type_t *const type = skip_typeref(orig_type);
 
 	if(token.type != '{') {
 		expression_t  *expression  = parse_assignment_expression();
@@ -1272,7 +1272,7 @@ static initializer_t *parse_initializer(type_t *type)
 		if(initializer == NULL) {
 			errorf(HERE,
 				"initializer expression '%E' of type '%T' is incompatible with type '%T'",
-				expression, expression->base.datatype, type);
+				expression, expression->base.datatype, orig_type);
 		}
 		return initializer;
 	}
