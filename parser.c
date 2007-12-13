@@ -3139,12 +3139,13 @@ static expression_t *parse_statement_expression(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
-	statement_t *statement          = parse_compound_statement();
-	expression->statement.statement = statement;
+	statement_t *statement           = parse_compound_statement();
+	expression->statement.statement  = statement;
 	if(statement == NULL) {
 		expect(')');
 		return NULL;
 	}
+	expression->base.source_position = statement->base.source_position;
 
 	/* find last statement and use its type */
 	type_t *type = type_void;
@@ -3156,6 +3157,8 @@ static expression_t *parse_statement_expression(void)
 		if (stmt->kind == STATEMENT_EXPRESSION) {
 			type = stmt->expression.expression->base.datatype;
 		}
+	} else {
+		warningf(expression->base.source_position, "empty statement expression ({})");
 	}
 	expression->base.datatype = type;
 
