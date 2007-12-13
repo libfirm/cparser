@@ -57,6 +57,7 @@
 #include "adt/error.h"
 #include "write_fluffy.h"
 #include "revision.h"
+#include "warning.h"
 
 #ifndef PREPROCESSOR
 #define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int"
@@ -456,13 +457,7 @@ int main(int argc, char **argv)
 		} else if(arg[0] == '-' && arg[1] == 'W') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-W");
-			if (strcmp(opt, "error") == 0) {
-				warnings_are_errors = true;
-			} else if (strcmp(opt, "fatal-errors") == 0) {
-				fatal_errors = true;
-			} else {
-				fprintf(stderr, "warning: ignoring gcc option -W%s\n", opt);
-			}
+			set_warning_opt(opt);
 		} else if(arg[0] == '-' && arg[1] == 'm') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-m");

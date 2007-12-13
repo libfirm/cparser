@@ -36,6 +36,7 @@ SOURCES := \
 	type.c \
 	types.c \
 	type_hash.c \
+	warning.c \
 	write_fluffy.c \
 	driver/firm_cmdline.c \
 	driver/firm_timing.c \

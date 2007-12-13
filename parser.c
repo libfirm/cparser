@@ -14,6 +14,7 @@
 #include "type_hash.h"
 #include "ast_t.h"
 #include "lang_features.h"
+#include "warning.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
 #include "adt/array.h"
@@ -1746,7 +1747,9 @@ finish_specifiers:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
 				if (! strict_mode) {
-					warningf(HERE, "no type specifiers in declaration, using int");
+					if (warning.implicit_int) {
+						warningf(HERE, "no type specifiers in declaration, using 'int'");
+					}
 					atomic_type = ATOMIC_TYPE_INT;
 					break;
 				} else {
@@ -2260,7 +2263,9 @@ static declaration_t *internal_record_declaration(
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
 
 	const type_t *const type = skip_typeref(declaration->type);
-	if (is_type_function(type) && type->function.unspecified_parameters) {
+	if (is_type_function(type) &&
+			type->function.unspecified_parameters &&
+			warning.strict_prototypes) {
 		warningf(declaration->source_position,
 		         "function declaration '%#T' is not a prototype",
 		         type, declaration->symbol);
@@ -2268,68 +2273,75 @@ static declaration_t *internal_record_declaration(
 
 	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
 	assert(declaration != previous_declaration);
-	if (previous_declaration != NULL
-			&& previous_declaration->parent_context == context) {
-		/* can happen for K&R style declarations */
-		if(previous_declaration->type == NULL) {
-			previous_declaration->type = declaration->type;
-		}
-
-		const type_t *const prev_type = skip_typeref(previous_declaration->type);
-		if (!types_compatible(type, prev_type)) {
-			errorf(declaration->source_position,
-				"declaration '%#T' is incompatible with previous declaration '%#T'",
-				type, symbol, previous_declaration->type, symbol);
-			errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-		} else {
-			unsigned old_storage_class = previous_declaration->storage_class;
-			unsigned new_storage_class = declaration->storage_class;
-
-			/* pretend no storage class means extern for function declarations
-			 * (except if the previous declaration is neither none nor extern) */
-			if (is_type_function(type)) {
-				switch (old_storage_class) {
-					case STORAGE_CLASS_NONE:
-						old_storage_class = STORAGE_CLASS_EXTERN;
-
-					case STORAGE_CLASS_EXTERN:
-						if (new_storage_class == STORAGE_CLASS_NONE && !is_function_definition) {
-							new_storage_class = STORAGE_CLASS_EXTERN;
-						}
-						break;
-
-					default: break;
-				}
+	if (previous_declaration != NULL) {
+		if (previous_declaration->parent_context == context) {
+			/* can happen for K&R style declarations */
+			if(previous_declaration->type == NULL) {
+				previous_declaration->type = declaration->type;
 			}
 
-			if (old_storage_class == STORAGE_CLASS_EXTERN &&
-			    new_storage_class == STORAGE_CLASS_EXTERN) {
-warn_redundant_declaration:
-					warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
-					warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-			} else if (current_function == NULL) {
-				if (old_storage_class != STORAGE_CLASS_STATIC &&
-				    new_storage_class == STORAGE_CLASS_STATIC) {
-					errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
-					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
-				} else {
-					if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
-						goto warn_redundant_declaration;
-					}
-					if (new_storage_class == STORAGE_CLASS_NONE) {
-						previous_declaration->storage_class = STORAGE_CLASS_NONE;
-					}
-				}
-			} else {
-				if (old_storage_class == new_storage_class) {
-					errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
-				} else {
-					errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
-				}
+			const type_t *const prev_type = skip_typeref(previous_declaration->type);
+			if (!types_compatible(type, prev_type)) {
+				errorf(declaration->source_position,
+					"declaration '%#T' is incompatible with previous declaration '%#T'",
+					type, symbol, previous_declaration->type, symbol);
 				errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+			} else {
+				unsigned old_storage_class = previous_declaration->storage_class;
+				unsigned new_storage_class = declaration->storage_class;
+
+				/* pretend no storage class means extern for function declarations
+				 * (except if the previous declaration is neither none nor extern) */
+				if (is_type_function(type)) {
+					switch (old_storage_class) {
+						case STORAGE_CLASS_NONE:
+							old_storage_class = STORAGE_CLASS_EXTERN;
+
+						case STORAGE_CLASS_EXTERN:
+							if (new_storage_class == STORAGE_CLASS_NONE && !is_function_definition) {
+								new_storage_class = STORAGE_CLASS_EXTERN;
+							}
+							break;
+
+						default: break;
+					}
+				}
+
+				if (old_storage_class == STORAGE_CLASS_EXTERN &&
+						new_storage_class == STORAGE_CLASS_EXTERN) {
+	warn_redundant_declaration:
+					if (warning.redundant_decls) {
+						warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
+						warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+					}
+				} else if (current_function == NULL) {
+					if (old_storage_class != STORAGE_CLASS_STATIC &&
+							new_storage_class == STORAGE_CLASS_STATIC) {
+						errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
+						errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+					} else {
+						if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
+							goto warn_redundant_declaration;
+						}
+						if (new_storage_class == STORAGE_CLASS_NONE) {
+							previous_declaration->storage_class = STORAGE_CLASS_NONE;
+						}
+					}
+				} else {
+					if (old_storage_class == new_storage_class) {
+						errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
+					} else {
+						errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
+					}
+					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+				}
 			}
+			return previous_declaration;
 		}
-		return previous_declaration;
+	} else if (is_function_definition &&
+			declaration->storage_class != STORAGE_CLASS_STATIC &&
+			warning.missing_declarations) {
+		warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
 	}
 
 	assert(declaration->parent_context == NULL);
@@ -2594,8 +2606,10 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 				errorf(HERE, "no type specified for function parameter '%Y'",
 				       parameter_declaration->symbol);
 			} else {
-				warningf(HERE, "no type specified for function parameter '%Y', using int",
-				         parameter_declaration->symbol);
+				if (warning.implicit_int) {
+					warningf(HERE, "no type specified for function parameter '%Y', using 'int'",
+						parameter_declaration->symbol);
+				}
 				parameter_type              = type_int;
 				parameter_declaration->type = parameter_type;
 			}
@@ -3086,8 +3100,10 @@ static expression_t *parse_reference(void)
 	if(declaration == NULL) {
 		if (! strict_mode && token.type == '(') {
 			/* an implicitly defined function */
-			warningf(HERE, "implicit declaration of function '%Y'",
-			         ref->symbol);
+			if (warning.implicit_function_declaration) {
+				warningf(HERE, "implicit declaration of function '%Y'",
+					ref->symbol);
+			}
 
 			declaration = create_implicit_function(ref->symbol,
 			                                       source_position);
@@ -3539,14 +3555,13 @@ static expression_t *parse_primary_expression(void)
  * Check if the expression has the character type and issue a warning then.
  */
 static void check_for_char_index_type(const expression_t *expression) {
-	type_t *type      = expression->base.datatype;
-	type_t *base_type = skip_typeref(type);
+	type_t       *const type      = expression->base.datatype;
+	const type_t *const base_type = skip_typeref(type);
 
-	if (base_type->base.kind == TYPE_ATOMIC) {
-		switch (base_type->atomic.akind == ATOMIC_TYPE_CHAR) {
-			warningf(expression->base.source_position,
-				"array subscript has type '%T'", type);
-		}
+	if (is_type_atomic(base_type, ATOMIC_TYPE_CHAR) &&
+			warning.char_subscripts) {
+		warningf(expression->base.source_position,
+			"array subscript has type '%T'", type);
 	}
 }
 

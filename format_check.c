@@ -5,6 +5,7 @@
 #include "format_check.h"
 #include "types.h"
 #include "type_t.h"
+#include "warning.h"
 
 
 typedef enum format_flag_t {
@@ -397,6 +398,9 @@ next_arg:
 
 void check_format(const call_expression_t *const call)
 {
+	if (!warning.check_format)
+		return;
+
 	const expression_t *const func_expr = call->function;
 	if (func_expr->kind != EXPR_REFERENCE)
 		return;

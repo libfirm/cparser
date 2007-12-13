@@ -6,6 +6,7 @@
 #include "diagnostic.h"
 #include "token_t.h"
 #include "type.h"
+#include "warning.h"
 
 /** Number of occurred diagnostics. */
 unsigned diagnostic_count = 0;
@@ -15,10 +16,6 @@ unsigned error_count      = 0;
 unsigned warning_count    = 0;
 /** true if warnings should be inhibited */
 bool inhibit_all_warnings = false;
-/** true if warnings should be treated as errors */
-bool warnings_are_errors  = false;
-/** true if the first error should stop the compilation */
-bool fatal_errors = false;
 
 /**
  * Issue a diagnostic message.
@@ -147,18 +144,16 @@ static void errorvf(const source_position_t pos,
 	diagnosticvf(fmt, ap);
 	fputc('\n', stderr);
 
-	if (fatal_errors)
-		abort();
+	if (warning.fatal_errors)
+		exit(EXIT_FAILURE);
 }
+
 void errorf(const source_position_t pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
 	errorvf(pos, fmt, ap);
 	va_end(ap);
-
-	if (fatal_errors)
-		exit(1);
 }
 
 static void warningvf(const source_position_t pos,
@@ -177,7 +172,7 @@ void warningf(const source_position_t pos, const char *const fmt, ...)
 
 	va_list ap;
 	va_start(ap, fmt);
-	if (warnings_are_errors) {
+	if (warning.s_are_errors) {
 		errorvf(pos, fmt, ap);
 	} else {
 		warningvf(pos, fmt, ap);
