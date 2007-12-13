@@ -2297,7 +2297,12 @@ static declaration_t *internal_record_declaration(
 							old_storage_class = STORAGE_CLASS_EXTERN;
 
 						case STORAGE_CLASS_EXTERN:
-							if (new_storage_class == STORAGE_CLASS_NONE && !is_function_definition) {
+							if (is_function_definition) {
+								if (warning.missing_prototypes &&
+								    prev_type->function.unspecified_parameters) {
+									warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
+								}
+							} else if (new_storage_class == STORAGE_CLASS_NONE) {
 								new_storage_class = STORAGE_CLASS_EXTERN;
 							}
 							break;
@@ -2308,7 +2313,7 @@ static declaration_t *internal_record_declaration(
 
 				if (old_storage_class == STORAGE_CLASS_EXTERN &&
 						new_storage_class == STORAGE_CLASS_EXTERN) {
-	warn_redundant_declaration:
+warn_redundant_declaration:
 					if (warning.redundant_decls) {
 						warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
 						warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
@@ -2338,9 +2343,12 @@ static declaration_t *internal_record_declaration(
 			return previous_declaration;
 		}
 	} else if (is_function_definition &&
-			declaration->storage_class != STORAGE_CLASS_STATIC &&
-			warning.missing_declarations) {
-		warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+			declaration->storage_class != STORAGE_CLASS_STATIC) {
+		if (warning.missing_prototypes) {
+			warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
+		} else if (warning.missing_declarations) {
+			warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+		}
 	}
 
 	assert(declaration->parent_context == NULL);

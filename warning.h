@@ -37,7 +37,9 @@ typedef struct warning_t {
 #if 0 // TODO
 	bool missing_format_attribute:1;      /* If '-Wformat' is enabled, also warn about functions which might be candidates for 'format' attributes */
 	bool missing_noreturn:1;              /* Warn about functions which might be candidates for attribute 'noreturn' */
+#endif
 	bool missing_prototypes:1;            /* Warn if a global function is defined without a previous prototype declaration */
+#if 0 // TODO
 	bool multichar:1;                     /* Warn if a multicharacter constant ('FOOF') is used. */
 	bool nested_externs:1;                /* Warn if an 'extern' declaration is encountered within a function */
 	bool packed:1;                        /* Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
