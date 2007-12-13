@@ -3806,8 +3806,16 @@ static expression_t *parse_call_expression(unsigned precedence,
 				parameter = parameter->next, argument = argument->next) {
 			type_t *expected_type = parameter->type;
 			/* TODO report context in error messages */
-			argument->expression = create_implicit_cast(argument->expression,
-			                                            expected_type);
+			expression_t *const arg_expr = argument->expression;
+			type_t       *const res_type = semantic_assign(expected_type, arg_expr, "function call");
+			if (res_type == NULL) {
+				/* TODO improve error message */
+				errorf(arg_expr->base.source_position,
+					"Cannot call function with argument '%E' of type '%T' where type '%T' is expected",
+					arg_expr, arg_expr->base.datatype, expected_type);
+			} else {
+				argument->expression = create_implicit_cast(argument->expression, expected_type);
+			}
 		}
 		/* too few parameters */
 		if(parameter != NULL) {
