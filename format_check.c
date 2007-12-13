@@ -210,7 +210,7 @@ break_fmt_flags:
 			break;
 		}
 
-		const type_t   *expected_type = NULL;
+		const type_t   *expected_type;
 		format_flags_t  allowed_flags;
 		switch (*fmt) {
 			case 'd':
@@ -227,7 +227,7 @@ break_fmt_flags:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_ZERO;
 				break;
@@ -254,7 +254,7 @@ eval_fmt_mod_unsigned:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				break;
 
@@ -273,7 +273,7 @@ eval_fmt_mod_unsigned:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_SPACE | FMT_FLAG_PLUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
 				break;
@@ -281,6 +281,7 @@ eval_fmt_mod_unsigned:
 			case 'C':
 				if (fmt_mod != FMT_MOD_NONE) {
 					warn_invalid_length_modifier(pos, fmt_mod, *fmt);
+					goto next_arg;
 				}
 				expected_type = type_wchar_t;
 				allowed_flags = FMT_FLAG_NONE;
@@ -294,7 +295,7 @@ eval_fmt_mod_unsigned:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				allowed_flags = FMT_FLAG_NONE;
 				break;
@@ -302,6 +303,7 @@ eval_fmt_mod_unsigned:
 			case 'S':
 				if (fmt_mod != FMT_MOD_NONE) {
 					warn_invalid_length_modifier(pos, fmt_mod, *fmt);
+					goto next_arg;
 				}
 				expected_type = type_wchar_t_ptr;
 				allowed_flags = FMT_FLAG_NONE;
@@ -314,7 +316,7 @@ eval_fmt_mod_unsigned:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				allowed_flags = FMT_FLAG_NONE;
 				break;
@@ -322,6 +324,7 @@ eval_fmt_mod_unsigned:
 			case 'p':
 				if (fmt_mod != FMT_MOD_NONE) {
 					warn_invalid_length_modifier(pos, fmt_mod, *fmt);
+					goto next_arg;
 				}
 				expected_type = type_void_ptr;
 				allowed_flags = FMT_FLAG_NONE;
@@ -340,15 +343,14 @@ eval_fmt_mod_unsigned:
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, *fmt);
-						break;
+						goto next_arg;
 				}
 				allowed_flags = FMT_FLAG_NONE;
 				break;
 
 			default:
 				warningf(pos, "encountered unknown conversion specifier '%%%C'", (wint_t)*fmt);
-				arg = arg->next;
-				continue;
+				goto next_arg;
 		}
 
 		if ((fmt_flags & ~allowed_flags) != 0) {
@@ -368,19 +370,21 @@ eval_fmt_mod_unsigned:
 				type_t *const exp_to = skip_typeref(expected_type->pointer.points_to);
 				type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
 				if (arg_to == exp_to) {
-					goto arg_type_ok;
+					goto next_arg;
 				}
 			}
 		} else {
 			if (get_unqualified_type(skip_typeref(arg_type)) == expected_type) {
-				goto arg_type_ok;
+				goto next_arg;
 			}
 		}
-		warningf(pos,
-			"argument type '%T' does not match conversion specifier '%%%s%c'\n",
-			arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
-arg_type_ok:
+		if (is_type_valid(arg_type)) {
+			warningf(pos,
+				"argument type '%T' does not match conversion specifier '%%%s%c'\n",
+				arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
+		}
 
+next_arg:
 		arg = arg->next;
 	}
 	if (fmt + 1 != wstring->begin + wstring->size) {

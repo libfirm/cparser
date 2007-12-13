@@ -570,13 +570,12 @@ bool is_type_incomplete(const type_t *type)
 
 	case TYPE_POINTER:
 	case TYPE_BUILTIN:
+	case TYPE_ERROR:
 		return false;
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("is_type_incomplete called without typerefs skipped");
-	case TYPE_ERROR:
-		panic("error type found");
 	case TYPE_INVALID:
 		break;
 	}

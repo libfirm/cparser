@@ -647,7 +647,7 @@ static int get_rank(const type_t *type)
 static type_t *promote_integer(type_t *type)
 {
 	if(type->kind == TYPE_BITFIELD)
-		return promote_integer(type->bitfield.base);
+		type = type->bitfield.base;
 
 	if(get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
@@ -704,77 +704,12 @@ static bool is_null_pointer_constant(const expression_t *expression)
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
-	type_t *source_type = expression->base.datatype;
+	type_t *const source_type = expression->base.datatype;
 
-	if(source_type == NULL)
+	if (source_type == dest_type)
 		return expression;
 
-	source_type = skip_typeref(source_type);
-	dest_type   = skip_typeref(dest_type);
-
-	if(source_type == dest_type)
-		return expression;
-
-	switch (dest_type->kind) {
-		case TYPE_ENUM:
-			/* TODO warning for implicitly converting to enum */
-		case TYPE_BITFIELD:
-		case TYPE_ATOMIC:
-			if (source_type->kind != TYPE_ATOMIC &&
-					source_type->kind != TYPE_ENUM &&
-					source_type->kind != TYPE_BITFIELD) {
-				panic("casting of non-atomic types not implemented yet");
-			}
-
-			if(is_type_floating(dest_type) && !is_type_scalar(source_type)) {
-				type_error_incompatible("can't cast types",
-						expression->base.source_position, source_type,
-						dest_type);
-				return expression;
-			}
-
-			return create_cast_expression(expression, dest_type);
-
-		case TYPE_POINTER:
-			switch (source_type->kind) {
-				case TYPE_ATOMIC:
-					if (is_null_pointer_constant(expression)) {
-						return create_cast_expression(expression, dest_type);
-					}
-					break;
-
-				case TYPE_POINTER:
-					if (pointers_compatible(source_type, dest_type)) {
-						return create_cast_expression(expression, dest_type);
-					}
-					break;
-
-				case TYPE_ARRAY: {
-					array_type_t   *array_type   = &source_type->array;
-					pointer_type_t *pointer_type = &dest_type->pointer;
-					if (types_compatible(array_type->element_type,
-										 pointer_type->points_to)) {
-						return create_cast_expression(expression, dest_type);
-					}
-					break;
-				}
-
-				default:
-					panic("casting of non-atomic types not implemented yet");
-			}
-
-			type_error_incompatible("can't implicitly cast types",
-					expression->base.source_position, source_type, dest_type);
-			return expression;
-
-		case TYPE_COMPOUND_STRUCT:
-		case TYPE_COMPOUND_UNION:
-		case TYPE_ERROR:
-			return expression;
-
-		default:
-			panic("casting of non-atomic types not implemented yet");
-	}
+	return create_cast_expression(expression, dest_type);
 }
 
 /** Implements the rules from § 6.5.16.1 */
@@ -783,12 +718,8 @@ static type_t *semantic_assign(type_t *orig_type_left,
                             const char *context)
 {
 	type_t *const orig_type_right = right->base.datatype;
-
-	if (!is_type_valid(orig_type_right))
-		return orig_type_right;
-
-	type_t *const type_left  = skip_typeref(orig_type_left);
-	type_t *const type_right = skip_typeref(orig_type_right);
+	type_t *const type_left       = skip_typeref(orig_type_left);
+	type_t *const type_right      = skip_typeref(orig_type_right);
 
 	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
 	    (is_type_pointer(type_left) && is_null_pointer_constant(right)) ||
@@ -820,7 +751,7 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
 				&& !types_compatible(points_to_left, points_to_right)) {
-			return type_error_type;
+			return NULL;
 		}
 
 		return orig_type_left;
@@ -834,7 +765,13 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		}
 	}
 
-	return type_error_type;
+	if (!is_type_valid(type_left))
+		return type_left;
+
+	if (!is_type_valid(type_right))
+		return orig_type_right;
+
+	return NULL;
 }
 
 static expression_t *parse_constant_expression(void)
@@ -1043,7 +980,7 @@ static initializer_t *initializer_from_expression(type_t *type,
 	}
 
 	type_t *const res_type = semantic_assign(type, expression, "initializer");
-	if (!is_type_valid(res_type))
+	if (res_type == NULL)
 		return NULL;
 
 	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
@@ -1267,10 +1204,6 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 
 	if(token.type != '{') {
 		expression_t  *expression  = parse_assignment_expression();
-		if (expression->base.datatype == NULL) {
-			/* something bad happens, don't produce further errors */
-			return NULL;
-		}
 		initializer_t *initializer = initializer_from_expression(type, expression);
 		if(initializer == NULL) {
 			errorf(HERE,
@@ -1912,10 +1845,8 @@ static void semantic_parameter(declaration_t *declaration)
 		errorf(HERE, "parameter may only have none or register storage class");
 	}
 
-	type_t *orig_type = declaration->type;
-	if(orig_type == NULL)
-		return;
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = declaration->type;
+	type_t *      type      = skip_typeref(orig_type);
 
 	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
 	 * into a pointer. § 6.7.5.3 (7) */
@@ -2767,16 +2698,14 @@ static void parse_external_declaration(void)
 	}
 
 	type_t *type = ndeclaration->type;
-	if(type == NULL) {
-		eat_block();
-		return;
-	}
 
 	/* note that we don't skip typerefs: the standard doesn't allow them here
 	 * (so we can't use is_type_function here) */
 	if(type->kind != TYPE_FUNCTION) {
-		errorf(HERE, "declarator '%#T' has a body but is not a function type",
-		       type, ndeclaration->symbol);
+		if (is_type_valid(type)) {
+			errorf(HERE, "declarator '%#T' has a body but is not a function type",
+			       type, ndeclaration->symbol);
+		}
 		eat_block();
 		return;
 	}
@@ -3105,9 +3034,6 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
  */
 static type_t *automatic_type_conversion(type_t *orig_type)
 {
-	if(orig_type == NULL)
-		return NULL;
-
 	type_t *type = skip_typeref(orig_type);
 	if(is_type_array(type)) {
 		array_type_t *array_type   = &type->array;
@@ -3130,9 +3056,6 @@ static type_t *automatic_type_conversion(type_t *orig_type)
  */
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
-	if(expression->base.datatype == NULL)
-		return NULL;
-
 	switch(expression->kind) {
 	case EXPR_REFERENCE: {
 		const reference_expression_t *ref = &expression->reference;
@@ -3155,13 +3078,12 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		return get_builtin_symbol_type(builtin->symbol);
 	}
 	case EXPR_ARRAY_ACCESS: {
-		const array_access_expression_t *array_access
-			= &expression->array_access;
-		const expression_t *array_ref = array_access->array_ref;
-		type_t *type_left  = skip_typeref(array_ref->base.datatype);
+		const expression_t *const array_ref = expression->array_access.array_ref;
+		type_t             *const type_left = skip_typeref(array_ref->base.datatype);
+		if (!is_type_valid(type_left))
+			return type_left;
 		assert(is_type_pointer(type_left));
-		pointer_type_t *pointer_type = &type_left->pointer;
-		return pointer_type->points_to;
+		return type_left->pointer.points_to;
 	}
 
 	default:
@@ -3523,16 +3445,16 @@ static expression_t *parse_compare_builtin(void)
 	expression->binary.right = parse_assignment_expression();
 	expect(')');
 
-	type_t *orig_type_left  = expression->binary.left->base.datatype;
-	type_t *orig_type_right = expression->binary.right->base.datatype;
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return expression;
+	type_t *const orig_type_left  = expression->binary.left->base.datatype;
+	type_t *const orig_type_right = expression->binary.right->base.datatype;
 
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	type_t *const type_left  = skip_typeref(orig_type_left);
+	type_t *const type_right = skip_typeref(orig_type_right);
 	if(!is_type_floating(type_left) && !is_type_floating(type_right)) {
-		type_error_incompatible("invalid operands in comparison",
-		                        token.source_position, type_left, type_right);
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			type_error_incompatible("invalid operands in comparison",
+				token.source_position, orig_type_left, orig_type_right);
+		}
 	} else {
 		semantic_comparison(&expression->binary);
 	}
@@ -3671,33 +3593,34 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	array_access->expression.kind = EXPR_ARRAY_ACCESS;
 
-	type_t *type_left   = left->base.datatype;
-	type_t *type_inside = inside->base.datatype;
-	type_t *return_type = NULL;
+	type_t *const orig_type_left   = left->base.datatype;
+	type_t *const orig_type_inside = inside->base.datatype;
 
-	if(type_left != NULL && type_inside != NULL) {
-		type_left   = skip_typeref(type_left);
-		type_inside = skip_typeref(type_inside);
+	type_t *const type_left   = skip_typeref(orig_type_left);
+	type_t *const type_inside = skip_typeref(orig_type_inside);
 
-		if(is_type_pointer(type_left)) {
-			pointer_type_t *pointer = &type_left->pointer;
-			return_type             = pointer->points_to;
-			array_access->array_ref = left;
-			array_access->index     = inside;
-			check_for_char_index_type(inside);
-		} else if(is_type_pointer(type_inside)) {
-			pointer_type_t *pointer = &type_inside->pointer;
-			return_type             = pointer->points_to;
-			array_access->array_ref = inside;
-			array_access->index     = left;
-			array_access->flipped   = true;
-			check_for_char_index_type(left);
-		} else {
-			errorf(HERE, "array access on object with non-pointer types '%T', '%T'", type_left, type_inside);
-		}
-	} else {
+	type_t *return_type;
+	if (is_type_pointer(type_left)) {
+		pointer_type_t *const pointer = &type_left->pointer;
+		return_type             = pointer->points_to;
 		array_access->array_ref = left;
 		array_access->index     = inside;
+		check_for_char_index_type(inside);
+	} else if (is_type_pointer(type_inside)) {
+		pointer_type_t *const pointer = &type_inside->pointer;
+		return_type             = pointer->points_to;
+		array_access->array_ref = inside;
+		array_access->index     = left;
+		array_access->flipped   = true;
+		check_for_char_index_type(left);
+	} else {
+		if (is_type_valid(type_left) && is_type_valid(type_inside)) {
+			errorf(HERE,
+				"array access on object with non-pointer types '%T', '%T'",
+				orig_type_left, orig_type_inside);
+		}
+		return_type             = type_error_type;
+		array_access->array_ref = create_invalid_expression();
 	}
 
 	if(token.type != ']') {
@@ -3756,16 +3679,15 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->select.symbol = symbol;
 	next_token();
 
-	type_t *orig_type = compound->base.datatype;
-	if(orig_type == NULL)
-		return create_invalid_expression();
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = compound->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 
 	type_t *type_left = type;
 	if(is_pointer) {
-		if(type->kind != TYPE_POINTER) {
-			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
+		if (!is_type_pointer(type)) {
+			if (is_type_valid(type)) {
+				errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
+			}
 			return create_invalid_expression();
 		}
 		pointer_type_t *pointer_type = &type->pointer;
@@ -3773,10 +3695,12 @@ static expression_t *parse_select_expression(unsigned precedence,
 	}
 	type_left = skip_typeref(type_left);
 
-	if(type_left->kind != TYPE_COMPOUND_STRUCT
-			&& type_left->kind != TYPE_COMPOUND_UNION) {
-		errorf(HERE, "request for member '%Y' in something not a struct or "
-		       "union, but '%T'", symbol, type_left);
+	if (type_left->kind != TYPE_COMPOUND_STRUCT &&
+	    type_left->kind != TYPE_COMPOUND_UNION) {
+		if (is_type_valid(type_left)) {
+			errorf(HERE, "request for member '%Y' in something not a struct or "
+			       "union, but '%T'", symbol, type_left);
+		}
 		return create_invalid_expression();
 	}
 
@@ -3833,27 +3757,21 @@ static expression_t *parse_call_expression(unsigned precedence,
 	call_expression_t *call = &result->call;
 	call->function          = expression;
 
+	type_t *const orig_type = expression->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
+
 	function_type_t *function_type = NULL;
-	type_t          *orig_type     = expression->base.datatype;
-	if(is_type_valid(orig_type)) {
-		type_t *type  = skip_typeref(orig_type);
+	if (is_type_pointer(type)) {
+		type_t *const to_type = skip_typeref(type->pointer.points_to);
 
-		if(is_type_pointer(type)) {
-			pointer_type_t *pointer_type = &type->pointer;
-
-			type = skip_typeref(pointer_type->points_to);
-
-			if (is_type_function(type)) {
-				function_type             = &type->function;
-				call->expression.datatype = function_type->return_type;
-			}
+		if (is_type_function(to_type)) {
+			function_type             = &to_type->function;
+			call->expression.datatype = function_type->return_type;
 		}
-		if(function_type == NULL) {
-			errorf(HERE, "called object '%E' (type '%T') is not a pointer to a function", expression, orig_type);
+	}
 
-			function_type             = NULL;
-			call->expression.datatype = NULL;
-		}
+	if (function_type == NULL && is_type_valid(type)) {
+		errorf(HERE, "called object '%E' (type '%T') is not a pointer to a function", expression, orig_type);
 	}
 
 	/* parse arguments */
@@ -3902,9 +3820,6 @@ static expression_t *parse_call_expression(unsigned precedence,
 				/* do default promotion */
 				for( ; argument != NULL; argument = argument->next) {
 					type_t *type = argument->expression->base.datatype;
-
-					if(type == NULL)
-						continue;
 
 					type = skip_typeref(type);
 					if(is_type_integer(type)) {
@@ -3983,7 +3898,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	type_t *false_type = skip_typeref(orig_false_type);
 
 	/* 6.5.15.3 */
-	type_t *result_type = NULL;
+	type_t *result_type;
 	if (is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
 		result_type = semantic_arithmetic(true_type, false_type);
 
@@ -3993,9 +3908,10 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		conditional->true_expression     = true_expression;
 		conditional->false_expression    = false_expression;
 		conditional->expression.datatype = result_type;
-	} else if (same_compound_type(true_type, false_type)
-			|| (is_type_atomic(true_type, ATOMIC_TYPE_VOID) &&
-				is_type_atomic(false_type, ATOMIC_TYPE_VOID))) {
+	} else if (same_compound_type(true_type, false_type) || (
+	    is_type_atomic(true_type, ATOMIC_TYPE_VOID) &&
+	    is_type_atomic(false_type, ATOMIC_TYPE_VOID)
+		)) {
 		/* just take 1 of the 2 types */
 		result_type = true_type;
 	} else if (is_type_pointer(true_type) && is_type_pointer(false_type)
@@ -4004,9 +3920,12 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		result_type = true_type;
 	} else {
 		/* TODO */
-		type_error_incompatible("while parsing conditional",
-		                        expression->base.source_position, true_type,
-		                        false_type);
+		if (is_type_valid(true_type) && is_type_valid(false_type)) {
+			type_error_incompatible("while parsing conditional",
+			                        expression->base.source_position, true_type,
+			                        false_type);
+		}
+		result_type = type_error_type;
 	}
 
 	conditional->expression.datatype = result_type;
@@ -4249,20 +4168,18 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
  */
 static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 {
-	expression_t *left       = expression->left;
-	expression_t *right      = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
-		errorf(HERE, "operation needs arithmetic types");
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(HERE, "operation needs arithmetic types");
+		}
 		return;
 	}
 
@@ -4274,20 +4191,18 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 
 static void semantic_shift_op(binary_expression_t *expression)
 {
-	expression_t *left       = expression->left;
-	expression_t *right      = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *      type_left       = skip_typeref(orig_type_left);
+	type_t       *      type_right      = skip_typeref(orig_type_right);
 
 	if(!is_type_integer(type_left) || !is_type_integer(type_right)) {
 		/* TODO: improve error message */
-		errorf(HERE, "operation needs integer types");
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(HERE, "operation needs integer types");
+		}
 		return;
 	}
 
@@ -4301,16 +4216,12 @@ static void semantic_shift_op(binary_expression_t *expression)
 
 static void semantic_add(binary_expression_t *expression)
 {
-	expression_t *left            = expression->left;
-	expression_t *right           = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	/* § 5.6.5 */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -4323,23 +4234,19 @@ static void semantic_add(binary_expression_t *expression)
 		expression->expression.datatype = type_left;
 	} else if(is_type_pointer(type_right) && is_type_integer(type_left)) {
 		expression->expression.datatype = type_right;
-	} else {
+	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		errorf(HERE, "invalid operands to binary + ('%T', '%T')", orig_type_left, orig_type_right);
 	}
 }
 
 static void semantic_sub(binary_expression_t *expression)
 {
-	expression_t *left            = expression->left;
-	expression_t *right           = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t       *type_left       = skip_typeref(orig_type_left);
-	type_t       *type_right      = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	/* § 5.6.5 */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -4352,12 +4259,12 @@ static void semantic_sub(binary_expression_t *expression)
 		expression->expression.datatype = type_left;
 	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		if(!pointers_compatible(type_left, type_right)) {
-			errorf(HERE, "pointers to incompatible objects to binary - ('%T', '%T')", orig_type_left, orig_type_right);
+			errorf(HERE, "pointers to incompatible objects to binary '-' ('%T', '%T')", orig_type_left, orig_type_right);
 		} else {
 			expression->expression.datatype = type_ptrdiff_t;
 		}
-	} else {
-		errorf(HERE, "invalid operands to binary - ('%T', '%T')", orig_type_left, orig_type_right);
+	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
+		errorf(HERE, "invalid operands to binary '-' ('%T', '%T')", orig_type_left, orig_type_right);
 	}
 }
 
@@ -4367,9 +4274,6 @@ static void semantic_comparison(binary_expression_t *expression)
 	expression_t *right           = expression->right;
 	type_t       *orig_type_left  = left->base.datatype;
 	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
 
 	type_t *type_left  = skip_typeref(orig_type_left);
 	type_t *type_right = skip_typeref(orig_type_right);
@@ -4386,7 +4290,7 @@ static void semantic_comparison(binary_expression_t *expression)
 		expression->right = create_implicit_cast(right, type_left);
 	} else if (is_type_pointer(type_right)) {
 		expression->left = create_implicit_cast(left, type_right);
-	} else {
+	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		type_error_incompatible("invalid operands in comparison",
 		                        token.source_position, type_left, type_right);
 	}
@@ -4400,15 +4304,14 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	type_t       *orig_type_left  = left->base.datatype;
 	type_t       *orig_type_right = right->base.datatype;
 
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
 	type_t *type_left  = skip_typeref(orig_type_left);
 	type_t *type_right = skip_typeref(orig_type_right);
 
 	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
-		errorf(HERE, "operation needs arithmetic types");
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(HERE, "operation needs arithmetic types");
+		}
 		return;
 	}
 
@@ -4423,16 +4326,12 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 
 static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 {
-	expression_t *left            = expression->left;
-	expression_t *right           = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		/* combined instructions are tricky. We can't create an implicit cast on
@@ -4444,9 +4343,8 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 		expression->expression.datatype = type_left;
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		expression->expression.datatype = type_left;
-	} else {
+	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		errorf(HERE, "incompatible types '%T' and '%T' in assignment", orig_type_left, orig_type_right);
-		return;
 	}
 }
 
@@ -4455,20 +4353,18 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
  */
 static void semantic_logical_op(binary_expression_t *expression)
 {
-	expression_t *left            = expression->left;
-	expression_t *right           = expression->right;
-	type_t       *orig_type_left  = left->base.datatype;
-	type_t       *orig_type_right = right->base.datatype;
-
-	if(orig_type_left == NULL || orig_type_right == NULL)
-		return;
-
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.datatype;
+	type_t       *const orig_type_right = right->base.datatype;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */
-		errorf(HERE, "operation needs scalar types");
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(HERE, "operation needs scalar types");
+		}
 		return;
 	}
 
@@ -4503,9 +4399,6 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression_t *left           = expression->left;
 	type_t       *orig_type_left = left->base.datatype;
 
-	if(orig_type_left == NULL)
-		return;
-
 	type_t *type_left = revert_automatic_type_conversion(left);
 	type_left         = skip_typeref(orig_type_left);
 
@@ -4533,7 +4426,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 
 	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
 	                                         "assignment");
-	if (!is_type_valid(res_type)) {
+	if (res_type == NULL) {
 		errorf(expression->expression.source_position,
 			"cannot assign to '%T' from '%T'",
 			orig_type_left, expression->right->base.datatype);
@@ -4541,7 +4434,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 		expression->right = create_implicit_cast(expression->right, res_type);
 	}
 
-	expression->expression.datatype = res_type;
+	expression->expression.datatype = orig_type_left;
 }
 
 static void semantic_comma(binary_expression_t *expression)
@@ -5081,7 +4974,13 @@ static statement_t *parse_switch(void)
 
 	expect('(');
 	expression_t *const expr = parse_expression();
-	type_t       *const type = promote_integer(skip_typeref(expr->base.datatype));
+	type_t       *      type = skip_typeref(expr->base.datatype);
+	if (is_type_integer(type)) {
+		type = promote_integer(type);
+	} else if (is_type_valid(type)) {
+		errorf(expr->base.source_position, "switch quantity is not an integer, but '%T'", type);
+		type = type_error_type;
+	}
 	statement->expression = create_implicit_cast(expr, type);
 	expect(')');
 
@@ -5320,11 +5219,6 @@ static statement_t *parse_return(void)
 	}
 	expect(';');
 
-	if(!is_type_valid(return_type))
-		return (statement_t*) statement;
-	if(!is_type_valid(return_value->base.datatype))
-		return (statement_t*) statement;
-
 	return_type = skip_typeref(return_type);
 
 	if(return_value != NULL) {
@@ -5336,20 +5230,14 @@ static statement_t *parse_return(void)
 				"'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
-			if(is_type_valid(return_type)) {
-				if (return_value->base.datatype == NULL)
-					return (statement_t*)statement;
-
-				type_t *const res_type = semantic_assign(return_type,
-					return_value, "'return'");
-				if (!is_type_valid(res_type)) {
-					errorf(statement->statement.source_position,
-						"cannot assign to '%T' from '%T'",
-						"cannot return something of type '%T' in function returning '%T'",
-						return_value->base.datatype, return_type);
-				} else {
-					return_value = create_implicit_cast(return_value, res_type);
-				}
+			type_t *const res_type = semantic_assign(return_type,
+				return_value, "'return'");
+			if (res_type == NULL) {
+				errorf(statement->statement.source_position,
+					"cannot return something of type '%T' in function returning '%T'",
+					return_value->base.datatype, return_type);
+			} else {
+				return_value = create_implicit_cast(return_value, res_type);
 			}
 		}
 		/* check for returning address of a local var */
