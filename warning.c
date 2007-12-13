@@ -39,7 +39,10 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value)
 	}
 #endif
+	OPT("unused-value",                  unused_value)
 #undef OPT
+#undef SET
+#undef OPT_X
 	else {
 		fprintf(stderr, "warning: ignoring unknown option -W%s\n", opt);
 	}
@@ -52,5 +55,6 @@ warning_t warning = {
 	.implicit_int                  = true,
 	.missing_declarations          = true,
 	.strict_prototypes             = true,
-	.redundant_decls               = true
+	.redundant_decls               = true,
+	.unused_value                  = true
 };

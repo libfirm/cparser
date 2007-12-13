@@ -4408,8 +4408,114 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression->expression.datatype = orig_type_left;
 }
 
+static bool expression_has_effect(const expression_t *const expr)
+{
+	switch (expr->kind) {
+		case EXPR_UNKNOWN:                   break;
+		case EXPR_INVALID:                   break;
+		case EXPR_REFERENCE:                 return false;
+		case EXPR_CONST:                     return false;
+		case EXPR_STRING_LITERAL:            return false;
+		case EXPR_WIDE_STRING_LITERAL:       return false;
+		case EXPR_CALL: {
+			const call_expression_t *const call = &expr->call;
+			if (call->function->kind == EXPR_BUILTIN_SYMBOL) {
+				switch (call->function->builtin_symbol.symbol->ID) {
+					case T___builtin_va_end: return true;
+					default:                 return false;
+				}
+			}
+		}
+		case EXPR_CONDITIONAL: {
+			const conditional_expression_t *const cond = &expr->conditional;
+			return
+				expression_has_effect(cond->true_expression) &&
+				expression_has_effect(cond->false_expression);
+		}
+		case EXPR_SELECT:                    return false;
+		case EXPR_ARRAY_ACCESS:              return false;
+		case EXPR_SIZEOF:                    return false;
+		case EXPR_CLASSIFY_TYPE:             return false;
+		case EXPR_ALIGNOF:                   return false;
+
+		case EXPR_FUNCTION:                  return false;
+		case EXPR_PRETTY_FUNCTION:           return false;
+		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
+		case EXPR_BUILTIN_CONSTANT_P:        return false;
+		case EXPR_BUILTIN_PREFETCH:          return true;
+		case EXPR_OFFSETOF:                  return false;
+		case EXPR_VA_START:                  return true;
+		case EXPR_VA_ARG:                    return true;
+		case EXPR_STATEMENT:                 return true; // TODO
+
+		case EXPR_UNARY_NEGATE:              return false;
+		case EXPR_UNARY_PLUS:                return false;
+		case EXPR_UNARY_BITWISE_NEGATE:      return false;
+		case EXPR_UNARY_NOT:                 return false;
+		case EXPR_UNARY_DEREFERENCE:         return false;
+		case EXPR_UNARY_TAKE_ADDRESS:        return false;
+		case EXPR_UNARY_POSTFIX_INCREMENT:   return true;
+		case EXPR_UNARY_POSTFIX_DECREMENT:   return true;
+		case EXPR_UNARY_PREFIX_INCREMENT:    return true;
+		case EXPR_UNARY_PREFIX_DECREMENT:    return true;
+		case EXPR_UNARY_CAST:
+			return is_type_atomic(expr->base.datatype, ATOMIC_TYPE_VOID);
+		case EXPR_UNARY_CAST_IMPLICIT:       return true;
+		case EXPR_UNARY_ASSUME:              return true;
+		case EXPR_UNARY_BITFIELD_EXTRACT:    return false;
+
+		case EXPR_BINARY_ADD:                return false;
+		case EXPR_BINARY_SUB:                return false;
+		case EXPR_BINARY_MUL:                return false;
+		case EXPR_BINARY_DIV:                return false;
+		case EXPR_BINARY_MOD:                return false;
+		case EXPR_BINARY_EQUAL:              return false;
+		case EXPR_BINARY_NOTEQUAL:           return false;
+		case EXPR_BINARY_LESS:               return false;
+		case EXPR_BINARY_LESSEQUAL:          return false;
+		case EXPR_BINARY_GREATER:            return false;
+		case EXPR_BINARY_GREATEREQUAL:       return false;
+		case EXPR_BINARY_BITWISE_AND:        return false;
+		case EXPR_BINARY_BITWISE_OR:         return false;
+		case EXPR_BINARY_BITWISE_XOR:        return false;
+		case EXPR_BINARY_LOGICAL_AND:        return false;
+		case EXPR_BINARY_LOGICAL_OR:         return false;
+		case EXPR_BINARY_SHIFTLEFT:          return false;
+		case EXPR_BINARY_SHIFTRIGHT:         return false;
+		case EXPR_BINARY_ASSIGN:             return true;
+		case EXPR_BINARY_MUL_ASSIGN:         return true;
+		case EXPR_BINARY_DIV_ASSIGN:         return true;
+		case EXPR_BINARY_MOD_ASSIGN:         return true;
+		case EXPR_BINARY_ADD_ASSIGN:         return true;
+		case EXPR_BINARY_SUB_ASSIGN:         return true;
+		case EXPR_BINARY_SHIFTLEFT_ASSIGN:   return true;
+		case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  return true;
+		case EXPR_BINARY_BITWISE_AND_ASSIGN: return true;
+		case EXPR_BINARY_BITWISE_XOR_ASSIGN: return true;
+		case EXPR_BINARY_BITWISE_OR_ASSIGN:  return true;
+		case EXPR_BINARY_COMMA:
+			return expression_has_effect(expr->binary.right);
+
+		case EXPR_BINARY_BUILTIN_EXPECT:     return true;
+		case EXPR_BINARY_ISGREATER:          return false;
+		case EXPR_BINARY_ISGREATEREQUAL:     return false;
+		case EXPR_BINARY_ISLESS:             return false;
+		case EXPR_BINARY_ISLESSEQUAL:        return false;
+		case EXPR_BINARY_ISLESSGREATER:      return false;
+		case EXPR_BINARY_ISUNORDERED:        return false;
+	}
+
+	panic("unexpected statement");
+}
+
 static void semantic_comma(binary_expression_t *expression)
 {
+	if (warning.unused_value) {
+		const expression_t *const left = expression->left;
+		if (!expression_has_effect(left)) {
+			warningf(left->base.source_position, "left-hand operand of comma expression has no effect");
+		}
+	}
 	expression->expression.datatype = expression->right->base.datatype;
 }
 
@@ -5258,7 +5364,12 @@ static statement_t *parse_expression_statement(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_EXPRESSION);
 
 	statement->base.source_position  = token.source_position;
-	statement->expression.expression = parse_expression();
+	expression_t *const expr         = parse_expression();
+	statement->expression.expression = expr;
+
+	if (warning.unused_value  && !expression_has_effect(expr)) {
+		warningf(expr->base.source_position, "statement has no effect");
+	}
 
 	expect(';');
 

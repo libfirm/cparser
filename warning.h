@@ -69,7 +69,9 @@ typedef struct warning_t {
 	bool unused_label:1;                  /* Warn whenever a label is declared but not used */
 	bool unused_parameter:1;              /* Warn whenever a function parameter is unused aside from its declaration */
 	bool unused_variable:1;               /* Warn whenever a local variable or non-constant static variable is unused aside from its declaration */
+#endif
 	bool unused_value:1;                  /* Warn whenever a statement computes a result that is explicitly not used */
+#if 0 // TODO
 	bool write_strings:1;                 /* Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char *' pointer will get a warning */
 #endif
 } warning_t;
