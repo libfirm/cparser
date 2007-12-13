@@ -2498,8 +2498,9 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		type_t *orig_type = declaration->type;
 		type_t *type      = skip_typeref(orig_type);
 
-		if(is_type_valid(type) &&
-		   type->kind != TYPE_FUNCTION && declaration->is_inline) {
+		if (type->kind != TYPE_FUNCTION &&
+		    declaration->is_inline &&
+		    is_type_valid(type)) {
 			warningf(declaration->source_position,
 			         "variable '%Y' declared 'inline'\n", declaration->symbol);
 		}
@@ -3873,13 +3874,11 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	conditional->condition = expression;
 
 	/* 6.5.15.2 */
-	type_t *condition_type_orig = expression->base.datatype;
-	if(is_type_valid(condition_type_orig)) {
-		type_t *condition_type = skip_typeref(condition_type_orig);
-		if(condition_type->kind != TYPE_ERROR && !is_type_scalar(condition_type)) {
-			type_error("expected a scalar type in conditional condition",
-			           expression->base.source_position, condition_type_orig);
-		}
+	type_t *const condition_type_orig = expression->base.datatype;
+	type_t *const condition_type      = skip_typeref(condition_type_orig);
+	if (!is_type_scalar(condition_type) && is_type_valid(condition_type)) {
+		type_error("expected a scalar type in conditional condition",
+		           expression->base.source_position, condition_type_orig);
 	}
 
 	expression_t *true_expression = parse_expression();
@@ -3889,13 +3888,10 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	conditional->true_expression  = true_expression;
 	conditional->false_expression = false_expression;
 
-	type_t *orig_true_type  = true_expression->base.datatype;
-	type_t *orig_false_type = false_expression->base.datatype;
-	if(!is_type_valid(orig_true_type) || !is_type_valid(orig_false_type))
-		return result;
-
-	type_t *true_type  = skip_typeref(orig_true_type);
-	type_t *false_type = skip_typeref(orig_false_type);
+	type_t *const orig_true_type  = true_expression->base.datatype;
+	type_t *const orig_false_type = false_expression->base.datatype;
+	type_t *const true_type       = skip_typeref(orig_true_type);
+	type_t *const false_type      = skip_typeref(orig_false_type);
 
 	/* 6.5.15.3 */
 	type_t *result_type;
@@ -3962,14 +3958,13 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 
 static void semantic_incdec(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.datatype;
-	if(!is_type_valid(orig_type))
-		return;
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = expression->value->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 	if(!is_type_arithmetic(type) && type->kind != TYPE_POINTER) {
-		/* TODO: improve error message */
-		errorf(HERE, "operation needs an arithmetic or pointer type");
+		if (is_type_valid(type)) {
+			/* TODO: improve error message */
+			errorf(HERE, "operation needs an arithmetic or pointer type");
+		}
 		return;
 	}
 
@@ -3978,14 +3973,13 @@ static void semantic_incdec(unary_expression_t *expression)
 
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.datatype;
-	if(!is_type_valid(orig_type))
-		return;
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = expression->value->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 	if(!is_type_arithmetic(type)) {
-		/* TODO: improve error message */
-		errorf(HERE, "operation needs an arithmetic type");
+		if (is_type_valid(type)) {
+			/* TODO: improve error message */
+			errorf(HERE, "operation needs an arithmetic type");
+		}
 		return;
 	}
 
@@ -3994,13 +3988,12 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 
 static void semantic_unexpr_scalar(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.datatype;
-	if(!is_type_valid(orig_type))
-		return;
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = expression->value->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_scalar(type)) {
-		errorf(HERE, "operand of ! must be of scalar type");
+		if (is_type_valid(type)) {
+			errorf(HERE, "operand of ! must be of scalar type");
+		}
 		return;
 	}
 
@@ -4009,13 +4002,12 @@ static void semantic_unexpr_scalar(unary_expression_t *expression)
 
 static void semantic_unexpr_integer(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.datatype;
-	if(!is_type_valid(orig_type))
-		return;
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = expression->value->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_integer(type)) {
-		errorf(HERE, "operand of ~ must be of integer type");
+		if (is_type_valid(type)) {
+			errorf(HERE, "operand of ~ must be of integer type");
+		}
 		return;
 	}
 
@@ -4024,13 +4016,12 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 
 static void semantic_dereference(unary_expression_t *expression)
 {
-	type_t *orig_type = expression->value->base.datatype;
-	if(!is_type_valid(orig_type))
-		return;
-
-	type_t *type = skip_typeref(orig_type);
+	type_t *const orig_type = expression->value->base.datatype;
+	type_t *const type      = skip_typeref(orig_type);
 	if(!is_type_pointer(type)) {
-		errorf(HERE, "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
+		if (is_type_valid(type)) {
+			errorf(HERE, "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
+		}
 		return;
 	}
 
