@@ -4427,11 +4427,12 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_WIDE_STRING_LITERAL:       return false;
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;
-			if (call->function->kind == EXPR_BUILTIN_SYMBOL) {
-				switch (call->function->builtin_symbol.symbol->ID) {
-					case T___builtin_va_end: return true;
-					default:                 return false;
-				}
+			if (call->function->kind != EXPR_BUILTIN_SYMBOL)
+				return true;
+
+			switch (call->function->builtin_symbol.symbol->ID) {
+				case T___builtin_va_end: return true;
+				default:                 return false;
 			}
 		}
 		case EXPR_CONDITIONAL: {
