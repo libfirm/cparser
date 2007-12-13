@@ -3147,19 +3147,17 @@ static expression_t *parse_statement_expression(void)
 	}
 
 	/* find last statement and use its type */
-	assert(statement->kind == STATEMENT_COMPOUND);
-	const statement_t *iter           = statement->compound.statements;
-	const statement_t *last_statement = NULL;
-	for( ; iter != NULL; iter = iter->base.next) {
-		last_statement = iter;
-	}
+	type_t *type = type_void;
+	const statement_t *stmt = statement->compound.statements;
+	if (stmt != NULL) {
+		while (stmt->base.next != NULL)
+			stmt = stmt->base.next;
 
-	if(last_statement->kind == STATEMENT_EXPRESSION) {
-		expression->base.datatype
-			= last_statement->expression.expression->base.datatype;
-	} else {
-		expression->base.datatype = type_void;
+		if (stmt->kind == STATEMENT_EXPRESSION) {
+			type = stmt->expression.expression->base.datatype;
+		}
 	}
+	expression->base.datatype = type;
 
 	expect(')');
 
