@@ -639,9 +639,7 @@ static int get_rank(const type_t *type)
 		return ATOMIC_TYPE_INT;
 
 	assert(type->kind == TYPE_ATOMIC);
-	const atomic_type_t *atomic_type = &type->atomic;
-	atomic_type_kind_t   atype       = atomic_type->akind;
-	return atype;
+	return type->atomic.akind;
 }
 
 static type_t *promote_integer(type_t *type)
@@ -729,13 +727,8 @@ static type_t *semantic_assign(type_t *orig_type_left,
 	}
 
 	if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		pointer_type_t *pointer_type_left  = &type_left->pointer;
-		pointer_type_t *pointer_type_right = &type_right->pointer;
-		type_t         *points_to_left     = pointer_type_left->points_to;
-		type_t         *points_to_right    = pointer_type_right->points_to;
-
-		points_to_left  = skip_typeref(points_to_left);
-		points_to_right = skip_typeref(points_to_right);
+		type_t *points_to_left  = skip_typeref(type_left->pointer.points_to);
+		type_t *points_to_right = skip_typeref(type_right->pointer.points_to);
 
 		/* the left type has all qualifiers from the right type */
 		unsigned missing_qualifiers
@@ -1069,16 +1062,14 @@ static initializer_t *parse_sub_initializer(type_t *type,
 	initializer_t  *result = NULL;
 	initializer_t **elems;
 	if(is_type_array(type)) {
-		array_type_t *array_type   = &type->array;
-		type_t       *element_type = array_type->element_type;
-		element_type               = skip_typeref(element_type);
-
 		if(token.type == '.') {
 			errorf(HERE,
 			       "compound designator in initializer for array type '%T'",
 			       type);
 			skip_designator();
 		}
+
+		type_t *const element_type = skip_typeref(type->array.element_type);
 
 		initializer_t *sub;
 		had_initializer_brace_warning = false;
@@ -1116,8 +1107,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		}
 	} else {
 		assert(is_type_compound(type));
-		compound_type_t *compound_type = &type->compound;
-		context_t       *context       = &compound_type->declaration->context;
+		context_t *const context = &type->compound.declaration->context;
 
 		if(token.type == '[') {
 			errorf(HERE,
@@ -1851,8 +1841,7 @@ static void semantic_parameter(declaration_t *declaration)
 	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
 	 * into a pointer. § 6.7.5.3 (7) */
 	if (is_type_array(type)) {
-		const array_type_t *arr_type     = &type->array;
-		type_t             *element_type = arr_type->element_type;
+		type_t *const element_type = type->array.element_type;
 
 		type = make_pointer_type(element_type, type->base.qualifiers);
 
@@ -2416,20 +2405,17 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 			switch (initializer->kind) {
 				case INITIALIZER_LIST: {
-					initializer_list_t *const list = &initializer->list;
-					cnst->conste.v.int_value = list->len;
+					cnst->conste.v.int_value = initializer->list.len;
 					break;
 				}
 
 				case INITIALIZER_STRING: {
-					initializer_string_t *const string = &initializer->string;
-					cnst->conste.v.int_value = string->string.size;
+					cnst->conste.v.int_value = initializer->string.string.size;
 					break;
 				}
 
 				case INITIALIZER_WIDE_STRING: {
-					initializer_wide_string_t *const string = &initializer->wide_string;
-					cnst->conste.v.int_value = string->string.size;
+					cnst->conste.v.int_value = initializer->wide_string.string.size;
 					break;
 				}
 
@@ -2470,8 +2456,7 @@ static void parse_anonymous_declaration_rest(
 	switch (type->kind) {
 		case TYPE_COMPOUND_STRUCT:
 		case TYPE_COMPOUND_UNION: {
-			const compound_type_t *compound_type = &type->compound;
-			if (compound_type->declaration->symbol == NULL) {
+			if (type->compound.declaration->symbol == NULL) {
 				warningf(declaration->source_position, "unnamed struct/union that defines no instances");
 			}
 			break;
@@ -3057,38 +3042,30 @@ static type_t *automatic_type_conversion(type_t *orig_type)
  */
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
-	switch(expression->kind) {
-	case EXPR_REFERENCE: {
-		const reference_expression_t *ref = &expression->reference;
-		return ref->declaration->type;
-	}
-	case EXPR_SELECT: {
-		const select_expression_t *select = &expression->select;
-		return select->compound_entry->type;
-	}
-	case EXPR_UNARY_DEREFERENCE: {
-		expression_t   *value        = expression->unary.value;
-		type_t         *type         = skip_typeref(value->base.datatype);
-		pointer_type_t *pointer_type = &type->pointer;
+	switch (expression->kind) {
+		case EXPR_REFERENCE: return expression->reference.declaration->type;
+		case EXPR_SELECT:    return expression->select.compound_entry->type;
 
-		return pointer_type->points_to;
-	}
-	case EXPR_BUILTIN_SYMBOL: {
-		const builtin_symbol_expression_t *builtin
-			= &expression->builtin_symbol;
-		return get_builtin_symbol_type(builtin->symbol);
-	}
-	case EXPR_ARRAY_ACCESS: {
-		const expression_t *const array_ref = expression->array_access.array_ref;
-		type_t             *const type_left = skip_typeref(array_ref->base.datatype);
-		if (!is_type_valid(type_left))
-			return type_left;
-		assert(is_type_pointer(type_left));
-		return type_left->pointer.points_to;
-	}
+		case EXPR_UNARY_DEREFERENCE: {
+			const expression_t *const value = expression->unary.value;
+			type_t             *const type  = skip_typeref(value->base.datatype);
+			assert(is_type_pointer(type));
+			return type->pointer.points_to;
+		}
 
-	default:
-		break;
+		case EXPR_BUILTIN_SYMBOL:
+			return get_builtin_symbol_type(expression->builtin_symbol.symbol);
+
+		case EXPR_ARRAY_ACCESS: {
+			const expression_t *const array_ref = expression->array_access.array_ref;
+			type_t             *const type_left = skip_typeref(array_ref->base.datatype);
+			if (!is_type_valid(type_left))
+				return type_left;
+			assert(is_type_pointer(type_left));
+			return type_left->pointer.points_to;
+		}
+
+		default: break;
 	}
 
 	return expression->base.datatype;
@@ -3169,21 +3146,17 @@ static expression_t *parse_statement_expression(void)
 		return NULL;
 	}
 
+	/* find last statement and use its type */
 	assert(statement->kind == STATEMENT_COMPOUND);
-	compound_statement_t *compound_statement = &statement->compound;
-
-	/* find last statement and use it's type */
+	const statement_t *iter           = statement->compound.statements;
 	const statement_t *last_statement = NULL;
-	const statement_t *iter           = compound_statement->statements;
 	for( ; iter != NULL; iter = iter->base.next) {
 		last_statement = iter;
 	}
 
 	if(last_statement->kind == STATEMENT_EXPRESSION) {
-		const expression_statement_t *expression_statement
-			= &last_statement->expression;
 		expression->base.datatype
-			= expression_statement->expression->base.datatype;
+			= last_statement->expression.expression->base.datatype;
 	} else {
 		expression->base.datatype = type_void;
 	}
@@ -3602,14 +3575,12 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	type_t *return_type;
 	if (is_type_pointer(type_left)) {
-		pointer_type_t *const pointer = &type_left->pointer;
-		return_type             = pointer->points_to;
+		return_type             = type_left->pointer.points_to;
 		array_access->array_ref = left;
 		array_access->index     = inside;
 		check_for_char_index_type(inside);
 	} else if (is_type_pointer(type_inside)) {
-		pointer_type_t *const pointer = &type_inside->pointer;
-		return_type             = pointer->points_to;
+		return_type             = type_inside->pointer.points_to;
 		array_access->array_ref = inside;
 		array_access->index     = left;
 		array_access->flipped   = true;
@@ -3691,8 +3662,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 			}
 			return create_invalid_expression();
 		}
-		pointer_type_t *pointer_type = &type->pointer;
-		type_left                    = pointer_type->points_to;
+		type_left = type->pointer.points_to;
 	}
 	type_left = skip_typeref(type_left);
 
@@ -3705,8 +3675,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return create_invalid_expression();
 	}
 
-	compound_type_t *compound_type = &type_left->compound;
-	declaration_t   *declaration   = compound_type->declaration;
+	declaration_t *const declaration = type_left->compound.declaration;
 
 	if(!declaration->init.is_defined) {
 		errorf(HERE, "request for member '%Y' of incomplete type '%T'",
@@ -3855,15 +3824,10 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);
 
 static bool same_compound_type(const type_t *type1, const type_t *type2)
 {
-	if(!is_type_compound(type1))
-		return false;
-	if(type1->kind != type2->kind)
-		return false;
-
-	const compound_type_t *compound1 = &type1->compound;
-	const compound_type_t *compound2 = &type2->compound;
-
-	return compound1->declaration == compound2->declaration;
+	return
+		is_type_compound(type1) &&
+		type1->kind == type2->kind &&
+		type1->compound.declaration == type2->compound.declaration;
 }
 
 /**
@@ -4033,9 +3997,7 @@ static void semantic_dereference(unary_expression_t *expression)
 		return;
 	}
 
-	pointer_type_t *pointer_type = &type->pointer;
-	type_t         *result_type  = pointer_type->points_to;
-
+	type_t *result_type = type->pointer.points_to;
 	result_type = automatic_type_conversion(result_type);
 	expression->expression.datatype = result_type;
 }
@@ -4053,8 +4015,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 		return;
 
 	if(value->kind == EXPR_REFERENCE) {
-		reference_expression_t *reference   = (reference_expression_t*) value;
-		declaration_t          *declaration = reference->declaration;
+		declaration_t *const declaration = value->reference.declaration;
 		if(declaration != NULL) {
 			if (declaration->storage_class == STORAGE_CLASS_REGISTER) {
 				errorf(expression->expression.source_position,
@@ -5208,17 +5169,15 @@ static statement_t *parse_return(void)
 	statement->statement.kind            = STATEMENT_RETURN;
 	statement->statement.source_position = token.source_position;
 
-	assert(is_type_function(current_function->type));
-	function_type_t *function_type = &current_function->type->function;
-	type_t          *return_type   = function_type->return_type;
-
 	expression_t *return_value = NULL;
 	if(token.type != ';') {
 		return_value = parse_expression();
 	}
 	expect(';');
 
-	return_type = skip_typeref(return_type);
+	const type_t *const func_type = current_function->type;
+	assert(is_type_function(func_type));
+	type_t *const return_type = skip_typeref(func_type->function.return_type);
 
 	if(return_value != NULL) {
 		type_t *return_value_type = skip_typeref(return_value->base.datatype);
