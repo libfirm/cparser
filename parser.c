@@ -3141,10 +3141,6 @@ static expression_t *parse_statement_expression(void)
 
 	statement_t *statement           = parse_compound_statement();
 	expression->statement.statement  = statement;
-	if(statement == NULL) {
-		expect(')');
-		return NULL;
-	}
 	expression->base.source_position = statement->base.source_position;
 
 	/* find last statement and use its type */
@@ -5364,7 +5360,7 @@ static statement_t *parse_statement(void)
  */
 static statement_t *parse_compound_statement(void)
 {
-	compound_statement_t *compound_statement
+	compound_statement_t *const compound_statement
 		= allocate_ast_zero(sizeof(compound_statement[0]));
 	compound_statement->statement.kind            = STATEMENT_COMPOUND;
 	compound_statement->statement.source_position = token.source_position;
