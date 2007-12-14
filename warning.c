@@ -28,6 +28,7 @@ void set_warning_opt(const char *const opt)
 	}
 	OPT("implicit-function-declaration", implicit_function_declaration)
 	OPT("implicit-int",                  implicit_int)
+	OPT("main",                          main)
 	OPT("missing-declarations",          missing_declarations)
 	OPT("missing-prototypes",            missing_prototypes)
 	OPT("redundant-decls",               redundant_decls)
@@ -59,6 +60,7 @@ warning_t warning = {
 	.fatal_errors                  = false,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
+	.main                          = true,
 	.missing_declarations          = true,
 	.missing_prototypes            = true,
 	.redundant_decls               = true,

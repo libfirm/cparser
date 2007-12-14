@@ -27,6 +27,8 @@ extern type_t *type_short_ptr;
 extern type_t *type_signed_char_ptr;
 extern type_t *type_void_ptr;
 
+extern type_t *type_char_ptr_ptr;
+
 extern type_t *type_intmax_t;
 extern type_t *type_ptrdiff_t;
 extern type_t *type_size_t;

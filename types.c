@@ -26,6 +26,8 @@ type_t *type_short_ptr;
 type_t *type_signed_char_ptr;
 type_t *type_void_ptr;
 
+type_t *type_char_ptr_ptr;
+
 type_t *type_intmax_t;
 type_t *type_ptrdiff_t;
 type_t *type_size_t;
@@ -67,4 +69,6 @@ void init_basic_types(void)
 	type_int_ptr            = make_pointer_type(type_int,               TYPE_QUALIFIER_NONE);
 	type_long_ptr           = make_pointer_type(type_long,              TYPE_QUALIFIER_NONE);
 	type_long_long_ptr      = make_pointer_type(type_long_long,         TYPE_QUALIFIER_NONE);
+
+	type_char_ptr_ptr       = make_pointer_type(type_string,            TYPE_QUALIFIER_NONE);
 }

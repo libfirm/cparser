@@ -2249,6 +2249,33 @@ static declaration_t *append_declaration(declaration_t* const declaration)
 	return declaration;
 }
 
+static void check_type_of_main(const declaration_t *const decl, const function_type_t *const func_type)
+{
+	if (skip_typeref(func_type->return_type) != type_int) {
+		warningf(decl->source_position, "return type of 'main' should be 'int', but is '%T'", func_type->return_type);
+	}
+	const function_parameter_t *parm = func_type->parameters;
+	if (parm != NULL) {
+		type_t *const first_type = parm->type;
+		if (!types_compatible(skip_typeref(first_type), type_int)) {
+			warningf(decl->source_position, "first argument of 'main' should be 'int', but is '%T'", first_type);
+		}
+		parm = parm->next;
+		if (parm != NULL) {
+			type_t *const second_type = parm->type;
+			if (!types_compatible(skip_typeref(second_type), type_char_ptr_ptr)) {
+				warningf(decl->source_position, "second argument of 'main' should be 'char**', but is '%T'", second_type);
+			}
+			parm = parm->next;
+			if (parm != NULL) {
+				warningf(decl->source_position, "'main' takes only zero or two arguments");
+			}
+		} else {
+			warningf(decl->source_position, "'main' takes only zero or two arguments");
+		}
+	}
+}
+
 static bool is_sym_main(const symbol_t *const sym)
 {
 	return strcmp(sym->string, "main") == 0;
@@ -2269,6 +2296,10 @@ static declaration_t *internal_record_declaration(
 		warningf(declaration->source_position,
 		         "function declaration '%#T' is not a prototype",
 		         orig_type, declaration->symbol);
+	}
+
+	if (is_function_definition && warning.main && is_sym_main(symbol)) {
+		check_type_of_main(declaration, &type->function);
 	}
 
 	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
