@@ -18,6 +18,7 @@ void set_warning_opt(const char *const opt)
 #define SET(y)    warning.y = state;
 #define OPT(x, y) OPTX(x) SET(y)
 	OPT("char-subscripts",               char_subscripts)
+	OPT("empty-statement",               empty_statement)
 	OPT("error",                         s_are_errors)
 	OPT("fatal-errors",                  fatal_errors)
 	OPT("format",                        check_format)
@@ -54,6 +55,7 @@ void set_warning_opt(const char *const opt)
 warning_t warning = {
 	.char_subscripts               = true,
 	.check_format                  = true,
+	.empty_statement               = true,
 	.fatal_errors                  = false,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,

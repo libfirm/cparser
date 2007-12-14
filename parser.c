@@ -5451,6 +5451,9 @@ static statement_t *parse_statement(void)
 		break;
 
 	case ';':
+		if (warning.empty_statement) {
+			warningf(HERE, "statement is empty");
+		}
 		next_token();
 		statement = NULL;
 		break;
