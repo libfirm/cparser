@@ -84,7 +84,7 @@ bool char_is_signed = true;
 bool strict_mode = false;
 
 static int            verbose;
-static struct obstack cppflags_obst;
+static struct obstack cppflags_obst, ldflags_obst;
 
 #if defined(_DEBUG) || defined(FIRM_DEBUG)
 /**
@@ -185,8 +185,9 @@ static FILE* preprocess(FILE* in, const char *fname)
 static void do_link(const char *out, const char *in)
 {
 	char buf[4096];
+	const char *flags = obstack_finish(&ldflags_obst);
 
-	snprintf(buf, sizeof(buf), "%s %s -o %s", LINKER, in, out);
+	snprintf(buf, sizeof(buf), LINKER " %s -o %s %s", flags, out, in);
 	if(verbose) {
 		puts(buf);
 	}
@@ -334,6 +335,7 @@ int main(int argc, char **argv)
 	compile_mode_t  mode         = CompileAssembleLink;
 
 	obstack_init(&cppflags_obst);
+	obstack_init(&ldflags_obst);
 
 #define GET_ARG_AFTER(def, args)                                             \
 	def = &arg[sizeof(args)-1];                                              \
@@ -352,139 +354,158 @@ int main(int argc, char **argv)
 		}                                                                    \
 	}
 
+#define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
+
 	bool help_displayed  = false;
 	bool argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
-		if(strncmp(arg, "-o", 2) == 0) {
-			GET_ARG_AFTER(outname, "-o");
-		} else if(strcmp(arg, "-c") == 0) {
-			mode = CompileAssemble;
-		} else if(strcmp(arg, "-S") == 0) {
-			mode = Compile;
-		} else if(strcmp(arg, "--gcc") == 0) {
-			c_mode |= _GNUC;
-		} else if(strcmp(arg, "--no-gcc") == 0) {
-			c_mode &= ~_GNUC;
-		} else if(strcmp(arg, "--ms") == 0) {
-			c_mode |= _MS;
-		} else if(strcmp(arg, "--signed-chars") == 0) {
-			char_is_signed = true;
-		} else if(strcmp(arg, "--unsigned-chars") == 0) {
-			char_is_signed = false;
-		} else if(strcmp(arg, "--strict") == 0) {
-			strict_mode = true;
-		} else if(strcmp(arg, "--no-ms") == 0) {
-			c_mode &= ~_MS;
-		} else if(strcmp(arg, "--lextest") == 0) {
-			mode = LexTest;
-		} else if(strcmp(arg, "--print-ast") == 0) {
-			mode = PrintAst;
-		} else if(strcmp(arg, "--print-fluffy") == 0) {
-			mode = PrintFluffy;
-		} else if(strcmp(arg, "--version") == 0) {
-			firm_version_t ver;
-			firm_get_version(&ver);
-			printf("cparser (%d.%d %s) using libFirm (%u.%u", 0, 1, cparser_REVISION, ver.major, ver.minor);
-			if(ver.revision[0] != 0) {
-				putchar(' ');
-				fputs(ver.revision, stdout);
-			}
-			if(ver.build[0] != 0) {
-				putchar(' ');
-				fputs(ver.build, stdout);
-			}
-			puts(")\n");
-			exit(EXIT_SUCCESS);
-		} else if(strcmp(arg, "-fsyntax-only") == 0) {
-			mode = ParseOnly;
-		} else if(strncmp(arg, "-I", 2) == 0) {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-I");
-			obstack_printf(&cppflags_obst, " -I%s", opt);
-		} else if(strncmp(arg, "-D", 2) == 0) {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-D");
-			obstack_printf(&cppflags_obst, " -D%s", opt);
-		} else if(strncmp(arg, "-U", 2) == 0) {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-U");
-			obstack_printf(&cppflags_obst, " -U%s", opt);
-		} else if(strcmp(arg, "--dump-function") == 0) {
-			++i;
-			if(i >= argc) {
-				fprintf(stderr, "error: "
-				        "expected argument after '--dump-function'\n");
-				argument_errors = true;
-				break;
-			}
-			dumpfunction = argv[i];
-			mode         = CompileDump;
-		} else if(strcmp(arg, "-v") == 0) {
-			verbose = 1;
-		} else if(strcmp(arg, "-w") == 0) {
-			inhibit_all_warnings = true;
-		} else if(arg[0] == '-' && arg[1] == 'f') {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-f");
+		if(arg[0] == '-') {
+			/* an option */
+			const char *option = &arg[1];
+			if(option[0] == 'o') {
+				GET_ARG_AFTER(outname, "-o");
+			} else if(SINGLE_OPTION('c')) {
+				mode = CompileAssemble;
+			} else if(SINGLE_OPTION('S')) {
+				mode = Compile;
+			} else if(option[0] == 'I') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-I");
+				obstack_printf(&cppflags_obst, " -I%s", opt);
+			} else if(option[0] == 'D') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-D");
+				obstack_printf(&cppflags_obst, " -D%s", opt);
+			} else if(option[0] == 'U') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-U");
+				obstack_printf(&cppflags_obst, " -U%s", opt);
+			} else if(option[0] == 'l') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-l");
+				obstack_printf(&ldflags_obst, " -l%s", opt);
+			} else if(option[0] == 'L') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-L");
+				obstack_printf(&ldflags_obst, " -L%s", opt);
+			} else if(SINGLE_OPTION('v')) {
+				verbose = 1;
+			} else if(SINGLE_OPTION('w')) {
+				inhibit_all_warnings = true;
+			} else if(option[0] == 'f') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-f");
 
-			if(strcmp(opt, "omit-frame-pointer") == 0) {
-				firm_be_option("omitfp");
-			} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
-				firm_be_option("omitfp=no");
-			} else {
-				int res = firm_option(opt);
+				if(strcmp(opt, "syntax-only") == 0) {
+					mode = ParseOnly;
+				} else if(strcmp(opt, "omit-frame-pointer") == 0) {
+					firm_be_option("omitfp");
+				} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
+					firm_be_option("omitfp=no");
+				} else {
+					int res = firm_option(opt);
+					if (res == 0) {
+						fprintf(stderr, "error: unknown Firm option '-f %s'\n",
+						        opt);
+						argument_errors = true;
+						continue;
+					} else if (res == -1) {
+						help_displayed = true;
+					}
+				}
+			} else if(option[0] == 'b') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-b");
+				int res = firm_be_option(opt);
 				if (res == 0) {
-					fprintf(stderr, "error: unknown Firm option '-f %s'\n",
+					fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
 					        opt);
 					argument_errors = true;
-					continue;
 				} else if (res == -1) {
 					help_displayed = true;
 				}
-			}
-		} else if(arg[0] == '-' && arg[1] == 'b') {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-b");
-			int res = firm_be_option(opt);
-			if (res == 0) {
-				fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
-				        opt);
-				argument_errors = true;
-			} else if (res == -1) {
-				help_displayed = true;
-			}
-		} else if(arg[0] == '-' && arg[1] == 'W') {
-			set_warning_opt(&arg[2]);
-		} else if(arg[0] == '-' && arg[1] == 'm') {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-m");
-			char *endptr;
-			long int value = strtol(opt, &endptr, 10);
-			if (*endptr != '\0') {
-				fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
-				argument_errors = true;
-			}
-			if (value != 16 && value != 32 && value != 64) {
-				fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
-				argument_errors = true;
-			} else {
-				machine_size = (unsigned int)value;
-			}
-		} else if(arg[0] == '-') {
-			if (arg[1] == '\0') {
+			} else if(option[0] == 'W') {
+				set_warning_opt(&option[1]);
+			} else if(option[0] == 'm') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-m");
+				char *endptr;
+				long int value = strtol(opt, &endptr, 10);
+				if (*endptr != '\0') {
+					fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
+					argument_errors = true;
+				}
+				if (value != 16 && value != 32 && value != 64) {
+					fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
+					argument_errors = true;
+				} else {
+					machine_size = (unsigned int)value;
+				}
+			} else if (option[0] == '\0') {
 				if(input != NULL) {
 					fprintf(stderr, "error: multiple input files specified\n");
 					argument_errors = true;
 				} else {
 					input = arg;
 				}
-			} else if(strcmp(arg, "-pedantic") == 0) {
+			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
-			} else if(arg[1] == 'O' ||
-					arg[1] == 'g' ||
-					strncmp(arg + 1, "std=", 4) == 0) {
+			} else if(option[0] == 'O' ||
+			          option[0] == 'g' ||
+			          strncmp(option, "std=", 4) == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+			} else if (option[0] == '-') {
+				/* double dash option */
+				++option;
+				if(strcmp(option, "gcc") == 0) {
+					c_mode |= _GNUC;
+				} else if(strcmp(option, "no-gcc") == 0) {
+					c_mode &= ~_GNUC;
+				} else if(strcmp(option, "ms") == 0) {
+					c_mode |= _MS;
+				} else if(strcmp(option, "no-ms") == 0) {
+					c_mode &= ~_MS;
+				} else if(strcmp(option, "signed-chars") == 0) {
+					char_is_signed = true;
+				} else if(strcmp(option, "unsigned-chars") == 0) {
+					char_is_signed = false;
+				} else if(strcmp(option, "strict") == 0) {
+					strict_mode = true;
+				} else if(strcmp(option, "lextest") == 0) {
+					mode = LexTest;
+				} else if(strcmp(option, "print-ast") == 0) {
+					mode = PrintAst;
+				} else if(strcmp(option, "print-fluffy") == 0) {
+					mode = PrintFluffy;
+				} else if(strcmp(option, "version") == 0) {
+					firm_version_t ver;
+					firm_get_version(&ver);
+					printf("cparser (%d.%d %s) using libFirm (%u.%u", 0, 1, cparser_REVISION, ver.major, ver.minor);
+					if(ver.revision[0] != 0) {
+						putchar(' ');
+						fputs(ver.revision, stdout);
+					}
+					if(ver.build[0] != 0) {
+						putchar(' ');
+						fputs(ver.build, stdout);
+					}
+					puts(")\n");
+					exit(EXIT_SUCCESS);
+				} else if(strcmp(option, "dump-function") == 0) {
+					++i;
+					if(i >= argc) {
+						fprintf(stderr, "error: "
+						        "expected argument after '--dump-function'\n");
+						argument_errors = true;
+						break;
+					}
+					dumpfunction = argv[i];
+					mode         = CompileDump;
+				} else {
+					fprintf(stderr, "error: unknown argument '%s'\n", arg);
+					argument_errors = true;
+				}
 			} else {
 				fprintf(stderr, "error: unknown argument '%s'\n", arg);
 				argument_errors = true;
@@ -681,6 +702,7 @@ int main(int argc, char **argv)
 	}
 
 	obstack_free(&cppflags_obst, NULL);
+	obstack_free(&ldflags_obst, NULL);
 
 	exit_ast2firm();
 	exit_parser();
