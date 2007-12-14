@@ -2343,15 +2343,17 @@ warn_redundant_declaration:
 			}
 			return previous_declaration;
 		}
-	} else if (is_function_definition &&
-			declaration->storage_class != STORAGE_CLASS_STATIC) {
-		if (warning.missing_prototypes && !is_sym_main(symbol)) {
-			warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
-		} else if (warning.missing_declarations && !is_sym_main(symbol)) {
-			warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+	} else if (is_function_definition) {
+		if (declaration->storage_class != STORAGE_CLASS_STATIC) {
+			if (warning.missing_prototypes && !is_sym_main(symbol)) {
+				warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
+			} else if (warning.missing_declarations && !is_sym_main(symbol)) {
+				warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+			}
 		}
 	} else if (warning.missing_declarations &&
-	    context == global_context && (
+	    context == global_context &&
+	    !is_type_function(type) && (
 	      declaration->storage_class == STORAGE_CLASS_NONE ||
 	      declaration->storage_class == STORAGE_CLASS_THREAD
 	    )) {
