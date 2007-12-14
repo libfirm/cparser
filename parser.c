@@ -2352,6 +2352,7 @@ warn_redundant_declaration:
 		}
 	} else if (warning.missing_declarations &&
 	    context == global_context &&
+	    declaration->storage_class != STORAGE_CLASS_EXTERN &&
 	    declaration->storage_class != STORAGE_CLASS_STATIC &&
 	    declaration->storage_class != STORAGE_CLASS_TYPEDEF &&
 	    declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY &&
