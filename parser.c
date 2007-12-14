@@ -4487,8 +4487,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_BITWISE_AND:        return false;
 		case EXPR_BINARY_BITWISE_OR:         return false;
 		case EXPR_BINARY_BITWISE_XOR:        return false;
-		case EXPR_BINARY_LOGICAL_AND:        return false;
-		case EXPR_BINARY_LOGICAL_OR:         return false;
 		case EXPR_BINARY_SHIFTLEFT:          return false;
 		case EXPR_BINARY_SHIFTRIGHT:         return false;
 		case EXPR_BINARY_ASSIGN:             return true;
@@ -4502,6 +4500,8 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_BITWISE_AND_ASSIGN: return true;
 		case EXPR_BINARY_BITWISE_XOR_ASSIGN: return true;
 		case EXPR_BINARY_BITWISE_OR_ASSIGN:  return true;
+		case EXPR_BINARY_LOGICAL_AND:
+		case EXPR_BINARY_LOGICAL_OR:
 		case EXPR_BINARY_COMMA:
 			return expression_has_effect(expr->binary.right);
 
