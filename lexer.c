@@ -96,11 +96,11 @@ static inline void next_char(void);
 			next_char();                      \
 		}                                     \
 		lexer_token.source_position.linenr++; \
-		code;                                 \
+		code                                  \
 	case '\n':                                \
 		next_char();                          \
 		lexer_token.source_position.linenr++; \
-		code;
+		code
 
 #define eat(c_type)  do { assert(c == c_type); next_char(); } while(0)
 

@@ -55,7 +55,7 @@ void set_warning_opt(const char *const opt)
 warning_t warning = {
 	.char_subscripts               = true,
 	.check_format                  = true,
-	.empty_statement               = true,
+	.empty_statement               = false,
 	.fatal_errors                  = false,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
