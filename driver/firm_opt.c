@@ -873,10 +873,8 @@ static void do_firm_lowering(const char *input_filename)
     DUMP_ALL(firm_dump.ir_graph, "-low-opt");
   }
 
-#if 0
   if (firm_opt.cc_opt)
     mark_private_methods();
-#endif
 
   /* set the phase to low */
   for (i = get_irp_n_irgs() - 1; i >= 0; --i)
