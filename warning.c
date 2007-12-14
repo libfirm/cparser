@@ -31,6 +31,7 @@ void set_warning_opt(const char *const opt)
 	OPT("missing-prototypes",            missing_prototypes)
 	OPT("redundant-decls",               redundant_decls)
 	OPT("strict-prototypes",             strict_prototypes)
+	OPT("switch-default",                switch_default)
 #if 0
 	OPTX("unused") {
 		SET(unused_function)
@@ -52,11 +53,14 @@ void set_warning_opt(const char *const opt)
 warning_t warning = {
 	.char_subscripts               = true,
 	.check_format                  = true,
+	.fatal_errors                  = false,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
 	.missing_declarations          = true,
 	.missing_prototypes            = true,
-	.strict_prototypes             = true,
 	.redundant_decls               = true,
+	.s_are_errors                  = false,
+	.strict_prototypes             = true,
+	.switch_default                = false,
 	.unused_value                  = true
 };

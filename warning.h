@@ -59,8 +59,8 @@ typedef struct warning_t {
 	bool strict_aliasing:1;               /* Warn about code which might break the strict aliasing rules that the compiler is using for optimization. */
 #endif
 	bool strict_prototypes:1;             /* warn if a function declaration has an unspecified parameter list */
-#if 0 // TODO
 	bool switch_default:1;                /* Warn whenever a 'switch' statement does not have a 'default' case */
+#if 0 // TODO
 	bool switch_enum:1;                   /* Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch? */
 	bool traditional:1;                   /* Warn about certain constructs that behave differently in traditional and ISO C */
 	bool undef:1;                         /* Warn if an undefined identifier is evaluated in an '#if' directive */

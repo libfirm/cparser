@@ -5075,6 +5075,10 @@ static statement_t *parse_switch(void)
 	statement->body = parse_statement();
 	current_switch  = rem;
 
+	if (warning.switch_default && find_default_label(statement) == NULL) {
+		warningf(statement->statement.source_position, "switch has no default case");
+	}
+
 	return (statement_t*) statement;
 }
 
