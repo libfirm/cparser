@@ -3386,7 +3386,9 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	current_switch_cond                  = cond;
 	break_label                          = break_block;
 
-	statement_to_firm(statement->body);
+	if (statement->body != NULL) {
+		statement_to_firm(statement->body);
+	}
 
 	if(get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
