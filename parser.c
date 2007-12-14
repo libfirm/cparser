@@ -2351,12 +2351,10 @@ warn_redundant_declaration:
 			warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
 		}
 	} else if (warning.missing_declarations &&
-	    context == global_context &&
-	    declaration->storage_class != STORAGE_CLASS_EXTERN &&
-	    declaration->storage_class != STORAGE_CLASS_STATIC &&
-	    declaration->storage_class != STORAGE_CLASS_TYPEDEF &&
-	    declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY &&
-	    declaration->storage_class != STORAGE_CLASS_THREAD_STATIC) {
+	    context == global_context && (
+	      declaration->storage_class == STORAGE_CLASS_NONE ||
+	      declaration->storage_class == STORAGE_CLASS_THREAD
+	    )) {
 		warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
 	}
 
