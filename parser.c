@@ -5023,7 +5023,14 @@ static statement_t *parse_label_statement(void)
 		errorf(HERE, "label at end of compound statement");
 		return (statement_t*) label_statement;
 	} else {
-		label_statement->label_statement = parse_statement();
+		if (token.type == ';') {
+			/* eat an empty statement here, to avoid the warning about an empty
+			 * after a label.  label:; is commonly used to have a label before
+			 * a }. */
+			next_token();
+		} else {
+			label_statement->label_statement = parse_statement();
+		}
 	}
 
 	return (statement_t*) label_statement;
