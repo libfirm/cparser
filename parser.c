@@ -983,19 +983,16 @@ static initializer_t *initializer_from_expression(type_t *type,
 }
 
 static initializer_t *parse_sub_initializer(type_t *type,
-                                            expression_t *expression,
-                                            type_t *expression_type);
+                                            expression_t *expression);
 
 static initializer_t *parse_sub_initializer_elem(type_t *type)
 {
 	if(token.type == '{') {
-		return parse_sub_initializer(type, NULL, NULL);
+		return parse_sub_initializer(type, NULL);
 	}
 
-	expression_t *expression      = parse_assignment_expression();
-	type_t       *expression_type = skip_typeref(expression->base.datatype);
-
-	return parse_sub_initializer(type, expression, expression_type);
+	expression_t *expression = parse_assignment_expression();
+	return parse_sub_initializer(type, expression);
 }
 
 static bool had_initializer_brace_warning;
@@ -1019,8 +1016,7 @@ static void skip_designator(void)
 }
 
 static initializer_t *parse_sub_initializer(type_t *type,
-                                            expression_t *expression,
-                                            type_t *expression_type)
+                                            expression_t *expression)
 {
 	if(is_type_scalar(type)) {
 		/* there might be extra {} hierarchies */
@@ -1030,7 +1026,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 				warningf(HERE, "braces around scalar initializer");
 				had_initializer_brace_warning = true;
 			}
-			initializer_t *result = parse_sub_initializer(type, NULL, NULL);
+			initializer_t *result = parse_sub_initializer(type, NULL);
 			if(token.type == ',') {
 				next_token();
 				/* TODO: warn about excessive elements */
@@ -1076,8 +1072,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		if(expression == NULL) {
 			sub = parse_sub_initializer_elem(element_type);
 		} else {
-			sub = parse_sub_initializer(element_type, expression,
-			                            expression_type);
+			sub = parse_sub_initializer(element_type, expression);
 		}
 
 		/* didn't match the subtypes -> try the parent type */
@@ -1127,7 +1122,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		if(expression == NULL) {
 			sub = parse_sub_initializer_elem(first_type);
 		} else {
-			sub = parse_sub_initializer(first_type, expression,expression_type);
+			sub = parse_sub_initializer(first_type, expression);
 		}
 
 		/* didn't match the subtypes -> try our parent type */
@@ -1216,7 +1211,7 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 		expect('}');
 		return result;
 	} else {
-		result = parse_sub_initializer(type, NULL, NULL);
+		result = parse_sub_initializer(type, NULL);
 	}
 
 	return result;
@@ -3951,6 +3946,7 @@ static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.datatype;
 	type_t *const type      = skip_typeref(orig_type);
+	/* TODO !is_type_real && !is_type_pointer */
 	if(!is_type_arithmetic(type) && type->kind != TYPE_POINTER) {
 		if (is_type_valid(type)) {
 			/* TODO: improve error message */
