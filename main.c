@@ -455,9 +455,7 @@ int main(int argc, char **argv)
 				help_displayed = true;
 			}
 		} else if(arg[0] == '-' && arg[1] == 'W') {
-			const char *opt;
-			GET_ARG_AFTER(opt, "-W");
-			set_warning_opt(opt);
+			set_warning_opt(&arg[2]);
 		} else if(arg[0] == '-' && arg[1] == 'm') {
 			const char *opt;
 			GET_ARG_AFTER(opt, "-m");
