@@ -2350,6 +2350,10 @@ warn_redundant_declaration:
 		} else if (warning.missing_declarations && !is_sym_main(symbol)) {
 			warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
 		}
+	} else if (warning.missing_declarations &&
+	    declaration->storage_class != STORAGE_CLASS_STATIC &&
+	    declaration->storage_class != STORAGE_CLASS_TYPEDEF) {
+		warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
 	}
 
 	assert(declaration->parent_context == NULL);
