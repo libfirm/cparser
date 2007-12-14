@@ -11,6 +11,7 @@
 #include "type_t.h"
 #include "target_architecture.h"
 #include "parser.h"
+#include "warning.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -1037,7 +1038,9 @@ static void parse_preprocessor_identifier(void)
 		error_directive();
 		break;
 	case TP_pragma:
-		warningf(lexer_token.source_position, "encountered unknown #pragma");
+		if (warning.unknown_pragmas) {
+			warningf(lexer_token.source_position, "encountered unknown #pragma");
+		}
 		eat_until_newline();
 		break;
 	}

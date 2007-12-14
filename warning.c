@@ -32,6 +32,7 @@ void set_warning_opt(const char *const opt)
 	OPT("redundant-decls",               redundant_decls)
 	OPT("strict-prototypes",             strict_prototypes)
 	OPT("switch-default",                switch_default)
+	OPT("unknown-pragmas",               unknown_pragmas)
 #if 0
 	OPTX("unused") {
 		SET(unused_function)
@@ -62,5 +63,6 @@ warning_t warning = {
 	.s_are_errors                  = false,
 	.strict_prototypes             = true,
 	.switch_default                = false,
+	.unknown_pragmas               = true,
 	.unused_value                  = true
 };

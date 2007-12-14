@@ -65,7 +65,9 @@ typedef struct warning_t {
 	bool traditional:1;                   /* Warn about certain constructs that behave differently in traditional and ISO C */
 	bool undef:1;                         /* Warn if an undefined identifier is evaluated in an '#if' directive */
 	bool uninitialized:1;                 /* Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call. */
-	bool unknown_pragmas:1;               /* Warn when a #pragma directive is encountered which is not understood by GCC */
+#endif
+	bool unknown_pragmas:1;               /* Warn when a #pragma directive is encountered which is not understood */
+#if 0 // TODO
 	bool unreachable_code:1;              /* Warn if the compiler detects that code will never be executed */
 	bool unused_function:1;               /* Warn whenever a static function is declared but not defined or a non-inline static function is unused */
 	bool unused_label:1;                  /* Warn whenever a label is declared but not used */
