@@ -592,10 +592,10 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for(", out);
-	if(statement->context.declarations != NULL) {
+	if(statement->scope.declarations != NULL) {
 		assert(statement->initialisation == NULL);
-		print_declaration(statement->context.declarations);
-		if(statement->context.declarations->next != NULL) {
+		print_declaration(statement->scope.declarations);
+		if(statement->scope.declarations->next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 		fputc(' ', out);
@@ -775,7 +775,7 @@ static void print_normal_declaration(const declaration_t *declaration)
 			fputs("inline ", out);
 	}
 	print_type_ext(declaration->type, declaration->symbol,
-	               &declaration->context);
+	               &declaration->scope);
 
 	if(declaration->type->kind == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {
@@ -828,7 +828,7 @@ void print_ast(const translation_unit_t *unit)
 {
 	inc_type_visited();
 
-	declaration_t *declaration = unit->context.declarations;
+	declaration_t *declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;

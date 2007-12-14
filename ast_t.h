@@ -152,8 +152,8 @@ typedef enum {
 	case EXPR_UNARY_ASSUME:                \
 	case EXPR_UNARY_BITFIELD_EXTRACT:
 
-struct context_t {
-	declaration_t *declarations;  /**< List of declarations in this context. */
+struct scope_t {
+	declaration_t *declarations;  /**< List of declarations in this scope. */
 };
 
 struct expression_base_t {
@@ -406,10 +406,10 @@ struct declaration_t {
 		initializer_t  *initializer;
 		expression_t   *enum_value;
 	} init;
-	context_t           context;
-	context_t          *parent_context;
+	scope_t             scope;
+	scope_t            *parent_scope;
 
-	/** next declaration in a context */
+	/** next declaration in a scope */
 	declaration_t      *next;
 	/** next declaration with same symbol */
 	declaration_t      *symbol_next;
@@ -457,7 +457,7 @@ struct return_statement_t {
 struct compound_statement_t {
 	statement_base_t  statement;
 	statement_t      *statements;
-	context_t         context;
+	scope_t           scope;
 };
 
 struct declaration_statement_t {
@@ -522,7 +522,7 @@ struct for_statement_t {
 	expression_t     *condition;
 	expression_t     *step;
 	statement_t      *body;
-	context_t         context;
+	scope_t           scope;
 };
 
 struct asm_constraint_t {
@@ -565,7 +565,7 @@ union statement_t {
 };
 
 struct translation_unit_t {
-	context_t context;
+	scope_t scope;
 };
 
 static inline

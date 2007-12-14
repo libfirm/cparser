@@ -44,8 +44,8 @@ static token_t             lookahead_buffer[MAX_LOOKAHEAD];
 static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
-static context_t          *global_context    = NULL;
-static context_t          *context           = NULL;
+static scope_t            *global_scope      = NULL;
+static scope_t            *scope             = NULL;
 static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
@@ -487,11 +487,11 @@ static void eat_paren(void)
     }                                              \
     next_token();
 
-static void set_context(context_t *new_context)
+static void set_scope(scope_t *new_scope)
 {
-	context = new_context;
+	scope = new_scope;
 
-	last_declaration = new_context->declarations;
+	last_declaration = new_scope->declarations;
 	if(last_declaration != NULL) {
 		while(last_declaration->next != NULL) {
 			last_declaration = last_declaration->next;
@@ -558,13 +558,13 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 static void environment_push(declaration_t *declaration)
 {
 	assert(declaration->source_position.input_name != NULL);
-	assert(declaration->parent_context != NULL);
+	assert(declaration->parent_scope != NULL);
 	stack_push(&environment_stack, declaration);
 }
 
 static void label_push(declaration_t *declaration)
 {
-	declaration->parent_context = &current_function->context;
+	declaration->parent_scope = &current_function->scope;
 	stack_push(&label_stack, declaration);
 }
 
@@ -1102,7 +1102,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		}
 	} else {
 		assert(is_type_compound(type));
-		context_t *const context = &type->compound.declaration->context;
+		scope_t *const scope = &type->compound.declaration->scope;
 
 		if(token.type == '[') {
 			errorf(HERE,
@@ -1111,7 +1111,7 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			skip_designator();
 		}
 
-		declaration_t *first = context->declarations;
+		declaration_t *first = scope->declarations;
 		if(first == NULL)
 			return NULL;
 		type_t *first_type = first->type;
@@ -1262,7 +1262,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
-		declaration->parent_context  = context;
+		declaration->parent_scope  = scope;
 		if (symbol != NULL) {
 			environment_push(declaration);
 		}
@@ -1274,19 +1274,19 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 			assert(symbol != NULL);
 			errorf(HERE, "multiple definition of '%s %Y'",
 			       is_struct ? "struct" : "union", symbol);
-			declaration->context.declarations = NULL;
+			declaration->scope.declarations = NULL;
 		}
 		declaration->init.is_defined = true;
 
-		int         top          = environment_top();
-		context_t  *last_context = context;
-		set_context(&declaration->context);
+		int       top        = environment_top();
+		scope_t  *last_scope = scope;
+		set_scope(&declaration->scope);
 
 		parse_compound_type_entries();
 		parse_attributes();
 
-		assert(context == &declaration->context);
-		set_context(last_context);
+		assert(scope == &declaration->scope);
+		set_scope(last_scope);
 		environment_pop_to(top);
 	}
 
@@ -1360,7 +1360,7 @@ static type_t *parse_enum_specifier(void)
 		declaration->namespc         = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
-		declaration->parent_context  = context;
+		declaration->parent_scope  = scope;
 	}
 
 	type_t *const type      = allocate_type_zero(TYPE_ENUM);
@@ -2020,7 +2020,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 
 	declaration_t *parameters = parse_parameters(&type->function);
 	if(declaration != NULL) {
-		declaration->context.declarations = parameters;
+		declaration->scope.declarations = parameters;
 	}
 
 	construct_function_type_t *construct_function_type =
@@ -2243,14 +2243,27 @@ static declaration_t *append_declaration(declaration_t* const declaration)
 	if (last_declaration != NULL) {
 		last_declaration->next = declaration;
 	} else {
-		context->declarations = declaration;
+		scope->declarations = declaration;
 	}
 	last_declaration = declaration;
 	return declaration;
 }
 
+/**
+ * Check if the declaration of main is suspicious.  main should be a
+ * function with external linkage, returning int, taking either zero
+ * arguments, two, or three arguments of appropriate types, ie.
+ *
+ * int main([ int argc, char **argv [, char **env ] ]).
+ *
+ * @param decl    the declaration to check
+ * @param type    the function type of the declaration
+ */
 static void check_type_of_main(const declaration_t *const decl, const function_type_t *const func_type)
 {
+	if (decl->storage_class == STORAGE_CLASS_STATIC) {
+		warningf(decl->source_position, "'main' is normally a non-static function");
+	}
 	if (skip_typeref(func_type->return_type) != type_int) {
 		warningf(decl->source_position, "return type of 'main' should be 'int', but is '%T'", func_type->return_type);
 	}
@@ -2268,14 +2281,24 @@ static void check_type_of_main(const declaration_t *const decl, const function_t
 			}
 			parm = parm->next;
 			if (parm != NULL) {
-				warningf(decl->source_position, "'main' takes only zero or two arguments");
+				type_t *const third_type = parm->type;
+				if (!types_compatible(skip_typeref(third_type), type_char_ptr_ptr)) {
+					warningf(decl->source_position, "third argument of 'main' should be 'char**', but is '%T'", third_type);
+				}
+				parm = parm->next;
+				if (parm != NULL) {
+					warningf(decl->source_position, "'main' takes only zero, two or three arguments");
+				}
 			}
 		} else {
-			warningf(decl->source_position, "'main' takes only zero or two arguments");
+			warningf(decl->source_position, "'main' takes only zero, two or three arguments");
 		}
 	}
 }
 
+/**
+ * Check if a symbol is the equal to "main".
+ */
 static bool is_sym_main(const symbol_t *const sym)
 {
 	return strcmp(sym->string, "main") == 0;
@@ -2305,7 +2328,7 @@ static declaration_t *internal_record_declaration(
 	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL) {
-		if (previous_declaration->parent_context == context) {
+		if (previous_declaration->parent_scope == scope) {
 			/* can happen for K&R style declarations */
 			if(previous_declaration->type == NULL) {
 				previous_declaration->type = declaration->type;
@@ -2384,7 +2407,7 @@ warn_redundant_declaration:
 			}
 		}
 	} else if (warning.missing_declarations &&
-	    context == global_context &&
+	    scope == global_scope &&
 	    !is_type_function(type) && (
 	      declaration->storage_class == STORAGE_CLASS_NONE ||
 	      declaration->storage_class == STORAGE_CLASS_THREAD
@@ -2392,11 +2415,11 @@ warn_redundant_declaration:
 		warningf(declaration->source_position, "no previous declaration for '%#T'", orig_type, symbol);
 	}
 
-	assert(declaration->parent_context == NULL);
+	assert(declaration->parent_scope == NULL);
 	assert(declaration->symbol != NULL);
-	assert(context != NULL);
+	assert(scope != NULL);
 
-	declaration->parent_context = context;
+	declaration->parent_scope = scope;
 
 	environment_push(declaration);
 	return append_declaration(declaration);
@@ -2577,7 +2600,7 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 
 	declaration_t *previous_declaration = get_declaration(symbol, namespc);
 	if(previous_declaration == NULL ||
-			previous_declaration->parent_context != context) {
+			previous_declaration->parent_scope != scope) {
 		errorf(HERE, "expected declaration of a function parameter, found '%Y'",
 		       symbol);
 		return declaration;
@@ -2586,7 +2609,7 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 	if(previous_declaration->type == NULL) {
 		previous_declaration->type           = declaration->type;
 		previous_declaration->storage_class  = declaration->storage_class;
-		previous_declaration->parent_context = context;
+		previous_declaration->parent_scope = scope;
 		return previous_declaration;
 	} else {
 		return record_declaration(declaration);
@@ -2617,14 +2640,14 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		return;
 
 	/* push function parameters */
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&declaration->context);
+	int       top        = environment_top();
+	scope_t  *last_scope = scope;
+	set_scope(&declaration->scope);
 
-	declaration_t *parameter = declaration->context.declarations;
+	declaration_t *parameter = declaration->scope.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		assert(parameter->parent_context == NULL);
-		parameter->parent_context = context;
+		assert(parameter->parent_scope == NULL);
+		parameter->parent_scope = scope;
 		environment_push(parameter);
 	}
 
@@ -2634,8 +2657,8 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	}
 
 	/* pop function parameters */
-	assert(context == &declaration->context);
-	set_context(last_context);
+	assert(scope == &declaration->scope);
+	set_scope(last_scope);
 	environment_pop_to(top);
 
 	/* update function type */
@@ -2645,7 +2668,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	function_parameter_t *parameters     = NULL;
 	function_parameter_t *last_parameter = NULL;
 
-	declaration_t *parameter_declaration = declaration->context.declarations;
+	declaration_t *parameter_declaration = declaration->scope.declarations;
 	for( ; parameter_declaration != NULL;
 			parameter_declaration = parameter_declaration->next) {
 		type_t *parameter_type = parameter_declaration->type;
@@ -2773,23 +2796,23 @@ static void parse_external_declaration(void)
 
 	declaration_t *const declaration = record_function_definition(ndeclaration);
 	if(ndeclaration != declaration) {
-		declaration->context = ndeclaration->context;
+		declaration->scope = ndeclaration->scope;
 	}
 	type = skip_typeref(declaration->type);
 
-	/* push function parameters and switch context */
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&declaration->context);
+	/* push function parameters and switch scope */
+	int       top        = environment_top();
+	scope_t  *last_scope = scope;
+	set_scope(&declaration->scope);
 
-	declaration_t *parameter = declaration->context.declarations;
+	declaration_t *parameter = declaration->scope.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		if(parameter->parent_context == &ndeclaration->context) {
-			parameter->parent_context = context;
+		if(parameter->parent_scope == &ndeclaration->scope) {
+			parameter->parent_scope = scope;
 		}
-		assert(parameter->parent_context == NULL
-				|| parameter->parent_context == context);
-		parameter->parent_context = context;
+		assert(parameter->parent_scope == NULL
+				|| parameter->parent_scope == scope);
+		parameter->parent_scope = scope;
 		environment_push(parameter);
 	}
 
@@ -2812,8 +2835,8 @@ static void parse_external_declaration(void)
 	}
 
 end_of_parse_external_declaration:
-	assert(context == &declaration->context);
-	set_context(last_context);
+	assert(scope == &declaration->scope);
+	set_scope(last_scope);
 	environment_pop_to(top);
 }
 
@@ -3010,18 +3033,18 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	declaration->type            = type;
 	declaration->symbol          = symbol;
 	declaration->source_position = source_position;
-	declaration->parent_context  = global_context;
+	declaration->parent_scope  = global_scope;
 
-	context_t *old_context = context;
-	set_context(global_context);
+	scope_t *old_scope = scope;
+	set_scope(global_scope);
 
 	environment_push(declaration);
-	/* prepend the declaration to the global declarations list */
-	declaration->next     = context->declarations;
-	context->declarations = declaration;
+	/* prepends the declaration to the global declarations list */
+	declaration->next   = scope->declarations;
+	scope->declarations = declaration;
 
-	assert(context == global_context);
-	set_context(old_context);
+	assert(scope == global_scope);
+	set_scope(old_scope);
 
 	return declaration;
 }
@@ -3366,7 +3389,7 @@ static expression_t *parse_va_start(void)
 	expression_t *const expr = parse_assignment_expression();
 	if (expr->kind == EXPR_REFERENCE) {
 		declaration_t *const decl = expr->reference.declaration;
-		if (decl->parent_context == &current_function->context &&
+		if (decl->parent_scope == &current_function->scope &&
 		    decl->next == NULL) {
 			expression->va_starte.parameter = decl;
 			expect(')');
@@ -3743,7 +3766,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return create_invalid_expression();
 	}
 
-	declaration_t *iter = declaration->context.declarations;
+	declaration_t *iter = declaration->scope.declarations;
 	for( ; iter != NULL; iter = iter->next) {
 		if(iter->symbol == symbol) {
 			break;
@@ -3834,7 +3857,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 		for( ; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
 			type_t *expected_type = parameter->type;
-			/* TODO report context in error messages */
+			/* TODO report scope in error messages */
 			expression_t *const arg_expr = argument->expression;
 			type_t       *const res_type = semantic_assign(expected_type, arg_expr, "function call");
 			if (res_type == NULL) {
@@ -4397,8 +4420,8 @@ static void semantic_logical_op(binary_expression_t *expression)
  */
 static bool has_const_fields(const compound_type_t *type)
 {
-	const context_t     *context = &type->declaration->context;
-	const declaration_t *declaration = context->declarations;
+	const scope_t       *scope       = &type->declaration->scope;
+	const declaration_t *declaration = scope->declarations;
 
 	for (; declaration != NULL; declaration = declaration->next) {
 		if (declaration->namespc != NAMESPACE_NORMAL)
@@ -5011,7 +5034,7 @@ static declaration_t *get_label(symbol_t *symbol)
 	/* if we found a label in the same function, then we already created the
 	 * declaration */
 	if(candidate != NULL
-			&& candidate->parent_context == &current_function->context) {
+			&& candidate->parent_scope == &current_function->scope) {
 		return candidate;
 	}
 
@@ -5194,9 +5217,9 @@ static statement_t *parse_for(void)
 
 	expect('(');
 
-	int         top          = environment_top();
-	context_t  *last_context = context;
-	set_context(&statement->context);
+	int      top        = environment_top();
+	scope_t *last_scope = scope;
+	set_scope(&statement->scope);
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
@@ -5219,8 +5242,8 @@ static statement_t *parse_for(void)
 	expect(')');
 	statement->body = parse_loop_body((statement_t*)statement);
 
-	assert(context == &statement->context);
-	set_context(last_context);
+	assert(scope == &statement->scope);
+	set_scope(last_scope);
 	environment_pop_to(top);
 
 	return (statement_t*) statement;
@@ -5409,7 +5432,7 @@ static statement_t *parse_declaration_statement(void)
 	parse_declaration(record_declaration);
 
 	if(before == NULL) {
-		statement->declaration.declarations_begin = context->declarations;
+		statement->declaration.declarations_begin = scope->declarations;
 	} else {
 		statement->declaration.declarations_begin = before->next;
 	}
@@ -5557,9 +5580,9 @@ static statement_t *parse_compound_statement(void)
 
 	eat('{');
 
-	int        top          = environment_top();
-	context_t *last_context = context;
-	set_context(&compound_statement->context);
+	int      top        = environment_top();
+	scope_t *last_scope = scope;
+	set_scope(&compound_statement->scope);
 
 	statement_t *last_statement = NULL;
 
@@ -5586,8 +5609,8 @@ static statement_t *parse_compound_statement(void)
 		errorf(compound_statement->statement.source_position, "end of file while looking for closing '}'");
 	}
 
-	assert(context == &compound_statement->context);
-	set_context(last_context);
+	assert(scope == &compound_statement->scope);
+	set_scope(last_scope);
 	environment_pop_to(top);
 
 	return (statement_t*) compound_statement;
@@ -5620,11 +5643,11 @@ static translation_unit_t *parse_translation_unit(void)
 {
 	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
 
-	assert(global_context == NULL);
-	global_context = &unit->context;
+	assert(global_scope == NULL);
+	global_scope = &unit->scope;
 
-	assert(context == NULL);
-	set_context(&unit->context);
+	assert(scope == NULL);
+	set_scope(&unit->scope);
 
 	initialize_builtin_types();
 
@@ -5638,12 +5661,12 @@ static translation_unit_t *parse_translation_unit(void)
 		}
 	}
 
-	assert(context == &unit->context);
-	context          = NULL;
+	assert(scope == &unit->scope);
+	scope          = NULL;
 	last_declaration = NULL;
 
-	assert(global_context == &unit->context);
-	global_context = NULL;
+	assert(global_scope == &unit->scope);
+	global_scope = NULL;
 
 	return unit;
 }

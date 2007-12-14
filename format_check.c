@@ -367,28 +367,29 @@ eval_fmt_mod_unsigned:
 			return;
 		}
 
-		type_t *const arg_type = arg->expression->base.datatype;
-		if (is_type_pointer(expected_type)) {
-			type_t *const arg_skip = skip_typeref(arg_type);
-			if (is_type_pointer(arg_skip)) {
-				type_t *const exp_to = skip_typeref(expected_type->pointer.points_to);
-				type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
-				if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
-				    get_unqualified_type(arg_to) == exp_to) {
+		{	/* create a scope here to prevent warning about the jump to next_arg */
+			type_t *const arg_type = arg->expression->base.datatype;
+			if (is_type_pointer(expected_type)) {
+				type_t *const arg_skip = skip_typeref(arg_type);
+				if (is_type_pointer(arg_skip)) {
+					type_t *const exp_to = skip_typeref(expected_type->pointer.points_to);
+					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
+					if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
+						get_unqualified_type(arg_to) == exp_to) {
+						goto next_arg;
+					}
+				}
+			} else {
+				if (get_unqualified_type(skip_typeref(arg_type)) == expected_type) {
 					goto next_arg;
 				}
 			}
-		} else {
-			if (get_unqualified_type(skip_typeref(arg_type)) == expected_type) {
-				goto next_arg;
+			if (is_type_valid(arg_type)) {
+				warningf(pos,
+					"argument type '%T' does not match conversion specifier '%%%s%c'",
+					arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
 			}
 		}
-		if (is_type_valid(arg_type)) {
-			warningf(pos,
-				"argument type '%T' does not match conversion specifier '%%%s%c'",
-				arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
-		}
-
 next_arg:
 		arg = arg->next;
 	}

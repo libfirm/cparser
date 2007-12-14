@@ -29,7 +29,7 @@ void print_type(const type_t *type);
  * if symbol is NULL
  */
 void print_type_ext(const type_t *type, const symbol_t *symbol,
-                    const context_t *context);
+                    const scope_t *scope);
 
 void print_type_qualifiers(unsigned qualifiers);
 

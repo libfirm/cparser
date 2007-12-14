@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef struct context_t                    context_t;
+typedef struct scope_t                    scope_t;
 
 typedef struct expression_base_t                expression_base_t;
 typedef struct const_expression_t               const_expression_t;

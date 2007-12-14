@@ -549,7 +549,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 	size_t align_all  = 1;
 	size_t offset     = 0;
 	size_t bit_offset = 0;
-	declaration_t *entry = type->declaration->context.declarations;
+	declaration_t *entry = type->declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -652,7 +652,7 @@ static ir_type *create_union_type(compound_type_t *type)
 
 	int align_all = 1;
 	int size      = 0;
-	declaration_t *entry = declaration->context.declarations;
+	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -2696,7 +2696,7 @@ static void create_initializer_compound(initializer_list_t *initializer,
 {
 	declaration_t *compound_declaration = type->declaration;
 
-	declaration_t *compound_entry = compound_declaration->context.declarations;
+	declaration_t *compound_entry = compound_declaration->scope.declarations;
 
 	compound_graph_path_entry_t entry;
 	entry.type = COMPOUND_GRAPH_ENTRY_COMPOUND;
@@ -3068,7 +3068,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for( ; statement != NULL; statement = statement->base.next) {
-		//context2firm(&statement->context);
+		//context2firm(&statement->scope);
 
 		if(statement->base.next == NULL
 				&& statement->kind == STATEMENT_EXPRESSION) {
@@ -3287,7 +3287,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		}
 
 		/* create declarations */
-		declaration_t *declaration = statement->context.declarations;
+		declaration_t *declaration = statement->scope.declarations;
 		for( ; declaration != NULL; declaration = declaration->next) {
 			create_local_declaration(declaration);
 		}
@@ -3750,7 +3750,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_FOR: {
 				const for_statement_t *const for_stmt = &stmt->fors;
-				count += count_local_declarations(for_stmt->context.declarations, NULL);
+				count += count_local_declarations(for_stmt->scope.declarations, NULL);
 				count += count_decls_in_expression(for_stmt->initialisation);
 				count += count_decls_in_expression(for_stmt->condition);
 				count += count_decls_in_expression(for_stmt->step);
@@ -3795,7 +3795,7 @@ static int get_function_n_local_vars(declaration_t *declaration)
 	int count = 0;
 
 	/* count parameters */
-	count += count_local_declarations(declaration->context.declarations, NULL);
+	count += count_local_declarations(declaration->scope.declarations, NULL);
 
 	/* count local variables declared in body */
 	count += count_decls_in_stmts(declaration->init.statement);
@@ -3811,7 +3811,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 	ir_type         *function_irtype = get_ir_type(declaration->type);
 
 	int            n         = 0;
-	declaration_t *parameter = declaration->context.declarations;
+	declaration_t *parameter = declaration->scope.declarations;
 	for( ; parameter != NULL; parameter = parameter->next, ++n) {
 		assert(parameter->declaration_kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->type);
@@ -4038,10 +4038,10 @@ create_var:
 	panic("Invalid storage class for global variable");
 }
 
-static void context_to_firm(context_t *context)
+static void scope_to_firm(scope_t *scope)
 {
 	/* first pass: create declarations */
-	declaration_t *declaration = context->declarations;
+	declaration_t *declaration = scope->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -4060,7 +4060,7 @@ static void context_to_firm(context_t *context)
 	}
 
 	/* second pass: create code */
-	declaration = context->declarations;
+	declaration = scope->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -4113,5 +4113,5 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	break_label         = NULL;
 	current_switch_cond = NULL;
 
-	context_to_firm(&unit->context);
+	scope_to_firm(&unit->scope);
 }

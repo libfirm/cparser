@@ -82,7 +82,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 }
 
 static void print_function_type_post(const function_type_t *type,
-                                     const context_t *context, bool top)
+                                     const scope_t *scope, bool top)
 {
 	intern_print_type_post(type->return_type, false);
 	/* don't emit braces if we're the toplevel type... */
@@ -91,8 +91,8 @@ static void print_function_type_post(const function_type_t *type,
 
 	fputc('(', out);
 
-	int                 first     = 1;
-	if(context == NULL) {
+	int first = 1;
+	if(scope == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
@@ -103,7 +103,7 @@ static void print_function_type_post(const function_type_t *type,
 			print_type(parameter->type);
 		}
 	} else {
-		declaration_t *parameter = context->declarations;
+		declaration_t *parameter = scope->declarations;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
 				first = 0;
@@ -111,7 +111,7 @@ static void print_function_type_post(const function_type_t *type,
 				fputs(", ", out);
 			}
 			print_type_ext(parameter->type, parameter->symbol,
-			               &parameter->context);
+			               &parameter->scope);
 		}
 	}
 	if(type->variadic) {
@@ -209,7 +209,7 @@ void print_compound_definition(const declaration_t *declaration)
 	fputs("{\n", out);
 	change_indent(1);
 
-	declaration_t *iter = declaration->context.declarations;
+	declaration_t *iter = declaration->scope.declarations;
 	for( ; iter != NULL; iter = iter->next) {
 		print_indent();
 		print_declaration(iter);
@@ -336,7 +336,7 @@ void print_type(const type_t *const type)
 }
 
 void print_type_ext(const type_t *const type, const symbol_t *symbol,
-                    const context_t *context)
+                    const scope_t *scope)
 {
 	if(type == NULL) {
 		fputs("nil type", out);
@@ -349,7 +349,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 		fputs(symbol->string, out);
 	}
 	if(type->kind == TYPE_FUNCTION) {
-		print_function_type_post(&type->function, context, true);
+		print_function_type_post(&type->function, scope, true);
 	} else {
 		intern_print_type_post(type, true);
 	}

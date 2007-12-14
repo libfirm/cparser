@@ -9,31 +9,31 @@
 #include "type.h"
 #include "adt/error.h"
 
-static const context_t *global_context;
-static FILE            *out;
+static const scope_t *global_scope;
+static FILE          *out;
 
 static void write_type(const type_t *type);
 
 static const char *get_atomic_type_string(const atomic_type_kind_t type)
 {
 	switch(type) {
-	case ATOMIC_TYPE_VOID:       return "void";
-	case ATOMIC_TYPE_CHAR:       return "byte";
-	case ATOMIC_TYPE_SCHAR:      return "byte";
-	case ATOMIC_TYPE_UCHAR:      return "unsigned byte";
-	case ATOMIC_TYPE_SHORT:	     return "short";
-	case ATOMIC_TYPE_USHORT:     return "unsigned short";
-	case ATOMIC_TYPE_INT:        return "int";
-	case ATOMIC_TYPE_UINT:       return "unsigned int";
-	case ATOMIC_TYPE_LONG:       return "int";
-	case ATOMIC_TYPE_ULONG:      return "unsigned int";
-	case ATOMIC_TYPE_LONGLONG:   return "long";
-	case ATOMIC_TYPE_ULONGLONG:  return "unsigned long";
-	case ATOMIC_TYPE_FLOAT:      return "float";
-	case ATOMIC_TYPE_DOUBLE:     return "double";
+	case ATOMIC_TYPE_VOID:        return "void";
+	case ATOMIC_TYPE_CHAR:        return "byte";
+	case ATOMIC_TYPE_SCHAR:       return "byte";
+	case ATOMIC_TYPE_UCHAR:       return "unsigned byte";
+	case ATOMIC_TYPE_SHORT:	      return "short";
+	case ATOMIC_TYPE_USHORT:      return "unsigned short";
+	case ATOMIC_TYPE_INT:         return "int";
+	case ATOMIC_TYPE_UINT:        return "unsigned int";
+	case ATOMIC_TYPE_LONG:        return "int";
+	case ATOMIC_TYPE_ULONG:       return "unsigned int";
+	case ATOMIC_TYPE_LONGLONG:    return "long";
+	case ATOMIC_TYPE_ULONGLONG:   return "unsigned long";
+	case ATOMIC_TYPE_FLOAT:       return "float";
+	case ATOMIC_TYPE_DOUBLE:      return "double";
 	case ATOMIC_TYPE_LONG_DOUBLE: return "double";
-	case ATOMIC_TYPE_BOOL:       return "bool";
-	default:                     panic("unsupported atomic type");
+	case ATOMIC_TYPE_BOOL:        return "bool";
+	default:                      panic("unsupported atomic type");
 	}
 }
 
@@ -51,7 +51,7 @@ static void write_pointer_type(const pointer_type_t *type)
 static declaration_t *find_typedef(const type_t *type)
 {
 	/* first: search for a matching typedef in the global type... */
-	declaration_t *declaration = global_context->declarations;
+	declaration_t *declaration = global_scope->declarations;
 	while(declaration != NULL) {
 		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			declaration = declaration->next;
@@ -174,7 +174,7 @@ static void write_struct(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "struct %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->declaration->context.declarations;
+	const declaration_t *declaration = type->declaration->scope.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -187,7 +187,7 @@ static void write_union(const symbol_t *symbol, const compound_type_t *type)
 {
 	fprintf(out, "union %s:\n", symbol->string);
 
-	const declaration_t *declaration = type->declaration->context.declarations;
+	const declaration_t *declaration = type->declaration->scope.declarations;
 	while(declaration != NULL) {
 		write_struct_entry(declaration);
 		declaration = declaration->next;
@@ -273,7 +273,7 @@ static void write_function(const declaration_t *declaration)
 	const function_type_t *function_type
 		= (const function_type_t*) declaration->type;
 
-	declaration_t *parameter = declaration->context.declarations;
+	declaration_t *parameter = declaration->scope.declarations;
 	int            first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
 		if(!first) {
@@ -309,13 +309,13 @@ static void write_function(const declaration_t *declaration)
 void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 {
 	out            = output;
-	global_context = &unit->context;
+	global_scope = &unit->scope;
 
 	ast_set_output(out);
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
 	/* write structs,unions + enums */
-	declaration_t *declaration = unit->context.declarations;
+	declaration_t *declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
 		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
@@ -332,7 +332,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write global variables */
-	declaration = unit->context.declarations;
+	declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -348,7 +348,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	}
 
 	/* write functions */
-	declaration = unit->context.declarations;
+	declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
