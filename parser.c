@@ -2261,13 +2261,14 @@ static declaration_t *internal_record_declaration(
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
 
-	const type_t *const type = skip_typeref(declaration->type);
+	type_t       *const orig_type = declaration->type;
+	const type_t *const type      = skip_typeref(orig_type);
 	if (is_type_function(type) &&
 			type->function.unspecified_parameters &&
 			warning.strict_prototypes) {
 		warningf(declaration->source_position,
 		         "function declaration '%#T' is not a prototype",
-		         type, declaration->symbol);
+		         orig_type, declaration->symbol);
 	}
 
 	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
@@ -2283,7 +2284,7 @@ static declaration_t *internal_record_declaration(
 			if (!types_compatible(type, prev_type)) {
 				errorf(declaration->source_position,
 					"declaration '%#T' is incompatible with previous declaration '%#T'",
-					type, symbol, previous_declaration->type, symbol);
+					orig_type, symbol, previous_declaration->type, symbol);
 				errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
 			} else {
 				unsigned old_storage_class = previous_declaration->storage_class;
@@ -2301,7 +2302,7 @@ static declaration_t *internal_record_declaration(
 								if (warning.missing_prototypes &&
 								    prev_type->function.unspecified_parameters &&
 								    !is_sym_main(symbol)) {
-									warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
+									warningf(declaration->source_position, "no previous prototype for '%#T'", orig_type, symbol);
 								}
 							} else if (new_storage_class == STORAGE_CLASS_NONE) {
 								new_storage_class = STORAGE_CLASS_EXTERN;
@@ -2346,9 +2347,9 @@ warn_redundant_declaration:
 	} else if (is_function_definition) {
 		if (declaration->storage_class != STORAGE_CLASS_STATIC) {
 			if (warning.missing_prototypes && !is_sym_main(symbol)) {
-				warningf(declaration->source_position, "no previous prototype for '%#T'", type, symbol);
+				warningf(declaration->source_position, "no previous prototype for '%#T'", orig_type, symbol);
 			} else if (warning.missing_declarations && !is_sym_main(symbol)) {
-				warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+				warningf(declaration->source_position, "no previous declaration for '%#T'", orig_type, symbol);
 			}
 		}
 	} else if (warning.missing_declarations &&
@@ -2357,7 +2358,7 @@ warn_redundant_declaration:
 	      declaration->storage_class == STORAGE_CLASS_NONE ||
 	      declaration->storage_class == STORAGE_CLASS_THREAD
 	    )) {
-		warningf(declaration->source_position, "no previous declaration for '%#T'", type, symbol);
+		warningf(declaration->source_position, "no previous declaration for '%#T'", orig_type, symbol);
 	}
 
 	assert(declaration->parent_context == NULL);
