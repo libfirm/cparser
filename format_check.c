@@ -381,7 +381,7 @@ eval_fmt_mod_unsigned:
 		}
 		if (is_type_valid(arg_type)) {
 			warningf(pos,
-				"argument type '%T' does not match conversion specifier '%%%s%c'\n",
+				"argument type '%T' does not match conversion specifier '%%%s%c'",
 				arg_type, get_length_modifier_name(fmt_mod), (char)*fmt);
 		}
 
