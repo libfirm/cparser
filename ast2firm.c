@@ -2156,7 +2156,14 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
 	type_t *type = expression->type;
 	if(type == NULL) {
-		type = expression->tp_expression->base.datatype;
+		/* beware: if expression is a variable reference, return the
+		   alignment of the variable. */
+		const expression_t *tp_expression = expression->tp_expression;
+		const declaration_t *declaration = expr_is_variable(tp_expression);
+		if (declaration != NULL) {
+			/* TODO: get the alignment of this variable. */
+		}
+		type = tp_expression->base.datatype;
 		assert(type != NULL);
 	}
 

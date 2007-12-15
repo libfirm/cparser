@@ -5420,6 +5420,31 @@ static bool is_local_var_declaration(const declaration_t *declaration) {
 }
 
 /**
+ * Check if a given declaration represents a variable.
+ */
+static bool is_var_declaration(const declaration_t *declaration) {
+	switch ((storage_class_tag_t) declaration->storage_class) {
+	case STORAGE_CLASS_NONE:
+	case STORAGE_CLASS_EXTERN:
+	case STORAGE_CLASS_STATIC:
+	case STORAGE_CLASS_AUTO:
+	case STORAGE_CLASS_REGISTER:
+	case STORAGE_CLASS_THREAD:
+	case STORAGE_CLASS_THREAD_EXTERN:
+	case STORAGE_CLASS_THREAD_STATIC: {
+		const type_t *type = skip_typeref(declaration->type);
+		if(is_type_function(type)) {
+			return false;
+		} else {
+			return true;
+		}
+	}
+	default:
+		return false;
+	}
+}
+
+/**
  * Check if a given expression represents a local variable.
  */
 static bool is_local_variable(const expression_t *expression)
@@ -5429,6 +5454,21 @@ static bool is_local_variable(const expression_t *expression)
 	}
 	const declaration_t *declaration = expression->reference.declaration;
 	return is_local_var_declaration(declaration);
+}
+
+/**
+ * Check if a given expression represents a local variable and
+ * return its declaration then, else return NULL.
+ */
+declaration_t *expr_is_variable(const expression_t *expression)
+{
+	if (expression->base.kind != EXPR_REFERENCE) {
+		return NULL;
+	}
+	declaration_t *declaration = expression->reference.declaration;
+	if (is_local_var_declaration(declaration))
+		return declaration;
+	return NULL;
 }
 
 /**
