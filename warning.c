@@ -36,6 +36,7 @@ void set_warning_opt(const char *const opt)
 	OPT("strict-prototypes",             strict_prototypes)
 	OPT("switch-default",                switch_default)
 	OPT("unknown-pragmas",               unknown_pragmas)
+	OPT("unused-label",                  unused_label)
 #if 0
 	OPTX("unused") {
 		SET(unused_function)

@@ -52,6 +52,8 @@ static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
 static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
+static label_statement_t  *label_first       = NULL;
+static label_statement_t  *label_last        = NULL;
 static struct obstack  temp_obst;
 
 /** The current source position. */
@@ -2713,27 +2715,49 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 /**
  * Check if all labels are defined in the current function.
+ * Check if all labels are used in the current function.
  */
-static void check_for_missing_labels(void)
+static void check_labels(void)
 {
 	bool first_err = true;
 	for (const goto_statement_t *goto_statement = goto_first;
-	     goto_statement != NULL;
-	     goto_statement = goto_statement->next) {
-		 const declaration_t *label = goto_statement->label;
+	    goto_statement != NULL;
+	    goto_statement = goto_statement->next) {
+		declaration_t *label = goto_statement->label;
 
-		 if (label->source_position.input_name == NULL) {
-			 if (first_err) {
-				 first_err = false;
-				 diagnosticf("%s: In function '%Y':\n",
-					 current_function->source_position.input_name,
-					 current_function->symbol);
-			 }
-			 errorf(goto_statement->statement.source_position,
-				 "label '%Y' used but not defined", label->symbol);
+		label->used = true;
+		if (label->source_position.input_name == NULL) {
+			if (first_err) {
+				first_err = false;
+				diagnosticf("%s: In function '%Y':\n",
+					current_function->source_position.input_name,
+					current_function->symbol);
+			}
+			errorf(goto_statement->statement.source_position,
+				"label '%Y' used but not defined", label->symbol);
 		 }
 	}
 	goto_first = goto_last = NULL;
+
+	if (warning.unused_label) {
+		for (const label_statement_t *label_statement = label_first;
+			 label_statement != NULL;
+			 label_statement = label_statement->next) {
+			const declaration_t *label = label_statement->label;
+
+			if (! label->used) {
+				if (first_err) {
+					first_err = false;
+					diagnosticf("%s: In function '%Y':\n",
+						current_function->source_position.input_name,
+						current_function->symbol);
+				}
+				warningf(label_statement->statement.source_position,
+					"label '%Y' defined but not used", label->symbol);
+			}
+		}
+	}
+	label_first = label_last = NULL;
 }
 
 static void parse_external_declaration(void)
@@ -2827,7 +2851,7 @@ static void parse_external_declaration(void)
 		current_function                    = declaration;
 
 		declaration->init.statement = parse_compound_statement();
-		check_for_missing_labels();
+		check_labels();
 
 		assert(current_function == declaration);
 		current_function = old_current_function;
@@ -5103,6 +5127,13 @@ static statement_t *parse_label_statement(void)
 		} else {
 			label_statement->label_statement = parse_statement();
 		}
+	}
+
+	/* remember the labels's in a list for later checking */
+	if (label_last == NULL) {
+		label_first = label_last = label_statement;
+	} else {
+		label_last->next = label_statement;
 	}
 
 	return (statement_t*) label_statement;

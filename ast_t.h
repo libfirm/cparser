@@ -397,6 +397,7 @@ struct declaration_t {
 	decl_modifiers_t    modifiers;
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
+	unsigned int        used          : 1;  /**< Set if the declaration is used. */
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;
@@ -482,8 +483,8 @@ struct switch_statement_t {
 
 struct goto_statement_t {
 	statement_base_t  statement;
-	declaration_t    *label;
-	goto_statement_t *next; /**< link all goto statements in a function */
+	declaration_t    *label;     /**< The destination label. */
+	goto_statement_t *next;      /**< links all goto statements of a function */
 };
 
 struct case_label_statement_t {
@@ -494,9 +495,10 @@ struct case_label_statement_t {
 };
 
 struct label_statement_t {
-	statement_base_t  statement;
-	declaration_t    *label;
-	statement_t      *label_statement;
+	statement_base_t   statement;
+	declaration_t     *label;
+	statement_t       *label_statement;
+	label_statement_t *next;            /**< links all label statements of a function */
 };
 
 struct expression_statement_t {
