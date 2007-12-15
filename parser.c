@@ -2713,13 +2713,27 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	declaration->type = type;
 }
 
+static bool first_err = true;
+
+/**
+ * When called with first_err set, prints the name of the current function,
+ * else does noting.
+ */
+static void print_in_function(void) {
+	if (first_err) {
+		first_err = false;
+		diagnosticf("%s: In function '%Y':\n",
+			current_function->source_position.input_name,
+			current_function->symbol);
+	}
+}
+
 /**
  * Check if all labels are defined in the current function.
  * Check if all labels are used in the current function.
  */
 static void check_labels(void)
 {
-	bool first_err = true;
 	for (const goto_statement_t *goto_statement = goto_first;
 	    goto_statement != NULL;
 	    goto_statement = goto_statement->next) {
@@ -2727,12 +2741,7 @@ static void check_labels(void)
 
 		label->used = true;
 		if (label->source_position.input_name == NULL) {
-			if (first_err) {
-				first_err = false;
-				diagnosticf("%s: In function '%Y':\n",
-					current_function->source_position.input_name,
-					current_function->symbol);
-			}
+			print_in_function();
 			errorf(goto_statement->statement.source_position,
 				"label '%Y' used but not defined", label->symbol);
 		 }
@@ -2746,12 +2755,7 @@ static void check_labels(void)
 			const declaration_t *label = label_statement->label;
 
 			if (! label->used) {
-				if (first_err) {
-					first_err = false;
-					diagnosticf("%s: In function '%Y':\n",
-						current_function->source_position.input_name,
-						current_function->symbol);
-				}
+				print_in_function();
 				warningf(label_statement->statement.source_position,
 					"label '%Y' defined but not used", label->symbol);
 			}
@@ -2771,6 +2775,7 @@ static void check_declarations(void)
 		const declaration_t *parameter = scope->declarations;
 		for (; parameter != NULL; parameter = parameter->next) {
 			if (! parameter->used) {
+				print_in_function();
 				warningf(parameter->source_position,
 					"unused parameter '%Y'", parameter->symbol);
 			}
@@ -2871,6 +2876,7 @@ static void parse_external_declaration(void)
 		current_function                    = declaration;
 
 		declaration->init.statement = parse_compound_statement();
+		first_err = true;
 		check_labels();
 		check_declarations();
 
