@@ -2760,6 +2760,26 @@ static void check_labels(void)
 	label_first = label_last = NULL;
 }
 
+/**
+ * Check declarations of current_function for unused entities.
+ */
+static void check_declarations(void)
+{
+	if (warning.unused_parameter) {
+		const scope_t *scope = &current_function->scope;
+
+		const declaration_t *parameter = scope->declarations;
+		for (; parameter != NULL; parameter = parameter->next) {
+			if (! parameter->used) {
+				warningf(parameter->source_position,
+					"unused parameter '%Y'", parameter->symbol);
+			}
+		}
+	}
+	if (warning.unused_variable) {
+	}
+}
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -2852,6 +2872,7 @@ static void parse_external_declaration(void)
 
 		declaration->init.statement = parse_compound_statement();
 		check_labels();
+		check_declarations();
 
 		assert(current_function == declaration);
 		current_function = old_current_function;
