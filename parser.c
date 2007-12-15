@@ -5473,7 +5473,7 @@ declaration_t *expr_is_variable(const expression_t *expression)
 		return NULL;
 	}
 	declaration_t *declaration = expression->reference.declaration;
-	if (is_local_var_declaration(declaration))
+	if (is_var_declaration(declaration))
 		return declaration;
 	return NULL;
 }

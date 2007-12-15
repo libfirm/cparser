@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef struct scope_t                    scope_t;
+typedef struct scope_t                          scope_t;
 
 typedef struct expression_base_t                expression_base_t;
 typedef struct const_expression_t               const_expression_t;
@@ -19,8 +19,7 @@ typedef struct binary_expression_t              binary_expression_t;
 typedef struct unary_expression_t               unary_expression_t;
 typedef struct select_expression_t              select_expression_t;
 typedef struct array_access_expression_t        array_access_expression_t;
-typedef struct typeprop_expression_t              typeprop_expression_t;
-typedef struct typeprop_expression_t             typeprop_expression_t;
+typedef struct typeprop_expression_t            typeprop_expression_t;
 typedef struct conditional_expression_t         conditional_expression_t;
 typedef struct expression_list_element_t        expression_list_element_t;
 typedef struct comma_expression_t               comma_expression_t;
