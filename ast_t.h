@@ -414,6 +414,8 @@ struct declaration_t {
 	declaration_t      *next;
 	/** next declaration with same symbol */
 	declaration_t      *symbol_next;
+	/** next variable/parameter in function scope/global scope */
+	declaration_t      *next_var;
 
 	/* the following fields are used in ast2firm module */
 	unsigned char       declaration_kind;

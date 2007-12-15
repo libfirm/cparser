@@ -3217,6 +3217,9 @@ static expression_t *parse_reference(void)
 	ref->declaration         = declaration;
 	ref->expression.datatype = type;
 
+	/* this declaration is used */
+	declaration->used = true;
+
 	return expression;
 }
 

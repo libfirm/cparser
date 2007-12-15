@@ -37,6 +37,8 @@ void set_warning_opt(const char *const opt)
 	OPT("switch-default",                switch_default)
 	OPT("unknown-pragmas",               unknown_pragmas)
 	OPT("unused-label",                  unused_label)
+	OPT("unused-parameter",              unused_parameter)
+	OPT("unused-variable",               unused_variable)
 #if 0
 	OPTX("unused") {
 		SET(unused_function)
@@ -72,5 +74,7 @@ warning_t warning = {
 	.switch_default                = false,
 	.unknown_pragmas               = true,
 	.unused_label                  = false,
+	.unused_parameter              = false,
+	.unused_variable               = false,
 	.unused_value                  = true
 };
