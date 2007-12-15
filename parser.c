@@ -4312,6 +4312,11 @@ static void semantic_sub(binary_expression_t *expression)
 	}
 }
 
+/**
+ * Check the semantics of comparison expressions.
+ *
+ * @param expression   The expression to check.
+ */
 static void semantic_comparison(binary_expression_t *expression)
 {
 	expression_t *left            = expression->left;
@@ -4328,6 +4333,13 @@ static void semantic_comparison(binary_expression_t *expression)
 		expression->left  = create_implicit_cast(left, arithmetic_type);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->expression.datatype = arithmetic_type;
+		if (warning.float_equal &&
+		    (expression->expression.kind == EXPR_BINARY_EQUAL ||
+		     expression->expression.kind == EXPR_BINARY_NOTEQUAL) &&
+		    is_type_floating(arithmetic_type)) {
+			warningf(expression->expression.source_position,
+			         "comparing floating point with == or != is unsafe");
+		}
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		/* TODO check compatibility */
 	} else if (is_type_pointer(type_left)) {
@@ -4336,7 +4348,8 @@ static void semantic_comparison(binary_expression_t *expression)
 		expression->left = create_implicit_cast(left, type_right);
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		type_error_incompatible("invalid operands in comparison",
-		                        token.source_position, type_left, type_right);
+		                        expression->expression.source_position,
+		                        type_left, type_right);
 	}
 	expression->expression.datatype = type_int;
 }

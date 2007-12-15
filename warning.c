@@ -21,6 +21,7 @@ void set_warning_opt(const char *const opt)
 	OPT("empty-statement",               empty_statement)
 	OPT("error",                         s_are_errors)
 	OPT("fatal-errors",                  fatal_errors)
+	OPT("float-equal",                   float_equal)
 	OPT("format",                        check_format)
 	OPTX("implicit") {
 		SET(implicit_function_declaration)
@@ -58,6 +59,7 @@ warning_t warning = {
 	.check_format                  = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
+	.float_equal                   = true,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
 	.main                          = true,
