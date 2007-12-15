@@ -57,8 +57,10 @@ typedef struct warning_t {
 	bool s_are_errors:1;                  /**< Treat warnings as errors */
 #if 0 // TODO
 	bool sequence_point:1;                /**< Warn about code that may have undefined semantics because of violations of sequence point rules */
+#endif
 	bool shadow:1;                        /**< Warn whenever a local variable shadows another local variable, parameter or global variable or whenever a built-in function is shadowed */
 	bool sign_compare:1;                  /**< Warn when a comparison between signed and unsigned values could produce an incorrect result when the signed value is converted to unsigned */
+#if 0 // TODO
 	bool strict_aliasing:1;               /**< Warn about code which might break the strict aliasing rules that the compiler is using for optimization. */
 #endif
 	bool strict_prototypes:1;             /**< Warn if a function declaration has an unspecified parameter list */

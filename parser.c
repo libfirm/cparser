@@ -4378,6 +4378,13 @@ static void semantic_comparison(binary_expression_t *expression)
 
 	/* TODO non-arithmetic types */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		if (warning.sign_compare &&
+		    (expression->expression.kind != EXPR_BINARY_EQUAL &&
+		     expression->expression.kind != EXPR_BINARY_NOTEQUAL) &&
+		    (is_type_signed(type_left) != is_type_signed(type_right))) {
+			warningf(expression->expression.source_position,
+				"comparison between signed and unsigned");
+		}
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->left  = create_implicit_cast(left, arithmetic_type);
 		expression->right = create_implicit_cast(right, arithmetic_type);

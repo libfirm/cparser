@@ -15,6 +15,8 @@ warning_t warning = {
 	.missing_prototypes            = false,
 	.redundant_decls               = true,
 	.s_are_errors                  = false,
+	.shadow                        = false,
+	.sign_compare                  = false,
 	.strict_prototypes             = true,
 	.switch_default                = false,
 	.unknown_pragmas               = true,
@@ -42,6 +44,7 @@ void set_warning_opt(const char *const opt)
 #define SET(y)    warning.y = state;
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
+		/* Note: this switched on a lot of more warnings than gcc's -Wall */
 		SET(char_subscripts)
 		SET(check_format)
 		SET(empty_statement)
@@ -49,6 +52,8 @@ void set_warning_opt(const char *const opt)
 		SET(implicit_int)
 		SET(main)
 		SET(redundant_decls)
+		SET(shadow)
+		SET(sign_compare)
 		SET(strict_prototypes)
 		SET(switch_default)
 		SET(unknown_pragmas)
@@ -84,6 +89,8 @@ void set_warning_opt(const char *const opt)
 	OPT("missing-declarations",          missing_declarations)
 	OPT("missing-prototypes",            missing_prototypes)
 	OPT("redundant-decls",               redundant_decls)
+	OPT("shadow",                        shadow)
+	OPT("sign-compare",                  sign_compare)
 	OPT("strict-prototypes",             strict_prototypes)
 	OPT("switch-default",                switch_default)
 	OPT("unknown-pragmas",               unknown_pragmas)
