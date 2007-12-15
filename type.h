@@ -56,7 +56,7 @@ bool is_type_signed(const type_t *type);
 /**
  * returns true if type contains floating point numbers
  */
-bool is_type_floating(const type_t *type);
+bool is_type_float(const type_t *type);
 
 /**
  * returns true if the type is valid. A type is valid if it contains no

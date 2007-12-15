@@ -41,6 +41,11 @@ void print_type_qualifiers(type_qualifiers_t qualifiers)
 	if(qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
 }
 
+/**
+ * Prints the name of a atomic type.
+ *
+ * @param type  The type.
+ */
 static
 void print_atomic_type(const atomic_type_t *type)
 {
@@ -70,6 +75,12 @@ void print_atomic_type(const atomic_type_t *type)
 	fputs(s, out);
 }
 
+/**
+ * Print the first part (the prefix) of a type.
+ *
+ * @param type   The type to print.
+ * @param top    true, if this is the top type, false if it's an embedded type.
+ */
 static void print_function_type_pre(const function_type_t *type, bool top)
 {
 	print_type_qualifiers(type->type.qualifiers);
@@ -81,6 +92,12 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 		fputc('(', out);
 }
 
+/**
+ * Print the second part (the postfix) of a type.
+ *
+ * @param type   The type to print.
+ * @param top    true, if this is the top type, false if it's an embedded type.
+ */
 static void print_function_type_post(const function_type_t *type,
                                      const scope_t *scope, bool top)
 {
@@ -128,6 +145,11 @@ static void print_function_type_post(const function_type_t *type,
 	fputc(')', out);
 }
 
+/**
+ * Prints the prefix part of a pointer type.
+ *
+ * @param type   The pointer type.
+ */
 static void print_pointer_type_pre(const pointer_type_t *type)
 {
 	intern_print_type_pre(type->points_to, false);
@@ -135,16 +157,31 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 	print_type_qualifiers(type->type.qualifiers);
 }
 
+/**
+ * Prints the postfix part of a pointer type.
+ *
+ * @param type   The pointer type.
+ */
 static void print_pointer_type_post(const pointer_type_t *type)
 {
 	intern_print_type_post(type->points_to, false);
 }
 
+/**
+ * Prints the prefix part of an array type.
+ *
+ * @param type   The array type.
+ */
 static void print_array_type_pre(const array_type_t *type)
 {
 	intern_print_type_pre(type->element_type, false);
 }
 
+/**
+ * Prints the postfix part of an array type.
+ *
+ * @param type   The array type.
+ */
 static void print_array_type_post(const array_type_t *type)
 {
 	fputc('[', out);
@@ -159,6 +196,11 @@ static void print_array_type_post(const array_type_t *type)
 	intern_print_type_post(type->element_type, false);
 }
 
+/**
+ * Prints the postfix part of a bitfield type.
+ *
+ * @param type   The array type.
+ */
 static void print_bitfield_type_post(const bitfield_type_t *type)
 {
 	fputs(" : ", out);
@@ -166,6 +208,11 @@ static void print_bitfield_type_post(const bitfield_type_t *type)
 	intern_print_type_post(type->base, false);
 }
 
+/**
+ * Prints an enum definition.
+ *
+ * @param declaration  The enum's type declaration.
+ */
 void print_enum_definition(const declaration_t *declaration)
 {
 	fputs("{\n", out);
@@ -190,6 +237,11 @@ void print_enum_definition(const declaration_t *declaration)
 	fputs("}", out);
 }
 
+/**
+ * Prints an enum type.
+ *
+ * @param type  The enum type.
+ */
 static void print_type_enum(const enum_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
@@ -204,6 +256,11 @@ static void print_type_enum(const enum_type_t *type)
 	}
 }
 
+/**
+ * Print the compound part of a compound type.
+ *
+ * @param declaration  The declaration of the compound type.
+ */
 void print_compound_definition(const declaration_t *declaration)
 {
 	fputs("{\n", out);
@@ -221,6 +278,11 @@ void print_compound_definition(const declaration_t *declaration)
 	fputs("}", out);
 }
 
+/**
+ * Prints a compound type.
+ *
+ * @param type  The compound type.
+ */
 static void print_compound_type(const compound_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
@@ -241,12 +303,22 @@ static void print_compound_type(const compound_type_t *type)
 	}
 }
 
+/**
+ * Prints the prefix part of a typedef type.
+ *
+ * @param type   The typedef type.
+ */
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 	fputs(type->declaration->symbol->string, out);
 }
 
+/**
+ * Prints the prefix part of a typeof type.
+ *
+ * @param type   The typeof type.
+ */
 static void print_typeof_type_pre(const typeof_type_t *const type)
 {
 	fputs("typeof(", out);
@@ -259,6 +331,12 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 	fputc(')', out);
 }
 
+/**
+ * Prints the prefix part of a type.
+ *
+ * @param type   The type.
+ * @param top    true if we print the toplevel type, false else.
+ */
 static void intern_print_type_pre(const type_t *const type, const bool top)
 {
 	switch(type->kind) {
@@ -302,6 +380,12 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 	fputs("unknown", out);
 }
 
+/**
+ * Prints the postfix part of a type.
+ *
+ * @param type   The type.
+ * @param top    true if we print the toplevel type, false else.
+ */
 static void intern_print_type_post(const type_t *const type, const bool top)
 {
 	switch(type->kind) {
@@ -330,6 +414,11 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 	}
 }
 
+/**
+ * Prints a type.
+ *
+ * @param type   The type.
+ */
 void print_type(const type_t *const type)
 {
 	print_type_ext(type, NULL, NULL);
@@ -355,7 +444,12 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 	}
 }
 
-static size_t get_type_size(type_t *type)
+/**
+ * Return the size of a type AST node.
+ *
+ * @param type  The type.
+ */
+static size_t get_type_size(const type_t *type)
 {
 	switch(type->kind) {
 	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
@@ -376,10 +470,14 @@ static size_t get_type_size(type_t *type)
 }
 
 /**
- * duplicates a type
- * note that this does not produce a deep copy!
+ * Duplicates a type.
+ *
+ * @param type  The type to copy.
+ * @return A copy of the type.
+ *
+ * @note This does not produce a deep copy!
  */
-type_t *duplicate_type(type_t *type)
+type_t *duplicate_type(const type_t *type)
 {
 	size_t size = get_type_size(type);
 
@@ -389,6 +487,12 @@ type_t *duplicate_type(type_t *type)
 	return copy;
 }
 
+/**
+ * Returns the unqualified type of a given type.
+ *
+ * @param type  The type.
+ * @returns The unqualified type.
+ */
 type_t *get_unqualified_type(type_t *type)
 {
 	if(type->base.qualifiers == TYPE_QUALIFIER_NONE)
@@ -405,11 +509,23 @@ type_t *get_unqualified_type(type_t *type)
 	return result;
 }
 
+/**
+ * Check if a type is valid.
+ *
+ * @param type  The type to check.
+ * @return true if type represents a valid type.
+ */
 bool type_valid(const type_t *type)
 {
 	return type->kind != TYPE_INVALID;
 }
 
+/**
+ * Returns true if the given type is an integer type.
+ *
+ * @param type  The type to check.
+ * @return True if type is an integer type.
+ */
 bool is_type_integer(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -439,7 +555,13 @@ bool is_type_integer(const type_t *type)
 	}
 }
 
-bool is_type_floating(const type_t *type)
+/**
+ * Returns true if the given type is an floating point type.
+ *
+ * @param type  The type to check.
+ * @return True if type is a floating point type.
+ */
+bool is_type_float(const type_t *type)
 {
 	assert(!is_typeref(type));
 
@@ -464,6 +586,12 @@ bool is_type_floating(const type_t *type)
 	}
 }
 
+/**
+ * Returns true if the given type is a signed type.
+ *
+ * @param type  The type to check.
+ * @return True if type is a signed type.
+ */
 bool is_type_signed(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -513,6 +641,12 @@ bool is_type_signed(const type_t *type)
 	return false;
 }
 
+/**
+ * Returns true if the given type represents an arithmetic type.
+ *
+ * @param type  The type to check.
+ * @return True if type represents an arithmetic type.
+ */
 bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -520,12 +654,18 @@ bool is_type_arithmetic(const type_t *type)
 	if(type->kind == TYPE_BITFIELD)
 		return true;
 
-	if(is_type_integer(type) || is_type_floating(type))
+	if(is_type_integer(type) || is_type_float(type))
 		return true;
 
 	return false;
 }
 
+/**
+ * Returns true if the given type represents a scalar type.
+ *
+ * @param type  The type to check.
+ * @return True if type represents a scalar type.
+ */
 bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -540,7 +680,10 @@ bool is_type_scalar(const type_t *type)
 }
 
 /**
- * Check if a given type is incomplete
+ * Check if a given type is incomplete.
+ *
+ * @param type  The type to check.
+ * @return True if the given type is incomplete (ie. just forward).
  */
 bool is_type_incomplete(const type_t *type)
 {
@@ -583,6 +726,9 @@ bool is_type_incomplete(const type_t *type)
 	panic("invalid type found");
 }
 
+/**
+ * Check if two function types are compatible.
+ */
 static bool function_types_compatible(const function_type_t *func1,
                                       const function_type_t *func2)
 {
@@ -621,6 +767,9 @@ static bool function_types_compatible(const function_type_t *func1,
 	return true;
 }
 
+/**
+ * Check if two array types are compatible.
+ */
 static bool array_types_compatible(const array_type_t *array1,
                                    const array_type_t *array2)
 {
@@ -637,6 +786,9 @@ static bool array_types_compatible(const array_type_t *array1,
 	return true;
 }
 
+/**
+ * Check if two types are compatible.
+ */
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(!is_typeref(type1));
@@ -691,6 +843,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	return false;
 }
 
+/**
+ * Check if two pointer types are compatible.
+ */
 bool pointers_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(!is_typeref(type1));
@@ -751,8 +906,10 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
-
-
+/**
+ * Hash the given type and return the "singleton" version
+ * of it.
+ */
 static type_t *identify_new_type(type_t *type)
 {
 	type_t *result = typehash_insert(type);
@@ -762,6 +919,12 @@ static type_t *identify_new_type(type_t *type)
 	return result;
 }
 
+/**
+ * Creates a new atomic type.
+ *
+ * @param akind       The kind of the atomic type.
+ * @param qualifiers  Type qualifiers for the new type.
+ */
 type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 {
 	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
@@ -774,6 +937,12 @@ type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 	return identify_new_type(type);
 }
 
+/**
+ * Creates a new pointer type.
+ *
+ * @param points_to   The points-to type for teh new type.
+ * @param qualifiers  Type qualifiers for the new type.
+ */
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 {
 	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
@@ -786,8 +955,11 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 	return identify_new_type(type);
 }
 
+/**
+ * Debug helper. Prints the given type to stdout.
+ */
 static __attribute__((unused))
-void dbg_type(type_t *type)
+void dbg_type(const type_t *type)
 {
 	FILE *old_out = out;
 	out = stderr;

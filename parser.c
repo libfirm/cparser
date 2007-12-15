@@ -3563,7 +3563,7 @@ static expression_t *parse_compare_builtin(void)
 
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
-	if(!is_type_floating(type_left) && !is_type_floating(type_right)) {
+	if(!is_type_float(type_left) && !is_type_float(type_right)) {
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			type_error_incompatible("invalid operands in comparison",
 				expression->base.source_position, orig_type_left, orig_type_right);
@@ -4391,7 +4391,7 @@ static void semantic_comparison(binary_expression_t *expression)
 		if (warning.float_equal &&
 		    (expression->expression.kind == EXPR_BINARY_EQUAL ||
 		     expression->expression.kind == EXPR_BINARY_NOTEQUAL) &&
-		    is_type_floating(arithmetic_type)) {
+		    is_type_float(arithmetic_type)) {
 			warningf(expression->expression.source_position,
 			         "comparing floating point with == or != is unsafe");
 		}

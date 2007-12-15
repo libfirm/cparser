@@ -523,7 +523,7 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 
 	unsigned size = fold_constant(type->size);
 
-	assert(!is_type_floating(base));
+	assert(!is_type_float(base));
 	if(is_type_signed(base)) {
 		return get_signed_int_type_for_bit_size(irbase, size);
 	} else {

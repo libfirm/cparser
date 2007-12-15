@@ -167,7 +167,7 @@ union type_t {
 type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 
-type_t *duplicate_type(type_t *type);
+type_t *duplicate_type(const type_t *type);
 
 static inline bool is_typeref(const type_t *type)
 {
