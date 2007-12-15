@@ -5714,6 +5714,33 @@ static void initialize_builtin_types(void)
 }
 
 /**
+ * Check for unused functions in the given scope.
+ */
+static void check_unused_functions(const scope_t *scope) {
+	bool first_err = true;
+	const declaration_t *declaration = scope->declarations;
+
+	for (; declaration != NULL; declaration = declaration->next) {
+		if (! declaration->used) {
+			if (declaration->storage_class == STORAGE_CLASS_STATIC) {
+				const type_t *type = declaration->type;
+
+				if (is_type_function(type)) {
+					if (first_err) {
+						first_err = false;
+						diagnosticf("%s: At top level:\n",
+							declaration->source_position.input_name);
+					}
+					warningf(declaration->source_position,
+						"'%Y' defined but not used",
+						declaration->symbol);
+				}
+			}
+		}
+	}
+}
+
+/**
  * Parse a translation unit.
  */
 static translation_unit_t *parse_translation_unit(void)
@@ -5743,6 +5770,9 @@ static translation_unit_t *parse_translation_unit(void)
 	last_declaration = NULL;
 
 	assert(global_scope == &unit->scope);
+	if (warning.unused_function) {
+		check_unused_functions(global_scope);
+	}
 	global_scope = NULL;
 
 	return unit;
