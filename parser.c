@@ -5714,29 +5714,33 @@ static void initialize_builtin_types(void)
 }
 
 /**
- * Check for unused functions in the given scope.
+ * Check for unused global static functions and variables
  */
-static void check_unused_functions(const scope_t *scope) {
-	bool first_err = true;
-	const declaration_t *declaration = scope->declarations;
+static void check_unused_globals(void)
+{
+	if (!warning.unused_function && !warning.unused_variable)
+		return;
 
-	for (; declaration != NULL; declaration = declaration->next) {
-		if (! declaration->used) {
-			if (declaration->storage_class == STORAGE_CLASS_STATIC) {
-				const type_t *type = declaration->type;
+	for (const declaration_t *decl = global_scope->declarations; decl != NULL; decl = decl->next) {
+		if (decl->used || decl->storage_class != STORAGE_CLASS_STATIC)
+			continue;
 
-				if (is_type_function(type)) {
-					if (first_err) {
-						first_err = false;
-						diagnosticf("%s: At top level:\n",
-							declaration->source_position.input_name);
-					}
-					warningf(declaration->source_position,
-						"'%Y' defined but not used",
-						declaration->symbol);
-				}
-			}
+		type_t *const type = decl->type;
+		const char *s;
+		if (is_type_function(skip_typeref(type))) {
+			if (!warning.unused_function || decl->is_inline)
+				continue;
+
+			s = (decl->init.statement != NULL ? "defined" : "declared");
+		} else {
+			if (!warning.unused_variable)
+				continue;
+
+			s = "defined";
 		}
+
+		warningf(decl->source_position, "'%#T' %s but not used",
+			type, decl->symbol, s);
 	}
 }
 
@@ -5770,9 +5774,7 @@ static translation_unit_t *parse_translation_unit(void)
 	last_declaration = NULL;
 
 	assert(global_scope == &unit->scope);
-	if (warning.unused_function) {
-		check_unused_functions(global_scope);
-	}
+	check_unused_globals();
 	global_scope = NULL;
 
 	return unit;
