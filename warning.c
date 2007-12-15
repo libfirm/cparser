@@ -60,7 +60,7 @@ warning_t warning = {
 	.check_format                  = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
-	.float_equal                   = true,
+	.float_equal                   = false,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
 	.main                          = true,
@@ -71,5 +71,6 @@ warning_t warning = {
 	.strict_prototypes             = true,
 	.switch_default                = false,
 	.unknown_pragmas               = true,
+	.unused_label                  = false,
 	.unused_value                  = true
 };

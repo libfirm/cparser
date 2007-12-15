@@ -3519,6 +3519,7 @@ static expression_t *parse_compare_builtin(void)
 		panic("invalid compare builtin found");
 		break;
 	}
+	expression->base.source_position = HERE;
 	next_token();
 
 	expect('(');
@@ -3535,7 +3536,7 @@ static expression_t *parse_compare_builtin(void)
 	if(!is_type_floating(type_left) && !is_type_floating(type_right)) {
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			type_error_incompatible("invalid operands in comparison",
-				token.source_position, orig_type_left, orig_type_right);
+				expression->base.source_position, orig_type_left, orig_type_right);
 		}
 	} else {
 		semantic_comparison(&expression->binary);
@@ -4635,10 +4636,12 @@ static expression_t *parse_##binexpression_type(unsigned precedence,      \
                                                 expression_t *left)       \
 {                                                                         \
 	eat(token_type);                                                      \
+	source_position_t pos = HERE;                                         \
                                                                           \
 	expression_t *right = parse_sub_expression(precedence + lr);          \
                                                                           \
 	expression_t *binexpr = allocate_expression_zero(binexpression_type); \
+	binexpr->base.source_position = pos;                                  \
 	binexpr->binary.left  = left;                                         \
 	binexpr->binary.right = right;                                        \
 	sfunc(&binexpr->binary);                                              \
