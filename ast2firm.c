@@ -2132,11 +2132,14 @@ static ir_node *array_access_to_firm(
 	return deref_address(irtype, addr, dbgi);
 }
 
-static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
+/**
+ * Transform a sizeof expression into Firm code.
+ */
+static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 {
 	type_t *type = expression->type;
 	if(type == NULL) {
-		type = expression->size_expression->base.datatype;
+		type = expression->tp_expression->base.datatype;
 		assert(type != NULL);
 	}
 
@@ -2146,9 +2149,17 @@ static ir_node *sizeof_to_firm(const sizeof_expression_t *expression)
 	return new_SymConst(mode, sym, symconst_type_size);
 }
 
-static ir_node *alignof_to_firm(const alignof_expression_t *expression)
+/**
+ * Transform an alignof expression into Firm code.
+ */
+static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
-	type_t *const  type = expression->type;
+	type_t *type = expression->type;
+	if(type == NULL) {
+		type = expression->tp_expression->base.datatype;
+		assert(type != NULL);
+	}
+
 	ir_mode *const mode = get_ir_mode(expression->expression.datatype);
 	symconst_symbol sym;
 	sym.type_p = get_ir_type(type);
@@ -2491,9 +2502,9 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_ARRAY_ACCESS:
 		return array_access_to_firm(&expression->array_access);
 	case EXPR_SIZEOF:
-		return sizeof_to_firm(&expression->sizeofe);
+		return sizeof_to_firm(&expression->typeprop);
 	case EXPR_ALIGNOF:
-		return alignof_to_firm(&expression->alignofe);
+		return alignof_to_firm(&expression->typeprop);
 	case EXPR_CONDITIONAL:
 		return conditional_to_firm(&expression->conditional);
 	case EXPR_SELECT:

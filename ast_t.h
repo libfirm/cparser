@@ -240,15 +240,10 @@ struct array_access_expression_t {
 	bool               flipped; /* index/ref was written in a 5[a] way */
 };
 
-struct sizeof_expression_t {
+struct typeprop_expression_t {
 	expression_base_t  expression;
 	type_t            *type;
-	expression_t      *size_expression;
-};
-
-struct alignof_expression_t {
-	expression_base_t  expression;
-	type_t            *type;
+	expression_t      *tp_expression;
 };
 
 struct designator_t {
@@ -306,14 +301,13 @@ union expression_t {
 	binary_expression_t              binary;
 	select_expression_t              select;
 	array_access_expression_t        array_access;
-	sizeof_expression_t              sizeofe;
+	typeprop_expression_t            typeprop;
 	offsetof_expression_t            offsetofe;
 	va_start_expression_t            va_starte;
 	va_arg_expression_t              va_arge;
 	conditional_expression_t         conditional;
 	statement_expression_t           statement;
 	classify_type_expression_t       classify_type;
-	alignof_expression_t             alignofe;
 };
 
 typedef enum {

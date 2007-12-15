@@ -264,25 +264,23 @@ static void print_array_expression(const array_access_expression_t *expression)
 	}
 }
 
-static void print_sizeof_expression(const sizeof_expression_t *expression)
+static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
-	fputs("sizeof", out);
-	if(expression->size_expression != NULL) {
+	if (expression->expression.kind == EXPR_SIZEOF) {
+		fputs("sizeof", out);
+	} else {
+		assert(expression->expression.kind == EXPR_ALIGNOF);
+		fputs("__alignof__", out);
+	}
+	if(expression->tp_expression != NULL) {
 		fputc('(', out);
-		print_expression(expression->size_expression);
+		print_expression(expression->tp_expression);
 		fputc(')', out);
 	} else {
 		fputc('(', out);
 		print_type(expression->type);
 		fputc(')', out);
 	}
-}
-
-static void print_alignof_expression(const alignof_expression_t *expression)
-{
-	fputs("__alignof__(", out);
-	print_type(expression->type);
-	fputc(')', out);
 }
 
 static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
@@ -427,10 +425,8 @@ void print_expression(const expression_t *expression)
 		print_unary_expression(&expression->unary);
 		break;
 	case EXPR_SIZEOF:
-		print_sizeof_expression(&expression->sizeofe);
-		break;
 	case EXPR_ALIGNOF:
-		print_alignof_expression(&expression->alignofe);
+		print_typeprop_expression(&expression->typeprop);
 		break;
 	case EXPR_BUILTIN_SYMBOL:
 		print_builtin_symbol(&expression->builtin_symbol);

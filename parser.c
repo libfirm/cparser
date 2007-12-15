@@ -206,7 +206,8 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_CONDITIONAL]         = sizeof(conditional_expression_t),
 		[EXPR_SELECT]              = sizeof(select_expression_t),
 		[EXPR_ARRAY_ACCESS]        = sizeof(array_access_expression_t),
-		[EXPR_SIZEOF]              = sizeof(sizeof_expression_t),
+		[EXPR_SIZEOF]              = sizeof(typeprop_expression_t),
+		[EXPR_ALIGNOF]             = sizeof(typeprop_expression_t),
 		[EXPR_CLASSIFY_TYPE]       = sizeof(classify_type_expression_t),
 		[EXPR_FUNCTION]            = sizeof(string_literal_expression_t),
 		[EXPR_PRETTY_FUNCTION]     = sizeof(string_literal_expression_t),
@@ -3607,20 +3608,6 @@ static expression_t *parse_assume(void) {
 	return expression;
 }
 
-static expression_t *parse_alignof(void) {
-	eat(T___alignof__);
-
-	expression_t *expression
-		= allocate_expression_zero(EXPR_ALIGNOF);
-
-	expect('(');
-	expression->alignofe.type = parse_typename();
-	expect(')');
-
-	expression->base.datatype = type_size_t;
-	return expression;
-}
-
 static expression_t *parse_primary_expression(void)
 {
 	switch(token.type) {
@@ -3662,8 +3649,6 @@ static expression_t *parse_primary_expression(void)
 		return parse_builtin_constant();
 	case T___builtin_prefetch:
 		return parse_builtin_prefetch();
-	case T___alignof__:
-		return parse_alignof();
 	case T_assume:
 		return parse_assume();
 
@@ -3745,28 +3730,37 @@ static expression_t *parse_array_expression(unsigned precedence,
 	return (expression_t*) array_access;
 }
 
-static expression_t *parse_sizeof(unsigned precedence)
+static expression_t *parse_typeprop(expression_kind_t kind, unsigned precedence)
 {
-	eat(T_sizeof);
-
-	sizeof_expression_t *sizeof_expression
-		= allocate_ast_zero(sizeof(sizeof_expression[0]));
-	sizeof_expression->expression.kind     = EXPR_SIZEOF;
-	sizeof_expression->expression.datatype = type_size_t;
+	expression_t *tp_expression
+		= allocate_expression_zero(kind);
+	tp_expression->base.datatype = type_size_t;
 
 	if(token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
-		sizeof_expression->type = parse_typename();
+		tp_expression->typeprop.type = parse_typename();
 		expect(')');
 	} else {
 		expression_t *expression  = parse_sub_expression(precedence);
 		expression->base.datatype = revert_automatic_type_conversion(expression);
 
-		sizeof_expression->type            = expression->base.datatype;
-		sizeof_expression->size_expression = expression;
+		tp_expression->typeprop.type          = expression->base.datatype;
+		tp_expression->typeprop.tp_expression = expression;
 	}
 
-	return (expression_t*) sizeof_expression;
+	return tp_expression;
+}
+
+static expression_t *parse_sizeof(unsigned precedence)
+{
+	eat(T_sizeof);
+	return parse_typeprop(EXPR_SIZEOF, precedence);
+}
+
+static expression_t *parse_alignof(unsigned precedence)
+{
+	eat(T___alignof__);
+	return parse_typeprop(EXPR_SIZEOF, precedence);
 }
 
 static expression_t *parse_select_expression(unsigned precedence,
@@ -4887,7 +4881,8 @@ static void init_expression_parsers(void)
 	                                                          T_PLUSPLUS,   25);
 	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT,
 	                                                          T_MINUSMINUS, 25);
-	register_expression_parser(parse_sizeof,                  T_sizeof,     25);
+	register_expression_parser(parse_sizeof,                      T_sizeof, 25);
+	register_expression_parser(parse_alignof,                T___alignof__, 25);
 	register_expression_parser(parse_extension,            T___extension__, 25);
 	register_expression_parser(parse_builtin_classify_type,
 	                                             T___builtin_classify_type, 25);
