@@ -5166,10 +5166,11 @@ static statement_t *parse_label_statement(void)
 
 	/* remember the labels's in a list for later checking */
 	if (label_last == NULL) {
-		label_first = label_last = label_statement;
+		label_first = label_statement;
 	} else {
 		label_last->next = label_statement;
 	}
+	label_last = label_statement;
 
 	return (statement_t*) label_statement;
 }
@@ -5354,10 +5355,11 @@ static statement_t *parse_goto(void)
 
 	/* remember the goto's in a list for later checking */
 	if (goto_last == NULL) {
-		goto_first = goto_last = statement;
+		goto_first = statement;
 	} else {
 		goto_last->next = statement;
 	}
+	goto_last = statement;
 
 	expect(';');
 
