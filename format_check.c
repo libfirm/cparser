@@ -142,7 +142,7 @@ break_fmt_flags:
 					warningf(pos, "missing argument for '*' field width in conversion specification");
 					return;
 				}
-				const type_t *const arg_type = arg->expression->base.datatype;
+				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
 					warningf(pos, "argument for '*' field width in conversion specification is not an 'int', but an '%T'", arg_type);
 				}
@@ -162,7 +162,7 @@ break_fmt_flags:
 					warningf(pos, "missing argument for '*' precision in conversion specification");
 					return;
 				}
-				const type_t *const arg_type = arg->expression->base.datatype;
+				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
 					warningf(pos, "argument for '*' precision in conversion specification is not an 'int', but an '%T'", arg_type);
 				}
@@ -368,7 +368,7 @@ eval_fmt_mod_unsigned:
 		}
 
 		{	/* create a scope here to prevent warning about the jump to next_arg */
-			type_t *const arg_type = arg->expression->base.datatype;
+			type_t *const arg_type = arg->expression->base.type;
 			if (is_type_pointer(expected_type)) {
 				type_t *const arg_skip = skip_typeref(arg_type);
 				if (is_type_pointer(arg_skip)) {

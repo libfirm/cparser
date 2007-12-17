@@ -1,3 +1,8 @@
+Refactoring:
+- Rename type_string to type_char_ptr
+- Rename the statement_base_t statement; field in all the statements to
+  statement_base_t base;
+
 Lexer:
 - Add preprocessor code
 - proper handling of different file encodings, parsing non-ascii strings

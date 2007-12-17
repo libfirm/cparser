@@ -32,12 +32,12 @@ void print_indent(void)
 
 static void print_const(const const_expression_t *cnst)
 {
-	if(cnst->expression.datatype == NULL)
+	if(cnst->base.type == NULL)
 		return;
 
-	if(is_type_integer(cnst->expression.datatype)) {
+	if(is_type_integer(cnst->base.type)) {
 		fprintf(out, "%lld", cnst->v.int_value);
-	} else if(is_type_float(cnst->expression.datatype)) {
+	} else if(is_type_float(cnst->base.type)) {
 		fprintf(out, "%Lf", cnst->v.float_value);
 	}
 }
@@ -45,7 +45,8 @@ static void print_const(const const_expression_t *cnst)
 static void print_quoted_string(const string_t *const string)
 {
 	fputc('"', out);
-	for (const char *c = string->begin, *const end = c + string->size; c != end; ++c) {
+	const char *end = string->begin + string->size;
+	for (const char *c = string->begin; c != end; ++c) {
 		switch(*c) {
 		case '\"':  fputs("\\\"", out); break;
 		case '\\':  fputs("\\\\", out); break;
@@ -141,7 +142,7 @@ static void print_call_expression(const call_expression_t *call)
 
 static void print_binary_expression(const binary_expression_t *binexpr)
 {
-	if(binexpr->expression.kind == EXPR_BINARY_BUILTIN_EXPECT) {
+	if(binexpr->base.kind == EXPR_BINARY_BUILTIN_EXPECT) {
 		fputs("__builtin_expect(", out);
 		print_expression(binexpr->left);
 		fputs(", ", out);
@@ -153,7 +154,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	fprintf(out, "(");
 	print_expression(binexpr->left);
 	fprintf(out, " ");
-	switch(binexpr->expression.kind) {
+	switch(binexpr->base.kind) {
 	case EXPR_BINARY_COMMA:              fputs(",", out);     break;
 	case EXPR_BINARY_ASSIGN:             fputs("=", out);     break;
 	case EXPR_BINARY_ADD:                fputs("+", out);     break;
@@ -194,7 +195,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
-	switch(unexpr->expression.kind) {
+	switch(unexpr->base.kind) {
 	case EXPR_UNARY_NEGATE:           fputs("-", out);  break;
 	case EXPR_UNARY_PLUS:             fputs("+", out);  break;
 	case EXPR_UNARY_NOT:              fputs("!", out);  break;
@@ -228,7 +229,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		/* fallthrough */
 	case EXPR_UNARY_CAST:
 		fputs("(", out);
-		print_type(unexpr->expression.datatype);
+		print_type(unexpr->base.type);
 		fputs(")", out);
 		break;
 	case EXPR_UNARY_ASSUME:
@@ -266,10 +267,10 @@ static void print_array_expression(const array_access_expression_t *expression)
 
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
-	if (expression->expression.kind == EXPR_SIZEOF) {
+	if (expression->base.kind == EXPR_SIZEOF) {
 		fputs("sizeof", out);
 	} else {
-		assert(expression->expression.kind == EXPR_ALIGNOF);
+		assert(expression->base.kind == EXPR_ALIGNOF);
 		fputs("__alignof__", out);
 	}
 	if(expression->tp_expression != NULL) {
@@ -335,15 +336,15 @@ static void print_va_arg(const va_arg_expression_t *expression)
 	fputs("__builtin_va_arg(", out);
 	print_expression(expression->ap);
 	fputs(", ", out);
-	print_type(expression->expression.datatype);
+	print_type(expression->base.type);
 	fputs(")", out);
 }
 
 static void print_select(const select_expression_t *expression)
 {
 	print_expression(expression->compound);
-	if(expression->compound->base.datatype == NULL ||
-			expression->compound->base.datatype->kind == TYPE_POINTER) {
+	if(expression->compound->base.type == NULL ||
+			expression->compound->base.type->kind == TYPE_POINTER) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);

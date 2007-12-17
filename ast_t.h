@@ -158,12 +158,12 @@ struct scope_t {
 
 struct expression_base_t {
 	expression_kind_t   kind;
-	type_t             *datatype;
+	type_t             *type;
 	source_position_t   source_position;
 };
 
 struct const_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	union {
 		long long   int_value;
 		long double float_value;
@@ -171,34 +171,34 @@ struct const_expression_t {
 };
 
 struct string_literal_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	string_t           value;
 };
 
 struct wide_string_literal_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	wide_string_t      value;
 };
 
 struct builtin_symbol_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	symbol_t          *symbol;
 };
 
 struct builtin_constant_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *value;
 };
 
 struct builtin_prefetch_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *adr;
 	expression_t      *rw;
 	expression_t      *locality;
 };
 
 struct reference_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	symbol_t          *symbol;
 	declaration_t     *declaration;
 };
@@ -209,24 +209,24 @@ struct call_argument_t {
 };
 
 struct call_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *function;
 	call_argument_t   *arguments;
 };
 
 struct unary_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *value;
 };
 
 struct binary_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *left;
 	expression_t      *right;
 };
 
 struct select_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *compound;
 	symbol_t          *symbol;
 
@@ -234,14 +234,14 @@ struct select_expression_t {
 };
 
 struct array_access_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *array_ref;
 	expression_t      *index;
 	bool               flipped; /* index/ref was written in a 5[a] way */
 };
 
 struct typeprop_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	type_t            *type;
 	expression_t      *tp_expression;
 };
@@ -253,36 +253,36 @@ struct designator_t {
 };
 
 struct offsetof_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	type_t            *type;
 	designator_t      *designator;
 };
 
 struct va_start_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *ap;
 	declaration_t     *parameter;
 };
 
 struct va_arg_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *ap;
 };
 
 struct conditional_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *condition;
 	expression_t      *true_expression;
 	expression_t      *false_expression;
 };
 
 struct statement_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	statement_t       *statement;
 };
 
 struct classify_type_expression_t {
-	expression_base_t  expression;
+	expression_base_t  base;
 	expression_t      *type_expression;
 };
 

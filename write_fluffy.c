@@ -200,7 +200,7 @@ static void write_expression(const expression_t *expression);
 
 static void write_unary_expression(const unary_expression_t *expression)
 {
-	switch(expression->expression.kind) {
+	switch(expression->base.kind) {
 	case EXPR_UNARY_NEGATE:
 		fputc('-', out);
 		break;
@@ -220,7 +220,7 @@ static void write_expression(const expression_t *expression)
 	switch(expression->kind) {
 	case EXPR_CONST:
 		constant = &expression->conste;
-		if(is_type_integer(expression->base.datatype)) {
+		if(is_type_integer(expression->base.type)) {
 			fprintf(out, "%lld", constant->v.int_value);
 		} else {
 			fprintf(out, "%Lf", constant->v.float_value);
