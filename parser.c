@@ -2315,8 +2315,8 @@ static declaration_t *internal_record_declaration(
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
 
-	type_t       *const orig_type = declaration->type;
-	const type_t *const type      = skip_typeref(orig_type);
+	type_t *const orig_type = declaration->type;
+	type_t *const type      = skip_typeref(orig_type);
 	if (is_type_function(type) &&
 			type->function.unspecified_parameters &&
 			warning.strict_prototypes) {
@@ -2338,18 +2338,27 @@ static declaration_t *internal_record_declaration(
 				previous_declaration->type = declaration->type;
 			}
 
-			const type_t *const prev_type = skip_typeref(previous_declaration->type);
+			const type_t *prev_type = skip_typeref(previous_declaration->type);
 			if (!types_compatible(type, prev_type)) {
 				errorf(declaration->source_position,
-					"declaration '%#T' is incompatible with previous declaration '%#T'",
-					orig_type, symbol, previous_declaration->type, symbol);
-				errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+				       "declaration '%#T' is incompatible with "
+				       "previous declaration '%#T'",
+				       orig_type, symbol, previous_declaration->type, symbol);
+				errorf(previous_declaration->source_position,
+				       "previous declaration of '%Y' was here", symbol);
 			} else {
-				unsigned old_storage_class = previous_declaration->storage_class;
+				unsigned old_storage_class
+					= previous_declaration->storage_class;
 				unsigned new_storage_class = declaration->storage_class;
 
-				/* pretend no storage class means extern for function declarations
-				 * (except if the previous declaration is neither none nor extern) */
+				if(is_type_incomplete(prev_type)) {
+					previous_declaration->type = type;
+					prev_type                  = type;
+				}
+
+				/* pretend no storage class means extern for function
+				 * declarations (except if the previous declaration is neither
+				 * none nor extern) */
 				if (is_type_function(type)) {
 					switch (old_storage_class) {
 						case STORAGE_CLASS_NONE:
@@ -2360,7 +2369,9 @@ static declaration_t *internal_record_declaration(
 								if (warning.missing_prototypes &&
 								    prev_type->function.unspecified_parameters &&
 								    !is_sym_main(symbol)) {
-									warningf(declaration->source_position, "no previous prototype for '%#T'", orig_type, symbol);
+									warningf(declaration->source_position,
+									         "no previous prototype for '%#T'",
+									         orig_type, symbol);
 								}
 							} else if (new_storage_class == STORAGE_CLASS_NONE) {
 								new_storage_class = STORAGE_CLASS_EXTERN;
@@ -2375,14 +2386,20 @@ static declaration_t *internal_record_declaration(
 						new_storage_class == STORAGE_CLASS_EXTERN) {
 warn_redundant_declaration:
 					if (warning.redundant_decls) {
-						warningf(declaration->source_position, "redundant declaration for '%Y'", symbol);
-						warningf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+						warningf(declaration->source_position,
+						         "redundant declaration for '%Y'", symbol);
+						warningf(previous_declaration->source_position,
+						         "previous declaration of '%Y' was here",
+						         symbol);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC &&
 							new_storage_class == STORAGE_CLASS_STATIC) {
-						errorf(declaration->source_position, "static declaration of '%Y' follows non-static declaration", symbol);
-						errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+						errorf(declaration->source_position,
+						       "static declaration of '%Y' follows non-static declaration",
+						       symbol);
+						errorf(previous_declaration->source_position,
+						       "previous declaration of '%Y' was here", symbol);
 					} else {
 						if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
 							goto warn_redundant_declaration;
@@ -2393,11 +2410,15 @@ warn_redundant_declaration:
 					}
 				} else {
 					if (old_storage_class == new_storage_class) {
-						errorf(declaration->source_position, "redeclaration of '%Y'", symbol);
+						errorf(declaration->source_position,
+						       "redeclaration of '%Y'", symbol);
 					} else {
-						errorf(declaration->source_position, "redeclaration of '%Y' with different linkage", symbol);
+						errorf(declaration->source_position,
+						       "redeclaration of '%Y' with different linkage",
+						       symbol);
 					}
-					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+					errorf(previous_declaration->source_position,
+					       "previous declaration of '%Y' was here", symbol);
 				}
 			}
 			return previous_declaration;
@@ -2405,9 +2426,12 @@ warn_redundant_declaration:
 	} else if (is_function_definition) {
 		if (declaration->storage_class != STORAGE_CLASS_STATIC) {
 			if (warning.missing_prototypes && !is_sym_main(symbol)) {
-				warningf(declaration->source_position, "no previous prototype for '%#T'", orig_type, symbol);
+				warningf(declaration->source_position,
+				         "no previous prototype for '%#T'", orig_type, symbol);
 			} else if (warning.missing_declarations && !is_sym_main(symbol)) {
-				warningf(declaration->source_position, "no previous declaration for '%#T'", orig_type, symbol);
+				warningf(declaration->source_position,
+				         "no previous declaration for '%#T'", orig_type,
+				         symbol);
 			}
 		}
 	} else if (warning.missing_declarations &&
@@ -2416,7 +2440,8 @@ warn_redundant_declaration:
 	      declaration->storage_class == STORAGE_CLASS_NONE ||
 	      declaration->storage_class == STORAGE_CLASS_THREAD
 	    )) {
-		warningf(declaration->source_position, "no previous declaration for '%#T'", orig_type, symbol);
+		warningf(declaration->source_position,
+		         "no previous declaration for '%#T'", orig_type, symbol);
 	}
 
 	assert(declaration->parent_scope == NULL);
