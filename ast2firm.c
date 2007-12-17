@@ -1734,8 +1734,12 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	}
 	case EXPR_UNARY_CAST_IMPLICIT: {
 		ir_node *value_node = expression_to_firm(value);
-		ir_mode *mode = get_ir_mode(type);
-		return create_conv(dbgi, value_node, mode);
+		if(is_type_scalar(type)) {
+			ir_mode *mode = get_ir_mode(type);
+			return create_conv(dbgi, value_node, mode);
+		} else {
+			return value_node;
+		}
 	}
 	case EXPR_UNARY_ASSUME:
 		if(firm_opt.confirm)
