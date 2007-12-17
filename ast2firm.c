@@ -1045,7 +1045,9 @@ static ir_node *wide_string_literal_to_firm(
 static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
                               dbg_info *const dbgi)
 {
-	if(is_compound_type(irtype) || is_Array_type(irtype)) {
+	if (is_compound_type(irtype) ||
+			is_Method_type(irtype)   ||
+			is_Array_type(irtype)) {
 		return addr;
 	}
 
