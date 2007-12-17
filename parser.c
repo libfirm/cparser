@@ -140,7 +140,7 @@ static void *allocate_ast_zero(size_t size)
 
 static declaration_t *allocate_declaration_zero(void)
 {
-	declaration_t *declaration = allocate_ast_zero(sizeof(*allocate_declaration_zero()));
+	declaration_t *declaration = allocate_ast_zero(sizeof(declaration_t));
 	declaration->type = type_error_type;
 	return declaration;
 }
