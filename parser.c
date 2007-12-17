@@ -1805,6 +1805,7 @@ static declaration_t *parse_identifier_list(void)
 	declaration_t *last_declaration = NULL;
 	do {
 		declaration_t *const declaration = allocate_declaration_zero();
+		declaration->type            = NULL; /* a K&R parameter list has no types, yet */
 		declaration->source_position = token.source_position;
 		declaration->symbol          = token.v.symbol;
 		next_token();
