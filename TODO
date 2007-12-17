@@ -5,6 +5,8 @@ Refactoring:
 Lexer:
 - Add preprocessor code
 - proper handling of different file encodings, parsing non-ascii strings
+- We could save some space by holding source positions in a separate (somehow
+  compressed table) and only storing pointers to it on the AST.
 
 Parser:
 - the expect macros abort functions directly. This leads to some functions
@@ -16,6 +18,8 @@ Parser:
   an own module and replacable
 - Support some attributes. noreturn, unused, printf, scanf, packed would be
   interesting candidates
+- SourcePositions could be stored selectively on expressions that really need
+  them.
 
 ast2firm:
 - output source file positions for panics...

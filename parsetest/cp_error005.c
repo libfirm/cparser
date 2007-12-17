@@ -1,7 +1,7 @@
 extern char ofname[];
 char ofname[1024];
 
-unsigned s(void)
+int main(void)
 {
-	return sizeof(ofname);
+	return sizeof(ofname) == 1024;
 }
