@@ -1610,7 +1610,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 		}
 		case T_union: {
-			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
+			type = allocate_type_zero(TYPE_COMPOUND_UNION);
 
 			type->compound.declaration = parse_compound_type_specifier(false);
 			break;
