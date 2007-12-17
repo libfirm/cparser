@@ -408,8 +408,6 @@ struct declaration_t {
 	declaration_t      *next;
 	/** next declaration with same symbol */
 	declaration_t      *symbol_next;
-	/** next variable/parameter in function scope/global scope */
-	declaration_t      *next_var;
 
 	/* the following fields are used in ast2firm module */
 	unsigned char       declaration_kind;
@@ -447,75 +445,75 @@ struct statement_base_t {
 };
 
 struct return_statement_t {
-	statement_base_t  statement;
-	expression_t     *return_value;
+	statement_base_t  base;
+	expression_t     *value;
 };
 
 struct compound_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	statement_t      *statements;
 	scope_t           scope;
 };
 
 struct declaration_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	declaration_t    *declarations_begin;
 	declaration_t    *declarations_end;
 };
 
 struct if_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	expression_t     *condition;
 	statement_t      *true_statement;
 	statement_t      *false_statement;
 };
 
 struct switch_statement_t {
-	statement_base_t       statement;
+	statement_base_t       base;
 	expression_t           *expression;
 	statement_t            *body;
 	case_label_statement_t *first_case, *last_case;
 };
 
 struct goto_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	declaration_t    *label;     /**< The destination label. */
 	goto_statement_t *next;      /**< links all goto statements of a function */
 };
 
 struct case_label_statement_t {
-	statement_base_t        statement;
+	statement_base_t        base;
 	expression_t           *expression;
-	statement_t            *label_statement;
-	case_label_statement_t *next; /**< link to the next case label in the switch */
+	statement_t            *statement;
+	case_label_statement_t *next; /**< link to the next case label in switch */
 };
 
 struct label_statement_t {
-	statement_base_t   statement;
+	statement_base_t   base;
 	declaration_t     *label;
-	statement_t       *label_statement;
-	label_statement_t *next;            /**< links all label statements of a function */
+	statement_t       *statement;
+	label_statement_t *next;    /**< links all label statements of a function */
 };
 
 struct expression_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	expression_t     *expression;
 };
 
 struct while_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct do_while_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct for_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	expression_t     *initialisation;
 	expression_t     *condition;
 	expression_t     *step;
@@ -536,7 +534,7 @@ struct asm_clobber_t {
 };
 
 struct asm_statement_t {
-	statement_base_t  statement;
+	statement_base_t  base;
 	string_t          asm_text;
 	asm_constraint_t *inputs;
 	asm_constraint_t *outputs;

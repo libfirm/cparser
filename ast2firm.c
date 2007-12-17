@@ -3031,17 +3031,17 @@ static void return_statement_to_firm(return_statement_t *statement)
 	if(get_cur_block() == NULL)
 		return;
 
-	ir_type *func_irtype = get_ir_type(current_function_decl->type);
+	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
+	ir_type  *func_irtype = get_ir_type(current_function_decl->type);
 
-	dbg_info *dbgi  = get_dbg_info(&statement->statement.source_position);
 
 	ir_node *in[1];
 	int      in_len;
 	if(get_method_n_ress(func_irtype) > 0) {
 		ir_type *res_type = get_method_res_type(func_irtype, 0);
 
-		if(statement->return_value != NULL) {
-			ir_node *node = expression_to_firm(statement->return_value);
+		if(statement->value != NULL) {
+			ir_node *node = expression_to_firm(statement->value);
 			node  = do_strict_conv(dbgi, node);
 			in[0] = node;
 		} else {
@@ -3056,8 +3056,8 @@ static void return_statement_to_firm(return_statement_t *statement)
 		in_len = 1;
 	} else {
 		/* build return_value for its side effects */
-		if(statement->return_value != NULL) {
-			expression_to_firm(statement->return_value);
+		if(statement->value != NULL) {
+			expression_to_firm(statement->value);
 		}
 		in_len = 0;
 	}
@@ -3388,7 +3388,7 @@ static void create_jump_statement(const statement_t *statement,
 
 static void switch_statement_to_firm(const switch_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
 	ir_node *expression  = expression_to_firm(statement->expression);
 	ir_node *cond        = new_d_Cond(dbgi, expression);
@@ -3430,7 +3430,7 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 
 static void case_label_to_firm(const case_label_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->statement.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
@@ -3458,8 +3458,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
 
-	if(statement->label_statement != NULL) {
-		statement_to_firm(statement->label_statement);
+	if(statement->statement != NULL) {
+		statement_to_firm(statement->statement);
 	}
 }
 
@@ -3496,8 +3496,8 @@ static void label_to_firm(const label_statement_t *statement)
 	set_cur_block(block);
 	keep_alive(block);
 
-	if(statement->label_statement != NULL) {
-		statement_to_firm(statement->label_statement);
+	if(statement->statement != NULL) {
+		statement_to_firm(statement->statement);
 	}
 }
 
@@ -3746,7 +3746,9 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_LABEL: {
 				const label_statement_t *const label_stmt = &stmt->label;
-				count += count_decls_in_stmts(label_stmt->label_statement);
+				if(label_stmt->statement != NULL) {
+					count += count_decls_in_stmts(label_stmt->statement);
+				}
 				break;
 			}
 
@@ -3777,7 +3779,9 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_CASE_LABEL: {
 				const case_label_statement_t *label = &stmt->case_label;
 				count += count_decls_in_expression(label->expression);
-				count += count_decls_in_stmts(label->label_statement);
+				if(label->statement != NULL) {
+					count += count_decls_in_stmts(label->statement);
+				}
 				break;
 			}
 
@@ -3798,7 +3802,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_RETURN: {
 				const return_statement_t *ret_stmt = &stmt->returns;
-				count += count_decls_in_expression(ret_stmt->return_value);
+				count += count_decls_in_expression(ret_stmt->value);
 				break;
 			}
 		}

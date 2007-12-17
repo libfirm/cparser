@@ -487,8 +487,8 @@ static void print_compound_statement(const compound_statement_t *block)
 static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
-	if(statement->return_value != NULL)
-		print_expression(statement->return_value);
+	if(statement->value != NULL)
+		print_expression(statement->value);
 	fputs(";\n", out);
 }
 
@@ -510,8 +510,8 @@ static void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(stderr, "(%p)", (void*) statement->label);
 	fprintf(out, "%s:\n", statement->label->symbol->string);
-	if(statement->label_statement != NULL) {
-		print_statement(statement->label_statement);
+	if(statement->statement != NULL) {
+		print_statement(statement->statement);
 	}
 }
 
@@ -548,7 +548,9 @@ static void print_case_label(const case_label_statement_t *statement)
 		print_expression(statement->expression);
 		fputs(":\n", out);
 	}
-	print_statement(statement->label_statement);
+	if(statement->statement != NULL) {
+		print_statement(statement->statement);
+	}
 }
 
 static void print_declaration_statement(

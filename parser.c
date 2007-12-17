@@ -2744,8 +2744,8 @@ static void check_labels(void)
 		label->used = true;
 		if (label->source_position.input_name == NULL) {
 			print_in_function();
-			errorf(goto_statement->statement.source_position,
-				"label '%Y' used but not defined", label->symbol);
+			errorf(goto_statement->base.source_position,
+			       "label '%Y' used but not defined", label->symbol);
 		 }
 	}
 	goto_first = goto_last = NULL;
@@ -2758,7 +2758,7 @@ static void check_labels(void)
 
 			if (! label->used) {
 				print_in_function();
-				warningf(label_statement->statement.source_position,
+				warningf(label_statement->base.source_position,
 					"label '%Y' defined but not used", label->symbol);
 			}
 		}
@@ -3023,7 +3023,7 @@ static expression_t *expected_expression_error(void)
 static expression_t *parse_string_const(void)
 {
 	expression_t *cnst = allocate_expression_zero(EXPR_STRING_LITERAL);
-	cnst->base.type    = type_string;
+	cnst->base.type    = type_char_ptr;
 	cnst->string.value = parse_string_literals();
 
 	return cnst;
@@ -3139,11 +3139,11 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	case T___builtin_alloca:
 		return make_function_1_type(type_void_ptr, type_size_t);
 	case T___builtin_nan:
-		return make_function_1_type(type_double, type_string);
+		return make_function_1_type(type_double, type_char_ptr);
 	case T___builtin_nanf:
-		return make_function_1_type(type_float, type_string);
+		return make_function_1_type(type_float, type_char_ptr);
 	case T___builtin_nand:
-		return make_function_1_type(type_long_double, type_string);
+		return make_function_1_type(type_long_double, type_char_ptr);
 	case T___builtin_va_end:
 		return make_function_1_type(type_void, type_valist);
 	default:
@@ -3340,7 +3340,7 @@ static expression_t *parse_function_keyword(void)
 	}
 
 	expression_t *expression = allocate_expression_zero(EXPR_FUNCTION);
-	expression->base.type    = type_string;
+	expression->base.type    = type_char_ptr;
 
 	return expression;
 }
@@ -3355,7 +3355,7 @@ static expression_t *parse_pretty_function_keyword(void)
 	}
 
 	expression_t *expression = allocate_expression_zero(EXPR_PRETTY_FUNCTION);
-	expression->base.type    = type_string;
+	expression->base.type    = type_char_ptr;
 
 	return expression;
 }
@@ -5038,7 +5038,7 @@ static statement_t *parse_case_statement(void)
 				"case label not within a switch statement");
 		}
 	}
-	statement->case_label.label_statement = parse_statement();
+	statement->case_label.statement = parse_statement();
 
 	return statement;
 }
@@ -5074,7 +5074,7 @@ static statement_t *parse_default_statement(void)
 		const case_label_statement_t *def_label = find_default_label(current_switch);
 		if (def_label != NULL) {
 			errorf(HERE, "multiple default labels in one switch");
-			errorf(def_label->statement.source_position,
+			errorf(def_label->base.source_position,
 				"this is the first default label");
 		} else {
 			/* link all cases into the switch statement */
@@ -5089,7 +5089,7 @@ static statement_t *parse_default_statement(void)
 		errorf(statement->base.source_position,
 			"'default' label not within a switch statement");
 	}
-	statement->label.label_statement = parse_statement();
+	statement->label.statement = parse_statement();
 
 	return statement;
 }
@@ -5139,18 +5139,17 @@ static statement_t *parse_label_statement(void)
 		label->source_position = token.source_position;
 	}
 
-	label_statement_t *label_statement = allocate_ast_zero(sizeof(label[0]));
+	statement_t *statement = allocate_statement_zero(STATEMENT_LABEL);
 
-	label_statement->statement.kind            = STATEMENT_LABEL;
-	label_statement->statement.source_position = token.source_position;
-	label_statement->label                     = label;
+	statement->base.source_position = token.source_position;
+	statement->label.label          = label;
 
 	eat(':');
 
 	if(token.type == '}') {
 		/* TODO only warn? */
 		errorf(HERE, "label at end of compound statement");
-		return (statement_t*) label_statement;
+		return statement;
 	} else {
 		if (token.type == ';') {
 			/* eat an empty statement here, to avoid the warning about an empty
@@ -5158,19 +5157,19 @@ static statement_t *parse_label_statement(void)
 			 * a }. */
 			next_token();
 		} else {
-			label_statement->label_statement = parse_statement();
+			statement->label.statement = parse_statement();
 		}
 	}
 
 	/* remember the labels's in a list for later checking */
 	if (label_last == NULL) {
-		label_first = label_statement;
+		label_first = &statement->label;
 	} else {
-		label_last->next = label_statement;
+		label_last->next = &statement->label;
 	}
-	label_last = label_statement;
+	label_last = &statement->label;
 
-	return (statement_t*) label_statement;
+	return statement;
 }
 
 /**
@@ -5180,21 +5179,20 @@ static statement_t *parse_if(void)
 {
 	eat(T_if);
 
-	if_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.kind            = STATEMENT_IF;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement          = allocate_statement_zero(STATEMENT_IF);
+	statement->base.source_position = token.source_position;
 
 	expect('(');
-	statement->condition = parse_expression();
+	statement->ifs.condition = parse_expression();
 	expect(')');
 
-	statement->true_statement = parse_statement();
+	statement->ifs.true_statement = parse_statement();
 	if(token.type == T_else) {
 		next_token();
-		statement->false_statement = parse_statement();
+		statement->ifs.false_statement = parse_statement();
 	}
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5204,9 +5202,8 @@ static statement_t *parse_switch(void)
 {
 	eat(T_switch);
 
-	switch_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.kind            = STATEMENT_SWITCH;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement          = allocate_statement_zero(STATEMENT_SWITCH);
+	statement->base.source_position = token.source_position;
 
 	expect('(');
 	expression_t *const expr = parse_expression();
@@ -5214,29 +5211,33 @@ static statement_t *parse_switch(void)
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
 	} else if (is_type_valid(type)) {
-		errorf(expr->base.source_position, "switch quantity is not an integer, but '%T'", type);
+		errorf(expr->base.source_position,
+		       "switch quantity is not an integer, but '%T'", type);
 		type = type_error_type;
 	}
-	statement->expression = create_implicit_cast(expr, type);
+	statement->switchs.expression = create_implicit_cast(expr, type);
 	expect(')');
 
 	switch_statement_t *rem = current_switch;
-	current_switch  = statement;
-	statement->body = parse_statement();
-	current_switch  = rem;
+	current_switch          = &statement->switchs;
+	statement->switchs.body = parse_statement();
+	current_switch          = rem;
 
-	if (warning.switch_default && find_default_label(statement) == NULL) {
-		warningf(statement->statement.source_position, "switch has no default case");
+	if (warning.switch_default
+			&& find_default_label(&statement->switchs) == NULL) {
+		warningf(statement->base.source_position, "switch has no default case");
 	}
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
 {
 	statement_t *const rem = current_loop;
 	current_loop = loop;
+
 	statement_t *const body = parse_statement();
+
 	current_loop = rem;
 	return body;
 }
@@ -5248,17 +5249,16 @@ static statement_t *parse_while(void)
 {
 	eat(T_while);
 
-	while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.kind            = STATEMENT_WHILE;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement          = allocate_statement_zero(STATEMENT_WHILE);
+	statement->base.source_position = token.source_position;
 
 	expect('(');
-	statement->condition = parse_expression();
+	statement->whiles.condition = parse_expression();
 	expect(')');
 
-	statement->body = parse_loop_body((statement_t*)statement);
+	statement->whiles.body = parse_loop_body(statement);
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5268,18 +5268,19 @@ static statement_t *parse_do(void)
 {
 	eat(T_do);
 
-	do_while_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.kind            = STATEMENT_DO_WHILE;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_DO_WHILE);
 
-	statement->body = parse_loop_body((statement_t*)statement);
+	statement->base.source_position = token.source_position;
+
+	statement->do_while.body = parse_loop_body(statement);
+
 	expect(T_while);
 	expect('(');
-	statement->condition = parse_expression();
+	statement->do_while.condition = parse_expression();
 	expect(')');
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5289,21 +5290,20 @@ static statement_t *parse_for(void)
 {
 	eat(T_for);
 
-	for_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-	statement->statement.kind            = STATEMENT_FOR;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement          = allocate_statement_zero(STATEMENT_FOR);
+	statement->base.source_position = token.source_position;
 
 	expect('(');
 
 	int      top        = environment_top();
 	scope_t *last_scope = scope;
-	set_scope(&statement->scope);
+	set_scope(&statement->fors.scope);
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
 			parse_declaration(record_declaration);
 		} else {
-			statement->initialisation = parse_expression();
+			statement->fors.initialisation = parse_expression();
 			expect(';');
 		}
 	} else {
@@ -5311,20 +5311,20 @@ static statement_t *parse_for(void)
 	}
 
 	if(token.type != ';') {
-		statement->condition = parse_expression();
+		statement->fors.condition = parse_expression();
 	}
 	expect(';');
 	if(token.type != ')') {
-		statement->step = parse_expression();
+		statement->fors.step = parse_expression();
 	}
 	expect(')');
-	statement->body = parse_loop_body((statement_t*)statement);
+	statement->fors.body = parse_loop_body(statement);
 
-	assert(scope == &statement->scope);
+	assert(scope == &statement->fors.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5344,24 +5344,22 @@ static statement_t *parse_goto(void)
 
 	declaration_t *label = get_label(symbol);
 
-	goto_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
+	statement_t *statement          = allocate_statement_zero(STATEMENT_GOTO);
+	statement->base.source_position = token.source_position;
 
-	statement->statement.kind            = STATEMENT_GOTO;
-	statement->statement.source_position = token.source_position;
-
-	statement->label = label;
+	statement->gotos.label = label;
 
 	/* remember the goto's in a list for later checking */
 	if (goto_last == NULL) {
-		goto_first = statement;
+		goto_first = &statement->gotos;
 	} else {
-		goto_last->next = statement;
+		goto_last->next = &statement->gotos;
 	}
-	goto_last = statement;
+	goto_last = &statement->gotos;
 
 	expect(';');
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5485,10 +5483,8 @@ static statement_t *parse_return(void)
 {
 	eat(T_return);
 
-	return_statement_t *statement = allocate_ast_zero(sizeof(statement[0]));
-
-	statement->statement.kind            = STATEMENT_RETURN;
-	statement->statement.source_position = token.source_position;
+	statement_t *statement          = allocate_statement_zero(STATEMENT_RETURN);
+	statement->base.source_position = token.source_position;
 
 	expression_t *return_value = NULL;
 	if(token.type != ';') {
@@ -5505,16 +5501,16 @@ static statement_t *parse_return(void)
 
 		if(is_type_atomic(return_type, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
-			warningf(statement->statement.source_position,
-				"'return' with a value, in function returning void");
+			warningf(statement->base.source_position,
+			         "'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
 			type_t *const res_type = semantic_assign(return_type,
 				return_value, "'return'");
 			if (res_type == NULL) {
-				errorf(statement->statement.source_position,
-					"cannot return something of type '%T' in function returning '%T'",
-					return_value->base.type, return_type);
+				errorf(statement->base.source_position,
+				       "cannot return something of type '%T' in function returning '%T'",
+				       return_value->base.type, return_type);
 			} else {
 				return_value = create_implicit_cast(return_value, res_type);
 			}
@@ -5523,19 +5519,19 @@ static statement_t *parse_return(void)
 		if (return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (is_local_variable(expression)) {
-				warningf(statement->statement.source_position,
-					"function returns address of local variable");
+				warningf(statement->base.source_position,
+				         "function returns address of local variable");
 			}
 		}
 	} else {
 		if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			warningf(statement->statement.source_position,
-				"'return' without value, in function returning non-void");
+			warningf(statement->base.source_position,
+			         "'return' without value, in function returning non-void");
 		}
 	}
-	statement->return_value = return_value;
+	statement->returns.value = return_value;
 
-	return (statement_t*) statement;
+	return statement;
 }
 
 /**
@@ -5692,47 +5688,47 @@ static statement_t *parse_statement(void)
  */
 static statement_t *parse_compound_statement(void)
 {
-	compound_statement_t *const compound_statement
-		= allocate_ast_zero(sizeof(compound_statement[0]));
-	compound_statement->statement.kind            = STATEMENT_COMPOUND;
-	compound_statement->statement.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_COMPOUND);
+
+	statement->base.source_position = token.source_position;
 
 	eat('{');
 
 	int      top        = environment_top();
 	scope_t *last_scope = scope;
-	set_scope(&compound_statement->scope);
+	set_scope(&statement->compound.scope);
 
 	statement_t *last_statement = NULL;
 
 	while(token.type != '}' && token.type != T_EOF) {
-		statement_t *statement = parse_statement();
-		if(statement == NULL)
+		statement_t *sub_statement = parse_statement();
+		if(sub_statement == NULL)
 			continue;
 
 		if(last_statement != NULL) {
-			last_statement->base.next = statement;
+			last_statement->base.next = sub_statement;
 		} else {
-			compound_statement->statements = statement;
+			statement->compound.statements = sub_statement;
 		}
 
-		while(statement->base.next != NULL)
-			statement = statement->base.next;
+		while(sub_statement->base.next != NULL)
+			sub_statement = sub_statement->base.next;
 
-		last_statement = statement;
+		last_statement = sub_statement;
 	}
 
 	if(token.type == '}') {
 		next_token();
 	} else {
-		errorf(compound_statement->statement.source_position, "end of file while looking for closing '}'");
+		errorf(statement->base.source_position,
+		       "end of file while looking for closing '}'");
 	}
 
-	assert(scope == &compound_statement->scope);
+	assert(scope == &statement->compound.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
 
-	return (statement_t*) compound_statement;
+	return statement;
 }
 
 /**

@@ -1,7 +1,6 @@
 Refactoring:
-- Rename type_string to type_char_ptr
-- Rename the statement_base_t statement; field in all the statements to
-  statement_base_t base;
+- create an empty_statement_t and use that instead of a NULL pointer in places
+  like if, loop bodys, statements after labels
 
 Lexer:
 - Add preprocessor code

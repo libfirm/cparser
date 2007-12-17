@@ -210,4 +210,9 @@ static inline bool is_type_compound(const type_t *type)
 		|| type->kind == TYPE_COMPOUND_UNION;
 }
 
+static inline bool is_type_valid(const type_t *type)
+{
+	return type->kind != TYPE_ERROR;
+}
+
 #endif

@@ -314,7 +314,7 @@ eval_fmt_mod_unsigned:
 
 			case 's':
 				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_string;      break;
+					case FMT_MOD_NONE: expected_type = type_char_ptr;    break;
 					case FMT_MOD_l:    expected_type = type_wchar_t_ptr; break;
 
 					default:
