@@ -744,10 +744,15 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		points_to_left  = get_unqualified_type(points_to_left);
 		points_to_right = get_unqualified_type(points_to_right);
 
-		if(!is_type_atomic(points_to_left, ATOMIC_TYPE_VOID)
-				&& !is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)
-				&& !types_compatible(points_to_left, points_to_right)) {
-			return NULL;
+		if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
+				is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
+			return orig_type_left;
+		}
+
+		if (!types_compatible(points_to_left, points_to_right)) {
+			warningf(right->base.source_position,
+				"destination type '%T' in %s is incompatible with '%E' of type '%T'",
+				orig_type_left, context, right, orig_type_right);
 		}
 
 		return orig_type_left;
