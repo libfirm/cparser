@@ -3656,8 +3656,10 @@ static expression_t *parse_primary_expression(void)
 		return parse_va_arg();
 	case T___builtin_expect:
 		return parse_builtin_expect();
-	case T___builtin_nanf:
 	case T___builtin_alloca:
+	case T___builtin_nan:
+	case T___builtin_nand:
+	case T___builtin_nanf:
 	case T___builtin_va_end:
 		return parse_builtin_symbol();
 	case T___builtin_isgreater:
