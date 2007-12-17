@@ -3135,7 +3135,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	for( ; declaration != end; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		create_local_variable(declaration);
+		create_local_declaration(declaration);
 	}
 }
 
