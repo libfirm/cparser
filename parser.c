@@ -3444,6 +3444,8 @@ static expression_t *parse_va_start(void)
 	expression_t *const expr = parse_assignment_expression();
 	if (expr->kind == EXPR_REFERENCE) {
 		declaration_t *const decl = expr->reference.declaration;
+		if (decl == NULL)
+			return create_invalid_expression();
 		if (decl->parent_scope == &current_function->scope &&
 		    decl->next == NULL) {
 			expression->va_starte.parameter = decl;
