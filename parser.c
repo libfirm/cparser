@@ -2326,7 +2326,9 @@ static declaration_t *internal_record_declaration(
 		check_type_of_main(declaration, &type->function);
 	}
 
-	declaration_t *const previous_declaration = get_declaration(symbol, namespc);
+	assert(declaration->symbol != NULL);
+	declaration_t *previous_declaration = get_declaration(symbol, namespc);
+
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL) {
 		if (previous_declaration->parent_scope == scope) {
@@ -2442,7 +2444,6 @@ warn_redundant_declaration:
 	}
 
 	assert(declaration->parent_scope == NULL);
-	assert(declaration->symbol != NULL);
 	assert(scope != NULL);
 
 	declaration->parent_scope = scope;
@@ -2649,7 +2650,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	parse_declaration_specifiers(&specifiers);
 
 	if(token.type == ';') {
-		parse_anonymous_declaration_rest(&specifiers, finished_declaration);
+		parse_anonymous_declaration_rest(&specifiers, append_declaration);
 	} else {
 		declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
 		parse_declaration_rest(declaration, &specifiers, finished_declaration);

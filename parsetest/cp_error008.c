@@ -5,7 +5,7 @@ int FirstOne(long long arg1)
 		long long d;
 	};
 
-	union doub xx;
+	union doub x;
 	x.d = arg1;
 	return x.i[2];
 }

@@ -3110,6 +3110,9 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_local_declaration(declaration_t *declaration)
 {
+	if(declaration->symbol == NULL)
+		return;
+
 	type_t *type = skip_typeref(declaration->type);
 
 	switch ((storage_class_tag_t) declaration->storage_class) {
