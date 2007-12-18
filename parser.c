@@ -1082,20 +1082,23 @@ static initializer_t *parse_sub_initializer(type_t *type,
 			return parse_sub_initializer(type, NULL);
 		}
 
-		expression = parse_assignment_expression();
+		if(expression == NULL) {
+			expression = parse_assignment_expression();
 
-		/* 6.7.8.14 + 15 */
-		if(read_paren && (expression->kind == EXPR_STRING_LITERAL
-				|| expression->kind == EXPR_WIDE_STRING_LITERAL)) {
-			initializer_t *result
-				= initializer_from_expression(type, expression);
-			if(result != NULL) {
-				expect_block('}');
-				return result;
+			/* 6.7.8.14 + 15: we can have an optional {} around the string
+			 * literal */
+			if(read_paren && (expression->kind == EXPR_STRING_LITERAL
+					|| expression->kind == EXPR_WIDE_STRING_LITERAL)) {
+				initializer_t *result
+					= initializer_from_expression(type, expression);
+				if(result != NULL) {
+					expect_block('}');
+					return result;
+				}
 			}
 		}
 
-		sub = parse_sub_initializer(type, expression);
+		sub = parse_sub_initializer(element_type, expression);
 
 		/* didn't match the subtypes -> try the parent type */
 		if(sub == NULL) {
@@ -3746,7 +3749,7 @@ static expression_t *parse_primary_expression(void)
 		return parse_brace_expression();
 	}
 
-	errorf(HERE, "unexpected token '%K'", &token);
+	errorf(HERE, "unexpected token %K", &token);
 	eat_statement();
 
 	return create_invalid_expression();
