@@ -83,6 +83,9 @@ bool char_is_signed = true;
 /** true for strict language checking. */
 bool strict_mode = false;
 
+/* to switch off printing of implicit casts */
+extern bool print_implicit_casts;
+
 static int            verbose;
 static struct obstack cppflags_obst, ldflags_obst;
 
@@ -476,6 +479,8 @@ int main(int argc, char **argv)
 					mode = LexTest;
 				} else if(strcmp(option, "print-ast") == 0) {
 					mode = PrintAst;
+				} else if(strcmp(option, "no-implicit-cast") == 0) {
+					print_implicit_casts = false;
 				} else if(strcmp(option, "print-fluffy") == 0) {
 					mode = PrintFluffy;
 				} else if(strcmp(option, "version") == 0) {

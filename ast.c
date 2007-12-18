@@ -14,9 +14,11 @@ struct obstack ast_obstack;
 
 static FILE *out;
 static int   indent;
-static int   print_implicit_casts = 1;
+
+bool print_implicit_casts = true;
 
 static void print_statement(const statement_t *statement);
+static void print_expression_prec(const expression_t *expression, unsigned prec);
 
 void change_indent(int delta)
 {
@@ -30,6 +32,134 @@ void print_indent(void)
 		fprintf(out, "\t");
 }
 
+enum precedence_t {
+	PREC_BAD = 0,
+	PREC_COMMA,   /* ,                                    left to right */
+	PREC_ASSIGN,  /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
+	PREC_COND,    /* ?:                                   right to left */
+	PREC_LOG_OR,  /* ||                                   left to right */
+	PREC_LOG_AND, /* &&                                   left to right */
+	PREC_BIT_OR,  /* |                                    left to right */
+	PREC_BIT_XOR, /* ^                                    left to right */
+	PREC_BIT_AND, /* &                                    left to right */
+	PREC_EQ,      /* == !=                                left to right */
+	PREC_CMP,     /* < <= > >=                            left to right */
+	PREC_SHF,     /* << >>                                left to right */
+	PREC_PLUS,    /* + -                                  left to right */
+	PREC_MUL,     /* * / %                                left to right */
+	PREC_UNARY,   /* ! ~ ++ -- + - (type) * & sizeof      right to left */
+	PREC_ACCESS,  /* () [] -> .                           left to right */
+	PREC_PRIM,    /* primary */
+};
+
+/**
+ * Returns 1 if a given precedence level has right-to-left
+ * associativity, else -1.
+ */
+static int right_to_left(unsigned precedence) {
+	return (precedence == PREC_ASSIGN || precedence == PREC_COND ||
+		precedence == PREC_UNARY) ? 1 : -1;
+}
+
+/**
+ * Return the precedence of an expression.
+ */
+static unsigned get_expression_precedence(expression_kind_t kind)
+{
+	static const unsigned prec[] = {
+		[EXPR_UNKNOWN]                   = PREC_PRIM,
+		[EXPR_INVALID]                   = PREC_PRIM,
+		[EXPR_REFERENCE]                 = PREC_PRIM,
+		[EXPR_CONST]                     = PREC_PRIM,
+		[EXPR_STRING_LITERAL]            = PREC_PRIM,
+		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
+		[EXPR_CALL]                      = PREC_PRIM,
+		[EXPR_CONDITIONAL]               = PREC_COND,
+		[EXPR_SELECT]                    = PREC_ACCESS,
+		[EXPR_ARRAY_ACCESS]              = PREC_ACCESS,
+		[EXPR_SIZEOF]                    = PREC_UNARY,
+		[EXPR_CLASSIFY_TYPE]             = PREC_UNARY,
+		[EXPR_ALIGNOF]                   = PREC_UNARY,
+
+		[EXPR_FUNCTION]                  = PREC_PRIM,
+		[EXPR_PRETTY_FUNCTION]           = PREC_PRIM,
+		[EXPR_BUILTIN_SYMBOL]            = PREC_PRIM,
+		[EXPR_BUILTIN_CONSTANT_P]        = PREC_PRIM,
+		[EXPR_BUILTIN_PREFETCH]          = PREC_PRIM,
+		[EXPR_OFFSETOF]                  = PREC_PRIM,
+		[EXPR_VA_START]                  = PREC_PRIM,
+		[EXPR_VA_ARG]                    = PREC_PRIM,
+		[EXPR_STATEMENT]                 = PREC_ACCESS,
+
+		[EXPR_UNARY_NEGATE]              = PREC_UNARY,
+		[EXPR_UNARY_PLUS]                = PREC_UNARY,
+		[EXPR_UNARY_BITWISE_NEGATE]      = PREC_UNARY,
+		[EXPR_UNARY_NOT]                 = PREC_UNARY,
+		[EXPR_UNARY_DEREFERENCE]         = PREC_UNARY,
+		[EXPR_UNARY_TAKE_ADDRESS]        = PREC_UNARY,
+		[EXPR_UNARY_POSTFIX_INCREMENT]   = PREC_UNARY,
+		[EXPR_UNARY_POSTFIX_DECREMENT]   = PREC_UNARY,
+		[EXPR_UNARY_PREFIX_INCREMENT]    = PREC_UNARY,
+		[EXPR_UNARY_PREFIX_DECREMENT]    = PREC_UNARY,
+		[EXPR_UNARY_CAST]                = PREC_UNARY,
+		[EXPR_UNARY_CAST_IMPLICIT]       = PREC_UNARY,
+		[EXPR_UNARY_ASSUME]              = PREC_PRIM,
+		[EXPR_UNARY_BITFIELD_EXTRACT]    = PREC_ACCESS,
+
+		[EXPR_BINARY_ADD]                = PREC_PLUS,
+		[EXPR_BINARY_SUB]                = PREC_PLUS,
+		[EXPR_BINARY_MUL]                = PREC_MUL,
+		[EXPR_BINARY_DIV]                = PREC_MUL,
+		[EXPR_BINARY_MOD]                = PREC_MUL,
+		[EXPR_BINARY_EQUAL]              = PREC_EQ,
+		[EXPR_BINARY_NOTEQUAL]           = PREC_EQ,
+		[EXPR_BINARY_LESS]               = PREC_CMP,
+		[EXPR_BINARY_LESSEQUAL]          = PREC_CMP,
+		[EXPR_BINARY_GREATER]            = PREC_CMP,
+		[EXPR_BINARY_GREATEREQUAL]       = PREC_CMP,
+		[EXPR_BINARY_BITWISE_AND]        = PREC_BIT_AND,
+		[EXPR_BINARY_BITWISE_OR]         = PREC_BIT_OR,
+		[EXPR_BINARY_BITWISE_XOR]        = PREC_BIT_XOR,
+		[EXPR_BINARY_LOGICAL_AND]        = PREC_LOG_AND,
+		[EXPR_BINARY_LOGICAL_OR]         = PREC_LOG_OR,
+		[EXPR_BINARY_SHIFTLEFT]          = PREC_SHF,
+		[EXPR_BINARY_SHIFTRIGHT]         = PREC_SHF,
+		[EXPR_BINARY_ASSIGN]             = PREC_ASSIGN,
+		[EXPR_BINARY_MUL_ASSIGN]         = PREC_ASSIGN,
+		[EXPR_BINARY_DIV_ASSIGN]         = PREC_ASSIGN,
+		[EXPR_BINARY_MOD_ASSIGN]         = PREC_ASSIGN,
+		[EXPR_BINARY_ADD_ASSIGN]         = PREC_ASSIGN,
+		[EXPR_BINARY_SUB_ASSIGN]         = PREC_ASSIGN,
+		[EXPR_BINARY_SHIFTLEFT_ASSIGN]   = PREC_ASSIGN,
+		[EXPR_BINARY_SHIFTRIGHT_ASSIGN]  = PREC_ASSIGN,
+		[EXPR_BINARY_BITWISE_AND_ASSIGN] = PREC_ASSIGN,
+		[EXPR_BINARY_BITWISE_XOR_ASSIGN] = PREC_ASSIGN,
+		[EXPR_BINARY_BITWISE_OR_ASSIGN]  = PREC_ASSIGN,
+		[EXPR_BINARY_COMMA]              = PREC_COMMA,
+
+		[EXPR_BINARY_BUILTIN_EXPECT]     = PREC_PRIM,
+		[EXPR_BINARY_ISGREATER]          = PREC_PRIM,
+		[EXPR_BINARY_ISGREATEREQUAL]     = PREC_PRIM,
+		[EXPR_BINARY_ISLESS]             = PREC_PRIM,
+		[EXPR_BINARY_ISLESSEQUAL]        = PREC_PRIM,
+		[EXPR_BINARY_ISLESSGREATER]      = PREC_PRIM,
+		[EXPR_BINARY_ISUNORDERED]        = PREC_PRIM
+	};
+#ifndef NDEBUG
+	if ((unsigned)kind >= (sizeof(prec)/sizeof(prec[0]))) {
+		panic("wrong expression kind");
+	}
+	unsigned res = prec[kind];
+	if (res == PREC_BAD) {
+		panic("expression kind not defined in get_expression_precedence()");
+	}
+#endif
+	return res;
+}
+
+/**
+ * Print a constant expression.
+ */
 static void print_const(const const_expression_t *cnst)
 {
 	if(cnst->base.type == NULL)
@@ -42,6 +172,9 @@ static void print_const(const const_expression_t *cnst)
 	}
 }
 
+/**
+ * Print a quoted string constant.
+ */
 static void print_quoted_string(const string_t *const string)
 {
 	fputc('"', out);
@@ -70,12 +203,18 @@ static void print_quoted_string(const string_t *const string)
 	fputc('"', out);
 }
 
+/**
+ * Prints a string literal expression.
+ */
 static void print_string_literal(
 		const string_literal_expression_t *string_literal)
 {
 	print_quoted_string(&string_literal->value);
 }
 
+/**
+ * Prints a wide string literal expression.
+ */
 static void print_wide_string_literal(
 	const wide_string_literal_expression_t *const wstr)
 {
@@ -121,9 +260,13 @@ static void print_wide_string_literal(
 	fputc('"', out);
 }
 
+/**
+ * Prints a call expression.
+ */
 static void print_call_expression(const call_expression_t *call)
 {
-	print_expression(call->function);
+	unsigned prec = get_expression_precedence(call->base.kind);
+	print_expression_prec(call->function, prec);
 	fprintf(out, "(");
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
@@ -133,28 +276,35 @@ static void print_call_expression(const call_expression_t *call)
 		} else {
 			first = 0;
 		}
-		print_expression(argument->expression);
+		print_expression_prec(argument->expression, PREC_COMMA + 1);
 
 		argument = argument->next;
 	}
 	fprintf(out, ")");
 }
 
+/**
+ * Prints a binary expression.
+ */
 static void print_binary_expression(const binary_expression_t *binexpr)
 {
+	unsigned prec = get_expression_precedence(binexpr->base.kind);
+	int      r2l  = right_to_left(prec);
+
 	if(binexpr->base.kind == EXPR_BINARY_BUILTIN_EXPECT) {
 		fputs("__builtin_expect(", out);
-		print_expression(binexpr->left);
+		print_expression_prec(binexpr->left, prec);
 		fputs(", ", out);
-		print_expression(binexpr->right);
-		fputs(")", out);
+		print_expression_prec(binexpr->right, prec);
+		fputc(')', out);
 		return;
 	}
 
-	fprintf(out, "(");
-	print_expression(binexpr->left);
-	fprintf(out, " ");
-	switch(binexpr->base.kind) {
+	print_expression_prec(binexpr->left, prec + r2l);
+	if (binexpr->base.kind != EXPR_BINARY_COMMA) {
+		fputc(' ', out);
+	}
+	switch (binexpr->base.kind) {
 	case EXPR_BINARY_COMMA:              fputs(",", out);     break;
 	case EXPR_BINARY_ASSIGN:             fputs("=", out);     break;
 	case EXPR_BINARY_ADD:                fputs("+", out);     break;
@@ -188,13 +338,16 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  fputs(">>=", out);   break;
 	default: panic("invalid binexpression found");
 	}
-	fprintf(out, " ");
-	print_expression(binexpr->right);
-	fprintf(out, ")");
+	fputc(' ', out);
+	print_expression_prec(binexpr->right, prec - r2l);
 }
 
+/**
+ * Prints an unary expression.
+ */
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
+	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch(unexpr->base.kind) {
 	case EXPR_UNARY_NEGATE:           fputs("-", out);  break;
 	case EXPR_UNARY_PLUS:             fputs("+", out);  break;
@@ -206,65 +359,69 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 	case EXPR_UNARY_TAKE_ADDRESS:     fputs("&", out);  break;
 
 	case EXPR_UNARY_BITFIELD_EXTRACT:
-		print_expression(unexpr->value);
+		print_expression_prec(unexpr->value, prec);
 		return;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
-		fputs("(", out);
-		print_expression(unexpr->value);
-		fputs(")", out);
+		print_expression_prec(unexpr->value, prec);
 		fputs("++", out);
 		return;
 	case EXPR_UNARY_POSTFIX_DECREMENT:
-		fputs("(", out);
-		print_expression(unexpr->value);
-		fputs(")", out);
+		print_expression_prec(unexpr->value, prec);
 		fputs("--", out);
 		return;
 	case EXPR_UNARY_CAST_IMPLICIT:
 		if(!print_implicit_casts) {
-			print_expression(unexpr->value);
+			print_expression_prec(unexpr->value, prec);
 			return;
 		}
 		/* fallthrough */
 	case EXPR_UNARY_CAST:
-		fputs("(", out);
+		fputc('(', out);
 		print_type(unexpr->base.type);
-		fputs(")", out);
+		fputc(')', out);
 		break;
 	case EXPR_UNARY_ASSUME:
-		fputs("__assume", out);
-		break;
+		fputs("__assume(", out);
+		print_expression_prec(unexpr->value, PREC_COMMA + 1);
+		fputc(')', out);
+		return;
 	default:
 		panic("invalid unary expression found");
 	}
-	fputs("(", out);
-	print_expression(unexpr->value);
-	fputs(")", out);
+	print_expression_prec(unexpr->value, prec);
 }
 
+/**
+ * Prints a reference expression.
+ */
 static void print_reference_expression(const reference_expression_t *ref)
 {
 	fprintf(out, "%s", ref->declaration->symbol->string);
 }
 
+/**
+ * Prints an array expression.
+ */
 static void print_array_expression(const array_access_expression_t *expression)
 {
+	unsigned prec = get_expression_precedence(expression->base.kind);
 	if(!expression->flipped) {
-		fputs("(", out);
-		print_expression(expression->array_ref);
-		fputs(")[", out);
-		print_expression(expression->index);
-		fputs("]", out);
+		print_expression_prec(expression->array_ref, prec);
+		fputc('[', out);
+		print_expression_prec(expression->index, prec);
+		fputc(']', out);
 	} else {
-		fputs("(", out);
-		print_expression(expression->index);
-		fputs(")[", out);
-		print_expression(expression->array_ref);
-		fputs("]", out);
+		print_expression_prec(expression->index, prec);
+		fputc('[', out);
+		print_expression_prec(expression->array_ref, prec);
+		fputc(']', out);
 	}
 }
 
+/**
+ * Prints a typeproperty expression.
+ */
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
 	if (expression->base.kind == EXPR_SIZEOF) {
@@ -274,8 +431,9 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 		fputs("__alignof__", out);
 	}
 	if(expression->tp_expression != NULL) {
+		/* always print the '()' here, sizeof x is right but unusual */
 		fputc('(', out);
-		print_expression(expression->tp_expression);
+		print_expression_prec(expression->tp_expression, PREC_ACCESS);
 		fputc(')', out);
 	} else {
 		fputc('(', out);
@@ -284,65 +442,88 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 	}
 }
 
+/**
+ * Prints an builtin symbol
+ */
 static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 {
 	fputs(expression->symbol->string, out);
 }
 
+/**
+ * Prints a builtin constant expression.
+ */
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
 	fputs("__builtin_constant_p(", out);
-	print_expression(expression->value);
+	print_expression_prec(expression->value, PREC_COMMA + 1);
 	fputc(')', out);
 }
 
+/**
+ * Prints a builtin prefetch expression.
+ */
 static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
 {
 	fputs("__builtin_prefetch(", out);
-	print_expression(expression->adr);
+	print_expression_prec(expression->adr, PREC_COMMA + 1);
 	if (expression->rw) {
 		fputc(',', out);
-		print_expression(expression->rw);
+		print_expression_prec(expression->rw, PREC_COMMA + 1);
 	}
 	if (expression->locality) {
 		fputc(',', out);
-		print_expression(expression->locality);
+		print_expression_prec(expression->locality, PREC_COMMA + 1);
 	}
 	fputc(')', out);
 }
 
+/**
+ * Prints a conditional expression.
+ */
 static void print_conditional(const conditional_expression_t *expression)
 {
+	unsigned prec = get_expression_precedence(expression->base.kind);
 	fputs("(", out);
-	print_expression(expression->condition);
+	print_expression_prec(expression->condition, prec);
 	fputs(" ? ", out);
-	print_expression(expression->true_expression);
+	print_expression_prec(expression->true_expression, prec);
 	fputs(" : ", out);
-	print_expression(expression->false_expression);
+	print_expression_prec(expression->false_expression, prec);
 	fputs(")", out);
 }
 
+/**
+ * Prints a va_start expression.
+ */
 static void print_va_start(const va_start_expression_t *const expression)
 {
 	fputs("__builtin_va_start(", out);
-	print_expression(expression->ap);
+	print_expression_prec(expression->ap, PREC_COMMA + 1);
 	fputs(", ", out);
 	fputs(expression->parameter->symbol->string, out);
 	fputs(")", out);
 }
 
+/**
+ * Prints a va_arg expression.
+ */
 static void print_va_arg(const va_arg_expression_t *expression)
 {
 	fputs("__builtin_va_arg(", out);
-	print_expression(expression->ap);
+	print_expression_prec(expression->ap, PREC_COMMA + 1);
 	fputs(", ", out);
 	print_type(expression->base.type);
 	fputs(")", out);
 }
 
+/**
+ * Prints a select expression.
+ */
 static void print_select(const select_expression_t *expression)
 {
-	print_expression(expression->compound);
+	unsigned prec = get_expression_precedence(expression->base.kind);
+	print_expression_prec(expression->compound, prec);
 	if(expression->compound->base.type == NULL ||
 			expression->compound->base.type->kind == TYPE_POINTER) {
 		fputs("->", out);
@@ -352,11 +533,14 @@ static void print_select(const select_expression_t *expression)
 	fputs(expression->symbol->string, out);
 }
 
+/**
+ * Prints a type classify expression.
+ */
 static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
 {
 	fputs("__builtin_classify_type(", out);
-	print_expression(expr->type_expression);
+	print_expression_prec(expr->type_expression, PREC_COMMA + 1);
 	fputc(')', out);
 }
 
@@ -366,7 +550,7 @@ static void print_designator(const designator_t *designator)
 	for (designator = designator->next; designator != NULL; designator = designator->next) {
 		if (designator->array_access) {
 			fputc('[', out);
-			print_expression(designator->array_access);
+			print_expression_prec(designator->array_access, PREC_ACCESS);
 			fputc(']', out);
 		} else {
 			fputc('.', out);
@@ -375,6 +559,9 @@ static void print_designator(const designator_t *designator)
 	}
 }
 
+/**
+ * Prints an offsetof classify expression.
+ */
 static void print_offsetof_expression(const offsetof_expression_t *expression)
 {
 	fputs("__builtin_offsetof", out);
@@ -385,6 +572,9 @@ static void print_offsetof_expression(const offsetof_expression_t *expression)
 	fputc(')', out);
 }
 
+/**
+ * Prints a statement expression.
+ */
 static void print_statement_expression(const statement_expression_t *expression)
 {
 	fputc('(', out);
@@ -392,8 +582,11 @@ static void print_statement_expression(const statement_expression_t *expression)
 	fputc(')', out);
 }
 
-void print_expression(const expression_t *expression)
+static void print_expression_prec(const expression_t *expression, unsigned top_prec)
 {
+	unsigned prec = get_expression_precedence(expression->base.kind);
+	if (top_prec > prec)
+		fputc('(', out);
 	switch(expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
@@ -465,21 +658,25 @@ void print_expression(const expression_t *expression)
 		fprintf(out, "some expression of type %d", (int) expression->kind);
 		break;
 	}
+	if (top_prec > prec)
+		fputc(')', out);
 }
 
 static void print_compound_statement(const compound_statement_t *block)
 {
 	fputs("{\n", out);
-	indent++;
+	++indent;
 
 	statement_t *statement = block->statements;
 	while(statement != NULL) {
+		if (statement->base.kind == STATEMENT_CASE_LABEL)
+			--indent;
 		print_indent();
 		print_statement(statement);
 
 		statement = statement->base.next;
 	}
-	indent--;
+	--indent;
 	print_indent();
 	fputs("}\n", out);
 }
@@ -488,7 +685,7 @@ static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
 	if(statement->value != NULL)
-		print_expression(statement->value);
+		print_expression_prec(statement->value, PREC_BAD);
 	fputs(";\n", out);
 }
 
@@ -548,7 +745,12 @@ static void print_case_label(const case_label_statement_t *statement)
 		print_expression(statement->expression);
 		fputs(":\n", out);
 	}
+	++indent;
 	if(statement->statement != NULL) {
+		if (statement->statement->base.kind == STATEMENT_CASE_LABEL) {
+			--indent;
+		}
+		print_indent();
 		print_statement(statement->statement);
 	}
 }
@@ -787,6 +989,13 @@ static void print_normal_declaration(const declaration_t *declaration)
 		print_initializer(declaration->init.initializer);
 	}
 	fputc(';', out);
+}
+
+/**
+ * Prints an expression.
+ */
+void print_expression(const expression_t *expression) {
+	print_expression_prec(expression, PREC_BAD);
 }
 
 void print_declaration(const declaration_t *declaration)
