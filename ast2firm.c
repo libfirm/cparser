@@ -1727,10 +1727,14 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return create_incdec(expression);
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
-		ir_mode *mode = get_ir_mode(type);
-		ir_node *node = create_conv(dbgi, value_node, mode);
-		node = do_strict_conv(dbgi, node);
-		return node;
+		if(is_type_scalar(type)) {
+			ir_mode *mode = get_ir_mode(type);
+			ir_node *node = create_conv(dbgi, value_node, mode);
+			node = do_strict_conv(dbgi, node);
+			return node;
+		} else {
+			return value_node;
+		}
 	}
 	case EXPR_UNARY_CAST_IMPLICIT: {
 		ir_node *value_node = expression_to_firm(value);

@@ -24,6 +24,8 @@ Parser:
 ast2firm:
 - output source file positions for panics...
 - output variable names for uninitialized variable warnings
+- handle bitfield members with 0 correctly (standard says this finished the
+  current unit)
 
 Missing Warnings:
 * dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)

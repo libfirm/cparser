@@ -68,7 +68,7 @@ static expression_t *parse_sub_expression(unsigned precedence);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
 
-static void parse_compound_type_entries(void);
+static void parse_compound_type_entries(declaration_t *compound_declaration);
 static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract);
 static declaration_t *record_declaration(declaration_t *declaration);
@@ -1280,22 +1280,14 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	if(token.type == '{') {
 		if(declaration->init.is_defined) {
 			assert(symbol != NULL);
-			errorf(HERE, "multiple definition of '%s %Y'",
+			errorf(HERE, "multiple definitions of '%s %Y'",
 			       is_struct ? "struct" : "union", symbol);
 			declaration->scope.declarations = NULL;
 		}
 		declaration->init.is_defined = true;
 
-		int       top        = environment_top();
-		scope_t  *last_scope = scope;
-		set_scope(&declaration->scope);
-
-		parse_compound_type_entries();
+		parse_compound_type_entries(declaration);
 		parse_attributes();
-
-		assert(scope == &declaration->scope);
-		set_scope(last_scope);
-		environment_pop_to(top);
 	}
 
 	return declaration;
@@ -2641,9 +2633,9 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 	}
 
 	if(previous_declaration->type == NULL) {
-		previous_declaration->type           = declaration->type;
-		previous_declaration->storage_class  = declaration->storage_class;
-		previous_declaration->parent_scope = scope;
+		previous_declaration->type          = declaration->type;
+		previous_declaration->storage_class = declaration->storage_class;
+		previous_declaration->parent_scope  = scope;
 		return previous_declaration;
 	} else {
 		return record_declaration(declaration);
@@ -2932,9 +2924,16 @@ static type_t *make_bitfield_type(type_t *base, expression_t *size)
 	return type;
 }
 
-static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
+static void parse_compound_declarators(declaration_t *struct_declaration,
+		const declaration_specifiers_t *specifiers)
 {
-	/* TODO: check constraints for struct declarations (in specifiers) */
+	declaration_t *last_declaration = struct_declaration->scope.declarations;
+	if(last_declaration != NULL) {
+		while(last_declaration->next != NULL) {
+			last_declaration = last_declaration->next;
+		}
+	}
+
 	while(1) {
 		declaration_t *declaration;
 
@@ -2944,9 +2943,14 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 			type_t *base_type = specifiers->type;
 			expression_t *size = parse_constant_expression();
 
+			if(!is_type_integer(skip_typeref(base_type))) {
+				errorf(HERE, "bitfield base type '%T' is not an integer type",
+				       base_type);
+			}
+
 			type_t *type = make_bitfield_type(base_type, size);
 
-			declaration = allocate_declaration_zero();
+			declaration                  = allocate_declaration_zero();
 			declaration->namespc         = NAMESPACE_NORMAL;
 			declaration->storage_class   = STORAGE_CLASS_NONE;
 			declaration->source_position = token.source_position;
@@ -2955,15 +2959,56 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 		} else {
 			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);
 
+			type_t *orig_type = declaration->type;
+			type_t *type      = skip_typeref(orig_type);
+
 			if(token.type == ':') {
 				next_token();
 				expression_t *size = parse_constant_expression();
 
-				type_t *type = make_bitfield_type(declaration->type, size);
-				declaration->type = type;
+				if(!is_type_integer(type)) {
+					errorf(HERE, "bitfield base type '%T' is not an "
+					       "integer type", orig_type);
+				}
+
+				type_t *bitfield_type = make_bitfield_type(orig_type, size);
+				declaration->type = bitfield_type;
+			} else {
+				/* TODO we ignore arrays for now... what is missing is a check
+				 * that they're at the end of the struct */
+				if(is_type_incomplete(type) && !is_type_array(type)) {
+					errorf(HERE,
+					       "compound member '%Y' has incomplete type '%T'",
+					       declaration->symbol, orig_type);
+				} else if(is_type_function(type)) {
+					errorf(HERE, "compound member '%Y' must not have function "
+					       "type '%T'", declaration->symbol, orig_type);
+				}
 			}
 		}
-		record_declaration(declaration);
+
+		/* make sure we don't define a symbol multiple times */
+		symbol_t *symbol = declaration->symbol;
+		if(symbol != NULL) {
+			declaration_t *iter = struct_declaration->scope.declarations;
+			for( ; iter != NULL; iter = iter->next) {
+				if(iter->symbol == symbol) {
+					errorf(declaration->source_position,
+					       "multiple declarations of symbol '%Y'", symbol);
+					errorf(iter->source_position,
+					       "previous declaration of '%Y' was here", symbol);
+					break;
+				}
+			}
+		}
+
+		/* append declaration */
+		if(last_declaration != NULL) {
+			last_declaration->next = declaration;
+		} else {
+			struct_declaration->scope.declarations = declaration;
+		}
+		last_declaration = declaration;
 
 		if(token.type != ',')
 			break;
@@ -2972,7 +3017,7 @@ static void parse_struct_declarators(const declaration_specifiers_t *specifiers)
 	expect_void(';');
 }
 
-static void parse_compound_type_entries(void)
+static void parse_compound_type_entries(declaration_t *compound_declaration)
 {
 	eat('{');
 
@@ -2981,7 +3026,7 @@ static void parse_compound_type_entries(void)
 		memset(&specifiers, 0, sizeof(specifiers));
 		parse_declaration_specifiers(&specifiers);
 
-		parse_struct_declarators(&specifiers);
+		parse_compound_declarators(compound_declaration, &specifiers);
 	}
 	if(token.type == T_EOF) {
 		errorf(HERE, "EOF while parsing struct");
