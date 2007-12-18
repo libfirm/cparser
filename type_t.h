@@ -97,8 +97,9 @@ struct array_type_t {
 	type_base_t   type;
 	type_t       *element_type;
 	expression_t *size;
-	bool          is_static;
-	bool          is_variable;
+	unsigned      is_static         : 1;
+	unsigned      is_variable       : 1;
+	unsigned      has_implicit_size : 1;
 };
 
 struct function_parameter_t {

@@ -2533,7 +2533,8 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 					panic("invalid initializer type");
 			}
 
-			array_type->size = cnst;
+			array_type->size              = cnst;
+			array_type->has_implicit_size = true;
 		}
 	}
 

@@ -7,9 +7,10 @@
 #include "adt/error.h"
 
 static struct obstack   _type_obst;
-struct obstack         *type_obst = &_type_obst;
 static FILE            *out;
-static int              type_visited = 0;
+struct obstack         *type_obst                 = &_type_obst;
+static int              type_visited              = 0;
+static bool             print_implicit_array_size = true;
 
 static void intern_print_type_pre(const type_t *type, bool top);
 static void intern_print_type_post(const type_t *type, bool top);
@@ -189,7 +190,8 @@ static void print_array_type_post(const array_type_t *type)
 		fputs("static ", out);
 	}
 	print_type_qualifiers(type->type.qualifiers);
-	if(type->size != NULL) {
+	if(type->size != NULL
+			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size);
 	}
 	fputc(']', out);
