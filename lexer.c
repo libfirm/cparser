@@ -917,6 +917,12 @@ static void skip_multiline_comment(void)
 
 	while(1) {
 		switch(c) {
+		case '/':
+			next_char();
+			if (c == '*') {
+				/* TODO: nested comment, warn here */
+			}
+			break;
 		case '*':
 			next_char();
 			if(c == '/') {

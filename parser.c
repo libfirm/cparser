@@ -274,13 +274,14 @@ static size_t get_type_struct_size(type_kind_t kind)
  * Allocate a type node of given kind and initialize all
  * fields with zero.
  */
-static type_t *allocate_type_zero(type_kind_t kind)
+static type_t *allocate_type_zero(type_kind_t kind, source_position_t source_position)
 {
 	size_t  size = get_type_struct_size(kind);
 	type_t *res  = obstack_alloc(type_obst, size);
 	memset(res, 0, size);
 
-	res->base.kind = kind;
+	res->base.kind            = kind;
+	res->base.source_position = source_position;
 	return res;
 }
 
@@ -806,7 +807,7 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 
 	record_declaration(declaration);
 
-	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF);
+	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF, builtin_source_position);
 	typedef_type->typedeft.declaration = declaration;
 
 	return typedef_type;
@@ -1380,7 +1381,7 @@ static type_t *parse_enum_specifier(void)
 		declaration->parent_scope  = scope;
 	}
 
-	type_t *const type      = allocate_type_zero(TYPE_ENUM);
+	type_t *const type      = allocate_type_zero(TYPE_ENUM, declaration->source_position);
 	type->enumt.declaration = declaration;
 
 	if(token.type == '{') {
@@ -1453,7 +1454,7 @@ restart:
 
 	expect(')');
 
-	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF);
+	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF, expression->base.source_position);
 	typeof_type->typeoft.expression  = expression;
 	typeof_type->typeoft.typeof_type = type;
 
@@ -1481,7 +1482,7 @@ typedef enum {
 static type_t *create_builtin_type(symbol_t *const symbol,
                                    type_t *const real_type)
 {
-	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
+	type_t *type            = allocate_type_zero(TYPE_BUILTIN, builtin_source_position);
 	type->builtin.symbol    = symbol;
 	type->builtin.real_type = real_type;
 
@@ -1500,7 +1501,7 @@ static type_t *get_typedef_type(symbol_t *symbol)
 			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
-	type_t *type               = allocate_type_zero(TYPE_TYPEDEF);
+	type_t *type               = allocate_type_zero(TYPE_TYPEDEF, declaration->source_position);
 	type->typedeft.declaration = declaration;
 
 	return type;
@@ -1618,13 +1619,13 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* TODO: if is_type_valid(type) for the following rules should issue
 		 * an error */
 		case T_struct: {
-			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
+			type = allocate_type_zero(TYPE_COMPOUND_STRUCT, HERE);
 
 			type->compound.declaration = parse_compound_type_specifier(true);
 			break;
 		}
 		case T_union: {
-			type = allocate_type_zero(TYPE_COMPOUND_UNION);
+			type = allocate_type_zero(TYPE_COMPOUND_UNION, HERE);
 
 			type->compound.declaration = parse_compound_type_specifier(false);
 			break;
@@ -1777,7 +1778,7 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		type               = allocate_type_zero(TYPE_ATOMIC);
+		type               = allocate_type_zero(TYPE_ATOMIC, builtin_source_position);
 		type->atomic.akind = atomic_type;
 		newtype            = 1;
 	} else {
@@ -1949,11 +1950,11 @@ typedef enum {
 	CONSTRUCT_POINTER,
 	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
-} construct_type_type_t;
+} construct_type_kind_t;
 
 typedef struct construct_type_t construct_type_t;
 struct construct_type_t {
-	construct_type_type_t  type;
+	construct_type_kind_t  kind;
 	construct_type_t      *next;
 };
 
@@ -1990,7 +1991,7 @@ static construct_type_t *parse_pointer_declarator(void)
 
 	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
 	memset(pointer, 0, sizeof(pointer[0]));
-	pointer->construct_type.type = CONSTRUCT_POINTER;
+	pointer->construct_type.kind = CONSTRUCT_POINTER;
 	pointer->type_qualifiers     = parse_type_qualifiers();
 
 	return (construct_type_t*) pointer;
@@ -2002,7 +2003,7 @@ static construct_type_t *parse_array_declarator(void)
 
 	parsed_array_t *array = obstack_alloc(&temp_obst, sizeof(array[0]));
 	memset(array, 0, sizeof(array[0]));
-	array->construct_type.type = CONSTRUCT_ARRAY;
+	array->construct_type.kind = CONSTRUCT_ARRAY;
 
 	if(token.type == T_static) {
 		array->is_static = true;
@@ -2034,7 +2035,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	type_t *type = allocate_type_zero(TYPE_FUNCTION);
+	type_t *type = allocate_type_zero(TYPE_FUNCTION, declaration->source_position);
 
 	declaration_t *parameters = parse_parameters(&type->function);
 	if(declaration != NULL) {
@@ -2044,7 +2045,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	construct_function_type_t *construct_function_type =
 		obstack_alloc(&temp_obst, sizeof(construct_function_type[0]));
 	memset(construct_function_type, 0, sizeof(construct_function_type[0]));
-	construct_function_type->construct_type.type = CONSTRUCT_FUNCTION;
+	construct_function_type->construct_type.kind = CONSTRUCT_FUNCTION;
 	construct_function_type->function_type       = type;
 
 	expect(')');
@@ -2155,7 +2156,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 {
 	construct_type_t *iter = construct_list;
 	for( ; iter != NULL; iter = iter->next) {
-		switch(iter->type) {
+		switch(iter->kind) {
 		case CONSTRUCT_INVALID:
 			panic("invalid type construction found");
 		case CONSTRUCT_FUNCTION: {
@@ -2181,7 +2182,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_POINTER: {
 			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
-			type_t           *pointer_type   = allocate_type_zero(TYPE_POINTER);
+			type_t           *pointer_type   = allocate_type_zero(TYPE_POINTER, (source_position_t){NULL, 0});
 			pointer_type->pointer.points_to  = type;
 			pointer_type->base.qualifiers    = parsed_pointer->type_qualifiers;
 
@@ -2191,7 +2192,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_ARRAY: {
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
-			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY);
+			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, (source_position_t){NULL, 0});
 
 			array_type->base.qualifiers    = parsed_array->type_qualifiers;
 			array_type->array.element_type = type;
@@ -2214,7 +2215,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		if(hashed_type != type) {
 			/* the function type was constructed earlier freeing it here will
 			 * destroy other types... */
-			if(iter->type != CONSTRUCT_FUNCTION) {
+			if(iter->kind != CONSTRUCT_FUNCTION) {
 				free_type(type);
 			}
 			type = hashed_type;
@@ -2934,9 +2935,9 @@ end_of_parse_external_declaration:
 	environment_pop_to(top);
 }
 
-static type_t *make_bitfield_type(type_t *base, expression_t *size)
+static type_t *make_bitfield_type(type_t *base, expression_t *size, source_position_t source_position)
 {
-	type_t *type        = allocate_type_zero(TYPE_BITFIELD);
+	type_t *type        = allocate_type_zero(TYPE_BITFIELD, source_position);
 	type->bitfield.base = base;
 	type->bitfield.size = size;
 
@@ -2957,6 +2958,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 		declaration_t *declaration;
 
 		if(token.type == ':') {
+			source_position_t source_position = HERE;
 			next_token();
 
 			type_t *base_type = specifiers->type;
@@ -2967,12 +2969,12 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 				       base_type);
 			}
 
-			type_t *type = make_bitfield_type(base_type, size);
+			type_t *type = make_bitfield_type(base_type, size, source_position);
 
 			declaration                  = allocate_declaration_zero();
 			declaration->namespc         = NAMESPACE_NORMAL;
 			declaration->storage_class   = STORAGE_CLASS_NONE;
-			declaration->source_position = token.source_position;
+			declaration->source_position = source_position;
 			declaration->modifiers       = specifiers->decl_modifiers;
 			declaration->type            = type;
 		} else {
@@ -2982,6 +2984,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			type_t *type      = skip_typeref(orig_type);
 
 			if(token.type == ':') {
+				source_position_t source_position = HERE;
 				next_token();
 				expression_t *size = parse_constant_expression();
 
@@ -2990,7 +2993,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 					       "integer type", orig_type);
 				}
 
-				type_t *bitfield_type = make_bitfield_type(orig_type, size);
+				type_t *bitfield_type = make_bitfield_type(orig_type, size, source_position);
 				declaration->type = bitfield_type;
 			} else {
 				/* TODO we ignore arrays for now... what is missing is a check
@@ -3166,7 +3169,7 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t source_position)
 {
-	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
+	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION, source_position);
 	ntype->function.return_type            = type_int;
 	ntype->function.unspecified_parameters = true;
 
@@ -3210,7 +3213,7 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	memset(parameter, 0, sizeof(parameter[0]));
 	parameter->type = argument_type;
 
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION, builtin_source_position);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 

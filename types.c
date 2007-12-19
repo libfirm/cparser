@@ -45,7 +45,7 @@ type_t *type_wchar_t_ptr;
 
 void init_basic_types(void)
 {
-	static const type_base_t error = { TYPE_ERROR, TYPE_QUALIFIER_NONE, NULL };
+	static const type_base_t error = { TYPE_ERROR, TYPE_QUALIFIER_NONE, { NULL, 0 }, NULL };
 
 	type_error_type         = (type_t*)&error;
 	type_signed_char        = make_atomic_type(ATOMIC_TYPE_SCHAR,       TYPE_QUALIFIER_NONE);

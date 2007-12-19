@@ -359,9 +359,10 @@ static long fold_constant(const expression_t *expression);
 
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
+	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
 	ir_mode *mode   = get_atomic_mode(type);
 	ident   *id     = get_mode_ident(mode);
-	ir_type *irtype = new_type_primitive(id, mode);
+	ir_type *irtype = new_d_type_primitive(id, mode, dbgi);
 
 	if(type->akind == ATOMIC_TYPE_LONG_DOUBLE
 			|| type->akind == ATOMIC_TYPE_DOUBLE) {
@@ -378,7 +379,8 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	ident   *id           = unique_ident("functiontype");
 	int      n_parameters = count_parameters(function_type);
 	int      n_results    = return_type == type_void ? 0 : 1;
-	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
+	dbg_info *dbgi        = get_dbg_info(&function_type->type.source_position);
+	ir_type *irtype       = new_d_type_method(id, n_parameters, n_results, dbgi);
 
 	if(return_type != type_void) {
 		ir_type *restype = get_ir_type(return_type);
@@ -408,8 +410,9 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	 * again (might be a struct). We therefore first create a void* pointer
 	 * and then set the real points_to type
 	 */
-	ir_type *ir_type = new_type_pointer(unique_ident("pointer"),
-	                                    ir_type_void, mode_P_data);
+	dbg_info *dbgi   = get_dbg_info(&type->type.source_position);
+	ir_type *ir_type = new_d_type_pointer(unique_ident("pointer"),
+	                                    ir_type_void, mode_P_data, dbgi);
 	type->type.firm_type  = ir_type;
 
 	ir_points_to = get_ir_type(points_to);
@@ -424,7 +427,8 @@ static ir_type *create_array_type(array_type_t *type)
 	ir_type *ir_element_type = get_ir_type(element_type);
 
 	ident   *id      = unique_ident("array");
-	ir_type *ir_type = new_type_array(id, 1, ir_element_type);
+	dbg_info *dbgi   = get_dbg_info(&type->type.source_position);
+	ir_type *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
 
 	if(type->size != NULL) {
 		int n_elements = fold_constant(type->size);
@@ -474,7 +478,8 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 	char name[32];
 	snprintf(name, sizeof(name), "I%u", size);
 	ident *id = new_id_from_str(name);
-	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
+	res = new_d_type_primitive(mangle_u(get_type_ident(base_tp), id), mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -509,7 +514,8 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 
 	snprintf(name, sizeof(name), "U%u", size);
 	ident *id = new_id_from_str(name);
-	res = new_type_primitive(mangle_u(get_type_ident(base_tp), id), mode);
+	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
+	res = new_d_type_primitive(mangle_u(get_type_ident(base_tp), id), mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -542,7 +548,8 @@ static ir_type *create_struct_type(compound_type_t *type)
 	} else {
 		id = unique_ident("__anonymous_struct");
 	}
-	ir_type *irtype = new_type_struct(id);
+	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
+	ir_type *irtype = new_d_type_struct(id, dbgi);
 
 	type->type.firm_type = irtype;
 
@@ -621,6 +628,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 			                                 (unsigned char) bits_remainder);
 			add_struct_member(irtype, entity);
 			entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
+			assert(entry->v.entity == NULL);
 			entry->v.entity         = entity;
 		}
 	}
@@ -646,7 +654,8 @@ static ir_type *create_union_type(compound_type_t *type)
 	} else {
 		id = unique_ident("__anonymous_union");
 	}
-	ir_type *irtype = new_type_union(id);
+	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
+	ir_type *irtype = new_d_type_union(id, dbgi);
 
 	type->type.firm_type = irtype;
 
@@ -967,11 +976,11 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
                                const string_t *const value)
 {
 	ir_type *const global_type = get_glob_type();
-	ir_type *const type        = new_type_array(unique_ident("strtype"), 1,
-	                                            ir_type_const_char);
+	dbg_info *const dbgi       = get_dbg_info(src_pos);
+	ir_type *const type        = new_d_type_array(unique_ident("strtype"), 1,
+	                                            ir_type_const_char, dbgi);
 
 	ident     *const id     = unique_ident(id_prefix);
-	dbg_info  *const dbgi   = get_dbg_info(src_pos);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
@@ -1011,11 +1020,11 @@ static ir_node *wide_string_literal_to_firm(
 {
 	ir_type *const global_type = get_glob_type();
 	ir_type *const elem_type   = ir_type_wchar_t;
-	ir_type *const type        = new_type_array(unique_ident("strtype"), 1,
-	                                            elem_type);
+	dbg_info *const dbgi       = get_dbg_info(&literal->base.source_position);
+	ir_type *const type        = new_d_type_array(unique_ident("strtype"), 1,
+	                                            elem_type, dbgi);
 
 	ident     *const id     = unique_ident("Lstr");
-	dbg_info  *const dbgi   = get_dbg_info(&literal->base.source_position);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
@@ -1279,8 +1288,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
-		new_method_type = new_type_method(unique_ident("calltype"),
-		                                  n_parameters, n_res);
+		dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
+		new_method_type = new_d_type_method(unique_ident("calltype"),
+		                                  n_parameters, n_res, dbgi);
 		set_method_calling_convention(new_method_type,
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
