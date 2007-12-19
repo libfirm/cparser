@@ -4,6 +4,7 @@
 
 TS(IDENTIFIER,          "identifier", = 256)
 TS(INTEGER,             "integer number",)
+TS(CHARS,               "character constant",)
 TS(FLOATINGPOINT,       "floatingpoint number",)
 TS(STRING_LITERAL,      "string literal",)
 TS(WIDE_STRING_LITERAL, "wide string literal",)

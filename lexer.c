@@ -45,34 +45,13 @@ static const char *bufpos;
 static strset_t    stringset;
 
 /**
- * Print an error prefix at the given coordinates.
- *
- * @param input_name   the input file name
- * @param linenr       the line number
- */
-static void error_prefix_at(const char *input_name, unsigned linenr)
-{
-	fprintf(stderr, "%s:%u: Error: ", input_name, linenr);
-}
-
-/**
- * Print an error prefix at the current token coordinates.
- */
-static void error_prefix(void)
-{
-	error_prefix_at(lexer_token.source_position.input_name,
-	                lexer_token.source_position.linenr);
-}
-
-/**
  * Prints a parse error message at the current token.
  *
  * @param msg   the error message
  */
 static void parse_error(const char *msg)
 {
-	error_prefix();
-	fprintf(stderr, "%s\n", msg);
+	errorf(lexer_token.source_position,  "%s", msg);
 }
 
 static inline void next_real_char(void)
@@ -710,8 +689,7 @@ static void parse_string_literal(void)
 {
 	const unsigned start_linenr = lexer_token.source_position.linenr;
 
-	assert(c == '"');
-	next_char();
+	eat('"');
 
 	int tc;
 	while(1) {
@@ -721,12 +699,14 @@ static void parse_string_literal(void)
 			obstack_1grow(&symbol_obstack, (char) tc);
 			break;
 
-		case EOF:
-			error_prefix_at(lexer_token.source_position.input_name,
-			                start_linenr);
-			fprintf(stderr, "string has no end\n");
+		case EOF: {
+			source_position_t source_position;
+			source_position.input_name = lexer_token.source_position.input_name;
+			source_position.linenr     = start_linenr;
+			errorf(source_position, "string has no end");
 			lexer_token.type = T_ERROR;
 			return;
+		}
 
 		case '"':
 			next_char();
@@ -816,29 +796,31 @@ static void parse_wide_string_literal(void)
 
 	while(1) {
 		switch(c) {
-			case '\\': {
-				wchar_rep_t tc = parse_escape_sequence();
-				obstack_grow(&symbol_obstack, &tc, sizeof(tc));
-				break;
-			}
+		case '\\': {
+			wchar_rep_t tc = parse_escape_sequence();
+			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
+			break;
+		}
 
-			case EOF:
-				error_prefix_at(lexer_token.source_position.input_name,
-				                start_linenr);
-				fprintf(stderr, "string has no end\n");
-				lexer_token.type = T_ERROR;
-				return;
+		case EOF: {
+			source_position_t source_position;
+			source_position.input_name = lexer_token.source_position.input_name;
+			source_position.linenr     = start_linenr;
+			errorf(source_position, "string has no end");
+			lexer_token.type = T_ERROR;
+			return;
+		}
 
-			case '"':
-				next_char();
-				goto end_of_string;
+		case '"':
+			next_char();
+			goto end_of_string;
 
-			default: {
-				wchar_rep_t tc = c;
-				obstack_grow(&symbol_obstack, &tc, sizeof(tc));
-				next_char();
-				break;
-			}
+		default: {
+			wchar_rep_t tc = c;
+			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
+			next_char();
+			break;
+		}
 		}
 	}
 
@@ -869,13 +851,16 @@ end_of_string:;
 
 static void parse_character_constant(void)
 {
+	const unsigned start_linenr = lexer_token.source_position.linenr;
+
 	eat('\'');
 
-	int found_char = 0;
+	int tc;
 	while(1) {
 		switch(c) {
 		case '\\':
-			found_char = parse_escape_sequence();
+			tc = parse_escape_sequence();
+			obstack_1grow(&symbol_obstack, (char) tc);
 			break;
 
 		MATCH_NEWLINE(
@@ -883,32 +868,35 @@ static void parse_character_constant(void)
 			break;
 		)
 
+		case EOF: {
+			source_position_t source_position;
+			source_position.input_name = lexer_token.source_position.input_name;
+			source_position.linenr     = start_linenr;
+			errorf(source_position, "EOF while parsing character constant");
+			lexer_token.type = T_ERROR;
+			return;
+		}
+
 		case '\'':
 			next_char();
 			goto end_of_char_constant;
 
-		case EOF:
-			parse_error("EOF while parsing character constant");
-			lexer_token.type = T_ERROR;
-			return;
-
 		default:
-			if(found_char != 0) {
-				parse_error("more than 1 characters in character "
-				            "constant");
-				goto end_of_char_constant;
-			} else {
-				found_char = c;
-				next_char();
-			}
+			obstack_1grow(&symbol_obstack, (char) c);
+			next_char();
 			break;
+
 		}
 	}
 
-end_of_char_constant:
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = found_char;
-	lexer_token.datatype   = type_int;
+end_of_char_constant:;
+	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
+	const char *const string = obstack_finish(&symbol_obstack);
+
+	lexer_token.type           = T_CHARS;
+	lexer_token.v.string.begin = string;
+	lexer_token.v.string.size  = size;
+	lexer_token.datatype       = type_int;
 }
 
 static void skip_multiline_comment(void)
@@ -933,11 +921,13 @@ static void skip_multiline_comment(void)
 
 		MATCH_NEWLINE(break;)
 
-		case EOF:
-			error_prefix_at(lexer_token.source_position.input_name,
-			                start_linenr);
-			fprintf(stderr, "at end of file while looking for comment end\n");
+		case EOF: {
+			source_position_t source_position;
+			source_position.input_name = lexer_token.source_position.input_name;
+			source_position.linenr     = start_linenr;
+			errorf(source_position, "at end of file while looking for comment end");
 			return;
+		}
 
 		default:
 			next_char();
@@ -977,14 +967,6 @@ static void eat_until_newline(void)
 	while(pp_token.type != '\n' && pp_token.type != T_EOF) {
 		next_pp_token();
 	}
-}
-
-static void error_directive(void)
-{
-	error_prefix();
-	fprintf(stderr, "#error directive: \n");
-
-	/* parse pp-tokens until new-line */
 }
 
 static void define_directive(void)
@@ -1055,7 +1037,8 @@ static void parse_preprocessor_identifier(void)
 	case TP_elif:
 	case TP_undef:
 	case TP_error:
-		error_directive();
+		/* TODO; output the rest of the line */
+		parse_error("#error directive: ");
 		break;
 	case TP_pragma:
 		if (warning.unknown_pragmas) {
@@ -1290,8 +1273,7 @@ void lexer_next_preprocessing_token(void)
 
 		default:
 			next_char();
-			error_prefix();
-			fprintf(stderr, "unknown character '%c' found\n", c);
+			errorf(lexer_token.source_position, "unknown character '%c' found\n", c);
 			lexer_token.type = T_ERROR;
 			return;
 		}

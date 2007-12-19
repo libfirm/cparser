@@ -198,6 +198,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_INVALID]             = sizeof(expression_base_t),
 		[EXPR_REFERENCE]           = sizeof(reference_expression_t),
 		[EXPR_CONST]               = sizeof(const_expression_t),
+		[EXPR_CHAR_CONST]          = sizeof(const_expression_t),
 		[EXPR_STRING_LITERAL]      = sizeof(string_literal_expression_t),
 		[EXPR_WIDE_STRING_LITERAL] = sizeof(wide_string_literal_expression_t),
 		[EXPR_CALL]                = sizeof(call_expression_t),
@@ -3144,10 +3145,35 @@ static expression_t *parse_wide_string_const(void)
  */
 static expression_t *parse_int_const(void)
 {
-	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
-	cnst->base.type          = token.datatype;
-	cnst->conste.v.int_value = token.v.intvalue;
+	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
+	cnst->base.source_position = HERE;
+	cnst->base.type            = token.datatype;
+	cnst->conste.v.int_value   = token.v.intvalue;
 
+	next_token();
+
+	return cnst;
+}
+
+/**
+ * Parse a character constant.
+ */
+static expression_t *parse_char_const(void)
+{
+	expression_t *cnst         = allocate_expression_zero(EXPR_CHAR_CONST);
+	cnst->base.source_position = HERE;
+	cnst->base.type            = token.datatype;
+	cnst->conste.v.chars.begin = token.v.string.begin;
+	cnst->conste.v.chars.size  = token.v.string.size;
+
+	if (cnst->conste.v.chars.size != 1) {
+		if (c_mode & _GNUC) {
+			/* TODO */
+			warningf(HERE, "multi-character character constant");
+		} else {
+			errorf(HERE, "more than 1 characters in character constant");
+		}
+	}
 	next_token();
 
 	return cnst;
@@ -3708,6 +3734,8 @@ static expression_t *parse_primary_expression(void)
 	switch(token.type) {
 	case T_INTEGER:
 		return parse_int_const();
+	case T_CHARS:
+		return parse_char_const();
 	case T_FLOATINGPOINT:
 		return parse_float_const();
 	case T_STRING_LITERAL:
@@ -4655,6 +4683,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_INVALID:                   break;
 		case EXPR_REFERENCE:                 return false;
 		case EXPR_CONST:                     return false;
+		case EXPR_CHAR_CONST:                return false;
 		case EXPR_STRING_LITERAL:            return false;
 		case EXPR_WIDE_STRING_LITERAL:       return false;
 		case EXPR_CALL: {

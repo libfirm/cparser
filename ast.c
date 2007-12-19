@@ -79,6 +79,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNKNOWN]                   = PREC_PRIM,
 		[EXPR_INVALID]                   = PREC_PRIM,
 		[EXPR_REFERENCE]                 = PREC_PRIM,
+		[EXPR_CHAR_CONST]                = PREC_PRIM,
 		[EXPR_CONST]                     = PREC_PRIM,
 		[EXPR_STRING_LITERAL]            = PREC_PRIM,
 		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
@@ -187,14 +188,17 @@ static void print_const(const const_expression_t *cnst)
  * Print a quoted string constant.
  *
  * @param string  the string constant
+ * @param border  the border char
  */
-static void print_quoted_string(const string_t *const string)
+static void print_quoted_string(const string_t *const string, char border)
 {
-	fputc('"', out);
+	fputc(border, out);
 	const char *end = string->begin + string->size;
 	for (const char *c = string->begin; c != end; ++c) {
+		if (*c == border) {
+			fputc('\\', out);
+		}
 		switch(*c) {
-		case '\"':  fputs("\\\"", out); break;
 		case '\\':  fputs("\\\\", out); break;
 		case '\a':  fputs("\\a", out); break;
 		case '\b':  fputs("\\b", out); break;
@@ -213,7 +217,17 @@ static void print_quoted_string(const string_t *const string)
 			break;
 		}
 	}
-	fputc('"', out);
+	fputc(border, out);
+}
+
+/**
+ * Print a constant character expression.
+ *
+ * @param cnst  the constant character expression
+ */
+static void print_char_const(const const_expression_t *cnst)
+{
+	print_quoted_string(&cnst->v.chars, '\'');
 }
 
 /**
@@ -224,7 +238,7 @@ static void print_quoted_string(const string_t *const string)
 static void print_string_literal(
 		const string_literal_expression_t *string_literal)
 {
-	print_quoted_string(&string_literal->value);
+	print_quoted_string(&string_literal->value, '"');
 }
 
 /**
@@ -654,6 +668,9 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_INVALID:
 		fprintf(out, "*invalid expression*");
 		break;
+	case EXPR_CHAR_CONST:
+		print_char_const(&expression->conste);
+		break;
 	case EXPR_CONST:
 		print_const(&expression->conste);
 		break;
@@ -958,7 +975,7 @@ static void print_asm_constraints(asm_constraint_t *constraints)
 		if(constraint->symbol) {
 			fprintf(out, "[%s] ", constraint->symbol->string);
 		}
-		print_quoted_string(&constraint->constraints);
+		print_quoted_string(&constraint->constraints, '"');
 		fputs(" (", out);
 		print_expression(constraint->expression);
 		fputs(")", out);
@@ -977,7 +994,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 		if(clobber != clobbers)
 			fputs(", ", out);
 
-		print_quoted_string(&clobber->clobber);
+		print_quoted_string(&clobber->clobber, '"');
 	}
 }
 
@@ -993,7 +1010,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 		fputs("volatile ", out);
 	}
 	fputs("(", out);
-	print_quoted_string(&statement->asm_text);
+	print_quoted_string(&statement->asm_text, '"');
 	if(statement->inputs == NULL && statement->outputs == NULL
 			&& statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
@@ -1234,6 +1251,7 @@ bool is_constant_expression(const expression_t *expression)
 	switch(expression->kind) {
 
 	case EXPR_CONST:
+	case EXPR_CHAR_CONST:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_SIZEOF:

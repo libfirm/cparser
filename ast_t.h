@@ -17,6 +17,7 @@ typedef enum {
 	EXPR_INVALID,
 	EXPR_REFERENCE,
 	EXPR_CONST,
+	EXPR_CHAR_CONST,
 	EXPR_STRING_LITERAL,
 	EXPR_WIDE_STRING_LITERAL,
 	EXPR_CALL,
@@ -165,8 +166,9 @@ struct expression_base_t {
 struct const_expression_t {
 	expression_base_t  base;
 	union {
-		long long   int_value;
-		long double float_value;
+		long long    int_value;
+		long double  float_value;
+		string_t     chars;
 	} v;
 };
 
