@@ -541,7 +541,12 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 
 static ir_type *create_struct_type(compound_type_t *type)
 {
-	symbol_t *symbol = type->declaration->symbol;
+	declaration_t *declaration = type->declaration;
+	if(declaration->v.irtype != NULL) {
+		return declaration->v.irtype;
+	}
+
+	symbol_t *symbol = declaration->symbol;
 	ident    *id;
 	if(symbol != NULL) {
 		id = unique_ident(symbol->string);
@@ -556,7 +561,7 @@ static ir_type *create_struct_type(compound_type_t *type)
 	size_t align_all  = 1;
 	size_t offset     = 0;
 	size_t bit_offset = 0;
-	declaration_t *entry = type->declaration->scope.declarations;
+	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
@@ -641,12 +646,18 @@ static ir_type *create_struct_type(compound_type_t *type)
 	set_type_size_bytes(irtype, offset);
 	set_type_state(irtype, layout_fixed);
 
+	declaration->v.irtype = irtype;
+
 	return irtype;
 }
 
 static ir_type *create_union_type(compound_type_t *type)
 {
 	declaration_t *declaration = type->declaration;
+	if(declaration->v.irtype != NULL) {
+		return declaration->v.irtype;
+	}
+
 	symbol_t      *symbol      = declaration->symbol;
 	ident         *id;
 	if(symbol != NULL) {
@@ -678,6 +689,7 @@ static ir_type *create_union_type(compound_type_t *type)
 		add_union_member(irtype, entity);
 		set_entity_offset(entity, 0);
 		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
+		assert(entry->v.entity == NULL);
 		entry->v.entity         = entity;
 
 		if(entry_size > size) {
@@ -694,6 +706,8 @@ static ir_type *create_union_type(compound_type_t *type)
 	set_type_alignment_bytes(irtype, align_all);
 	set_type_size_bytes(irtype, size);
 	set_type_state(irtype, layout_fixed);
+
+	declaration->v.irtype = irtype;
 
 	return irtype;
 }

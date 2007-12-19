@@ -416,6 +416,7 @@ struct declaration_t {
 		ir_entity      *entity;
 		ir_node        *block;
 		tarval         *enum_val;
+		ir_type        *irtype;
 	} v;
 };
 

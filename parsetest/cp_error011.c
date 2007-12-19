@@ -5,3 +5,7 @@ void f(void)
 {
 	const struct bla x = { 0 };
 }
+
+int main(void) {
+	return 0;
+}
