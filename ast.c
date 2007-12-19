@@ -60,6 +60,8 @@ enum precedence_t {
 /**
  * Returns 1 if a given precedence level has right-to-left
  * associativity, else -1.
+ *
+ * @param precedence   the operator precedence
  */
 static int right_to_left(unsigned precedence) {
 	return (precedence == PREC_ASSIGN || precedence == PREC_COND ||
@@ -67,7 +69,9 @@ static int right_to_left(unsigned precedence) {
 }
 
 /**
- * Return the precedence of an expression.
+ * Return the precedence of an expression given by its kind.
+ *
+ * @param kind   the expression kind
  */
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
@@ -164,6 +168,8 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 
 /**
  * Print a constant expression.
+ *
+ * @param cnst  the constant expression
  */
 static void print_const(const const_expression_t *cnst)
 {
@@ -179,6 +185,8 @@ static void print_const(const const_expression_t *cnst)
 
 /**
  * Print a quoted string constant.
+ *
+ * @param string  the string constant
  */
 static void print_quoted_string(const string_t *const string)
 {
@@ -210,6 +218,8 @@ static void print_quoted_string(const string_t *const string)
 
 /**
  * Prints a string literal expression.
+ *
+ * @param string_literal  the string literal expression
  */
 static void print_string_literal(
 		const string_literal_expression_t *string_literal)
@@ -219,6 +229,8 @@ static void print_string_literal(
 
 /**
  * Prints a wide string literal expression.
+ *
+ * @param wstr  the wide string literal expression
  */
 static void print_wide_string_literal(
 	const wide_string_literal_expression_t *const wstr)
@@ -267,6 +279,8 @@ static void print_wide_string_literal(
 
 /**
  * Prints a call expression.
+ *
+ * @param call  the call expression
  */
 static void print_call_expression(const call_expression_t *call)
 {
@@ -290,6 +304,8 @@ static void print_call_expression(const call_expression_t *call)
 
 /**
  * Prints a binary expression.
+ *
+ * @param binexpr   the binary expression
  */
 static void print_binary_expression(const binary_expression_t *binexpr)
 {
@@ -349,6 +365,8 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 
 /**
  * Prints an unary expression.
+ *
+ * @param unexpr   the unary expression
  */
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
@@ -399,6 +417,8 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 
 /**
  * Prints a reference expression.
+ *
+ * @param ref   the reference expression
  */
 static void print_reference_expression(const reference_expression_t *ref)
 {
@@ -407,6 +427,8 @@ static void print_reference_expression(const reference_expression_t *ref)
 
 /**
  * Prints an array expression.
+ *
+ * @param expression   the array expression
  */
 static void print_array_expression(const array_access_expression_t *expression)
 {
@@ -425,7 +447,9 @@ static void print_array_expression(const array_access_expression_t *expression)
 }
 
 /**
- * Prints a typeproperty expression.
+ * Prints a typeproperty expression (sizeof or __alignof__).
+ *
+ * @param expression   the type property expression
  */
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
@@ -448,7 +472,9 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 }
 
 /**
- * Prints an builtin symbol
+ * Prints an builtin symbol.
+ *
+ * @param expression   the builtin symbol expression
  */
 static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 {
@@ -457,6 +483,8 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 
 /**
  * Prints a builtin constant expression.
+ *
+ * @param expression   the builtin constant expression
  */
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
@@ -467,6 +495,8 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 
 /**
  * Prints a builtin prefetch expression.
+ *
+ * @param expression   the builtin prefetch expression
  */
 static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
 {
@@ -485,6 +515,8 @@ static void print_builtin_prefetch(const builtin_prefetch_expression_t *expressi
 
 /**
  * Prints a conditional expression.
+ *
+ * @param expression   the conditional expression
  */
 static void print_conditional(const conditional_expression_t *expression)
 {
@@ -500,6 +532,8 @@ static void print_conditional(const conditional_expression_t *expression)
 
 /**
  * Prints a va_start expression.
+ *
+ * @param expression   the va_start expression
  */
 static void print_va_start(const va_start_expression_t *const expression)
 {
@@ -512,6 +546,8 @@ static void print_va_start(const va_start_expression_t *const expression)
 
 /**
  * Prints a va_arg expression.
+ *
+ * @param expression   the va_arg expression
  */
 static void print_va_arg(const va_arg_expression_t *expression)
 {
@@ -523,7 +559,9 @@ static void print_va_arg(const va_arg_expression_t *expression)
 }
 
 /**
- * Prints a select expression.
+ * Prints a select expression (. or ->).
+ *
+ * @param expression   the select expression
  */
 static void print_select(const select_expression_t *expression)
 {
@@ -540,6 +578,8 @@ static void print_select(const select_expression_t *expression)
 
 /**
  * Prints a type classify expression.
+ *
+ * @param expr   the type classify expression
  */
 static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
@@ -549,6 +589,11 @@ static void print_classify_type_expression(
 	fputc(')', out);
 }
 
+/**
+ * Prints a designator.
+ *
+ * @param designator  the designator
+ */
 static void print_designator(const designator_t *designator)
 {
 	fputs(designator->symbol->string, out);
@@ -565,7 +610,9 @@ static void print_designator(const designator_t *designator)
 }
 
 /**
- * Prints an offsetof classify expression.
+ * Prints an offsetof expression.
+ *
+ * @param expression   the offset expression
  */
 static void print_offsetof_expression(const offsetof_expression_t *expression)
 {
@@ -579,6 +626,8 @@ static void print_offsetof_expression(const offsetof_expression_t *expression)
 
 /**
  * Prints a statement expression.
+ *
+ * @param expression   the statement expression
  */
 static void print_statement_expression(const statement_expression_t *expression)
 {
@@ -587,6 +636,12 @@ static void print_statement_expression(const statement_expression_t *expression)
 	fputc(')', out);
 }
 
+/**
+ * Prints an expression with parenthesis if needed.
+ *
+ * @param expression  the expression to print
+ * @param top_prec    the precedence of the user of this expression.
+ */
 static void print_expression_prec(const expression_t *expression, unsigned top_prec)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
@@ -669,6 +724,11 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		fputc(')', out);
 }
 
+/**
+ * Print an compound statement.
+ *
+ * @param block  the compound statement
+ */
 static void print_compound_statement(const compound_statement_t *block)
 {
 	fputs("{\n", out);
@@ -688,20 +748,35 @@ static void print_compound_statement(const compound_statement_t *block)
 	fputs("}\n", out);
 }
 
+/**
+ * Print a return statement.
+ *
+ * @param statement  the return statement
+ */
 static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
 	if(statement->value != NULL)
-		print_expression_prec(statement->value, PREC_BOTTOM);
+		print_expression(statement->value);
 	fputs(";\n", out);
 }
 
+/**
+ * Print an expression statement.
+ *
+ * @param statement  the expression statement
+ */
 static void print_expression_statement(const expression_statement_t *statement)
 {
 	print_expression(statement->expression);
 	fputs(";\n", out);
 }
 
+/**
+ * Print a goto statement.
+ *
+ * @param statement  the goto statement
+ */
 static void print_goto_statement(const goto_statement_t *statement)
 {
 	fprintf(out, "goto ");
@@ -710,6 +785,11 @@ static void print_goto_statement(const goto_statement_t *statement)
 	fputs(";\n", out);
 }
 
+/**
+ * Print a label statement.
+ *
+ * @param statement  the label statement
+ */
 static void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(stderr, "(%p)", (void*) statement->label);
@@ -719,6 +799,11 @@ static void print_label_statement(const label_statement_t *statement)
 	}
 }
 
+/**
+ * Print an if statement.
+ *
+ * @param statement  the if statement
+ */
 static void print_if_statement(const if_statement_t *statement)
 {
 	fputs("if(", out);
@@ -735,6 +820,11 @@ static void print_if_statement(const if_statement_t *statement)
 	}
 }
 
+/**
+ * Print a switch statement.
+ *
+ * @param statement  the switch statement
+ */
 static void print_switch_statement(const switch_statement_t *statement)
 {
 	fputs("switch(", out);
@@ -743,6 +833,11 @@ static void print_switch_statement(const switch_statement_t *statement)
 	print_statement(statement->body);
 }
 
+/**
+ * Print a case label (including the default label).
+ *
+ * @param statement  the case label statement
+ */
 static void print_case_label(const case_label_statement_t *statement)
 {
 	if(statement->expression == NULL) {
@@ -762,6 +857,11 @@ static void print_case_label(const case_label_statement_t *statement)
 	}
 }
 
+/**
+ * Print a declaration statement.
+ *
+ * @param statement   the statement
+ */
 static void print_declaration_statement(
 		const declaration_statement_t *statement)
 {
@@ -779,6 +879,11 @@ static void print_declaration_statement(
 	}
 }
 
+/**
+ * Print a while statement.
+ *
+ * @param statement   the statement
+ */
 static void print_while_statement(const while_statement_t *statement)
 {
 	fputs("while(", out);
@@ -787,6 +892,11 @@ static void print_while_statement(const while_statement_t *statement)
 	print_statement(statement->body);
 }
 
+/**
+ * Print a do-while statement.
+ *
+ * @param statement   the statement
+ */
 static void print_do_while_statement(const do_while_statement_t *statement)
 {
 	fputs("do ", out);
@@ -797,6 +907,11 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 	fputs(");\n", out);
 }
 
+/**
+ * Print a for statement.
+ *
+ * @param statement   the statement
+ */
 static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for(", out);
@@ -824,6 +939,11 @@ static void print_for_statement(const for_statement_t *statement)
 	print_statement(statement->body);
 }
 
+/**
+ * Print assembler constraints.
+ *
+ * @param constraints   the constraints
+ */
 static void print_asm_constraints(asm_constraint_t *constraints)
 {
 	asm_constraint_t *constraint = constraints;
@@ -841,6 +961,11 @@ static void print_asm_constraints(asm_constraint_t *constraints)
 	}
 }
 
+/**
+ * Print assembler clobbers.
+ *
+ * @param clobbers   the clobbers
+ */
 static void print_asm_clobbers(asm_clobber_t *clobbers)
 {
 	asm_clobber_t *clobber = clobbers;
@@ -852,6 +977,11 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 	}
 }
 
+/**
+ * Print an assembler statement.
+ *
+ * @param statement   the statement
+ */
 static void print_asm_statement(const asm_statement_t *statement)
 {
 	fputs("asm ", out);
@@ -881,6 +1011,11 @@ end_of_print_asm_statement:
 	fputs(");\n", out);
 }
 
+/**
+ * Print a statement.
+ *
+ * @param statement   the statement
+ */
 void print_statement(const statement_t *statement)
 {
 	switch(statement->kind) {
@@ -935,6 +1070,11 @@ void print_statement(const statement_t *statement)
 	}
 }
 
+/**
+ * Print a storage class.
+ *
+ * @param storage_class   the storage class
+ */
 static void print_storage_class(unsigned storage_class)
 {
 	switch((storage_class_tag_t) storage_class) {
@@ -952,6 +1092,11 @@ static void print_storage_class(unsigned storage_class)
 	}
 }
 
+/**
+ * Print an initializer.
+ *
+ * @param initializer  the initializer
+ */
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer->kind == INITIALIZER_VALUE) {
@@ -973,6 +1118,11 @@ void print_initializer(const initializer_t *initializer)
 	fputs("}", out);
 }
 
+/**
+ * Print a declaration in the NORMAL namespace.
+ *
+ * @param declaration  the declaration
+ */
 static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class(declaration->storage_class);
@@ -1000,11 +1150,18 @@ static void print_normal_declaration(const declaration_t *declaration)
 
 /**
  * Prints an expression.
+ *
+ * @param expression  the expression
  */
 void print_expression(const expression_t *expression) {
 	print_expression_prec(expression, PREC_BOTTOM);
 }
 
+/**
+ * Print a declaration.
+ *
+ * @param declaration  the declaration
+ */
 void print_declaration(const declaration_t *declaration)
 {
 	if(declaration->namespc != NAMESPACE_NORMAL &&
@@ -1039,6 +1196,11 @@ void print_declaration(const declaration_t *declaration)
 	}
 }
 
+/**
+ * Print the AST of a translation unit.
+ *
+ * @param unit   the translation unit
+ */
 void print_ast(const translation_unit_t *unit)
 {
 	inc_type_visited();
@@ -1057,6 +1219,12 @@ void print_ast(const translation_unit_t *unit)
 	}
 }
 
+/**
+ * Returns true if a given expression is a compile time
+ * constant.
+ *
+ * @param expression  the expression to check
+ */
 bool is_constant_expression(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -1165,24 +1333,41 @@ bool is_constant_expression(const expression_t *expression)
 	panic("invalid expression found (is constant expression)");
 }
 
-
+/**
+ * Initialize the AST construction.
+ */
 void init_ast(void)
 {
 	obstack_init(&ast_obstack);
 }
 
+/**
+ * Free the AST.
+ */
 void exit_ast(void)
 {
 	obstack_free(&ast_obstack, NULL);
 }
 
+/**
+ * Set the output stream for the AST printer.
+ *
+ * @param stream  the output stream
+ */
 void ast_set_output(FILE *stream)
 {
 	out = stream;
 	type_set_output(stream);
 }
 
-void* (allocate_ast) (size_t size)
+/**
+ * Allocate an AST object of the given size.
+ *
+ * @param size  the size of the object to allocate
+ *
+ * @return  A new allocated object in the AST memeory space.
+ */
+void *(allocate_ast)(size_t size)
 {
 	return _allocate_ast(size);
 }
