@@ -379,7 +379,7 @@ static void parse_error_expected(const char *message, ...)
 	}
 	va_list ap;
 	va_start(ap, message);
-	errorf(HERE, "got '%K', expected %#k", &token, &ap, ", ");
+	errorf(HERE, "got %K, expected %#k", &token, &ap, ", ");
 	va_end(ap);
 }
 

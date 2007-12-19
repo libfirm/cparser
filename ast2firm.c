@@ -3556,9 +3556,11 @@ typedef enum modifier_t {
 	ASM_MODIFIER_EARLYCLOBBER = 1 << 3,
 } modifier_t;
 
-#if 0
 static void asm_statement_to_firm(const asm_statement_t *statement)
 {
+	(void) statement;
+	fprintf(stderr, "WARNING asm not implemented yet!\n");
+#if 0
 	bool needs_memory = false;
 
 	size_t         n_clobbers = 0;
@@ -3640,9 +3642,8 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 		}
 	}
-
-}
 #endif
+}
 
 static void statement_to_firm(statement_t *statement)
 {
@@ -3692,9 +3693,8 @@ static void statement_to_firm(statement_t *statement)
 		goto_to_firm(&statement->gotos);
 		return;
 	case STATEMENT_ASM:
-		//asm_statement_to_firm(&statement->asms);
-		//return;
-		break;
+		asm_statement_to_firm(&statement->asms);
+		return;
 	}
 	panic("Statement not implemented\n");
 }
