@@ -15,7 +15,11 @@ struct obstack ast_obstack;
 static FILE *out;
 static int   indent;
 
-bool print_implicit_casts = true;
+/** If set, implicit casts are printed. */
+bool print_implicit_casts = false;
+
+/** If set parenthesis are printed to indicate operator precedence. */
+bool print_parenthesis = false;
 
 static void print_statement(const statement_t *statement);
 static void print_expression_prec(const expression_t *expression, unsigned prec);
@@ -33,23 +37,24 @@ void print_indent(void)
 }
 
 enum precedence_t {
-	PREC_BAD = 0,
-	PREC_COMMA,   /* ,                                    left to right */
-	PREC_ASSIGN,  /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
-	PREC_COND,    /* ?:                                   right to left */
-	PREC_LOG_OR,  /* ||                                   left to right */
-	PREC_LOG_AND, /* &&                                   left to right */
-	PREC_BIT_OR,  /* |                                    left to right */
-	PREC_BIT_XOR, /* ^                                    left to right */
-	PREC_BIT_AND, /* &                                    left to right */
-	PREC_EQ,      /* == !=                                left to right */
-	PREC_CMP,     /* < <= > >=                            left to right */
-	PREC_SHF,     /* << >>                                left to right */
-	PREC_PLUS,    /* + -                                  left to right */
-	PREC_MUL,     /* * / %                                left to right */
-	PREC_UNARY,   /* ! ~ ++ -- + - (type) * & sizeof      right to left */
-	PREC_ACCESS,  /* () [] -> .                           left to right */
-	PREC_PRIM,    /* primary */
+	PREC_BOTTOM  =  0,
+	PREC_COMMA   =  2, /* ,                                    left to right */
+	PREC_ASSIGN  =  4, /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
+	PREC_COND    =  6, /* ?:                                   right to left */
+	PREC_LOG_OR  =  8, /* ||                                   left to right */
+	PREC_LOG_AND = 10, /* &&                                   left to right */
+	PREC_BIT_OR  = 12, /* |                                    left to right */
+	PREC_BIT_XOR = 14, /* ^                                    left to right */
+	PREC_BIT_AND = 16, /* &                                    left to right */
+	PREC_EQ      = 18, /* == !=                                left to right */
+	PREC_CMP     = 20, /* < <= > >=                            left to right */
+	PREC_SHF     = 22, /* << >>                                left to right */
+	PREC_PLUS    = 24, /* + -                                  left to right */
+	PREC_MUL     = 26, /* * / %                                left to right */
+	PREC_UNARY   = 28, /* ! ~ ++ -- + - (type) * & sizeof      right to left */
+	PREC_ACCESS  = 30, /* () [] -> .                           left to right */
+	PREC_PRIM    = 32, /* primary */
+	PREC_TOP     = 34
 };
 
 /**
@@ -150,7 +155,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		panic("wrong expression kind");
 	}
 	unsigned res = prec[kind];
-	if (res == PREC_BAD) {
+	if (res == PREC_BOTTOM) {
 		panic("expression kind not defined in get_expression_precedence()");
 	}
 #endif
@@ -585,6 +590,8 @@ static void print_statement_expression(const statement_expression_t *expression)
 static void print_expression_prec(const expression_t *expression, unsigned top_prec)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
+	if (print_parenthesis && top_prec != PREC_BOTTOM)
+		top_prec = PREC_TOP;
 	if (top_prec > prec)
 		fputc('(', out);
 	switch(expression->kind) {
@@ -685,7 +692,7 @@ static void print_return_statement(const return_statement_t *statement)
 {
 	fprintf(out, "return ");
 	if(statement->value != NULL)
-		print_expression_prec(statement->value, PREC_BAD);
+		print_expression_prec(statement->value, PREC_BOTTOM);
 	fputs(";\n", out);
 }
 
@@ -995,7 +1002,7 @@ static void print_normal_declaration(const declaration_t *declaration)
  * Prints an expression.
  */
 void print_expression(const expression_t *expression) {
-	print_expression_prec(expression, PREC_BAD);
+	print_expression_prec(expression, PREC_BOTTOM);
 }
 
 void print_declaration(const declaration_t *declaration)
