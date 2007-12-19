@@ -13,6 +13,7 @@ warning_t warning = {
 	.main                          = true,
 	.missing_declarations          = false,
 	.missing_prototypes            = false,
+	.multichar                     = true,
 	.redundant_decls               = true,
 	.s_are_errors                  = false,
 	.shadow                        = false,
@@ -87,6 +88,7 @@ void set_warning_opt(const char *const opt)
 	OPT("main",                          main)
 	OPT("missing-declarations",          missing_declarations)
 	OPT("missing-prototypes",            missing_prototypes)
+	OPT("multichar",                     multichar)
 	OPT("redundant-decls",               redundant_decls)
 	OPT("shadow",                        shadow)
 	OPT("sign-compare",                  sign_compare)

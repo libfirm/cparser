@@ -3167,7 +3167,7 @@ static expression_t *parse_char_const(void)
 	cnst->conste.v.chars.size  = token.v.string.size;
 
 	if (cnst->conste.v.chars.size != 1) {
-		if (c_mode & _GNUC) {
+		if (warning.multichar && (c_mode & _GNUC)) {
 			/* TODO */
 			warningf(HERE, "multi-character character constant");
 		} else {
