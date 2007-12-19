@@ -44,17 +44,31 @@ static const char *bufend;
 static const char *bufpos;
 static strset_t    stringset;
 
+/**
+ * Print an error prefix at the given coordinates.
+ *
+ * @param input_name   the input file name
+ * @param linenr       the line number
+ */
 static void error_prefix_at(const char *input_name, unsigned linenr)
 {
 	fprintf(stderr, "%s:%u: Error: ", input_name, linenr);
 }
 
+/**
+ * Print an error prefix at the current token coordinates.
+ */
 static void error_prefix(void)
 {
 	error_prefix_at(lexer_token.source_position.input_name,
 	                lexer_token.source_position.linenr);
 }
 
+/**
+ * Prints a parse error message at the current token.
+ *
+ * @param msg   the error message
+ */
 static void parse_error(const char *msg)
 {
 	error_prefix();
