@@ -3450,26 +3450,39 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	/* let's create a node and hope firm constant folding creates a Const
 	 * node... */
 	ir_node *proj;
-	set_cur_block(get_nodes_block(current_switch_cond));
-	if(statement->expression) {
-		long pn = fold_constant(statement->expression);
-		if(pn == MAGIC_DEFAULT_PN_NUMBER) {
-			/* oops someone detected our cheating... */
-			panic("magic default pn used");
+	ir_node *old_block = get_nodes_block(current_switch_cond);
+	ir_node *block     = new_immBlock();
+
+	set_cur_block(old_block);
+	if(statement->expression != NULL) {
+		long start_pn = fold_constant(statement->expression);
+		long end_pn = start_pn;
+		if (statement->end_range != NULL) {
+			end_pn = fold_constant(statement->end_range);
 		}
-		proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+		assert(start_pn <= end_pn);
+		/* create jumps for all cases in the given range */
+		for (long pn = start_pn; pn <= end_pn; ++pn) {
+			if(pn == MAGIC_DEFAULT_PN_NUMBER) {
+				/* oops someone detected our cheating... */
+				panic("magic default pn used");
+			}
+			proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+			add_immBlock_pred(block, proj);
+		}
 	} else {
 		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
 		                         MAGIC_DEFAULT_PN_NUMBER);
+
+		add_immBlock_pred(block, proj);
 	}
 
-	ir_node *block = new_immBlock();
 	if (fallthrough != NULL) {
 		add_immBlock_pred(block, fallthrough);
 	}
-	add_immBlock_pred(block, proj);
 	mature_immBlock(block);
+	set_cur_block(block);
 
 	if(statement->statement != NULL) {
 		statement_to_firm(statement->statement);

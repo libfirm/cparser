@@ -483,7 +483,8 @@ struct goto_statement_t {
 
 struct case_label_statement_t {
 	statement_base_t        base;
-	expression_t           *expression;
+	expression_t           *expression;  /**< The case label expression, NULL for default label. */
+	expression_t           *end_range;   /**< For GNUC case a .. b: the end range expression, NULL else. */
 	statement_t            *statement;
 	case_label_statement_t *next; /**< link to the next case label in switch */
 };

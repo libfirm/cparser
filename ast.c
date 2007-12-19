@@ -845,6 +845,10 @@ static void print_case_label(const case_label_statement_t *statement)
 	} else {
 		fputs("case ", out);
 		print_expression(statement->expression);
+		if (statement->end_range != NULL) {
+			fputs(" ... ", out);
+			print_expression(statement->end_range);
+		}
 		fputs(":\n", out);
 	}
 	++indent;

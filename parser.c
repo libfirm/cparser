@@ -5114,6 +5114,13 @@ static statement_t *parse_case_statement(void)
 	statement->base.source_position  = token.source_position;
 	statement->case_label.expression = parse_expression();
 
+	if (c_mode & _GNUC) {
+		if (token.type == T_DOTDOTDOT) {
+			next_token();
+			statement->case_label.end_range = parse_expression();
+		}
+	}
+
 	expect(':');
 
 	if (! is_constant_expression(statement->case_label.expression)) {
