@@ -2115,6 +2115,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return create_arithmetic_assign_binop(expression, new_d_Sub);
 	case EXPR_BINARY_MUL_ASSIGN:
 		return create_arithmetic_assign_binop(expression, new_d_Mul);
+	case EXPR_BINARY_MOD_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:
 		return create_arithmetic_assign_divmod(expression);
 	case EXPR_BINARY_BITWISE_AND_ASSIGN:

@@ -1616,8 +1616,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}
 			break;
 
-		/* TODO: if is_type_valid(type) for the following rules should issue
-		 * an error */
 		case T_struct: {
 			type = allocate_type_zero(TYPE_COMPOUND_STRUCT, HERE);
 
@@ -1642,11 +1640,14 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T___attribute__:
-			/* TODO */
 			parse_attributes();
 			break;
 
 		case T_IDENTIFIER: {
+			/* only parse identifier if we haven't found a type yet */
+			if(type != NULL || type_specifiers != 0)
+				goto finish_specifiers;
+
 			type_t *typedef_type = get_typedef_type(token.v.symbol);
 
 			if(typedef_type == NULL)
