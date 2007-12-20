@@ -430,22 +430,23 @@ static ir_type *create_array_type(array_type_t *type)
 	dbg_info *dbgi   = get_dbg_info(&type->type.source_position);
 	ir_type *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
 
+	const int align = get_type_alignment_bytes(ir_element_type);
+	set_type_alignment_bytes(ir_type, align);
+
 	if(type->size != NULL) {
 		int n_elements = fold_constant(type->size);
 
 		set_array_bounds_int(ir_type, 0, 0, n_elements);
 
 		size_t elemsize = get_type_size_bytes(ir_element_type);
-		int align = get_type_alignment_bytes(ir_element_type);
 		if(elemsize % align > 0) {
 			elemsize += align - (elemsize % align);
 		}
 		set_type_size_bytes(ir_type, n_elements * elemsize);
-		set_type_alignment_bytes(ir_type, align);
-		set_type_state(ir_type, layout_fixed);
 	} else {
 		set_array_lower_bound_int(ir_type, 0, 0);
 	}
+	set_type_state(ir_type, layout_fixed);
 
 	return ir_type;
 }
