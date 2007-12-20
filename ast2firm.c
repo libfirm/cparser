@@ -556,7 +556,8 @@ static ir_type *create_struct_type(compound_type_t *type)
 	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
 	ir_type *irtype = new_d_type_struct(id, dbgi);
 
-	type->type.firm_type = irtype;
+	declaration->v.irtype = irtype;
+	type->type.firm_type  = irtype;
 
 	size_t align_all  = 1;
 	size_t offset     = 0;
@@ -645,8 +646,6 @@ static ir_type *create_struct_type(compound_type_t *type)
 	set_type_alignment_bytes(irtype, align_all);
 	set_type_size_bytes(irtype, offset);
 	set_type_state(irtype, layout_fixed);
-
-	declaration->v.irtype = irtype;
 
 	return irtype;
 }
