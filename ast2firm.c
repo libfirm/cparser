@@ -1567,12 +1567,13 @@ static bool is_local_variable(expression_t *expression)
 	return declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE;
 }
 
-static pn_Cmp get_pnc(const expression_kind_t kind)
+static pn_Cmp get_pnc(const expression_kind_t kind, type_t *const type)
 {
 	switch(kind) {
 	case EXPR_BINARY_EQUAL:         return pn_Cmp_Eq;
 	case EXPR_BINARY_ISLESSGREATER: return pn_Cmp_Lg;
-	case EXPR_BINARY_NOTEQUAL:      return pn_Cmp_Ne;
+	case EXPR_BINARY_NOTEQUAL:
+		return is_type_float(skip_typeref(type)) ? pn_Cmp_Ne : pn_Cmp_Lg;
 	case EXPR_BINARY_ISLESS:
 	case EXPR_BINARY_LESS:          return pn_Cmp_Lt;
 	case EXPR_BINARY_ISLESSEQUAL:
@@ -1610,7 +1611,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 	ir_node       *res = NULL;
 	pn_Cmp         cmp_val;
 
-	cmp_val = get_pnc(expression->base.kind);
+	cmp_val = get_pnc(expression->base.kind, op1->base.type);
 
 	if (is_local_variable(op1) && is_local_variable(op2)) {
     	var  = op1->reference.declaration;
@@ -2090,7 +2091,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		ir_node *left  = expression_to_firm(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
 		ir_node *cmp   = new_d_Cmp(dbgi, left, right);
-		long     pnc   = get_pnc(kind);
+		long     pnc   = get_pnc(kind, expression->left->base.type);
 		ir_node *proj  = new_d_Proj(dbgi, cmp, mode_b, pnc);
 		return proj;
 	}
