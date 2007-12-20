@@ -16,6 +16,9 @@ void exit_lexer(void);
 
 void lexer_open_stream(FILE *stream, const char *input_name);
 
-string_t concat_strings(const string_t *s1, const string_t *s2);
+string_t      concat_strings(           const string_t      *s1, const string_t      *s2);
+wide_string_t concat_string_wide_string(const string_t      *s1, const wide_string_t *s2);
+wide_string_t concat_wide_strings(      const wide_string_t *s1, const wide_string_t *s2);
+wide_string_t concat_wide_string_string(const wide_string_t *s1, const string_t      *s2);
 
 #endif

@@ -3121,23 +3121,46 @@ static expression_t *expected_expression_error(void)
  */
 static expression_t *parse_string_const(void)
 {
-	expression_t *cnst = allocate_expression_zero(EXPR_STRING_LITERAL);
-	cnst->base.type    = type_char_ptr;
-	cnst->string.value = parse_string_literals();
+	wide_string_t wres;
+	if (token.type == T_STRING_LITERAL) {
+		string_t res = token.v.string;
+		next_token();
+		while (token.type == T_STRING_LITERAL) {
+			res = concat_strings(&res, &token.v.string);
+			next_token();
+		}
+		if (token.type != T_WIDE_STRING_LITERAL) {
+			expression_t *const cnst = allocate_expression_zero(EXPR_STRING_LITERAL);
+			cnst->base.type    = type_char_ptr;
+			cnst->string.value = res;
+			return cnst;
+		}
 
-	return cnst;
-}
-
-/**
- * Parse a wide string constant.
- */
-static expression_t *parse_wide_string_const(void)
-{
-	expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
-	cnst->base.type         = type_wchar_t_ptr;
-	cnst->wide_string.value = token.v.wide_string; /* TODO concatenate */
+		wres = concat_string_wide_string(&res, &token.v.wide_string);
+	} else {
+		wres = token.v.wide_string;
+	}
 	next_token();
-	return cnst;
+
+	for (;;) {
+		switch (token.type) {
+			case T_WIDE_STRING_LITERAL:
+				wres = concat_wide_strings(&wres, &token.v.wide_string);
+				break;
+
+			case T_STRING_LITERAL:
+				wres = concat_wide_string_string(&wres, &token.v.string);
+				break;
+
+			default: {
+				expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
+				cnst->base.type         = type_wchar_t_ptr;
+				cnst->wide_string.value = wres;
+				return cnst;
+			}
+		}
+		next_token();
+	}
 }
 
 /**
@@ -3739,9 +3762,8 @@ static expression_t *parse_primary_expression(void)
 	case T_FLOATINGPOINT:
 		return parse_float_const();
 	case T_STRING_LITERAL:
-		return parse_string_const();
 	case T_WIDE_STRING_LITERAL:
-		return parse_wide_string_const();
+		return parse_string_const();
 	case T_IDENTIFIER:
 		return parse_reference();
 	case T___FUNCTION__:
