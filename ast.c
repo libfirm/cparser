@@ -177,10 +177,14 @@ static void print_const(const const_expression_t *cnst)
 	if(cnst->base.type == NULL)
 		return;
 
-	if(is_type_integer(cnst->base.type)) {
+	const type_t *const type = skip_typeref(cnst->base.type);
+
+	if (is_type_integer(type)) {
 		fprintf(out, "%lld", cnst->v.int_value);
-	} else if(is_type_float(cnst->base.type)) {
+	} else if (is_type_float(type)) {
 		fprintf(out, "%Lf", cnst->v.float_value);
+	} else {
+		panic("unknown constant");
 	}
 }
 
