@@ -1081,26 +1081,26 @@ static initializer_t *parse_sub_initializer(type_t *type,
 		had_initializer_brace_warning = false;
 
 		if(token.type == '{') {
-			return parse_sub_initializer(type, NULL);
-		}
+			sub = parse_sub_initializer(element_type, NULL);
+		} else {
+			if(expression == NULL) {
+				expression = parse_assignment_expression();
 
-		if(expression == NULL) {
-			expression = parse_assignment_expression();
-
-			/* 6.7.8.14 + 15: we can have an optional {} around the string
-			 * literal */
-			if(read_paren && (expression->kind == EXPR_STRING_LITERAL
-					|| expression->kind == EXPR_WIDE_STRING_LITERAL)) {
-				initializer_t *result
-					= initializer_from_expression(type, expression);
-				if(result != NULL) {
-					expect_block('}');
-					return result;
+				/* 6.7.8.14 + 15: we can have an optional {} around the string
+				 * literal */
+				if(read_paren && (expression->kind == EXPR_STRING_LITERAL
+						|| expression->kind == EXPR_WIDE_STRING_LITERAL)) {
+					initializer_t *result
+						= initializer_from_expression(type, expression);
+					if(result != NULL) {
+						expect_block('}');
+						return result;
+					}
 				}
 			}
-		}
 
-		sub = parse_sub_initializer(element_type, expression);
+			sub = parse_sub_initializer(element_type, expression);
+		}
 
 		/* didn't match the subtypes -> try the parent type */
 		if(sub == NULL) {
