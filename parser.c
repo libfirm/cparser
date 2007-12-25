@@ -5461,7 +5461,11 @@ static statement_t *parse_for(void)
 		if(is_declaration_specifier(&token, false)) {
 			parse_declaration(record_declaration);
 		} else {
-			statement->fors.initialisation = parse_expression();
+			expression_t *const init = parse_expression();
+			statement->fors.initialisation = init;
+			if (warning.unused_value  && !expression_has_effect(init)) {
+				warningf(init->base.source_position, "initialisation of 'for'-statement has no effect");
+			}
 			expect(';');
 		}
 	} else {
@@ -5473,7 +5477,11 @@ static statement_t *parse_for(void)
 	}
 	expect(';');
 	if(token.type != ')') {
-		statement->fors.step = parse_expression();
+		expression_t *const step = parse_expression();
+		statement->fors.step = step;
+		if (warning.unused_value  && !expression_has_effect(step)) {
+			warningf(step->base.source_position, "step of 'for'-statement has no effect");
+		}
 	}
 	expect(')');
 	statement->fors.body = parse_loop_body(statement);
