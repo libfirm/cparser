@@ -2,8 +2,14 @@ int puts(const char *msg);
 
 int k(const char *msg) {
 	puts(msg);
-	return 42;
+	double gl = 12;
+	{
+		extern int gl;
+		return gl;
+	}
 }
+
+int gl = 42;
 
 int main(void)
 {
