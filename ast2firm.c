@@ -3841,6 +3841,14 @@ static int count_decls_in_expression(const expression_t *expression) {
 	}
 	EXPR_UNARY_CASES
 		return count_decls_in_expression(expression->unary.value);
+	case EXPR_CALL:	{
+		int count = 0;
+		call_argument_t *argument = expression->call.arguments;
+		for( ; argument != NULL; argument = argument->next) {
+			count += count_decls_in_expression(argument->expression);
+		}
+		return count;
+	}
 
 	default:
 		break;
