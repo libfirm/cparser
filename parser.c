@@ -5230,9 +5230,8 @@ static statement_t *parse_case_statement(void)
 static case_label_statement_t *
 find_default_label(const switch_statement_t *statement)
 {
-	for (case_label_statement_t *label = statement->first_case;
-	     label != NULL;
-		 label = label->next) {
+	case_label_statement_t *label = statement->first_case;
+	for ( ; label != NULL; label = label->next) {
 		if (label->expression == NULL)
 			return label;
 	}
@@ -5270,7 +5269,7 @@ static statement_t *parse_default_statement(void)
 		errorf(statement->base.source_position,
 			"'default' label not within a switch statement");
 	}
-	statement->label.statement = parse_statement();
+	statement->case_label.statement = parse_statement();
 
 	return statement;
 }
