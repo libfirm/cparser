@@ -3244,7 +3244,11 @@ static void create_local_declaration(declaration_t *declaration)
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
 		if(is_type_function(type)) {
-			panic("nested functions not supported yet");
+			if(declaration->init.statement != NULL) {
+				panic("nested functions not supported yet");
+			} else {
+				get_function_entity(declaration);
+			}
 		} else {
 			create_local_variable(declaration);
 		}

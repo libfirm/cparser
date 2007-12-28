@@ -20,6 +20,8 @@ Parser:
   interesting candidates
 - SourcePositions could be stored selectively on expressions that really need
   them.
+- check semantic for functions declared/defined in global scope and declared
+  again in a local scope
 
 ast2firm:
 - output source file positions for panics...
