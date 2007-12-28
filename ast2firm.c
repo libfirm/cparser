@@ -540,35 +540,65 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
-static ir_type *create_struct_type(compound_type_t *type)
+static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
+                                  size_t *outer_offset, size_t *outer_align);
+
+static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
+                                   size_t *outer_offset, size_t *outer_align)
 {
 	declaration_t *declaration = type->declaration;
 	if(declaration->v.irtype != NULL) {
 		return declaration->v.irtype;
 	}
 
-	symbol_t *symbol = declaration->symbol;
-	ident    *id;
-	if(symbol != NULL) {
-		id = unique_ident(symbol->string);
-	} else {
-		id = unique_ident("__anonymous_struct");
-	}
-	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
-	ir_type *irtype = new_d_type_struct(id, dbgi);
-
-	declaration->v.irtype = irtype;
-	type->type.firm_type  = irtype;
-
 	size_t align_all  = 1;
 	size_t offset     = 0;
 	size_t bit_offset = 0;
+	if(irtype == NULL) {
+		symbol_t *symbol = declaration->symbol;
+		ident    *id;
+		if(symbol != NULL) {
+			id = unique_ident(symbol->string);
+		} else {
+			id = unique_ident("__anonymous_struct");
+		}
+		dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
+
+		irtype = new_d_type_struct(id, dbgi);
+
+		declaration->v.irtype = irtype;
+		type->type.firm_type  = irtype;
+	} else {
+		offset    = *outer_offset;
+		align_all = *outer_align;
+	}
+
 	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		type_t  *entry_type  = skip_typeref(entry->type);
+		symbol_t *symbol     = entry->symbol;
+		type_t   *entry_type = skip_typeref(entry->type);
+		dbg_info *dbgi       = get_dbg_info(&entry->source_position);
+		ident    *ident;
+		if(symbol != NULL) {
+			ident = new_id_from_str(symbol->string);
+		} else {
+			if(entry_type->kind == TYPE_COMPOUND_STRUCT) {
+				create_struct_type(&entry_type->compound, irtype, &offset,
+		 		                   &align_all);
+				continue;
+			} else if(entry_type->kind == TYPE_COMPOUND_UNION) {
+				create_union_type(&entry_type->compound, irtype, &offset,
+				                  &align_all);
+				continue;
+			} else {
+				assert(entry_type->kind == TYPE_BITFIELD);
+			}
+			ident = unique_ident("anon");
+		}
+
 		ir_type *base_irtype;
 		if(entry_type->kind == TYPE_BITFIELD) {
 			base_irtype = get_ir_type(entry_type->bitfield.base);
@@ -579,16 +609,8 @@ static ir_type *create_struct_type(compound_type_t *type)
 		size_t entry_alignment = get_type_alignment_bytes(base_irtype);
 		size_t misalign        = offset % entry_alignment;
 
-		dbg_info  *dbgi   = get_dbg_info(&entry->source_position);
-		ir_entity *entity = NULL;
-		if(entry->symbol != NULL) {
-			ident   *ident        = new_id_from_str(entry->symbol->string);
-			ir_type *entry_irtype = get_ir_type(entry_type);
-			entity = new_d_entity(irtype, ident, entry_irtype, dbgi);
-		} else {
-			/* only bitfields are allowed to be anonymous */
-			assert(entry_type->kind == TYPE_BITFIELD);
-		}
+		ir_type   *entry_irtype = get_ir_type(entry_type);
+		ir_entity *entity = new_d_entity(irtype, ident, entry_irtype, dbgi);
 
 		size_t base;
 		size_t bits_remainder;
@@ -629,64 +651,100 @@ static ir_type *create_struct_type(compound_type_t *type)
 			align_all = entry_alignment;
 		}
 
-		if(entity != NULL) {
-			set_entity_offset(entity, base);
-			set_entity_offset_bits_remainder(entity,
-			                                 (unsigned char) bits_remainder);
-			add_struct_member(irtype, entity);
-			entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
-			assert(entry->v.entity == NULL);
-			entry->v.entity         = entity;
-		}
+		set_entity_offset(entity, base);
+		set_entity_offset_bits_remainder(entity,
+		                                 (unsigned char) bits_remainder);
+		//add_struct_member(irtype, entity);
+		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
+		assert(entry->v.entity == NULL);
+		entry->v.entity         = entity;
 	}
 
 	size_t misalign = offset % align_all;
 	if(misalign > 0 || bit_offset > 0) {
 		offset += align_all - misalign;
 	}
-	set_type_alignment_bytes(irtype, align_all);
-	set_type_size_bytes(irtype, offset);
-	set_type_state(irtype, layout_fixed);
+
+	if(outer_offset != NULL) {
+		*outer_offset = offset;
+		*outer_align  = align_all;
+	} else {
+		set_type_alignment_bytes(irtype, align_all);
+		set_type_size_bytes(irtype, offset);
+		set_type_state(irtype, layout_fixed);
+	}
 
 	return irtype;
 }
 
-static ir_type *create_union_type(compound_type_t *type)
+static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
+                                  size_t *outer_offset, size_t *outer_align)
 {
 	declaration_t *declaration = type->declaration;
 	if(declaration->v.irtype != NULL) {
 		return declaration->v.irtype;
 	}
 
-	symbol_t      *symbol      = declaration->symbol;
-	ident         *id;
-	if(symbol != NULL) {
-		id = unique_ident(symbol->string);
+	size_t offset    = 0;
+	size_t align_all = 1;
+	size_t size      = 0;
+
+	if(irtype == NULL) {
+		symbol_t      *symbol      = declaration->symbol;
+		ident         *id;
+		if(symbol != NULL) {
+			id = unique_ident(symbol->string);
+		} else {
+			id = unique_ident("__anonymous_union");
+		}
+		dbg_info *dbgi = get_dbg_info(&type->type.source_position);
+
+		irtype = new_d_type_union(id, dbgi);
 	} else {
-		id = unique_ident("__anonymous_union");
+		offset    = *outer_offset;
+		align_all = *outer_align;
 	}
-	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
-	ir_type *irtype = new_d_type_union(id, dbgi);
 
 	type->type.firm_type = irtype;
 
-	int align_all = 1;
-	int size      = 0;
 	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		ident   *ident         = new_id_from_str(entry->symbol->string);
-		ir_type *entry_ir_type = get_ir_type(entry->type);
+		type_t  *entry_type    = skip_typeref(entry->type);
+		ir_type *entry_ir_type = get_ir_type(entry_type);
 
-		int entry_size      = get_type_size_bytes(entry_ir_type);
-		int entry_alignment = get_type_alignment_bytes(entry_ir_type);
+		ident *ident;
+		if(entry->symbol != NULL) {
+			ident = new_id_from_str(entry->symbol->string);
+		} else {
+			size_t offs = offset;
+			if(entry_type->kind == TYPE_COMPOUND_STRUCT) {
+				create_struct_type(&entry_type->compound, irtype, &offs,
+				                   &align_all);
+				continue;
+			} else if(entry_type->kind == TYPE_COMPOUND_UNION) {
+				create_union_type(&entry_type->compound, irtype, &offs,
+				                  &align_all);
+				continue;
+			} else {
+				panic("anonymous union member must be struct or union");
+			}
+			size_t entry_size = offs - offset;
+			if(entry_size > size) {
+				size = entry_size;
+			}
+			ident = unique_ident("anon");
+		}
+
+		size_t entry_size      = get_type_size_bytes(entry_ir_type);
+		size_t entry_alignment = get_type_alignment_bytes(entry_ir_type);
 
 		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
 		ir_entity *const entity = new_d_entity(irtype, ident, entry_ir_type,
 		                                       dbgi);
-		add_union_member(irtype, entity);
+		//add_union_member(irtype, entity);
 		set_entity_offset(entity, 0);
 		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
 		assert(entry->v.entity == NULL);
@@ -703,11 +761,26 @@ static ir_type *create_union_type(compound_type_t *type)
 		}
 	}
 
-	set_type_alignment_bytes(irtype, align_all);
-	set_type_size_bytes(irtype, size);
-	set_type_state(irtype, layout_fixed);
+	if(outer_offset != NULL) {
+		assert(*outer_offset == offset);
 
-	declaration->v.irtype = irtype;
+		size_t misalign = offset % align_all;
+		if (misalign != 0)
+			size += align_all - misalign;
+		*outer_offset += size;
+
+		if(align_all > *outer_align) {
+			if(align_all % *outer_align != 0) {
+				panic("uneven alignments not supported yet");
+			}
+			*outer_align = align_all;
+		}
+	} else {
+		set_type_alignment_bytes(irtype, align_all);
+		set_type_size_bytes(irtype, size);
+		set_type_state(irtype, layout_fixed);
+		declaration->v.irtype = irtype;
+	}
 
 	return irtype;
 }
@@ -773,10 +846,10 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_array_type(&type->array);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type(&type->compound);
+		firm_type = create_struct_type(&type->compound, NULL, NULL, NULL);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type(&type->compound);
+		firm_type = create_union_type(&type->compound, NULL, NULL, NULL);
 		break;
 	case TYPE_ENUM:
 		firm_type = create_enum_type(&type->enumt);

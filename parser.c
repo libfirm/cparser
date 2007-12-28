@@ -1867,7 +1867,7 @@ static void semantic_parameter(declaration_t *declaration)
 	}
 
 	if(is_type_incomplete(type)) {
-		errorf(HERE, "incomplete type ('%T') not allowed for parameter '%Y'",
+		errorf(HERE, "incomplete type '%T' not allowed for parameter '%Y'",
 		       orig_type, declaration->symbol);
 	}
 }
@@ -2937,13 +2937,41 @@ end_of_parse_external_declaration:
 	environment_pop_to(top);
 }
 
-static type_t *make_bitfield_type(type_t *base, expression_t *size, source_position_t source_position)
+static type_t *make_bitfield_type(type_t *base, expression_t *size,
+                                  source_position_t source_position)
 {
 	type_t *type        = allocate_type_zero(TYPE_BITFIELD, source_position);
 	type->bitfield.base = base;
 	type->bitfield.size = size;
 
 	return type;
+}
+
+static declaration_t *find_compound_entry(declaration_t *compound_declaration,
+                                          symbol_t *symbol)
+{
+	declaration_t *iter = compound_declaration->scope.declarations;
+	for( ; iter != NULL; iter = iter->next) {
+		if(iter->namespc != NAMESPACE_NORMAL)
+			continue;
+
+		if(iter->symbol == NULL) {
+			type_t *type = skip_typeref(iter->type);
+			if(is_type_compound(type)) {
+				declaration_t *result
+					= find_compound_entry(type->compound.declaration, symbol);
+				if(result != NULL)
+					return result;
+			}
+			continue;
+		}
+
+		if(iter->symbol == symbol) {
+			return iter;
+		}
+	}
+
+	return NULL;
 }
 
 static void parse_compound_declarators(declaration_t *struct_declaration,
@@ -3014,15 +3042,15 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 		/* make sure we don't define a symbol multiple times */
 		symbol_t *symbol = declaration->symbol;
 		if(symbol != NULL) {
-			declaration_t *iter = struct_declaration->scope.declarations;
-			for( ; iter != NULL; iter = iter->next) {
-				if(iter->symbol == symbol) {
-					errorf(declaration->source_position,
-					       "multiple declarations of symbol '%Y'", symbol);
-					errorf(iter->source_position,
-					       "previous declaration of '%Y' was here", symbol);
-					break;
-				}
+			declaration_t *prev_decl
+				= find_compound_entry(struct_declaration, symbol);
+
+			if(prev_decl != NULL) {
+				assert(prev_decl->symbol == symbol);
+				errorf(declaration->source_position,
+				       "multiple declarations of symbol '%Y'", symbol);
+				errorf(prev_decl->source_position,
+				       "previous declaration of '%Y' was here", symbol);
 			}
 		}
 
@@ -3960,12 +3988,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		return create_invalid_expression();
 	}
 
-	declaration_t *iter = declaration->scope.declarations;
-	for( ; iter != NULL; iter = iter->next) {
-		if(iter->symbol == symbol) {
-			break;
-		}
-	}
+	declaration_t *iter = find_compound_entry(declaration, symbol);
 	if(iter == NULL) {
 		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
 		return create_invalid_expression();
