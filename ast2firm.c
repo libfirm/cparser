@@ -4196,8 +4196,6 @@ create_var:
 			                          var_type);
 			set_entity_visibility(declaration->v.entity, vis);
 
-			current_ir_graph = get_const_code_irg();
-			create_initializer(declaration);
 			return;
 
 		case STORAGE_CLASS_TYPEDEF:
@@ -4230,7 +4228,7 @@ static void scope_to_firm(scope_t *scope)
 		}
 	}
 
-	/* second pass: create code */
+	/* second pass: create code/initializers */
 	declaration = scope->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
@@ -4242,10 +4240,14 @@ static void scope_to_firm(scope_t *scope)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->kind != TYPE_FUNCTION)
-			continue;
-
-		create_function(declaration);
+		if(type->kind == TYPE_FUNCTION) {
+			create_function(declaration);
+		} else {
+			assert(declaration->declaration_kind
+					== DECLARATION_KIND_GLOBAL_VARIABLE);
+			current_ir_graph = get_const_code_irg();
+			create_initializer(declaration);
+		}
 	}
 }
 

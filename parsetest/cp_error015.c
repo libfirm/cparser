@@ -1,4 +1,4 @@
-void (*var) (void);
+extern void (*var) (void);
 
 extern void puts(void);
 
