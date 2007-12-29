@@ -2039,7 +2039,12 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
 
-	type_t *type = allocate_type_zero(TYPE_FUNCTION, declaration->source_position);
+	type_t *type;
+	if(declaration != NULL) {
+		type = allocate_type_zero(TYPE_FUNCTION, declaration->source_position);
+	} else {
+		type = allocate_type_zero(TYPE_FUNCTION, token.source_position);
+	}
 
 	declaration_t *parameters = parse_parameters(&type->function);
 	if(declaration != NULL) {
