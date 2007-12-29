@@ -528,19 +528,12 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 	symbol_t    *symbol    = declaration->symbol;
 	namespace_t  namespc = (namespace_t)declaration->namespc;
 
-	/* remember old declaration */
-	stack_entry_t entry;
-	entry.symbol          = symbol;
-	entry.old_declaration = symbol->declaration;
-	entry.namespc         = (unsigned short) namespc;
-	ARR_APP1(stack_entry_t, *stack_ptr, entry);
-
 	/* replace/add declaration into declaration list of the symbol */
-	if(symbol->declaration == NULL) {
+	declaration_t *iter = symbol->declaration;
+	if (iter == NULL) {
 		symbol->declaration = declaration;
 	} else {
 		declaration_t *iter_last = NULL;
-		declaration_t *iter      = symbol->declaration;
 		for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 			/* replace an entry? */
 			if(iter->namespc == namespc) {
@@ -558,6 +551,13 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 			iter_last->symbol_next = declaration;
 		}
 	}
+
+	/* remember old declaration */
+	stack_entry_t entry;
+	entry.symbol          = symbol;
+	entry.old_declaration = iter;
+	entry.namespc         = (unsigned short) namespc;
+	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 }
 
 static void environment_push(declaration_t *declaration)
