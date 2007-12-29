@@ -12,6 +12,7 @@
 #include "target_architecture.h"
 #include "parser.h"
 #include "warning.h"
+#include "lang_features.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -70,6 +71,11 @@ static inline void next_real_char(void)
 	c = *bufpos++;
 }
 
+/**
+ * Put a character back into the buffer.
+ *
+ * @param pc  the character to put back
+ */
 static inline void put_back(int pc)
 {
 	assert(bufpos > buf);
@@ -112,6 +118,10 @@ static void maybe_concat_lines(void)
 	c = '\\';
 }
 
+/**
+ * Set c to the next input character, ie.
+ * after expanding trigraphs.
+ */
 static inline void next_char(void)
 {
 	next_real_char();
@@ -223,6 +233,10 @@ end_of_next_char:;
 	case '8':         \
 	case '9':
 
+/**
+ * Read a symbol from the input and build
+ * the lexer_token.
+ */
 static void parse_symbol(void)
 {
 	symbol_t *symbol;
@@ -336,7 +350,7 @@ static void parse_integer_suffix(bool is_oct_hex)
 static void parse_floating_suffix(void)
 {
 	switch(c) {
-	/* TODO: do something usefull with the suffixes... */
+	/* TODO: do something useful with the suffixes... */
 	case 'f':
 	case 'F':
 		next_char();
@@ -437,6 +451,10 @@ end:
 	return v;
 }
 
+/**
+ * Parses a hex number including hex floats and set the
+ * lexer_token.
+ */
 static void parse_number_hex(void)
 {
 	assert(c == 'x' || c == 'X');
@@ -469,11 +487,31 @@ static void parse_number_hex(void)
 	parse_integer_suffix(true);
 }
 
+/**
+ * Returns true if the given char is a octal digit.
+ *
+ * @param char  the character to check
+ */
 static inline bool is_octal_digit(int chr)
 {
-	return '0' <= chr && chr <= '7';
+	switch(chr) {
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+		return true;
+	default:
+		return false;
+	}
 }
 
+/**
+ * Parses a octal number and set the lexer_token.
+ */
 static void parse_number_oct(void)
 {
 	while(is_octal_digit(c)) {
@@ -494,6 +532,10 @@ static void parse_number_oct(void)
 	parse_integer_suffix(true);
 }
 
+/**
+ * Parses a decimal including float number and set the
+ * lexer_token.
+ */
 static void parse_number_dec(void)
 {
 	bool is_float = false;
@@ -555,6 +597,9 @@ static void parse_number_dec(void)
 	obstack_free(&symbol_obstack, string);
 }
 
+/**
+ * Parses a number and sets the lexer_token.
+ */
 static void parse_number(void)
 {
 	if (c == '0') {
@@ -593,38 +638,74 @@ static void parse_number(void)
 	}
 }
 
+/**
+ * Returns the value of a digit.
+ * The only portable way to do it ...
+ */
+static int digit_value(int digit) {
+	switch (digit) {
+	case '0': return 0;
+	case '1': return 1;
+	case '2': return 2;
+	case '3': return 3;
+	case '4': return 4;
+	case '5': return 5;
+	case '6': return 6;
+	case '7': return 7;
+	case '8': return 8;
+	case '9': return 9;
+	case 'a':
+	case 'A': return 10;
+	case 'b':
+	case 'B': return 11;
+	case 'c':
+	case 'C': return 12;
+	case 'd':
+	case 'D': return 13;
+	case 'e':
+	case 'E': return 14;
+	case 'f':
+	case 'F': return 15;
+	default:
+		panic("wrong character given");
+	}
+}
+
+/**
+ * Parses an octal character sequence.
+ *
+ * @param first_digit  the already read first digit
+ */
 static int parse_octal_sequence(const int first_digit)
 {
 	assert(is_octal_digit(first_digit));
-	int value = first_digit - '0';
+	int value = digit_value(first_digit);
 	if (!is_octal_digit(c)) return value;
-	value = 8 * value + c - '0';
+	value = 8 * value + digit_value(c);
 	next_char();
 	if (!is_octal_digit(c)) return value;
-	value = 8 * value + c - '0';
+	value = 8 * value + digit_value(c);
 	next_char();
 	return (char_type)value;
 }
 
+/**
+ * Parses a hex character sequence.
+ */
 static int parse_hex_sequence(void)
 {
 	int value = 0;
-	while(1) {
-		if (c >= '0' && c <= '9') {
-			value = 16 * value + c - '0';
-		} else if ('A' <= c && c <= 'F') {
-			value = 16 * value + c - 'A' + 10;
-		} else if ('a' <= c && c <= 'f') {
-			value = 16 * value + c - 'a' + 10;
-		} else {
-			break;
-		}
+	while(isxdigit(c)) {
+		value = 16 * value + digit_value(c);
 		next_char();
 	}
 
 	return (char_type)value;
 }
 
+/**
+ * Parse an escape sequence.
+ */
 static int parse_escape_sequence(void)
 {
 	eat('\\');
@@ -664,6 +745,9 @@ static int parse_escape_sequence(void)
 	}
 }
 
+/**
+ * Concatenate two strings.
+ */
 string_t concat_strings(const string_t *const s1, const string_t *const s2)
 {
 	const size_t len1 = s1->size - 1;
@@ -685,48 +769,9 @@ string_t concat_strings(const string_t *const s1, const string_t *const s2)
 #endif
 }
 
-wide_string_t concat_string_wide_string(const string_t *const s1, const wide_string_t *const s2)
-{
-	const size_t len1 = s1->size - 1;
-	const size_t len2 = s2->size - 1;
-
-	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
-	const char *const src = s1->begin;
-	for (size_t i = 0; i != len1; ++i) {
-		concat[i] = src[i];
-	}
-	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
-
-	return (wide_string_t){ concat, len1 + len2 + 1 };
-}
-
-wide_string_t concat_wide_strings(const wide_string_t *const s1, const wide_string_t *const s2)
-{
-	const size_t len1 = s1->size - 1;
-	const size_t len2 = s2->size - 1;
-
-	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
-	memcpy(concat,        s1->begin, len1       * sizeof(*concat));
-	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
-
-	return (wide_string_t){ concat, len1 + len2 + 1 };
-}
-
-wide_string_t concat_wide_string_string(const wide_string_t *const s1, const string_t *const s2)
-{
-	const size_t len1 = s1->size - 1;
-	const size_t len2 = s2->size - 1;
-
-	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
-	memcpy(concat, s1->begin, len1 * sizeof(*concat));
-	const char *const src = s2->begin;
-	for (size_t i = 0; i != len2 + 1; ++i) {
-		concat[i] = src[i];
-	}
-
-	return (wide_string_t){ concat, len1 + len2 + 1 };
-}
-
+/**
+ * Parse a string literal and set lexer_token.
+ */
 static void parse_string_literal(void)
 {
 	const unsigned start_linenr = lexer_token.source_position.linenr;
@@ -785,6 +830,9 @@ end_of_string:
 	lexer_token.v.string.size  = size;
 }
 
+/**
+ * Parse a wide character constant and set lexer_token.
+ */
 static void parse_wide_character_constant(void)
 {
 	eat('\'');
@@ -829,6 +877,9 @@ end_of_wide_char_constant:
 	lexer_token.datatype   = type_wchar_t;
 }
 
+/**
+ * Parse a wide string literal and set lexer_token.
+ */
 static void parse_wide_string_literal(void)
 {
 	const unsigned start_linenr = lexer_token.source_position.linenr;
@@ -891,6 +942,9 @@ end_of_string:;
 	lexer_token.v.wide_string.size  = size;
 }
 
+/**
+ * Parse a character constant and set lexer_token.
+ */
 static void parse_character_constant(void)
 {
 	const unsigned start_linenr = lexer_token.source_position.linenr;
@@ -941,6 +995,9 @@ end_of_char_constant:;
 	lexer_token.datatype       = type_int;
 }
 
+/**
+ * Skip a multiline comment.
+ */
 static void skip_multiline_comment(void)
 {
 	unsigned start_linenr = lexer_token.source_position.linenr;
@@ -978,6 +1035,9 @@ static void skip_multiline_comment(void)
 	}
 }
 
+/**
+ * Skip a single line comment.
+ */
 static void skip_line_comment(void)
 {
 	while(1) {
@@ -996,14 +1056,21 @@ static void skip_line_comment(void)
 	}
 }
 
+/** The current preprocessor token. */
 static token_t pp_token;
 
+/**
+ * Read the next preprocessor token.
+ */
 static inline void next_pp_token(void)
 {
 	lexer_next_preprocessing_token();
 	pp_token = lexer_token;
 }
 
+/**
+ * Eat all preprocessor tokens until newline.
+ */
 static void eat_until_newline(void)
 {
 	while(pp_token.type != '\n' && pp_token.type != T_EOF) {
@@ -1011,6 +1078,9 @@ static void eat_until_newline(void)
 	}
 }
 
+/**
+ * Handle the define directive.
+ */
 static void define_directive(void)
 {
 	lexer_next_preprocessing_token();
@@ -1020,6 +1090,9 @@ static void define_directive(void)
 	}
 }
 
+/**
+ * Handle the ifdef directive.
+ */
 static void ifdef_directive(int is_ifndef)
 {
 	(void) is_ifndef;
@@ -1028,11 +1101,17 @@ static void ifdef_directive(int is_ifndef)
 	//extect_newline();
 }
 
+/**
+ * Handle the endif directive.
+ */
 static void endif_directive(void)
 {
 	//expect_newline();
 }
 
+/**
+ * Parse the line directive.
+ */
 static void parse_line_directive(void)
 {
 	if(pp_token.type != T_INTEGER) {
@@ -1049,6 +1128,87 @@ static void parse_line_directive(void)
 	eat_until_newline();
 }
 
+/**
+ * STDC pragmas.
+ */
+typedef enum {
+	STDC_UNKNOWN,
+	STDC_FP_CONTRACT,
+	STDC_FENV_ACCESS,
+	STDC_CX_LIMITED_RANGE
+} stdc_pragma_kind_t;
+
+/**
+ * STDC pragma values.
+ */
+typedef enum {
+	STDC_VALUE_UNKNOWN,
+	STDC_VALUE_ON,
+	STDC_VALUE_OFF,
+	STDC_VALUE_DEFAULT
+} stdc_pragma_value_kind_t;
+
+/**
+ * Parse a pragma directive.
+ */
+static void parse_pragma(void) {
+	bool unknown_pragma = true;
+
+	next_pp_token();
+	if (pp_token.v.symbol->pp_ID == TP_STDC) {
+		stdc_pragma_kind_t kind = STDC_UNKNOWN;
+		/* a STDC pragma */
+		if (c_mode & _C99) {
+			next_pp_token();
+
+			switch (pp_token.v.symbol->pp_ID) {
+			case TP_FP_CONTRACT:
+				kind = STDC_FP_CONTRACT;
+				break;
+			case TP_FENV_ACCESS:
+				kind = STDC_FENV_ACCESS;
+				break;
+			case TP_CX_LIMITED_RANGE:
+				kind = STDC_CX_LIMITED_RANGE;
+				break;
+			default:
+				break;
+			}
+			if (kind != STDC_UNKNOWN) {
+				stdc_pragma_value_kind_t value = STDC_VALUE_UNKNOWN;
+				next_pp_token();
+				switch (pp_token.v.symbol->pp_ID) {
+				case TP_ON:
+					value = STDC_VALUE_ON;
+					break;
+				case TP_OFF:
+					value = STDC_VALUE_OFF;
+					break;
+				case TP_DEFAULT:
+					value = STDC_VALUE_DEFAULT;
+					break;
+				default:
+					break;
+				}
+				if (value != STDC_VALUE_UNKNOWN) {
+					unknown_pragma = false;
+				} else {
+					errorf(pp_token.source_position, "bad STDC pragma argument");
+				}
+			}
+		}
+	} else {
+		unknown_pragma = true;
+	}
+	eat_until_newline();
+	if (unknown_pragma && warning.unknown_pragmas) {
+		warningf(pp_token.source_position, "encountered unknown #pragma");
+	}
+}
+
+/**
+ * Parse a preprocessor non-null directive.
+ */
 static void parse_preprocessor_identifier(void)
 {
 	assert(pp_token.type == T_IDENTIFIER);
@@ -1083,14 +1243,14 @@ static void parse_preprocessor_identifier(void)
 		parse_error("#error directive: ");
 		break;
 	case TP_pragma:
-		if (warning.unknown_pragmas) {
-			warningf(lexer_token.source_position, "encountered unknown #pragma");
-		}
-		eat_until_newline();
+		parse_pragma();
 		break;
 	}
 }
 
+/**
+ * Parse a preprocessor directive.
+ */
 static void parse_preprocessor_directive(void)
 {
 	next_pp_token();
@@ -1101,6 +1261,9 @@ static void parse_preprocessor_directive(void)
 		break;
 	case T_INTEGER:
 		parse_line_directive();
+		break;
+	case '\n':
+		/* NULL directive, see § 6.10.7 */
 		break;
 	default:
 		parse_error("invalid preprocessor directive");
