@@ -525,8 +525,8 @@ static declaration_t *get_declaration(const symbol_t *const symbol, const namesp
  */
 static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 {
-	symbol_t    *symbol    = declaration->symbol;
-	namespace_t  namespc = (namespace_t)declaration->namespc;
+	symbol_t    *symbol  = declaration->symbol;
+	namespace_t  namespc = (namespace_t) declaration->namespc;
 
 	/* replace/add declaration into declaration list of the symbol */
 	declaration_t *iter = symbol->declaration;
@@ -610,7 +610,9 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 				if(iter->namespc == namespc) {
 					assert(iter_last != NULL);
 					iter_last->symbol_next = old_declaration;
-					old_declaration->symbol_next = iter->symbol_next;
+					if(old_declaration != NULL) {
+						old_declaration->symbol_next = iter->symbol_next;
+					}
 					break;
 				}
 			}
