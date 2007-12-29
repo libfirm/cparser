@@ -4193,8 +4193,15 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 			&& pointers_compatible(true_type, false_type)) {
 		/* ok */
 		result_type = true_type;
+	} else if (is_type_pointer(true_type)
+			&& is_null_pointer_constant(false_expression)) {
+		result_type = true_type;
+	} else if (is_type_pointer(false_type)
+			&& is_null_pointer_constant(true_expression)) {
+		result_type = false_type;
 	} else {
-		/* TODO */
+		/* TODO: one pointer to void*, other some pointer */
+
 		if (is_type_valid(true_type) && is_type_valid(false_type)) {
 			type_error_incompatible("while parsing conditional",
 			                        expression->base.source_position, true_type,
