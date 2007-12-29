@@ -4788,8 +4788,10 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_UNARY_POSTFIX_DECREMENT:   return true;
 		case EXPR_UNARY_PREFIX_INCREMENT:    return true;
 		case EXPR_UNARY_PREFIX_DECREMENT:    return true;
-		case EXPR_UNARY_CAST:
-			return is_type_atomic(expr->base.type, ATOMIC_TYPE_VOID);
+		case EXPR_UNARY_CAST: {
+			type_t *type = skip_typeref(expr->base.type);
+			return is_type_atomic(type, ATOMIC_TYPE_VOID);
+		}
 		case EXPR_UNARY_CAST_IMPLICIT:       return true;
 		case EXPR_UNARY_ASSUME:              return true;
 		case EXPR_UNARY_BITFIELD_EXTRACT:    return false;
