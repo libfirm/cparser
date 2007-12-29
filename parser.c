@@ -4164,9 +4164,6 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	expect(':');
 	expression_t *false_expression = parse_sub_expression(precedence);
 
-	conditional->true_expression  = true_expression;
-	conditional->false_expression = false_expression;
-
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
 	type_t *const true_type       = skip_typeref(orig_true_type);
@@ -4210,6 +4207,10 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		result_type = type_error_type;
 	}
 
+	conditional->true_expression
+		= create_implicit_cast(true_expression, result_type);
+	conditional->false_expression
+		= create_implicit_cast(false_expression, result_type);
 	conditional->base.type = result_type;
 	return result;
 }
