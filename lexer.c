@@ -770,6 +770,57 @@ string_t concat_strings(const string_t *const s1, const string_t *const s2)
 }
 
 /**
+ * Concatenate a string and a wide string.
+ */
+wide_string_t concat_string_wide_string(const string_t *const s1, const wide_string_t *const s2)
+{
+	const size_t len1 = s1->size - 1;
+	const size_t len2 = s2->size - 1;
+
+	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
+	const char *const src = s1->begin;
+	for (size_t i = 0; i != len1; ++i) {
+		concat[i] = src[i];
+	}
+	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
+
+	return (wide_string_t){ concat, len1 + len2 + 1 };
+}
+
+/**
+ * Concatenate two wide strings.
+ */
+wide_string_t concat_wide_strings(const wide_string_t *const s1, const wide_string_t *const s2)
+{
+	const size_t len1 = s1->size - 1;
+	const size_t len2 = s2->size - 1;
+
+	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
+	memcpy(concat,        s1->begin, len1       * sizeof(*concat));
+	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
+
+	return (wide_string_t){ concat, len1 + len2 + 1 };
+}
+
+/**
+ * Concatenate a wide string and a string.
+ */
+wide_string_t concat_wide_string_string(const wide_string_t *const s1, const string_t *const s2)
+{
+	const size_t len1 = s1->size - 1;
+	const size_t len2 = s2->size - 1;
+
+	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
+	memcpy(concat, s1->begin, len1 * sizeof(*concat));
+	const char *const src = s2->begin;
+	for (size_t i = 0; i != len2 + 1; ++i) {
+		concat[i] = src[i];
+	}
+
+	return (wide_string_t){ concat, len1 + len2 + 1 };
+}
+
+/**
  * Parse a string literal and set lexer_token.
  */
 static void parse_string_literal(void)
