@@ -288,6 +288,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   ir_graph *irg;
   unsigned aa_opt;
 
+  /* FIXME: cloning might ADD new graphs. */
   irg_dump_no = calloc(get_irp_last_idx(), sizeof(*irg_dump_no));
 
   set_opt_strength_red(firm_opt.strength_red);
@@ -425,6 +426,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     if (firm_opt.luffig) {
       opt_ldst2(irg);
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst2");
+      CHECK_ONE(firm_opt.check_all, irg);
     }
 
     timer_push(TV_CF_OPT);
@@ -541,6 +543,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   if (firm_opt.cloning) {
     proc_cloning((float)firm_opt.clone_threshold);
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "clone");
+    CHECK_ALL(firm_opt.check_all);
   }
 
   if (firm_dump.ir_graph) {
