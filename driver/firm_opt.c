@@ -338,7 +338,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
   if (firm_opt.func_calls) {
     timer_push(TV_REAL_FUNC_CALL);
-      optimize_funccalls(firm_const_exists);
+      optimize_funccalls(firm_const_exists, NULL);
     timer_pop();
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "func_call");
     CHECK_ALL(firm_opt.check_all);
