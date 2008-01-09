@@ -24,7 +24,7 @@ COMPILETIME_ASSERT(UINT_MAX == 4294967295U, uintmax)
  *
  * @note See hacker's delight, page 27.
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 int add_saturated(int x, int y)
 {
 	int sum      = x + y;
@@ -53,7 +53,7 @@ int add_saturated(int x, int y)
  * @param x A 32-bit word.
  * @return The number of bits set in x.
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 unsigned popcnt(unsigned x) {
 	x -= ((x >> 1) & 0x55555555);
 	x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
@@ -68,7 +68,7 @@ unsigned popcnt(unsigned x) {
  * @param x The word.
  * @return The number of leading (from the most significant bit) zeros.
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 unsigned nlz(unsigned x) {
 #ifdef USE_X86_ASSEMBLY
 	unsigned res;
@@ -94,7 +94,7 @@ unsigned nlz(unsigned x) {
  * @param x The word.
  * @return The number of trailing zeros.
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 unsigned ntz(unsigned x) {
 #ifdef USE_X86_ASSEMBLY
 	unsigned res;
@@ -161,7 +161,7 @@ unsigned floor_po2(unsigned x)
  * @remark x has to be <= 0x8000000 of course
  * @note see hackers delight power-of-2 boundaries, page 48
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 unsigned ceil_po2(unsigned x)
 {
 	if(x == 0)
@@ -185,7 +185,7 @@ unsigned ceil_po2(unsigned x)
 /**
  * Tests whether @p x is a power of 2
  */
-static INLINE __attribute__((const))
+static inline __attribute__((const))
 int is_po2(unsigned x)
 {
 	return (x & (x-1)) == 0;
