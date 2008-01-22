@@ -3418,7 +3418,7 @@ static expression_t *parse_reference(void)
 			                                       source_position);
 		} else {
 			errorf(HERE, "unknown symbol '%Y' found.", ref->symbol);
-			return expression;
+			return create_invalid_expression();
 		}
 	}
 
