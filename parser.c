@@ -963,9 +963,12 @@ static initializer_t *initializer_from_expression(type_t *type,
 		type_t       *const element_type = skip_typeref(array_type->element_type);
 
 		if (element_type->kind == TYPE_ATOMIC) {
+			atomic_type_kind_t akind = element_type->atomic.akind;
 			switch (expression->kind) {
 				case EXPR_STRING_LITERAL:
-					if (element_type->atomic.akind == ATOMIC_TYPE_CHAR) {
+					if (akind == ATOMIC_TYPE_CHAR
+							|| akind == ATOMIC_TYPE_SCHAR
+							|| akind == ATOMIC_TYPE_UCHAR) {
 						return initializer_from_string(array_type,
 							&expression->string.value);
 					}
