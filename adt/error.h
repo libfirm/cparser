@@ -3,6 +3,6 @@
 #include <stdlib.h>
 #include "config.h"
 
-static inline NORETURN
+static inline __attribute__((noreturn))
 void panic(const char *msg)
 { fprintf(stderr, "Panic: %s\n", msg); abort(); }
