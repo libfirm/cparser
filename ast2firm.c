@@ -2797,8 +2797,9 @@ struct compound_graph_path_entry_t {
 	compound_graph_path_entry_t *prev;
 };
 
-static void create_initializer_object(initializer_t *initializer, type_t *type,
-		ir_entity *entity, compound_graph_path_entry_t *entry, int len);
+static void create_ir_initializer_object(initializer_t *initializer,
+		type_t *type, ir_entity *entity, compound_graph_path_entry_t *entry,
+		int len);
 
 static compound_graph_path *create_compound_path(ir_type *type,
 		compound_graph_path_entry_t *entry, int len)
@@ -2820,10 +2821,10 @@ static compound_graph_path *create_compound_path(ir_type *type,
 	return path;
 }
 
-static void create_initializer_value(initializer_value_t *initializer,
-                                     ir_entity *entity,
-                                     compound_graph_path_entry_t *entry,
-                                     int len)
+static void create_ir_initializer_value(initializer_value_t *initializer,
+                                        ir_entity *entity,
+                                        compound_graph_path_entry_t *entry,
+                                        int len)
 {
 	ir_node             *node = expression_to_firm(initializer->value);
 	ir_type             *type = get_entity_type(entity);
@@ -2831,11 +2832,9 @@ static void create_initializer_value(initializer_value_t *initializer,
 	add_compound_ent_value_w_path(entity, node, path);
 }
 
-static void create_initializer_compound(initializer_list_t *initializer,
-                                        compound_type_t *type,
-                                        ir_entity *entity,
-                                        compound_graph_path_entry_t *last_entry,
-                                        int len)
+static void create_ir_initializer_compound(initializer_list_t *initializer,
+		compound_type_t *type, ir_entity *entity,
+		compound_graph_path_entry_t *last_entry, int len)
 {
 	declaration_t *compound_declaration = type->declaration;
 
@@ -2865,22 +2864,22 @@ static void create_initializer_compound(initializer_list_t *initializer,
 				== DECLARATION_KIND_COMPOUND_MEMBER);
 
 		if(sub_initializer->kind == INITIALIZER_VALUE) {
-			create_initializer_value(&sub_initializer->value,
-			                         entity, &entry, len);
+			create_ir_initializer_value(&sub_initializer->value,
+			                            entity, &entry, len);
 		} else {
 			type_t *entry_type = skip_typeref(compound_entry->type);
-			create_initializer_object(sub_initializer, entry_type, entity,
-			                          &entry, len);
+			create_ir_initializer_object(sub_initializer, entry_type, entity,
+			                             &entry, len);
 		}
 
 		++i;
 	}
 }
 
-static void create_initializer_array(initializer_list_t *initializer,
-                                     array_type_t *type, ir_entity *entity,
-                                     compound_graph_path_entry_t *last_entry,
-                                     int len)
+static void create_ir_initializer_array(initializer_list_t *initializer,
+                                        array_type_t *type, ir_entity *entity,
+                                        compound_graph_path_entry_t *last_entry,
+                                        int len)
 {
 	type_t *element_type = type->element_type;
 	element_type         = skip_typeref(element_type);
@@ -2897,10 +2896,10 @@ static void create_initializer_array(initializer_list_t *initializer,
 		initializer_t *sub_initializer = initializer->initializers[i];
 
 		if(sub_initializer->kind == INITIALIZER_VALUE) {
-			create_initializer_value(&sub_initializer->value,
+			create_ir_initializer_value(&sub_initializer->value,
 			                         entity, &entry, len);
 		} else {
-			create_initializer_object(sub_initializer, element_type, entity,
+			create_ir_initializer_object(sub_initializer, element_type, entity,
 			                          &entry, len);
 		}
 	}
@@ -2916,10 +2915,9 @@ static void create_initializer_array(initializer_list_t *initializer,
 #endif
 }
 
-static void create_initializer_string(initializer_string_t *initializer,
-                                      array_type_t *type, ir_entity *entity,
-                                      compound_graph_path_entry_t *last_entry,
-                                      int len)
+static void create_ir_initializer_string(initializer_string_t *initializer,
+		array_type_t *type, ir_entity *entity,
+		compound_graph_path_entry_t *last_entry, int len)
 {
 	type_t *element_type = type->element_type;
 	element_type         = skip_typeref(element_type);
@@ -2944,10 +2942,10 @@ static void create_initializer_string(initializer_string_t *initializer,
 	}
 }
 
-static void create_initializer_wide_string(
-	const initializer_wide_string_t *const initializer, array_type_t *const type,
-	ir_entity *const entity, compound_graph_path_entry_t *const last_entry,
-	int len)
+static void create_ir_initializer_wide_string(
+		const initializer_wide_string_t *const initializer,
+		array_type_t *const type, ir_entity *const entity,
+		compound_graph_path_entry_t *const last_entry, int len)
 {
 	type_t *element_type = type->element_type;
 	element_type         = skip_typeref(element_type);
@@ -2970,8 +2968,9 @@ static void create_initializer_wide_string(
 	}
 }
 
-static void create_initializer_object(initializer_t *initializer, type_t *type,
-		ir_entity *entity, compound_graph_path_entry_t *entry, int len)
+static void create_ir_initializer_object(initializer_t *initializer,
+		type_t *type, ir_entity *entity, compound_graph_path_entry_t *entry,
+		int len)
 {
 	if(is_type_array(type)) {
 		array_type_t *array_type = &type->array;
@@ -2979,19 +2978,23 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 		switch (initializer->kind) {
 			case INITIALIZER_STRING: {
 				initializer_string_t *const string = &initializer->string;
-				create_initializer_string(string, array_type, entity, entry, len);
+				create_ir_initializer_string(string, array_type, entity, entry,
+				                             len);
 				return;
 			}
 
 			case INITIALIZER_WIDE_STRING: {
-				initializer_wide_string_t *const string = &initializer->wide_string;
-				create_initializer_wide_string(string, array_type, entity, entry, len);
+				initializer_wide_string_t *const string
+					= &initializer->wide_string;
+				create_ir_initializer_wide_string(string, array_type, entity,
+				                                  entry, len);
 				return;
 			}
 
 			case INITIALIZER_LIST: {
 				initializer_list_t *const list = &initializer->list;
-				create_initializer_array(list, array_type, entity, entry, len);
+				create_ir_initializer_array(list, array_type, entity, entry,
+				                            len);
 				return;
 			}
 
@@ -3005,7 +3008,7 @@ static void create_initializer_object(initializer_t *initializer, type_t *type,
 
 		assert(is_type_compound(type));
 		compound_type_t *compound_type = &type->compound;
-		create_initializer_compound(list, compound_type, entity, entry, len);
+		create_ir_initializer_compound(list, compound_type, entity, entry, len);
 	}
 }
 
@@ -3043,7 +3046,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	current_ir_graph = get_const_code_irg();
 
 	type_t *const type = skip_typeref(declaration->type);
-	create_initializer_object(initializer, type, init_entity, NULL, 0);
+	create_ir_initializer_object(initializer, type, init_entity, NULL, 0);
 
 	assert(current_ir_graph == get_const_code_irg());
 	current_ir_graph = old_current_ir_graph;
@@ -3055,7 +3058,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	set_store(copyb_mem);
 }
 
-static void create_initializer(declaration_t *declaration)
+static void create_ir_initializer(declaration_t *declaration)
 {
 	initializer_t *initializer = declaration->init.initializer;
 	if(initializer == NULL)
@@ -3091,7 +3094,7 @@ static void create_initializer(declaration_t *declaration)
 		set_entity_variability(entity, variability_initialized);
 
 		type_t *type = skip_typeref(declaration->type);
-		create_initializer_object(initializer, type, entity, NULL, 0);
+		create_ir_initializer_object(initializer, type, entity, NULL, 0);
 	}
 }
 
@@ -3121,7 +3124,7 @@ static void create_local_variable(declaration_t *declaration)
 		++next_value_number_function;
 	}
 
-	create_initializer(declaration);
+	create_ir_initializer(declaration);
 }
 
 static void create_local_static_variable(declaration_t *declaration)
@@ -3145,7 +3148,7 @@ static void create_local_static_variable(declaration_t *declaration)
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
-	create_initializer(declaration);
+	create_ir_initializer(declaration);
 
 	assert(current_ir_graph == get_const_code_irg());
 	current_ir_graph = old_current_ir_graph;
@@ -3294,7 +3297,7 @@ static void create_local_declaration(declaration_t *declaration)
 		panic("enum entry declaration in local block found");
 	case STORAGE_CLASS_EXTERN:
 		create_global_variable(declaration);
-		create_initializer(declaration);
+		create_ir_initializer(declaration);
 		return;
 	case STORAGE_CLASS_NONE:
 	case STORAGE_CLASS_AUTO:
@@ -4252,7 +4255,7 @@ static void scope_to_firm(scope_t *scope)
 			assert(declaration->declaration_kind
 					== DECLARATION_KIND_GLOBAL_VARIABLE);
 			current_ir_graph = get_const_code_irg();
-			create_initializer(declaration);
+			create_ir_initializer(declaration);
 		}
 	}
 }
