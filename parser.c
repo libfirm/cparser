@@ -3792,53 +3792,36 @@ static expression_t *parse_assume(void) {
 
 static expression_t *parse_primary_expression(void)
 {
-	switch(token.type) {
-	case T_INTEGER:
-		return parse_int_const();
-	case T_CHARS:
-		return parse_char_const();
-	case T_FLOATINGPOINT:
-		return parse_float_const();
-	case T_STRING_LITERAL:
-	case T_WIDE_STRING_LITERAL:
-		return parse_string_const();
-	case T_IDENTIFIER:
-		return parse_reference();
-	case T___FUNCTION__:
-	case T___func__:
-		return parse_function_keyword();
-	case T___PRETTY_FUNCTION__:
-		return parse_pretty_function_keyword();
-	case T___builtin_offsetof:
-		return parse_offsetof();
-	case T___builtin_va_start:
-		return parse_va_start();
-	case T___builtin_va_arg:
-		return parse_va_arg();
-	case T___builtin_expect:
-		return parse_builtin_expect();
-	case T___builtin_alloca:
-	case T___builtin_nan:
-	case T___builtin_nand:
-	case T___builtin_nanf:
-	case T___builtin_va_end:
-		return parse_builtin_symbol();
-	case T___builtin_isgreater:
-	case T___builtin_isgreaterequal:
-	case T___builtin_isless:
-	case T___builtin_islessequal:
-	case T___builtin_islessgreater:
-	case T___builtin_isunordered:
-		return parse_compare_builtin();
-	case T___builtin_constant_p:
-		return parse_builtin_constant();
-	case T___builtin_prefetch:
-		return parse_builtin_prefetch();
-	case T_assume:
-		return parse_assume();
+	switch (token.type) {
+		case T_INTEGER:                  return parse_int_const();
+		case T_CHARS:                    return parse_char_const();
+		case T_FLOATINGPOINT:            return parse_float_const();
+		case T_STRING_LITERAL:
+		case T_WIDE_STRING_LITERAL:      return parse_string_const();
+		case T_IDENTIFIER:               return parse_reference();
+		case T___FUNCTION__:
+		case T___func__:                 return parse_function_keyword();
+		case T___PRETTY_FUNCTION__:      return parse_pretty_function_keyword();
+		case T___builtin_offsetof:       return parse_offsetof();
+		case T___builtin_va_start:       return parse_va_start();
+		case T___builtin_va_arg:         return parse_va_arg();
+		case T___builtin_expect:         return parse_builtin_expect();
+		case T___builtin_alloca:
+		case T___builtin_nan:
+		case T___builtin_nand:
+		case T___builtin_nanf:
+		case T___builtin_va_end:         return parse_builtin_symbol();
+		case T___builtin_isgreater:
+		case T___builtin_isgreaterequal:
+		case T___builtin_isless:
+		case T___builtin_islessequal:
+		case T___builtin_islessgreater:
+		case T___builtin_isunordered:    return parse_compare_builtin();
+		case T___builtin_constant_p:     return parse_builtin_constant();
+		case T___builtin_prefetch:       return parse_builtin_prefetch();
+		case T_assume:                   return parse_assume();
 
-	case '(':
-		return parse_brace_expression();
+		case '(':                        return parse_brace_expression();
 	}
 
 	errorf(HERE, "unexpected token %K", &token);
