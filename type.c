@@ -855,6 +855,8 @@ bool pointers_compatible(const type_t *type1, const type_t *type2)
 
 	assert(type1->kind == TYPE_POINTER);
 	assert(type2->kind == TYPE_POINTER);
+	(void) type1;
+	(void) type2;
 	/* TODO */
 	return true;
 }

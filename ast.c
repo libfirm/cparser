@@ -155,15 +155,10 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_BINARY_ISLESSGREATER]      = PREC_PRIM,
 		[EXPR_BINARY_ISUNORDERED]        = PREC_PRIM
 	};
-#ifndef NDEBUG
-	if ((unsigned)kind >= (sizeof(prec)/sizeof(prec[0]))) {
-		panic("wrong expression kind");
-	}
+	assert((unsigned)kind < (sizeof(prec)/sizeof(prec[0])));
 	unsigned res = prec[kind];
-	if (res == PREC_BOTTOM) {
-		panic("expression kind not defined in get_expression_precedence()");
-	}
-#endif
+
+	assert(res != PREC_BOTTOM);
 	return res;
 }
 

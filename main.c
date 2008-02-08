@@ -316,6 +316,7 @@ void lower_compound_params(void)
 }
 
 typedef enum compile_mode_t {
+	BenchmarkParser,
 	ParseOnly,
 	Compile,
 	CompileDump,
@@ -480,6 +481,8 @@ int main(int argc, char **argv)
 					strict_mode = true;
 				} else if(strcmp(option, "lextest") == 0) {
 					mode = LexTest;
+				} else if(strcmp(option, "benchmark") == 0) {
+					mode = BenchmarkParser;
 				} else if(strcmp(option, "print-ast") == 0) {
 					mode = PrintAst;
 				} else if(strcmp(option, "print-implicit-cast") == 0) {
@@ -556,6 +559,7 @@ int main(int argc, char **argv)
 	char  outnamebuf[4096];
 	if(outname == NULL) {
 		switch(mode) {
+		case BenchmarkParser:
 		case PrintAst:
 		case PrintFluffy:
 		case LexTest:
@@ -630,6 +634,10 @@ int main(int argc, char **argv)
 	}
 	if (warning_count > 0) {
 		fprintf(stderr, "%u warning(s)\n", warning_count);
+	}
+
+	if(mode == BenchmarkParser) {
+		return 0;
 	}
 
 	if(mode == PrintAst) {

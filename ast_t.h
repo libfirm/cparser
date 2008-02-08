@@ -154,7 +154,8 @@ typedef enum {
 	case EXPR_UNARY_BITFIELD_EXTRACT:
 
 struct scope_t {
-	declaration_t *declarations;  /**< List of declarations in this scope. */
+	declaration_t *declarations;      /**< List of declarations in this scope. */
+	declaration_t *last_declaration;
 };
 
 struct expression_base_t {

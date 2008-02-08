@@ -494,14 +494,12 @@ static void eat_paren(void)
 
 static void set_scope(scope_t *new_scope)
 {
+	if(scope != NULL) {
+		scope->last_declaration = last_declaration;
+	}
 	scope = new_scope;
 
-	last_declaration = new_scope->declarations;
-	if(last_declaration != NULL) {
-		while(last_declaration->next != NULL) {
-			last_declaration = last_declaration->next;
-		}
-	}
+	last_declaration = new_scope->last_declaration;
 }
 
 /**
