@@ -3822,7 +3822,7 @@ static expression_t *parse_primary_expression(void)
 		case '(':                        return parse_brace_expression();
 	}
 
-	errorf(HERE, "unexpected token %K", &token);
+	errorf(HERE, "unexpected token %K, expected an expression", &token);
 	eat_statement();
 
 	return create_invalid_expression();
