@@ -19,6 +19,7 @@
 #include "parser.h"
 #include "diagnostic.h"
 #include "lang_features.h"
+#include "types.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 
@@ -30,8 +31,6 @@ static ir_type *ir_type_void;
 static ir_type *ir_type_int;
 
 static type_t *type_const_char;
-static type_t *type_void;
-static type_t *type_int;
 
 static int       next_value_number_function;
 static ir_node  *continue_label;
@@ -63,8 +62,9 @@ ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const declaration_t *declaration = get_irg_loc_description(irg, pos);
 
-	warningf(declaration->source_position, "variable '%#T' might be used uninitialized",
-			declaration->type, declaration->symbol);
+	warningf(declaration->source_position,
+	         "variable '%#T' might be used uninitialized",
+	         declaration->type, declaration->symbol);
 	return new_r_Unknown(irg, mode);
 }
 
@@ -353,10 +353,6 @@ static unsigned count_parameters(const function_type_t *function_type)
 }
 
 
-
-
-static long fold_constant(const expression_t *expression);
-
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
 	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
@@ -426,15 +422,15 @@ static ir_type *create_array_type(array_type_t *type)
 	type_t  *element_type    = type->element_type;
 	ir_type *ir_element_type = get_ir_type(element_type);
 
-	ident   *id      = unique_ident("array");
-	dbg_info *dbgi   = get_dbg_info(&type->type.source_position);
-	ir_type *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
+	ident    *id      = unique_ident("array");
+	dbg_info *dbgi    = get_dbg_info(&type->type.source_position);
+	ir_type  *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
 
 	const int align = get_type_alignment_bytes(ir_element_type);
 	set_type_alignment_bytes(ir_type, align);
 
-	if(type->size != NULL) {
-		int n_elements = fold_constant(type->size);
+	if(type->size_constant) {
+		int n_elements = type->size;
 
 		set_array_bounds_int(ir_type, 0, 0, n_elements);
 
@@ -685,8 +681,8 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		return declaration->v.irtype;
 	}
 
-	size_t offset    = 0;
 	size_t align_all = 1;
+	size_t offset    = 0;
 	size_t size      = 0;
 
 	if(irtype == NULL) {
@@ -700,6 +696,9 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		dbg_info *dbgi = get_dbg_info(&type->type.source_position);
 
 		irtype = new_d_type_union(id, dbgi);
+
+		declaration->v.irtype = irtype;
+		type->type.firm_type  = irtype;
 	} else {
 		offset    = *outer_offset;
 		align_all = *outer_align;
@@ -712,11 +711,12 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		type_t  *entry_type    = skip_typeref(entry->type);
-		ir_type *entry_ir_type = get_ir_type(entry_type);
+		symbol_t *symbol        = entry->symbol;
+		type_t   *entry_type    = skip_typeref(entry->type);
+		ir_type  *entry_ir_type = get_ir_type(entry_type);
 
 		ident *ident;
-		if(entry->symbol != NULL) {
+		if(symbol != NULL) {
 			ident = new_id_from_str(entry->symbol->string);
 		} else {
 			size_t offs = offset;
@@ -792,7 +792,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 {
 	type->type.firm_type = ir_type_int;
 
-	ir_mode *const mode    = get_ir_mode((type_t*) type);
+	ir_mode *const mode    = mode_int;
 	tarval  *const one     = get_mode_one(mode);
 	tarval  *      tv_next = get_tarval_null(mode);
 
@@ -1078,10 +1078,10 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
                                const char *const id_prefix,
                                const string_t *const value)
 {
-	ir_type *const global_type = get_glob_type();
-	dbg_info *const dbgi       = get_dbg_info(src_pos);
-	ir_type *const type        = new_d_type_array(unique_ident("strtype"), 1,
-	                                            ir_type_const_char, dbgi);
+	ir_type  *const global_type = get_glob_type();
+	dbg_info *const dbgi        = get_dbg_info(src_pos);
+	ir_type  *const type        = new_d_type_array(unique_ident("strtype"), 1,
+	                                               ir_type_const_char, dbgi);
 
 	ident     *const id     = unique_ident(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
@@ -2257,6 +2257,82 @@ static ir_node *array_access_to_firm(
 	return deref_address(irtype, addr, dbgi);
 }
 
+static long get_offsetof_offset(const offsetof_expression_t *expression)
+{
+	type_t *orig_type = expression->type;
+	long    offset    = 0;
+
+	designator_t *designator = expression->designator;
+	for( ; designator != NULL; designator = designator->next) {
+		type_t *type = skip_typeref(orig_type);
+		/* be sure the type is constructed */
+		(void) get_ir_type(type);
+
+		if(designator->symbol != NULL) {
+			assert(is_type_compound(type));
+			symbol_t *symbol = designator->symbol;
+
+			declaration_t *declaration = type->compound.declaration;
+			declaration_t *iter        = declaration->scope.declarations;
+			for( ; iter != NULL; iter = iter->next) {
+				if(iter->symbol == symbol) {
+					break;
+				}
+			}
+			assert(iter != NULL);
+
+			assert(iter->declaration_kind == DECLARATION_KIND_COMPOUND_MEMBER);
+			offset += get_entity_offset(iter->v.entity);
+
+			orig_type = iter->type;
+		} else {
+			expression_t *array_index = designator->array_index;
+			assert(designator->array_index != NULL);
+			assert(is_type_array(type));
+			assert(is_type_valid(array_index->base.type));
+
+			long index         = fold_constant(array_index);
+			ir_type *arr_type  = get_ir_type(type);
+			ir_type *elem_type = get_array_element_type(arr_type);
+			long     elem_size = get_type_size_bytes(elem_type);
+
+			offset += index * elem_size;
+
+			orig_type = type->array.element_type;
+		}
+	}
+
+	return offset;
+}
+
+static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
+{
+	ir_mode  *mode   = get_ir_mode(expression->base.type);
+	long      offset = get_offsetof_offset(expression);
+	tarval   *tv     = new_tarval_from_long(offset, mode);
+	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
+
+	return new_d_Const(dbgi, mode, tv);
+}
+
+static ir_node *compound_literal_to_firm(
+		const compound_literal_expression_t *expression)
+{
+	/* create an entity on the stack */
+	ir_type *frame_type = get_irg_frame_type(current_ir_graph);
+
+	ident     *const id     = unique_ident("CompLit");
+	ir_type   *const irtype = get_ir_type(expression->type);
+	dbg_info  *const dbgi   = get_dbg_info(&expression->base.source_position);
+	ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
+	set_entity_ld_ident(entity, id);
+
+	set_entity_variability(entity, variability_uninitialized);
+
+	/* create initialisation code TODO */
+	return NULL;
+}
+
 /**
  * Transform a sizeof expression into Firm code.
  */
@@ -2298,8 +2374,11 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	return new_SymConst(mode, sym, symconst_type_align);
 }
 
-static long fold_constant(const expression_t *expression)
+static void init_ir_types(void);
+long fold_constant(const expression_t *expression)
 {
+	init_ir_types();
+
 	assert(is_constant_expression(expression));
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
@@ -2652,13 +2731,16 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return va_start_expression_to_firm(&expression->va_starte);
 	case EXPR_VA_ARG:
 		return va_arg_expression_to_firm(&expression->va_arge);
-	case EXPR_OFFSETOF:
 	case EXPR_BUILTIN_SYMBOL:
 		panic("unimplemented expression found");
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
 	case EXPR_BUILTIN_PREFETCH:
 		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
+	case EXPR_OFFSETOF:
+		return offsetof_to_firm(&expression->offsetofe);
+	case EXPR_COMPOUND_LITERAL:
+		return compound_literal_to_firm(&expression->compound_literal);
 
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
@@ -2781,8 +2863,249 @@ static void create_declaration_entity(declaration_t *declaration,
 	/* TODO: visibility? */
 }
 
+
+typedef struct type_path_entry_t type_path_entry_t;
+struct type_path_entry_t {
+	type_t           *type;
+	ir_initializer_t *initializer;
+	size_t            index;
+	declaration_t    *compound_entry;
+};
+
+typedef struct type_path_t type_path_t;
+struct type_path_t {
+	type_path_entry_t *path;
+	type_t            *top_type;
+	bool               invalid;
+};
+
+static __attribute__((unused)) void debug_print_type_path(const type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+
+	for(size_t i = 0; i < len; ++i) {
+		const type_path_entry_t *entry = & path->path[i];
+
+		type_t *type = skip_typeref(entry->type);
+		if(is_type_compound(type)) {
+			fprintf(stderr, ".%s", entry->compound_entry->symbol->string);
+		} else if(is_type_array(type)) {
+			fprintf(stderr, "[%u]", entry->index);
+		} else {
+			fprintf(stderr, "-INVALID-");
+		}
+	}
+	fprintf(stderr, "  (");
+	print_type(path->top_type);
+	fprintf(stderr, ")");
+}
+
+static type_path_entry_t *get_type_path_top(const type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+	assert(len > 0);
+	return & path->path[len-1];
+}
+
+static type_path_entry_t *append_to_type_path(type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+	ARR_RESIZE(type_path_entry_t, path->path, len+1);
+
+	type_path_entry_t *result = & path->path[len];
+	memset(result, 0, sizeof(result[0]));
+	return result;
+}
+
+static size_t get_compound_size(const compound_type_t *type)
+{
+	declaration_t *declaration = type->declaration;
+	declaration_t *member      = declaration->scope.declarations;
+	size_t         size        = 0;
+	for( ; member != NULL; member = member->next) {
+		++size;
+	}
+	/* TODO: cache results? */
+
+	return size;
+}
+
+static ir_initializer_t *get_initializer_entry(type_path_t *path)
+{
+	type_t *orig_top_type = path->top_type;
+	type_t *top_type      = skip_typeref(orig_top_type);
+
+	assert(is_type_compound(top_type) || is_type_array(top_type));
+
+	if(ARR_LEN(path->path) == 0) {
+		return NULL;
+	} else {
+		type_path_entry_t *top         = get_type_path_top(path);
+		ir_initializer_t  *initializer = top->initializer;
+		return get_initializer_compound_value(initializer, top->index);
+	}
+}
+
+static void descend_into_subtype(type_path_t *path)
+{
+	type_t *orig_top_type = path->top_type;
+	type_t *top_type      = skip_typeref(orig_top_type);
+
+	assert(is_type_compound(top_type) || is_type_array(top_type));
+
+	ir_initializer_t *initializer = get_initializer_entry(path);
+
+	type_path_entry_t *top = append_to_type_path(path);
+	top->type              = top_type;
+
+	size_t len;
+
+	if(is_type_compound(top_type)) {
+		declaration_t *declaration = top_type->compound.declaration;
+		declaration_t *entry       = declaration->scope.declarations;
+
+		top->compound_entry = entry;
+		top->index          = 0;
+		path->top_type      = entry->type;
+		len                 = get_compound_size(&top_type->compound);
+	} else {
+		assert(is_type_array(top_type));
+		assert(top_type->array.size > 0);
+
+		top->index     = 0;
+		path->top_type = top_type->array.element_type;
+		len            = top_type->array.size;
+	}
+	if(initializer == NULL
+			|| get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
+		initializer = create_initializer_compound(len);
+		/* we have to set the entry at the 2nd latest path entry... */
+		size_t path_len = ARR_LEN(path->path);
+		assert(path_len >= 1);
+		if(path_len > 1) {
+			type_path_entry_t *entry        = & path->path[path_len-2];
+			ir_initializer_t  *tinitializer = entry->initializer;
+			set_initializer_compound_value(tinitializer, entry->index,
+			                               initializer);
+		}
+	}
+	top->initializer = initializer;
+}
+
+static void ascend_from_subtype(type_path_t *path)
+{
+	type_path_entry_t *top = get_type_path_top(path);
+
+	path->top_type = top->type;
+
+	size_t len = ARR_LEN(path->path);
+	ARR_RESIZE(type_path_entry_t, path->path, len-1);
+}
+
+static void walk_designator(type_path_t *path, const designator_t *designator)
+{
+	/* designators start at current object type */
+	ARR_RESIZE(type_path_entry_t, path->path, 1);
+
+	for( ; designator != NULL; designator = designator->next) {
+		type_path_entry_t *top         = get_type_path_top(path);
+		type_t            *orig_type   = top->type;
+		type_t            *type        = skip_typeref(orig_type);
+
+		if(designator->symbol != NULL) {
+			assert(is_type_compound(type));
+			size_t    index  = 0;
+			symbol_t *symbol = designator->symbol;
+
+			declaration_t *declaration = type->compound.declaration;
+			declaration_t *iter        = declaration->scope.declarations;
+			for( ; iter != NULL; iter = iter->next, ++index) {
+				if(iter->symbol == symbol) {
+					break;
+				}
+			}
+			assert(iter != NULL);
+
+			top->type           = orig_type;
+			top->compound_entry = iter;
+			top->index          = index;
+			orig_type           = iter->type;
+		} else {
+			expression_t *array_index = designator->array_index;
+			assert(designator->array_index != NULL);
+			assert(is_type_array(type));
+			assert(is_type_valid(array_index->base.type));
+
+			long index = fold_constant(array_index);
+			assert(index >= 0);
+#ifndef NDEBUG
+			if(type->array.size_constant == 1) {
+				long array_size = type->array.size;
+				assert(index < array_size);
+			}
+#endif
+
+			top->type  = orig_type;
+			top->index = (size_t) index;
+			orig_type  = type->array.element_type;
+		}
+		path->top_type = orig_type;
+
+		if(designator->next != NULL) {
+			descend_into_subtype(path);
+		}
+	}
+
+	path->invalid  = false;
+}
+
+static void advance_current_object(type_path_t *path)
+{
+	if(path->invalid) {
+		/* TODO: handle this... */
+		panic("invalid initializer in ast2firm (excessive elements)");
+		return;
+	}
+
+	type_path_entry_t *top = get_type_path_top(path);
+
+	type_t *type = skip_typeref(top->type);
+	if(is_type_union(type)) {
+		top->compound_entry = NULL;
+	} else if(is_type_struct(type)) {
+		declaration_t *entry = top->compound_entry;
+
+		top->index++;
+		entry               = entry->next;
+		top->compound_entry = entry;
+		if(entry != NULL) {
+			path->top_type = entry->type;
+			return;
+		}
+	} else {
+		assert(is_type_array(type));
+
+		top->index++;
+		if(!type->array.size_constant || top->index < type->array.size) {
+			return;
+		}
+	}
+
+	/* we're past the last member of the current sub-aggregate, try if we
+	 * can ascend in the type hierarchy and continue with another subobject */
+  	size_t len = ARR_LEN(path->path);
+
+	if(len > 1) {
+		ascend_from_subtype(path);
+		advance_current_object(path);
+	} else {
+		path->invalid = true;
+	}
+}
+
+
 static ir_initializer_t *create_ir_initializer(
-		const initializer_t *initializer);
+		const initializer_t *initializer, type_t *type);
 
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
@@ -2791,34 +3114,68 @@ static ir_initializer_t *create_ir_initializer_value(
 	return create_initializer_const(value);
 }
 
-static ir_initializer_t *create_ir_initializer_compound(
-		const initializer_list_t *initializer)
+static ir_initializer_t *create_ir_initializer_list(
+		const initializer_list_t *initializer, type_t *type)
 {
-	ir_initializer_t *irinitializer
-		= create_initializer_compound(initializer->len);
+	type_path_t path;
+	memset(&path, 0, sizeof(path));
+	path.top_type = type;
+	path.path     = NEW_ARR_F(type_path_entry_t, 0);
+
+	descend_into_subtype(&path);
 
 	for(size_t i = 0; i < initializer->len; ++i) {
-		const initializer_t *sub_initializer   = initializer->initializers[i];
-		ir_initializer_t    *sub_irinitializer
-			= create_ir_initializer(sub_initializer);
+		const initializer_t *sub_initializer = initializer->initializers[i];
 
-		set_initializer_compound_value(irinitializer, i, sub_irinitializer);
+		if(sub_initializer->kind == INITIALIZER_DESIGNATOR) {
+			walk_designator(&path, sub_initializer->designator.designator);
+			continue;
+		}
+
+		if(sub_initializer->kind == INITIALIZER_VALUE) {
+			/* we might have to descend into types until we're at a scalar
+			 * type */
+			while(true) {
+				type_t *orig_top_type = path.top_type;
+				type_t *top_type      = skip_typeref(orig_top_type);
+
+				if(is_type_scalar(top_type))
+					break;
+				descend_into_subtype(&path);
+			}
+		}
+
+		ir_initializer_t *sub_irinitializer
+			= create_ir_initializer(sub_initializer, path.top_type);
+
+		size_t path_len = ARR_LEN(path.path);
+		assert(path_len >= 1);
+		type_path_entry_t *entry        = & path.path[path_len-1];
+		ir_initializer_t  *tinitializer = entry->initializer;
+		set_initializer_compound_value(tinitializer, entry->index,
+		                               sub_irinitializer);
+
+		advance_current_object(&path);
 	}
 
-	return irinitializer;
+	assert(ARR_LEN(path.path) >= 1);
+	ir_initializer_t *result = path.path[0].initializer;
+	DEL_ARR_F(path.path);
+
+	return result;
 }
 
 static ir_initializer_t *create_ir_initializer_string(
 		const initializer_string_t *initializer)
 {
-	size_t len = initializer->string.size;
+	size_t            len           = initializer->string.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
 	const char *string = initializer->string.begin;
 	ir_mode    *mode   = get_type_mode(ir_type_const_char);
 
 	for(size_t i = 0; i < len; ++i) {
-		tarval *tv = new_tarval_from_long(string[i], mode);
+		tarval           *tv = new_tarval_from_long(string[i], mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
 
 		set_initializer_compound_value(irinitializer, i, char_initializer);
@@ -2830,7 +3187,7 @@ static ir_initializer_t *create_ir_initializer_string(
 static ir_initializer_t *create_ir_initializer_wide_string(
 		const initializer_wide_string_t *initializer)
 {
-	size_t len = initializer->string.size;
+	size_t            len           = initializer->string.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
 	const wchar_rep_t *string = initializer->string.begin;
@@ -2846,9 +3203,10 @@ static ir_initializer_t *create_ir_initializer_wide_string(
 	return irinitializer;
 }
 
-static ir_initializer_t *create_ir_initializer(const initializer_t *initializer)
+static ir_initializer_t *create_ir_initializer(
+		const initializer_t *initializer, type_t *type)
 {
-	switch((initializer_kind_t) initializer->kind) {
+	switch(initializer->kind) {
 		case INITIALIZER_STRING:
 			return create_ir_initializer_string(&initializer->string);
 
@@ -2856,36 +3214,38 @@ static ir_initializer_t *create_ir_initializer(const initializer_t *initializer)
 			return create_ir_initializer_wide_string(&initializer->wide_string);
 
 		case INITIALIZER_LIST:
-			return create_ir_initializer_compound(&initializer->list);
+			return create_ir_initializer_list(&initializer->list, type);
 
 		case INITIALIZER_VALUE:
 			return create_ir_initializer_value(&initializer->value);
+
+		case INITIALIZER_DESIGNATOR:
+			panic("unexpected designator initializer found");
 	}
 	panic("unknown initializer");
 }
 
-static void create_initializer_local_variable_entity(declaration_t *declaration)
+
+static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
+                                     ir_entity *entity, type_t *type)
 {
-	initializer_t *initializer = declaration->init.initializer;
-	dbg_info      *dbgi        = get_dbg_info(&declaration->source_position);
-	ir_entity     *entity      = declaration->v.entity;
-	ir_node       *memory      = get_store();
-	ir_node       *nomem       = new_NoMem();
-	ir_node       *frame       = get_irg_frame(current_ir_graph);
-	ir_node       *addr        = new_d_simpleSel(dbgi, nomem, frame, entity);
+	ir_node *memory = get_store();
+	ir_node *nomem  = new_NoMem();
+	ir_node *frame  = get_irg_frame(current_ir_graph);
+	ir_node *addr   = new_d_simpleSel(dbgi, nomem, frame, entity);
 
 	if(initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
 		ir_node *value = expression_to_firm(initializer_value->value);
-		type_t  *type  = skip_typeref(declaration->type);
+		type = skip_typeref(type);
 		assign_value(dbgi, addr, type, value);
 		return;
 	}
 
 	/* create a "template" entity which is copied to the entity on the stack */
 	ident     *const id          = unique_ident("initializer");
-	ir_type   *const irtype      = get_ir_type(declaration->type);
+	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
 	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(init_entity, id);
@@ -2897,7 +3257,7 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
-	ir_initializer_t *irinitializer = create_ir_initializer(initializer);
+	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
 	set_entity_initializer(init_entity, irinitializer);
 
 	assert(current_ir_graph == get_const_code_irg());
@@ -2908,6 +3268,15 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
 	set_store(copyb_mem);
+}
+
+static void create_initializer_local_variable_entity(declaration_t *declaration)
+{
+	initializer_t *initializer = declaration->init.initializer;
+	dbg_info      *dbgi        = get_dbg_info(&declaration->source_position);
+	ir_entity     *entity      = declaration->v.entity;
+	type_t        *type        = declaration->type;
+	create_local_initializer(initializer, dbgi, entity, type);
 }
 
 static void create_declaration_initializer(declaration_t *declaration)
@@ -2943,7 +3312,8 @@ static void create_declaration_initializer(declaration_t *declaration)
 				|| declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 		ir_entity        *entity        = declaration->v.entity;
-		ir_initializer_t *irinitializer = create_ir_initializer(initializer);
+		ir_initializer_t *irinitializer
+			= create_ir_initializer(initializer, declaration->type);
 
 		set_entity_variability(entity, variability_initialized);
 		set_entity_initializer(entity, irinitializer);
@@ -4123,13 +4493,13 @@ void init_ast2firm(void)
 	}
 }
 
-void exit_ast2firm(void)
+static void init_ir_types(void)
 {
-	obstack_free(&asm_obst, NULL);
-}
+	static int ir_types_initialized = 0;
+	if(ir_types_initialized)
+		return;
+	ir_types_initialized = 1;
 
-void translation_unit_to_firm(translation_unit_t *unit)
-{
 	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
 	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
 	type_int        = make_atomic_type(ATOMIC_TYPE_INT,  TYPE_QUALIFIER_NONE);
@@ -4141,11 +4511,21 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	                                               type in firm */
 
 	type_void->base.firm_type = ir_type_void;
+}
 
+void exit_ast2firm(void)
+{
+	obstack_free(&asm_obst, NULL);
+}
+
+void translation_unit_to_firm(translation_unit_t *unit)
+{
 	/* just to be sure */
 	continue_label      = NULL;
 	break_label         = NULL;
 	current_switch_cond = NULL;
+
+	init_ir_types();
 
 	scope_to_firm(&unit->scope);
 }

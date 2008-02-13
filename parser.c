@@ -54,7 +54,7 @@ static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
 static label_statement_t  *label_last        = NULL;
-static struct obstack  temp_obst;
+static struct obstack      temp_obst;
 
 /** The current source position. */
 #define HERE token.source_position
@@ -201,6 +201,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_CHAR_CONST]          = sizeof(const_expression_t),
 		[EXPR_STRING_LITERAL]      = sizeof(string_literal_expression_t),
 		[EXPR_WIDE_STRING_LITERAL] = sizeof(wide_string_literal_expression_t),
+		[EXPR_COMPOUND_LITERAL]    = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                = sizeof(call_expression_t),
 		[EXPR_UNARY_FIRST]         = sizeof(unary_expression_t),
 		[EXPR_BINARY_FIRST]        = sizeof(binary_expression_t),
@@ -297,7 +298,8 @@ static size_t get_initializer_size(initializer_kind_t kind)
 		[INITIALIZER_VALUE]       = sizeof(initializer_value_t),
 		[INITIALIZER_STRING]      = sizeof(initializer_string_t),
 		[INITIALIZER_WIDE_STRING] = sizeof(initializer_wide_string_t),
-		[INITIALIZER_LIST]        = sizeof(initializer_list_t)
+		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
+		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
 	assert(kind < sizeof(sizes) / sizeof(*sizes));
 	assert(sizes[kind] != 0);
@@ -469,28 +471,34 @@ static void eat_paren(void)
 }
 
 #define expect(expected)                           \
+	do {                                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
         eat_statement();                           \
         return NULL;                               \
     }                                              \
-    next_token();
+    next_token();                                  \
+	} while(0)
 
 #define expect_block(expected)                     \
+	do {                                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
         eat_block();                               \
         return NULL;                               \
     }                                              \
-    next_token();
+    next_token();                                  \
+	} while(0)
 
 #define expect_void(expected)                      \
+	do {                                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
         eat_statement();                           \
         return;                                    \
     }                                              \
-    next_token();
+    next_token();                                  \
+    } while(0)
 
 static void set_scope(scope_t *new_scope)
 {
@@ -760,7 +768,8 @@ static type_t *semantic_assign(type_t *orig_type_left,
 		return orig_type_left;
 	}
 
-	if (is_type_compound(type_left)  && is_type_compound(type_right)) {
+	if ((is_type_compound(type_left)  && is_type_compound(type_right))
+			|| (is_type_builtin(type_left) && is_type_builtin(type_right))) {
 		type_t *const unqual_type_left  = get_unqualified_type(type_left);
 		type_t *const unqual_type_right = get_unqualified_type(type_right);
 		if (types_compatible(unqual_type_left, unqual_type_right)) {
@@ -879,26 +888,24 @@ attributes_finished:
 	;
 }
 
-#if 0
 static designator_t *parse_designation(void)
 {
-	if(token.type != '[' && token.type != '.')
-		return NULL;
-
 	designator_t *result = NULL;
 	designator_t *last   = NULL;
 
-	while(1) {
+	while(true) {
 		designator_t *designator;
 		switch(token.type) {
 		case '[':
 			designator = allocate_ast_zero(sizeof(designator[0]));
+			designator->source_position = token.source_position;
 			next_token();
-			designator->array_access = parse_constant_expression();
+			designator->array_index = parse_constant_expression();
 			expect(']');
 			break;
 		case '.':
 			designator = allocate_ast_zero(sizeof(designator[0]));
+			designator->source_position = token.source_position;
 			next_token();
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing designator",
@@ -922,7 +929,6 @@ static designator_t *parse_designation(void)
 		last = designator;
 	}
 }
-#endif
 
 static initializer_t *initializer_from_string(array_type_t *type,
                                               const string_t *const string)
@@ -949,13 +955,15 @@ static initializer_t *initializer_from_wide_string(array_type_t *const type,
 	return initializer;
 }
 
-static initializer_t *initializer_from_expression(type_t *type,
+static initializer_t *initializer_from_expression(type_t *orig_type,
                                                   expression_t *expression)
 {
 	/* TODO check that expression is a constant expression */
 
 	/* § 6.7.8.14/15 char array may be initialized by string literals */
-	type_t *const expr_type = expression->base.type;
+	type_t *type           = skip_typeref(orig_type);
+	type_t *expr_type_orig = expression->base.type;
+	type_t *expr_type      = skip_typeref(expr_type_orig);
 	if (is_type_array(type) && expr_type->kind == TYPE_POINTER) {
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
@@ -995,220 +1003,429 @@ static initializer_t *initializer_from_expression(type_t *type,
 	return result;
 }
 
-static initializer_t *parse_sub_initializer(type_t *type,
-                                            expression_t *expression);
-
-static initializer_t *parse_sub_initializer_elem(type_t *type)
+static initializer_t *parse_scalar_initializer(type_t *type)
 {
-	if(token.type == '{') {
-		return parse_sub_initializer(type, NULL);
-	}
-
-	expression_t *expression = parse_assignment_expression();
-	return parse_sub_initializer(type, expression);
-}
-
-static bool had_initializer_brace_warning;
-
-static void skip_designator(void)
-{
-	while(1) {
-		if(token.type == '.') {
-			next_token();
-			if(token.type == T_IDENTIFIER)
-				next_token();
-		} else if(token.type == '[') {
-			next_token();
-			parse_constant_expression();
-			if(token.type == ']')
-				next_token();
-		} else {
-			break;
-		}
-	}
-}
-
-static initializer_t *parse_sub_initializer(type_t *type,
-                                            expression_t *expression)
-{
-	if(is_type_scalar(type)) {
-		/* there might be extra {} hierarchies */
-		if(token.type == '{') {
-			next_token();
-			if(!had_initializer_brace_warning) {
-				warningf(HERE, "braces around scalar initializer");
-				had_initializer_brace_warning = true;
-			}
-			initializer_t *result = parse_sub_initializer(type, NULL);
-			if(token.type == ',') {
-				next_token();
-				/* TODO: warn about excessive elements */
-			}
-			expect_block('}');
-			return result;
-		}
-
-		if(expression == NULL) {
-			expression = parse_assignment_expression();
-		}
-		return initializer_from_expression(type, expression);
-	}
-
-	/* does the expression match the currently looked at object to initialize */
-	if(expression != NULL) {
-		initializer_t *result = initializer_from_expression(type, expression);
-		if(result != NULL)
-			return result;
-	}
-
-	bool read_paren = false;
-	if(token.type == '{') {
+	/* there might be extra {} hierarchies */
+	int braces = 0;
+	while(token.type == '{') {
 		next_token();
-		read_paren = true;
+		if(braces == 0) {
+			warningf(HERE, "extra curly braces around scalar initializer");
+		}
+		braces++;
 	}
 
-	/* descend into subtype */
-	initializer_t  *result = NULL;
-	initializer_t **elems;
-	if(is_type_array(type)) {
-		if(token.type == '.') {
-			errorf(HERE,
-			       "compound designator in initializer for array type '%T'",
-			       type);
-			skip_designator();
+	expression_t  *expression  = parse_assignment_expression();
+	initializer_t *initializer = initializer_from_expression(type, expression);
+
+	if(initializer == NULL) {
+		errorf(expression->base.source_position,
+		       "expression '%E' doesn't match expected type '%T'",
+		       expression, type);
+		/* TODO */
+		return NULL;
+	}
+
+	bool additional_warning_displayed = false;
+	while(braces > 0) {
+		if(token.type == ',') {
+			next_token();
 		}
+		if(token.type != '}') {
+			if(!additional_warning_displayed) {
+				warningf(HERE, "additional elements in scalar initializer");
+				additional_warning_displayed = true;
+			}
+		}
+		eat_block();
+		braces--;
+	}
 
-		type_t *const element_type = skip_typeref(type->array.element_type);
+	return initializer;
+}
 
-		initializer_t *sub;
-		had_initializer_brace_warning = false;
+typedef struct type_path_entry_t type_path_entry_t;
+struct type_path_entry_t {
+	type_t *type;
+	union {
+		size_t         index;
+		declaration_t *compound_entry;
+	} v;
+};
 
-		if(token.type == '{') {
-			sub = parse_sub_initializer(element_type, NULL);
+typedef struct type_path_t type_path_t;
+struct type_path_t {
+	type_path_entry_t *path;
+	type_t            *top_type;
+	bool               invalid;
+};
+
+static __attribute__((unused)) void debug_print_type_path(const type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+
+	if(path->invalid) {
+		fprintf(stderr, "invalid path");
+		return;
+	}
+
+	for(size_t i = 0; i < len; ++i) {
+		const type_path_entry_t *entry = & path->path[i];
+
+		type_t *type = skip_typeref(entry->type);
+		if(is_type_compound(type)) {
+			fprintf(stderr, ".%s", entry->v.compound_entry->symbol->string);
+		} else if(is_type_array(type)) {
+			fprintf(stderr, "[%u]", entry->v.index);
 		} else {
-			if(expression == NULL) {
-				expression = parse_assignment_expression();
+			fprintf(stderr, "-INVALID-");
+		}
+	}
+	fprintf(stderr, "  (");
+	print_type(path->top_type);
+	fprintf(stderr, ")");
+}
 
-				/* 6.7.8.14 + 15: we can have an optional {} around the string
-				 * literal */
-				if(read_paren && (expression->kind == EXPR_STRING_LITERAL
-						|| expression->kind == EXPR_WIDE_STRING_LITERAL)) {
-					initializer_t *result
-						= initializer_from_expression(type, expression);
-					if(result != NULL) {
-						expect_block('}');
-						return result;
+static type_path_entry_t *get_type_path_top(const type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+	assert(len > 0);
+	return & path->path[len-1];
+}
+
+static type_path_entry_t *append_to_type_path(type_path_t *path)
+{
+	size_t len = ARR_LEN(path->path);
+	ARR_RESIZE(type_path_entry_t, path->path, len+1);
+
+	type_path_entry_t *result = & path->path[len];
+	memset(result, 0, sizeof(result[0]));
+	return result;
+}
+
+static void descend_into_subtype(type_path_t *path)
+{
+	type_t *orig_top_type = path->top_type;
+	type_t *top_type      = skip_typeref(orig_top_type);
+
+	assert(is_type_compound(top_type) || is_type_array(top_type));
+
+	type_path_entry_t *top = append_to_type_path(path);
+	top->type              = top_type;
+
+	if(is_type_compound(top_type)) {
+		declaration_t *declaration = top_type->compound.declaration;
+		declaration_t *entry       = declaration->scope.declarations;
+
+		top->v.compound_entry = entry;
+		path->top_type        = entry->type;
+	} else {
+		assert(is_type_array(top_type));
+
+		top->v.index   = 0;
+		path->top_type = top_type->array.element_type;
+	}
+}
+
+static void ascend_from_subtype(type_path_t *path)
+{
+	type_path_entry_t *top = get_type_path_top(path);
+
+	path->top_type = top->type;
+
+	size_t len = ARR_LEN(path->path);
+	ARR_RESIZE(type_path_entry_t, path->path, len-1);
+}
+
+static void ascend_to(type_path_t *path, size_t top_path_level)
+{
+	size_t len = ARR_LEN(path->path);
+	assert(len >= top_path_level);
+
+	while(len > top_path_level) {
+		ascend_from_subtype(path);
+		len = ARR_LEN(path->path);
+	}
+}
+
+static bool walk_designator(type_path_t *path, const designator_t *designator,
+                            bool used_in_offsetof)
+{
+	for( ; designator != NULL; designator = designator->next) {
+		type_path_entry_t *top       = get_type_path_top(path);
+		type_t            *orig_type = top->type;
+
+		type_t *type = skip_typeref(orig_type);
+
+		if(designator->symbol != NULL) {
+			symbol_t *symbol = designator->symbol;
+			if(!is_type_compound(type)) {
+				if(is_type_valid(type)) {
+					errorf(designator->source_position,
+					       "'.%Y' designator used for non-compound type '%T'",
+					       symbol, orig_type);
+				}
+				goto failed;
+			}
+
+			declaration_t *declaration = type->compound.declaration;
+			declaration_t *iter        = declaration->scope.declarations;
+			for( ; iter != NULL; iter = iter->next) {
+				if(iter->symbol == symbol) {
+					break;
+				}
+			}
+			if(iter == NULL) {
+				errorf(designator->source_position,
+				       "'%T' has no member named '%Y'", orig_type, symbol);
+				goto failed;
+			}
+			if(used_in_offsetof) {
+				type_t *real_type = skip_typeref(iter->type);
+				if(real_type->kind == TYPE_BITFIELD) {
+					errorf(designator->source_position,
+					       "offsetof designator '%Y' may not specify bitfield",
+					       symbol);
+					goto failed;
+				}
+			}
+
+			top->type             = orig_type;
+			top->v.compound_entry = iter;
+			orig_type             = iter->type;
+		} else {
+			expression_t *array_index = designator->array_index;
+			assert(designator->array_index != NULL);
+
+			if(!is_type_array(type)) {
+				if(is_type_valid(type)) {
+					errorf(designator->source_position,
+					       "[%E] designator used for non-array type '%T'",
+					       array_index, orig_type);
+				}
+				goto failed;
+			}
+			if(!is_type_valid(array_index->base.type)) {
+				goto failed;
+			}
+
+			long index = fold_constant(array_index);
+			if(!used_in_offsetof) {
+				if(index < 0) {
+					errorf(designator->source_position,
+					       "array index [%E] must be positive", array_index);
+					goto failed;
+				}
+				if(type->array.size_constant == true) {
+					long array_size = type->array.size;
+					if(index >= array_size) {
+						errorf(designator->source_position,
+		 						"designator [%E] (%d) exceeds array size %d",
+			 					array_index, index, array_size);
+						goto failed;
 					}
 				}
 			}
 
-			sub = parse_sub_initializer(element_type, expression);
+			top->type    = orig_type;
+			top->v.index = (size_t) index;
+			orig_type    = type->array.element_type;
 		}
+		path->top_type = orig_type;
 
-		/* didn't match the subtypes -> try the parent type */
-		if(sub == NULL) {
-			assert(!read_paren);
-			return NULL;
+		if(designator->next != NULL) {
+			descend_into_subtype(path);
 		}
+	}
 
-		elems = NEW_ARR_F(initializer_t*, 0);
-		ARR_APP1(initializer_t*, elems, sub);
+	path->invalid  = false;
+	return true;
 
-		while(true) {
-			if(token.type == '}')
-				break;
-			expect_block(',');
-			if(token.type == '}')
-				break;
+failed:
+	return false;
+}
 
-			sub = parse_sub_initializer_elem(element_type);
-			if(sub == NULL) {
-				/* TODO error, do nicer cleanup */
-				errorf(HERE, "member initializer didn't match");
-				DEL_ARR_F(elems);
-				return NULL;
-			}
-			ARR_APP1(initializer_t*, elems, sub);
+static void advance_current_object(type_path_t *path, size_t top_path_level)
+{
+	if(path->invalid)
+		return;
+
+	type_path_entry_t *top = get_type_path_top(path);
+
+	type_t *type = skip_typeref(top->type);
+	if(is_type_union(type)) {
+		/* in unions only the first element is initialized */
+		top->v.compound_entry = NULL;
+	} else if(is_type_struct(type)) {
+		declaration_t *entry = top->v.compound_entry;
+
+		entry                 = entry->next;
+		top->v.compound_entry = entry;
+		if(entry != NULL) {
+			path->top_type = entry->type;
+			return;
 		}
 	} else {
-		assert(is_type_compound(type));
-		scope_t *const scope = &type->compound.declaration->scope;
+		assert(is_type_array(type));
 
-		if(token.type == '[') {
-			errorf(HERE,
-			       "array designator in initializer for compound type '%T'",
-			       type);
-			skip_designator();
+		top->v.index++;
+
+		if(!type->array.size_constant || top->v.index < type->array.size) {
+			return;
 		}
+	}
 
-		declaration_t *first = scope->declarations;
-		if(first == NULL)
-			return NULL;
-		type_t *first_type = first->type;
-		first_type         = skip_typeref(first_type);
+	/* we're past the last member of the current sub-aggregate, try if we
+	 * can ascend in the type hierarchy and continue with another subobject */
+	size_t len = ARR_LEN(path->path);
+
+	if(len > top_path_level) {
+		ascend_from_subtype(path);
+		advance_current_object(path, top_path_level);
+	} else {
+		path->invalid = true;
+	}
+}
+
+static void skip_initializers(void)
+{
+	if(token.type == '{')
+		next_token();
+
+	while(token.type != '}') {
+		if(token.type == T_EOF)
+			return;
+		if(token.type == '{') {
+			eat_block();
+			continue;
+		}
+		next_token();
+	}
+}
+
+static initializer_t *parse_sub_initializer(type_path_t *path,
+		type_t *outer_type, size_t top_path_level)
+{
+	type_t *orig_type = path->top_type;
+	type_t *type      = skip_typeref(orig_type);
+
+	/* we can't do usefull stuff if we didn't even parse the type. Skip the
+	 * initializers in this case. */
+	if(!is_type_valid(type)) {
+		skip_initializers();
+		return NULL;
+	}
+
+	initializer_t **initializers = NEW_ARR_F(initializer_t*, 0);
+
+	while(true) {
+		designator_t *designator = NULL;
+		if(token.type == '.' || token.type == '[') {
+			designator = parse_designation();
+
+			/* reset path to toplevel, evaluate designator from there */
+			ascend_to(path, top_path_level);
+			if(!walk_designator(path, designator, false)) {
+				/* can't continue after designation error */
+				goto end_error;
+			}
+
+			initializer_t *designator_initializer
+				= allocate_initializer_zero(INITIALIZER_DESIGNATOR);
+			designator_initializer->designator.designator = designator;
+			ARR_APP1(initializer_t*, initializers, designator_initializer);
+		}
 
 		initializer_t *sub;
-		had_initializer_brace_warning = false;
-		if(expression == NULL) {
-			sub = parse_sub_initializer_elem(first_type);
-		} else {
-			sub = parse_sub_initializer(first_type, expression);
-		}
 
-		/* didn't match the subtypes -> try our parent type */
-		if(sub == NULL) {
-			assert(!read_paren);
-			return NULL;
-		}
+		if(token.type == '{') {
+			if(is_type_scalar(type)) {
+				sub = parse_scalar_initializer(type);
+			} else {
+				eat('{');
+				descend_into_subtype(path);
 
-		elems = NEW_ARR_F(initializer_t*, 0);
-		ARR_APP1(initializer_t*, elems, sub);
+				sub = parse_sub_initializer(path, orig_type, top_path_level+1);
 
-		declaration_t *iter  = first->next;
-		for( ; iter != NULL; iter = iter->next) {
-			if(iter->symbol == NULL)
-				continue;
-			if(iter->namespc != NAMESPACE_NORMAL)
-				continue;
+				ascend_from_subtype(path);
 
-			if(token.type == '}')
-				break;
-			expect_block(',');
-			if(token.type == '}')
-				break;
-
-			type_t *iter_type = iter->type;
-			iter_type         = skip_typeref(iter_type);
-
-			sub = parse_sub_initializer_elem(iter_type);
-			if(sub == NULL) {
-				/* TODO error, do nicer cleanup */
-				errorf(HERE, "member initializer didn't match");
-				DEL_ARR_F(elems);
-				return NULL;
+				expect_block('}');
 			}
-			ARR_APP1(initializer_t*, elems, sub);
+		} else {
+			/* must be an expression */
+			expression_t *expression = parse_assignment_expression();
+
+			/* handle { "string" } special case */
+			if((expression->kind == EXPR_STRING_LITERAL
+					|| expression->kind == EXPR_WIDE_STRING_LITERAL)
+					&& outer_type != NULL) {
+				sub = initializer_from_expression(outer_type, expression);
+				if(sub != NULL) {
+					if(token.type == ',') {
+						next_token();
+					}
+					if(token.type != '}') {
+						warningf(HERE, "excessive elements in initializer for type '%T'",
+								 orig_type);
+					}
+					/* TODO: eat , ... */
+					return sub;
+				}
+			}
+
+			/* descend into subtypes until expression matches type */
+			while(true) {
+				orig_type = path->top_type;
+				type      = skip_typeref(orig_type);
+
+				sub = initializer_from_expression(orig_type, expression);
+				if(sub != NULL) {
+					break;
+				}
+				if(!is_type_valid(type)) {
+					goto end_error;
+				}
+				if(is_type_scalar(type)) {
+					errorf(expression->base.source_position,
+							"expression '%E' doesn't match expected type '%T'",
+							expression, orig_type);
+					goto end_error;
+				}
+
+				descend_into_subtype(path);
+			}
 		}
+		ARR_APP1(initializer_t*, initializers, sub);
+
+		if(token.type == '}') {
+			break;
+		}
+		expect(',');
+		if(token.type == '}') {
+			break;
+		}
+		advance_current_object(path, top_path_level);
 	}
 
-	int    len        = ARR_LEN(elems);
-	size_t elems_size = sizeof(initializer_t*) * len;
+	size_t len  = ARR_LEN(initializers);
+	size_t size = sizeof(initializer_list_t) + len * sizeof(initializers[0]);
+	initializer_t *result = allocate_ast_zero(size);
+	result->kind          = INITIALIZER_LIST;
+	result->list.len      = len;
+	memcpy(&result->list.initializers, initializers,
+	       len * sizeof(initializers[0]));
 
-	initializer_list_t *init = allocate_ast_zero(sizeof(init[0]) + elems_size);
+	ascend_to(path, top_path_level);
 
-	init->initializer.kind = INITIALIZER_LIST;
-	init->len              = len;
-	memcpy(init->initializers, elems, elems_size);
-	DEL_ARR_F(elems);
+	/* TODO: if(is_global && !is_constant(...)) { error } */
 
-	result = (initializer_t*) init;
-
-	if(read_paren) {
-		if(token.type == ',')
-			next_token();
-		expect('}');
-	}
 	return result;
+
+end_error:
+	skip_initializers();
+	DEL_ARR_F(initializers);
+	ascend_to(path, top_path_level);
+	return NULL;
 }
 
 static initializer_t *parse_initializer(type_t *const orig_type)
@@ -1229,19 +1446,31 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 	}
 
 	if(is_type_scalar(type)) {
-		/* § 6.7.8.11 */
-		eat('{');
+		/* TODO: § 6.7.8.11; eat {} without warning */
 
-		expression_t *expression = parse_assignment_expression();
-		result = initializer_from_expression(type, expression);
+		result = parse_scalar_initializer(type);
 
 		if(token.type == ',')
 			next_token();
 
-		expect('}');
 		return result;
+	} else if(token.type == '{') {
+		next_token();
+
+		type_path_t path;
+		memset(&path, 0, sizeof(path));
+		path.top_type = orig_type;
+		path.path     = NEW_ARR_F(type_path_entry_t, 0);
+
+		descend_into_subtype(&path);
+
+		result = parse_sub_initializer(&path, orig_type, 1);
+
+		DEL_ARR_F(path.path);
+
+		expect('}');
 	} else {
-		result = parse_sub_initializer(type, NULL);
+		/* TODO ... */
 	}
 
 	return result;
@@ -2204,11 +2433,20 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
 			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, (source_position_t){NULL, 0});
 
-			array_type->base.qualifiers    = parsed_array->type_qualifiers;
-			array_type->array.element_type = type;
-			array_type->array.is_static    = parsed_array->is_static;
-			array_type->array.is_variable  = parsed_array->is_variable;
-			array_type->array.size         = parsed_array->size;
+			expression_t *size_expression = parsed_array->size;
+
+			array_type->base.qualifiers       = parsed_array->type_qualifiers;
+			array_type->array.element_type    = type;
+			array_type->array.is_static       = parsed_array->is_static;
+			array_type->array.is_variable     = parsed_array->is_variable;
+			array_type->array.size_expression = size_expression;
+
+			if(size_expression != NULL &&
+					is_constant_expression(size_expression)) {
+				array_type->array.size_constant = true;
+		  		array_type->array.size
+					= fold_constant(size_expression);
+			}
 
 			type_t *skipped_type = skip_typeref(type);
 			if (is_type_atomic(skipped_type, ATOMIC_TYPE_VOID)) {
@@ -2536,33 +2774,38 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	if(is_type_array(type) && initializer != NULL) {
 		array_type_t *array_type = &type->array;
 
-		if(array_type->size == NULL) {
-			expression_t *cnst = allocate_expression_zero(EXPR_CONST);
-
-			cnst->base.type = type_size_t;
-
+		if(array_type->size_expression == NULL) {
+			size_t size;
 			switch (initializer->kind) {
 				case INITIALIZER_LIST: {
-					cnst->conste.v.int_value = initializer->list.len;
+					/* TODO */
+					size = initializer->list.len;
 					break;
 				}
 
 				case INITIALIZER_STRING: {
-					cnst->conste.v.int_value = initializer->string.string.size;
+					size = initializer->string.string.size;
 					break;
 				}
 
 				case INITIALIZER_WIDE_STRING: {
-					cnst->conste.v.int_value = initializer->wide_string.string.size;
+					size = initializer->wide_string.string.size;
 					break;
 				}
 
-				default:
+				default: {
 					panic("invalid initializer type");
+					break;
+				}
 			}
 
-			array_type->size              = cnst;
-			array_type->has_implicit_size = true;
+			expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
+			cnst->base.type          = type_size_t;
+			cnst->conste.v.int_value = size;
+
+			array_type->size_expression = cnst;
+			array_type->size_constant   = true;
+			array_type->size            = size;
 		}
 	}
 
@@ -3442,15 +3685,32 @@ static void check_cast_allowed(expression_t *expression, type_t *dest_type)
 	/* TODO check if explicit cast is allowed and issue warnings/errors */
 }
 
+static expression_t *parse_compound_literal(type_t *type)
+{
+	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
+
+	expression->compound_literal.type        = type;
+	expression->compound_literal.initializer = parse_initializer(type);
+	expression->base.type                    = automatic_type_conversion(type);
+
+	return expression;
+}
+
 static expression_t *parse_cast(void)
 {
-	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
-
-	cast->base.source_position = token.source_position;
+	source_position_t source_position = token.source_position;
 
 	type_t *type  = parse_typename();
 
 	expect(')');
+
+	if(token.type == '{') {
+		return parse_compound_literal(type);
+	}
+
+	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
+	cast->base.source_position = source_position;
+
 	expression_t *value = parse_sub_expression(20);
 
 	check_cast_allowed(value, type);
@@ -3545,7 +3805,8 @@ static expression_t *parse_pretty_function_keyword(void)
 
 static designator_t *parse_designator(void)
 {
-	designator_t *result = allocate_ast_zero(sizeof(result[0]));
+	designator_t *result    = allocate_ast_zero(sizeof(result[0]));
+	result->source_position = HERE;
 
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
@@ -3566,8 +3827,9 @@ static designator_t *parse_designator(void)
 				eat_paren();
 				return NULL;
 			}
-			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
-			designator->symbol       = token.v.symbol;
+			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
+			designator->source_position = HERE;
+			designator->symbol          = token.v.symbol;
 			next_token();
 
 			last_designator->next = designator;
@@ -3576,9 +3838,10 @@ static designator_t *parse_designator(void)
 		}
 		if(token.type == '[') {
 			next_token();
-			designator_t *designator = allocate_ast_zero(sizeof(result[0]));
-			designator->array_access = parse_expression();
-			if(designator->array_access == NULL) {
+			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
+			designator->source_position = HERE;
+			designator->array_index     = parse_expression();
+			if(designator->array_index == NULL) {
 				eat_paren();
 				return NULL;
 			}
@@ -3602,10 +3865,26 @@ static expression_t *parse_offsetof(void)
 	expression->base.type    = type_size_t;
 
 	expect('(');
-	expression->offsetofe.type = parse_typename();
+	type_t *type = parse_typename();
 	expect(',');
-	expression->offsetofe.designator = parse_designator();
+	designator_t *designator = parse_designator();
 	expect(')');
+
+	expression->offsetofe.type       = type;
+	expression->offsetofe.designator = designator;
+
+	type_path_t path;
+	memset(&path, 0, sizeof(path));
+	path.top_type = type;
+	path.path     = NEW_ARR_F(type_path_entry_t, 0);
+
+	descend_into_subtype(&path);
+
+	if(!walk_designator(&path, designator, true)) {
+		return create_invalid_expression();
+	}
+
+	DEL_ARR_F(path.path);
 
 	return expression;
 }
@@ -4761,6 +5040,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_VA_START:                  return true;
 		case EXPR_VA_ARG:                    return true;
 		case EXPR_STATEMENT:                 return true; // TODO
+		case EXPR_COMPOUND_LITERAL:          return false;
 
 		case EXPR_UNARY_NEGATE:              return false;
 		case EXPR_UNARY_PLUS:                return false;

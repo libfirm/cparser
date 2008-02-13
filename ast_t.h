@@ -20,6 +20,7 @@ typedef enum {
 	EXPR_CHAR_CONST,
 	EXPR_STRING_LITERAL,
 	EXPR_WIDE_STRING_LITERAL,
+	EXPR_COMPOUND_LITERAL,
 	EXPR_CALL,
 	EXPR_CONDITIONAL,
 	EXPR_SELECT,
@@ -183,6 +184,12 @@ struct wide_string_literal_expression_t {
 	wide_string_t      value;
 };
 
+struct compound_literal_expression_t {
+	expression_base_t  base;
+	type_t            *type;
+	initializer_t     *initializer;
+};
+
 struct builtin_symbol_expression_t {
 	expression_base_t  base;
 	symbol_t          *symbol;
@@ -250,9 +257,10 @@ struct typeprop_expression_t {
 };
 
 struct designator_t {
-	symbol_t     *symbol;
-	expression_t *array_access;
-	designator_t *next;
+	source_position_t  source_position;
+	symbol_t          *symbol;
+	expression_t      *array_index;
+	designator_t      *next;
 };
 
 struct offsetof_expression_t {
@@ -295,6 +303,7 @@ union expression_t {
 	const_expression_t               conste;
 	string_literal_expression_t      string;
 	wide_string_literal_expression_t wide_string;
+	compound_literal_expression_t    compound_literal;
 	builtin_symbol_expression_t      builtin_symbol;
 	builtin_constant_expression_t    builtin_constant;
 	builtin_prefetch_expression_t    builtin_prefetch;
@@ -338,7 +347,8 @@ typedef enum {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
-	INITIALIZER_WIDE_STRING
+	INITIALIZER_WIDE_STRING,
+	INITIALIZER_DESIGNATOR
 } initializer_kind_t;
 
 struct initializer_base_t {
@@ -346,24 +356,29 @@ struct initializer_base_t {
 };
 
 struct initializer_value_t {
-	initializer_base_t  initializer;
+	initializer_base_t  base;
 	expression_t       *value;
 };
 
 struct initializer_list_t {
-	initializer_base_t  initializer;
+	initializer_base_t  base;
 	size_t              len;
 	initializer_t      *initializers[];
 };
 
 struct initializer_string_t {
-	initializer_base_t initializer;
+	initializer_base_t base;
 	string_t           string;
 };
 
 struct initializer_wide_string_t {
-	initializer_base_t  initializer;
+	initializer_base_t  base;
 	wide_string_t       string;
+};
+
+struct initializer_designator_t {
+	initializer_base_t  base;
+	designator_t       *designator;
 };
 
 union initializer_t {
@@ -373,6 +388,7 @@ union initializer_t {
 	initializer_list_t        list;
 	initializer_string_t      string;
 	initializer_wide_string_t wide_string;
+	initializer_designator_t  designator;
 };
 
 typedef enum {

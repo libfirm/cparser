@@ -97,10 +97,12 @@ struct pointer_type_t {
 struct array_type_t {
 	type_base_t   type;
 	type_t       *element_type;
-	expression_t *size;
+	expression_t *size_expression;
+	size_t        size;
 	unsigned      is_static         : 1;
 	unsigned      is_variable       : 1;
 	unsigned      has_implicit_size : 1;
+	unsigned      size_constant     : 1;
 };
 
 struct function_parameter_t {
@@ -203,6 +205,24 @@ static inline bool is_type_function(const type_t *type)
 {
 	assert(!is_typeref(type));
 	return type->kind == TYPE_FUNCTION;
+}
+
+static inline bool is_type_union(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_COMPOUND_UNION;
+}
+
+static inline bool is_type_struct(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_COMPOUND_STRUCT;
+}
+
+static inline bool is_type_builtin(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_BUILTIN;
 }
 
 static inline bool is_type_compound(const type_t *type)

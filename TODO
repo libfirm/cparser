@@ -1,6 +1,11 @@
+Initializer rewrite:
+- determining of array size for array types of unspecified length is wrong in
+  presence of designators and unions
+
 Refactoring:
 - create an empty_statement_t and use that instead of a NULL pointer in places
   like if, loop bodys, statements after labels
+- eliminate target_architecture.h and replace with stuff in lang_features.h
 
 Lexer:
 - Add preprocessor code
@@ -10,22 +15,24 @@ Lexer:
 
 Parser:
 - the expect macros abort functions directly. This leads to some functions
-  not resetting the current context properly (parse_for)
+  not resetting the current context properly (parse_for); expect in expressions
+  suddenly return NULL which triggers asserts
 - label: declaration; is no valid C99 but we parse it anyway
 - designator support for initializers
 - add constant folding code
-- Refactor code, so code to handle number values and strings is
-  an own module and replacable
+- Refactor code, so code to handle number values (and strings?) is an own
+  module and replacable
 - Support some attributes. noreturn, unused, printf, scanf, packed would be
   interesting candidates
+- Add columns to source positions
 - SourcePositions could be stored selectively on expressions that really need
   them.
 - check semantic for functions declared/defined in global scope and declared
   again in a local scope
 
 ast2firm:
+- handle non-constant initializers
 - output source file positions for panics...
-- output variable names for uninitialized variable warnings
 - handle bitfield members with 0 correctly (standard says they finish the
   current unit)
 

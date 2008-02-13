@@ -36,6 +36,7 @@ extern type_t *type_ssize_t;
 extern type_t *type_uintmax_t;
 extern type_t *type_uptrdiff_t;
 extern type_t *type_wchar_t;
+extern type_t *type_wchar_ptr_t;
 extern type_t *type_wint_t;
 
 extern type_t *type_intmax_t_ptr;

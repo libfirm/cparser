@@ -10,6 +10,7 @@ typedef struct expression_base_t                expression_base_t;
 typedef struct const_expression_t               const_expression_t;
 typedef struct string_literal_expression_t      string_literal_expression_t;
 typedef struct wide_string_literal_expression_t wide_string_literal_expression_t;
+typedef struct compound_literal_expression_t    compound_literal_expression_t;
 typedef struct reference_expression_t           reference_expression_t;
 typedef struct cast_expression_t                cast_expression_t;
 typedef struct call_argument_t                  call_argument_t;
@@ -40,6 +41,7 @@ typedef struct initializer_list_t           initializer_list_t;
 typedef struct initializer_value_t          initializer_value_t;
 typedef struct initializer_string_t         initializer_string_t;
 typedef struct initializer_wide_string_t    initializer_wide_string_t;
+typedef struct initializer_designator_t     initializer_designator_t;
 typedef union  initializer_t                initializer_t;
 
 typedef struct declaration_t                declaration_t;
@@ -77,5 +79,7 @@ void  change_indent(int delta);
 void *allocate_ast(size_t size);
 
 bool is_constant_expression(const expression_t *expression);
+
+long fold_constant(const expression_t *expression);
 
 #endif

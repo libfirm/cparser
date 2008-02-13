@@ -83,6 +83,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_CONST]                     = PREC_PRIM,
 		[EXPR_STRING_LITERAL]            = PREC_PRIM,
 		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
+		[EXPR_COMPOUND_LITERAL]          = PREC_UNARY,
 		[EXPR_CALL]                      = PREC_PRIM,
 		[EXPR_CONDITIONAL]               = PREC_COND,
 		[EXPR_SELECT]                    = PREC_ACCESS,
@@ -245,12 +246,10 @@ static void print_string_literal(
  *
  * @param wstr  the wide string literal expression
  */
-static void print_wide_string_literal(
-	const wide_string_literal_expression_t *const wstr)
+static void print_quoted_wide_string(const wide_string_t *const wstr)
 {
 	fputs("L\"", out);
-	for (const wchar_rep_t *c   = wstr->value.begin,
-	                       *end = c + wstr->value.size;
+	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size;
 	     c != end; ++c) {
 		switch (*c) {
 			case L'\"':  fputs("\\\"", out); break;
@@ -288,6 +287,21 @@ static void print_wide_string_literal(
 		}
 	}
 	fputc('"', out);
+}
+
+static void print_wide_string_literal(
+	const wide_string_literal_expression_t *const wstr)
+{
+	print_quoted_wide_string(&wstr->value);
+}
+
+static void print_compound_literal(
+		const compound_literal_expression_t *expression)
+{
+	fputc('(', out);
+	print_type(expression->type);
+	fputs(") ", out);
+	print_initializer(expression->initializer);
 }
 
 /**
@@ -609,11 +623,10 @@ static void print_classify_type_expression(
  */
 static void print_designator(const designator_t *designator)
 {
-	fputs(designator->symbol->string, out);
-	for (designator = designator->next; designator != NULL; designator = designator->next) {
-		if (designator->array_access) {
+	for ( ; designator != NULL; designator = designator->next) {
+		if (designator->symbol == NULL) {
 			fputc('[', out);
-			print_expression_prec(designator->array_access, PREC_ACCESS);
+			print_expression_prec(designator->array_index, PREC_ACCESS);
 			fputc(']', out);
 		} else {
 			fputc('.', out);
@@ -680,6 +693,9 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	case EXPR_WIDE_STRING_LITERAL:
 		print_wide_string_literal(&expression->wide_string);
+		break;
+	case EXPR_COMPOUND_LITERAL:
+		print_compound_literal(&expression->compound_literal);
 		break;
 	case EXPR_CALL:
 		print_call_expression(&expression->call);
@@ -1119,23 +1135,45 @@ static void print_storage_class(unsigned storage_class)
  */
 void print_initializer(const initializer_t *initializer)
 {
-	if(initializer->kind == INITIALIZER_VALUE) {
+	if(initializer == NULL) {
+		fputs("{ NIL-INITIALIZER }", out);
+		return;
+	}
+
+	switch(initializer->kind) {
+	case INITIALIZER_VALUE: {
 		const initializer_value_t *value = &initializer->value;
 		print_expression(value->value);
 		return;
 	}
+	case INITIALIZER_LIST: {
+		assert(initializer->kind == INITIALIZER_LIST);
+		fputs("{ ", out);
+		const initializer_list_t *list = &initializer->list;
 
-	assert(initializer->kind == INITIALIZER_LIST);
-	fputs("{ ", out);
-	const initializer_list_t *list = &initializer->list;
-
-	for(size_t i = 0 ; i < list->len; ++i) {
-		if(i > 0) {
-			fputs(", ", out);
+		for(size_t i = 0 ; i < list->len; ++i) {
+			const initializer_t *sub_init = list->initializers[i];
+			print_initializer(list->initializers[i]);
+			if(i < list->len-1 && sub_init->kind != INITIALIZER_DESIGNATOR) {
+				fputs(", ", out);
+			}
 		}
-		print_initializer(list->initializers[i]);
+		fputs(" }", out);
+		return;
 	}
-	fputs("}", out);
+	case INITIALIZER_STRING:
+		print_quoted_string(&initializer->string.string, '"');
+		return;
+	case INITIALIZER_WIDE_STRING:
+		print_quoted_wide_string(&initializer->wide_string.string);
+		return;
+	case INITIALIZER_DESIGNATOR:
+		print_designator(initializer->designator.designator);
+		fputs(" = ", out);
+		return;
+	}
+
+	panic("invalid initializer kind found");
 }
 
 /**
@@ -1326,6 +1364,10 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_ISUNORDERED:
 		return is_constant_expression(expression->binary.left)
 			&& is_constant_expression(expression->binary.right);
+
+	case EXPR_COMPOUND_LITERAL:
+		/* TODO: check initializer if it is constant */
+		return true;
 
 	case EXPR_CONDITIONAL:
 		/* TODO: not correct, we only have to test expressions which are

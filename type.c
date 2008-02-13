@@ -190,9 +190,9 @@ static void print_array_type_post(const array_type_t *type)
 		fputs("static ", out);
 	}
 	print_type_qualifiers(type->type.qualifiers);
-	if(type->size != NULL
+	if(type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
-		print_expression(type->size);
+		print_expression(type->size_expression);
 	}
 	fputc(']', out);
 	intern_print_type_post(type->element_type, false);
@@ -708,7 +708,7 @@ bool is_type_incomplete(const type_t *type)
 		return true;
 
 	case TYPE_ARRAY:
-		return type->array.size == NULL;
+		return type->array.size_expression == NULL;
 
 	case TYPE_ATOMIC:
 		return type->atomic.akind == ATOMIC_TYPE_VOID;
@@ -780,12 +780,10 @@ static bool array_types_compatible(const array_type_t *array1,
 	if(!types_compatible(element_type1, element_type2))
 		return false;
 
-	if(array1->size != NULL && array2->size != NULL) {
-		/* TODO: check if size expression evaluate to the same value
-		 * if they are constant */
-	}
+	if(!array1->size_constant || !array2->size_constant)
+		return true;
 
-	return true;
+	return array1->size == array2->size;
 }
 
 /**
