@@ -51,6 +51,7 @@ SOURCES := \
 OBJECTS = $(SOURCES:%.c=build/%.o)
 
 SPLINTS = $(addsuffix .splint, $(SOURCES))
+CPARSERS = $(addsuffix .cparser, $(SOURCES))
 
 Q = @
 
@@ -82,9 +83,15 @@ $(GOAL): build/adt build/driver $(OBJECTS)
 
 splint: $(SPLINTS)
 
+selfcheck: $(CPARSERS)
+
 %.c.splint: %.c
 	@echo '===> SPLINT $<'
 	$(Q)splint $(CPPFLAGS) $<
+
+%.c.cparser: %.c
+	@echo '===> CPARSER $<'
+	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
 build/adt build/driver:
 	@echo "===> MKDIR $@"
