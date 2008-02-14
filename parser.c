@@ -1404,7 +1404,10 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		if(token.type == '}') {
 			break;
 		}
+
 		advance_current_object(path, top_path_level);
+		orig_type = path->top_type;
+		type      = skip_typeref(orig_type);
 	}
 
 	size_t len  = ARR_LEN(initializers);
@@ -1470,7 +1473,7 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 
 		expect('}');
 	} else {
-		/* TODO ... */
+		panic("TODO");
 	}
 
 	return result;
