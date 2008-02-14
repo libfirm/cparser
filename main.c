@@ -168,6 +168,7 @@ static void lextest(FILE *in, const char *fname)
 static FILE* preprocess(FILE* in, const char *fname)
 {
 	char buf[4096];
+	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
 
 	if(in != stdin) {
@@ -191,6 +192,7 @@ static FILE* preprocess(FILE* in, const char *fname)
 static void do_link(const char *out, const char *in)
 {
 	char buf[4096];
+	obstack_1grow(&ldflags_obst, '\0');
 	const char *flags = obstack_finish(&ldflags_obst);
 
 	snprintf(buf, sizeof(buf), LINKER " %s -o %s %s", flags, out, in);
