@@ -2315,14 +2315,19 @@ static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 	return new_d_Const(dbgi, mode, tv);
 }
 
+static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
+                                     ir_entity *entity, type_t *type);
+
 static ir_node *compound_literal_to_firm(
 		const compound_literal_expression_t *expression)
 {
+	type_t *type = expression->type;
+
 	/* create an entity on the stack */
 	ir_type *frame_type = get_irg_frame_type(current_ir_graph);
 
 	ident     *const id     = unique_ident("CompLit");
-	ir_type   *const irtype = get_ir_type(expression->type);
+	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&expression->base.source_position);
 	ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
@@ -2330,7 +2335,13 @@ static ir_node *compound_literal_to_firm(
 	set_entity_variability(entity, variability_uninitialized);
 
 	/* create initialisation code TODO */
-	return NULL;
+	initializer_t *initializer = expression->initializer;
+	create_local_initializer(initializer, dbgi, entity, type);
+
+	/* create a sel for the compound literal address */
+	ir_node   *frame = get_local_frame(entity);
+	ir_node   *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+	return sel;
 }
 
 /**
