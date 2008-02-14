@@ -1570,7 +1570,10 @@ static void parse_enum_entries(type_t *const enum_type)
 
 		if(token.type == '=') {
 			next_token();
-			entry->init.enum_value = parse_constant_expression();
+			expression_t *value = parse_constant_expression();
+
+			value = create_implicit_cast(value, enum_type);
+			entry->init.enum_value = value;
 
 			/* TODO semantic */
 		}
