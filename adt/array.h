@@ -19,10 +19,10 @@
 
 #include <assert.h>
 #include <stddef.h>
-#include <obstack.h>
 
 #include "fourcc.h"
 #include "align.h"
+#include "obst.h"
 #include "xmalloc.h"
 
 #define ARR_D_MAGIC	FOURCC('A','R','R','D')
