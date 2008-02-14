@@ -8,6 +8,8 @@
  * $Id$
  */
 
+#include <stdio.h>
+
 enum timings {
 #define DEFTIMEVAR(x, y, z)	x,
 #include "firm_timing.def"

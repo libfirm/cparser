@@ -5,7 +5,7 @@
  *
  * $Id$
  */
-#include <libcore/lc_timing.h>
+#include <libfirm/timing.h>
 #include "firm_timing.h"
 
 static const char *tv_names[] = {
@@ -22,14 +22,14 @@ static const char *tv_desc[] = {
 #undef DEFTIMEVAR
 };
 
-static lc_timer_t *timers[TV_LAST];
+static ir_timer_t *timers[TV_LAST];
 static int timers_inited;
 
 void timer_init(void) {
 	int i;
 
 	for (i = 0; i < TV_LAST; ++i) {
-		timers[i] = lc_timer_register(tv_names[i], tv_desc[i]);
+		timers[i] = ir_timer_register(tv_names[i], tv_desc[i]);
 	}
 
 	timers_inited = 1;
@@ -39,8 +39,8 @@ void timer_term(FILE *f) {
 	int i;
 
 	for (i = 0; i < TV_LAST; ++i) {
-		unsigned long val = lc_timer_elapsed_msec(timers[i]);
-		fprintf(f, "%-30s %8lu\n", tv_desc[i], val);
+		double val = (double)ir_timer_elapsed_usec(timers[i]) / 1000.0;
+		fprintf(f, "%-30s %8.3f msec\n", tv_desc[i], val);
 	}
 
 	timers_inited = 0;
@@ -48,20 +48,20 @@ void timer_term(FILE *f) {
 
 void timer_push(int timer) {
 	if (timers_inited)
-		lc_timer_push(timers[timer]);
+		ir_timer_push(timers[timer]);
 }
 
 void timer_pop(void) {
 	if (timers_inited)
-		lc_timer_pop();
+		ir_timer_pop();
 }
 
 void timer_start(int timer) {
 	if (timers_inited)
-		lc_timer_start(timers[timer]);
+		ir_timer_start(timers[timer]);
 }
 
 void timer_stop(int timer) {
 	if (timers_inited)
-		lc_timer_stop(timers[timer]);
+		ir_timer_stop(timers[timer]);
 }
