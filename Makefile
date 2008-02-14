@@ -25,6 +25,8 @@ LFLAGS += $(FIRM_LIBS)
 SOURCES := \
 	adt/hashset.c \
 	adt/strset.c \
+	adt/obstack.c \
+	adt/obstack_printf.c \
 	adt/xmalloc.c \
 	ast.c \
 	ast2firm.c \

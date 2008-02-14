@@ -6,9 +6,7 @@
  * @author  Martin Trapp, Christian Schaefer
  * @version $Id$
  */
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <obstack.h>
+#include "obstack.h"
 #include "xmalloc.h"
 
 #define obstack_chunk_alloc xmalloc
