@@ -1277,6 +1277,29 @@ void print_ast(const translation_unit_t *unit)
 	}
 }
 
+static bool is_initializer_const(const initializer_t *initializer)
+{
+	switch(initializer->kind) {
+	case INITIALIZER_STRING:
+	case INITIALIZER_WIDE_STRING:
+	case INITIALIZER_DESIGNATOR:
+		return true;
+
+	case INITIALIZER_VALUE:
+		return is_constant_expression(initializer->value.value);
+
+	case INITIALIZER_LIST: {
+		for(size_t i = 0; i < initializer->list.len; ++i) {
+			initializer_t *sub_initializer = initializer->list.initializers[i];
+			if(!is_initializer_const(sub_initializer))
+				return false;
+		}
+		return true;
+	}
+	}
+	panic("invalid initializer kind found");
+}
+
 /**
  * Returns true if a given expression is a compile time
  * constant.
@@ -1366,8 +1389,7 @@ bool is_constant_expression(const expression_t *expression)
 			&& is_constant_expression(expression->binary.right);
 
 	case EXPR_COMPOUND_LITERAL:
-		/* TODO: check initializer if it is constant */
-		return true;
+		return is_initializer_const(expression->compound_literal.initializer);
 
 	case EXPR_CONDITIONAL:
 		/* TODO: not correct, we only have to test expressions which are
