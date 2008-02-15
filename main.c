@@ -342,6 +342,7 @@ int main(int argc, char **argv)
 	const char     *outname      = NULL;
 	const char     *dumpfunction = NULL;
 	compile_mode_t  mode         = CompileAssembleLink;
+	int             opt_level    = 1;
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
@@ -365,6 +366,43 @@ int main(int argc, char **argv)
 
 #define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
 
+	/* early options parsing (find out optimisation level) */
+	for(int i = 1; i < argc; ++i) {
+		const char *arg = argv[i];
+		if(arg[0] != '-')
+			continue;
+
+		const char *option = &arg[1];
+		if(option[0] == 'O') {
+			sscanf(&option[1], "%d", &opt_level);
+		}
+	}
+
+	/* apply optimisation level */
+	switch(opt_level) {
+	case 0:
+		firm_option("no-opt");
+		break;
+	case 1:
+		firm_option("no-inline");
+		break;
+	default:
+	case 4:
+		firm_option("strict-aliasing");
+		/* fallthrough */
+	case 3:
+		firm_option("cond-eval");
+		firm_option("if-conv");
+		/* fallthrough */
+	case 2:
+		firm_option("inline");
+		firm_option("no-strength-red");
+		firm_option("deconv");
+		firm_be_option("omitfp");
+		break;
+	}
+
+	/* parse rest of options */
 	bool help_displayed  = false;
 	bool argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
@@ -378,6 +416,8 @@ int main(int argc, char **argv)
 				mode = CompileAssemble;
 			} else if(SINGLE_OPTION('S')) {
 				mode = Compile;
+			} else if(option[0] == 'O') {
+				continue;
 			} else if(option[0] == 'I') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-I");
@@ -460,9 +500,7 @@ int main(int argc, char **argv)
 				}
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
-			} else if(option[0] == 'O' ||
-			          option[0] == 'g' ||
-			          strncmp(option, "std=", 4) == 0) {
+			} else if(option[0] == 'g' || strncmp(option, "std=", 4) == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (option[0] == '-') {
 				/* double dash option */
