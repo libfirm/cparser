@@ -1,8 +1,10 @@
+static const int l = 5;
+
 struct S {
 	int a, b;
 };
 
-struct S arr[] = { { 1, 2, { 3, 4 } } };
+struct S arr[] = { 1, l };
 
 int main(void)
 {
