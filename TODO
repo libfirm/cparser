@@ -14,8 +14,7 @@ Parser:
   not resetting the current context properly (parse_for); expect in expressions
   suddenly return NULL which triggers asserts
 - label: declaration; is no valid C99 but we parse it anyway
-- designator support for initializers
-- add constant folding code
+- add constant folding code (optional, ast2firm already does it)
 - Refactor code, so code to handle number values (and strings?) is an own
   module and replacable
 - Support some attributes. noreturn, unused, printf, scanf, packed would be
