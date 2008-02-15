@@ -52,6 +52,7 @@ OBJECTS = $(SOURCES:%.c=build/%.o)
 
 SPLINTS = $(addsuffix .splint, $(SOURCES))
 CPARSERS = $(addsuffix .cparser, $(SOURCES))
+CPARSEROS = $(SOURCES:%.c=build/cpb/%.o)
 
 Q = @
 
@@ -85,6 +86,8 @@ splint: $(SPLINTS)
 
 selfcheck: $(CPARSERS)
 
+bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS)
+
 %.c.splint: %.c
 	@echo '===> SPLINT $<'
 	$(Q)splint $(CPPFLAGS) $<
@@ -93,9 +96,13 @@ selfcheck: $(CPARSERS)
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-build/adt build/driver:
+build/adt build/driver build/cpb build/cpb/adt build/cpb/driver:
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
+
+build/cpb/%.o: %.c
+	@echo '===> CPARSER $<'
+	$(Q)./cparser $(CPPFLAGS) -Wall -c $< -o $@
 
 build/%.o: %.c
 	@echo '===> CC $<'

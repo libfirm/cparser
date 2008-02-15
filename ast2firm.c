@@ -4559,7 +4559,6 @@ static void create_function(declaration_t *declaration)
 	}
 	set_type_size_bytes(frame_type, offset);
 	set_type_alignment_bytes(frame_type, align_all);
-	set_type_state(frame_type, layout_fixed);
 
 	irg_vrfy(irg);
 }
