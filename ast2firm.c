@@ -1871,6 +1871,36 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	panic("invalid UNEXPR type found");
 }
 
+static ir_node *produce_condition_result(const expression_t *expression,
+                                         dbg_info *dbgi)
+{
+	ir_mode *mode      = get_ir_mode(expression->base.type);
+	ir_node *cur_block = get_cur_block();
+
+	ir_node *one_block = new_immBlock();
+	ir_node *one       = new_Const(mode, get_mode_one(mode));
+	ir_node *jmp_one   = new_d_Jmp(dbgi);
+
+	ir_node *zero_block = new_immBlock();
+	ir_node *zero       = new_Const(mode, get_mode_null(mode));
+	ir_node *jmp_zero   = new_d_Jmp(dbgi);
+
+	set_cur_block(cur_block);
+	create_condition_evaluation(expression, one_block, zero_block);
+	mature_immBlock(one_block);
+	mature_immBlock(zero_block);
+
+	ir_node *common_block = new_immBlock();
+	add_immBlock_pred(common_block, jmp_one);
+	add_immBlock_pred(common_block, jmp_zero);
+	mature_immBlock(common_block);
+
+	ir_node *in[2] = { one, zero };
+	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
+
+	return val;
+}
+
 static ir_node *create_lazy_op(const binary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
@@ -1890,31 +1920,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		}
 	}
 
-	ir_node *cur_block = get_cur_block();
-
-	ir_node *one_block = new_immBlock();
-	ir_node *one       = new_Const(mode, get_mode_one(mode));
-	ir_node *jmp_one   = new_d_Jmp(dbgi);
-
-	ir_node *zero_block = new_immBlock();
-	ir_node *zero       = new_Const(mode, get_mode_null(mode));
-	ir_node *jmp_zero   = new_d_Jmp(dbgi);
-
-	set_cur_block(cur_block);
-	create_condition_evaluation((const expression_t*) expression,
-	                            one_block, zero_block);
-	mature_immBlock(one_block);
-	mature_immBlock(zero_block);
-
-	ir_node *common_block = new_immBlock();
-	add_immBlock_pred(common_block, jmp_one);
-	add_immBlock_pred(common_block, jmp_zero);
-	mature_immBlock(common_block);
-
-	ir_node *in[2] = { one, zero };
-	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
-
-	return val;
+	return produce_condition_result((const expression_t*) expression, dbgi);
 }
 
 typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
@@ -2764,7 +2770,17 @@ static ir_node *expression_to_firm(const expression_t *expression)
 
 	if(res != NULL && get_irn_mode(res) == mode_b) {
 		ir_mode *mode = get_ir_mode(expression->base.type);
-		res           = create_conv(NULL, res, mode);
+		if(is_Const(res)) {
+			if(is_Const_null(res)) {
+				return new_Const_long(mode, 0);
+			} else {
+				assert(is_Const_one(res));
+				return new_Const_long(mode, 1);
+			}
+		}
+
+		dbg_info *dbgi        = get_dbg_info(&expression->base.source_position);
+		return produce_condition_result(expression, dbgi);
 	}
 
 	return res;
