@@ -31,7 +31,7 @@ typedef struct {
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	source_position_t  source_position;
-	unsigned char      storage_class;
+	unsigned char      declared_storage_class;
 	bool               is_inline;
 	decl_modifiers_t   decl_modifiers;
 	type_t            *type;
@@ -809,11 +809,12 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 	symbol_t *const symbol       = symbol_table_insert(name);
 
 	declaration_t *const declaration = allocate_declaration_zero();
-	declaration->namespc         = NAMESPACE_NORMAL;
-	declaration->storage_class   = STORAGE_CLASS_TYPEDEF;
-	declaration->type            = type;
-	declaration->symbol          = symbol;
-	declaration->source_position = builtin_source_position;
+	declaration->namespc                = NAMESPACE_NORMAL;
+	declaration->storage_class          = STORAGE_CLASS_TYPEDEF;
+	declaration->declared_storage_class = STORAGE_CLASS_TYPEDEF;
+	declaration->type                   = type;
+	declaration->symbol                 = symbol;
+	declaration->source_position        = builtin_source_position;
 
 	record_declaration(declaration);
 
@@ -1003,6 +1004,12 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	return result;
 }
 
+static bool is_initializer_constant(const expression_t *expression)
+{
+	return is_constant_expression(expression)
+		|| is_address_constant(expression);
+}
+
 static initializer_t *parse_scalar_initializer(type_t *type,
                                                bool must_be_constant)
 {
@@ -1017,7 +1024,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	}
 
 	expression_t *expression = parse_assignment_expression();
-	if(must_be_constant && !is_constant_expression(expression)) {
+	if(must_be_constant && !is_initializer_constant(expression)) {
 		errorf(expression->base.source_position,
 		       "Initialisation expression '%E' is not constant\n",
 		       expression);
@@ -1365,7 +1372,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
 
-			if(must_be_constant && !is_constant_expression(expression)) {
+			if(must_be_constant && !is_initializer_constant(expression)) {
 				errorf(expression->base.source_position,
 				       "Initialisation expression '%E' is not constant\n",
 				       expression);
@@ -1471,23 +1478,11 @@ static void parse_initializer(parse_initializer_env_t *env)
 	initializer_t *result = NULL;
 	size_t         max_index;
 
-	if(token.type != '{') {
-		expression_t *expression = parse_assignment_expression();
-
-		result = initializer_from_expression(type, expression);
-		if(result == NULL) {
-			errorf(HERE,
-				"initializer expression '%E' of type '%T' is incompatible with type '%T'",
-				expression, expression->base.type, env->type);
-		}
-	} else if(is_type_scalar(type)) {
+	if(is_type_scalar(type)) {
 		/* TODO: § 6.7.8.11; eat {} without warning */
 		result = parse_scalar_initializer(type, env->must_be_constant);
-
-		if(token.type == ',')
-			next_token();
 	} else if(token.type == '{') {
-		next_token();
+		eat('{');
 
 		type_path_t path;
 		memset(&path, 0, sizeof(path));
@@ -1504,8 +1499,9 @@ static void parse_initializer(parse_initializer_env_t *env)
 
 		expect_void('}');
 	} else {
-		/* TODO: can this even happen? */
-		panic("TODO");
+		/* parse_scalar_initializer also works in this case: we simply
+		 * have an expression without {} around it */
+		result = parse_scalar_initializer(type, env->must_be_constant);
 	}
 
 	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
@@ -1825,13 +1821,13 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		switch(token.type) {
 
 		/* storage class */
-#define MATCH_STORAGE_CLASS(token, class)                                \
-		case token:                                                      \
-			if(specifiers->storage_class != STORAGE_CLASS_NONE) {        \
+#define MATCH_STORAGE_CLASS(token, class)                                  \
+		case token:                                                        \
+			if(specifiers->declared_storage_class != STORAGE_CLASS_NONE) { \
 				errorf(HERE, "multiple storage classes in declaration specifiers"); \
-			}                                                            \
-			specifiers->storage_class = class;                           \
-			next_token();                                                \
+			}                                                              \
+			specifiers->declared_storage_class = class;                    \
+			next_token();                                                  \
 			break;
 
 		MATCH_STORAGE_CLASS(T_typedef,  STORAGE_CLASS_TYPEDEF)
@@ -1841,22 +1837,22 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_STORAGE_CLASS(T_register, STORAGE_CLASS_REGISTER)
 
 		case T___thread:
-			switch (specifiers->storage_class) {
-				case STORAGE_CLASS_NONE:
-					specifiers->storage_class = STORAGE_CLASS_THREAD;
-					break;
+			switch (specifiers->declared_storage_class) {
+			case STORAGE_CLASS_NONE:
+				specifiers->declared_storage_class = STORAGE_CLASS_THREAD;
+				break;
 
-				case STORAGE_CLASS_EXTERN:
-					specifiers->storage_class = STORAGE_CLASS_THREAD_EXTERN;
-					break;
+			case STORAGE_CLASS_EXTERN:
+				specifiers->declared_storage_class = STORAGE_CLASS_THREAD_EXTERN;
+				break;
 
-				case STORAGE_CLASS_STATIC:
-					specifiers->storage_class = STORAGE_CLASS_THREAD_STATIC;
-					break;
+			case STORAGE_CLASS_STATIC:
+				specifiers->declared_storage_class = STORAGE_CLASS_THREAD_STATIC;
+				break;
 
-				default:
-					errorf(HERE, "multiple storage classes in declaration specifiers");
-					break;
+			default:
+				errorf(HERE, "multiple storage classes in declaration specifiers");
+				break;
 			}
 			next_token();
 			break;
@@ -2150,10 +2146,10 @@ static void semantic_parameter(declaration_t *declaration)
 {
 	/* TODO: improve error messages */
 
-	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF) {
+	if(declaration->declared_storage_class == STORAGE_CLASS_TYPEDEF) {
 		errorf(HERE, "typedef not allowed in parameter list");
-	} else if(declaration->storage_class != STORAGE_CLASS_NONE
-			&& declaration->storage_class != STORAGE_CLASS_REGISTER) {
+	} else if(declaration->declared_storage_class != STORAGE_CLASS_NONE
+			&& declaration->declared_storage_class != STORAGE_CLASS_REGISTER) {
 		errorf(HERE, "parameter may only have none or register storage class");
 	}
 
@@ -2548,10 +2544,16 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
-	declaration_t *const declaration = allocate_declaration_zero();
-	declaration->storage_class  = specifiers->storage_class;
-	declaration->modifiers      = specifiers->decl_modifiers;
-	declaration->is_inline      = specifiers->is_inline;
+	declaration_t *const declaration    = allocate_declaration_zero();
+	declaration->declared_storage_class = specifiers->declared_storage_class;
+	declaration->modifiers              = specifiers->decl_modifiers;
+	declaration->is_inline              = specifiers->is_inline;
+
+	declaration->storage_class          = specifiers->declared_storage_class;
+	if(declaration->storage_class == STORAGE_CLASS_NONE
+			&& scope != global_scope) {
+		declaration->storage_class = STORAGE_CLASS_AUTO;
+	}
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(declaration, may_be_abstract);
@@ -2743,6 +2745,7 @@ warn_redundant_declaration:
 						}
 						if (new_storage_class == STORAGE_CLASS_NONE) {
 							previous_declaration->storage_class = STORAGE_CLASS_NONE;
+							previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
 						}
 					}
 				} else {
@@ -2873,14 +2876,15 @@ static void parse_anonymous_declaration_rest(
 {
 	eat(';');
 
-	declaration_t *const declaration = allocate_declaration_zero();
-	declaration->type            = specifiers->type;
-	declaration->storage_class   = specifiers->storage_class;
-	declaration->source_position = specifiers->source_position;
+	declaration_t *const declaration    = allocate_declaration_zero();
+	declaration->type                   = specifiers->type;
+	declaration->declared_storage_class = specifiers->declared_storage_class;
+	declaration->source_position        = specifiers->source_position;
 
-	if (declaration->storage_class != STORAGE_CLASS_NONE) {
+	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
 		warningf(declaration->source_position, "useless storage class in empty declaration");
 	}
+	declaration->storage_class = STORAGE_CLASS_NONE;
 
 	type_t *type = declaration->type;
 	switch (type->kind) {
@@ -2955,6 +2959,7 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 
 	if(previous_declaration->type == NULL) {
 		previous_declaration->type          = declaration->type;
+		previous_declaration->declared_storage_class = declaration->declared_storage_class;
 		previous_declaration->storage_class = declaration->storage_class;
 		previous_declaration->parent_scope  = scope;
 		return previous_declaration;
@@ -3300,12 +3305,13 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 
 			type_t *type = make_bitfield_type(base_type, size, source_position);
 
-			declaration                  = allocate_declaration_zero();
-			declaration->namespc         = NAMESPACE_NORMAL;
-			declaration->storage_class   = STORAGE_CLASS_NONE;
-			declaration->source_position = source_position;
-			declaration->modifiers       = specifiers->decl_modifiers;
-			declaration->type            = type;
+			declaration                         = allocate_declaration_zero();
+			declaration->namespc                = NAMESPACE_NORMAL;
+			declaration->declared_storage_class = STORAGE_CLASS_NONE;
+			declaration->storage_class          = STORAGE_CLASS_NONE;
+			declaration->source_position        = source_position;
+			declaration->modifiers              = specifiers->decl_modifiers;
+			declaration->type                   = type;
 		} else {
 			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);
 
@@ -3390,7 +3396,7 @@ static type_t *parse_typename(void)
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
-	if(specifiers.storage_class != STORAGE_CLASS_NONE) {
+	if(specifiers.declared_storage_class != STORAGE_CLASS_NONE) {
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
@@ -3555,12 +3561,13 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 		free_type(ntype);
 	}
 
-	declaration_t *const declaration = allocate_declaration_zero();
-	declaration->storage_class   = STORAGE_CLASS_EXTERN;
-	declaration->type            = type;
-	declaration->symbol          = symbol;
-	declaration->source_position = source_position;
-	declaration->parent_scope  = global_scope;
+	declaration_t *const declaration    = allocate_declaration_zero();
+	declaration->storage_class          = STORAGE_CLASS_EXTERN;
+	declaration->declared_storage_class = STORAGE_CLASS_EXTERN;
+	declaration->type                   = type;
+	declaration->symbol                 = symbol;
+	declaration->source_position        = source_position;
+	declaration->parent_scope           = global_scope;
 
 	scope_t *old_scope = scope;
 	set_scope(global_scope);
@@ -5935,7 +5942,6 @@ static statement_t *parse_break(void)
  */
 static bool is_local_var_declaration(const declaration_t *declaration) {
 	switch ((storage_class_tag_t) declaration->storage_class) {
-	case STORAGE_CLASS_NONE:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER: {
 		const type_t *type = skip_typeref(declaration->type);
@@ -5954,25 +5960,11 @@ static bool is_local_var_declaration(const declaration_t *declaration) {
  * Check if a given declaration represents a variable.
  */
 static bool is_var_declaration(const declaration_t *declaration) {
-	switch ((storage_class_tag_t) declaration->storage_class) {
-	case STORAGE_CLASS_NONE:
-	case STORAGE_CLASS_EXTERN:
-	case STORAGE_CLASS_STATIC:
-	case STORAGE_CLASS_AUTO:
-	case STORAGE_CLASS_REGISTER:
-	case STORAGE_CLASS_THREAD:
-	case STORAGE_CLASS_THREAD_EXTERN:
-	case STORAGE_CLASS_THREAD_STATIC: {
-		const type_t *type = skip_typeref(declaration->type);
-		if(is_type_function(type)) {
-			return false;
-		} else {
-			return true;
-		}
-	}
-	default:
+	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 		return false;
-	}
+
+	const type_t *type = skip_typeref(declaration->type);
+	return !is_type_function(type);
 }
 
 /**

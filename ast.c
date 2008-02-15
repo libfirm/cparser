@@ -594,8 +594,7 @@ static void print_select(const select_expression_t *expression)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
 	print_expression_prec(expression->compound, prec);
-	if(expression->compound->base.type == NULL ||
-			expression->compound->base.type->kind == TYPE_POINTER) {
+	if(is_type_pointer(expression->compound->base.type)) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);
@@ -1111,9 +1110,9 @@ void print_statement(const statement_t *statement)
  *
  * @param storage_class   the storage class
  */
-static void print_storage_class(unsigned storage_class)
+static void print_storage_class(storage_class_tag_t storage_class)
 {
-	switch((storage_class_tag_t) storage_class) {
+	switch(storage_class) {
 	case STORAGE_CLASS_ENUM_ENTRY:
 	case STORAGE_CLASS_NONE:
 		break;
@@ -1183,7 +1182,7 @@ void print_initializer(const initializer_t *initializer)
  */
 static void print_normal_declaration(const declaration_t *declaration)
 {
-	print_storage_class(declaration->storage_class);
+	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
 	if(declaration->is_inline) {
 		if (declaration->modifiers & DM_FORCEINLINE)
 			fputs("__forceinline ", out);
@@ -1277,7 +1276,7 @@ void print_ast(const translation_unit_t *unit)
 	}
 }
 
-static bool is_initializer_const(const initializer_t *initializer)
+bool is_constant_initializer(const initializer_t *initializer)
 {
 	switch(initializer->kind) {
 	case INITIALIZER_STRING:
@@ -1291,7 +1290,7 @@ static bool is_initializer_const(const initializer_t *initializer)
 	case INITIALIZER_LIST: {
 		for(size_t i = 0; i < initializer->list.len; ++i) {
 			initializer_t *sub_initializer = initializer->list.initializers[i];
-			if(!is_initializer_const(sub_initializer))
+			if(!is_constant_initializer(sub_initializer))
 				return false;
 		}
 		return true;
@@ -1300,12 +1299,83 @@ static bool is_initializer_const(const initializer_t *initializer)
 	panic("invalid initializer kind found");
 }
 
-/**
- * Returns true if a given expression is a compile time
- * constant.
- *
- * @param expression  the expression to check
- */
+static bool is_object_with_constant_address(const expression_t *expression)
+{
+	switch(expression->kind) {
+	case EXPR_UNARY_DEREFERENCE:
+		return is_address_constant(expression->unary.value);
+
+	case EXPR_SELECT: {
+		if(is_type_pointer(expression->select.compound->base.type)) {
+			/* it's a -> */
+			return is_address_constant(expression->select.compound);
+		} else {
+			return is_object_with_constant_address(expression->select.compound);
+		}
+	}
+
+	case EXPR_ARRAY_ACCESS:
+		return is_constant_expression(expression->array_access.index)
+			&& is_address_constant(expression->array_access.array_ref);
+
+	case EXPR_REFERENCE: {
+		declaration_t *declaration = expression->reference.declaration;
+		switch((storage_class_tag_t) declaration->storage_class) {
+		case STORAGE_CLASS_NONE:
+		case STORAGE_CLASS_EXTERN:
+		case STORAGE_CLASS_STATIC:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	default:
+		return false;
+	}
+}
+
+bool is_address_constant(const expression_t *expression)
+{
+	switch(expression->kind) {
+	case EXPR_UNARY_TAKE_ADDRESS:
+		return is_object_with_constant_address(expression->unary.value);
+
+	case EXPR_UNARY_CAST:
+		return is_type_pointer(expression->base.type)
+			&& (is_constant_expression(expression->unary.value)
+			|| is_address_constant(expression->unary.value));
+
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_SUB: {
+		expression_t *left  = expression->binary.left;
+		expression_t *right = expression->binary.right;
+
+		if(is_type_pointer(left->base.type)) {
+			return is_address_constant(left) && is_constant_expression(right);
+		} else if(is_type_pointer(right->base.type)) {
+			return is_constant_expression(left)	&& is_address_constant(right);
+		}
+
+		return false;
+	}
+
+	case EXPR_REFERENCE: {
+		declaration_t *declaration = expression->reference.declaration;
+		type_t *type = skip_typeref(declaration->type);
+		if(is_type_function(type))
+			return true;
+		if(is_type_array(type)) {
+			return is_object_with_constant_address(expression);
+		}
+		return false;
+	}
+
+	default:
+		return false;
+	}
+}
+
 bool is_constant_expression(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -1336,6 +1406,8 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 	case EXPR_UNARY_BITFIELD_EXTRACT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
+	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_TAKE_ADDRESS:
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:
@@ -1354,11 +1426,12 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PLUS:
 	case EXPR_UNARY_BITWISE_NEGATE:
 	case EXPR_UNARY_NOT:
-	case EXPR_UNARY_DEREFERENCE:
-	case EXPR_UNARY_TAKE_ADDRESS:
+		return is_constant_expression(expression->unary.value);
+
 	case EXPR_UNARY_CAST:
 	case EXPR_UNARY_CAST_IMPLICIT:
-		return is_constant_expression(expression->unary.value);
+		return is_type_arithmetic(expression->base.type)
+			&& is_constant_expression(expression->unary.value);
 
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_SUB:
@@ -1389,7 +1462,7 @@ bool is_constant_expression(const expression_t *expression)
 			&& is_constant_expression(expression->binary.right);
 
 	case EXPR_COMPOUND_LITERAL:
-		return is_initializer_const(expression->compound_literal.initializer);
+		return is_constant_initializer(expression->compound_literal.initializer);
 
 	case EXPR_CONDITIONAL:
 		/* TODO: not correct, we only have to test expressions which are

@@ -2,6 +2,7 @@ Refactoring:
 - create an empty_statement_t and use that instead of a NULL pointer in places
   like if, loop bodys, statements after labels
 - eliminate target_architecture.h and replace with stuff in lang_features.h
+- redo storage classes: so we can separate real from declared storage class
 
 Lexer:
 - Add preprocessor code
@@ -10,6 +11,7 @@ Lexer:
   compressed table) and only storing pointers to it on the AST.
 
 Parser:
+- disallow storage class specifiers in sturct/union members
 - the expect macros abort functions directly. This leads to some functions
   not resetting the current context properly (parse_for); expect in expressions
   suddenly return NULL which triggers asserts

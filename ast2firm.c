@@ -1,7 +1,5 @@
 #include <config.h>
 
-#define _GNU_SOURCE
-
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
@@ -2339,8 +2337,8 @@ static ir_node *compound_literal_to_firm(
 	create_local_initializer(initializer, dbgi, entity, type);
 
 	/* create a sel for the compound literal address */
-	ir_node   *frame = get_local_frame(entity);
-	ir_node   *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+	ir_node *frame = get_local_frame(entity);
+	ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 	return sel;
 }
 
@@ -3249,6 +3247,101 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
+static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
+		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
+{
+	switch(get_initializer_kind(initializer)) {
+	case IR_INITIALIZER_NULL: {
+		ir_mode *mode = get_type_mode(type);
+		/* TODO: implement this for compound types... */
+		assert(type != NULL);
+		tarval  *zero = get_mode_null(mode);
+		ir_node *cnst = new_d_Const(dbgi, mode, zero);
+
+		/* TODO: bitfields */
+		ir_node *mem    = get_store();
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
+		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+		set_store(proj_m);
+		return;
+	}
+	case IR_INITIALIZER_CONST: {
+		ir_node *node = get_initializer_const_value(initializer);
+		ir_mode *mode = get_irn_mode(node);
+		assert(get_type_mode(type) == mode);
+
+		/* TODO: bitfields... */
+		ir_node *mem    = get_store();
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node);
+		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+		set_store(proj_m);
+		return;
+	}
+	case IR_INITIALIZER_TARVAL: {
+		tarval  *tv   = get_initializer_tarval_value(initializer);
+		ir_mode *mode = get_tarval_mode(tv);
+		ir_node *cnst = new_d_Const(dbgi, mode, tv);
+		assert(get_type_mode(type) == mode);
+
+		/* TODO: bitfields... */
+		ir_node *mem    = get_store();
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
+		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+		set_store(proj_m);
+		return;
+	}
+	case IR_INITIALIZER_COMPOUND: {
+		assert(is_compound_type(type));
+		int n_members;
+		if(is_Array_type(type)) {
+			assert(has_array_upper_bound(type, 0));
+			n_members = get_array_upper_bound_int(type, 0);
+		} else {
+			n_members = get_compound_n_members(type);
+		}
+
+		if(get_initializer_compound_n_entries(initializer)
+				!= (unsigned) n_members)
+			panic("initializer doesn't match compound type");
+
+		for(int i = 0; i < n_members; ++i) {
+			ir_node *addr;
+			ir_type *irtype;
+			if(is_Array_type(type)) {
+				ir_entity *entity   = get_array_element_entity(type);
+				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
+				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
+				ir_node   *in[1]    = { cnst };
+				irtype = get_array_element_type(type);
+				addr   = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in, entity);
+			} else {
+				ir_entity *member = get_compound_member(type, i);
+
+				irtype = get_entity_type(member);
+				addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr, member);
+			}
+
+			ir_initializer_t *sub_init
+				= get_initializer_compound_value(initializer, i);
+
+			create_dynamic_initializer_sub(sub_init, irtype, dbgi, addr);
+		}
+		return;
+	}
+	}
+
+	panic("invalid IR_INITIALIZER found");
+}
+
+static void create_dynamic_initializer(ir_initializer_t *initializer,
+		dbg_info *dbgi, ir_entity *entity)
+{
+	ir_node *frame     = get_local_frame(entity);
+	ir_node *base_addr = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+	ir_type *type      = get_entity_type(entity);
+
+	create_dynamic_initializer_sub(initializer, type, dbgi, base_addr);
+}
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
                                      ir_entity *entity, type_t *type)
@@ -3267,6 +3360,23 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 		return;
 	}
 
+	if(!is_constant_initializer(initializer)) {
+		ir_initializer_t *irinitializer
+			= create_ir_initializer(initializer, type);
+
+		create_dynamic_initializer(irinitializer, dbgi, entity);
+		return;
+	}
+
+	/* create the ir_initializer */
+	ir_graph *const old_current_ir_graph = current_ir_graph;
+	current_ir_graph = get_const_code_irg();
+
+	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
+
+	assert(current_ir_graph == get_const_code_irg());
+	current_ir_graph = old_current_ir_graph;
+
 	/* create a "template" entity which is copied to the entity on the stack */
 	ident     *const id          = unique_ident("initializer");
 	ir_type   *const irtype      = get_ir_type(type);
@@ -3278,17 +3388,10 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	set_entity_visibility(init_entity, visibility_local);
 	set_entity_allocation(init_entity, allocation_static);
 
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
-	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
 	set_entity_initializer(init_entity, irinitializer);
 
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
-
-	ir_node *const src_addr  = create_symconst(dbgi, mode_P_data, init_entity);
-	ir_node *const copyb     = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
+	ir_node *const src_addr = create_symconst(dbgi, mode_P_data, init_entity);
+	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
 	set_store(copyb_mem);

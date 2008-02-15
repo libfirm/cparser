@@ -324,15 +324,15 @@ union expression_t {
 
 typedef enum {
 	STORAGE_CLASS_NONE,
-	STORAGE_CLASS_TYPEDEF,
 	STORAGE_CLASS_EXTERN,
 	STORAGE_CLASS_STATIC,
+	STORAGE_CLASS_TYPEDEF,
 	STORAGE_CLASS_AUTO,
 	STORAGE_CLASS_REGISTER,
 	STORAGE_CLASS_ENUM_ENTRY,
 	STORAGE_CLASS_THREAD,
 	STORAGE_CLASS_THREAD_EXTERN,
-	STORAGE_CLASS_THREAD_STATIC
+	STORAGE_CLASS_THREAD_STATIC,
 } storage_class_tag_t;
 
 typedef enum {
@@ -406,6 +406,7 @@ typedef unsigned short decl_modifiers_t;
 
 struct declaration_t {
 	unsigned char       namespc;
+	unsigned char       declared_storage_class;
 	unsigned char       storage_class;
 	decl_modifiers_t    modifiers;
 	unsigned int        address_taken : 1;

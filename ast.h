@@ -78,7 +78,23 @@ void  print_declaration(const declaration_t *declaration);
 void  change_indent(int delta);
 void *allocate_ast(size_t size);
 
+/**
+ * Returns true if a given expression is a compile time
+ * constant.
+ *
+ * @param expression  the expression to check
+ */
+bool is_constant_initializer(const initializer_t *initializer);
+
+/**
+ * Returns true if a given expression is a compile time
+ * constant.
+ *
+ * @param expression  the expression to check
+ */
 bool is_constant_expression(const expression_t *expression);
+
+bool is_address_constant(const expression_t *expression);
 
 long fold_constant(const expression_t *expression);
 
