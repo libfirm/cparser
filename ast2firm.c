@@ -2334,7 +2334,7 @@ static ir_node *compound_literal_to_firm(
 
 	set_entity_variability(entity, variability_uninitialized);
 
-	/* create initialisation code TODO */
+	/* create initialisation code */
 	initializer_t *initializer = expression->initializer;
 	create_local_initializer(initializer, dbgi, entity, type);
 
@@ -3177,15 +3177,21 @@ static ir_initializer_t *create_ir_initializer_list(
 }
 
 static ir_initializer_t *create_ir_initializer_string(
-		const initializer_string_t *initializer)
+		const initializer_string_t *initializer, type_t *type)
 {
-	size_t            len           = initializer->string.size;
+	size_t            string_len    = initializer->string.size;
+	assert(type->kind == TYPE_ARRAY && type->array.size_constant);
+	size_t            len           = type->array.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
 	const char *string = initializer->string.begin;
 	ir_mode    *mode   = get_type_mode(ir_type_const_char);
 
 	for(size_t i = 0; i < len; ++i) {
+		char c = 0;
+		if(i < string_len)
+			c = string[i];
+
 		tarval           *tv = new_tarval_from_long(string[i], mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
 
@@ -3196,15 +3202,21 @@ static ir_initializer_t *create_ir_initializer_string(
 }
 
 static ir_initializer_t *create_ir_initializer_wide_string(
-		const initializer_wide_string_t *initializer)
+		const initializer_wide_string_t *initializer, type_t *type)
 {
-	size_t            len           = initializer->string.size;
+	size_t            string_len    = initializer->string.size;
+	assert(type->kind == TYPE_ARRAY && type->array.size_constant);
+	size_t            len           = type->array.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
 	const wchar_rep_t *string = initializer->string.begin;
 	ir_mode           *mode   = get_type_mode(ir_type_wchar_t);
 
 	for(size_t i = 0; i < len; ++i) {
+		wchar_rep_t c = 0;
+		if(i < string_len) {
+			c = string[i];
+		}
 		tarval *tv = new_tarval_from_long(string[i], mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
 
@@ -3219,10 +3231,11 @@ static ir_initializer_t *create_ir_initializer(
 {
 	switch(initializer->kind) {
 		case INITIALIZER_STRING:
-			return create_ir_initializer_string(&initializer->string);
+			return create_ir_initializer_string(&initializer->string, type);
 
 		case INITIALIZER_WIDE_STRING:
-			return create_ir_initializer_wide_string(&initializer->wide_string);
+			return create_ir_initializer_wide_string(&initializer->wide_string,
+			                                         type);
 
 		case INITIALIZER_LIST:
 			return create_ir_initializer_list(&initializer->list, type);
@@ -3526,8 +3539,6 @@ static void create_local_declaration(declaration_t *declaration)
 	case STORAGE_CLASS_STATIC:
 		create_local_static_variable(declaration);
 		return;
-	case STORAGE_CLASS_ENUM_ENTRY:
-		panic("enum entry declaration in local block found");
 	case STORAGE_CLASS_EXTERN:
 		create_global_variable(declaration);
 		create_declaration_initializer(declaration);
@@ -3545,6 +3556,7 @@ static void create_local_declaration(declaration_t *declaration)
 			create_local_variable(declaration);
 		}
 		return;
+	case STORAGE_CLASS_ENUM_ENTRY:
 	case STORAGE_CLASS_TYPEDEF:
 	case STORAGE_CLASS_THREAD:
 	case STORAGE_CLASS_THREAD_EXTERN:

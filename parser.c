@@ -1003,7 +1003,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	return result;
 }
 
-static initializer_t *parse_scalar_initializer(type_t *type)
+static initializer_t *parse_scalar_initializer(type_t *type,
+                                               bool must_be_constant)
 {
 	/* there might be extra {} hierarchies */
 	int braces = 0;
@@ -1015,7 +1016,13 @@ static initializer_t *parse_scalar_initializer(type_t *type)
 		braces++;
 	}
 
-	expression_t  *expression  = parse_assignment_expression();
+	expression_t *expression = parse_assignment_expression();
+	if(must_be_constant && !is_constant_expression(expression)) {
+		errorf(expression->base.source_position,
+		       "Initialisation expression '%E' is not constant\n",
+		       expression);
+	}
+
 	initializer_t *initializer = initializer_from_expression(type, expression);
 
 	if(initializer == NULL) {
@@ -1304,7 +1311,7 @@ static void skip_initializers(void)
 }
 
 static initializer_t *parse_sub_initializer(type_path_t *path,
-		type_t *outer_type, size_t top_path_level)
+		type_t *outer_type, size_t top_path_level, bool must_be_constant)
 {
 	type_t *orig_type = path->top_type;
 	type_t *type      = skip_typeref(orig_type);
@@ -1340,12 +1347,13 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 		if(token.type == '{') {
 			if(is_type_scalar(type)) {
-				sub = parse_scalar_initializer(type);
+				sub = parse_scalar_initializer(type, must_be_constant);
 			} else {
 				eat('{');
 				descend_into_subtype(path);
 
-				sub = parse_sub_initializer(path, orig_type, top_path_level+1);
+				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
+				                            must_be_constant);
 
 				ascend_from_subtype(path);
 
@@ -1354,6 +1362,12 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		} else {
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
+
+			if(must_be_constant && !is_constant_expression(expression)) {
+				errorf(expression->base.source_position,
+				       "Initialisation expression '%E' is not constant\n",
+				       expression);
+			}
 
 			/* handle { "string" } special case */
 			if((expression->kind == EXPR_STRING_LITERAL
@@ -1431,7 +1445,8 @@ end_error:
 	return NULL;
 }
 
-static initializer_t *parse_initializer(type_t *const orig_type)
+static initializer_t *parse_initializer(type_t *const orig_type,
+                                        bool must_be_constant)
 {
 	initializer_t *result;
 
@@ -1451,7 +1466,7 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 	if(is_type_scalar(type)) {
 		/* TODO: § 6.7.8.11; eat {} without warning */
 
-		result = parse_scalar_initializer(type);
+		result = parse_scalar_initializer(type, must_be_constant);
 
 		if(token.type == ',')
 			next_token();
@@ -1467,12 +1482,13 @@ static initializer_t *parse_initializer(type_t *const orig_type)
 
 		descend_into_subtype(&path);
 
-		result = parse_sub_initializer(&path, orig_type, 1);
+		result = parse_sub_initializer(&path, orig_type, 1, must_be_constant);
 
 		DEL_ARR_F(path.path);
 
 		expect('}');
 	} else {
+		/* TODO: can this even happen? */
 		panic("TODO");
 	}
 
@@ -2773,7 +2789,14 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		parser_error_multiple_definition(declaration, token.source_position);
 	}
 
-	initializer_t *initializer = parse_initializer(type);
+	bool must_be_constant = false;
+	if(declaration->storage_class == STORAGE_CLASS_STATIC
+			|| declaration->storage_class == STORAGE_CLASS_THREAD_STATIC
+			|| declaration->parent_scope == global_scope) {
+		must_be_constant = true;
+	}
+
+	initializer_t *initializer = parse_initializer(type, must_be_constant);
 
 	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
 	 * the array type size */
@@ -3696,7 +3719,7 @@ static expression_t *parse_compound_literal(type_t *type)
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 
 	expression->compound_literal.type        = type;
-	expression->compound_literal.initializer = parse_initializer(type);
+	expression->compound_literal.initializer = parse_initializer(type, false);
 	expression->base.type                    = automatic_type_conversion(type);
 
 	return expression;
