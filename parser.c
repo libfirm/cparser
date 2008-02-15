@@ -1063,11 +1063,13 @@ struct type_path_entry_t {
 typedef struct type_path_t type_path_t;
 struct type_path_t {
 	type_path_entry_t *path;
-	type_t            *top_type;
+	type_t            *top_type;     /**< type of the element the path points */
+	size_t             max_index;    /**< largest index in outermost array */
 	bool               invalid;
 };
 
-static __attribute__((unused)) void debug_print_type_path(const type_path_t *path)
+static __attribute__((unused)) void debug_print_type_path(
+		const type_path_t *path)
 {
 	size_t len = ARR_LEN(path->path);
 
@@ -1409,6 +1411,18 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				descend_into_subtype(path);
 			}
 		}
+
+		/* update largest index of top array */
+		const type_path_entry_t *first      = &path->path[0];
+		type_t                  *first_type = first->type;
+		first_type                          = skip_typeref(first_type);
+		if(is_type_array(first_type)) {
+			size_t index = first->v.index;
+			if(index > path->max_index)
+				path->max_index = index;
+		}
+
+		/* append to initializers list */
 		ARR_APP1(initializer_t*, initializers, sub);
 
 		if(token.type == '}') {
@@ -1434,8 +1448,6 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 	ascend_to(path, top_path_level);
 
-	/* TODO: if(is_global && !is_constant(...)) { error } */
-
 	return result;
 
 end_error:
@@ -1445,54 +1457,92 @@ end_error:
 	return NULL;
 }
 
-static initializer_t *parse_initializer(type_t *const orig_type,
-                                        bool must_be_constant)
-{
-	initializer_t *result;
+typedef struct parse_initializer_env_t {
+	type_t        *type;        /* the type of the initializer. In case of an
+	                               array type with unspecified size this gets
+	                               adjusted to the actual size. */
+	initializer_t *initializer; /* initializer will be filled in here */
+	bool           must_be_constant;
+} parse_initializer_env_t;
 
-	type_t *const type = skip_typeref(orig_type);
+static void parse_initializer(parse_initializer_env_t *env)
+{
+	type_t        *type   = skip_typeref(env->type);
+	initializer_t *result = NULL;
+	size_t         max_index;
 
 	if(token.type != '{') {
-		expression_t  *expression  = parse_assignment_expression();
-		initializer_t *initializer = initializer_from_expression(type, expression);
-		if(initializer == NULL) {
+		expression_t *expression = parse_assignment_expression();
+
+		result = initializer_from_expression(type, expression);
+		if(result == NULL) {
 			errorf(HERE,
 				"initializer expression '%E' of type '%T' is incompatible with type '%T'",
-				expression, expression->base.type, orig_type);
+				expression, expression->base.type, env->type);
 		}
-		return initializer;
-	}
-
-	if(is_type_scalar(type)) {
+	} else if(is_type_scalar(type)) {
 		/* TODO: § 6.7.8.11; eat {} without warning */
-
-		result = parse_scalar_initializer(type, must_be_constant);
+		result = parse_scalar_initializer(type, env->must_be_constant);
 
 		if(token.type == ',')
 			next_token();
-
-		return result;
 	} else if(token.type == '{') {
 		next_token();
 
 		type_path_t path;
 		memset(&path, 0, sizeof(path));
-		path.top_type = orig_type;
+		path.top_type = env->type;
 		path.path     = NEW_ARR_F(type_path_entry_t, 0);
 
 		descend_into_subtype(&path);
 
-		result = parse_sub_initializer(&path, orig_type, 1, must_be_constant);
+		result = parse_sub_initializer(&path, env->type, 1,
+		                               env->must_be_constant);
 
+		max_index = path.max_index;
 		DEL_ARR_F(path.path);
 
-		expect('}');
+		expect_void('}');
 	} else {
 		/* TODO: can this even happen? */
 		panic("TODO");
 	}
 
-	return result;
+	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
+	 * the array type size */
+	if(is_type_array(type) && type->array.size_expression == NULL
+			&& result != NULL) {
+		size_t size;
+		switch (result->kind) {
+		case INITIALIZER_LIST:
+			size = max_index + 1;
+			break;
+
+		case INITIALIZER_STRING:
+			size = result->string.string.size;
+			break;
+
+		case INITIALIZER_WIDE_STRING:
+			size = result->wide_string.string.size;
+			break;
+
+		default:
+			panic("invalid initializer type");
+		}
+
+		expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
+		cnst->base.type          = type_size_t;
+		cnst->conste.v.int_value = size;
+
+		type_t *new_type = duplicate_type(type);
+
+		new_type->array.size_expression = cnst;
+		new_type->array.size_constant   = true;
+		new_type->array.size            = size;
+		env->type = new_type;
+	}
+
+	env->initializer = result;
 }
 
 static declaration_t *append_declaration(declaration_t *declaration);
@@ -2783,7 +2833,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	eat('=');
 
 	type_t *orig_type = declaration->type;
-	type_t *type      = type = skip_typeref(orig_type);
+	type_t *type      = skip_typeref(orig_type);
 
 	if(declaration->init.initializer != NULL) {
 		parser_error_multiple_definition(declaration, token.source_position);
@@ -2796,46 +2846,15 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		must_be_constant = true;
 	}
 
-	initializer_t *initializer = parse_initializer(type, must_be_constant);
+	parse_initializer_env_t env;
+	env.type             = orig_type;
+	env.must_be_constant = must_be_constant;
+	parse_initializer(&env);
 
-	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
-	 * the array type size */
-	if(is_type_array(type) && initializer != NULL) {
-		array_type_t *array_type = &type->array;
-
-		if(array_type->size_expression == NULL) {
-			size_t size;
-			switch (initializer->kind) {
-				case INITIALIZER_LIST: {
-					/* TODO */
-					size = initializer->list.len;
-					break;
-				}
-
-				case INITIALIZER_STRING: {
-					size = initializer->string.string.size;
-					break;
-				}
-
-				case INITIALIZER_WIDE_STRING: {
-					size = initializer->wide_string.string.size;
-					break;
-				}
-
-				default: {
-					panic("invalid initializer type");
-					break;
-				}
-			}
-
-			expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
-			cnst->base.type          = type_size_t;
-			cnst->conste.v.int_value = size;
-
-			array_type->size_expression = cnst;
-			array_type->size_constant   = true;
-			array_type->size            = size;
-		}
+	if(env.type != orig_type) {
+		orig_type         = env.type;
+		type              = skip_typeref(orig_type);
+		declaration->type = env.type;
 	}
 
 	if(is_type_function(type)) {
@@ -2843,7 +2862,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		       "initializers not allowed for function types at declator '%Y' (type '%T')",
 		       declaration->symbol, orig_type);
 	} else {
-		declaration->init.initializer = initializer;
+		declaration->init.initializer = env.initializer;
 	}
 }
 
@@ -3658,6 +3677,9 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 			return type_left->pointer.points_to;
 		}
 
+		case EXPR_COMPOUND_LITERAL:
+			return expression->compound_literal.type;
+
 		default: break;
 	}
 
@@ -3718,8 +3740,14 @@ static expression_t *parse_compound_literal(type_t *type)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 
+	parse_initializer_env_t env;
+	env.type             = type;
+	env.must_be_constant = false;
+	parse_initializer(&env);
+	type = env.type;
+
 	expression->compound_literal.type        = type;
-	expression->compound_literal.initializer = parse_initializer(type, false);
+	expression->compound_literal.initializer = env.initializer;
 	expression->base.type                    = automatic_type_conversion(type);
 
 	return expression;

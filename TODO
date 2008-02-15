@@ -1,7 +1,3 @@
-Initializer rewrite:
-- determining of array size for array types of unspecified length is wrong in
-  presence of designators and unions
-
 Refactoring:
 - create an empty_statement_t and use that instead of a NULL pointer in places
   like if, loop bodys, statements after labels

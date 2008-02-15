@@ -1,3 +1,5 @@
+int gk = sizeof( (int[]) { 1, 2, 3 } ) / sizeof(int);
+
 int main(void) {
 	int k = sizeof( (int[]) { 1, 2, 3 } ) / sizeof(int);
 
