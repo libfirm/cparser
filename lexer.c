@@ -28,14 +28,6 @@
 #define strtold(s, e) strtod(s, e)
 #endif
 
-#if defined HAS_SIGNED_CHAR
-typedef signed char char_type;
-#elif defined HAS_UNSIGNED_CHAR
-typedef unsigned char char_type;
-#else
-#	error signedness of char not determined
-#endif
-
 static int         c;
 token_t            lexer_token;
 symbol_t          *symbol_L;
@@ -686,7 +678,12 @@ static int parse_octal_sequence(const int first_digit)
 	if (!is_octal_digit(c)) return value;
 	value = 8 * value + digit_value(c);
 	next_char();
-	return (char_type)value;
+
+	if(char_is_signed) {
+		return (signed char) value;
+	} else {
+		return (unsigned char) value;
+	}
 }
 
 /**
@@ -700,7 +697,11 @@ static int parse_hex_sequence(void)
 		next_char();
 	}
 
-	return (char_type)value;
+	if(char_is_signed) {
+		return (signed char) value;
+	} else {
+		return (unsigned char) value;
+	}
 }
 
 /**

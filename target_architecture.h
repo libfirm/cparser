@@ -1,9 +1,6 @@
 #ifndef TARGET_ARCHITECTURE_H
 #define TARGET_ARCHITECTURE_H
 
-#define HAS_SIGNED_CHAR
-//#define HAS_UNSIGNED_CHAR
-
 #include <limits.h>
 
 #define TARGET_INT_MIN     INT_MIN
