@@ -193,7 +193,7 @@ static void print_const(const const_expression_t *cnst)
 static void print_quoted_string(const string_t *const string, char border)
 {
 	fputc(border, out);
-	const char *end = string->begin + string->size;
+	const char *end = string->begin + string->size - 1;
 	for (const char *c = string->begin; c != end; ++c) {
 		if (*c == border) {
 			fputc('\\', out);
@@ -249,7 +249,7 @@ static void print_string_literal(
 static void print_quoted_wide_string(const wide_string_t *const wstr)
 {
 	fputs("L\"", out);
-	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size;
+	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size - 1;
 	     c != end; ++c) {
 		switch (*c) {
 			case L'\"':  fputs("\\\"", out); break;
