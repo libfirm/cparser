@@ -1342,7 +1342,7 @@ bool is_address_constant(const expression_t *expression)
 		return is_object_with_constant_address(expression->unary.value);
 
 	case EXPR_UNARY_CAST:
-		return is_type_pointer(expression->base.type)
+		return is_type_pointer(skip_typeref(expression->base.type))
 			&& (is_constant_expression(expression->unary.value)
 			|| is_address_constant(expression->unary.value));
 
@@ -1351,9 +1351,9 @@ bool is_address_constant(const expression_t *expression)
 		expression_t *left  = expression->binary.left;
 		expression_t *right = expression->binary.right;
 
-		if(is_type_pointer(left->base.type)) {
+		if(is_type_pointer(skip_typeref(left->base.type))) {
 			return is_address_constant(left) && is_constant_expression(right);
-		} else if(is_type_pointer(right->base.type)) {
+		} else if(is_type_pointer(skip_typeref(right->base.type))) {
 			return is_constant_expression(left)	&& is_address_constant(right);
 		}
 
@@ -1430,7 +1430,7 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_UNARY_CAST:
 	case EXPR_UNARY_CAST_IMPLICIT:
-		return is_type_arithmetic(expression->base.type)
+		return is_type_arithmetic(skip_typeref(expression->base.type))
 			&& is_constant_expression(expression->unary.value);
 
 	case EXPR_BINARY_ADD:
