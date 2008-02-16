@@ -3464,6 +3464,9 @@ static expression_t *parse_string_const(void)
 		}
 		if (token.type != T_WIDE_STRING_LITERAL) {
 			expression_t *const cnst = allocate_expression_zero(EXPR_STRING_LITERAL);
+			/* note: that we use type_char_ptr here, which is already the
+			 * automatic converted type. revert_automatic_type_conversion
+			 * will construct the array type */
 			cnst->base.type    = type_char_ptr;
 			cnst->string.value = res;
 			return cnst;
@@ -3682,6 +3685,16 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 				return type_left;
 			assert(is_type_pointer(type_left));
 			return type_left->pointer.points_to;
+		}
+
+		case EXPR_STRING_LITERAL: {
+			size_t size = expression->string.value.size;
+			return make_array_type(type_char, size, TYPE_QUALIFIER_NONE);
+		}
+
+		case EXPR_WIDE_STRING_LITERAL: {
+			size_t size = expression->wide_string.value.size;
+			return make_array_type(type_wchar_t, size, TYPE_QUALIFIER_NONE);
 		}
 
 		case EXPR_COMPOUND_LITERAL:

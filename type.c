@@ -957,6 +957,21 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 	return identify_new_type(type);
 }
 
+type_t *make_array_type(type_t *element_type, size_t size,
+                        type_qualifiers_t qualifiers)
+{
+	type_t *type = obstack_alloc(type_obst, sizeof(array_type_t));
+	memset(type, 0, sizeof(array_type_t));
+
+	type->kind                = TYPE_ARRAY;
+	type->base.qualifiers     = qualifiers;
+	type->array.element_type  = element_type;
+	type->array.size          = size;
+	type->array.size_constant = true;
+
+	return identify_new_type(type);
+}
+
 /**
  * Debug helper. Prints the given type to stdout.
  */
