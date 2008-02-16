@@ -82,11 +82,16 @@ $(GOAL): build/adt build/driver $(OBJECTS)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
 
+cparser.bootstrap: $(CPARSEROS)
+	@echo "===> LD $@"
+	$(Q)$(CC) $(CPARSEROS) $(LFLAGS) -o $@
+
+
 splint: $(SPLINTS)
 
 selfcheck: $(CPARSERS)
 
-bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS)
+bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS) cparser.bootstrap
 
 %.c.splint: %.c
 	@echo '===> SPLINT $<'

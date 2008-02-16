@@ -358,8 +358,12 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 	ident   *id     = get_mode_ident(mode);
 	ir_type *irtype = new_d_type_primitive(id, mode, dbgi);
 
+	/* TODO: this is x86 specific, we should fiddle this into
+	 * lang_features.h somehow... */
 	if(type->akind == ATOMIC_TYPE_LONG_DOUBLE
-			|| type->akind == ATOMIC_TYPE_DOUBLE) {
+			|| type->akind == ATOMIC_TYPE_DOUBLE
+			|| type->akind == ATOMIC_TYPE_LONGLONG
+			|| type->akind == ATOMIC_TYPE_ULONGLONG) {
 		set_type_alignment_bytes(irtype, 4);
 	}
 
