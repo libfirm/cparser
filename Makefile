@@ -107,7 +107,7 @@ build/adt build/driver build/cpb build/cpb/adt build/cpb/driver:
 
 build/cpb/%.o: %.c
 	@echo '===> CPARSER $<'
-	$(Q)./cparser $(CPPFLAGS) -Wall -c $< -o $@
+	$(Q)./cparser $(CPPFLAGS) -Wall -g -c $< -o $@
 
 build/%.o: %.c
 	@echo '===> CC $<'

@@ -412,6 +412,8 @@ int main(int argc, char **argv)
 			const char *option = &arg[1];
 			if(option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
+			} else if(option[0] == 'g') {
+				firm_be_option("stabs=yes");
 			} else if(SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
 			} else if(SINGLE_OPTION('S')) {
@@ -500,7 +502,7 @@ int main(int argc, char **argv)
 				}
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
-			} else if(option[0] == 'g' || strncmp(option, "std=", 4) == 0) {
+			} else if(strncmp(option, "std=", 4) == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (option[0] == '-') {
 				/* double dash option */
