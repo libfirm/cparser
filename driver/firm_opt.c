@@ -352,14 +352,16 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     CHECK_ALL(firm_opt.check_all);
   }
 
+  lower_const_code();
+
   for (i = 0; i < get_irp_n_irgs(); i++) {
     irg = current_ir_graph = get_irp_irg(i);
 
 
 #ifdef FIRM_EXT_GRS
-  /* If SIMD optimization is on, make sure we have only 1 return */
-  if (firm_ext_grs.create_pattern || firm_ext_grs.simd_opt)
-    normalize_one_return(irg);
+    /* If SIMD optimization is on, make sure we have only 1 return */
+    if (firm_ext_grs.create_pattern || firm_ext_grs.simd_opt)
+	  normalize_one_return(irg);
 #endif
 
 
