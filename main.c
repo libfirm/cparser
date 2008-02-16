@@ -414,6 +414,8 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(outname, "-o");
 			} else if(option[0] == 'g') {
 				firm_be_option("stabs=yes");
+				firm_be_option("omitfp=no");
+				firm_be_option("ia32-nooptcc=yes");
 			} else if(SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
 			} else if(SINGLE_OPTION('S')) {
