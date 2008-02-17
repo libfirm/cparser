@@ -79,7 +79,9 @@ endif
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
-$(GOAL): build/adt build/driver $(OBJECTS)
+DIRS = build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver
+
+$(GOAL): $(DIRS) $(OBJECTS)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
 
@@ -100,7 +102,7 @@ bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bo
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver:
+$(DIRS):
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 
