@@ -5083,6 +5083,18 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression->base.type = orig_type_left;
 }
 
+/**
+ * Determine if the outermost operation (or parts thereof) of the given
+ * expression has no effect in order to generate a warning about this fact.
+ * Therefore in some cases this only examines some of the operands of the
+ * expression (see comments in the function and examples below).
+ * Examples:
+ *   f() + 23;    // warning, because + has no effect
+ *   x || f();    // no warning, because x controls execution of f()
+ *   x ? y : f(); // warning, because y has no effect
+ *   (void)x;     // no warning to be able to suppress the warning
+ * This function can NOT be used for an "expression has definitely no effect"-
+ * analysis. */
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
@@ -5093,6 +5105,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_CHAR_CONST:                return false;
 		case EXPR_STRING_LITERAL:            return false;
 		case EXPR_WIDE_STRING_LITERAL:       return false;
+
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;
 			if (call->function->kind != EXPR_BUILTIN_SYMBOL)
@@ -5103,12 +5116,16 @@ static bool expression_has_effect(const expression_t *const expr)
 				default:                 return false;
 			}
 		}
+
+		/* Generate the warning if either the left or right hand side of a
+		 * conditional expression has no effect */
 		case EXPR_CONDITIONAL: {
 			const conditional_expression_t *const cond = &expr->conditional;
 			return
 				expression_has_effect(cond->true_expression) &&
 				expression_has_effect(cond->false_expression);
 		}
+
 		case EXPR_SELECT:                    return false;
 		case EXPR_ARRAY_ACCESS:              return false;
 		case EXPR_SIZEOF:                    return false;
@@ -5136,10 +5153,14 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_UNARY_POSTFIX_DECREMENT:   return true;
 		case EXPR_UNARY_PREFIX_INCREMENT:    return true;
 		case EXPR_UNARY_PREFIX_DECREMENT:    return true;
+
+		/* Treat void casts as if they have an effect in order to being able to
+		 * suppress the warning */
 		case EXPR_UNARY_CAST: {
-			type_t *type = skip_typeref(expr->base.type);
+			type_t *const type = skip_typeref(expr->base.type);
 			return is_type_atomic(type, ATOMIC_TYPE_VOID);
 		}
+
 		case EXPR_UNARY_CAST_IMPLICIT:       return true;
 		case EXPR_UNARY_ASSUME:              return true;
 		case EXPR_UNARY_BITFIELD_EXTRACT:    return false;
@@ -5171,8 +5192,14 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_BITWISE_AND_ASSIGN: return true;
 		case EXPR_BINARY_BITWISE_XOR_ASSIGN: return true;
 		case EXPR_BINARY_BITWISE_OR_ASSIGN:  return true;
+
+		/* Only examine the right hand side of && and ||, because the left hand
+		 * side already has the effect of controlling the execution of the right
+		 * hand side */
 		case EXPR_BINARY_LOGICAL_AND:
 		case EXPR_BINARY_LOGICAL_OR:
+		/* Only examine the right hand side of a comma expression, because the left
+		 * hand side has a separate warning */
 		case EXPR_BINARY_COMMA:
 			return expression_has_effect(expr->binary.right);
 
