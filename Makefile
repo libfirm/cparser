@@ -53,6 +53,7 @@ OBJECTS = $(SOURCES:%.c=build/%.o)
 SPLINTS = $(addsuffix .splint, $(SOURCES))
 CPARSERS = $(addsuffix .cparser, $(SOURCES))
 CPARSEROS = $(SOURCES:%.c=build/cpb/%.o)
+CPARSEROS2 = $(SOURCES:%.c=build/cpb2/%.o)
 
 Q = @
 
@@ -82,16 +83,14 @@ $(GOAL): build/adt build/driver $(OBJECTS)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
 
-cparser.bootstrap: $(CPARSEROS)
-	@echo "===> LD $@"
-	$(Q)$(CC) $(CPARSEROS) $(LFLAGS) -o $@
-
 
 splint: $(SPLINTS)
 
 selfcheck: $(CPARSERS)
 
 bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS) cparser.bootstrap
+
+bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bootstrap2
 
 %.c.splint: %.c
 	@echo '===> SPLINT $<'
@@ -101,17 +100,28 @@ bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS) cparser.bootstr
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-build/adt build/driver build/cpb build/cpb/adt build/cpb/driver:
+build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver:
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 
-build/cpb/%.o: %.c
+build/cpb/%.o: %.c cparser
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -Wall -g -c $< -o $@
 
+build/cpb2/%.o: %.c cparser.bootstrap
+	@echo '===> CPARSER.BOOTSTRAP $<'
+	$(Q)./cparser.bootstrap $(CPPFLAGS) -Wall -g -c $< -o $@
+
+cparser.bootstrap: $(CPARSEROS)
+	@echo "===> LD $@"
+	$(Q)$(CC) $(CPARSEROS) $(LFLAGS) -o $@
+
+cparser.bootstrap2: $(CPARSEROS2)
+	@echo "===> LD $@"
+	$(Q)$(CC) $(CPARSEROS2) $(LFLAGS) -o $@
+
 build/%.o: %.c
 	@echo '===> CC $<'
-#-$(Q)build/cparser $(CPPFLAGS) $(CFLAGS) -fsyntax-only $<
 	$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
 	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
