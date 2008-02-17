@@ -2501,8 +2501,11 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
 			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, (source_position_t){NULL, 0});
 
-			expression_t *size_expression
-				= create_implicit_cast(parsed_array->size, type_size_t);
+			expression_t *size_expression = parsed_array->size;
+			if(size_expression != NULL) {
+				size_expression
+					= create_implicit_cast(size_expression, type_size_t);
+			}
 
 			array_type->base.qualifiers       = parsed_array->type_qualifiers;
 			array_type->array.element_type    = type;
