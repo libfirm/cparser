@@ -99,10 +99,14 @@ struct array_type_t {
 	type_t       *element_type;
 	expression_t *size_expression;
 	size_t        size;
-	unsigned      is_static         : 1;
-	unsigned      is_variable       : 1;
+
+	ir_node      *size_node; /**< used by ast2firm phase */
+
+	unsigned      is_static         : 1; /**< a [static] type */
+	unsigned      is_variable       : 1; /**< a [*] type */
 	unsigned      has_implicit_size : 1;
-	unsigned      size_constant     : 1;
+	unsigned      size_constant     : 1; /**< size expression is constant */
+	unsigned      is_vla            : 1; /**< it's a variable length array */
 };
 
 struct function_parameter_t {

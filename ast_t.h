@@ -432,11 +432,12 @@ struct declaration_t {
 	/* the following fields are used in ast2firm module */
 	unsigned char       declaration_kind;
 	union {
-		unsigned int    value_number;
-		ir_entity      *entity;
-		ir_node        *block;
-		tarval         *enum_val;
-		ir_type        *irtype;
+		unsigned int  value_number;
+		ir_entity    *entity;
+		ir_node      *block;
+		ir_node      *vla_base;
+		tarval       *enum_val;
+		ir_type      *irtype;
 	} v;
 };
 

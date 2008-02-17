@@ -181,6 +181,13 @@ static bool array_types_equal(const array_type_t *type1,
 		return false;
 	if(type1->is_static != type2->is_static)
 		return false;
+	if(type1->size_constant != type2->size_constant)
+		return false;
+
+	/* never identify vla types, because we need them for caching calculated
+	 * sizes later in ast2firm */
+	if(type1->is_vla || type2->is_vla)
+		return false;
 
 	/* TODO: compare size expressions for equality... */
 

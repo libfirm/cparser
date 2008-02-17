@@ -2501,7 +2501,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
 			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, (source_position_t){NULL, 0});
 
-			expression_t *size_expression = parsed_array->size;
+			expression_t *size_expression
+				= create_implicit_cast(parsed_array->size, type_size_t);
 
 			array_type->base.qualifiers       = parsed_array->type_qualifiers;
 			array_type->array.element_type    = type;
@@ -2509,11 +2510,14 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			array_type->array.is_variable     = parsed_array->is_variable;
 			array_type->array.size_expression = size_expression;
 
-			if(size_expression != NULL &&
-					is_constant_expression(size_expression)) {
-				array_type->array.size_constant = true;
-		  		array_type->array.size
-					= fold_constant(size_expression);
+			if(size_expression != NULL) {
+				if(is_constant_expression(size_expression)) {
+					array_type->array.size_constant = true;
+					array_type->array.size
+						= fold_constant(size_expression);
+				} else {
+					array_type->array.is_vla = true;
+				}
 			}
 
 			type_t *skipped_type = skip_typeref(type);

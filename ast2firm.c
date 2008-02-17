@@ -45,6 +45,7 @@ static struct obstack asm_obst;
 typedef enum declaration_kind_t {
 	DECLARATION_KIND_UNKNOWN,
 	DECLARATION_KIND_FUNCTION,
+	DECLARATION_KIND_VARIABLE_LENGTH_ARRAY,
 	DECLARATION_KIND_GLOBAL_VARIABLE,
 	DECLARATION_KIND_LOCAL_VARIABLE,
 	DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
@@ -195,6 +196,9 @@ static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST];
 
 static ir_mode *mode_int, *mode_uint;
 
+static ir_node *expression_to_firm(const expression_t *expression);
+static inline ir_mode *get_ir_mode(type_t *type);
+
 /**
  * Initialises the atomic modes depending on the machine size.
  */
@@ -245,8 +249,6 @@ static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 		panic("Encountered unknown atomic type");
 	return res;
 }
-
-static unsigned get_type_size(type_t *type);
 
 static unsigned get_atomic_type_size(const atomic_type_t *type)
 {
@@ -300,12 +302,13 @@ static unsigned get_compound_type_size(compound_type_t *type)
 
 static unsigned get_array_type_size(array_type_t *type)
 {
+	assert(!type->is_vla);
 	ir_type *irtype = get_ir_type((type_t*) type);
 	return get_type_size_bytes(irtype);
 }
 
 
-static unsigned get_type_size(type_t *type)
+static unsigned get_type_size_const(type_t *type)
 {
 	type = skip_typeref(type);
 
@@ -327,7 +330,7 @@ static unsigned get_type_size(type_t *type)
 	case TYPE_ARRAY:
 		return get_array_type_size(&type->array);
 	case TYPE_BUILTIN:
-		return get_type_size(type->builtin.real_type);
+		return get_type_size_const(type->builtin.real_type);
 	case TYPE_BITFIELD:
 		panic("type size of bitfield request");
 	case TYPE_TYPEDEF:
@@ -336,6 +339,30 @@ static unsigned get_type_size(type_t *type)
 		break;
 	}
 	panic("Trying to determine size of invalid type");
+}
+
+static ir_node *get_type_size(type_t *type)
+{
+	type = skip_typeref(type);
+
+	if(is_type_array(type) && type->array.is_vla) {
+		ir_node *size_node = type->array.size_node;
+		if(size_node == NULL) {
+			size_node = expression_to_firm(type->array.size_expression);
+			assert(!is_Const(size_node));
+			type->array.size_node = size_node;
+		}
+
+		ir_node *elem_size = get_type_size(type->array.element_type);
+		ir_mode *mode      = get_irn_mode(size_node);
+		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
+		return real_size;
+	}
+
+	ir_mode *mode = get_ir_mode(type_size_t);
+	symconst_symbol sym;
+	sym.type_p = get_ir_type(type);
+	return new_SymConst(mode, sym, symconst_type_size);
 }
 
 static unsigned count_parameters(const function_type_t *function_type)
@@ -786,9 +813,6 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 
 	return irtype;
 }
-
-static ir_node *expression_to_firm(const expression_t *expression);
-static inline ir_mode *get_ir_mode(type_t *type);
 
 static ir_type *create_enum_type(enum_type_t *const type)
 {
@@ -1269,6 +1293,9 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		return deref_address(irtype, sel, dbgi);
 	}
 
+	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+		return declaration->v.vla_base;
+
 	case DECLARATION_KIND_COMPOUND_MEMBER:
 	case DECLARATION_KIND_LABEL_BLOCK:
 		panic("not implemented reference type");
@@ -1303,6 +1330,9 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 
 		return sel;
 	}
+
+	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+		return declaration->v.vla_base;
 
 	case DECLARATION_KIND_ENUM_ENTRY:
 		panic("trying to reference enum entry");
@@ -1600,8 +1630,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	ir_node *offset;
 	if(is_type_pointer(type)) {
 		pointer_type_t *pointer_type = &type->pointer;
-		unsigned        elem_size    = get_type_size(pointer_type->points_to);
-		offset = new_Const_long(mode_int, elem_size);
+		offset                       = get_type_size(pointer_type->points_to);
 	} else {
 		assert(is_type_arithmetic(type));
 		offset = new_Const(mode, get_mode_one(mode));
@@ -1954,7 +1983,7 @@ static ir_node *pointer_arithmetic(ir_node  *const pointer,
 {
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = pointer_type->points_to;
-	const unsigned        elem_size    = get_type_size(points_to);
+	const unsigned        elem_size    = get_type_size_const(points_to);
 
 	assert(elem_size >= 1);
 	if (elem_size > 1) {
@@ -2031,13 +2060,13 @@ static ir_node *create_sub(const binary_expression_t *expression)
 		return new_d_Sub(dbgi, left, right, mode);
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		const pointer_type_t *const ptr_type = &type_left->pointer;
-		const unsigned elem_size             = get_type_size(ptr_type->points_to);
-		ir_mode *const mode   = get_ir_mode(type);
-		ir_node *const sub    = new_d_Sub(dbgi, left, right, mode);
-		ir_node *const cnst   = new_Const_long(mode_int, (long)elem_size);
-		ir_node *const no_mem = new_NoMem();
-		ir_node *const div    = new_d_Div(dbgi, no_mem, sub, cnst, mode,
-		                                  op_pin_state_floats);
+
+		ir_node *const elem_size = get_type_size(ptr_type->points_to);
+		ir_mode *const mode      = get_ir_mode(type);
+		ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
+		ir_node *const no_mem    = new_NoMem();
+		ir_node *const div       = new_d_Div(dbgi, no_mem, sub, elem_size, mode,
+		                                     op_pin_state_floats);
 		return new_d_Proj(dbgi, div, mode, pn_Div_res);
 	}
 
@@ -2243,8 +2272,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	assert(is_type_pointer(ref_type));
 	pointer_type_t *pointer_type = &ref_type->pointer;
 
-	unsigned elem_size       = get_type_size(pointer_type->points_to);
-	ir_node *elem_size_const = new_Const_long(mode_uint, elem_size);
+	ir_node *elem_size_const = get_type_size(pointer_type->points_to);
 	ir_node *real_offset     = new_d_Mul(dbgi, offset, elem_size_const,
 	                                     mode_uint);
 	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
@@ -2363,10 +2391,14 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 		assert(type != NULL);
 	}
 
-	ir_mode *const mode = get_ir_mode(expression->base.type);
-	symconst_symbol sym;
-	sym.type_p = get_ir_type(type);
-	return new_SymConst(mode, sym, symconst_type_size);
+	type = skip_typeref(type);
+	/* § 6.5.3.4 (2) if the type is a VLA, evaluate the expression. */
+	if(is_type_array(type) && type->array.is_vla
+			&& expression->tp_expression != NULL) {
+		expression_to_firm(expression->tp_expression);
+	}
+
+	return get_type_size(type);
 }
 
 /**
@@ -2638,8 +2670,7 @@ static ir_node *va_start_expression_to_firm(
 	ir_node   *const arg_sel     =
 		new_d_simpleSel(dbgi, no_mem, arg_base, parm_ent);
 
-	size_t     const parm_size   = get_type_size(expr->parameter->type);
-	ir_node   *const cnst        = new_Const_long(mode_uint, parm_size);
+	ir_node   *const cnst        = get_type_size(expr->parameter->type);
 	ir_node   *const add         = new_d_Add(dbgi, arg_sel, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
@@ -2653,8 +2684,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	dbg_info *const dbgi   = get_dbg_info(&expr->base.source_position);
 	ir_node  *const res    = deref_address(irtype, ap, dbgi);
 
-	size_t    const parm_size = get_type_size(expr->base.type);
-	ir_node  *const cnst      = new_Const_long(mode_uint, parm_size);
+	ir_node  *const cnst      = get_type_size(expr->base.type);
 	ir_node  *const add       = new_d_Add(dbgi, ap, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
@@ -3467,6 +3497,32 @@ static void create_declaration_initializer(declaration_t *declaration)
 	}
 }
 
+static void create_variable_length_array(declaration_t *declaration)
+{
+	dbg_info *dbgi      = get_dbg_info(&declaration->source_position);
+	type_t   *type      = declaration->type;
+	ir_node  *mem       = get_store();
+	ir_type  *el_type   = get_ir_type(type->array.element_type);
+
+	/* make sure size_node is calculated */
+	get_type_size(type);
+	ir_node  *elems = type->array.size_node;
+	ir_node  *alloc = new_d_Alloc(dbgi, mem, elems, el_type, stack_alloc);
+
+	ir_node  *proj_m = new_d_Proj(dbgi, alloc, mode_M, pn_Alloc_M);
+	ir_node  *addr   = new_d_Proj(dbgi, alloc, mode_P_data, pn_Alloc_res);
+	set_store(proj_m);
+
+	/* initializers are not allowed for VLAs */
+	assert(declaration->init.initializer == NULL);
+
+	declaration->declaration_kind = DECLARATION_KIND_VARIABLE_LENGTH_ARRAY;
+	declaration->v.vla_base       = addr;
+
+	/* TODO: record VLA somewhere so we create the free node when we leave
+	 * it's scope */
+}
+
 /**
  * Creates a Firm local variable from a declaration.
  */
@@ -3477,7 +3533,11 @@ static void create_local_variable(declaration_t *declaration)
 	bool needs_entity = declaration->address_taken;
 	type_t *type = skip_typeref(declaration->type);
 
-	if(is_type_array(type) || is_type_compound(type)) {
+	/* is it a variable length array? */
+	if(is_type_array(type) && !type->array.size_constant) {
+		create_variable_length_array(declaration);
+		return;
+	} else if(is_type_array(type) || is_type_compound(type)) {
 		needs_entity = true;
 	}
 

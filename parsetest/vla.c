@@ -1,4 +1,5 @@
 int puts(const char *str);
+void *memcpy(void *dest, const void *src, unsigned int n);
 
 int get_size(void)
 {
@@ -11,6 +12,8 @@ int get_size2(void)
 	puts("sideeffect2");
 	return 10;
 }
+
+int gk[10];
 
 int main(int argc, char **argv)
 {
@@ -25,6 +28,10 @@ int main(int argc, char **argv)
 	sizeof(c[puts("effect")]);
 	sizeof(c[puts("effect2")][puts("but not this time")]);
 	sizeof(z[puts("no effect")]);
+
+	k[5] = 42;
+	k[2] = 10;
+	memcpy(gk, k, sizeof(gk));
 
 	return 0;
 }
