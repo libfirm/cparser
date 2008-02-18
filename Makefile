@@ -106,9 +106,9 @@ $(DIRS):
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 
-build/cpb/%.o: %.c cparser
+build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'
-	$(Q)./cparser $(CPPFLAGS) -Wall -g -c $< -o $@
+	$(Q)./build/cparser $(CPPFLAGS) -Wall -g -c $< -o $@
 
 build/cpb2/%.o: %.c cparser.bootstrap
 	@echo '===> CPARSER.BOOTSTRAP $<'
