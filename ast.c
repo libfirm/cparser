@@ -1464,13 +1464,17 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_COMPOUND_LITERAL:
 		return is_constant_initializer(expression->compound_literal.initializer);
 
-	case EXPR_CONDITIONAL:
-		/* TODO: not correct, we only have to test expressions which are
-		 * evaluated, which means either the true or false part might be not
-		 * constant */
-		return is_constant_expression(expression->conditional.condition)
-			&& is_constant_expression(expression->conditional.true_expression)
-			&& is_constant_expression(expression->conditional.false_expression);
+	case EXPR_CONDITIONAL: {
+		expression_t *condition = expression->conditional.condition;
+		if(!is_constant_expression(condition))
+			return false;
+
+		long val = fold_constant(condition);
+		if(val != 0)
+			return is_constant_expression(expression->conditional.true_expression);
+		else
+			return is_constant_expression(expression->conditional.false_expression);
+	}
 
 	case EXPR_ARRAY_ACCESS:
 		return is_constant_expression(expression->array_access.array_ref)
