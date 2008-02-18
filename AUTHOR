@@ -1,0 +1,9 @@
+CParser was written by Matthias Braun <matze@braunis.de>
+
+It probably wouldn't be where it is now without all the bugfixes, new features
+and general support by:
+
+Christoph Mallon   (he understands the standard :), bugfixes,
+                    diagnostic infrastructure and printf format checker,
+                    warnings)
+Michael Beck       (bugfixes, firm optimisation driver, warnings, comments)

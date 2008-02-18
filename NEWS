@@ -1,0 +1,4 @@
+===== cparser 0.9 (18.02.2008) =====
+
+* initial release
+* cparser is able to bootstrap itself
