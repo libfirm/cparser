@@ -57,9 +57,9 @@ CPARSEROS2 = $(SOURCES:%.c=build/cpb2/%.o)
 
 Q = @
 
-.PHONY : all clean dirs
+.PHONY : all clean dirs bootstrap bootstrap2
 
-all: $(GOAL)
+all: $(DIRS) $(GOAL)
 
 ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
@@ -81,10 +81,9 @@ endif
 
 DIRS = build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver
 
-$(GOAL): $(DIRS) $(OBJECTS)
+$(GOAL): $(OBJECTS)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
-
 
 splint: $(SPLINTS)
 
