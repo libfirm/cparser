@@ -57,9 +57,9 @@ CPARSEROS2 = $(SOURCES:%.c=build/cpb2/%.o)
 
 Q = @
 
-.PHONY : all clean dirs bootstrap bootstrap2
-
 all: $(DIRS) $(GOAL)
+
+.PHONY: all clean dirs bootstrap bootstrap2
 
 ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
@@ -79,7 +79,8 @@ endif
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
-DIRS = build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver
+DIRS = build build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver
+UNUSED := $(shell mkdir -p $(DIRS))
 
 $(GOAL): $(OBJECTS)
 	@echo "===> LD $@"
