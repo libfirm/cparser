@@ -1,3 +1,20 @@
+#ifndef TS
+#define TS(x,str,val)
+#endif
+
+TS(HEADERNAME,              "header name", = 256)
+TS(IDENTIFIER,              "identifier",)
+TS(NUMBER,                  "number",)
+TS(CHARACTER_CONSTANT,      "character constant",)
+TS(WIDE_CHARACTER_CONSTANT, "character constant",)
+TS(STRING_LITERAL,          "string literal",)
+TS(WIDE_STRING_LITERAL,     "wide string literal",)
+TS(PUNCTUATOR,              "punctuator",)
+
+#define PUNCTUATOR(name,string,val)   T(_ALL,name,string,val)
+#include "tokens_punctuator.inc"
+#undef PUNCTUATOR
+
 #define S(x)   T(_ALL,x,#x,)
 
 S(if)
@@ -24,6 +41,8 @@ S(FP_CONTRACT)
 S(FENV_ACCESS)
 S(CX_LIMITED_RANGE)
 
-#undef S
-
 #define TP_LAST_TOKEN  (TP_CX_LIMITED_RANGE + 1)
+
+TS(NEWLINE,                 "newline", = '\n')
+
+#undef S

@@ -557,7 +557,8 @@ int main(int argc, char **argv)
 				} else if(strcmp(option, "version") == 0) {
 					firm_version_t ver;
 					firm_get_version(&ver);
-					printf("cparser (%d.%d %s) using libFirm (%u.%u", 0, 1, cparser_REVISION, ver.major, ver.minor);
+					printf("cparser (%s) using libFirm (%u.%u",
+					       cparser_REVISION, ver.major, ver.minor);
 					if(ver.revision[0] != 0) {
 						putchar(' ');
 						fputs(ver.revision, stdout);

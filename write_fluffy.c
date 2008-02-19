@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "write_fluffy.h"
+#include "symbol_t.h"
 #include "ast_t.h"
 #include "type_t.h"
 #include "type.h"

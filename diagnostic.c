@@ -20,10 +20,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "adt/error.h"
-#include "ast.h"
 #include "diagnostic.h"
+#include "adt/error.h"
+#include "symbol_t.h"
 #include "token_t.h"
+#include "ast.h"
 #include "type.h"
 #include "warning.h"
 

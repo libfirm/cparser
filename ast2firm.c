@@ -30,6 +30,7 @@
 
 #include "adt/error.h"
 #include "adt/array.h"
+#include "symbol_t.h"
 #include "token_t.h"
 #include "type_t.h"
 #include "ast_t.h"
@@ -1094,15 +1095,29 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
-static ir_node *char_const_to_firm(const const_expression_t *cnst)
+static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 {
 	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
 	ir_mode  *mode = get_ir_mode(cnst->base.type);
 
 	long long int v = 0;
-	for (size_t i = 0; i < cnst->v.chars.size; ++i) {
-		v = (v << 8) | ((unsigned char)cnst->v.chars.begin[i]);
+	for (size_t i = 0; i < cnst->v.character.size; ++i) {
+		v = (v << 8) | ((unsigned char)cnst->v.character.begin[i]);
 	}
+	char    buf[128];
+	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
+	tarval *tv = new_tarval_from_str(buf, len, mode);
+
+	return new_d_Const(dbgi, mode, tv);
+}
+
+static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
+{
+	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
+	ir_mode  *mode = get_ir_mode(cnst->base.type);
+
+	long long int v = cnst->v.wide_character.begin[0];
+
 	char    buf[128];
 	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
 	tarval *tv = new_tarval_from_str(buf, len, mode);
@@ -2762,8 +2777,10 @@ static ir_node *builtin_prefetch_to_firm(
 static ir_node *_expression_to_firm(const expression_t *expression)
 {
 	switch(expression->kind) {
-	case EXPR_CHAR_CONST:
-		return char_const_to_firm(&expression->conste);
+	case EXPR_CHARACTER_CONSTANT:
+		return character_constant_to_firm(&expression->conste);
+	case EXPR_WIDE_CHARACTER_CONSTANT:
+		return wide_character_constant_to_firm(&expression->conste);
 	case EXPR_CONST:
 		return const_to_firm(&expression->conste);
 	case EXPR_STRING_LITERAL:

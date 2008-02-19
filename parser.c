@@ -23,10 +23,11 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include "parser.h"
 #include "diagnostic.h"
 #include "format_check.h"
-#include "parser.h"
 #include "lexer.h"
+#include "symbol_t.h"
 #include "token_t.h"
 #include "types.h"
 #include "type_t.h"
@@ -214,31 +215,32 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[EXPR_INVALID]             = sizeof(expression_base_t),
-		[EXPR_REFERENCE]           = sizeof(reference_expression_t),
-		[EXPR_CONST]               = sizeof(const_expression_t),
-		[EXPR_CHAR_CONST]          = sizeof(const_expression_t),
-		[EXPR_STRING_LITERAL]      = sizeof(string_literal_expression_t),
-		[EXPR_WIDE_STRING_LITERAL] = sizeof(wide_string_literal_expression_t),
-		[EXPR_COMPOUND_LITERAL]    = sizeof(compound_literal_expression_t),
-		[EXPR_CALL]                = sizeof(call_expression_t),
-		[EXPR_UNARY_FIRST]         = sizeof(unary_expression_t),
-		[EXPR_BINARY_FIRST]        = sizeof(binary_expression_t),
-		[EXPR_CONDITIONAL]         = sizeof(conditional_expression_t),
-		[EXPR_SELECT]              = sizeof(select_expression_t),
-		[EXPR_ARRAY_ACCESS]        = sizeof(array_access_expression_t),
-		[EXPR_SIZEOF]              = sizeof(typeprop_expression_t),
-		[EXPR_ALIGNOF]             = sizeof(typeprop_expression_t),
-		[EXPR_CLASSIFY_TYPE]       = sizeof(classify_type_expression_t),
-		[EXPR_FUNCTION]            = sizeof(string_literal_expression_t),
-		[EXPR_PRETTY_FUNCTION]     = sizeof(string_literal_expression_t),
-		[EXPR_BUILTIN_SYMBOL]      = sizeof(builtin_symbol_expression_t),
-		[EXPR_BUILTIN_CONSTANT_P]  = sizeof(builtin_constant_expression_t),
-		[EXPR_BUILTIN_PREFETCH]    = sizeof(builtin_prefetch_expression_t),
-		[EXPR_OFFSETOF]            = sizeof(offsetof_expression_t),
-		[EXPR_VA_START]            = sizeof(va_start_expression_t),
-		[EXPR_VA_ARG]              = sizeof(va_arg_expression_t),
-		[EXPR_STATEMENT]           = sizeof(statement_expression_t),
+		[EXPR_INVALID]                 = sizeof(expression_base_t),
+		[EXPR_REFERENCE]               = sizeof(reference_expression_t),
+		[EXPR_CONST]                   = sizeof(const_expression_t),
+		[EXPR_CHARACTER_CONSTANT]      = sizeof(const_expression_t),
+		[EXPR_WIDE_CHARACTER_CONSTANT] = sizeof(const_expression_t),
+		[EXPR_STRING_LITERAL]          = sizeof(string_literal_expression_t),
+		[EXPR_WIDE_STRING_LITERAL]   = sizeof(wide_string_literal_expression_t),
+		[EXPR_COMPOUND_LITERAL]        = sizeof(compound_literal_expression_t),
+		[EXPR_CALL]                    = sizeof(call_expression_t),
+		[EXPR_UNARY_FIRST]             = sizeof(unary_expression_t),
+		[EXPR_BINARY_FIRST]            = sizeof(binary_expression_t),
+		[EXPR_CONDITIONAL]             = sizeof(conditional_expression_t),
+		[EXPR_SELECT]                  = sizeof(select_expression_t),
+		[EXPR_ARRAY_ACCESS]            = sizeof(array_access_expression_t),
+		[EXPR_SIZEOF]                  = sizeof(typeprop_expression_t),
+		[EXPR_ALIGNOF]                 = sizeof(typeprop_expression_t),
+		[EXPR_CLASSIFY_TYPE]           = sizeof(classify_type_expression_t),
+		[EXPR_FUNCTION]                = sizeof(string_literal_expression_t),
+		[EXPR_PRETTY_FUNCTION]         = sizeof(string_literal_expression_t),
+		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
+		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
+		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
+		[EXPR_OFFSETOF]                = sizeof(offsetof_expression_t),
+		[EXPR_VA_START]                = sizeof(va_start_expression_t),
+		[EXPR_VA_ARG]                  = sizeof(va_arg_expression_t),
+		[EXPR_STATEMENT]               = sizeof(statement_expression_t),
 	};
 	if(kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
 		return sizes[EXPR_UNARY_FIRST];
@@ -533,7 +535,8 @@ static void set_scope(scope_t *new_scope)
  * Search a symbol in a given namespace and returns its declaration or
  * NULL if this symbol was not found.
  */
-static declaration_t *get_declaration(const symbol_t *const symbol, const namespace_t namespc)
+static declaration_t *get_declaration(const symbol_t *const symbol,
+                                      const namespace_t namespc)
 {
 	declaration_t *declaration = symbol->declaration;
 	for( ; declaration != NULL; declaration = declaration->symbol_next) {
@@ -3543,15 +3546,39 @@ static expression_t *parse_int_const(void)
 /**
  * Parse a character constant.
  */
-static expression_t *parse_char_const(void)
+static expression_t *parse_character_constant(void)
 {
-	expression_t *cnst         = allocate_expression_zero(EXPR_CHAR_CONST);
+	expression_t *cnst = allocate_expression_zero(EXPR_CHARACTER_CONSTANT);
+
 	cnst->base.source_position = HERE;
 	cnst->base.type            = token.datatype;
-	cnst->conste.v.chars.begin = token.v.string.begin;
-	cnst->conste.v.chars.size  = token.v.string.size;
+	cnst->conste.v.character   = token.v.string;
 
-	if (cnst->conste.v.chars.size != 1) {
+	if (cnst->conste.v.character.size != 1) {
+		if (warning.multichar && (c_mode & _GNUC)) {
+			/* TODO */
+			warningf(HERE, "multi-character character constant");
+		} else {
+			errorf(HERE, "more than 1 characters in character constant");
+		}
+	}
+	next_token();
+
+	return cnst;
+}
+
+/**
+ * Parse a wide character constant.
+ */
+static expression_t *parse_wide_character_constant(void)
+{
+	expression_t *cnst = allocate_expression_zero(EXPR_WIDE_CHARACTER_CONSTANT);
+
+	cnst->base.source_position    = HERE;
+	cnst->base.type               = token.datatype;
+	cnst->conste.v.wide_character = token.v.wide_string;
+
+	if (cnst->conste.v.wide_character.size != 1) {
 		if (warning.multichar && (c_mode & _GNUC)) {
 			/* TODO */
 			warningf(HERE, "multi-character character constant");
@@ -4174,7 +4201,8 @@ static expression_t *parse_primary_expression(void)
 {
 	switch (token.type) {
 		case T_INTEGER:                  return parse_int_const();
-		case T_CHARS:                    return parse_char_const();
+		case T_CHARACTER_CONSTANT:       return parse_character_constant();
+		case T_WIDE_CHARACTER_CONSTANT:  return parse_wide_character_constant();
 		case T_FLOATINGPOINT:            return parse_float_const();
 		case T_STRING_LITERAL:
 		case T_WIDE_STRING_LITERAL:      return parse_string_const();
@@ -5121,7 +5149,8 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_INVALID:                   break;
 		case EXPR_REFERENCE:                 return false;
 		case EXPR_CONST:                     return false;
-		case EXPR_CHAR_CONST:                return false;
+		case EXPR_CHARACTER_CONSTANT:        return false;
+		case EXPR_WIDE_CHARACTER_CONSTANT:   return false;
 		case EXPR_STRING_LITERAL:            return false;
 		case EXPR_WIDE_STRING_LITERAL:       return false;
 

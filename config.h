@@ -17,16 +17,3 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
-#define INLINE inline
-
-#ifdef __GNUC__
-#define NORETURN __attribute__((noreturn))
-#elif defined _MSC_VER
-#define NORETURN __declspec(noreturn)
-#define __attribute__(x)
-#else
-#define NORETURN
-#ifndef __attribute__
-#define __attribute__(x)
-#endif
-#endif

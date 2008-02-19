@@ -20,6 +20,7 @@
 #ifndef DIAGNOSTIC_H
 #define DIAGNOSTIC_H
 
+#include <stdbool.h>
 #include "token_t.h"
 
 void diagnosticf(const char *fmt, ...);

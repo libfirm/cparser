@@ -21,7 +21,9 @@
 
 #include <stdio.h>
 #include <assert.h>
+
 #include "type_t.h"
+#include "symbol_t.h"
 #include "type_hash.h"
 #include "adt/error.h"
 

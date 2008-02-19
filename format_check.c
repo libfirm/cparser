@@ -19,9 +19,10 @@
  */
 #include <wctype.h>
 
+#include "format_check.h"
+#include "symbol_t.h"
 #include "ast_t.h"
 #include "diagnostic.h"
-#include "format_check.h"
 #include "types.h"
 #include "type_t.h"
 #include "warning.h"

@@ -32,7 +32,7 @@ typedef enum {
 #include "tokens.inc"
 #undef TS
 #undef T
-
+	T_NULL  =  0,
 	T_EOF   = -1,
 	T_ERROR = -2
 } token_type_t;
@@ -43,6 +43,9 @@ typedef enum {
 #include "tokens_preprocessor.inc"
 #undef TS
 #undef T
+	TP_NULL  = T_NULL,
+	TP_EOF   = T_EOF,
+	TP_ERROR = T_ERROR
 } preprocessor_token_type_t;
 
 typedef struct source_position_t source_position_t;
@@ -71,5 +74,8 @@ void init_tokens(void);
 void exit_tokens(void);
 void print_token_type(FILE *out, token_type_t token_type);
 void print_token(FILE *out, const token_t *token);
+
+void print_pp_token_type(FILE *out, preprocessor_token_type_t type);
+void print_pp_token(FILE *out, const token_t *token);
 
 #endif

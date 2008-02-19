@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include "token_t.h"
+#include "symbol_t.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -29,6 +30,7 @@
 #include "adt/array.h"
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
+static symbol_t *pp_token_symbols[TP_LAST_TOKEN];
 
 source_position_t builtin_source_position = { "<built-in>", 0 };
 
@@ -38,6 +40,7 @@ void init_tokens(void)
 	int       last_id = -2;
 
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
+	memset(pp_token_symbols, 0, TP_LAST_TOKEN * sizeof(pp_token_symbols[0]));
 
 #define T(mode,x,str,val)                                          \
 	if (T_##x > 255) {                                             \
@@ -63,8 +66,14 @@ void init_tokens(void)
 
 #define T(mode,x,str,val)                                          \
 	assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);                 \
-	symbol               = symbol_table_insert(str);               \
-	symbol->pp_ID        = TP_##x;
+	symbol                   = symbol_table_insert(str);           \
+	symbol->pp_ID            = TP_##x;                             \
+	pp_token_symbols[TP_##x] = symbol;
+
+#define TS(x,str,val)                                              \
+	assert(TP_##x >= 0 && TP_##x < T_LAST_TOKEN);                  \
+	symbol                   = symbol_table_insert(str);           \
+	pp_token_symbols[TP_##x] = symbol;
 
 #include "tokens_preprocessor.inc"
 
@@ -121,6 +130,53 @@ void print_token(FILE *f, const token_t *token)
 		break;
 	default:
 		print_token_type(f, (token_type_t)token->type);
+		break;
+	}
+}
+
+void print_pp_token_type(FILE *f, preprocessor_token_type_t token_type)
+{
+	if(token_type == TP_EOF) {
+		fputs("end of file", f);
+		return;
+	}
+	if(token_type == TP_ERROR) {
+		fputs("error", f);
+		return;
+	}
+
+	int token_symbols_len = TP_LAST_TOKEN;
+	if(token_type < 0 || token_type >= token_symbols_len) {
+		fputs("invalid token", f);
+		return;
+	}
+
+	const symbol_t *symbol = pp_token_symbols[token_type];
+	if(symbol != NULL) {
+		fprintf(f, "'%s'", symbol->string);
+	} else {
+		if(token_type >= 0 && token_type < 256) {
+			fprintf(f, "'%c'", token_type);
+			return;
+		}
+		fputs("unknown token", f);
+	}
+}
+
+void print_pp_token(FILE *f, const token_t *token)
+{
+	switch((preprocessor_token_type_t) token->type) {
+	case TP_IDENTIFIER:
+		fprintf(f, "symbol '%s'", token->v.symbol->string);
+		break;
+	case TP_NUMBER:
+		fprintf(f, "number %lld", token->v.intvalue);
+		break;
+	case TP_STRING_LITERAL:
+		fprintf(f, "string '%s'", token->v.string.begin);
+		break;
+	default:
+		print_pp_token_type(f, (preprocessor_token_type_t) token->type);
 		break;
 	}
 }

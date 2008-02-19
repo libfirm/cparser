@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include "ast_t.h"
+#include "symbol_t.h"
 #include "type_t.h"
 
 #include <assert.h>
@@ -98,7 +99,8 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNKNOWN]                   = PREC_PRIM,
 		[EXPR_INVALID]                   = PREC_PRIM,
 		[EXPR_REFERENCE]                 = PREC_PRIM,
-		[EXPR_CHAR_CONST]                = PREC_PRIM,
+		[EXPR_CHARACTER_CONSTANT]        = PREC_PRIM,
+		[EXPR_WIDE_CHARACTER_CONSTANT]   = PREC_PRIM,
 		[EXPR_CONST]                     = PREC_PRIM,
 		[EXPR_STRING_LITERAL]            = PREC_PRIM,
 		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
@@ -240,35 +242,16 @@ static void print_quoted_string(const string_t *const string, char border)
 }
 
 /**
- * Print a constant character expression.
- *
- * @param cnst  the constant character expression
- */
-static void print_char_const(const const_expression_t *cnst)
-{
-	print_quoted_string(&cnst->v.chars, '\'');
-}
-
-/**
- * Prints a string literal expression.
- *
- * @param string_literal  the string literal expression
- */
-static void print_string_literal(
-		const string_literal_expression_t *string_literal)
-{
-	print_quoted_string(&string_literal->value, '"');
-}
-
-/**
  * Prints a wide string literal expression.
  *
  * @param wstr  the wide string literal expression
  */
-static void print_quoted_wide_string(const wide_string_t *const wstr)
+static void print_quoted_wide_string(const wide_string_t *const wstr,
+                                     char border)
 {
-	fputs("L\"", out);
-	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size - 1;
+	fputc('L', out);
+	fputc(border, out);
+	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size-1;
 	     c != end; ++c) {
 		switch (*c) {
 			case L'\"':  fputs("\\\"", out); break;
@@ -305,13 +288,39 @@ static void print_quoted_wide_string(const wide_string_t *const wstr)
 			}
 		}
 	}
-	fputc('"', out);
+	fputc(border, out);
+}
+
+/**
+ * Print a constant character expression.
+ *
+ * @param cnst  the constant character expression
+ */
+static void print_character_constant(const const_expression_t *cnst)
+{
+	print_quoted_string(&cnst->v.character, '\'');
+}
+
+static void print_wide_character_constant(const const_expression_t *cnst)
+{
+	print_quoted_wide_string(&cnst->v.wide_character, '\'');
+}
+
+/**
+ * Prints a string literal expression.
+ *
+ * @param string_literal  the string literal expression
+ */
+static void print_string_literal(
+		const string_literal_expression_t *string_literal)
+{
+	print_quoted_string(&string_literal->value, '"');
 }
 
 static void print_wide_string_literal(
 	const wide_string_literal_expression_t *const wstr)
 {
-	print_quoted_wide_string(&wstr->value);
+	print_quoted_wide_string(&wstr->value, '"');
 }
 
 static void print_compound_literal(
@@ -698,8 +707,11 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_INVALID:
 		fprintf(out, "*invalid expression*");
 		break;
-	case EXPR_CHAR_CONST:
-		print_char_const(&expression->conste);
+	case EXPR_CHARACTER_CONSTANT:
+		print_character_constant(&expression->conste);
+		break;
+	case EXPR_WIDE_CHARACTER_CONSTANT:
+		print_wide_character_constant(&expression->conste);
 		break;
 	case EXPR_CONST:
 		print_const(&expression->conste);
@@ -1183,7 +1195,7 @@ void print_initializer(const initializer_t *initializer)
 		print_quoted_string(&initializer->string.string, '"');
 		return;
 	case INITIALIZER_WIDE_STRING:
-		print_quoted_wide_string(&initializer->wide_string.string);
+		print_quoted_wide_string(&initializer->wide_string.string, '"');
 		return;
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
@@ -1400,7 +1412,8 @@ bool is_constant_expression(const expression_t *expression)
 	switch(expression->kind) {
 
 	case EXPR_CONST:
-	case EXPR_CHAR_CONST:
+	case EXPR_CHARACTER_CONSTANT:
+	case EXPR_WIDE_CHARACTER_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_SIZEOF:

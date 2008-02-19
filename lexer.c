@@ -21,6 +21,7 @@
 
 #include "diagnostic.h"
 #include "lexer.h"
+#include "symbol_t.h"
 #include "token_t.h"
 #include "symbol_table_t.h"
 #include "adt/error.h"
@@ -906,14 +907,17 @@ end_of_string:
  */
 static void parse_wide_character_constant(void)
 {
+	const unsigned start_linenr = lexer_token.source_position.linenr;
+
 	eat('\'');
 
-	int found_char = 0;
 	while(1) {
 		switch(c) {
-		case '\\':
-			found_char = parse_escape_sequence();
+		case '\\': {
+			wchar_rep_t tc = parse_escape_sequence();
+			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
 			break;
+		}
 
 		MATCH_NEWLINE(
 			parse_error("newline while parsing character constant");
@@ -924,28 +928,31 @@ static void parse_wide_character_constant(void)
 			next_char();
 			goto end_of_wide_char_constant;
 
-		case EOF:
-			parse_error("EOF while parsing character constant");
+		case EOF: {
+			source_position_t source_position = lexer_token.source_position;
+			source_position.linenr = start_linenr;
+			errorf(source_position, "EOF while parsing character constant");
 			lexer_token.type = T_ERROR;
 			return;
+		}
 
-		default:
-			if(found_char != 0) {
-				parse_error("more than 1 characters in character "
-				            "constant");
-				goto end_of_wide_char_constant;
-			} else {
-				found_char = c;
-				next_char();
-			}
+		default: {
+			wchar_rep_t tc = (wchar_rep_t) c;
+			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
+			next_char();
 			break;
+		}
 		}
 	}
 
-end_of_wide_char_constant:
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = found_char;
-	lexer_token.datatype   = type_wchar_t;
+end_of_wide_char_constant:;
+	size_t             size   = (size_t) obstack_object_size(&symbol_obstack);
+	const wchar_rep_t *string = obstack_finish(&symbol_obstack);
+
+	lexer_token.type                = T_WIDE_CHARACTER_CONSTANT;
+	lexer_token.v.wide_string.begin = string;
+	lexer_token.v.wide_string.size  = size;
+	lexer_token.datatype            = type_wchar_t;
 }
 
 /**
@@ -1022,18 +1029,22 @@ static void parse_character_constant(void)
 
 	eat('\'');
 
-	int tc;
 	while(1) {
 		switch(c) {
-		case '\\':
-			tc = parse_escape_sequence();
+		case '\\': {
+			int tc = parse_escape_sequence();
 			obstack_1grow(&symbol_obstack, (char) tc);
 			break;
+		}
 
 		MATCH_NEWLINE(
 			parse_error("newline while parsing character constant");
 			break;
 		)
+
+		case '\'':
+			next_char();
+			goto end_of_char_constant;
 
 		case EOF: {
 			source_position_t source_position;
@@ -1043,10 +1054,6 @@ static void parse_character_constant(void)
 			lexer_token.type = T_ERROR;
 			return;
 		}
-
-		case '\'':
-			next_char();
-			goto end_of_char_constant;
 
 		default:
 			obstack_1grow(&symbol_obstack, (char) c);
@@ -1060,7 +1067,7 @@ end_of_char_constant:;
 	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
 	const char *const string = obstack_finish(&symbol_obstack);
 
-	lexer_token.type           = T_CHARS;
+	lexer_token.type           = T_CHARACTER_CONSTANT;
 	lexer_token.v.string.begin = string;
 	lexer_token.v.string.size  = size;
 	lexer_token.datatype       = type_int;
@@ -1473,25 +1480,25 @@ void lexer_next_preprocessing_token(void)
 			ELSE('/')
 		case '%':
 			MAYBE_PROLOG
-			MAYBE('>', T_PERCENTGREATER)
+			MAYBE('>', '}')
 			MAYBE('=', T_PERCENTEQUAL)
 				case ':':
 					MAYBE_PROLOG
 						case '%':
 							MAYBE_PROLOG
-							MAYBE(':', T_PERCENTCOLONPERCENTCOLON)
+							MAYBE(':', T_HASHHASH)
 							ELSE_CODE(
 								put_back(c);
 								c = '%';
-								lexer_token.type = T_PERCENTCOLON;
+								lexer_token.type = '#';
 								return;
 							)
-					ELSE(T_PERCENTCOLON)
+					ELSE('#')
 			ELSE('%')
 		case '<':
 			MAYBE_PROLOG
-			MAYBE(':', T_LESSCOLON)
-			MAYBE('%', T_LESSPERCENT)
+			MAYBE(':', '[')
+			MAYBE('%', '{')
 			MAYBE('=', T_LESSEQUAL)
 				case '<':
 					MAYBE_PROLOG
@@ -1517,7 +1524,7 @@ void lexer_next_preprocessing_token(void)
 			ELSE('|')
 		case ':':
 			MAYBE_PROLOG
-			MAYBE('>', T_COLONGREATER)
+			MAYBE('>', ']')
 			ELSE(':')
 		case '=':
 			MAYBE_PROLOG

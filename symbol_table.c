@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include "symbol_table_t.h"
+#include "symbol_t.h"
 #include "token_t.h"
 #include "adt/hash_string.h"
 #include "adt/obst.h"

@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include "ast.h"
 #include "symbol.h"
 
 typedef struct type_base_t           type_base_t;
