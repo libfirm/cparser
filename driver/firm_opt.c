@@ -300,10 +300,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   set_opt_auto_create_sync(firm_opt.auto_sync);
   set_opt_alias_analysis(firm_opt.alias_analysis);
 
-  /* Overflow unsafe transformation can be enabled here if OSR is disabled, else
-     must be disabled until OSR finished. */
-  set_opt_overflow_unsafe_transform(firm_opt.strength_red == FALSE);
-
   aa_opt = aa_opt_no_opt;
   if (firm_opt.strict_alias)
     aa_opt |= aa_opt_type_based | aa_opt_byte_type_may_alias;
@@ -533,8 +529,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
     timer_push(TV_OSR);
       opt_osr(current_ir_graph, osr_flag_default | osr_flag_keep_reg_pressure | osr_flag_ignore_x86_shift);
-	  /* now it is safe to enable overflow unsafe transformations */
-	  set_opt_overflow_unsafe_transform(1);
     timer_pop();
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "stred");
     CHECK_ONE(firm_opt.check_all, irg);
