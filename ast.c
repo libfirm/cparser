@@ -1520,8 +1520,10 @@ bool is_constant_expression(const expression_t *expression)
 		return false;
 	}
 
-	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
+		return true;
+
+	case EXPR_UNKNOWN:
 		break;
 	}
 	panic("invalid expression found (is constant expression)");

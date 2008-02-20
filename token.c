@@ -170,7 +170,7 @@ void print_pp_token(FILE *f, const token_t *token)
 		fprintf(f, "symbol '%s'", token->v.symbol->string);
 		break;
 	case TP_NUMBER:
-		fprintf(f, "number %lld", token->v.intvalue);
+		fprintf(f, "number %s", token->v.string.begin);
 		break;
 	case TP_STRING_LITERAL:
 		fprintf(f, "string '%s'", token->v.string.begin);

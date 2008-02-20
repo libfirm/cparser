@@ -478,6 +478,10 @@ static void eat_paren(void)
 		if(token.type == ')' || token.type == ';' || token.type == '}') {
 			return;
 		}
+		if(token.type == ')') {
+			next_token();
+			return;
+		}
 		if(token.type == '(') {
 			eat_paren();
 			continue;
@@ -488,7 +492,6 @@ static void eat_paren(void)
 		}
 		next_token();
 	}
-	eat(')');
 }
 
 #define expect(expected)                           \

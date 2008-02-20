@@ -87,6 +87,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					break;
 				}
 
+#ifndef PPTEST
 				case 'E': {
 					const expression_t* const expr = va_arg(ap, const expression_t*);
 					print_expression(expr);
@@ -108,6 +109,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					print_type_ext(type, sym, NULL);
 					break;
 				}
+#endif
 
 				case 'K': {
 					const token_t* const token = va_arg(ap, const token_t*);
