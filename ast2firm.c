@@ -2097,10 +2097,11 @@ static ir_node *create_sub(const binary_expression_t *expression)
 
 		ir_node *const elem_size = get_type_size(ptr_type->points_to);
 		ir_mode *const mode      = get_ir_mode(type);
+		ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 		ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
 		ir_node *const no_mem    = new_NoMem();
-		ir_node *const div       = new_d_Div(dbgi, no_mem, sub, elem_size, mode,
-		                                     op_pin_state_floats);
+		ir_node *const div       = new_d_DivRL(dbgi, no_mem, sub, conv_size, mode,
+		                                       op_pin_state_floats);
 		return new_d_Proj(dbgi, div, mode, pn_Div_res);
 	}
 
