@@ -174,9 +174,12 @@ typedef enum {
 	case EXPR_UNARY_ASSUME:                \
 	case EXPR_UNARY_BITFIELD_EXTRACT:
 
+/**
+ * A scope containing declarations.
+ */
 struct scope_t {
 	declaration_t *declarations;      /**< List of declarations in this scope. */
-	declaration_t *last_declaration;
+	declaration_t *last_declaration;  /**< last declaration in this scope. */
 };
 
 struct expression_base_t {
@@ -442,8 +445,8 @@ struct declaration_t {
 		initializer_t  *initializer;
 		expression_t   *enum_value;
 	} init;
-	scope_t             scope;
-	scope_t            *parent_scope;
+	scope_t             scope;              /**< The scope that this declaration opens. */
+	scope_t            *parent_scope;       /**< The parant scope where this declaration lives. */
 
 	/** next declaration in a scope */
 	declaration_t      *next;
