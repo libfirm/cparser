@@ -494,12 +494,17 @@ static void eat_paren(void)
 	}
 }
 
+/**
+ * Expect the the current token is the expected token.
+ * If not, generate an error, eat the current statement,
+ * and goto the end_error label.
+ */
 #define expect(expected)                           \
 	do {                                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
         eat_statement();                           \
-        return NULL;                               \
+        goto end_error;                            \
     }                                              \
     next_token();                                  \
 	} while(0)
@@ -954,6 +959,8 @@ static designator_t *parse_designation(void)
 		}
 		last = designator;
 	}
+end_error:
+	return NULL;
 }
 
 static initializer_t *initializer_from_string(array_type_t *type,
@@ -1785,6 +1792,8 @@ restart:
 	typeof_type->typeoft.typeof_type = type;
 
 	return typeof_type;
+end_error:
+	return NULL;
 }
 
 typedef enum {
@@ -2356,6 +2365,8 @@ static construct_type_t *parse_array_declarator(void)
 	expect(']');
 
 	return (construct_type_t*) array;
+end_error:
+	return NULL;
 }
 
 static construct_type_t *parse_function_declarator(declaration_t *declaration)
@@ -2383,6 +2394,8 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	expect(')');
 
 	return (construct_type_t*) construct_function_type;
+end_error:
+	return NULL;
 }
 
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
@@ -2481,6 +2494,8 @@ declarator_finished:
 	}
 
 	return first;
+end_error:
+	return NULL;
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list,
@@ -3829,6 +3844,9 @@ static expression_t *parse_compound_literal(type_t *type)
 	return expression;
 }
 
+/**
+ * Parse a cast expression.
+ */
 static expression_t *parse_cast(void)
 {
 	source_position_t source_position = token.source_position;
@@ -3852,8 +3870,13 @@ static expression_t *parse_cast(void)
 	cast->unary.value = value;
 
 	return cast;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parse a statement expression.
+ */
 static expression_t *parse_statement_expression(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
@@ -3880,8 +3903,13 @@ static expression_t *parse_statement_expression(void)
 	expect(')');
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parse a braced expression.
+ */
 static expression_t *parse_brace_expression(void)
 {
 	eat('(');
@@ -3904,6 +3932,8 @@ static expression_t *parse_brace_expression(void)
 	expect(')');
 
 	return result;
+end_error:
+	return create_invalid_expression();
 }
 
 static expression_t *parse_function_keyword(void)
@@ -3988,8 +4018,13 @@ static designator_t *parse_designator(void)
 	}
 
 	return result;
+end_error:
+	return NULL;
 }
 
+/**
+ * Parse the __builtin_offsetof() expression.
+ */
 static expression_t *parse_offsetof(void)
 {
 	eat(T___builtin_offsetof);
@@ -4020,8 +4055,13 @@ static expression_t *parse_offsetof(void)
 	DEL_ARR_F(path.path);
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a _builtin_va_start() expression.
+ */
 static expression_t *parse_va_start(void)
 {
 	eat(T___builtin_va_start);
@@ -4044,10 +4084,13 @@ static expression_t *parse_va_start(void)
 		}
 	}
 	errorf(expr->base.source_position, "second argument of 'va_start' must be last parameter of the current function");
-
+end_error:
 	return create_invalid_expression();
 }
 
+/**
+ * Parses a _builtin_va_arg() expression.
+ */
 static expression_t *parse_va_arg(void)
 {
 	eat(T___builtin_va_arg);
@@ -4061,6 +4104,8 @@ static expression_t *parse_va_arg(void)
 	expect(')');
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
 static expression_t *parse_builtin_symbol(void)
@@ -4079,6 +4124,9 @@ static expression_t *parse_builtin_symbol(void)
 	return expression;
 }
 
+/**
+ * Parses a __builtin_constant() expression.
+ */
 static expression_t *parse_builtin_constant(void)
 {
 	eat(T___builtin_constant_p);
@@ -4091,8 +4139,13 @@ static expression_t *parse_builtin_constant(void)
 	expression->base.type = type_int;
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a __builtin_prefetch() expression.
+ */
 static expression_t *parse_builtin_prefetch(void)
 {
 	eat(T___builtin_prefetch);
@@ -4113,8 +4166,13 @@ static expression_t *parse_builtin_prefetch(void)
 	expression->base.type = type_void;
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a __builtin_is_*() compare expression.
+ */
 static expression_t *parse_compare_builtin(void)
 {
 	expression_t *expression;
@@ -4166,8 +4224,13 @@ static expression_t *parse_compare_builtin(void)
 	}
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a __builtin_expect() expression.
+ */
 static expression_t *parse_builtin_expect(void)
 {
 	eat(T___builtin_expect);
@@ -4184,8 +4247,13 @@ static expression_t *parse_builtin_expect(void)
 	expression->base.type = expression->binary.left->base.type;
 
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a MS assume() expression.
+ */
 static expression_t *parse_assume(void) {
 	eat(T_assume);
 
@@ -4198,8 +4266,13 @@ static expression_t *parse_assume(void) {
 
 	expression->base.type = type_void;
 	return expression;
+end_error:
+	return create_invalid_expression();
 }
 
+/**
+ * Parses a primary expression.
+ */
 static expression_t *parse_primary_expression(void)
 {
 	switch (token.type) {
@@ -4326,6 +4399,8 @@ static expression_t *parse_typeprop(expression_kind_t kind, unsigned precedence)
 	}
 
 	return tp_expression;
+end_error:
+	return create_invalid_expression();
 }
 
 static expression_t *parse_sizeof(unsigned precedence)
@@ -4522,6 +4597,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 	}
 
 	return result;
+end_error:
+	return create_invalid_expression();
 }
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);
@@ -4610,6 +4687,8 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		= create_implicit_cast(false_expression, result_type);
 	conditional->base.type = result_type;
 	return result;
+end_error:
+	return create_invalid_expression();
 }
 
 /**
@@ -4625,6 +4704,9 @@ static expression_t *parse_extension(unsigned precedence)
 	return expression;
 }
 
+/**
+ * Parse a __builtin_classify_type() expression.
+ */
 static expression_t *parse_builtin_classify_type(const unsigned precedence)
 {
 	eat(T___builtin_classify_type);
@@ -4638,6 +4720,8 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 	result->classify_type.type_expression = expression;
 
 	return result;
+end_error:
+	return create_invalid_expression();
 }
 
 static void semantic_incdec(unary_expression_t *expression)
@@ -5149,7 +5233,7 @@ static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
 		case EXPR_UNKNOWN:                   break;
-		case EXPR_INVALID:                   break;
+		case EXPR_INVALID:                   return true; /* do NOT warn */
 		case EXPR_REFERENCE:                 return false;
 		case EXPR_CONST:                     return false;
 		case EXPR_CHARACTER_CONSTANT:        return false;
@@ -5263,7 +5347,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_ISUNORDERED:        return false;
 	}
 
-	panic("unexpected statement");
+	panic("unexpected expression");
 }
 
 static void semantic_comma(binary_expression_t *expression)
@@ -5552,6 +5636,8 @@ static asm_constraint_t *parse_asm_constraints(void)
 	}
 
 	return result;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5621,6 +5707,8 @@ end_of_asm:
 	expect(')');
 	expect(';');
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5665,6 +5753,8 @@ static statement_t *parse_case_statement(void)
 	statement->case_label.statement = parse_statement();
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5715,6 +5805,8 @@ static statement_t *parse_default_statement(void)
 	statement->case_label.statement = parse_statement();
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5816,6 +5908,8 @@ static statement_t *parse_if(void)
 	}
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5852,6 +5946,8 @@ static statement_t *parse_switch(void)
 	}
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
@@ -5882,6 +5978,8 @@ static statement_t *parse_while(void)
 	statement->whiles.body = parse_loop_body(statement);
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5904,6 +6002,8 @@ static statement_t *parse_do(void)
 	expect(';');
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5956,6 +6056,8 @@ static statement_t *parse_for(void)
 	environment_pop_to(top);
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -5991,6 +6093,8 @@ static statement_t *parse_goto(void)
 	expect(';');
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -6012,6 +6116,8 @@ static statement_t *parse_continue(void)
 	expect(';');
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -6033,6 +6139,8 @@ static statement_t *parse_break(void)
 	expect(';');
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -6148,6 +6256,8 @@ static statement_t *parse_return(void)
 	statement->returns.value = return_value;
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
@@ -6190,6 +6300,8 @@ static statement_t *parse_expression_statement(void)
 	expect(';');
 
 	return statement;
+end_error:
+	return NULL;
 }
 
 /**
