@@ -57,6 +57,15 @@ struct declaration_specifiers_t {
 	type_t            *type;
 };
 
+typedef struct parse_initializer_env_t {
+	type_t        *type;        /**< the type of the initializer. In case of an
+	                                 array type with unspecified size this gets
+	                                 adjusted to the actual size. */
+	initializer_t *initializer; /**< initializer will be filled in here */
+	declaration_t *declaration; /**< the declaration that is initialized */
+	bool           must_be_constant;
+} parse_initializer_env_t;
+
 typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration);
 
 static token_t             token;
@@ -1036,12 +1045,20 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	return result;
 }
 
+/**
+ * Checks if a given expression can be used as an constant initializer.
+ */
 static bool is_initializer_constant(const expression_t *expression)
 {
 	return is_constant_expression(expression)
 		|| is_address_constant(expression);
 }
 
+/**
+ * Parses an scalar initializer.
+ *
+ * § 6.7.8.11; eat {} without warning
+ */
 static initializer_t *parse_scalar_initializer(type_t *type,
                                                bool must_be_constant)
 {
@@ -1122,6 +1139,11 @@ static __attribute__((unused)) void debug_print_type_path(
 
 		type_t *type = skip_typeref(entry->type);
 		if(is_type_compound(type)) {
+			/* in gcc mode structs can have no members */
+			if(entry->v.compound_entry->symbol->string) {
+				assert(i == len-1);
+				continue;
+			}
 			fprintf(stderr, ".%s", entry->v.compound_entry->symbol->string);
 		} else if(is_type_array(type)) {
 			fprintf(stderr, "[%u]", entry->v.index);
@@ -1129,9 +1151,11 @@ static __attribute__((unused)) void debug_print_type_path(
 			fprintf(stderr, "-INVALID-");
 		}
 	}
-	fprintf(stderr, "  (");
-	print_type(path->top_type);
-	fprintf(stderr, ")");
+	if (path->top_type != NULL) {
+		fprintf(stderr, "  (");
+		print_type(path->top_type);
+		fprintf(stderr, ")");
+	}
 }
 
 static type_path_entry_t *get_type_path_top(const type_path_t *path)
@@ -1165,8 +1189,13 @@ static void descend_into_subtype(type_path_t *path)
 		declaration_t *declaration = top_type->compound.declaration;
 		declaration_t *entry       = declaration->scope.declarations;
 
-		top->v.compound_entry = entry;
-		path->top_type        = entry->type;
+		if(entry != NULL) {
+			top->v.compound_entry = entry;
+			path->top_type        = entry->type;
+		} else {
+			top->v.compound_entry = NULL;
+			path->top_type        = NULL;
+		}
 	} else {
 		assert(is_type_array(top_type));
 
@@ -1352,10 +1381,24 @@ static void skip_initializers(void)
 }
 
 static initializer_t *parse_sub_initializer(type_path_t *path,
-		type_t *outer_type, size_t top_path_level, bool must_be_constant)
+		type_t *outer_type, size_t top_path_level,
+		parse_initializer_env_t *env)
 {
 	type_t *orig_type = path->top_type;
-	type_t *type      = skip_typeref(orig_type);
+
+	if(orig_type == NULL) {
+		/* We don't have declarations in this scope. Issue an error and skip
+	 	 * initializers in this case. */
+	 	if (env->declaration != NULL)
+			warningf(HERE, "excess elements in struct initializer for '%Y'",
+			         env->declaration->symbol);
+		else
+			warningf(HERE, "excess elements in struct initializer");
+		skip_initializers();
+		return NULL;
+	}
+
+	type_t *type = skip_typeref(orig_type);
 
 	/* we can't do usefull stuff if we didn't even parse the type. Skip the
 	 * initializers in this case. */
@@ -1388,13 +1431,13 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 		if(token.type == '{') {
 			if(is_type_scalar(type)) {
-				sub = parse_scalar_initializer(type, must_be_constant);
+				sub = parse_scalar_initializer(type, env->must_be_constant);
 			} else {
 				eat('{');
 				descend_into_subtype(path);
 
 				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
-				                            must_be_constant);
+				                            env);
 
 				ascend_from_subtype(path);
 
@@ -1404,7 +1447,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
 
-			if(must_be_constant && !is_initializer_constant(expression)) {
+			if(env->must_be_constant && !is_initializer_constant(expression)) {
 				errorf(expression->base.source_position,
 				       "Initialisation expression '%E' is not constant\n",
 				       expression);
@@ -1496,14 +1539,9 @@ end_error:
 	return NULL;
 }
 
-typedef struct parse_initializer_env_t {
-	type_t        *type;        /* the type of the initializer. In case of an
-	                               array type with unspecified size this gets
-	                               adjusted to the actual size. */
-	initializer_t *initializer; /* initializer will be filled in here */
-	bool           must_be_constant;
-} parse_initializer_env_t;
-
+/**
+ * Parses an initializer.
+ */
 static void parse_initializer(parse_initializer_env_t *env)
 {
 	type_t        *type   = skip_typeref(env->type);
@@ -1511,7 +1549,6 @@ static void parse_initializer(parse_initializer_env_t *env)
 	size_t         max_index;
 
 	if(is_type_scalar(type)) {
-		/* TODO: § 6.7.8.11; eat {} without warning */
 		result = parse_scalar_initializer(type, env->must_be_constant);
 	} else if(token.type == '{') {
 		eat('{');
@@ -1523,8 +1560,7 @@ static void parse_initializer(parse_initializer_env_t *env)
 
 		descend_into_subtype(&path);
 
-		result = parse_sub_initializer(&path, env->type, 1,
-		                               env->must_be_constant);
+		result = parse_sub_initializer(&path, env->type, 1, env);
 
 		max_index = path.max_index;
 		DEL_ARR_F(path.path);
@@ -2899,6 +2935,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	parse_initializer_env_t env;
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
+	env.declaration      = declaration;
 	parse_initializer(&env);
 
 	if(env.type != orig_type) {
@@ -3833,6 +3870,7 @@ static expression_t *parse_compound_literal(type_t *type)
 
 	parse_initializer_env_t env;
 	env.type             = type;
+	env.declaration      = NULL;
 	env.must_be_constant = false;
 	parse_initializer(&env);
 	type = env.type;
