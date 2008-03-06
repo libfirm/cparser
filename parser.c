@@ -87,6 +87,23 @@ static label_statement_t  *label_first       = NULL;
 static label_statement_t  *label_last        = NULL;
 static struct obstack      temp_obst;
 
+/* symbols for Microsoft extended-decl-modifier */
+static const symbol_t *sym_align     = NULL;
+static const symbol_t *sym_allocate  = NULL;
+static const symbol_t *sym_dllimport = NULL;
+static const symbol_t *sym_dllexport = NULL;
+static const symbol_t *sym_naked     = NULL;
+static const symbol_t *sym_noinline  = NULL;
+static const symbol_t *sym_noreturn  = NULL;
+static const symbol_t *sym_nothrow   = NULL;
+static const symbol_t *sym_novtable  = NULL;
+static const symbol_t *sym_property  = NULL;
+static const symbol_t *sym_get       = NULL;
+static const symbol_t *sym_put       = NULL;
+static const symbol_t *sym_selectany = NULL;
+static const symbol_t *sym_thread    = NULL;
+static const symbol_t *sym_uuid      = NULL;
+
 /** The current source position. */
 #define HERE token.source_position
 
@@ -1932,6 +1949,82 @@ static type_t *get_typedef_type(symbol_t *symbol)
 	return type;
 }
 
+static void parse_microsoft_extended_decl_modifier(void)
+{
+	symbol_t *symbol;
+
+	while(true) {
+		switch(token.type) {
+		case T_IDENTIFIER:
+			symbol = token.v.symbol;
+			if(symbol == sym_align) {
+				next_token();
+				expect('(');
+				if (token.type != T_INTEGER)
+					goto end_error;
+				(void)token.v.intvalue;
+				next_token();
+				expect(')');
+			} else if(symbol == sym_allocate) {
+				next_token();
+				expect('(');
+				if (token.type != T_IDENTIFIER)
+					goto end_error;
+				(void)token.v.symbol;
+				expect(')');
+			} else if(symbol == sym_dllimport) {
+				next_token();
+			} else if(symbol == sym_dllimport) {
+				next_token();
+			} else if(symbol == sym_dllexport) {
+				next_token();
+			} else if(symbol == sym_naked) {
+				next_token();
+			} else if(symbol == sym_noinline) {
+				next_token();
+			} else if(symbol == sym_noreturn) {
+				next_token();
+			} else if(symbol == sym_nothrow) {
+				next_token();
+			} else if(symbol == sym_novtable) {
+				next_token();
+			} else if(symbol == sym_property) {
+				next_token();
+				expect('(');
+				if(token.type != T_IDENTIFIER)
+					goto end_error;
+				if(token.v.symbol == sym_get) {
+				} else if(token.v.symbol == sym_put) {
+				} else
+					goto end_error;
+				next_token();
+				expect('=');
+				if(token.type != T_IDENTIFIER)
+					goto end_error;
+				(void)token.v.symbol;
+				next_token();
+				expect(')');
+			} else if(symbol == sym_selectany) {
+				next_token();
+			} else if(symbol == sym_thread) {
+				next_token();
+			} else if(symbol == sym_uuid) {
+				next_token();
+				expect('(');
+				if(token.type != T_STRING_LITERAL)
+					goto end_error;
+				next_token();
+				expect(')');
+			}
+			break;
+		default:
+			return;
+		}
+	}
+end_error:
+	;
+}
+
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t   *type            = NULL;
@@ -1959,6 +2052,13 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_STORAGE_CLASS(T_static,   STORAGE_CLASS_STATIC)
 		MATCH_STORAGE_CLASS(T_auto,     STORAGE_CLASS_AUTO)
 		MATCH_STORAGE_CLASS(T_register, STORAGE_CLASS_REGISTER)
+
+		case T_declspec:
+			next_token();
+			expect('(');
+			parse_microsoft_extended_decl_modifier();
+			expect(')');
+			break;
 
 		case T___thread:
 			switch (specifiers->declared_storage_class) {
@@ -2221,6 +2321,8 @@ finish_specifiers:
 	}
 
 	specifiers->type = result;
+end_error:
+	return;
 }
 
 static type_qualifiers_t parse_type_qualifiers(void)
@@ -6693,6 +6795,24 @@ translation_unit_t *parse(void)
  */
 void init_parser(void)
 {
+	if(c_mode & _MS) {
+		/* add predefined symbols for extended-decl-modifier */
+		sym_align     = symbol_table_insert("align");
+		sym_allocate  = symbol_table_insert("allocate");
+		sym_dllimport = symbol_table_insert("dllimport");
+		sym_dllexport = symbol_table_insert("dllexport");
+		sym_naked     = symbol_table_insert("naked");
+		sym_noinline  = symbol_table_insert("noinline");
+		sym_noreturn  = symbol_table_insert("noreturn");
+		sym_nothrow   = symbol_table_insert("nothrow");
+		sym_novtable  = symbol_table_insert("novtable");
+		sym_property  = symbol_table_insert("property");
+		sym_get       = symbol_table_insert("get");
+		sym_put       = symbol_table_insert("put");
+		sym_selectany = symbol_table_insert("selectany");
+		sym_thread    = symbol_table_insert("thread");
+		sym_uuid      = symbol_table_insert("uuid");
+	}
 	init_expression_parsers();
 	obstack_init(&temp_obst);
 
