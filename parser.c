@@ -2823,8 +2823,13 @@ static declaration_t *internal_record_declaration(
 				errorf(previous_declaration->source_position,
 				       "previous declaration of '%Y' was here", symbol);
 			} else {
-				unsigned old_storage_class
-					= previous_declaration->storage_class;
+				unsigned old_storage_class = previous_declaration->storage_class;
+				if (old_storage_class == STORAGE_CLASS_ENUM_ENTRY) {
+					errorf(declaration->source_position, "redeclaration of enum entry '%Y'", symbol);
+					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+					return previous_declaration;
+				}
+
 				unsigned new_storage_class = declaration->storage_class;
 
 				if(is_type_incomplete(prev_type)) {
