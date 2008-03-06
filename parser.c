@@ -57,12 +57,14 @@ struct declaration_specifiers_t {
 	type_t            *type;
 };
 
+/**
+ * An environment for parsing initializers (and compound literals).
+ */
 typedef struct parse_initializer_env_t {
 	type_t        *type;        /**< the type of the initializer. In case of an
 	                                 array type with unspecified size this gets
 	                                 adjusted to the actual size. */
-	initializer_t *initializer; /**< initializer will be filled in here */
-	declaration_t *declaration; /**< the declaration that is initialized */
+	declaration_t *declaration; /**< the declaration that is initialized if any */
 	bool           must_be_constant;
 } parse_initializer_env_t;
 
@@ -988,6 +990,9 @@ static initializer_t *initializer_from_wide_string(array_type_t *const type,
 	return initializer;
 }
 
+/**
+ * Build an initializer from a given expression.
+ */
 static initializer_t *initializer_from_expression(type_t *orig_type,
                                                   expression_t *expression)
 {
@@ -1098,32 +1103,35 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	return initializer;
 }
 
+/**
+ * An entry in the type path.
+ */
 typedef struct type_path_entry_t type_path_entry_t;
 struct type_path_entry_t {
-	type_t *type;
+	type_t *type;       /**< the upper top type. restored to path->top_tye if this entry is popped. */
 	union {
-		size_t         index;
-		declaration_t *compound_entry;
+		size_t         index;          /**< For array types: the current index. */
+		declaration_t *compound_entry; /**< For compound types: the current declaration. */
 	} v;
 };
 
+/**
+ * A type path expression a position inside compound or array types.
+ */
 typedef struct type_path_t type_path_t;
 struct type_path_t {
-	type_path_entry_t *path;
+	type_path_entry_t *path;         /**< An flexible array containing the current path. */
 	type_t            *top_type;     /**< type of the element the path points */
 	size_t             max_index;    /**< largest index in outermost array */
-	bool               invalid;
 };
 
+/**
+ * Prints a type path for debugging.
+ */
 static __attribute__((unused)) void debug_print_type_path(
 		const type_path_t *path)
 {
 	size_t len = ARR_LEN(path->path);
-
-	if(path->invalid) {
-		fprintf(stderr, "invalid path");
-		return;
-	}
 
 	for(size_t i = 0; i < len; ++i) {
 		const type_path_entry_t *entry = & path->path[i];
@@ -1131,7 +1139,7 @@ static __attribute__((unused)) void debug_print_type_path(
 		type_t *type = skip_typeref(entry->type);
 		if(is_type_compound(type)) {
 			/* in gcc mode structs can have no members */
-			if(entry->v.compound_entry->symbol->string) {
+			if(entry->v.compound_entry == NULL) {
 				assert(i == len-1);
 				continue;
 			}
@@ -1142,20 +1150,27 @@ static __attribute__((unused)) void debug_print_type_path(
 			fprintf(stderr, "-INVALID-");
 		}
 	}
-	if (path->top_type != NULL) {
+	if(path->top_type != NULL) {
 		fprintf(stderr, "  (");
 		print_type(path->top_type);
 		fprintf(stderr, ")");
 	}
 }
 
+/**
+ * Return the top type path entry, ie. in a path
+ * (type).a.b returns the b.
+ */
 static type_path_entry_t *get_type_path_top(const type_path_t *path)
 {
 	size_t len = ARR_LEN(path->path);
 	assert(len > 0);
-	return & path->path[len-1];
+	return &path->path[len-1];
 }
 
+/**
+ * Enlarge the type path by an (empty) element.
+ */
 static type_path_entry_t *append_to_type_path(type_path_t *path)
 {
 	size_t len = ARR_LEN(path->path);
@@ -1166,6 +1181,10 @@ static type_path_entry_t *append_to_type_path(type_path_t *path)
 	return result;
 }
 
+/**
+ * Descending into a sub-type. Enter the scope of the current
+ * top_type.
+ */
 static void descend_into_subtype(type_path_t *path)
 {
 	type_t *orig_top_type = path->top_type;
@@ -1179,13 +1198,12 @@ static void descend_into_subtype(type_path_t *path)
 	if(is_type_compound(top_type)) {
 		declaration_t *declaration = top_type->compound.declaration;
 		declaration_t *entry       = declaration->scope.declarations;
+		top->v.compound_entry      = entry;
 
 		if(entry != NULL) {
-			top->v.compound_entry = entry;
-			path->top_type        = entry->type;
+			path->top_type         = entry->type;
 		} else {
-			top->v.compound_entry = NULL;
-			path->top_type        = NULL;
+			path->top_type         = NULL;
 		}
 	} else {
 		assert(is_type_array(top_type));
@@ -1195,6 +1213,10 @@ static void descend_into_subtype(type_path_t *path)
 	}
 }
 
+/**
+ * Pop an entry from the given type path, ie. returning from
+ * (type).a.b to (type).a
+ */
 static void ascend_from_subtype(type_path_t *path)
 {
 	type_path_entry_t *top = get_type_path_top(path);
@@ -1205,10 +1227,13 @@ static void ascend_from_subtype(type_path_t *path)
 	ARR_RESIZE(type_path_entry_t, path->path, len-1);
 }
 
+/**
+ * Pop entries from the given type path until the given
+ * path level is reached.
+ */
 static void ascend_to(type_path_t *path, size_t top_path_level)
 {
 	size_t len = ARR_LEN(path->path);
-	assert(len >= top_path_level);
 
 	while(len > top_path_level) {
 		ascend_from_subtype(path);
@@ -1305,8 +1330,6 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			descend_into_subtype(path);
 		}
 	}
-
-	path->invalid  = false;
 	return true;
 
 failed:
@@ -1315,9 +1338,6 @@ failed:
 
 static void advance_current_object(type_path_t *path, size_t top_path_level)
 {
-	if(path->invalid)
-		return;
-
 	type_path_entry_t *top = get_type_path_top(path);
 
 	type_t *type = skip_typeref(top->type);
@@ -1351,10 +1371,13 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 		ascend_from_subtype(path);
 		advance_current_object(path, top_path_level);
 	} else {
-		path->invalid = true;
+		path->top_type = NULL;
 	}
 }
 
+/**
+ * skip any {...} blocks until a closing braket is reached.
+ */
 static void skip_initializers(void)
 {
 	if(token.type == '{')
@@ -1371,31 +1394,32 @@ static void skip_initializers(void)
 	}
 }
 
+/**
+ * Parse a part of an initialiser for a struct or union,
+ */
 static initializer_t *parse_sub_initializer(type_path_t *path,
 		type_t *outer_type, size_t top_path_level,
 		parse_initializer_env_t *env)
 {
-	type_t *orig_type = path->top_type;
-
-	if(orig_type == NULL) {
-		/* We don't have declarations in this scope. Issue an error and skip
-	 	 * initializers in this case. */
-	 	if (env->declaration != NULL)
-			warningf(HERE, "excess elements in struct initializer for '%Y'",
-			         env->declaration->symbol);
-		else
-			warningf(HERE, "excess elements in struct initializer");
-		skip_initializers();
+	if(token.type == '}') {
+		/* empty initializer */
 		return NULL;
 	}
 
-	type_t *type = skip_typeref(orig_type);
+	type_t *orig_type = path->top_type;
+	type_t *type      = NULL;
 
-	/* we can't do usefull stuff if we didn't even parse the type. Skip the
-	 * initializers in this case. */
-	if(!is_type_valid(type)) {
-		skip_initializers();
-		return NULL;
+	if (orig_type == NULL) {
+		/* We are initializing an empty compound. */
+	} else {
+		type = skip_typeref(orig_type);
+
+		/* we can't do usefull stuff if we didn't even parse the type. Skip the
+		 * initializers in this case. */
+		if(!is_type_valid(type)) {
+			skip_initializers();
+			return NULL;
+		}
 	}
 
 	initializer_t **initializers = NEW_ARR_F(initializer_t*, 0);
@@ -1421,18 +1445,29 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		initializer_t *sub;
 
 		if(token.type == '{') {
-			if(is_type_scalar(type)) {
+			if(type != NULL && is_type_scalar(type)) {
 				sub = parse_scalar_initializer(type, env->must_be_constant);
 			} else {
 				eat('{');
-				descend_into_subtype(path);
+				if(type == NULL) {
+					if (env->declaration != NULL)
+						errorf(HERE, "extra brace group at end of initializer for '%Y'",
+				        	env->declaration->symbol);
+			    	else
+				  		errorf(HERE, "extra brace group at end of initializer");
+				} else
+					descend_into_subtype(path);
 
 				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
 				                            env);
 
-				ascend_from_subtype(path);
-
-				expect_block('}');
+				if(type != NULL) {
+					ascend_from_subtype(path);
+					expect_block('}');
+				} else {
+					expect_block('}');
+					goto error_parse_next;
+				}
 			}
 		} else {
 			/* must be an expression */
@@ -1442,6 +1477,11 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				errorf(expression->base.source_position,
 				       "Initialisation expression '%E' is not constant\n",
 				       expression);
+			}
+
+			if(type == NULL) {
+				/* we are already outside, ... */
+				goto error_excess;
 			}
 
 			/* handle { "string" } special case */
@@ -1495,9 +1535,19 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				path->max_index = index;
 		}
 
-		/* append to initializers list */
-		ARR_APP1(initializer_t*, initializers, sub);
+		if(type != NULL) {
+			/* append to initializers list */
+			ARR_APP1(initializer_t*, initializers, sub);
+		} else {
+error_excess:
+			if(env->declaration != NULL)
+				warningf(HERE, "excess elements in struct initializer for '%Y'",
+			         env->declaration->symbol);
+			else
+				warningf(HERE, "excess elements in struct initializer");
+		}
 
+error_parse_next:
 		if(token.type == '}') {
 			break;
 		}
@@ -1506,9 +1556,15 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			break;
 		}
 
-		advance_current_object(path, top_path_level);
-		orig_type = path->top_type;
-		type      = skip_typeref(orig_type);
+		if(type != NULL) {
+			/* advance to the next declaration if we are not at the end */
+			advance_current_object(path, top_path_level);
+			orig_type = path->top_type;
+			if(orig_type != NULL)
+				type = skip_typeref(orig_type);
+			else
+				type = NULL;
+		}
 	}
 
 	size_t len  = ARR_LEN(initializers);
@@ -1531,9 +1587,10 @@ end_error:
 }
 
 /**
- * Parses an initializer.
+ * Parses an initializer. Parsers either a compound literal
+ * (env->declaration == NULL) or an initializer of a declaration.
  */
-static void parse_initializer(parse_initializer_env_t *env)
+static initializer_t *parse_initializer(parse_initializer_env_t *env)
 {
 	type_t        *type   = skip_typeref(env->type);
 	initializer_t *result = NULL;
@@ -1558,7 +1615,7 @@ static void parse_initializer(parse_initializer_env_t *env)
 
 		expect('}');
 	} else {
-		/* parse_scalar_initializer also works in this case: we simply
+		/* parse_scalar_initializer() also works in this case: we simply
 		 * have an expression without {} around it */
 		result = parse_scalar_initializer(type, env->must_be_constant);
 	}
@@ -1597,7 +1654,9 @@ static void parse_initializer(parse_initializer_env_t *env)
 		env->type = new_type;
 	}
 
-	env->initializer = result;
+	return result;
+end_error:
+	return NULL;
 
 end_error:
 	;
@@ -2933,7 +2992,8 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
 	env.declaration      = declaration;
-	parse_initializer(&env);
+
+	initializer_t *initializer = parse_initializer(&env);
 
 	if(env.type != orig_type) {
 		orig_type         = env.type;
@@ -2946,7 +3006,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		       "initializers not allowed for function types at declator '%Y' (type '%T')",
 		       declaration->symbol, orig_type);
 	} else {
-		declaration->init.initializer = env.initializer;
+		declaration->init.initializer = initializer;
 	}
 }
 
@@ -3875,11 +3935,11 @@ static expression_t *parse_compound_literal(type_t *type)
 	env.type             = type;
 	env.declaration      = NULL;
 	env.must_be_constant = false;
-	parse_initializer(&env);
+	initializer_t *initializer = parse_initializer(&env);
 	type = env.type;
 
+	expression->compound_literal.initializer = initializer;
 	expression->compound_literal.type        = type;
-	expression->compound_literal.initializer = env.initializer;
 	expression->base.type                    = automatic_type_conversion(type);
 
 	return expression;
