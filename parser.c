@@ -1575,6 +1575,7 @@ error_parse_next:
 	memcpy(&result->list.initializers, initializers,
 	       len * sizeof(initializers[0]));
 
+	DEL_ARR_F(initializers);
 	ascend_to(path, top_path_level);
 
 	return result;
@@ -1657,9 +1658,6 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	return result;
 end_error:
 	return NULL;
-
-end_error:
-	;
 }
 
 static declaration_t *append_declaration(declaration_t *declaration);

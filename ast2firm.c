@@ -3062,8 +3062,9 @@ static void descend_into_subtype(type_path_t *path)
 
 		top->compound_entry = entry;
 		top->index          = 0;
-		path->top_type      = entry->type;
 		len                 = get_compound_size(&top_type->compound);
+		if(entry != NULL)
+			path->top_type = entry->type;
 	} else {
 		assert(is_type_array(top_type));
 		assert(top_type->array.size > 0);
