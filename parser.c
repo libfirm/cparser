@@ -528,16 +528,6 @@ static void eat_paren(void)
     next_token();                                  \
 	} while(0)
 
-#define expect_void(expected)                      \
-	do {                                           \
-    if(UNLIKELY(token.type != (expected))) {       \
-        parse_error_expected(NULL, (expected), 0); \
-        eat_statement();                           \
-        return;                                    \
-    }                                              \
-    next_token();                                  \
-    } while(0)
-
 static void set_scope(scope_t *new_scope)
 {
 	if(scope != NULL) {
@@ -885,7 +875,7 @@ static void parse_attributes(void)
 		case T___attribute__: {
 			next_token();
 
-			expect_void('(');
+			expect('(');
 			int depth = 1;
 			while(depth > 0) {
 				switch(token.type) {
@@ -908,7 +898,7 @@ static void parse_attributes(void)
 		}
 		case T_asm:
 			next_token();
-			expect_void('(');
+			expect('(');
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
 				                     T_STRING_LITERAL);
@@ -917,13 +907,14 @@ static void parse_attributes(void)
 			} else {
 				parse_string_literals();
 			}
-			expect_void(')');
+			expect(')');
 			break;
 		default:
 			goto attributes_finished;
 		}
 	}
 
+end_error:
 attributes_finished:
 	;
 }
@@ -1565,7 +1556,7 @@ static void parse_initializer(parse_initializer_env_t *env)
 		max_index = path.max_index;
 		DEL_ARR_F(path.path);
 
-		expect_void('}');
+		expect('}');
 	} else {
 		/* parse_scalar_initializer also works in this case: we simply
 		 * have an expression without {} around it */
@@ -1607,6 +1598,9 @@ static void parse_initializer(parse_initializer_env_t *env)
 	}
 
 	env->initializer = result;
+
+end_error:
+	;
 }
 
 static declaration_t *append_declaration(declaration_t *declaration);
@@ -1718,7 +1712,10 @@ static void parse_enum_entries(type_t *const enum_type)
 		next_token();
 	} while(token.type != '}');
 
-	expect_void('}');
+	expect('}');
+
+end_error:
+	;
 }
 
 static type_t *parse_enum_specifier(void)
@@ -3018,7 +3015,10 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 
 		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false);
 	}
-	expect_void(';');
+	expect(';');
+
+end_error:
+	;
 }
 
 static declaration_t *finished_kr_declaration(declaration_t *declaration)
@@ -3455,7 +3455,10 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			break;
 		next_token();
 	}
-	expect_void(';');
+	expect(';');
+
+end_error:
+	;
 }
 
 static void parse_compound_type_entries(declaration_t *compound_declaration)
@@ -6054,11 +6057,11 @@ static statement_t *parse_for(void)
 	statement_t *statement          = allocate_statement_zero(STATEMENT_FOR);
 	statement->base.source_position = token.source_position;
 
-	expect('(');
-
 	int      top        = environment_top();
 	scope_t *last_scope = scope;
 	set_scope(&statement->fors.scope);
+
+	expect('(');
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
@@ -6067,7 +6070,8 @@ static statement_t *parse_for(void)
 			expression_t *const init = parse_expression();
 			statement->fors.initialisation = init;
 			if (warning.unused_value  && !expression_has_effect(init)) {
-				warningf(init->base.source_position, "initialisation of 'for'-statement has no effect");
+				warningf(init->base.source_position,
+				         "initialisation of 'for'-statement has no effect");
 			}
 			expect(';');
 		}
@@ -6083,7 +6087,8 @@ static statement_t *parse_for(void)
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
 		if (warning.unused_value  && !expression_has_effect(step)) {
-			warningf(step->base.source_position, "step of 'for'-statement has no effect");
+			warningf(step->base.source_position,
+			         "step of 'for'-statement has no effect");
 		}
 	}
 	expect(')');
@@ -6094,7 +6099,12 @@ static statement_t *parse_for(void)
 	environment_pop_to(top);
 
 	return statement;
+
 end_error:
+	assert(scope == &statement->fors.scope);
+	set_scope(last_scope);
+	environment_pop_to(top);
+
 	return NULL;
 }
 
