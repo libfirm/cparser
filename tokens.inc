@@ -145,6 +145,8 @@ T(_MS,      __int32,          "__int32",                 = T_int32)
 T(_MS,      int64,            "_int64",)
 T(_MS,      __int64,          "__int64",                 = T_int64)
 
+T(_MS,      w64,              "__w64",)
+
 #define T_LAST_TOKEN  (T___int64+1)
 
 #undef _T
