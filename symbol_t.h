@@ -21,21 +21,25 @@
 #define SYMBOL_T_H
 
 #include <stdbool.h>
+#include "symbol.h"
 #include "ast.h"
 #include "token_t.h"
 
-struct pp_definition {
+struct pp_definition_t {
+	symbol_t          *symbol;
 	source_position_t  source_position;
-	bool               expanding;
+	pp_definition_t   *parent_expansion;
+	size_t             expand_pos;
+	size_t             list_len;
 	token_t            replacement_list[];
 };
 
 struct symbol_t {
-	const char     *string;
-	unsigned short  ID;
-	unsigned short  pp_ID;
-	declaration_t  *declaration;
-	pp_definition  *pp_define;
+	const char       *string;
+	unsigned short    ID;
+	unsigned short    pp_ID;
+	declaration_t    *declaration;
+	pp_definition_t  *pp_definition;
 };
 
 #endif

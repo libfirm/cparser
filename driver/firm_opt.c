@@ -457,14 +457,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       irg_verify(irg, VRFY_ENFORCE_SSA);
     }
 
-    if (firm_opt.loop_unrolling) {
-      timer_push(TV_LOOP_UNROLL);
-        optimize_loop_unrolling(irg);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "loop");
-      CHECK_ONE(firm_opt.check_all, irg);
-	}
-
     if (firm_opt.load_store) {
       timer_push(TV_LOAD_STORE);
         optimize_load_store(irg);

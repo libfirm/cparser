@@ -24,7 +24,6 @@ struct a_firm_opt firm_opt = {
   /* gvn_pre         = */ FALSE,	/* currently buggy */
   /* cond_eval       = */ FALSE,
   /* if_conversion   = */ FALSE,
-  /* loop_unrolling  = */ FALSE,	/* currently buggy */
   /* func_calls      = */ TRUE,
   /* do_inline       = */ FALSE,
   /* auto_inline     = */ TRUE,
@@ -129,8 +128,6 @@ static const struct params {
   { X("no-cond-eval"),           &firm_opt.cond_eval,        0, "firm: disable partial condition evaluation optimization" },
   { X("if-conv"),                &firm_opt.if_conversion,    1, "firm: enable if-conversion optimization" },
   { X("no-if-conv"),             &firm_opt.if_conversion,    0, "firm: disable if-conversion optimization" },
-  { X("opt-loop-unrolling"),     &firm_opt.loop_unrolling,   1, "firm: enable loop-unrolling optimization" },
-  { X("no-opt-loop-unrolling"),  &firm_opt.loop_unrolling,   0, "firm: disable loop-unrolling optimization" },
   { X("opt-func-call"),          &firm_opt.func_calls,       1, "firm: enable function call optimization" },
   { X("no-opt-func-call"),       &firm_opt.func_calls,       0, "firm: disable function call optimization" },
   { X("reassociation"),          &firm_opt.reassoc,          1, "firm: enable reassociation" },
@@ -287,7 +284,6 @@ static void disable_opts(void) {
   firm_opt.gvn_pre         = FALSE;
   firm_opt.cond_eval       = FALSE;
   firm_opt.if_conversion   = FALSE;
-  firm_opt.loop_unrolling  = FALSE;
   firm_opt.func_calls      = FALSE;
   firm_opt.do_inline       = FALSE;
   firm_opt.auto_inline     = FALSE;

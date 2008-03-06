@@ -415,7 +415,6 @@ int main(int argc, char **argv)
 		/* fallthrough */
 	case 2:
 		firm_option("inline");
-		firm_option("no-strength-red");
 		firm_option("deconv");
 		firm_be_option("omitfp");
 		break;

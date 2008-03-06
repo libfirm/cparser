@@ -20,7 +20,7 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-typedef struct symbol_t       symbol_t;
-typedef struct pp_definition  pp_definition;
+typedef struct symbol_t         symbol_t;
+typedef struct pp_definition_t  pp_definition_t;
 
 #endif

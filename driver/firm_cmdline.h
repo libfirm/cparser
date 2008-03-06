@@ -37,7 +37,6 @@ struct a_firm_opt {
                                  and partial redundancy elimination */
   a_byte   cond_eval;       /**< enable condition evaluation */
   a_byte   if_conversion;   /**< enable if-conversion */
-  a_byte   loop_unrolling;  /**< enable automatic loop unrolling */
   a_byte   func_calls;      /**< enable function call optimization */
   a_byte   do_inline;       /**< do automatic inlining */
   a_byte   auto_inline;     /**< current automatic inlining state */
