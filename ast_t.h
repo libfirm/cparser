@@ -438,6 +438,7 @@ struct declaration_t {
 	unsigned char       namespc;
 	unsigned char       declared_storage_class;
 	unsigned char       storage_class;
+	unsigned char       alignment;          /**< Alignmnet of the declaration, 0 for default. */
 	decl_modifiers_t    modifiers;
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;

@@ -955,7 +955,10 @@ type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 
 	type->kind            = TYPE_ATOMIC;
 	type->base.qualifiers = qualifiers;
+	type->base.alignment  = 0;
 	type->atomic.akind    = atype;
+
+	/* TODO: set the aligmnent depending on the atype here */
 
 	return identify_new_type(type);
 }
@@ -973,6 +976,7 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 
 	type->kind              = TYPE_POINTER;
 	type->base.qualifiers   = qualifiers;
+	type->base.alignment    = 0;
 	type->pointer.points_to = points_to;
 
 	return identify_new_type(type);
@@ -986,6 +990,7 @@ type_t *make_array_type(type_t *element_type, size_t size,
 
 	type->kind                = TYPE_ARRAY;
 	type->base.qualifiers     = qualifiers;
+	type->base.alignment      = 0;
 	type->array.element_type  = element_type;
 	type->array.size          = size;
 	type->array.size_constant = true;

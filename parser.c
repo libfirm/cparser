@@ -52,6 +52,7 @@ typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	source_position_t  source_position;
 	unsigned char      declared_storage_class;
+	unsigned char      alignment;      /**< Alignment, 0 if not set. */
 	bool               is_inline;
 	decl_modifiers_t   decl_modifiers;
 	type_t            *type;
@@ -189,7 +190,8 @@ static void *allocate_ast_zero(size_t size)
 static declaration_t *allocate_declaration_zero(void)
 {
 	declaration_t *declaration = allocate_ast_zero(sizeof(declaration_t));
-	declaration->type = type_error_type;
+	declaration->type      = type_error_type;
+	declaration->alignment = 0;
 	return declaration;
 }
 
@@ -1949,9 +1951,32 @@ static type_t *get_typedef_type(symbol_t *symbol)
 	return type;
 }
 
-static void parse_microsoft_extended_decl_modifier(decl_modifiers_t *modifiers)
+/**
+ * check for the allowed MS alignment values.
+ */
+static bool check_elignment_value(long long intvalue) {
+	if(intvalue < 1 || intvalue > 8192) {
+		errorf(HERE, "illegal alignment value");
+		return false;
+	}
+	unsigned v = (unsigned)intvalue;
+	for(unsigned i = 1; i <= 8192; i += i) {
+		if (i == v)
+			return true;
+	}
+	errorf(HERE, "alignment must be power of two");
+	return false;
+}
+
+#define DET_MOD(name, tag) do { \
+	if(*modifiers & tag) warningf(HERE, #name " used more than once"); \
+	*modifiers |= tag; \
+} while(0)
+
+static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *specifiers)
 {
 	symbol_t         *symbol;
+	decl_modifiers_t *modifiers = &specifiers->decl_modifiers;
 
 	while(true) {
 		switch(token.type) {
@@ -1960,42 +1985,46 @@ static void parse_microsoft_extended_decl_modifier(decl_modifiers_t *modifiers)
 			if(symbol == sym_align) {
 				next_token();
 				expect('(');
-				if (token.type != T_INTEGER)
+				if(token.type != T_INTEGER)
 					goto end_error;
-				(void)token.v.intvalue;
+				if(check_elignment_value(token.v.intvalue)) {
+					if(specifiers->alignment != 0)
+						warningf(HERE, "align used more than once");
+					specifiers->alignment = (unsigned char)token.v.intvalue;
+				}
 				next_token();
 				expect(')');
 			} else if(symbol == sym_allocate) {
 				next_token();
 				expect('(');
-				if (token.type != T_IDENTIFIER)
+				if(token.type != T_IDENTIFIER)
 					goto end_error;
 				(void)token.v.symbol;
 				expect(')');
 			} else if(symbol == sym_dllimport) {
 				next_token();
-				*modifiers |= DM_DLLIMPORT;
+				DET_MOD(dllimport, DM_DLLIMPORT);
 			} else if(symbol == sym_dllexport) {
 				next_token();
-				*modifiers |= DM_DLLEXPORT;
+				DET_MOD(dllexport, DM_DLLEXPORT);
 			} else if(symbol == sym_thread) {
 				next_token();
-				*modifiers |= DM_THREAD;
+				DET_MOD(thread, DM_THREAD);
 			} else if(symbol == sym_naked) {
 				next_token();
-				*modifiers |= DM_NAKED;
+				DET_MOD(naked, DM_NAKED);
 			} else if(symbol == sym_noinline) {
 				next_token();
-				*modifiers |= DM_NOINLINE;
+				DET_MOD(noinline, DM_NOINLINE);
 			} else if(symbol == sym_noreturn) {
 				next_token();
-				*modifiers |= DM_NORETURN;
+				DET_MOD(noreturn, DM_NORETURN);
 			} else if(symbol == sym_nothrow) {
 				next_token();
-				*modifiers |= DM_NOTHROW;
+				DET_MOD(nothrow, DM_NOTHROW);
 			} else if(symbol == sym_novtable) {
 				next_token();
-				*modifiers |= DM_NOVTABLE;
+				DET_MOD(novtable, DM_NOVTABLE);
 			} else if(symbol == sym_property) {
 				next_token();
 				expect('(');
@@ -2014,6 +2043,7 @@ static void parse_microsoft_extended_decl_modifier(decl_modifiers_t *modifiers)
 				expect(')');
 			} else if(symbol == sym_selectany) {
 				next_token();
+				DET_MOD(selectany, DM_SELECTANY);
 			} else if(symbol == sym_uuid) {
 				next_token();
 				expect('(');
@@ -2062,7 +2092,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T_declspec:
 			next_token();
 			expect('(');
-			parse_microsoft_extended_decl_modifier(&specifiers->decl_modifiers);
+			parse_microsoft_extended_decl_modifier(specifiers);
 			expect(')');
 			break;
 
@@ -2798,6 +2828,11 @@ static declaration_t *parse_declarator(
 	if(declaration->storage_class == STORAGE_CLASS_NONE
 			&& scope != global_scope) {
 		declaration->storage_class = STORAGE_CLASS_AUTO;
+	}
+
+	if(specifiers->alignment != 0) {
+		/* TODO: add checks here */
+		declaration->alignment = specifiers->alignment;
 	}
 
 	construct_type_t *construct_type

@@ -92,6 +92,7 @@ typedef unsigned int type_qualifiers_t;
 struct type_base_t {
 	type_kind_t       kind;
 	type_qualifiers_t qualifiers;
+	unsigned char     alignment;      /**< The extra alignment of the type, 0 for default. */
 	source_position_t source_position;
 
 	ir_type          *firm_type;

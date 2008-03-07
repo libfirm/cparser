@@ -1213,7 +1213,7 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 	decl_modifiers_t modifiers = declaration->modifiers;
 
 	/* DM_FORCEINLINE handled outside. */
-	if((modifiers & ~DM_FORCEINLINE) != 0) {
+	if((modifiers & ~DM_FORCEINLINE) != 0 || declaration->alignment != 0) {
 		char next = '(';
 
 		fputs("__declspec", out);
@@ -1243,6 +1243,9 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		}
 		if(modifiers & DM_NOINLINE) {
 			fputc(next, out); next = ' '; fputs("noinline", out);
+		}
+		if(declaration->alignment != 0) {
+			fputc(next, out); next = ' '; fprintf(out, "align(%u)", declaration->alignment);
 		}
 		fputs(") ", out);
 	}
