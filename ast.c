@@ -1207,6 +1207,48 @@ void print_initializer(const initializer_t *initializer)
 }
 
 /**
+ * Print microsoft extended declaration modifiers.
+ */
+static void print_ms_modifiers(const declaration_t *declaration) {
+	decl_modifiers_t modifiers = declaration->modifiers;
+
+	/* DM_FORCEINLINE handled outside. */
+	if((modifiers & ~DM_FORCEINLINE) != 0) {
+		char next = '(';
+
+		fputs("__declspec", out);
+		if(modifiers & DM_DLLIMPORT) {
+			fputc(next, out); next = ' '; fputs("dllimport", out);
+		}
+		if(modifiers & DM_DLLEXPORT) {
+			fputc(next, out); next = ' '; fputs("dllexport", out);
+		}
+		if(modifiers & DM_THREAD) {
+			fputc(next, out); next = ' '; fputs("thread", out);
+		}
+		if(modifiers & DM_NAKED) {
+			fputc(next, out); next = ' '; fputs("naked", out);
+		}
+		if(modifiers & DM_THREAD) {
+			fputc(next, out); next = ' '; fputs("thread", out);
+		}
+		if(modifiers & DM_SELECTANY) {
+			fputc(next, out); next = ' '; fputs("selectany", out);
+		}
+		if(modifiers & DM_NOTHROW) {
+			fputc(next, out); next = ' '; fputs("nothrow", out);
+		}
+		if(modifiers & DM_NORETURN) {
+			fputc(next, out); next = ' '; fputs("noreturn", out);
+		}
+		if(modifiers & DM_NOINLINE) {
+			fputc(next, out); next = ' '; fputs("noinline", out);
+		}
+		fputs(") ", out);
+	}
+}
+
+/**
  * Print a declaration in the NORMAL namespace.
  *
  * @param declaration  the declaration
@@ -1215,11 +1257,16 @@ static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
 	if(declaration->is_inline) {
-		if (declaration->modifiers & DM_FORCEINLINE)
+		if(declaration->modifiers & DM_FORCEINLINE)
 			fputs("__forceinline ", out);
-		else
-			fputs("inline ", out);
+		else {
+			if(declaration->modifiers & DM_MICROSOFT_INLINE)
+				fputs("__inline ", out);
+			else
+				fputs("inline ", out);
+		}
 	}
+	print_ms_modifiers(declaration);
 	print_type_ext(declaration->type, declaration->symbol,
 	               &declaration->scope);
 

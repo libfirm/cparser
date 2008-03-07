@@ -1949,9 +1949,9 @@ static type_t *get_typedef_type(symbol_t *symbol)
 	return type;
 }
 
-static void parse_microsoft_extended_decl_modifier(void)
+static void parse_microsoft_extended_decl_modifier(decl_modifiers_t *modifiers)
 {
-	symbol_t *symbol;
+	symbol_t         *symbol;
 
 	while(true) {
 		switch(token.type) {
@@ -1974,20 +1974,28 @@ static void parse_microsoft_extended_decl_modifier(void)
 				expect(')');
 			} else if(symbol == sym_dllimport) {
 				next_token();
-			} else if(symbol == sym_dllimport) {
-				next_token();
+				*modifiers |= DM_DLLIMPORT;
 			} else if(symbol == sym_dllexport) {
 				next_token();
+				*modifiers |= DM_DLLEXPORT;
+			} else if(symbol == sym_thread) {
+				next_token();
+				*modifiers |= DM_THREAD;
 			} else if(symbol == sym_naked) {
 				next_token();
+				*modifiers |= DM_NAKED;
 			} else if(symbol == sym_noinline) {
 				next_token();
+				*modifiers |= DM_NOINLINE;
 			} else if(symbol == sym_noreturn) {
 				next_token();
+				*modifiers |= DM_NORETURN;
 			} else if(symbol == sym_nothrow) {
 				next_token();
+				*modifiers |= DM_NOTHROW;
 			} else if(symbol == sym_novtable) {
 				next_token();
+				*modifiers |= DM_NOVTABLE;
 			} else if(symbol == sym_property) {
 				next_token();
 				expect('(');
@@ -2006,8 +2014,6 @@ static void parse_microsoft_extended_decl_modifier(void)
 				expect(')');
 			} else if(symbol == sym_selectany) {
 				next_token();
-			} else if(symbol == sym_thread) {
-				next_token();
 			} else if(symbol == sym_uuid) {
 				next_token();
 				expect('(');
@@ -2022,7 +2028,7 @@ static void parse_microsoft_extended_decl_modifier(void)
 		}
 	}
 end_error:
-	;
+	return;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
@@ -2056,7 +2062,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T_declspec:
 			next_token();
 			expect('(');
-			parse_microsoft_extended_decl_modifier();
+			parse_microsoft_extended_decl_modifier(&specifiers->decl_modifiers);
 			expect(')');
 			break;
 
@@ -3126,6 +3132,7 @@ static void parse_anonymous_declaration_rest(
 	declaration->type                   = specifiers->type;
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->source_position        = specifiers->source_position;
+	declaration->modifiers              = specifiers->decl_modifiers;
 
 	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
 		warningf(declaration->source_position, "useless storage class in empty declaration");
