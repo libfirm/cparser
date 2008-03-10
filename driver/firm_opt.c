@@ -714,24 +714,14 @@ static int compute_type_size(ir_type *ty)
 }  /* compute_type_size */
 
 /**
- * layout all types of the Firm graph
+ * layout all non-frame types of the Firm graph
  */
 static void compute_type_sizes(void)
 {
   int i;
   ir_type *tp;
-  ir_graph *irg;
 
-  /* all frame types */
-  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-    irg = get_irp_irg(i);
-    /* do not optimize away variables in debug mode */
-    if (firm_opt.debug_mode == DBG_MODE_NONE)
-      opt_frame_irg(irg);
-    compute_type_size(get_irg_frame_type(irg));
-  }
-
-  /* all other types */
+  /* all non-frame other types */
   for (i = get_irp_n_types() - 1; i >= 0; --i) {
     tp = get_irp_type(i);
     compute_type_size(tp);
@@ -746,6 +736,24 @@ static void compute_type_sizes(void)
     }
   }
 }  /* compute_type_sizes */
+
+/**
+ * layout all frame-types of the Firm graph
+ */
+static void compute_frame_type_sizes(void)
+{
+  int i;
+  ir_graph *irg;
+
+  /* all frame types */
+  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+    irg = get_irp_irg(i);
+    /* do not optimize away variables in debug mode */
+    if (firm_opt.debug_mode == DBG_MODE_NONE)
+      opt_frame_irg(irg);
+    compute_type_size(get_irg_frame_type(irg));
+  }
+}  /* compute_frame_type_sizes */
 
 /**
  * do Firm lowering
@@ -1044,6 +1052,12 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
   /* computes the sizes of all types that are still not computed */
   compute_type_sizes();
 
+  /* lower copyb nodes */
+  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+    ir_graph *irg = get_irp_irg(i);
+    lower_CopyB(irg, 128, 4);
+  }
+
   if (firm_dump.statistic & STAT_BEFORE_OPT) {
     stat_dump_snapshot(input_filename, "noopt");
   }
@@ -1060,6 +1074,9 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
 
   if (firm_opt.lower)
     do_firm_lowering(input_filename);
+
+  /* computes the sizes of all frame types */
+  compute_frame_type_sizes();
 
   /* set the phase to low */
   for (i = get_irp_n_irgs() - 1; i >= 0; --i)
