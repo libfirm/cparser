@@ -1213,39 +1213,56 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 	decl_modifiers_t modifiers = declaration->modifiers;
 
 	/* DM_FORCEINLINE handled outside. */
-	if((modifiers & ~DM_FORCEINLINE) != 0 || declaration->alignment != 0) {
-		char next = '(';
+	if((modifiers & ~DM_FORCEINLINE) != 0 || declaration->alignment != 0 ||
+	    declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
+		char *next = "(";
 
 		fputs("__declspec", out);
 		if(modifiers & DM_DLLIMPORT) {
-			fputc(next, out); next = ' '; fputs("dllimport", out);
+			fputs(next, out); next = ", "; fputs("dllimport", out);
 		}
 		if(modifiers & DM_DLLEXPORT) {
-			fputc(next, out); next = ' '; fputs("dllexport", out);
+			fputs(next, out); next = ", "; fputs("dllexport", out);
 		}
 		if(modifiers & DM_THREAD) {
-			fputc(next, out); next = ' '; fputs("thread", out);
+			fputs(next, out); next = ", "; fputs("thread", out);
 		}
 		if(modifiers & DM_NAKED) {
-			fputc(next, out); next = ' '; fputs("naked", out);
+			fputs(next, out); next = ", "; fputs("naked", out);
 		}
 		if(modifiers & DM_THREAD) {
-			fputc(next, out); next = ' '; fputs("thread", out);
+			fputs(next, out); next = ", "; fputs("thread", out);
 		}
 		if(modifiers & DM_SELECTANY) {
-			fputc(next, out); next = ' '; fputs("selectany", out);
+			fputs(next, out); next = ", "; fputs("selectany", out);
 		}
 		if(modifiers & DM_NOTHROW) {
-			fputc(next, out); next = ' '; fputs("nothrow", out);
+			fputs(next, out); next = ", "; fputs("nothrow", out);
 		}
 		if(modifiers & DM_NORETURN) {
-			fputc(next, out); next = ' '; fputs("noreturn", out);
+			fputs(next, out); next = ", "; fputs("noreturn", out);
 		}
 		if(modifiers & DM_NOINLINE) {
-			fputc(next, out); next = ' '; fputs("noinline", out);
+			fputs(next, out); next = ", "; fputs("noinline", out);
+		}
+		if(modifiers & DM_DEPRECATED) {
+			fputs(next, out); next = ", "; fputs("deprecated", out);
+			if(declaration->deprecated_string != NULL)
+				fprintf(out, "(\"%s\")", declaration->deprecated_string);
 		}
 		if(declaration->alignment != 0) {
-			fputc(next, out); next = ' '; fprintf(out, "align(%u)", declaration->alignment);
+			fputs(next, out); next = ", "; fprintf(out, "align(%u)", declaration->alignment);
+		}
+	    if(declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
+	    	char *comma = "";
+			fputs(next, out); next = ", "; fprintf(out, "property(");
+	    	if(declaration->get_property_sym != NULL) {
+	    		fprintf(out, "get=%s", declaration->get_property_sym->string);
+	    		comma = ", ";
+			}
+	    	if(declaration->put_property_sym != NULL)
+	    		fprintf(out, "%sput=%s", comma, declaration->put_property_sym->string);
+			fputc(')', out);
 		}
 		fputs(") ", out);
 	}

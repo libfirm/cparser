@@ -429,7 +429,8 @@ typedef enum {
 	DM_NOTHROW          = (1 <<  7),
 	DM_NOVTABLE         = (1 <<  8),
 	DM_NORETURN         = (1 <<  9),
-	DM_NOINLINE         = (1 << 10)
+	DM_NOINLINE         = (1 << 10),
+	DM_DEPRECATED       = (1 << 11)
 } decl_modifier_t;
 
 typedef unsigned short decl_modifiers_t;
@@ -439,7 +440,10 @@ struct declaration_t {
 	unsigned char       declared_storage_class;
 	unsigned char       storage_class;
 	unsigned char       alignment;          /**< Alignmnet of the declaration, 0 for default. */
-	decl_modifiers_t    modifiers;
+	decl_modifiers_t    modifiers;          /**< MS __declspec modifiers. */
+	const char         *deprecated_string;  /**< MS deprecated string if any. */
+	symbol_t           *get_property_sym;   /**< MS get property. */
+	symbol_t           *put_property_sym;   /**< MS put property. */
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */

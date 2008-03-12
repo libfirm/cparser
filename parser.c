@@ -52,9 +52,12 @@ typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	source_position_t  source_position;
 	unsigned char      declared_storage_class;
-	unsigned char      alignment;      /**< Alignment, 0 if not set. */
+	unsigned char      alignment;         /**< Alignment, 0 if not set. */
 	bool               is_inline;
-	decl_modifiers_t   decl_modifiers;
+	decl_modifiers_t   decl_modifiers;    /**< MS __declspec extended modifier mask */
+	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
+	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
+	symbol_t          *put_property_sym;  /**< the name of the put property if set. */
 	type_t            *type;
 };
 
@@ -89,21 +92,22 @@ static label_statement_t  *label_last        = NULL;
 static struct obstack      temp_obst;
 
 /* symbols for Microsoft extended-decl-modifier */
-static const symbol_t *sym_align     = NULL;
-static const symbol_t *sym_allocate  = NULL;
-static const symbol_t *sym_dllimport = NULL;
-static const symbol_t *sym_dllexport = NULL;
-static const symbol_t *sym_naked     = NULL;
-static const symbol_t *sym_noinline  = NULL;
-static const symbol_t *sym_noreturn  = NULL;
-static const symbol_t *sym_nothrow   = NULL;
-static const symbol_t *sym_novtable  = NULL;
-static const symbol_t *sym_property  = NULL;
-static const symbol_t *sym_get       = NULL;
-static const symbol_t *sym_put       = NULL;
-static const symbol_t *sym_selectany = NULL;
-static const symbol_t *sym_thread    = NULL;
-static const symbol_t *sym_uuid      = NULL;
+static const symbol_t *sym_align      = NULL;
+static const symbol_t *sym_allocate   = NULL;
+static const symbol_t *sym_dllimport  = NULL;
+static const symbol_t *sym_dllexport  = NULL;
+static const symbol_t *sym_naked      = NULL;
+static const symbol_t *sym_noinline   = NULL;
+static const symbol_t *sym_noreturn   = NULL;
+static const symbol_t *sym_nothrow    = NULL;
+static const symbol_t *sym_novtable   = NULL;
+static const symbol_t *sym_property   = NULL;
+static const symbol_t *sym_get        = NULL;
+static const symbol_t *sym_put        = NULL;
+static const symbol_t *sym_selectany  = NULL;
+static const symbol_t *sym_thread     = NULL;
+static const symbol_t *sym_uuid       = NULL;
+static const symbol_t *sym_deprecated = NULL;
 
 /** The current source position. */
 #define HERE token.source_position
@@ -1395,6 +1399,17 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 }
 
 /**
+ * skip until token is found.
+ */
+static void skip_until(int type) {
+	while(token.type != type) {
+		if(token.type == T_EOF)
+			return;
+		next_token();
+	}
+}
+
+/**
  * skip any {...} blocks until a closing braket is reached.
  */
 static void skip_initializers(void)
@@ -1978,84 +1993,121 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 	symbol_t         *symbol;
 	decl_modifiers_t *modifiers = &specifiers->decl_modifiers;
 
-	while(true) {
-		switch(token.type) {
-		case T_IDENTIFIER:
-			symbol = token.v.symbol;
-			if(symbol == sym_align) {
-				next_token();
-				expect('(');
-				if(token.type != T_INTEGER)
-					goto end_error;
-				if(check_elignment_value(token.v.intvalue)) {
-					if(specifiers->alignment != 0)
-						warningf(HERE, "align used more than once");
-					specifiers->alignment = (unsigned char)token.v.intvalue;
-				}
-				next_token();
-				expect(')');
-			} else if(symbol == sym_allocate) {
-				next_token();
-				expect('(');
-				if(token.type != T_IDENTIFIER)
-					goto end_error;
-				(void)token.v.symbol;
-				expect(')');
-			} else if(symbol == sym_dllimport) {
-				next_token();
-				DET_MOD(dllimport, DM_DLLIMPORT);
-			} else if(symbol == sym_dllexport) {
-				next_token();
-				DET_MOD(dllexport, DM_DLLEXPORT);
-			} else if(symbol == sym_thread) {
-				next_token();
-				DET_MOD(thread, DM_THREAD);
-			} else if(symbol == sym_naked) {
-				next_token();
-				DET_MOD(naked, DM_NAKED);
-			} else if(symbol == sym_noinline) {
-				next_token();
-				DET_MOD(noinline, DM_NOINLINE);
-			} else if(symbol == sym_noreturn) {
-				next_token();
-				DET_MOD(noreturn, DM_NORETURN);
-			} else if(symbol == sym_nothrow) {
-				next_token();
-				DET_MOD(nothrow, DM_NOTHROW);
-			} else if(symbol == sym_novtable) {
-				next_token();
-				DET_MOD(novtable, DM_NOVTABLE);
-			} else if(symbol == sym_property) {
-				next_token();
-				expect('(');
+	while(token.type == T_IDENTIFIER) {
+		symbol = token.v.symbol;
+		if(symbol == sym_align) {
+			next_token();
+			expect('(');
+			if(token.type != T_INTEGER)
+				goto end_error;
+			if(check_elignment_value(token.v.intvalue)) {
+				if(specifiers->alignment != 0)
+					warningf(HERE, "align used more than once");
+				specifiers->alignment = (unsigned char)token.v.intvalue;
+			}
+			next_token();
+			expect(')');
+		} else if(symbol == sym_allocate) {
+			next_token();
+			expect('(');
+			if(token.type != T_IDENTIFIER)
+				goto end_error;
+			(void)token.v.symbol;
+			expect(')');
+		} else if(symbol == sym_dllimport) {
+			next_token();
+			DET_MOD(dllimport, DM_DLLIMPORT);
+		} else if(symbol == sym_dllexport) {
+			next_token();
+			DET_MOD(dllexport, DM_DLLEXPORT);
+		} else if(symbol == sym_thread) {
+			next_token();
+			DET_MOD(thread, DM_THREAD);
+		} else if(symbol == sym_naked) {
+			next_token();
+			DET_MOD(naked, DM_NAKED);
+		} else if(symbol == sym_noinline) {
+			next_token();
+			DET_MOD(noinline, DM_NOINLINE);
+		} else if(symbol == sym_noreturn) {
+			next_token();
+			DET_MOD(noreturn, DM_NORETURN);
+		} else if(symbol == sym_nothrow) {
+			next_token();
+			DET_MOD(nothrow, DM_NOTHROW);
+		} else if(symbol == sym_novtable) {
+			next_token();
+			DET_MOD(novtable, DM_NOVTABLE);
+		} else if(symbol == sym_property) {
+			next_token();
+			expect('(');
+			for(;;) {
+				bool is_get = false;
 				if(token.type != T_IDENTIFIER)
 					goto end_error;
 				if(token.v.symbol == sym_get) {
+					is_get = true;
 				} else if(token.v.symbol == sym_put) {
-				} else
+				} else {
+					errorf(HERE, "Bad property name '%Y'", token.v.symbol);
 					goto end_error;
+				}
 				next_token();
 				expect('=');
 				if(token.type != T_IDENTIFIER)
 					goto end_error;
-				(void)token.v.symbol;
+				if(is_get) {
+					if(specifiers->get_property_sym != NULL) {
+						errorf(HERE, "get property name already specified");
+					} else {
+						specifiers->get_property_sym = token.v.symbol;
+					}
+				} else {
+					if(specifiers->put_property_sym != NULL) {
+						errorf(HERE, "put property name already specified");
+					} else {
+						specifiers->put_property_sym = token.v.symbol;
+					}
+				}
 				next_token();
-				expect(')');
-			} else if(symbol == sym_selectany) {
+			    if(token.type == ',') {
+					next_token();
+					continue;
+				}
+				break;
+			}
+			expect(')');
+		} else if(symbol == sym_selectany) {
+			next_token();
+			DET_MOD(selectany, DM_SELECTANY);
+		} else if(symbol == sym_uuid) {
+			next_token();
+			expect('(');
+			if(token.type != T_STRING_LITERAL)
+				goto end_error;
+			next_token();
+			expect(')');
+		} else if(symbol == sym_deprecated) {
+			next_token();
+			DET_MOD(deprecated, DM_DEPRECATED);
+               if(token.type == '(') {
 				next_token();
-				DET_MOD(selectany, DM_SELECTANY);
-			} else if(symbol == sym_uuid) {
-				next_token();
-				expect('(');
-				if(token.type != T_STRING_LITERAL)
-					goto end_error;
-				next_token();
+				if(token.type == T_STRING_LITERAL) {
+					specifiers->deprecated_string = token.v.string.begin;
+					next_token();
+				} else {
+					errorf(HERE, "string literal expected");
+				}
 				expect(')');
 			}
-			break;
-		default:
-			return;
+		} else {
+			warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
+			next_token();
+			if(token.type == '(')
+				skip_until(')');
 		}
+		if (token.type == ',')
+			next_token();
 	}
 end_error:
 	return;
@@ -2822,6 +2874,9 @@ static declaration_t *parse_declarator(
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->modifiers              = specifiers->decl_modifiers;
+	declaration->deprecated_string      = specifiers->deprecated_string;
+	declaration->get_property_sym       = specifiers->get_property_sym;
+	declaration->put_property_sym       = specifiers->put_property_sym;
 	declaration->is_inline              = specifiers->is_inline;
 
 	declaration->storage_class          = specifiers->declared_storage_class;
@@ -6839,21 +6894,22 @@ void init_parser(void)
 {
 	if(c_mode & _MS) {
 		/* add predefined symbols for extended-decl-modifier */
-		sym_align     = symbol_table_insert("align");
-		sym_allocate  = symbol_table_insert("allocate");
-		sym_dllimport = symbol_table_insert("dllimport");
-		sym_dllexport = symbol_table_insert("dllexport");
-		sym_naked     = symbol_table_insert("naked");
-		sym_noinline  = symbol_table_insert("noinline");
-		sym_noreturn  = symbol_table_insert("noreturn");
-		sym_nothrow   = symbol_table_insert("nothrow");
-		sym_novtable  = symbol_table_insert("novtable");
-		sym_property  = symbol_table_insert("property");
-		sym_get       = symbol_table_insert("get");
-		sym_put       = symbol_table_insert("put");
-		sym_selectany = symbol_table_insert("selectany");
-		sym_thread    = symbol_table_insert("thread");
-		sym_uuid      = symbol_table_insert("uuid");
+		sym_align      = symbol_table_insert("align");
+		sym_allocate   = symbol_table_insert("allocate");
+		sym_dllimport  = symbol_table_insert("dllimport");
+		sym_dllexport  = symbol_table_insert("dllexport");
+		sym_naked      = symbol_table_insert("naked");
+		sym_noinline   = symbol_table_insert("noinline");
+		sym_noreturn   = symbol_table_insert("noreturn");
+		sym_nothrow    = symbol_table_insert("nothrow");
+		sym_novtable   = symbol_table_insert("novtable");
+		sym_property   = symbol_table_insert("property");
+		sym_get        = symbol_table_insert("get");
+		sym_put        = symbol_table_insert("put");
+		sym_selectany  = symbol_table_insert("selectany");
+		sym_thread     = symbol_table_insert("thread");
+		sym_uuid       = symbol_table_insert("uuid");
+		sym_deprecated = symbol_table_insert("deprecated");
 	}
 	init_expression_parsers();
 	obstack_init(&temp_obst);
