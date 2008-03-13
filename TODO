@@ -37,4 +37,16 @@ ast2firm:
 Missing Warnings:
 * dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
 * unused label
-*
+
+
+Spec-Status:
+(only test datasets tried yet)
+164.gzip:    works
+175.vpr:     works
+181.mcf:     works
+186.crafty:  works (~though an asm is replaced with a stub)
+253.perlbmk: not ok
+254.gap:     not ok
+255.vortex:  works
+256.bzip2:   works
+300.twolf:   works

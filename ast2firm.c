@@ -1912,6 +1912,8 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 			node = do_strict_conv(dbgi, node);
 			return node;
 		} else {
+			/* make sure firm type is constructed */
+			(void) get_ir_type(type);
 			return value_node;
 		}
 	}
@@ -3265,6 +3267,8 @@ static ir_initializer_t *create_ir_initializer_list(
 static ir_initializer_t *create_ir_initializer_string(
 		const initializer_string_t *initializer, type_t *type)
 {
+	type = skip_typeref(type);
+
 	size_t            string_len    = initializer->string.size;
 	assert(type->kind == TYPE_ARRAY && type->array.size_constant);
 	size_t            len           = type->array.size;
