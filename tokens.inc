@@ -136,6 +136,10 @@ T(_MS,      __declspec,       "__declspec",              = T_declspec)
 T(_MS,      based,            "_based",)
 T(_MS,      __based,          "__based",                 = T_based)
 
+T(_MS,      ptr32,            "__ptr32",)
+T(_MS,      ptr64,            "__ptr64",)
+T(_MS,      sptr,             "__sptr",)
+T(_MS,      uptr,             "__uptr",)
 T(_MS,      w64,              "__w64",)
 
 T(_MS,      int8,             "_int8",)
@@ -146,7 +150,5 @@ T(_MS,      int32,            "_int32",)
 T(_MS,      __int32,          "__int32",                 = T_int32)
 T(_MS,      int64,            "_int64",)
 T(_MS,      __int64,          "__int64",                 = T_int64)
-
-#define T_LAST_TOKEN  (T___int64+1)
 
 #undef _T

@@ -27,25 +27,27 @@
 #include "type.h"
 
 typedef enum {
+	T_NULL  =  0,
+	T_EOF   = -1,
+	T_ERROR = -2,
 #define T(mode,x,str,val) T_##x val,
 #define TS(x,str,val) T_##x val,
 #include "tokens.inc"
 #undef TS
 #undef T
-	T_NULL  =  0,
-	T_EOF   = -1,
-	T_ERROR = -2
+	T_LAST_TOKEN
 } token_type_t;
 
 typedef enum {
+	TP_NULL  = T_NULL,
+	TP_EOF   = T_EOF,
+	TP_ERROR = T_ERROR,
 #define T(mode,x,str,val) TP_##x val,
 #define TS(x,str,val) TP_##x val,
 #include "tokens_preprocessor.inc"
 #undef TS
 #undef T
-	TP_NULL  = T_NULL,
-	TP_EOF   = T_EOF,
-	TP_ERROR = T_ERROR
+	TP_LAST_TOKEN
 } preprocessor_token_type_t;
 
 typedef struct source_position_t source_position_t;

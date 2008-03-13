@@ -10,6 +10,7 @@ TS(WIDE_CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,          "string literal",)
 TS(WIDE_STRING_LITERAL,     "wide string literal",)
 TS(PUNCTUATOR,              "punctuator",)
+TS(NEWLINE,                 "newline", = '\n')
 
 #define PUNCTUATOR(name,string,val)   T(_ALL,name,string,val)
 #include "tokens_punctuator.inc"
@@ -40,9 +41,5 @@ S(DEFAULT)
 S(FP_CONTRACT)
 S(FENV_ACCESS)
 S(CX_LIMITED_RANGE)
-
-#define TP_LAST_TOKEN  (TP_CX_LIMITED_RANGE + 1)
-
-TS(NEWLINE,                 "newline", = '\n')
 
 #undef S

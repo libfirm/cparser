@@ -109,6 +109,9 @@ static const symbol_t *sym_thread     = NULL;
 static const symbol_t *sym_uuid       = NULL;
 static const symbol_t *sym_deprecated = NULL;
 
+/** The token anchor set */
+static unsigned char token_anchor_set[T_LAST_TOKEN];
+
 /** The current source position. */
 #define HERE token.source_position
 
@@ -397,7 +400,6 @@ static size_t label_top(void)
 	return ARR_LEN(label_stack);
 }
 
-
 /**
  * Return the next token.
  */
@@ -423,6 +425,98 @@ static inline const token_t *look_ahead(int num)
 	assert(num > 0 && num <= MAX_LOOKAHEAD);
 	int pos = (lookahead_bufpos+num-1) % MAX_LOOKAHEAD;
 	return &lookahead_buffer[pos];
+}
+
+/**
+ * Adds a token to the token anchor set (a multi-set).
+ */
+static void add_anchor_token(int token_type) {
+	assert(0 <= token_type && token_type < T_LAST_TOKEN);
+	++token_anchor_set[token_type];
+}
+
+/**
+ * Remove a token from the token anchor set (a multi-set).
+ */
+static void rem_anchor_token(int token_type) {
+	assert(0 <= token_type && token_type < T_LAST_TOKEN);
+	--token_anchor_set[token_type];
+}
+
+static bool at_anchor(void) {
+	if(token.type < 0)
+		return false;
+	return token_anchor_set[token.type];
+}
+
+/**
+ * Eat tokens until a matching token is found.
+ */
+static void eat_until_matching_token(int type) {
+	unsigned parenthesis_count = 0;
+	unsigned brace_count = 0;
+	unsigned bracket_count = 0;
+	int end_token = type;
+
+	if(type == '(')
+		end_token = ')';
+	else if(type == '{')
+		end_token = '}';
+	else if(type == '[')
+		end_token = ']';
+
+	while(token.type != end_token ||
+	      (parenthesis_count > 0 || brace_count > 0 || bracket_count > 0)) {
+
+		switch(token.type) {
+		case T_EOF: return;
+		case '(': ++parenthesis_count; break;
+		case '{': ++brace_count;       break;
+		case '[': ++bracket_count;     break;
+		case ')':
+			if(parenthesis_count > 0)
+				--parenthesis_count;
+			break;
+		case '}':
+			if(brace_count > 0)
+				--brace_count;
+			break;
+		case ']':
+			if(bracket_count > 0)
+				--bracket_count;
+			break;
+		default:
+			break;
+		}
+		next_token();
+	}
+}
+
+/**
+ * Eat input tokens until an anchor is found.
+ */
+static void eat_until_anchor(void) {
+	if(token.type == T_EOF)
+		return;
+	while(token_anchor_set[token.type] == 0) {
+		if(token.type == '(' || token.type == '{' || token.type == '[')
+			eat_until_matching_token(token.type);
+		if(token.type == T_EOF)
+			break;
+		next_token();
+	}
+}
+
+static void eat_block(void) {
+	eat_until_matching_token('{');
+	if(token.type == '}')
+		next_token();
+}
+
+static void eat_statement(void) {
+	eat_until_matching_token(';');
+	if(token.type == ';')
+		next_token();
 }
 
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
@@ -460,75 +554,6 @@ static void type_error_incompatible(const char *msg,
 }
 
 /**
- * Eat an complete block, ie. '{ ... }'.
- */
-static void eat_block(void)
-{
-	if(token.type == '{')
-		next_token();
-
-	while(token.type != '}') {
-		if(token.type == T_EOF)
-			return;
-		if(token.type == '{') {
-			eat_block();
-			continue;
-		}
-		next_token();
-	}
-	eat('}');
-}
-
-/**
- * Eat a statement until an ';' token.
- */
-static void eat_statement(void)
-{
-	while(token.type != ';') {
-		if(token.type == T_EOF)
-			return;
-		if(token.type == '}')
-			return;
-		if(token.type == '{') {
-			eat_block();
-			continue;
-		}
-		next_token();
-	}
-	eat(';');
-}
-
-/**
- * Eat a parenthesed term, ie. '( ... )'.
- */
-static void eat_paren(void)
-{
-	if(token.type == '(')
-		next_token();
-
-	while(token.type != ')') {
-		if(token.type == T_EOF)
-			return;
-		if(token.type == ')' || token.type == ';' || token.type == '}') {
-			return;
-		}
-		if(token.type == ')') {
-			next_token();
-			return;
-		}
-		if(token.type == '(') {
-			eat_paren();
-			continue;
-		}
-		if(token.type == '{') {
-			eat_block();
-			continue;
-		}
-		next_token();
-	}
-}
-
-/**
  * Expect the the current token is the expected token.
  * If not, generate an error, eat the current statement,
  * and goto the end_error label.
@@ -537,18 +562,10 @@ static void eat_paren(void)
 	do {                                           \
     if(UNLIKELY(token.type != (expected))) {       \
         parse_error_expected(NULL, (expected), 0); \
-        eat_statement();                           \
+		add_anchor_token(expected);                \
+        eat_until_anchor();                        \
+		rem_anchor_token(expected);                \
         goto end_error;                            \
-    }                                              \
-    next_token();                                  \
-	} while(0)
-
-#define expect_block(expected)                     \
-	do {                                           \
-    if(UNLIKELY(token.type != (expected))) {       \
-        parse_error_expected(NULL, (expected), 0); \
-        eat_block();                               \
-        return NULL;                               \
     }                                              \
     next_token();                                  \
 	} while(0)
@@ -927,7 +944,7 @@ static void parse_attributes(void)
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
 				                     T_STRING_LITERAL);
-				eat_paren();
+				eat_until_matching_token('(');
 				break;
 			} else {
 				parse_string_literals();
@@ -1497,9 +1514,9 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 				if(type != NULL) {
 					ascend_from_subtype(path);
-					expect_block('}');
+					expect('}');
 				} else {
-					expect_block('}');
+					expect('}');
 					goto error_parse_next;
 				}
 			}
@@ -3486,7 +3503,10 @@ static void parse_external_declaration(void)
 	 * specifiers */
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
+
+	add_anchor_token(';');
 	parse_declaration_specifiers(&specifiers);
+	rem_anchor_token(';');
 
 	/* must be a declaration */
 	if(token.type == ';') {
@@ -3494,8 +3514,16 @@ static void parse_external_declaration(void)
 		return;
 	}
 
+	add_anchor_token(',');
+	add_anchor_token('=');
+	rem_anchor_token(';');
+
 	/* declarator is common to both function-definitions and declarations */
 	declaration_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
+
+	rem_anchor_token(',');
+	rem_anchor_token('=');
+	rem_anchor_token(';');
 
 	/* must be a declaration */
 	if(token.type == ',' || token.type == '=' || token.type == ';') {
@@ -3508,7 +3536,7 @@ static void parse_external_declaration(void)
 
 	if(token.type != '{') {
 		parse_error_expected("while parsing function definition", '{', 0);
-		eat_statement();
+		eat_until_matching_token(';');
 		return;
 	}
 
@@ -4276,7 +4304,6 @@ static designator_t *parse_designator(void)
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
 		                     T_IDENTIFIER, 0);
-		eat_paren();
 		return NULL;
 	}
 	result->symbol = token.v.symbol;
@@ -4289,7 +4316,6 @@ static designator_t *parse_designator(void)
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
 				                     T_IDENTIFIER, 0);
-				eat_paren();
 				return NULL;
 			}
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
@@ -4306,11 +4332,10 @@ static designator_t *parse_designator(void)
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = HERE;
 			designator->array_index     = parse_expression();
+			expect(']');
 			if(designator->array_index == NULL) {
-				eat_paren();
 				return NULL;
 			}
-			expect(']');
 
 			last_designator->next = designator;
 			last_designator       = designator;
@@ -4611,8 +4636,6 @@ static expression_t *parse_primary_expression(void)
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
-	eat_statement();
-
 	return create_invalid_expression();
 }
 
@@ -6203,7 +6226,10 @@ static statement_t *parse_if(void)
 	statement->ifs.condition = parse_expression();
 	expect(')');
 
+	add_anchor_token(T_else);
 	statement->ifs.true_statement = parse_statement();
+	rem_anchor_token(T_else);
+
 	if(token.type == T_else) {
 		next_token();
 		statement->ifs.false_statement = parse_statement();
@@ -6295,7 +6321,9 @@ static statement_t *parse_do(void)
 
 	statement->base.source_position = token.source_position;
 
+	add_anchor_token(T_while);
 	statement->do_while.body = parse_loop_body(statement);
+	rem_anchor_token(T_while);
 
 	expect(T_while);
 	expect('(');
@@ -6739,8 +6767,12 @@ static statement_t *parse_compound_statement(void)
 
 	while(token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = parse_statement();
-		if(sub_statement == NULL)
+		if(sub_statement == NULL) {
+			/* an error occurred. if we are at an anchor, return */
+			if(at_anchor())
+				goto end_error;
 			continue;
+		}
 
 		if(last_statement != NULL) {
 			last_statement->base.next = sub_statement;
@@ -6761,6 +6793,7 @@ static statement_t *parse_compound_statement(void)
 		       "end of file while looking for closing '}'");
 	}
 
+end_error:
 	assert(scope == &statement->compound.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
@@ -6910,6 +6943,8 @@ void init_parser(void)
 		sym_uuid       = symbol_table_insert("uuid");
 		sym_deprecated = symbol_table_insert("deprecated");
 	}
+	memset(token_anchor_set, 0, sizeof(token_anchor_set));
+
 	init_expression_parsers();
 	obstack_init(&temp_obst);
 
