@@ -18,3 +18,7 @@ int func(void)
 }
 
 struct blup k = { 1, 2};
+
+int main() {
+	return func();
+}
