@@ -4358,10 +4358,12 @@ static int count_local_declarations(const declaration_t *      decl,
 }
 
 static int count_decls_in_expression(const expression_t *expression) {
+	int count = 0;
+
 	if(expression == NULL)
 		return 0;
 
-	switch(expression->base.kind) {
+	switch((expression_kind_t) expression->base.kind) {
 	case EXPR_STATEMENT:
 		return count_decls_in_stmts(expression->statement.statement);
 	EXPR_BINARY_CASES {
@@ -4372,7 +4374,6 @@ static int count_decls_in_expression(const expression_t *expression) {
 	EXPR_UNARY_CASES
 		return count_decls_in_expression(expression->unary.value);
 	case EXPR_CALL:	{
-		int count = 0;
 		call_argument_t *argument = expression->call.arguments;
 		for( ; argument != NULL; argument = argument->next) {
 			count += count_decls_in_expression(argument->expression);
@@ -4380,7 +4381,64 @@ static int count_decls_in_expression(const expression_t *expression) {
 		return count;
 	}
 
-	default:
+	case EXPR_UNKNOWN:
+	case EXPR_INVALID:
+		panic("unexpected expression kind");
+
+	case EXPR_COMPOUND_LITERAL:
+		/* TODO... */
+		break;
+
+	case EXPR_CONDITIONAL:
+		count += count_decls_in_expression(expression->conditional.condition);
+		count += count_decls_in_expression(expression->conditional.true_expression);
+		count += count_decls_in_expression(expression->conditional.false_expression);
+		return count;
+
+	case EXPR_BUILTIN_PREFETCH:
+		count += count_decls_in_expression(expression->builtin_prefetch.adr);
+		count += count_decls_in_expression(expression->builtin_prefetch.rw);
+		count += count_decls_in_expression(expression->builtin_prefetch.locality);
+		return count;
+
+	case EXPR_BUILTIN_CONSTANT_P:
+		count += count_decls_in_expression(expression->builtin_constant.value);
+		return count;
+
+	case EXPR_SELECT:
+		count += count_decls_in_expression(expression->select.compound);
+		return count;
+
+	case EXPR_ARRAY_ACCESS:
+		count += count_decls_in_expression(expression->array_access.array_ref);
+		count += count_decls_in_expression(expression->array_access.index);
+		return count;
+
+	case EXPR_CLASSIFY_TYPE:
+		count += count_decls_in_expression(expression->classify_type.type_expression);
+		return count;
+
+	case EXPR_SIZEOF:
+	case EXPR_ALIGNOF: {
+		expression_t *tp_expression = expression->typeprop.tp_expression;
+		if (tp_expression != NULL) {
+			count += count_decls_in_expression(tp_expression);
+		}
+		return count;
+	}
+
+	case EXPR_OFFSETOF:
+	case EXPR_REFERENCE:
+	case EXPR_CONST:
+	case EXPR_CHARACTER_CONSTANT:
+	case EXPR_WIDE_CHARACTER_CONSTANT:
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_FUNCTION:
+	case EXPR_PRETTY_FUNCTION:
+	case EXPR_BUILTIN_SYMBOL:
+	case EXPR_VA_START:
+	case EXPR_VA_ARG:
 		break;
 	}
 
