@@ -1,6 +1,6 @@
 int main(void)
 {
-	enum { FALSE, TRUE } MYBOOL;
+	enum MYBOOL { FALSE, TRUE };
 
 	enum MYBOOL k = FALSE;
 
