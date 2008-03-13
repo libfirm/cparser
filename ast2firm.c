@@ -3340,9 +3340,10 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 {
 	switch(get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL: {
-		ir_mode *mode = get_type_mode(type);
 		/* TODO: implement this for compound types... */
 		assert(type != NULL);
+
+		ir_mode *mode = get_type_mode(type);
 		tarval  *zero = get_mode_null(mode);
 		ir_node *cnst = new_d_Const(dbgi, mode, zero);
 

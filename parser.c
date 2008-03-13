@@ -2673,9 +2673,8 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 
 	expect(')');
 
-	return (construct_type_t*) construct_function_type;
 end_error:
-	return NULL;
+	return (construct_type_t*) construct_function_type;
 }
 
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
