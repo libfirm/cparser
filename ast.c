@@ -1168,7 +1168,7 @@ static void print_storage_class(storage_class_tag_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if(initializer == NULL) {
-		fputs("{ NIL-INITIALIZER }", out);
+		fputs("{}", out);
 		return;
 	}
 
@@ -1186,8 +1186,9 @@ void print_initializer(const initializer_t *initializer)
 		for(size_t i = 0 ; i < list->len; ++i) {
 			const initializer_t *sub_init = list->initializers[i];
 			print_initializer(list->initializers[i]);
-			if(i < list->len-1 && sub_init->kind != INITIALIZER_DESIGNATOR) {
-				fputs(", ", out);
+			if(i < list->len-1) {
+				if(sub_init == NULL || sub_init->kind != INITIALIZER_DESIGNATOR)
+					fputs(", ", out);
 			}
 		}
 		fputs(" }", out);
