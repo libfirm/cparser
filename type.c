@@ -250,7 +250,13 @@ void print_enum_definition(const declaration_t *declaration)
 		fprintf(out, "%s", entry->symbol->string);
 		if(entry->init.initializer != NULL) {
 			fprintf(out, " = ");
-			print_expression(entry->init.enum_value);
+
+			/* skip the implicit cast */
+			expression_t *expression = entry->init.enum_value;
+			if(expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+				expression = expression->unary.value;
+			}
+			print_expression(expression);
 		}
 		fprintf(out, ",\n");
 	}
