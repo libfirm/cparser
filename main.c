@@ -362,6 +362,7 @@ int main(int argc, char **argv)
 	const char     *dumpfunction = NULL;
 	compile_mode_t  mode         = CompileAssembleLink;
 	int             opt_level    = 1;
+	int             result = EXIT_SUCCESS;
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
@@ -686,29 +687,35 @@ int main(int argc, char **argv)
 
 	FILE *preprocessed_in = preprocess(in, input);
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
-	int result = pclose(preprocessed_in);
-	if(result != 0) {
-		return result;
+	int res = pclose(preprocessed_in);
+	if(res != 0) {
+		return res;
 	}
-	if(unit == NULL) {
+
+	if(error_count > 0) {
 		/* parsing failed because of errors */
 		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count, warning_count);
-		return EXIT_FAILURE;
-	}
-	if (warning_count > 0) {
+		result = EXIT_FAILURE;
+	} else if(warning_count > 0) {
 		fprintf(stderr, "%u warning(s)\n", warning_count);
 	}
 
 	if(mode == BenchmarkParser) {
-		return 0;
+		return result;
 	}
 
+	/* prints the AST even if errors occurred */
 	if(mode == PrintAst) {
 		type_set_output(out);
 		ast_set_output(out);
 		print_ast(unit);
-		return 0;
+		return result;
 	}
+
+	/* cannot handle other modes with errors */
+	if(result != EXIT_SUCCESS)
+		return result;
+
 	if(mode == PrintFluffy) {
 		type_set_output(out);
 		ast_set_output(out);

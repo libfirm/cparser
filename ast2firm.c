@@ -4291,6 +4291,10 @@ static void statement_to_firm(statement_t *statement)
 	switch(statement->kind) {
 	case STATEMENT_INVALID:
 		panic("invalid statement found");
+		return;
+	case STATEMENT_EMPTY:
+		/* nothing */
+		return;
 	case STATEMENT_COMPOUND:
 		compound_statement_to_firm(&statement->compound);
 		return;
@@ -4458,6 +4462,9 @@ static int count_decls_in_stmts(const statement_t *stmt)
 	int count = 0;
 	for (; stmt != NULL; stmt = stmt->base.next) {
 		switch (stmt->kind) {
+			case STATEMENT_EMPTY:
+				break;
+
 			case STATEMENT_DECLARATION: {
 				const declaration_statement_t *const decl_stmt = &stmt->declaration;
 				count += count_local_declarations(decl_stmt->declarations_begin,

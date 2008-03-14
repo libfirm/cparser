@@ -66,6 +66,8 @@ typedef union  initializer_t                initializer_t;
 typedef struct declaration_t                declaration_t;
 
 typedef struct statement_base_t             statement_base_t;
+typedef struct invalid_statement_t          invalid_statement_t;
+typedef struct empty_statement_t            empty_statement_t;
 typedef struct compound_statement_t         compound_statement_t;
 typedef struct return_statement_t           return_statement_t;
 typedef struct if_statement_t               if_statement_t;

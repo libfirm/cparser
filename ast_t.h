@@ -478,6 +478,7 @@ struct declaration_t {
 
 typedef enum {
 	STATEMENT_INVALID,
+	STATEMENT_EMPTY,
 	STATEMENT_COMPOUND,
 	STATEMENT_RETURN,
 	STATEMENT_DECLARATION,
@@ -499,6 +500,14 @@ struct statement_base_t {
 	statement_kind_t   kind;
 	statement_t       *next;
 	source_position_t  source_position;
+};
+
+struct invalid_statement_t {
+	statement_base_t  base;
+};
+
+struct empty_statement_t {
+	statement_base_t  base;
 };
 
 struct return_statement_t {
@@ -627,6 +636,19 @@ void *_allocate_ast(size_t size)
 {
 	return obstack_alloc(&ast_obstack, size);
 }
+
+static inline
+bool is_invalid_expression(expression_t *expression)
+{
+	return expression->base.kind == EXPR_INVALID;
+}
+
+static inline
+bool is_invalid_statement(statement_t *statement)
+{
+	return statement->base.kind == STATEMENT_INVALID;
+}
+
 
 #define allocate_ast(size)                 _allocate_ast(size)
 

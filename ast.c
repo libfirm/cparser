@@ -705,7 +705,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	switch(expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
-		fprintf(out, "*invalid expression*");
+		fprintf(out, "$invalid expression$");
 		break;
 	case EXPR_CHARACTER_CONSTANT:
 		print_character_constant(&expression->conste);
@@ -856,9 +856,7 @@ static void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(stderr, "(%p)", (void*) statement->label);
 	fprintf(out, "%s:\n", statement->label->symbol->string);
-	if(statement->statement != NULL) {
-		print_statement(statement->statement);
-	}
+	print_statement(statement->statement);
 }
 
 /**
@@ -868,7 +866,7 @@ static void print_label_statement(const label_statement_t *statement)
  */
 static void print_if_statement(const if_statement_t *statement)
 {
-	fputs("if(", out);
+	fputs("if (", out);
 	print_expression(statement->condition);
 	fputs(") ", out);
 	if(statement->true_statement != NULL) {
@@ -889,7 +887,7 @@ static void print_if_statement(const if_statement_t *statement)
  */
 static void print_switch_statement(const switch_statement_t *statement)
 {
-	fputs("switch(", out);
+	fputs("switch (", out);
 	print_expression(statement->expression);
 	fputs(") ", out);
 	print_statement(statement->body);
@@ -952,7 +950,7 @@ static void print_declaration_statement(
  */
 static void print_while_statement(const while_statement_t *statement)
 {
-	fputs("while(", out);
+	fputs("while (", out);
 	print_expression(statement->condition);
 	fputs(") ", out);
 	print_statement(statement->body);
@@ -968,7 +966,7 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 	fputs("do ", out);
 	print_statement(statement->body);
 	print_indent();
-	fputs("while(", out);
+	fputs("while (", out);
 	print_expression(statement->condition);
 	fputs(");\n", out);
 }
@@ -980,7 +978,7 @@ static void print_do_while_statement(const do_while_statement_t *statement)
  */
 static void print_for_statement(const for_statement_t *statement)
 {
-	fputs("for(", out);
+	fputs("for (", out);
 	if(statement->scope.declarations != NULL) {
 		assert(statement->initialisation == NULL);
 		print_declaration(statement->scope.declarations);
@@ -1085,6 +1083,9 @@ end_of_print_asm_statement:
 void print_statement(const statement_t *statement)
 {
 	switch(statement->kind) {
+	case STATEMENT_EMPTY:
+		fputs(";\n", out);
+		break;
 	case STATEMENT_COMPOUND:
 		print_compound_statement(&statement->compound);
 		break;
@@ -1131,7 +1132,7 @@ void print_statement(const statement_t *statement)
 		print_asm_statement(&statement->asms);
 		break;
 	case STATEMENT_INVALID:
-		fprintf(out, "*invalid statement*");
+		fprintf(out, "$invalid statement$");
 		break;
 	}
 }

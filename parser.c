@@ -210,6 +210,8 @@ static declaration_t *allocate_declaration_zero(void)
 static size_t get_statement_struct_size(statement_kind_t kind)
 {
 	static const size_t sizes[] = {
+		[STATEMENT_INVALID]     = sizeof(invalid_statement_t),
+		[STATEMENT_EMPTY]       = sizeof(empty_statement_t),
 		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
 		[STATEMENT_RETURN]      = sizeof(return_statement_t),
 		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
@@ -242,6 +244,26 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 
 	res->base.kind = kind;
 	return res;
+}
+
+/**
+ * Creates a new invalid statement.
+ */
+static statement_t *create_invalid_statement(void)
+{
+	statement_t *statement          = allocate_statement_zero(STATEMENT_INVALID);
+	statement->base.source_position = token.source_position;
+	return statement;
+}
+
+/**
+ * Allocate a new empty statement.
+ */
+static statement_t *create_empty_statement(void)
+{
+	statement_t *statement          = allocate_statement_zero(STATEMENT_EMPTY);
+	statement->base.source_position = token.source_position;
+	return statement;
 }
 
 /**
@@ -513,6 +535,10 @@ static void eat_block(void) {
 		next_token();
 }
 
+/**
+ * eat all token until a ';' is reached
+ * or a stop token is found.
+ */
 static void eat_statement(void) {
 	eat_until_matching_token(';');
 	if(token.type == ';')
@@ -6100,7 +6126,7 @@ end_of_asm:
 	expect(';');
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6146,7 +6172,7 @@ static statement_t *parse_case_statement(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6198,7 +6224,7 @@ static statement_t *parse_default_statement(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6255,13 +6281,20 @@ static statement_t *parse_label_statement(void)
 
 	if(token.type == '}') {
 		/* TODO only warn? */
-		errorf(HERE, "label at end of compound statement");
+		if(false) {
+			warningf(HERE, "label at end of compound statement");
+			statement->label.statement = create_empty_statement();
+		} else {
+			errorf(HERE, "label at end of compound statement");
+			statement->label.statement = create_invalid_statement();
+		}
 		return statement;
 	} else {
 		if (token.type == ';') {
 			/* eat an empty statement here, to avoid the warning about an empty
 			 * after a label.  label:; is commonly used to have a label before
 			 * a }. */
+			statement->label.statement = create_empty_statement();
 			next_token();
 		} else {
 			statement->label.statement = parse_statement();
@@ -6306,7 +6339,7 @@ static statement_t *parse_if(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6344,7 +6377,7 @@ static statement_t *parse_switch(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
@@ -6378,7 +6411,7 @@ static statement_t *parse_while(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6406,7 +6439,7 @@ static statement_t *parse_do(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6470,7 +6503,7 @@ end_error:
 	set_scope(last_scope);
 	environment_pop_to(top);
 
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6507,7 +6540,7 @@ static statement_t *parse_goto(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6530,7 +6563,7 @@ static statement_t *parse_continue(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6553,7 +6586,7 @@ static statement_t *parse_break(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6670,7 +6703,7 @@ static statement_t *parse_return(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6714,7 +6747,7 @@ static statement_t *parse_expression_statement(void)
 
 	return statement;
 end_error:
-	return NULL;
+	return create_invalid_statement();
 }
 
 /**
@@ -6780,11 +6813,11 @@ static statement_t *parse_statement(void)
 		break;
 
 	case ';':
-		if (warning.empty_statement) {
+		if(warning.empty_statement) {
 			warningf(HERE, "statement is empty");
 		}
+		statement = create_empty_statement();
 		next_token();
-		statement = NULL;
 		break;
 
 	case T_IDENTIFIER:
@@ -6820,8 +6853,8 @@ static statement_t *parse_statement(void)
 	}
 	rem_anchor_token(';');
 
-	assert(statement == NULL
-			|| statement->base.source_position.input_name != NULL);
+	assert(statement != NULL
+			&& statement->base.source_position.input_name != NULL);
 
 	return statement;
 }
@@ -6846,7 +6879,7 @@ static statement_t *parse_compound_statement(void)
 
 	while(token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = parse_statement();
-		if(sub_statement == NULL) {
+		if(is_invalid_statement(sub_statement)) {
 			/* an error occurred. if we are at an anchor, return */
 			if(at_anchor())
 				goto end_error;
@@ -6992,9 +7025,6 @@ translation_unit_t *parse(void)
 
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
-
-	if(error_count > 0)
-		return NULL;
 
 	return unit;
 }
