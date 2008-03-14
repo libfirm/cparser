@@ -31,7 +31,7 @@ static struct obstack   _type_obst;
 static FILE            *out;
 struct obstack         *type_obst                 = &_type_obst;
 static int              type_visited              = 0;
-static bool             print_implicit_array_size = true;
+static bool             print_implicit_array_size = false;
 
 static void intern_print_type_pre(const type_t *type, bool top);
 static void intern_print_type_post(const type_t *type, bool top);

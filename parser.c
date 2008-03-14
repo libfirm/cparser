@@ -1475,6 +1475,13 @@ static void skip_initializers(void)
 	}
 }
 
+static initializer_t *create_empty_initializer(void)
+{
+	static initializer_t empty_initializer
+		= { .list = { { INITIALIZER_LIST }, 0 } };
+	return &empty_initializer;
+}
+
 /**
  * Parse a part of an initialiser for a struct or union,
  */
@@ -1484,7 +1491,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 {
 	if(token.type == '}') {
 		/* empty initializer */
-		return NULL;
+		return create_empty_initializer();
 	}
 
 	type_t *orig_type = path->top_type;
@@ -1499,7 +1506,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		 * initializers in this case. */
 		if(!is_type_valid(type)) {
 			skip_initializers();
-			return NULL;
+			return create_empty_initializer();
 		}
 	}
 
