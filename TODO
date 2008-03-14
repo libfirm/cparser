@@ -23,7 +23,6 @@ Parser:
   again in a local scope
 - print initialisation type_path for initializer errors
 - add format checker for normal strings
-- fix --print-implicit-casts for enums
 
 ast2firm:
 - handle non-constant initializers
