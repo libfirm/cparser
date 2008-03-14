@@ -931,6 +931,9 @@ static void print_declaration_statement(
 	declaration_t *declaration = statement->declarations_begin;
 	for( ; declaration != statement->declarations_end->next;
 	       declaration = declaration->next) {
+	    if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+	    	continue;
+
 		if(!first) {
 			print_indent();
 		} else {

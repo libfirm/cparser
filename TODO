@@ -38,6 +38,7 @@ Spec-Status:
 (only test datasets tried yet)
 164.gzip:    works
 175.vpr:     works
+176.gcc:     not ok
 181.mcf:     works
 186.crafty:  works (~though an asm is replaced with a stub)
 253.perlbmk: not ok
