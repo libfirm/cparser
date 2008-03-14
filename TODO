@@ -22,7 +22,6 @@ Parser:
 - check semantic for functions declared/defined in global scope and declared
   again in a local scope
 - print initialisation type_path for initializer errors
-- add format checker for normal strings
 
 ast2firm:
 - handle non-constant initializers
