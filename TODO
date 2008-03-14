@@ -9,10 +9,7 @@ Lexer:
   compressed table) and only storing pointers to it on the AST.
 
 Parser:
-- disallow storage class specifiers in sturct/union members
-- the expect macros abort functions directly. This leads to some functions
-  not resetting the current context properly (parse_for); expect in expressions
-  suddenly return NULL which triggers asserts
+- disallow storage class specifiers in struct/union members
 - label: declaration; is no valid C99 but we parse it anyway
 - add constant folding code (optional, ast2firm already does it)
 - Refactor code, so code to handle number values (and strings?) is an own

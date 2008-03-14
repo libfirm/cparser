@@ -108,6 +108,8 @@ static const symbol_t *sym_selectany  = NULL;
 static const symbol_t *sym_thread     = NULL;
 static const symbol_t *sym_uuid       = NULL;
 static const symbol_t *sym_deprecated = NULL;
+static const symbol_t *sym_restrict   = NULL;
+static const symbol_t *sym_noalias    = NULL;
 
 /** The token anchor set */
 static unsigned char token_anchor_set[T_LAST_TOKEN];
@@ -1723,7 +1725,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		default:
-			panic("invalid initializer type");
+			internal_errorf(HERE, "invalid initializer type");
 		}
 
 		expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
@@ -2044,11 +2046,16 @@ static bool check_elignment_value(long long intvalue) {
 
 static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *specifiers)
 {
-	symbol_t         *symbol;
 	decl_modifiers_t *modifiers = &specifiers->decl_modifiers;
 
-	while(token.type == T_IDENTIFIER) {
-		symbol = token.v.symbol;
+	while(true) {
+		if(token.type == T_restrict) {
+			next_token();
+			DET_MOD(restrict, DM_RESTRICT);
+			goto end_loop;
+		} else if(token.type != T_IDENTIFIER)
+			break;
+		symbol_t *symbol = token.v.symbol;
 		if(symbol == sym_align) {
 			next_token();
 			expect('(');
@@ -2154,12 +2161,16 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 				}
 				expect(')');
 			}
+		} else if(symbol == sym_noalias) {
+			next_token();
+			DET_MOD(noalias, DM_NOALIAS);
 		} else {
 			warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
 			next_token();
 			if(token.type == '(')
 				skip_until(')');
 		}
+end_loop:
 		if (token.type == ',')
 			next_token();
 	}
@@ -2846,7 +2857,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 	for( ; iter != NULL; iter = iter->next) {
 		switch(iter->kind) {
 		case CONSTRUCT_INVALID:
-			panic("invalid type construction found");
+			internal_errorf(HERE, "invalid type construction found");
 		case CONSTRUCT_FUNCTION: {
 			construct_function_type_t *construct_function_type
 				= (construct_function_type_t*) iter;
@@ -4084,7 +4095,7 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	case T___builtin_va_end:
 		return make_function_1_type(type_void, type_valist);
 	default:
-		panic("not implemented builtin symbol found");
+		internal_errorf(HERE, "not implemented builtin symbol found");
 	}
 }
 
@@ -4593,7 +4604,7 @@ static expression_t *parse_compare_builtin(void)
 		expression = allocate_expression_zero(EXPR_BINARY_ISUNORDERED);
 		break;
 	default:
-		panic("invalid compare builtin found");
+		internal_errorf(HERE, "invalid compare builtin found");
 		break;
 	}
 	expression->base.source_position = HERE;
@@ -5755,7 +5766,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_ISUNORDERED:        return false;
 	}
 
-	panic("unexpected expression");
+	internal_errorf(HERE, "unexpected expression");
 }
 
 static void semantic_comma(binary_expression_t *expression)
@@ -7052,6 +7063,8 @@ void init_parser(void)
 		sym_thread     = symbol_table_insert("thread");
 		sym_uuid       = symbol_table_insert("uuid");
 		sym_deprecated = symbol_table_insert("deprecated");
+		sym_restrict   = symbol_table_insert("restrict");
+		sym_noalias    = symbol_table_insert("noalias");
 	}
 	memset(token_anchor_set, 0, sizeof(token_anchor_set));
 

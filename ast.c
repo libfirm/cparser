@@ -869,9 +869,7 @@ static void print_if_statement(const if_statement_t *statement)
 	fputs("if (", out);
 	print_expression(statement->condition);
 	fputs(") ", out);
-	if(statement->true_statement != NULL) {
-		print_statement(statement->true_statement);
-	}
+	print_statement(statement->true_statement);
 
 	if(statement->false_statement != NULL) {
 		print_indent();
@@ -1253,6 +1251,12 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		}
 		if(declaration->alignment != 0) {
 			fputs(next, out); next = ", "; fprintf(out, "align(%u)", declaration->alignment);
+		}
+		if(modifiers & DM_RESTRICT) {
+			fputs(next, out); next = ", "; fputs("restrict", out);
+		}
+		if(modifiers & DM_NOALIAS) {
+			fputs(next, out); next = ", "; fputs("noalias", out);
 		}
 	    if(declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
 	    	char *comma = "";

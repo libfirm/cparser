@@ -430,7 +430,9 @@ typedef enum {
 	DM_NOVTABLE         = (1 <<  8),
 	DM_NORETURN         = (1 <<  9),
 	DM_NOINLINE         = (1 << 10),
-	DM_DEPRECATED       = (1 << 11)
+	DM_DEPRECATED       = (1 << 11),
+	DM_RESTRICT         = (1 << 12),
+	DM_NOALIAS          = (1 << 13)
 } decl_modifier_t;
 
 typedef unsigned short decl_modifiers_t;

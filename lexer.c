@@ -67,6 +67,16 @@ static void parse_error(const char *msg)
 	errorf(lexer_token.source_position,  "%s", msg);
 }
 
+/**
+ * Prints an internal error message at the current token.
+ *
+ * @param msg   the error message
+ */
+static NORETURN internal_error(const char *msg)
+{
+	internal_errorf(lexer_token.source_position,  "%s", msg);
+}
+
 static inline void next_real_char(void)
 {
 	assert(bufpos <= bufend);
@@ -481,7 +491,7 @@ static void parse_number_hex(void)
 
 	if(c == '.' || c == 'p' || c == 'P') {
 		next_char();
-		panic("Hex floating point numbers not implemented yet");
+		internal_error("Hex floating point numbers not implemented yet");
 	}
 	if(*string == '\0') {
 		parse_error("invalid hex number");
@@ -679,7 +689,7 @@ static int digit_value(int digit) {
 	case 'f':
 	case 'F': return 15;
 	default:
-		panic("wrong character given");
+		internal_error("wrong character given");
 	}
 }
 

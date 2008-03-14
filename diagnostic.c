@@ -199,3 +199,20 @@ void warningf(const source_position_t pos, const char *const fmt, ...)
 	}
 	va_end(ap);
 }
+
+static void internal_errorvf(const source_position_t pos,
+                    const char *const fmt, va_list ap)
+{
+	fprintf(stderr, "%s:%u: internal error: ", pos.input_name, pos.linenr);
+	diagnosticvf(fmt, ap);
+	fputc('\n', stderr);
+}
+
+void internal_errorf(const source_position_t pos, const char *const fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	internal_errorvf(pos, fmt, ap);
+	va_end(ap);
+	abort();
+}
