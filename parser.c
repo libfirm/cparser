@@ -531,7 +531,7 @@ static void parse_error_expected(const char *message, ...)
 	}
 	va_list ap;
 	va_start(ap, message);
-	errorf(HERE, "got %K, expected %#k", &token, &ap, ", ");
+	errorf(HERE, "got %K, expected %#k", &token, &ap, "a ");
 	va_end(ap);
 }
 
@@ -973,7 +973,9 @@ static designator_t *parse_designation(void)
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = token.source_position;
 			next_token();
+			add_anchor_token(']');
 			designator->array_index = parse_constant_expression();
+			rem_anchor_token(']');
 			expect(']');
 			break;
 		case '.':
@@ -1509,8 +1511,10 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				} else
 					descend_into_subtype(path);
 
+				add_anchor_token('}');
 				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
 				                            env);
+				rem_anchor_token('}');
 
 				if(type != NULL) {
 					ascend_from_subtype(path);
@@ -1660,7 +1664,9 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 
 		descend_into_subtype(&path);
 
+		add_anchor_token('}');
 		result = parse_sub_initializer(&path, env->type, 1, env);
+		rem_anchor_token('}');
 
 		max_index = path.max_index;
 		DEL_ARR_F(path.path);
@@ -1789,10 +1795,12 @@ static void parse_enum_entries(type_t *const enum_type)
 		return;
 	}
 
+	add_anchor_token('}');
 	do {
 		if(token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing enum entry", T_IDENTIFIER, 0);
 			eat_block();
+			rem_anchor_token('}');
 			return;
 		}
 
@@ -1819,6 +1827,7 @@ static void parse_enum_entries(type_t *const enum_type)
 			break;
 		next_token();
 	} while(token.type != '}');
+	rem_anchor_token('}');
 
 	expect('}');
 
@@ -1894,6 +1903,7 @@ static type_t *parse_typeof(void)
 	type_t *type;
 
 	expect('(');
+	add_anchor_token(')');
 
 	expression_t *expression  = NULL;
 
@@ -1926,6 +1936,7 @@ restart:
 		break;
 	}
 
+	rem_anchor_token(')');
 	expect(')');
 
 	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF, expression->base.source_position);
@@ -2161,7 +2172,9 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T_declspec:
 			next_token();
 			expect('(');
+			add_anchor_token(')');
 			parse_microsoft_extended_decl_modifier(specifiers);
+			rem_anchor_token(')');
 			expect(')');
 			break;
 
@@ -2633,6 +2646,7 @@ static construct_type_t *parse_pointer_declarator(void)
 static construct_type_t *parse_array_declarator(void)
 {
 	eat('[');
+	add_anchor_token(']');
 
 	parsed_array_t *array = obstack_alloc(&temp_obst, sizeof(array[0]));
 	memset(array, 0, sizeof(array[0]));
@@ -2659,6 +2673,7 @@ static construct_type_t *parse_array_declarator(void)
 		array->size = parse_assignment_expression();
 	}
 
+	rem_anchor_token(']');
 	expect(']');
 
 	return (construct_type_t*) array;
@@ -2669,6 +2684,7 @@ end_error:
 static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	eat('(');
+	add_anchor_token(')');
 
 	type_t *type;
 	if(declaration != NULL) {
@@ -2688,6 +2704,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	construct_function_type->construct_type.kind = CONSTRUCT_FUNCTION;
 	construct_function_type->function_type       = type;
 
+	rem_anchor_token(')');
 	expect(')');
 
 end_error:
@@ -2732,7 +2749,9 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		break;
 	case '(':
 		next_token();
+		add_anchor_token(')');
 		inner_types = parse_inner_declarator(declaration, may_be_abstract);
+		rem_anchor_token(')');
 		expect(')');
 		break;
 	default:
@@ -3270,6 +3289,9 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		const declaration_specifiers_t *specifiers,
 		parsed_declaration_func finished_declaration)
 {
+	add_anchor_token(';');
+	add_anchor_token('=');
+	add_anchor_token(',');
 	while(true) {
 		declaration_t *declaration = finished_declaration(ndeclaration);
 
@@ -3296,7 +3318,9 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 	expect(';');
 
 end_error:
-	;
+	rem_anchor_token(';');
+	rem_anchor_token('=');
+	rem_anchor_token(',');
 }
 
 static declaration_t *finished_kr_declaration(declaration_t *declaration)
@@ -3753,6 +3777,7 @@ end_error:
 static void parse_compound_type_entries(declaration_t *compound_declaration)
 {
 	eat('{');
+	add_anchor_token('}');
 
 	while(token.type != '}' && token.type != T_EOF) {
 		declaration_specifiers_t specifiers;
@@ -3761,6 +3786,8 @@ static void parse_compound_type_entries(declaration_t *compound_declaration)
 
 		parse_compound_declarators(compound_declaration, &specifiers);
 	}
+	rem_anchor_token('}');
+
 	if(token.type == T_EOF) {
 		errorf(HERE, "EOF while parsing struct");
 	}
@@ -4183,6 +4210,8 @@ static expression_t *parse_cast(void)
 
 	type_t *type  = parse_typename();
 
+	/* matching add_anchor_token() is at call site */
+	rem_anchor_token(')');
 	expect(')');
 
 	if(token.type == '{') {
@@ -4243,6 +4272,7 @@ end_error:
 static expression_t *parse_brace_expression(void)
 {
 	eat('(');
+	add_anchor_token(')');
 
 	switch(token.type) {
 	case '{':
@@ -4259,6 +4289,7 @@ static expression_t *parse_brace_expression(void)
 	}
 
 	expression_t *result = parse_expression();
+	rem_anchor_token(')');
 	expect(')');
 
 	return result;
@@ -4329,9 +4360,11 @@ static designator_t *parse_designator(void)
 		}
 		if(token.type == '[') {
 			next_token();
+			add_anchor_token(']');
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = HERE;
 			designator->array_index     = parse_expression();
+			rem_anchor_token(']');
 			expect(']');
 			if(designator->array_index == NULL) {
 				return NULL;
@@ -4360,9 +4393,13 @@ static expression_t *parse_offsetof(void)
 	expression->base.type    = type_size_t;
 
 	expect('(');
+	add_anchor_token(',');
 	type_t *type = parse_typename();
+	rem_anchor_token(',');
 	expect(',');
+	add_anchor_token(')');
 	designator_t *designator = parse_designator();
+	rem_anchor_token(')');
 	expect(')');
 
 	expression->offsetofe.type       = type;
@@ -4396,7 +4433,9 @@ static expression_t *parse_va_start(void)
 	expression_t *expression = allocate_expression_zero(EXPR_VA_START);
 
 	expect('(');
+	add_anchor_token(',');
 	expression->va_starte.ap = parse_assignment_expression();
+	rem_anchor_token(',');
 	expect(',');
 	expression_t *const expr = parse_assignment_expression();
 	if (expr->kind == EXPR_REFERENCE) {
@@ -4461,7 +4500,9 @@ static expression_t *parse_builtin_constant(void)
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
 
 	expect('(');
+	add_anchor_token(')');
 	expression->builtin_constant.value = parse_assignment_expression();
+	rem_anchor_token(')');
 	expect(')');
 	expression->base.type = type_int;
 
@@ -4480,6 +4521,7 @@ static expression_t *parse_builtin_prefetch(void)
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_PREFETCH);
 
 	expect('(');
+	add_anchor_token(')');
 	expression->builtin_prefetch.adr = parse_assignment_expression();
 	if (token.type == ',') {
 		next_token();
@@ -4489,6 +4531,7 @@ static expression_t *parse_builtin_prefetch(void)
 		next_token();
 		expression->builtin_prefetch.locality = parse_assignment_expression();
 	}
+	rem_anchor_token(')');
 	expect(')');
 	expression->base.type = type_void;
 
@@ -4588,7 +4631,9 @@ static expression_t *parse_assume(void) {
 		= allocate_expression_zero(EXPR_UNARY_ASSUME);
 
 	expect('(');
+	add_anchor_token(')');
 	expression->unary.value = parse_assignment_expression();
+	rem_anchor_token(')');
 	expect(')');
 
 	expression->base.type = type_void;
@@ -4659,6 +4704,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 	(void) precedence;
 
 	eat('[');
+	add_anchor_token(']');
 
 	expression_t *inside = parse_expression();
 
@@ -4694,6 +4740,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 		array_access->array_ref = create_invalid_expression();
 	}
 
+	rem_anchor_token(']');
 	if(token.type != ']') {
 		parse_error_expected("Problem while parsing array access", ']', 0);
 		return expression;
@@ -4713,7 +4760,9 @@ static expression_t *parse_typeprop(expression_kind_t kind, unsigned precedence)
 
 	if(token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
+		add_anchor_token(')');
 		tp_expression->typeprop.type = parse_typename();
+		rem_anchor_token(')');
 		expect(')');
 	} else {
 		expression_t *expression = parse_sub_expression(precedence);
@@ -4850,6 +4899,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 
 	/* parse arguments */
 	eat('(');
+	add_anchor_token(')');
+	add_anchor_token(',');
 
 	if(token.type != ')') {
 		call_argument_t *last_argument = NULL;
@@ -4870,6 +4921,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 			next_token();
 		}
 	}
+	rem_anchor_token(',');
+	rem_anchor_token(')');
 	expect(')');
 
 	if(function_type != NULL) {
@@ -4945,6 +4998,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
 {
 	eat('?');
+	add_anchor_token(':');
 
 	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
 
@@ -4960,6 +5014,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	}
 
 	expression_t *true_expression = parse_expression();
+	rem_anchor_token(':');
 	expect(':');
 	expression_t *false_expression = parse_sub_expression(precedence);
 
@@ -5040,7 +5095,9 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 	result->base.type    = type_int;
 
 	expect('(');
+	add_anchor_token(')');
 	expression_t *expression = parse_sub_expression(precedence);
+	rem_anchor_token(')');
 	expect(')');
 	result->classify_type.type_expression = expression;
 
@@ -6010,25 +6067,35 @@ static statement_t *parse_asm_statement(void)
 	}
 
 	expect('(');
+	add_anchor_token(')');
+	add_anchor_token(':');
 	asm_statement->asm_text = parse_string_literals();
 
-	if(token.type != ':')
+	if(token.type != ':') {
+		rem_anchor_token(':');
 		goto end_of_asm;
+	}
 	eat(':');
 
 	asm_statement->inputs = parse_asm_constraints();
-	if(token.type != ':')
+	if(token.type != ':') {
+		rem_anchor_token(':');
 		goto end_of_asm;
+	}
 	eat(':');
 
 	asm_statement->outputs = parse_asm_constraints();
-	if(token.type != ':')
+	if(token.type != ':') {
+		rem_anchor_token(':');
 		goto end_of_asm;
+	}
+	rem_anchor_token(':');
 	eat(':');
 
 	asm_statement->clobbers = parse_asm_clobbers();
 
 end_of_asm:
+	rem_anchor_token(')');
 	expect(')');
 	expect(';');
 	return statement;
@@ -6223,7 +6290,9 @@ static statement_t *parse_if(void)
 	statement->base.source_position = token.source_position;
 
 	expect('(');
+	add_anchor_token(')');
 	statement->ifs.condition = parse_expression();
+	rem_anchor_token(')');
 	expect(')');
 
 	add_anchor_token(T_else);
@@ -6300,7 +6369,9 @@ static statement_t *parse_while(void)
 	statement->base.source_position = token.source_position;
 
 	expect('(');
+	add_anchor_token(')');
 	statement->whiles.condition = parse_expression();
+	rem_anchor_token(')');
 	expect(')');
 
 	statement->whiles.body = parse_loop_body(statement);
@@ -6327,7 +6398,9 @@ static statement_t *parse_do(void)
 
 	expect(T_while);
 	expect('(');
+	add_anchor_token(')');
 	statement->do_while.condition = parse_expression();
+	rem_anchor_token(')');
 	expect(')');
 	expect(';');
 
@@ -6351,6 +6424,7 @@ static statement_t *parse_for(void)
 	set_scope(&statement->fors.scope);
 
 	expect('(');
+	add_anchor_token(')');
 
 	if(token.type != ';') {
 		if(is_declaration_specifier(&token, false)) {
@@ -6380,6 +6454,7 @@ static statement_t *parse_for(void)
 			         "step of 'for'-statement has no effect");
 		}
 	}
+	rem_anchor_token(')');
 	expect(')');
 	statement->fors.body = parse_loop_body(statement);
 
@@ -6390,6 +6465,7 @@ static statement_t *parse_for(void)
 	return statement;
 
 end_error:
+	rem_anchor_token(')');
 	assert(scope == &statement->fors.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
@@ -6649,6 +6725,7 @@ static statement_t *parse_statement(void)
 	statement_t   *statement = NULL;
 
 	/* declaration or statement */
+	add_anchor_token(';');
 	switch(token.type) {
 	case T_asm:
 		statement = parse_asm_statement();
@@ -6741,6 +6818,7 @@ static statement_t *parse_statement(void)
 		statement = parse_expression_statement();
 		break;
 	}
+	rem_anchor_token(';');
 
 	assert(statement == NULL
 			|| statement->base.source_position.input_name != NULL);
@@ -6758,6 +6836,7 @@ static statement_t *parse_compound_statement(void)
 	statement->base.source_position = token.source_position;
 
 	eat('{');
+	add_anchor_token('}');
 
 	int      top        = environment_top();
 	scope_t *last_scope = scope;
@@ -6794,6 +6873,7 @@ static statement_t *parse_compound_statement(void)
 	}
 
 end_error:
+	rem_anchor_token('}');
 	assert(scope == &statement->compound.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
