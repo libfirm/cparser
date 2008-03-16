@@ -4920,6 +4920,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 {
 	(void) precedence;
 	expression_t *result = allocate_expression_zero(EXPR_CALL);
+	result->base.source_position = expression->base.source_position;
 
 	call_expression_t *call = &result->call;
 	call->function          = expression;
