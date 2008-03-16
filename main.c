@@ -105,7 +105,7 @@ bool strict_mode = false;
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
 
-/* to switch on printing of  srenthesis to indicate operator precedence */
+/* to switch on printing of parenthesis to indicate operator precedence */
 extern bool print_parenthesis;
 
 static int            verbose;
