@@ -63,6 +63,16 @@ extern type_t *type_ptrdiff_t_ptr;
 extern type_t *type_ssize_t_ptr;
 extern type_t *type_wchar_t_ptr;
 
+/* microsoft types */
+extern type_t *type_int8;
+extern type_t *type_int16;
+extern type_t *type_int32;
+extern type_t *type_int64;
+extern type_t *type_unsigned_int8;
+extern type_t *type_unsigned_int16;
+extern type_t *type_unsigned_int32;
+extern type_t *type_unsigned_int64;
+
 void init_basic_types(void);
 
 #endif

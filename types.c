@@ -61,6 +61,16 @@ type_t *type_ptrdiff_t_ptr;
 type_t *type_ssize_t_ptr;
 type_t *type_wchar_t_ptr;
 
+/* microsoft types */
+type_t *type_int8;
+type_t *type_int16;
+type_t *type_int32;
+type_t *type_int64;
+type_t *type_unsigned_int8;
+type_t *type_unsigned_int16;
+type_t *type_unsigned_int32;
+type_t *type_unsigned_int64;
+
 
 void init_basic_types(void)
 {
@@ -81,6 +91,17 @@ void init_basic_types(void)
 	type_char               = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_NONE);
 	type_void               = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_NONE);
 
+	/* microsoft types */
+	type_int8               = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_NONE);
+	type_int16              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
+	type_int32              = make_atomic_type(ATOMIC_TYPE_INT,         TYPE_QUALIFIER_NONE);
+	type_int64              = make_atomic_type(ATOMIC_TYPE_LONGLONG,    TYPE_QUALIFIER_NONE);
+	type_unsigned_int8      = make_atomic_type(ATOMIC_TYPE_UCHAR,       TYPE_QUALIFIER_NONE);
+	type_unsigned_int16     = make_atomic_type(ATOMIC_TYPE_USHORT,      TYPE_QUALIFIER_NONE);
+	type_unsigned_int32     = make_atomic_type(ATOMIC_TYPE_UINT,        TYPE_QUALIFIER_NONE);
+	type_unsigned_int64     = make_atomic_type(ATOMIC_TYPE_ULONGLONG,   TYPE_QUALIFIER_NONE);
+
+	/* pointer types */
 	type_void_ptr           = make_pointer_type(type_void,              TYPE_QUALIFIER_NONE);
 	type_char_ptr           = make_pointer_type(type_char,              TYPE_QUALIFIER_NONE);
 	type_signed_char_ptr    = make_pointer_type(type_signed_char,       TYPE_QUALIFIER_NONE);
