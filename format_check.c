@@ -27,7 +27,7 @@
 #include "types.h"
 #include "type_t.h"
 #include "warning.h"
-
+#include "lang_features.h"
 
 typedef enum format_flag_t {
 	FMT_FLAG_NONE  = 0,
@@ -51,7 +51,12 @@ typedef enum format_length_modifier_t {
 	FMT_MOD_j,
 	FMT_MOD_t,
 	FMT_MOD_z,
-	FMT_MOD_q
+	FMT_MOD_q,
+	/* only in microsoft mode */
+	FMT_MOD_w,
+	FMT_MOD_I,
+	FMT_MOD_I32,
+	FMT_MOD_I64
 } format_length_modifier_t;
 
 static const char* get_length_modifier_name(const format_length_modifier_t mod)
@@ -66,7 +71,12 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 		[FMT_MOD_j]    = "j",
 		[FMT_MOD_t]    = "t",
 		[FMT_MOD_z]    = "z",
-		[FMT_MOD_q]    = "q"
+		[FMT_MOD_q]    = "q",
+		/* only in microsoft mode */
+		[FMT_MOD_w]    = "w",
+		[FMT_MOD_I]    = "I",
+		[FMT_MOD_I32]  = "I32",
+		[FMT_MOD_I64]  = "I64"
 	};
 	assert(mod < sizeof(names) / sizeof(*names));
 	return names[mod];
@@ -85,11 +95,14 @@ static void warn_invalid_length_modifier(const source_position_t pos,
 typedef struct vchar_t vchar_t;
 struct vchar_t {
 	const void *string;   /**< the string */
-	size_t     position;
-	size_t     size;
+	size_t     position;  /**< current position */
+	size_t     size;      /**< size of the string */
 
+	/** return the first character of the string and setthe position to 0. */
 	unsigned (*first)(vchar_t *self);
+	/** return the next character of the string */
 	unsigned (*next)(vchar_t *self);
+	/** return non_zero if the given character is a digit */
 	int (*is_digit)(unsigned vchar);
 };
 
@@ -283,7 +296,43 @@ break_fmt_flags:
 			case 't': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_t;    break;
 			case 'z': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_z;    break;
 			case 'q': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_q;    break;
-			default:                            fmt_mod = FMT_MOD_NONE; break;
+			/* microsoft mode */
+			case 'w':
+				if (c_mode & _MS) {
+					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_w;
+				} else {
+					fmt_mod = FMT_MOD_NONE;
+				}
+				break;
+			case 'I':
+				if (c_mode & _MS) {
+					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_I;
+					if (fmt == '3') {
+						fmt = vchar.next(&vchar);
+						if (fmt == '2') {
+							fmt = vchar.next(&vchar);
+							fmt_mod = FMT_MOD_I32;
+						} else {
+							/* rewind */
+							--vchar.position;
+						}
+					} else if (fmt == '6') {
+						fmt = vchar.next(&vchar);
+						if (fmt == '4') {
+							fmt = vchar.next(&vchar);
+							fmt_mod = FMT_MOD_I64;
+						} else {
+							/* rewind */
+							--vchar.position;
+						}
+					}
+				} else {
+					fmt_mod = FMT_MOD_NONE;
+				}
+				break;
+			default:
+				fmt_mod = FMT_MOD_NONE;
+				break;
 		}
 
 		if (fmt == '\0') {
@@ -306,6 +355,9 @@ break_fmt_flags:
 					case FMT_MOD_j:    expected_type = type_intmax_t;  break;
 					case FMT_MOD_z:    expected_type = type_ssize_t;   break;
 					case FMT_MOD_t:    expected_type = type_ptrdiff_t; break;
+					case FMT_MOD_I:    expected_type = type_ptrdiff_t; break;
+					case FMT_MOD_I32:  expected_type = type_int32;     break;
+					case FMT_MOD_I64:  expected_type = type_int64;     break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
@@ -333,6 +385,9 @@ eval_fmt_mod_unsigned:
 					case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
 					case FMT_MOD_z:    expected_type = type_size_t;             break;
 					case FMT_MOD_t:    expected_type = type_uptrdiff_t;         break;
+					case FMT_MOD_I:    expected_type = type_size_t;             break;
+					case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
+					case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
@@ -372,8 +427,9 @@ eval_fmt_mod_unsigned:
 			case 'c':
 				expected_type = type_int;
 				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;    break; /* TODO promoted char */
-					case FMT_MOD_l:    expected_type = type_wint_t; break;
+					case FMT_MOD_NONE: expected_type = type_int;     break; /* TODO promoted char */
+					case FMT_MOD_l:    expected_type = type_wint_t;  break;
+					case FMT_MOD_w:    expected_type = type_wchar_t; break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
@@ -396,6 +452,7 @@ eval_fmt_mod_unsigned:
 				switch (fmt_mod) {
 					case FMT_MOD_NONE: expected_type = type_char_ptr;    break;
 					case FMT_MOD_l:    expected_type = type_wchar_t_ptr; break;
+					case FMT_MOD_w:    expected_type = type_wchar_t_ptr; break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
