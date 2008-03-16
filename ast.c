@@ -1394,14 +1394,13 @@ bool is_constant_initializer(const initializer_t *initializer)
 	case INITIALIZER_VALUE:
 		return is_constant_expression(initializer->value.value);
 
-	case INITIALIZER_LIST: {
+	case INITIALIZER_LIST:
 		for(size_t i = 0; i < initializer->list.len; ++i) {
 			initializer_t *sub_initializer = initializer->list.initializers[i];
 			if(!is_constant_initializer(sub_initializer))
 				return false;
 		}
 		return true;
-	}
 	}
 	panic("invalid initializer kind found");
 }
