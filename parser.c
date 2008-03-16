@@ -282,7 +282,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_CHARACTER_CONSTANT]      = sizeof(const_expression_t),
 		[EXPR_WIDE_CHARACTER_CONSTANT] = sizeof(const_expression_t),
 		[EXPR_STRING_LITERAL]          = sizeof(string_literal_expression_t),
-		[EXPR_WIDE_STRING_LITERAL]   = sizeof(wide_string_literal_expression_t),
+		[EXPR_WIDE_STRING_LITERAL]     = sizeof(wide_string_literal_expression_t),
 		[EXPR_COMPOUND_LITERAL]        = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                    = sizeof(call_expression_t),
 		[EXPR_UNARY_FIRST]             = sizeof(unary_expression_t),
@@ -5015,6 +5015,22 @@ static expression_t *parse_call_expression(unsigned precedence,
 			}
 		} else {
 			check_format(&result->call);
+		}
+
+		/* check deprecated */
+		if(expression->base.kind == EXPR_REFERENCE) {
+			const reference_expression_t *ref = (reference_expression_t *)expression;
+			const declaration_t *declaration = ref->declaration;
+			if(declaration->modifiers & DM_DEPRECATED) {
+				if (declaration->deprecated_string != NULL) {
+					warningf(result->base.source_position,
+						"function '%Y' was declared 'deprecated(%s)'", declaration->symbol,
+						declaration->deprecated_string);
+				} else {
+					warningf(result->base.source_position,
+						"function '%Y' was declared 'deprecated'", declaration->symbol);
+				}
+			}
 		}
 	}
 
