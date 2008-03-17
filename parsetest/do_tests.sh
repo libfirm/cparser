@@ -11,6 +11,13 @@ for i in *.c; do
 	echo ""
 done
 
+for i in MS/*.c; do
+	echo -n "Compile $i..."
+	../build/cparser --ms $i -O3 -o prog.cparser >> messages.cparser 2>&1 || echo -n " CPARSER COMPILE FAILED"
+	./prog.cparser > out.cparser || echo -n " FAILED CPARSER RUN"
+	echo ""
+done
+
 for i in shouldfail/*.c; do
 	echo -n "Compile $i..."
 	../cparser $i -O3 -o prog.cparser >> messages.cparser 2>&1 && echo -n " CPARSER COMPILED"
