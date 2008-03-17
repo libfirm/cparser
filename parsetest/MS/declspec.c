@@ -1,3 +1,5 @@
+#include "declspec.h"
+
 int __declspec(align(4)) x;
 
 int __declspec(dllimport) y;
@@ -11,3 +13,16 @@ struct x {
 
 __declspec(restrict) char * malloc_like();
 int __declspec(noalias) test1(void *a, void *b);
+
+void test3(void) {
+	test2();
+	func();
+}
+
+__declspec(deprecated) int (*ptr)(void) = ****test2;
+
+int test4(void) {
+	int x  = ptr();
+	printf("%I64d\n", x);
+	return x;
+}
