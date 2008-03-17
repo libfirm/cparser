@@ -1,6 +1,5 @@
-int main(int argc) {
-
+int main(int argc, char *argv[]) {
 	enum { A, B, C } a = argc;
 
-	return a;
+	return a != 1;
 }
