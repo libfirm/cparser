@@ -22,6 +22,7 @@
 #include "ast_t.h"
 #include "symbol_t.h"
 #include "type_t.h"
+#include "parser.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -1447,6 +1448,14 @@ bool is_address_constant(const expression_t *expression)
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_constant_address(expression->unary.value);
 
+	case EXPR_UNARY_DEREFERENCE: {
+		type_t *real_type = revert_automatic_type_conversion(expression->unary.value);
+		/* dereferencing a function is a NOP */
+		if(is_type_function(real_type)) {
+			return is_address_constant(expression->unary.value);
+		}
+	}
+
 	case EXPR_UNARY_CAST:
 		return is_type_pointer(skip_typeref(expression->base.type))
 			&& (is_constant_expression(expression->unary.value)
@@ -1513,8 +1522,8 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 	case EXPR_UNARY_BITFIELD_EXTRACT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
-	case EXPR_UNARY_DEREFERENCE:
 	case EXPR_UNARY_TAKE_ADDRESS:
+	case EXPR_UNARY_DEREFERENCE:
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:
