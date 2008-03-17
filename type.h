@@ -25,6 +25,48 @@
 #include "ast.h"
 #include "symbol.h"
 
+/* note that the constant values represent the rank of the types as defined
+ * in § 6.3.1 */
+typedef enum {
+	ATOMIC_TYPE_INVALID = 0,
+	ATOMIC_TYPE_VOID,
+	ATOMIC_TYPE_CHAR,
+	ATOMIC_TYPE_SCHAR,
+	ATOMIC_TYPE_UCHAR,
+	ATOMIC_TYPE_SHORT,
+	ATOMIC_TYPE_USHORT,
+	ATOMIC_TYPE_INT,
+	ATOMIC_TYPE_UINT,
+	ATOMIC_TYPE_LONG,
+	ATOMIC_TYPE_ULONG,
+	ATOMIC_TYPE_LONGLONG,
+	ATOMIC_TYPE_ULONGLONG,
+	ATOMIC_TYPE_FLOAT,
+	ATOMIC_TYPE_DOUBLE,
+	ATOMIC_TYPE_LONG_DOUBLE,
+	ATOMIC_TYPE_BOOL,
+	/* microsoft extensions */
+	ATOMIC_TYPE_INT8,
+	ATOMIC_TYPE_INT16,
+	ATOMIC_TYPE_INT32,
+	ATOMIC_TYPE_INT64,
+	ATOMIC_TYPE_INT128,
+	ATOMIC_TYPE_UINT8,
+	ATOMIC_TYPE_UINT16,
+	ATOMIC_TYPE_UINT32,
+	ATOMIC_TYPE_UINT64,
+	ATOMIC_TYPE_UINT128,
+
+	ATOMIC_TYPE_FLOAT_COMPLEX,
+	ATOMIC_TYPE_DOUBLE_COMPLEX,
+	ATOMIC_TYPE_LONG_DOUBLE_COMPLEX,
+	ATOMIC_TYPE_FLOAT_IMAGINARY,
+	ATOMIC_TYPE_DOUBLE_IMAGINARY,
+	ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY,
+
+	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY
+} atomic_type_kind_t;
+
 typedef struct type_base_t           type_base_t;
 typedef struct atomic_type_t         atomic_type_t;
 typedef struct pointer_type_t        pointer_type_t;
@@ -102,5 +144,15 @@ bool pointers_compatible(const type_t *type1, const type_t *type2);
 
 type_t *get_unqualified_type(type_t *type);
 type_t *skip_typeref(type_t *type);
+
+/**
+ * returns size of an atomic type kind in bytes
+ */
+unsigned get_atomic_type_size(atomic_type_kind_t kind);
+
+/**
+ * returns alignment of an atomic type kind in bytes
+ */
+unsigned get_atomic_type_align(atomic_type_kind_t kind);
 
 #endif

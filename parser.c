@@ -760,6 +760,23 @@ static type_t *promote_integer(type_t *type)
 	if(type->kind == TYPE_BITFIELD)
 		type = type->bitfield.base;
 
+	/* handle microsofts explicit size types */
+	atomic_type_kind_t kind = type->atomic.akind;
+	if(kind >= ATOMIC_TYPE_INT8 && kind <= ATOMIC_TYPE_UINT128) {
+		unsigned size = get_atomic_type_size(kind);
+		if(kind <= ATOMIC_TYPE_INT128) {
+			if(size <= get_atomic_type_size(ATOMIC_TYPE_INT)) {
+				return type_int;
+			}
+		} else {
+			if(size <= get_atomic_type_size(ATOMIC_TYPE_UINT)) {
+				return type_unsigned_int;
+			}
+		}
+
+		return type;
+	}
+
 	if(get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
 
@@ -1996,9 +2013,14 @@ typedef enum {
 	SPECIFIER_FLOAT     = 1 << 8,
 	SPECIFIER_BOOL      = 1 << 9,
 	SPECIFIER_VOID      = 1 << 10,
+	SPECIFIER_INT8      = 1 << 11,
+	SPECIFIER_INT16     = 1 << 12,
+	SPECIFIER_INT32     = 1 << 13,
+	SPECIFIER_INT64     = 1 << 14,
+	SPECIFIER_INT128    = 1 << 15,
 #ifdef PROVIDE_COMPLEX
-	SPECIFIER_COMPLEX   = 1 << 11,
-	SPECIFIER_IMAGINARY = 1 << 12,
+	SPECIFIER_COMPLEX   = 1 << 16,
+	SPECIFIER_IMAGINARY = 1 << 17,
 #endif
 } specifiers_t;
 
@@ -2280,6 +2302,11 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed")
 		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned")
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool")
+		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8")
+		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16")
+		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32")
+		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64")
+		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128")
 #ifdef PROVIDE_COMPLEX
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
@@ -2412,6 +2439,52 @@ finish_specifiers:
 			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONGLONG;
 			break;
+
+		case SPECIFIER_UNSIGNED | SPECIFIER_INT8:
+			atomic_type = ATOMIC_TYPE_UINT8;
+			break;
+
+		case SPECIFIER_UNSIGNED | SPECIFIER_INT16:
+			atomic_type = ATOMIC_TYPE_UINT16;
+			break;
+
+		case SPECIFIER_UNSIGNED | SPECIFIER_INT32:
+			atomic_type = ATOMIC_TYPE_UINT32;
+			break;
+
+		case SPECIFIER_UNSIGNED | SPECIFIER_INT64:
+			atomic_type = ATOMIC_TYPE_UINT64;
+			break;
+
+		case SPECIFIER_UNSIGNED | SPECIFIER_INT128:
+			atomic_type = ATOMIC_TYPE_UINT128;
+			break;
+
+		case SPECIFIER_INT8:
+		case SPECIFIER_SIGNED | SPECIFIER_INT8:
+			atomic_type = ATOMIC_TYPE_INT8;
+			break;
+
+		case SPECIFIER_INT16:
+		case SPECIFIER_SIGNED | SPECIFIER_INT16:
+			atomic_type = ATOMIC_TYPE_INT16;
+			break;
+
+		case SPECIFIER_INT32:
+		case SPECIFIER_SIGNED | SPECIFIER_INT32:
+			atomic_type = ATOMIC_TYPE_INT32;
+			break;
+
+		case SPECIFIER_INT64:
+		case SPECIFIER_SIGNED | SPECIFIER_INT64:
+			atomic_type = ATOMIC_TYPE_INT64;
+			break;
+
+		case SPECIFIER_INT128:
+		case SPECIFIER_SIGNED | SPECIFIER_INT128:
+			atomic_type = ATOMIC_TYPE_INT128;
+			break;
+
 		case SPECIFIER_FLOAT:
 			atomic_type = ATOMIC_TYPE_FLOAT;
 			break;

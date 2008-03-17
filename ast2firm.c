@@ -212,7 +212,7 @@ static ir_mode *get_ptrmode(unsigned size, char *name)
 	return res;
 }
 
-static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST];
+static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
 
@@ -245,12 +245,21 @@ static void init_atomic_modes(void) {
 	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = mode_E;
 	_atomic_modes[ATOMIC_TYPE_BOOL]        = get_umode(int_size);
 
-#ifdef PROVIDE_COMPLEX
+	_atomic_modes[ATOMIC_TYPE_INT8]        = get_smode(1);
+	_atomic_modes[ATOMIC_TYPE_INT16]       = get_smode(2);
+	_atomic_modes[ATOMIC_TYPE_INT32]       = get_smode(4);
+	_atomic_modes[ATOMIC_TYPE_INT64]       = get_smode(8);
+	_atomic_modes[ATOMIC_TYPE_INT128]      = get_smode(16);
+	_atomic_modes[ATOMIC_TYPE_UINT8]       = get_umode(1);
+	_atomic_modes[ATOMIC_TYPE_UINT16]      = get_umode(2);
+	_atomic_modes[ATOMIC_TYPE_UINT32]      = get_umode(4);
+	_atomic_modes[ATOMIC_TYPE_UINT64]      = get_umode(8);
+	_atomic_modes[ATOMIC_TYPE_UINT128]     = get_umode(16);
+
 	_atomic_modes[ATOMIC_TYPE_BOOL]                  = _atomic_modes[ATOMIC_TYPE_INT];
 	_atomic_modes[ATOMIC_TYPE_FLOAT_IMAGINARY]       = _atomic_modes[ATOMIC_TYPE_FLOAT];
 	_atomic_modes[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = _atomic_modes[ATOMIC_TYPE_DOUBLE];
 	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY] = _atomic_modes[ATOMIC_TYPE_LONG_DOUBLE];
-#endif
 
 	/* Hmm, pointers should be machine size */
 	set_modeP_data(get_ptrmode(machine_size >> 3, NULL));
@@ -263,55 +272,11 @@ static void init_atomic_modes(void) {
 static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
 {
 	ir_mode *res = NULL;
-	if ((unsigned)atomic_type->akind < (unsigned)ATOMIC_TYPE_LAST)
+	if ((unsigned)atomic_type->akind <= (unsigned)ATOMIC_TYPE_LAST)
 		res = _atomic_modes[(unsigned)atomic_type->akind];
 	if (res == NULL)
 		panic("Encountered unknown atomic type");
 	return res;
-}
-
-static unsigned get_atomic_type_size(const atomic_type_t *type)
-{
-	switch(type->akind) {
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-		return 1;
-
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-		return 2;
-
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_UINT:
-		return machine_size >> 3;
-
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_ULONG:
-		return machine_size > 16 ? machine_size >> 3 : 4;
-
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_ULONGLONG:
-		return machine_size > 16 ? 8 : 4;
-
-	case ATOMIC_TYPE_FLOAT:
-		return 4;
-
-	case ATOMIC_TYPE_DOUBLE:
-		return 8;
-
-	case ATOMIC_TYPE_LONG_DOUBLE:
-		return 12;
-
-	case ATOMIC_TYPE_VOID:
-		return 1;
-
-	case ATOMIC_TYPE_INVALID:
-	case ATOMIC_TYPE_LAST:
-		break;
-	}
-	panic("Trying to determine size of invalid atomic type");
 }
 
 static unsigned get_compound_type_size(compound_type_t *type)
@@ -336,7 +301,7 @@ static unsigned get_type_size_const(type_t *type)
 	case TYPE_ERROR:
 		panic("error type occured");
 	case TYPE_ATOMIC:
-		return get_atomic_type_size(&type->atomic);
+		return get_atomic_type_size(type->atomic.akind);
 	case TYPE_ENUM:
 		return get_mode_size_bytes(mode_int);
 	case TYPE_COMPOUND_UNION:
@@ -2597,23 +2562,23 @@ typedef enum gcc_type_class
 
 static ir_node *classify_type_to_firm(const classify_type_expression_t *const expr)
 {
-	const type_t *const type = expr->type_expression->base.type;
+	const type_t *const type = skip_typeref(expr->type_expression->base.type);
 
 	gcc_type_class tc;
 	switch (type->kind)
 	{
 		case TYPE_ATOMIC: {
 			const atomic_type_t *const atomic_type = &type->atomic;
-			switch (atomic_type->akind) {
+			switch ((atomic_type_kind_t) atomic_type->akind) {
 				/* should not be reached */
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;
-					break;
+					goto make_const;
 
 				/* gcc cannot do that */
 				case ATOMIC_TYPE_VOID:
 					tc = void_type_class;
-					break;
+					goto make_const;
 
 				case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
 				case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
@@ -2627,47 +2592,61 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 				case ATOMIC_TYPE_LONGLONG:
 				case ATOMIC_TYPE_ULONGLONG:
 				case ATOMIC_TYPE_BOOL:      /* gcc handles this as integer */
+				/* microsoft types */
+				case ATOMIC_TYPE_INT8:
+				case ATOMIC_TYPE_INT16:
+				case ATOMIC_TYPE_INT32:
+				case ATOMIC_TYPE_INT64:
+				case ATOMIC_TYPE_INT128:
+				case ATOMIC_TYPE_UINT8:
+				case ATOMIC_TYPE_UINT16:
+				case ATOMIC_TYPE_UINT32:
+				case ATOMIC_TYPE_UINT64:
+				case ATOMIC_TYPE_UINT128:
 					tc = integer_type_class;
-					break;
+					goto make_const;
 
 				case ATOMIC_TYPE_FLOAT:
 				case ATOMIC_TYPE_DOUBLE:
 				case ATOMIC_TYPE_LONG_DOUBLE:
 					tc = real_type_class;
-					break;
+					goto make_const;
 
-#ifdef PROVIDE_COMPLEX
 				case ATOMIC_TYPE_FLOAT_COMPLEX:
 				case ATOMIC_TYPE_DOUBLE_COMPLEX:
 				case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
 					tc = complex_type_class;
-					break;
+					goto make_const;
 				case ATOMIC_TYPE_FLOAT_IMAGINARY:
 				case ATOMIC_TYPE_DOUBLE_IMAGINARY:
 				case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
 					tc = complex_type_class;
-					break;
-#endif
-
-				default:
-					panic("Unimplemented case in classify_type_to_firm().");
+					goto make_const;
 			}
-			break;
+			panic("Unexpected atomic type in classify_type_to_firm().");
 		}
 
+		case TYPE_BITFIELD:        tc = integer_type_class; goto make_const;
 		case TYPE_ARRAY:           /* gcc handles this as pointer */
 		case TYPE_FUNCTION:        /* gcc handles this as pointer */
-		case TYPE_POINTER:         tc = pointer_type_class; break;
-		case TYPE_COMPOUND_STRUCT: tc = record_type_class;  break;
-		case TYPE_COMPOUND_UNION:  tc = union_type_class;   break;
+		case TYPE_POINTER:         tc = pointer_type_class; goto make_const;
+		case TYPE_COMPOUND_STRUCT: tc = record_type_class;  goto make_const;
+		case TYPE_COMPOUND_UNION:  tc = union_type_class;   goto make_const;
 
 		/* gcc handles this as integer */
-		case TYPE_ENUM:            tc = integer_type_class; break;
+		case TYPE_ENUM:            tc = integer_type_class; goto make_const;
 
-		default:
-			panic("Unimplemented case in classify_type_to_firm().");
+		case TYPE_BUILTIN:
+		/* typedef/typeof should be skipped already */
+		case TYPE_TYPEDEF:
+		case TYPE_TYPEOF:
+		case TYPE_INVALID:
+		case TYPE_ERROR:
+			break;
 	}
+	panic("unexpected TYPE classify_type_to_firm().");
 
+make_const: ;
 	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
 	ir_mode  *const mode = mode_int;
 	tarval   *const tv   = new_tarval_from_long(tc, mode);

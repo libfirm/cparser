@@ -26,6 +26,7 @@
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "adt/error.h"
+#include "lang_features.h"
 
 static struct obstack   _type_obst;
 static FILE            *out;
@@ -73,26 +74,41 @@ void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->type.qualifiers);
 
-	const char *s;
-	switch(type->akind) {
-	case ATOMIC_TYPE_INVALID:     s = "INVALIDATOMIC";      break;
-	case ATOMIC_TYPE_VOID:        s = "void";               break;
-	case ATOMIC_TYPE_BOOL:        s = "_Bool";              break;
-	case ATOMIC_TYPE_CHAR:        s = "char";               break;
-	case ATOMIC_TYPE_SCHAR:       s = "signed char";        break;
-	case ATOMIC_TYPE_UCHAR:       s = "unsigned char";      break;
-	case ATOMIC_TYPE_INT:         s = "int";                break;
-	case ATOMIC_TYPE_UINT:        s = "unsigned int";       break;
-	case ATOMIC_TYPE_SHORT:       s = "short";              break;
-	case ATOMIC_TYPE_USHORT:      s = "unsigned short";     break;
-	case ATOMIC_TYPE_LONG:        s = "long";               break;
-	case ATOMIC_TYPE_ULONG:       s = "unsigned long";      break;
-	case ATOMIC_TYPE_LONGLONG:    s = "long long";          break;
-	case ATOMIC_TYPE_ULONGLONG:   s = "unsigned long long"; break;
-	case ATOMIC_TYPE_LONG_DOUBLE: s = "long double";        break;
-	case ATOMIC_TYPE_FLOAT:       s = "float";              break;
-	case ATOMIC_TYPE_DOUBLE:      s = "double";             break;
-	default:                      s = "UNKNOWNATOMIC";      break;
+	const char *s = "INVALIDATOMIC";
+	switch((atomic_type_kind_t) type->akind) {
+	case ATOMIC_TYPE_INVALID:     break;
+	case ATOMIC_TYPE_VOID:                  s = "void";               break;
+	case ATOMIC_TYPE_BOOL:                  s = "_Bool";              break;
+	case ATOMIC_TYPE_CHAR:                  s = "char";               break;
+	case ATOMIC_TYPE_SCHAR:                 s = "signed char";        break;
+	case ATOMIC_TYPE_UCHAR:                 s = "unsigned char";      break;
+	case ATOMIC_TYPE_INT:                   s = "int";                break;
+	case ATOMIC_TYPE_UINT:                  s = "unsigned int";       break;
+	case ATOMIC_TYPE_SHORT:                 s = "short";              break;
+	case ATOMIC_TYPE_USHORT:                s = "unsigned short";     break;
+	case ATOMIC_TYPE_LONG:                  s = "long";               break;
+	case ATOMIC_TYPE_ULONG:                 s = "unsigned long";      break;
+	case ATOMIC_TYPE_LONGLONG:              s = "long long";          break;
+	case ATOMIC_TYPE_ULONGLONG:             s = "unsigned long long"; break;
+	case ATOMIC_TYPE_LONG_DOUBLE:           s = "long double";        break;
+	case ATOMIC_TYPE_FLOAT:                 s = "float";              break;
+	case ATOMIC_TYPE_DOUBLE:                s = "double";             break;
+	case ATOMIC_TYPE_INT8:                  s = "__int8";             break;
+	case ATOMIC_TYPE_INT16:                 s = "__int16";            break;
+	case ATOMIC_TYPE_INT32:                 s = "__int32";            break;
+	case ATOMIC_TYPE_INT64:                 s = "__int64";            break;
+	case ATOMIC_TYPE_INT128:                s = "__int128";           break;
+	case ATOMIC_TYPE_UINT8:                 s = "unsigned __int8";    break;
+	case ATOMIC_TYPE_UINT16:                s = "unsigned __int16";   break;
+	case ATOMIC_TYPE_UINT32:                s = "unsigned __int32";   break;
+	case ATOMIC_TYPE_UINT64:                s = "unsigned __int64";   break;
+	case ATOMIC_TYPE_UINT128:               s = "unsigned __int128";  break;
+	case ATOMIC_TYPE_FLOAT_COMPLEX:         s = "_Complex float";     break;
+	case ATOMIC_TYPE_DOUBLE_COMPLEX:        s = "_Complex float";     break;
+	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:   s = "_Complex float";     break;
+	case ATOMIC_TYPE_FLOAT_IMAGINARY:       s = "_Imaginary float";   break;
+	case ATOMIC_TYPE_DOUBLE_IMAGINARY:      s = "_Imaginary float";   break;
+	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY: s = "_Imaginary float";   break;
 	}
 	fputs(s, out);
 }
@@ -565,7 +581,7 @@ bool is_type_integer(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.akind) {
+	switch((atomic_type_kind_t) type->atomic.akind) {
 	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
@@ -578,10 +594,33 @@ bool is_type_integer(const type_t *type)
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_LONGLONG:
 	case ATOMIC_TYPE_ULONGLONG:
+	case ATOMIC_TYPE_INT8:
+	case ATOMIC_TYPE_INT16:
+	case ATOMIC_TYPE_INT32:
+	case ATOMIC_TYPE_INT64:
+	case ATOMIC_TYPE_INT128:
+	case ATOMIC_TYPE_UINT8:
+	case ATOMIC_TYPE_UINT16:
+	case ATOMIC_TYPE_UINT32:
+	case ATOMIC_TYPE_UINT64:
+	case ATOMIC_TYPE_UINT128:
 		return true;
-	default:
+
+	case ATOMIC_TYPE_INVALID:
+	case ATOMIC_TYPE_VOID:
+	case ATOMIC_TYPE_FLOAT:
+	case ATOMIC_TYPE_DOUBLE:
+	case ATOMIC_TYPE_LONG_DOUBLE:
+	case ATOMIC_TYPE_FLOAT_COMPLEX:
+	case ATOMIC_TYPE_DOUBLE_COMPLEX:
+	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
+	case ATOMIC_TYPE_FLOAT_IMAGINARY:
+	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
+	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
 		return false;
 	}
+
+	panic("unexpected atomic type kind");
 }
 
 /**
@@ -597,22 +636,46 @@ bool is_type_float(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.akind) {
+	switch((atomic_type_kind_t) type->atomic.akind) {
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
-#ifdef PROVIDE_COMPLEX
 	case ATOMIC_TYPE_FLOAT_COMPLEX:
 	case ATOMIC_TYPE_DOUBLE_COMPLEX:
 	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
 	case ATOMIC_TYPE_FLOAT_IMAGINARY:
 	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
 	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-#endif
 		return true;
-	default:
+
+	case ATOMIC_TYPE_INVALID:
+	case ATOMIC_TYPE_VOID:
+	case ATOMIC_TYPE_BOOL:
+	case ATOMIC_TYPE_CHAR:
+	case ATOMIC_TYPE_SCHAR:
+	case ATOMIC_TYPE_UCHAR:
+	case ATOMIC_TYPE_SHORT:
+	case ATOMIC_TYPE_USHORT:
+	case ATOMIC_TYPE_INT:
+	case ATOMIC_TYPE_UINT:
+	case ATOMIC_TYPE_LONG:
+	case ATOMIC_TYPE_ULONG:
+	case ATOMIC_TYPE_LONGLONG:
+	case ATOMIC_TYPE_ULONGLONG:
+	case ATOMIC_TYPE_INT8:
+	case ATOMIC_TYPE_INT16:
+	case ATOMIC_TYPE_INT32:
+	case ATOMIC_TYPE_INT64:
+	case ATOMIC_TYPE_INT128:
+	case ATOMIC_TYPE_UINT8:
+	case ATOMIC_TYPE_UINT16:
+	case ATOMIC_TYPE_UINT32:
+	case ATOMIC_TYPE_UINT64:
+	case ATOMIC_TYPE_UINT128:
 		return false;
 	}
+
+	panic("unexpected atomic type kind");
 }
 
 /**
@@ -632,7 +695,7 @@ bool is_type_signed(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch(type->atomic.akind) {
+	switch((atomic_type_kind_t) type->atomic.akind) {
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_SHORT:
@@ -642,14 +705,17 @@ bool is_type_signed(const type_t *type)
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
-#ifdef PROVIDE_COMPLEX
+	case ATOMIC_TYPE_INT8:
+	case ATOMIC_TYPE_INT16:
+	case ATOMIC_TYPE_INT32:
+	case ATOMIC_TYPE_INT64:
+	case ATOMIC_TYPE_INT128:
 	case ATOMIC_TYPE_FLOAT_COMPLEX:
 	case ATOMIC_TYPE_DOUBLE_COMPLEX:
 	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
 	case ATOMIC_TYPE_FLOAT_IMAGINARY:
 	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
 	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-#endif
 		return true;
 
 	case ATOMIC_TYPE_BOOL:
@@ -658,11 +724,15 @@ bool is_type_signed(const type_t *type)
 	case ATOMIC_TYPE_UINT:
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_ULONGLONG:
+	case ATOMIC_TYPE_UINT8:
+	case ATOMIC_TYPE_UINT16:
+	case ATOMIC_TYPE_UINT32:
+	case ATOMIC_TYPE_UINT64:
+	case ATOMIC_TYPE_UINT128:
 		return false;
 
 	case ATOMIC_TYPE_VOID:
 	case ATOMIC_TYPE_INVALID:
-	case ATOMIC_TYPE_LAST:
 		return false;
 	}
 
@@ -933,6 +1003,77 @@ type_t *skip_typeref(type_t *type)
 	}
 
 	return type;
+}
+
+unsigned get_atomic_type_size(atomic_type_kind_t kind)
+{
+	switch(kind) {
+	case ATOMIC_TYPE_CHAR:
+	case ATOMIC_TYPE_SCHAR:
+	case ATOMIC_TYPE_UCHAR:
+	case ATOMIC_TYPE_INT8:
+	case ATOMIC_TYPE_UINT8:
+		return 1;
+
+	case ATOMIC_TYPE_SHORT:
+	case ATOMIC_TYPE_USHORT:
+	case ATOMIC_TYPE_INT16:
+	case ATOMIC_TYPE_UINT16:
+		return 2;
+
+	case ATOMIC_TYPE_INT32:
+	case ATOMIC_TYPE_UINT32:
+		return 4;
+
+	case ATOMIC_TYPE_INT64:
+	case ATOMIC_TYPE_UINT64:
+		return 8;
+
+	case ATOMIC_TYPE_INT128:
+	case ATOMIC_TYPE_UINT128:
+		return 16;
+
+	case ATOMIC_TYPE_BOOL:
+	case ATOMIC_TYPE_INT:
+	case ATOMIC_TYPE_UINT:
+		return machine_size >> 3;
+
+	case ATOMIC_TYPE_LONG:
+	case ATOMIC_TYPE_ULONG:
+		return machine_size > 16 ? machine_size >> 3 : 4;
+
+	case ATOMIC_TYPE_LONGLONG:
+	case ATOMIC_TYPE_ULONGLONG:
+		return machine_size > 16 ? 8 : 4;
+
+	case ATOMIC_TYPE_FLOAT_IMAGINARY:
+	case ATOMIC_TYPE_FLOAT:
+		return 4;
+
+	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
+	case ATOMIC_TYPE_DOUBLE:
+		return 8;
+
+	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
+	case ATOMIC_TYPE_LONG_DOUBLE:
+		return 12;
+
+	case ATOMIC_TYPE_VOID:
+		return 1;
+
+	case ATOMIC_TYPE_FLOAT_COMPLEX:
+		return 2 * get_atomic_type_size(ATOMIC_TYPE_FLOAT);
+
+	case ATOMIC_TYPE_DOUBLE_COMPLEX:
+		return 2 * get_atomic_type_size(ATOMIC_TYPE_DOUBLE);
+
+	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
+		return 2 * get_atomic_type_size(ATOMIC_TYPE_LONG_DOUBLE);
+
+	case ATOMIC_TYPE_INVALID:
+		break;
+	}
+	panic("Trying to determine size of invalid atomic type");
 }
 
 /**
