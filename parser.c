@@ -173,6 +173,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_enum:              \
 	case T___typeof__:        \
 	case T___builtin_va_list: \
+	case T_declspec:          \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -4217,6 +4218,22 @@ static expression_t *parse_reference(void)
 	/* this declaration is used */
 	declaration->used = true;
 
+	/* check for deprecated functions */
+	if(declaration->modifiers & DM_DEPRECATED) {
+		const char *prefix = "";
+		if (is_type_function(declaration->type))
+			prefix = "function ";
+
+		if (declaration->deprecated_string != NULL) {
+			warningf(source_position,
+				"%s'%Y' was declared 'deprecated(\"%s\")'", prefix, declaration->symbol,
+				declaration->deprecated_string);
+		} else {
+			warningf(source_position,
+				"%s'%Y' was declared 'deprecated'", prefix, declaration->symbol);
+		}
+	}
+
 	return expression;
 }
 
@@ -5016,22 +5033,6 @@ static expression_t *parse_call_expression(unsigned precedence,
 			}
 		} else {
 			check_format(&result->call);
-		}
-
-		/* check deprecated */
-		if(expression->base.kind == EXPR_REFERENCE) {
-			const reference_expression_t *ref = (reference_expression_t *)expression;
-			const declaration_t *declaration = ref->declaration;
-			if(declaration->modifiers & DM_DEPRECATED) {
-				if (declaration->deprecated_string != NULL) {
-					warningf(result->base.source_position,
-						"function '%Y' was declared 'deprecated(%s)'", declaration->symbol,
-						declaration->deprecated_string);
-				} else {
-					warningf(result->base.source_position,
-						"function '%Y' was declared 'deprecated'", declaration->symbol);
-				}
-			}
 		}
 	}
 
