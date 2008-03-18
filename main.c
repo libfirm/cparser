@@ -524,7 +524,16 @@ int main(int argc, char **argv)
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(strncmp(option, "std=", 4) == 0) {
-				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+				if(strcmp(&option[4], "c99") == 0) {
+					c_mode = _C89|_C99;
+				} else if(strcmp(&option[4], "c89") == 0) {
+					c_mode = _C89;
+				} else if(strcmp(&option[4], "gnu99") == 0) {
+					c_mode = _C89|_C99|_GNUC;
+				} else if(strcmp(&option[4], "microsoft") == 0) {
+					c_mode = _C89|_C99|_MS;
+				} else
+					fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;

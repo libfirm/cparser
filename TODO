@@ -1,9 +1,9 @@
 Driver:
-- add an -std= option (for c99, gnu99, ms at least)
 
 Refactoring:
 - eliminate target_architecture.h and replace with stuff in lang_features.h
 - redo storage classes: so we can separate real from declared storage class
+- create structures for variables and functions, removing the omnipotent declaration
 
 Lexer:
 - Add preprocessor code
