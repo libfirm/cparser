@@ -1029,14 +1029,14 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
 	if(kind == ATOMIC_TYPE_INVALID) {
-		static const possible_kinds[] = {
+		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_SCHAR,
 			ATOMIC_TYPE_SHORT,
 			ATOMIC_TYPE_INT,
 			ATOMIC_TYPE_LONG,
 			ATOMIC_TYPE_LONGLONG
 		};
-		for(int i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
 			if(get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;
@@ -1056,14 +1056,14 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
 	if(kind == ATOMIC_TYPE_INVALID) {
-		static const possible_kinds[] = {
+		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_UCHAR,
 			ATOMIC_TYPE_USHORT,
 			ATOMIC_TYPE_UINT,
 			ATOMIC_TYPE_ULONG,
 			ATOMIC_TYPE_ULONGLONG
 		};
-		for(int i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
 			if(get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;

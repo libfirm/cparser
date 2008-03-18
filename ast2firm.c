@@ -59,6 +59,7 @@ static ir_node **imature_blocks;
 
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
+static ir_node             *current_funcsig;
 
 static struct obstack asm_obst;
 
@@ -2644,6 +2645,20 @@ static ir_node *function_name_to_firm(
 	return current_function_name;
 }
 
+static ir_node *funcsig_to_firm(
+		const string_literal_expression_t *const expr)
+{
+	if (current_funcsig == NULL) {
+		const source_position_t *const src_pos = &expr->base.source_position;
+		ir_entity *ent = get_irg_entity(current_ir_graph);
+		const char *const name = get_entity_ld_name(ent);
+		const string_t string = { name, strlen(name) + 1 };
+		current_funcsig = string_to_firm(src_pos, "__FUNCSIG__", &string);
+	}
+
+	return current_funcsig;
+}
+
 static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 {
 	statement_t *statement = expr->statement;
@@ -2769,7 +2784,10 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return classify_type_to_firm(&expression->classify_type);
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
+	case EXPR_FUNCDNAME:
 		return function_name_to_firm(&expression->string);
+	case EXPR_FUNCSIG:
+		return funcsig_to_firm(&expression->string);
 	case EXPR_STATEMENT:
 		return statement_expression_to_firm(&expression->statement);
 	case EXPR_VA_START:
@@ -4401,6 +4419,8 @@ static int count_decls_in_expression(const expression_t *expression) {
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCTION:
 	case EXPR_PRETTY_FUNCTION:
+	case EXPR_FUNCSIG:
+	case EXPR_FUNCDNAME:
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
@@ -4617,6 +4637,7 @@ static void create_function(declaration_t *declaration)
 
 	current_function_decl = declaration;
 	current_function_name = NULL;
+	current_funcsig       = NULL;
 
 	assert(imature_blocks == NULL);
 	imature_blocks = NEW_ARR_F(ir_node*, 0);

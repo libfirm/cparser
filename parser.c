@@ -953,7 +953,9 @@ static void parse_gnu_attribute(void)
 	while(true) {
 		if(token.type != T_IDENTIFIER)
 			break;
-		symbol_t *symbol = token.v.symbol;
+		symbol_t *sym = token.v.symbol;
+		if(sym == sym_deprecated) {
+		}
 		next_token();
 		if(token.type == '(')
 			eat_until_matching_token('(');
@@ -5824,6 +5826,8 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_FUNCTION:                  return false;
 		case EXPR_PRETTY_FUNCTION:           return false;
+		case EXPR_FUNCSIG:                   return false;
+		case EXPR_FUNCDNAME:                 return false;
 		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:        return false;
 		case EXPR_BUILTIN_PREFETCH:          return true;

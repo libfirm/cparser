@@ -1508,6 +1508,8 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_SIZEOF:
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_FUNCTION:
+	case EXPR_FUNCSIG:
+	case EXPR_FUNCDNAME:
 	case EXPR_PRETTY_FUNCTION:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
