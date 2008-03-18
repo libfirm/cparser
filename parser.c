@@ -145,7 +145,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_restrict:        \
 	case T_volatile:        \
 	case T_inline:          \
-	case T_forceinline:
+	case T__forceinline:
 
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
@@ -173,7 +173,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_enum:              \
 	case T___typeof__:        \
 	case T___builtin_va_list: \
-	case T_declspec:          \
+	case T__declspec:         \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -2294,7 +2294,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
 #endif
-		case T_forceinline:
+		case T__forceinline:
 			/* only in microsoft mode */
 			specifiers->decl_modifiers |= DM_FORCEINLINE;
 
@@ -4742,7 +4742,7 @@ end_error:
  * Parses a MS assume() expression.
  */
 static expression_t *parse_assume(void) {
-	eat(T_assume);
+	eat(T__assume);
 
 	expression_t *expression
 		= allocate_expression_zero(EXPR_UNARY_ASSUME);
@@ -4792,7 +4792,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_isunordered:    return parse_compare_builtin();
 		case T___builtin_constant_p:     return parse_builtin_constant();
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
-		case T_assume:                   return parse_assume();
+		case T__assume:                  return parse_assume();
 
 		case '(':                        return parse_brace_expression();
 	}
