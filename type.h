@@ -45,17 +45,6 @@ typedef enum {
 	ATOMIC_TYPE_DOUBLE,
 	ATOMIC_TYPE_LONG_DOUBLE,
 	ATOMIC_TYPE_BOOL,
-	/* microsoft extensions */
-	ATOMIC_TYPE_INT8,
-	ATOMIC_TYPE_INT16,
-	ATOMIC_TYPE_INT32,
-	ATOMIC_TYPE_INT64,
-	ATOMIC_TYPE_INT128,
-	ATOMIC_TYPE_UINT8,
-	ATOMIC_TYPE_UINT16,
-	ATOMIC_TYPE_UINT32,
-	ATOMIC_TYPE_UINT64,
-	ATOMIC_TYPE_UINT128,
 
 	ATOMIC_TYPE_FLOAT_COMPLEX,
 	ATOMIC_TYPE_DOUBLE_COMPLEX,
@@ -154,5 +143,15 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
  * returns alignment of an atomic type kind in bytes
  */
 unsigned get_atomic_type_align(atomic_type_kind_t kind);
+
+/**
+ * Find the atomic type kind representing a given size (signed).
+ */
+atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size);
+
+/**
+ * Find the atomic type kind representing a given size (unsigned).
+ */
+atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 
 #endif

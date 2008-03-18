@@ -93,16 +93,6 @@ void print_atomic_type(const atomic_type_t *type)
 	case ATOMIC_TYPE_LONG_DOUBLE:           s = "long double";        break;
 	case ATOMIC_TYPE_FLOAT:                 s = "float";              break;
 	case ATOMIC_TYPE_DOUBLE:                s = "double";             break;
-	case ATOMIC_TYPE_INT8:                  s = "__int8";             break;
-	case ATOMIC_TYPE_INT16:                 s = "__int16";            break;
-	case ATOMIC_TYPE_INT32:                 s = "__int32";            break;
-	case ATOMIC_TYPE_INT64:                 s = "__int64";            break;
-	case ATOMIC_TYPE_INT128:                s = "__int128";           break;
-	case ATOMIC_TYPE_UINT8:                 s = "unsigned __int8";    break;
-	case ATOMIC_TYPE_UINT16:                s = "unsigned __int16";   break;
-	case ATOMIC_TYPE_UINT32:                s = "unsigned __int32";   break;
-	case ATOMIC_TYPE_UINT64:                s = "unsigned __int64";   break;
-	case ATOMIC_TYPE_UINT128:               s = "unsigned __int128";  break;
 	case ATOMIC_TYPE_FLOAT_COMPLEX:         s = "_Complex float";     break;
 	case ATOMIC_TYPE_DOUBLE_COMPLEX:        s = "_Complex float";     break;
 	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:   s = "_Complex float";     break;
@@ -594,16 +584,6 @@ bool is_type_integer(const type_t *type)
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_LONGLONG:
 	case ATOMIC_TYPE_ULONGLONG:
-	case ATOMIC_TYPE_INT8:
-	case ATOMIC_TYPE_INT16:
-	case ATOMIC_TYPE_INT32:
-	case ATOMIC_TYPE_INT64:
-	case ATOMIC_TYPE_INT128:
-	case ATOMIC_TYPE_UINT8:
-	case ATOMIC_TYPE_UINT16:
-	case ATOMIC_TYPE_UINT32:
-	case ATOMIC_TYPE_UINT64:
-	case ATOMIC_TYPE_UINT128:
 		return true;
 
 	case ATOMIC_TYPE_INVALID:
@@ -662,16 +642,6 @@ bool is_type_float(const type_t *type)
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_LONGLONG:
 	case ATOMIC_TYPE_ULONGLONG:
-	case ATOMIC_TYPE_INT8:
-	case ATOMIC_TYPE_INT16:
-	case ATOMIC_TYPE_INT32:
-	case ATOMIC_TYPE_INT64:
-	case ATOMIC_TYPE_INT128:
-	case ATOMIC_TYPE_UINT8:
-	case ATOMIC_TYPE_UINT16:
-	case ATOMIC_TYPE_UINT32:
-	case ATOMIC_TYPE_UINT64:
-	case ATOMIC_TYPE_UINT128:
 		return false;
 	}
 
@@ -705,11 +675,6 @@ bool is_type_signed(const type_t *type)
 	case ATOMIC_TYPE_FLOAT:
 	case ATOMIC_TYPE_DOUBLE:
 	case ATOMIC_TYPE_LONG_DOUBLE:
-	case ATOMIC_TYPE_INT8:
-	case ATOMIC_TYPE_INT16:
-	case ATOMIC_TYPE_INT32:
-	case ATOMIC_TYPE_INT64:
-	case ATOMIC_TYPE_INT128:
 	case ATOMIC_TYPE_FLOAT_COMPLEX:
 	case ATOMIC_TYPE_DOUBLE_COMPLEX:
 	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
@@ -724,11 +689,6 @@ bool is_type_signed(const type_t *type)
 	case ATOMIC_TYPE_UINT:
 	case ATOMIC_TYPE_ULONG:
 	case ATOMIC_TYPE_ULONGLONG:
-	case ATOMIC_TYPE_UINT8:
-	case ATOMIC_TYPE_UINT16:
-	case ATOMIC_TYPE_UINT32:
-	case ATOMIC_TYPE_UINT64:
-	case ATOMIC_TYPE_UINT128:
 		return false;
 
 	case ATOMIC_TYPE_VOID:
@@ -1011,27 +971,11 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind)
 	case ATOMIC_TYPE_CHAR:
 	case ATOMIC_TYPE_SCHAR:
 	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_INT8:
-	case ATOMIC_TYPE_UINT8:
 		return 1;
 
 	case ATOMIC_TYPE_SHORT:
 	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_INT16:
-	case ATOMIC_TYPE_UINT16:
 		return 2;
-
-	case ATOMIC_TYPE_INT32:
-	case ATOMIC_TYPE_UINT32:
-		return 4;
-
-	case ATOMIC_TYPE_INT64:
-	case ATOMIC_TYPE_UINT64:
-		return 8;
-
-	case ATOMIC_TYPE_INT128:
-	case ATOMIC_TYPE_UINT128:
-		return 16;
 
 	case ATOMIC_TYPE_BOOL:
 	case ATOMIC_TYPE_INT:
@@ -1077,6 +1021,60 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind)
 }
 
 /**
+ * Find the atomic type kind representing a given size (signed).
+ */
+atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
+	static atomic_type_kind_t kinds[32];
+
+	assert(size < 32);
+	atomic_type_kind_t kind = kinds[size];
+	if(kind == ATOMIC_TYPE_INVALID) {
+		static const possible_kinds[] = {
+			ATOMIC_TYPE_SCHAR,
+			ATOMIC_TYPE_SHORT,
+			ATOMIC_TYPE_INT,
+			ATOMIC_TYPE_LONG,
+			ATOMIC_TYPE_LONGLONG
+		};
+		for(int i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+			if(get_atomic_type_size(possible_kinds[i]) == size) {
+				kind = possible_kinds[i];
+				break;
+			}
+		}
+		kinds[size] = kind;
+	}
+	return kind;
+}
+
+/**
+ * Find the atomic type kind representing a given size (signed).
+ */
+atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
+	static atomic_type_kind_t kinds[32];
+
+	assert(size < 32);
+	atomic_type_kind_t kind = kinds[size];
+	if(kind == ATOMIC_TYPE_INVALID) {
+		static const possible_kinds[] = {
+			ATOMIC_TYPE_UCHAR,
+			ATOMIC_TYPE_USHORT,
+			ATOMIC_TYPE_UINT,
+			ATOMIC_TYPE_ULONG,
+			ATOMIC_TYPE_ULONGLONG
+		};
+		for(int i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+			if(get_atomic_type_size(possible_kinds[i]) == size) {
+				kind = possible_kinds[i];
+				break;
+			}
+		}
+		kinds[size] = kind;
+	}
+	return kind;
+}
+
+/**
  * Hash the given type and return the "singleton" version
  * of it.
  */
@@ -1105,7 +1103,7 @@ type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 	type->base.alignment  = 0;
 	type->atomic.akind    = atype;
 
-	/* TODO: set the aligmnent depending on the atype here */
+	/* TODO: set the alignment depending on the atype here */
 
 	return identify_new_type(type);
 }
@@ -1113,7 +1111,7 @@ type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
 /**
  * Creates a new pointer type.
  *
- * @param points_to   The points-to type for teh new type.
+ * @param points_to   The points-to type for the new type.
  * @param qualifiers  Type qualifiers for the new type.
  */
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)

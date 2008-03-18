@@ -19,6 +19,7 @@
  */
 #include "type_t.h"
 #include "types.h"
+#include "lang_features.h"
 
 /** The error type. */
 type_t *type_error_type;
@@ -62,6 +63,17 @@ type_t *type_ssize_t_ptr;
 type_t *type_wchar_t_ptr;
 
 /* microsoft types */
+atomic_type_kind_t int8_type_kind            = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t int16_type_kind           = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t int32_type_kind           = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t int64_type_kind           = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t int128_type_kind          = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t unsigned_int8_type_kind   = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t unsigned_int16_type_kind  = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t unsigned_int32_type_kind  = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t unsigned_int64_type_kind  = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t unsigned_int128_type_kind = ATOMIC_TYPE_INVALID;
+
 type_t *type_int8;
 type_t *type_int16;
 type_t *type_int32;
@@ -92,14 +104,24 @@ void init_basic_types(void)
 	type_void               = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_NONE);
 
 	/* microsoft types */
-	type_int8               = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_NONE);
-	type_int16              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
-	type_int32              = make_atomic_type(ATOMIC_TYPE_INT,         TYPE_QUALIFIER_NONE);
-	type_int64              = make_atomic_type(ATOMIC_TYPE_LONGLONG,    TYPE_QUALIFIER_NONE);
-	type_unsigned_int8      = make_atomic_type(ATOMIC_TYPE_UCHAR,       TYPE_QUALIFIER_NONE);
-	type_unsigned_int16     = make_atomic_type(ATOMIC_TYPE_USHORT,      TYPE_QUALIFIER_NONE);
-	type_unsigned_int32     = make_atomic_type(ATOMIC_TYPE_UINT,        TYPE_QUALIFIER_NONE);
-	type_unsigned_int64     = make_atomic_type(ATOMIC_TYPE_ULONGLONG,   TYPE_QUALIFIER_NONE);
+	if(c_mode & _MS) {
+		int8_type_kind           = find_signed_int_atomic_type_kind_for_size(1);
+		type_int8                = make_atomic_type(int8_type_kind, TYPE_QUALIFIER_NONE);
+		int16_type_kind          = find_signed_int_atomic_type_kind_for_size(2);
+		type_int16               = make_atomic_type(int16_type_kind, TYPE_QUALIFIER_NONE);
+		int32_type_kind          = find_signed_int_atomic_type_kind_for_size(4);
+		type_int32               = make_atomic_type(int32_type_kind, TYPE_QUALIFIER_NONE);
+		int64_type_kind          = find_signed_int_atomic_type_kind_for_size(8);
+		type_int64               = make_atomic_type(int64_type_kind, TYPE_QUALIFIER_NONE);
+		unsigned_int8_type_kind  = find_unsigned_int_atomic_type_kind_for_size(1);
+		type_unsigned_int8       = make_atomic_type(unsigned_int8_type_kind, TYPE_QUALIFIER_NONE);
+		unsigned_int16_type_kind = find_unsigned_int_atomic_type_kind_for_size(2);
+		type_unsigned_int16      = make_atomic_type(unsigned_int16_type_kind, TYPE_QUALIFIER_NONE);
+		unsigned_int32_type_kind = find_unsigned_int_atomic_type_kind_for_size(4);
+		type_unsigned_int32      = make_atomic_type(unsigned_int32_type_kind, TYPE_QUALIFIER_NONE);
+		unsigned_int64_type_kind = find_unsigned_int_atomic_type_kind_for_size(8);
+		type_unsigned_int64      = make_atomic_type(unsigned_int64_type_kind, TYPE_QUALIFIER_NONE);
+	}
 
 	/* pointer types */
 	type_void_ptr           = make_pointer_type(type_void,              TYPE_QUALIFIER_NONE);

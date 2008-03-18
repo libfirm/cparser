@@ -760,23 +760,6 @@ static type_t *promote_integer(type_t *type)
 	if(type->kind == TYPE_BITFIELD)
 		type = type->bitfield.base;
 
-	/* handle microsofts explicit size types */
-	atomic_type_kind_t kind = type->atomic.akind;
-	if(kind >= ATOMIC_TYPE_INT8 && kind <= ATOMIC_TYPE_UINT128) {
-		unsigned size = get_atomic_type_size(kind);
-		if(kind <= ATOMIC_TYPE_INT128) {
-			if(size <= get_atomic_type_size(ATOMIC_TYPE_INT)) {
-				return type_int;
-			}
-		} else {
-			if(size <= get_atomic_type_size(ATOMIC_TYPE_UINT)) {
-				return type_unsigned_int;
-			}
-		}
-
-		return type;
-	}
-
 	if(get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
 
@@ -2441,48 +2424,48 @@ finish_specifiers:
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT8:
-			atomic_type = ATOMIC_TYPE_UINT8;
+			atomic_type = unsigned_int8_type_kind;
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT16:
-			atomic_type = ATOMIC_TYPE_UINT16;
+			atomic_type = unsigned_int16_type_kind;
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT32:
-			atomic_type = ATOMIC_TYPE_UINT32;
+			atomic_type = unsigned_int32_type_kind;
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT64:
-			atomic_type = ATOMIC_TYPE_UINT64;
+			atomic_type = unsigned_int64_type_kind;
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT128:
-			atomic_type = ATOMIC_TYPE_UINT128;
+			atomic_type = unsigned_int128_type_kind;
 			break;
 
 		case SPECIFIER_INT8:
 		case SPECIFIER_SIGNED | SPECIFIER_INT8:
-			atomic_type = ATOMIC_TYPE_INT8;
+			atomic_type = int8_type_kind;
 			break;
 
 		case SPECIFIER_INT16:
 		case SPECIFIER_SIGNED | SPECIFIER_INT16:
-			atomic_type = ATOMIC_TYPE_INT16;
+			atomic_type = int16_type_kind;
 			break;
 
 		case SPECIFIER_INT32:
 		case SPECIFIER_SIGNED | SPECIFIER_INT32:
-			atomic_type = ATOMIC_TYPE_INT32;
+			atomic_type = int32_type_kind;
 			break;
 
 		case SPECIFIER_INT64:
 		case SPECIFIER_SIGNED | SPECIFIER_INT64:
-			atomic_type = ATOMIC_TYPE_INT64;
+			atomic_type = int64_type_kind;
 			break;
 
 		case SPECIFIER_INT128:
 		case SPECIFIER_SIGNED | SPECIFIER_INT128:
-			atomic_type = ATOMIC_TYPE_INT128;
+			atomic_type = int128_type_kind;
 			break;
 
 		case SPECIFIER_FLOAT:

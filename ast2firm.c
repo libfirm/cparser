@@ -245,17 +245,6 @@ static void init_atomic_modes(void) {
 	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = mode_E;
 	_atomic_modes[ATOMIC_TYPE_BOOL]        = get_umode(int_size);
 
-	_atomic_modes[ATOMIC_TYPE_INT8]        = get_smode(1);
-	_atomic_modes[ATOMIC_TYPE_INT16]       = get_smode(2);
-	_atomic_modes[ATOMIC_TYPE_INT32]       = get_smode(4);
-	_atomic_modes[ATOMIC_TYPE_INT64]       = get_smode(8);
-	_atomic_modes[ATOMIC_TYPE_INT128]      = get_smode(16);
-	_atomic_modes[ATOMIC_TYPE_UINT8]       = get_umode(1);
-	_atomic_modes[ATOMIC_TYPE_UINT16]      = get_umode(2);
-	_atomic_modes[ATOMIC_TYPE_UINT32]      = get_umode(4);
-	_atomic_modes[ATOMIC_TYPE_UINT64]      = get_umode(8);
-	_atomic_modes[ATOMIC_TYPE_UINT128]     = get_umode(16);
-
 	_atomic_modes[ATOMIC_TYPE_BOOL]                  = _atomic_modes[ATOMIC_TYPE_INT];
 	_atomic_modes[ATOMIC_TYPE_FLOAT_IMAGINARY]       = _atomic_modes[ATOMIC_TYPE_FLOAT];
 	_atomic_modes[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = _atomic_modes[ATOMIC_TYPE_DOUBLE];
@@ -2592,17 +2581,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 				case ATOMIC_TYPE_LONGLONG:
 				case ATOMIC_TYPE_ULONGLONG:
 				case ATOMIC_TYPE_BOOL:      /* gcc handles this as integer */
-				/* microsoft types */
-				case ATOMIC_TYPE_INT8:
-				case ATOMIC_TYPE_INT16:
-				case ATOMIC_TYPE_INT32:
-				case ATOMIC_TYPE_INT64:
-				case ATOMIC_TYPE_INT128:
-				case ATOMIC_TYPE_UINT8:
-				case ATOMIC_TYPE_UINT16:
-				case ATOMIC_TYPE_UINT32:
-				case ATOMIC_TYPE_UINT64:
-				case ATOMIC_TYPE_UINT128:
 					tc = integer_type_class;
 					goto make_const;
 
