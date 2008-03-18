@@ -297,6 +297,8 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_CLASSIFY_TYPE]           = sizeof(classify_type_expression_t),
 		[EXPR_FUNCTION]                = sizeof(string_literal_expression_t),
 		[EXPR_PRETTY_FUNCTION]         = sizeof(string_literal_expression_t),
+		[EXPR_FUNCSIG]                 = sizeof(string_literal_expression_t),
+		[EXPR_FUNCDNAME]               = sizeof(string_literal_expression_t),
 		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
 		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
@@ -4456,13 +4458,40 @@ static expression_t *parse_function_keyword(void)
 static expression_t *parse_pretty_function_keyword(void)
 {
 	eat(T___PRETTY_FUNCTION__);
-	/* TODO */
 
 	if (current_function == NULL) {
 		errorf(HERE, "'__PRETTY_FUNCTION__' used outside of a function");
 	}
 
 	expression_t *expression = allocate_expression_zero(EXPR_PRETTY_FUNCTION);
+	expression->base.type    = type_char_ptr;
+
+	return expression;
+}
+
+static expression_t *parse_funcsig_keyword(void)
+{
+	next_token();
+
+	if (current_function == NULL) {
+		errorf(HERE, "'__FUNCSIG__' used outside of a function");
+	}
+
+	expression_t *expression = allocate_expression_zero(EXPR_FUNCSIG);
+	expression->base.type    = type_char_ptr;
+
+	return expression;
+}
+
+static expression_t *parse_funcdname_keyword(void)
+{
+	next_token();
+
+	if (current_function == NULL) {
+		errorf(HERE, "'__FUNCDNAME__' used outside of a function");
+	}
+
+	expression_t *expression = allocate_expression_zero(EXPR_FUNCDNAME);
 	expression->base.type    = type_char_ptr;
 
 	return expression;
@@ -4799,6 +4828,8 @@ static expression_t *parse_primary_expression(void)
 		case T___FUNCTION__:
 		case T___func__:                 return parse_function_keyword();
 		case T___PRETTY_FUNCTION__:      return parse_pretty_function_keyword();
+		case T___FUNCSIG__:              return parse_funcsig_keyword();
+		case T___FUNCDNAME__:            return parse_funcdname_keyword();
 		case T___builtin_offsetof:       return parse_offsetof();
 		case T___builtin_va_start:       return parse_va_start();
 		case T___builtin_va_arg:         return parse_va_arg();

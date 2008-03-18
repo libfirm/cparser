@@ -72,6 +72,8 @@ S(_GNUC, __builtin_prefetch)
 S(_GNUC, __PRETTY_FUNCTION__)
 S(_ALL, __FUNCTION__)
 S(_C99, __func__)
+S(_MS, __FUNCSIG__)
+S(_MS, __FUNCDNAME__)
 #undef S
 
 T(_GNUC,      __real__,       "__real__",)
