@@ -1275,8 +1275,8 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	if(initializer == NULL) {
 		errorf(expression->base.source_position,
-		       "expression '%E' doesn't match expected type '%T'",
-		       expression, type);
+		       "expression '%E' (type '%T') doesn't match expected type '%T'",
+		       expression, expression->base.type, type);
 		/* TODO */
 		return NULL;
 	}
@@ -5356,7 +5356,16 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	/* 6.5.15.3 */
 	type_t *result_type;
-	if (is_type_arithmetic(true_type) && is_type_arithmetic(false_type)) {
+	if(is_type_atomic(true_type, ATOMIC_TYPE_VOID) ||
+		is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+		if (!is_type_atomic(true_type, ATOMIC_TYPE_VOID)
+				|| !is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+			warningf(expression->base.source_position,
+					"ISO C forbids conditional expression with only one void side");
+		}
+		result_type = type_void;
+	} else if (is_type_arithmetic(true_type)
+			&& is_type_arithmetic(false_type)) {
 		result_type = semantic_arithmetic(true_type, false_type);
 
 		true_expression  = create_implicit_cast(true_expression, result_type);
@@ -5365,22 +5374,40 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		conditional->true_expression  = true_expression;
 		conditional->false_expression = false_expression;
 		conditional->base.type        = result_type;
-	} else if (same_compound_type(true_type, false_type) || (
-	    is_type_atomic(true_type, ATOMIC_TYPE_VOID) &&
-	    is_type_atomic(false_type, ATOMIC_TYPE_VOID)
-		)) {
+	} else if (same_compound_type(true_type, false_type)) {
 		/* just take 1 of the 2 types */
 		result_type = true_type;
-	} else if (is_type_pointer(true_type) && is_type_pointer(false_type)
-			&& pointers_compatible(true_type, false_type)) {
-		/* ok */
-		result_type = true_type;
-	} else if (is_type_pointer(true_type)
-			&& is_null_pointer_constant(false_expression)) {
-		result_type = true_type;
-	} else if (is_type_pointer(false_type)
-			&& is_null_pointer_constant(true_expression)) {
-		result_type = false_type;
+	} else if (is_type_pointer(true_type) || is_type_pointer(false_type)) {
+		type_t *pointer_type;
+		type_t *other_type;
+		expression_t *other_expression;
+		if (is_type_pointer(true_type)) {
+			pointer_type     = true_type;
+			other_type       = false_type;
+			other_expression = false_expression;
+		} else {
+			pointer_type     = false_type;
+			other_type       = true_type;
+			other_expression = true_expression;
+		}
+
+		if(is_type_pointer(other_type)) {
+			if(!pointers_compatible(true_type, false_type)) {
+				warningf(expression->base.source_position,
+						"pointer types '%T' and '%T' in conditional expression are incompatible", true_type, false_type);
+			}
+			result_type = true_type;
+		} else if(is_null_pointer_constant(other_expression)) {
+			result_type = pointer_type;
+		} else if(is_type_integer(other_type)) {
+			warningf(expression->base.source_position,
+					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
+			result_type = pointer_type;
+		} else {
+			type_error_incompatible("while parsing conditional",
+					expression->base.source_position, true_type, false_type);
+			result_type = type_error_type;
+		}
 	} else {
 		/* TODO: one pointer to void*, other some pointer */
 
