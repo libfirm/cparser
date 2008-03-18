@@ -3449,16 +3449,14 @@ static declaration_t *internal_record_declaration(
 			const type_t *prev_type = skip_typeref(previous_declaration->type);
 			if (!types_compatible(type, prev_type)) {
 				errorf(declaration->source_position,
-				       "declaration '%#T' is incompatible with "
-				       "previous declaration '%#T'",
-				       orig_type, symbol, previous_declaration->type, symbol);
-				errorf(previous_declaration->source_position,
-				       "previous declaration of '%Y' was here", symbol);
+				       "declaration '%#T' is incompatible with '%#T' (declared %P)",
+				       orig_type, symbol, previous_declaration->type, symbol,
+			           previous_declaration->source_position);
 			} else {
 				unsigned old_storage_class = previous_declaration->storage_class;
 				if (old_storage_class == STORAGE_CLASS_ENUM_ENTRY) {
-					errorf(declaration->source_position, "redeclaration of enum entry '%Y'", symbol);
-					errorf(previous_declaration->source_position, "previous declaration of '%Y' was here", symbol);
+					errorf(declaration->source_position, "redeclaration of enum entry '%Y' (declared %P)",
+					       symbol, previous_declaration->source_position);
 					return previous_declaration;
 				}
 
@@ -3500,19 +3498,15 @@ static declaration_t *internal_record_declaration(
 warn_redundant_declaration:
 					if (warning.redundant_decls) {
 						warningf(declaration->source_position,
-						         "redundant declaration for '%Y'", symbol);
-						warningf(previous_declaration->source_position,
-						         "previous declaration of '%Y' was here",
-						         symbol);
+						         "redundant declaration for '%Y' (declared %P)",
+						         symbol, previous_declaration->source_position);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC &&
 							new_storage_class == STORAGE_CLASS_STATIC) {
 						errorf(declaration->source_position,
-						       "static declaration of '%Y' follows non-static declaration",
-						       symbol);
-						errorf(previous_declaration->source_position,
-						       "previous declaration of '%Y' was here", symbol);
+						       "static declaration of '%Y' follows non-static declaration (declared %P)",
+						       symbol, previous_declaration->source_position);
 					} else {
 						if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
 							goto warn_redundant_declaration;
@@ -3525,14 +3519,13 @@ warn_redundant_declaration:
 				} else {
 					if (old_storage_class == new_storage_class) {
 						errorf(declaration->source_position,
-						       "redeclaration of '%Y'", symbol);
+						       "redeclaration of '%Y' (declared %P)",
+						       symbol, previous_declaration->source_position);
 					} else {
 						errorf(declaration->source_position,
-						       "redeclaration of '%Y' with different linkage",
-						       symbol);
+						       "redeclaration of '%Y' with different linkage (declared %P)",
+						       symbol, previous_declaration->source_position);
 					}
-					errorf(previous_declaration->source_position,
-					       "previous declaration of '%Y' was here", symbol);
 				}
 			}
 			return previous_declaration;
@@ -3580,10 +3573,8 @@ static declaration_t *record_function_definition(declaration_t *declaration)
 static void parser_error_multiple_definition(declaration_t *declaration,
 		const source_position_t source_position)
 {
-	errorf(source_position, "multiple definition of symbol '%Y'",
-	       declaration->symbol);
-	errorf(declaration->source_position,
-	       "this is the location of the previous definition.");
+	errorf(source_position, "multiple definition of symbol '%Y' (declared %P)",
+	       declaration->symbol, declaration->source_position);
 }
 
 static bool is_declaration_specifier(const token_t *token,
@@ -4149,9 +4140,8 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			if(prev_decl != NULL) {
 				assert(prev_decl->symbol == symbol);
 				errorf(declaration->source_position,
-				       "multiple declarations of symbol '%Y'", symbol);
-				errorf(prev_decl->source_position,
-				       "previous declaration of '%Y' was here", symbol);
+				       "multiple declarations of symbol '%Y' (declared %P)",
+				       symbol, prev_decl->source_position);
 			}
 		}
 
@@ -6745,9 +6735,8 @@ static statement_t *parse_label_statement(void)
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
 	if(label->source_position.input_name != NULL) {
-		errorf(HERE, "duplicate label '%Y'", symbol);
-		errorf(label->source_position, "previous definition of '%Y' was here",
-		       symbol);
+		errorf(HERE, "duplicate label '%Y' (declared %P)",
+		       symbol, label->source_position);
 	} else {
 		label->source_position = token.source_position;
 	}

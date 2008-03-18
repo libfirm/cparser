@@ -41,6 +41,18 @@
 # endif /* ifndef NORETURN */
 #endif /* ifndef NORETURN */
 
+/**
+ * Issue a diagnostic message.
+ * Format types:
+ *  %Y  symbol_t
+ *  %E  expression_t
+ *  %Q  unsigned  (qualifier)
+ *  %T  type_t
+ *  %K  token_t
+ *  %k  token_kind_t
+ *  %P  source_position_t
+ *
+ */
 void diagnosticf(const char *fmt, ...);
 void errorf(source_position_t pos, const char *fmt, ...);
 void warningf(source_position_t pos, const char *fmt, ...);
