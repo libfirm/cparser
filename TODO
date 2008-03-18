@@ -25,6 +25,7 @@ Parser:
 - check semantic for functions declared/defined in global scope and declared
   again in a local scope
 - print initialisation type_path for initializer errors
+- check switches for: double cases, all enums
 
 ast2firm:
 - handle non-constant initializers
@@ -32,9 +33,13 @@ ast2firm:
 - handle bitfield members with 0 correctly (standard says they finish the
   current unit)
 
+Missing Errors:
+* check switches for double cases
+
 Missing Warnings:
 * dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
 * unused label
+* check switches for all enums values
 
 
 Spec-Status:
