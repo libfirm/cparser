@@ -238,39 +238,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 }
 
 /**
- * Allocate a statement node of given kind and initialize all
- * fields with zero.
- */
-static statement_t *allocate_statement_zero(statement_kind_t kind)
-{
-	size_t       size = get_statement_struct_size(kind);
-	statement_t *res  = allocate_ast_zero(size);
-
-	res->base.kind = kind;
-	return res;
-}
-
-/**
- * Creates a new invalid statement.
- */
-static statement_t *create_invalid_statement(void)
-{
-	statement_t *statement          = allocate_statement_zero(STATEMENT_INVALID);
-	statement->base.source_position = token.source_position;
-	return statement;
-}
-
-/**
- * Allocate a new empty statement.
- */
-static statement_t *create_empty_statement(void)
-{
-	statement_t *statement          = allocate_statement_zero(STATEMENT_EMPTY);
-	statement->base.source_position = token.source_position;
-	return statement;
-}
-
-/**
  * Returns the size of an expression node.
  *
  * @param kind  the expression kind
@@ -316,6 +283,19 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 }
 
 /**
+ * Allocate a statement node of given kind and initialize all
+ * fields with zero.
+ */
+static statement_t *allocate_statement_zero(statement_kind_t kind)
+{
+	size_t       size = get_statement_struct_size(kind);
+	statement_t *res  = allocate_ast_zero(size);
+
+	res->base.kind = kind;
+	return res;
+}
+
+/**
  * Allocate an expression node of given kind and initialize all
  * fields with zero.
  */
@@ -327,6 +307,36 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 	res->base.kind = kind;
 	res->base.type = type_error_type;
 	return res;
+}
+
+/**
+ * Creates a new invalid expression.
+ */
+static expression_t *create_invalid_expression(void)
+{
+	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
+	expression->base.source_position = token.source_position;
+	return expression;
+}
+
+/**
+ * Creates a new invalid statement.
+ */
+static statement_t *create_invalid_statement(void)
+{
+	statement_t *statement          = allocate_statement_zero(STATEMENT_INVALID);
+	statement->base.source_position = token.source_position;
+	return statement;
+}
+
+/**
+ * Allocate a new empty statement.
+ */
+static statement_t *create_empty_statement(void)
+{
+	statement_t *statement          = allocate_statement_zero(STATEMENT_EMPTY);
+	statement->base.source_position = token.source_position;
+	return statement;
 }
 
 /**
@@ -953,6 +963,11 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_ALWAYS_INLINE,
 	GNU_AK_MALLOC,
 	GNU_AK_WEAK,
+	GNU_AK_ALIGNED,
+	GNU_AK_ALIAS,
+	GNU_AK_SECTION,
+	GNU_AK_FORMAT,
+	GNU_AK_FORMAT_ARG,
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
@@ -970,6 +985,11 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_ALWAYS_INLINE] = "always_inline",
 	[GNU_AK_MALLOC]        = "malloc",
 	[GNU_AK_WEAK]          = "weak",
+	[GNU_AK_ALIGNED]       = "aligned",
+	[GNU_AK_ALIAS]         = "alias",
+	[GNU_AK_SECTION]       = "section",
+	[GNU_AK_FORMAT]        = "format",
+	[GNU_AK_FORMAT_ARG]    = "format_arg"
 };
 
 /**
@@ -986,6 +1006,78 @@ static int strcmp_underscore(const char *s1, const char *s2) {
 		return strncmp(s1, s2, l1);
 	}
 	return strcmp(s1, s2);
+}
+
+static expression_t *parse_gnu_attribute_const_arg(void) {
+	expression_t *expression;
+	expect('(');
+	add_anchor_token('(');
+	expression = parse_constant_expression();
+	rem_anchor_token('(');
+	expect(')');
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+static string_t parse_gnu_attribute_string_arg(void) {
+	string_t string = { NULL, 0 };
+	expect('(');
+	add_anchor_token('(');
+	if(token.type != T_STRING_LITERAL) {
+		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL);
+		goto end_error;
+	}
+	string = parse_string_literals();
+	rem_anchor_token('(');
+	expect(')');
+end_error:
+	return string;
+}
+
+static const char *format_names[] = {
+	"printf",
+	"scanf",
+	"strftime",
+	"strfmon"
+};
+
+/**
+ * parse ( identifier, const expression, const expression )
+ */
+static void parse_gnu_attribute_format_args(void) {
+	int i;
+	expect('(');
+	if(token.type != T_IDENTIFIER) {
+		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER);
+		goto end_error;
+	}
+	const char *name = token.v.symbol->string;
+	for(i = 0; i < 4; ++i) {
+		if(strcmp_underscore(format_names[i], name) == 0)
+			break;
+	}
+	if(i >= 4) {
+		if(warning.attribute)
+			warningf(HERE, "'%s' is an unrecognized format function type", name);
+	}
+	next_token();
+
+	expect(',');
+	add_anchor_token(')');
+	add_anchor_token(',');
+	parse_constant_expression();
+	rem_anchor_token(',');
+	rem_anchor_token('(');
+
+	expect(',');
+	add_anchor_token(')');
+	parse_constant_expression();
+	rem_anchor_token('(');
+	expect(')');
+	return;
+end_error:
+	return;
 }
 
 /**
@@ -1008,72 +1100,98 @@ static int strcmp_underscore(const char *s1, const char *s2) {
  *  always_inline
  *  malloc
  *  weak
+ *
+ * The following attributes are parsed with arguments
+ *  aligned( const expression )
+ *  alias( string literal )
+ *  section( string literal )
+ *  format( identifier, const expression, const expression )
+ *  format_arg( const expression )
  */
 static void parse_gnu_attribute(void)
 {
 	eat(T___attribute__);
 	expect('(');
 	expect('(');
-	while(true) {
-		const char *name;
-		if(token.type == T_const) {
-			name = "const";
-		} else if(token.type == T_volatile) {
-			name = "volatile";
-		} else if(token.type == T_cdecl) {
-			/* __attribute__((cdecl)), WITH ms mode */
-			name = "cdecl";
-		} else if(token.type != T_IDENTIFIER) {
-			parse_error_expected("while parsing GNU attribute", T_IDENTIFIER);
-			break;
-		}
-		const symbol_t *sym = token.v.symbol;
-		name = sym->string;
-		next_token();
-
-		gnu_attribute_kind_t kind;
-		for(kind = 0; kind < GNU_AK_LAST; ++kind) {
-			if(strcmp_underscore(gnu_attribute_names[kind], name) == 0)
+	if(token.type != ')') {
+		/* non-empty attribute list */
+		while(true) {
+			const char *name;
+			if(token.type == T_const) {
+				name = "const";
+			} else if(token.type == T_volatile) {
+				name = "volatile";
+			} else if(token.type == T_cdecl) {
+				/* __attribute__((cdecl)), WITH ms mode */
+				name = "cdecl";
+			} else if(token.type != T_IDENTIFIER) {
+				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER);
 				break;
-		}
-		switch(kind) {
-		case GNU_AK_CONST:
-			break;
-		case GNU_AK_VOLATILE:
-			break;
-		case GNU_AK_CDECL:
-			break;
-		case GNU_AK_STDCALL:
-			break;
-		case GNU_AK_FASTCALL:
-			break;
-		case GNU_AK_DEPRECATED:
-			break;
-		case GNU_AK_NOINLINE:
-			break;
-		case GNU_AK_NORETURN:
-			break;
-		case GNU_AK_NAKED:
-			break;
-		case GNU_AK_PURE:
-			break;
-		case GNU_AK_ALWAYS_INLINE:
-			break;
-		case GNU_AK_MALLOC:
-			break;
-		case GNU_AK_WEAK:
-			break;
-		case GNU_AK_LAST:
-			warningf(HERE, "unrecognized attribute '%s'", name);
+			}
+			const symbol_t *sym = token.v.symbol;
+			name = sym->string;
+			next_token();
 
-			/* skip possible arguments */
-			if(token.type == '(')
-				eat_until_matching_token('(');
-			break;
+			gnu_attribute_kind_t kind;
+			for(kind = 0; kind < GNU_AK_LAST; ++kind) {
+				if(strcmp_underscore(gnu_attribute_names[kind], name) == 0)
+					break;
+			}
+			switch(kind) {
+			case GNU_AK_CONST:
+				break;
+			case GNU_AK_VOLATILE:
+				break;
+			case GNU_AK_CDECL:
+				break;
+			case GNU_AK_STDCALL:
+				break;
+			case GNU_AK_FASTCALL:
+				break;
+			case GNU_AK_DEPRECATED:
+				break;
+			case GNU_AK_NOINLINE:
+				break;
+			case GNU_AK_NORETURN:
+				break;
+			case GNU_AK_NAKED:
+				break;
+			case GNU_AK_PURE:
+				break;
+			case GNU_AK_ALWAYS_INLINE:
+				break;
+			case GNU_AK_MALLOC:
+				break;
+			case GNU_AK_WEAK:
+				break;
+			case GNU_AK_ALIGNED:
+				parse_gnu_attribute_const_arg();
+				break;
+			case GNU_AK_ALIAS:
+				parse_gnu_attribute_string_arg();
+				break;
+			case GNU_AK_SECTION:
+				parse_gnu_attribute_string_arg();
+				break;
+			case GNU_AK_FORMAT:
+				parse_gnu_attribute_format_args();
+				break;
+			case GNU_AK_FORMAT_ARG:
+				parse_gnu_attribute_const_arg();
+				break;
+			case GNU_AK_LAST:
+				if(warning.attribute)
+					warningf(HERE, "'%s' attribute directive ignored", name);
+
+				/* skip possible arguments */
+				if(token.type == '(')
+					eat_until_matching_token('(');
+				break;
+			}
+			if(token.type != ',')
+				break;
+			next_token();
 		}
-		if(token.type != ',')
-			break;
-		next_token();
 	}
 	expect(')');
 	expect(')');
@@ -4068,16 +4186,6 @@ struct expression_parser_function_t {
 };
 
 expression_parser_function_t expression_parsers[T_LAST_TOKEN];
-
-/**
- * Creates a new invalid expression.
- */
-static expression_t *create_invalid_expression(void)
-{
-	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
-	expression->base.source_position = token.source_position;
-	return expression;
-}
 
 /**
  * Prints an error message if an expression was expected but not read

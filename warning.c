@@ -22,6 +22,7 @@
 #include "warning.h"
 
 warning_t warning = {
+	.attribute                     = true,
 	.char_subscripts               = true,
 	.check_format                  = true,
 	.empty_statement               = false,
@@ -65,6 +66,7 @@ void set_warning_opt(const char *const opt)
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
+		SET(attribute)
 		SET(char_subscripts)
 		SET(check_format)
 		SET(empty_statement)
@@ -82,6 +84,7 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value)
 		SET(unused_variable)
 	}
+	OPT("attribute",                     attribute)
 	OPT("char-subscripts",               char_subscripts)
 	OPT("empty-statement",               empty_statement)
 	OPT("error",                         s_are_errors)
