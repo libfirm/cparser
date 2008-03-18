@@ -2963,7 +2963,7 @@ static __attribute__((unused)) void debug_print_type_path(const type_path_t *pat
 		if(is_type_compound(type)) {
 			fprintf(stderr, ".%s", entry->compound_entry->symbol->string);
 		} else if(is_type_array(type)) {
-			fprintf(stderr, "[%u]", entry->index);
+			fprintf(stderr, "[%zd]", entry->index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}

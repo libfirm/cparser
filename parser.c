@@ -1229,7 +1229,7 @@ static __attribute__((unused)) void debug_print_type_path(
 			}
 			fprintf(stderr, ".%s", entry->v.compound_entry->symbol->string);
 		} else if(is_type_array(type)) {
-			fprintf(stderr, "[%u]", entry->v.index);
+			fprintf(stderr, "[%zd]", entry->v.index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}
