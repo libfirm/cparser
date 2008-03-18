@@ -976,6 +976,8 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_ALWAYS_INLINE,
 	GNU_AK_MALLOC,
 	GNU_AK_WEAK,
+ 	GNU_AK_CONSTRUCTOR,
+	GNU_AK_DESTRUCTOR,
 	GNU_AK_ALIGNED,
 	GNU_AK_ALIAS,
 	GNU_AK_SECTION,
@@ -998,6 +1000,8 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_ALWAYS_INLINE] = "always_inline",
 	[GNU_AK_MALLOC]        = "malloc",
 	[GNU_AK_WEAK]          = "weak",
+ 	[GNU_AK_CONSTRUCTOR]   = "constructor",
+	[GNU_AK_DESTRUCTOR]    = "destructor",
 	[GNU_AK_ALIGNED]       = "aligned",
 	[GNU_AK_ALIAS]         = "alias",
 	[GNU_AK_SECTION]       = "section",
@@ -1023,7 +1027,6 @@ static int strcmp_underscore(const char *s1, const char *s2) {
 
 static expression_t *parse_gnu_attribute_const_arg(void) {
 	expression_t *expression;
-	expect('(');
 	add_anchor_token('(');
 	expression = parse_constant_expression();
 	rem_anchor_token('(');
@@ -1035,7 +1038,6 @@ end_error:
 
 static string_t parse_gnu_attribute_string_arg(void) {
 	string_t string = { NULL, 0 };
-	expect('(');
 	add_anchor_token('(');
 	if(token.type != T_STRING_LITERAL) {
 		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL);
@@ -1060,7 +1062,6 @@ static const char *format_names[] = {
  */
 static void parse_gnu_attribute_format_args(void) {
 	int i;
-	expect('(');
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER);
 		goto end_error;
@@ -1113,6 +1114,8 @@ end_error:
  *  always_inline
  *  malloc
  *  weak
+ *  constructor
+ *  destructor
  *
  * The following attributes are parsed with arguments
  *  aligned( const expression )
@@ -1150,56 +1153,79 @@ static void parse_gnu_attribute(void)
 				if(strcmp_underscore(gnu_attribute_names[kind], name) == 0)
 					break;
 			}
-			switch(kind) {
-			case GNU_AK_CONST:
-				break;
-			case GNU_AK_VOLATILE:
-				break;
-			case GNU_AK_CDECL:
-				break;
-			case GNU_AK_STDCALL:
-				break;
-			case GNU_AK_FASTCALL:
-				break;
-			case GNU_AK_DEPRECATED:
-				break;
-			case GNU_AK_NOINLINE:
-				break;
-			case GNU_AK_NORETURN:
-				break;
-			case GNU_AK_NAKED:
-				break;
-			case GNU_AK_PURE:
-				break;
-			case GNU_AK_ALWAYS_INLINE:
-				break;
-			case GNU_AK_MALLOC:
-				break;
-			case GNU_AK_WEAK:
-				break;
-			case GNU_AK_ALIGNED:
-				parse_gnu_attribute_const_arg();
-				break;
-			case GNU_AK_ALIAS:
-				parse_gnu_attribute_string_arg();
-				break;
-			case GNU_AK_SECTION:
-				parse_gnu_attribute_string_arg();
-				break;
-			case GNU_AK_FORMAT:
-				parse_gnu_attribute_format_args();
-				break;
-			case GNU_AK_FORMAT_ARG:
-				parse_gnu_attribute_const_arg();
-				break;
-			case GNU_AK_LAST:
+
+			if(kind == GNU_AK_LAST) {
 				if(warning.attribute)
 					warningf(HERE, "'%s' attribute directive ignored", name);
 
 				/* skip possible arguments */
-				if(token.type == '(')
-					eat_until_matching_token('(');
-				break;
+				if(token.type == '(') {
+					eat_until_matching_token(')');
+				}
+			} else {
+				/* check for arguments */
+				bool have_args = false;
+				if(token.type == '(') {
+					next_token();
+					if(token.type == ')') {
+						/* empty args are allowed */
+						next_token();
+					} else
+						have_args = true;
+				}
+
+				switch(kind) {
+				case GNU_AK_CONST:
+				case GNU_AK_VOLATILE:
+				case GNU_AK_CDECL:
+				case GNU_AK_STDCALL:
+				case GNU_AK_FASTCALL:
+				case GNU_AK_DEPRECATED:
+				case GNU_AK_NOINLINE:
+				case GNU_AK_NORETURN:
+				case GNU_AK_NAKED:
+				case GNU_AK_PURE:
+				case GNU_AK_ALWAYS_INLINE:
+				case GNU_AK_MALLOC:
+				case GNU_AK_WEAK:
+				case GNU_AK_CONSTRUCTOR:
+				case GNU_AK_DESTRUCTOR:
+					if(have_args) {
+						/* should have no arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+						eat_until_matching_token('(');
+						/* we have already consumend '(', so we stop before ')', eat it */
+						eat(')');
+					}
+					break;
+
+				case GNU_AK_ALIGNED:
+				case GNU_AK_FORMAT_ARG:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_const_arg();
+					break;
+				case GNU_AK_ALIAS:
+				case GNU_AK_SECTION:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_string_arg();
+					break;
+				case GNU_AK_FORMAT:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_format_args();
+					break;
+				case GNU_AK_LAST:
+					/* already handled */
+					break;
+				}
 			}
 			if(token.type != ',')
 				break;

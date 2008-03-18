@@ -1,6 +1,7 @@
 int test1(int a) __attribute__((noreturn));
 int test2(int a) __attribute__((const));
-int test3(int a) __attribute__((weak));
+/* empty args are allowed */
+int test3(int a) __attribute__((weak()));
 int test4(int a) __attribute__((unknown_error("bla", 3)));
 int test5(int a) __attribute__((alias("test2")));
 int test6(int a) __attribute__((section("extra")));
