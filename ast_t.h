@@ -197,11 +197,13 @@ struct expression_base_t {
 struct const_expression_t {
 	expression_base_t  base;
 	union {
-		long long     int_value;
-		long double   float_value;
-		string_t      character;
-		wide_string_t wide_character;
+		long long      int_value;
+		long double    float_value;
+		string_t       character;
+		wide_string_t  wide_character;
 	} v;
+	bool               is_ms_noop;  /**< True, if this constant is the result
+	                                     of an microsoft __noop operator */
 };
 
 struct string_literal_expression_t {

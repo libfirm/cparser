@@ -4846,6 +4846,7 @@ static expression_t *parse_noop_expression(void) {
 	cnst->base.source_position = source_position;
 	cnst->base.type            = type_int;
 	cnst->conste.v.int_value   = 0;
+	cnst->conste.is_ms_noop    = true;
 
 	return cnst;
 
@@ -5832,7 +5833,8 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_UNKNOWN:                   break;
 		case EXPR_INVALID:                   return true; /* do NOT warn */
 		case EXPR_REFERENCE:                 return false;
-		case EXPR_CONST:                     return false;
+		/* suppress the warning for microsoft __noop operations */
+		case EXPR_CONST:                     return expr->conste.is_ms_noop;
 		case EXPR_CHARACTER_CONSTANT:        return false;
 		case EXPR_WIDE_CHARACTER_CONSTANT:   return false;
 		case EXPR_STRING_LITERAL:            return false;
