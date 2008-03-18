@@ -295,10 +295,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_SIZEOF]                  = sizeof(typeprop_expression_t),
 		[EXPR_ALIGNOF]                 = sizeof(typeprop_expression_t),
 		[EXPR_CLASSIFY_TYPE]           = sizeof(classify_type_expression_t),
-		[EXPR_FUNCTION]                = sizeof(string_literal_expression_t),
-		[EXPR_PRETTY_FUNCTION]         = sizeof(string_literal_expression_t),
-		[EXPR_FUNCSIG]                 = sizeof(string_literal_expression_t),
-		[EXPR_FUNCDNAME]               = sizeof(string_literal_expression_t),
+		[EXPR_FUNCNAME]                = sizeof(funcname_expression_t),
 		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
 		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
@@ -4451,8 +4448,9 @@ static expression_t *parse_function_keyword(void)
 		errorf(HERE, "'__func__' used outside of a function");
 	}
 
-	expression_t *expression = allocate_expression_zero(EXPR_FUNCTION);
-	expression->base.type    = type_char_ptr;
+	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
+	expression->base.type     = type_char_ptr;
+	expression->funcname.kind = FUNCNAME_FUNCTION;
 
 	return expression;
 }
@@ -4465,36 +4463,39 @@ static expression_t *parse_pretty_function_keyword(void)
 		errorf(HERE, "'__PRETTY_FUNCTION__' used outside of a function");
 	}
 
-	expression_t *expression = allocate_expression_zero(EXPR_PRETTY_FUNCTION);
-	expression->base.type    = type_char_ptr;
+	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
+	expression->base.type     = type_char_ptr;
+	expression->funcname.kind = FUNCNAME_PRETTY_FUNCTION;
 
 	return expression;
 }
 
 static expression_t *parse_funcsig_keyword(void)
 {
-	next_token();
+	eat(T___FUNCSIG__);
 
 	if (current_function == NULL) {
 		errorf(HERE, "'__FUNCSIG__' used outside of a function");
 	}
 
-	expression_t *expression = allocate_expression_zero(EXPR_FUNCSIG);
-	expression->base.type    = type_char_ptr;
+	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
+	expression->base.type     = type_char_ptr;
+	expression->funcname.kind = FUNCNAME_FUNCSIG;
 
 	return expression;
 }
 
 static expression_t *parse_funcdname_keyword(void)
 {
-	next_token();
+	eat(T___FUNCDNAME__);
 
 	if (current_function == NULL) {
 		errorf(HERE, "'__FUNCDNAME__' used outside of a function");
 	}
 
-	expression_t *expression = allocate_expression_zero(EXPR_FUNCDNAME);
-	expression->base.type    = type_char_ptr;
+	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
+	expression->base.type     = type_char_ptr;
+	expression->funcname.kind = FUNCNAME_FUNCDNAME;
 
 	return expression;
 }
@@ -5824,10 +5825,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_CLASSIFY_TYPE:             return false;
 		case EXPR_ALIGNOF:                   return false;
 
-		case EXPR_FUNCTION:                  return false;
-		case EXPR_PRETTY_FUNCTION:           return false;
-		case EXPR_FUNCSIG:                   return false;
-		case EXPR_FUNCDNAME:                 return false;
+		case EXPR_FUNCNAME:                  return false;
 		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:        return false;
 		case EXPR_BUILTIN_PREFETCH:          return true;

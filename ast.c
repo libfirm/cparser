@@ -115,8 +115,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_CLASSIFY_TYPE]             = PREC_UNARY,
 		[EXPR_ALIGNOF]                   = PREC_UNARY,
 
-		[EXPR_FUNCTION]                  = PREC_PRIM,
-		[EXPR_PRETTY_FUNCTION]           = PREC_PRIM,
+		[EXPR_FUNCNAME]                  = PREC_PRIM,
 		[EXPR_BUILTIN_SYMBOL]            = PREC_PRIM,
 		[EXPR_BUILTIN_CONSTANT_P]        = PREC_PRIM,
 		[EXPR_BUILTIN_PREFETCH]          = PREC_PRIM,
@@ -317,6 +316,24 @@ static void print_string_literal(
 		const string_literal_expression_t *string_literal)
 {
 	print_quoted_string(&string_literal->value, '"');
+}
+
+/**
+ * Prints a predefined symbol.
+ */
+static void print_funcname(
+		const funcname_expression_t *funcname)
+{
+	const char *s = "";
+	switch(funcname->kind) {
+	case FUNCNAME_FUNCTION:        s = (c_mode & _C99) ? "__func__" : "__FUNCTION__"; break;
+	case FUNCNAME_PRETTY_FUNCTION: s = "__PRETTY_FUNCTION__"; break;
+	case FUNCNAME_FUNCSIG:         s = "__FUNCSIG__"; break;
+	case FUNCNAME_FUNCDNAME:       s = "__FUNCDNAME__"; break;
+	}
+	fputc('"', out);
+	fputs(s, out);
+	fputc('"', out);
 }
 
 static void print_wide_string_literal(
@@ -718,8 +735,9 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_CONST:
 		print_const(&expression->conste);
 		break;
-	case EXPR_FUNCTION:
-	case EXPR_PRETTY_FUNCTION:
+	case EXPR_FUNCNAME:
+		print_funcname(&expression->funcname);
+		break;
 	case EXPR_STRING_LITERAL:
 		print_string_literal(&expression->string);
 		break;
@@ -1507,10 +1525,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_SIZEOF:
 	case EXPR_CLASSIFY_TYPE:
-	case EXPR_FUNCTION:
-	case EXPR_FUNCSIG:
-	case EXPR_FUNCDNAME:
-	case EXPR_PRETTY_FUNCTION:
+	case EXPR_FUNCNAME:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:

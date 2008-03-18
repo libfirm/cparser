@@ -49,10 +49,7 @@ typedef enum {
 	EXPR_CLASSIFY_TYPE,
 	EXPR_ALIGNOF,
 
-	EXPR_FUNCTION,
-	EXPR_PRETTY_FUNCTION,
-	EXPR_FUNCSIG,           /**< MS function signature, aka ld_name */
-	EXPR_FUNCDNAME,         /**< MS decorated name of a function */
+	EXPR_FUNCNAME,
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_BUILTIN_PREFETCH,
@@ -119,6 +116,13 @@ typedef enum {
 	EXPR_BINARY_ISUNORDERED,
 	EXPR_BINARY_LAST = EXPR_BINARY_ISUNORDERED,
 } expression_kind_t;
+
+typedef enum {
+	FUNCNAME_FUNCTION,           /**< C99 __func__, older __FUNCTION__ */
+	FUNCNAME_PRETTY_FUNCTION,    /**< GNUC __PRETTY_FUNCTION__ */
+	FUNCNAME_FUNCSIG,            /**< MS __FUNCSIG__ */
+	FUNCNAME_FUNCDNAME           /**< MS __FUNCDNAME__ */
+} funcname_kind_t;
 
 /* convenience macros */
 #define EXPR_BINARY_CASES                  \
@@ -203,6 +207,12 @@ struct const_expression_t {
 struct string_literal_expression_t {
 	expression_base_t  base;
 	string_t           value;
+};
+
+struct funcname_expression_t {
+	expression_base_t  base;
+	funcname_kind_t    kind;
+	string_t           value;     /**< the value once assigned. */
 };
 
 struct wide_string_literal_expression_t {
@@ -327,6 +337,7 @@ union expression_t {
 	expression_kind_t                kind;
 	expression_base_t                base;
 	const_expression_t               conste;
+	funcname_expression_t            funcname;
 	string_literal_expression_t      string;
 	wide_string_literal_expression_t wide_string;
 	compound_literal_expression_t    compound_literal;

@@ -33,6 +33,8 @@ S(pragma)
 
 S(defined)
 T(_ALL, va_args, "__VA_ARGS__",)
+T(_MS, __COUNTER__, "__COUNTER__",)
+T(_MS, __TIMESTAMP__, "__TIMESTAMP__",)
 
 S(STDC)
 S(ON)

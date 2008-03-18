@@ -2633,30 +2633,30 @@ make_const: ;
 }
 
 static ir_node *function_name_to_firm(
-		const string_literal_expression_t *const expr)
+		const funcname_expression_t *const expr)
 {
-	if (current_function_name == NULL) {
-		const source_position_t *const src_pos = &expr->base.source_position;
-		const char *const name = current_function_decl->symbol->string;
-		const string_t string = { name, strlen(name) + 1 };
-		current_function_name = string_to_firm(src_pos, "__func__", &string);
+	switch(expr->kind) {
+	case FUNCNAME_FUNCTION:
+	case FUNCNAME_PRETTY_FUNCTION:
+	case FUNCNAME_FUNCDNAME:
+		if (current_function_name == NULL) {
+			const source_position_t *const src_pos = &expr->base.source_position;
+			const char *const name = current_function_decl->symbol->string;
+			const string_t string = { name, strlen(name) + 1 };
+			current_function_name = string_to_firm(src_pos, "__func__", &string);
+		}
+		return current_function_name;
+	case FUNCNAME_FUNCSIG:
+		if (current_funcsig == NULL) {
+			const source_position_t *const src_pos = &expr->base.source_position;
+			ir_entity *ent = get_irg_entity(current_ir_graph);
+			const char *const name = get_entity_ld_name(ent);
+			const string_t string = { name, strlen(name) + 1 };
+			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__", &string);
+		}
+		return current_funcsig;
 	}
-
-	return current_function_name;
-}
-
-static ir_node *funcsig_to_firm(
-		const string_literal_expression_t *const expr)
-{
-	if (current_funcsig == NULL) {
-		const source_position_t *const src_pos = &expr->base.source_position;
-		ir_entity *ent = get_irg_entity(current_ir_graph);
-		const char *const name = get_entity_ld_name(ent);
-		const string_t string = { name, strlen(name) + 1 };
-		current_funcsig = string_to_firm(src_pos, "__FUNCSIG__", &string);
-	}
-
-	return current_funcsig;
+	panic("Unsupported function name");
 }
 
 static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
@@ -2782,12 +2782,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return select_to_firm(&expression->select);
 	case EXPR_CLASSIFY_TYPE:
 		return classify_type_to_firm(&expression->classify_type);
-	case EXPR_FUNCTION:
-	case EXPR_PRETTY_FUNCTION:
-	case EXPR_FUNCDNAME:
-		return function_name_to_firm(&expression->string);
-	case EXPR_FUNCSIG:
-		return funcsig_to_firm(&expression->string);
+	case EXPR_FUNCNAME:
+		return function_name_to_firm(&expression->funcname);
 	case EXPR_STATEMENT:
 		return statement_expression_to_firm(&expression->statement);
 	case EXPR_VA_START:
@@ -4417,10 +4413,7 @@ static int count_decls_in_expression(const expression_t *expression) {
 	case EXPR_WIDE_CHARACTER_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
-	case EXPR_FUNCTION:
-	case EXPR_PRETTY_FUNCTION:
-	case EXPR_FUNCSIG:
-	case EXPR_FUNCDNAME:
+	case EXPR_FUNCNAME:
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:

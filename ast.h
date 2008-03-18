@@ -28,6 +28,7 @@ typedef struct scope_t                          scope_t;
 typedef struct expression_base_t                expression_base_t;
 typedef struct const_expression_t               const_expression_t;
 typedef struct string_literal_expression_t      string_literal_expression_t;
+typedef struct funcname_expression_t            funcname_expression_t;
 typedef struct wide_string_literal_expression_t wide_string_literal_expression_t;
 typedef struct compound_literal_expression_t    compound_literal_expression_t;
 typedef struct reference_expression_t           reference_expression_t;
