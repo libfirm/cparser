@@ -939,8 +939,75 @@ static string_t parse_string_literals(void)
 	return result;
 }
 
+typedef enum gnu_attribute_kind_t {
+	GNU_AK_CONST,
+	GNU_AK_VOLATILE,
+	GNU_AK_CDECL,
+	GNU_AK_STDCALL,
+	GNU_AK_FASTCALL,
+	GNU_AK_DEPRECATED,
+	GNU_AK_NOINLINE,
+	GNU_AK_NORETURN,
+	GNU_AK_NAKED,
+	GNU_AK_PURE,
+	GNU_AK_ALWAYS_INLINE,
+	GNU_AK_MALLOC,
+	GNU_AK_WEAK,
+	GNU_AK_LAST
+} gnu_attribute_kind_t;
+
+static const char *gnu_attribute_names[GNU_AK_LAST] = {
+	[GNU_AK_CONST]         = "const",
+	[GNU_AK_VOLATILE]      = "volatile",
+	[GNU_AK_CDECL]         = "cdecl",
+	[GNU_AK_STDCALL]       = "stdcall",
+	[GNU_AK_FASTCALL]      = "fastcall",
+	[GNU_AK_DEPRECATED]    = "deprecated",
+	[GNU_AK_NOINLINE]      = "noinline",
+	[GNU_AK_NORETURN]      = "noreturn",
+	[GNU_AK_NAKED]         = "naked",
+	[GNU_AK_PURE]          = "pure",
+	[GNU_AK_ALWAYS_INLINE] = "always_inline",
+	[GNU_AK_MALLOC]        = "malloc",
+	[GNU_AK_WEAK]          = "weak",
+};
+
+/**
+ * compare two string, ignoring double underscores on the second.
+ */
+static int strcmp_underscore(const char *s1, const char *s2) {
+	if(s2[0] == '_' && s2[1] == '_') {
+		s2 += 2;
+		size_t l1 = strlen(s1);
+		if(l1 + 2 != strlen(s2)) {
+			/* not equal */
+			return 1;
+		}
+		return strncmp(s1, s2, l1);
+	}
+	return strcmp(s1, s2);
+}
+
 /**
  * Parse one GNU attribute.
+ *
+ * Note that attribute names can be specified WITH or WITHOUT
+ * double underscores, ie const or __const__.
+ *
+ * The following attributes are parsed without arguments
+ *  const
+ *  volatile
+ *  cdecl
+ *  stdcall
+ *  fastcall
+ *  deprecated
+ *  noinline
+ *  noreturn
+ *  naked
+ *  pure
+ *  always_inline
+ *  malloc
+ *  weak
  */
 static void parse_gnu_attribute(void)
 {
@@ -948,14 +1015,62 @@ static void parse_gnu_attribute(void)
 	expect('(');
 	expect('(');
 	while(true) {
-		if(token.type != T_IDENTIFIER)
+		const char *name;
+		if(token.type == T_const) {
+			name = "const";
+		} else if(token.type == T_volatile) {
+			name = "volatile";
+		} else if(token.type == T_cdecl) {
+			/* __attribute__((cdecl)), WITH ms mode */
+			name = "cdecl";
+		} else if(token.type != T_IDENTIFIER) {
+			parse_error_expected("while parsing GNU attribute", T_IDENTIFIER);
 			break;
-		symbol_t *sym = token.v.symbol;
-		if(sym == sym_deprecated) {
 		}
+		const symbol_t *sym = token.v.symbol;
+		name = sym->string;
 		next_token();
-		if(token.type == '(')
-			eat_until_matching_token('(');
+
+		gnu_attribute_kind_t kind;
+		for(kind = 0; kind < GNU_AK_LAST; ++kind) {
+			if(strcmp_underscore(gnu_attribute_names[kind], name) == 0)
+				break;
+		}
+		switch(kind) {
+		case GNU_AK_CONST:
+			break;
+		case GNU_AK_VOLATILE:
+			break;
+		case GNU_AK_CDECL:
+			break;
+		case GNU_AK_STDCALL:
+			break;
+		case GNU_AK_FASTCALL:
+			break;
+		case GNU_AK_DEPRECATED:
+			break;
+		case GNU_AK_NOINLINE:
+			break;
+		case GNU_AK_NORETURN:
+			break;
+		case GNU_AK_NAKED:
+			break;
+		case GNU_AK_PURE:
+			break;
+		case GNU_AK_ALWAYS_INLINE:
+			break;
+		case GNU_AK_MALLOC:
+			break;
+		case GNU_AK_WEAK:
+			break;
+		case GNU_AK_LAST:
+			warningf(HERE, "unrecognized attribute '%s'", name);
+
+			/* skip possible arguments */
+			if(token.type == '(')
+				eat_until_matching_token('(');
+			break;
+		}
 		if(token.type != ',')
 			break;
 		next_token();
