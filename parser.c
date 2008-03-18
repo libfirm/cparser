@@ -53,7 +53,8 @@ struct declaration_specifiers_t {
 	source_position_t  source_position;
 	unsigned char      declared_storage_class;
 	unsigned char      alignment;         /**< Alignment, 0 if not set. */
-	bool               is_inline;
+	unsigned int       is_inline : 1;
+	unsigned int       deprecated : 1;
 	decl_modifiers_t   decl_modifiers;    /**< MS __declspec extended modifier mask */
 	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
 	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
@@ -939,32 +940,40 @@ static string_t parse_string_literals(void)
 	return result;
 }
 
+/**
+ * Parse one GNU attribute.
+ */
+static void parse_gnu_attribute(void)
+{
+	eat(T___attribute__);
+	expect('(');
+	expect('(');
+	while(true) {
+		if(token.type != T_IDENTIFIER)
+			break;
+		symbol_t *symbol = token.v.symbol;
+		next_token();
+		if(token.type == '(')
+			eat_until_matching_token('(');
+		if(token.type != ',')
+			break;
+		next_token();
+	}
+	expect(')');
+	expect(')');
+end_error:
+	return;
+}
+
+/**
+ * Parse GNU attributes.
+ */
 static void parse_attributes(void)
 {
 	while(true) {
 		switch(token.type) {
 		case T___attribute__: {
-			next_token();
-
-			expect('(');
-			int depth = 1;
-			while(depth > 0) {
-				switch(token.type) {
-				case T_EOF:
-					errorf(HERE, "EOF while parsing attribute");
-					break;
-				case '(':
-					next_token();
-					depth++;
-					break;
-				case ')':
-					next_token();
-					depth--;
-					break;
-				default:
-					next_token();
-				}
-			}
+			parse_gnu_attribute();
 			break;
 		}
 		case T_asm:
@@ -2163,8 +2172,10 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			expect(')');
 		} else if(symbol == sym_deprecated) {
 			next_token();
-			DET_MOD(deprecated, DM_DEPRECATED);
-               if(token.type == '(') {
+			if(specifiers->deprecated != 0)
+				warningf(HERE, "deprecated used more than once");
+			specifiers->deprecated = 1;
+			if(token.type == '(') {
 				next_token();
 				if(token.type == T_STRING_LITERAL) {
 					specifiers->deprecated_string = token.v.string.begin;
@@ -2219,7 +2230,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_STORAGE_CLASS(T_auto,     STORAGE_CLASS_AUTO)
 		MATCH_STORAGE_CLASS(T_register, STORAGE_CLASS_REGISTER)
 
-		case T_declspec:
+		case T__declspec:
 			next_token();
 			expect('(');
 			add_anchor_token(')');
@@ -2259,6 +2270,11 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
 		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
+		MATCH_TYPE_QUALIFIER(T__w64,     TYPE_QUALIFIER_W64);
+		MATCH_TYPE_QUALIFIER(T___ptr32,  TYPE_QUALIFIER_PTR32);
+		MATCH_TYPE_QUALIFIER(T___ptr64,  TYPE_QUALIFIER_PTR64);
+		MATCH_TYPE_QUALIFIER(T___uptr,   TYPE_QUALIFIER_UPTR);
+		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
 
 		case T___extension__:
 			/* TODO */
@@ -2533,6 +2549,7 @@ finish_specifiers:
 	}
 
 	type->base.qualifiers = type_qualifiers;
+	/* FIXME: check type qualifiers here */
 
 	type_t *result = typehash_insert(type);
 	if(newtype && result != type) {
@@ -2554,6 +2571,12 @@ static type_qualifiers_t parse_type_qualifiers(void)
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
 		MATCH_TYPE_QUALIFIER(T_volatile, TYPE_QUALIFIER_VOLATILE);
+		/* microsoft extended type modifiers */
+		MATCH_TYPE_QUALIFIER(T__w64,     TYPE_QUALIFIER_W64);
+		MATCH_TYPE_QUALIFIER(T___ptr32,  TYPE_QUALIFIER_PTR32);
+		MATCH_TYPE_QUALIFIER(T___ptr64,  TYPE_QUALIFIER_PTR64);
+		MATCH_TYPE_QUALIFIER(T___uptr,   TYPE_QUALIFIER_UPTR);
+		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
 
 		default:
 			return type_qualifiers;
@@ -3010,6 +3033,7 @@ static declaration_t *parse_declarator(
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->modifiers              = specifiers->decl_modifiers;
+	declaration->deprecated             = specifiers->deprecated;
 	declaration->deprecated_string      = specifiers->deprecated_string;
 	declaration->get_property_sym       = specifiers->get_property_sym;
 	declaration->put_property_sym       = specifiers->put_property_sym;
@@ -4275,7 +4299,7 @@ static expression_t *parse_reference(void)
 	declaration->used = true;
 
 	/* check for deprecated functions */
-	if(declaration->modifiers & DM_DEPRECATED) {
+	if(declaration->deprecated != 0) {
 		const char *prefix = "";
 		if (is_type_function(declaration->type))
 			prefix = "function ";

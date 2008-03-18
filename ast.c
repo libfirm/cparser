@@ -23,6 +23,7 @@
 #include "symbol_t.h"
 #include "type_t.h"
 #include "parser.h"
+#include "lang_features.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -1214,10 +1215,14 @@ void print_initializer(const initializer_t *initializer)
  * Print microsoft extended declaration modifiers.
  */
 static void print_ms_modifiers(const declaration_t *declaration) {
+	if((c_mode & _MS) == 0)
+		return;
+
 	decl_modifiers_t modifiers = declaration->modifiers;
 
 	/* DM_FORCEINLINE handled outside. */
-	if((modifiers & ~DM_FORCEINLINE) != 0 || declaration->alignment != 0 ||
+	if((modifiers & ~DM_FORCEINLINE) != 0 ||
+	    declaration->alignment != 0 || declaration->deprecated != 0 ||
 	    declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
 		char *next = "(";
 
@@ -1249,7 +1254,7 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		if(modifiers & DM_NOINLINE) {
 			fputs(next, out); next = ", "; fputs("noinline", out);
 		}
-		if(modifiers & DM_DEPRECATED) {
+		if(declaration->deprecated != 0) {
 			fputs(next, out); next = ", "; fputs("deprecated", out);
 			if(declaration->deprecated_string != NULL)
 				fprintf(out, "(\"%s\")", declaration->deprecated_string);
