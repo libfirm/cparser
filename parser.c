@@ -836,55 +836,68 @@ static expression_t *create_implicit_cast(expression_t *expression,
 /** Implements the rules from § 6.5.16.1 */
 static type_t *semantic_assign(type_t *orig_type_left,
                             const expression_t *const right,
-                            const char *context)
+                            const char *context,
+                            source_position_t source_position)
 {
 	type_t *const orig_type_right = right->base.type;
 	type_t *const type_left       = skip_typeref(orig_type_left);
 	type_t *const type_right      = skip_typeref(orig_type_right);
 
-	if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (is_type_pointer(type_left) && is_null_pointer_constant(right)) ||
+	if(is_type_pointer(type_left)) {
+		if(is_null_pointer_constant(right)) {
+			return orig_type_left;
+		} else if(is_type_pointer(type_right)) {
+			type_t *points_to_left
+				= skip_typeref(type_left->pointer.points_to);
+			type_t *points_to_right
+				= skip_typeref(type_right->pointer.points_to);
+
+			/* the left type has all qualifiers from the right type */
+			unsigned missing_qualifiers
+				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
+			if(missing_qualifiers != 0) {
+				errorf(source_position,
+						"destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type", type_left, context, type_right, missing_qualifiers);
+				return orig_type_left;
+			}
+
+			points_to_left  = get_unqualified_type(points_to_left);
+			points_to_right = get_unqualified_type(points_to_right);
+
+			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
+					is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
+				return orig_type_left;
+			}
+
+			if (!types_compatible(points_to_left, points_to_right)) {
+				warningf(source_position,
+					"destination type '%T' in %s is incompatible with '%E' of type '%T'",
+					orig_type_left, context, right, orig_type_right);
+			}
+
+			return orig_type_left;
+		} else if(is_type_integer(type_right)) {
+			warningf(source_position,
+					"%s makes pointer '%T' from integer '%T' without a cast",
+					context, orig_type_left, orig_type_right);
+			return orig_type_left;
+		}
+	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
 	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
 	     	&& is_type_pointer(type_right))) {
 		return orig_type_left;
-	}
-
-	if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		type_t *points_to_left  = skip_typeref(type_left->pointer.points_to);
-		type_t *points_to_right = skip_typeref(type_right->pointer.points_to);
-
-		/* the left type has all qualifiers from the right type */
-		unsigned missing_qualifiers
-			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
-		if(missing_qualifiers != 0) {
-			errorf(HERE, "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type", type_left, context, type_right, missing_qualifiers);
-			return orig_type_left;
-		}
-
-		points_to_left  = get_unqualified_type(points_to_left);
-		points_to_right = get_unqualified_type(points_to_right);
-
-		if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
-				is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
-			return orig_type_left;
-		}
-
-		if (!types_compatible(points_to_left, points_to_right)) {
-			warningf(right->base.source_position,
-				"destination type '%T' in %s is incompatible with '%E' of type '%T'",
-				orig_type_left, context, right, orig_type_right);
-		}
-
-		return orig_type_left;
-	}
-
-	if ((is_type_compound(type_left)  && is_type_compound(type_right))
+	} else if ((is_type_compound(type_left)  && is_type_compound(type_right))
 			|| (is_type_builtin(type_left) && is_type_builtin(type_right))) {
 		type_t *const unqual_type_left  = get_unqualified_type(type_left);
 		type_t *const unqual_type_right = get_unqualified_type(type_right);
 		if (types_compatible(unqual_type_left, unqual_type_right)) {
 			return orig_type_left;
 		}
+	} else if (is_type_integer(type_left) && is_type_pointer(type_right)) {
+		warningf(source_position,
+				"%s makes integer '%T' from pointer '%T' without a cast",
+				context, orig_type_left, orig_type_right);
+		return orig_type_left;
 	}
 
 	if (!is_type_valid(type_left))
@@ -1345,7 +1358,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		}
 	}
 
-	type_t *const res_type = semantic_assign(type, expression, "initializer");
+	type_t *const res_type = semantic_assign(type, expression, "initializer",
+			expression->base.source_position);
 	if (res_type == NULL)
 		return NULL;
 
@@ -5372,7 +5386,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 			type_t *expected_type = parameter->type;
 			/* TODO report scope in error messages */
 			expression_t *const arg_expr = argument->expression;
-			type_t       *const res_type = semantic_assign(expected_type, arg_expr, "function call");
+			type_t       *const res_type = semantic_assign(expected_type, arg_expr, "function call", arg_expr->base.source_position);
 			if (res_type == NULL) {
 				/* TODO improve error message */
 				errorf(arg_expr->base.source_position,
@@ -6053,7 +6067,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	}
 
 	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
-	                                         "assignment");
+			"assignment", left->base.source_position);
 	if (res_type == NULL) {
 		errorf(expression->base.source_position,
 			"cannot assign to '%T' from '%T'",
@@ -7091,10 +7105,10 @@ declaration_t *expr_is_variable(const expression_t *expression)
  */
 static statement_t *parse_return(void)
 {
-	eat(T_return);
-
 	statement_t *statement          = allocate_statement_zero(STATEMENT_RETURN);
 	statement->base.source_position = token.source_position;
+
+	eat(T_return);
 
 	expression_t *return_value = NULL;
 	if(token.type != ';') {
@@ -7116,7 +7130,7 @@ static statement_t *parse_return(void)
 			return_value = NULL;
 		} else {
 			type_t *const res_type = semantic_assign(return_type,
-				return_value, "'return'");
+				return_value, "'return'", statement->base.source_position);
 			if (res_type == NULL) {
 				errorf(statement->base.source_position,
 				       "cannot return something of type '%T' in function returning '%T'",
