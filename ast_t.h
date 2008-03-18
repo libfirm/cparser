@@ -51,6 +51,8 @@ typedef enum {
 
 	EXPR_FUNCTION,
 	EXPR_PRETTY_FUNCTION,
+	EXPR_FUNCSIG,           /**< MS function signature, aka ld_name */
+	EXPR_FUNCDNAME,         /**< MS decorated name of a function */
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_BUILTIN_PREFETCH,
