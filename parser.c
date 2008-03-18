@@ -4816,6 +4816,44 @@ end_error:
 }
 
 /**
+ * Parse a microsoft __noop expression.
+ */
+static expression_t *parse_noop_expression(void) {
+	source_position_t source_position = HERE;
+	eat(T___noop);
+
+	if (token.type == '(') {
+		/* parse arguments */
+		eat('(');
+		add_anchor_token(')');
+		add_anchor_token(',');
+
+		if(token.type != ')') {
+			while(true) {
+				(void)parse_assignment_expression();
+				if(token.type != ',')
+					break;
+				next_token();
+			}
+		}
+	}
+	rem_anchor_token(',');
+	rem_anchor_token(')');
+	expect(')');
+
+	/* the result is a (int)0 */
+	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
+	cnst->base.source_position = source_position;
+	cnst->base.type            = type_int;
+	cnst->conste.v.int_value   = 0;
+
+	return cnst;
+
+end_error:
+	return create_invalid_expression();
+}
+
+/**
  * Parses a primary expression.
  */
 static expression_t *parse_primary_expression(void)
@@ -4853,6 +4891,7 @@ static expression_t *parse_primary_expression(void)
 		case T__assume:                  return parse_assume();
 
 		case '(':                        return parse_brace_expression();
+		case T___noop:                   return parse_noop_expression();
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
