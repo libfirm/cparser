@@ -42,10 +42,10 @@ static const source_position_t *curr_pos = NULL;
 /**
  * prints an additional source position
  */
-static void print_source_position(FILE *out, source_position_t pos) {
-	fprintf(out, "at line %u", pos.linenr);
-	if (curr_pos == NULL || curr_pos->input_name != pos.input_name)
-		fprintf(out, " of \"%s\"", pos.input_name);
+static void print_source_position(FILE *out, const source_position_t *pos) {
+	fprintf(out, "at line %u", pos->linenr);
+	if (curr_pos == NULL || curr_pos->input_name != pos->input_name)
+		fprintf(out, " of \"%s\"", pos->input_name);
 }
 
 /**
@@ -150,7 +150,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 				}
 
 				case 'P': {
-					source_position_t pos = va_arg(ap, source_position_t);
+					const source_position_t *pos = va_arg(ap, const source_position_t *);
 					print_source_position(stderr, pos);
 					break;
 				}
@@ -174,12 +174,12 @@ void diagnosticf(const char *const fmt, ...)
 	va_end(ap);
 }
 
-static void errorvf(const source_position_t pos,
+static void errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: error: ", pos.input_name, pos.linenr);
+	fprintf(stderr, "%s:%u: error: ", pos->input_name, pos->linenr);
 	++error_count;
-	curr_pos = &pos;
+	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 	fputc('\n', stderr);
 
@@ -187,33 +187,33 @@ static void errorvf(const source_position_t pos,
 		exit(EXIT_FAILURE);
 }
 
-void errorf(const source_position_t pos, const char *const fmt, ...)
+void errorf(const source_position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = &pos;
+	curr_pos = pos;
 	errorvf(pos, fmt, ap);
 	va_end(ap);
 }
 
-static void warningvf(const source_position_t pos,
+static void warningvf(const source_position_t *pos,
                       const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: warning: ", pos.input_name, pos.linenr);
+	fprintf(stderr, "%s:%u: warning: ", pos->input_name, pos->linenr);
 	++warning_count;
-	curr_pos = &pos;
+	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 	fputc('\n', stderr);
 }
 
-void warningf(const source_position_t pos, const char *const fmt, ...)
+void warningf(const source_position_t *pos, const char *const fmt, ...)
 {
 	if (inhibit_all_warnings)
 		return;
 
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = &pos;
+	curr_pos = pos;
 	if (warning.s_are_errors) {
 		errorvf(pos, fmt, ap);
 	} else {
@@ -222,20 +222,20 @@ void warningf(const source_position_t pos, const char *const fmt, ...)
 	va_end(ap);
 }
 
-static void internal_errorvf(const source_position_t pos,
+static void internal_errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: internal error: ", pos.input_name, pos.linenr);
-	curr_pos = &pos;
+	fprintf(stderr, "%s:%u: internal error: ", pos->input_name, pos->linenr);
+	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 	fputc('\n', stderr);
 }
 
-void internal_errorf(const source_position_t pos, const char *const fmt, ...)
+void internal_errorf(const source_position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = &pos;
+	curr_pos = pos;
 	internal_errorvf(pos, fmt, ap);
 	va_end(ap);
 	abort();

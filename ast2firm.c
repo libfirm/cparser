@@ -82,7 +82,7 @@ ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const declaration_t *declaration = get_irg_loc_description(irg, pos);
 
-	warningf(declaration->source_position,
+	warningf(&declaration->source_position,
 	         "variable '%#T' might be used uninitialized",
 	         declaration->type, declaration->symbol);
 	return new_r_Unknown(irg, mode);

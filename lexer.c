@@ -64,7 +64,7 @@ static strset_t    stringset;
  */
 static void parse_error(const char *msg)
 {
-	errorf(lexer_token.source_position,  "%s", msg);
+	errorf(&lexer_token.source_position,  "%s", msg);
 }
 
 /**
@@ -74,7 +74,7 @@ static void parse_error(const char *msg)
  */
 static NORETURN internal_error(const char *msg)
 {
-	internal_errorf(lexer_token.source_position,  "%s", msg);
+	internal_errorf(&lexer_token.source_position,  "%s", msg);
 }
 
 static inline void next_real_char(void)
@@ -872,7 +872,7 @@ static void parse_string_literal(void)
 			source_position_t source_position;
 			source_position.input_name = lexer_token.source_position.input_name;
 			source_position.linenr     = start_linenr;
-			errorf(source_position, "string has no end");
+			errorf(&source_position, "string has no end");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -941,7 +941,7 @@ static void parse_wide_character_constant(void)
 		case EOF: {
 			source_position_t source_position = lexer_token.source_position;
 			source_position.linenr = start_linenr;
-			errorf(source_position, "EOF while parsing character constant");
+			errorf(&source_position, "EOF while parsing character constant");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -987,7 +987,7 @@ static void parse_wide_string_literal(void)
 			source_position_t source_position;
 			source_position.input_name = lexer_token.source_position.input_name;
 			source_position.linenr     = start_linenr;
-			errorf(source_position, "string has no end");
+			errorf(&source_position, "string has no end");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -1060,7 +1060,7 @@ static void parse_character_constant(void)
 			source_position_t source_position;
 			source_position.input_name = lexer_token.source_position.input_name;
 			source_position.linenr     = start_linenr;
-			errorf(source_position, "EOF while parsing character constant");
+			errorf(&source_position, "EOF while parsing character constant");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -1112,7 +1112,7 @@ static void skip_multiline_comment(void)
 			source_position_t source_position;
 			source_position.input_name = lexer_token.source_position.input_name;
 			source_position.linenr     = start_linenr;
-			errorf(source_position, "at end of file while looking for comment end");
+			errorf(&source_position, "at end of file while looking for comment end");
 			return;
 		}
 
@@ -1281,7 +1281,7 @@ static void parse_pragma(void) {
 				if (value != STDC_VALUE_UNKNOWN) {
 					unknown_pragma = false;
 				} else {
-					errorf(pp_token.source_position, "bad STDC pragma argument");
+					errorf(&pp_token.source_position, "bad STDC pragma argument");
 				}
 			}
 		}
@@ -1290,7 +1290,7 @@ static void parse_pragma(void) {
 	}
 	eat_until_newline();
 	if (unknown_pragma && warning.unknown_pragmas) {
-		warningf(pp_token.source_position, "encountered unknown #pragma");
+		warningf(&pp_token.source_position, "encountered unknown #pragma");
 	}
 }
 
@@ -1566,7 +1566,7 @@ void lexer_next_preprocessing_token(void)
 
 		default:
 			next_char();
-			errorf(lexer_token.source_position, "unknown character '%c' found\n", c);
+			errorf(&lexer_token.source_position, "unknown character '%c' found\n", c);
 			lexer_token.type = T_ERROR;
 			return;
 		}

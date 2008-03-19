@@ -82,7 +82,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 	return names[mod];
 }
 
-static void warn_invalid_length_modifier(const source_position_t pos,
+static void warn_invalid_length_modifier(const source_position_t *pos,
                                          const format_length_modifier_t mod,
                                          const wchar_rep_t conversion)
 {
@@ -165,7 +165,7 @@ static void check_format_arguments(const call_argument_t *const fmt_arg, const c
 	} else {
 		return;
 	}
-	const source_position_t    pos     = fmt_expr->base.source_position;
+	const source_position_t *pos = &fmt_expr->base.source_position;
 	unsigned fmt = vchar.first(&vchar);
 	for (; fmt != '\0'; fmt = vchar.next(&vchar)) {
 		if (fmt != '%')

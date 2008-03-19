@@ -32,7 +32,7 @@
 static symbol_t *token_symbols[T_LAST_TOKEN];
 static symbol_t *pp_token_symbols[TP_LAST_TOKEN];
 
-source_position_t builtin_source_position = { "<built-in>", 0 };
+const source_position_t builtin_source_position = { "<built-in>", 0 };
 
 void init_tokens(void)
 {

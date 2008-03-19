@@ -57,7 +57,7 @@ struct source_position_t {
 };
 
 /* position used for "builtin" declarations/types */
-extern source_position_t builtin_source_position;
+extern const source_position_t builtin_source_position;
 
 typedef struct {
 	int type;

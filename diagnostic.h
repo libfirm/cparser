@@ -44,19 +44,19 @@
 /**
  * Issue a diagnostic message.
  * Format types:
- *  %Y  symbol_t
- *  %E  expression_t
+ *  %Y  const symbol_t *
+ *  %E  const expression_t *
  *  %Q  unsigned  (qualifier)
  *  %T  type_t
  *  %K  token_t
  *  %k  token_kind_t
- *  %P  source_position_t
+ *  %P  const source_position_t *
  *
  */
 void diagnosticf(const char *fmt, ...);
-void errorf(source_position_t pos, const char *fmt, ...);
-void warningf(source_position_t pos, const char *fmt, ...);
-NORETURN internal_errorf(source_position_t pos, const char *fmt, ...);
+void errorf(const source_position_t *pos, const char *fmt, ...);
+void warningf(const source_position_t *pos, const char *fmt, ...);
+NORETURN internal_errorf(const source_position_t *pos, const char *fmt, ...);
 
 extern unsigned diagnostic_count;
 extern unsigned error_count;
