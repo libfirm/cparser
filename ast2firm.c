@@ -2925,7 +2925,8 @@ static void create_declaration_entity(declaration_t *declaration,
                                       ir_type *parent_type)
 {
 	ident     *const id     = new_id_from_str(declaration->symbol->string);
-	ir_type   *const irtype = get_ir_type(declaration->type);
+	type_t    *const type   = skip_typeref(declaration->type);
+	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
@@ -2937,7 +2938,10 @@ static void create_declaration_entity(declaration_t *declaration,
 		set_entity_allocation(entity, allocation_automatic);
 	else if(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
 		set_entity_allocation(entity, allocation_static);
-	/* TODO: visibility? */
+
+	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		set_entity_volatility(entity, volatility_is_volatile);
+	}
 }
 
 
@@ -3591,6 +3595,10 @@ static void create_local_static_variable(declaration_t *declaration)
 	dbg_info  *const dbgi        = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(entity, id);
+
+	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		set_entity_volatility(entity, volatility_is_volatile);
+	}
 
 	declaration->declaration_kind = DECLARATION_KIND_GLOBAL_VARIABLE;
 	declaration->v.entity         = entity;
