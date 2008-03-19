@@ -166,9 +166,9 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 	memcpy(buf+last_dot, newext, extlen);
 }
 
-static translation_unit_t *do_parsing(FILE *const in, const char *const input)
+static translation_unit_t *do_parsing(FILE *const in, const char *const input_name)
 {
-	lexer_open_stream(in, input);
+	lexer_open_stream(in, input_name);
 	translation_unit_t *unit = parse();
 	return unit;
 }
@@ -184,7 +184,7 @@ static void lextest(FILE *in, const char *fname)
 	} while(lexer_token.type != T_EOF);
 }
 
-static FILE* preprocess(FILE* in, const char *fname)
+static FILE *preprocess(FILE *in, const char *fname)
 {
 	char buf[4096];
 	obstack_1grow(&cppflags_obst, '\0');
@@ -200,8 +200,8 @@ static FILE* preprocess(FILE* in, const char *fname)
 	if(verbose) {
 		puts(buf);
 	}
-	FILE* f = popen(buf, "r");
-	if (f == NULL) {
+	FILE *f = popen(buf, "r");
+	if(f == NULL) {
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(1);
 	}
