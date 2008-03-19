@@ -1169,12 +1169,13 @@ static ir_node *wide_string_literal_to_firm(
 	return create_symconst(dbgi, mode_P_data, entity);
 }
 
-static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
+static ir_node *deref_address(type_t *const type, ir_node *const addr,
                               dbg_info *const dbgi)
 {
-	if (is_compound_type(irtype) ||
-			is_Method_type(irtype)   ||
-			is_Array_type(irtype)) {
+	ir_type *irtype = get_ir_type(type);
+	if (is_compound_type(irtype)
+			|| is_Method_type(irtype)
+			|| is_Array_type(irtype)) {
 		return addr;
 	}
 
@@ -1183,6 +1184,11 @@ static ir_node *deref_address(ir_type *const irtype, ir_node *const addr,
 	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode);
 	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
+
+	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		set_Load_volatility(load, volatility_is_volatile);
+	}
+
 	set_store(load_mem);
 	return load_res;
 }
@@ -1270,16 +1276,14 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
-		ir_type *const irtype = get_entity_type(declaration->v.entity);
-		return deref_address(irtype, addr, dbgi);
+		return deref_address(declaration->type, addr, dbgi);
 	}
 
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_local_frame(entity);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-		ir_type   *irtype = get_entity_type(entity);
-		return deref_address(irtype, sel, dbgi);
+		return deref_address(declaration->type, sel, dbgi);
 	}
 
 	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
@@ -1489,6 +1493,8 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	if(is_type_scalar(type)) {
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
+		if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
+			set_Store_volatility(store, volatility_is_volatile);
 		set_store(store_mem);
 	} else {
 		ir_type *irtype    = get_ir_type(type);
@@ -1561,6 +1567,11 @@ static void bitfield_store_to_firm(const unary_expression_t *expression,
 	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
+
+	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		set_Load_volatility(load, volatility_is_volatile);
+		set_Store_volatility(store, volatility_is_volatile);
+	}
 }
 
 static void set_value_for_expression(const expression_t *expression,
@@ -1849,9 +1860,8 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_DEREFERENCE: {
 		ir_node *value_node = expression_to_firm(value);
 		type_t  *value_type = skip_typeref(value->base.type);
-		ir_type *irtype     = get_ir_type(value_type);
-		assert(is_Pointer_type(irtype));
-		ir_type *points_to  = get_pointer_points_to_type(irtype);
+		assert(is_type_pointer(value_type));
+		type_t  *points_to  = value_type->pointer.points_to;
 		return deref_address(points_to, value_node, dbgi);
 	}
 	case EXPR_UNARY_POSTFIX_INCREMENT:
@@ -2280,9 +2290,8 @@ static ir_node *array_access_to_firm(
 	type_t   *type   = revert_automatic_type_conversion(
 			(const expression_t*) expression);
 	type             = skip_typeref(type);
-	ir_type  *irtype = get_ir_type(type);
 
-	return deref_address(irtype, addr, dbgi);
+	return deref_address(type, addr, dbgi);
 }
 
 static long get_offsetof_offset(const offsetof_expression_t *expression)
@@ -2520,9 +2529,8 @@ static ir_node *select_to_firm(const select_expression_t *expression)
 	type_t   *type   = revert_automatic_type_conversion(
 			(const expression_t*) expression);
 	type             = skip_typeref(type);
-	ir_type  *irtype = get_ir_type(type);
 
-	return deref_address(irtype, addr, dbgi);
+	return deref_address(type, addr, dbgi);
 }
 
 /* Values returned by __builtin_classify_type. */
@@ -2688,13 +2696,13 @@ static ir_node *va_start_expression_to_firm(
 
 static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 {
-	ir_type  *const irtype = get_ir_type(expr->base.type);
+	type_t   *const type   = expr->base.type;
 	ir_node  *const ap     = expression_to_firm(expr->ap);
 	dbg_info *const dbgi   = get_dbg_info(&expr->base.source_position);
-	ir_node  *const res    = deref_address(irtype, ap, dbgi);
+	ir_node  *const res    = deref_address(type, ap, dbgi);
 
-	ir_node  *const cnst      = get_type_size(expr->base.type);
-	ir_node  *const add       = new_d_Add(dbgi, ap, cnst, mode_P_data);
+	ir_node  *const cnst   = get_type_size(expr->base.type);
+	ir_node  *const add    = new_d_Add(dbgi, ap, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
 	return res;
@@ -3552,6 +3560,8 @@ static void create_local_variable(declaration_t *declaration)
 		create_variable_length_array(declaration);
 		return;
 	} else if(is_type_array(type) || is_type_compound(type)) {
+		needs_entity = true;
+	} else if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		needs_entity = true;
 	}
 
