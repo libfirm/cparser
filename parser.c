@@ -979,6 +979,28 @@ typedef enum gnu_attribute_kind_t {
  	GNU_AK_CONSTRUCTOR,
 	GNU_AK_DESTRUCTOR,
 	GNU_AK_NOTHROW,
+	GNU_AK_TRANSPARENT_UNION,
+	GNU_AK_COMMON,
+	GNU_AK_NOCOMMON,
+	GNU_AK_PACKED,
+	GNU_AK_SHARED,
+	GNU_AK_USED,
+	GNU_AK_UNUSED,
+	GNU_AK_NO_INSTRUMENT_FUNCTION,
+	GNU_AK_WARN_UNUSED_RESULT,
+	GNU_AK_LONGCALL,
+	GNU_AK_SHORTCALL,
+	GNU_AK_LONG_CALL,
+	GNU_AK_SHORT_CALL,
+	GNU_AK_FUNCTION_VECTOR,
+	GNU_AK_INTERRUPT,
+	GNU_AK_INTERRUPT_HANDLER,
+	GNU_AK_NEAR,
+	GNU_AK_FAR,
+	GNU_AK_SIGNAL,
+	GNU_AK_EIGTHBIT_DATA,
+	GNU_AK_TINY_DATA,
+	GNU_AK_SAVEALL,
 	GNU_AK_ALIGNED,
 	GNU_AK_ALIAS,
 	GNU_AK_SECTION,
@@ -986,33 +1008,67 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_FORMAT_ARG,
 	GNU_AK_WEAKREF,
 	GNU_AK_NONNULL,
+	GNU_AK_TLS_MODEL,
+	GNU_AK_VISIBILITY,
+	GNU_AK_REGPARM,
+	GNU_AK_MODEL,
+	GNU_AK_TRAP_EXIT,
+	GNU_AK_SP_SWITCH,
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
 static const char *gnu_attribute_names[GNU_AK_LAST] = {
-	[GNU_AK_CONST]         = "const",
-	[GNU_AK_VOLATILE]      = "volatile",
-	[GNU_AK_CDECL]         = "cdecl",
-	[GNU_AK_STDCALL]       = "stdcall",
-	[GNU_AK_FASTCALL]      = "fastcall",
-	[GNU_AK_DEPRECATED]    = "deprecated",
-	[GNU_AK_NOINLINE]      = "noinline",
-	[GNU_AK_NORETURN]      = "noreturn",
-	[GNU_AK_NAKED]         = "naked",
-	[GNU_AK_PURE]          = "pure",
-	[GNU_AK_ALWAYS_INLINE] = "always_inline",
-	[GNU_AK_MALLOC]        = "malloc",
-	[GNU_AK_WEAK]          = "weak",
- 	[GNU_AK_CONSTRUCTOR]   = "constructor",
-	[GNU_AK_DESTRUCTOR]    = "destructor",
-	[GNU_AK_NOTHROW]       = "nothrow",
-	[GNU_AK_ALIGNED]       = "aligned",
-	[GNU_AK_ALIAS]         = "alias",
-	[GNU_AK_SECTION]       = "section",
-	[GNU_AK_FORMAT]        = "format",
-	[GNU_AK_FORMAT_ARG]    = "format_arg",
-	[GNU_AK_WEAKREF]       = "weakref",
-	[GNU_AK_NONNULL]       = "nonnull"
+	[GNU_AK_CONST]                  = "const",
+	[GNU_AK_VOLATILE]               = "volatile",
+	[GNU_AK_CDECL]                  = "cdecl",
+	[GNU_AK_STDCALL]                = "stdcall",
+	[GNU_AK_FASTCALL]               = "fastcall",
+	[GNU_AK_DEPRECATED]             = "deprecated",
+	[GNU_AK_NOINLINE]               = "noinline",
+	[GNU_AK_NORETURN]               = "noreturn",
+	[GNU_AK_NAKED]                  = "naked",
+	[GNU_AK_PURE]                   = "pure",
+	[GNU_AK_ALWAYS_INLINE]          = "always_inline",
+	[GNU_AK_MALLOC]                 = "malloc",
+	[GNU_AK_WEAK]                   = "weak",
+ 	[GNU_AK_CONSTRUCTOR]            = "constructor",
+	[GNU_AK_DESTRUCTOR]             = "destructor",
+	[GNU_AK_NOTHROW]                = "nothrow",
+	[GNU_AK_TRANSPARENT_UNION]      = "transparent_union",
+	[GNU_AK_COMMON]                 = "coommon",
+	[GNU_AK_NOCOMMON]               = "nocommon",
+	[GNU_AK_PACKED]                 = "packed",
+	[GNU_AK_SHARED]                 = "shared",
+	[GNU_AK_USED]                   = "used",
+	[GNU_AK_UNUSED]                 = "unused",
+	[GNU_AK_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
+	[GNU_AK_WARN_UNUSED_RESULT]     = "warn_unused_result",
+	[GNU_AK_LONGCALL]               = "longcall",
+ 	[GNU_AK_SHORTCALL]              = "shortcall",
+	[GNU_AK_LONG_CALL]              = "long_call",
+ 	[GNU_AK_SHORT_CALL]             = "short_call",
+	[GNU_AK_FUNCTION_VECTOR]        = "function_vector",
+ 	[GNU_AK_INTERRUPT]				= "interrupt",
+ 	[GNU_AK_INTERRUPT_HANDLER]      = "interrupt_handler",
+ 	[GNU_AK_NEAR]                   = "near",
+	[GNU_AK_FAR]                    = "far",
+	[GNU_AK_SIGNAL]                 = "signal",
+	[GNU_AK_EIGTHBIT_DATA]          = "eightbit_data",
+	[GNU_AK_TINY_DATA]              = "tiny_data",
+	[GNU_AK_SAVEALL]                = "saveall",
+	[GNU_AK_ALIGNED]                = "aligned",
+	[GNU_AK_ALIAS]                  = "alias",
+	[GNU_AK_SECTION]                = "section",
+	[GNU_AK_FORMAT]                 = "format",
+	[GNU_AK_FORMAT_ARG]             = "format_arg",
+	[GNU_AK_WEAKREF]                = "weakref",
+	[GNU_AK_NONNULL]                = "nonnull",
+	[GNU_AK_TLS_MODEL]              = "tls_model",
+	[GNU_AK_VISIBILITY]             = "visibility",
+	[GNU_AK_REGPARM]                = "regparm",
+	[GNU_AK_MODEL]                  = "model",
+	[GNU_AK_TRAP_EXIT]              = "trap_exit",
+	[GNU_AK_SP_SWITCH]              = "sp_switch"
 };
 
 /**
@@ -1084,6 +1140,90 @@ end_error:
 }
 
 /**
+ * parse one tls model.
+ */
+static int parse_gnu_attribute_tls_model_arg(void) {
+	static const char *tls_models[] = {
+		"global-dynamic",
+		"local-dynamic",
+		"initial-exec",
+		"local-exec"
+	};
+	string_t string = parse_gnu_attribute_string_arg();
+	if(string.begin != NULL) {
+		for(int i = 0; i < 4; ++i) {
+			if(strcmp(tls_models[i], string.begin) == 0)
+				return i;
+		}
+	}
+	errorf(HERE, "'%s' is an unrecognized tls model", string.begin);
+	return -1;
+}
+
+/**
+ * parse one tls model.
+ */
+static int parse_gnu_attribute_visibility_arg(void) {
+	static const char *visibilities[] = {
+		"default",
+		"protected",
+		"hidden",
+		"internal"
+	};
+	string_t string = parse_gnu_attribute_string_arg();
+	if(string.begin != NULL) {
+		for(int i = 0; i < 4; ++i) {
+			if(strcmp(visibilities[i], string.begin) == 0)
+				return i;
+		}
+	}
+	errorf(HERE, "'%s' is an unrecognized visibility", string.begin);
+	return -1;
+}
+
+/**
+ * parse one (code) model.
+ */
+static int parse_gnu_attribute_model_arg(void) {
+	static const char *visibilities[] = {
+		"small",
+		"medium",
+		"large"
+	};
+	string_t string = parse_gnu_attribute_string_arg();
+	if(string.begin != NULL) {
+		for(int i = 0; i < 3; ++i) {
+			if(strcmp(visibilities[i], string.begin) == 0)
+				return i;
+		}
+	}
+	errorf(HERE, "'%s' is an unrecognized model", string.begin);
+	return -1;
+}
+
+/**
+ * parse one interrupt argument.
+ */
+static int parse_gnu_attribute_interrupt_arg(void) {
+	static const char *interrupts[] = {
+		"IRQ",
+		"FIQ",
+		"SWI",
+		"ABORT",
+		"UNDEF"
+	};
+	string_t string = parse_gnu_attribute_string_arg();
+	if(string.begin != NULL) {
+		for(int i = 0; i < 5; ++i) {
+			if(strcmp(interrupts[i], string.begin) == 0)
+				return i;
+		}
+	}
+	errorf(HERE, "'%s' is an interrupt", string.begin);
+	return -1;
+}
+
+/**
  * parse ( identifier, const expression, const expression )
  */
 static void parse_gnu_attribute_format_args(void) {
@@ -1150,6 +1290,27 @@ end_error:
  *  constructor
  *  destructor
  *  nothrow
+ *  transparent_union
+ *  common
+ *  nocommon
+ *  packed
+ *  shared
+ *  used
+ *  unused
+ *  no_instrument_function
+ *  warn_unused_result
+ *  longcall
+ *  shortcall
+ *  long_call
+ *  short_call
+ *  function_vector
+ *  interrupt_handler
+ *  near
+ *  far
+ *  signal
+ *  eightbit_data
+ *  tiny_data
+ *  saveall
  *
  * The following attributes are parsed with arguments
  *  aligned( const expression )
@@ -1157,10 +1318,17 @@ end_error:
  *  section( string literal )
  *  format( identifier, const expression, const expression )
  *  format_arg( const expression )
+ *  tls_model( string literal )
+ *  visibility( string literal )
+ *  regparm( const expression )
+ *  model( string leteral )
+ *  trap_exit( const expression )
+ *  sp_switch( string literal )
  *
  * The following attributes might have arguments
  *  weak_ref( string literal )
  *  non_null( const expression // ',' )
+ *  interrupt( string literal )
  */
 static void parse_gnu_attribute(void)
 {
@@ -1229,6 +1397,27 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_CONSTRUCTOR:
 				case GNU_AK_DESTRUCTOR:
 				case GNU_AK_NOTHROW:
+				case GNU_AK_TRANSPARENT_UNION:
+				case GNU_AK_COMMON:
+				case GNU_AK_NOCOMMON:
+				case GNU_AK_PACKED:
+				case GNU_AK_SHARED:
+				case GNU_AK_USED:
+				case GNU_AK_UNUSED:
+				case GNU_AK_NO_INSTRUMENT_FUNCTION:
+				case GNU_AK_WARN_UNUSED_RESULT:
+				case GNU_AK_LONGCALL:
+				case GNU_AK_SHORTCALL:
+				case GNU_AK_LONG_CALL:
+				case GNU_AK_SHORT_CALL:
+				case GNU_AK_FUNCTION_VECTOR:
+				case GNU_AK_INTERRUPT_HANDLER:
+			 	case GNU_AK_NEAR:
+				case GNU_AK_FAR:
+				case GNU_AK_SIGNAL:
+				case GNU_AK_EIGTHBIT_DATA:
+				case GNU_AK_TINY_DATA:
+				case GNU_AK_SAVEALL:
 					if(have_args) {
 						/* should have no arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
@@ -1240,6 +1429,8 @@ static void parse_gnu_attribute(void)
 
 				case GNU_AK_ALIGNED:
 				case GNU_AK_FORMAT_ARG:
+				case GNU_AK_REGPARM:
+				case GNU_AK_TRAP_EXIT:
 					if(!have_args) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
@@ -1248,6 +1439,7 @@ static void parse_gnu_attribute(void)
 					break;
 				case GNU_AK_ALIAS:
 				case GNU_AK_SECTION:
+				case GNU_AK_SP_SWITCH:
 					if(!have_args) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
@@ -1269,6 +1461,32 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_NONNULL:
 					if(have_args)
 						parse_gnu_attribute_const_arg_list();
+					break;
+				case GNU_AK_TLS_MODEL:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_tls_model_arg();
+					break;
+				case GNU_AK_VISIBILITY:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_visibility_arg();
+					break;
+				case GNU_AK_MODEL:
+					if(!have_args) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_model_arg();
+				case GNU_AK_INTERRUPT:
+					/* may have one string argument */
+					if(have_args)
+						parse_gnu_attribute_interrupt_arg();
+					break;
 				case GNU_AK_LAST:
 					/* already handled */
 					break;
