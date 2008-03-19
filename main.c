@@ -655,7 +655,11 @@ int main(int argc, char **argv)
 			outname = outnamebuf;
 			break;
 		case CompileAssembleLink:
+#ifdef _WIN32
+			outname = "a.exe";
+#else
 			outname = "a.out";
+#endif
 			break;
 		}
 	}
