@@ -1026,6 +1026,8 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_MAY_ALIAS]              = "may_alias",
 	[GNU_AK_MS_STRUCT]              = "ms_struct",
 	[GNU_AK_GCC_STRUCT]             = "gcc_struct",
+	[GNU_AK_DLLIMPORT]              = "dllimport",
+	[GNU_AK_DLLEXPORT]              = "dllexport",
 	[GNU_AK_ALIGNED]                = "aligned",
 	[GNU_AK_ALIAS]                  = "alias",
 	[GNU_AK_SECTION]                = "section",
@@ -1317,6 +1319,8 @@ end_error:
  *  may_alias
  *  ms_struct
  *  gcc_struct
+ *  dllimport
+ *  dllexport
  *
  * The following attributes are parsed with arguments
  *  aligned( const expression )
@@ -1448,6 +1452,8 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_MAY_ALIAS:
 				case GNU_AK_MS_STRUCT:
 				case GNU_AK_GCC_STRUCT:
+				case GNU_AK_DLLIMPORT:
+				case GNU_AK_DLLEXPORT:
 					if(attribute->have_arguments) {
 						/* should have no arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
