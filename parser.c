@@ -1387,11 +1387,12 @@ static void parse_gnu_attribute(void)
 			name = sym->string;
 			next_token();
 
-			gnu_attribute_kind_t kind;
-			for(kind = 0; kind < GNU_AK_LAST; ++kind) {
-				if(strcmp_underscore(gnu_attribute_names[kind], name) == 0)
+			int i;
+			for(i = 0; i < GNU_AK_LAST; ++i) {
+				if(strcmp_underscore(gnu_attribute_names[i], name) == 0)
 					break;
 			}
+			gnu_attribute_kind_t kind = (gnu_attribute_kind_t)i;
 
 			if(kind == GNU_AK_LAST) {
 				if(warning.attribute)
