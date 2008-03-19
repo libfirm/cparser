@@ -984,6 +984,7 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_NOCOMMON,
 	GNU_AK_PACKED,
 	GNU_AK_SHARED,
+	GNU_AK_NOTSHARED,
 	GNU_AK_USED,
 	GNU_AK_UNUSED,
 	GNU_AK_NO_INSTRUMENT_FUNCTION,
@@ -995,12 +996,21 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_FUNCTION_VECTOR,
 	GNU_AK_INTERRUPT,
 	GNU_AK_INTERRUPT_HANDLER,
+ 	GNU_AK_NMI_HANDLER,
+ 	GNU_AK_NESTING,
 	GNU_AK_NEAR,
 	GNU_AK_FAR,
 	GNU_AK_SIGNAL,
 	GNU_AK_EIGTHBIT_DATA,
 	GNU_AK_TINY_DATA,
 	GNU_AK_SAVEALL,
+	GNU_AK_FLATTEN,
+	GNU_AK_SSEREGPARM,
+	GNU_AK_EXTERNALLY_VISIBLE,
+	GNU_AK_RETURN_TWICE,
+	GNU_AK_MAY_ALIAS,
+	GNU_AK_MS_STRUCT,
+	GNU_AK_GCC_STRUCT,
 	GNU_AK_ALIGNED,
 	GNU_AK_ALIAS,
 	GNU_AK_SECTION,
@@ -1014,6 +1024,7 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_MODEL,
 	GNU_AK_TRAP_EXIT,
 	GNU_AK_SP_SWITCH,
+	GNU_AK_SENTINEL,
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
@@ -1039,6 +1050,7 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_NOCOMMON]               = "nocommon",
 	[GNU_AK_PACKED]                 = "packed",
 	[GNU_AK_SHARED]                 = "shared",
+	[GNU_AK_NOTSHARED]              = "notshared",
 	[GNU_AK_USED]                   = "used",
 	[GNU_AK_UNUSED]                 = "unused",
 	[GNU_AK_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
@@ -1050,12 +1062,21 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_FUNCTION_VECTOR]        = "function_vector",
  	[GNU_AK_INTERRUPT]				= "interrupt",
  	[GNU_AK_INTERRUPT_HANDLER]      = "interrupt_handler",
+ 	[GNU_AK_NMI_HANDLER]            = "nmi_handler",
+ 	[GNU_AK_NESTING]                = "nesting",
  	[GNU_AK_NEAR]                   = "near",
 	[GNU_AK_FAR]                    = "far",
 	[GNU_AK_SIGNAL]                 = "signal",
 	[GNU_AK_EIGTHBIT_DATA]          = "eightbit_data",
 	[GNU_AK_TINY_DATA]              = "tiny_data",
 	[GNU_AK_SAVEALL]                = "saveall",
+	[GNU_AK_FLATTEN]                = "flatten",
+	[GNU_AK_SSEREGPARM]             = "sseregparm",
+	[GNU_AK_EXTERNALLY_VISIBLE]     = "externally_visible",
+	[GNU_AK_RETURN_TWICE]           = "return_twice",
+	[GNU_AK_MAY_ALIAS]              = "may_alias",
+	[GNU_AK_MS_STRUCT]              = "ms_struct",
+	[GNU_AK_GCC_STRUCT]             = "gcc_struct",
 	[GNU_AK_ALIGNED]                = "aligned",
 	[GNU_AK_ALIAS]                  = "alias",
 	[GNU_AK_SECTION]                = "section",
@@ -1068,7 +1089,8 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_REGPARM]                = "regparm",
 	[GNU_AK_MODEL]                  = "model",
 	[GNU_AK_TRAP_EXIT]              = "trap_exit",
-	[GNU_AK_SP_SWITCH]              = "sp_switch"
+	[GNU_AK_SP_SWITCH]              = "sp_switch",
+	[GNU_AK_SENTINEL]               = "sentinel"
 };
 
 /**
@@ -1295,6 +1317,7 @@ end_error:
  *  nocommon
  *  packed
  *  shared
+ *  notshared
  *  used
  *  unused
  *  no_instrument_function
@@ -1305,12 +1328,21 @@ end_error:
  *  short_call
  *  function_vector
  *  interrupt_handler
+ *  nmi_handler
+ *  nesting
  *  near
  *  far
  *  signal
  *  eightbit_data
  *  tiny_data
  *  saveall
+ *  flatten
+ *  sseregparm
+ *  externally_visible
+ *  return_twice
+ *  may_alias
+ *  ms_struct
+ *  gcc_struct
  *
  * The following attributes are parsed with arguments
  *  aligned( const expression )
@@ -1329,6 +1361,7 @@ end_error:
  *  weak_ref( string literal )
  *  non_null( const expression // ',' )
  *  interrupt( string literal )
+ *  sentinel( constant expression )
  */
 static void parse_gnu_attribute(void)
 {
@@ -1402,6 +1435,7 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_NOCOMMON:
 				case GNU_AK_PACKED:
 				case GNU_AK_SHARED:
+				case GNU_AK_NOTSHARED:
 				case GNU_AK_USED:
 				case GNU_AK_UNUSED:
 				case GNU_AK_NO_INSTRUMENT_FUNCTION:
@@ -1412,12 +1446,21 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_SHORT_CALL:
 				case GNU_AK_FUNCTION_VECTOR:
 				case GNU_AK_INTERRUPT_HANDLER:
+				case GNU_AK_NMI_HANDLER:
+				case GNU_AK_NESTING:
 			 	case GNU_AK_NEAR:
 				case GNU_AK_FAR:
 				case GNU_AK_SIGNAL:
 				case GNU_AK_EIGTHBIT_DATA:
 				case GNU_AK_TINY_DATA:
 				case GNU_AK_SAVEALL:
+				case GNU_AK_FLATTEN:
+				case GNU_AK_SSEREGPARM:
+				case GNU_AK_EXTERNALLY_VISIBLE:
+				case GNU_AK_RETURN_TWICE:
+				case GNU_AK_MAY_ALIAS:
+				case GNU_AK_MS_STRUCT:
+				case GNU_AK_GCC_STRUCT:
 					if(have_args) {
 						/* should have no arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
@@ -1486,6 +1529,11 @@ static void parse_gnu_attribute(void)
 					/* may have one string argument */
 					if(have_args)
 						parse_gnu_attribute_interrupt_arg();
+					break;
+				case GNU_AK_SENTINEL:
+					/* may have one string argument */
+					if(have_args)
+						parse_gnu_attribute_const_arg();
 					break;
 				case GNU_AK_LAST:
 					/* already handled */
