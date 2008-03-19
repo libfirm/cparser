@@ -24,7 +24,8 @@
 warning_t warning = {
 	.attribute                     = true,
 	.char_subscripts               = true,
-	.check_format                  = true,
+	.format                        = true,
+	.nonnull                       = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
 	.float_equal                   = false,
@@ -68,7 +69,8 @@ void set_warning_opt(const char *const opt)
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
 		SET(attribute)
 		SET(char_subscripts)
-		SET(check_format)
+		SET(format)
+		SET(nonnull)
 		SET(empty_statement)
 		SET(implicit_function_declaration)
 		SET(implicit_int)
@@ -100,7 +102,11 @@ void set_warning_opt(const char *const opt)
 	}
 	OPT("fatal-errors",                  fatal_errors)
 	OPT("float-equal",                   float_equal)
-	OPT("format",                        check_format)
+	OPTX("format") {
+		SET(format)
+		SET(nonnull)
+	}
+	OPT("nonnull",                       nonnull)
 	OPTX("implicit") {
 		SET(implicit_function_declaration)
 		SET(implicit_int)

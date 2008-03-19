@@ -540,7 +540,7 @@ next_arg:
 
 void check_format(const call_expression_t *const call)
 {
-	if (!warning.check_format)
+	if (!warning.format)
 		return;
 
 	const expression_t *const func_expr = call->function;

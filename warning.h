@@ -31,7 +31,8 @@ typedef struct warning_t {
 #endif
 	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 	bool char_subscripts:1;               /**< Warn if an array subscript has the type 'char' */
-	bool check_format:1;                  /**< Check printf-style format strings */
+	bool format:1;                        /**< Check printf-style format strings */
+	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull */
 #if 0 // TODO
 	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 	bool cast_qual:1;                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
