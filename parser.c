@@ -978,11 +978,14 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_WEAK,
  	GNU_AK_CONSTRUCTOR,
 	GNU_AK_DESTRUCTOR,
+	GNU_AK_NOTHROW,
 	GNU_AK_ALIGNED,
 	GNU_AK_ALIAS,
 	GNU_AK_SECTION,
 	GNU_AK_FORMAT,
 	GNU_AK_FORMAT_ARG,
+	GNU_AK_WEAKREF,
+	GNU_AK_NONNULL,
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
@@ -1002,11 +1005,14 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_WEAK]          = "weak",
  	[GNU_AK_CONSTRUCTOR]   = "constructor",
 	[GNU_AK_DESTRUCTOR]    = "destructor",
+	[GNU_AK_NOTHROW]       = "nothrow",
 	[GNU_AK_ALIGNED]       = "aligned",
 	[GNU_AK_ALIAS]         = "alias",
 	[GNU_AK_SECTION]       = "section",
 	[GNU_AK_FORMAT]        = "format",
-	[GNU_AK_FORMAT_ARG]    = "format_arg"
+	[GNU_AK_FORMAT_ARG]    = "format_arg",
+	[GNU_AK_WEAKREF]       = "weakref",
+	[GNU_AK_NONNULL]       = "nonnull"
 };
 
 /**
@@ -1025,17 +1031,44 @@ static int strcmp_underscore(const char *s1, const char *s2) {
 	return strcmp(s1, s2);
 }
 
+/**
+ * parse one constant expression argument.
+ */
 static expression_t *parse_gnu_attribute_const_arg(void) {
 	expression_t *expression;
-	add_anchor_token('(');
+	add_anchor_token(')');
 	expression = parse_constant_expression();
-	rem_anchor_token('(');
+	rem_anchor_token(')');
 	expect(')');
 	return expression;
 end_error:
 	return create_invalid_expression();
 }
 
+/**
+ * parse a list of constant expressions argumnets.
+ */
+static expression_t *parse_gnu_attribute_const_arg_list(void) {
+	expression_t *expression;
+	add_anchor_token(')');
+	add_anchor_token(',');
+	while(true){
+		expression = parse_constant_expression();
+		if(token.type != ',')
+			break;
+		next_token();
+	}
+	rem_anchor_token(',');
+	rem_anchor_token(')');
+	expect(')');
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+/**
+ * parse one string literal argument.
+ */
 static string_t parse_gnu_attribute_string_arg(void) {
 	string_t string = { NULL, 0 };
 	add_anchor_token('(');
@@ -1050,18 +1083,18 @@ end_error:
 	return string;
 }
 
-static const char *format_names[] = {
-	"printf",
-	"scanf",
-	"strftime",
-	"strfmon"
-};
-
 /**
  * parse ( identifier, const expression, const expression )
  */
 static void parse_gnu_attribute_format_args(void) {
+	static const char *format_names[] = {
+		"printf",
+		"scanf",
+		"strftime",
+		"strfmon"
+	};
 	int i;
+
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER);
 		goto end_error;
@@ -1116,6 +1149,7 @@ end_error:
  *  weak
  *  constructor
  *  destructor
+ *  nothrow
  *
  * The following attributes are parsed with arguments
  *  aligned( const expression )
@@ -1123,6 +1157,10 @@ end_error:
  *  section( string literal )
  *  format( identifier, const expression, const expression )
  *  format_arg( const expression )
+ *
+ * The following attributes might have arguments
+ *  weak_ref( string literal )
+ *  non_null( const expression // ',' )
  */
 static void parse_gnu_attribute(void)
 {
@@ -1190,6 +1228,7 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_WEAK:
 				case GNU_AK_CONSTRUCTOR:
 				case GNU_AK_DESTRUCTOR:
+				case GNU_AK_NOTHROW:
 					if(have_args) {
 						/* should have no arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
@@ -1222,6 +1261,14 @@ static void parse_gnu_attribute(void)
 					} else
 						parse_gnu_attribute_format_args();
 					break;
+				case GNU_AK_WEAKREF:
+					/* may have one string argument */
+					if(have_args)
+						parse_gnu_attribute_string_arg();
+					break;
+				case GNU_AK_NONNULL:
+					if(have_args)
+						parse_gnu_attribute_const_arg_list();
 				case GNU_AK_LAST:
 					/* already handled */
 					break;
