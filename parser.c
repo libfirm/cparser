@@ -48,6 +48,18 @@ typedef struct {
 	unsigned short namespc;
 } stack_entry_t;
 
+typedef struct gnu_attribute_t gnu_attribute_t;
+struct gnu_attribute_t {
+	gnu_attribute_kind_t kind;
+	gnu_attribute_t     *next;
+	bool                 invalid;
+	bool                 have_arguments;
+	union {
+		size_t   value;
+		string_t string;
+	} u;
+};
+
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	source_position_t  source_position;
@@ -56,6 +68,7 @@ struct declaration_specifiers_t {
 	unsigned int       is_inline : 1;
 	unsigned int       deprecated : 1;
 	decl_modifiers_t   decl_modifiers;    /**< MS __declspec extended modifier mask */
+	gnu_attribute_t   *gnu_attributes;    /**< list of GNU attributes */
 	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
 	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
 	symbol_t          *put_property_sym;  /**< the name of the put property if set. */
@@ -962,72 +975,6 @@ static string_t parse_string_literals(void)
 	return result;
 }
 
-typedef enum gnu_attribute_kind_t {
-	GNU_AK_CONST,
-	GNU_AK_VOLATILE,
-	GNU_AK_CDECL,
-	GNU_AK_STDCALL,
-	GNU_AK_FASTCALL,
-	GNU_AK_DEPRECATED,
-	GNU_AK_NOINLINE,
-	GNU_AK_NORETURN,
-	GNU_AK_NAKED,
-	GNU_AK_PURE,
-	GNU_AK_ALWAYS_INLINE,
-	GNU_AK_MALLOC,
-	GNU_AK_WEAK,
- 	GNU_AK_CONSTRUCTOR,
-	GNU_AK_DESTRUCTOR,
-	GNU_AK_NOTHROW,
-	GNU_AK_TRANSPARENT_UNION,
-	GNU_AK_COMMON,
-	GNU_AK_NOCOMMON,
-	GNU_AK_PACKED,
-	GNU_AK_SHARED,
-	GNU_AK_NOTSHARED,
-	GNU_AK_USED,
-	GNU_AK_UNUSED,
-	GNU_AK_NO_INSTRUMENT_FUNCTION,
-	GNU_AK_WARN_UNUSED_RESULT,
-	GNU_AK_LONGCALL,
-	GNU_AK_SHORTCALL,
-	GNU_AK_LONG_CALL,
-	GNU_AK_SHORT_CALL,
-	GNU_AK_FUNCTION_VECTOR,
-	GNU_AK_INTERRUPT,
-	GNU_AK_INTERRUPT_HANDLER,
- 	GNU_AK_NMI_HANDLER,
- 	GNU_AK_NESTING,
-	GNU_AK_NEAR,
-	GNU_AK_FAR,
-	GNU_AK_SIGNAL,
-	GNU_AK_EIGTHBIT_DATA,
-	GNU_AK_TINY_DATA,
-	GNU_AK_SAVEALL,
-	GNU_AK_FLATTEN,
-	GNU_AK_SSEREGPARM,
-	GNU_AK_EXTERNALLY_VISIBLE,
-	GNU_AK_RETURN_TWICE,
-	GNU_AK_MAY_ALIAS,
-	GNU_AK_MS_STRUCT,
-	GNU_AK_GCC_STRUCT,
-	GNU_AK_ALIGNED,
-	GNU_AK_ALIAS,
-	GNU_AK_SECTION,
-	GNU_AK_FORMAT,
-	GNU_AK_FORMAT_ARG,
-	GNU_AK_WEAKREF,
-	GNU_AK_NONNULL,
-	GNU_AK_TLS_MODEL,
-	GNU_AK_VISIBILITY,
-	GNU_AK_REGPARM,
-	GNU_AK_MODEL,
-	GNU_AK_TRAP_EXIT,
-	GNU_AK_SP_SWITCH,
-	GNU_AK_SENTINEL,
-	GNU_AK_LAST
-} gnu_attribute_kind_t;
-
 static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_CONST]                  = "const",
 	[GNU_AK_VOLATILE]               = "volatile",
@@ -1110,23 +1057,35 @@ static int strcmp_underscore(const char *s1, const char *s2) {
 }
 
 /**
+ * Allocate a new gnu temporal attribute.
+ */
+static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind) {
+	gnu_attribute_t *attribute = obstack_alloc(&temp_obst, sizeof(*attribute));
+	attribute->kind           = kind;
+	attribute->next           = NULL;
+	attribute->invalid        = false;
+	attribute->have_arguments = false;
+}
+
+/**
  * parse one constant expression argument.
  */
-static expression_t *parse_gnu_attribute_const_arg(void) {
+static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute) {
 	expression_t *expression;
 	add_anchor_token(')');
 	expression = parse_constant_expression();
 	rem_anchor_token(')');
 	expect(')');
-	return expression;
+	(void)expression;
+	return;
 end_error:
-	return create_invalid_expression();
+	attribute->invalid = true;
 }
 
 /**
- * parse a list of constant expressions argumnets.
+ * parse a list of constant expressions arguments.
  */
-static expression_t *parse_gnu_attribute_const_arg_list(void) {
+static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute) {
 	expression_t *expression;
 	add_anchor_token(')');
 	add_anchor_token(',');
@@ -1139,94 +1098,104 @@ static expression_t *parse_gnu_attribute_const_arg_list(void) {
 	rem_anchor_token(',');
 	rem_anchor_token(')');
 	expect(')');
-	return expression;
+	(void)expression;
+	return;
 end_error:
-	return create_invalid_expression();
+	attribute->invalid = true;
 }
 
 /**
  * parse one string literal argument.
  */
-static string_t parse_gnu_attribute_string_arg(void) {
-	string_t string = { NULL, 0 };
+static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute, string_t *string) {
 	add_anchor_token('(');
 	if(token.type != T_STRING_LITERAL) {
 		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL);
 		goto end_error;
 	}
-	string = parse_string_literals();
+	*string = parse_string_literals();
 	rem_anchor_token('(');
 	expect(')');
+	return;
 end_error:
-	return string;
+	attribute->invalid = true;
 }
 
 /**
  * parse one tls model.
  */
-static int parse_gnu_attribute_tls_model_arg(void) {
+static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute) {
 	static const char *tls_models[] = {
 		"global-dynamic",
 		"local-dynamic",
 		"initial-exec",
 		"local-exec"
 	};
-	string_t string = parse_gnu_attribute_string_arg();
+	string_t string = { NULL, 0 };
+	parse_gnu_attribute_string_arg(attribute, &string);
 	if(string.begin != NULL) {
-		for(int i = 0; i < 4; ++i) {
-			if(strcmp(tls_models[i], string.begin) == 0)
-				return i;
+		for(size_t i = 0; i < 4; ++i) {
+			if(strcmp(tls_models[i], string.begin) == 0) {
+				attribute->u.value = i;
+				return;
+			}
 		}
 	}
 	errorf(HERE, "'%s' is an unrecognized tls model", string.begin);
-	return -1;
+	attribute->invalid = true;
 }
 
 /**
  * parse one tls model.
  */
-static int parse_gnu_attribute_visibility_arg(void) {
+static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute) {
 	static const char *visibilities[] = {
 		"default",
 		"protected",
 		"hidden",
 		"internal"
 	};
-	string_t string = parse_gnu_attribute_string_arg();
+	string_t string = { NULL, 0 };
+	parse_gnu_attribute_string_arg(attribute, &string);
 	if(string.begin != NULL) {
-		for(int i = 0; i < 4; ++i) {
-			if(strcmp(visibilities[i], string.begin) == 0)
-				return i;
+		for(size_t i = 0; i < 4; ++i) {
+			if(strcmp(visibilities[i], string.begin) == 0) {
+				attribute->u.value = i;
+				return;
+			}
 		}
 	}
 	errorf(HERE, "'%s' is an unrecognized visibility", string.begin);
-	return -1;
+	attribute->invalid = true;
 }
 
 /**
  * parse one (code) model.
  */
-static int parse_gnu_attribute_model_arg(void) {
+static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute) {
 	static const char *visibilities[] = {
 		"small",
 		"medium",
 		"large"
 	};
-	string_t string = parse_gnu_attribute_string_arg();
+	string_t string = { NULL, 0 };
+	parse_gnu_attribute_string_arg(attribute, &string);
 	if(string.begin != NULL) {
 		for(int i = 0; i < 3; ++i) {
-			if(strcmp(visibilities[i], string.begin) == 0)
-				return i;
+			if(strcmp(visibilities[i], string.begin) == 0) {
+				attribute->u.value = i;
+				return;
+			}
 		}
 	}
 	errorf(HERE, "'%s' is an unrecognized model", string.begin);
-	return -1;
+	attribute->invalid = true;
 }
 
 /**
  * parse one interrupt argument.
  */
-static int parse_gnu_attribute_interrupt_arg(void) {
+static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute) {
 	static const char *interrupts[] = {
 		"IRQ",
 		"FIQ",
@@ -1234,21 +1203,24 @@ static int parse_gnu_attribute_interrupt_arg(void) {
 		"ABORT",
 		"UNDEF"
 	};
-	string_t string = parse_gnu_attribute_string_arg();
+	string_t string = { NULL, 0 };
+	parse_gnu_attribute_string_arg(attribute, &string);
 	if(string.begin != NULL) {
-		for(int i = 0; i < 5; ++i) {
-			if(strcmp(interrupts[i], string.begin) == 0)
-				return i;
+		for(size_t i = 0; i < 5; ++i) {
+			if(strcmp(interrupts[i], string.begin) == 0) {
+				attribute->u.value = i;
+				return;
+			}
 		}
 	}
 	errorf(HERE, "'%s' is an interrupt", string.begin);
-	return -1;
+	attribute->invalid = true;
 }
 
 /**
  * parse ( identifier, const expression, const expression )
  */
-static void parse_gnu_attribute_format_args(void) {
+static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute) {
 	static const char *format_names[] = {
 		"printf",
 		"scanf",
@@ -1286,7 +1258,7 @@ static void parse_gnu_attribute_format_args(void) {
 	expect(')');
 	return;
 end_error:
-	return;
+	attribute->u.value = true;
 }
 
 /**
@@ -1363,12 +1335,23 @@ end_error:
  *  interrupt( string literal )
  *  sentinel( constant expression )
  */
-static void parse_gnu_attribute(void)
+static void parse_gnu_attribute(gnu_attribute_t **attributes)
 {
+	gnu_attribute_t *head = *attributes;
+	gnu_attribute_t *last = *attributes;
+	gnu_attribute_t *attribute;
+
 	eat(T___attribute__);
 	expect('(');
 	expect('(');
+
 	if(token.type != ')') {
+		/* find the end of the list */
+		if(last != NULL) {
+			while(last->next != NULL)
+				last = last->next;
+		}
+
 		/* non-empty attribute list */
 		while(true) {
 			const char *name;
@@ -1394,6 +1377,7 @@ static void parse_gnu_attribute(void)
 			}
 			gnu_attribute_kind_t kind = (gnu_attribute_kind_t)i;
 
+			attribute = NULL;
 			if(kind == GNU_AK_LAST) {
 				if(warning.attribute)
 					warningf(HERE, "'%s' attribute directive ignored", name);
@@ -1404,14 +1388,14 @@ static void parse_gnu_attribute(void)
 				}
 			} else {
 				/* check for arguments */
-				bool have_args = false;
+				attribute = allocate_gnu_attribute(kind);
 				if(token.type == '(') {
 					next_token();
 					if(token.type == ')') {
 						/* empty args are allowed */
 						next_token();
 					} else
-						have_args = true;
+						attribute->have_arguments = true;
 				}
 
 				switch(kind) {
@@ -1462,12 +1446,13 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_MAY_ALIAS:
 				case GNU_AK_MS_STRUCT:
 				case GNU_AK_GCC_STRUCT:
-					if(have_args) {
+					if(attribute->have_arguments) {
 						/* should have no arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						eat_until_matching_token('(');
-						/* we have already consumend '(', so we stop before ')', eat it */
+						/* we have already consumed '(', so we stop before ')', eat it */
 						eat(')');
+						attribute->invalid = true;
 					}
 					break;
 
@@ -1475,72 +1460,84 @@ static void parse_gnu_attribute(void)
 				case GNU_AK_FORMAT_ARG:
 				case GNU_AK_REGPARM:
 				case GNU_AK_TRAP_EXIT:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+						attribute->invalid = true;
 					} else
-						parse_gnu_attribute_const_arg();
+						parse_gnu_attribute_const_arg(attribute);
 					break;
 				case GNU_AK_ALIAS:
 				case GNU_AK_SECTION:
 				case GNU_AK_SP_SWITCH:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+						attribute->invalid = true;
 					} else
-						parse_gnu_attribute_string_arg();
+						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_FORMAT:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+						attribute->invalid = true;
 					} else
-						parse_gnu_attribute_format_args();
+						parse_gnu_attribute_format_args(attribute);
 					break;
 				case GNU_AK_WEAKREF:
 					/* may have one string argument */
-					if(have_args)
-						parse_gnu_attribute_string_arg();
+					if(attribute->have_arguments)
+						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_NONNULL:
-					if(have_args)
-						parse_gnu_attribute_const_arg_list();
+					if(attribute->have_arguments)
+						parse_gnu_attribute_const_arg_list(attribute);
 					break;
 				case GNU_AK_TLS_MODEL:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
-						parse_gnu_attribute_tls_model_arg();
+						parse_gnu_attribute_tls_model_arg(attribute);
 					break;
 				case GNU_AK_VISIBILITY:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
-						parse_gnu_attribute_visibility_arg();
+						parse_gnu_attribute_visibility_arg(attribute);
 					break;
 				case GNU_AK_MODEL:
-					if(!have_args) {
+					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
-						parse_gnu_attribute_model_arg();
+						parse_gnu_attribute_model_arg(attribute);
 				case GNU_AK_INTERRUPT:
 					/* may have one string argument */
-					if(have_args)
-						parse_gnu_attribute_interrupt_arg();
+					if(attribute->have_arguments)
+						parse_gnu_attribute_interrupt_arg(attribute);
 					break;
 				case GNU_AK_SENTINEL:
 					/* may have one string argument */
-					if(have_args)
-						parse_gnu_attribute_const_arg();
+					if(attribute->have_arguments)
+						parse_gnu_attribute_const_arg(attribute);
 					break;
 				case GNU_AK_LAST:
 					/* already handled */
 					break;
 				}
 			}
+			if(attribute != NULL) {
+				if(last != NULL) {
+					last->next = attribute;
+					last       = attribute;
+				} else {
+					head = last = attribute;
+				}
+			}
+
 			if(token.type != ',')
 				break;
 			next_token();
@@ -1549,18 +1546,18 @@ static void parse_gnu_attribute(void)
 	expect(')');
 	expect(')');
 end_error:
-	return;
+	*attributes = head;
 }
 
 /**
  * Parse GNU attributes.
  */
-static void parse_attributes(void)
+static void parse_attributes(gnu_attribute_t **attributes)
 {
 	while(true) {
 		switch(token.type) {
 		case T___attribute__: {
-			parse_gnu_attribute();
+			parse_gnu_attribute(attributes);
 			break;
 		}
 		case T_asm:
@@ -1581,9 +1578,9 @@ static void parse_attributes(void)
 		}
 	}
 
-end_error:
 attributes_finished:
-	;
+end_error:
+	return;
 }
 
 static designator_t *parse_designation(void)
@@ -2354,6 +2351,7 @@ static declaration_t *append_declaration(declaration_t *declaration);
 
 static declaration_t *parse_compound_type_specifier(bool is_struct)
 {
+	gnu_attribute_t *attributes = NULL;
 	if(is_struct) {
 		eat(T_struct);
 	} else {
@@ -2364,8 +2362,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	declaration_t *declaration = NULL;
 
 	if (token.type == T___attribute__) {
-		/* TODO */
-		parse_attributes();
+		parse_attributes(&attributes);
 	}
 
 	if(token.type == T_IDENTIFIER) {
@@ -2412,7 +2409,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		declaration->init.is_defined = true;
 
 		parse_compound_type_entries(declaration);
-		parse_attributes();
+		parse_attributes(&attributes);
 	}
 
 	return declaration;
@@ -2470,11 +2467,11 @@ end_error:
 
 static type_t *parse_enum_specifier(void)
 {
+	gnu_attribute_t *attributes = NULL;
+	declaration_t   *declaration;
+	symbol_t        *symbol;
+
 	eat(T_enum);
-
-	declaration_t *declaration;
-	symbol_t      *symbol;
-
 	if(token.type == T_IDENTIFIER) {
 		symbol = token.v.symbol;
 		next_token();
@@ -2511,7 +2508,7 @@ static type_t *parse_enum_specifier(void)
 		declaration->init.is_defined = 1;
 
 		parse_enum_entries(type);
-		parse_attributes();
+		parse_attributes(&attributes);
 	}
 
 	return type;
@@ -2942,7 +2939,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T___attribute__:
-			parse_attributes();
+			parse_attributes(&specifiers->gnu_attributes);
 			break;
 
 		case T_IDENTIFIER: {
@@ -3430,6 +3427,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	 * how to construct the final declarator type */
 	construct_type_t *first = NULL;
 	construct_type_t *last  = NULL;
+	gnu_attribute_t  *attributes = NULL;
 
 	/* pointers */
 	while(token.type == '*') {
@@ -3445,7 +3443,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 	/* TODO: find out if this is correct */
-	parse_attributes();
+	parse_attributes(&attributes);
 
 	construct_type_t *inner_types = NULL;
 
@@ -3509,7 +3507,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 declarator_finished:
-	parse_attributes();
+	parse_attributes(&attributes);
 
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
