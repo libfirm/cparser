@@ -1069,6 +1069,7 @@ static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind) {
 	attribute->next           = NULL;
 	attribute->invalid        = false;
 	attribute->have_arguments = false;
+	return attribute;
 }
 
 /**
