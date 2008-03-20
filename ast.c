@@ -1117,6 +1117,17 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 }
 
 /**
+ * Print a microsoft __leave statement.
+ *
+ * @param statement   the statement
+ */
+static void print_leave_statement(const leave_statement_t *statement)
+{
+	(void) statement;
+	fputs("__leave;\n", out);
+}
+
+/**
  * Print a statement.
  *
  * @param statement   the statement
@@ -1174,6 +1185,9 @@ void print_statement(const statement_t *statement)
 		break;
 	case STATEMENT_MS_TRY:
 		print_ms_try_statement(&statement->ms_try);
+		break;
+	case STATEMENT_LEAVE:
+		print_leave_statement(&statement->leave);
 		break;
 	case STATEMENT_INVALID:
 		fprintf(out, "$invalid statement$");

@@ -587,6 +587,7 @@ typedef enum {
 	STATEMENT_FOR,
 	STATEMENT_ASM,
 	STATEMENT_MS_TRY,
+	STATEMENT_LEAVE
 } statement_kind_t;
 
 struct statement_base_t {
@@ -709,6 +710,10 @@ struct ms_try_statement_t {
 	statement_t      *final_statement;
 };
 
+struct leave_statement_t {
+	statement_base_t  base;
+};
+
 union statement_t {
 	statement_kind_t         kind;
 	statement_base_t         base;
@@ -726,6 +731,7 @@ union statement_t {
 	for_statement_t          fors;
 	asm_statement_t          asms;
 	ms_try_statement_t       ms_try;
+	leave_statement_t        leave;
 };
 
 struct translation_unit_t {

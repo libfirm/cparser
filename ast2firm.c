@@ -4280,6 +4280,10 @@ static void	ms_try_statement_to_firm(ms_try_statement_t *statement) {
 	warningf(&statement->base.source_position, "structured exception handling ignored");
 }
 
+static void	leave_statement_to_firm(leave_statement_t *statement) {
+	errorf(&statement->base.source_position, "__leave not supported yet");
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->kind) {
@@ -4336,6 +4340,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_MS_TRY:
 		ms_try_statement_to_firm(&statement->ms_try);
+		return;
+	case STATEMENT_LEAVE:
+		leave_statement_to_firm(&statement->leave);
 		return;
 	}
 	panic("Statement not implemented\n");
@@ -4543,6 +4550,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			}
 
 			case STATEMENT_GOTO:
+			case STATEMENT_LEAVE:
 			case STATEMENT_INVALID:
 				break;
 

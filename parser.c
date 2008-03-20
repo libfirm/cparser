@@ -99,6 +99,7 @@ static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
+static ms_try_statement_t *current_try       = NULL;
 static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
@@ -246,7 +247,8 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_DO_WHILE]    = sizeof(do_while_statement_t),
 		[STATEMENT_FOR]         = sizeof(for_statement_t),
 		[STATEMENT_ASM]         = sizeof(asm_statement_t),
-		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t)
+		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t),
+		[STATEMENT_LEAVE]       = sizeof(leave_statement_t)
 	};
 	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
@@ -7358,7 +7360,7 @@ static statement_t *parse_continue(void)
 	statement_t *statement;
 	if (current_loop == NULL) {
 		errorf(HERE, "continue statement not within loop");
-		statement = NULL;
+		statement = create_invalid_statement();
 	} else {
 		statement = allocate_statement_zero(STATEMENT_CONTINUE);
 
@@ -7381,7 +7383,7 @@ static statement_t *parse_break(void)
 	statement_t *statement;
 	if (current_switch == NULL && current_loop == NULL) {
 		errorf(HERE, "break statement not within loop or switch");
-		statement = NULL;
+		statement = create_invalid_statement();
 	} else {
 		statement = allocate_statement_zero(STATEMENT_BREAK);
 
@@ -7389,6 +7391,29 @@ static statement_t *parse_break(void)
 	}
 
 	eat(T_break);
+	expect(';');
+
+	return statement;
+end_error:
+	return create_invalid_statement();
+}
+
+/**
+ * Parse a __leave statement.
+ */
+static statement_t *parse_leave(void)
+{
+	statement_t *statement;
+	if (current_try == NULL) {
+		errorf(HERE, "__leave statement not within __try");
+		statement = create_invalid_statement();
+	} else {
+		statement = allocate_statement_zero(STATEMENT_LEAVE);
+
+		statement->base.source_position = token.source_position;
+	}
+
+	eat(T___leave);
 	expect(';');
 
 	return statement;
@@ -7567,7 +7592,10 @@ static statement_t *parse_ms_try_statment(void) {
 	statement->base.source_position  = token.source_position;
 	eat(T___try);
 
+	ms_try_statement_t *rem = current_try;
+	current_try = &statement->ms_try;
 	statement->ms_try.try_statement = parse_compound_statement();
+	current_try = rem;
 
 	if(token.type == T___except) {
 		eat(T___except);
@@ -7654,6 +7682,10 @@ static statement_t *parse_statement(void)
 
 	case T_break:
 		statement = parse_break();
+		break;
+
+	case T___leave:
+		statement = parse_leave();
 		break;
 
 	case T_return:
