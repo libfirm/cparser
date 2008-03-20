@@ -538,7 +538,7 @@ struct declaration_t {
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */
-	unsigned int        deprecated    : 1;  /**< Microsoft of GNU deprecated attribute. */
+	unsigned int        deprecated    : 1;  /**< Microsoft or GNU deprecated attribute. */
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;
