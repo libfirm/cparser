@@ -128,7 +128,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 
 				case 'k': {
 					if (extended) {
-						bool              first     = false;
+						bool              first     = true;
 						va_list*          toks      = va_arg(ap, va_list*);
 						const char* const delimiter = va_arg(ap, const char*);
 						for (;;) {
