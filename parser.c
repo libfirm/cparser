@@ -245,7 +245,8 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_WHILE]       = sizeof(while_statement_t),
 		[STATEMENT_DO_WHILE]    = sizeof(do_while_statement_t),
 		[STATEMENT_FOR]         = sizeof(for_statement_t),
-		[STATEMENT_ASM]         = sizeof(asm_statement_t)
+		[STATEMENT_ASM]         = sizeof(asm_statement_t),
+		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t)
 	};
 	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
@@ -585,7 +586,7 @@ static void parse_error_expected(const char *message, ...)
 	}
 	va_list ap;
 	va_start(ap, message);
-	errorf(HERE, "got %K, expected %#k", &token, &ap, "a ");
+	errorf(HERE, "got %K, expected %#k", &token, &ap, ", ");
 	va_end(ap);
 }
 
@@ -1115,7 +1116,7 @@ end_error:
 static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute, string_t *string) {
 	add_anchor_token('(');
 	if(token.type != T_STRING_LITERAL) {
-		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL);
+		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL, 0);
 		goto end_error;
 	}
 	*string = parse_string_literals();
@@ -1235,7 +1236,7 @@ static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute) {
 	int i;
 
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER);
+		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER, 0);
 		goto end_error;
 	}
 	const char *name = token.v.symbol->string;
@@ -1370,7 +1371,7 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 				/* __attribute__((cdecl)), WITH ms mode */
 				name = "cdecl";
 			} else if(token.type != T_IDENTIFIER) {
-				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER);
+				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER, 0);
 				break;
 			}
 			const symbol_t *sym = token.v.symbol;
@@ -1574,7 +1575,7 @@ static void parse_attributes(gnu_attribute_t **attributes)
 			expect('(');
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
-				                     T_STRING_LITERAL);
+				                     T_STRING_LITERAL, 0);
 				eat_until_matching_token('(');
 				break;
 			} else {
@@ -7557,6 +7558,47 @@ end_error:
 }
 
 /**
+ * Parse a microsoft __try { } __finally { } or
+ * __try{ } __except() { }
+ */
+static statement_t *parse_ms_try_statment(void) {
+	statement_t *statement = allocate_statement_zero(STATEMENT_MS_TRY);
+
+	statement->base.source_position  = token.source_position;
+	eat(T___try);
+
+	statement->ms_try.try_statement = parse_compound_statement();
+
+	if(token.type == T___except) {
+		eat(T___except);
+		expect('(');
+		add_anchor_token(')');
+		expression_t *const expr = parse_expression();
+		type_t       *      type = skip_typeref(expr->base.type);
+		if (is_type_integer(type)) {
+			type = promote_integer(type);
+		} else if (is_type_valid(type)) {
+			errorf(&expr->base.source_position,
+			       "__expect expression is not an integer, but '%T'", type);
+			type = type_error_type;
+		}
+		statement->ms_try.except_expression = create_implicit_cast(expr, type);
+		rem_anchor_token(')');
+		expect(')');
+		statement->ms_try.final_statement = parse_compound_statement();
+	} else if(token.type == T__finally) {
+		eat(T___finally);
+		statement->ms_try.final_statement = parse_compound_statement();
+	} else {
+		parse_error_expected("while parsing __try statement", T___except, T___finally, 0);
+		return create_invalid_statement();
+	}
+	return statement;
+end_error:
+	return create_invalid_statement();
+}
+
+/**
  * Parse a statement.
  */
 static statement_t *parse_statement(void)
@@ -7651,6 +7693,10 @@ static statement_t *parse_statement(void)
 
 	DECLARATION_START
 		statement = parse_declaration_statement();
+		break;
+
+	case T___try:
+		statement = parse_ms_try_statment();
 		break;
 
 	default:

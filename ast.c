@@ -1097,6 +1097,26 @@ end_of_print_asm_statement:
 }
 
 /**
+ * Print a microsoft __try statement.
+ *
+ * @param statement   the statement
+ */
+static void print_ms_try_statement(const ms_try_statement_t *statement)
+{
+	fputs("__try ", out);
+	print_statement(statement->try_statement);
+	print_indent();
+	if(statement->except_expression != NULL) {
+		fputs("__except(", out);
+		print_expression(statement->except_expression);
+		fputs(") ", out);
+	} else {
+		fputs("__finally ", out);
+	}
+	print_statement(statement->final_statement);
+}
+
+/**
  * Print a statement.
  *
  * @param statement   the statement
@@ -1151,6 +1171,9 @@ void print_statement(const statement_t *statement)
 		break;
 	case STATEMENT_ASM:
 		print_asm_statement(&statement->asms);
+		break;
+	case STATEMENT_MS_TRY:
+		print_ms_try_statement(&statement->ms_try);
 		break;
 	case STATEMENT_INVALID:
 		fprintf(out, "$invalid statement$");

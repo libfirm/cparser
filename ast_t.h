@@ -585,7 +585,8 @@ typedef enum {
 	STATEMENT_WHILE,
 	STATEMENT_DO_WHILE,
 	STATEMENT_FOR,
-	STATEMENT_ASM
+	STATEMENT_ASM,
+	STATEMENT_MS_TRY,
 } statement_kind_t;
 
 struct statement_base_t {
@@ -701,6 +702,13 @@ struct asm_statement_t {
 	bool              is_volatile;
 };
 
+struct ms_try_statement_t {
+	statement_base_t  base;
+	statement_t      *try_statement;
+	expression_t     *except_expression; /**< non-null for except, NULL for finally */
+	statement_t      *final_statement;
+};
+
 union statement_t {
 	statement_kind_t         kind;
 	statement_base_t         base;
@@ -717,6 +725,7 @@ union statement_t {
 	do_while_statement_t     do_while;
 	for_statement_t          fors;
 	asm_statement_t          asms;
+	ms_try_statement_t       ms_try;
 };
 
 struct translation_unit_t {

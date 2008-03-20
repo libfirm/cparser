@@ -4275,6 +4275,11 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 #endif
 }
 
+static void	ms_try_statement_to_firm(ms_try_statement_t *statement) {
+	statement_to_firm(statement->try_statement);
+	warningf(&statement->base.source_position, "structured exception handling ignored");
+}
+
 static void statement_to_firm(statement_t *statement)
 {
 	switch(statement->kind) {
@@ -4328,6 +4333,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_ASM:
 		asm_statement_to_firm(&statement->asms);
+		return;
+	case STATEMENT_MS_TRY:
+		ms_try_statement_to_firm(&statement->ms_try);
 		return;
 	}
 	panic("Statement not implemented\n");
@@ -4541,6 +4549,15 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_RETURN: {
 				const return_statement_t *ret_stmt = &stmt->returns;
 				count += count_decls_in_expression(ret_stmt->value);
+				break;
+			}
+
+			case STATEMENT_MS_TRY: {
+				const ms_try_statement_t *const try_stmt = &stmt->ms_try;
+				count += count_decls_in_stmts(try_stmt->try_statement);
+				if(try_stmt->except_expression != NULL)
+					count += count_decls_in_expression(try_stmt->except_expression);
+				count += count_decls_in_stmts(try_stmt->final_statement);
 				break;
 			}
 		}
