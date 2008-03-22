@@ -142,7 +142,7 @@ void init_types(void)
 {
 	obstack_init(type_obst);
 
-	atomic_type_properties_t *props = &atomic_type_properties;
+	atomic_type_properties_t *props = atomic_type_properties;
 
 	if(char_is_signed) {
 		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
