@@ -142,8 +142,19 @@ static bool atend(vchar_t *self) {
 	return self->position + 1 == self->size;
 }
 
-static void check_format_arguments(const call_argument_t *const fmt_arg, const call_argument_t* arg)
+/**
+ * Check printf-style format.
+ */
+static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt, unsigned idx_param)
 {
+	const call_argument_t *fmt_arg;
+	unsigned idx = 0;
+
+	/* find format arg */
+	for(idx = 0; idx < idx_fmt; ++idx)
+		arg = arg->next;
+	fmt_arg = arg;
+
 	const expression_t *fmt_expr = fmt_arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		fmt_expr = fmt_expr->unary.value;
@@ -165,6 +176,10 @@ static void check_format_arguments(const call_argument_t *const fmt_arg, const c
 	} else {
 		return;
 	}
+	/* find the real args */
+	for(; idx < idx_fmt; ++idx)
+		arg = arg->next;
+
 	const source_position_t *pos = &fmt_expr->base.source_position;
 	unsigned fmt = vchar.first(&vchar);
 	for (; fmt != '\0'; fmt = vchar.next(&vchar)) {
@@ -538,6 +553,60 @@ next_arg:
 	}
 }
 
+static const struct {
+	const char    *name;
+	format_kind_t  fmt_kind;
+	unsigned       fmt_idx;
+	unsigned       arg_idx;
+} builtin_table[] = {
+	{ "printf",        FORMAT_PRINTF,   0, 1 },
+	{ "wprintf",       FORMAT_PRINTF,   0, 1 },
+	{ "sprintf",       FORMAT_PRINTF,   1, 2 },
+	{ "swprintf",      FORMAT_PRINTF,   1, 2 },
+	{ "snprintf",      FORMAT_PRINTF,   2, 3 },
+	{ "snwprintf",     FORMAT_PRINTF,   2, 3 },
+	{ "fprintf",       FORMAT_PRINTF,   1, 2 },
+	{ "fwprintf",      FORMAT_PRINTF,   1, 2 },
+	{ "snwprintf",     FORMAT_PRINTF,   2, 3 },
+	{ "snwprintf",     FORMAT_PRINTF,   2, 3 },
+
+	{ "scanf",         FORMAT_SCANF,    0, 1 },
+	{ "wscanf",        FORMAT_SCANF,    0, 1 },
+	{ "sscanf",        FORMAT_SCANF,    1, 2 },
+	{ "swscanf",       FORMAT_SCANF,    1, 2 },
+	{ "fscanf",        FORMAT_SCANF,    1, 2 },
+	{ "fwscanf",       FORMAT_SCANF,    1, 2 },
+
+	{ "strftime",      FORMAT_STRFTIME, 3, 4 },
+	{ "wcstrftime",    FORMAT_STRFTIME, 3, 4 },
+
+	{ "strfmon",       FORMAT_STRFMON,  3, 4 },
+
+	/* MS extensions */
+	{ "_snprintf",     FORMAT_PRINTF,   2, 3 },
+	{ "_snwprintf",    FORMAT_PRINTF,   2, 3 },
+	{ "_scrintf",      FORMAT_PRINTF,   0, 1 },
+	{ "_scwprintf",    FORMAT_PRINTF,   0, 1 },
+	{ "printf_s",      FORMAT_PRINTF,   0, 1 },
+	{ "wprintf_s",     FORMAT_PRINTF,   0, 1 },
+	{ "sprintf_s",     FORMAT_PRINTF,   3, 4 },
+	{ "swprintf_s",    FORMAT_PRINTF,   3, 4 },
+	{ "fprintf_s",     FORMAT_PRINTF,   1, 2 },
+	{ "fwprintf_s",    FORMAT_PRINTF,   1, 2 },
+	{ "_sprintf_l",    FORMAT_PRINTF,   1, 3 },
+	{ "_swprintf_l",   FORMAT_PRINTF,   1, 3 },
+	{ "_printf_l",     FORMAT_PRINTF,   0, 2 },
+	{ "_wprintf_l",    FORMAT_PRINTF,   0, 2 },
+	{ "_fprintf_l",    FORMAT_PRINTF,   1, 3 },
+	{ "_fwprintf_l",   FORMAT_PRINTF,   1, 3 },
+	{ "_printf_s_l",   FORMAT_PRINTF,   0, 2 },
+	{ "_wprintf_s_l",  FORMAT_PRINTF,   0, 2 },
+	{ "_sprintf_s_l",  FORMAT_PRINTF,   3, 5 },
+	{ "_swprintf_s_l", FORMAT_PRINTF,   3, 5 },
+	{ "_fprintf_s_l",  FORMAT_PRINTF,   1, 3 },
+	{ "_fwprintf_s_l", FORMAT_PRINTF,   1, 3 },
+};
+
 void check_format(const call_expression_t *const call)
 {
 	if (!warning.format)
@@ -547,17 +616,26 @@ void check_format(const call_expression_t *const call)
 	if (func_expr->kind != EXPR_REFERENCE)
 		return;
 
-	const char            *const name = func_expr->reference.symbol->string;
+	const declaration_t   *const decl = func_expr->reference.declaration;
 	const call_argument_t *      arg  = call->arguments;
-	if (strcmp(name, "wprintf") == 0) { /* TODO gammlig */
-		check_format_arguments(arg, arg->next);
-	} else if (strcmp(name, "printf") == 0) {
-		check_format_arguments(arg, arg->next);
-	} else if (strcmp(name, "swprintf") == 0) {
-		arg = arg->next->next; /* skip destination buffer and size */
-		check_format_arguments(arg, arg->next);
-	} else if (strcmp(name, "sprintf") == 0) {
-		arg = arg->next->next; /* skip destination buffer and size */
-		check_format_arguments(arg, arg->next);
+
+	if(false) {
+		/* the declaration has a GNU format attribute, check it */
+	} else {
+		/*
+		 * For some functions we always check the format, even if it was not specified.
+		 * This allows to check format even in MS mode or without header included.
+		 */
+		const char            *const name = decl->symbol->string;
+		for(size_t i = 0; i < sizeof(builtin_table) / sizeof(builtin_table[0]); ++i) {
+			if(strcmp(name, builtin_table[i].name) == 0) {
+				if(builtin_table[i].fmt_kind == FORMAT_PRINTF) {
+					check_format_arguments(arg,
+										   builtin_table[i].fmt_idx,
+										   builtin_table[i].arg_idx);
+				}
+				break;
+			}
+		}
 	}
 }

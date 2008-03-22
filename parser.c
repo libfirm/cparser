@@ -4858,9 +4858,9 @@ static expression_t *parse_reference(void)
 	expression_t *expression = allocate_expression_zero(EXPR_REFERENCE);
 
 	reference_expression_t *ref = &expression->reference;
-	ref->symbol = token.v.symbol;
+	symbol_t *const symbol = token.v.symbol;
 
-	declaration_t *declaration = get_declaration(ref->symbol, NAMESPACE_NORMAL);
+	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
 
 	source_position_t source_position = token.source_position;
 	next_token();
@@ -4870,13 +4870,13 @@ static expression_t *parse_reference(void)
 			/* an implicitly defined function */
 			if (warning.implicit_function_declaration) {
 				warningf(HERE, "implicit declaration of function '%Y'",
-					ref->symbol);
+					symbol);
 			}
 
-			declaration = create_implicit_function(ref->symbol,
+			declaration = create_implicit_function(symbol,
 			                                       &source_position);
 		} else {
-			errorf(HERE, "unknown symbol '%Y' found.", ref->symbol);
+			errorf(HERE, "unknown symbol '%Y' found.", symbol);
 			return create_invalid_expression();
 		}
 	}

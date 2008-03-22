@@ -251,7 +251,6 @@ struct builtin_prefetch_expression_t {
 
 struct reference_expression_t {
 	expression_base_t  base;
-	symbol_t          *symbol;
 	declaration_t     *declaration;
 };
 
