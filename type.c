@@ -800,12 +800,19 @@ bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->kind == TYPE_BITFIELD || type->kind == TYPE_ENUM)
+	switch(type->kind) {
+	case TYPE_BITFIELD:
+	case TYPE_ENUM:
 		return true;
-	if(type->kind != TYPE_ATOMIC)
+	case TYPE_ATOMIC:
+		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	case TYPE_COMPLEX:
+		return test_atomic_type_flag(type->complex.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	case TYPE_IMAGINARY:
+		return test_atomic_type_flag(type->imaginary.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	default:
 		return false;
-
-	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	}
 }
 
 /**
