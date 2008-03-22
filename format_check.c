@@ -631,8 +631,8 @@ void check_format(const call_expression_t *const call)
 			if(strcmp(name, builtin_table[i].name) == 0) {
 				if(builtin_table[i].fmt_kind == FORMAT_PRINTF) {
 					check_format_arguments(arg,
-										   builtin_table[i].fmt_idx,
-										   builtin_table[i].arg_idx);
+					                       builtin_table[i].fmt_idx,
+					                       builtin_table[i].arg_idx);
 				}
 				break;
 			}
