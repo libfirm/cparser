@@ -897,6 +897,47 @@ static const struct {
 	{ rts_strncmp,    1, "strncmp",      3, _C89 }
 };
 
+/**
+ * Mangles an entity linker (ld) name for win32 usage.
+ *
+ * @param ent             the entity to be mangled
+ * @param decl_modifiers  the set of modifiers for this entity
+ */
+static ir_ident_ptr decorate_win32(ir_entity_ptr ent, decl_modifiers_t decl_modifiers) {
+	ir_ident_ptr id;
+
+	if (is_Method_type(get_entity_type(ent)))
+		id = decorate_win32_c_fkt(ent, get_entity_ident(ent));
+	else {
+		/* always add an underscore in win32 */
+		id = mangle(new_id_from_chars("_", 1), get_entity_ident(ent));
+	}
+
+	if (decl_modifiers & DM_DLLIMPORT) {
+		/* add prefix for imported symbols */
+		id = mangle(new_id_from_chars("__imp_", 6), id);
+	}
+	return id;
+}
+
+/**
+ * Mangles an entity linker (ld) name from a declaration.
+ *
+ * @param ent             the entity to be mangled
+ * @param declaration     the declaration
+ */
+static void mangle_ent_from_decl(ir_entity *ent, declaration_t *declaration)
+{
+	ident *id;
+
+	if (firm_opt.os_support == OS_SUPPORT_MINGW)
+		id = decorate_win32(ent, declaration->decl_modifiers);
+	else
+		id = get_entity_ident(ent);
+
+	set_entity_ld_ident(ent, id);
+}
+
 static ir_entity* get_function_entity(declaration_t *declaration)
 {
 	if(declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
@@ -912,7 +953,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(global_type, id, ir_type_method, dbgi);
-	set_entity_ld_ident(entity, id);
+	mangle_ent_from_decl(entity, declaration);
 	if(declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
 		set_entity_visibility(entity, visibility_local);
@@ -2855,7 +2896,7 @@ static void create_declaration_entity(declaration_t *declaration,
 	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
-	set_entity_ld_ident(entity, id);
+	mangle_ent_from_decl(entity, declaration);
 
 	declaration->declaration_kind = (unsigned char) declaration_kind;
 	declaration->v.entity         = entity;
@@ -3534,7 +3575,7 @@ static void create_local_static_variable(declaration_t *declaration)
 	ir_type   *const irtype      = get_ir_type(type);
 	dbg_info  *const dbgi        = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
-	set_entity_ld_ident(entity, id);
+	mangle_ent_from_decl(entity, declaration);
 
 	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(entity, volatility_is_volatile);
@@ -4625,7 +4666,7 @@ static void create_function(declaration_t *declaration)
 	/* set inline flags */
 	if (declaration->is_inline)
     	set_irg_inline_property(irg, irg_inline_recomended);
-    handle_decl_modifier_irg(irg, declaration->modifiers);
+    handle_decl_modifier_irg(irg, declaration->decl_modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);

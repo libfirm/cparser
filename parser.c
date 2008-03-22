@@ -3637,7 +3637,7 @@ static declaration_t *parse_declarator(
 {
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->declared_storage_class = specifiers->declared_storage_class;
-	declaration->modifiers              = specifiers->decl_modifiers;
+	declaration->decl_modifiers         = specifiers->decl_modifiers;
 	declaration->deprecated             = specifiers->deprecated;
 	declaration->deprecated_string      = specifiers->deprecated_string;
 	declaration->get_property_sym       = specifiers->get_property_sym;
@@ -3985,7 +3985,7 @@ static void parse_anonymous_declaration_rest(
 	declaration->type                   = specifiers->type;
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->source_position        = specifiers->source_position;
-	declaration->modifiers              = specifiers->decl_modifiers;
+	declaration->decl_modifiers         = specifiers->decl_modifiers;
 
 	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
 		warningf(&declaration->source_position,
@@ -4438,7 +4438,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			declaration->declared_storage_class = STORAGE_CLASS_NONE;
 			declaration->storage_class          = STORAGE_CLASS_NONE;
 			declaration->source_position        = source_position;
-			declaration->modifiers              = specifiers->decl_modifiers;
+			declaration->decl_modifiers         = specifiers->decl_modifiers;
 			declaration->type                   = type;
 		} else {
 			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);

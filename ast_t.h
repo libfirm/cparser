@@ -531,7 +531,7 @@ struct declaration_t {
 	unsigned char       declared_storage_class;
 	unsigned char       storage_class;
 	unsigned char       alignment;          /**< Alignment of the declaration, 0 for default. */
-	decl_modifiers_t    modifiers;          /**< MS __declspec modifiers. */
+	decl_modifiers_t    decl_modifiers;     /**< MS __declspec modifiers. */
 	const char         *deprecated_string;  /**< MS deprecated string if any. */
 	symbol_t           *get_property_sym;   /**< MS get property. */
 	symbol_t           *put_property_sym;   /**< MS put property. */
@@ -549,7 +549,7 @@ struct declaration_t {
 		expression_t   *enum_value;
 	} init;
 	scope_t             scope;              /**< The scope that this declaration opens. */
-	scope_t            *parent_scope;       /**< The parant scope where this declaration lives. */
+	scope_t            *parent_scope;       /**< The parent scope where this declaration lives. */
 
 	/** next declaration in a scope */
 	declaration_t      *next;
