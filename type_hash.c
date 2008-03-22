@@ -98,7 +98,7 @@ static unsigned hash_typeof_type(const typeof_type_t *type)
 
 static unsigned hash_bitfield_type(const bitfield_type_t *type)
 {
-	unsigned result  = hash_ptr(type->base);
+	unsigned result  = hash_ptr(type->base_type);
 	result          ^= 27172145;
 
 	return result;
@@ -251,7 +251,7 @@ static bool typeof_types_equal(const typeof_type_t *type1,
 static bool bitfield_types_equal(const bitfield_type_t *type1,
                                  const bitfield_type_t *type2)
 {
-	if(type1->base != type2->base)
+	if(type1->base_type != type2->base_type)
 		return false;
 	/* TODO: compare size expression */
 	return false;

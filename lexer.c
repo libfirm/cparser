@@ -957,6 +957,9 @@ static void parse_wide_character_constant(void)
 
 end_of_wide_char_constant:;
 	size_t             size   = (size_t) obstack_object_size(&symbol_obstack);
+	assert(size % sizeof(wchar_rep_t) == 0);
+	size /= sizeof(wchar_rep_t);
+
 	const wchar_rep_t *string = obstack_finish(&symbol_obstack);
 
 	lexer_token.type                = T_WIDE_CHARACTER_CONSTANT;
@@ -1373,7 +1376,7 @@ static void parse_preprocessor_directive(void)
 
 #define ELSE_CODE(code)                                    \
 				default:                                   \
-					code;                                  \
+					code                                   \
 				}                                          \
 			} /* end of while(1) */                        \
 			break;

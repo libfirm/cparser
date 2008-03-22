@@ -120,19 +120,19 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
 		.alignment  = 4,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_DOUBLE] = {
 		.size       = 8,
 		.alignment  = 8,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_LONG_DOUBLE] = {
 		.size       = 12,
 		.alignment  = 12,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	/* complex and imaginary types are set in init_types */
@@ -221,7 +221,7 @@ void print_type_qualifiers(type_qualifiers_t qualifiers)
 static
 void print_atomic_type(const atomic_type_t *type)
 {
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 
 	const char *s = "INVALIDATOMIC";
 	switch((atomic_type_kind_t) type->akind) {
@@ -260,7 +260,7 @@ void print_atomic_type(const atomic_type_t *type)
  */
 static void print_function_type_pre(const function_type_t *type, bool top)
 {
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 
 	intern_print_type_pre(type->return_type, false);
 
@@ -331,7 +331,7 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 {
 	intern_print_type_pre(type->points_to, false);
 	fputs("*", out);
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 }
 
 /**
@@ -365,7 +365,7 @@ static void print_array_type_post(const array_type_t *type)
 	if(type->is_static) {
 		fputs("static ", out);
 	}
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 	if(type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
@@ -383,7 +383,7 @@ static void print_bitfield_type_post(const bitfield_type_t *type)
 {
 	fputs(" : ", out);
 	print_expression(type->size);
-	intern_print_type_post(type->base, false);
+	intern_print_type_post(type->base_type, false);
 }
 
 /**
@@ -428,7 +428,7 @@ void print_enum_definition(const declaration_t *declaration)
  */
 static void print_type_enum(const enum_type_t *type)
 {
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 	fputs("enum ", out);
 
 	declaration_t *declaration = type->declaration;
@@ -469,12 +469,12 @@ void print_compound_definition(const declaration_t *declaration)
  */
 static void print_compound_type(const compound_type_t *type)
 {
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 
-	if(type->type.kind == TYPE_COMPOUND_STRUCT) {
+	if(type->base.kind == TYPE_COMPOUND_STRUCT) {
 		fputs("struct ", out);
 	} else {
-		assert(type->type.kind == TYPE_COMPOUND_UNION);
+		assert(type->base.kind == TYPE_COMPOUND_UNION);
 		fputs("union ", out);
 	}
 
@@ -494,7 +494,7 @@ static void print_compound_type(const compound_type_t *type)
  */
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
-	print_type_qualifiers(type->type.qualifiers);
+	print_type_qualifiers(type->base.qualifiers);
 	fputs(type->declaration->symbol->string, out);
 }
 
@@ -549,7 +549,7 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 		print_pointer_type_pre(&type->pointer);
 		return;
 	case TYPE_BITFIELD:
-		intern_print_type_pre(type->bitfield.base, top);
+		intern_print_type_pre(type->bitfield.base_type, top);
 		return;
 	case TYPE_ARRAY:
 		print_array_type_pre(&type->array);
@@ -1046,6 +1046,26 @@ unsigned get_atomic_type_flags(atomic_type_kind_t kind)
 {
 	assert(kind <= ATOMIC_TYPE_LAST);
 	return atomic_type_properties[kind].flags;
+}
+
+atomic_type_kind_t get_intptr_kind(void)
+{
+	if(machine_size <= 32)
+		return ATOMIC_TYPE_INT;
+	else if(machine_size <= 64)
+		return ATOMIC_TYPE_LONG;
+	else
+		return ATOMIC_TYPE_LONGLONG;
+}
+
+atomic_type_kind_t get_uintptr_kind(void)
+{
+	if(machine_size <= 32)
+		return ATOMIC_TYPE_UINT;
+	else if(machine_size <= 64)
+		return ATOMIC_TYPE_ULONG;
+	else
+		return ATOMIC_TYPE_ULONGLONG;
 }
 
 /**

@@ -123,96 +123,6 @@ static ident *unique_ident(const char *tag)
 	return new_id_from_str(buf);
 }
 
-/**
- * Return the signed integer mode of size bytes.
- *
- * @param size   the size
- */
-static ir_mode *get_smode(unsigned size)
-{
-	static ir_mode *s_modes[16 + 1] = {0, };
-	ir_mode *res;
-
-	if (size <= 0 || size > 16)
-		return NULL;
-
-	res = s_modes[size];
-	if (res == NULL) {
-		unsigned bits;
-    	char name[32];
-
-    	bits = size * 8;
-    	snprintf(name, sizeof(name), "i%u", bits);
-    	res = new_ir_mode(name, irms_int_number, bits, 1, irma_twos_complement,
-    					bits <= machine_size ? machine_size : bits );
-
-		s_modes[size] = res;
-	}
-	return res;
-}
-
-/**
- * Return the unsigned integer mode of size bytes.
- *
- * @param size  the size
- */
-static ir_mode *get_umode(unsigned size)
-{
-	static ir_mode *u_modes[16 + 1] = {0, };
-	ir_mode *res;
-
-	if (size <= 0 || size > 16)
-		return NULL;
-
-	res = u_modes[size];
-	if (res == NULL) {
-		unsigned bits;
-		char name[32];
-
-		bits = size * 8;
-		snprintf(name, sizeof(name), "u%u", bits);
-		res = new_ir_mode(name, irms_int_number, bits, 0, irma_twos_complement,
-						bits <= machine_size ? machine_size : bits );
-
-		u_modes[size] = res;
-	}
-	return res;
-}
-
-/**
- * Return the pointer mode of size bytes.
- *
- * @param size  the size
- */
-static ir_mode *get_ptrmode(unsigned size, char *name)
-{
-	static ir_mode *p_modes[16 + 1] = {0, };
-	ir_mode *res;
-
-	if (size <= 0 || size > 16)
-		return NULL;
-
-	res = p_modes[size];
-	if (res == NULL) {
-		unsigned bits;
-		char buf[32];
-
-		bits = size * 8;
-		if (name == NULL) {
-			snprintf(buf, sizeof(buf), "p%u", bits);
-			name = buf;
-		}
-		res = new_ir_mode(name, irms_reference, bits, 0, irma_twos_complement,
-						bits <= machine_size ? machine_size : bits);
-
-		p_modes[size] = res;
-
-		set_reference_mode_signed_eq(res, get_smode(size));
-		set_reference_mode_unsigned_eq(res, get_umode(size));
-	}
-	return res;
-}
-
 static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
@@ -220,53 +130,72 @@ static ir_mode *mode_int, *mode_uint;
 static ir_node *expression_to_firm(const expression_t *expression);
 static inline ir_mode *get_ir_mode(type_t *type);
 
+static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
+{
+	unsigned flags = get_atomic_type_flags(kind);
+	unsigned size  = get_atomic_type_size(kind);
+	if( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
+			&& !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+		char            name[64];
+		mode_sort       sort;
+		unsigned        bit_size     = size * 8;
+		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
+		mode_arithmetic arithmetic;
+		unsigned        modulo_shift;
+
+		if(flags & ATOMIC_TYPE_FLAG_INTEGER) {
+			assert(! (flags & ATOMIC_TYPE_FLAG_FLOAT));
+			snprintf(name, sizeof(name), "i%s%d", is_signed?"":"u", bit_size);
+			sort         = irms_int_number;
+			arithmetic   = irma_twos_complement;
+			modulo_shift = bit_size < machine_size ? machine_size : bit_size;
+		} else {
+			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
+			snprintf(name, sizeof(name), "f%d", bit_size);
+			sort         = irms_float_number;
+			arithmetic   = irma_ieee754;
+			modulo_shift = 0;
+		}
+		return new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
+		                   modulo_shift);
+	}
+
+	return NULL;
+}
+
 /**
  * Initialises the atomic modes depending on the machine size.
  */
-static void init_atomic_modes(void) {
-	unsigned int_size   = machine_size < 32 ? 2 : 4;
-	unsigned long_size  = machine_size < 64 ? 4 : 8;
-	unsigned llong_size = machine_size < 32 ? 4 : 8;
-
-	/* firm has no real void... */
-	_atomic_modes[ATOMIC_TYPE_VOID]        = mode_T;
-	_atomic_modes[ATOMIC_TYPE_CHAR]        = char_is_signed ? get_smode(1) : get_umode(1);
-	_atomic_modes[ATOMIC_TYPE_SCHAR]       = get_smode(1);
-	_atomic_modes[ATOMIC_TYPE_UCHAR]       = get_umode(1);
-	_atomic_modes[ATOMIC_TYPE_SHORT]       = get_smode(2);
-	_atomic_modes[ATOMIC_TYPE_USHORT]      = get_umode(2);
-	_atomic_modes[ATOMIC_TYPE_INT]         = get_smode(int_size);
-	_atomic_modes[ATOMIC_TYPE_UINT]        = get_umode(int_size);
-	_atomic_modes[ATOMIC_TYPE_LONG]        = get_smode(long_size);
-	_atomic_modes[ATOMIC_TYPE_ULONG]       = get_umode(long_size);
-	_atomic_modes[ATOMIC_TYPE_LONGLONG]    = get_smode(llong_size);
-	_atomic_modes[ATOMIC_TYPE_ULONGLONG]   = get_umode(llong_size);
-	_atomic_modes[ATOMIC_TYPE_FLOAT]       = mode_F;
-	_atomic_modes[ATOMIC_TYPE_DOUBLE]      = mode_D;
-	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = mode_E;
-	_atomic_modes[ATOMIC_TYPE_BOOL]        = get_umode(int_size);
-
-	_atomic_modes[ATOMIC_TYPE_BOOL]                  = _atomic_modes[ATOMIC_TYPE_INT];
-	_atomic_modes[ATOMIC_TYPE_FLOAT_IMAGINARY]       = _atomic_modes[ATOMIC_TYPE_FLOAT];
-	_atomic_modes[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = _atomic_modes[ATOMIC_TYPE_DOUBLE];
-	_atomic_modes[ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY] = _atomic_modes[ATOMIC_TYPE_LONG_DOUBLE];
-
-	/* Hmm, pointers should be machine size */
-	set_modeP_data(get_ptrmode(machine_size >> 3, NULL));
-	set_modeP_code(get_ptrmode(machine_size >> 3, NULL));
-
+static void init_atomic_modes(void)
+{
+	for(int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
+		_atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
+	}
 	mode_int  = _atomic_modes[ATOMIC_TYPE_INT];
 	mode_uint = _atomic_modes[ATOMIC_TYPE_UINT];
-}
 
-static ir_mode *get_atomic_mode(const atomic_type_t* atomic_type)
-{
-	ir_mode *res = NULL;
-	if ((unsigned)atomic_type->akind <= (unsigned)ATOMIC_TYPE_LAST)
-		res = _atomic_modes[(unsigned)atomic_type->akind];
-	if (res == NULL)
-		panic("Encountered unknown atomic type");
-	return res;
+	/* there's no real void type in firm */
+	_atomic_modes[ATOMIC_TYPE_VOID] = mode_int;
+
+	/* initialize pointer modes */
+	char            name[64];
+	mode_sort       sort         = irms_reference;
+	unsigned        bit_size     = machine_size;
+	bool            is_signed    = 0;
+	mode_arithmetic arithmetic   = irma_twos_complement;
+	unsigned        modulo_shift
+		= bit_size < machine_size ? machine_size : bit_size;
+
+	snprintf(name, sizeof(name), "p%d", machine_size);
+	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
+	                                modulo_shift);
+
+	set_reference_mode_signed_eq(ptr_mode, _atomic_modes[get_intptr_kind()]);
+	set_reference_mode_unsigned_eq(ptr_mode, _atomic_modes[get_uintptr_kind()]);
+
+	/* Hmm, pointers should be machine size */
+	set_modeP_data(ptr_mode);
+	set_modeP_code(ptr_mode);
 }
 
 static unsigned get_compound_type_size(compound_type_t *type)
@@ -352,22 +281,19 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
-
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
-	dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
-	ir_mode *mode   = get_atomic_mode(type);
-	ident   *id     = get_mode_ident(mode);
-	ir_type *irtype = new_d_type_primitive(id, mode, dbgi);
+	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
+	atomic_type_kind_t  kind      = type->akind;
+	ir_mode            *mode      = _atomic_modes[kind];
+	unsigned            alignment = get_atomic_type_alignment(kind);
+	ident              *id        = get_mode_ident(mode);
+	ir_type            *irtype    = new_d_type_primitive(id, mode, dbgi);
 
-	/* TODO: this is x86 specific, we should fiddle this into
-	 * lang_features.h somehow... */
-	if(type->akind == ATOMIC_TYPE_LONG_DOUBLE
-			|| type->akind == ATOMIC_TYPE_DOUBLE
-			|| type->akind == ATOMIC_TYPE_LONGLONG
-			|| type->akind == ATOMIC_TYPE_ULONGLONG) {
-		set_type_alignment_bytes(irtype, 4);
-	}
+	if(type->base.alignment > alignment)
+		alignment = type->base.alignment;
+
+	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
 }
@@ -379,7 +305,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	ident   *id           = unique_ident("functiontype");
 	int      n_parameters = count_parameters(function_type);
 	int      n_results    = return_type == type_void ? 0 : 1;
-	dbg_info *dbgi        = get_dbg_info(&function_type->type.source_position);
+	dbg_info *dbgi        = get_dbg_info(&function_type->base.source_position);
 	ir_type *irtype       = new_d_type_method(id, n_parameters, n_results, dbgi);
 
 	if(return_type != type_void) {
@@ -410,10 +336,10 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	 * again (might be a struct). We therefore first create a void* pointer
 	 * and then set the real points_to type
 	 */
-	dbg_info *dbgi   = get_dbg_info(&type->type.source_position);
-	ir_type *ir_type = new_d_type_pointer(unique_ident("pointer"),
+	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
+	ir_type  *ir_type = new_d_type_pointer(unique_ident("pointer"),
 	                                    ir_type_void, mode_P_data, dbgi);
-	type->type.firm_type  = ir_type;
+	type->base.firm_type  = ir_type;
 
 	ir_points_to = get_ir_type(points_to);
 	set_pointer_points_to_type(ir_type, ir_points_to);
@@ -427,7 +353,7 @@ static ir_type *create_array_type(array_type_t *type)
 	ir_type *ir_element_type = get_ir_type(element_type);
 
 	ident    *id      = unique_ident("array");
-	dbg_info *dbgi    = get_dbg_info(&type->type.source_position);
+	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
 	ir_type  *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
 
 	const int align = get_type_alignment_bytes(ir_element_type);
@@ -524,7 +450,7 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 
 static ir_type *create_bitfield_type(bitfield_type_t *const type)
 {
-	type_t *base = skip_typeref(type->base);
+	type_t *base = skip_typeref(type->base_type);
 	assert(base->kind == TYPE_ATOMIC);
 	ir_type *irbase = get_ir_type(base);
 
@@ -562,12 +488,12 @@ static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
 		} else {
 			id = unique_ident("__anonymous_struct");
 		}
-		dbg_info *dbgi  = get_dbg_info(&type->type.source_position);
+		dbg_info *dbgi  = get_dbg_info(&type->base.source_position);
 
 		irtype = new_d_type_struct(id, dbgi);
 
 		declaration->v.irtype = irtype;
-		type->type.firm_type  = irtype;
+		type->base.firm_type  = irtype;
 	} else {
 		offset    = *outer_offset;
 		align_all = *outer_align;
@@ -601,7 +527,7 @@ static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
 
 		ir_type *base_irtype;
 		if(entry_type->kind == TYPE_BITFIELD) {
-			base_irtype = get_ir_type(entry_type->bitfield.base);
+			base_irtype = get_ir_type(entry_type->bitfield.base_type);
 		} else {
 			base_irtype = get_ir_type(entry_type);
 		}
@@ -697,18 +623,18 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		} else {
 			id = unique_ident("__anonymous_union");
 		}
-		dbg_info *dbgi = get_dbg_info(&type->type.source_position);
+		dbg_info *dbgi = get_dbg_info(&type->base.source_position);
 
 		irtype = new_d_type_union(id, dbgi);
 
 		declaration->v.irtype = irtype;
-		type->type.firm_type  = irtype;
+		type->base.firm_type  = irtype;
 	} else {
 		offset    = *outer_offset;
 		align_all = *outer_align;
 	}
 
-	type->type.firm_type = irtype;
+	type->base.firm_type = irtype;
 
 	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
@@ -791,7 +717,7 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 
 static ir_type *create_enum_type(enum_type_t *const type)
 {
-	type->type.firm_type = ir_type_int;
+	type->base.firm_type = ir_type_int;
 
 	ir_mode *const mode    = mode_int;
 	tarval  *const one     = get_mode_one(mode);
@@ -1532,7 +1458,7 @@ static void bitfield_store_to_firm(const unary_expression_t *expression,
 	assert(select->kind == EXPR_SELECT);
 	type_t       *type   = select->base.type;
 	assert(type->kind == TYPE_BITFIELD);
-	ir_mode      *mode   = get_ir_mode(type->bitfield.base);
+	ir_mode      *mode   = get_ir_mode(type->bitfield.base_type);
 	ir_node      *addr   = expression_to_addr(select);
 
 	assert(get_irn_mode(value) == mode);
@@ -1785,7 +1711,7 @@ static ir_node *bitfield_extract_to_firm(const unary_expression_t *expression)
 
 	type_t   *type     = select->base.type;
 	assert(type->kind == TYPE_BITFIELD);
-	ir_mode  *mode     = get_ir_mode(type->bitfield.base);
+	ir_mode  *mode     = get_ir_mode(type->bitfield.base_type);
 	dbg_info *dbgi     = get_dbg_info(&expression->base.source_position);
 	ir_node  *addr     = expression_to_addr(select);
 	ir_node  *mem      = get_store();
@@ -4834,10 +4760,7 @@ static void init_ir_types(void)
 	ir_type_int        = get_ir_type(type_int);
 	ir_type_const_char = get_ir_type(type_const_char);
 	ir_type_wchar_t    = get_ir_type(type_wchar_t);
-	ir_type_void       = get_ir_type(type_int); /* we don't have a real void
-	                                               type in firm */
-
-	type_void->base.firm_type = ir_type_void;
+	ir_type_void       = get_ir_type(type_void);
 }
 
 void exit_ast2firm(void)

@@ -74,23 +74,23 @@ struct type_base_t {
 };
 
 struct atomic_type_t {
-	type_base_t         type;
+	type_base_t         base;
 	atomic_type_kind_t  akind;
 };
 
 struct builtin_type_t {
-	type_base_t  type;
+	type_base_t  base;
 	symbol_t    *symbol;
 	type_t      *real_type;
 };
 
 struct pointer_type_t {
-	type_base_t  type;
+	type_base_t  base;
 	type_t      *points_to;
 };
 
 struct array_type_t {
-	type_base_t   type;
+	type_base_t   base;
 	type_t       *element_type;
 	expression_t *size_expression;
 	size_t        size;
@@ -110,7 +110,7 @@ struct function_parameter_t {
 };
 
 struct function_type_t {
-	type_base_t           type;
+	type_base_t           base;
 	type_t               *return_type;
 	function_parameter_t *parameters;
 	unsigned              variadic : 1;
@@ -119,14 +119,14 @@ struct function_type_t {
 };
 
 struct compound_type_t {
-	type_base_t    type;
+	type_base_t    base;
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
 	declaration_t *declaration;
 };
 
 struct enum_type_t {
-	type_base_t    type;
+	type_base_t    base;
 	/** the declaration of the enum type. You can find the enum entries by
 	 *  walking the declaration->next list until you don't find
 	 *  STORAGE_CLASS_ENUM_ENTRY declarations anymore */
@@ -134,21 +134,21 @@ struct enum_type_t {
 };
 
 struct typedef_type_t {
-	type_base_t    type;
+	type_base_t    base;
 	declaration_t *declaration;
 	type_t        *resolved_type;
 };
 
 struct typeof_type_t {
-	type_base_t   type;
+	type_base_t   base;
 	expression_t *expression;
 	type_t       *typeof_type;
 	type_t       *resolved_type;
 };
 
 struct bitfield_type_t {
-	type_base_t   type;
-	type_t       *base;
+	type_base_t   base;
+	type_t       *base_type;
 	expression_t *size;
 };
 

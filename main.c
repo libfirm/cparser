@@ -362,7 +362,7 @@ int main(int argc, char **argv)
 	const char     *dumpfunction = NULL;
 	compile_mode_t  mode         = CompileAssembleLink;
 	int             opt_level    = 1;
-	int             result = EXIT_SUCCESS;
+	int             result       = EXIT_SUCCESS;
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);

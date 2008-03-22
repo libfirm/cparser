@@ -158,6 +158,9 @@ unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
  */
 unsigned get_atomic_type_flags(atomic_type_kind_t kind);
 
+atomic_type_kind_t get_intptr_kind(void);
+atomic_type_kind_t get_uintptr_kind(void);
+
 /**
  * Find the atomic type kind representing a given size (signed).
  */

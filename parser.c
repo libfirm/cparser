@@ -136,7 +136,7 @@ static unsigned char token_anchor_set[T_LAST_TOKEN];
 
 static type_t *type_valist;
 
-static statement_t *parse_compound_statement(void);
+static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
 static expression_t *parse_sub_expression(unsigned precedence);
@@ -567,8 +567,7 @@ static void eat_block(void) {
 }
 
 /**
- * eat all token until a ';' is reached
- * or a stop token is found.
+ * eat all token until a ';' is reached or a stop token is found.
  */
 static void eat_statement(void) {
 	eat_until_matching_token(';');
@@ -581,7 +580,8 @@ static void eat_statement(void) {
 /**
  * Report a parse error because an expected token was not found.
  */
-static void parse_error_expected(const char *message, ...)
+static __attribute__((sentinel))
+void parse_error_expected(const char *message, ...)
 {
 	if(message != NULL) {
 		errorf(HERE, "%s", message);
@@ -607,7 +607,8 @@ static void type_error(const char *msg, const source_position_t *source_position
 static void type_error_incompatible(const char *msg,
 		const source_position_t *source_position, type_t *type1, type_t *type2)
 {
-	errorf(source_position, "%s, incompatible types: '%T' - '%T'", msg, type1, type2);
+	errorf(source_position, "%s, incompatible types: '%T' - '%T'",
+	       msg, type1, type2);
 }
 
 /**
@@ -615,16 +616,16 @@ static void type_error_incompatible(const char *msg,
  * If not, generate an error, eat the current statement,
  * and goto the end_error label.
  */
-#define expect(expected)                           \
-	do {                                           \
-    if(UNLIKELY(token.type != (expected))) {       \
-        parse_error_expected(NULL, (expected), 0); \
-		add_anchor_token(expected);                \
-        eat_until_anchor();                        \
-		rem_anchor_token(expected);                \
-        goto end_error;                            \
-    }                                              \
-    next_token();                                  \
+#define expect(expected)                              \
+	do {                                              \
+    if(UNLIKELY(token.type != (expected))) {          \
+        parse_error_expected(NULL, (expected), NULL); \
+		add_anchor_token(expected);                   \
+        eat_until_anchor();                           \
+		rem_anchor_token(expected);                   \
+        goto end_error;                               \
+    }                                                 \
+    next_token();                                     \
 	} while(0)
 
 static void set_scope(scope_t *new_scope)
@@ -771,7 +772,7 @@ static void label_pop_to(size_t new_top)
 static int get_rank(const type_t *type)
 {
 	assert(!is_typeref(type));
-	/* The C-standard allows promoting to int or unsigned int (see § 7.2.2
+	/* The C-standard allows promoting enums to int or unsigned int (see § 7.2.2
 	 * and esp. footnote 108). However we can't fold constants (yet), so we
 	 * can't decide whether unsigned int is possible, while int always works.
 	 * (unsigned int would be preferable when possible... for stuff like
@@ -786,7 +787,7 @@ static int get_rank(const type_t *type)
 static type_t *promote_integer(type_t *type)
 {
 	if(type->kind == TYPE_BITFIELD)
-		type = type->bitfield.base;
+		type = type->bitfield.base_type;
 
 	if(get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
@@ -933,7 +934,8 @@ static expression_t *parse_constant_expression(void)
 	expression_t *result = parse_sub_expression(7);
 
 	if(!is_constant_expression(result)) {
-		errorf(&result->base.source_position, "expression '%E' is not constant\n", result);
+		errorf(&result->base.source_position,
+		       "expression '%E' is not constant\n", result);
 	}
 
 	return result;
@@ -1068,10 +1070,12 @@ static int strcmp_underscore(const char *s1, const char *s2) {
  */
 static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind) {
 	gnu_attribute_t *attribute = obstack_alloc(&temp_obst, sizeof(*attribute));
-	attribute->kind           = kind;
-	attribute->next           = NULL;
-	attribute->invalid        = false;
-	attribute->have_arguments = false;
+	attribute->kind            = kind;
+	attribute->next            = NULL;
+	attribute->invalid         = false;
+	attribute->have_arguments  = false;
+
+	return attribute;
 	return attribute;
 }
 
@@ -1115,10 +1119,13 @@ end_error:
 /**
  * parse one string literal argument.
  */
-static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute, string_t *string) {
+static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute,
+                                           string_t *string)
+{
 	add_anchor_token('(');
 	if(token.type != T_STRING_LITERAL) {
-		parse_error_expected("while parsing attribute directive", T_STRING_LITERAL, 0);
+		parse_error_expected("while parsing attribute directive",
+		                     T_STRING_LITERAL, NULL);
 		goto end_error;
 	}
 	*string = parse_string_literals();
@@ -1238,7 +1245,7 @@ static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute) {
 	int i;
 
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER, 0);
+		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER, NULL);
 		goto end_error;
 	}
 	const char *name = token.v.symbol->string;
@@ -1373,7 +1380,7 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 				/* __attribute__((cdecl)), WITH ms mode */
 				name = "cdecl";
 			} else if(token.type != T_IDENTIFIER) {
-				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER, 0);
+				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER, NULL);
 				break;
 			}
 			const symbol_t *sym = token.v.symbol;
@@ -1577,7 +1584,7 @@ static void parse_attributes(gnu_attribute_t **attributes)
 			expect('(');
 			if(token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
-				                     T_STRING_LITERAL, 0);
+				                     T_STRING_LITERAL, NULL);
 				eat_until_matching_token('(');
 				break;
 			} else {
@@ -1618,7 +1625,7 @@ static designator_t *parse_designation(void)
 			next_token();
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing designator",
-				                     T_IDENTIFIER, 0);
+				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
 			designator->symbol = token.v.symbol;
@@ -2389,10 +2396,10 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	} else if(token.type != '{') {
 		if(is_struct) {
 			parse_error_expected("while parsing struct type specifier",
-			                     T_IDENTIFIER, '{', 0);
+			                     T_IDENTIFIER, '{', NULL);
 		} else {
 			parse_error_expected("while parsing union type specifier",
-			                     T_IDENTIFIER, '{', 0);
+			                     T_IDENTIFIER, '{', NULL);
 		}
 
 		return NULL;
@@ -2440,7 +2447,7 @@ static void parse_enum_entries(type_t *const enum_type)
 	add_anchor_token('}');
 	do {
 		if(token.type != T_IDENTIFIER) {
-			parse_error_expected("while parsing enum entry", T_IDENTIFIER, 0);
+			parse_error_expected("while parsing enum entry", T_IDENTIFIER, NULL);
 			eat_block();
 			rem_anchor_token('}');
 			return;
@@ -2491,7 +2498,7 @@ static type_t *parse_enum_specifier(void)
 		declaration = get_declaration(symbol, NAMESPACE_ENUM);
 	} else if(token.type != '{') {
 		parse_error_expected("while parsing enum type specifier",
-		                     T_IDENTIFIER, '{', 0);
+		                     T_IDENTIFIER, '{', NULL);
 		return NULL;
 	} else {
 		declaration = NULL;
@@ -3479,7 +3486,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	default:
 		if(may_be_abstract)
 			break;
-		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', 0);
+		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
 		/* avoid a loop in the outermost scope, because eat_statement doesn't
 		 * eat '}' */
 		if(token.type == '}' && current_function == NULL) {
@@ -4282,7 +4289,7 @@ static void parse_external_declaration(void)
 	parse_kr_declaration_list(ndeclaration);
 
 	if(token.type != '{') {
-		parse_error_expected("while parsing function definition", '{', 0);
+		parse_error_expected("while parsing function definition", '{', NULL);
 		eat_until_matching_token(';');
 		return;
 	}
@@ -4345,7 +4352,7 @@ static void parse_external_declaration(void)
 		declaration_t *old_current_function = current_function;
 		current_function                    = declaration;
 
-		declaration->init.statement = parse_compound_statement();
+		declaration->init.statement = parse_compound_statement(false);
 		first_err = true;
 		check_labels();
 		check_declarations();
@@ -4361,12 +4368,13 @@ end_of_parse_external_declaration:
 	environment_pop_to(top);
 }
 
-static type_t *make_bitfield_type(type_t *base, expression_t *size,
+static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
                                   source_position_t *source_position)
 {
-	type_t *type        = allocate_type_zero(TYPE_BITFIELD, source_position);
-	type->bitfield.base = base;
-	type->bitfield.size = size;
+	type_t *type = allocate_type_zero(TYPE_BITFIELD, source_position);
+
+	type->bitfield.base_type = base_type;
+	type->bitfield.size      = size;
 
 	return type;
 }
@@ -4785,7 +4793,7 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 	if(is_type_array(type)) {
 		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
-		unsigned      qualifiers   = array_type->type.qualifiers;
+		unsigned      qualifiers   = array_type->base.qualifiers;
 
 		return make_pointer_type(element_type, qualifiers);
 	}
@@ -4968,7 +4976,7 @@ static expression_t *parse_statement_expression(void)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
-	statement_t *statement           = parse_compound_statement();
+	statement_t *statement           = parse_compound_statement(true);
 	expression->statement.statement  = statement;
 	expression->base.source_position = statement->base.source_position;
 
@@ -5093,7 +5101,7 @@ static designator_t *parse_designator(void)
 
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
-		                     T_IDENTIFIER, 0);
+		                     T_IDENTIFIER, NULL);
 		return NULL;
 	}
 	result->symbol = token.v.symbol;
@@ -5105,7 +5113,7 @@ static designator_t *parse_designator(void)
 			next_token();
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
-				                     T_IDENTIFIER, 0);
+				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
@@ -5544,7 +5552,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 
 	rem_anchor_token(']');
 	if(token.type != ']') {
-		parse_error_expected("Problem while parsing array access", ']', 0);
+		parse_error_expected("Problem while parsing array access", ']', NULL);
 		return expression;
 	}
 	next_token();
@@ -5604,7 +5612,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->select.compound = compound;
 
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing select", T_IDENTIFIER, 0);
+		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
 		return select;
 	}
 	symbol_t *symbol      = token.v.symbol;
@@ -5660,7 +5668,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		expression_t *extract
 			= allocate_expression_zero(EXPR_UNARY_BITFIELD_EXTRACT);
 		extract->unary.value = select;
-		extract->base.type   = expression_type->bitfield.base;
+		extract->base.type   = expression_type->bitfield.base_type;
 
 		return extract;
 	}
@@ -6259,10 +6267,33 @@ static void semantic_comparison(binary_expression_t *expression)
 
 	/* TODO non-arithmetic types */
 	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+		/* test for signed vs unsigned compares */
 		if (warning.sign_compare &&
 		    (expression->base.kind != EXPR_BINARY_EQUAL &&
 		     expression->base.kind != EXPR_BINARY_NOTEQUAL) &&
 		    (is_type_signed(type_left) != is_type_signed(type_right))) {
+
+			/* check if 1 of the operands is a constant, in this case we just
+			 * check wether we can safely represent the resulting constant in
+			 * the type of the other operand. */
+			expression_t *const_expr = NULL;
+			expression_t *other_expr = NULL;
+
+			if(is_constant_expression(left)) {
+				const_expr = left;
+				other_expr = right;
+			} else if(is_constant_expression(right)) {
+				const_expr = right;
+				other_expr = left;
+			}
+
+			type_t *other_type = skip_typeref(other_expr->base.type);
+			if(const_expr != NULL) {
+				long val = fold_constant(const_expr);
+				/* TODO: check if val can be represented by other_type */
+				(void) other_type;
+				(void) val;
+			}
 			warningf(&expression->base.source_position,
 			         "comparison between signed and unsigned");
 		}
@@ -6825,7 +6856,7 @@ static asm_constraint_t *parse_asm_constraints(void)
 			eat('[');
 			if(token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing asm constraint",
-				                     T_IDENTIFIER, 0);
+				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
 			constraint->symbol = token.v.symbol;
@@ -7323,7 +7354,7 @@ static statement_t *parse_goto(void)
 	eat(T_goto);
 
 	if(token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing goto", T_IDENTIFIER, 0);
+		parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_statement();
 		return NULL;
 	}
@@ -7571,10 +7602,6 @@ static statement_t *parse_expression_statement(void)
 	expression_t *const expr         = parse_expression();
 	statement->expression.expression = expr;
 
-	if (warning.unused_value && !expression_has_effect(expr)) {
-		warningf(&expr->base.source_position, "statement has no effect");
-	}
-
 	expect(';');
 
 	return statement;
@@ -7594,7 +7621,7 @@ static statement_t *parse_ms_try_statment(void) {
 
 	ms_try_statement_t *rem = current_try;
 	current_try = &statement->ms_try;
-	statement->ms_try.try_statement = parse_compound_statement();
+	statement->ms_try.try_statement = parse_compound_statement(false);
 	current_try = rem;
 
 	if(token.type == T___except) {
@@ -7613,12 +7640,12 @@ static statement_t *parse_ms_try_statment(void) {
 		statement->ms_try.except_expression = create_implicit_cast(expr, type);
 		rem_anchor_token(')');
 		expect(')');
-		statement->ms_try.final_statement = parse_compound_statement();
+		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else if(token.type == T__finally) {
 		eat(T___finally);
-		statement->ms_try.final_statement = parse_compound_statement();
+		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
-		parse_error_expected("while parsing __try statement", T___except, T___finally, 0);
+		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
 		return create_invalid_statement();
 	}
 	return statement;
@@ -7628,10 +7655,12 @@ end_error:
 
 /**
  * Parse a statement.
+ * There's also parse_statement() which additionally checks for
+ * "statement has no effect" warnings
  */
-static statement_t *parse_statement(void)
+static statement_t *intern_parse_statement(void)
 {
-	statement_t   *statement = NULL;
+	statement_t *statement = NULL;
 
 	/* declaration or statement */
 	add_anchor_token(';');
@@ -7649,7 +7678,7 @@ static statement_t *parse_statement(void)
 		break;
 
 	case '{':
-		statement = parse_compound_statement();
+		statement = parse_compound_statement(false);
 		break;
 
 	case T_if:
@@ -7744,9 +7773,30 @@ static statement_t *parse_statement(void)
 }
 
 /**
+ * parse a statement and emits "statement has no effect" warning if needed
+ * (This is really a wrapper around intern_parse_statement with check for 1
+ *  single warning. It is needed, because for statement expressions we have
+ *  to avoid the warning on the last statement)
+ */
+static statement_t *parse_statement(void)
+{
+	statement_t *statement = intern_parse_statement();
+
+	if(statement->kind == STATEMENT_EXPRESSION && warning.unused_value) {
+		expression_t *expression = statement->expression.expression;
+		if(!expression_has_effect(expression)) {
+			warningf(&expression->base.source_position,
+					"statement has no effect");
+		}
+	}
+
+	return statement;
+}
+
+/**
  * Parse a compound statement.
  */
-static statement_t *parse_compound_statement(void)
+static statement_t *parse_compound_statement(bool inside_expression_statement)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_COMPOUND);
 
@@ -7762,7 +7812,7 @@ static statement_t *parse_compound_statement(void)
 	statement_t *last_statement = NULL;
 
 	while(token.type != '}' && token.type != T_EOF) {
-		statement_t *sub_statement = parse_statement();
+		statement_t *sub_statement = intern_parse_statement();
 		if(is_invalid_statement(sub_statement)) {
 			/* an error occurred. if we are at an anchor, return */
 			if(at_anchor())
@@ -7787,6 +7837,25 @@ static statement_t *parse_compound_statement(void)
 	} else {
 		errorf(&statement->base.source_position,
 		       "end of file while looking for closing '}'");
+	}
+
+	/* look over all statements again to produce no effect warnings */
+	if(warning.unused_value) {
+		statement_t *sub_statement = statement->compound.statements;
+		for( ; sub_statement != NULL; sub_statement = sub_statement->base.next) {
+			if(sub_statement->kind != STATEMENT_EXPRESSION)
+				continue;
+			/* don't emit a warning for the last expression in an expression
+			 * statement as it has always an effect */
+			if(inside_expression_statement && sub_statement->base.next == NULL)
+				continue;
+
+			expression_t *expression = sub_statement->expression.expression;
+			if(!expression_has_effect(expression)) {
+				warningf(&expression->base.source_position,
+				         "statement has no effect");
+			}
+		}
 	}
 
 end_error:
