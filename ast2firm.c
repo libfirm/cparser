@@ -3248,6 +3248,20 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
+static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
+                                            ir_node *base_addr)
+{
+	ir_mode *mode = get_type_mode(type);
+	tarval  *zero = get_mode_null(mode);
+	ir_node *cnst = new_d_Const(dbgi, mode, zero);
+
+	/* TODO: bitfields */
+	ir_node *mem    = get_store();
+	ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
+	ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+	set_store(proj_m);
+}
+
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {

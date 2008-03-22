@@ -12,7 +12,6 @@ Lexer:
 
 Parser:
 - disallow storage class specifiers in struct/union members
-- label: declaration; is no valid C99 but we parse it anyway
 - add constant folding code (optional, ast2firm already does it)
 - Refactor code, so code to handle number values (and strings?) is an own
   module and replacable
@@ -33,6 +32,7 @@ ast2firm:
   current unit)
 
 Missing Errors:
+* label: declaration; is no valid C99 but we parse it anyway
 * check switches for double cases
 
 Missing Warnings:
