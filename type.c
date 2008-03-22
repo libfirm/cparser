@@ -37,9 +37,158 @@ static bool             print_implicit_array_size = false;
 static void intern_print_type_pre(const type_t *type, bool top);
 static void intern_print_type_post(const type_t *type, bool top);
 
+typedef struct atomic_type_properties_t atomic_type_properties_t;
+struct atomic_type_properties_t {
+	unsigned   size;              /**< type size in bytes */
+	unsigned   alignment;         /**< type alignment in bytes */
+	unsigned   flags;             /**< type flags from atomic_type_flag_t */
+};
+
+static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
+	//ATOMIC_TYPE_INVALID = 0,
+	[ATOMIC_TYPE_VOID] = {
+		.size       = 0,
+		.alignment  = 0,
+		.flags      = ATOMIC_TYPE_FLAG_NONE
+	},
+	[ATOMIC_TYPE_CHAR] = {
+		.size       = 1,
+		.alignment  = 1,
+		/* signed flag will be set when known */
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_SCHAR] = {
+		.size       = 1,
+		.alignment  = 1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_UCHAR] = {
+		.size       = 1,
+		.alignment  = 1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_SHORT] = {
+		.size       = 2,
+		.alignment  = 2,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED
+	},
+	[ATOMIC_TYPE_USHORT] = {
+		.size       = 2,
+		.alignment  = 2,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_INT] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_UINT] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_LONG] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_ULONG] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_LONGLONG] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_ULONGLONG] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_BOOL] = {
+		.size       = (unsigned) -1,
+		.alignment  = (unsigned) -1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
+	[ATOMIC_TYPE_FLOAT] = {
+		.size       = 4,
+		.alignment  = 4,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_DOUBLE] = {
+		.size       = 8,
+		.alignment  = 8,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	[ATOMIC_TYPE_LONG_DOUBLE] = {
+		.size       = 12,
+		.alignment  = 12,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+	},
+	/* complex and imaginary types are set in init_types */
+};
+
 void init_types(void)
 {
 	obstack_init(type_obst);
+
+	atomic_type_properties_t *props = &atomic_type_properties;
+
+	if(char_is_signed) {
+		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
+	}
+
+	unsigned int_size   = machine_size < 32 ? 2 : 4;
+	unsigned long_size  = machine_size < 64 ? 4 : 8;
+	unsigned llong_size = machine_size < 32 ? 4 : 8;
+
+	props[ATOMIC_TYPE_INT].size            = int_size;
+	props[ATOMIC_TYPE_INT].alignment       = int_size;
+	props[ATOMIC_TYPE_UINT].size           = int_size;
+	props[ATOMIC_TYPE_UINT].alignment      = int_size;
+	props[ATOMIC_TYPE_LONG].size           = long_size;
+	props[ATOMIC_TYPE_LONG].alignment      = long_size;
+	props[ATOMIC_TYPE_ULONG].size          = long_size;
+	props[ATOMIC_TYPE_ULONG].alignment     = long_size;
+	props[ATOMIC_TYPE_LONGLONG].size       = llong_size;
+	props[ATOMIC_TYPE_LONGLONG].alignment  = llong_size;
+	props[ATOMIC_TYPE_ULONGLONG].size      = llong_size;
+	props[ATOMIC_TYPE_ULONGLONG].alignment = llong_size;
+
+	/* TODO: backend specific, need a way to query the backend for this.
+	 * The following are good settings for x86 */
+	props[ATOMIC_TYPE_FLOAT].alignment     = 4;
+	props[ATOMIC_TYPE_DOUBLE].alignment    = 4;
+	props[ATOMIC_TYPE_LONGLONG].alignment  = 4;
+	props[ATOMIC_TYPE_ULONGLONG].alignment = 4;
+
+	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UINT];
+
+	/* initialize complex/imaginary types */
+	props[ATOMIC_TYPE_FLOAT_COMPLEX]              = props[ATOMIC_TYPE_FLOAT];
+	props[ATOMIC_TYPE_FLOAT_COMPLEX].flags       |= ATOMIC_TYPE_FLAG_COMPLEX;
+	props[ATOMIC_TYPE_FLOAT_COMPLEX].size        *= 2;
+	props[ATOMIC_TYPE_DOUBLE_COMPLEX]             = props[ATOMIC_TYPE_DOUBLE];
+	props[ATOMIC_TYPE_DOUBLE_COMPLEX].flags      |= ATOMIC_TYPE_FLAG_COMPLEX;
+	props[ATOMIC_TYPE_DOUBLE_COMPLEX].size       *= 2;
+	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX]
+		= props[ATOMIC_TYPE_LONG_DOUBLE];
+	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX].flags |= ATOMIC_TYPE_FLAG_COMPLEX;
+	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX].size  *= 2;
+
+	props[ATOMIC_TYPE_FLOAT_IMAGINARY]       = props[ATOMIC_TYPE_FLOAT];
+	props[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = props[ATOMIC_TYPE_DOUBLE];
+	props[ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY] = props[ATOMIC_TYPE_LONG_DOUBLE];
 }
 
 void exit_types(void)
@@ -555,6 +704,13 @@ bool type_valid(const type_t *type)
 	return type->kind != TYPE_INVALID;
 }
 
+static bool test_atomic_type_flag(atomic_type_kind_t kind,
+                                  atomic_type_flag_t flag)
+{
+	assert(kind <= ATOMIC_TYPE_LAST);
+	return (atomic_type_properties[kind].flags & flag) != 0;
+}
+
 /**
  * Returns true if the given type is an integer type.
  *
@@ -571,36 +727,7 @@ bool is_type_integer(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch((atomic_type_kind_t) type->atomic.akind) {
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_UINT:
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_ULONGLONG:
-		return true;
-
-	case ATOMIC_TYPE_INVALID:
-	case ATOMIC_TYPE_VOID:
-	case ATOMIC_TYPE_FLOAT:
-	case ATOMIC_TYPE_DOUBLE:
-	case ATOMIC_TYPE_LONG_DOUBLE:
-	case ATOMIC_TYPE_FLOAT_COMPLEX:
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-		return false;
-	}
-
-	panic("unexpected atomic type kind");
+	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_INTEGER);
 }
 
 /**
@@ -616,36 +743,7 @@ bool is_type_float(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch((atomic_type_kind_t) type->atomic.akind) {
-	case ATOMIC_TYPE_FLOAT:
-	case ATOMIC_TYPE_DOUBLE:
-	case ATOMIC_TYPE_LONG_DOUBLE:
-	case ATOMIC_TYPE_FLOAT_COMPLEX:
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-		return true;
-
-	case ATOMIC_TYPE_INVALID:
-	case ATOMIC_TYPE_VOID:
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_UINT:
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_ULONGLONG:
-		return false;
-	}
-
-	panic("unexpected atomic type kind");
+	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_FLOAT);
 }
 
 /**
@@ -665,39 +763,7 @@ bool is_type_signed(const type_t *type)
 	if(type->kind != TYPE_ATOMIC)
 		return false;
 
-	switch((atomic_type_kind_t) type->atomic.akind) {
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_FLOAT:
-	case ATOMIC_TYPE_DOUBLE:
-	case ATOMIC_TYPE_LONG_DOUBLE:
-	case ATOMIC_TYPE_FLOAT_COMPLEX:
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-		return true;
-
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_UCHAR:
-	case ATOMIC_TYPE_USHORT:
-	case ATOMIC_TYPE_UINT:
-	case ATOMIC_TYPE_ULONG:
-	case ATOMIC_TYPE_ULONGLONG:
-		return false;
-
-	case ATOMIC_TYPE_VOID:
-	case ATOMIC_TYPE_INVALID:
-		return false;
-	}
-
-	panic("invalid atomic type found");
-	return false;
+	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_SIGNED);
 }
 
 /**
@@ -710,13 +776,12 @@ bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->kind == TYPE_BITFIELD)
+	if(type->kind == TYPE_BITFIELD || type->kind == TYPE_ENUM)
 		return true;
+	if(type->kind != TYPE_ATOMIC)
+		return false;
 
-	if(is_type_integer(type) || is_type_float(type))
-		return true;
-
-	return false;
+	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
 }
 
 /**
@@ -732,7 +797,7 @@ bool is_type_scalar(const type_t *type)
 	switch (type->kind) {
 		case TYPE_POINTER: return true;
 		case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
-		default:            break;
+		default:           break;
 	}
 
 	return is_type_arithmetic(type);
@@ -967,57 +1032,20 @@ type_t *skip_typeref(type_t *type)
 
 unsigned get_atomic_type_size(atomic_type_kind_t kind)
 {
-	switch(kind) {
-	case ATOMIC_TYPE_CHAR:
-	case ATOMIC_TYPE_SCHAR:
-	case ATOMIC_TYPE_UCHAR:
-		return 1;
+	assert(kind <= ATOMIC_TYPE_LAST);
+	return atomic_type_properties[kind].size;
+}
 
-	case ATOMIC_TYPE_SHORT:
-	case ATOMIC_TYPE_USHORT:
-		return 2;
+unsigned get_atomic_type_alignment(atomic_type_kind_t kind)
+{
+	assert(kind <= ATOMIC_TYPE_LAST);
+	return atomic_type_properties[kind].alignment;
+}
 
-	case ATOMIC_TYPE_BOOL:
-	case ATOMIC_TYPE_INT:
-	case ATOMIC_TYPE_UINT:
-		return machine_size >> 3;
-
-	case ATOMIC_TYPE_LONG:
-	case ATOMIC_TYPE_ULONG:
-		return machine_size > 16 ? machine_size >> 3 : 4;
-
-	case ATOMIC_TYPE_LONGLONG:
-	case ATOMIC_TYPE_ULONGLONG:
-		return machine_size > 16 ? 8 : 4;
-
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:
-	case ATOMIC_TYPE_FLOAT:
-		return 4;
-
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_DOUBLE:
-		return 8;
-
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-	case ATOMIC_TYPE_LONG_DOUBLE:
-		return 12;
-
-	case ATOMIC_TYPE_VOID:
-		return 1;
-
-	case ATOMIC_TYPE_FLOAT_COMPLEX:
-		return 2 * get_atomic_type_size(ATOMIC_TYPE_FLOAT);
-
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:
-		return 2 * get_atomic_type_size(ATOMIC_TYPE_DOUBLE);
-
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-		return 2 * get_atomic_type_size(ATOMIC_TYPE_LONG_DOUBLE);
-
-	case ATOMIC_TYPE_INVALID:
-		break;
-	}
-	panic("Trying to determine size of invalid atomic type");
+unsigned get_atomic_type_flags(atomic_type_kind_t kind)
+{
+	assert(kind <= ATOMIC_TYPE_LAST);
+	return atomic_type_properties[kind].flags;
 }
 
 /**

@@ -56,6 +56,15 @@ typedef enum {
 	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY
 } atomic_type_kind_t;
 
+typedef enum {
+	ATOMIC_TYPE_FLAG_NONE       = 0,
+	ATOMIC_TYPE_FLAG_SIGNED     = 1 << 0,
+	ATOMIC_TYPE_FLAG_INTEGER    = 1 << 1,
+	ATOMIC_TYPE_FLAG_FLOAT      = 1 << 2,
+	ATOMIC_TYPE_FLAG_ARITHMETIC = 1 << 3,
+	ATOMIC_TYPE_FLAG_COMPLEX    = 1 << 4,
+} atomic_type_flag_t;
+
 typedef struct type_base_t           type_base_t;
 typedef struct atomic_type_t         atomic_type_t;
 typedef struct pointer_type_t        pointer_type_t;
@@ -142,7 +151,12 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
 /**
  * returns alignment of an atomic type kind in bytes
  */
-unsigned get_atomic_type_align(atomic_type_kind_t kind);
+unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
+
+/**
+ * returns flags of an atomic type kind
+ */
+unsigned get_atomic_type_flags(atomic_type_kind_t kind);
 
 /**
  * Find the atomic type kind representing a given size (signed).
