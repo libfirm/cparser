@@ -119,19 +119,19 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
-		.alignment  = 4,
+		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_DOUBLE] = {
 		.size       = 8,
-		.alignment  = 8,
+		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_LONG_DOUBLE] = {
 		.size       = 12,
-		.alignment  = 12,
+		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
