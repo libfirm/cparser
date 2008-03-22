@@ -26,7 +26,7 @@ Parser:
 
 ast2firm:
 - handle non-constant initializers
-- output source file positions for panics...
+- output source file positions for panics.
 - handle bitfield members with 0 correctly (standard says they finish the
   current unit)
 - create asm nodes.
