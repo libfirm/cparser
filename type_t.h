@@ -37,6 +37,8 @@ typedef enum {
 	TYPE_INVALID,
 	TYPE_ERROR,
 	TYPE_ATOMIC,
+	TYPE_COMPLEX,
+	TYPE_IMAGINARY,
 	TYPE_COMPOUND_STRUCT,
 	TYPE_COMPOUND_UNION,
 	TYPE_ENUM,
@@ -74,6 +76,16 @@ struct type_base_t {
 };
 
 struct atomic_type_t {
+	type_base_t         base;
+	atomic_type_kind_t  akind;
+};
+
+struct complex_type_t {
+	type_base_t         base;
+	atomic_type_kind_t  akind;
+};
+
+struct imaginary_type_t {
 	type_base_t         base;
 	atomic_type_kind_t  akind;
 };
@@ -156,6 +168,8 @@ union type_t {
 	type_kind_t      kind;
 	type_base_t      base;
 	atomic_type_t    atomic;
+	complex_type_t   complex;
+	imaginary_type_t imaginary;
 	builtin_type_t   builtin;
 	pointer_type_t   pointer;
 	array_type_t     array;
@@ -168,6 +182,8 @@ union type_t {
 };
 
 type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
+type_t *make_complex_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
+type_t *make_imaginary_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);

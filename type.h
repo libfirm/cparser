@@ -46,14 +46,7 @@ typedef enum {
 	ATOMIC_TYPE_LONG_DOUBLE,
 	ATOMIC_TYPE_BOOL,
 
-	ATOMIC_TYPE_FLOAT_COMPLEX,
-	ATOMIC_TYPE_DOUBLE_COMPLEX,
-	ATOMIC_TYPE_LONG_DOUBLE_COMPLEX,
-	ATOMIC_TYPE_FLOAT_IMAGINARY,
-	ATOMIC_TYPE_DOUBLE_IMAGINARY,
-	ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY,
-
-	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY
+	ATOMIC_TYPE_LAST = ATOMIC_TYPE_BOOL
 } atomic_type_kind_t;
 
 typedef enum {
@@ -67,6 +60,8 @@ typedef enum {
 
 typedef struct type_base_t           type_base_t;
 typedef struct atomic_type_t         atomic_type_t;
+typedef struct complex_type_t        complex_type_t;
+typedef struct imaginary_type_t      imaginary_type_t;
 typedef struct pointer_type_t        pointer_type_t;
 typedef struct function_parameter_t  function_parameter_t;
 typedef struct function_type_t       function_type_t;

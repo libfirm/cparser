@@ -366,6 +366,8 @@ static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
+		[TYPE_COMPLEX]         = sizeof(complex_type_t),
+		[TYPE_IMAGINARY]       = sizeof(imaginary_type_t),
 		[TYPE_BITFIELD]        = sizeof(bitfield_type_t),
 		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
 		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
@@ -2071,7 +2073,7 @@ static void skip_until(int type) {
 }
 
 /**
- * skip any {...} blocks until a closing braket is reached.
+ * skip any {...} blocks until a closing bracket is reached.
  */
 static void skip_initializers(void)
 {
@@ -2614,10 +2616,8 @@ typedef enum {
 	SPECIFIER_INT32     = 1 << 13,
 	SPECIFIER_INT64     = 1 << 14,
 	SPECIFIER_INT128    = 1 << 15,
-#ifdef PROVIDE_COMPLEX
 	SPECIFIER_COMPLEX   = 1 << 16,
 	SPECIFIER_IMAGINARY = 1 << 17,
-#endif
 } specifiers_t;
 
 static type_t *create_builtin_type(symbol_t *const symbol,
@@ -2628,7 +2628,7 @@ static type_t *create_builtin_type(symbol_t *const symbol,
 	type->builtin.real_type = real_type;
 
 	type_t *result = typehash_insert(type);
-	if (type != result) {
+	if(type != result) {
 		free_type(type);
 	}
 
@@ -2638,8 +2638,8 @@ static type_t *create_builtin_type(symbol_t *const symbol,
 static type_t *get_typedef_type(symbol_t *symbol)
 {
 	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
-	if(declaration == NULL
-			|| declaration->storage_class != STORAGE_CLASS_TYPEDEF)
+	if(declaration == NULL ||
+	   declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
 	type_t *type               = allocate_type_zero(TYPE_TYPEDEF, &declaration->source_position);
@@ -2757,7 +2757,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 					}
 				}
 				next_token();
-			    if(token.type == ',') {
+				if(token.type == ',') {
 					next_token();
 					continue;
 				}
@@ -2910,10 +2910,9 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32")
 		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64")
 		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128")
-#ifdef PROVIDE_COMPLEX
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
-#endif
+
 		case T__forceinline:
 			/* only in microsoft mode */
 			specifiers->decl_modifiers |= DM_FORCEINLINE;
@@ -3100,26 +3099,18 @@ finish_specifiers:
 		case SPECIFIER_BOOL:
 			atomic_type = ATOMIC_TYPE_BOOL;
 			break;
-#ifdef PROVIDE_COMPLEX
 		case SPECIFIER_FLOAT | SPECIFIER_COMPLEX:
-			atomic_type = ATOMIC_TYPE_FLOAT_COMPLEX;
+		case SPECIFIER_FLOAT | SPECIFIER_IMAGINARY:
+			atomic_type = ATOMIC_TYPE_FLOAT;
 			break;
 		case SPECIFIER_DOUBLE | SPECIFIER_COMPLEX:
-			atomic_type = ATOMIC_TYPE_DOUBLE_COMPLEX;
+		case SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
+			atomic_type = ATOMIC_TYPE_DOUBLE;
 			break;
 		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_COMPLEX:
-			atomic_type = ATOMIC_TYPE_LONG_DOUBLE_COMPLEX;
-			break;
-		case SPECIFIER_FLOAT | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_FLOAT_IMAGINARY;
-			break;
-		case SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_DOUBLE_IMAGINARY;
-			break;
 		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY;
+			atomic_type = ATOMIC_TYPE_LONG_DOUBLE;
 			break;
-#endif
 		default:
 			/* invalid specifier combination, give an error message */
 			if(type_specifiers == 0) {
@@ -3143,9 +3134,19 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		type               = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
-		type->atomic.akind = atomic_type;
-		newtype            = 1;
+		if(type_specifiers & SPECIFIER_COMPLEX &&
+		   atomic_type != ATOMIC_TYPE_INVALID) {
+			type                = allocate_type_zero(TYPE_COMPLEX, &builtin_source_position);
+			type->complex.akind = atomic_type;
+		} else if(type_specifiers & SPECIFIER_IMAGINARY &&
+		          atomic_type != ATOMIC_TYPE_INVALID) {
+			type                  = allocate_type_zero(TYPE_IMAGINARY, &builtin_source_position);
+			type->imaginary.akind = atomic_type;
+		} else {
+			type               = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
+			type->atomic.akind = atomic_type;
+		}
+		newtype = 1;
 	} else {
 		if(type_specifiers != 0) {
 			errorf(HERE, "multiple datatypes in declaration");

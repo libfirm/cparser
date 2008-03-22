@@ -173,22 +173,6 @@ void init_types(void)
 	props[ATOMIC_TYPE_ULONGLONG].alignment = 4;
 
 	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UINT];
-
-	/* initialize complex/imaginary types */
-	props[ATOMIC_TYPE_FLOAT_COMPLEX]              = props[ATOMIC_TYPE_FLOAT];
-	props[ATOMIC_TYPE_FLOAT_COMPLEX].flags       |= ATOMIC_TYPE_FLAG_COMPLEX;
-	props[ATOMIC_TYPE_FLOAT_COMPLEX].size        *= 2;
-	props[ATOMIC_TYPE_DOUBLE_COMPLEX]             = props[ATOMIC_TYPE_DOUBLE];
-	props[ATOMIC_TYPE_DOUBLE_COMPLEX].flags      |= ATOMIC_TYPE_FLAG_COMPLEX;
-	props[ATOMIC_TYPE_DOUBLE_COMPLEX].size       *= 2;
-	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX]
-		= props[ATOMIC_TYPE_LONG_DOUBLE];
-	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX].flags |= ATOMIC_TYPE_FLAG_COMPLEX;
-	props[ATOMIC_TYPE_LONG_DOUBLE_COMPLEX].size  *= 2;
-
-	props[ATOMIC_TYPE_FLOAT_IMAGINARY]       = props[ATOMIC_TYPE_FLOAT];
-	props[ATOMIC_TYPE_DOUBLE_IMAGINARY]      = props[ATOMIC_TYPE_DOUBLE];
-	props[ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY] = props[ATOMIC_TYPE_LONG_DOUBLE];
 }
 
 void exit_types(void)
@@ -214,7 +198,38 @@ void print_type_qualifiers(type_qualifiers_t qualifiers)
 }
 
 /**
- * Prints the name of a atomic type.
+ * Prints the name of an atomic type kinds.
+ *
+ * @param kind  The type kind.
+ */
+static
+void print_atomic_kinds(atomic_type_kind_t kind)
+{
+	const char *s = "INVALIDATOMIC";
+	switch(kind) {
+	case ATOMIC_TYPE_INVALID:                               break;
+	case ATOMIC_TYPE_VOID:        s = "void";               break;
+	case ATOMIC_TYPE_BOOL:        s = "_Bool";              break;
+	case ATOMIC_TYPE_CHAR:        s = "char";               break;
+	case ATOMIC_TYPE_SCHAR:       s = "signed char";        break;
+	case ATOMIC_TYPE_UCHAR:       s = "unsigned char";      break;
+	case ATOMIC_TYPE_INT:         s = "int";                break;
+	case ATOMIC_TYPE_UINT:        s = "unsigned int";       break;
+	case ATOMIC_TYPE_SHORT:       s = "short";              break;
+	case ATOMIC_TYPE_USHORT:      s = "unsigned short";     break;
+	case ATOMIC_TYPE_LONG:        s = "long";               break;
+	case ATOMIC_TYPE_ULONG:       s = "unsigned long";      break;
+	case ATOMIC_TYPE_LONGLONG:    s = "long long";          break;
+	case ATOMIC_TYPE_ULONGLONG:   s = "unsigned long long"; break;
+	case ATOMIC_TYPE_LONG_DOUBLE: s = "long double";        break;
+	case ATOMIC_TYPE_FLOAT:       s = "float";              break;
+	case ATOMIC_TYPE_DOUBLE:      s = "double";             break;
+	}
+	fputs(s, out);
+}
+
+/**
+ * Prints the name of an atomic type.
  *
  * @param type  The type.
  */
@@ -222,34 +237,33 @@ static
 void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers);
+	print_atomic_kinds(type->akind);
+}
 
-	const char *s = "INVALIDATOMIC";
-	switch((atomic_type_kind_t) type->akind) {
-	case ATOMIC_TYPE_INVALID:     break;
-	case ATOMIC_TYPE_VOID:                  s = "void";               break;
-	case ATOMIC_TYPE_BOOL:                  s = "_Bool";              break;
-	case ATOMIC_TYPE_CHAR:                  s = "char";               break;
-	case ATOMIC_TYPE_SCHAR:                 s = "signed char";        break;
-	case ATOMIC_TYPE_UCHAR:                 s = "unsigned char";      break;
-	case ATOMIC_TYPE_INT:                   s = "int";                break;
-	case ATOMIC_TYPE_UINT:                  s = "unsigned int";       break;
-	case ATOMIC_TYPE_SHORT:                 s = "short";              break;
-	case ATOMIC_TYPE_USHORT:                s = "unsigned short";     break;
-	case ATOMIC_TYPE_LONG:                  s = "long";               break;
-	case ATOMIC_TYPE_ULONG:                 s = "unsigned long";      break;
-	case ATOMIC_TYPE_LONGLONG:              s = "long long";          break;
-	case ATOMIC_TYPE_ULONGLONG:             s = "unsigned long long"; break;
-	case ATOMIC_TYPE_LONG_DOUBLE:           s = "long double";        break;
-	case ATOMIC_TYPE_FLOAT:                 s = "float";              break;
-	case ATOMIC_TYPE_DOUBLE:                s = "double";             break;
-	case ATOMIC_TYPE_FLOAT_COMPLEX:         s = "_Complex float";     break;
-	case ATOMIC_TYPE_DOUBLE_COMPLEX:        s = "_Complex float";     break;
-	case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:   s = "_Complex float";     break;
-	case ATOMIC_TYPE_FLOAT_IMAGINARY:       s = "_Imaginary float";   break;
-	case ATOMIC_TYPE_DOUBLE_IMAGINARY:      s = "_Imaginary float";   break;
-	case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY: s = "_Imaginary float";   break;
-	}
-	fputs(s, out);
+/**
+ * Prints the name of a complex type.
+ *
+ * @param type  The type.
+ */
+static
+void print_complex_type(const complex_type_t *type)
+{
+	print_type_qualifiers(type->base.qualifiers);
+	fputs("_Complex ", out);
+	print_atomic_kinds(type->akind);
+}
+
+/**
+ * Prints the name of an imaginary type.
+ *
+ * @param type  The type.
+ */
+static
+void print_imaginary_type(const imaginary_type_t *type)
+{
+	print_type_qualifiers(type->base.qualifiers);
+	fputs("_Imaginary ", out);
+	print_atomic_kinds(type->akind);
 }
 
 /**
@@ -535,6 +549,12 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 	case TYPE_ATOMIC:
 		print_atomic_type(&type->atomic);
 		return;
+	case TYPE_COMPLEX:
+		print_complex_type(&type->complex);
+		return;
+	case TYPE_IMAGINARY:
+		print_imaginary_type(&type->imaginary);
+		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 		print_compound_type(&type->compound);
@@ -588,6 +608,8 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 	case TYPE_ERROR:
 	case TYPE_INVALID:
 	case TYPE_ATOMIC:
+	case TYPE_COMPLEX:
+	case TYPE_IMAGINARY:
 	case TYPE_ENUM:
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
@@ -637,6 +659,8 @@ static size_t get_type_size(const type_t *type)
 {
 	switch(type->kind) {
 	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
+	case TYPE_COMPLEX:         return sizeof(complex_type_t);
+	case TYPE_IMAGINARY:       return sizeof(imaginary_type_t);
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
 	case TYPE_ENUM:            return sizeof(enum_type_t);
@@ -835,6 +859,12 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_ATOMIC:
 		return type->atomic.akind == ATOMIC_TYPE_VOID;
 
+	case TYPE_COMPLEX:
+		return type->complex.akind == ATOMIC_TYPE_VOID;
+
+	case TYPE_IMAGINARY:
+		return type->imaginary.akind == ATOMIC_TYPE_VOID;
+
 	case TYPE_POINTER:
 	case TYPE_BUILTIN:
 	case TYPE_ERROR:
@@ -930,6 +960,10 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		return function_types_compatible(&type1->function, &type2->function);
 	case TYPE_ATOMIC:
 		return type1->atomic.akind == type2->atomic.akind;
+	case TYPE_COMPLEX:
+		return type1->complex.akind == type2->complex.akind;
+	case TYPE_IMAGINARY:
+		return type1->imaginary.akind == type2->imaginary.akind;
 	case TYPE_ARRAY:
 		return array_types_compatible(&type1->array, &type2->array);
 
@@ -1141,17 +1175,53 @@ static type_t *identify_new_type(type_t *type)
  * @param akind       The kind of the atomic type.
  * @param qualifiers  Type qualifiers for the new type.
  */
-type_t *make_atomic_type(atomic_type_kind_t atype, type_qualifiers_t qualifiers)
+type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 {
 	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
 	memset(type, 0, sizeof(atomic_type_t));
 
 	type->kind            = TYPE_ATOMIC;
 	type->base.qualifiers = qualifiers;
-	type->base.alignment  = 0;
-	type->atomic.akind    = atype;
+	type->base.alignment  = get_atomic_type_alignment(akind);
+	type->atomic.akind    = akind;
 
-	/* TODO: set the alignment depending on the atype here */
+	return identify_new_type(type);
+}
+
+/**
+ * Creates a new complex type.
+ *
+ * @param akind       The kind of the atomic type.
+ * @param qualifiers  Type qualifiers for the new type.
+ */
+type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
+{
+	type_t *type = obstack_alloc(type_obst, sizeof(complex_type_t));
+	memset(type, 0, sizeof(complex_type_t));
+
+	type->kind            = TYPE_COMPLEX;
+	type->base.qualifiers = qualifiers;
+	type->base.alignment  = get_atomic_type_alignment(akind);
+	type->complex.akind   = akind;
+
+	return identify_new_type(type);
+}
+
+/**
+ * Creates a new imaginary type.
+ *
+ * @param akind       The kind of the atomic type.
+ * @param qualifiers  Type qualifiers for the new type.
+ */
+type_t *make_imaginary_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
+{
+	type_t *type = obstack_alloc(type_obst, sizeof(imaginary_type_t));
+	memset(type, 0, sizeof(imaginary_type_t));
+
+	type->kind            = TYPE_IMAGINARY;
+	type->base.qualifiers = qualifiers;
+	type->base.alignment  = get_atomic_type_alignment(akind);
+	type->imaginary.akind = akind;
 
 	return identify_new_type(type);
 }

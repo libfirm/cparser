@@ -221,6 +221,10 @@ static unsigned get_type_size_const(type_t *type)
 		panic("error type occured");
 	case TYPE_ATOMIC:
 		return get_atomic_type_size(type->atomic.akind);
+	case TYPE_COMPLEX:
+		return 2 * get_atomic_type_size(type->complex.akind);
+	case TYPE_IMAGINARY:
+		return get_atomic_type_size(type->imaginary.akind);
 	case TYPE_ENUM:
 		return get_mode_size_bytes(mode_int);
 	case TYPE_COMPOUND_UNION:
@@ -281,19 +285,48 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
+/**
+ * Creates a Firm type for an atomic type
+ */
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
 	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
 	atomic_type_kind_t  kind      = type->akind;
 	ir_mode            *mode      = _atomic_modes[kind];
-	unsigned            alignment = get_atomic_type_alignment(kind);
 	ident              *id        = get_mode_ident(mode);
 	ir_type            *irtype    = new_d_type_primitive(id, mode, dbgi);
 
-	if(type->base.alignment > alignment)
-		alignment = type->base.alignment;
+	set_type_alignment_bytes(irtype, type->base.alignment);
 
-	set_type_alignment_bytes(irtype, alignment);
+	return irtype;
+}
+
+/**
+ * Creates a Firm type for a complex type
+ */
+static ir_type *create_complex_type(const complex_type_t *type)
+{
+	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
+	atomic_type_kind_t  kind      = type->akind;
+	ir_mode            *mode      = _atomic_modes[kind];
+	ident              *id        = get_mode_ident(mode);
+
+	/* FIXME: finish the array */
+	return NULL;
+}
+
+/**
+ * Creates a Firm type for an imaginary type
+ */
+static ir_type *create_imaginary_type(const imaginary_type_t *type)
+{
+	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
+	atomic_type_kind_t  kind      = type->akind;
+	ir_mode            *mode      = _atomic_modes[kind];
+	ident              *id        = get_mode_ident(mode);
+	ir_type            *irtype    = new_d_type_primitive(id, mode, dbgi);
+
+	set_type_alignment_bytes(irtype, type->base.alignment);
 
 	return irtype;
 }
@@ -759,9 +792,15 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch(type->kind) {
 	case TYPE_ERROR:
-		panic("error type occured");
+		panic("error type occurred");
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(&type->atomic);
+		break;
+	case TYPE_COMPLEX:
+		firm_type = create_complex_type(&type->complex);
+		break;
+	case TYPE_IMAGINARY:
+		firm_type = create_imaginary_type(&type->imaginary);
 		break;
 	case TYPE_FUNCTION:
 		firm_type = create_method_type(&type->function);
@@ -2534,7 +2573,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	{
 		case TYPE_ATOMIC: {
 			const atomic_type_t *const atomic_type = &type->atomic;
-			switch ((atomic_type_kind_t) atomic_type->akind) {
+			switch (atomic_type->akind) {
 				/* should not be reached */
 				case ATOMIC_TYPE_INVALID:
 					tc = no_type_class;
@@ -2565,21 +2604,12 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 				case ATOMIC_TYPE_LONG_DOUBLE:
 					tc = real_type_class;
 					goto make_const;
-
-				case ATOMIC_TYPE_FLOAT_COMPLEX:
-				case ATOMIC_TYPE_DOUBLE_COMPLEX:
-				case ATOMIC_TYPE_LONG_DOUBLE_COMPLEX:
-					tc = complex_type_class;
-					goto make_const;
-				case ATOMIC_TYPE_FLOAT_IMAGINARY:
-				case ATOMIC_TYPE_DOUBLE_IMAGINARY:
-				case ATOMIC_TYPE_LONG_DOUBLE_IMAGINARY:
-					tc = complex_type_class;
-					goto make_const;
 			}
 			panic("Unexpected atomic type in classify_type_to_firm().");
 		}
 
+		case TYPE_COMPLEX:         tc = complex_type_class; goto make_const;
+		case TYPE_IMAGINARY:       tc = complex_type_class; goto make_const;
 		case TYPE_BITFIELD:        tc = integer_type_class; goto make_const;
 		case TYPE_ARRAY:           /* gcc handles this as pointer */
 		case TYPE_FUNCTION:        /* gcc handles this as pointer */

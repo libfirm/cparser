@@ -53,6 +53,22 @@ static unsigned hash_atomic_type(const atomic_type_t *type)
 	return result;
 }
 
+static unsigned hash_complex_type(const complex_type_t *type)
+{
+	unsigned some_prime = 27644437;
+	unsigned result     = type->akind * some_prime;
+
+	return result;
+}
+
+static unsigned hash_imaginary_type(const imaginary_type_t *type)
+{
+	unsigned some_prime = 27644437;
+	unsigned result     = type->akind * some_prime;
+
+	return result;
+}
+
 static unsigned hash_pointer_type(const pointer_type_t *type)
 {
 	return hash_ptr(type->points_to);
@@ -117,6 +133,12 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_ATOMIC:
 		hash = hash_atomic_type(&type->atomic);
 		break;
+	case TYPE_COMPLEX:
+		hash = hash_complex_type(&type->complex);
+		break;
+	case TYPE_IMAGINARY:
+		hash = hash_imaginary_type(&type->imaginary);
+		break;
 	case TYPE_ENUM:
 		hash = hash_enum_type(&type->enumt);
 		break;
@@ -154,7 +176,19 @@ static unsigned hash_type(const type_t *type)
 }
 
 static bool atomic_types_equal(const atomic_type_t *type1,
-                               const atomic_type_t *type2)
+							   const atomic_type_t *type2)
+{
+	return type1->akind == type2->akind;
+}
+
+static bool complex_types_equal(const complex_type_t *type1,
+							    const complex_type_t *type2)
+{
+	return type1->akind == type2->akind;
+}
+
+static bool imaginary_types_equal(const imaginary_type_t *type1,
+							      const imaginary_type_t *type2)
 {
 	return type1->akind == type2->akind;
 }
@@ -274,6 +308,10 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 		return false;
 	case TYPE_ATOMIC:
 		return atomic_types_equal(&type1->atomic, &type2->atomic);
+	case TYPE_COMPLEX:
+		return complex_types_equal(&type1->complex, &type2->complex);
+	case TYPE_IMAGINARY:
+		return imaginary_types_equal(&type1->imaginary, &type2->imaginary);
 	case TYPE_ENUM:
 		return enum_types_equal(&type1->enumt, &type2->enumt);
 	case TYPE_COMPOUND_STRUCT:
