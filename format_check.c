@@ -145,7 +145,8 @@ static bool atend(vchar_t *self) {
 /**
  * Check printf-style format.
  */
-static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt, unsigned idx_param)
+static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
+		unsigned idx_param)
 {
 	const call_argument_t *fmt_arg;
 	unsigned idx = 0;
@@ -177,7 +178,7 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 		return;
 	}
 	/* find the real args */
-	for(; idx < idx_fmt; ++idx)
+	for(; idx < idx_param; ++idx)
 		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
