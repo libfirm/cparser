@@ -656,7 +656,10 @@ int main(int argc, char **argv)
 			break;
 		case CompileAssembleLink:
 #ifdef _WIN32
-			outname = "a.exe";
+			/* Windows compiler typically derive the output name from
+			   the first source file */
+			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".exe");
+			outname = outnamebuf;
 #else
 			outname = "a.out";
 #endif

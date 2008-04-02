@@ -43,6 +43,10 @@
 
 #define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
 
+/* some idents needed for name mangling */
+static ident *id_underscore;
+static ident *id_imp;
+
 static ir_type *ir_type_const_char;
 static ir_type *ir_type_wchar_t;
 static ir_type *ir_type_void;
@@ -931,8 +935,8 @@ static const struct {
 /**
  * Mangles an entity linker (ld) name for win32 usage.
  *
- * @param ent             the entity to be mangled
- * @param decl_modifiers  the set of modifiers for this entity
+ * @param ent          the entity to be mangled
+ * @param declaration  the declaration
  */
 static ident *create_ld_ident_win32(ir_entity *ent, declaration_t *declaration)
 {
@@ -942,34 +946,46 @@ static ident *create_ld_ident_win32(ir_entity *ent, declaration_t *declaration)
 		id = decorate_win32_c_fkt(ent, get_entity_ident(ent));
 	else {
 		/* always add an underscore in win32 */
-		id = mangle(new_id_from_chars("_", 1), get_entity_ident(ent));
+		id = mangle(id_underscore, get_entity_ident(ent));
 	}
 
 	decl_modifiers_t decl_modifiers = declaration->decl_modifiers;
 	if (decl_modifiers & DM_DLLIMPORT) {
 		/* add prefix for imported symbols */
-		id = mangle(new_id_from_chars("__imp_", 6), id);
+		id = mangle(id_imp, id);
 	}
 	return id;
 }
 
-static ident *create_ld_ident_linux(ir_entity *entity,
-                                    declaration_t *declaration)
+/**
+ * Mangles an entity linker (ld) name for Linux ELF usage.
+ *
+ * @param ent          the entity to be mangled
+ * @param declaration  the declaration
+ */
+static ident *create_ld_ident_linux_elf(ir_entity *entity,
+                                        declaration_t *declaration)
 {
 	(void) declaration;
 	return get_entity_ident(entity);
 }
 
+/**
+ * Mangles an entity linker (ld) name for Mach-O usage.
+ *
+ * @param ent          the entity to be mangled
+ * @param declaration  the declaration
+ */
 static ident *create_ld_ident_macho(ir_entity *ent, declaration_t *declaration)
 {
 	(void) declaration;
-	ident *id = mangle(new_id_from_chars("_", 1), get_entity_ident(ent));
+	ident *id = mangle(id_underscore, get_entity_ident(ent));
 	return id;
 }
 
 typedef ident* (*create_ld_ident_func)(ir_entity *entity,
                                        declaration_t *declaration);
-create_ld_ident_func  create_ld_ident = create_ld_ident_linux;
+create_ld_ident_func  create_ld_ident = create_ld_ident_linux_elf;
 
 static ir_entity* get_function_entity(declaration_t *declaration)
 {
@@ -4821,9 +4837,26 @@ void init_ast2firm(void)
 	obstack_init(&asm_obst);
 	init_atomic_modes();
 
-	(void) create_ld_ident_win32;
-	(void) create_ld_ident_linux;
-	(void) create_ld_ident_macho;
+	id_underscore = new_id_from_chars("_", 1);
+	id_imp        = new_id_from_chars("__imp_", 6);
+
+	/* OS option must be set to the backend */
+	const char *s = "ia32-gasmode=linux";
+	switch (firm_opt.os_support) {
+	case OS_SUPPORT_WIN32:
+		create_ld_ident = create_ld_ident_win32;
+		s = "ia32-gasmode=mingw";
+		break;
+	case OS_SUPPORT_LINUX:
+		create_ld_ident = create_ld_ident_linux_elf;
+		s = "ia32-gasmode=linux"; break;
+		break;
+	case OS_SUPPORT_MACHO:
+		create_ld_ident = create_ld_ident_macho;
+		s = "ia32-gasmode=macho"; break;
+		break;
+	}
+	firm_be_option(s);
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
