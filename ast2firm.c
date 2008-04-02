@@ -1090,18 +1090,12 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 }
 
 static ir_node *create_global(dbg_info *dbgi, ir_mode *mode,
-                                ir_entity *entity)
+                              ir_entity *entity)
 {
 	assert(entity != NULL);
-	if(firm_opt.pic) {
-		ir_graph *irg = current_ir_graph;
-		return new_d_simpleSel(dbgi, get_irg_no_mem(irg),
-				get_irg_globals(irg), entity);
-	} else {
-		symconst_symbol sym;
-		sym.entity_p = entity;
-		return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
-	}
+	symconst_symbol sym;
+	sym.entity_p = entity;
+	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
 }
 
 static ir_node *string_to_firm(const source_position_t *const src_pos,
