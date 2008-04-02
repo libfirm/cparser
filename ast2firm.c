@@ -112,17 +112,6 @@ static dbg_info *get_dbg_info(const source_position_t *pos)
 	return (dbg_info*) pos;
 }
 
-static unsigned unique_id = 0;
-
-static ident *unique_ident(const char *tag)
-{
-	char buf[256];
-
-	snprintf(buf, sizeof(buf), "%s.%u", tag, unique_id);
-	unique_id++;
-	return new_id_from_str(buf);
-}
-
 static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
@@ -306,13 +295,13 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
  */
 static ir_type *create_complex_type(const complex_type_t *type)
 {
-	/*
 	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
 	atomic_type_kind_t  kind      = type->akind;
 	ir_mode            *mode      = _atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
-	*/
-	(void)type;
+
+	(void) id;
+	(void) dbgi;
 
 	/* FIXME: finish the array */
 	return NULL;
@@ -338,7 +327,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 {
 	type_t  *return_type  = function_type->return_type;
 
-	ident   *id           = unique_ident("functiontype");
+	ident   *id           = id_unique("functiontype.%u");
 	int      n_parameters = count_parameters(function_type);
 	int      n_results    = return_type == type_void ? 0 : 1;
 	dbg_info *dbgi        = get_dbg_info(&function_type->base.source_position);
@@ -373,7 +362,7 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	 * and then set the real points_to type
 	 */
 	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
-	ir_type  *ir_type = new_d_type_pointer(unique_ident("pointer"),
+	ir_type  *ir_type = new_d_type_pointer(id_unique("pointer.%u"),
 	                                    ir_type_void, mode_P_data, dbgi);
 	type->base.firm_type  = ir_type;
 
@@ -388,7 +377,7 @@ static ir_type *create_array_type(array_type_t *type)
 	type_t  *element_type    = type->element_type;
 	ir_type *ir_element_type = get_ir_type(element_type);
 
-	ident    *id      = unique_ident("array");
+	ident    *id      = id_unique("array.%u");
 	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
 	ir_type  *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
 
@@ -520,9 +509,9 @@ static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
 		symbol_t *symbol = declaration->symbol;
 		ident    *id;
 		if(symbol != NULL) {
-			id = unique_ident(symbol->string);
+			id = new_id_from_str(symbol->string);
 		} else {
-			id = unique_ident("__anonymous_struct");
+			id = id_unique("__anonymous_struct.%u");
 		}
 		dbg_info *dbgi  = get_dbg_info(&type->base.source_position);
 
@@ -558,7 +547,7 @@ static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
 			} else {
 				assert(entry_type->kind == TYPE_BITFIELD);
 			}
-			ident = unique_ident("anon");
+			ident = id_unique("anon.%u");
 		}
 
 		ir_type *base_irtype;
@@ -655,9 +644,9 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		symbol_t      *symbol      = declaration->symbol;
 		ident         *id;
 		if(symbol != NULL) {
-			id = unique_ident(symbol->string);
+			id = new_id_from_str(symbol->string);
 		} else {
-			id = unique_ident("__anonymous_union");
+			id = id_unique("__anonymous_union.%u");
 		}
 		dbg_info *dbgi = get_dbg_info(&type->base.source_position);
 
@@ -701,7 +690,7 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 			if(entry_size > size) {
 				size = entry_size;
 			}
-			ident = unique_ident("anon");
+			ident = id_unique("anon.%u");
 		}
 
 		size_t entry_size      = get_type_size_bytes(entry_ir_type);
@@ -945,8 +934,9 @@ static const struct {
  * @param ent             the entity to be mangled
  * @param decl_modifiers  the set of modifiers for this entity
  */
-static ir_ident_ptr decorate_win32(ir_entity_ptr ent, decl_modifiers_t decl_modifiers) {
-	ir_ident_ptr id;
+static ident *create_ld_ident_win32(ir_entity *ent, declaration_t *declaration)
+{
+	ident *id;
 
 	if (is_Method_type(get_entity_type(ent)))
 		id = decorate_win32_c_fkt(ent, get_entity_ident(ent));
@@ -955,6 +945,7 @@ static ir_ident_ptr decorate_win32(ir_entity_ptr ent, decl_modifiers_t decl_modi
 		id = mangle(new_id_from_chars("_", 1), get_entity_ident(ent));
 	}
 
+	decl_modifiers_t decl_modifiers = declaration->decl_modifiers;
 	if (decl_modifiers & DM_DLLIMPORT) {
 		/* add prefix for imported symbols */
 		id = mangle(new_id_from_chars("__imp_", 6), id);
@@ -962,23 +953,23 @@ static ir_ident_ptr decorate_win32(ir_entity_ptr ent, decl_modifiers_t decl_modi
 	return id;
 }
 
-/**
- * Mangles an entity linker (ld) name from a declaration.
- *
- * @param ent             the entity to be mangled
- * @param declaration     the declaration
- */
-static void mangle_ent_from_decl(ir_entity *ent, declaration_t *declaration)
+static ident *create_ld_ident_linux(ir_entity *entity,
+                                    declaration_t *declaration)
 {
-	ident *id;
-
-	if (firm_opt.os_support == OS_SUPPORT_MINGW)
-		id = decorate_win32(ent, declaration->decl_modifiers);
-	else
-		id = get_entity_ident(ent);
-
-	set_entity_ld_ident(ent, id);
+	(void) declaration;
+	return get_entity_ident(entity);
 }
+
+static ident *create_ld_ident_macho(ir_entity *ent, declaration_t *declaration)
+{
+	(void) declaration;
+	ident *id = mangle(new_id_from_chars("_", 1), get_entity_ident(ent));
+	return id;
+}
+
+typedef ident* (*create_ld_ident_func)(ir_entity *entity,
+                                       declaration_t *declaration);
+create_ld_ident_func  create_ld_ident = create_ld_ident_linux;
 
 static ir_entity* get_function_entity(declaration_t *declaration)
 {
@@ -995,7 +986,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(global_type, id, ir_type_method, dbgi);
-	mangle_ent_from_decl(entity, declaration);
+	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 	if(declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
 		set_entity_visibility(entity, visibility_local);
@@ -1089,11 +1080,11 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
-static ir_node *create_global(dbg_info *dbgi, ir_mode *mode,
+static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
                               ir_entity *entity)
 {
 	assert(entity != NULL);
-	symconst_symbol sym;
+	union symconst_symbol sym;
 	sym.entity_p = entity;
 	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
 }
@@ -1104,10 +1095,10 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 {
 	ir_type  *const global_type = get_glob_type();
 	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const type        = new_d_type_array(unique_ident("strtype"), 1,
+	ir_type  *const type        = new_d_type_array(id_unique("strtype.%u"), 1,
 	                                               ir_type_const_char, dbgi);
 
-	ident     *const id     = unique_ident(id_prefix);
+	ident     *const id     = id_unique(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
@@ -1132,13 +1123,13 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_global(dbgi, mode_P_data, entity);
+	return create_symconst(dbgi, mode_P_data, entity);
 }
 
 static ir_node *string_literal_to_firm(
 		const string_literal_expression_t* literal)
 {
-	return string_to_firm(&literal->base.source_position, "Lstr",
+	return string_to_firm(&literal->base.source_position, "Lstr.%u",
 	                      &literal->value);
 }
 
@@ -1148,10 +1139,10 @@ static ir_node *wide_string_literal_to_firm(
 	ir_type *const global_type = get_glob_type();
 	ir_type *const elem_type   = ir_type_wchar_t;
 	dbg_info *const dbgi       = get_dbg_info(&literal->base.source_position);
-	ir_type *const type        = new_d_type_array(unique_ident("strtype"), 1,
+	ir_type *const type        = new_d_type_array(id_unique("strtype.%u"), 1,
 	                                            elem_type, dbgi);
 
-	ident     *const id     = unique_ident("Lstr");
+	ident     *const id     = id_unique("Lstr.%u");
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
@@ -1175,7 +1166,7 @@ static ir_node *wide_string_literal_to_firm(
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_global(dbgi, mode_P_data, entity);
+	return create_symconst(dbgi, mode_P_data, entity);
 }
 
 static ir_node *deref_address(type_t *const type, ir_node *const addr,
@@ -1238,7 +1229,7 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 		}
 
 		default:
-			return create_global(dbgi, mode_P_data, entity);
+			return create_symconst(dbgi, mode_P_data, entity);
 	}
 }
 
@@ -1281,7 +1272,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode(type);
-		return create_global(dbgi, mode, declaration->v.entity);
+		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
@@ -1319,7 +1310,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_FUNCTION: {
 		type_t *const  type = skip_typeref(ref->base.type);
 		ir_mode *const mode = get_ir_mode(type);
-		return create_global(dbgi, mode, declaration->v.entity);
+		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr = get_global_var_address(dbgi, declaration);
@@ -1426,7 +1417,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
 		dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
-		new_method_type = new_d_type_method(unique_ident("calltype"),
+		new_method_type = new_d_type_method(id_unique("calltype.%u"),
 		                                  n_parameters, n_res, dbgi);
 		set_method_calling_convention(new_method_type,
 		               get_method_calling_convention(ir_method_type));
@@ -2372,7 +2363,7 @@ static ir_node *compound_literal_to_firm(
 	/* create an entity on the stack */
 	ir_type *frame_type = get_irg_frame_type(current_ir_graph);
 
-	ident     *const id     = unique_ident("CompLit");
+	ident     *const id     = id_unique("CompLit.%u");
 	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&expression->base.source_position);
 	ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
@@ -2651,7 +2642,7 @@ static ir_node *function_name_to_firm(
 			const source_position_t *const src_pos = &expr->base.source_position;
 			const char *const name = current_function_decl->symbol->string;
 			const string_t string = { name, strlen(name) + 1 };
-			current_function_name = string_to_firm(src_pos, "__func__", &string);
+			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
@@ -2660,7 +2651,7 @@ static ir_node *function_name_to_firm(
 			ir_entity *ent = get_irg_entity(current_ir_graph);
 			const char *const name = get_entity_ld_name(ent);
 			const string_t string = { name, strlen(name) + 1 };
-			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__", &string);
+			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
 		}
 		return current_funcsig;
 	}
@@ -2929,11 +2920,11 @@ static void create_declaration_entity(declaration_t *declaration,
 	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
-	mangle_ent_from_decl(entity, declaration);
 
 	declaration->declaration_kind = (unsigned char) declaration_kind;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
+	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 	if(parent_type == get_tls_type())
 		set_entity_allocation(entity, allocation_automatic);
 	else if(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
@@ -3265,7 +3256,7 @@ static ir_initializer_t *create_ir_initializer_string(
 		if(i < string_len)
 			c = string[i];
 
-		tarval           *tv = new_tarval_from_long(string[i], mode);
+		tarval           *tv = new_tarval_from_long(c, mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
 
 		set_initializer_compound_value(irinitializer, i, char_initializer);
@@ -3290,7 +3281,7 @@ static ir_initializer_t *create_ir_initializer_wide_string(
 		if(i < string_len) {
 			c = string[i];
 		}
-		tarval *tv = new_tarval_from_long(string[i], mode);
+		tarval *tv = new_tarval_from_long(c, mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
 
 		set_initializer_compound_value(irinitializer, i, char_initializer);
@@ -3322,6 +3313,7 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
+#if 0
 static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
                                             ir_node *base_addr)
 {
@@ -3335,6 +3327,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 	ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 	set_store(proj_m);
 }
+#endif
 
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
@@ -3468,7 +3461,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	current_ir_graph = old_current_ir_graph;
 
 	/* create a "template" entity which is copied to the entity on the stack */
-	ident     *const id          = unique_ident("initializer");
+	ident     *const id          = id_unique("initializer.%u");
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
 	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
@@ -3480,7 +3473,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 
 	set_entity_initializer(init_entity, irinitializer);
 
-	ir_node *const src_addr = create_global(dbgi, mode_P_data, init_entity);
+	ir_node *const src_addr = create_symconst(dbgi, mode_P_data, init_entity);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
@@ -3604,11 +3597,10 @@ static void create_local_static_variable(declaration_t *declaration)
 
 	type_t    *const type        = skip_typeref(declaration->type);
 	ir_type   *const global_type = get_glob_type();
-	ident     *const id          = unique_ident(declaration->symbol->string);
+	ident     *const id          = new_id_from_str(declaration->symbol->string);
 	ir_type   *const irtype      = get_ir_type(type);
 	dbg_info  *const dbgi        = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
-	mangle_ent_from_decl(entity, declaration);
 
 	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(entity, volatility_is_volatile);
@@ -3616,6 +3608,7 @@ static void create_local_static_variable(declaration_t *declaration)
 
 	declaration->declaration_kind = DECLARATION_KIND_GLOBAL_VARIABLE;
 	declaration->v.entity         = entity;
+	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 	set_entity_variability(entity, variability_uninitialized);
 	set_entity_visibility(entity, visibility_local);
 	set_entity_allocation(entity, allocation_static);
@@ -4827,6 +4820,10 @@ void init_ast2firm(void)
 {
 	obstack_init(&asm_obst);
 	init_atomic_modes();
+
+	(void) create_ld_ident_win32;
+	(void) create_ld_ident_linux;
+	(void) create_ld_ident_macho;
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
