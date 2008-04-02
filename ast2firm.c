@@ -306,10 +306,13 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
  */
 static ir_type *create_complex_type(const complex_type_t *type)
 {
+	/*
 	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
 	atomic_type_kind_t  kind      = type->akind;
 	ir_mode            *mode      = _atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
+	*/
+	(void)type;
 
 	/* FIXME: finish the array */
 	return NULL;
@@ -1086,13 +1089,19 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
-static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
+static ir_node *create_global(dbg_info *dbgi, ir_mode *mode,
                                 ir_entity *entity)
 {
 	assert(entity != NULL);
-	union symconst_symbol sym;
-	sym.entity_p = entity;
-	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
+	if(firm_opt.pic) {
+		ir_graph *irg = current_ir_graph;
+		return new_d_simpleSel(dbgi, get_irg_no_mem(irg),
+				get_irg_globals(irg), entity);
+	} else {
+		symconst_symbol sym;
+		sym.entity_p = entity;
+		return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
+	}
 }
 
 static ir_node *string_to_firm(const source_position_t *const src_pos,
@@ -1129,7 +1138,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_symconst(dbgi, mode_P_data, entity);
+	return create_global(dbgi, mode_P_data, entity);
 }
 
 static ir_node *string_literal_to_firm(
@@ -1172,7 +1181,7 @@ static ir_node *wide_string_literal_to_firm(
 	set_array_entity_values(entity, tvs, slen);
 	free(tvs);
 
-	return create_symconst(dbgi, mode_P_data, entity);
+	return create_global(dbgi, mode_P_data, entity);
 }
 
 static ir_node *deref_address(type_t *const type, ir_node *const addr,
@@ -1235,7 +1244,7 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 		}
 
 		default:
-			return create_symconst(dbgi, mode_P_data, entity);
+			return create_global(dbgi, mode_P_data, entity);
 	}
 }
 
@@ -1278,7 +1287,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode(type);
-		return create_symconst(dbgi, mode, declaration->v.entity);
+		return create_global(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
@@ -1316,7 +1325,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_FUNCTION: {
 		type_t *const  type = skip_typeref(ref->base.type);
 		ir_mode *const mode = get_ir_mode(type);
-		return create_symconst(dbgi, mode, declaration->v.entity);
+		return create_global(dbgi, mode, declaration->v.entity);
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr = get_global_var_address(dbgi, declaration);
@@ -3477,7 +3486,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 
 	set_entity_initializer(init_entity, irinitializer);
 
-	ir_node *const src_addr = create_symconst(dbgi, mode_P_data, init_entity);
+	ir_node *const src_addr = create_global(dbgi, mode_P_data, init_entity);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);

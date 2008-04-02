@@ -59,6 +59,7 @@ struct a_firm_opt firm_opt = {
   /* os_support      = */ OS_SUPPORT_LINUX,
   /* honor_restrict  = */ TRUE,
   /* lower_bitfields = */ TRUE,
+  /* pic             = */ FALSE,
   /* ycomp_dbg       = */ FALSE,
   /* ycomp_host      = */ FIRM_YCOMP_DEFAULT_HOST,
   /* ycomp_port      = */ FIRM_YCOMP_DEFAULT_PORT,
@@ -111,6 +112,7 @@ static const struct params {
   { X("help"),                   NULL,                       0, "print FCC related help options" },
 
   /* firm optimization options */
+  { X("pic"),                    &firm_opt.pic,              1, "firm: generate position independent code" },
   { X("g0"),                     &firm_opt.debug_mode,       DBG_MODE_BACKSTORE, "firm: Debug Mode: use back stores" },
   { X("g1"),                     &firm_opt.debug_mode,       DBG_MODE_FULL,      "firm: Debug Mode: no register variables" },
   { X("no-opt"),                 NULL,                       0, "firm: disable all FIRM optimizations" },
@@ -407,7 +409,7 @@ void print_firm_version(FILE *f) {
   firm_get_version(&version);
 
   fprintf(f, "Firm C-Compiler using libFirm (%u.%u", version.major, version.minor);
-  if(version.revision[0] != 0) {
+  if (version.revision[0] != 0) {
   	fputc(' ', f);
     fputs(version.revision, f);
   }
@@ -415,8 +417,8 @@ void print_firm_version(FILE *f) {
   	fputc(' ', f);
     fputs(version.build, f);
   }
-  fputs(")\n", f);
-  fprintf(f, "(C) 2006-2007 Michael Beck\n"
-             "(C) 1995-2007 University of Karlsruhe\n"
+  fprintf(f, "}\n"
+  		     "(C) 2005-2008 Michael Beck\n"
+             "(C) 1995-2008 University of Karlsruhe\n"
              "Using ");
 }  /* print_firm_version */
