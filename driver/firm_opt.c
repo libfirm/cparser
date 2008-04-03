@@ -954,6 +954,9 @@ void gen_firm_init(void)
   set_opt_precise_exc_context(firm_opt.precise_exc);
   set_opt_fragile_ops(firm_opt.fragile_ops);
 
+  /* Sel node cannot produce NULL pointers */
+  set_opt_sel_based_null_check_elim(1);
+
   /* dynamic dispatch works currently only if whole world scenarios */
   set_opt_dyn_meth_dispatch(0);
 
