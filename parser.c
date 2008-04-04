@@ -582,7 +582,10 @@ static void eat_statement(void) {
 /**
  * Report a parse error because an expected token was not found.
  */
-static __attribute__((sentinel))
+static
+#if defined __GNUC__ && __GNUC__ >= 4
+__attribute__((sentinel))
+#endif
 void parse_error_expected(const char *message, ...)
 {
 	if(message != NULL) {
