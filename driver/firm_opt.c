@@ -331,13 +331,16 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     CHECK_ALL(firm_opt.check_all);
   }
 
-  if (firm_opt.tail_rec) {
-    timer_push(TV_TAIL_REC);
-      opt_tail_recursion();
+  /* first step: kill dead code */
+  for (i = 0; i < get_irp_n_irgs(); i++) {
+    irg = current_ir_graph = get_irp_irg(i);
+    /* Confirm construction currently can only handle blocks with only one control
+       flow predecessor. Calling optimize_cf here removes Bad predecessors and help
+       the optimization of switch constructs. */
+    timer_push(TV_CF_OPT);
+      optimize_graph_df(irg);
+      optimize_cf(irg);
     timer_pop();
-
-    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "tail_rec");
-    CHECK_ALL(firm_opt.check_all);
   }
 
   if (firm_opt.func_calls) {
@@ -348,20 +351,11 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     CHECK_ALL(firm_opt.check_all);
   }
 
-  if (firm_opt.do_inline) {
-    timer_push(TV_INLINE);
-      inline_leave_functions(500, 80, 30, FALSE);
-    timer_pop();
-    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "inl");
-    CHECK_ALL(firm_opt.check_all);
-  }
-
   /* do lowering on the const code irg */
   lower_const_code();
 
   for (i = 0; i < get_irp_n_irgs(); i++) {
     irg = current_ir_graph = get_irp_irg(i);
-
 
 #ifdef FIRM_EXT_GRS
   /* If SIMD optimization is on, make sure we have only 1 return */
@@ -539,9 +533,22 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     CHECK_ONE(firm_opt.check_all, irg);
   }
 
+  if (firm_opt.do_inline) {
+    inline_functions(50);
+    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "inl");
+    CHECK_ALL(firm_opt.check_all);
+  }
   if (firm_opt.cloning) {
     proc_cloning((float)firm_opt.clone_threshold);
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "clone");
+    CHECK_ALL(firm_opt.check_all);
+  }
+  if (firm_opt.tail_rec) {
+    timer_push(TV_TAIL_REC);
+      opt_tail_recursion();
+    timer_pop();
+
+    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "tail_rec");
     CHECK_ALL(firm_opt.check_all);
   }
 
@@ -570,8 +577,10 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   DUMP_ALL(firm_dump.ir_graph, "-opt");
 
   /* verify optimized graphs */
-  for (i = get_irp_n_irgs() - 1; i >= 0; --i)
-    irg_verify(get_irp_irg(i), VRFY_ENFORCE_SSA);
+  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+    ir_graph *irg = get_irp_irg(i);
+    irg_verify(irg, VRFY_ENFORCE_SSA);
+  }
 
   if (firm_dump.statistic & STAT_AFTER_OPT)
     stat_dump_snapshot(input_filename, "opt");
@@ -790,7 +799,6 @@ static void do_firm_lowering(const char *input_filename)
     }
     timer_push(TV_DW_LOWER);
       lower_dw_ops(&init);
-      DUMP_ALL(firm_dump.ir_graph, "-dw");
     timer_pop();
   }
 
@@ -842,7 +850,6 @@ static void do_firm_lowering(const char *input_filename)
         CHECK_ONE(firm_opt.check_all, current_ir_graph);
       }
 
-//      set_opt_global_cse(0);
       timer_push(TV_LOAD_STORE);
         optimize_load_store(current_ir_graph);
       timer_pop();
