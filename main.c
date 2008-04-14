@@ -521,6 +521,9 @@ int main(int argc, char **argv)
 				} else {
 					input = arg;
 				}
+			} else if(strcmp(option, "pg") == 0) {
+				firm_be_option("-b gprof");
+				obstack_printf(&ldflags_obst, " -pg");
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(strncmp(option, "std=", 4) == 0) {
