@@ -363,6 +363,7 @@ int main(int argc, char **argv)
 	compile_mode_t  mode         = CompileAssembleLink;
 	int             opt_level    = 1;
 	int             result       = EXIT_SUCCESS;
+	char            cpu_arch[16] = "ia32";
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
@@ -496,23 +497,53 @@ int main(int argc, char **argv)
 					argument_errors = true;
 				} else if (res == -1) {
 					help_displayed = true;
+				} else {
+					strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if(option[0] == 'W') {
 				set_warning_opt(&option[1]);
 			} else if(option[0] == 'm') {
 				const char *opt;
+				char arch_opt[64];
+
 				GET_ARG_AFTER(opt, "-m");
-				char *endptr;
-				long int value = strtol(opt, &endptr, 10);
-				if (*endptr != '\0') {
-					fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
-					argument_errors = true;
-				}
-				if (value != 16 && value != 32 && value != 64) {
-					fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
-					argument_errors = true;
+				if(strncmp(opt, "arch=", 5) == 0) {
+					GET_ARG_AFTER(opt, "-march=");
+					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
+					int res = firm_be_option(arch_opt);
+					if (res == 0)
+						argument_errors = true;
+					else {
+						snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
+						int res = firm_be_option(arch_opt);
+						if (res == 0)
+							argument_errors = true;
+					}
+				} else if(strncmp(opt, "tune=", 5) == 0) {
+					GET_ARG_AFTER(opt, "-mtune=");
+					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
+					int res = firm_be_option(arch_opt);
+					if (res == 0)
+						argument_errors = true;
+				} else if(strncmp(opt, "fpu=", 4) == 0) {
+					GET_ARG_AFTER(opt, "-mfpu=");
+					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
+					int res = firm_be_option(arch_opt);
+					if (res == 0)
+						argument_errors = true;
 				} else {
-					machine_size = (unsigned int)value;
+					char *endptr;
+					long int value = strtol(opt, &endptr, 10);
+					if (*endptr != '\0') {
+						fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
+						argument_errors = true;
+					}
+					if (value != 16 && value != 32 && value != 64) {
+						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
+						argument_errors = true;
+					} else {
+						machine_size = (unsigned int)value;
+					}
 				}
 			} else if (option[0] == '\0') {
 				if(input != NULL) {
