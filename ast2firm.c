@@ -4703,12 +4703,17 @@ static void create_function(declaration_t *declaration)
 
 	int       n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
-	ir_node  *first_block  = get_cur_block();
+
+	set_irg_fp_model(irg, firm_opt.fp_model);
+	tarval_enable_fp_ops((firm_opt.fp_model & fp_strict_algebraic) == 0);
+	set_irn_dbg_info(get_irg_start_block(irg), get_entity_dbg_info(function_entity));
+
+	ir_node *first_block = get_cur_block();
 
 	/* set inline flags */
 	if (declaration->is_inline)
-    	set_irg_inline_property(irg, irg_inline_recomended);
-    handle_decl_modifier_irg(irg, declaration->decl_modifiers);
+		set_irg_inline_property(irg, irg_inline_recomended);
+	handle_decl_modifier_irg(irg, declaration->decl_modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);
