@@ -534,7 +534,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   }
 
   if (firm_opt.do_inline) {
-    inline_functions(50);
+    inline_functions(500, 50);
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "inl");
     CHECK_ALL(firm_opt.check_all);
   }
