@@ -525,6 +525,12 @@ int main(int argc, char **argv)
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
+				} else if(strncmp(opt, "cpu=", 4) == 0) {
+					GET_ARG_AFTER(opt, "-mcpu=");
+					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
+					int res = firm_be_option(arch_opt);
+					if (res == 0)
+						argument_errors = true;
 				} else if(strncmp(opt, "fpu=", 4) == 0) {
 					GET_ARG_AFTER(opt, "-mfpu=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
