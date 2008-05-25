@@ -3329,30 +3329,10 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
-#if 0
 static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
-                                            ir_node *base_addr)
+		ir_node *base_addr)
 {
-	ir_mode *mode = get_type_mode(type);
-	tarval  *zero = get_mode_null(mode);
-	ir_node *cnst = new_d_Const(dbgi, mode, zero);
-
-	/* TODO: bitfields */
-	ir_node *mem    = get_store();
-	ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
-	ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
-	set_store(proj_m);
-}
-#endif
-
-static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
-		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
-{
-	switch(get_initializer_kind(initializer)) {
-	case IR_INITIALIZER_NULL: {
-		/* TODO: implement this for compound types... */
-		assert(type != NULL);
-
+	if (is_atomic_type(type)) {
 		ir_mode *mode = get_type_mode(type);
 		tarval  *zero = get_mode_null(mode);
 		ir_node *cnst = new_d_Const(dbgi, mode, zero);
@@ -3362,6 +3342,45 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
+	} else {
+		assert(is_compound_type(type));
+
+		int n_members;
+		if(is_Array_type(type)) {
+			assert(has_array_upper_bound(type, 0));
+			n_members = get_array_upper_bound_int(type, 0);
+		} else {
+			n_members = get_compound_n_members(type);
+		}
+
+		for(int i = 0; i < n_members; ++i) {
+			ir_node *addr;
+			ir_type *irtype;
+			if(is_Array_type(type)) {
+				ir_entity *entity   = get_array_element_entity(type);
+				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
+				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
+				ir_node   *in[1]    = { cnst };
+				irtype = get_array_element_type(type);
+				addr   = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in, entity);
+			} else {
+				ir_entity *member = get_compound_member(type, i);
+
+				irtype = get_entity_type(member);
+				addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr, member);
+			}
+
+			create_dynamic_null_initializer(irtype, dbgi, addr);
+		}
+	}
+}
+
+static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
+		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
+{
+	switch(get_initializer_kind(initializer)) {
+	case IR_INITIALIZER_NULL: {
+		create_dynamic_null_initializer(type, dbgi, base_addr);
 		return;
 	}
 	case IR_INITIALIZER_CONST: {
