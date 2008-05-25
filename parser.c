@@ -1048,6 +1048,7 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_TLS_MODEL]              = "tls_model",
 	[GNU_AK_VISIBILITY]             = "visibility",
 	[GNU_AK_REGPARM]                = "regparm",
+	[GNU_AK_MODE]                   = "mode",
 	[GNU_AK_MODEL]                  = "model",
 	[GNU_AK_TRAP_EXIT]              = "trap_exit",
 	[GNU_AK_SP_SWITCH]              = "sp_switch",
@@ -1538,6 +1539,12 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
 						parse_gnu_attribute_model_arg(attribute);
+				case GNU_AK_MODE:
+					if(!attribute->have_arguments) {
+						/* should have arguments */
+						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+					} else
+						parse_gnu_attribute_const_arg(attribute);
 				case GNU_AK_INTERRUPT:
 					/* may have one string argument */
 					if(attribute->have_arguments)
