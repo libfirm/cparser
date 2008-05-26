@@ -1213,6 +1213,21 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute) {
 	attribute->invalid = true;
 }
 
+static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
+{
+	/* TODO: find out what is allowed here... */
+
+	/* at least: byte, word, pointer, list of machine modes
+	 * __XXX___ is interpreted as XXX */
+	add_anchor_token(')');
+	expect(T_IDENTIFIER);
+	rem_anchor_token(')');
+	expect(')');
+	return;
+end_error:
+	attribute->invalid = true;
+}
+
 /**
  * parse one interrupt argument.
  */
@@ -1537,14 +1552,18 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else
+					} else {
 						parse_gnu_attribute_model_arg(attribute);
+					}
+					break;
 				case GNU_AK_MODE:
 					if(!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else
-						parse_gnu_attribute_const_arg(attribute);
+					} else {
+						parse_gnu_attribute_mode_arg(attribute);
+					}
+					break;
 				case GNU_AK_INTERRUPT:
 					/* may have one string argument */
 					if(attribute->have_arguments)
