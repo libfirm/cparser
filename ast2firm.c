@@ -3199,6 +3199,9 @@ static ir_initializer_t *create_ir_initializer(
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
 {
+	if (is_type_compound(initializer->value->base.type)) {
+		panic("initializer creation for compounds not implemented yet");
+	}
 	ir_node *value = expression_to_firm(initializer->value);
 	return create_initializer_const(value);
 }
