@@ -356,7 +356,7 @@ break_fmt_flags:
 			break;
 		}
 
-		const type_t      *expected_type;
+		type_t            *expected_type;
 		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
 		format_flags_t     allowed_flags;
 		switch (fmt) {
@@ -521,11 +521,12 @@ eval_fmt_mod_unsigned:
 		}
 
 		{	/* create a scope here to prevent warning about the jump to next_arg */
-			type_t *const arg_type = arg->expression->base.type;
-			if (is_type_pointer(expected_type)) {
+			type_t *const arg_type           = arg->expression->base.type;
+			type_t *const expected_type_skip = skip_typeref(expected_type);
+			if (is_type_pointer(expected_type_skip)) {
 				type_t *const arg_skip = skip_typeref(arg_type);
 				if (is_type_pointer(arg_skip)) {
-					type_t *const exp_to = skip_typeref(expected_type->pointer.points_to);
+					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
 					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
 					if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
 						get_unqualified_type(arg_to) == exp_to) {
@@ -533,7 +534,7 @@ eval_fmt_mod_unsigned:
 					}
 				}
 			} else {
-				if (get_unqualified_type(skip_typeref(arg_type)) == expected_type) {
+				if (get_unqualified_type(skip_typeref(arg_type)) == expected_type_skip) {
 					goto next_arg;
 				}
 			}
