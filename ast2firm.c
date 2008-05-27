@@ -1038,7 +1038,11 @@ static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 
 	long long int v = 0;
 	for (size_t i = 0; i < cnst->v.character.size; ++i) {
-		v = (v << 8) | ((unsigned char)cnst->v.character.begin[i]);
+		if (char_is_signed) {
+			v = (v << 8) | ((signed char)cnst->v.character.begin[i]);
+		} else {
+			v = (v << 8) | ((unsigned char)cnst->v.character.begin[i]);
+		}
 	}
 	char    buf[128];
 	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
