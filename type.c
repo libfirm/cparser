@@ -849,12 +849,12 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_COMPOUND_UNION: {
 		const compound_type_t *compound_type = &type->compound;
 		declaration_t         *declaration   = compound_type->declaration;
-		return !declaration->init.is_defined;
+		return !declaration->init.complete;
 	}
 	case TYPE_ENUM: {
 		const enum_type_t *enum_type   = &type->enumt;
 		declaration_t     *declaration = enum_type->declaration;
-		return !declaration->init.is_defined;
+		return !declaration->init.complete;
 	}
 	case TYPE_BITFIELD:
 	case TYPE_FUNCTION:

@@ -2442,7 +2442,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
 		declaration->source_position = token.source_position;
 		declaration->symbol          = symbol;
-		declaration->parent_scope  = scope;
+		declaration->parent_scope    = scope;
 		if (symbol != NULL) {
 			environment_push(declaration);
 		}
@@ -2450,13 +2450,13 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if(token.type == '{') {
-		if(declaration->init.is_defined) {
+		if (declaration->init.complete) {
 			assert(symbol != NULL);
 			errorf(HERE, "multiple definitions of '%s %Y'",
 			       is_struct ? "struct" : "union", symbol);
 			declaration->scope.declarations = NULL;
 		}
-		declaration->init.is_defined = true;
+		declaration->init.complete = true;
 
 		parse_compound_type_entries(declaration);
 		parse_attributes(&attributes);
@@ -2548,14 +2548,14 @@ static type_t *parse_enum_specifier(void)
 	type->enumt.declaration = declaration;
 
 	if(token.type == '{') {
-		if(declaration->init.is_defined) {
+		if(declaration->init.complete) {
 			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
 		if (symbol != NULL) {
 			environment_push(declaration);
 		}
 		append_declaration(declaration);
-		declaration->init.is_defined = 1;
+		declaration->init.complete = true;
 
 		parse_enum_entries(type);
 		parse_attributes(&attributes);
@@ -5675,7 +5675,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	declaration_t *const declaration = type_left->compound.declaration;
 
-	if(!declaration->init.is_defined) {
+	if(!declaration->init.complete) {
 		errorf(HERE, "request for member '%Y' of incomplete type '%T'",
 		       symbol, type_left);
 		return create_invalid_expression();

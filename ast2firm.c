@@ -76,10 +76,13 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
 	DECLARATION_KIND_COMPOUND_MEMBER,
 	DECLARATION_KIND_LABEL_BLOCK,
-	DECLARATION_KIND_ENUM_ENTRY
+	DECLARATION_KIND_ENUM_ENTRY,
+	DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE,
+	DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
 } declaration_kind_t;
 
 static ir_type *get_ir_type(type_t *type);
+static ir_type *get_ir_type_incomplete(type_t *type);
 static int count_decls_in_stmts(const statement_t *stmt);
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
@@ -359,19 +362,11 @@ static ir_type *create_method_type(const function_type_t *function_type)
 
 static ir_type *create_pointer_type(pointer_type_t *type)
 {
-	type_t  *points_to = type->points_to;
-	ir_type *ir_points_to;
-	/* Avoid endless recursion if the points_to type contains this poiner type
-	 * again (might be a struct). We therefore first create a void* pointer
-	 * and then set the real points_to type
-	 */
-	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
-	ir_type  *ir_type = new_d_type_pointer(id_unique("pointer.%u"),
-	                                    ir_type_void, mode_P_data, dbgi);
-	type->base.firm_type  = ir_type;
-
-	ir_points_to = get_ir_type(points_to);
-	set_pointer_points_to_type(ir_type, ir_points_to);
+	type_t   *points_to    = type->points_to;
+	ir_type  *ir_points_to = get_ir_type_incomplete(points_to);
+	dbg_info *dbgi         = get_dbg_info(&type->base.source_position);
+	ir_type  *ir_type      = new_d_type_pointer(id_unique("pointer.%u"),
+	                                            ir_points_to, mode_P_data, dbgi);
 
 	return ir_type;
 }
@@ -495,59 +490,92 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 
 #define INVALID_TYPE ((ir_type_ptr)-1)
 
-static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
-                                  size_t *outer_offset, size_t *outer_align);
+enum {
+	COMPOUND_IS_STRUCT = false,
+	COMPOUND_IS_UNION  = true
+};
 
-static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
-                                   size_t *outer_offset, size_t *outer_align)
+/**
+ * Construct firm type from ast struct tyep.
+ *
+ * As anonymous inner structs get flattened to a single firm type, we might get
+ * irtype, outer_offset and out_align passed (they represent the position of
+ * the anonymous inner struct inside the resulting firm struct)
+ */
+static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
+                                     size_t *outer_offset, size_t *outer_align,
+                                     bool incomplete, bool is_union)
 {
-	declaration_t *declaration = type->declaration;
-	if(declaration->v.irtype != NULL) {
+	declaration_t      *declaration = type->declaration;
+	declaration_kind_t  kind        = declaration->declaration_kind;
+
+	if(kind == DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
+			|| (kind == DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE
+				&& incomplete))
 		return declaration->v.irtype;
-	}
 
 	size_t align_all  = 1;
 	size_t offset     = 0;
 	size_t bit_offset = 0;
+	size_t size       = 0;
+
 	if(irtype == NULL) {
 		symbol_t *symbol = declaration->symbol;
 		ident    *id;
 		if(symbol != NULL) {
 			id = new_id_from_str(symbol->string);
 		} else {
-			id = id_unique("__anonymous_struct.%u");
+			if (is_union) {
+				id = id_unique("__anonymous_union.%u");
+			} else {
+				id = id_unique("__anonymous_struct.%u");
+			}
 		}
 		dbg_info *dbgi  = get_dbg_info(&type->base.source_position);
 
-		irtype = new_d_type_struct(id, dbgi);
+		if (is_union) {
+			irtype = new_d_type_union(id, dbgi);
+		} else {
+			irtype = new_d_type_struct(id, dbgi);
+		}
 
-		declaration->v.irtype = irtype;
-		type->base.firm_type  = irtype;
+		declaration->declaration_kind
+			= DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE;
+		declaration->v.irtype         = irtype;
+		//type->base.firm_type          = irtype;
 	} else {
 		offset    = *outer_offset;
 		align_all = *outer_align;
 	}
+
+	if(incomplete)
+		return irtype;
+
+	declaration->declaration_kind = DECLARATION_KIND_COMPOUND_TYPE_COMPLETE;
 
 	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
 		if(entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
+		size_t prev_offset = offset;
+
 		symbol_t *symbol     = entry->symbol;
 		type_t   *entry_type = skip_typeref(entry->type);
 		dbg_info *dbgi       = get_dbg_info(&entry->source_position);
+
 		ident    *ident;
 		if(symbol != NULL) {
 			ident = new_id_from_str(symbol->string);
 		} else {
 			if(entry_type->kind == TYPE_COMPOUND_STRUCT) {
-				create_struct_type(&entry_type->compound, irtype, &offset,
-		 		                   &align_all);
-				continue;
+				create_compound_type(&entry_type->compound, irtype, &offset,
+		 		                     &align_all, false, COMPOUND_IS_STRUCT);
+		 		goto finished_member;
 			} else if(entry_type->kind == TYPE_COMPOUND_UNION) {
-				create_union_type(&entry_type->compound, irtype, &offset,
-				                  &align_all);
-				continue;
+				create_compound_type(&entry_type->compound, irtype, &offset,
+				                     &align_all, false, COMPOUND_IS_UNION);
+				goto finished_member;
 			} else {
 				assert(entry_type->kind == TYPE_BITFIELD);
 			}
@@ -613,122 +641,35 @@ static ir_type *create_struct_type(compound_type_t *type, ir_type *irtype,
 		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
 		assert(entry->v.entity == NULL);
 		entry->v.entity         = entity;
+
+finished_member:
+		if (is_union) {
+			size_t entry_size = offset - prev_offset;
+			if (entry_size > size) {
+				size = entry_size;
+			}
+			offset     = 0;
+			bit_offset = 0;
+		}
+	}
+
+	if (!is_union) {
+		size = offset;
 	}
 
 	size_t misalign = offset % align_all;
 	if(misalign > 0 || bit_offset > 0) {
-		offset += align_all - misalign;
+		size += align_all - misalign;
 	}
 
 	if(outer_offset != NULL) {
-		*outer_offset = offset;
-		*outer_align  = align_all;
-	} else {
-		set_type_alignment_bytes(irtype, align_all);
-		set_type_size_bytes(irtype, offset);
-		set_type_state(irtype, layout_fixed);
-	}
-
-	return irtype;
-}
-
-static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
-                                  size_t *outer_offset, size_t *outer_align)
-{
-	declaration_t *declaration = type->declaration;
-	if(declaration->v.irtype != NULL) {
-		return declaration->v.irtype;
-	}
-
-	size_t align_all = 1;
-	size_t offset    = 0;
-	size_t size      = 0;
-
-	if(irtype == NULL) {
-		symbol_t      *symbol      = declaration->symbol;
-		ident         *id;
-		if(symbol != NULL) {
-			id = new_id_from_str(symbol->string);
+		if (!is_union) {
+			*outer_offset = offset;
 		} else {
-			id = id_unique("__anonymous_union.%u");
-		}
-		dbg_info *dbgi = get_dbg_info(&type->base.source_position);
-
-		irtype = new_d_type_union(id, dbgi);
-
-		declaration->v.irtype = irtype;
-		type->base.firm_type  = irtype;
-	} else {
-		offset    = *outer_offset;
-		align_all = *outer_align;
-	}
-
-	type->base.firm_type = irtype;
-
-	declaration_t *entry = declaration->scope.declarations;
-	for( ; entry != NULL; entry = entry->next) {
-		if(entry->namespc != NAMESPACE_NORMAL)
-			continue;
-
-		symbol_t *symbol        = entry->symbol;
-		type_t   *entry_type    = skip_typeref(entry->type);
-		ir_type  *entry_ir_type = get_ir_type(entry_type);
-
-		ident *ident;
-		if(symbol != NULL) {
-			ident = new_id_from_str(entry->symbol->string);
-		} else {
-			size_t offs = offset;
-			if(entry_type->kind == TYPE_COMPOUND_STRUCT) {
-				create_struct_type(&entry_type->compound, irtype, &offs,
-				                   &align_all);
-				continue;
-			} else if(entry_type->kind == TYPE_COMPOUND_UNION) {
-				create_union_type(&entry_type->compound, irtype, &offs,
-				                  &align_all);
-				continue;
-			} else {
-				panic("anonymous union member must be struct or union");
-			}
-			size_t entry_size = offs - offset;
-			if(entry_size > size) {
-				size = entry_size;
-			}
-			ident = id_unique("anon.%u");
+			*outer_offset += size;
 		}
 
-		size_t entry_size      = get_type_size_bytes(entry_ir_type);
-		size_t entry_alignment = get_type_alignment_bytes(entry_ir_type);
-
-		dbg_info  *const dbgi   = get_dbg_info(&entry->source_position);
-		ir_entity *const entity = new_d_entity(irtype, ident, entry_ir_type,
-		                                       dbgi);
-		//add_union_member(irtype, entity);
-		set_entity_offset(entity, 0);
-		entry->declaration_kind = DECLARATION_KIND_COMPOUND_MEMBER;
-		assert(entry->v.entity == NULL);
-		entry->v.entity         = entity;
-
-		if(entry_size > size) {
-			size = entry_size;
-		}
-		if(entry_alignment > align_all) {
-			if(entry_alignment % align_all != 0) {
-				panic("Uneven alignments not supported yet");
-			}
-			align_all = entry_alignment;
-		}
-	}
-
-	if(outer_offset != NULL) {
-		assert(*outer_offset == offset);
-
-		size_t misalign = offset % align_all;
-		if (misalign != 0)
-			size += align_all - misalign;
-		*outer_offset += size;
-
-		if(align_all > *outer_align) {
+		if (align_all > *outer_align) {
 			if(align_all % *outer_align != 0) {
 				panic("uneven alignments not supported yet");
 			}
@@ -738,7 +679,6 @@ static ir_type *create_union_type(compound_type_t *type, ir_type *irtype,
 		set_type_alignment_bytes(irtype, align_all);
 		set_type_size_bytes(irtype, size);
 		set_type_state(irtype, layout_fixed);
-		declaration->v.irtype = irtype;
 	}
 
 	return irtype;
@@ -774,19 +714,42 @@ static ir_type *create_enum_type(enum_type_t *const type)
 	return ir_type_int;
 }
 
+static ir_type *get_ir_type_incomplete(type_t *type)
+{
+	assert(type != NULL);
+	type = skip_typeref(type);
+
+	if (type->base.firm_type != NULL) {
+		assert(type->base.firm_type != INVALID_TYPE);
+		return type->base.firm_type;
+	}
+
+	switch (type->kind) {
+	case TYPE_COMPOUND_STRUCT:
+		return create_compound_type(&type->compound, NULL, NULL, NULL,
+		                            true, COMPOUND_IS_STRUCT);
+		break;
+	case TYPE_COMPOUND_UNION:
+		return create_compound_type(&type->compound, NULL, NULL, NULL,
+		                            true, COMPOUND_IS_UNION);
+	default:
+		return get_ir_type(type);
+	}
+}
+
 static ir_type *get_ir_type(type_t *type)
 {
 	assert(type != NULL);
 
 	type = skip_typeref(type);
 
-	if(type->base.firm_type != NULL) {
+	if (type->base.firm_type != NULL) {
 		assert(type->base.firm_type != INVALID_TYPE);
 		return type->base.firm_type;
 	}
 
 	ir_type *firm_type = NULL;
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_ERROR:
 		panic("error type occurred");
 	case TYPE_ATOMIC:
@@ -808,10 +771,12 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_array_type(&type->array);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_struct_type(&type->compound, NULL, NULL, NULL);
+		firm_type = create_compound_type(&type->compound, NULL, NULL, NULL,
+		                                 false, COMPOUND_IS_STRUCT);
 		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_union_type(&type->compound, NULL, NULL, NULL);
+		firm_type = create_compound_type(&type->compound, NULL, NULL, NULL,
+		                                 false, COMPOUND_IS_UNION);
 		break;
 	case TYPE_ENUM:
 		firm_type = create_enum_type(&type->enumt);
@@ -1305,6 +1270,8 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
 		return declaration->v.vla_base;
 
+	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
+	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
 	case DECLARATION_KIND_COMPOUND_MEMBER:
 	case DECLARATION_KIND_LABEL_BLOCK:
 		panic("not implemented reference type");
@@ -1346,6 +1313,8 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_ENUM_ENTRY:
 		panic("trying to reference enum entry");
 
+	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
+	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
 	case DECLARATION_KIND_COMPOUND_MEMBER:
 	case DECLARATION_KIND_LABEL_BLOCK:
 		panic("not implemented reference type");
@@ -1439,6 +1408,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
 		               get_method_additional_properties(ir_method_type));
+		set_method_variadicity(new_method_type,
+		                       get_method_variadicity(ir_method_type));
 
 		for(int i = 0; i < n_res; ++i) {
 			set_method_res_type(new_method_type, i,
@@ -2526,6 +2497,13 @@ static ir_node *select_addr(const select_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 
 	ir_node *compound_addr = expression_to_firm(expression->compound);
+
+	/* make sure the type is constructed */
+	type_t *type = skip_typeref(expression->compound->base.type);
+	if (is_type_pointer(type)) {
+		type = type->pointer.points_to;
+	}
+	(void) get_ir_type(type);
 
 	declaration_t *entry = expression->compound_entry;
 	assert(entry->declaration_kind == DECLARATION_KIND_COMPOUND_MEMBER);

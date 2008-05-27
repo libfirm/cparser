@@ -543,7 +543,7 @@ struct declaration_t {
 	symbol_t           *symbol;
 	source_position_t   source_position;
 	union {
-		bool            is_defined;
+		bool            complete;           /**< used to indicate wether struct/union types are already defined or if just the name is declared */
 		statement_t    *statement;
 		initializer_t  *initializer;
 		expression_t   *enum_value;
