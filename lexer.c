@@ -343,7 +343,7 @@ static void parse_integer_suffix(bool is_oct_hex)
 			if(v >= TARGET_LONG_MIN && v <= TARGET_LONG_MAX) {
 				lexer_token.datatype = type_long;
 				return;
-			} else if(is_oct_hex && v >= 0 && v <= TARGET_ULONG_MAX) {
+			} else if(is_oct_hex && v >= 0 && (unsigned long long)v <= (unsigned long long)TARGET_ULONG_MAX) {
 				lexer_token.datatype = type_unsigned_long;
 				return;
 			}
