@@ -498,7 +498,8 @@ int main(int argc, char **argv)
 				} else if (res == -1) {
 					help_displayed = true;
 				} else {
-					strncpy(cpu_arch, opt, sizeof(cpu_arch));
+					if (strncmp(opt, "isa=", 4) == 0)
+						strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if(option[0] == 'W') {
 				set_warning_opt(&option[1]);
