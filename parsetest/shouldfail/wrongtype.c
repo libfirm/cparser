@@ -2,7 +2,7 @@ int test(int a, int b);
 
 int adr(int *x);
 
-int test1(int a, int b) {
+int test1(itn a, int b) {
 	return test(a,b);
 }
 
