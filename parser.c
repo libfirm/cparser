@@ -3923,6 +3923,9 @@ warn_redundant_declaration:
 					}
 				}
 			}
+
+			if (declaration->is_inline)
+				previous_declaration->is_inline = true;
 			return previous_declaration;
 		}
 	} else if (is_function_definition) {
@@ -4816,6 +4819,20 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	return result;
 }
 
+static type_t *make_function_0_type(type_t *return_type)
+{
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION, &builtin_source_position);
+	type->function.return_type = return_type;
+	type->function.parameters  = NULL;
+
+	type_t *result = typehash_insert(type);
+	if(result != type) {
+		free_type(type);
+	}
+
+	return result;
+}
+
 /**
  * Creates a function type for some function like builtins.
  *
@@ -4826,6 +4843,8 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	switch(symbol->ID) {
 	case T___builtin_alloca:
 		return make_function_1_type(type_void_ptr, type_size_t);
+	case T___builtin_huge_val:
+		return make_function_0_type(type_double);
 	case T___builtin_nan:
 		return make_function_1_type(type_double, type_char_ptr);
 	case T___builtin_nanf:
@@ -5532,6 +5551,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_nan:
 		case T___builtin_nand:
 		case T___builtin_nanf:
+		case T___builtin_huge_val:
 		case T___builtin_va_end:         return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
