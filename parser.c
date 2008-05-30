@@ -3321,12 +3321,10 @@ static declaration_t *parse_parameters(function_type_t *type)
 	}
 
 	if(token.type == ')') {
-		next_token();
 		type->unspecified_parameters = 1;
 		goto parameters_finished;
 	}
 	if(token.type == T_void && look_ahead(1)->type == ')') {
-		next_token();
 		next_token();
 		goto parameters_finished;
 	}
