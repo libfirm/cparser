@@ -6344,9 +6344,9 @@ static void semantic_comparison(binary_expression_t *expression)
 				other_expr = left;
 			}
 
-			type_t *other_type = skip_typeref(other_expr->base.type);
 			if(const_expr != NULL) {
-				long val = fold_constant(const_expr);
+				type_t *other_type = skip_typeref(other_expr->base.type);
+				long    val        = fold_constant(const_expr);
 				/* TODO: check if val can be represented by other_type */
 				(void) other_type;
 				(void) val;
