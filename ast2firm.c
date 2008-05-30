@@ -1549,7 +1549,7 @@ static void bitfield_store_to_firm(const unary_expression_t *expression,
 	ir_mode      *mode   = get_ir_mode(type->bitfield.base_type);
 	ir_node      *addr   = expression_to_addr(select);
 
-	assert(get_irn_mode(value) == mode);
+	assert(get_irn_mode(value) == mode || is_Bad(value));
 
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 
@@ -3633,9 +3633,14 @@ static void create_local_static_variable(declaration_t *declaration)
 
 	type_t    *const type        = skip_typeref(declaration->type);
 	ir_type   *const global_type = get_glob_type();
-	ident     *const id          = new_id_from_str(declaration->symbol->string);
 	ir_type   *const irtype      = get_ir_type(type);
 	dbg_info  *const dbgi        = get_dbg_info(&declaration->source_position);
+
+	size_t l = strlen(declaration->symbol->string);
+	char   buf[l + sizeof(".%u")];
+	snprintf(buf, sizeof(buf), "%s.%%u", declaration->symbol->string);
+	ident     *const id = id_unique(buf);
+
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
 
 	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
