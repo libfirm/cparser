@@ -4,6 +4,9 @@
 #include <libfirm/firm_types.h>
 #include <libfirm/dbginfo.h>
 
+/** The floating point immediate mode if set. */
+extern ir_mode *firm_imm_fp_mode;
+
 enum rts_names {
   rts_debugbreak,  /**< the name of the __debugbreak() intrinsic */
   rts_abort,       /**< the name of the abort() function */

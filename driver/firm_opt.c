@@ -9,10 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libfirm/firm.h>
-
-#ifdef FIRM_BACKEND
 #include <libfirm/be.h>
-#endif /* FIRM_BACKEND */
 
 
 #include "firm_opt.h"
@@ -111,6 +108,8 @@ static const ir_settings_arch_dep_t *ad_param = NULL;
 static create_intrinsic_fkt *arch_create_intrinsic = NULL;
 static void *create_intrinsic_ctx = NULL;
 static const ir_settings_if_conv_t *if_conv_info = NULL;
+
+ir_mode *firm_imm_fp_mode = NULL;
 
 /* entities of runtime functions */
 ir_entity_ptr rts_entities[rts_max];
@@ -388,28 +387,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "reassoc");
     CHECK_ONE(firm_opt.check_all, irg);
 
-    if (firm_opt.confirm) {
-      /* Confirm construction currently can only handle blocks with only one control
-         flow predecessor. Calling optimize_cf here removes Bad predecessors and help
-         the optimization of switch constructs. */
-      timer_push(TV_CF_OPT);
-        optimize_cf(irg);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
-      CHECK_ONE(firm_opt.check_all, irg);
-      timer_push(TV_CONFIRM_CREATE);
-        construct_confirms(irg);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "confirms");
-      CHECK_ONE(firm_opt.check_all, irg);
-    }
-
-    timer_push(TV_LOCAL_OPT);
-      optimize_graph_df(irg);
-    timer_pop();
-    DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "lopt");
-    CHECK_ONE(firm_opt.check_all, irg);
-
     compute_doms(irg);
     CHECK_ONE(firm_opt.check_all, irg);
 
@@ -421,6 +398,28 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
         set_opt_global_cse(0);
       timer_pop();
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "place");
+      CHECK_ONE(firm_opt.check_all, irg);
+    }
+
+    if (firm_opt.confirm) {
+      /* Confirm construction currently can only handle blocks with only one control
+         flow predecessor. Calling optimize_cf here removes Bad predecessors and help
+         the optimization of switch constructs. */
+      timer_push(TV_CF_OPT);
+      optimize_cf(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
+      CHECK_ONE(firm_opt.check_all, irg);
+      timer_push(TV_CONFIRM_CREATE);
+        construct_confirms(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "confirms");
+      CHECK_ONE(firm_opt.check_all, irg);
+
+      timer_push(TV_LOCAL_OPT);
+        optimize_graph_df(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "lopt");
       CHECK_ONE(firm_opt.check_all, irg);
     }
 
@@ -436,13 +435,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
     CHECK_ONE(firm_opt.check_all, irg);
 
-    /* should we really remove the Confirm here? */
-    if (firm_opt.confirm) {
-      timer_push(TV_CONFIRM_CREATE);
-        remove_confirms(irg);
-      timer_pop();
-    }
-
     irg_verify(irg, VRFY_ENFORCE_SSA);
     if (firm_opt.gvn_pre) {
       do_gvn_pre(irg);
@@ -457,7 +449,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       timer_pop();
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst");
       CHECK_ONE(firm_opt.check_all, irg);
-	}
+    }
 
     lower_highlevel_graph(irg, firm_opt.lower_bitfields);
 
@@ -475,6 +467,13 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       timer_pop();
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cond_eval");
       CHECK_ONE(firm_opt.check_all, irg);
+    }
+
+    /* should we really remove the Confirm here? */
+    if (firm_opt.confirm) {
+      timer_push(TV_CONFIRM_CREATE);
+      remove_confirms(irg);
+      timer_pop();
     }
 
     compute_doms(irg);
@@ -550,6 +549,23 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "tail_rec");
     CHECK_ALL(firm_opt.check_all);
+  }
+
+  if (firm_opt.cond_eval) {
+    for (i = 0; i < get_irp_n_irgs(); i++) {
+      irg = get_irp_irg(i);
+      timer_push(TV_COND_EVAL);
+        opt_cond_eval(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cond_eval");
+      CHECK_ONE(firm_opt.check_all, irg);
+
+      timer_push(TV_CF_OPT);
+        optimize_cf(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
+      CHECK_ONE(firm_opt.check_all, irg);
+    }
   }
 
   if (firm_dump.ir_graph) {
@@ -828,6 +844,12 @@ static void do_firm_lowering(const char *input_filename)
       CHECK_ONE(firm_opt.check_all, current_ir_graph);
     }
 
+    /* enable architecture dependent optimizations */
+    arch_dep_set_opts((arch_dep_opts_t)
+                      ((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
+                      (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
+                      (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
+
     for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
       current_ir_graph = get_irp_irg(i);
 
@@ -931,9 +953,17 @@ void gen_firm_init(void)
   params.cc_mask               = 0; /* no regparam, cdecl */
   params.builtin_dbg           = NULL;
 
-#ifdef FIRM_BACKEND
+  #ifdef FIRM_EXT_GRS
+  /* Activate Graph rewriting if SIMD optimization is turned on */
+  /* This has to be done before init_firm() is called! */
+  if (firm_ext_grs.simd_opt)
+    ext_grs_activate();
+#endif
+
+  init_firm(&params);
+
   if (firm_be_opt.selection == BE_FIRM_BE) {
-    const backend_params *be_params = be_init();
+    const backend_params *be_params = be_get_backend_param();
 
     firm_opt.lower_ll       = (a_byte) be_params->do_dw_lowering;
     params.arch_op_settings = be_params->arch_op_settings;
@@ -943,17 +973,11 @@ void gen_firm_init(void)
 
     ad_param                = be_params->dep_param;
     if_conv_info            = be_params->if_conv_info;
+
+    if (be_params->has_imm_fp_mode)
+      firm_imm_fp_mode = be_params->imm_fp_mode;
   }
-#endif /* FIRM_BACKEND */
 
-#ifdef FIRM_EXT_GRS
-  /* Activate Graph rewriting if SIMD optimization is turned on */
-  /* This has to be done before init_firm() is called! */
-  if (firm_ext_grs.simd_opt)
-	  ext_grs_activate();
-#endif
-
-  init_firm(&params);
   dbg_init(NULL, NULL, dbg_snprint);
   edges_init_dbg(firm_opt.vrfy_edges);
   //cbackend_set_debug_retrieve(dbg_retrieve);
@@ -1109,13 +1133,6 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
     ext_grs_simd_opt();
 #endif
 
-  /* enable architecture dependent optimizations */
-  arch_dep_set_opts((arch_dep_opts_t)
-                    ((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
-                    (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
-                    (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
-
-
   if (firm_dump.statistic & STAT_FINAL_IR)
     stat_dump_snapshot(input_filename, "final-ir");
 
@@ -1136,9 +1153,7 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
  * Do very early initializations
  */
 void firm_early_init(void) {
-#ifdef FIRM_BACKEND
   /* arg: need this here for command line options */
   be_opt_register();
-#endif
   firm_init_options(NULL, 0, NULL);
 }  /* firm_early_init */
