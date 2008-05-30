@@ -1,3 +1,5 @@
+int printf(const char *fmt, ...);
+
 static void foo();
 
 static void kaputt(void) {
