@@ -3692,6 +3692,7 @@ static declaration_t *parse_declarator(
 
 	if(construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
+		declaration->valid = true;
 	}
 
 	return declaration;
@@ -3787,6 +3788,9 @@ static declaration_t *internal_record_declaration(
 {
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
+
+	if (!declaration->valid)
+		return declaration;
 
 	type_t *const orig_type = declaration->type;
 	type_t *const type      = skip_typeref(orig_type);
