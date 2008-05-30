@@ -1187,9 +1187,9 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 {
 	ir_mode *mode = get_irn_mode(node);
 
-	if(!(get_irg_fp_model(current_ir_graph) & fp_explicit_rounding))
+	if (!(get_irg_fp_model(current_ir_graph) & fp_explicit_rounding))
 		return node;
-	if(!mode_is_float(mode))
+	if (!mode_is_float(mode))
 		return node;
 
 	/* check if there is already a Conv */
@@ -3529,8 +3529,11 @@ static void create_declaration_initializer(declaration_t *declaration)
 
 	if(initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
+		dbg_info            *dbgi
+			= get_dbg_info(&declaration->source_position);
 
 		ir_node *value = expression_to_firm(initializer_value->value);
+		value = do_strict_conv(dbgi, value);
 
 		if(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
