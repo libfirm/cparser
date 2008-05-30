@@ -490,6 +490,18 @@ static void add_anchor_token(int token_type) {
 	++token_anchor_set[token_type];
 }
 
+static int save_and_reset_anchor_state(int token_type) {
+	assert(0 <= token_type && token_type < T_LAST_TOKEN);
+	int count = token_anchor_set[token_type];
+	token_anchor_set[token_type] = 0;
+	return count;
+}
+
+static void restore_anchor_state(int token_type, int count) {
+	assert(0 <= token_type && token_type < T_LAST_TOKEN);
+	token_anchor_set[token_type] = count;
+}
+
 /**
  * Remove a token from the token anchor set (a multi-set).
  */
@@ -627,6 +639,8 @@ static void type_error_incompatible(const char *msg,
         parse_error_expected(NULL, (expected), NULL); \
 		add_anchor_token(expected);                   \
         eat_until_anchor();                           \
+        if (token.type == expected)                   \
+        	next_token();                             \
 		rem_anchor_token(expected);                   \
         goto end_error;                               \
     }                                                 \
@@ -3236,8 +3250,9 @@ static declaration_t *parse_identifier_list(void)
 		}
 		last_declaration = declaration;
 
-		if(token.type != ',')
+		if (token.type != ',') {
 			break;
+		}
 		next_token();
 	} while(token.type == T_IDENTIFIER);
 
@@ -3290,24 +3305,32 @@ static declaration_t *parse_parameter(void)
 
 static declaration_t *parse_parameters(function_type_t *type)
 {
+	declaration_t *declarations = NULL;
+
+	eat('(');
+	add_anchor_token(')');
+	int saved_comma_state = save_and_reset_anchor_state(',');
+
 	if(token.type == T_IDENTIFIER) {
 		symbol_t *symbol = token.v.symbol;
 		if(!is_typedef_symbol(symbol)) {
 			type->kr_style_parameters = true;
-			return parse_identifier_list();
+			declarations = parse_identifier_list();
+			goto parameters_finished;
 		}
 	}
 
 	if(token.type == ')') {
+		next_token();
 		type->unspecified_parameters = 1;
-		return NULL;
+		goto parameters_finished;
 	}
 	if(token.type == T_void && look_ahead(1)->type == ')') {
 		next_token();
-		return NULL;
+		next_token();
+		goto parameters_finished;
 	}
 
-	declaration_t        *declarations = NULL;
 	declaration_t        *declaration;
 	declaration_t        *last_declaration = NULL;
 	function_parameter_t *parameter;
@@ -3318,7 +3341,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 		case T_DOTDOTDOT:
 			next_token();
 			type->variadic = 1;
-			return declarations;
+			goto parameters_finished;
 
 		case T_IDENTIFIER:
 		case T___extension__:
@@ -3341,12 +3364,25 @@ static declaration_t *parse_parameters(function_type_t *type)
 			break;
 
 		default:
-			return declarations;
+			goto parameters_finished;
 		}
-		if(token.type != ',')
-			return declarations;
+		if (token.type != ',') {
+			goto parameters_finished;
+		}
 		next_token();
 	}
+
+
+parameters_finished:
+	rem_anchor_token(')');
+	expect(')');
+
+	restore_anchor_state(',', saved_comma_state);
+	return declarations;
+
+end_error:
+	restore_anchor_state(',', saved_comma_state);
+	return NULL;
 }
 
 typedef enum {
@@ -3441,9 +3477,6 @@ end_error:
 
 static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
-	eat('(');
-	add_anchor_token(')');
-
 	type_t *type;
 	if(declaration != NULL) {
 		type = allocate_type_zero(TYPE_FUNCTION, &declaration->source_position);
@@ -3462,10 +3495,6 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	construct_function_type->construct_type.kind = CONSTRUCT_FUNCTION;
 	construct_function_type->function_type       = type;
 
-	rem_anchor_token(')');
-	expect(')');
-
-end_error:
 	return (construct_type_t*) construct_function_type;
 }
 
@@ -3692,7 +3721,6 @@ static declaration_t *parse_declarator(
 
 	if(construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
-		declaration->valid = true;
 	}
 
 	return declaration;
@@ -3788,9 +3816,6 @@ static declaration_t *internal_record_declaration(
 {
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
-
-	if (!declaration->valid)
-		return declaration;
 
 	type_t *const orig_type = declaration->type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -4135,10 +4160,10 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 static void parse_kr_declaration_list(declaration_t *declaration)
 {
 	type_t *type = skip_typeref(declaration->type);
-	if(!is_type_function(type))
+	if (!is_type_function(type))
 		return;
 
-	if(!type->function.kr_style_parameters)
+	if (!type->function.kr_style_parameters)
 		return;
 
 	/* push function parameters */
