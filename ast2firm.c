@@ -1237,6 +1237,23 @@ static ir_node *get_local_frame(ir_entity *const ent)
 	}
 }
 
+static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
+{
+	ir_mode *value_mode = get_irn_mode(value);
+
+	if (value_mode == dest_mode || is_Bad(value))
+		return value;
+
+	if(dest_mode == mode_b) {
+		ir_node *zero = new_Const(value_mode, get_mode_null(value_mode));
+		ir_node *cmp  = new_d_Cmp(dbgi, value, zero);
+		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
+		return proj;
+	}
+
+	return new_d_Conv(dbgi, value, dest_mode);
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->base.source_position);
@@ -1396,23 +1413,23 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	assert(is_type_function(points_to));
 	function_type_t *function_type = &points_to->function;
 
-	int              n_parameters = 0;
-	call_argument_t *argument     = call->arguments;
-	for( ; argument != NULL; argument = argument->next) {
-		++n_parameters;
-	}
-
 	dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
 
+	int      n_parameters = 0;
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
 	if(function_type->variadic || function_type->unspecified_parameters) {
+		const call_argument_t *argument = call->arguments;
+		for( ; argument != NULL; argument = argument->next) {
+			++n_parameters;
+		}
+
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
 		dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
 		new_method_type = new_d_type_method(id_unique("calltype.%u"),
-		                                  n_parameters, n_res, dbgi);
+		                                    n_parameters, n_res, dbgi);
 		set_method_calling_convention(new_method_type,
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
@@ -1424,29 +1441,30 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 			set_method_res_type(new_method_type, i,
 			                    get_method_res_type(ir_method_type, i));
 		}
+		argument = call->arguments;
+		for(int i = 0; i < n_parameters; ++i, argument = argument->next) {
+			expression_t *expression = argument->expression;
+			ir_type      *irtype     = get_ir_type(expression->base.type);
+			set_method_param_type(new_method_type, i, irtype);
+		}
+		ir_method_type = new_method_type;
+	} else {
+		n_parameters = get_method_n_params(ir_method_type);
 	}
+
 	ir_node *in[n_parameters];
 
-	argument = call->arguments;
-	int n = 0;
-	for( ; argument != NULL; argument = argument->next) {
+	const call_argument_t *argument = call->arguments;
+	for(int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
 		ir_node      *arg_node   = expression_to_firm(expression);
 
 		arg_node = do_strict_conv(dbgi, arg_node);
 
 		in[n] = arg_node;
-		if(new_method_type != NULL) {
-			ir_type *irtype = get_ir_type(expression->base.type);
-			set_method_param_type(new_method_type, n, irtype);
-		}
 
-		n++;
+		argument = argument->next;
 	}
-	assert(n == n_parameters);
-
-	if(new_method_type != NULL)
-		ir_method_type = new_method_type;
 
 	ir_node  *store = get_store();
 	ir_node  *node  = new_d_Call(dbgi, store, callee, n_parameters, in,
@@ -1595,23 +1613,6 @@ static void set_value_for_expression(const expression_t *expression,
 	ir_node *addr = expression_to_addr(expression);
 	type_t  *type = skip_typeref(expression->base.type);
 	assign_value(dbgi, addr, type, value);
-}
-
-static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
-{
-	ir_mode *value_mode = get_irn_mode(value);
-
-	if (value_mode == dest_mode || is_Bad(value))
-		return value;
-
-	if(dest_mode == mode_b) {
-		ir_node *zero = new_Const(value_mode, get_mode_null(value_mode));
-		ir_node *cmp  = new_d_Cmp(dbgi, value, zero);
-		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
-		return proj;
-	}
-
-	return new_d_Conv(dbgi, value, dest_mode);
 }
 
 static ir_node *create_incdec(const unary_expression_t *expression)
@@ -2264,15 +2265,22 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	dbg_info *dbgi      = get_dbg_info(&expression->base.source_position);
 	ir_node  *base_addr = expression_to_firm(expression->array_ref);
 	ir_node  *offset    = expression_to_firm(expression->index);
-	offset              = create_conv(dbgi, offset, mode_uint);
+
+	/* Matze: it would be better to force mode to mode_uint as this creates more
+	 * opportunities for CSE. Unforunately we still have some optimisations that
+	 * are too conservative in the presence of convs. So we better go with the
+	 * mode of offset and avoid the conv */
+	ir_mode  *mode = get_irn_mode(offset);
+	offset         = create_conv(dbgi, offset, mode);
 
 	type_t *ref_type = skip_typeref(expression->array_ref->base.type);
 	assert(is_type_pointer(ref_type));
 	pointer_type_t *pointer_type = &ref_type->pointer;
 
 	ir_node *elem_size_const = get_type_size(pointer_type->points_to);
+	elem_size_const          = create_conv(dbgi, elem_size_const, mode);
 	ir_node *real_offset     = new_d_Mul(dbgi, offset, elem_size_const,
-	                                     mode_uint);
+	                                     mode);
 	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
 
 	return result;

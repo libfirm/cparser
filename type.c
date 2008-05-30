@@ -299,12 +299,12 @@ static void print_function_type_post(const function_type_t *type,
 
 	fputc('(', out);
 
-	int first = 1;
+	bool first = true;
 	if(scope == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
-				first = 0;
+				first = false;
 			} else {
 				fputs(", ", out);
 			}
@@ -314,7 +314,7 @@ static void print_function_type_post(const function_type_t *type,
 		declaration_t *parameter = scope->declarations;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if(first) {
-				first = 0;
+				first = false;
 			} else {
 				fputs(", ", out);
 			}
@@ -324,7 +324,7 @@ static void print_function_type_post(const function_type_t *type,
 	}
 	if(type->variadic) {
 		if(first) {
-			first = 0;
+			first = false;
 		} else {
 			fputs(", ", out);
 		}
