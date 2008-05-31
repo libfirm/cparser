@@ -4173,14 +4173,14 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	set_scope(&declaration->scope);
 
 	declaration_t *parameter = declaration->scope.declarations;
-	for( ; parameter != NULL; parameter = parameter->next) {
+	for ( ; parameter != NULL; parameter = parameter->next) {
 		assert(parameter->parent_scope == NULL);
 		parameter->parent_scope = scope;
 		environment_push(parameter);
 	}
 
 	/* parse declaration list */
-	while(is_declaration_specifier(&token, false)) {
+	while (is_declaration_specifier(&token, false)) {
 		parse_declaration(finished_kr_declaration);
 	}
 
@@ -4191,7 +4191,6 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 	/* update function type */
 	type_t *new_type = duplicate_type(type);
-	new_type->function.kr_style_parameters = false;
 
 	function_parameter_t *parameters     = NULL;
 	function_parameter_t *last_parameter = NULL;
@@ -4229,7 +4228,11 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		}
 		last_parameter = function_parameter;
 	}
+
+	/* § 6.9.1.7: A K&R style parameter list does NOT act as a function
+	 * prototype */
 	new_type->function.parameters = parameters;
+	new_type->function.unspecified_parameters = true;
 
 	type = typehash_insert(new_type);
 	if(type != new_type) {
@@ -4369,7 +4372,9 @@ static void parse_external_declaration(void)
 
 	/* § 6.7.5.3 (14) a function definition with () means no
 	 * parameters (and not unspecified parameters) */
-	if(type->function.unspecified_parameters) {
+	if(type->function.unspecified_parameters
+			&& type->function.parameters == NULL
+			&& !type->function.kr_style_parameters) {
 		type_t *duplicate = duplicate_type(type);
 		duplicate->function.unspecified_parameters = false;
 
