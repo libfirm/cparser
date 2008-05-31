@@ -78,7 +78,8 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_LABEL_BLOCK,
 	DECLARATION_KIND_ENUM_ENTRY,
 	DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE,
-	DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
+	DECLARATION_KIND_COMPOUND_TYPE_COMPLETE,
+	DECLARATION_KIND_TYPE
 } declaration_kind_t;
 
 static ir_type *get_ir_type(type_t *type);
@@ -1254,13 +1255,13 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	declaration_t *declaration = ref->declaration;
 	type_t        *type        = skip_typeref(declaration->type);
 
+	/* make sure the type is constructed */
+	(void) get_ir_type(type);
+
 	switch((declaration_kind_t) declaration->declaration_kind) {
+	case DECLARATION_KIND_TYPE:
 	case DECLARATION_KIND_UNKNOWN:
-		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY) {
-			break;
-		}
-		get_ir_type(type);
-		/* FALLTHROUGH */
+		break;
 
 	case DECLARATION_KIND_ENUM_ENTRY: {
 		ir_mode *const mode = get_ir_mode(type);
@@ -1306,6 +1307,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	declaration_t *declaration = ref->declaration;
 
 	switch((declaration_kind_t) declaration->declaration_kind) {
+	case DECLARATION_KIND_TYPE:
 	case DECLARATION_KIND_UNKNOWN:
 		break;
 	case DECLARATION_KIND_LOCAL_VARIABLE:
@@ -3826,11 +3828,16 @@ static void create_local_declaration(declaration_t *declaration)
 		}
 		return;
 	case STORAGE_CLASS_ENUM_ENTRY:
+		/* should already be handled */
+		assert(declaration->declaration_kind == DECLARATION_KIND_ENUM_ENTRY);
+		return;
 	case STORAGE_CLASS_TYPEDEF:
+		declaration->declaration_kind = DECLARATION_KIND_TYPE;
+		return;
 	case STORAGE_CLASS_THREAD:
 	case STORAGE_CLASS_THREAD_EXTERN:
 	case STORAGE_CLASS_THREAD_STATIC:
-		return;
+		break;
 	}
 	panic("invalid storage class found");
 }
@@ -3853,6 +3860,7 @@ static void initialize_local_declaration(declaration_t *declaration)
 	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
 	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
 	case DECLARATION_KIND_FUNCTION:
+	case DECLARATION_KIND_TYPE:
 	case DECLARATION_KIND_ENUM_ENTRY:
 		return;
 
@@ -4031,16 +4039,20 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 static void for_statement_to_firm(for_statement_t *statement)
 {
 	ir_node *jmp = NULL;
+
+	/* create declarations */
+	declaration_t *declaration = statement->scope.declarations;
+	for( ; declaration != NULL; declaration = declaration->next) {
+		create_local_declaration(declaration);
+	}
+	declaration = statement->scope.declarations;
+	for( ; declaration != NULL; declaration = declaration->next) {
+		initialize_local_declaration(declaration);
+	}
+
 	if (get_cur_block() != NULL) {
 		if(statement->initialisation != NULL) {
 			expression_to_firm(statement->initialisation);
-		}
-
-		/* create declarations */
-		declaration_t *declaration = statement->scope.declarations;
-		for( ; declaration != NULL; declaration = declaration->next) {
-			create_local_declaration(declaration);
-			initialize_local_declaration(declaration);
 		}
 
 		jmp = new_Jmp();
