@@ -995,12 +995,9 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 			if (id != rts_idents[i])
 				continue;
 
-			printf("FoudnID: %s\n", symbol->string);
-
 			/* ignore those rts functions not necessary needed for current mode */
 			if ((c_mode & rts_data[i].flags) == 0)
 				continue;
-			printf("Found rts: %s\n", symbol->string);
 			rts_entities[rts_data[i].id] = entity;
 		}
 	}
