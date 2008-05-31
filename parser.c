@@ -4782,18 +4782,11 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	declaration->type                   = type;
 	declaration->symbol                 = symbol;
 	declaration->source_position        = *source_position;
-	declaration->parent_scope           = global_scope;
 
-	scope_t *old_scope = scope;
-	set_scope(global_scope);
-
-	environment_push(declaration);
-	/* prepends the declaration to the global declarations list */
-	declaration->next   = scope->declarations;
-	scope->declarations = declaration;
-
-	assert(scope == global_scope);
-	set_scope(old_scope);
+	bool strict_prototypes_old = warning.strict_prototypes;
+	warning.strict_prototypes  = false;
+	record_declaration(declaration);
+	warning.strict_prototypes = strict_prototypes_old;
 
 	return declaration;
 }

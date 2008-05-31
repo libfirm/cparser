@@ -125,6 +125,7 @@ static ir_mode *mode_int, *mode_uint;
 
 static ir_node *expression_to_firm(const expression_t *expression);
 static inline ir_mode *get_ir_mode(type_t *type);
+static void create_local_declaration(declaration_t *declaration);
 
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
@@ -998,6 +999,7 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 			/* ignore those rts functions not necessary needed for current mode */
 			if ((c_mode & rts_data[i].flags) == 0)
 				continue;
+			assert(rts_entities[rts_data[i].id] == NULL);
 			rts_entities[rts_data[i].id] = entity;
 		}
 	}
@@ -3621,8 +3623,6 @@ static void create_local_variable(declaration_t *declaration)
 		set_irg_loc_description(current_ir_graph, next_value_number_function, declaration);
 		++next_value_number_function;
 	}
-
-	create_declaration_initializer(declaration);
 }
 
 static void create_local_static_variable(declaration_t *declaration)
@@ -3718,11 +3718,14 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 
 static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
+	declaration_t *declaration = compound->scope.declarations;
+	for( ; declaration != NULL; declaration = declaration->next) {
+		create_local_declaration(declaration);
+	}
+
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for( ; statement != NULL; statement = statement->base.next) {
-		//context2firm(&statement->scope);
-
 		if(statement->base.next == NULL
 				&& statement->kind == STATEMENT_EXPRESSION) {
 			result = expression_statement_to_firm(
@@ -3791,8 +3794,13 @@ create_var:
 
 static void create_local_declaration(declaration_t *declaration)
 {
-	if(declaration->symbol == NULL)
+	if (declaration->namespc != NAMESPACE_NORMAL)
 		return;
+	/* construct type */
+	(void) get_ir_type(declaration->type);
+	if (declaration->symbol == NULL) {
+		return;
+	}
 
 	type_t *type = skip_typeref(declaration->type);
 
@@ -3827,6 +3835,33 @@ static void create_local_declaration(declaration_t *declaration)
 	panic("invalid storage class found");
 }
 
+static void initialize_local_declaration(declaration_t *declaration)
+{
+	if(declaration->symbol == NULL || declaration->namespc != NAMESPACE_NORMAL)
+		return;
+
+	switch ((declaration_kind_t) declaration->declaration_kind) {
+	case DECLARATION_KIND_LOCAL_VARIABLE:
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
+		create_declaration_initializer(declaration);
+		return;
+
+	case DECLARATION_KIND_LABEL_BLOCK:
+	case DECLARATION_KIND_COMPOUND_MEMBER:
+	case DECLARATION_KIND_GLOBAL_VARIABLE:
+	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
+	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
+	case DECLARATION_KIND_FUNCTION:
+	case DECLARATION_KIND_ENUM_ENTRY:
+		return;
+
+	case DECLARATION_KIND_UNKNOWN:
+		panic("can't initialize unknwon declaration");
+	}
+	panic("invalid declaration kind");
+}
+
 static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
 	declaration_t *declaration = statement->declarations_begin;
@@ -3834,7 +3869,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	for( ; declaration != end; declaration = declaration->next) {
 		if(declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		create_local_declaration(declaration);
+		initialize_local_declaration(declaration);
 	}
 }
 
@@ -4005,6 +4040,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		declaration_t *declaration = statement->scope.declarations;
 		for( ; declaration != NULL; declaration = declaration->next) {
 			create_local_declaration(declaration);
+			initialize_local_declaration(declaration);
 		}
 
 		jmp = new_Jmp();
