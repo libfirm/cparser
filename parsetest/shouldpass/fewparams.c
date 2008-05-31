@@ -9,7 +9,6 @@ static void kaputt(void) {
 static void foo(int a, int b) {
 	(void) a;
 	(void) b;
-	printf("%d %d\n", a, b);
 }
 
 int main(void) {
