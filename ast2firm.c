@@ -814,8 +814,6 @@ static inline ir_mode *get_ir_mode(type_t *type)
 	return mode;
 }
 
-static ident *predef_idents[rts_max];
-
 /** Names of the runtime functions. */
 static const struct {
 	int        id;           /**< the rts id */
@@ -826,6 +824,7 @@ static const struct {
 } rts_data[] = {
 	{ rts_debugbreak, 0, "__debugbreak", 0, _MS },
 	{ rts_abort,      0, "abort",        0, _C89 },
+	{ rts_alloca,     1, "alloca",       1, _GNUC },
 	{ rts_abs,        1, "abs",          1, _C89 },
 	{ rts_labs,       1, "labs",         1, _C89 },
 	{ rts_llabs,      1, "llabs",        1, _C99 },
@@ -896,6 +895,8 @@ static const struct {
 	{ rts_strcmp,     1, "strcmp",       2, _C89 },
 	{ rts_strncmp,    1, "strncmp",      3, _C89 }
 };
+
+static ident *rts_idents[sizeof(rts_data) / sizeof(rts_data[0])];
 
 /**
  * Mangles an entity linker (ld) name for win32 usage.
@@ -980,35 +981,29 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 		set_entity_visibility(entity, visibility_external_visible);
 	} else {
 		set_entity_visibility(entity, visibility_external_allocated);
-
-		/* We should check for file scope here, but as long as we compile C only
-		   this is not needed. */
-		int    n_params = get_method_n_params(ir_type_method);
-		int    n_res    = get_method_n_ress(ir_type_method);
-		int    i;
-
-		if (n_params == 0 && n_res == 0 && id == predef_idents[rts_abort]) {
-			/* found abort(), store for later */
-			//abort_ent = ent;
-			//abort_tp  = ftype;
-		} else {
-			if (! firm_opt.freestanding) {
-				/* check for a known runtime function */
-				for (i = 0; i < rts_max; ++i) {
-					/* ignore those rts functions not necessary needed for current mode */
-					if ((c_mode & rts_data[i].flags) == 0)
-						continue;
-					if (n_params == rts_data[i].n_params && n_res == rts_data[i].n_res &&
-						id == predef_idents[rts_data[i].id])
-						rts_entities[rts_data[i].id] = entity;
-				}
-			}
-		}
 	}
 	set_entity_allocation(entity, allocation_static);
 
 	declaration->declaration_kind = DECLARATION_KIND_FUNCTION;
 	declaration->v.entity         = entity;
+
+	/* We should check for file scope here, but as long as we compile C only
+	   this is not needed. */
+	if (! firm_opt.freestanding) {
+		/* check for a known runtime function */
+		for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
+			if (id != rts_idents[i])
+				continue;
+
+			printf("FoudnID: %s\n", symbol->string);
+
+			/* ignore those rts functions not necessary needed for current mode */
+			if ((c_mode & rts_data[i].flags) == 0)
+				continue;
+			printf("Found rts: %s\n", symbol->string);
+			rts_entities[rts_data[i].id] = entity;
+		}
+	}
 
 	return entity;
 }
@@ -4897,7 +4892,7 @@ void init_ast2firm(void)
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
-		predef_idents[rts_data[i].id] = new_id_from_str(rts_data[i].name);
+		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
 }
 

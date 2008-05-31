@@ -143,6 +143,7 @@ static void rts_map(void) {
   } mapper[] = {
     /* integer */
     { &rts_entities[rts_abs],     i_mapper_abs },
+	{ &rts_entities[rts_alloca],  i_mapper_alloca },
     { &rts_entities[rts_labs],    i_mapper_abs },
     { &rts_entities[rts_llabs],   i_mapper_abs },
     { &rts_entities[rts_imaxabs], i_mapper_abs },
@@ -220,7 +221,7 @@ static void rts_map(void) {
   i_record rec[sizeof(mapper)/sizeof(mapper[0])];
   unsigned i, n_map;
 
-  for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i)
+  for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i) {
     if (*mapper[i].ent != NULL) {
       rec[n_map].i_call.kind     = INTRINSIC_CALL;
       rec[n_map].i_call.i_ent    = *mapper[i].ent;
@@ -228,7 +229,8 @@ static void rts_map(void) {
       rec[n_map].i_call.ctx      = NULL;
       rec[n_map].i_call.link     = NULL;
       ++n_map;
-  }  /* if */
+    }  /* if */
+  }
   if (n_map > 0)
     lower_intrinsics(rec, n_map, /* part_block_used=*/0);
 }  /* rts_map */
