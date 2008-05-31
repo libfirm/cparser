@@ -167,10 +167,11 @@ void init_types(void)
 
 	/* TODO: backend specific, need a way to query the backend for this.
 	 * The following are good settings for x86 */
-	props[ATOMIC_TYPE_FLOAT].alignment     = 4;
-	props[ATOMIC_TYPE_DOUBLE].alignment    = 4;
-	props[ATOMIC_TYPE_LONGLONG].alignment  = 4;
-	props[ATOMIC_TYPE_ULONGLONG].alignment = 4;
+	props[ATOMIC_TYPE_FLOAT].alignment       = 4;
+	props[ATOMIC_TYPE_DOUBLE].alignment      = 4;
+	props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
+	props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
+	props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
 
 	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UINT];
 }
