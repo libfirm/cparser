@@ -3976,18 +3976,18 @@ static void parser_error_multiple_definition(declaration_t *declaration,
 }
 
 static bool is_declaration_specifier(const token_t *token,
-                                     bool only_type_specifiers)
+                                     bool only_specifiers_qualifiers)
 {
 	switch(token->type) {
 		TYPE_SPECIFIERS
+		TYPE_QUALIFIERS
 			return true;
 		case T_IDENTIFIER:
 			return is_typedef_symbol(token->v.symbol);
 
 		case T___extension__:
 		STORAGE_CLASSES
-		TYPE_QUALIFIERS
-			return !only_type_specifiers;
+			return !only_specifiers_qualifiers;
 
 		default:
 			return false;
