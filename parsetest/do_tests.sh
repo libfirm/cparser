@@ -1,7 +1,7 @@
 #!/bin/bash
 
 rm -f messages.cparser messages.gcc
-for i in *.c; do
+for i in *.c shouldpass/*.c; do
 	echo -n "Compile $i..."
 	../build/cparser $i -O3 -o prog.cparser >> messages.cparser 2>&1 || echo -n " CPARSER COMPILE FAILED"
 	gcc -m32 -std=gnu99 $i -O3 -o prog.gcc >> messages.gcc 2>&1 || echo -n " GCC COMPILE FAILED"
