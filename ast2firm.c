@@ -133,10 +133,10 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	if( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
 			&& !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
 		char            name[64];
-		mode_sort       sort;
+		ir_mode_sort    sort;
 		unsigned        bit_size     = size * 8;
 		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
-		mode_arithmetic arithmetic;
+		ir_mode_arithmetic arithmetic;
 		unsigned        modulo_shift;
 
 		if(flags & ATOMIC_TYPE_FLAG_INTEGER) {
@@ -175,10 +175,10 @@ static void init_atomic_modes(void)
 
 	/* initialize pointer modes */
 	char            name[64];
-	mode_sort       sort         = irms_reference;
+	ir_mode_sort    sort         = irms_reference;
 	unsigned        bit_size     = machine_size;
 	bool            is_signed    = 0;
-	mode_arithmetic arithmetic   = irma_twos_complement;
+	ir_mode_arithmetic arithmetic   = irma_twos_complement;
 	unsigned        modulo_shift
 		= bit_size < machine_size ? machine_size : bit_size;
 
@@ -4106,6 +4106,7 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	ir_node *const old_switch_cond       = current_switch_cond;
 	ir_node *const old_break_label       = break_label;
 	const bool     old_saw_default_label = saw_default_label;
+	saw_default_label                    = false;
 	current_switch_cond                  = cond;
 	break_label                          = break_block;
 
