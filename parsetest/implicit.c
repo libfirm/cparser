@@ -3,7 +3,8 @@ void test1() {
 }
 
 void test2() {
-	for(int i = rand(); i < 20; ++i)
+	int i;
+	for(i = rand(); i < 20; ++i)
 		break;
 }
 
