@@ -748,6 +748,8 @@ bool is_type_integer(const type_t *type)
 
 	if(type->kind == TYPE_ENUM)
 		return true;
+	if(type->kind == TYPE_BITFIELD)
+		return true;
 
 	if(type->kind != TYPE_ATOMIC)
 		return false;
@@ -784,6 +786,8 @@ bool is_type_signed(const type_t *type)
 	/* enum types are int for now */
 	if(type->kind == TYPE_ENUM)
 		return true;
+	if(type->kind == TYPE_BITFIELD)
+		return is_type_signed(type->bitfield.base_type);
 
 	if(type->kind != TYPE_ATOMIC)
 		return false;
