@@ -359,6 +359,23 @@ static void usage(const char *argv0)
 	fprintf(stderr, "Usage %s input [-o output] [-c]\n", argv0);
 }
 
+static void print_cparser_version(void) {
+	firm_version_t ver;
+	firm_get_version(&ver);
+
+	printf("cparser (%s) using libFirm (%u.%u",
+		cparser_REVISION, ver.major, ver.minor);
+	if(ver.revision[0] != 0) {
+		putchar(' ');
+		fputs(ver.revision, stdout);
+	}
+	if(ver.build[0] != 0) {
+		putchar(' ');
+		fputs(ver.build, stdout);
+	}
+	puts(")\n");
+}
+
 int main(int argc, char **argv)
 {
 	initialize_firm();
@@ -512,6 +529,7 @@ int main(int argc, char **argv)
 			} else if(option[0] == 'W') {
 				set_warning_opt(&option[1]);
 			} else if(option[0] == 'm') {
+				/* -m options */
 				const char *opt;
 				char arch_opt[64];
 
@@ -540,12 +558,30 @@ int main(int argc, char **argv)
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if(strncmp(opt, "fpu=", 4) == 0) {
-					GET_ARG_AFTER(opt, "-mfpu=");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
+				} else if(strncmp(opt, "fpmath=", 7) == 0) {
+					GET_ARG_AFTER(opt, "-mfpmath=");
+					if(strcmp(opt, "387") == 0)
+						opt = "x87";
+					else if(strcmp(opt, "sse") == 0)
+						opt = "sse2";
+					else {
+						fprintf(stderr, "error: option -mfpumath supports only 387 or sse\n");
+						argument_errors = true;
+					}
+					if(!argument_errors) {
+						snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
+						int res = firm_be_option(arch_opt);
+						if (res == 0)
+							argument_errors = true;
+					}
+				} else if(strncmp(opt, "preferred-stack-boundary=", 25) == 0) {
+					GET_ARG_AFTER(opt, "-mpreferred-stack-boundary=");
+					snprintf(arch_opt, sizeof(arch_opt), "%s-stackalign=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
+				} else if(strcmp(opt, "32") == 0) {
+					/* ignore -m32, we are always 32bit */
 				} else {
 					char *endptr;
 					long int value = strtol(opt, &endptr, 10);
@@ -583,6 +619,8 @@ int main(int argc, char **argv)
 					c_mode = _C89|_C99|_MS;
 				} else
 					fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+			} else if(strcmp(option, "version") == 0) {
+				print_cparser_version();
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;
@@ -613,19 +651,7 @@ int main(int argc, char **argv)
 				} else if(strcmp(option, "print-fluffy") == 0) {
 					mode = PrintFluffy;
 				} else if(strcmp(option, "version") == 0) {
-					firm_version_t ver;
-					firm_get_version(&ver);
-					printf("cparser (%s) using libFirm (%u.%u",
-					       cparser_REVISION, ver.major, ver.minor);
-					if(ver.revision[0] != 0) {
-						putchar(' ');
-						fputs(ver.revision, stdout);
-					}
-					if(ver.build[0] != 0) {
-						putchar(' ');
-						fputs(ver.build, stdout);
-					}
-					puts(")\n");
+					print_cparser_version();
 					exit(EXIT_SUCCESS);
 				} else if(strcmp(option, "dump-function") == 0) {
 					++i;
