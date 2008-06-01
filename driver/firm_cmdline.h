@@ -14,8 +14,8 @@
 
 enum an_os_support {
   OS_SUPPORT_LINUX,         /**< create code for Linux OS */
-  OS_SUPPORT_WIN32,         /**< create code for MinGW WIN32 */
-  OS_SUPPORT_MACHO
+  OS_SUPPORT_MINGW,         /**< create code for MinGW WIN32 */
+  OS_SUPPORT_MACHO          /**< create code for MacOS Mach-O */
 } an_os_support;
 
 enum a_debug_mode {

@@ -13,7 +13,7 @@
 #include <libfirm/be.h>
 
 #ifdef _WIN32
-#define DEFAULT_OS OS_SUPPORT_WIN32
+#define DEFAULT_OS OS_SUPPORT_MINGW
 #else
 #define DEFAULT_OS OS_SUPPORT_LINUX
 #endif
@@ -245,7 +245,7 @@ static const struct params {
   { X("stat-pattern"),           &firm_dump.stat_pattern,    1, "misc: Firm statistic calculates most used pattern" },
   { X("stat-dag"),               &firm_dump.stat_dag,        1, "misc: Firm calculates DAG statistics" },
   { X("firm-asm"),               &firm_dump.gen_firm_asm,    1, "misc: output Firm assembler" },
-  { X("win32"),                  &firm_opt.os_support,       OS_SUPPORT_WIN32, "misc: generate Win32 code" },
+  { X("win32"),                  &firm_opt.os_support,       OS_SUPPORT_MINGW, "misc: generate MinGW Win32 code" },
   { X("mac"),                    &firm_opt.os_support,       OS_SUPPORT_MACHO, "misc: generate MacOS code" },
   { X("linux"),                  &firm_opt.os_support,       OS_SUPPORT_LINUX, "misc: generate Linux-ELF code" },
   { X("ycomp"),                  &firm_opt.ycomp_dbg,        1, "misc: enable yComp debugger extension" },
@@ -373,13 +373,25 @@ int firm_option(const char *opt)
         if (firm_opt.debug_mode == DBG_MODE_FULL)
           disable_opts();
         res = 1;
-#ifdef FIRM_BACKEND
         res &= firm_be_option("omitfp=0");
         res &= firm_be_option("stabs");
-#endif /* FIRM_BACKEND */
         return res;
       }
-      break;
+      /* OS option must be set to the backend */
+      else if (firm_options[i].flag == &firm_opt.os_support) {
+        switch (firm_opt.os_support) {
+        case OS_SUPPORT_MINGW:
+          firm_be_option("ia32-gasmode=mingw");
+          break;
+        case OS_SUPPORT_MACHO:
+          firm_be_option("ia32-gasmode=macho");
+          break;
+        case OS_SUPPORT_LINUX:
+        default:
+          firm_be_option("ia32-gasmode=linux");
+          break;
+        }
+      }
     }
   }
 
