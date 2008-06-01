@@ -132,7 +132,7 @@ static const symbol_t *sym_noalias    = NULL;
 static unsigned char token_anchor_set[T_LAST_TOKEN];
 
 /** The current source position. */
-#define HERE &token.source_position
+#define HERE (&token.source_position)
 
 static type_t *type_valist;
 
@@ -5638,20 +5638,47 @@ static expression_t *parse_array_expression(unsigned precedence,
 	return expression;
 }
 
-static expression_t *parse_typeprop(expression_kind_t kind, unsigned precedence)
+static expression_t *parse_typeprop(expression_kind_t const kind,
+                                    source_position_t const pos,
+                                    unsigned const precedence)
 {
 	expression_t *tp_expression = allocate_expression_zero(kind);
-	tp_expression->base.type    = type_size_t;
+	tp_expression->base.type            = type_size_t;
+	tp_expression->base.source_position = pos;
 
-	if(token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
+	char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
+
+	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		add_anchor_token(')');
-		tp_expression->typeprop.type = parse_typename();
+		type_t* const type = parse_typename();
+		tp_expression->typeprop.type = type;
+
+		char const* const wrong_type =
+			is_type_incomplete(type)    ? "incomplete"          :
+			type->kind == TYPE_FUNCTION ? "function designator" :
+			type->kind == TYPE_BITFIELD ? "bitfield"            :
+			NULL;
+		if (wrong_type != NULL) {
+			errorf(&pos, "operand of %s expression must not be %s type '%T'", what, wrong_type, type);
+		}
+
 		rem_anchor_token(')');
 		expect(')');
 	} else {
 		expression_t *expression = parse_sub_expression(precedence);
-		expression->base.type    = revert_automatic_type_conversion(expression);
+
+		type_t* const type = revert_automatic_type_conversion(expression);
+		expression->base.type = type;
+
+		char const* const wrong_type =
+			is_type_incomplete(type)    ? "incomplete"          :
+			type->kind == TYPE_FUNCTION ? "function designator" :
+			type->kind == TYPE_BITFIELD ? "bitfield"            :
+			NULL;
+		if (wrong_type != NULL) {
+			errorf(&pos, "operand of %s expression must not be expression of %s type '%T'", what, wrong_type, type);
+		}
 
 		tp_expression->typeprop.type          = expression->base.type;
 		tp_expression->typeprop.tp_expression = expression;
@@ -5664,14 +5691,16 @@ end_error:
 
 static expression_t *parse_sizeof(unsigned precedence)
 {
+	source_position_t pos = *HERE;
 	eat(T_sizeof);
-	return parse_typeprop(EXPR_SIZEOF, precedence);
+	return parse_typeprop(EXPR_SIZEOF, pos, precedence);
 }
 
 static expression_t *parse_alignof(unsigned precedence)
 {
+	source_position_t pos = *HERE;
 	eat(T___alignof__);
-	return parse_typeprop(EXPR_ALIGNOF, precedence);
+	return parse_typeprop(EXPR_ALIGNOF, pos, precedence);
 }
 
 static expression_t *parse_select_expression(unsigned precedence,
