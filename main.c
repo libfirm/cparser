@@ -201,8 +201,8 @@ static FILE *preprocess(FILE *in, const char *fname, bool to_stdout)
 		puts(buf);
 	}
 	if(to_stdout) {
-		system(buf);
-		exit(0);
+		int res = system(buf);
+		exit(res);
 	} else {
 		FILE *f = popen(buf, "r");
 		if(f == NULL) {
