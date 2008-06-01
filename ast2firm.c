@@ -216,7 +216,7 @@ static unsigned get_type_size_const(type_t *type)
 
 	switch(type->kind) {
 	case TYPE_ERROR:
-		panic("error type occured");
+		panic("error type occurred");
 	case TYPE_ATOMIC:
 		return get_atomic_type_size(type->atomic.akind);
 	case TYPE_COMPLEX:
@@ -498,7 +498,7 @@ enum {
 };
 
 /**
- * Construct firm type from ast struct tyep.
+ * Construct firm type from ast struct type.
  *
  * As anonymous inner structs get flattened to a single firm type, we might get
  * irtype, outer_offset and out_align passed (they represent the position of
@@ -509,7 +509,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
                                      bool incomplete, bool is_union)
 {
 	declaration_t      *declaration = type->declaration;
-	declaration_kind_t  kind        = declaration->declaration_kind;
+	declaration_kind_t  kind        = (declaration_kind_t)declaration->declaration_kind;
 
 	if(kind == DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
 			|| (kind == DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE
@@ -955,7 +955,12 @@ typedef ident* (*create_ld_ident_func)(ir_entity *entity,
                                        declaration_t *declaration);
 create_ld_ident_func  create_ld_ident = create_ld_ident_linux_elf;
 
-static ir_entity* get_function_entity(declaration_t *declaration)
+/**
+ * Creates an entity representing a function.
+ *
+ * @param declaration  the function declaration
+ */
+static ir_entity *get_function_entity(declaration_t *declaration)
 {
 	if(declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
 		return declaration->v.entity;
@@ -1008,6 +1013,9 @@ static ir_entity* get_function_entity(declaration_t *declaration)
 	return entity;
 }
 
+/**
+ * Creates a Const node representing a constant.
+ */
 static ir_node *const_to_firm(const const_expression_t *cnst)
 {
 	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
@@ -1031,6 +1039,9 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
+/**
+ * Creates a Const node representing a character constant.
+ */
 static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 {
 	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
@@ -1051,6 +1062,9 @@ static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
+/**
+ * Creates a Const node representing a wide character constant.
+ */
 static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 {
 	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
@@ -1065,6 +1079,13 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 	return new_d_Const(dbgi, mode, tv);
 }
 
+/**
+ * Creates a SymConst for a given entity.
+ *
+ * @param dbgi    debug info
+ * @param mode    the (reference) mode for the SymConst
+ * @param entity  the entity
+ */
 static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
                               ir_entity *entity)
 {
@@ -1074,6 +1095,13 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
 	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
 }
 
+/**
+ * Creates a SymConst node representing a string constant.
+ *
+ * @param src_pos    the source position of the string constant
+ * @param id_prefix  a prefix for the name of the generated string constant
+ * @param value      the value of the string constant
+ */
 static ir_node *string_to_firm(const source_position_t *const src_pos,
                                const char *const id_prefix,
                                const string_t *const value)
@@ -1111,6 +1139,11 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	return create_symconst(dbgi, mode_P_data, entity);
 }
 
+/**
+ * Creates a SymConst node representing a string literal.
+ *
+ * @param literal   the string literal
+ */
 static ir_node *string_literal_to_firm(
 		const string_literal_expression_t* literal)
 {
@@ -1118,6 +1151,11 @@ static ir_node *string_literal_to_firm(
 	                      &literal->value);
 }
 
+/**
+ * Creates a SymConst node representing a wide string literal.
+ *
+ * @param literal   the wide string literal
+ */
 static ir_node *wide_string_literal_to_firm(
 	const wide_string_literal_expression_t* const literal)
 {
@@ -1178,6 +1216,9 @@ static ir_node *deref_address(type_t *const type, ir_node *const addr,
 	return load_res;
 }
 
+/**
+ * Creates a strict Conv if neccessary.
+ */
 static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 {
 	ir_mode *mode = get_irn_mode(node);
@@ -1188,7 +1229,7 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 		return node;
 
 	/* check if there is already a Conv */
-	if (get_irn_op(node) == op_Conv) {
+	if (is_Conv(node)) {
 		/* convert it into a strict Conv */
 		set_Conv_strict(node, 1);
 		return node;
@@ -1218,8 +1259,10 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 	}
 }
 
-/* Returns the correct base address depending on whether it is a parameter or a
- * normal local variable */
+/**
+ * Returns the correct base address depending on whether it is a parameter or a
+ * normal local variable.
+ */
 static ir_node *get_local_frame(ir_entity *const ent)
 {
 	ir_graph      *const irg   = current_ir_graph;
@@ -2542,6 +2585,9 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	return val;
 }
 
+/**
+ * Returns an IR-node representing the address of a field.
+ */
 static ir_node *select_addr(const select_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
@@ -2749,6 +2795,9 @@ static ir_node *dereference_addr(const unary_expression_t *const expression)
 	return expression_to_firm(expression->value);
 }
 
+/**
+ * Returns a IR-node representing an lvalue of the given expression.
+ */
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->kind) {
