@@ -392,6 +392,7 @@ int firm_option(const char *opt)
           break;
         }
       }
+      break;
     }
   }
 
