@@ -826,7 +826,7 @@ static const struct {
 } rts_data[] = {
 	{ rts_debugbreak, 0, "__debugbreak", 0, _MS },
 	{ rts_abort,      0, "abort",        0, _C89 },
-	{ rts_alloca,     1, "alloca",       1, _GNUC },
+	{ rts_alloca,     1, "alloca",       1, _ALL },
 	{ rts_abs,        1, "abs",          1, _C89 },
 	{ rts_labs,       1, "labs",         1, _C89 },
 	{ rts_llabs,      1, "llabs",        1, _C99 },
@@ -1345,6 +1345,9 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	panic("reference to declaration with unknown type found");
 }
 
+/**
+ * Transform calls to builtin functions.
+ */
 static ir_node *process_builtin_call(const call_expression_t *call)
 {
 	dbg_info *dbgi = get_dbg_info(&call->base.source_position);
@@ -1398,6 +1401,12 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 }
 
+/**
+ * Transform a call expression.
+ * Handles some special cases, like alloca() calls, which must be resolved BEFORE the inlines runs.
+ * Inlining routines calling alloca() is dangerous, 176.gcc for instance might allocate 2GB instead of
+ * 256 MB if alloca is not handled right...
+ */
 static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
 	assert(get_cur_block() != NULL);
@@ -1405,6 +1414,28 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	expression_t *function = call->function;
 	if(function->kind == EXPR_BUILTIN_SYMBOL) {
 		return process_builtin_call(call);
+	}
+	if(function->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &function->reference;
+		declaration_t *declaration = ref->declaration;
+
+		if((declaration_kind_t)declaration->declaration_kind == DECLARATION_KIND_FUNCTION) {
+			if (declaration->v.entity == rts_entities[rts_alloca]) {
+				/* handle alloca() call */
+				expression_t *argument = call->arguments->expression;
+		                ir_node      *size     = expression_to_firm(argument);
+
+                		ir_node *store  = get_store();
+				dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
+		                ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+                                              stack_alloc);
+               			ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+		                set_store(proj_m);
+		                ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+
+                		return res;
+			}
+		}
 	}
 	ir_node *callee = expression_to_firm(function);
 
@@ -4920,7 +4951,7 @@ void init_ast2firm(void)
 	/* OS option must be set to the backend */
 	const char *s = "ia32-gasmode=linux";
 	switch (firm_opt.os_support) {
-	case OS_SUPPORT_WIN32:
+	case OS_SUPPORT_MINGW:
 		create_ld_ident = create_ld_ident_win32;
 		s = "ia32-gasmode=mingw";
 		break;
