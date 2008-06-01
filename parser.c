@@ -5671,7 +5671,7 @@ static expression_t *parse_sizeof(unsigned precedence)
 static expression_t *parse_alignof(unsigned precedence)
 {
 	eat(T___alignof__);
-	return parse_typeprop(EXPR_SIZEOF, precedence);
+	return parse_typeprop(EXPR_ALIGNOF, precedence);
 }
 
 static expression_t *parse_select_expression(unsigned precedence,
