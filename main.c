@@ -184,7 +184,7 @@ static void lextest(FILE *in, const char *fname)
 	} while(lexer_token.type != T_EOF);
 }
 
-static FILE *preprocess(FILE *in, const char *fname)
+static FILE *preprocess(FILE *in, const char *fname, bool to_stdout)
 {
 	char buf[4096];
 	obstack_1grow(&cppflags_obst, '\0');
@@ -200,12 +200,17 @@ static FILE *preprocess(FILE *in, const char *fname)
 	if(verbose) {
 		puts(buf);
 	}
-	FILE *f = popen(buf, "r");
-	if(f == NULL) {
-		fprintf(stderr, "invoking preprocessor failed\n");
-		exit(1);
+	if(to_stdout) {
+		system(buf);
+		exit(0);
+	} else {
+		FILE *f = popen(buf, "r");
+		if(f == NULL) {
+			fprintf(stderr, "invoking preprocessor failed\n");
+			exit(1);
+		}
+		return f;
 	}
-	return f;
 }
 
 static void do_link(const char *out, const char *in)
@@ -338,6 +343,7 @@ void lower_compound_params(void)
 
 typedef enum compile_mode_t {
 	BenchmarkParser,
+	PreprocessOnly,
 	ParseOnly,
 	Compile,
 	CompileDump,
@@ -438,6 +444,8 @@ int main(int argc, char **argv)
 				firm_be_option("ia32-nooptcc=yes");
 			} else if(SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
+			} else if(SINGLE_OPTION('E')) {
+				mode = PreprocessOnly;
 			} else if(SINGLE_OPTION('S')) {
 				mode = Compile;
 			} else if(option[0] == 'O') {
@@ -680,6 +688,8 @@ int main(int argc, char **argv)
 			if(outname == NULL)
 				outname = "-";
 			break;
+		case PreprocessOnly:
+			break;
 		case ParseOnly:
 			break;
 		case Compile:
@@ -742,7 +752,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	FILE *preprocessed_in = preprocess(in, input);
+	FILE *preprocessed_in = preprocess(in, input, mode == PreprocessOnly);
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
 	int res = pclose(preprocessed_in);
 	if(res != 0) {
