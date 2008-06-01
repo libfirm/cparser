@@ -858,6 +858,8 @@ bool is_type_incomplete(const type_t *type)
 		return !declaration->init.complete;
 	}
 	case TYPE_BITFIELD:
+		return false;
+
 	case TYPE_FUNCTION:
 		return true;
 
