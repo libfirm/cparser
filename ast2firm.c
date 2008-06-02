@@ -1468,17 +1468,17 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 			if (declaration->v.entity == rts_entities[rts_alloca]) {
 				/* handle alloca() call */
 				expression_t *argument = call->arguments->expression;
-		                ir_node      *size     = expression_to_firm(argument);
+			   	ir_node      *size     = expression_to_firm(argument);
 
-                		ir_node *store  = get_store();
+	   			ir_node *store  = get_store();
 				dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
-		                ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+				ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
                                               stack_alloc);
-               			ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
-		                set_store(proj_m);
-		                ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+				ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+				set_store(proj_m);
+				ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
 
-                		return res;
+				return res;
 			}
 		}
 	}
@@ -2239,6 +2239,8 @@ need_addr:
 	ir_node *result = create_op(dbgi, expression, left, right);
 
 	result = create_conv(dbgi, result, left_mode);
+	result = do_strict_conv(dbgi, result);
+
 	if (left_addr == NULL) {
 		set_value(value_number, result);
 	} else {
@@ -2332,12 +2334,14 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 	ir_node  *base_addr = expression_to_firm(expression->array_ref);
 	ir_node  *offset    = expression_to_firm(expression->index);
 
-	/* Matze: it would be better to force mode to mode_uint as this creates more
-	 * opportunities for CSE. Unforunately we still have some optimisations that
-	 * are too conservative in the presence of convs. So we better go with the
-	 * mode of offset and avoid the conv */
-	ir_mode  *mode = get_irn_mode(offset);
-	offset         = create_conv(dbgi, offset, mode);
+	type_t  *offset_type = skip_typeref(expression->index->base.type);
+	ir_mode *mode;
+	if (is_type_signed(offset_type)) {
+		mode = get_ir_mode(type_ssize_t);
+	} else {
+		mode = get_ir_mode(type_size_t);
+	}
+	offset = create_conv(dbgi, offset, mode);
 
 	type_t *ref_type = skip_typeref(expression->array_ref->base.type);
 	assert(is_type_pointer(ref_type));
