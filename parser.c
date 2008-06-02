@@ -2325,14 +2325,14 @@ error_parse_next:
 	       len * sizeof(initializers[0]));
 
 	DEL_ARR_F(initializers);
-	ascend_to(path, top_path_level);
+	ascend_to(path, top_path_level+1);
 
 	return result;
 
 end_error:
 	skip_initializers();
 	DEL_ARR_F(initializers);
-	ascend_to(path, top_path_level);
+	ascend_to(path, top_path_level+1);
 	return NULL;
 }
 
