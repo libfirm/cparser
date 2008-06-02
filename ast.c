@@ -1546,6 +1546,26 @@ bool is_address_constant(const expression_t *expression)
 	}
 }
 
+static bool is_builtin_const_call(const expression_t *expression)
+{
+	expression_t *function = expression->call.function;
+	if (function->kind != EXPR_BUILTIN_SYMBOL) {
+		return false;
+	}
+
+	symbol_t *symbol = function->builtin_symbol.symbol;
+
+	switch (symbol->ID) {
+	case T___builtin_huge_val:
+	case T___builtin_nan:
+	case T___builtin_nanf:
+	case T___builtin_nand:
+		return true;
+	}
+
+	return false;
+}
+
 bool is_constant_expression(const expression_t *expression)
 {
 	switch(expression->kind) {
@@ -1565,7 +1585,6 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_BUILTIN_PREFETCH:
-	case EXPR_CALL:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
@@ -1590,6 +1609,9 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 	case EXPR_BINARY_COMMA:
 		return false;
+
+	case EXPR_CALL:
+		return is_builtin_const_call(expression);
 
 	case EXPR_UNARY_NEGATE:
 	case EXPR_UNARY_PLUS:
