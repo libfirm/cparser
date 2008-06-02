@@ -4267,13 +4267,22 @@ static void create_jump_statement(const statement_t *statement,
 	set_cur_block(NULL);
 }
 
+static ir_node *get_break_label(void)
+{
+	if (break_label == NULL) {
+		ir_node *cur_block = get_cur_block();
+		break_label = new_immBlock();
+		set_cur_block(cur_block);
+	}
+	return break_label;
+}
+
 static void switch_statement_to_firm(const switch_statement_t *statement)
 {
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
 	ir_node *expression  = expression_to_firm(statement->expression);
 	ir_node *cond        = new_d_Cond(dbgi, expression);
-	ir_node *break_block = new_immBlock();
 
 	set_cur_block(NULL);
 
@@ -4282,32 +4291,33 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	const bool     old_saw_default_label = saw_default_label;
 	saw_default_label                    = false;
 	current_switch_cond                  = cond;
-	break_label                          = break_block;
+	break_label                          = NULL;
 
 	if (statement->body != NULL) {
 		statement_to_firm(statement->body);
 	}
 
-	if(get_cur_block() != NULL) {
+	if (get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
-		add_immBlock_pred(break_block, jmp);
+		add_immBlock_pred(get_break_label(), jmp);
 	}
 
 	if (!saw_default_label) {
 		set_cur_block(get_nodes_block(cond));
 		ir_node *const proj = new_d_defaultProj(dbgi, cond,
 		                                        MAGIC_DEFAULT_PN_NUMBER);
-		add_immBlock_pred(break_block, proj);
+		add_immBlock_pred(get_break_label(), proj);
 	}
 
+	if (break_label != NULL) {
+		mature_immBlock(break_label);
+	}
+	set_cur_block(break_label);
+
 	assert(current_switch_cond == cond);
-	assert(break_label         == break_block);
 	current_switch_cond = old_switch_cond;
 	break_label         = old_break_label;
 	saw_default_label   = old_saw_default_label;
-
-	mature_immBlock(break_block);
-	set_cur_block(break_block);
 }
 
 static void case_label_to_firm(const case_label_statement_t *statement)
@@ -4552,7 +4562,7 @@ static void statement_to_firm(statement_t *statement)
 		declaration_statement_to_firm(&statement->declaration);
 		return;
 	case STATEMENT_BREAK:
-		create_jump_statement(statement, break_label);
+		create_jump_statement(statement, get_break_label());
 		return;
 	case STATEMENT_CONTINUE:
 		create_jump_statement(statement, continue_label);
