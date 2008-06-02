@@ -5651,9 +5651,10 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		add_anchor_token(')');
-		type_t* const type = parse_typename();
-		tp_expression->typeprop.type = type;
+		type_t* const orig_type = parse_typename();
+		tp_expression->typeprop.type = orig_type;
 
+		type_t const* const type = skip_typeref(orig_type);
 		char const* const wrong_type =
 			is_type_incomplete(type)    ? "incomplete"          :
 			type->kind == TYPE_FUNCTION ? "function designator" :
@@ -5668,9 +5669,10 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 	} else {
 		expression_t *expression = parse_sub_expression(precedence);
 
-		type_t* const type = revert_automatic_type_conversion(expression);
-		expression->base.type = type;
+		type_t* const orig_type = revert_automatic_type_conversion(expression);
+		expression->base.type = orig_type;
 
+		type_t const* const type = skip_typeref(orig_type);
 		char const* const wrong_type =
 			is_type_incomplete(type)    ? "incomplete"          :
 			type->kind == TYPE_FUNCTION ? "function designator" :
@@ -6426,12 +6428,76 @@ static void semantic_comparison(binary_expression_t *expression)
 	expression->base.type = type_int;
 }
 
+/**
+ * Checks if a compound type has constant fields.
+ */
+static bool has_const_fields(const compound_type_t *type)
+{
+	const scope_t       *scope       = &type->declaration->scope;
+	const declaration_t *declaration = scope->declarations;
+
+	for (; declaration != NULL; declaration = declaration->next) {
+		if (declaration->namespc != NAMESPACE_NORMAL)
+			continue;
+
+		const type_t *decl_type = skip_typeref(declaration->type);
+		if (decl_type->base.qualifiers & TYPE_QUALIFIER_CONST)
+			return true;
+	}
+	/* TODO */
+	return false;
+}
+
+static bool is_valid_assignment_lhs(expression_t const* const left)
+{
+	type_t *const orig_type_left = revert_automatic_type_conversion(left);
+	type_t *const type_left      = skip_typeref(orig_type_left);
+
+	switch (left->kind)  {
+		case EXPR_REFERENCE:
+		case EXPR_ARRAY_ACCESS:
+		case EXPR_SELECT:
+		case EXPR_UNARY_DEREFERENCE:
+		case EXPR_UNARY_BITFIELD_EXTRACT:
+			break;
+
+		default:
+			errorf(HERE, "left hand side '%E' of assignment is not an lvalue", left);
+			return false;
+	}
+
+	if (is_type_array(type_left)) {
+		errorf(HERE, "cannot assign to arrays ('%E')", left);
+		return false;
+	}
+	if (type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
+		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left,
+		       orig_type_left);
+		return false;
+	}
+	if (is_type_incomplete(type_left)) {
+		errorf(HERE, "left-hand side '%E' of assignment has incomplete type '%T'",
+		       left, orig_type_left);
+		return false;
+	}
+	if (is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
+		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields",
+		       left, orig_type_left);
+		return false;
+	}
+
+	return true;
+}
+
 static void semantic_arithmetic_assign(binary_expression_t *expression)
 {
 	expression_t *left            = expression->left;
 	expression_t *right           = expression->right;
 	type_t       *orig_type_left  = left->base.type;
 	type_t       *orig_type_right = right->base.type;
+
+	if (!is_valid_assignment_lhs(left))
+		return;
 
 	type_t *type_left  = skip_typeref(orig_type_left);
 	type_t *type_right = skip_typeref(orig_type_right);
@@ -6461,6 +6527,9 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 	type_t       *const orig_type_right = right->base.type;
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
+
+	if (!is_valid_assignment_lhs(left))
+		return;
 
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		/* combined instructions are tricky. We can't create an implicit cast on
@@ -6501,26 +6570,6 @@ static void semantic_logical_op(binary_expression_t *expression)
 }
 
 /**
- * Checks if a compound type has constant fields.
- */
-static bool has_const_fields(const compound_type_t *type)
-{
-	const scope_t       *scope       = &type->declaration->scope;
-	const declaration_t *declaration = scope->declarations;
-
-	for (; declaration != NULL; declaration = declaration->next) {
-		if (declaration->namespc != NAMESPACE_NORMAL)
-			continue;
-
-		const type_t *decl_type = skip_typeref(declaration->type);
-		if (decl_type->base.qualifiers & TYPE_QUALIFIER_CONST)
-			return true;
-	}
-	/* TODO */
-	return false;
-}
-
-/**
  * Check the semantic restrictions of a binary assign expression.
  */
 static void semantic_binexpr_assign(binary_expression_t *expression)
@@ -6531,27 +6580,8 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	type_t *type_left = revert_automatic_type_conversion(left);
 	type_left         = skip_typeref(orig_type_left);
 
-	/* must be a modifiable lvalue */
-	if (is_type_array(type_left)) {
-		errorf(HERE, "cannot assign to arrays ('%E')", left);
+	if (!is_valid_assignment_lhs(left))
 		return;
-	}
-	if(type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
-		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left,
-		       orig_type_left);
-		return;
-	}
-	if(is_type_incomplete(type_left)) {
-		errorf(HERE,
-		       "left-hand side of assignment '%E' has incomplete type '%T'",
-		       left, orig_type_left);
-		return;
-	}
-	if(is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
-		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields",
-		       left, orig_type_left);
-		return;
-	}
 
 	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
 			"assignment", &left->base.source_position);
