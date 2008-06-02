@@ -76,8 +76,7 @@ typedef enum {
 	EXPR_UNARY_CAST,
 	EXPR_UNARY_CAST_IMPLICIT, /**< compiler generated cast */
 	EXPR_UNARY_ASSUME,        /**< MS __assume() */
-	EXPR_UNARY_BITFIELD_EXTRACT,
-	EXPR_UNARY_LAST = EXPR_UNARY_BITFIELD_EXTRACT,
+	EXPR_UNARY_LAST = EXPR_UNARY_ASSUME,
 
 	EXPR_BINARY_FIRST,
 	EXPR_BINARY_ADD = EXPR_BINARY_FIRST,
@@ -181,8 +180,7 @@ typedef enum {
 	case EXPR_UNARY_PREFIX_DECREMENT:      \
 	case EXPR_UNARY_CAST:                  \
 	case EXPR_UNARY_CAST_IMPLICIT:         \
-	case EXPR_UNARY_ASSUME:                \
-	case EXPR_UNARY_BITFIELD_EXTRACT:
+	case EXPR_UNARY_ASSUME:
 
 /**
  * A scope containing declarations.
@@ -196,6 +194,9 @@ struct expression_base_t {
 	expression_kind_t   kind;
 	type_t             *type;
 	source_position_t   source_position;
+#ifndef NDEBUG
+	bool                transformed;
+#endif
 };
 
 struct const_expression_t {
@@ -594,6 +595,9 @@ struct statement_base_t {
 	statement_kind_t   kind;
 	statement_t       *next;
 	source_position_t  source_position;
+#ifndef NDEBUG
+	bool               transformed;
+#endif
 };
 
 struct invalid_statement_t {

@@ -868,7 +868,8 @@ bool is_type_incomplete(const type_t *type)
 		return true;
 
 	case TYPE_ARRAY:
-		return type->array.size_expression == NULL;
+		return type->array.size_expression == NULL
+			&& !type->array.size_constant;
 
 	case TYPE_ATOMIC:
 		return type->atomic.akind == ATOMIC_TYPE_VOID;

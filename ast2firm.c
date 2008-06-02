@@ -124,6 +124,7 @@ static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
 
+static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
 static inline ir_mode *get_ir_mode(type_t *type);
 static void create_local_declaration(declaration_t *declaration);
@@ -1192,8 +1193,8 @@ static ir_node *wide_string_literal_to_firm(
 	return create_symconst(dbgi, mode_P_data, entity);
 }
 
-static ir_node *deref_address(type_t *const type, ir_node *const addr,
-                              dbg_info *const dbgi)
+static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
+		                      ir_node *const addr)
 {
 	ir_type *irtype = get_ir_type(type);
 	if (is_compound_type(irtype)
@@ -1321,14 +1322,14 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
-		return deref_address(declaration->type, addr, dbgi);
+		return deref_address(dbgi, declaration->type, addr);
 	}
 
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *entity = declaration->v.entity;
 		ir_node   *frame  = get_local_frame(entity);
 		ir_node   *sel    = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-		return deref_address(declaration->type, sel, dbgi);
+		return deref_address(dbgi, declaration->type, sel);
 	}
 
 	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
@@ -1615,22 +1616,18 @@ static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 	return mask1;
 }
 
-static void bitfield_store_to_firm(const unary_expression_t *expression,
-                                   ir_node *value)
+static void bitfield_store_to_firm(const select_expression_t *expression,
+                                   ir_node *addr, ir_node *value)
 {
-	expression_t *select = expression->value;
-	assert(select->kind == EXPR_SELECT);
-	type_t       *type   = select->base.type;
-	assert(type->kind == TYPE_BITFIELD);
-	ir_mode      *mode   = get_ir_mode(type->bitfield.base_type);
-	ir_node      *addr   = expression_to_addr(select);
+	type_t       *type   = expression->base.type;
+	ir_mode      *mode   = get_ir_mode(type);
 
 	assert(get_irn_mode(value) == mode || is_Bad(value));
 
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 
 	/* kill upper bits of value and shift to right position */
-	ir_entity *entity       = select->select.compound_entry->v.entity;
+	ir_entity *entity       = expression->compound_entry->v.entity;
 	int        bitoffset    = get_entity_offset_bits_remainder(entity);
 	ir_type   *entity_type  = get_entity_type(entity);
 	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
@@ -1670,35 +1667,110 @@ static void set_value_for_expression(const expression_t *expression,
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 	value          = do_strict_conv(dbgi, value);
 
-	if(expression->kind == EXPR_REFERENCE) {
+	if (expression->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref = &expression->reference;
 
 		declaration_t *declaration = ref->declaration;
 		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
-		if(declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
 			return;
 		}
 	}
 
-	if(expression->kind == EXPR_UNARY_BITFIELD_EXTRACT) {
-		bitfield_store_to_firm(&expression->unary, value);
-		return;
-	}
-
 	ir_node *addr = expression_to_addr(expression);
 	type_t  *type = skip_typeref(expression->base.type);
+
+	if (expression->kind == EXPR_SELECT) {
+		const select_expression_t *select = &expression->select;
+
+		declaration_t *declaration = select->compound_entry;
+		if (declaration->type->kind == TYPE_BITFIELD) {
+			bitfield_store_to_firm(select, addr, value);
+			return;
+		}
+	}
+
 	assign_value(dbgi, addr, type, value);
 }
 
+static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
+		ir_node *addr)
+{
+	dbg_info *dbgi     = get_dbg_info(&expression->base.source_position);
+	type_t   *type     = expression->base.type;
+	ir_mode  *mode     = get_ir_mode(type);
+	ir_node  *mem      = get_store();
+	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode);
+	ir_node  *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
+	ir_node  *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
+
+	load_res           = create_conv(dbgi, load_res, mode_int);
+
+	set_store(load_mem);
+
+	/* kill upper bits */
+	ir_entity *entity       = expression->compound_entry->v.entity;
+	int        bitoffset    = get_entity_offset_bits_remainder(entity);
+	ir_type   *entity_type  = get_entity_type(entity);
+	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
+	long       shift_bitsl  = machine_size - bitoffset - bitsize;
+	assert(shift_bitsl >= 0);
+	tarval    *tvl          = new_tarval_from_long(shift_bitsl, mode_uint);
+	ir_node   *countl       = new_d_Const(dbgi, mode_uint, tvl);
+	ir_node   *shiftl       = new_d_Shl(dbgi, load_res, countl, mode_int);
+
+	long       shift_bitsr  = bitoffset + shift_bitsl;
+	assert(shift_bitsr <= (long) machine_size);
+	tarval    *tvr          = new_tarval_from_long(shift_bitsr, mode_uint);
+	ir_node   *countr       = new_d_Const(dbgi, mode_uint, tvr);
+	ir_node   *shiftr;
+	if(mode_is_signed(mode)) {
+		shiftr = new_d_Shrs(dbgi, shiftl, countr, mode_int);
+	} else {
+		shiftr = new_d_Shr(dbgi, shiftl, countr, mode_int);
+	}
+
+	return create_conv(dbgi, shiftr, mode);
+}
+
+
+
 static ir_node *create_incdec(const unary_expression_t *expression)
 {
-	dbg_info     *dbgi  = get_dbg_info(&expression->base.source_position);
-	type_t       *type  = skip_typeref(expression->base.type);
-	ir_mode      *mode  = get_ir_mode(type);
-	expression_t *value = expression->value;
+	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
+	const expression_t *value_expr  = expression->value;
+	type_t             *value_type  = skip_typeref(value_expr->base.type);
+	ir_mode            *value_mode  = get_ir_mode(value_type);
+	ir_node            *value_addr;
+	ir_node            *value;
+	int                 value_number;
 
-	ir_node *value_node = expression_to_firm(value);
+	if (value_expr->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &value_expr->reference;
+
+		declaration_t *declaration = ref->declaration;
+		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
+		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+			value_number = declaration->v.value_number;
+			value        = get_value(value_number, value_mode);
+			value_addr   = NULL;
+		} else {
+			goto need_addr;
+		}
+	} else {
+need_addr:
+		value_addr = expression_to_addr(value_expr);
+		if (value_expr->kind == EXPR_SELECT &&
+				value_expr->select.compound_entry->type->kind == TYPE_BITFIELD){
+			value = bitfield_extract_to_firm(&value_expr->select, value_addr);
+		} else {
+			value = deref_address(dbgi, value_type, value_addr);
+		}
+	}
+
+	type_t  *type = skip_typeref(expression->base.type);
+	ir_mode *mode = get_ir_mode(expression->base.type);
 
 	ir_node *offset;
 	if(is_type_pointer(type)) {
@@ -1709,31 +1781,41 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		offset = new_Const(mode, get_mode_one(mode));
 	}
 
+	ir_node *result;
+	ir_node *store_value;
 	switch(expression->base.kind) {
-	case EXPR_UNARY_POSTFIX_INCREMENT: {
-		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
-		set_value_for_expression(value, new_value);
-		return value_node;
-	}
-	case EXPR_UNARY_POSTFIX_DECREMENT: {
-		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
-		set_value_for_expression(value, new_value);
-		return value_node;
-	}
-	case EXPR_UNARY_PREFIX_INCREMENT: {
-		ir_node *new_value = new_d_Add(dbgi, value_node, offset, mode);
-		set_value_for_expression(value, new_value);
-		return new_value;
-	}
-	case EXPR_UNARY_PREFIX_DECREMENT: {
-		ir_node *new_value = new_d_Sub(dbgi, value_node, offset, mode);
-		set_value_for_expression(value, new_value);
-		return new_value;
-	}
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+		result      = value;
+		store_value = new_d_Add(dbgi, value, offset, mode);
+		break;
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+		result      = value;
+		store_value = new_d_Sub(dbgi, value, offset, mode);
+		break;
+	case EXPR_UNARY_PREFIX_INCREMENT:
+		result      = new_d_Add(dbgi, value, offset, mode);
+		store_value = result;
+		break;
+	case EXPR_UNARY_PREFIX_DECREMENT:
+		result      = new_d_Sub(dbgi, value, offset, mode);
+		store_value = result;
+		break;
 	default:
 		panic("no incdec expr in create_incdec");
-		return NULL;
 	}
+
+	if (value_addr == NULL) {
+		set_value(value_number, store_value);
+	} else {
+		if (value_expr->kind == EXPR_SELECT &&
+				value_expr->select.compound_entry->type->kind == TYPE_BITFIELD){
+			bitfield_store_to_firm(&value_expr->select, value_addr, store_value);
+		} else {
+			assign_value(dbgi, value_addr, value_type, store_value);
+		}
+	}
+
+	return result;
 }
 
 static bool is_local_variable(expression_t *expression)
@@ -1851,50 +1933,6 @@ static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression) {
 	}
 }
 
-static ir_node *bitfield_extract_to_firm(const unary_expression_t *expression)
-{
-	expression_t *select = expression->value;
-	assert(select->kind == EXPR_SELECT);
-
-	type_t   *type     = select->base.type;
-	assert(type->kind == TYPE_BITFIELD);
-	ir_mode  *mode     = get_ir_mode(type->bitfield.base_type);
-	dbg_info *dbgi     = get_dbg_info(&expression->base.source_position);
-	ir_node  *addr     = expression_to_addr(select);
-	ir_node  *mem      = get_store();
-	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode);
-	ir_node  *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
-	ir_node  *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
-
-	load_res           = create_conv(dbgi, load_res, mode_int);
-
-	set_store(load_mem);
-
-	/* kill upper bits */
-	ir_entity *entity       = select->select.compound_entry->v.entity;
-	int        bitoffset    = get_entity_offset_bits_remainder(entity);
-	ir_type   *entity_type  = get_entity_type(entity);
-	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
-	long       shift_bitsl  = machine_size - bitoffset - bitsize;
-	assert(shift_bitsl >= 0);
-	tarval    *tvl          = new_tarval_from_long(shift_bitsl, mode_uint);
-	ir_node   *countl       = new_d_Const(dbgi, mode_uint, tvl);
-	ir_node   *shiftl       = new_d_Shl(dbgi, load_res, countl, mode_int);
-
-	long       shift_bitsr  = bitoffset + shift_bitsl;
-	assert(shift_bitsr <= (long) machine_size);
-	tarval    *tvr          = new_tarval_from_long(shift_bitsr, mode_uint);
-	ir_node   *countr       = new_d_Const(dbgi, mode_uint, tvr);
-	ir_node   *shiftr;
-	if(mode_is_signed(mode)) {
-		shiftr = new_d_Shrs(dbgi, shiftl, countr, mode_int);
-	} else {
-		shiftr = new_d_Shr(dbgi, shiftl, countr, mode_int);
-	}
-
-	return create_conv(dbgi, shiftr, mode);
-}
-
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
@@ -1919,23 +1957,17 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return new_d_Not(dbgi, value_node, mode);
 	}
 	case EXPR_UNARY_NOT: {
-		ir_node *value_node = expression_to_firm(value);
-		ir_mode *mode = get_ir_mode(type);
-		if(get_irn_mode(value_node) != mode_b) {
-			value_node = create_conv(dbgi, value_node, mode_b);
-		}
-		value_node = new_d_Not(dbgi, value_node, mode_b);
-		if(mode != mode_b) {
-			value_node = create_conv(dbgi, value_node, mode);
-		}
-		return value_node;
+		ir_node *value_node = _expression_to_firm(value);
+		value_node          = create_conv(dbgi, value_node, mode_b);
+		ir_node *res        = new_d_Not(dbgi, value_node, mode_b);
+		return res;
 	}
 	case EXPR_UNARY_DEREFERENCE: {
 		ir_node *value_node = expression_to_firm(value);
 		type_t  *value_type = skip_typeref(value->base.type);
 		assert(is_type_pointer(value_type));
 		type_t  *points_to  = value_type->pointer.points_to;
-		return deref_address(points_to, value_node, dbgi);
+		return deref_address(dbgi, points_to, value_node);
 	}
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 	case EXPR_UNARY_POSTFIX_DECREMENT:
@@ -1969,8 +2001,6 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 			return handle_assume(dbgi, value);
 		else
 			return NULL;
-	case EXPR_UNARY_BITFIELD_EXTRACT:
-		return bitfield_extract_to_firm(expression);
 
 	default:
 		break;
@@ -1978,6 +2008,9 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	panic("invalid UNEXPR type found");
 }
 
+/**
+ * produces a 0/1 depending of the value of a mode_b node
+ */
 static ir_node *produce_condition_result(const expression_t *expression,
                                          dbg_info *dbgi)
 {
@@ -2008,6 +2041,140 @@ static ir_node *produce_condition_result(const expression_t *expression,
 	return val;
 }
 
+static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
+		ir_node *value, type_t *type)
+{
+	pointer_type_t *const pointer_type = &type->pointer;
+	type_t         *const points_to    = pointer_type->points_to;
+	const unsigned        elem_size    = get_type_size_const(points_to);
+
+	assert(elem_size >= 1);
+	if (elem_size == 1)
+		return value;
+
+	value = create_conv(dbgi, value, mode_int);
+	ir_node *const cnst = new_Const_long(mode_int, (long)elem_size);
+	ir_node *const mul  = new_d_Mul(dbgi, value, cnst, mode_int);
+	return mul;
+}
+
+static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
+                          ir_node *left, ir_node *right)
+{
+	ir_mode  *mode;
+	type_t   *type_left  = skip_typeref(expression->left->base.type);
+	type_t   *type_right = skip_typeref(expression->right->base.type);
+
+	expression_kind_t kind = expression->base.kind;
+
+	switch (kind) {
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+		mode  = get_irn_mode(left);
+		right = create_conv(dbgi, right, mode_uint);
+		break;
+
+	case EXPR_BINARY_SUB:
+		if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
+			const pointer_type_t *const ptr_type = &type_left->pointer;
+
+			mode = get_ir_mode(expression->base.type);
+			ir_node *const elem_size = get_type_size(ptr_type->points_to);
+			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
+			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
+			ir_node *const no_mem    = new_NoMem();
+			ir_node *const div       = new_d_DivRL(dbgi, no_mem, sub, conv_size,
+												   mode, op_pin_state_floats);
+			return new_d_Proj(dbgi, div, mode, pn_Div_res);
+		}
+		/* fallthrough */
+	case EXPR_BINARY_SUB_ASSIGN:
+		if (is_type_pointer(type_left)) {
+			right = adjust_for_pointer_arithmetic(dbgi, right, type_left);
+			mode  = get_ir_mode(type_left);
+			break;
+		}
+		goto normal_node;
+
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_ADD_ASSIGN:
+		if (is_type_pointer(type_left)) {
+			right = adjust_for_pointer_arithmetic(dbgi, right, type_left);
+			mode  = get_ir_mode(type_left);
+			break;
+		} else if (is_type_pointer(type_right)) {
+			left  = adjust_for_pointer_arithmetic(dbgi, left, type_right);
+			mode  = get_ir_mode(type_right);
+			break;
+		}
+		goto normal_node;
+
+	default:
+normal_node:
+		mode = get_irn_mode(right);
+		left = create_conv(dbgi, left, mode);
+		break;
+	}
+
+	switch (kind) {
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_ADD:
+		return new_d_Add(dbgi, left, right, mode);
+	case EXPR_BINARY_SUB_ASSIGN:
+	case EXPR_BINARY_SUB:
+		return new_d_Sub(dbgi, left, right, mode);
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_MUL:
+		return new_d_Mul(dbgi, left, right, mode);
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
+		return new_d_And(dbgi, left, right, mode);
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:
+		return new_d_Or(dbgi, left, right, mode);
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+		return new_d_Eor(dbgi, left, right, mode);
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+		return new_d_Shl(dbgi, left, right, mode);
+	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+		if (mode_is_signed(mode)) {
+			return new_d_Shrs(dbgi, left, right, mode);
+		} else {
+			return new_d_Shr(dbgi, left, right, mode);
+		}
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_DIV_ASSIGN: {
+		ir_node *pin = new_Pin(new_NoMem());
+		ir_node *op;
+		ir_node *res;
+		if(mode_is_float(mode)) {
+			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
+		} else {
+			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
+			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
+		}
+		return res;
+	}
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_MOD_ASSIGN: {
+		ir_node *pin = new_Pin(new_NoMem());
+		assert(!mode_is_float(mode));
+		ir_node *op  = new_d_Mod(dbgi, pin, left, right, mode,
+		                         op_pin_state_floats);
+		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
+		return res;
+	}
+	default:
+		panic("unexpected expression kind");
+	}
+}
+
 static ir_node *create_lazy_op(const binary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
@@ -2033,227 +2200,56 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
                                             ir_node *right, ir_mode *mode);
 
-static ir_node *create_arithmetic_binop(const binary_expression_t *expression,
-                                        create_arithmetic_func func)
+static ir_node *create_assign_binop(const binary_expression_t *expression)
 {
-	dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
-	ir_node  *left  = expression_to_firm(expression->left);
-	ir_node  *right = expression_to_firm(expression->right);
-	type_t   *type  = expression->right->base.type;
-	/* be careful with the modes, because in arithmetic assign nodes only
-	 * the right operand has the mode of the arithmetic already */
-	ir_mode  *mode  = get_ir_mode(type);
-	left            = create_conv(dbgi, left, mode);
-	ir_node  *res   = func(dbgi, left, right, mode);
+	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
+	const expression_t *left_expr  = expression->left;
+	ir_mode            *left_mode  = get_ir_mode(left_expr->base.type);
+	type_t             *left_type  = skip_typeref(left_expr->base.type);
+	ir_node            *left_addr;
+	int                 value_number;
+	ir_node            *left;
 
-	return res;
-}
+	if (left_expr->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &left_expr->reference;
 
-static ir_node *pointer_arithmetic(ir_node  *const pointer,
-                                   ir_node  *      integer,
-                                   type_t   *const type,
-                                   dbg_info *const dbgi,
-                                   const create_arithmetic_func func)
-{
-	pointer_type_t *const pointer_type = &type->pointer;
-	type_t         *const points_to    = pointer_type->points_to;
-	const unsigned        elem_size    = get_type_size_const(points_to);
-
-	assert(elem_size >= 1);
-	if (elem_size > 1) {
-		integer             = create_conv(dbgi, integer, mode_int);
-		ir_node *const cnst = new_Const_long(mode_int, (long)elem_size);
-		ir_node *const mul  = new_d_Mul(dbgi, integer, cnst, mode_int);
-		integer = mul;
-	}
-
-	ir_mode *const mode = get_ir_mode(type);
-	return func(dbgi, pointer, integer, mode);
-}
-
-static ir_node *create_arithmetic_assign_binop(
-		const binary_expression_t *expression, create_arithmetic_func func)
-{
-	dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
-	type_t   *const type = skip_typeref(expression->base.type);
-	ir_node  *value;
-
-	if (is_type_pointer(type)) {
-		ir_node *const pointer = expression_to_firm(expression->left);
-		ir_node *      integer = expression_to_firm(expression->right);
-		value = pointer_arithmetic(pointer, integer, type, dbgi, func);
-	} else {
-		value = create_arithmetic_binop(expression, func);
-	}
-
-	ir_mode *const mode = get_ir_mode(type);
-	value = create_conv(dbgi, value, mode);
-	set_value_for_expression(expression->left, value);
-
-	return value;
-}
-
-static ir_node *create_add(const binary_expression_t *expression)
-{
-	dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
-	ir_node  *left  = expression_to_firm(expression->left);
-	ir_node  *right = expression_to_firm(expression->right);
-	type_t   *type  = expression->base.type;
-
-	expression_t *expr_left  = expression->left;
-	expression_t *expr_right = expression->right;
-	type_t       *type_left  = skip_typeref(expr_left->base.type);
-	type_t       *type_right = skip_typeref(expr_right->base.type);
-
-	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		ir_mode *const mode = get_ir_mode(type);
-		return new_d_Add(dbgi, left, right, mode);
-	}
-
-	if (is_type_pointer(type_left)) {
-		return pointer_arithmetic(left, right, type, dbgi, new_d_Add);
-	} else {
-		assert(is_type_pointer(type_right));
-		return pointer_arithmetic(right, left, type, dbgi, new_d_Add);
-	}
-}
-
-static ir_node *create_sub(const binary_expression_t *expression)
-{
-	dbg_info *const dbgi  = get_dbg_info(&expression->base.source_position);
-	expression_t *const expr_left  = expression->left;
-	expression_t *const expr_right = expression->right;
-	ir_node      *const left       = expression_to_firm(expr_left);
-	ir_node      *const right      = expression_to_firm(expr_right);
-	type_t       *const type       = expression->base.type;
-	type_t       *const type_left  = skip_typeref(expr_left->base.type);
-	type_t       *const type_right = skip_typeref(expr_right->base.type);
-
-	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		ir_mode *const mode = get_ir_mode(type);
-		return new_d_Sub(dbgi, left, right, mode);
-	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		const pointer_type_t *const ptr_type = &type_left->pointer;
-
-		ir_node *const elem_size = get_type_size(ptr_type->points_to);
-		ir_mode *const mode      = get_ir_mode(type);
-		ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
-		ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
-		ir_node *const no_mem    = new_NoMem();
-		ir_node *const div       = new_d_DivRL(dbgi, no_mem, sub, conv_size, mode,
-		                                       op_pin_state_floats);
-		return new_d_Proj(dbgi, div, mode, pn_Div_res);
-	}
-
-	assert(is_type_pointer(type_left));
-	return pointer_arithmetic(left, right, type_left, dbgi, new_d_Sub);
-}
-
-static ir_node *create_shift(const binary_expression_t *expression)
-{
-	dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
-	ir_node  *left  = expression_to_firm(expression->left);
-	ir_node  *right = expression_to_firm(expression->right);
-	type_t   *type  = expression->base.type;
-	ir_mode  *mode  = get_ir_mode(type);
-
-	/* firm always wants the shift count to be unsigned */
-	right = create_conv(dbgi, right, mode_uint);
-
-	ir_node *res;
-
-	switch(expression->base.kind) {
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
-	case EXPR_BINARY_SHIFTLEFT:
-		res = new_d_Shl(dbgi, left, right, mode);
-		break;
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-	case EXPR_BINARY_SHIFTRIGHT: {
-	 	 expression_t *expr_left = expression->left;
-		 type_t       *type_left = skip_typeref(expr_left->base.type);
-
-		 if(is_type_signed(type_left)) {
-			res = new_d_Shrs(dbgi, left, right, mode);
-		 } else {
-		 	 res = new_d_Shr(dbgi, left, right, mode);
-		 }
-		 break;
-	}
-	default:
-		panic("create shift op called for non-shift op");
-	}
-
-	return res;
-}
-
-
-static ir_node *create_divmod(const binary_expression_t *expression)
-{
-	dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
-	ir_node  *left  = expression_to_firm(expression->left);
-	ir_node  *right = expression_to_firm(expression->right);
-	ir_node  *pin   = new_Pin(new_NoMem());
-	/* be careful with the modes, because in arithmetic assign nodes only
-	 * the right operand has the mode of the arithmetic already */
-	type_t   *type  = expression->right->base.type;
-	ir_mode  *mode  = get_ir_mode(type);
-	left            = create_conv(dbgi, left, mode);
-	ir_node  *op;
-	ir_node  *res;
-
-	switch (expression->base.kind) {
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_DIV_ASSIGN:
-		if(mode_is_float(mode)) {
-			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
+		declaration_t *declaration = ref->declaration;
+		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
+		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+			value_number       = declaration->v.value_number;
+			left               = get_value(value_number, left_mode);
+			left_addr          = NULL;
 		} else {
-			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
+			goto need_addr;
 		}
-		break;
-
-	case EXPR_BINARY_MOD:
-	case EXPR_BINARY_MOD_ASSIGN:
-		assert(!mode_is_float(mode));
-		op  = new_d_Mod(dbgi, pin, left, right, mode, op_pin_state_floats);
-		res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
-		break;
-
-	default: panic("unexpected binary expression type in create_divmod()");
+	} else {
+need_addr:
+		left_addr = expression_to_addr(left_expr);
+		if (left_expr->kind == EXPR_SELECT &&
+				left_expr->select.compound_entry->type->kind == TYPE_BITFIELD) {
+			left = bitfield_extract_to_firm(&left_expr->select, left_addr);
+		} else {
+			left = deref_address(dbgi, left_type, left_addr);
+		}
 	}
 
-	return res;
-}
+	ir_node *right = expression_to_firm(expression->right);
 
-static ir_node *create_arithmetic_assign_divmod(
-		const binary_expression_t *expression)
-{
-	ir_node  *      value = create_divmod(expression);
-	dbg_info *const dbgi  = get_dbg_info(&expression->base.source_position);
-	type_t   *const type  = expression->base.type;
-	ir_mode  *const mode  = get_ir_mode(type);
+	ir_node *result = create_op(dbgi, expression, left, right);
 
-	assert(type->kind != TYPE_POINTER);
+	result = create_conv(dbgi, result, left_mode);
+	if (left_addr == NULL) {
+		set_value(value_number, result);
+	} else {
+		if (left_expr->kind == EXPR_SELECT &&
+				left_expr->select.compound_entry->type->kind == TYPE_BITFIELD) {
+			bitfield_store_to_firm(&left_expr->select, left_addr, result);
+		} else {
+			assign_value(dbgi, left_addr, left_type, result);
+		}
+	}
 
-	value = create_conv(dbgi, value, mode);
-	set_value_for_expression(expression->left, value);
-
-	return value;
-}
-
-static ir_node *create_arithmetic_assign_shift(
-		const binary_expression_t *expression)
-{
-	ir_node  *      value = create_shift(expression);
-	dbg_info *const dbgi  = get_dbg_info(&expression->base.source_position);
-	type_t   *const type  = expression->base.type;
-	ir_mode  *const mode  = get_ir_mode(type);
-
-	value = create_conv(dbgi, value, mode);
-	set_value_for_expression(expression->left, value);
-
-	return value;
+	return result;
 }
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
@@ -2288,49 +2284,42 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return right;
 	}
 	case EXPR_BINARY_ADD:
-		return create_add(expression);
 	case EXPR_BINARY_SUB:
-		return create_sub(expression);
 	case EXPR_BINARY_MUL:
-		return create_arithmetic_binop(expression, new_d_Mul);
-	case EXPR_BINARY_BITWISE_AND:
-		return create_arithmetic_binop(expression, new_d_And);
-	case EXPR_BINARY_BITWISE_OR:
-		return create_arithmetic_binop(expression, new_d_Or);
-	case EXPR_BINARY_BITWISE_XOR:
-		return create_arithmetic_binop(expression, new_d_Eor);
-	case EXPR_BINARY_SHIFTLEFT:
-	case EXPR_BINARY_SHIFTRIGHT:
-		return create_shift(expression);
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_MOD:
-		return create_divmod(expression);
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+	{
+		dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
+		ir_node  *left  = expression_to_firm(expression->left);
+		ir_node  *right = expression_to_firm(expression->right);
+		return create_op(dbgi, expression, left, right);
+	}
 	case EXPR_BINARY_LOGICAL_AND:
 	case EXPR_BINARY_LOGICAL_OR:
 		return create_lazy_op(expression);
 	case EXPR_BINARY_COMMA:
-		expression_to_firm(expression->left);
-		return expression_to_firm(expression->right);
+		/* create side effects of left side */
+		(void) expression_to_firm(expression->left);
+		return _expression_to_firm(expression->right);
+
 	case EXPR_BINARY_ADD_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Add);
 	case EXPR_BINARY_SUB_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Sub);
 	case EXPR_BINARY_MUL_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Mul);
 	case EXPR_BINARY_MOD_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:
-		return create_arithmetic_assign_divmod(expression);
 	case EXPR_BINARY_BITWISE_AND_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_And);
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Or);
 	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
-		return create_arithmetic_assign_binop(expression, new_d_Eor);
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-		return create_arithmetic_assign_shift(expression);
+		return create_assign_binop(expression);
 	case EXPR_BINARY_BUILTIN_EXPECT:
-		return expression_to_firm(expression->left);
+		return _expression_to_firm(expression->left);
 	default:
 		panic("TODO binexpr type");
 	}
@@ -2371,7 +2360,7 @@ static ir_node *array_access_to_firm(
 			(const expression_t*) expression);
 	type             = skip_typeref(type);
 
-	return deref_address(type, addr, dbgi);
+	return deref_address(dbgi, type, addr);
 }
 
 static long get_offsetof_offset(const offsetof_expression_t *expression)
@@ -2506,9 +2495,14 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	return new_SymConst(mode, sym, symconst_type_align);
 }
 
+static bool constant_folding;
+
 static void init_ir_types(void);
 long fold_constant(const expression_t *expression)
 {
+	bool constant_folding_old = constant_folding;
+	constant_folding = true;
+
 	init_ir_types();
 
 	assert(is_constant_expression(expression));
@@ -2529,6 +2523,8 @@ long fold_constant(const expression_t *expression)
 	if(!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer\n");
 	}
+
+	constant_folding = constant_folding_old;
 
 	return get_tarval_long(tv);
 }
@@ -2614,13 +2610,20 @@ static ir_node *select_addr(const select_expression_t *expression)
 
 static ir_node *select_to_firm(const select_expression_t *expression)
 {
-	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
-	ir_node  *addr   = select_addr(expression);
-	type_t   *type   = revert_automatic_type_conversion(
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	ir_node  *addr = select_addr(expression);
+	type_t   *type = revert_automatic_type_conversion(
 			(const expression_t*) expression);
-	type             = skip_typeref(type);
+	type           = skip_typeref(type);
 
-	return deref_address(type, addr, dbgi);
+	declaration_t *entry      = expression->compound_entry;
+	type_t        *entry_type = skip_typeref(entry->type);
+
+	if (entry_type->kind == TYPE_BITFIELD) {
+		return bitfield_extract_to_firm(expression, addr);
+	}
+
+	return deref_address(dbgi, type, addr);
 }
 
 /* Values returned by __builtin_classify_type. */
@@ -2777,13 +2780,13 @@ static ir_node *va_start_expression_to_firm(
 
 static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 {
-	type_t   *const type   = expr->base.type;
-	ir_node  *const ap     = expression_to_firm(expr->ap);
-	dbg_info *const dbgi   = get_dbg_info(&expr->base.source_position);
-	ir_node  *const res    = deref_address(type, ap, dbgi);
+	type_t   *const type = expr->base.type;
+	ir_node  *const ap   = expression_to_firm(expr->ap);
+	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
+	ir_node  *const res  = deref_address(dbgi, type, ap);
 
-	ir_node  *const cnst   = get_type_size(expr->base.type);
-	ir_node  *const add    = new_d_Add(dbgi, ap, cnst, mode_P_data);
+	ir_node  *const cnst = get_type_size(expr->base.type);
+	ir_node  *const add  = new_d_Add(dbgi, ap, cnst, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
 	return res;
@@ -2841,8 +2844,20 @@ static ir_node *builtin_prefetch_to_firm(
 	return NULL;
 }
 
+/**
+ * creates firm nodes for an expression. The difference between this function
+ * and expression_to_firm is, that this version might produce mode_b nodes
+ * instead of mode_Is.
+ */
 static ir_node *_expression_to_firm(const expression_t *expression)
 {
+#ifndef NDEBUG
+	if (!constant_folding) {
+		assert(!expression->base.transformed);
+		((expression_t*) expression)->base.transformed = true;
+	}
+#endif
+
 	switch(expression->kind) {
 	case EXPR_CHARACTER_CONSTANT:
 		return character_constant_to_firm(&expression->conste);
@@ -2900,26 +2915,54 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	panic("invalid expression found");
 }
 
+static bool produces_mode_b(const expression_t *expression)
+{
+	switch (expression->kind) {
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED:
+	case EXPR_UNARY_NOT:
+		return true;
+
+	case EXPR_BINARY_BUILTIN_EXPECT:
+		return produces_mode_b(expression->binary.left);
+
+	default:
+		return false;
+	}
+}
+
 static ir_node *expression_to_firm(const expression_t *expression)
 {
-	ir_node *res = _expression_to_firm(expression);
-
-	if(res != NULL && get_irn_mode(res) == mode_b) {
-		ir_mode *mode = get_ir_mode(expression->base.type);
-		if(is_Const(res)) {
-			if(is_Const_null(res)) {
-				return new_Const_long(mode, 0);
-			} else {
-				assert(is_Const_one(res));
-				return new_Const_long(mode, 1);
-			}
-		}
-
-		dbg_info *dbgi        = get_dbg_info(&expression->base.source_position);
-		return produce_condition_result(expression, dbgi);
+	if (!produces_mode_b(expression)) {
+		ir_node *res = _expression_to_firm(expression);
+		assert(res == NULL || get_irn_mode(res) != mode_b);
+		return res;
 	}
 
-	return res;
+	if (is_constant_expression(expression)) {
+		ir_node *res  = _expression_to_firm(expression);
+		ir_mode *mode = get_ir_mode(expression->base.type);
+		assert(is_Const(res));
+		if (is_Const_null(res)) {
+			return new_Const_long(mode, 0);
+		} else {
+			return new_Const_long(mode, 1);
+		}
+	}
+
+	/* we have to produce a 0/1 from the mode_b expression */
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	return produce_condition_result(expression, dbgi);
 }
 
 static ir_node *expression_to_modeb(const expression_t *expression)
@@ -4461,6 +4504,11 @@ static void	leave_statement_to_firm(leave_statement_t *statement) {
 
 static void statement_to_firm(statement_t *statement)
 {
+#ifndef NDEBUG
+	assert(!statement->base.transformed);
+	statement->base.transformed = true;
+#endif
+
 	switch(statement->kind) {
 	case STATEMENT_INVALID:
 		panic("invalid statement found");

@@ -137,7 +137,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_CAST]                = PREC_UNARY,
 		[EXPR_UNARY_CAST_IMPLICIT]       = PREC_UNARY,
 		[EXPR_UNARY_ASSUME]              = PREC_PRIM,
-		[EXPR_UNARY_BITFIELD_EXTRACT]    = PREC_ACCESS,
 
 		[EXPR_BINARY_ADD]                = PREC_PLUS,
 		[EXPR_BINARY_SUB]                = PREC_PLUS,
@@ -454,10 +453,6 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--", out); break;
 	case EXPR_UNARY_DEREFERENCE:      fputs("*", out);  break;
 	case EXPR_UNARY_TAKE_ADDRESS:     fputs("&", out);  break;
-
-	case EXPR_UNARY_BITFIELD_EXTRACT:
-		print_expression_prec(unexpr->value, prec);
-		return;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 		print_expression_prec(unexpr->value, prec);
@@ -1579,7 +1574,6 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_POSTFIX_DECREMENT:
 	case EXPR_UNARY_PREFIX_INCREMENT:
 	case EXPR_UNARY_PREFIX_DECREMENT:
-	case EXPR_UNARY_BITFIELD_EXTRACT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
 	case EXPR_UNARY_TAKE_ADDRESS:
 	case EXPR_UNARY_DEREFERENCE:

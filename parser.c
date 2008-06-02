@@ -5661,7 +5661,8 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 			type->kind == TYPE_BITFIELD ? "bitfield"            :
 			NULL;
 		if (wrong_type != NULL) {
-			errorf(&pos, "operand of %s expression must not be %s type '%T'", what, wrong_type, type);
+			errorf(&pos, "operand of %s expression must not be %s type '%T'",
+			       what, wrong_type, type);
 		}
 
 		rem_anchor_token(')');
@@ -5717,7 +5718,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	expression_t *select    = allocate_expression_zero(EXPR_SELECT);
 	select->select.compound = compound;
 
-	if(token.type != T_IDENTIFIER) {
+	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
 		return select;
 	}
@@ -5729,7 +5730,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 	type_t *const type      = skip_typeref(orig_type);
 
 	type_t *type_left = type;
-	if(is_pointer) {
+	if (is_pointer) {
 		if (!is_type_pointer(type)) {
 			if (is_type_valid(type)) {
 				errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
@@ -5751,14 +5752,14 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	declaration_t *const declaration = type_left->compound.declaration;
 
-	if(!declaration->init.complete) {
+	if (!declaration->init.complete) {
 		errorf(HERE, "request for member '%Y' of incomplete type '%T'",
 		       symbol, type_left);
 		return create_invalid_expression();
 	}
 
 	declaration_t *iter = find_compound_entry(declaration, symbol);
-	if(iter == NULL) {
+	if (iter == NULL) {
 		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
 		return create_invalid_expression();
 	}
@@ -5770,13 +5771,9 @@ static expression_t *parse_select_expression(unsigned precedence,
 	select->select.compound_entry = iter;
 	select->base.type             = expression_type;
 
-	if(expression_type->kind == TYPE_BITFIELD) {
-		expression_t *extract
-			= allocate_expression_zero(EXPR_UNARY_BITFIELD_EXTRACT);
-		extract->unary.value = select;
-		extract->base.type   = expression_type->bitfield.base_type;
-
-		return extract;
+	type_t *skipped = skip_typeref(iter->type);
+	if (skipped->kind == TYPE_BITFIELD) {
+		select->base.type = skipped->bitfield.base_type;
 	}
 
 	return select;
@@ -6458,7 +6455,6 @@ static bool is_valid_assignment_lhs(expression_t const* const left)
 		case EXPR_ARRAY_ACCESS:
 		case EXPR_SELECT:
 		case EXPR_UNARY_DEREFERENCE:
-		case EXPR_UNARY_BITFIELD_EXTRACT:
 			break;
 
 		default:
@@ -6677,7 +6673,6 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_UNARY_CAST_IMPLICIT:       return true;
 		case EXPR_UNARY_ASSUME:              return true;
-		case EXPR_UNARY_BITFIELD_EXTRACT:    return false;
 
 		case EXPR_BINARY_ADD:                return false;
 		case EXPR_BINARY_SUB:                return false;
