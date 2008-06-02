@@ -5890,8 +5890,6 @@ static expression_t *parse_call_expression(unsigned precedence,
 		}
 	}
 
-	check_format(&result->call);
-
 	/* do default promotion */
 	for( ; argument != NULL; argument = argument->next) {
 		type_t *type = argument->expression->base.type;
@@ -5901,6 +5899,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 		argument->expression
 			= create_implicit_cast(argument->expression, type);
 	}
+
+	check_format(&result->call);
 
 	return result;
 end_error:
