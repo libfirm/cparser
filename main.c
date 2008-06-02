@@ -580,8 +580,14 @@ int main(int argc, char **argv)
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if(strcmp(opt, "32") == 0) {
-					/* ignore -m32, we are always 32bit */
+				} else if(strcmp(opt, "omit-leaf-frame-pointer") == 0) {
+					int res = firm_be_option("omitleaffp=1");
+					if (res == 0)
+						argument_errors = true;
+				} else if(strcmp(opt, "no-omit-leaf-frame-pointer") == 0) {
+					int res = firm_be_option("omitleaffp=0");
+					if (res == 0)
+						argument_errors = true;
 				} else {
 					char *endptr;
 					long int value = strtol(opt, &endptr, 10);
