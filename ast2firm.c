@@ -357,7 +357,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		++n;
 	}
 
-	if(function_type->variadic) {
+	if(function_type->variadic || function_type->unspecified_parameters) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
@@ -1356,7 +1356,9 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_UNKNOWN:
 		break;
 	case DECLARATION_KIND_LOCAL_VARIABLE:
-		panic("local variable without entity has no address");
+		/* you can store to a local variable (so we don't panic but return NULL
+		 * as an indicator for no real address) */
+		return NULL;
 	case DECLARATION_KIND_FUNCTION: {
 		type_t *const  type = skip_typeref(ref->base.type);
 		ir_mode *const mode = get_ir_mode(type);
@@ -1662,39 +1664,6 @@ static void bitfield_store_to_firm(const select_expression_t *expression,
 	}
 }
 
-static void set_value_for_expression(const expression_t *expression,
-                                     ir_node *value)
-{
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
-	value          = do_strict_conv(dbgi, value);
-
-	if (expression->kind == EXPR_REFERENCE) {
-		const reference_expression_t *ref = &expression->reference;
-
-		declaration_t *declaration = ref->declaration;
-		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
-		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
-			set_value(declaration->v.value_number, value);
-			return;
-		}
-	}
-
-	ir_node *addr = expression_to_addr(expression);
-	type_t  *type = skip_typeref(expression->base.type);
-
-	if (expression->kind == EXPR_SELECT) {
-		const select_expression_t *select = &expression->select;
-
-		declaration_t *declaration = select->compound_entry;
-		if (declaration->type->kind == TYPE_BITFIELD) {
-			bitfield_store_to_firm(select, addr, value);
-			return;
-		}
-	}
-
-	assign_value(dbgi, addr, type, value);
-}
-
 static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 		ir_node *addr)
 {
@@ -1735,40 +1704,83 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	return create_conv(dbgi, shiftr, mode);
 }
 
+static void set_value_for_expression_addr(const expression_t *expression,
+                                          ir_node *value, ir_node *addr)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	value          = do_strict_conv(dbgi, value);
+
+	if (expression->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &expression->reference;
+
+		declaration_t *declaration = ref->declaration;
+		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
+		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+			set_value(declaration->v.value_number, value);
+			return;
+		}
+	}
+
+	if (addr == NULL)
+		addr = expression_to_addr(expression);
+
+	type_t *type = skip_typeref(expression->base.type);
+
+	if (expression->kind == EXPR_SELECT) {
+		const select_expression_t *select = &expression->select;
+
+		declaration_t *declaration = select->compound_entry;
+		if (declaration->type->kind == TYPE_BITFIELD) {
+			bitfield_store_to_firm(select, addr, value);
+			return;
+		}
+	}
+
+	assign_value(dbgi, addr, type, value);
+}
+
+static void set_value_for_expression(const expression_t *expression,
+                                     ir_node *value)
+{
+	set_value_for_expression_addr(expression, value, NULL);
+}
+
+static ir_node *get_value_from_lvalue(const expression_t *expression,
+                                      ir_node *addr)
+{
+	if (expression->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &expression->reference;
+
+		declaration_t *declaration = ref->declaration;
+		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
+		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+			assert(addr == NULL);
+			ir_mode *mode = get_ir_mode(expression->base.type);
+			return get_value(declaration->v.value_number, mode);
+		}
+	}
+
+	assert(addr != NULL);
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+
+	ir_node *value;
+	if (expression->kind == EXPR_SELECT &&
+	    expression->select.compound_entry->type->kind == TYPE_BITFIELD){
+		value = bitfield_extract_to_firm(&expression->select, addr);
+	} else {
+		value = deref_address(dbgi, expression->base.type, addr);
+	}
+
+	return value;
+}
 
 
 static ir_node *create_incdec(const unary_expression_t *expression)
 {
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
-	const expression_t *value_expr  = expression->value;
-	type_t             *value_type  = skip_typeref(value_expr->base.type);
-	ir_mode            *value_mode  = get_ir_mode(value_type);
-	ir_node            *value_addr;
-	ir_node            *value;
-	int                 value_number;
-
-	if (value_expr->kind == EXPR_REFERENCE) {
-		const reference_expression_t *ref = &value_expr->reference;
-
-		declaration_t *declaration = ref->declaration;
-		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
-		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
-			value_number = declaration->v.value_number;
-			value        = get_value(value_number, value_mode);
-			value_addr   = NULL;
-		} else {
-			goto need_addr;
-		}
-	} else {
-need_addr:
-		value_addr = expression_to_addr(value_expr);
-		if (value_expr->kind == EXPR_SELECT &&
-				value_expr->select.compound_entry->type->kind == TYPE_BITFIELD){
-			value = bitfield_extract_to_firm(&value_expr->select, value_addr);
-		} else {
-			value = deref_address(dbgi, value_type, value_addr);
-		}
-	}
+	const expression_t *value_expr = expression->value;
+	ir_node            *addr       = expression_to_addr(value_expr);
+	ir_node            *value      = get_value_from_lvalue(value_expr, addr);
 
 	type_t  *type = skip_typeref(expression->base.type);
 	ir_mode *mode = get_ir_mode(expression->base.type);
@@ -1805,16 +1817,7 @@ need_addr:
 		panic("no incdec expr in create_incdec");
 	}
 
-	if (value_addr == NULL) {
-		set_value(value_number, store_value);
-	} else {
-		if (value_expr->kind == EXPR_SELECT &&
-				value_expr->select.compound_entry->type->kind == TYPE_BITFIELD){
-			bitfield_store_to_firm(&value_expr->select, value_addr, store_value);
-		} else {
-			assign_value(dbgi, value_addr, value_type, store_value);
-		}
-	}
+	set_value_for_expression_addr(value_expr, store_value, addr);
 
 	return result;
 }
@@ -2204,53 +2207,17 @@ typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
 static ir_node *create_assign_binop(const binary_expression_t *expression)
 {
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
-	const expression_t *left_expr  = expression->left;
-	ir_mode            *left_mode  = get_ir_mode(left_expr->base.type);
-	type_t             *left_type  = skip_typeref(left_expr->base.type);
-	ir_node            *left_addr;
-	int                 value_number;
-	ir_node            *left;
-
-	if (left_expr->kind == EXPR_REFERENCE) {
-		const reference_expression_t *ref = &left_expr->reference;
-
-		declaration_t *declaration = ref->declaration;
-		assert(declaration->declaration_kind != DECLARATION_KIND_UNKNOWN);
-		if (declaration->declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
-			value_number       = declaration->v.value_number;
-			left               = get_value(value_number, left_mode);
-			left_addr          = NULL;
-		} else {
-			goto need_addr;
-		}
-	} else {
-need_addr:
-		left_addr = expression_to_addr(left_expr);
-		if (left_expr->kind == EXPR_SELECT &&
-				left_expr->select.compound_entry->type->kind == TYPE_BITFIELD) {
-			left = bitfield_extract_to_firm(&left_expr->select, left_addr);
-		} else {
-			left = deref_address(dbgi, left_type, left_addr);
-		}
-	}
-
-	ir_node *right = expression_to_firm(expression->right);
-
-	ir_node *result = create_op(dbgi, expression, left, right);
+	const expression_t *left_expr = expression->left;
+	ir_mode            *left_mode = get_ir_mode(left_expr->base.type);
+	ir_node            *left_addr = expression_to_addr(left_expr);
+	ir_node            *left      = get_value_from_lvalue(left_expr, left_addr);
+	ir_node            *right     = expression_to_firm(expression->right);
+	ir_node            *result    = create_op(dbgi, expression, left, right);
 
 	result = create_conv(dbgi, result, left_mode);
 	result = do_strict_conv(dbgi, result);
 
-	if (left_addr == NULL) {
-		set_value(value_number, result);
-	} else {
-		if (left_expr->kind == EXPR_SELECT &&
-				left_expr->select.compound_entry->type->kind == TYPE_BITFIELD) {
-			bitfield_store_to_firm(&left_expr->select, left_addr, result);
-		} else {
-			assign_value(dbgi, left_addr, left_type, result);
-		}
-	}
+	set_value_for_expression_addr(left_expr, result, left_addr);
 
 	return result;
 }
