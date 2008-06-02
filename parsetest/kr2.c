@@ -1,6 +1,6 @@
 int printf(const char *str, ...);
 
-int a(int first, float second, const char *third);
+static int a(int first, float second, const char *third);
 
 int main(void)
 {
@@ -8,7 +8,7 @@ int main(void)
 	return 0;
 }
 
-int a(first, second, third)
+static int a(first, second, third)
 	float second;
 	const char *third;
 	int first;

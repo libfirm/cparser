@@ -861,11 +861,6 @@ bool is_type_incomplete(const type_t *type)
 		declaration_t     *declaration = enum_type->declaration;
 		return !declaration->init.complete;
 	}
-	case TYPE_BITFIELD:
-		return false;
-
-	case TYPE_FUNCTION:
-		return true;
 
 	case TYPE_ARRAY:
 		return type->array.size_expression == NULL
@@ -880,6 +875,8 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_IMAGINARY:
 		return type->imaginary.akind == ATOMIC_TYPE_VOID;
 
+	case TYPE_BITFIELD:
+	case TYPE_FUNCTION:
 	case TYPE_POINTER:
 	case TYPE_BUILTIN:
 	case TYPE_ERROR:
@@ -907,10 +904,10 @@ static bool function_types_compatible(const function_type_t *func1,
 		return false;
 
 	/* can parameters be compared? */
-	if(func1->unspecified_parameters || func2->unspecified_parameters)
+	if (func1->unspecified_parameters || func2->unspecified_parameters)
 		return true;
 
-	if(func1->variadic != func2->variadic)
+	if (func1->variadic != func2->variadic)
 		return false;
 
 	/* TODO: handling of unspecified parameters not correct yet */
@@ -918,7 +915,7 @@ static bool function_types_compatible(const function_type_t *func1,
 	/* all argument types must be compatible */
 	function_parameter_t *parameter1 = func1->parameters;
 	function_parameter_t *parameter2 = func2->parameters;
-	for( ; parameter1 != NULL && parameter2 != NULL;
+	for ( ; parameter1 != NULL && parameter2 != NULL;
 			parameter1 = parameter1->next, parameter2 = parameter2->next) {
 		type_t *parameter1_type = skip_typeref(parameter1->type);
 		type_t *parameter2_type = skip_typeref(parameter2->type);
@@ -926,11 +923,11 @@ static bool function_types_compatible(const function_type_t *func1,
 		parameter1_type = get_unqualified_type(parameter1_type);
 		parameter2_type = get_unqualified_type(parameter2_type);
 
-		if(!types_compatible(parameter1_type, parameter2_type))
+		if (!types_compatible(parameter1_type, parameter2_type))
 			return false;
 	}
 	/* same number of arguments? */
-	if(parameter1 != NULL || parameter2 != NULL)
+	if (parameter1 != NULL || parameter2 != NULL)
 		return false;
 
 	return true;

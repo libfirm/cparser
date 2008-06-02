@@ -3834,101 +3834,97 @@ static declaration_t *internal_record_declaration(
 	}
 
 	assert(declaration != previous_declaration);
-	if (previous_declaration != NULL) {
-		if (previous_declaration->parent_scope == scope) {
-			/* can happen for K&R style declarations */
-			if(previous_declaration->type == NULL) {
-				previous_declaration->type = declaration->type;
-			}
-
-			const type_t *prev_type = skip_typeref(previous_declaration->type);
-			if (!types_compatible(type, prev_type)) {
-				errorf(&declaration->source_position,
-				       "declaration '%#T' is incompatible with '%#T' (declared %P)",
-				       orig_type, symbol, previous_declaration->type, symbol,
-			           &previous_declaration->source_position);
-			} else {
-				unsigned old_storage_class = previous_declaration->storage_class;
-				if(old_storage_class == STORAGE_CLASS_ENUM_ENTRY) {
-					errorf(&declaration->source_position,
-					       "redeclaration of enum entry '%Y' (declared %P)",
-					       symbol, &previous_declaration->source_position);
-					return previous_declaration;
-				}
-
-				unsigned new_storage_class = declaration->storage_class;
-
-				if(is_type_incomplete(prev_type)) {
-					previous_declaration->type = type;
-					prev_type                  = type;
-				}
-
-				/* pretend no storage class means extern for function
-				 * declarations (except if the previous declaration is neither
-				 * none nor extern) */
-				if (is_type_function(type)) {
-					switch (old_storage_class) {
-						case STORAGE_CLASS_NONE:
-							old_storage_class = STORAGE_CLASS_EXTERN;
-
-						case STORAGE_CLASS_EXTERN:
-							if (is_function_definition) {
-								if (warning.missing_prototypes &&
-								    prev_type->function.unspecified_parameters &&
-								    !is_sym_main(symbol)) {
-									warningf(&declaration->source_position,
-									         "no previous prototype for '%#T'",
-									         orig_type, symbol);
-								}
-							} else if (new_storage_class == STORAGE_CLASS_NONE) {
-								new_storage_class = STORAGE_CLASS_EXTERN;
-							}
-							break;
-
-						default: break;
-					}
-				}
-
-				if (old_storage_class == STORAGE_CLASS_EXTERN &&
-						new_storage_class == STORAGE_CLASS_EXTERN) {
-warn_redundant_declaration:
-					if (warning.redundant_decls) {
-						warningf(&declaration->source_position,
-						         "redundant declaration for '%Y' (declared %P)",
-						         symbol, &previous_declaration->source_position);
-					}
-				} else if (current_function == NULL) {
-					if (old_storage_class != STORAGE_CLASS_STATIC &&
-							new_storage_class == STORAGE_CLASS_STATIC) {
-						errorf(&declaration->source_position,
-						       "static declaration of '%Y' follows non-static declaration (declared %P)",
-						       symbol, &previous_declaration->source_position);
-					} else {
-						if (old_storage_class != STORAGE_CLASS_EXTERN && !is_function_definition) {
-							goto warn_redundant_declaration;
-						}
-						if (new_storage_class == STORAGE_CLASS_NONE) {
-							previous_declaration->storage_class = STORAGE_CLASS_NONE;
-							previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
-						}
-					}
-				} else {
-					if (old_storage_class == new_storage_class) {
-						errorf(&declaration->source_position,
-						       "redeclaration of '%Y' (declared %P)",
-						       symbol, &previous_declaration->source_position);
-					} else {
-						errorf(&declaration->source_position,
-						       "redeclaration of '%Y' with different linkage (declared %P)",
-						       symbol, &previous_declaration->source_position);
-					}
-				}
-			}
-
-			if (declaration->is_inline)
-				previous_declaration->is_inline = true;
-			return previous_declaration;
+	if (previous_declaration != NULL
+			&& previous_declaration->parent_scope == scope) {
+		/* can happen for K&R style declarations */
+		if (previous_declaration->type == NULL) {
+			previous_declaration->type = declaration->type;
 		}
+
+		const type_t *prev_type = skip_typeref(previous_declaration->type);
+		if (!types_compatible(type, prev_type)) {
+			errorf(&declaration->source_position,
+				   "declaration '%#T' is incompatible with '%#T' (declared %P)",
+				   orig_type, symbol, previous_declaration->type, symbol,
+				   &previous_declaration->source_position);
+		} else {
+			unsigned old_storage_class = previous_declaration->storage_class;
+			if (old_storage_class == STORAGE_CLASS_ENUM_ENTRY) {
+				errorf(&declaration->source_position,
+					   "redeclaration of enum entry '%Y' (declared %P)",
+					   symbol, &previous_declaration->source_position);
+				return previous_declaration;
+			}
+
+			unsigned new_storage_class = declaration->storage_class;
+
+			if (is_type_incomplete(prev_type)) {
+				previous_declaration->type = type;
+				prev_type                  = type;
+			}
+
+			/* pretend no storage class means extern for function
+			 * declarations (except if the previous declaration is neither
+			 * none nor extern) */
+			if (is_type_function(type)) {
+				switch (old_storage_class) {
+				case STORAGE_CLASS_NONE:
+					old_storage_class = STORAGE_CLASS_EXTERN;
+
+				case STORAGE_CLASS_EXTERN:
+					if (is_function_definition) {
+						if (warning.missing_prototypes &&
+							prev_type->function.unspecified_parameters &&
+							!is_sym_main(symbol)) {
+							warningf(&declaration->source_position,
+									 "no previous prototype for '%#T'",
+									 orig_type, symbol);
+						}
+					} else if (new_storage_class == STORAGE_CLASS_NONE) {
+						new_storage_class = STORAGE_CLASS_EXTERN;
+					}
+					break;
+
+				default:
+					break;
+				}
+			}
+
+			if (old_storage_class == STORAGE_CLASS_EXTERN &&
+					new_storage_class == STORAGE_CLASS_EXTERN) {
+warn_redundant_declaration:
+				if (warning.redundant_decls) {
+					warningf(&declaration->source_position,
+							 "redundant declaration for '%Y' (declared %P)",
+							 symbol, &previous_declaration->source_position);
+				}
+			} else if (current_function == NULL) {
+				if (old_storage_class != STORAGE_CLASS_STATIC &&
+						new_storage_class == STORAGE_CLASS_STATIC) {
+					errorf(&declaration->source_position,
+						   "static declaration of '%Y' follows non-static declaration (declared %P)",
+						   symbol, &previous_declaration->source_position);
+				} else if (old_storage_class != STORAGE_CLASS_EXTERN
+						&& !is_function_definition) {
+					goto warn_redundant_declaration;
+				} else if (new_storage_class == STORAGE_CLASS_NONE) {
+						previous_declaration->storage_class = STORAGE_CLASS_NONE;
+						previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
+				}
+			} else if (old_storage_class == new_storage_class) {
+				errorf(&declaration->source_position,
+					   "redeclaration of '%Y' (declared %P)",
+					   symbol, &previous_declaration->source_position);
+			} else {
+				errorf(&declaration->source_position,
+					   "redeclaration of '%Y' with different linkage (declared %P)",
+					   symbol, &previous_declaration->source_position);
+			}
+		}
+
+		if (declaration->is_inline)
+			previous_declaration->is_inline = true;
+		return previous_declaration;
 	} else if (is_function_definition) {
 		if (declaration->storage_class != STORAGE_CLASS_STATIC) {
 			if (warning.missing_prototypes && !is_sym_main(symbol)) {

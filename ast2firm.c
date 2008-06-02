@@ -357,7 +357,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		++n;
 	}
 
-	if(function_type->variadic || function_type->unspecified_parameters) {
+	if(function_type->variadic) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
