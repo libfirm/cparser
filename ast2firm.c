@@ -2752,14 +2752,17 @@ static ir_node *va_start_expression_to_firm(
 
 static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 {
-	type_t   *const type = expr->base.type;
-	ir_node  *const ap   = expression_to_firm(expr->ap);
-	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
-	ir_node  *const res  = deref_address(dbgi, type, ap);
+	type_t       *const type    = expr->base.type;
+	expression_t *const ap_expr = expr->ap;
+	ir_node      *const ap_addr = expression_to_addr(ap_expr);
+	ir_node      *const ap      = get_value_from_lvalue(ap_expr, ap_addr);
+	dbg_info     *const dbgi    = get_dbg_info(&expr->base.source_position);
+	ir_node      *const res     = deref_address(dbgi, type, ap);
 
-	ir_node  *const cnst = get_type_size(expr->base.type);
-	ir_node  *const add  = new_d_Add(dbgi, ap, cnst, mode_P_data);
-	set_value_for_expression(expr->ap, add);
+	ir_node      *const cnst    = get_type_size(expr->base.type);
+	ir_node      *const add     = new_d_Add(dbgi, ap, cnst, mode_P_data);
+
+	set_value_for_expression_addr(ap_expr, add, ap_addr);
 
 	return res;
 }
