@@ -38,6 +38,7 @@
 #include "diagnostic.h"
 #include "lang_features.h"
 #include "types.h"
+#include "warning.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 
@@ -4974,9 +4975,11 @@ static void create_function(declaration_t *declaration)
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
-				warningf(&declaration->source_position, "missing return statement at end of non-void function '%Y'",
-					declaration->symbol);
-
+				if(warning.return_type) {
+					warningf(&declaration->source_position,
+						"missing return statement at end of non-void function '%Y'",
+						declaration->symbol);
+				}
 			}
 			ret = new_Return(get_store(), 1, in);
 		}

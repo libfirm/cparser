@@ -46,7 +46,8 @@ warning_t warning = {
 	.unused_label                  = false,
 	.unused_parameter              = false,
 	.unused_value                  = true,
-	.unused_variable               = false
+	.unused_variable               = false,
+	.return_type                   = true
 };
 
 void set_warning_opt(const char *const opt)
@@ -85,6 +86,7 @@ void set_warning_opt(const char *const opt)
 		SET(unused_parameter)
 		SET(unused_value)
 		SET(unused_variable)
+		SET(return_type)
 	}
 	OPT("attribute",                     attribute)
 	OPT("char-subscripts",               char_subscripts)
@@ -135,6 +137,7 @@ void set_warning_opt(const char *const opt)
 	OPT("unused-parameter",              unused_parameter)
 	OPT("unused-value",                  unused_value)
 	OPT("unused-variable",               unused_variable)
+	OPT("return-type",                   return_type)
 #undef OPT
 #undef SET
 #undef OPT_X

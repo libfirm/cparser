@@ -104,6 +104,9 @@ typedef struct warning_t {
 #if 0 // TODO
 	bool write_strings:1;                 /**< Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char *' pointer will get a warning */
 #endif
+	bool return_type:1;                   /**< Warn whenever a function is defined with a return-type that
+						   defaults to `int'.  Also warn about any `return' statement with no
+						   return-value in a function whose return-type is not `void'. */
 } warning_t;
 
 extern warning_t warning;
