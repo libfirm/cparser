@@ -6925,13 +6925,13 @@ static void init_expression_parsers(void)
 	register_infix_parser(parse_EXPR_UNARY_POSTFIX_DECREMENT,
 	                                                      T_MINUSMINUS,     30);
 
-	register_infix_parser(parse_EXPR_BINARY_MUL,          '*',              16);
-	register_infix_parser(parse_EXPR_BINARY_DIV,          '/',              16);
-	register_infix_parser(parse_EXPR_BINARY_MOD,          '%',              16);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT,    T_LESSLESS,       16);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT,   T_GREATERGREATER, 16);
-	register_infix_parser(parse_EXPR_BINARY_ADD,          '+',              15);
-	register_infix_parser(parse_EXPR_BINARY_SUB,          '-',              15);
+	register_infix_parser(parse_EXPR_BINARY_MUL,          '*',              17);
+	register_infix_parser(parse_EXPR_BINARY_DIV,          '/',              17);
+	register_infix_parser(parse_EXPR_BINARY_MOD,          '%',              17);
+	register_infix_parser(parse_EXPR_BINARY_ADD,          '+',              16);
+	register_infix_parser(parse_EXPR_BINARY_SUB,          '-',              16);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT,    T_LESSLESS,       15);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT,   T_GREATERGREATER, 15);
 	register_infix_parser(parse_EXPR_BINARY_LESS,         '<',              14);
 	register_infix_parser(parse_EXPR_BINARY_GREATER,      '>',              14);
 	register_infix_parser(parse_EXPR_BINARY_LESSEQUAL,    T_LESSEQUAL,      14);
