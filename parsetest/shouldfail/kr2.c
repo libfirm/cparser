@@ -3,7 +3,7 @@ int a(first, second, third)
 	const char *third;
 	float first;
 {
-	printf("Args: %d %f %s\n", first, second, third);
+	printf("Args: %f %d %s\n", first, second, third);
 	return 0;
 }
 
