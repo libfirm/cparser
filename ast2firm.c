@@ -4864,16 +4864,22 @@ static void initialize_function_parameters(declaration_t *declaration)
 			continue;
 		}
 
+		ir_type *param_irtype = get_method_param_type(function_irtype, n);
+		ir_mode *param_mode   = get_type_mode(param_irtype);
+
+		long     pn    = n;
+		ir_node *value = new_r_Proj(irg, start_block, args, param_mode, pn);
+
 		ir_mode *mode = get_ir_mode(parameter->type);
-		long     pn   = n;
-		ir_node *proj = new_r_Proj(irg, start_block, args, mode, pn);
+		value = create_conv(NULL, value, mode);
+		value = do_strict_conv(NULL, value);
 
 		parameter->declaration_kind = DECLARATION_KIND_LOCAL_VARIABLE;
 		parameter->v.value_number   = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function, parameter);
 		++next_value_number_function;
 
-		set_value(parameter->v.value_number, proj);
+		set_value(parameter->v.value_number, value);
 	}
 }
 

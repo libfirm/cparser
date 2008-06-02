@@ -3815,11 +3815,15 @@ static declaration_t *internal_record_declaration(
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
 
+	assert(declaration->symbol != NULL);
+	declaration_t *previous_declaration = get_declaration(symbol, namespc);
+
 	type_t *const orig_type = declaration->type;
 	type_t *const type      = skip_typeref(orig_type);
 	if (is_type_function(type) &&
 			type->function.unspecified_parameters &&
-			warning.strict_prototypes) {
+			warning.strict_prototypes &&
+			previous_declaration == NULL) {
 		warningf(&declaration->source_position,
 		         "function declaration '%#T' is not a prototype",
 		         orig_type, declaration->symbol);
@@ -3828,9 +3832,6 @@ static declaration_t *internal_record_declaration(
 	if (is_function_definition && warning.main && is_sym_main(symbol)) {
 		check_type_of_main(declaration, &type->function);
 	}
-
-	assert(declaration->symbol != NULL);
-	declaration_t *previous_declaration = get_declaration(symbol, namespc);
 
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL) {
@@ -4158,6 +4159,20 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	}
 }
 
+static type_t *get_default_promoted_type(type_t *orig_type)
+{
+	type_t *result = orig_type;
+
+	type_t *type = skip_typeref(orig_type);
+	if(is_type_integer(type)) {
+		result = promote_integer(type);
+	} else if(type == type_float) {
+		result = type_double;
+	}
+
+	return result;
+}
+
 static void parse_kr_declaration_list(declaration_t *declaration)
 {
 	type_t *type = skip_typeref(declaration->type);
@@ -4216,6 +4231,11 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		semantic_parameter(parameter_declaration);
 		parameter_type = parameter_declaration->type;
 
+		/*
+		 * we need the default promoted types for the function type
+		 */
+		parameter_type = get_default_promoted_type(parameter_type);
+
 		function_parameter_t *function_parameter
 			= obstack_alloc(type_obst, sizeof(function_parameter[0]));
 		memset(function_parameter, 0, sizeof(function_parameter[0]));
@@ -4231,7 +4251,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 	/* § 6.9.1.7: A K&R style parameter list does NOT act as a function
 	 * prototype */
-	new_type->function.parameters = parameters;
+	new_type->function.parameters             = parameters;
 	new_type->function.unspecified_parameters = true;
 
 	type = typehash_insert(new_type);
@@ -5839,17 +5859,20 @@ static expression_t *parse_call_expression(unsigned precedence,
 	rem_anchor_token(')');
 	expect(')');
 
-	if(function_type != NULL) {
-		function_parameter_t *parameter = function_type->parameters;
-		call_argument_t      *argument  = call->arguments;
+	if(function_type == NULL)
+		return result;
+
+	function_parameter_t *parameter = function_type->parameters;
+	call_argument_t      *argument  = call->arguments;
+	if (!function_type->unspecified_parameters) {
 		for( ; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
 			type_t *expected_type = parameter->type;
 			/* TODO report scope in error messages */
 			expression_t *const arg_expr = argument->expression;
 			type_t       *const res_type = semantic_assign(expected_type, arg_expr,
-			                                               "function call",
-			                                               &arg_expr->base.source_position);
+														   "function call",
+														   &arg_expr->base.source_position);
 			if (res_type == NULL) {
 				/* TODO improve error message */
 				errorf(&arg_expr->base.source_position,
@@ -5859,35 +5882,24 @@ static expression_t *parse_call_expression(unsigned precedence,
 				argument->expression = create_implicit_cast(argument->expression, expected_type);
 			}
 		}
-		/* too few parameters */
-		if(parameter != NULL) {
+
+		if (parameter != NULL) {
 			errorf(HERE, "too few arguments to function '%E'", expression);
-		} else if(argument != NULL) {
-			/* too many parameters */
-			if(!function_type->variadic
-					&& !function_type->unspecified_parameters) {
-				errorf(HERE, "too many arguments to function '%E'", expression);
-			} else {
-				/* do default promotion */
-				for( ; argument != NULL; argument = argument->next) {
-					type_t *type = argument->expression->base.type;
-
-					type = skip_typeref(type);
-					if(is_type_integer(type)) {
-						type = promote_integer(type);
-					} else if(type == type_float) {
-						type = type_double;
-					}
-
-					argument->expression
-						= create_implicit_cast(argument->expression, type);
-				}
-
-				check_format(&result->call);
-			}
-		} else {
-			check_format(&result->call);
+		} else if (argument != NULL && !function_type->variadic) {
+			errorf(HERE, "too many arguments to function '%E'", expression);
 		}
+	}
+
+	check_format(&result->call);
+
+	/* do default promotion */
+	for( ; argument != NULL; argument = argument->next) {
+		type_t *type = argument->expression->base.type;
+
+		type = get_default_promoted_type(type);
+
+		argument->expression
+			= create_implicit_cast(argument->expression, type);
 	}
 
 	return result;

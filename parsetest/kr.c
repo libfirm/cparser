@@ -1,3 +1,4 @@
+int printf(const char *str, ...);
 
 int a(first, second, third)
 	float second;
