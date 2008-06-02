@@ -4513,6 +4513,9 @@ static void	leave_statement_to_firm(leave_statement_t *statement) {
 	errorf(&statement->base.source_position, "__leave not supported yet");
 }
 
+/**
+ * Transform a statement.
+ */
 static void statement_to_firm(statement_t *statement)
 {
 #ifndef NDEBUG
@@ -4898,6 +4901,9 @@ static void handle_decl_modifier_irg(ir_graph_ptr irg, decl_modifiers_t decl_mod
 	}
 }
 
+/**
+ * Create code for a function.
+ */
 static void create_function(declaration_t *declaration)
 {
 	ir_entity *function_entity = get_function_entity(declaration);
@@ -4958,6 +4964,9 @@ static void create_function(declaration_t *declaration)
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
+				warningf(&declaration->source_position, "missing return statement at end of non-void function '%Y'",
+					declaration->symbol);
+
 			}
 			ret = new_Return(get_store(), 1, in);
 		}
