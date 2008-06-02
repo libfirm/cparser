@@ -4314,64 +4314,6 @@ static void check_declarations(void)
 	}
 }
 
-/**
- * check all returns vor matching type.
- */
-static bool search_return_statements(statement_t *statement) {
-	switch(statement->kind) {
-	case STATEMENT_RETURN:
-		/* ok, found a return */
-		return true;
-	case STATEMENT_IF: {
-		/* return must be found on then and else */
-		if_statement_t *if_stat = &statement->ifs;
-		if(if_stat->true_statement != NULL && if_stat->false_statement != NULL) {
-			return search_return_statements(if_stat->true_statement) &&
-			       search_return_statements(if_stat->false_statement);
-		}
-		break;
-	}
-	case STATEMENT_DO_WHILE: {
-		do_while_statement_t *do_stmt = &statement->do_while;
-		if(do_stmt->body != NULL) {
-			if (search_return_statements(do_stmt->body))
-				return true;
-		}
-		break;
-	}
-	case STATEMENT_COMPOUND: {
-		/* search the last statement */
-		compound_statement_t *compound = &statement->compound;
-		statement_t *statement = compound->statements;
-		if(statement == NULL)
-			return false;
-		for( ; statement != NULL; statement = statement->base.next) {
-			if (search_return_statements(statement))
-				return true;
-		}
-		break;
-	}
-	default:
-		break;
-	}
-	return false;
-}
-
-/**
- * Check returns of a function.
- */
-static void check_return_type(declaration_t *declaration) {
-	function_type_t *function_type = &declaration->type->function;
-	type_t          *ret_type      = function_type->return_type;
-
-	if (ret_type != type_void) {
-		if (! search_return_statements(declaration->init.statement)) {
-			warningf(HERE, "missing return statement at end of non-void function '%Y'",
-					declaration->symbol);
-		}
-	}
-}
-
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -4483,7 +4425,6 @@ static void parse_external_declaration(void)
 		assert(current_function == declaration);
 		current_function = old_current_function;
 		label_pop_to(label_stack_top);
-		check_return_type(declaration);
 	}
 
 end_of_parse_external_declaration:
