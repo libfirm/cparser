@@ -4008,47 +4008,58 @@ static void if_statement_to_firm(if_statement_t *statement)
 {
 	ir_node *cur_block = get_cur_block();
 
-	ir_node *fallthrough_block = new_immBlock();
+	ir_node *fallthrough_block = NULL;
 
 	/* the true (blocks) */
-	ir_node *true_block;
+	ir_node *true_block = NULL;
 	if (statement->true_statement != NULL) {
 		true_block = new_immBlock();
 		statement_to_firm(statement->true_statement);
-		if(get_cur_block() != NULL) {
+		if (get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
+			if (fallthrough_block == NULL)
+				fallthrough_block = new_immBlock();
 			add_immBlock_pred(fallthrough_block, jmp);
 		}
-	} else {
-		true_block = fallthrough_block;
 	}
 
 	/* the false (blocks) */
-	ir_node *false_block;
-	if(statement->false_statement != NULL) {
+	ir_node *false_block = NULL;
+	if (statement->false_statement != NULL) {
 		false_block = new_immBlock();
 
 		statement_to_firm(statement->false_statement);
-		if(get_cur_block() != NULL) {
+		if (get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
+			if (fallthrough_block == NULL)
+				fallthrough_block = new_immBlock();
 			add_immBlock_pred(fallthrough_block, jmp);
 		}
-	} else {
-		false_block = fallthrough_block;
 	}
 
 	/* create the condition */
-	if(cur_block != NULL) {
+	if (cur_block != NULL) {
+		if (true_block == NULL || false_block == NULL) {
+			if (fallthrough_block == NULL)
+				fallthrough_block = new_immBlock();
+			if (true_block == NULL)
+				true_block = fallthrough_block;
+			if (false_block == NULL)
+				false_block = fallthrough_block;
+		}
+
 		set_cur_block(cur_block);
 		create_condition_evaluation(statement->condition, true_block,
 		                            false_block);
 	}
 
 	mature_immBlock(true_block);
-	if(false_block != fallthrough_block) {
+	if (false_block != fallthrough_block) {
 		mature_immBlock(false_block);
 	}
-	mature_immBlock(fallthrough_block);
+	if (fallthrough_block != NULL) {
+		mature_immBlock(fallthrough_block);
+	}
 
 	set_cur_block(fallthrough_block);
 }
