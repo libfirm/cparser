@@ -3867,6 +3867,11 @@ static declaration_t *internal_record_declaration(
 			 * declarations (except if the previous declaration is neither
 			 * none nor extern) */
 			if (is_type_function(type)) {
+				if (prev_type->function.unspecified_parameters) {
+					previous_declaration->type = type;
+					prev_type                  = type;
+				}
+
 				switch (old_storage_class) {
 				case STORAGE_CLASS_NONE:
 					old_storage_class = STORAGE_CLASS_EXTERN;

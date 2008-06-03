@@ -344,20 +344,20 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	dbg_info *dbgi        = get_dbg_info(&function_type->base.source_position);
 	ir_type *irtype       = new_d_type_method(id, n_parameters, n_results, dbgi);
 
-	if(return_type != type_void) {
+	if (return_type != type_void) {
 		ir_type *restype = get_ir_type(return_type);
 		set_method_res_type(irtype, 0, restype);
 	}
 
 	function_parameter_t *parameter = function_type->parameters;
 	int                   n         = 0;
-	for( ; parameter != NULL; parameter = parameter->next) {
+	for ( ; parameter != NULL; parameter = parameter->next) {
 		ir_type *p_irtype = get_ir_type(parameter->type);
 		set_method_param_type(irtype, n, p_irtype);
 		++n;
 	}
 
-	if(function_type->variadic || function_type->unspecified_parameters) {
+	if (function_type->variadic || function_type->unspecified_parameters) {
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
