@@ -111,6 +111,13 @@ extern bool print_parenthesis;
 static int            verbose;
 static struct obstack cppflags_obst, ldflags_obst;
 
+typedef struct file_list_entry_t file_list_entry_t;
+
+struct file_list_entry_t {
+	const char        *filename;
+	file_list_entry_t *next;
+};
+
 #if defined(_DEBUG) || defined(FIRM_DEBUG)
 /**
  * Debug printf implementation.
@@ -351,7 +358,8 @@ typedef enum compile_mode_t {
 	CompileAssembleLink,
 	LexTest,
 	PrintAst,
-	PrintFluffy
+	PrintFluffy,
+	Link
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -380,16 +388,21 @@ int main(int argc, char **argv)
 {
 	initialize_firm();
 
-	const char     *input        = NULL;
-	const char     *outname      = NULL;
-	const char     *dumpfunction = NULL;
-	compile_mode_t  mode         = CompileAssembleLink;
-	int             opt_level    = 1;
-	int             result       = EXIT_SUCCESS;
-	char            cpu_arch[16] = "ia32";
+	const char        *input        = NULL;
+	const char        *outname      = NULL;
+	const char        *dumpfunction = NULL;
+	compile_mode_t     mode         = CompileAssembleLink;
+	int                opt_level    = 1;
+	int                result       = EXIT_SUCCESS;
+	char               cpu_arch[16] = "ia32";
+	file_list_entry_t *c_files      = NULL;
+	file_list_entry_t *s_files      = NULL;
+	file_list_entry_t *o_files      = NULL;
+	struct obstack     file_obst;
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
+	obstack_init(&file_obst);
 
 #define GET_ARG_AFTER(def, args)                                             \
 	def = &arg[sizeof(args)-1];                                              \
@@ -678,22 +691,47 @@ int main(int argc, char **argv)
 				argument_errors = true;
 			}
 		} else {
-			if(input != NULL) {
-				fprintf(stderr, "error: multiple input files specified\n");
-				argument_errors = true;
+
+			size_t len = strlen(arg);
+			if (len < 2) {
+				fprintf(stderr, "'%s': file format not recognized\n", input);
+				continue;
+			}
+
+			file_list_entry_t *entry
+				= obstack_alloc(&file_obst, sizeof(entry[0]));
+			entry->filename = arg;
+			if (strcmp(arg+len-2, ".c") == 0) {
+				entry->next = c_files;
+				c_files     = entry;
+			} else if (strcmp(arg+len-2, ".s") == 0) {
+				entry->next = s_files;
+				s_files     = entry;
+			} else if (strcmp(arg+len-2, ".o") == 0) {
+				entry->next = o_files;
+				o_files     = entry;
 			} else {
-				input = arg;
+				fprintf(stderr, "'%s': file format not recognized\n", input);
 			}
 		}
+	}
+
+	if (c_files == NULL && s_files == NULL && o_files != NULL) {
+		mode = Link;
+	} else if (c_files != NULL && c_files->next == NULL) {
+		input = c_files->filename;
+	} else {
+		fprintf(stderr, "error: multiple input files specified\n");
+		argument_errors = true;
 	}
 
 	/* we do the lowering in ast2firm */
 	firm_opt.lower_bitfields = FALSE;
 
-	if(help_displayed) {
+	if (help_displayed) {
 		return !argument_errors;
 	}
-	if(argument_errors) {
+	if (argument_errors) {
 		usage(argv[0]);
 		return 1;
 	}
@@ -737,6 +775,7 @@ int main(int argc, char **argv)
 			                ".vcg");
 			outname = outnamebuf;
 			break;
+		case Link:
 		case CompileAssembleLink:
 #ifdef _WIN32
 			/* Windows compiler typically derive the output name from
@@ -748,6 +787,29 @@ int main(int argc, char **argv)
 #endif
 			break;
 		}
+	}
+
+	if (mode == Link) {
+		obstack_1grow(&ldflags_obst, '\0');
+		const char *flags = obstack_finish(&ldflags_obst);
+
+		obstack_printf(&file_obst, LINKER " %s -o %s", flags, outname);
+
+		for (file_list_entry_t *entry = o_files; entry != NULL;
+				entry = entry->next) {
+			obstack_printf(&file_obst, " %s", entry->filename);
+		}
+		char *buf = obstack_finish(&file_obst);
+
+		if(verbose) {
+			puts(buf);
+		}
+		int err = system(buf);
+		if(err != 0) {
+			fprintf(stderr, "linker reported an error\n");
+			exit(1);
+		}
+		return 0;
 	}
 
 	if(outname != NULL) {
@@ -890,6 +952,7 @@ int main(int argc, char **argv)
 
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
+	obstack_free(&file_obst, NULL);
 
 	exit_ast2firm();
 	exit_parser();
