@@ -2910,6 +2910,8 @@ static bool produces_mode_b(const expression_t *expression)
 
 	case EXPR_BINARY_BUILTIN_EXPECT:
 		return produces_mode_b(expression->binary.left);
+	case EXPR_BINARY_COMMA:
+		return produces_mode_b(expression->binary.right);
 
 	default:
 		return false;
