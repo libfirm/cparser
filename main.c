@@ -79,7 +79,7 @@
 #include "warning.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int"
+#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -m32"
 #endif
 
 #ifndef LINKER
