@@ -980,21 +980,26 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 
 	/* already an entity defined? */
 	ir_entity *entity = entitymap_get(&entitymap, symbol);
-	if (entity != NULL)
+	if (entity != NULL) {
+		if (get_entity_visibility(entity) == visibility_external_allocated
+				&& declaration->init.statement != NULL) {
+			set_entity_visibility(entity, visibility_external_visible);
+		}
 		goto entity_created;
+	}
 
 	dbg_info *const dbgi = get_dbg_info(&declaration->source_position);
 	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
-	if(declaration->storage_class == STORAGE_CLASS_STATIC &&
+	if (declaration->storage_class == STORAGE_CLASS_STATIC &&
 		declaration->init.statement == NULL) {
 		/* this entity was declared, but never defined */
 		set_entity_peculiarity(entity, peculiarity_description);
 	}
-	if(declaration->storage_class == STORAGE_CLASS_STATIC
+	if (declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
 		set_entity_visibility(entity, visibility_local);
-	} else if(declaration->init.statement != NULL) {
+	} else if (declaration->init.statement != NULL) {
 		set_entity_visibility(entity, visibility_external_visible);
 	} else {
 		set_entity_visibility(entity, visibility_external_allocated);
@@ -3899,7 +3904,9 @@ create_var:
 			create_declaration_entity(declaration,
 			                          DECLARATION_KIND_GLOBAL_VARIABLE,
 			                          var_type);
-			set_entity_visibility(declaration->v.entity, vis);
+			if (!is_type_function(skip_typeref(declaration->type))) {
+				set_entity_visibility(declaration->v.entity, vis);
+			}
 
 			return;
 
