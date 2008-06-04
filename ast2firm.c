@@ -2260,8 +2260,9 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		return proj;
 	}
 	case EXPR_BINARY_ASSIGN: {
+		ir_node *addr  = expression_to_addr(expression->left);
 		ir_node *right = expression_to_firm(expression->right);
-		set_value_for_expression(expression->left, right);
+		set_value_for_expression_addr(expression->left, right, addr);
 
 		return right;
 	}
