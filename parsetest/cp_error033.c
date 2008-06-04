@@ -8,11 +8,10 @@ static struct A deduce_conversion(int from, int to)
 	return result;
 }
 
-struct A globa[4];
-int x = 1;
+struct A *globa;
 
 int main(int argc, char **argv)
 {
-	globa[x] = deduce_conversion(1, 2);
+	*globa = deduce_conversion(1, 2);
 	return 0;
 }
