@@ -2,8 +2,7 @@ struct A {
 	int a, b;
 };
 
-static struct A
-deduce_conversion(int from, int to)
+static struct A deduce_conversion(int from, int to)
 {
 	struct A result = { 1, 2 };
 	return result;
