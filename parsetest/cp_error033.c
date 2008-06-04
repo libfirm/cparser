@@ -1,13 +1,9 @@
-
 struct A {
 	int a, b;
 };
 
-enum typecode { C1, C2 };
-
 static struct A
-deduce_conversion(from, to)
-	enum typecode from, to;
+deduce_conversion(int from, int to)
 {
 	struct A result = { 1, 2 };
 	return result;
@@ -18,6 +14,6 @@ int x = 1;
 
 int main(int argc, char **argv)
 {
-	globa[x] = deduce_conversion(C1, C2);
+	globa[x] = deduce_conversion(1, 2);
 	return 0;
 }
