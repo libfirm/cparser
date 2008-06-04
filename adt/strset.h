@@ -30,6 +30,9 @@
 #undef HashSetIterator
 #undef HashSet
 
+typedef struct strset_t           strset_t;
+typedef struct strset_iterator_t  strset_iterator_t;
+
 /**
  * Initializes a strset
  *

@@ -31,6 +31,7 @@ SOURCES := \
 	ast.c \
 	ast2firm.c \
 	diagnostic.c \
+	entitymap.c \
 	format_check.c \
 	lexer.c \
 	main.c \

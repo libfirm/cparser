@@ -39,6 +39,7 @@
 #include "lang_features.h"
 #include "types.h"
 #include "warning.h"
+#include "entitymap_t.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 
@@ -65,6 +66,8 @@ static ir_node **imature_blocks;
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
 static ir_node             *current_funcsig;
+
+static entitymap_t  entitymap;
 
 static struct obstack asm_obst;
 
@@ -975,8 +978,13 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	ir_type  *ir_type_method = get_ir_type(declaration->type);
 	assert(is_Method_type(ir_type_method));
 
-	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
-	ir_entity *const entity = new_d_entity(global_type, id, ir_type_method, dbgi);
+	/* already an entity defined? */
+	ir_entity *entity = entitymap_get(&entitymap, symbol);
+	if (entity != NULL)
+		goto entity_created;
+
+	dbg_info *const dbgi = get_dbg_info(&declaration->source_position);
+	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 	if(declaration->storage_class == STORAGE_CLASS_STATIC &&
 		declaration->init.statement == NULL) {
@@ -993,9 +1001,6 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	}
 	set_entity_allocation(entity, allocation_static);
 
-	declaration->declaration_kind = DECLARATION_KIND_FUNCTION;
-	declaration->v.entity         = entity;
-
 	/* We should check for file scope here, but as long as we compile C only
 	   this is not needed. */
 	if (! firm_opt.freestanding) {
@@ -1011,6 +1016,12 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 			rts_entities[rts_data[i].id] = entity;
 		}
 	}
+
+	entitymap_insert(&entitymap, symbol, entity);
+
+entity_created:
+	declaration->declaration_kind = DECLARATION_KIND_FUNCTION;
+	declaration->v.entity         = entity;
 
 	return entity;
 }
@@ -1456,6 +1467,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
  */
 static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
+	dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
 	assert(get_cur_block() != NULL);
 
 	expression_t *function = call->function;
@@ -1471,6 +1483,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 				/* handle alloca() call */
 				expression_t *argument = call->arguments->expression;
 			   	ir_node      *size     = expression_to_firm(argument);
+
+			   	size = create_conv(dbgi, size, get_ir_mode(type_size_t));
 
 	   			ir_node *store  = get_store();
 				dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
@@ -1492,8 +1506,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	type_t         *points_to    = skip_typeref(pointer_type->points_to);
 	assert(is_type_function(points_to));
 	function_type_t *function_type = &points_to->function;
-
-	dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
 
 	int      n_parameters = 0;
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
@@ -3028,8 +3040,13 @@ static void create_declaration_entity(declaration_t *declaration,
                                       declaration_kind_t declaration_kind,
                                       ir_type *parent_type)
 {
-	ident     *const id     = new_id_from_str(declaration->symbol->string);
 	type_t    *const type   = skip_typeref(declaration->type);
+	if (is_type_function(type)) {
+		(void) get_function_entity(declaration);
+		return;
+	}
+
+	ident     *const id     = new_id_from_str(declaration->symbol->string);
 	ir_type   *const irtype = get_ir_type(type);
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
@@ -5082,6 +5099,8 @@ void init_ast2firm(void)
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
+
+	entitymap_init(&entitymap);
 }
 
 static void init_ir_types(void)
@@ -5103,6 +5122,7 @@ static void init_ir_types(void)
 
 void exit_ast2firm(void)
 {
+	entitymap_destroy(&entitymap);
 	obstack_free(&asm_obst, NULL);
 }
 

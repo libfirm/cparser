@@ -1,21 +1,20 @@
 /*
- * This file is part of cparser.
- * Copyright (C) 2007-2008 Matthias Braun <matze@braunis.de>
+ * Copyright (C) 1995-2008 University of Karlsruhe.  All right reserved.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of libFirm.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This file may be distributed and/or modified under the terms of the
+ * GNU General Public License version 2 as published by the Free Software
+ * Foundation and appearing in the file LICENSE.GPL included in the
+ * packaging of this file.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
- * 02111-1307, USA.
+ * Licensees holding valid libFirm Professional Edition licenses may use
+ * this file in accordance with the libFirm Commercial License.
+ * Agreement provided with the Software.
+ *
+ * This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+ * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE.
  */
 
 /**
@@ -24,10 +23,10 @@
  * @brief   Generic hashset functions
  * @author  Matthias Braun
  * @version $Id$
+ *
+ * You have to specialize this header by defining HashSet, HashSetIterator and
+ * ValueType
  */
-
-/* You have to specialize this header by defining HashSet, HashSetIterator and
- * ValueType */
 #ifdef HashSet
 
 #include <stdlib.h>
@@ -39,11 +38,6 @@ typedef struct HashSetEntry {
 	ValueType data;
 	unsigned hash;
 } HashSetEntry;
-#endif
-
-#ifndef NO_TYPEDEFS
-typedef struct HashSet         HashSet;
-typedef struct HashSetIterator HashSetIterator;
 #endif
 
 struct HashSet {
@@ -58,7 +52,7 @@ struct HashSet {
 	unsigned entries_version;
 #endif
 #ifdef ADDITIONAL_DATA
-	ADDITIONAL_DATA;
+	ADDITIONAL_DATA
 #endif
 };
 
@@ -66,7 +60,7 @@ struct HashSetIterator {
 	HashSetEntry *current_bucket;
 	HashSetEntry *end;
 #ifndef NDEBUG
-	const HashSet *set;
+	const struct HashSet *set;
 	unsigned entries_version;
 #endif
 };

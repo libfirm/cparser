@@ -33,4 +33,7 @@
 #undef HashSetIterator
 #undef HashSet
 
+typedef struct symbol_table_iterator_t  symbol_table_iterator_t;
+typedef struct symbol_table_t           symbol_table_t;
+
 #endif

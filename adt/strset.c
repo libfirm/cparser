@@ -32,6 +32,7 @@
 #define Hash(this, value)          hash_string(value)
 #define KeysEqual(this,key1,key2)  (strcmp(key1, key2) == 0)
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(strset_entry_t))
+#define SCALAR_RETURN
 
 #define hashset_init            strset_init
 #define hashset_init_size       strset_init_size
