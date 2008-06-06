@@ -8,7 +8,8 @@ static struct A deduce_conversion(int from, int to)
 	return result;
 }
 
-struct A *globa;
+struct A globa_real;
+struct A *globa = &globa_real;
 
 int main(int argc, char **argv)
 {
