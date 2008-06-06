@@ -117,11 +117,11 @@ build/cpb2/%.o: %.c cparser.bootstrap
 
 cparser.bootstrap: $(CPARSEROS)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(CPARSEROS) $(LFLAGS) -o $@
+	$(Q)./build/cparser $(CPARSEROS) $(LFLAGS) -o $@
 
 cparser.bootstrap2: $(CPARSEROS2)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(CPARSEROS2) $(LFLAGS) -o $@
+	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LFLAGS) -o $@
 
 build/%.o: %.c
 	@echo '===> CC $<'

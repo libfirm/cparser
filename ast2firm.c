@@ -62,6 +62,7 @@ static ir_node  *break_label;
 static ir_node  *current_switch_cond;
 static bool      saw_default_label;
 static ir_node **imature_blocks;
+static bool constant_folding;
 
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
@@ -699,6 +700,9 @@ static ir_type *create_enum_type(enum_type_t *const type)
 	tarval  *const one     = get_mode_one(mode);
 	tarval  *      tv_next = get_tarval_null(mode);
 
+	bool constant_folding_old = constant_folding;
+	constant_folding = true;
+
 	declaration_t *declaration = type->declaration->next;
 	for (; declaration != NULL; declaration = declaration->next) {
 		if (declaration->storage_class != STORAGE_CLASS_ENUM_ENTRY)
@@ -717,6 +721,8 @@ static ir_type *create_enum_type(enum_type_t *const type)
 		declaration->v.enum_val = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
+
+	constant_folding = constant_folding_old;
 
 	return ir_type_int;
 }
@@ -2484,8 +2490,6 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	sym.type_p = get_ir_type(type);
 	return new_SymConst(mode, sym, symconst_type_align);
 }
-
-static bool constant_folding;
 
 static void init_ir_types(void);
 long fold_constant(const expression_t *expression)
