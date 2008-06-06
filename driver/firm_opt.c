@@ -1082,6 +1082,12 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
   /* all graphs are finalized, set the irp phase to high */
   set_irp_phase_state(phase_high);
 
+  /* BEWARE: kill unreachable code before doing compound lowering */
+  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+    ir_graph *irg = get_irp_irg(i);
+    optimize_cf(irg);
+  }
+
   /* lower all compound call return values */
   lower_compound_params();
 
