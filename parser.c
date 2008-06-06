@@ -2187,6 +2187,9 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				= allocate_initializer_zero(INITIALIZER_DESIGNATOR);
 			designator_initializer->designator.designator = designator;
 			ARR_APP1(initializer_t*, initializers, designator_initializer);
+
+			orig_type = path->top_type;
+			type      = orig_type != NULL ? skip_typeref(orig_type) : NULL;
 		}
 
 		initializer_t *sub;
