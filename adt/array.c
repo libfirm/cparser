@@ -49,9 +49,13 @@
 #endif
 
 /**
- * An empty dynamic array
+ * An empty dynamic array descriptor.
  */
-_arr_descr arr_mt_descr;
+_arr_descr arr_mt_descr
+#ifndef NDEBUG
+	= { ARR_D_MAGIC, 0, {0}, 0, {{{0}}} }
+#endif
+;
 
 /**
  * Creates a dynamic array on a obstack.
