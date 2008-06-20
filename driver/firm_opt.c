@@ -143,10 +143,10 @@ static void rts_map(void) {
   } mapper[] = {
     /* integer */
     { &rts_entities[rts_abs],     i_mapper_abs },
-	{ &rts_entities[rts_alloca],  i_mapper_alloca },
     { &rts_entities[rts_labs],    i_mapper_abs },
     { &rts_entities[rts_llabs],   i_mapper_abs },
     { &rts_entities[rts_imaxabs], i_mapper_abs },
+    { &rts_entities[rts_alloca],  i_mapper_alloca },
 
     /* double -> double */
     { &rts_entities[rts_fabs],    i_mapper_abs },
@@ -221,7 +221,7 @@ static void rts_map(void) {
   i_record rec[sizeof(mapper)/sizeof(mapper[0])];
   unsigned i, n_map;
 
-  for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i) {
+  for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i)
     if (*mapper[i].ent != NULL) {
       rec[n_map].i_call.kind     = INTRINSIC_CALL;
       rec[n_map].i_call.i_ent    = *mapper[i].ent;
@@ -229,8 +229,7 @@ static void rts_map(void) {
       rec[n_map].i_call.ctx      = NULL;
       rec[n_map].i_call.link     = NULL;
       ++n_map;
-    }  /* if */
-  }
+  }  /* if */
   if (n_map > 0)
     lower_intrinsics(rec, n_map, /* part_block_used=*/0);
 }  /* rts_map */
@@ -561,13 +560,23 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       timer_pop();
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cond_eval");
       CHECK_ONE(firm_opt.check_all, irg);
-
-      timer_push(TV_CF_OPT);
-        optimize_cf(irg);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
-      CHECK_ONE(firm_opt.check_all, irg);
     }
+  }
+
+  /* final run of local optimizations */
+  for (i = 0; i < get_irp_n_irgs(); i++) {
+    irg = get_irp_irg(i);
+    timer_push(TV_LOCAL_OPT);
+      optimize_graph_df(irg);
+    timer_pop();
+    DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "local_opt");
+    CHECK_ONE(firm_opt.check_all, irg);
+
+    timer_push(TV_CF_OPT);
+      optimize_cf(irg);
+    timer_pop();
+    DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
+    CHECK_ONE(firm_opt.check_all, irg);
   }
 
   if (firm_dump.ir_graph) {
@@ -688,6 +697,7 @@ static int compute_type_size(ir_type *ty)
     save_optimization_state(&state);
     set_optimize(1);
     set_opt_constant_folding(1);
+	set_opt_algebraic_simplification(1);
 
     for (i = 0; i < dims; ++i) {
       ir_node *lower   = get_array_lower_bound(ty, i);
@@ -935,7 +945,6 @@ static void do_firm_lowering(const char *input_filename)
 void gen_firm_init(void)
 {
   firm_parameter_t params;
-  char             *dump_filter;
   unsigned         pattern = 0;
 
   /* the automatic state is only set if inlining is enabled */
@@ -979,6 +988,19 @@ void gen_firm_init(void)
     if (be_params->has_imm_fp_mode)
       firm_imm_fp_mode = be_params->imm_fp_mode;
   }
+  /* OS option must be set to the backend */
+  switch (firm_opt.os_support) {
+  case OS_SUPPORT_MINGW:
+    firm_be_option("ia32-gasmode=mingw");
+    break;
+  case OS_SUPPORT_MACHO:
+    firm_be_option("ia32-gasmode=macho");
+    break;
+  case OS_SUPPORT_LINUX:
+  default:
+    firm_be_option("ia32-gasmode=linux");
+    break;
+  }
 
   dbg_init(NULL, NULL, dbg_snprint);
   edges_init_dbg(firm_opt.vrfy_edges);
@@ -1005,19 +1027,16 @@ void gen_firm_init(void)
   if (firm_opt.enabled) {
     set_optimize(1);
     set_opt_constant_folding(firm_opt.const_folding);
+    set_opt_algebraic_simplification(firm_opt.const_folding);
     set_opt_cse(firm_opt.cse);
-    set_opt_global_cse (0);
+    set_opt_global_cse(0);
     set_opt_unreachable_code(1);
     set_opt_control_flow(firm_opt.control_flow);
     set_opt_control_flow_weak_simplification(1);
     set_opt_control_flow_strong_simplification(1);
-  }
-  else
+  } else {
     set_optimize(0);
-
-  dump_filter = getenv("FIRM_DUMP_FILTER");
-  if (dump_filter)
-    only_dump_method_with_name(new_id_from_str(dump_filter));
+  }
 
   /* do not dump entity ld names */
   dump_ld_names(0);
