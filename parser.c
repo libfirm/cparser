@@ -7501,7 +7501,7 @@ static statement_t *parse_goto(void)
 	if(token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_statement();
-		return NULL;
+		goto end_error;
 	}
 	symbol_t *symbol = token.v.symbol;
 	next_token();
