@@ -104,7 +104,7 @@ ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg)
 {
 	const source_position_t *pos = (const source_position_t*) dbg;
-	if(pos == NULL)
+	if (pos == NULL)
 		return 0;
 	return (unsigned) snprintf(buf, len, "%s:%u", pos->input_name,
 	                           pos->linenr);
@@ -113,9 +113,9 @@ unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg)
 const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 {
 	const source_position_t *pos = (const source_position_t*) dbg;
-	if(pos == NULL)
+	if (pos == NULL)
 		return NULL;
-	if(line != NULL)
+	if (line != NULL)
 		*line = pos->linenr;
 	return pos->input_name;
 }
@@ -138,7 +138,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
-	if( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
+	if ( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
 			&& !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
 		char            name[64];
 		ir_mode_sort    sort;
@@ -147,7 +147,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 		ir_mode_arithmetic arithmetic;
 		unsigned        modulo_shift;
 
-		if(flags & ATOMIC_TYPE_FLAG_INTEGER) {
+		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 			assert(! (flags & ATOMIC_TYPE_FLAG_FLOAT));
 			snprintf(name, sizeof(name), "i%s%d", is_signed?"":"u", bit_size);
 			sort         = irms_int_number;
@@ -257,9 +257,9 @@ static ir_node *get_type_size(type_t *type)
 {
 	type = skip_typeref(type);
 
-	if(is_type_array(type) && type->array.is_vla) {
+	if (is_type_array(type) && type->array.is_vla) {
 		ir_node *size_node = type->array.size_node;
-		if(size_node == NULL) {
+		if (size_node == NULL) {
 			size_node = expression_to_firm(type->array.size_expression);
 			assert(!is_Const(size_node));
 			type->array.size_node = size_node;
@@ -391,13 +391,13 @@ static ir_type *create_array_type(array_type_t *type)
 	const int align = get_type_alignment_bytes(ir_element_type);
 	set_type_alignment_bytes(ir_type, align);
 
-	if(type->size_constant) {
+	if (type->size_constant) {
 		int n_elements = type->size;
 
 		set_array_bounds_int(ir_type, 0, 0, n_elements);
 
 		size_t elemsize = get_type_size_bytes(ir_element_type);
-		if(elemsize % align > 0) {
+		if (elemsize % align > 0) {
 			elemsize += align - (elemsize % align);
 		}
 		set_type_size_bytes(ir_type, n_elements * elemsize);
@@ -489,7 +489,7 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 	unsigned size = fold_constant(type->size);
 
 	assert(!is_type_float(base));
-	if(is_type_signed(base)) {
+	if (is_type_signed(base)) {
 		return get_signed_int_type_for_bit_size(irbase, size);
 	} else {
 		return get_unsigned_int_type_for_bit_size(irbase, size);
@@ -517,7 +517,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 	declaration_t      *declaration = type->declaration;
 	declaration_kind_t  kind        = (declaration_kind_t)declaration->declaration_kind;
 
-	if(kind == DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
+	if (kind == DECLARATION_KIND_COMPOUND_TYPE_COMPLETE
 			|| (kind == DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE
 				&& incomplete))
 		return declaration->v.irtype;
@@ -527,10 +527,10 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 	size_t bit_offset = 0;
 	size_t size       = 0;
 
-	if(irtype == NULL) {
+	if (irtype == NULL) {
 		symbol_t *symbol = declaration->symbol;
 		ident    *id;
-		if(symbol != NULL) {
+		if (symbol != NULL) {
 			id = new_id_from_str(symbol->string);
 		} else {
 			if (is_union) {
@@ -556,14 +556,14 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 		align_all = *outer_align;
 	}
 
-	if(incomplete)
+	if (incomplete)
 		return irtype;
 
 	declaration->declaration_kind = DECLARATION_KIND_COMPOUND_TYPE_COMPLETE;
 
 	declaration_t *entry = declaration->scope.declarations;
 	for( ; entry != NULL; entry = entry->next) {
-		if(entry->namespc != NAMESPACE_NORMAL)
+		if (entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
 		size_t prev_offset = offset;
@@ -573,14 +573,14 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 		dbg_info *dbgi       = get_dbg_info(&entry->source_position);
 
 		ident    *ident;
-		if(symbol != NULL) {
+		if (symbol != NULL) {
 			ident = new_id_from_str(symbol->string);
 		} else {
-			if(entry_type->kind == TYPE_COMPOUND_STRUCT) {
+			if (entry_type->kind == TYPE_COMPOUND_STRUCT) {
 				create_compound_type(&entry_type->compound, irtype, &offset,
 		 		                     &align_all, false, COMPOUND_IS_STRUCT);
 		 		goto finished_member;
-			} else if(entry_type->kind == TYPE_COMPOUND_UNION) {
+			} else if (entry_type->kind == TYPE_COMPOUND_UNION) {
 				create_compound_type(&entry_type->compound, irtype, &offset,
 				                     &align_all, false, COMPOUND_IS_UNION);
 				goto finished_member;
@@ -591,7 +591,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 		}
 
 		ir_type *base_irtype;
-		if(entry_type->kind == TYPE_BITFIELD) {
+		if (entry_type->kind == TYPE_BITFIELD) {
 			base_irtype = get_ir_type(entry_type->bitfield.base_type);
 		} else {
 			base_irtype = get_ir_type(entry_type);
@@ -605,11 +605,11 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 
 		size_t base;
 		size_t bits_remainder;
-		if(entry_type->kind == TYPE_BITFIELD) {
+		if (entry_type->kind == TYPE_BITFIELD) {
 			size_t size_bits      = fold_constant(entry_type->bitfield.size);
 			size_t rest_size_bits = (entry_alignment - misalign)*8 - bit_offset;
 
-			if(size_bits > rest_size_bits) {
+			if (size_bits > rest_size_bits) {
 				/* start a new bucket */
 				offset     += entry_alignment - misalign;
 				bit_offset  = 0;
@@ -626,7 +626,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 			bit_offset  = bit_offset + (size_bits % 8);
 		} else {
 			size_t entry_size = get_type_size_bytes(base_irtype);
-			if(misalign > 0 || bit_offset > 0)
+			if (misalign > 0 || bit_offset > 0)
 				offset += entry_alignment - misalign;
 
 			base           = offset;
@@ -635,8 +635,8 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 			bit_offset     = 0;
 		}
 
-		if(entry_alignment > align_all) {
-			if(entry_alignment % align_all != 0) {
+		if (entry_alignment > align_all) {
+			if (entry_alignment % align_all != 0) {
 				panic("uneven alignments not supported yet");
 			}
 			align_all = entry_alignment;
@@ -666,11 +666,11 @@ finished_member:
 	}
 
 	size_t misalign = offset % align_all;
-	if(misalign > 0 || bit_offset > 0) {
+	if (misalign > 0 || bit_offset > 0) {
 		size += align_all - misalign;
 	}
 
-	if(outer_offset != NULL) {
+	if (outer_offset != NULL) {
 		if (!is_union) {
 			*outer_offset = offset;
 		} else {
@@ -678,7 +678,7 @@ finished_member:
 		}
 
 		if (align_all > *outer_align) {
-			if(align_all % *outer_align != 0) {
+			if (align_all % *outer_align != 0) {
 				panic("uneven alignments not supported yet");
 			}
 			*outer_align = align_all;
@@ -806,7 +806,7 @@ static ir_type *get_ir_type(type_t *type)
 	case TYPE_INVALID:
 		break;
 	}
-	if(firm_type == NULL)
+	if (firm_type == NULL)
 		panic("unknown type found");
 
 	type->base.firm_type = firm_type;
@@ -818,7 +818,7 @@ static inline ir_mode *get_ir_mode(type_t *type)
 	ir_type *irtype = get_ir_type(type);
 
 	/* firm doesn't report a mode for arrays somehow... */
-	if(is_Array_type(irtype)) {
+	if (is_Array_type(irtype)) {
 		return mode_P_data;
 	}
 
@@ -973,7 +973,7 @@ create_ld_ident_func  create_ld_ident = create_ld_ident_linux_elf;
  */
 static ir_entity *get_function_entity(declaration_t *declaration)
 {
-	if(declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
+	if (declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
 		return declaration->v.entity;
 	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
@@ -1048,10 +1048,10 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 	char    buf[128];
 	tarval *tv;
 	size_t  len;
-	if(mode_is_float(mode)) {
+	if (mode_is_float(mode)) {
 		tv = new_tarval_from_double(cnst->v.float_value, mode);
 	} else {
-		if(mode_is_signed(mode)) {
+		if (mode_is_signed(mode)) {
 			len = snprintf(buf, sizeof(buf), "%lld", cnst->v.int_value);
 		} else {
 			len = snprintf(buf, sizeof(buf), "%llu",
@@ -1232,7 +1232,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
 
-	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_Load_volatility(load, volatility_is_volatile);
 	}
 
@@ -1306,7 +1306,7 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	if (value_mode == dest_mode || is_Bad(value))
 		return value;
 
-	if(dest_mode == mode_b) {
+	if (dest_mode == mode_b) {
 		ir_node *zero = new_Const(value_mode, get_mode_null(value_mode));
 		ir_node *cmp  = new_d_Cmp(dbgi, value, zero);
 		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
@@ -1432,7 +1432,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 	switch(symbol->ID) {
 	case T___builtin_alloca: {
-		if(call->arguments == NULL || call->arguments->next != NULL) {
+		if (call->arguments == NULL || call->arguments->next != NULL) {
 			panic("invalid number of parameters on __builtin_alloca");
 		}
 		expression_t *argument = call->arguments->expression;
@@ -1482,14 +1482,14 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	assert(get_cur_block() != NULL);
 
 	expression_t *function = call->function;
-	if(function->kind == EXPR_BUILTIN_SYMBOL) {
+	if (function->kind == EXPR_BUILTIN_SYMBOL) {
 		return process_builtin_call(call);
 	}
-	if(function->kind == EXPR_REFERENCE) {
+	if (function->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref = &function->reference;
 		declaration_t *declaration = ref->declaration;
 
-		if((declaration_kind_t)declaration->declaration_kind == DECLARATION_KIND_FUNCTION) {
+		if ((declaration_kind_t)declaration->declaration_kind == DECLARATION_KIND_FUNCTION) {
 			if (declaration->v.entity == rts_entities[rts_alloca]) {
 				/* handle alloca() call */
 				expression_t *argument = call->arguments->expression;
@@ -1521,7 +1521,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	int      n_parameters = 0;
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
-	if(function_type->variadic || function_type->unspecified_parameters) {
+	if (function_type->variadic || function_type->unspecified_parameters) {
 		const call_argument_t *argument = call->arguments;
 		for( ; argument != NULL; argument = argument->next) {
 			++n_parameters;
@@ -1578,9 +1578,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 	type_t  *return_type = skip_typeref(function_type->return_type);
 	ir_node *result      = NULL;
 
-	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+	if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 		ir_mode *mode;
-		if(is_type_scalar(return_type)) {
+		if (is_type_scalar(return_type)) {
 			mode = get_ir_mode(return_type);
 		} else {
 			mode = mode_P_data;
@@ -1607,10 +1607,10 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 
 	ir_node *memory = get_store();
 
-	if(is_type_scalar(type)) {
+	if (is_type_scalar(type)) {
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-		if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
+		if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
 			set_Store_volatility(store, volatility_is_volatile);
 		set_store(store_mem);
 	} else {
@@ -1628,7 +1628,7 @@ static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 
 	assert(offset >= 0 && size >= 0);
 	assert(offset + size <= mode_size);
-	if(size == mode_size) {
+	if (size == mode_size) {
 		return all_one;
 	}
 
@@ -1681,7 +1681,7 @@ static void bitfield_store_to_firm(const select_expression_t *expression,
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
 
-	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_Load_volatility(load, volatility_is_volatile);
 		set_Store_volatility(store, volatility_is_volatile);
 	}
@@ -1718,7 +1718,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	tarval    *tvr          = new_tarval_from_long(shift_bitsr, mode_uint);
 	ir_node   *countr       = new_d_Const(dbgi, mode_uint, tvr);
 	ir_node   *shiftr;
-	if(mode_is_signed(mode)) {
+	if (mode_is_signed(mode)) {
 		shiftr = new_d_Shrs(dbgi, shiftl, countr, mode_int);
 	} else {
 		shiftr = new_d_Shr(dbgi, shiftl, countr, mode_int);
@@ -1809,7 +1809,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	ir_mode *mode = get_ir_mode(expression->base.type);
 
 	ir_node *offset;
-	if(is_type_pointer(type)) {
+	if (is_type_pointer(type)) {
 		pointer_type_t *pointer_type = &type->pointer;
 		offset                       = get_type_size(pointer_type->points_to);
 	} else {
@@ -1965,7 +1965,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 	type_t   *type = skip_typeref(expression->base.type);
 
-	if(expression->base.kind == EXPR_UNARY_TAKE_ADDRESS)
+	if (expression->base.kind == EXPR_UNARY_TAKE_ADDRESS)
 		return expression_to_addr(expression->value);
 
 	const expression_t *value = expression->value;
@@ -2003,7 +2003,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return create_incdec(expression);
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
-		if(is_type_scalar(type)) {
+		if (is_type_scalar(type)) {
 			ir_mode *mode = get_ir_mode(type);
 			ir_node *node = create_conv(dbgi, value_node, mode);
 			node = do_strict_conv(dbgi, node);
@@ -2016,7 +2016,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	}
 	case EXPR_UNARY_CAST_IMPLICIT: {
 		ir_node *value_node = expression_to_firm(value);
-		if(is_type_scalar(type)) {
+		if (is_type_scalar(type)) {
 			ir_mode *mode = get_ir_mode(type);
 			return create_conv(dbgi, value_node, mode);
 		} else {
@@ -2024,7 +2024,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		}
 	}
 	case EXPR_UNARY_ASSUME:
-		if(firm_opt.confirm)
+		if (firm_opt.confirm)
 			return handle_assume(dbgi, value);
 		else
 			return NULL;
@@ -2179,7 +2179,7 @@ normal_node:
 		ir_node *pin = new_Pin(new_NoMem());
 		ir_node *op;
 		ir_node *res;
-		if(mode_is_float(mode)) {
+		if (mode_is_float(mode)) {
 			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
 			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
 		} else {
@@ -2208,10 +2208,10 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	type_t   *type = expression->base.type;
 	ir_mode  *mode = get_ir_mode(type);
 
-	if(is_constant_expression(expression->left)) {
+	if (is_constant_expression(expression->left)) {
 		long val = fold_constant(expression->left);
 		expression_kind_t ekind = expression->base.kind;
-		if((ekind == EXPR_BINARY_LOGICAL_AND && val != 0)
+		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0)
 				|| (ekind == EXPR_BINARY_LOGICAL_OR && val == 0)) {
 			return expression_to_firm(expression->right);
 		} else {
@@ -2370,14 +2370,14 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 		/* be sure the type is constructed */
 		(void) get_ir_type(type);
 
-		if(designator->symbol != NULL) {
+		if (designator->symbol != NULL) {
 			assert(is_type_compound(type));
 			symbol_t *symbol = designator->symbol;
 
 			declaration_t *declaration = type->compound.declaration;
 			declaration_t *iter        = declaration->scope.declarations;
 			for( ; iter != NULL; iter = iter->next) {
-				if(iter->symbol == symbol) {
+				if (iter->symbol == symbol) {
 					break;
 				}
 			}
@@ -2452,14 +2452,14 @@ static ir_node *compound_literal_to_firm(
 static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 {
 	type_t *type = expression->type;
-	if(type == NULL) {
+	if (type == NULL) {
 		type = expression->tp_expression->base.type;
 		assert(type != NULL);
 	}
 
 	type = skip_typeref(type);
 	/* § 6.5.3.4 (2) if the type is a VLA, evaluate the expression. */
-	if(is_type_array(type) && type->array.is_vla
+	if (is_type_array(type) && type->array.is_vla
 			&& expression->tp_expression != NULL) {
 		expression_to_firm(expression->tp_expression);
 	}
@@ -2473,7 +2473,7 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
 	type_t *type = expression->type;
-	if(type == NULL) {
+	if (type == NULL) {
 		/* beware: if expression is a variable reference, return the
 		   alignment of the variable. */
 		const expression_t *tp_expression = expression->tp_expression;
@@ -2502,19 +2502,19 @@ long fold_constant(const expression_t *expression)
 	assert(is_constant_expression(expression));
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
-	if(current_ir_graph == NULL) {
+	if (current_ir_graph == NULL) {
 		current_ir_graph = get_const_code_irg();
 	}
 
 	ir_node *cnst = expression_to_firm(expression);
 	current_ir_graph = old_current_ir_graph;
 
-	if(!is_Const(cnst)) {
+	if (!is_Const(cnst)) {
 		panic("couldn't fold constant\n");
 	}
 
 	tarval *tv = get_Const_tarval(cnst);
-	if(!tarval_is_long(tv)) {
+	if (!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer\n");
 	}
 
@@ -2528,9 +2528,9 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
 
 	/* first try to fold a constant condition */
-	if(is_constant_expression(expression->condition)) {
+	if (is_constant_expression(expression->condition)) {
 		long val = fold_constant(expression->condition);
-		if(val) {
+		if (val) {
 			return expression_to_firm(expression->true_expression);
 		} else {
 			return expression_to_firm(expression->false_expression);
@@ -3026,11 +3026,11 @@ static void create_condition_evaluation(const expression_t *expression,
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
 	/* set branch prediction info based on __builtin_expect */
-	if(expression->kind == EXPR_BINARY_BUILTIN_EXPECT) {
+	if (expression->kind == EXPR_BINARY_BUILTIN_EXPECT) {
 		long               cnst = fold_constant(expression->binary.right);
 		cond_jmp_predicate pred;
 
-		if(cnst == 0) {
+		if (cnst == 0) {
 			pred = COND_JMP_PRED_FALSE;
 		} else {
 			pred = COND_JMP_PRED_TRUE;
@@ -3039,7 +3039,9 @@ static void create_condition_evaluation(const expression_t *expression,
 	}
 
 	add_immBlock_pred(true_block, true_proj);
-	add_immBlock_pred(false_block, false_proj);
+	if (false_block != NULL) {
+		add_immBlock_pred(false_block, false_proj);
+	}
 
 	set_cur_block(NULL);
 }
@@ -3065,12 +3067,12 @@ static void create_declaration_entity(declaration_t *declaration,
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
-	if(parent_type == get_tls_type())
+	if (parent_type == get_tls_type())
 		set_entity_allocation(entity, allocation_automatic);
-	else if(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
+	else if (declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
 		set_entity_allocation(entity, allocation_static);
 
-	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(entity, volatility_is_volatile);
 	}
 }
@@ -3099,9 +3101,9 @@ static __attribute__((unused)) void debug_print_type_path(const type_path_t *pat
 		const type_path_entry_t *entry = & path->path[i];
 
 		type_t *type = skip_typeref(entry->type);
-		if(is_type_compound(type)) {
+		if (is_type_compound(type)) {
 			fprintf(stderr, ".%s", entry->compound_entry->symbol->string);
-		} else if(is_type_array(type)) {
+		} else if (is_type_array(type)) {
 			fprintf(stderr, "[%zd]", entry->index);
 		} else {
 			fprintf(stderr, "-INVALID-");
@@ -3149,7 +3151,7 @@ static ir_initializer_t *get_initializer_entry(type_path_t *path)
 
 	assert(is_type_compound(top_type) || is_type_array(top_type));
 
-	if(ARR_LEN(path->path) == 0) {
+	if (ARR_LEN(path->path) == 0) {
 		return NULL;
 	} else {
 		type_path_entry_t *top         = get_type_path_top(path);
@@ -3172,14 +3174,14 @@ static void descend_into_subtype(type_path_t *path)
 
 	size_t len;
 
-	if(is_type_compound(top_type)) {
+	if (is_type_compound(top_type)) {
 		declaration_t *declaration = top_type->compound.declaration;
 		declaration_t *entry       = declaration->scope.declarations;
 
 		top->compound_entry = entry;
 		top->index          = 0;
 		len                 = get_compound_size(&top_type->compound);
-		if(entry != NULL)
+		if (entry != NULL)
 			path->top_type = entry->type;
 	} else {
 		assert(is_type_array(top_type));
@@ -3189,13 +3191,13 @@ static void descend_into_subtype(type_path_t *path)
 		path->top_type = top_type->array.element_type;
 		len            = top_type->array.size;
 	}
-	if(initializer == NULL
+	if (initializer == NULL
 			|| get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
 		initializer = create_initializer_compound(len);
 		/* we have to set the entry at the 2nd latest path entry... */
 		size_t path_len = ARR_LEN(path->path);
 		assert(path_len >= 1);
-		if(path_len > 1) {
+		if (path_len > 1) {
 			type_path_entry_t *entry        = & path->path[path_len-2];
 			ir_initializer_t  *tinitializer = entry->initializer;
 			set_initializer_compound_value(tinitializer, entry->index,
@@ -3225,7 +3227,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 		type_t            *orig_type   = top->type;
 		type_t            *type        = skip_typeref(orig_type);
 
-		if(designator->symbol != NULL) {
+		if (designator->symbol != NULL) {
 			assert(is_type_compound(type));
 			size_t    index  = 0;
 			symbol_t *symbol = designator->symbol;
@@ -3233,7 +3235,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			declaration_t *declaration = type->compound.declaration;
 			declaration_t *iter        = declaration->scope.declarations;
 			for( ; iter != NULL; iter = iter->next, ++index) {
-				if(iter->symbol == symbol) {
+				if (iter->symbol == symbol) {
 					break;
 				}
 			}
@@ -3252,7 +3254,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			long index = fold_constant(array_index);
 			assert(index >= 0);
 #ifndef NDEBUG
-			if(type->array.size_constant == 1) {
+			if (type->array.size_constant == 1) {
 				long array_size = type->array.size;
 				assert(index < array_size);
 			}
@@ -3264,7 +3266,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 		}
 		path->top_type = orig_type;
 
-		if(designator->next != NULL) {
+		if (designator->next != NULL) {
 			descend_into_subtype(path);
 		}
 	}
@@ -3274,7 +3276,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 static void advance_current_object(type_path_t *path)
 {
-	if(path->invalid) {
+	if (path->invalid) {
 		/* TODO: handle this... */
 		panic("invalid initializer in ast2firm (excessive elements)");
 		return;
@@ -3283,15 +3285,15 @@ static void advance_current_object(type_path_t *path)
 	type_path_entry_t *top = get_type_path_top(path);
 
 	type_t *type = skip_typeref(top->type);
-	if(is_type_union(type)) {
+	if (is_type_union(type)) {
 		top->compound_entry = NULL;
-	} else if(is_type_struct(type)) {
+	} else if (is_type_struct(type)) {
 		declaration_t *entry = top->compound_entry;
 
 		top->index++;
 		entry               = entry->next;
 		top->compound_entry = entry;
-		if(entry != NULL) {
+		if (entry != NULL) {
 			path->top_type = entry->type;
 			return;
 		}
@@ -3299,7 +3301,7 @@ static void advance_current_object(type_path_t *path)
 		assert(is_type_array(type));
 
 		top->index++;
-		if(!type->array.size_constant || top->index < type->array.size) {
+		if (!type->array.size_constant || top->index < type->array.size) {
 			return;
 		}
 	}
@@ -3308,7 +3310,7 @@ static void advance_current_object(type_path_t *path)
 	 * can ascend in the type hierarchy and continue with another subobject */
   	size_t len = ARR_LEN(path->path);
 
-	if(len > 1) {
+	if (len > 1) {
 		ascend_from_subtype(path);
 		advance_current_object(path);
 	} else {
@@ -3343,19 +3345,19 @@ static ir_initializer_t *create_ir_initializer_list(
 	for(size_t i = 0; i < initializer->len; ++i) {
 		const initializer_t *sub_initializer = initializer->initializers[i];
 
-		if(sub_initializer->kind == INITIALIZER_DESIGNATOR) {
+		if (sub_initializer->kind == INITIALIZER_DESIGNATOR) {
 			walk_designator(&path, sub_initializer->designator.designator);
 			continue;
 		}
 
-		if(sub_initializer->kind == INITIALIZER_VALUE) {
+		if (sub_initializer->kind == INITIALIZER_VALUE) {
 			/* we might have to descend into types until we're at a scalar
 			 * type */
 			while(true) {
 				type_t *orig_top_type = path.top_type;
 				type_t *top_type      = skip_typeref(orig_top_type);
 
-				if(is_type_scalar(top_type))
+				if (is_type_scalar(top_type))
 					break;
 				descend_into_subtype(&path);
 			}
@@ -3396,7 +3398,7 @@ static ir_initializer_t *create_ir_initializer_string(
 
 	for(size_t i = 0; i < len; ++i) {
 		char c = 0;
-		if(i < string_len)
+		if (i < string_len)
 			c = string[i];
 
 		tarval           *tv = new_tarval_from_long(c, mode);
@@ -3421,7 +3423,7 @@ static ir_initializer_t *create_ir_initializer_wide_string(
 
 	for(size_t i = 0; i < len; ++i) {
 		wchar_rep_t c = 0;
-		if(i < string_len) {
+		if (i < string_len) {
 			c = string[i];
 		}
 		tarval *tv = new_tarval_from_long(c, mode);
@@ -3473,7 +3475,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 		assert(is_compound_type(type));
 
 		int n_members;
-		if(is_Array_type(type)) {
+		if (is_Array_type(type)) {
 			assert(has_array_upper_bound(type, 0));
 			n_members = get_array_upper_bound_int(type, 0);
 		} else {
@@ -3483,7 +3485,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 		for(int i = 0; i < n_members; ++i) {
 			ir_node *addr;
 			ir_type *irtype;
-			if(is_Array_type(type)) {
+			if (is_Array_type(type)) {
 				ir_entity *entity   = get_array_element_entity(type);
 				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
@@ -3538,21 +3540,21 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	case IR_INITIALIZER_COMPOUND: {
 		assert(is_compound_type(type));
 		int n_members;
-		if(is_Array_type(type)) {
+		if (is_Array_type(type)) {
 			assert(has_array_upper_bound(type, 0));
 			n_members = get_array_upper_bound_int(type, 0);
 		} else {
 			n_members = get_compound_n_members(type);
 		}
 
-		if(get_initializer_compound_n_entries(initializer)
+		if (get_initializer_compound_n_entries(initializer)
 				!= (unsigned) n_members)
 			panic("initializer doesn't match compound type");
 
 		for(int i = 0; i < n_members; ++i) {
 			ir_node *addr;
 			ir_type *irtype;
-			if(is_Array_type(type)) {
+			if (is_Array_type(type)) {
 				ir_entity *entity   = get_array_element_entity(type);
 				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
@@ -3596,7 +3598,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	ir_node *frame  = get_irg_frame(current_ir_graph);
 	ir_node *addr   = new_d_simpleSel(dbgi, nomem, frame, entity);
 
-	if(initializer->kind == INITIALIZER_VALUE) {
+	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
 		ir_node *value = expression_to_firm(initializer_value->value);
@@ -3605,7 +3607,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 		return;
 	}
 
-	if(!is_constant_initializer(initializer)) {
+	if (!is_constant_initializer(initializer)) {
 		ir_initializer_t *irinitializer
 			= create_ir_initializer(initializer, type);
 
@@ -3654,17 +3656,17 @@ static void create_initializer_local_variable_entity(declaration_t *declaration)
 static void create_declaration_initializer(declaration_t *declaration)
 {
 	initializer_t *initializer = declaration->init.initializer;
-	if(initializer == NULL)
+	if (initializer == NULL)
 		return;
 
 	declaration_kind_t declaration_kind
 		= (declaration_kind_t) declaration->declaration_kind;
-	if(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY) {
+	if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY) {
 		create_initializer_local_variable_entity(declaration);
 		return;
 	}
 
-	if(initializer->kind == INITIALIZER_VALUE) {
+	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 		dbg_info            *dbgi
 			= get_dbg_info(&declaration->source_position);
@@ -3672,7 +3674,7 @@ static void create_declaration_initializer(declaration_t *declaration)
 		ir_node *value = expression_to_firm(initializer_value->value);
 		value = do_strict_conv(dbgi, value);
 
-		if(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(declaration->v.value_number, value);
 		} else {
 			assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
@@ -3732,16 +3734,16 @@ static void create_local_variable(declaration_t *declaration)
 	type_t *type = skip_typeref(declaration->type);
 
 	/* is it a variable length array? */
-	if(is_type_array(type) && !type->array.size_constant) {
+	if (is_type_array(type) && !type->array.size_constant) {
 		create_variable_length_array(declaration);
 		return;
-	} else if(is_type_array(type) || is_type_compound(type)) {
+	} else if (is_type_array(type) || is_type_compound(type)) {
 		needs_entity = true;
-	} else if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	} else if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		needs_entity = true;
 	}
 
-	if(needs_entity) {
+	if (needs_entity) {
 		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
 		create_declaration_entity(declaration,
 		                          DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
@@ -3770,7 +3772,7 @@ static void create_local_static_variable(declaration_t *declaration)
 
 	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
 
-	if(type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(entity, volatility_is_volatile);
 	}
 
@@ -3794,7 +3796,7 @@ static void create_local_static_variable(declaration_t *declaration)
 
 static void return_statement_to_firm(return_statement_t *statement)
 {
-	if(get_cur_block() == NULL)
+	if (get_cur_block() == NULL)
 		return;
 
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
@@ -3803,16 +3805,16 @@ static void return_statement_to_firm(return_statement_t *statement)
 
 	ir_node *in[1];
 	int      in_len;
-	if(get_method_n_ress(func_irtype) > 0) {
+	if (get_method_n_ress(func_irtype) > 0) {
 		ir_type *res_type = get_method_res_type(func_irtype, 0);
 
-		if(statement->value != NULL) {
+		if (statement->value != NULL) {
 			ir_node *node = expression_to_firm(statement->value);
 			node  = do_strict_conv(dbgi, node);
 			in[0] = node;
 		} else {
 			ir_mode *mode;
-			if(is_compound_type(res_type)) {
+			if (is_compound_type(res_type)) {
 				mode = mode_P_data;
 			} else {
 				mode = get_type_mode(res_type);
@@ -3822,7 +3824,7 @@ static void return_statement_to_firm(return_statement_t *statement)
 		in_len = 1;
 	} else {
 		/* build return_value for its side effects */
-		if(statement->value != NULL) {
+		if (statement->value != NULL) {
 			expression_to_firm(statement->value);
 		}
 		in_len = 0;
@@ -3839,7 +3841,7 @@ static void return_statement_to_firm(return_statement_t *statement)
 
 static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 {
-	if(get_cur_block() == NULL)
+	if (get_cur_block() == NULL)
 		return NULL;
 
 	return expression_to_firm(statement->expression);
@@ -3855,7 +3857,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for( ; statement != NULL; statement = statement->base.next) {
-		if(statement->base.next == NULL
+		if (statement->base.next == NULL
 				&& statement->kind == STATEMENT_EXPRESSION) {
 			result = expression_statement_to_firm(
 					&statement->expression);
@@ -3946,8 +3948,8 @@ static void create_local_declaration(declaration_t *declaration)
 	case STORAGE_CLASS_NONE:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
-		if(is_type_function(type)) {
-			if(declaration->init.statement != NULL) {
+		if (is_type_function(type)) {
+			if (declaration->init.statement != NULL) {
 				panic("nested functions not supported yet");
 			} else {
 				get_function_entity(declaration);
@@ -3973,7 +3975,7 @@ static void create_local_declaration(declaration_t *declaration)
 
 static void initialize_local_declaration(declaration_t *declaration)
 {
-	if(declaration->symbol == NULL || declaration->namespc != NAMESPACE_NORMAL)
+	if (declaration->symbol == NULL || declaration->namespc != NAMESPACE_NORMAL)
 		return;
 
 	switch ((declaration_kind_t) declaration->declaration_kind) {
@@ -4004,7 +4006,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	declaration_t *declaration = statement->declarations_begin;
 	declaration_t *end         = statement->declarations_end->next;
 	for( ; declaration != end; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
+		if (declaration->namespc != NAMESPACE_NORMAL)
 			continue;
 		initialize_local_declaration(declaration);
 	}
@@ -4073,50 +4075,60 @@ static void if_statement_to_firm(if_statement_t *statement)
 static void while_statement_to_firm(while_statement_t *statement)
 {
 	ir_node *jmp = NULL;
-	if(get_cur_block() != NULL) {
+	if (get_cur_block() != NULL) {
 		jmp = new_Jmp();
 	}
 
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
-	if(jmp != NULL) {
+	if (jmp != NULL) {
 		add_immBlock_pred(header_block, jmp);
 	}
 
-	/* the false block */
-	ir_node *false_block = new_immBlock();
-
 	/* the loop body */
-	ir_node *body_block;
-	if (statement->body != NULL) {
-		ir_node *old_continue_label = continue_label;
-		ir_node *old_break_label    = break_label;
-		continue_label              = header_block;
-		break_label                 = false_block;
+	ir_node *old_continue_label = continue_label;
+	ir_node *old_break_label    = break_label;
+	continue_label              = header_block;
+	break_label                 = NULL;
 
-		body_block = new_immBlock();
-		statement_to_firm(statement->body);
+	ir_node *body_block = new_immBlock();
+	statement_to_firm(statement->body);
+	ir_node *false_block = break_label;
 
-		assert(continue_label == header_block);
-		assert(break_label    == false_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
+	assert(continue_label == header_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
 
-		if(get_cur_block() != NULL) {
-			jmp = new_Jmp();
-			add_immBlock_pred(header_block, jmp);
-		}
-	} else {
-		body_block = header_block;
+	if (get_cur_block() != NULL) {
+		jmp = new_Jmp();
+		add_immBlock_pred(header_block, jmp);
 	}
 
-	/* create the condition */
-	set_cur_block(header_block);
+	/* shortcut for while(true) */
+	if (is_constant_expression(statement->condition)
+			&& fold_constant(statement->condition) != 0) {
+		set_cur_block(header_block);
+		ir_node *header_jmp = new_Jmp();
+		add_immBlock_pred(body_block, header_jmp);
 
-	create_condition_evaluation(statement->condition, body_block, false_block);
+		keep_alive(body_block);
+	} else {
+		if (false_block == NULL) {
+			false_block = new_immBlock();
+		}
+
+		/* create the condition */
+		set_cur_block(header_block);
+
+		create_condition_evaluation(statement->condition, body_block,
+		                            false_block);
+	}
+
 	mature_immBlock(body_block);
-	mature_immBlock(false_block);
 	mature_immBlock(header_block);
+	if (false_block != NULL) {
+		mature_immBlock(false_block);
+	}
 
 	set_cur_block(false_block);
 }
@@ -4124,21 +4136,20 @@ static void while_statement_to_firm(while_statement_t *statement)
 static void do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	ir_node *jmp = NULL;
-	if(get_cur_block() != NULL) {
+	if (get_cur_block() != NULL) {
 		jmp = new_Jmp();
 	}
 
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
 
-	/* the false block */
-	ir_node *false_block = new_immBlock();
-
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	if(jmp != NULL) {
+	if (jmp != NULL) {
 		add_immBlock_pred(body_block, jmp);
 	}
+
+	ir_node *false_block = NULL;
 
 	if (statement->body != NULL) {
 		ir_node *old_continue_label = continue_label;
@@ -4147,31 +4158,28 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 		break_label                 = false_block;
 
 		statement_to_firm(statement->body);
+		false_block = break_label;
 
 		assert(continue_label == header_block);
-		assert(break_label    == false_block);
 		continue_label = old_continue_label;
 		break_label    = old_break_label;
-
-		if (get_cur_block() == NULL) {
-			mature_immBlock(header_block);
-			mature_immBlock(body_block);
-			mature_immBlock(false_block);
-			return;
-		}
 	}
 
-	ir_node *body_jmp = new_Jmp();
-	add_immBlock_pred(header_block, body_jmp);
-	mature_immBlock(header_block);
+	if (get_cur_block() != NULL) {
+		ir_node *body_jmp = new_Jmp();
+		add_immBlock_pred(header_block, body_jmp);
+		mature_immBlock(header_block);
+	}
 
 	/* create the condition */
 	set_cur_block(header_block);
 
 	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
-	mature_immBlock(false_block);
 	mature_immBlock(header_block);
+	if (false_block != NULL) {
+		mature_immBlock(false_block);
+	}
 
 	set_cur_block(false_block);
 }
@@ -4191,7 +4199,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	}
 
 	if (get_cur_block() != NULL) {
-		if(statement->initialisation != NULL) {
+		if (statement->initialisation != NULL) {
 			expression_to_firm(statement->initialisation);
 		}
 
@@ -4263,7 +4271,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 static void create_jump_statement(const statement_t *statement,
                                   ir_node *target_block)
 {
-	if(get_cur_block() == NULL)
+	if (get_cur_block() == NULL)
 		return;
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
@@ -4339,7 +4347,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	ir_node *block     = new_immBlock();
 
 	set_cur_block(old_block);
-	if(statement->expression != NULL) {
+	if (statement->expression != NULL) {
 		long start_pn = fold_constant(statement->expression);
 		long end_pn = start_pn;
 		if (statement->end_range != NULL) {
@@ -4348,7 +4356,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		assert(start_pn <= end_pn);
 		/* create jumps for all cases in the given range */
 		for (long pn = start_pn; pn <= end_pn; ++pn) {
-			if(pn == MAGIC_DEFAULT_PN_NUMBER) {
+			if (pn == MAGIC_DEFAULT_PN_NUMBER) {
 				/* oops someone detected our cheating... */
 				panic("magic default pn used");
 			}
@@ -4369,7 +4377,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	mature_immBlock(block);
 	set_cur_block(block);
 
-	if(statement->statement != NULL) {
+	if (statement->statement != NULL) {
 		statement_to_firm(statement->statement);
 	}
 }
@@ -4378,7 +4386,7 @@ static ir_node *get_label_block(declaration_t *label)
 {
 	assert(label->namespc == NAMESPACE_LABEL);
 
-	if(label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
+	if (label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
 		return label->v.block;
 	}
 	assert(label->declaration_kind == DECLARATION_KIND_UNKNOWN);
@@ -4399,7 +4407,7 @@ static void label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
 
-	if(get_cur_block() != NULL) {
+	if (get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
 		add_immBlock_pred(block, jmp);
 	}
@@ -4407,14 +4415,14 @@ static void label_to_firm(const label_statement_t *statement)
 	set_cur_block(block);
 	keep_alive(block);
 
-	if(statement->statement != NULL) {
+	if (statement->statement != NULL) {
 		statement_to_firm(statement->statement);
 	}
 }
 
 static void goto_to_firm(const goto_statement_t *statement)
 {
-	if(get_cur_block() == NULL)
+	if (get_cur_block() == NULL)
 		return;
 
 	ir_node *block = get_label_block(statement->label);
@@ -4441,7 +4449,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	size_t         n_clobbers = 0;
 	asm_clobber_t *clobber    = statement->clobbers;
 	for( ; clobber != NULL; clobber = clobber->next) {
-		if(strcmp(clobber->clobber, "memory") == 0) {
+		if (strcmp(clobber->clobber, "memory") == 0) {
 			needs_memory = true;
 			continue;
 		}
@@ -4452,7 +4460,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	}
 	assert(obstack_object_size(&asm_obst) == n_clobbers * sizeof(ident*));
 	ident **clobbers = NULL;
-	if(n_clobbers > 0) {
+	if (n_clobbers > 0) {
 		clobbers = obstack_finish(&asm_obst);
 	}
 
@@ -4478,12 +4486,12 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 				obstack_1grow(&asm_obst, *c);
 				break;
 			case '=':
-				if(modifiers & ASM_MODIFIER_READ_WRITE)
+				if (modifiers & ASM_MODIFIER_READ_WRITE)
 					panic("inconsistent register constraints");
 				modifiers |= ASM_MODIFIER_WRITE_ONLY;
 				break;
 			case '+':
-				if(modifiers & ASM_MODIFIER_WRITE_ONLY)
+				if (modifiers & ASM_MODIFIER_WRITE_ONLY)
 					panic("inconsistent register constraints");
 				modifiers |= ASM_MODIFIER_READ_WRITE;
 				break;
@@ -4513,7 +4521,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 		const char *constraint_string = obstack_finish(&asm_obst);
 
 		needs_memory |= supports_memop;
-		if(supports_memop) {
+		if (supports_memop) {
 
 		}
 	}
@@ -4608,14 +4616,14 @@ static int count_local_declarations(const declaration_t *      decl,
 {
 	int count = 0;
 	for (; decl != end; decl = decl->next) {
-		if(decl->namespc != NAMESPACE_NORMAL)
+		if (decl->namespc != NAMESPACE_NORMAL)
 			continue;
 		const type_t *type = skip_typeref(decl->type);
 		if (!decl->address_taken && is_type_scalar(type))
 			++count;
 		const initializer_t *initializer = decl->init.initializer;
 		/* FIXME: should walk initializer hierarchies... */
-		if(initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
+		if (initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
 			count += count_decls_in_expression(initializer->value.value);
 		}
 	}
@@ -4625,7 +4633,7 @@ static int count_local_declarations(const declaration_t *      decl,
 static int count_decls_in_expression(const expression_t *expression) {
 	int count = 0;
 
-	if(expression == NULL)
+	if (expression == NULL)
 		return 0;
 
 	switch((expression_kind_t) expression->base.kind) {
@@ -4752,7 +4760,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 
 			case STATEMENT_LABEL: {
 				const label_statement_t *const label_stmt = &stmt->label;
-				if(label_stmt->statement != NULL) {
+				if (label_stmt->statement != NULL) {
 					count += count_decls_in_stmts(label_stmt->statement);
 				}
 				break;
@@ -4785,7 +4793,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_CASE_LABEL: {
 				const case_label_statement_t *label = &stmt->case_label;
 				count += count_decls_in_expression(label->expression);
-				if(label->statement != NULL) {
+				if (label->statement != NULL) {
 					count += count_decls_in_stmts(label->statement);
 				}
 				break;
@@ -4816,7 +4824,7 @@ static int count_decls_in_stmts(const statement_t *stmt)
 			case STATEMENT_MS_TRY: {
 				const ms_try_statement_t *const try_stmt = &stmt->ms_try;
 				count += count_decls_in_stmts(try_stmt->try_statement);
-				if(try_stmt->except_expression != NULL)
+				if (try_stmt->except_expression != NULL)
 					count += count_decls_in_expression(try_stmt->except_expression);
 				count += count_decls_in_stmts(try_stmt->final_statement);
 				break;
@@ -4854,11 +4862,11 @@ static void initialize_function_parameters(declaration_t *declaration)
 
 		bool needs_entity = parameter->address_taken;
 		assert(!is_type_array(type));
-		if(is_type_compound(type)) {
+		if (is_type_compound(type)) {
 			needs_entity = true;
 		}
 
-		if(needs_entity) {
+		if (needs_entity) {
 			ir_entity *entity = get_method_value_param_ent(function_irtype, n);
 			ident     *id     = new_id_from_str(parameter->symbol->string);
 			set_entity_ident(entity, id);
@@ -4930,7 +4938,7 @@ static void create_function(declaration_t *declaration)
 {
 	ir_entity *function_entity = get_function_entity(declaration);
 
-	if(declaration->init.statement == NULL)
+	if (declaration->init.statement == NULL)
 		return;
 
 	current_function_decl = declaration;
@@ -4962,7 +4970,7 @@ static void create_function(declaration_t *declaration)
 	ir_node *end_block = get_irg_end_block(irg);
 
 	/* do we have a return statement yet? */
-	if(get_cur_block() != NULL) {
+	if (get_cur_block() != NULL) {
 		type_t *type = skip_typeref(declaration->type);
 		assert(is_type_function(type));
 		const function_type_t *func_type   = &type->function;
@@ -4974,7 +4982,7 @@ static void create_function(declaration_t *declaration)
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
 			ir_mode *mode;
-			if(is_type_scalar(return_type)) {
+			if (is_type_scalar(return_type)) {
 				mode = get_ir_mode(func_type->return_type);
 			} else {
 				mode = mode_P_data;
@@ -4986,7 +4994,7 @@ static void create_function(declaration_t *declaration)
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
-				if(warning.return_type) {
+				if (warning.return_type) {
 					warningf(&declaration->source_position,
 						"missing return statement at end of non-void function '%Y'",
 						declaration->symbol);
@@ -5018,12 +5026,12 @@ static void create_function(declaration_t *declaration)
 		ir_type   *entity_type = get_entity_type(entity);
 
 		int align = get_type_alignment_bytes(entity_type);
-		if(align > align_all)
+		if (align > align_all)
 			align_all = align;
 		int misalign = 0;
-		if(align > 0) {
+		if (align > 0) {
 			misalign  = offset % align;
-			if(misalign > 0) {
+			if (misalign > 0) {
 				offset += align - misalign;
 			}
 		}
@@ -5042,16 +5050,16 @@ static void scope_to_firm(scope_t *scope)
 	/* first pass: create declarations */
 	declaration_t *declaration = scope->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
+		if (declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
+		if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
 				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 			continue;
-		if(declaration->symbol == NULL)
+		if (declaration->symbol == NULL)
 			continue;
 
 		type_t *type = skip_typeref(declaration->type);
-		if(is_type_function(type)) {
+		if (is_type_function(type)) {
 			get_function_entity(declaration);
 		} else {
 			create_global_variable(declaration);
@@ -5061,16 +5069,16 @@ static void scope_to_firm(scope_t *scope)
 	/* second pass: create code/initializers */
 	declaration = scope->declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
+		if (declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
+		if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY
 				|| declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 			continue;
-		if(declaration->symbol == NULL)
+		if (declaration->symbol == NULL)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->kind == TYPE_FUNCTION) {
+		if (type->kind == TYPE_FUNCTION) {
 			create_function(declaration);
 		} else {
 			assert(declaration->declaration_kind
@@ -5118,7 +5126,7 @@ void init_ast2firm(void)
 static void init_ir_types(void)
 {
 	static int ir_types_initialized = 0;
-	if(ir_types_initialized)
+	if (ir_types_initialized)
 		return;
 	ir_types_initialized = 1;
 
