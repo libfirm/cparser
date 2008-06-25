@@ -4149,26 +4149,26 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 		add_immBlock_pred(body_block, jmp);
 	}
 
-	ir_node *false_block = NULL;
+	ir_node *old_continue_label = continue_label;
+	ir_node *old_break_label    = break_label;
+	continue_label              = header_block;
+	break_label                 = NULL;
 
-	if (statement->body != NULL) {
-		ir_node *old_continue_label = continue_label;
-		ir_node *old_break_label    = break_label;
-		continue_label              = header_block;
-		break_label                 = false_block;
+	statement_to_firm(statement->body);
+	ir_node *false_block = break_label;
 
-		statement_to_firm(statement->body);
-		false_block = break_label;
-
-		assert(continue_label == header_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
-	}
+	assert(continue_label == header_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
 
 	if (get_cur_block() != NULL) {
 		ir_node *body_jmp = new_Jmp();
 		add_immBlock_pred(header_block, body_jmp);
 		mature_immBlock(header_block);
+	}
+
+	if (false_block == NULL) {
+		false_block = new_immBlock();
 	}
 
 	/* create the condition */
