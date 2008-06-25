@@ -793,12 +793,15 @@ int main(int argc, char **argv)
 		obstack_1grow(&ldflags_obst, '\0');
 		const char *flags = obstack_finish(&ldflags_obst);
 
-		obstack_printf(&file_obst, LINKER " %s -o %s", flags, outname);
+		obstack_printf(&file_obst, "%s", LINKER);
 
 		for (file_list_entry_t *entry = o_files; entry != NULL;
 				entry = entry->next) {
 			obstack_printf(&file_obst, " %s", entry->filename);
 		}
+
+		obstack_printf(&file_obst, " -o %s %s", outname, flags);
+
 		char *buf = obstack_finish(&file_obst);
 
 		if(verbose) {
