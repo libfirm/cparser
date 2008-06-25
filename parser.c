@@ -7694,7 +7694,8 @@ static statement_t *parse_return(void)
 			}
 		}
 		/* check for returning address of a local var */
-		if (return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
+		if (return_value != NULL &&
+				return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (is_local_variable(expression)) {
 				warningf(&statement->base.source_position,
