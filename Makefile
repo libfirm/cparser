@@ -109,7 +109,7 @@ $(DIRS):
 
 build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'
-	$(Q)./build/cparser $(CPPFLAGS) -Wall -g -c $< -o $@
+	$(Q)./build/cparser $(CPPFLAGS) -Wall -g3 -c $< -o $@
 
 build/cpb2/%.o: %.c cparser.bootstrap
 	@echo '===> CPARSER.BOOTSTRAP $<'

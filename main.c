@@ -463,7 +463,7 @@ int main(int argc, char **argv)
 	bool argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
-		if(arg[0] == '-') {
+		if(arg[0] == '-' && arg[1] != 0) {
 			/* an option */
 			const char *option = &arg[1];
 			if(option[0] == 'o') {
@@ -692,15 +692,22 @@ int main(int argc, char **argv)
 			}
 		} else {
 
+			file_list_entry_t *entry
+				= obstack_alloc(&file_obst, sizeof(entry[0]));
+			entry->filename = arg;
+
 			size_t len = strlen(arg);
 			if (len < 2) {
+				if (arg[0] == '-') {
+					/* exception: '-' as name reads C from stdin */
+					entry->next = c_files;
+					c_files     = entry;
+					continue;
+				}
 				fprintf(stderr, "'%s': file format not recognized\n", input);
 				continue;
 			}
 
-			file_list_entry_t *entry
-				= obstack_alloc(&file_obst, sizeof(entry[0]));
-			entry->filename = arg;
 			if (strcmp(arg+len-2, ".c") == 0) {
 				entry->next = c_files;
 				c_files     = entry;
@@ -721,7 +728,11 @@ int main(int argc, char **argv)
 	} else if (c_files != NULL && c_files->next == NULL) {
 		input = c_files->filename;
 	} else {
-		fprintf(stderr, "error: multiple input files specified\n");
+		if (c_files == NULL) {
+			fprintf(stderr, "error: no input files specified\n");
+		} else {
+			fprintf(stderr, "error: multiple input files specified\n");
+		}
 		argument_errors = true;
 	}
 
