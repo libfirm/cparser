@@ -3716,12 +3716,12 @@ static void allocate_variable_length_array(declaration_t *declaration)
 
 	dbg_info *dbgi      = get_dbg_info(&declaration->source_position);
 	type_t   *type      = declaration->type;
-	ir_node  *mem       = get_store();
 	ir_type  *el_type   = get_ir_type(type->array.element_type);
 
 	/* make sure size_node is calculated */
 	get_type_size(type);
 	ir_node  *elems = type->array.size_node;
+	ir_node  *mem   = get_store();
 	ir_node  *alloc = new_d_Alloc(dbgi, mem, elems, el_type, stack_alloc);
 
 	ir_node  *proj_m = new_d_Proj(dbgi, alloc, mode_M, pn_Alloc_M);
