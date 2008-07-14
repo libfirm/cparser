@@ -26,8 +26,8 @@ struct a_firm_opt firm_opt = {
   /* reassoc         = */ TRUE,
   /* cse             = */ TRUE,
   /* control_flow    = */ TRUE,
-  /* code_place      = */ TRUE,
-  /* gvn_pre         = */ FALSE,	/* currently buggy */
+  /* gcse            = */ TRUE,
+  /* gvn_pre         = */ FALSE,
   /* cond_eval       = */ FALSE,
   /* if_conversion   = */ FALSE,
   /* func_calls      = */ TRUE,
@@ -128,8 +128,8 @@ static const struct params {
   { X("no-const-fold"),          &firm_opt.const_folding,    0, "firm: disable constant folding" },
   { X("control_flow"),           &firm_opt.control_flow,     1, "firm: enable control flow optimization" },
   { X("no-control-flow"),        &firm_opt.control_flow,     0, "firm: disable control flow optimization" },
-  { X("code-place"),             &firm_opt.code_place,       1, "firm: enable GCSE and code placement" },
-  { X("no-code-place"),          &firm_opt.code_place,       0, "firm: disable GCSE and code placement" },
+  { X("gcse"),                   &firm_opt.gcse,             1, "firm: enable global common subexpression elimination" },
+  { X("no-gcse"),                &firm_opt.gcse,             0, "firm: disable global common subexpression elimination" },
   { X("gvn-pre"),                &firm_opt.gvn_pre,          1, "firm: enable GVN partial redundancy elimination" },
   { X("no-gvn-pre"),             &firm_opt.gvn_pre,          0, "firm: disable GVN partial redundancy elimination" },
   { X("cond-eval"),              &firm_opt.cond_eval,        1, "firm: enable partial condition evaluation optimization" },
@@ -290,7 +290,7 @@ static void disable_opts(void) {
   firm_opt.reassoc         = FALSE;
   firm_opt.cse             = FALSE;
   /* firm_opt.control_flow */
-  firm_opt.code_place      = FALSE;
+  firm_opt.gcse            = FALSE;
   firm_opt.gvn_pre         = FALSE;
   firm_opt.cond_eval       = FALSE;
   firm_opt.if_conversion   = FALSE;
@@ -376,21 +376,6 @@ int firm_option(const char *opt)
         res &= firm_be_option("omitfp=0");
         res &= firm_be_option("stabs");
         return res;
-      }
-      /* OS option must be set to the backend */
-      else if (firm_options[i].flag == &firm_opt.os_support) {
-        switch (firm_opt.os_support) {
-        case OS_SUPPORT_MINGW:
-          firm_be_option("ia32-gasmode=mingw");
-          break;
-        case OS_SUPPORT_MACHO:
-          firm_be_option("ia32-gasmode=macho");
-          break;
-        case OS_SUPPORT_LINUX:
-        default:
-          firm_be_option("ia32-gasmode=linux");
-          break;
-        }
       }
       break;
     }

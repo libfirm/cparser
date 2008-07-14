@@ -354,12 +354,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   lower_const_code();
 
   for (i = 0; i < get_irp_n_irgs(); i++) {
-  	int i2;
-
     irg = current_ir_graph = get_irp_irg(i);
-
-	/* test hack... */
-    for (i2 = 0; i2 < 3; i2++) {
 
 #ifdef FIRM_EXT_GRS
   /* If SIMD optimization is on, make sure we have only 1 return */
@@ -543,9 +538,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     timer_pop();
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "dead");
     CHECK_ONE(firm_opt.check_all, irg);
-
-	}
-
   }
 
   if (firm_opt.do_inline) {

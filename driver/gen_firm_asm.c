@@ -510,7 +510,7 @@ static void generate_code_Const(FILE *f, ir_node *n)
     else {
 def_mode:
       tarval_snprintf(buf, sizeof(buf), tv);
-      fprintf(f, "new_tarval_from_str(\"%s\", %zd, ", buf, strlen(buf));
+      fprintf(f, "new_tarval_from_str(\"%s\", %u, ", buf, strlen(buf));
       fprintf(f, "mode_%s)", get_mode_name(mode));
     }
   }

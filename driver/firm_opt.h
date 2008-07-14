@@ -10,8 +10,8 @@ extern ir_mode *firm_imm_fp_mode;
 enum rts_names {
   rts_debugbreak,  /**< the name of the __debugbreak() intrinsic */
   rts_abort,       /**< the name of the abort() function */
-  rts_alloca,      /**< the name of the alloca() function */
   rts_abs,         /**< the name of the abs() function */
+  rts_alloca,      /**< the name of the alloca() function */
   rts_labs,        /**< the name of the labs() function */
   rts_llabs,       /**< the name of the llabs() function */
   rts_imaxabs,     /**< the name of the imaxabs() function */

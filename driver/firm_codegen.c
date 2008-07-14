@@ -71,19 +71,19 @@ void do_codegen(FILE *out, const char *file_name) {
   switch (firm_be_opt.selection) {
 #ifdef FIRM2C_BACKEND
   case BE_FIRM2C:
-    timer_push(TV_FIRM2C_BE);
+    timer_start(TV_FIRM2C_BE);
       cbackend_set_debug_retrieve(dbg_retrieve);
       generate_code_file(out);
-    timer_pop();
+    timer_stop(TV_FIRM2C_BE);
     break;
 #endif
 
 #ifdef FIRM_BACKEND
   case BE_FIRM_BE:
-    timer_push(TV_FIRM_BE);
+    timer_start(TV_FIRM_BE);
       ir_set_debug_retrieve(dbg_retrieve);
       be_main(out, file_name);
-    timer_pop();
+    timer_stop(TV_FIRM_BE);
     break;
 #endif
 

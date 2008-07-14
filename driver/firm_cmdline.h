@@ -32,8 +32,7 @@ struct a_firm_opt {
   a_byte   reassoc;         /**< enable reassociation */
   a_byte   cse;             /**< enable common-subexpression elimination */
   a_byte   control_flow;    /**< enable control flow optimizations */
-  a_byte   code_place;      /**< enable global common-subexpression elimination
-                                 and code placement */
+  a_byte   gcse;            /**< enable global common-subexpression elimination */
   a_byte   gvn_pre;         /**< enable global common-subexpression elimination
                                  and partial redundancy elimination */
   a_byte   cond_eval;       /**< enable condition evaluation */
