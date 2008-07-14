@@ -1,3 +1,11 @@
+===== cparser 0.9.5 (14.06.2008) =====
+
+* sync with latest libfirm
+* improve error handling (more graceful continue in case of an error)
+* lots of bugfixes
+* compatibility fixes for old C stuff (=> SPECint2000 works now)
+* improved commandline
+
 ===== cparser 0.9 (18.02.2008) =====
 
 * initial release
