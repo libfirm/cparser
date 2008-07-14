@@ -146,7 +146,6 @@ static void rts_map(void) {
     { &rts_entities[rts_labs],    i_mapper_abs },
     { &rts_entities[rts_llabs],   i_mapper_abs },
     { &rts_entities[rts_imaxabs], i_mapper_abs },
-    { &rts_entities[rts_alloca],  i_mapper_alloca },
 
     /* double -> double */
     { &rts_entities[rts_fabs],    i_mapper_abs },
@@ -355,7 +354,12 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   lower_const_code();
 
   for (i = 0; i < get_irp_n_irgs(); i++) {
+  	int i2;
+
     irg = current_ir_graph = get_irp_irg(i);
+
+	/* test hack... */
+    for (i2 = 0; i2 < 3; i2++) {
 
 #ifdef FIRM_EXT_GRS
   /* If SIMD optimization is on, make sure we have only 1 return */
@@ -363,13 +367,13 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     normalize_one_return(irg);
 #endif
 
+
 #if 0
     if (firm_opt.modes) {
       /* convert all modes into integer if possible */
       arch_mode_conversion(irg, predefs.mode_uint);
     }
 #endif
-
     timer_push(TV_SCALAR_REPLACE);
       scalar_replacement_opt(irg);
     timer_pop();
@@ -391,7 +395,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     compute_doms(irg);
     CHECK_ONE(firm_opt.check_all, irg);
 
-    if (firm_opt.code_place) {
+    if (firm_opt.gcse) {
       timer_push(TV_CODE_PLACE);
         set_opt_global_cse(1);
         optimize_graph_df(irg);
@@ -424,27 +428,17 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       CHECK_ONE(firm_opt.check_all, irg);
     }
 
-#if 1
     if (firm_opt.luffig) {
       opt_ldst2(irg);
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst2");
       CHECK_ONE(firm_opt.check_all, irg);
     }
-#endif
 
     timer_push(TV_CF_OPT);
       optimize_cf(irg);
     timer_pop();
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "cfopt");
     CHECK_ONE(firm_opt.check_all, irg);
-
-    irg_verify(irg, VRFY_ENFORCE_SSA);
-    if (firm_opt.gvn_pre) {
-      do_gvn_pre(irg);
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "pre");
-      CHECK_ONE(firm_opt.check_all, irg);
-      irg_verify(irg, VRFY_ENFORCE_SSA);
-    }
 
     if (firm_opt.load_store) {
       timer_push(TV_LOAD_STORE);
@@ -477,6 +471,22 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       timer_push(TV_CONFIRM_CREATE);
       remove_confirms(irg);
       timer_pop();
+    }
+
+    if (firm_opt.gvn_pre) {
+      do_gvn_pre(irg);
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "pre");
+      CHECK_ONE(firm_opt.check_all, irg);
+      irg_verify(irg, VRFY_ENFORCE_SSA);
+    }
+
+    if (! firm_opt.gcse) {
+      timer_push(TV_CODE_PLACE);
+        optimize_graph_df(irg);
+        place_code(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "place");
+      CHECK_ONE(firm_opt.check_all, irg);
     }
 
     compute_doms(irg);
@@ -533,10 +543,13 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     timer_pop();
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "dead");
     CHECK_ONE(firm_opt.check_all, irg);
+
+	}
+
   }
 
   if (firm_opt.do_inline) {
-    inline_functions(5000, 500);
+    inline_functions(500, 50);
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "inl");
     CHECK_ALL(firm_opt.check_all);
   }
@@ -556,12 +569,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
   if (firm_opt.cond_eval) {
     for (i = 0; i < get_irp_n_irgs(); i++) {
-	  	if (firm_opt.luffig) {
-			opt_ldst2(irg);
-			DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst2");
-			CHECK_ONE(firm_opt.check_all, irg);
-		}
-
       irg = get_irp_irg(i);
       timer_push(TV_COND_EVAL);
         opt_cond_eval(irg);
@@ -873,17 +880,17 @@ static void do_firm_lowering(const char *input_filename)
     for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
       current_ir_graph = get_irp_irg(i);
 
-      if (firm_opt.code_place)
+      if (firm_opt.gcse)
         set_opt_global_cse(1);
 
       timer_push(TV_LOCAL_OPT);
         optimize_graph_df(current_ir_graph);
       timer_pop();
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "lopt");
-      if (! firm_opt.code_place)
+      if (! firm_opt.gcse)
         CHECK_ONE(firm_opt.check_all, current_ir_graph);
 
-      if (firm_opt.code_place) {
+      if (firm_opt.gcse) {
         timer_push(TV_CODE_PLACE);
           place_code(current_ir_graph);
           set_opt_global_cse(0);
