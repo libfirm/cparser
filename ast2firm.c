@@ -741,7 +741,6 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 		return create_compound_type(&type->compound, NULL, NULL, NULL,
 		                            true, COMPOUND_IS_STRUCT);
-		break;
 	case TYPE_COMPOUND_UNION:
 		return create_compound_type(&type->compound, NULL, NULL, NULL,
 		                            true, COMPOUND_IS_UNION);
@@ -5106,14 +5105,16 @@ void init_ast2firm(void)
 		break;
 	case OS_SUPPORT_LINUX:
 		create_ld_ident = create_ld_ident_linux_elf;
-		s = "ia32-gasmode=linux"; break;
+		s = "ia32-gasmode=elf";
 		break;
 	case OS_SUPPORT_MACHO:
 		create_ld_ident = create_ld_ident_macho;
-		s = "ia32-gasmode=macho"; break;
+		s = "ia32-gasmode=macho";
 		break;
 	}
-	firm_be_option(s);
+	int res = firm_be_option(s);
+	(void) res;
+	assert(res);
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {

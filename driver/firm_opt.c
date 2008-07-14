@@ -363,13 +363,13 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     normalize_one_return(irg);
 #endif
 
-
 #if 0
     if (firm_opt.modes) {
       /* convert all modes into integer if possible */
       arch_mode_conversion(irg, predefs.mode_uint);
     }
 #endif
+
     timer_push(TV_SCALAR_REPLACE);
       scalar_replacement_opt(irg);
     timer_pop();
@@ -424,11 +424,13 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       CHECK_ONE(firm_opt.check_all, irg);
     }
 
+#if 1
     if (firm_opt.luffig) {
       opt_ldst2(irg);
       DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst2");
       CHECK_ONE(firm_opt.check_all, irg);
     }
+#endif
 
     timer_push(TV_CF_OPT);
       optimize_cf(irg);
@@ -534,7 +536,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
   }
 
   if (firm_opt.do_inline) {
-    inline_functions(500, 50);
+    inline_functions(5000, 500);
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "inl");
     CHECK_ALL(firm_opt.check_all);
   }
@@ -554,6 +556,12 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
   if (firm_opt.cond_eval) {
     for (i = 0; i < get_irp_n_irgs(); i++) {
+	  	if (firm_opt.luffig) {
+			opt_ldst2(irg);
+			DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "ldst2");
+			CHECK_ONE(firm_opt.check_all, irg);
+		}
+
       irg = get_irp_irg(i);
       timer_push(TV_COND_EVAL);
         opt_cond_eval(irg);

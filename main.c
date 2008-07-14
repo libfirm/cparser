@@ -384,6 +384,20 @@ static void print_cparser_version(void) {
 	puts(")\n");
 }
 
+static void set_be_option(const char *arg)
+{
+	int res = firm_be_option(arg);
+	(void) res;
+	assert(res);
+}
+
+static void set_option(const char *arg)
+{
+	int res = firm_option(arg);
+	(void) res;
+	assert(res);
+}
+
 int main(int argc, char **argv)
 {
 	initialize_firm();
@@ -438,23 +452,23 @@ int main(int argc, char **argv)
 	/* apply optimisation level */
 	switch(opt_level) {
 	case 0:
-		firm_option("no-opt");
+		set_option("no-opt");
 		break;
 	case 1:
-		firm_option("no-inline");
+		set_option("no-inline");
 		break;
 	default:
 	case 4:
-		firm_option("strict-aliasing");
+		set_option("strict-aliasing");
 		/* fallthrough */
 	case 3:
-		firm_option("cond-eval");
-		firm_option("if-conv");
+		set_option("cond-eval");
+		set_option("if-conv");
 		/* fallthrough */
 	case 2:
-		firm_option("inline");
-		firm_option("deconv");
-		firm_be_option("omitfp");
+		set_option("inline");
+		set_option("deconv");
+		set_be_option("omitfp");
 		break;
 	}
 
@@ -469,9 +483,9 @@ int main(int argc, char **argv)
 			if(option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
 			} else if(option[0] == 'g') {
-				firm_be_option("stabs=yes");
-				firm_be_option("omitfp=no");
-				firm_be_option("ia32-nooptcc=yes");
+				set_be_option("debuginfo=stabs");
+				set_be_option("omitfp=no");
+				set_be_option("ia32-nooptcc=yes");
 			} else if(SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
 			} else if(SINGLE_OPTION('E')) {
@@ -511,9 +525,9 @@ int main(int argc, char **argv)
 				if(strcmp(opt, "syntax-only") == 0) {
 					mode = ParseOnly;
 				} else if(strcmp(opt, "omit-frame-pointer") == 0) {
-					firm_be_option("omitfp");
+					set_be_option("omitfp");
 				} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
-					firm_be_option("omitfp=no");
+					set_be_option("omitfp=no");
 				} else {
 					int res = firm_option(opt);
 					if (res == 0) {
@@ -594,13 +608,9 @@ int main(int argc, char **argv)
 					if (res == 0)
 						argument_errors = true;
 				} else if(strcmp(opt, "omit-leaf-frame-pointer") == 0) {
-					int res = firm_be_option("omitleaffp=1");
-					if (res == 0)
-						argument_errors = true;
+					set_be_option("omitleaffp=1");
 				} else if(strcmp(opt, "no-omit-leaf-frame-pointer") == 0) {
-					int res = firm_be_option("omitleaffp=0");
-					if (res == 0)
-						argument_errors = true;
+					set_be_option("omitleaffp=0");
 				} else {
 					char *endptr;
 					long int value = strtol(opt, &endptr, 10);
@@ -623,7 +633,7 @@ int main(int argc, char **argv)
 					input = arg;
 				}
 			} else if(strcmp(option, "pg") == 0) {
-				firm_be_option("-b gprof");
+				set_be_option("-b gprof");
 				obstack_printf(&ldflags_obst, " -pg");
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
