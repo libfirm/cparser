@@ -3698,6 +3698,22 @@ static void create_declaration_initializer(declaration_t *declaration)
 
 static void create_variable_length_array(declaration_t *declaration)
 {
+	/* initializers are not allowed for VLAs */
+	assert(declaration->init.initializer == NULL);
+
+	declaration->declaration_kind = DECLARATION_KIND_VARIABLE_LENGTH_ARRAY;
+	declaration->v.vla_base       = NULL;
+
+	/* TODO: record VLA somewhere so we create the free node when we leave
+	 * it's scope */
+}
+
+static void allocate_variable_length_array(declaration_t *declaration)
+{
+	/* initializers are not allowed for VLAs */
+	assert(declaration->init.initializer == NULL);
+	assert(get_cur_block() != NULL);
+
 	dbg_info *dbgi      = get_dbg_info(&declaration->source_position);
 	type_t   *type      = declaration->type;
 	ir_node  *mem       = get_store();
@@ -3712,14 +3728,9 @@ static void create_variable_length_array(declaration_t *declaration)
 	ir_node  *addr   = new_d_Proj(dbgi, alloc, mode_P_data, pn_Alloc_res);
 	set_store(proj_m);
 
-	/* initializers are not allowed for VLAs */
-	assert(declaration->init.initializer == NULL);
-
-	declaration->declaration_kind = DECLARATION_KIND_VARIABLE_LENGTH_ARRAY;
+	assert(declaration->declaration_kind
+			== DECLARATION_KIND_VARIABLE_LENGTH_ARRAY);
 	declaration->v.vla_base       = addr;
-
-	/* TODO: record VLA somewhere so we create the free node when we leave
-	 * it's scope */
 }
 
 /**
@@ -3983,10 +3994,13 @@ static void initialize_local_declaration(declaration_t *declaration)
 		create_declaration_initializer(declaration);
 		return;
 
+	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+		allocate_variable_length_array(declaration);
+		return;
+
 	case DECLARATION_KIND_LABEL_BLOCK:
 	case DECLARATION_KIND_COMPOUND_MEMBER:
 	case DECLARATION_KIND_GLOBAL_VARIABLE:
-	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
 	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
 	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
 	case DECLARATION_KIND_FUNCTION:
