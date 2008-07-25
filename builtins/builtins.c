@@ -34,3 +34,12 @@ static inline __SIZE_TYPE__ strlen(const char *s)
 		result++;
 	return result;
 }
+
+static inline char *strcpy(char *dest, const char *source)
+{
+	char *d = dest;
+	for ( ; *source != 0; ++d, ++source) {
+		*d = *source;
+	}
+	return dest;
+}
