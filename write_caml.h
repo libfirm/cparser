@@ -17,28 +17,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
-#ifndef LEXER_H
-#define LEXER_H
+#ifndef WRITE_CAML_H
+#define WRITE_CAML_H
 
-#include "symbol_table_t.h"
-#include "token_t.h"
+#include "ast.h"
 
-extern token_t lexer_token;
-
-void lexer_next_token(void);
-
-/* for debugging */
-void lexer_next_preprocessing_token(void);
-
-void init_lexer(void);
-void exit_lexer(void);
-
-void lexer_open_stream(FILE *stream, const char *input_name);
-void lexer_open_buffer(const char *buffer, size_t len, const char *input_name);
-
-string_t      concat_strings(           const string_t      *s1, const string_t      *s2);
-wide_string_t concat_string_wide_string(const string_t      *s1, const wide_string_t *s2);
-wide_string_t concat_wide_strings(      const wide_string_t *s1, const wide_string_t *s2);
-wide_string_t concat_wide_string_string(const wide_string_t *s1, const string_t      *s2);
+void write_caml_decls(FILE *out, const translation_unit_t *unit);
 
 #endif

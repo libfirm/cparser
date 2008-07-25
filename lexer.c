@@ -81,6 +81,11 @@ static inline void next_real_char(void)
 {
 	assert(bufpos <= bufend);
 	if (bufpos >= bufend) {
+		if (input == NULL) {
+			c = EOF;
+			return;
+		}
+
 		size_t s = fread(buf + MAX_PUTBACK, 1, sizeof(buf) - MAX_PUTBACK,
 		                 input);
 		if(s == 0) {
@@ -1596,6 +1601,7 @@ newline_found:
 void init_lexer(void)
 {
 	strset_init(&stringset);
+	symbol_L = symbol_table_insert("L");
 }
 
 void lexer_open_stream(FILE *stream, const char *input_name)
@@ -1604,9 +1610,22 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 	lexer_token.source_position.linenr     = 0;
 	lexer_token.source_position.input_name = input_name;
 
-	symbol_L = symbol_table_insert("L");
 	bufpos = NULL;
 	bufend = NULL;
+
+	/* place a virtual \n at the beginning so the lexer knows that we're
+	 * at the beginning of a line */
+	c = '\n';
+}
+
+void lexer_open_buffer(const char *buffer, size_t len, const char *input_name)
+{
+	input                                  = NULL;
+	lexer_token.source_position.linenr     = 0;
+	lexer_token.source_position.input_name = input_name;
+
+	bufpos = buffer;
+	bufend = buffer + len;
 
 	/* place a virtual \n at the beginning so the lexer knows that we're
 	 * at the beginning of a line */

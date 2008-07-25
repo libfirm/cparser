@@ -104,6 +104,7 @@ static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
 static label_statement_t  *label_last        = NULL;
+static translation_unit_t *unit              = NULL;
 static struct obstack      temp_obst;
 
 static source_position_t null_position = { NULL, 0 };
@@ -3900,7 +3901,7 @@ static declaration_t *internal_record_declaration(
 			if (old_storage_class == STORAGE_CLASS_EXTERN &&
 					new_storage_class == STORAGE_CLASS_EXTERN) {
 warn_redundant_declaration:
-				if (warning.redundant_decls) {
+				if (warning.redundant_decls && strcmp(previous_declaration->source_position.input_name, "<builtin>") != 0) {
 					warningf(&declaration->source_position,
 							 "redundant declaration for '%Y' (declared %P)",
 							 symbol, &previous_declaration->source_position);
@@ -8066,18 +8067,8 @@ static void check_unused_globals(void)
 /**
  * Parse a translation unit.
  */
-static translation_unit_t *parse_translation_unit(void)
+static void parse_translation_unit(void)
 {
-	translation_unit_t *unit = allocate_ast_zero(sizeof(unit[0]));
-
-	assert(global_scope == NULL);
-	global_scope = &unit->scope;
-
-	assert(scope == NULL);
-	set_scope(&unit->scope);
-
-	initialize_builtin_types();
-
 	while(token.type != T_EOF) {
 		if (token.type == ';') {
 			/* TODO error in strict mode */
@@ -8087,16 +8078,6 @@ static translation_unit_t *parse_translation_unit(void)
 			parse_external_declaration();
 		}
 	}
-
-	assert(scope == &unit->scope);
-	scope          = NULL;
-	last_declaration = NULL;
-
-	assert(global_scope == &unit->scope);
-	check_unused_globals();
-	global_scope = NULL;
-
-	return unit;
 }
 
 /**
@@ -8104,7 +8085,7 @@ static translation_unit_t *parse_translation_unit(void)
  *
  * @return  the translation unit or NULL if errors occurred.
  */
-translation_unit_t *parse(void)
+void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
@@ -8115,16 +8096,43 @@ translation_unit_t *parse(void)
 	type_set_output(stderr);
 	ast_set_output(stderr);
 
-	lookahead_bufpos = 0;
-	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
-		next_token();
-	}
-	translation_unit_t *unit = parse_translation_unit();
+	assert(unit == NULL);
+	unit = allocate_ast_zero(sizeof(unit[0]));
+
+	assert(global_scope == NULL);
+	global_scope = &unit->scope;
+
+	assert(scope == NULL);
+	set_scope(&unit->scope);
+
+	initialize_builtin_types();
+}
+
+translation_unit_t *finish_parsing(void)
+{
+	assert(scope == &unit->scope);
+	scope          = NULL;
+	last_declaration = NULL;
+
+	assert(global_scope == &unit->scope);
+	check_unused_globals();
+	global_scope = NULL;
 
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
 
-	return unit;
+	translation_unit_t *result = unit;
+	unit = NULL;
+	return result;
+}
+
+void parse(void)
+{
+	lookahead_bufpos = 0;
+	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
+		next_token();
+	}
+	parse_translation_unit();
 }
 
 /**

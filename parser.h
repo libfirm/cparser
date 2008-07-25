@@ -28,7 +28,9 @@ typedef struct environment_entry_t environment_entry_t;
 void init_parser(void);
 void exit_parser(void);
 
-translation_unit_t *parse(void);
+void start_parsing(void);
+void parse(void);
+translation_unit_t *finish_parsing(void);
 
 type_t *revert_automatic_type_conversion(const expression_t *expression);
 declaration_t *expr_is_variable(const expression_t *expression);

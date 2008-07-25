@@ -75,11 +75,12 @@
 #include "driver/firm_cmdline.h"
 #include "adt/error.h"
 #include "write_fluffy.h"
+#include "write_caml.h"
 #include "revision.h"
 #include "warning.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -m32"
+#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -D__SIZE_TYPE__=__SIZE_TYPE__ -m32"
 #endif
 
 #ifndef LINKER
@@ -101,6 +102,9 @@ bool char_is_signed = true;
 
 /** true for strict language checking. */
 bool strict_mode = false;
+
+/** use builtins for some libc functions */
+bool use_builtins = false;
 
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
@@ -173,10 +177,21 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 	memcpy(buf+last_dot, newext, extlen);
 }
 
+#include "builtins.h"
+
 static translation_unit_t *do_parsing(FILE *const in, const char *const input_name)
 {
+	start_parsing();
+
+	if (use_builtins) {
+		lexer_open_buffer(builtins, sizeof(builtins)-1, "<builtin>");
+		parse();
+	}
+
 	lexer_open_stream(in, input_name);
-	translation_unit_t *unit = parse();
+	parse();
+
+	translation_unit_t *unit = finish_parsing();
 	return unit;
 }
 
@@ -359,6 +374,7 @@ typedef enum compile_mode_t {
 	LexTest,
 	PrintAst,
 	PrintFluffy,
+	PrintCaml,
 	Link
 } compile_mode_t;
 
@@ -464,6 +480,7 @@ int main(int argc, char **argv)
 	case 3:
 		set_option("cond-eval");
 		set_option("if-conv");
+		use_builtins = true;
 		/* fallthrough */
 	case 2:
 		set_option("inline");
@@ -633,7 +650,7 @@ int main(int argc, char **argv)
 					input = arg;
 				}
 			} else if(strcmp(option, "pg") == 0) {
-				set_be_option("-b gprof");
+				set_be_option("gprof");
 				obstack_printf(&ldflags_obst, " -pg");
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
@@ -679,6 +696,8 @@ int main(int argc, char **argv)
 					print_parenthesis = true;
 				} else if(strcmp(option, "print-fluffy") == 0) {
 					mode = PrintFluffy;
+				} else if(strcmp(option, "print-caml") == 0) {
+					mode = PrintCaml;
 				} else if(strcmp(option, "version") == 0) {
 					print_cparser_version();
 					exit(EXIT_SUCCESS);
@@ -718,7 +737,8 @@ int main(int argc, char **argv)
 				continue;
 			}
 
-			if (strcmp(arg+len-2, ".c") == 0) {
+			if (strcmp(arg+len-2, ".c") == 0
+					|| strcmp(arg+len-2, ".h") == 0) {
 				entry->next = c_files;
 				c_files     = entry;
 			} else if (strcmp(arg+len-2, ".s") == 0) {
@@ -775,6 +795,7 @@ int main(int argc, char **argv)
 		case BenchmarkParser:
 		case PrintAst:
 		case PrintFluffy:
+		case PrintCaml:
 		case LexTest:
 			if(outname == NULL)
 				outname = "-";
@@ -902,9 +923,10 @@ int main(int argc, char **argv)
 		return result;
 
 	if(mode == PrintFluffy) {
-		type_set_output(out);
-		ast_set_output(out);
 		write_fluffy_decls(out, unit);
+	}
+	if (mode == PrintCaml) {
+		write_caml_decls(out, unit);
 	}
 
 	translation_unit_to_firm(unit);

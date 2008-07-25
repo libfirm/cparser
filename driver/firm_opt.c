@@ -1130,8 +1130,11 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
     stat_dump_snapshot(input_filename, "noopt");
   }
 
-  if (firm_opt.enabled)
+  if (firm_opt.enabled) {
     do_firm_optimizations(input_filename, firm_const_exists);
+    do_firm_optimizations(input_filename, firm_const_exists);
+    do_firm_optimizations(input_filename, firm_const_exists);
+  }
 
   if (firm_dump.gen_firm_asm) {
     timer_push(TV_FIRM_ASM);

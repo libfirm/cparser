@@ -43,6 +43,7 @@ SOURCES := \
 	type_hash.c \
 	warning.c \
 	write_fluffy.c \
+	write_caml.c \
 	driver/firm_cmdline.c \
 	driver/firm_timing.c \
 	driver/firm_codegen.c \
@@ -109,6 +110,10 @@ bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bo
 $(DIRS):
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
+
+builtins.h: builtins/builtins.c
+	@echo '===> CREATE_BUILTINS $<'
+	$(Q)./create_builtins_h.sh > $@
 
 build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'

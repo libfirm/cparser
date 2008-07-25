@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "write_fluffy.h"
+#include "write_caml.h"
 #include "symbol_t.h"
 #include "ast_t.h"
 #include "type_t.h"
@@ -37,7 +37,7 @@ static void write_type(const type_t *type);
 static const char *get_atomic_type_string(const atomic_type_kind_t type)
 {
 	switch(type) {
-	case ATOMIC_TYPE_VOID:        return "void";
+	case ATOMIC_TYPE_VOID:        return "unit";
 	case ATOMIC_TYPE_CHAR:        return "byte";
 	case ATOMIC_TYPE_SCHAR:       return "byte";
 	case ATOMIC_TYPE_UCHAR:       return "unsigned byte";
@@ -64,6 +64,13 @@ static void write_atomic_type(const atomic_type_t *type)
 
 static void write_pointer_type(const pointer_type_t *type)
 {
+	type_t *points_to = type->points_to;
+	if (points_to->kind == TYPE_ATOMIC &&
+			is_type_atomic(points_to, ATOMIC_TYPE_CHAR)) {
+		fputs("string", out);
+		return;
+	}
+
 	write_type(type->points_to);
 	fputc('*', out);
 }
@@ -73,11 +80,11 @@ static declaration_t *find_typedef(const type_t *type)
 	/* first: search for a matching typedef in the global type... */
 	declaration_t *declaration = global_scope->declarations;
 	while(declaration != NULL) {
-		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
+		if (! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			declaration = declaration->next;
 			continue;
 		}
-		if(declaration->type == type)
+		if (declaration->type == type)
 			break;
 		declaration = declaration->next;
 	}
@@ -88,14 +95,14 @@ static declaration_t *find_typedef(const type_t *type)
 static void write_compound_type(const compound_type_t *type)
 {
 	declaration_t *declaration = find_typedef((const type_t*) type);
-	if(declaration != NULL) {
+	if (declaration != NULL) {
 		fprintf(out, "%s", declaration->symbol->string);
 		return;
 	}
 
 	/* does the struct have a name? */
 	symbol_t *symbol = type->declaration->symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
 		fprintf(out, "%s", symbol->string);
 		return;
@@ -107,14 +114,14 @@ static void write_compound_type(const compound_type_t *type)
 static void write_enum_type(const enum_type_t *type)
 {
 	declaration_t *declaration = find_typedef((const type_t*) type);
-	if(declaration != NULL) {
+	if (declaration != NULL) {
 		fprintf(out, "%s", declaration->symbol->string);
 		return;
 	}
 
 	/* does the enum have a name? */
 	symbol_t *symbol = type->declaration->symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		/* TODO: make sure we create an enum for it... */
 		fprintf(out, "%s", symbol->string);
 		return;
@@ -130,14 +137,14 @@ static void write_function_type(const function_type_t *type)
 	function_parameter_t *parameter = type->parameters;
 	int                   first     = 1;
 	while(parameter != NULL) {
-		if(!first) {
+		if (!first) {
 			fprintf(out, ", ");
 		} else {
 			first = 0;
 		}
 
 #if 0
-		if(parameter->symbol != NULL) {
+		if (parameter->symbol != NULL) {
 			fprintf(out, "%s : ", parameter->symbol->string);
 		} else {
 			/* TODO make up some unused names (or allow _ in fluffy?) */
@@ -185,6 +192,7 @@ static void write_type(const type_t *type)
 	}
 }
 
+#if 0
 static void write_struct_entry(const declaration_t *declaration)
 {
 	fprintf(out, "\t%s : ", declaration->symbol->string);
@@ -242,7 +250,7 @@ static void write_expression(const expression_t *expression)
 	switch(expression->kind) {
 	case EXPR_CONST:
 		constant = &expression->conste;
-		if(is_type_integer(expression->base.type)) {
+		if (is_type_integer(expression->base.type)) {
 			fprintf(out, "%lld", constant->v.int_value);
 		} else {
 			fprintf(out, "%Lf", constant->v.float_value);
@@ -264,7 +272,7 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 	for ( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
 			entry = entry->next) {
 		fprintf(out, "\t%s", entry->symbol->string);
-		if(entry->init.initializer != NULL) {
+		if (entry->init.initializer != NULL) {
 			fprintf(out, " <- ");
 			write_expression(entry->init.enum_value);
 		}
@@ -281,75 +289,63 @@ static void write_variable(const declaration_t *declaration)
 	/* TODO: initializers */
 	fprintf(out, "\n");
 }
+#endif
 
 static void write_function(const declaration_t *declaration)
 {
-	if(declaration->init.statement != NULL) {
+	if (declaration->init.statement != NULL) {
 		fprintf(stderr, "Warning: can't convert function bodies (at %s)\n",
 		        declaration->symbol->string);
 	}
 
-	fprintf(out, "func extern %s(",
-	        declaration->symbol->string);
+	fprintf(out, "external %s: ", declaration->symbol->string);
 
 	const function_type_t *function_type
 		= (const function_type_t*) declaration->type;
 
 	declaration_t *parameter = declaration->scope.declarations;
-	int            first     = 1;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
-		if(parameter->symbol != NULL) {
-			fprintf(out, "%s : ", parameter->symbol->string);
-		} else {
-			fputs("_ : ", out);
-		}
 		write_type(parameter->type);
+		fputs(" -> ", out);
 	}
-	if(function_type->variadic) {
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
-		fputs("...", out);
+	if (function_type->variadic) {
+		fprintf(stderr, "WARNING: Variadic function not supported yet\n");
 	}
-	fprintf(out, ")");
-
+	if (function_type->unspecified_parameters) {
+		fprintf(stderr, "WARNING: unspecified params not supported\n");
+	}
 	const type_t *return_type = function_type->return_type;
-	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-		fprintf(out, " : ");
-		write_type(return_type);
-	}
+	write_type(return_type);
+
+	fputs(" = \"", out);
+	fputs(declaration->symbol->string, out);
+	fputs("\"", out);
+
 	fputc('\n', out);
 }
 
-void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
+void write_caml_decls(FILE *output, const translation_unit_t *unit)
 {
-	out            = output;
+	out          = output;
 	global_scope = &unit->scope;
 
 	ast_set_output(out);
-	type_set_output(out);
-	fprintf(out, "/* WARNING: Automatically generated file */\n");
+	fprintf(out, "(* WARNING: Automatically generated file - chaning is useless *)\n");
 
+#if 0
 	/* write structs,unions + enums */
 	declaration_t *declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
 		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
-		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
+		if (! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
 			continue;
 		}
 		type_t *type = declaration->type;
-		if(type->kind == TYPE_COMPOUND_STRUCT) {
+		if (type->kind == TYPE_COMPOUND_STRUCT) {
 			write_struct(declaration->symbol, &type->compound);
-		} else if(type->kind == TYPE_COMPOUND_UNION) {
+		} else if (type->kind == TYPE_COMPOUND_UNION) {
 			write_union(declaration->symbol, &type->compound);
-		} else if(type->kind == TYPE_ENUM) {
+		} else if (type->kind == TYPE_ENUM) {
 			write_enum(declaration->symbol, &type->enumt);
 		}
 	}
@@ -357,30 +353,31 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	/* write global variables */
 	declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
+		if (declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
+		if (declaration->storage_class == STORAGE_CLASS_TYPEDEF
 				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->kind == TYPE_FUNCTION)
+		if (type->kind == TYPE_FUNCTION)
 			continue;
 
 		write_variable(declaration);
 	}
+#endif
 
 	/* write functions */
-	declaration = unit->scope.declarations;
+	declaration_t *declaration = unit->scope.declarations;
 	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
+		if (declaration->namespc != NAMESPACE_NORMAL)
 			continue;
-		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
+		if (declaration->storage_class == STORAGE_CLASS_TYPEDEF
 				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
 
 		type_t *type = declaration->type;
-		if(type->kind != TYPE_FUNCTION)
+		if (type->kind != TYPE_FUNCTION)
 			continue;
 
 		write_function(declaration);
