@@ -115,6 +115,8 @@ builtins.h: builtins/builtins.c
 	@echo '===> CREATE_BUILTINS $<'
 	$(Q)./create_builtins_h.sh > $@
 
+main.c: builtins.h
+
 build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'
 	$(Q)./build/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
