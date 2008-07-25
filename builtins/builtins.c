@@ -1,9 +1,9 @@
 static inline char *strchr(const char *s, int c)
 {
-	for ( ; *s != 0; ++s) {
+	do {
 		if (*s == c)
 			return (char*) s;
-	}
+	} while (*s++ != '\0');
 	return (char*) 0;
 }
 
@@ -11,10 +11,10 @@ static inline char *strrchr(const char *s, int c)
 {
 	const char *result = (const char*) 0;
 
-	for ( ; *s != 0; ++s) {
+	do {
 		if (*s == c)
 			result = s;
-	}
+	} while (*s++ != '\0');
 	return (char*) result;
 }
 
@@ -24,7 +24,7 @@ static inline int strcmp(const char *s1, const char *s2)
 		if(*s1 != *s2)
 			break;
 	}
-	return *s1 - *s2;
+	return (unsigned char)*s1 - (unsigned char)*s2;
 }
 
 static inline __SIZE_TYPE__ strlen(const char *s)
@@ -38,8 +38,6 @@ static inline __SIZE_TYPE__ strlen(const char *s)
 static inline char *strcpy(char *dest, const char *source)
 {
 	char *d = dest;
-	for ( ; *source != 0; ++d, ++source) {
-		*d = *source;
-	}
+	while ((*d++ = *source++) != '\0') {}
 	return dest;
 }
