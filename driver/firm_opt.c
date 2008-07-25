@@ -1132,8 +1132,8 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
 
   if (firm_opt.enabled) {
     do_firm_optimizations(input_filename, firm_const_exists);
-    do_firm_optimizations(input_filename, firm_const_exists);
-    do_firm_optimizations(input_filename, firm_const_exists);
+    //do_firm_optimizations(input_filename, firm_const_exists);
+    //do_firm_optimizations(input_filename, firm_const_exists);
   }
 
   if (firm_dump.gen_firm_asm) {
