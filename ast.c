@@ -1020,23 +1020,23 @@ static void print_for_statement(const for_statement_t *statement)
 }
 
 /**
- * Print assembler constraints.
+ * Print assembler arguments.
  *
- * @param constraints   the constraints
+ * @param arguments   the arguments
  */
-static void print_asm_constraints(asm_constraint_t *constraints)
+static void print_asm_arguments(asm_argument_t *arguments)
 {
-	asm_constraint_t *constraint = constraints;
-	for( ; constraint != NULL; constraint = constraint->next) {
-		if(constraint != constraints)
+	asm_argument_t *argument = arguments;
+	for( ; argument != NULL; argument = argument->next) {
+		if(argument != arguments)
 			fputs(", ", out);
 
-		if(constraint->symbol) {
-			fprintf(out, "[%s] ", constraint->symbol->string);
+		if(argument->symbol) {
+			fprintf(out, "[%s] ", argument->symbol->string);
 		}
-		print_quoted_string(&constraint->constraints, '"');
+		print_quoted_string(&argument->constraints, '"');
 		fputs(" (", out);
-		print_expression(constraint->expression);
+		print_expression(argument->expression);
 		fputs(")", out);
 	}
 }
@@ -1075,12 +1075,12 @@ static void print_asm_statement(const asm_statement_t *statement)
 		goto end_of_print_asm_statement;
 
 	fputs(" : ", out);
-	print_asm_constraints(statement->inputs);
+	print_asm_arguments(statement->inputs);
 	if(statement->outputs == NULL && statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
 	fputs(" : ", out);
-	print_asm_constraints(statement->outputs);
+	print_asm_arguments(statement->outputs);
 	if(statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 

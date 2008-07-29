@@ -81,7 +81,7 @@ typedef struct case_label_statement_t       case_label_statement_t;
 typedef struct while_statement_t            while_statement_t;
 typedef struct do_while_statement_t         do_while_statement_t;
 typedef struct for_statement_t              for_statement_t;
-typedef struct asm_constraint_t             asm_constraint_t;
+typedef struct asm_argument_t               asm_argument_t;
 typedef struct asm_clobber_t                asm_clobber_t;
 typedef struct asm_statement_t              asm_statement_t;
 typedef struct ms_try_statement_t           ms_try_statement_t;

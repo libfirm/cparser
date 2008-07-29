@@ -686,11 +686,11 @@ struct for_statement_t {
 	scope_t           scope;
 };
 
-struct asm_constraint_t {
-	string_t          constraints;
-	expression_t     *expression;
-	symbol_t         *symbol;
-	asm_constraint_t *next;
+struct asm_argument_t {
+	string_t        constraints;
+	expression_t   *expression;
+	symbol_t       *symbol;
+	asm_argument_t *next;
 };
 
 struct asm_clobber_t {
@@ -699,12 +699,12 @@ struct asm_clobber_t {
 };
 
 struct asm_statement_t {
-	statement_base_t  base;
-	string_t          asm_text;
-	asm_constraint_t *inputs;
-	asm_constraint_t *outputs;
-	asm_clobber_t    *clobbers;
-	bool              is_volatile;
+	statement_base_t base;
+	string_t         asm_text;
+	asm_argument_t  *inputs;
+	asm_argument_t  *outputs;
+	asm_clobber_t   *clobbers;
+	bool             is_volatile;
 };
 
 struct ms_try_statement_t {

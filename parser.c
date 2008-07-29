@@ -6461,21 +6461,29 @@ static bool has_const_fields(const compound_type_t *type)
 	return false;
 }
 
+static bool is_lvalue(const expression_t *expression)
+{
+	switch (expression->kind) {
+	case EXPR_REFERENCE:
+	case EXPR_ARRAY_ACCESS:
+	case EXPR_SELECT:
+	case EXPR_UNARY_DEREFERENCE:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
 static bool is_valid_assignment_lhs(expression_t const* const left)
 {
 	type_t *const orig_type_left = revert_automatic_type_conversion(left);
 	type_t *const type_left      = skip_typeref(orig_type_left);
 
-	switch (left->kind)  {
-		case EXPR_REFERENCE:
-		case EXPR_ARRAY_ACCESS:
-		case EXPR_SELECT:
-		case EXPR_UNARY_DEREFERENCE:
-			break;
-
-		default:
-			errorf(HERE, "left hand side '%E' of assignment is not an lvalue", left);
-			return false;
+	if (!is_lvalue(left)) {
+		errorf(HERE, "left hand side '%E' of assignment is not an lvalue",
+		       left);
+		return false;
 	}
 
 	if (is_type_array(type_left)) {
@@ -6986,40 +6994,44 @@ static void init_expression_parsers(void)
 }
 
 /**
- * Parse a asm statement constraints specification.
+ * Parse a asm statement arguments specification.
  */
-static asm_constraint_t *parse_asm_constraints(void)
+static asm_argument_t *parse_asm_arguments(bool is_out)
 {
-	asm_constraint_t *result = NULL;
-	asm_constraint_t *last   = NULL;
+	asm_argument_t *result = NULL;
+	asm_argument_t *last   = NULL;
 
 	while(token.type == T_STRING_LITERAL || token.type == '[') {
-		asm_constraint_t *constraint = allocate_ast_zero(sizeof(constraint[0]));
-		memset(constraint, 0, sizeof(constraint[0]));
+		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
+		memset(argument, 0, sizeof(argument[0]));
 
 		if(token.type == '[') {
 			eat('[');
 			if(token.type != T_IDENTIFIER) {
-				parse_error_expected("while parsing asm constraint",
+				parse_error_expected("while parsing asm argument",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
-			constraint->symbol = token.v.symbol;
+			argument->symbol = token.v.symbol;
 
 			expect(']');
 		}
 
-		constraint->constraints = parse_string_literals();
+		argument->constraints = parse_string_literals();
 		expect('(');
-		constraint->expression = parse_expression();
+		argument->expression = parse_expression();
+		if (is_out && !is_lvalue(argument->expression)) {
+			errorf(&argument->expression->base.source_position,
+			       "asm output argument is not an lvalue");
+		}
 		expect(')');
 
 		if(last != NULL) {
-			last->next = constraint;
+			last->next = argument;
 		} else {
-			result = constraint;
+			result = argument;
 		}
-		last = constraint;
+		last = argument;
 
 		if(token.type != ',')
 			break;
@@ -7086,14 +7098,14 @@ static statement_t *parse_asm_statement(void)
 	}
 	eat(':');
 
-	asm_statement->inputs = parse_asm_constraints();
+	asm_statement->outputs = parse_asm_arguments(true);
 	if(token.type != ':') {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
 	eat(':');
 
-	asm_statement->outputs = parse_asm_constraints();
+	asm_statement->inputs = parse_asm_arguments(false);
 	if(token.type != ':') {
 		rem_anchor_token(':');
 		goto end_of_asm;
