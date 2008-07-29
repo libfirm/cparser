@@ -4529,12 +4529,17 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 				|| (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER) ) {
 			expression_t *expr = argument->expression;
 			ir_node      *addr = expression_to_addr(expr);
+			/* in+output, construct an artifical same_as constraint on the
+			 * input */
 			if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_READ) {
+				char     buf[64];
 				ir_node *value = get_value_from_lvalue(expr, addr);
+
+				snprintf(buf, sizeof(buf), "%d", pos);
 
 				ir_asm_constraint constraint;
 				constraint.pos              = pos;
-				constraint.constraint       = new_id_from_str(constraints);
+				constraint.constraint       = new_id_from_str(buf);
 				constraint.mode             = get_ir_mode(expr->base.type);
 				tmp_in_constraints[in_size] = constraint;
 				ins[in_size] = value;
