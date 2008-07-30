@@ -820,6 +820,13 @@ bool is_type_arithmetic(const type_t *type)
 	}
 }
 
+bool is_type_real(const type_t *type)
+{
+	/* 6.2.5.17 */
+	return is_type_integer(type)
+		|| (type->kind == TYPE_ATOMIC && is_type_float(type));
+}
+
 /**
  * Returns true if the given type represents a scalar type.
  *
@@ -890,6 +897,11 @@ bool is_type_incomplete(const type_t *type)
 	}
 
 	panic("invalid type found");
+}
+
+bool is_type_object(const type_t *type)
+{
+	return !is_type_function(type) && !is_type_incomplete(type);
 }
 
 /**

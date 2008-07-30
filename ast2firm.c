@@ -2073,7 +2073,12 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 {
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = pointer_type->points_to;
-	const unsigned        elem_size    = get_type_size_const(points_to);
+	unsigned              elem_size    = get_type_size_const(points_to);
+
+	/* gcc extension */
+	if (elem_size == 0 && is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+		elem_size = 1;
+	}
 
 	assert(elem_size >= 1);
 	if (elem_size == 1)

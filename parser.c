@@ -6065,19 +6065,35 @@ end_error:
 	return create_invalid_expression();
 }
 
+static void check_pointer_arithmetic(const source_position_t *source_position,
+                                     type_t *pointer_type,
+                                     type_t *orig_pointer_type)
+{
+	type_t *points_to = pointer_type->pointer.points_to;
+	if (is_type_incomplete(points_to) &&
+			(! (c_mode & _GNUC)
+			 || !is_type_atomic(points_to, ATOMIC_TYPE_VOID))) {
+		errorf(source_position,
+			   "arithmetic with pointer to incomplete type '%T' not allowed",
+			   orig_pointer_type);
+	} else if (is_type_function(points_to)) {
+		errorf(source_position,
+			   "arithmetic with pointer to function type '%T' not allowed",
+			   orig_pointer_type);
+	}
+}
+
 static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	/* TODO !is_type_real && !is_type_pointer */
-	if(!is_type_arithmetic(type) && type->kind != TYPE_POINTER) {
-		if (is_type_valid(type)) {
-			/* TODO: improve error message */
-			errorf(HERE, "operation needs an arithmetic or pointer type");
-		}
-		return;
+	if (is_type_pointer(type)) {
+		check_pointer_arithmetic(&expression->base.source_position,
+		                         type, orig_type);
+	} else if (!is_type_real(type) && is_type_valid(type)) {
+		/* TODO: improve error message */
+		errorf(HERE, "operation needs an arithmetic or pointer type");
 	}
-
 	expression->base.type = orig_type;
 }
 
@@ -6321,19 +6337,25 @@ static void semantic_add(binary_expression_t *expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	/* § 5.6.5 */
-	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+	/* § 6.5.6 */
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->left  = create_implicit_cast(left, arithmetic_type);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->base.type = arithmetic_type;
 		return;
-	} else if(is_type_pointer(type_left) && is_type_integer(type_right)) {
+	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
+		check_pointer_arithmetic(&expression->base.source_position,
+		                         type_left, orig_type_left);
 		expression->base.type = type_left;
-	} else if(is_type_pointer(type_right) && is_type_integer(type_left)) {
+	} else if (is_type_pointer(type_right) && is_type_integer(type_left)) {
+		check_pointer_arithmetic(&expression->base.source_position,
+		                         type_right, orig_type_right);
 		expression->base.type = type_right;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
-		errorf(HERE, "invalid operands to binary + ('%T', '%T')", orig_type_left, orig_type_right);
+		errorf(&expression->base.source_position,
+		       "invalid operands to binary + ('%T', '%T')",
+		       orig_type_left, orig_type_right);
 	}
 }
 
@@ -6354,6 +6376,8 @@ static void semantic_sub(binary_expression_t *expression)
 		expression->base.type =  arithmetic_type;
 		return;
 	} else if(is_type_pointer(type_left) && is_type_integer(type_right)) {
+		check_pointer_arithmetic(&expression->base.source_position,
+		                         type_left, orig_type_left);
 		expression->base.type = type_left;
 	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		if(!pointers_compatible(type_left, type_right)) {
@@ -6560,6 +6584,8 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 		expression->right     = create_implicit_cast(right, arithmetic_type);
 		expression->base.type = type_left;
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
+		check_pointer_arithmetic(&expression->base.source_position,
+		                         type_left, orig_type_left);
 		expression->base.type = type_left;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		errorf(HERE, "incompatible types '%T' and '%T' in assignment", orig_type_left, orig_type_right);

@@ -113,6 +113,8 @@ bool is_type_signed(const type_t *type);
  */
 bool is_type_float(const type_t *type);
 
+bool is_type_real(const type_t *type);
+
 /**
  * returns true if the type is valid. A type is valid if it contains no
  * unresolved references anymore and is not of TYPE_INVALID.
@@ -130,6 +132,8 @@ bool is_type_arithmetic(const type_t *type);
 bool is_type_scalar(const type_t *type);
 
 bool is_type_incomplete(const type_t *type);
+
+bool is_type_object(const type_t *type);
 
 bool types_compatible(const type_t *type1, const type_t *type2);
 
