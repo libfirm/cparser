@@ -636,7 +636,7 @@ static void print_select(const select_expression_t *expression)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
 	print_expression_prec(expression->compound, prec);
-	if(is_type_pointer(expression->compound->base.type)) {
+	if(is_type_pointer(skip_typeref(expression->compound->base.type))) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);
