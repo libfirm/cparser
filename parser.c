@@ -6070,6 +6070,8 @@ static void check_pointer_arithmetic(const source_position_t *source_position,
                                      type_t *orig_pointer_type)
 {
 	type_t *points_to = pointer_type->pointer.points_to;
+	points_to = skip_typeref(points_to);
+
 	if (is_type_incomplete(points_to) &&
 			(! (c_mode & _GNUC)
 			 || !is_type_atomic(points_to, ATOMIC_TYPE_VOID))) {
