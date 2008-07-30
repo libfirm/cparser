@@ -545,6 +545,11 @@ int main(int argc, char **argv)
 					set_be_option("omitfp");
 				} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
 					set_be_option("omitfp=no");
+				} else if(strcmp(opt, "fast-math") == 0
+						|| strcmp(opt, "unroll-loops") == 0
+						|| strcmp(opt, "expensive-optimizations") == 0
+						|| strcmp(opt, "no-common") == 0) {
+					fprintf(stderr, "ignoring gcc option '-f %s'\n", opt);
 				} else {
 					int res = firm_option(opt);
 					if (res == 0) {
