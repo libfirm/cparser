@@ -206,7 +206,7 @@ static void lextest(FILE *in, const char *fname)
 	} while(lexer_token.type != T_EOF);
 }
 
-static FILE *preprocess(FILE *in, const char *fname, bool to_stdout)
+static FILE *preprocess(FILE *in, const char *fname)
 {
 	char buf[4096];
 	obstack_1grow(&cppflags_obst, '\0');
@@ -222,17 +222,13 @@ static FILE *preprocess(FILE *in, const char *fname, bool to_stdout)
 	if(verbose) {
 		puts(buf);
 	}
-	if(to_stdout) {
-		int res = system(buf);
-		exit(res);
-	} else {
-		FILE *f = popen(buf, "r");
-		if(f == NULL) {
-			fprintf(stderr, "invoking preprocessor failed\n");
-			exit(1);
-		}
-		return f;
+
+	FILE *f = popen(buf, "r");
+	if(f == NULL) {
+		fprintf(stderr, "invoking preprocessor failed\n");
+		exit(1);
 	}
+	return f;
 }
 
 static void do_link(const char *out, const char *in)
@@ -375,7 +371,7 @@ typedef enum compile_mode_t {
 	PrintAst,
 	PrintFluffy,
 	PrintCaml,
-	Link
+	Link,
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -412,6 +408,18 @@ static void set_option(const char *arg)
 	int res = firm_option(arg);
 	(void) res;
 	assert(res);
+}
+
+static void copy_file(FILE *dest, FILE *input)
+{
+	char buf[16384];
+
+	while (!feof(input) && !ferror(dest)) {
+		size_t read = fread(buf, 1, sizeof(buf), input);
+		if(fwrite(buf, 1, read, dest) != read) {
+			perror("couldn't write output");
+		}
+	}
 }
 
 int main(int argc, char **argv)
@@ -535,6 +543,21 @@ int main(int argc, char **argv)
 				verbose = 1;
 			} else if(SINGLE_OPTION('w')) {
 				inhibit_all_warnings = true;
+			} else if(strcmp(option, "M") == 0) {
+				mode = PreprocessOnly;
+				obstack_printf(&cppflags_obst, " -M");
+			} else if(strcmp(option, "MMD") == 0
+					|| strcmp(option, "MD") == 0
+					|| strcmp(option, "MM") == 0) {
+				obstack_printf(&cppflags_obst, " -%s", option);
+			} else if(strcmp(option, "MT") == 0
+					|| strcmp(option, "MQ") == 0
+					|| strcmp(option, "MF") == 0) {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-MT");
+				obstack_printf(&cppflags_obst, " -%s %s", option, opt);
+			} else if(strcmp(option, "pipe") == 0) {
+				/* here for gcc compatibility */
 			} else if(option[0] == 'f') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-f");
@@ -545,10 +568,15 @@ int main(int argc, char **argv)
 					set_be_option("omitfp");
 				} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
 					set_be_option("omitfp=no");
+				} else if(strcmp(opt, "strength-reduce") == 0) {
+					firm_option("strength-red");
 				} else if(strcmp(opt, "fast-math") == 0
 						|| strcmp(opt, "unroll-loops") == 0
 						|| strcmp(opt, "expensive-optimizations") == 0
-						|| strcmp(opt, "no-common") == 0) {
+						|| strcmp(opt, "no-common") == 0
+						|| strncmp(opt, "align-loops=", sizeof("align-loops=")-1) == 0
+						|| strncmp(opt, "align-jumps=", sizeof("align-jumps=")-1) == 0
+						|| strncmp(opt, "align-functions=", sizeof("align-functions=")-1) == 0) {
 					fprintf(stderr, "ignoring gcc option '-f %s'\n", opt);
 				} else {
 					int res = firm_option(opt);
@@ -802,10 +830,8 @@ int main(int argc, char **argv)
 		case PrintFluffy:
 		case PrintCaml:
 		case LexTest:
-			if(outname == NULL)
-				outname = "-";
-			break;
 		case PreprocessOnly:
+			outname = "-";
 			break;
 		case ParseOnly:
 			break;
@@ -896,10 +922,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	FILE *preprocessed_in = preprocess(in, input, mode == PreprocessOnly);
+	FILE *preprocessed_in = preprocess(in, input);
+	if (mode == PreprocessOnly) {
+		copy_file(out, preprocessed_in);
+		return pclose(preprocessed_in);
+	}
+
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
 	int res = pclose(preprocessed_in);
-	if(res != 0) {
+	if (res != 0) {
 		return res;
 	}
 
