@@ -206,6 +206,40 @@ static void lextest(FILE *in, const char *fname)
 	} while(lexer_token.type != T_EOF);
 }
 
+static void add_flag(struct obstack *obst, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+
+	char buf[4096];
+	vsnprintf(buf, sizeof(buf), format, ap);
+
+	/* escape stuff... */
+	obstack_1grow(obst, ' ');
+	for (char *c = buf; *c != '\0'; ++c) {
+		switch(*c) {
+		case '"':
+		case '\'':
+		case '`':
+		case ' ':
+		case '\t':
+		case '\n':
+		case '\r':
+		case '\\':
+		case '$':
+		case '(':
+		case ')':
+			obstack_1grow(obst, '\\');
+			/* fallthrough */
+		default:
+			obstack_1grow(obst, *c);
+			break;
+		}
+	}
+
+	va_end(ap);
+}
+
 static FILE *preprocess(FILE *in, const char *fname)
 {
 	char buf[4096];
@@ -522,40 +556,41 @@ int main(int argc, char **argv)
 			} else if(option[0] == 'I') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-I");
-				obstack_printf(&cppflags_obst, " -I%s", opt);
+				add_flag(&cppflags_obst, "-I%s", opt);
 			} else if(option[0] == 'D') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-D");
-				obstack_printf(&cppflags_obst, " -D%s", opt);
+				add_flag(&cppflags_obst, "-D%s", opt);
 			} else if(option[0] == 'U') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-U");
-				obstack_printf(&cppflags_obst, " -U%s", opt);
+				add_flag(&cppflags_obst, "-U%s", opt);
 			} else if(option[0] == 'l') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-l");
-				obstack_printf(&ldflags_obst, " -l%s", opt);
+				add_flag(&ldflags_obst, "-l%s", opt);
 			} else if(option[0] == 'L') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-L");
-				obstack_printf(&ldflags_obst, " -L%s", opt);
+				add_flag(&ldflags_obst, "-L%s", opt);
 			} else if(SINGLE_OPTION('v')) {
 				verbose = 1;
 			} else if(SINGLE_OPTION('w')) {
 				inhibit_all_warnings = true;
 			} else if(strcmp(option, "M") == 0) {
 				mode = PreprocessOnly;
-				obstack_printf(&cppflags_obst, " -M");
+				add_flag(&cppflags_obst, "-M");
 			} else if(strcmp(option, "MMD") == 0
 					|| strcmp(option, "MD") == 0
 					|| strcmp(option, "MM") == 0) {
-				obstack_printf(&cppflags_obst, " -%s", option);
+				add_flag(&cppflags_obst, "-%s", option);
 			} else if(strcmp(option, "MT") == 0
 					|| strcmp(option, "MQ") == 0
 					|| strcmp(option, "MF") == 0) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-MT");
-				obstack_printf(&cppflags_obst, " -%s %s", option, opt);
+				add_flag(&cppflags_obst, "-%s", option);
+				add_flag(&cppflags_obst, "%s", opt);
 			} else if(strcmp(option, "pipe") == 0) {
 				/* here for gcc compatibility */
 			} else if(option[0] == 'f') {
@@ -684,7 +719,7 @@ int main(int argc, char **argv)
 				}
 			} else if(strcmp(option, "pg") == 0) {
 				set_be_option("gprof");
-				obstack_printf(&ldflags_obst, " -pg");
+				add_flag(&ldflags_obst, "-pg");
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(strncmp(option, "std=", 4) == 0) {
