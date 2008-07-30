@@ -1076,8 +1076,18 @@ type_t *skip_typeref(type_t *type)
 	}
 
 	if (qualifiers != TYPE_QUALIFIER_NONE) {
-		type_t *const copy     = duplicate_type(type);
-		copy->base.qualifiers |= qualifiers;
+		type_t *const copy = duplicate_type(type);
+
+		/* for const with typedefed array type the element type has to be
+		 * adjusted */
+		if (is_type_array(copy)) {
+			type_t *element_type           = copy->array.element_type;
+			element_type                   = duplicate_type(element_type);
+			element_type->base.qualifiers |= qualifiers;
+			copy->array.element_type       = element_type;
+		} else {
+			copy->base.qualifiers |= qualifiers;
+		}
 
 		type = typehash_insert(copy);
 		if (type != copy) {
