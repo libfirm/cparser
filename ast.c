@@ -1461,7 +1461,7 @@ bool is_constant_initializer(const initializer_t *initializer)
 	panic("invalid initializer kind found");
 }
 
-static bool is_object_with_constant_address(const expression_t *expression)
+static bool is_object_with_linker_constant_address(const expression_t *expression)
 {
 	switch(expression->kind) {
 	case EXPR_UNARY_DEREFERENCE:
@@ -1472,7 +1472,7 @@ static bool is_object_with_constant_address(const expression_t *expression)
 			/* it's a -> */
 			return is_address_constant(expression->select.compound);
 		} else {
-			return is_object_with_constant_address(expression->select.compound);
+			return is_object_with_linker_constant_address(expression->select.compound);
 		}
 	}
 
@@ -1501,7 +1501,7 @@ bool is_address_constant(const expression_t *expression)
 {
 	switch(expression->kind) {
 	case EXPR_UNARY_TAKE_ADDRESS:
-		return is_object_with_constant_address(expression->unary.value);
+		return is_object_with_linker_constant_address(expression->unary.value);
 
 	case EXPR_UNARY_DEREFERENCE: {
 		type_t *real_type = revert_automatic_type_conversion(expression->unary.value);
@@ -1509,6 +1509,8 @@ bool is_address_constant(const expression_t *expression)
 		if(is_type_function(real_type)) {
 			return is_address_constant(expression->unary.value);
 		}
+
+		return false;
 	}
 
 	case EXPR_UNARY_CAST:
@@ -1536,7 +1538,7 @@ bool is_address_constant(const expression_t *expression)
 		if(is_type_function(type))
 			return true;
 		if(is_type_array(type)) {
-			return is_object_with_constant_address(expression);
+			return is_object_with_linker_constant_address(expression);
 		}
 		return false;
 	}
@@ -1564,6 +1566,42 @@ static bool is_builtin_const_call(const expression_t *expression)
 	}
 
 	return false;
+}
+
+static bool is_constant_pointer(const expression_t *expression)
+{
+	if (is_constant_expression(expression))
+		return true;
+
+	switch (expression->kind) {
+	case EXPR_UNARY_CAST:
+		return is_constant_pointer(expression->unary.value);
+	default:
+		return false;
+	}
+}
+
+static bool is_object_with_constant_address(const expression_t *expression)
+{
+	switch(expression->kind) {
+	case EXPR_SELECT: {
+		expression_t *compound      = expression->select.compound;
+		type_t       *compound_type = compound->base.type;
+		compound_type = skip_typeref(compound_type);
+		if(is_type_pointer(compound_type)) {
+			return is_constant_pointer(compound);
+		} else {
+			return is_object_with_constant_address(compound);
+		}
+	}
+	case EXPR_ARRAY_ACCESS:
+		return is_constant_pointer(expression->array_access.array_ref)
+			&& is_constant_expression(expression->array_access.index);
+	case EXPR_UNARY_DEREFERENCE:
+		return is_constant_pointer(expression->unary.value);
+	default:
+		return false;
+	}
 }
 
 bool is_constant_expression(const expression_t *expression)
@@ -1594,7 +1632,6 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PREFIX_INCREMENT:
 	case EXPR_UNARY_PREFIX_DECREMENT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
-	case EXPR_UNARY_TAKE_ADDRESS:
 	case EXPR_UNARY_DEREFERENCE:
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:
@@ -1609,6 +1646,9 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 	case EXPR_BINARY_COMMA:
 		return false;
+
+	case EXPR_UNARY_TAKE_ADDRESS:
+		return is_object_with_constant_address(expression->unary.value);
 
 	case EXPR_CALL:
 		return is_builtin_const_call(expression);
