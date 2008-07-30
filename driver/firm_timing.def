@@ -3,11 +3,12 @@
  *
  * (C) 2006  Michael Beck   beck@ipd.info.uni-karlsruhe.de
  *
- * $Id: firm_timing.def 14048 2007-05-26 10:43:19Z mallon $
+ * $Id: firm_timing.def 20710 2008-07-26 19:59:07Z beck $
  */
 DEFTIMEVAR(TV_ALL_OPT          , "allopt",     "Firm: all optimizations")
 DEFTIMEVAR(TV_VALUE_NUM        , "valnum",     "Firm: value numbers")
 DEFTIMEVAR(TV_CREATE           , "create",     "Firm: creation")
+DEFTIMEVAR(TV_COMBO            , "combo",      "Firm: combo")
 DEFTIMEVAR(TV_INLINE           , "inline",     "Firm: inlining")
 DEFTIMEVAR(TV_TAIL_REC         , "tailrec",    "Firm: tail-recursion")
 DEFTIMEVAR(TV_COMP_DOMS        , "doms",       "Firm: compute doms")

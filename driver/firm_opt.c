@@ -309,25 +309,21 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
 
   timer_start(TV_ALL_OPT);
 
-  if (firm_opt.remove_unused) {
-  	ir_entity **keep_methods;
-  	int         arr_len;
-
-    /* Analysis that finds the free methods,
-       i.e. methods that are dereferenced.
-       Optimizes polymorphic calls :-). */
-    cgana(&arr_len, &keep_methods);
-
-    /* Remove methods that are never called. */
-    gc_irgs(arr_len, keep_methods);
-
-    free(keep_methods);
-  }
-
   if (! firm_opt.freestanding) {
     rts_map();
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "rts");
     CHECK_ALL(firm_opt.check_all);
+  }
+
+  if (firm_opt.combo) {
+    for (i = 0; i < get_irp_n_irgs(); i++) {
+      timer_push(TV_COMBO);
+      irg = get_irp_irg(i);
+      combo(irg);
+      timer_pop();
+      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "combo");
+      CHECK_ONE(firm_opt.check_all, irg);
+    }
   }
 
   /* first step: kill dead code */
@@ -342,6 +338,31 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     timer_pop();
   }
 
+  if (firm_opt.remove_unused) {
+    ir_entity **keep_methods;
+    int         arr_len;
+
+    timer_push(TV_CGANA);
+    /* Analysis that finds the free methods,
+       i.e. methods that are dereferenced.
+       Optimizes polymorphic calls :-). */
+    cgana(&arr_len, &keep_methods);
+
+    /* Remove methods that are never called. */
+    gc_irgs(arr_len, keep_methods);
+
+    free(keep_methods);
+    timer_pop();
+  }
+
+  if (firm_opt.tail_rec) {
+    timer_push(TV_TAIL_REC);
+    opt_tail_recursion();
+    timer_pop();
+
+    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "tail_rec");
+    CHECK_ALL(firm_opt.check_all);
+  }
   if (firm_opt.func_calls) {
     timer_push(TV_REAL_FUNC_CALL);
       optimize_funccalls(firm_const_exists, NULL);
@@ -550,14 +571,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "clone");
     CHECK_ALL(firm_opt.check_all);
   }
-  if (firm_opt.tail_rec) {
-    timer_push(TV_TAIL_REC);
-      opt_tail_recursion();
-    timer_pop();
-
-    DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "tail_rec");
-    CHECK_ALL(firm_opt.check_all);
-  }
 
   if (firm_opt.cond_eval) {
     for (i = 0; i < get_irp_n_irgs(); i++) {
@@ -596,6 +609,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     ir_entity **keep_methods;
     int arr_len;
 
+    timer_push(TV_CGANA);
     /* Analysis that finds the free methods,
        i.e. methods that are dereferenced.
        Optimizes polymorphic calls :-). */
@@ -605,6 +619,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     gc_irgs(arr_len, keep_methods);
 
     free(keep_methods);
+    timer_pop();
   }
 
 
@@ -1130,11 +1145,8 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm
     stat_dump_snapshot(input_filename, "noopt");
   }
 
-  if (firm_opt.enabled) {
+  if (firm_opt.enabled)
     do_firm_optimizations(input_filename, firm_const_exists);
-    //do_firm_optimizations(input_filename, firm_const_exists);
-    //do_firm_optimizations(input_filename, firm_const_exists);
-  }
 
   if (firm_dump.gen_firm_asm) {
     timer_push(TV_FIRM_ASM);
