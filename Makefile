@@ -30,6 +30,7 @@ SOURCES := \
 	adt/xmalloc.c \
 	ast.c \
 	ast2firm.c \
+	config.h \
 	diagnostic.c \
 	entitymap.c \
 	format_check.c \
@@ -67,6 +68,9 @@ all: $(DIRS) $(GOAL)
 ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
 endif
+
+config.h:
+	cp config.h.in $@
 
 %.h:
 	@true
