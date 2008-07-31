@@ -928,7 +928,7 @@ static ident *create_ld_ident_win32(ir_entity *ent, declaration_t *declaration)
 		id = mangle(id_underscore, get_entity_ident(ent));
 	}
 
-	decl_modifiers_t decl_modifiers = declaration->decl_modifiers;
+	decl_modifiers_t decl_modifiers = declaration->modifiers;
 	if (decl_modifiers & DM_DLLIMPORT) {
 		/* add prefix for imported symbols */
 		id = mangle(id_imp, id);
@@ -5099,6 +5099,24 @@ static void handle_decl_modifier_irg(ir_graph_ptr irg, decl_modifiers_t decl_mod
 	}
 }
 
+static void add_function_pointer(ir_type *segment, ir_entity *method,
+                                 const char *unique_template)
+{
+	ir_type   *method_type  = get_entity_type(method);
+	ident     *id           = id_unique(unique_template);
+	ir_type   *ptr_type     = new_type_pointer(id, method_type, mode_P_code);
+
+	ident     *ide          = id_unique(unique_template);
+	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
+	ir_graph  *irg          = get_const_code_irg();
+	ir_node   *val          = new_rd_SymConst_addr_ent(NULL, irg, mode_P_code,
+	                                                   method, NULL);
+
+	set_entity_compiler_generated(ptr, 1);
+	set_entity_variability(ptr, variability_constant);
+	set_atomic_ent_value(ptr, val);
+}
+
 /**
  * Create code for a function.
  */
@@ -5108,6 +5126,15 @@ static void create_function(declaration_t *declaration)
 
 	if (declaration->init.statement == NULL)
 		return;
+
+	if (declaration->modifiers & DM_CONSTRUCTOR) {
+		ir_type *segment = get_segment_type(IR_SEGMENT_CONSTRUCTORS);
+		add_function_pointer(segment, function_entity, "constructor_ptr.%u");
+	}
+	if (declaration->modifiers & DM_DESTRUCTOR) {
+		ir_type *segment = get_segment_type(IR_SEGMENT_DESTRUCTORS);
+		add_function_pointer(segment, function_entity, "destructor_ptr.%u");
+	}
 
 	current_function_decl = declaration;
 	current_function_name = NULL;
@@ -5128,7 +5155,7 @@ static void create_function(declaration_t *declaration)
 	/* set inline flags */
 	if (declaration->is_inline)
 		set_irg_inline_property(irg, irg_inline_recomended);
-	handle_decl_modifier_irg(irg, declaration->decl_modifiers);
+	handle_decl_modifier_irg(irg, declaration->modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(declaration);

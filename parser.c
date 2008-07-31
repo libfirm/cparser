@@ -67,7 +67,7 @@ struct declaration_specifiers_t {
 	unsigned char      alignment;         /**< Alignment, 0 if not set. */
 	unsigned int       is_inline : 1;
 	unsigned int       deprecated : 1;
-	decl_modifiers_t   decl_modifiers;    /**< MS __declspec extended modifier mask */
+	decl_modifiers_t   modifiers;         /**< declaration modifiers */
 	gnu_attribute_t   *gnu_attributes;    /**< list of GNU attributes */
 	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
 	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
@@ -1311,6 +1311,19 @@ end_error:
 	attribute->u.value = true;
 }
 
+static void check_no_argument(gnu_attribute_t *attribute, const char *name)
+{
+	if(!attribute->have_arguments)
+		return;
+
+	/* should have no arguments */
+	errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
+	eat_until_matching_token('(');
+	/* we have already consumed '(', so we stop before ')', eat it */
+	eat(')');
+	attribute->invalid = true;
+}
+
 /**
  * Parse one GNU attribute.
  *
@@ -1387,10 +1400,11 @@ end_error:
  *  interrupt( string literal )
  *  sentinel( constant expression )
  */
-static void parse_gnu_attribute(gnu_attribute_t **attributes)
+static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 {
-	gnu_attribute_t *head = *attributes;
-	gnu_attribute_t *last = *attributes;
+	gnu_attribute_t *head      = *attributes;
+	gnu_attribute_t *last      = *attributes;
+	decl_modifiers_t modifiers = 0;
 	gnu_attribute_t *attribute;
 
 	eat(T___attribute__);
@@ -1457,20 +1471,11 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_STDCALL:
 				case GNU_AK_FASTCALL:
 				case GNU_AK_DEPRECATED:
-				case GNU_AK_NOINLINE:
-				case GNU_AK_NORETURN:
 				case GNU_AK_NAKED:
-				case GNU_AK_PURE:
-				case GNU_AK_ALWAYS_INLINE:
 				case GNU_AK_MALLOC:
 				case GNU_AK_WEAK:
-				case GNU_AK_CONSTRUCTOR:
-				case GNU_AK_DESTRUCTOR:
-				case GNU_AK_NOTHROW:
-				case GNU_AK_TRANSPARENT_UNION:
 				case GNU_AK_COMMON:
 				case GNU_AK_NOCOMMON:
-				case GNU_AK_PACKED:
 				case GNU_AK_SHARED:
 				case GNU_AK_NOTSHARED:
 				case GNU_AK_USED:
@@ -1498,16 +1503,62 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_MAY_ALIAS:
 				case GNU_AK_MS_STRUCT:
 				case GNU_AK_GCC_STRUCT:
+					check_no_argument(attribute, name);
+					break;
+
+				case GNU_AK_PURE:
+					check_no_argument(attribute, name);
+					modifiers |= DM_PURE;
+					break;
+
+				case GNU_AK_ALWAYS_INLINE:
+					check_no_argument(attribute, name);
+					modifiers |= DM_FORCEINLINE;
+					break;
+
 				case GNU_AK_DLLIMPORT:
+					check_no_argument(attribute, name);
+					modifiers |= DM_DLLIMPORT;
+					break;
+
 				case GNU_AK_DLLEXPORT:
-					if(attribute->have_arguments) {
-						/* should have no arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-						eat_until_matching_token('(');
-						/* we have already consumed '(', so we stop before ')', eat it */
-						eat(')');
-						attribute->invalid = true;
-					}
+					check_no_argument(attribute, name);
+					modifiers |= DM_DLLEXPORT;
+					break;
+
+				case GNU_AK_PACKED:
+					check_no_argument(attribute, name);
+					modifiers |= DM_PACKED;
+					break;
+
+				case GNU_AK_NOINLINE:
+					check_no_argument(attribute, name);
+					modifiers |= DM_NOINLINE;
+					break;
+
+				case GNU_AK_NORETURN:
+					check_no_argument(attribute, name);
+					modifiers |= DM_NORETURN;
+					break;
+
+				case GNU_AK_NOTHROW:
+					check_no_argument(attribute, name);
+					modifiers |= DM_NOTHROW;
+					break;
+
+				case GNU_AK_TRANSPARENT_UNION:
+					check_no_argument(attribute, name);
+					modifiers |= DM_TRANSPARENT_UNION;
+					break;
+
+				case GNU_AK_CONSTRUCTOR:
+					check_no_argument(attribute, name);
+					modifiers |= DM_CONSTRUCTOR;
+					break;
+
+				case GNU_AK_DESTRUCTOR:
+					check_no_argument(attribute, name);
+					modifiers |= DM_DESTRUCTOR;
 					break;
 
 				case GNU_AK_ALIGNED:
@@ -1611,17 +1662,21 @@ static void parse_gnu_attribute(gnu_attribute_t **attributes)
 	expect(')');
 end_error:
 	*attributes = head;
+
+	return modifiers;
 }
 
 /**
  * Parse GNU attributes.
  */
-static void parse_attributes(gnu_attribute_t **attributes)
+static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 {
+	decl_modifiers_t modifiers = 0;
+
 	while(true) {
 		switch(token.type) {
 		case T___attribute__: {
-			parse_gnu_attribute(attributes);
+			modifiers |= parse_gnu_attribute(attributes);
 			break;
 		}
 		case T_asm:
@@ -1644,7 +1699,7 @@ static void parse_attributes(gnu_attribute_t **attributes)
 
 attributes_finished:
 end_error:
-	return;
+	return modifiers;
 }
 
 static designator_t *parse_designation(void)
@@ -2718,7 +2773,7 @@ static bool check_elignment_value(long long intvalue) {
 
 static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *specifiers)
 {
-	decl_modifiers_t *modifiers = &specifiers->decl_modifiers;
+	decl_modifiers_t *modifiers = &specifiers->modifiers;
 
 	while(true) {
 		if(token.type == T_restrict) {
@@ -2961,7 +3016,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		case T__forceinline:
 			/* only in microsoft mode */
-			specifiers->decl_modifiers |= DM_FORCEINLINE;
+			specifiers->modifiers |= DM_FORCEINLINE;
 
 		case T_inline:
 			next_token();
@@ -3003,7 +3058,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T___attribute__:
-			parse_attributes(&specifiers->gnu_attributes);
+			specifiers->modifiers
+				|= parse_attributes(&specifiers->gnu_attributes);
 			break;
 
 		case T_IDENTIFIER: {
@@ -3522,7 +3578,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 	/* TODO: find out if this is correct */
-	parse_attributes(&attributes);
+	declaration->modifiers |= parse_attributes(&attributes);
 
 	construct_type_t *inner_types = NULL;
 
@@ -3586,7 +3642,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 declarator_finished:
-	parse_attributes(&attributes);
+	declaration->modifiers |= parse_attributes(&attributes);
 
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
@@ -3697,7 +3753,7 @@ static declaration_t *parse_declarator(
 {
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->declared_storage_class = specifiers->declared_storage_class;
-	declaration->decl_modifiers         = specifiers->decl_modifiers;
+	declaration->modifiers              = specifiers->modifiers;
 	declaration->deprecated             = specifiers->deprecated;
 	declaration->deprecated_string      = specifiers->deprecated_string;
 	declaration->get_property_sym       = specifiers->get_property_sym;
@@ -4050,7 +4106,7 @@ static void parse_anonymous_declaration_rest(
 	declaration->type                   = specifiers->type;
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->source_position        = specifiers->source_position;
-	declaration->decl_modifiers         = specifiers->decl_modifiers;
+	declaration->modifiers              = specifiers->modifiers;
 
 	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
 		warningf(&declaration->source_position,
@@ -4527,7 +4583,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			declaration->declared_storage_class = STORAGE_CLASS_NONE;
 			declaration->storage_class          = STORAGE_CLASS_NONE;
 			declaration->source_position        = source_position;
-			declaration->decl_modifiers         = specifiers->decl_modifiers;
+			declaration->modifiers              = specifiers->modifiers;
 			declaration->type                   = type;
 		} else {
 			declaration = parse_declarator(specifiers,/*may_be_abstract=*/true);

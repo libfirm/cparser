@@ -1268,7 +1268,7 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 	if((c_mode & _MS) == 0)
 		return;
 
-	decl_modifiers_t modifiers = declaration->decl_modifiers;
+	decl_modifiers_t modifiers = declaration->modifiers;
 
 	/* DM_FORCEINLINE handled outside. */
 	if((modifiers & ~DM_FORCEINLINE) != 0 ||
@@ -1342,10 +1342,10 @@ static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
 	if(declaration->is_inline) {
-		if(declaration->decl_modifiers & DM_FORCEINLINE)
+		if(declaration->modifiers & DM_FORCEINLINE)
 			fputs("__forceinline ", out);
 		else {
-			if(declaration->decl_modifiers & DM_MICROSOFT_INLINE)
+			if(declaration->modifiers & DM_MICROSOFT_INLINE)
 				fputs("__inline ", out);
 			else
 				fputs("inline ", out);
