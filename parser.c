@@ -2473,7 +2473,8 @@ static declaration_t *append_declaration(declaration_t *declaration);
 
 static declaration_t *parse_compound_type_specifier(bool is_struct)
 {
-	gnu_attribute_t *attributes = NULL;
+	gnu_attribute_t  *attributes = NULL;
+	decl_modifiers_t  modifiers  = 0;
 	if(is_struct) {
 		eat(T_struct);
 	} else {
@@ -2484,7 +2485,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	declaration_t *declaration = NULL;
 
 	if (token.type == T___attribute__) {
-		parse_attributes(&attributes);
+		modifiers |= parse_attributes(&attributes);
 	}
 
 	if(token.type == T_IDENTIFIER) {
@@ -2531,9 +2532,10 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		declaration->init.complete = true;
 
 		parse_compound_type_entries(declaration);
-		parse_attributes(&attributes);
+		modifiers |= parse_attributes(&attributes);
 	}
 
+	declaration->modifiers |= modifiers;
 	return declaration;
 }
 
@@ -3578,7 +3580,9 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 	/* TODO: find out if this is correct */
-	declaration->modifiers |= parse_attributes(&attributes);
+	decl_modifiers_t modifiers = parse_attributes(&attributes);
+	if (declaration != NULL)
+		declaration->modifiers |= modifiers;
 
 	construct_type_t *inner_types = NULL;
 
@@ -3642,7 +3646,9 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 declarator_finished:
-	declaration->modifiers |= parse_attributes(&attributes);
+	modifiers = parse_attributes(&attributes);
+	if (declaration != NULL)
+		declaration->modifiers |= modifiers;
 
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
