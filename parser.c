@@ -2525,8 +2525,9 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	if(token.type == '{') {
 		if (declaration->init.complete) {
 			assert(symbol != NULL);
-			errorf(HERE, "multiple definitions of '%s %Y'",
-			       is_struct ? "struct" : "union", symbol);
+			errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
+			       is_struct ? "struct" : "union", symbol,
+			       &declaration->source_position);
 			declaration->scope.declarations = NULL;
 		}
 		declaration->init.complete = true;
