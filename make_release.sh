@@ -7,7 +7,9 @@ RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
 SOURCEDIRS="adt driver builtins ."
-ADDFILES="README TODO NEWS AUTHOR COPYING Makefile"
+ADDFILES="README TODO NEWS AUTHOR COPYING"
+
+rm -rf "$FULLRELEASEDIR"
 
 echo "Preparing $FULLRELEASEDIR"
 mkdir -p "$WORKDIR"
@@ -21,6 +23,8 @@ for dir in $SOURCEDIRS; do
 	cp -p "$dir/"*.[ch] "$FULLRELEASEDIR/$dir"
 done
 cp $ADDFILES "$FULLRELEASEDIR"
+echo "REVISION = \"$VERSION\"" > "$FULLRELEASEDIR/Makefile"
+cat Makefile >> "$FULLRELEASEDIR/Makefile"
 
 echo "creating $RELEASEFILE"
 pushd "$WORKDIR"

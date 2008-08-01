@@ -74,8 +74,10 @@ config.h:
 %.h:
 	@true
 
+REVISION ?= $(shell svnversion -n .)
+
 .depend: config.h $(SOURCES)
-	@echo "#define cparser_REVISION \"`svnversion -n .`\"" > .revision.h
+	@echo "#define cparser_REVISION \"$(REVISION)\"" > .revision.h
 	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
 	      rm .revision.h;                                    \
 	    else                                                 \
