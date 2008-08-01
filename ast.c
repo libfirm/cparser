@@ -1504,13 +1504,14 @@ bool is_address_constant(const expression_t *expression)
 		return is_object_with_linker_constant_address(expression->unary.value);
 
 	case EXPR_UNARY_DEREFERENCE: {
-		type_t *real_type = revert_automatic_type_conversion(expression->unary.value);
+		type_t *real_type
+			= revert_automatic_type_conversion(expression->unary.value);
 		/* dereferencing a function is a NOP */
 		if(is_type_function(real_type)) {
 			return is_address_constant(expression->unary.value);
 		}
 
-		return false;
+		/* fallthrough */
 	}
 
 	case EXPR_UNARY_CAST:

@@ -997,13 +997,13 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	dbg_info *const dbgi = get_dbg_info(&declaration->source_position);
 	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
-	if (declaration->storage_class == STORAGE_CLASS_STATIC &&
-		declaration->init.statement == NULL) {
-		/* this entity was declared, but never defined */
-		set_entity_peculiarity(entity, peculiarity_description);
-	}
+
 	if (declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
+		if (declaration->init.statement == NULL) {
+			/* this entity was declared, but is defined nowhere */
+			set_entity_peculiarity(entity, peculiarity_description);
+		}
 		set_entity_visibility(entity, visibility_local);
 	} else if (declaration->init.statement != NULL) {
 		set_entity_visibility(entity, visibility_external_visible);
