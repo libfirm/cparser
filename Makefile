@@ -30,7 +30,6 @@ SOURCES := \
 	adt/xmalloc.c \
 	ast.c \
 	ast2firm.c \
-	config.h \
 	diagnostic.c \
 	entitymap.c \
 	format_check.c \
@@ -75,7 +74,7 @@ config.h:
 %.h:
 	@true
 
-.depend: $(SOURCES)
+.depend: config.h $(SOURCES)
 	@echo "#define cparser_REVISION \"`svnversion -n .`\"" > .revision.h
 	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
 	      rm .revision.h;                                    \
