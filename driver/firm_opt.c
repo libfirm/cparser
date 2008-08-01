@@ -482,7 +482,7 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       CHECK_ONE(firm_opt.check_all, irg);
     }
 
-#ifndef THIS_NEEDS_FURTHER_TESTING_AND_A_PARAMETER_FOR_SPARE_SIZE
+#ifdef THIS_NEEDS_FURTHER_TESTING_AND_A_PARAMETER_FOR_SPARE_SIZE
     lower_Switch(irg, 128);
     DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "lower_switch");
 #endif
