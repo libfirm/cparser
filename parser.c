@@ -2448,6 +2448,12 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			size = result->wide_string.string.size;
 			break;
 
+		case INITIALIZER_DESIGNATOR:
+		case INITIALIZER_VALUE:
+			/* can happen for parse errors */
+			size = 0;
+			break;
+
 		default:
 			internal_errorf(HERE, "invalid initializer type");
 		}
