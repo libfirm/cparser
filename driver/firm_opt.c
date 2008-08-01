@@ -482,6 +482,11 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
       CHECK_ONE(firm_opt.check_all, irg);
     }
 
+#ifndef THIS_NEEDS_FURTHER_TESTING_AND_A_PARAMETER_FOR_SPARE_SIZE
+    lower_Switch(irg, 128);
+    DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "lower_switch");
+#endif
+
     /* should we really remove the Confirm here? */
     if (firm_opt.confirm) {
       timer_push(TV_CONFIRM_CREATE);
@@ -571,11 +576,6 @@ static void do_firm_optimizations(const char *input_filename, int firm_const_exi
     DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, "clone");
     CHECK_ALL(firm_opt.check_all);
   }
-
-#ifndef THIS_NEEDS_FURTHER_TESTING_AND_A_PARAMETER_FOR_SPARE_SIZE
-  lower_Switch(irg, 128);
-  DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, "lower_switch");
-#endif
 
   if (firm_opt.cond_eval) {
     for (i = 0; i < get_irp_n_irgs(); i++) {
