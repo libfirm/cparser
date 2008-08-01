@@ -3671,6 +3671,8 @@ static void create_declaration_initializer(declaration_t *declaration)
 		return;
 	}
 
+	type_t *type = skip_typeref(declaration->type);
+
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 		dbg_info            *dbgi
@@ -3686,7 +3688,11 @@ static void create_declaration_initializer(declaration_t *declaration)
 
 			ir_entity *entity = declaration->v.entity;
 
-			set_entity_variability(entity, variability_initialized);
+			if (type->base.qualifiers & TYPE_QUALIFIER_CONST) {
+				set_entity_variability(entity, variability_constant);
+			} else {
+				set_entity_variability(entity, variability_initialized);
+			}
 			set_atomic_ent_value(entity, value);
 		}
 	} else {
@@ -3695,9 +3701,13 @@ static void create_declaration_initializer(declaration_t *declaration)
 
 		ir_entity        *entity        = declaration->v.entity;
 		ir_initializer_t *irinitializer
-			= create_ir_initializer(initializer, declaration->type);
+			= create_ir_initializer(initializer, type);
 
-		set_entity_variability(entity, variability_initialized);
+		if (type->base.qualifiers & TYPE_QUALIFIER_CONST) {
+			set_entity_variability(entity, variability_constant);
+		} else {
+			set_entity_variability(entity, variability_initialized);
+		}
 		set_entity_initializer(entity, irinitializer);
 	}
 }
