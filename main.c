@@ -406,6 +406,8 @@ typedef enum compile_mode_t {
 	PrintFluffy,
 	PrintCaml,
 	Link,
+	Assemble,
+	AssemblePreprocessed,
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -809,7 +811,7 @@ int main(int argc, char **argv)
 					|| strcmp(arg+len-2, ".h") == 0) {
 				entry->next = c_files;
 				c_files     = entry;
-			} else if (strcmp(arg+len-2, ".s") == 0) {
+			} else if (strcmp(arg+len-2, ".s") == 0 || strcmp(arg+len-2, ".S") == 0) {
 				entry->next = s_files;
 				s_files     = entry;
 			} else if (strcmp(arg+len-2, ".o") == 0) {
@@ -825,8 +827,14 @@ int main(int argc, char **argv)
 		mode = Link;
 	} else if (c_files != NULL && c_files->next == NULL) {
 		input = c_files->filename;
+	} else if (s_files != NULL && s_files->next == NULL) {
+		input = s_files->filename;
+		if(!strcmp(input + strlen(input) - 2, ".S"))
+			mode = AssemblePreprocessed;
+		else
+			mode = Assemble;
 	} else {
-		if (c_files == NULL) {
+		if (c_files == NULL && s_files == NULL) {
 			fprintf(stderr, "error: no input files specified\n");
 		} else {
 			fprintf(stderr, "error: multiple input files specified\n");
@@ -897,6 +905,11 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (mode == Assemble) {
+		assemble(outname, input);
+		return 0;
+	}
+
 	if (mode == Link) {
 		obstack_1grow(&ldflags_obst, '\0');
 		const char *flags = obstack_finish(&ldflags_obst);
@@ -961,6 +974,23 @@ int main(int argc, char **argv)
 	if (mode == PreprocessOnly) {
 		copy_file(out, preprocessed_in);
 		return pclose(preprocessed_in);
+	}
+
+	if (mode == AssemblePreprocessed) {
+		FILE *asm_pp;
+		char  asm_tempfile[1024];
+
+		/* write preprocessed assembler to a temporary file */
+		asm_pp = make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
+		copy_file(asm_pp, preprocessed_in);
+		fclose(asm_pp);
+		int res = pclose(preprocessed_in);
+		if (res != 0)
+			return res;
+
+		/* and assemble it */
+		assemble(outname, asm_tempfile);
+		return 0;
 	}
 
 	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
