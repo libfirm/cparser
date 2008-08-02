@@ -5,7 +5,7 @@
 	Name="cparser"
 	ProjectGUID="{806B1A44-83D7-41D9-94BE-3EC7C0D9C50C}"
 	VCNestedProjectGUID="{5187EF14-7A1E-4025-9B58-2C14DE64433E}"
-	VCNestedProjectCRC32="816390867"
+	VCNestedProjectCRC32="972539492"
 	VCNestedProjectFileName="cparser.vcproj"
 	Keyword="Win32Proj">
 	<Platforms>
@@ -25,7 +25,7 @@
 				Name="CppCmplrTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../../ipd/include;..;../win32"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FIRM_BACKEND"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FIRM_BACKEND;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
