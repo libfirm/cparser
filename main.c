@@ -724,6 +724,8 @@ int main(int argc, char **argv)
 				add_flag(&ldflags_obst, "-pg");
 			} else if(strcmp(option, "pedantic") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+			} else if(strcmp(option, "shared") == 0) {
+				add_flag(&ldflags_obst, "-shared");
 			} else if(strncmp(option, "std=", 4) == 0) {
 				if(strcmp(&option[4], "c99") == 0) {
 					c_mode = _C89|_C99;
@@ -922,6 +924,7 @@ int main(int argc, char **argv)
 		}
 
 		obstack_printf(&file_obst, " -o %s %s", outname, flags);
+		obstack_1grow(&file_obst, '\0');
 
 		char *buf = obstack_finish(&file_obst);
 
