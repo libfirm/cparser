@@ -117,8 +117,18 @@ static struct obstack cppflags_obst, ldflags_obst;
 
 typedef struct file_list_entry_t file_list_entry_t;
 
+typedef enum filetype_t {
+	FILETYPE_C,
+	FILETYPE_PREPROCESSED_C,
+	FILETYPE_ASSEMBLER,
+	FILETYPE_PREPROCESSED_ASSEMBLER,
+	FILETYPE_OBJECT,
+	FILETYPE_UNKNOWN
+} filetype_t;
+
 struct file_list_entry_t {
-	const char        *filename;
+	const char        *name; /**< filename or NULL for stdin */
+	filetype_t         type;
 	file_list_entry_t *next;
 };
 
@@ -240,19 +250,13 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 	va_end(ap);
 }
 
-static FILE *preprocess(FILE *in, const char *fname)
+static FILE *preprocess(const char *fname)
 {
 	char buf[4096];
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
 
-	if(in != stdin) {
-		snprintf(buf, sizeof(buf), PREPROCESSOR " %s %s", flags, fname);
-	} else {
-		/* read from stdin */
-		snprintf(buf, sizeof(buf), PREPROCESSOR " %s -", flags);
-	}
-
+	snprintf(buf, sizeof(buf), PREPROCESSOR " %s %s", flags, fname);
 	if(verbose) {
 		puts(buf);
 	}
@@ -263,23 +267,6 @@ static FILE *preprocess(FILE *in, const char *fname)
 		exit(1);
 	}
 	return f;
-}
-
-static void do_link(const char *out, const char *in)
-{
-	char buf[4096];
-	obstack_1grow(&ldflags_obst, '\0');
-	const char *flags = obstack_finish(&ldflags_obst);
-
-	snprintf(buf, sizeof(buf), LINKER " %s -o %s %s", flags, out, in);
-	if(verbose) {
-		puts(buf);
-	}
-	int err = system(buf);
-	if(err != 0) {
-		fprintf(stderr, "linker reported an error\n");
-		exit(1);
-	}
 }
 
 static void assemble(const char *out, const char *in)
@@ -349,19 +336,14 @@ static int mkstemp(char *templ)
 #endif
 
 /**
- * an own version of tmpnam, which: writes in a buffer, appends a user specified
- * suffix, emits no warnings during linking (like glibc/gnu ld do for tmpnam)...
+ * an own version of tmpnam, which: writes in a buffer, emits no warnings
+ * during linking (like glibc/gnu ld do for tmpnam)...
  */
-static FILE *make_temp_file(char *buffer, size_t buflen,
-                            const char *prefix, const char *suffix)
+static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
 {
 	const char *tempdir = get_tempdir();
 
-	/* oh well... mkstemp doesn't accept a suffix after XXXXXX... */
-	(void) suffix;
-	suffix = "";
-
-	snprintf(buffer, buflen, "%s/%sXXXXXX%s", tempdir, prefix, suffix);
+	snprintf(buffer, buflen, "%s/%sXXXXXX", tempdir, prefix);
 
 	int fd = mkstemp(buffer);
 	if(fd == -1) {
@@ -404,10 +386,7 @@ typedef enum compile_mode_t {
 	LexTest,
 	PrintAst,
 	PrintFluffy,
-	PrintCaml,
-	Link,
-	Assemble,
-	AssemblePreprocessed,
+	PrintCaml
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -458,20 +437,34 @@ static void copy_file(FILE *dest, FILE *input)
 	}
 }
 
+static FILE *open_file(const char *filename)
+{
+	if (strcmp(filename, "-") == 0) {
+		return stdin;
+	}
+
+	FILE *in = fopen(filename, "r");
+	if(in == NULL) {
+		fprintf(stderr, "Couldn't open '%s': %s\n", filename,
+				strerror(errno));
+		exit(1);
+	}
+
+	return in;
+}
+
 int main(int argc, char **argv)
 {
 	initialize_firm();
 
-	const char        *input        = NULL;
 	const char        *outname      = NULL;
 	const char        *dumpfunction = NULL;
 	compile_mode_t     mode         = CompileAssembleLink;
 	int                opt_level    = 1;
 	int                result       = EXIT_SUCCESS;
 	char               cpu_arch[16] = "ia32";
-	file_list_entry_t *c_files      = NULL;
-	file_list_entry_t *s_files      = NULL;
-	file_list_entry_t *o_files      = NULL;
+	file_list_entry_t *files        = NULL;
+	file_list_entry_t *last_file    = NULL;
 	struct obstack     file_obst;
 
 	obstack_init(&cppflags_obst);
@@ -712,13 +705,6 @@ int main(int argc, char **argv)
 						machine_size = (unsigned int)value;
 					}
 				}
-			} else if (option[0] == '\0') {
-				if(input != NULL) {
-					fprintf(stderr, "error: multiple input files specified\n");
-					argument_errors = true;
-				} else {
-					input = arg;
-				}
 			} else if(strcmp(option, "pg") == 0) {
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
@@ -792,60 +778,46 @@ int main(int argc, char **argv)
 				argument_errors = true;
 			}
 		} else {
-
-			file_list_entry_t *entry
-				= obstack_alloc(&file_obst, sizeof(entry[0]));
-			entry->filename = arg;
-
-			size_t len = strlen(arg);
-			if (len < 2) {
-				if (arg[0] == '-') {
-					/* exception: '-' as name reads C from stdin */
-					entry->next = c_files;
-					c_files     = entry;
-					continue;
+			filetype_t  type     = FILETYPE_UNKNOWN;
+			size_t      len      = strlen(arg);
+			const char *filename = arg;
+			if (len < 2 && arg[0] == '-') {
+				/* - implicitely means C source file */
+				type     = FILETYPE_C;
+				filename = NULL;
+			} else if (len > 2 && arg[len-2] == '.') {
+				switch(arg[len-1]) {
+				case 'c': type = FILETYPE_C; break;
+				case 'h': type = FILETYPE_C; break;
+				case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
+				case 'S': type = FILETYPE_ASSEMBLER; break;
+				case 'o': type = FILETYPE_OBJECT; break;
 				}
-				fprintf(stderr, "'%s': file format not recognized\n", input);
-				continue;
 			}
 
-			if (strcmp(arg+len-2, ".c") == 0
-					|| strcmp(arg+len-2, ".h") == 0) {
-				entry->next = c_files;
-				c_files     = entry;
-			} else if (strcmp(arg+len-2, ".s") == 0 || strcmp(arg+len-2, ".S") == 0) {
-				entry->next = s_files;
-				s_files     = entry;
-			} else if (strcmp(arg+len-2, ".o") == 0) {
-				entry->next = o_files;
-				o_files     = entry;
+			if (type == FILETYPE_UNKNOWN) {
+				fprintf(stderr, "'%s': file format not recognized\n", arg);
 			} else {
-				fprintf(stderr, "'%s': file format not recognized\n", input);
+				file_list_entry_t *entry
+					= obstack_alloc(&file_obst, sizeof(entry[0]));
+				memset(entry, 0, sizeof(entry[0]));
+				entry->name = arg;
+				entry->type = type;
+
+				if (last_file != NULL) {
+					last_file->next = entry;
+				} else {
+					files = entry;
+				}
+				last_file = entry;
 			}
 		}
 	}
 
-	if (c_files == NULL && s_files == NULL && o_files != NULL) {
-		mode = Link;
-	} else if (c_files != NULL && c_files->next == NULL) {
-		input = c_files->filename;
-	} else if (s_files != NULL && s_files->next == NULL) {
-		input = s_files->filename;
-		if(!strcmp(input + strlen(input) - 2, ".S"))
-			mode = AssemblePreprocessed;
-		else
-			mode = Assemble;
-	} else {
-		if (c_files == NULL && s_files == NULL) {
-			fprintf(stderr, "error: no input files specified\n");
-		} else {
-			fprintf(stderr, "error: multiple input files specified\n");
-		}
+	if (files == NULL) {
+		fprintf(stderr, "error: no input files specified\n");
 		argument_errors = true;
 	}
-
-	/* we do the lowering in ast2firm */
-	firm_opt.lower_bitfields = FALSE;
 
 	if (help_displayed) {
 		return !argument_errors;
@@ -854,6 +826,9 @@ int main(int argc, char **argv)
 		usage(argv[0]);
 		return 1;
 	}
+
+	/* we do the lowering in ast2firm */
+	firm_opt.lower_bitfields = FALSE;
 
 	gen_firm_init();
 	init_symbol_table();
@@ -866,9 +841,10 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 
-	FILE *out = NULL;
-	char  outnamebuf[4096];
-	if(outname == NULL) {
+	char outnamebuf[4096];
+	if (outname == NULL) {
+		const char *filename = files->name;
+
 		switch(mode) {
 		case BenchmarkParser:
 		case PrintAst:
@@ -881,11 +857,11 @@ int main(int argc, char **argv)
 		case ParseOnly:
 			break;
 		case Compile:
-			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".s");
+			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".s");
 			outname = outnamebuf;
 			break;
 		case CompileAssemble:
-			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".o");
+			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".o");
 			outname = outnamebuf;
 			break;
 		case CompileDump:
@@ -893,13 +869,9 @@ int main(int argc, char **argv)
 			                ".vcg");
 			outname = outnamebuf;
 			break;
-		case Link:
 		case CompileAssembleLink:
 #ifdef _WIN32
-			/* Windows compiler typically derive the output name from
-			   the first source file */
-			get_output_name(outnamebuf, sizeof(outnamebuf), input, ".exe");
-			outname = outnamebuf;
+			outname = "a.exe";
 #else
 			outname = "a.out";
 #endif
@@ -907,197 +879,220 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (mode == Assemble) {
-		assemble(outname, input);
-		return 0;
+	assert(outname != NULL);
+
+	FILE *out;
+	if(strcmp(outname, "-") == 0) {
+		out = stdout;
+	} else {
+		out = fopen(outname, "w");
+		if(out == NULL) {
+			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
+					strerror(errno));
+			return 1;
+		}
 	}
 
-	if (mode == Link) {
+	file_list_entry_t *file;
+	for (file = files; file != NULL; file = file->next) {
+		char        asm_tempfile[1024];
+		const char *filename = file->name;
+		filetype_t  filetype = file->type;
+
+		if (file->type == FILETYPE_OBJECT)
+			continue;
+
+		FILE *in = NULL;
+		if (mode == LexTest) {
+			if (in == NULL)
+				in = open_file(filename);
+			lextest(in, filename);
+			fclose(in);
+			exit(EXIT_SUCCESS);
+		}
+
+		FILE *preprocessed_in = NULL;
+		if (filetype == FILETYPE_C || filetype == FILETYPE_ASSEMBLER) {
+			/* no support for input on FILE* yet */
+			if (in != NULL)
+				panic("internal compiler error: in for preprocessor != NULL");
+
+			preprocessed_in = preprocess(filename);
+			if (mode == PreprocessOnly) {
+				copy_file(out, preprocessed_in);
+				int result = pclose(preprocessed_in);
+				fclose(out);
+				return result;
+			}
+
+			if (filetype == FILETYPE_C) {
+				filetype = FILETYPE_PREPROCESSED_C;
+			} else if (filetype == FILETYPE_ASSEMBLER) {
+				filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
+			} else {
+				panic("internal compiler error: unknown filetype at preproc");
+			}
+
+			in = preprocessed_in;
+		}
+
+		FILE *asm_out;
+		if(mode == Compile) {
+			asm_out = out;
+		} else {
+			asm_out = make_temp_file(asm_tempfile, sizeof(asm_tempfile),
+			                         "ccs");
+		}
+
+		if (in == NULL)
+			in = open_file(filename);
+
+		/* preprocess and compile */
+		if (filetype == FILETYPE_PREPROCESSED_C) {
+			translation_unit_t *const unit = do_parsing(in, filename);
+			if (in == preprocessed_in) {
+				int pp_result = pclose(preprocessed_in);
+				if (pp_result != EXIT_SUCCESS) {
+					return pp_result;
+				}
+			}
+
+			/* prints the AST even if errors occurred */
+			if (mode == PrintAst) {
+				type_set_output(out);
+				ast_set_output(out);
+				print_ast(unit);
+			}
+
+			if(error_count > 0) {
+				/* parsing failed because of errors */
+				fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
+				        warning_count);
+				result = EXIT_FAILURE;
+				continue;
+			} else if(warning_count > 0) {
+				fprintf(stderr, "%u warning(s)\n", warning_count);
+			}
+
+			if(mode == BenchmarkParser) {
+				return result;
+			} else if(mode == PrintFluffy) {
+				write_fluffy_decls(out, unit);
+				continue;
+			} else if (mode == PrintCaml) {
+				write_caml_decls(out, unit);
+				continue;
+			}
+
+			translation_unit_to_firm(unit);
+
+			if (mode == ParseOnly) {
+				continue;
+			}
+
+			if (mode == CompileDump) {
+				/* find irg */
+				ident    *id     = new_id_from_str(dumpfunction);
+				ir_graph *irg    = NULL;
+				int       n_irgs = get_irp_n_irgs();
+				for(int i = 0; i < n_irgs; ++i) {
+					ir_graph *tirg   = get_irp_irg(i);
+					ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
+					if(irg_id == id) {
+						irg = tirg;
+						break;
+					}
+				}
+
+				if(irg == NULL) {
+					fprintf(stderr, "No graph for function '%s' found\n",
+					        dumpfunction);
+					exit(1);
+				}
+
+				dump_ir_block_graph_file(irg, out);
+				fclose(out);
+				exit(0);
+			}
+
+			gen_firm_finish(asm_out, filename, /*c_mode=*/1,
+			                /*firm_const_exists=*/0);
+			if (asm_out != out) {
+				fclose(asm_out);
+			}
+
+		} else if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
+			copy_file(asm_out, in);
+			if (in == preprocessed_in) {
+				int pp_result = pclose(preprocessed_in);
+				if (pp_result != EXIT_SUCCESS) {
+					return pp_result;
+				}
+			}
+		}
+
+		if (mode == Compile)
+			continue;
+
+		/* if we're here then we have preprocessed assembly */
+		filename = asm_tempfile;
+		filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
+
+		/* assemble */
+		if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
+			char        temp[1024];
+			const char *filename_o;
+			if(mode == CompileAssemble) {
+				fclose(out);
+				filename_o = outname;
+			} else {
+				FILE *tempf = make_temp_file(temp, sizeof(temp), "cco");
+				fclose(tempf);
+				filename_o = temp;
+			}
+
+			assemble(filename_o, filename);
+
+			size_t len = strlen(filename_o) + 1;
+			filename = obstack_copy(&file_obst, filename_o, len);
+			filetype = FILETYPE_OBJECT;
+		}
+
+		/* ok we're done here, process next file */
+		file->name = filename;
+		file->type = filetype;
+	}
+
+	/* link program file */
+	if(mode == CompileAssembleLink) {
 		obstack_1grow(&ldflags_obst, '\0');
 		const char *flags = obstack_finish(&ldflags_obst);
 
+		/* construct commandline */
 		obstack_printf(&file_obst, "%s", LINKER);
-
-		for (file_list_entry_t *entry = o_files; entry != NULL;
+		for (file_list_entry_t *entry = files; entry != NULL;
 				entry = entry->next) {
-			obstack_printf(&file_obst, " %s", entry->filename);
+			if (entry->type != FILETYPE_OBJECT)
+				continue;
+
+			add_flag(&file_obst, "%s", entry->name);
 		}
 
-		obstack_printf(&file_obst, " -o %s %s", outname, flags);
+		add_flag(&file_obst, "-o");
+		add_flag(&file_obst, outname);
+		obstack_printf(&file_obst, "%s", flags);
 		obstack_1grow(&file_obst, '\0');
 
-		char *buf = obstack_finish(&file_obst);
+		char *commandline = obstack_finish(&file_obst);
 
 		if(verbose) {
-			puts(buf);
+			puts(commandline);
 		}
-		int err = system(buf);
-		if(err != 0) {
+		int err = system(commandline);
+		if(err != EXIT_SUCCESS) {
 			fprintf(stderr, "linker reported an error\n");
 			exit(1);
 		}
-		return 0;
-	}
-
-	if(outname != NULL) {
-		if(strcmp(outname, "-") == 0) {
-			out = stdout;
-		} else {
-			out = fopen(outname, "w");
-			if(out == NULL) {
-				fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
-				        strerror(errno));
-				return 1;
-			}
-		}
-	}
-
-	FILE *in;
-	if(input == NULL) {
-		fprintf(stderr, "%s: no input files\n", argv[0]);
-		return 1;
-	} else if(strcmp(input, "-") == 0) {
-		in    = stdin;
-		input = "<stdin>";
-	} else {
-		in = fopen(input, "r");
-		if(in == NULL) {
-			fprintf(stderr, "Couldn't open '%s': %s\n", input, strerror(errno));
-			return 1;
-		}
-	}
-
-	if(mode == LexTest) {
-		lextest(in, input);
-		fclose(in);
-		return 0;
-	}
-
-	FILE *preprocessed_in = preprocess(in, input);
-	if (mode == PreprocessOnly) {
-		copy_file(out, preprocessed_in);
-		return pclose(preprocessed_in);
-	}
-
-	if (mode == AssemblePreprocessed) {
-		FILE *asm_pp;
-		char  asm_tempfile[1024];
-
-		/* write preprocessed assembler to a temporary file */
-		asm_pp = make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
-		copy_file(asm_pp, preprocessed_in);
-		fclose(asm_pp);
-		int res = pclose(preprocessed_in);
-		if (res != 0)
-			return res;
-
-		/* and assemble it */
-		assemble(outname, asm_tempfile);
-		return 0;
-	}
-
-	translation_unit_t *const unit = do_parsing(preprocessed_in, input);
-	int res = pclose(preprocessed_in);
-	if (res != 0) {
-		return res;
-	}
-
-	if(error_count > 0) {
-		/* parsing failed because of errors */
-		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count, warning_count);
-		result = EXIT_FAILURE;
-	} else if(warning_count > 0) {
-		fprintf(stderr, "%u warning(s)\n", warning_count);
-	}
-
-	if(mode == BenchmarkParser) {
-		return result;
-	}
-
-	/* prints the AST even if errors occurred */
-	if(mode == PrintAst) {
-		type_set_output(out);
-		ast_set_output(out);
-		print_ast(unit);
-		return result;
-	}
-
-	/* cannot handle other modes with errors */
-	if(result != EXIT_SUCCESS)
-		return result;
-
-	if(mode == PrintFluffy) {
-		write_fluffy_decls(out, unit);
-	}
-	if (mode == PrintCaml) {
-		write_caml_decls(out, unit);
-	}
-
-	translation_unit_to_firm(unit);
-
-	if(mode == ParseOnly) {
-		return 0;
-	}
-
-	FILE *asm_out;
-	char  asm_tempfile[1024];
-	if(mode == CompileDump) {
-		asm_out = NULL;
-		firm_be_opt.selection = BE_NONE;
-	} else if(mode == Compile) {
-		asm_out = out;
-	} else {
-		asm_out
-			= make_temp_file(asm_tempfile, sizeof(asm_tempfile), "cc", ".s");
-	}
-	gen_firm_finish(asm_out, input, /*c_mode=*/1, /*firm_const_exists=*/0);
-
-	if(mode == CompileDump) {
-		/* find irg */
-		ident    *id     = new_id_from_str(dumpfunction);
-		ir_graph *irg    = NULL;
-		int       n_irgs = get_irp_n_irgs();
-		for(int i = 0; i < n_irgs; ++i) {
-			ir_graph *tirg   = get_irp_irg(i);
-			ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
-			if(irg_id == id) {
-				irg = tirg;
-				break;
-			}
-		}
-
-		if(irg == NULL) {
-			fprintf(stderr, "No graph for function '%s' found\n", dumpfunction);
-			return 1;
-		}
-
-		dump_ir_block_graph_file(irg, out);
-		fclose(out);
-		return 0;
-	}
-
-	fclose(asm_out);
-
-	/* assemble assembler and create object file */
-	char obj_tfile[1024];
-	if(mode == CompileAssemble || mode == CompileAssembleLink) {
-		const char *obj_outfile;
-		if(mode == CompileAssemble) {
-			fclose(out);
-			obj_outfile = outname;
-		} else {
-			FILE *tempf
-				= make_temp_file(obj_tfile, sizeof(obj_tfile), "cc", ".o");
-			fclose(tempf);
-			obj_outfile = obj_tfile;
-		}
-
-		assemble(obj_outfile, asm_tempfile);
-	}
-
-	/* link object file */
-	if(mode == CompileAssembleLink) {
-		do_link(outname, obj_tfile);
 	}
 
 	obstack_free(&cppflags_obst, NULL);
