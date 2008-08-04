@@ -118,6 +118,7 @@ static struct obstack cppflags_obst, ldflags_obst;
 typedef struct file_list_entry_t file_list_entry_t;
 
 typedef enum filetype_t {
+	FILETYPE_AUTODETECT,
 	FILETYPE_C,
 	FILETYPE_PREPROCESSED_C,
 	FILETYPE_ASSEMBLER,
@@ -453,6 +454,20 @@ static FILE *open_file(const char *filename)
 	return in;
 }
 
+static filetype_t get_filetype_from_string(const char *string)
+{
+	if (strcmp(string, "c") == 0 || strcmp(string, "c-header") == 0)
+		return FILETYPE_C;
+	if (strcmp(string, "assembler") == 0)
+		return FILETYPE_PREPROCESSED_ASSEMBLER;
+	if (strcmp(string, "assembler-with-cpp") == 0)
+		return FILETYPE_ASSEMBLER;
+	if (strcmp(string, "none") == 0)
+		return FILETYPE_AUTODETECT;
+
+	return FILETYPE_UNKNOWN;
+}
+
 int main(int argc, char **argv)
 {
 	initialize_firm();
@@ -527,8 +542,9 @@ int main(int argc, char **argv)
 	}
 
 	/* parse rest of options */
-	bool help_displayed  = false;
-	bool argument_errors = false;
+	filetype_t  forced_filetype = FILETYPE_AUTODETECT;
+	bool        help_displayed  = false;
+	bool        argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if(arg[0] == '-' && arg[1] != 0) {
@@ -572,6 +588,14 @@ int main(int argc, char **argv)
 				verbose = 1;
 			} else if(SINGLE_OPTION('w')) {
 				inhibit_all_warnings = true;
+			} else if(option[0] == 'x') {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-x");
+				forced_filetype = get_filetype_from_string(opt);
+				if (forced_filetype == FILETYPE_UNKNOWN) {
+					fprintf(stderr, "Unknown language '%s'\n", opt);
+					argument_errors = true;
+				}
 			} else if(strcmp(option, "M") == 0) {
 				mode = PreprocessOnly;
 				add_flag(&cppflags_obst, "-M");
@@ -778,39 +802,42 @@ int main(int argc, char **argv)
 				argument_errors = true;
 			}
 		} else {
-			filetype_t  type     = FILETYPE_UNKNOWN;
-			size_t      len      = strlen(arg);
+			filetype_t  type     = forced_filetype;
 			const char *filename = arg;
-			if (len < 2 && arg[0] == '-') {
-				/* - implicitely means C source file */
-				type     = FILETYPE_C;
-				filename = NULL;
-			} else if (len > 2 && arg[len-2] == '.') {
-				switch(arg[len-1]) {
-				case 'c': type = FILETYPE_C; break;
-				case 'h': type = FILETYPE_C; break;
-				case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
-				case 'S': type = FILETYPE_ASSEMBLER; break;
-				case 'o': type = FILETYPE_OBJECT; break;
+			if (type == FILETYPE_AUTODETECT) {
+				size_t      len      = strlen(arg);
+				if (len < 2 && arg[0] == '-') {
+					/* - implicitely means C source file */
+					type     = FILETYPE_C;
+					filename = NULL;
+				} else if (len > 2 && arg[len-2] == '.') {
+					switch(arg[len-1]) {
+					case 'c': type = FILETYPE_C; break;
+					case 'h': type = FILETYPE_C; break;
+					case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
+					case 'S': type = FILETYPE_ASSEMBLER; break;
+					case 'o': type = FILETYPE_OBJECT; break;
+					}
+				}
+
+				if (type == FILETYPE_AUTODETECT) {
+					fprintf(stderr, "'%s': file format not recognized\n", arg);
+					continue;
 				}
 			}
 
-			if (type == FILETYPE_UNKNOWN) {
-				fprintf(stderr, "'%s': file format not recognized\n", arg);
+			file_list_entry_t *entry
+				= obstack_alloc(&file_obst, sizeof(entry[0]));
+			memset(entry, 0, sizeof(entry[0]));
+			entry->name = arg;
+			entry->type = type;
+
+			if (last_file != NULL) {
+				last_file->next = entry;
 			} else {
-				file_list_entry_t *entry
-					= obstack_alloc(&file_obst, sizeof(entry[0]));
-				memset(entry, 0, sizeof(entry[0]));
-				entry->name = arg;
-				entry->type = type;
-
-				if (last_file != NULL) {
-					last_file->next = entry;
-				} else {
-					files = entry;
-				}
-				last_file = entry;
+				files = entry;
 			}
+			last_file = entry;
 		}
 	}
 
