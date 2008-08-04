@@ -1090,6 +1090,9 @@ int main(int argc, char **argv)
 		file->type = filetype;
 	}
 
+	if (result != EXIT_SUCCESS)
+		return result;
+
 	/* link program file */
 	if(mode == CompileAssembleLink) {
 		obstack_1grow(&ldflags_obst, '\0');
