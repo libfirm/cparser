@@ -658,7 +658,13 @@ int main(int argc, char **argv)
 						strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if(option[0] == 'W') {
-				set_warning_opt(&option[1]);
+				if(strncmp(option + 1, "l,", 2) == 0)	// a gcc-style linker option
+				{
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Wl,");
+					add_flag(&ldflags_obst, "%s", opt);
+				}
+				else set_warning_opt(&option[1]);
 			} else if(option[0] == 'm') {
 				/* -m options */
 				const char *opt;
@@ -816,7 +822,13 @@ int main(int argc, char **argv)
 					case 'h': type = FILETYPE_C; break;
 					case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
 					case 'S': type = FILETYPE_ASSEMBLER; break;
+
+					case 'a':
 					case 'o': type = FILETYPE_OBJECT; break;
+					}
+				} else if (len > 3 && arg[len-3] == '.') {
+					if(strcmp(arg + len - 2, "so") == 0) {
+						type = FILETYPE_OBJECT;
 					}
 				}
 
