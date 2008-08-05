@@ -662,7 +662,7 @@ int main(int argc, char **argv)
 				{
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
-					add_flag(&ldflags_obst, "%s", opt);
+					add_flag(&ldflags_obst, "-Wl,%s", opt);
 				}
 				else set_warning_opt(&option[1]);
 			} else if(option[0] == 'm') {
