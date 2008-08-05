@@ -1068,6 +1068,9 @@ int main(int argc, char **argv)
 					return pp_result;
 				}
 			}
+			if(asm_out != out) {
+				fclose(asm_out);
+			}
 		}
 
 		if (mode == Compile)
