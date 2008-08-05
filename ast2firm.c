@@ -484,7 +484,7 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 static ir_type *create_bitfield_type(bitfield_type_t *const type)
 {
 	type_t *base = skip_typeref(type->base_type);
-	assert(base->kind == TYPE_ATOMIC);
+	assert(base->kind == TYPE_ATOMIC || base->kind == TYPE_ENUM);
 	ir_type *irbase = get_ir_type(base);
 
 	unsigned size = fold_constant(type->size);
