@@ -4497,6 +4497,10 @@ static void parse_external_declaration(void)
 		assert(parameter->parent_scope == NULL
 				|| parameter->parent_scope == scope);
 		parameter->parent_scope = scope;
+		if (parameter->symbol == NULL) {
+			errorf(&ndeclaration->source_position, "parameter name omitted");
+			continue;
+		}
 		environment_push(parameter);
 	}
 
