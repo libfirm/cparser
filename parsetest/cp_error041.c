@@ -1,15 +1,12 @@
-typedef enum {
+enum pr_opcode_e {
 	blub
-} pr_opcode_e;
+};
 
-typedef struct statement_s {
-	pr_opcode_e		op:16;
-} dstatement_t;
-
-dstatement_t *ptr;
+struct statement_s {
+	enum pr_opcode_e op:16;
+};
 
 int main(void)
 {
-	ptr++;
-	return 0;
+	return sizeof(struct statement_s) == 0;
 }
