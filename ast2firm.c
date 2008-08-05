@@ -998,7 +998,16 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 
-	if (declaration->storage_class == STORAGE_CLASS_STATIC
+	/* static inline             => local
+	 * extern inline             => local
+	 * inline without definition => local
+	 * inline with definition    => external_visible */
+
+	if (declaration->is_inline && declaration->storage_class == STORAGE_CLASS_NONE
+			&& declaration->init.statement != NULL) {
+		set_entity_visibility(entity, visibility_external_visible);
+	}
+	else if (declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->is_inline) {
 		if (declaration->init.statement == NULL) {
 			/* this entity was declared, but is defined nowhere */
