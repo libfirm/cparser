@@ -6459,9 +6459,8 @@ static void semantic_sub(binary_expression_t *expression)
 			errorf(HERE,
 			       "pointers to incompatible objects to binary '-' ('%T', '%T')",
 			       orig_type_left, orig_type_right);
-		} else {
-			expression->base.type = type_ptrdiff_t;
 		}
+		expression->base.type = type_ptrdiff_t;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
 		errorf(HERE, "invalid operands to binary '-' ('%T', '%T')",
 		       orig_type_left, orig_type_right);
