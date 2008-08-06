@@ -122,12 +122,12 @@ bool is_type_real(const type_t *type);
 bool type_valid(const type_t *type);
 
 /**
- * returns true if the type is an arithmetic type (6.2.18)
+ * returns true if the type is an arithmetic type (§6.2.5 clause 18)
  */
 bool is_type_arithmetic(const type_t *type);
 
 /**
- * returns true if the type is a scalar type (6.2.21)
+ * returns true if the type is a scalar type (§6.2.5 clause 21)
  */
 bool is_type_scalar(const type_t *type);
 
