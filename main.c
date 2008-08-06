@@ -992,7 +992,7 @@ int main(int argc, char **argv)
 			if (in == preprocessed_in) {
 				int pp_result = pclose(preprocessed_in);
 				if (pp_result != EXIT_SUCCESS) {
-					return pp_result;
+					exit(EXIT_FAILURE);
 				}
 			}
 

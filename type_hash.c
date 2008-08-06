@@ -127,7 +127,7 @@ static unsigned hash_type(const type_t *type)
 {
 	unsigned hash = 0;
 
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_INVALID:
 		panic("internalizing void or invalid types not possible");
 		return 0;
@@ -199,24 +199,24 @@ static bool imaginary_types_equal(const imaginary_type_t *type1,
 static bool function_types_equal(const function_type_t *type1,
                                  const function_type_t *type2)
 {
-	if(type1->return_type != type2->return_type)
+	if (type1->return_type != type2->return_type)
 		return false;
-	if(type1->variadic != type2->variadic)
+	if (type1->variadic != type2->variadic)
 		return false;
-	if(type1->unspecified_parameters != type2->unspecified_parameters)
+	if (type1->unspecified_parameters != type2->unspecified_parameters)
 		return false;
-	if(type1->kr_style_parameters != type2->kr_style_parameters)
+	if (type1->kr_style_parameters != type2->kr_style_parameters)
 		return false;
 
 	function_parameter_t *param1 = type1->parameters;
 	function_parameter_t *param2 = type2->parameters;
 	while(param1 != NULL && param2 != NULL) {
-		if(param1->type != param2->type)
+		if (param1->type != param2->type)
 			return false;
 		param1 = param1->next;
 		param2 = param2->next;
 	}
-	if(param1 != NULL || param2 != NULL)
+	if (param1 != NULL || param2 != NULL)
 		return false;
 
 	return true;
@@ -231,18 +231,18 @@ static bool pointer_types_equal(const pointer_type_t *type1,
 static bool array_types_equal(const array_type_t *type1,
                               const array_type_t *type2)
 {
-	if(type1->element_type != type2->element_type)
+	if (type1->element_type != type2->element_type)
 		return false;
-	if(type1->is_variable != type2->is_variable)
+	if (type1->is_variable != type2->is_variable)
 		return false;
-	if(type1->is_static != type2->is_static)
+	if (type1->is_static != type2->is_static)
 		return false;
-	if(type1->size_constant != type2->size_constant)
+	if (type1->size_constant != type2->size_constant)
 		return false;
 
 	/* never identify vla types, because we need them for caching calculated
 	 * sizes later in ast2firm */
-	if(type1->is_vla || type2->is_vla)
+	if (type1->is_vla || type2->is_vla)
 		return false;
 
 	/* TODO: compare size expressions for equality... */
@@ -277,9 +277,9 @@ static bool typedef_types_equal(const typedef_type_t *type1,
 static bool typeof_types_equal(const typeof_type_t *type1,
                                const typeof_type_t *type2)
 {
-	if(type1->expression != type2->expression)
+	if (type1->expression != type2->expression)
 		return false;
-	if(type1->typeof_type != type2->typeof_type)
+	if (type1->typeof_type != type2->typeof_type)
 		return false;
 
 	return true;
@@ -288,7 +288,7 @@ static bool typeof_types_equal(const typeof_type_t *type1,
 static bool bitfield_types_equal(const bitfield_type_t *type1,
                                  const bitfield_type_t *type2)
 {
-	if(type1->base_type != type2->base_type)
+	if (type1->base_type != type2->base_type)
 		return false;
 	/* TODO: compare size expression */
 	return false;
@@ -296,14 +296,16 @@ static bool bitfield_types_equal(const bitfield_type_t *type1,
 
 static bool types_equal(const type_t *type1, const type_t *type2)
 {
-	if(type1 == type2)
+	if (type1 == type2)
 		return true;
-	if(type1->kind != type2->kind)
+	if (type1->kind != type2->kind)
 		return false;
-	if(type1->base.qualifiers != type2->base.qualifiers)
+	if (type1->base.qualifiers != type2->base.qualifiers)
+		return false;
+	if (type1->base.modifiers != type2->base.modifiers)
 		return false;
 
-	switch(type1->kind) {
+	switch (type1->kind) {
 	case TYPE_ERROR:
 		/* Hmm, the error type is never equal */
 		return false;

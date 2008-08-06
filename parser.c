@@ -163,7 +163,8 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_restrict:        \
 	case T_volatile:        \
 	case T_inline:          \
-	case T__forceinline:
+	case T__forceinline:    \
+	case T___attribute__:
 
 #ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
@@ -872,11 +873,74 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	return create_cast_expression(expression, dest_type);
 }
 
+typedef enum assign_error_t {
+	ASSIGN_SUCCESS,
+	ASSIGN_ERROR_INCOMPATIBLE,
+	ASSIGN_ERROR_POINTER_QUALIFIER_MISSING,
+	ASSIGN_WARNING_POINTER_INCOMPATIBLE,
+	ASSIGN_WARNING_POINTER_FROM_INT,
+	ASSIGN_WARNING_INT_FROM_POINTER
+} assign_error_t;
+
+static void report_assign_error(assign_error_t error, type_t *orig_type_left,
+                                const expression_t *const right,
+                                const char *context,
+                                const source_position_t *source_position)
+{
+	type_t *const orig_type_right = right->base.type;
+	type_t *const type_left       = skip_typeref(orig_type_left);
+	type_t *const type_right      = skip_typeref(orig_type_right);
+
+	switch (error) {
+	case ASSIGN_SUCCESS:
+		return;
+	case ASSIGN_ERROR_INCOMPATIBLE:
+		errorf(source_position,
+		       "destination type '%T' in %s is incompatible with type '%T'",
+		       orig_type_left, context, orig_type_right);
+		return;
+
+	case ASSIGN_ERROR_POINTER_QUALIFIER_MISSING: {
+		type_t *points_to_left
+			= skip_typeref(type_left->pointer.points_to);
+		type_t *points_to_right
+			= skip_typeref(type_right->pointer.points_to);
+
+		/* the left type has all qualifiers from the right type */
+		unsigned missing_qualifiers
+			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
+		errorf(source_position,
+		       "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type",
+		       orig_type_left, context, orig_type_right, missing_qualifiers);
+		return;
+	}
+
+	case ASSIGN_WARNING_POINTER_INCOMPATIBLE:
+		warningf(source_position,
+		         "destination type '%T' in %s is incompatible with '%E' of type '%T'",
+			 	 orig_type_left, context, right, orig_type_right);
+		return;
+
+	case ASSIGN_WARNING_POINTER_FROM_INT:
+		warningf(source_position,
+		         "%s makes integer '%T' from pointer '%T' without a cast",
+				 context, orig_type_left, orig_type_right);
+		return;
+
+	case ASSIGN_WARNING_INT_FROM_POINTER:
+		warningf(source_position,
+				"%s makes integer '%T' from pointer '%T' without a cast",
+				context, orig_type_left, orig_type_right);
+		return;
+
+	default:
+		panic("invalid error value");
+	}
+}
+
 /** Implements the rules from § 6.5.16.1 */
-static type_t *semantic_assign(type_t *orig_type_left,
-                            const expression_t *const right,
-                            const char *context,
-                            const source_position_t *source_position)
+static assign_error_t semantic_assign(type_t *orig_type_left,
+                                      const expression_t *const right)
 {
 	type_t *const orig_type_right = right->base.type;
 	type_t *const type_left       = skip_typeref(orig_type_left);
@@ -884,7 +948,7 @@ static type_t *semantic_assign(type_t *orig_type_left,
 
 	if(is_type_pointer(type_left)) {
 		if(is_null_pointer_constant(right)) {
-			return orig_type_left;
+			return ASSIGN_SUCCESS;
 		} else if(is_type_pointer(type_right)) {
 			type_t *points_to_left
 				= skip_typeref(type_left->pointer.points_to);
@@ -895,9 +959,7 @@ static type_t *semantic_assign(type_t *orig_type_left,
 			unsigned missing_qualifiers
 				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 			if(missing_qualifiers != 0) {
-				errorf(source_position,
-						"destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type", type_left, context, type_right, missing_qualifiers);
-				return orig_type_left;
+				return ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
 			}
 
 			points_to_left  = get_unqualified_type(points_to_left);
@@ -905,47 +967,36 @@ static type_t *semantic_assign(type_t *orig_type_left,
 
 			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
 					is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
-				return orig_type_left;
+				return ASSIGN_SUCCESS;
 			}
 
 			if (!types_compatible(points_to_left, points_to_right)) {
-				warningf(source_position,
-					"destination type '%T' in %s is incompatible with '%E' of type '%T'",
-					orig_type_left, context, right, orig_type_right);
+				return ASSIGN_WARNING_POINTER_INCOMPATIBLE;
 			}
 
-			return orig_type_left;
+			return ASSIGN_SUCCESS;
 		} else if(is_type_integer(type_right)) {
-			warningf(source_position,
-					"%s makes pointer '%T' from integer '%T' without a cast",
-					context, orig_type_left, orig_type_right);
-			return orig_type_left;
+			return ASSIGN_WARNING_POINTER_FROM_INT;
 		}
 	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
 	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
 	     	&& is_type_pointer(type_right))) {
-		return orig_type_left;
+		return ASSIGN_SUCCESS;
 	} else if ((is_type_compound(type_left)  && is_type_compound(type_right))
 			|| (is_type_builtin(type_left) && is_type_builtin(type_right))) {
 		type_t *const unqual_type_left  = get_unqualified_type(type_left);
 		type_t *const unqual_type_right = get_unqualified_type(type_right);
 		if (types_compatible(unqual_type_left, unqual_type_right)) {
-			return orig_type_left;
+			return ASSIGN_SUCCESS;
 		}
 	} else if (is_type_integer(type_left) && is_type_pointer(type_right)) {
-		warningf(source_position,
-				"%s makes integer '%T' from pointer '%T' without a cast",
-				context, orig_type_left, orig_type_right);
-		return orig_type_left;
+		return ASSIGN_WARNING_INT_FROM_POINTER;
 	}
 
-	if (!is_type_valid(type_left))
-		return type_left;
+	if (!is_type_valid(type_left) || !is_type_valid(type_right))
+		return ASSIGN_SUCCESS;
 
-	if (!is_type_valid(type_right))
-		return orig_type_right;
-
-	return NULL;
+	return ASSIGN_ERROR_INCOMPATIBLE;
 }
 
 static expression_t *parse_constant_expression(void)
@@ -1814,13 +1865,14 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		}
 	}
 
-	type_t *const res_type = semantic_assign(type, expression, "initializer",
-	                                         &expression->base.source_position);
-	if (res_type == NULL)
+	assign_error_t error = semantic_assign(type, expression);
+	if (error == ASSIGN_ERROR_INCOMPATIBLE)
 		return NULL;
+	report_assign_error(error, type, expression, "initializer",
+	                    &expression->base.source_position);
 
 	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
-	result->value.value = create_implicit_cast(expression, res_type);
+	result->value.value = create_implicit_cast(expression, type);
 
 	return result;
 }
@@ -2918,10 +2970,11 @@ end_error:
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t   *type            = NULL;
-	unsigned  type_qualifiers = 0;
-	unsigned  type_specifiers = 0;
-	int       newtype         = 0;
+	type_t            *type            = NULL;
+	type_qualifiers_t  qualifiers      = TYPE_QUALIFIER_NONE;
+	type_modifiers_t   modifiers       = TYPE_MODIFIER_NONE;
+	unsigned           type_specifiers = 0;
+	int                newtype         = 0;
 
 	specifiers->source_position = token.source_position;
 
@@ -2977,7 +3030,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* type qualifiers */
 #define MATCH_TYPE_QUALIFIER(token, qualifier)                          \
 		case token:                                                     \
-			type_qualifiers |= qualifier;                               \
+			qualifiers |= qualifier;                                    \
 			next_token();                                               \
 			break;
 
@@ -3051,8 +3104,9 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		}
 		case T_union: {
 			type = allocate_type_zero(TYPE_COMPOUND_UNION, HERE);
-
 			type->compound.declaration = parse_compound_type_specifier(false);
+			if (type->compound.declaration->modifiers & DM_TRANSPARENT_UNION)
+				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 			break;
 		}
 		case T_enum:
@@ -3069,6 +3123,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T___attribute__:
 			specifiers->modifiers
 				|= parse_attributes(&specifiers->gnu_attributes);
+			if (specifiers->modifiers & DM_TRANSPARENT_UNION)
+				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 			break;
 
 		case T_IDENTIFIER: {
@@ -3264,8 +3320,10 @@ finish_specifiers:
 		}
 	}
 
-	type->base.qualifiers = type_qualifiers;
 	/* FIXME: check type qualifiers here */
+
+	type->base.qualifiers = qualifiers;
+	type->base.modifiers  = modifiers;
 
 	type_t *result = typehash_insert(type);
 	if(newtype && result != type) {
@@ -3279,7 +3337,7 @@ end_error:
 
 static type_qualifiers_t parse_type_qualifiers(void)
 {
-	type_qualifiers_t type_qualifiers = TYPE_QUALIFIER_NONE;
+	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 
 	while(true) {
 		switch(token.type) {
@@ -3295,7 +3353,7 @@ static type_qualifiers_t parse_type_qualifiers(void)
 		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
 
 		default:
-			return type_qualifiers;
+			return qualifiers;
 		}
 	}
 }
@@ -3564,6 +3622,28 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	return (construct_type_t*) construct_function_type;
 }
 
+static void fix_declaration_type(declaration_t *declaration)
+{
+	decl_modifiers_t declaration_modifiers = declaration->modifiers;
+	type_modifiers_t type_modifiers        = declaration->type->base.modifiers;
+
+	if (declaration_modifiers & DM_TRANSPARENT_UNION)
+		type_modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
+
+	if (declaration->type->base.modifiers == type_modifiers)
+		return;
+
+	type_t *copy = duplicate_type(declaration->type);
+	copy->base.modifiers = type_modifiers;
+
+	type_t *result = typehash_insert(copy);
+	if (result != copy) {
+		obstack_free(type_obst, copy);
+	}
+
+	declaration->type = result;
+}
+
 static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		bool may_be_abstract)
 {
@@ -3588,8 +3668,6 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 
 	/* TODO: find out if this is correct */
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
-	if (declaration != NULL)
-		declaration->modifiers |= modifiers;
 
 	construct_type_t *inner_types = NULL;
 
@@ -3654,8 +3732,9 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 
 declarator_finished:
 	modifiers = parse_attributes(&attributes);
-	if (declaration != NULL)
+	if (declaration != NULL) {
 		declaration->modifiers |= modifiers;
+	}
 
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
@@ -3788,6 +3867,8 @@ static declaration_t *parse_declarator(
 		= parse_inner_declarator(declaration, may_be_abstract);
 	type_t *const type = specifiers->type;
 	declaration->type = construct_declarator_type(construct_type, type);
+
+	fix_declaration_type(declaration);
 
 	if(construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
@@ -4891,6 +4972,36 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 /**
  * Creates a return_type (func)(argument_type) function type if not
  * already exists.
+ */
+static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
+                                    type_t *argument_type2)
+{
+	function_parameter_t *parameter2
+		= obstack_alloc(type_obst, sizeof(parameter2[0]));
+	memset(parameter2, 0, sizeof(parameter2[0]));
+	parameter2->type = argument_type2;
+
+	function_parameter_t *parameter1
+		= obstack_alloc(type_obst, sizeof(parameter1[0]));
+	memset(parameter1, 0, sizeof(parameter1[0]));
+	parameter1->type = argument_type1;
+	parameter1->next = parameter2;
+
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION, &builtin_source_position);
+	type->function.return_type = return_type;
+	type->function.parameters  = parameter1;
+
+	type_t *result = typehash_insert(type);
+	if(result != type) {
+		free_type(type);
+	}
+
+	return result;
+}
+
+/**
+ * Creates a return_type (func)(argument_type) function type if not
+ * already exists.
  *
  * @param return_type    the return type
  * @param argument_type  the argument type
@@ -4948,6 +5059,8 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 		return make_function_1_type(type_long_double, type_char_ptr);
 	case T___builtin_va_end:
 		return make_function_1_type(type_void, type_valist);
+	case T___builtin_expect:
+		return make_function_2_type(type_long, type_long, type_long);
 	default:
 		internal_errorf(HERE, "not implemented builtin symbol found");
 	}
@@ -5537,6 +5650,7 @@ end_error:
 	return create_invalid_expression();
 }
 
+#if 0
 /**
  * Parses a __builtin_expect() expression.
  */
@@ -5559,6 +5673,7 @@ static expression_t *parse_builtin_expect(void)
 end_error:
 	return create_invalid_expression();
 }
+#endif
 
 /**
  * Parses a MS assume() expression.
@@ -5641,7 +5756,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_offsetof:       return parse_offsetof();
 		case T___builtin_va_start:       return parse_va_start();
 		case T___builtin_va_arg:         return parse_va_arg();
-		case T___builtin_expect:         return parse_builtin_expect();
+		case T___builtin_expect:
 		case T___builtin_alloca:
 		case T___builtin_nan:
 		case T___builtin_nand:
@@ -5876,6 +5991,50 @@ static expression_t *parse_select_expression(unsigned precedence,
 	return select;
 }
 
+static void check_call_argument(const function_parameter_t *parameter,
+                                call_argument_t *argument)
+{
+	type_t         *expected_type      = parameter->type;
+	type_t         *expected_type_skip = skip_typeref(expected_type);
+	assign_error_t  error              = ASSIGN_ERROR_INCOMPATIBLE;
+	expression_t   *arg_expr           = argument->expression;
+
+	/* handle transparent union gnu extension */
+	if (is_type_union(expected_type_skip)
+			&& (expected_type_skip->base.modifiers
+				& TYPE_MODIFIER_TRANSPARENT_UNION)) {
+		declaration_t  *union_decl = expected_type_skip->compound.declaration;
+
+		declaration_t *declaration = union_decl->scope.declarations;
+		type_t        *best_type   = NULL;
+		for ( ; declaration != NULL; declaration = declaration->next) {
+			type_t *decl_type = declaration->type;
+			error = semantic_assign(decl_type, arg_expr);
+			if (error == ASSIGN_ERROR_INCOMPATIBLE
+				|| error == ASSIGN_ERROR_POINTER_QUALIFIER_MISSING)
+				continue;
+
+			if (error == ASSIGN_SUCCESS) {
+				best_type = decl_type;
+			} else if (best_type == NULL) {
+				best_type = decl_type;
+			}
+		}
+
+		if (best_type != NULL) {
+			expected_type = best_type;
+		}
+	}
+
+	error                = semantic_assign(expected_type, arg_expr);
+	argument->expression = create_implicit_cast(argument->expression,
+	                                            expected_type);
+
+	/* TODO report exact scope in error messages (like "in 3rd parameter") */
+	report_assign_error(error, expected_type, arg_expr,	"function call",
+	                    &arg_expr->base.source_position);
+}
+
 /**
  * Parse a call expression, ie. expression '( ... )'.
  *
@@ -5944,20 +6103,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	if (!function_type->unspecified_parameters) {
 		for( ; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
-			type_t *expected_type = parameter->type;
-			/* TODO report scope in error messages */
-			expression_t *const arg_expr = argument->expression;
-			type_t       *const res_type = semantic_assign(expected_type, arg_expr,
-														   "function call",
-														   &arg_expr->base.source_position);
-			if (res_type == NULL) {
-				/* TODO improve error message */
-				errorf(&arg_expr->base.source_position,
-					"Cannot call function with argument '%E' of type '%T' where type '%T' is expected",
-					arg_expr, arg_expr->base.type, expected_type);
-			} else {
-				argument->expression = create_implicit_cast(argument->expression, expected_type);
-			}
+			check_call_argument(parameter, argument);
 		}
 
 		if (parameter != NULL) {
@@ -6252,6 +6398,25 @@ static void semantic_dereference(unary_expression_t *expression)
 	expression->base.type = result_type;
 }
 
+static void set_address_taken(expression_t *expression)
+{
+	if(expression->kind != EXPR_REFERENCE)
+		return;
+
+	declaration_t *const declaration = expression->reference.declaration;
+	/* happens for parse errors */
+	if(declaration == NULL)
+		return;
+
+	if (declaration->storage_class == STORAGE_CLASS_REGISTER) {
+		errorf(&expression->base.source_position,
+				"address of register variable '%Y' requested",
+				declaration->symbol);
+	} else {
+		declaration->address_taken = 1;
+	}
+}
+
 /**
  * Check the semantic of the address taken expression.
  */
@@ -6264,17 +6429,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 	if(!is_type_valid(orig_type))
 		return;
 
-	if(value->kind == EXPR_REFERENCE) {
-		declaration_t *const declaration = value->reference.declaration;
-		if(declaration != NULL) {
-			if (declaration->storage_class == STORAGE_CLASS_REGISTER) {
-				errorf(&expression->base.source_position,
-				       "address of register variable '%Y' requested",
-				       declaration->symbol);
-			}
-			declaration->address_taken = 1;
-		}
-	}
+	set_address_taken(value);
 
 	expression->base.type = make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 }
@@ -6735,16 +6890,10 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	if (!is_valid_assignment_lhs(left))
 		return;
 
-	type_t *const res_type = semantic_assign(orig_type_left, expression->right,
+	assign_error_t error = semantic_assign(orig_type_left, expression->right);
+	report_assign_error(error, orig_type_left, expression->right,
 			"assignment", &left->base.source_position);
-	if (res_type == NULL) {
-		errorf(&expression->base.source_position,
-			"cannot assign to '%T' from '%T'",
-			orig_type_left, expression->right->base.type);
-	} else {
-		expression->right = create_implicit_cast(expression->right, res_type);
-	}
-
+	expression->right = create_implicit_cast(expression->right, orig_type_left);
 	expression->base.type = orig_type_left;
 }
 
@@ -7133,13 +7282,13 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 	asm_argument_t *result = NULL;
 	asm_argument_t *last   = NULL;
 
-	while(token.type == T_STRING_LITERAL || token.type == '[') {
+	while (token.type == T_STRING_LITERAL || token.type == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 		memset(argument, 0, sizeof(argument[0]));
 
-		if(token.type == '[') {
+		if (token.type == '[') {
 			eat('[');
-			if(token.type != T_IDENTIFIER) {
+			if (token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing asm argument",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
@@ -7151,21 +7300,24 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 
 		argument->constraints = parse_string_literals();
 		expect('(');
-		argument->expression = parse_expression();
-		if (is_out && !is_lvalue(argument->expression)) {
-			errorf(&argument->expression->base.source_position,
+		expression_t *expression = parse_expression();
+		argument->expression     = expression;
+		if (is_out && !is_lvalue(expression)) {
+			errorf(&expression->base.source_position,
 			       "asm output argument is not an lvalue");
 		}
 		expect(')');
 
-		if(last != NULL) {
+		set_address_taken(expression);
+
+		if (last != NULL) {
 			last->next = argument;
 		} else {
 			result = argument;
 		}
 		last = argument;
 
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		eat(',');
 	}
@@ -7827,15 +7979,10 @@ static statement_t *parse_return(void)
 			         "'return' with a value, in function returning void");
 			return_value = NULL;
 		} else {
-			type_t *const res_type = semantic_assign(return_type,
-				return_value, "'return'", &statement->base.source_position);
-			if (res_type == NULL) {
-				errorf(&statement->base.source_position,
-				       "cannot return something of type '%T' in function returning '%T'",
-				       return_value->base.type, return_type);
-			} else {
-				return_value = create_implicit_cast(return_value, res_type);
-			}
+			assign_error_t error = semantic_assign(return_type, return_value);
+			report_assign_error(error, return_type,	return_value, "'return'",
+			                    &statement->base.source_position);
+			return_value = create_implicit_cast(return_value, return_type);
 		}
 		/* check for returning address of a local var */
 		if (return_value != NULL &&

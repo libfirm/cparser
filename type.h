@@ -58,6 +58,20 @@ typedef enum {
 	ATOMIC_TYPE_FLAG_COMPLEX    = 1 << 4,
 } atomic_type_flag_t;
 
+typedef enum {
+	TYPE_QUALIFIER_NONE     = 0,
+	TYPE_QUALIFIER_CONST    = 1 << 0,
+	TYPE_QUALIFIER_RESTRICT = 1 << 1,
+	TYPE_QUALIFIER_VOLATILE = 1 << 2,
+	/* microsoft extended qualifiers */
+	TYPE_QUALIFIER_W64      = 1 << 3,
+	TYPE_QUALIFIER_PTR32    = 1 << 4,
+	TYPE_QUALIFIER_PTR64    = 1 << 5,
+	TYPE_QUALIFIER_SPTR     = 1 << 6,
+	TYPE_QUALIFIER_UPTR     = 1 << 7,
+} type_qualifier_t;
+typedef unsigned short type_qualifiers_t;
+
 typedef struct type_base_t           type_base_t;
 typedef struct atomic_type_t         atomic_type_t;
 typedef struct complex_type_t        complex_type_t;
@@ -86,7 +100,7 @@ void print_type(const type_t *type);
 void print_type_ext(const type_t *type, const symbol_t *symbol,
                     const scope_t *scope);
 
-void print_type_qualifiers(unsigned qualifiers);
+void print_type_qualifiers(type_qualifiers_t qualifiers);
 
 void print_enum_definition(const declaration_t *declaration);
 void print_compound_definition(const declaration_t *declaration);

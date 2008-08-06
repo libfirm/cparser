@@ -52,23 +52,15 @@ typedef enum {
 } type_kind_t;
 
 typedef enum {
-	TYPE_QUALIFIER_NONE     = 0,
-	TYPE_QUALIFIER_CONST    = 1 << 0,
-	TYPE_QUALIFIER_RESTRICT = 1 << 1,
-	TYPE_QUALIFIER_VOLATILE = 1 << 2,
-	/* microsoft extended qualifiers */
-	TYPE_QUALIFIER_W64      = 1 << 3,
-	TYPE_QUALIFIER_PTR32    = 1 << 4,
-	TYPE_QUALIFIER_PTR64    = 1 << 5,
-	TYPE_QUALIFIER_SPTR     = 1 << 6,
-	TYPE_QUALIFIER_UPTR     = 1 << 7,
-} type_qualifier_t;
-
-typedef unsigned int type_qualifiers_t;
+	TYPE_MODIFIER_NONE              = 0,
+	TYPE_MODIFIER_TRANSPARENT_UNION = 1 << 0,
+} type_modifier_t;
+typedef unsigned short type_modifiers_t;
 
 struct type_base_t {
 	type_kind_t       kind;
 	type_qualifiers_t qualifiers;
+	type_modifiers_t  modifiers;
 	unsigned char     alignment;      /**< The extra alignment of the type, 0 for default. */
 	source_position_t source_position;
 

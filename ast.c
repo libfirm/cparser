@@ -1575,6 +1575,8 @@ static bool is_constant_pointer(const expression_t *expression)
 		return true;
 
 	switch (expression->kind) {
+	case EXPR_SELECT:
+		return is_constant_pointer(expression->select.compound);
 	case EXPR_UNARY_CAST:
 		return is_constant_pointer(expression->unary.value);
 	default:

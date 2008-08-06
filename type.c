@@ -144,7 +144,7 @@ void init_types(void)
 
 	atomic_type_properties_t *props = atomic_type_properties;
 
-	if(char_is_signed) {
+	if (char_is_signed) {
 		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
 	}
 
@@ -193,9 +193,9 @@ void inc_type_visited(void)
 
 void print_type_qualifiers(type_qualifiers_t qualifiers)
 {
-	if(qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
-	if(qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
-	if(qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
+	if (qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
+	if (qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
+	if (qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
 }
 
 /**
@@ -280,7 +280,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 	intern_print_type_pre(type->return_type, false);
 
 	/* don't emit braces if we're the toplevel type... */
-	if(!top)
+	if (!top)
 		fputc('(', out);
 }
 
@@ -295,16 +295,16 @@ static void print_function_type_post(const function_type_t *type,
 {
 	intern_print_type_post(type->return_type, false);
 	/* don't emit braces if we're the toplevel type... */
-	if(!top)
+	if (!top)
 		fputc(')', out);
 
 	fputc('(', out);
 
 	bool first = true;
-	if(scope == NULL) {
+	if (scope == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
-			if(first) {
+			if (first) {
 				first = false;
 			} else {
 				fputs(", ", out);
@@ -314,7 +314,7 @@ static void print_function_type_post(const function_type_t *type,
 	} else {
 		declaration_t *parameter = scope->declarations;
 		for( ; parameter != NULL; parameter = parameter->next) {
-			if(first) {
+			if (first) {
 				first = false;
 			} else {
 				fputs(", ", out);
@@ -323,15 +323,15 @@ static void print_function_type_post(const function_type_t *type,
 			               &parameter->scope);
 		}
 	}
-	if(type->variadic) {
-		if(first) {
+	if (type->variadic) {
+		if (first) {
 			first = false;
 		} else {
 			fputs(", ", out);
 		}
 		fputs("...", out);
 	}
-	if(first && !type->unspecified_parameters) {
+	if (first && !type->unspecified_parameters) {
 		fputs("void", out);
 	}
 	fputc(')', out);
@@ -377,11 +377,11 @@ static void print_array_type_pre(const array_type_t *type)
 static void print_array_type_post(const array_type_t *type)
 {
 	fputc('[', out);
-	if(type->is_static) {
+	if (type->is_static) {
 		fputs("static ", out);
 	}
 	print_type_qualifiers(type->base.qualifiers);
-	if(type->size_expression != NULL
+	if (type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
 	}
@@ -418,12 +418,12 @@ void print_enum_definition(const declaration_t *declaration)
 
 		print_indent();
 		fprintf(out, "%s", entry->symbol->string);
-		if(entry->init.initializer != NULL) {
+		if (entry->init.initializer != NULL) {
 			fprintf(out, " = ");
 
 			/* skip the implicit cast */
 			expression_t *expression = entry->init.enum_value;
-			if(expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+			if (expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
 				expression = expression->unary.value;
 			}
 			print_expression(expression);
@@ -448,7 +448,7 @@ static void print_type_enum(const enum_type_t *type)
 
 	declaration_t *declaration = type->declaration;
 	symbol_t      *symbol      = declaration->symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		fputs(symbol->string, out);
 	} else {
 		print_enum_definition(declaration);
@@ -486,7 +486,7 @@ static void print_compound_type(const compound_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers);
 
-	if(type->base.kind == TYPE_COMPOUND_STRUCT) {
+	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
 		fputs("struct ", out);
 	} else {
 		assert(type->base.kind == TYPE_COMPOUND_UNION);
@@ -495,7 +495,7 @@ static void print_compound_type(const compound_type_t *type)
 
 	declaration_t *declaration = type->declaration;
 	symbol_t      *symbol      = declaration->symbol;
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		fputs(symbol->string, out);
 	} else {
 		print_compound_definition(declaration);
@@ -521,7 +521,7 @@ static void print_typedef_type_pre(const typedef_type_t *const type)
 static void print_typeof_type_pre(const typeof_type_t *const type)
 {
 	fputs("typeof(", out);
-	if(type->expression != NULL) {
+	if (type->expression != NULL) {
 		assert(type->typeof_type == NULL);
 		print_expression(type->expression);
 	} else {
@@ -634,17 +634,17 @@ void print_type(const type_t *const type)
 void print_type_ext(const type_t *const type, const symbol_t *symbol,
                     const scope_t *scope)
 {
-	if(type == NULL) {
+	if (type == NULL) {
 		fputs("nil type", out);
 		return;
 	}
 
 	intern_print_type_pre(type, true);
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
-	if(type->kind == TYPE_FUNCTION) {
+	if (type->kind == TYPE_FUNCTION) {
 		print_function_type_post(&type->function, scope, true);
 	} else {
 		intern_print_type_post(type, true);
@@ -704,14 +704,14 @@ type_t *duplicate_type(const type_t *type)
  */
 type_t *get_unqualified_type(type_t *type)
 {
-	if(type->base.qualifiers == TYPE_QUALIFIER_NONE)
+	if (type->base.qualifiers == TYPE_QUALIFIER_NONE)
 		return type;
 
 	type_t *unqualified_type          = duplicate_type(type);
 	unqualified_type->base.qualifiers = TYPE_QUALIFIER_NONE;
 
 	type_t *result = typehash_insert(unqualified_type);
-	if(result != unqualified_type) {
+	if (result != unqualified_type) {
 		obstack_free(type_obst, unqualified_type);
 	}
 
@@ -746,12 +746,12 @@ bool is_type_integer(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->kind == TYPE_ENUM)
+	if (type->kind == TYPE_ENUM)
 		return true;
-	if(type->kind == TYPE_BITFIELD)
+	if (type->kind == TYPE_BITFIELD)
 		return true;
 
-	if(type->kind != TYPE_ATOMIC)
+	if (type->kind != TYPE_ATOMIC)
 		return false;
 
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_INTEGER);
@@ -767,7 +767,7 @@ bool is_type_float(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if(type->kind != TYPE_ATOMIC)
+	if (type->kind != TYPE_ATOMIC)
 		return false;
 
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_FLOAT);
@@ -784,12 +784,12 @@ bool is_type_signed(const type_t *type)
 	assert(!is_typeref(type));
 
 	/* enum types are int for now */
-	if(type->kind == TYPE_ENUM)
+	if (type->kind == TYPE_ENUM)
 		return true;
-	if(type->kind == TYPE_BITFIELD)
+	if (type->kind == TYPE_BITFIELD)
 		return is_type_signed(type->bitfield.base_type);
 
-	if(type->kind != TYPE_ATOMIC)
+	if (type->kind != TYPE_ATOMIC)
 		return false;
 
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_SIGNED);
@@ -953,10 +953,10 @@ static bool array_types_compatible(const array_type_t *array1,
 {
 	type_t *element_type1 = skip_typeref(array1->element_type);
 	type_t *element_type2 = skip_typeref(array2->element_type);
-	if(!types_compatible(element_type1, element_type2))
+	if (!types_compatible(element_type1, element_type2))
 		return false;
 
-	if(!array1->size_constant || !array2->size_constant)
+	if (!array1->size_constant || !array2->size_constant)
 		return true;
 
 	return array1->size == array2->size;
@@ -971,12 +971,12 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	assert(!is_typeref(type2));
 
 	/* shortcut: the same type is always compatible */
-	if(type1 == type2)
+	if (type1 == type2)
 		return true;
 
-	if(type1->base.qualifiers != type2->base.qualifiers)
+	if (type1->base.qualifiers != type2->base.qualifiers)
 		return false;
-	if(type1->kind != type2->kind)
+	if (type1->kind != type2->kind)
 		return false;
 
 	switch(type1->kind) {
@@ -1028,7 +1028,8 @@ bool types_compatible(const type_t *type1, const type_t *type2)
  */
 type_t *skip_typeref(type_t *type)
 {
-	unsigned qualifiers = TYPE_QUALIFIER_NONE;
+	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
+	type_modifiers_t  modifiers  = TYPE_MODIFIER_NONE;
 
 	while(true) {
 		switch(type->kind) {
@@ -1036,8 +1037,9 @@ type_t *skip_typeref(type_t *type)
 			return type;
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
+			modifiers  |= type->base.modifiers;
 			const typedef_type_t *typedef_type = &type->typedeft;
-			if(typedef_type->resolved_type != NULL) {
+			if (typedef_type->resolved_type != NULL) {
 				type = typedef_type->resolved_type;
 				break;
 			}
@@ -1046,7 +1048,7 @@ type_t *skip_typeref(type_t *type)
 		}
 		case TYPE_TYPEOF: {
 			const typeof_type_t *typeof_type = &type->typeoft;
-			if(typeof_type->typeof_type != NULL) {
+			if (typeof_type->typeof_type != NULL) {
 				type = typeof_type->typeof_type;
 			} else {
 				type = typeof_type->expression->base.type;
@@ -1059,7 +1061,7 @@ type_t *skip_typeref(type_t *type)
 		break;
 	}
 
-	if (qualifiers != TYPE_QUALIFIER_NONE) {
+	if (qualifiers != TYPE_QUALIFIER_NONE || modifiers != TYPE_MODIFIER_NONE) {
 		type_t *const copy = duplicate_type(type);
 
 		/* for const with typedefed array type the element type has to be
@@ -1068,9 +1070,11 @@ type_t *skip_typeref(type_t *type)
 			type_t *element_type           = copy->array.element_type;
 			element_type                   = duplicate_type(element_type);
 			element_type->base.qualifiers |= qualifiers;
+			element_type->base.modifiers  |= modifiers;
 			copy->array.element_type       = element_type;
 		} else {
 			copy->base.qualifiers |= qualifiers;
+			copy->base.modifiers  |= modifiers;
 		}
 
 		type = typehash_insert(copy);
@@ -1102,9 +1106,9 @@ unsigned get_atomic_type_flags(atomic_type_kind_t kind)
 
 atomic_type_kind_t get_intptr_kind(void)
 {
-	if(machine_size <= 32)
+	if (machine_size <= 32)
 		return ATOMIC_TYPE_INT;
-	else if(machine_size <= 64)
+	else if (machine_size <= 64)
 		return ATOMIC_TYPE_LONG;
 	else
 		return ATOMIC_TYPE_LONGLONG;
@@ -1112,9 +1116,9 @@ atomic_type_kind_t get_intptr_kind(void)
 
 atomic_type_kind_t get_uintptr_kind(void)
 {
-	if(machine_size <= 32)
+	if (machine_size <= 32)
 		return ATOMIC_TYPE_UINT;
-	else if(machine_size <= 64)
+	else if (machine_size <= 64)
 		return ATOMIC_TYPE_ULONG;
 	else
 		return ATOMIC_TYPE_ULONGLONG;
@@ -1128,7 +1132,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if(kind == ATOMIC_TYPE_INVALID) {
+	if (kind == ATOMIC_TYPE_INVALID) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_SCHAR,
 			ATOMIC_TYPE_SHORT,
@@ -1137,7 +1141,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
 			ATOMIC_TYPE_LONGLONG
 		};
 		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
-			if(get_atomic_type_size(possible_kinds[i]) == size) {
+			if (get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;
 			}
@@ -1155,7 +1159,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if(kind == ATOMIC_TYPE_INVALID) {
+	if (kind == ATOMIC_TYPE_INVALID) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_UCHAR,
 			ATOMIC_TYPE_USHORT,
@@ -1164,7 +1168,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
 			ATOMIC_TYPE_ULONGLONG
 		};
 		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
-			if(get_atomic_type_size(possible_kinds[i]) == size) {
+			if (get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;
 			}
@@ -1181,7 +1185,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
 static type_t *identify_new_type(type_t *type)
 {
 	type_t *result = typehash_insert(type);
-	if(result != type) {
+	if (result != type) {
 		obstack_free(type_obst, type);
 	}
 	return result;
