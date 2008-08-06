@@ -6455,14 +6455,25 @@ static void semantic_sub(binary_expression_t *expression)
 		                         type_left, orig_type_left);
 		expression->base.type = type_left;
 	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
-		if(!pointers_compatible(type_left, type_right)) {
-			errorf(HERE,
-			       "pointers to incompatible objects to binary '-' ('%T', '%T')",
+		type_t *const unqual_left  = get_unqualified_type(skip_typeref(type_left->pointer.points_to));
+		type_t *const unqual_right = get_unqualified_type(skip_typeref(type_right->pointer.points_to));
+		if (!types_compatible(unqual_left, unqual_right)) {
+			errorf(&expression->base.source_position,
+			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
+		} else if (!is_type_object(unqual_left)) {
+			if (is_type_atomic(unqual_left, ATOMIC_TYPE_VOID)) {
+				warningf(&expression->base.source_position,
+				         "subtracting pointers to void");
+			} else {
+				errorf(&expression->base.source_position,
+				       "subtracting pointers to non-object types '%T'",
+				       orig_type_left);
+			}
 		}
 		expression->base.type = type_ptrdiff_t;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
-		errorf(HERE, "invalid operands to binary '-' ('%T', '%T')",
+		errorf(HERE, "invalid operands of types '%T' and '%T' to binary '-'",
 		       orig_type_left, orig_type_right);
 	}
 }
