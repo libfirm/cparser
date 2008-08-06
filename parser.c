@@ -6065,12 +6065,33 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 			other_expression = true_expression;
 		}
 
-		if(is_type_pointer(other_type)) {
-			if(!pointers_compatible(true_type, false_type)) {
+		/* TODO Treat (void*)0 as null pointer constant */
+		if (is_type_pointer(other_type)) {
+			type_t *to1 = pointer_type->pointer.points_to;
+			type_t *to2 = other_type->pointer.points_to;
+
+			type_t *to;
+			if (is_type_atomic(to1, ATOMIC_TYPE_VOID) ||
+			    is_type_atomic(to2, ATOMIC_TYPE_VOID)) {
+				to = type_void;
+			} else if (types_compatible(get_unqualified_type(to1),
+			                            get_unqualified_type(to2))) {
+				to = to1;
+			} else {
 				warningf(&expression->base.source_position,
-						"pointer types '%T' and '%T' in conditional expression are incompatible", true_type, false_type);
+					"pointer types '%T' and '%T' in conditional expression are incompatible",
+					true_type, false_type);
+				to = type_void;
 			}
-			result_type = true_type;
+
+			type_t *const copy = duplicate_type(to);
+			copy->base.qualifiers = to1->base.qualifiers | to2->base.qualifiers;
+
+			type_t *const type = typehash_insert(copy);
+			if (type != copy)
+				free_type(copy);
+
+			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
 		} else if(is_null_pointer_constant(other_expression)) {
 			result_type = pointer_type;
 		} else if(is_type_integer(other_type)) {

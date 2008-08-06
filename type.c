@@ -1024,22 +1024,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 }
 
 /**
- * Check if two pointer types are compatible.
- */
-bool pointers_compatible(const type_t *type1, const type_t *type2)
-{
-	assert(!is_typeref(type1));
-	assert(!is_typeref(type2));
-
-	assert(type1->kind == TYPE_POINTER);
-	assert(type2->kind == TYPE_POINTER);
-	(void) type1;
-	(void) type2;
-	/* TODO */
-	return true;
-}
-
-/**
  * Skip all typerefs and return the underlying type.
  */
 type_t *skip_typeref(type_t *type)
