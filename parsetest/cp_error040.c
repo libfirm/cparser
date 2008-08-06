@@ -1,12 +1,11 @@
-long lrint (double x)
+long ret42(void)
 {
   long retval;
-  __asm__ __volatile__
-    ("fistpl %0"  : "=m" (retval) : "t" (x) : "st");
+  __asm__("movl $42, %0"  : "=m" (retval));
   return retval;
 }
 
 int main(void)
 {
-	return 0;
+	return ret42() != 42;
 }
