@@ -339,6 +339,21 @@ static ir_type *create_imaginary_type(const imaginary_type_t *type)
 	return irtype;
 }
 
+/**
+ * return type of a parameter (and take transparent union gnu extension into
+ * account)
+ */
+static type_t *get_parameter_type(type_t *type)
+{
+	type = skip_typeref(type);
+	if (type->base.modifiers & TYPE_MODIFIER_TRANSPARENT_UNION) {
+		declaration_t *decl = type->compound.declaration;
+		type                = decl->scope.declarations->type;
+	}
+
+	return type;
+}
+
 static ir_type *create_method_type(const function_type_t *function_type)
 {
 	type_t  *return_type  = function_type->return_type;
@@ -357,7 +372,8 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	function_parameter_t *parameter = function_type->parameters;
 	int                   n         = 0;
 	for ( ; parameter != NULL; parameter = parameter->next) {
-		ir_type *p_irtype = get_ir_type(parameter->type);
+		type_t  *type     = get_parameter_type(parameter->type);
+		ir_type *p_irtype = get_ir_type(type);
 		set_method_param_type(irtype, n, p_irtype);
 		++n;
 	}
@@ -1481,9 +1497,10 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 /**
  * Transform a call expression.
- * Handles some special cases, like alloca() calls, which must be resolved BEFORE the inlines runs.
- * Inlining routines calling alloca() is dangerous, 176.gcc for instance might allocate 2GB instead of
- * 256 MB if alloca is not handled right...
+ * Handles some special cases, like alloca() calls, which must be resolved
+ * BEFORE the inlines runs. Inlining routines calling alloca() is dangerous,
+ * 176.gcc for instance might allocate 2GB instead of 256 MB if alloca is not
+ * handled right...
  */
 static ir_node *call_expression_to_firm(const call_expression_t *call)
 {
@@ -4805,7 +4822,8 @@ static int count_local_declarations(const declaration_t *      decl,
 	for (; decl != end; decl = decl->next) {
 		if (decl->namespc != NAMESPACE_NORMAL)
 			continue;
-		const type_t *type = skip_typeref(decl->type);
+		type_t *type = skip_typeref(decl->type);
+
 		if (!decl->address_taken && is_type_scalar(type))
 			++count;
 		const initializer_t *initializer = decl->init.initializer;
@@ -5070,7 +5088,7 @@ static void initialize_function_parameters(declaration_t *declaration)
 		long     pn    = n;
 		ir_node *value = new_r_Proj(irg, start_block, args, param_mode, pn);
 
-		ir_mode *mode = get_ir_mode(parameter->type);
+		ir_mode *mode = get_ir_mode(type);
 		value = create_conv(NULL, value, mode);
 		value = do_strict_conv(NULL, value);
 
