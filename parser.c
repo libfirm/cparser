@@ -6400,7 +6400,7 @@ static void semantic_dereference(unary_expression_t *expression)
 	expression->base.type = result_type;
 }
 
-static void set_address_taken(expression_t *expression)
+static void set_address_taken(expression_t *expression, bool may_be_register)
 {
 	if(expression->kind != EXPR_REFERENCE)
 		return;
@@ -6410,7 +6410,7 @@ static void set_address_taken(expression_t *expression)
 	if(declaration == NULL)
 		return;
 
-	if (declaration->storage_class == STORAGE_CLASS_REGISTER) {
+	if (declaration->storage_class == STORAGE_CLASS_REGISTER && !may_be_register) {
 		errorf(&expression->base.source_position,
 				"address of register variable '%Y' requested",
 				declaration->symbol);
@@ -6431,7 +6431,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 	if(!is_type_valid(orig_type))
 		return;
 
-	set_address_taken(value);
+	set_address_taken(value, false);
 
 	expression->base.type = make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 }
@@ -7310,7 +7310,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		}
 		expect(')');
 
-		set_address_taken(expression);
+		set_address_taken(expression, true);
 
 		if (last != NULL) {
 			last->next = argument;

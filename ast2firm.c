@@ -3425,7 +3425,7 @@ static ir_initializer_t *create_ir_initializer_string(
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
 	const char *string = initializer->string.begin;
-	ir_mode    *mode   = get_type_mode(ir_type_const_char);
+	ir_mode    *mode   = get_ir_mode(type->array.element_type);
 
 	for(size_t i = 0; i < len; ++i) {
 		char c = 0;
