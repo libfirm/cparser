@@ -6212,7 +6212,8 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		type_t *pointer_type;
 		type_t *other_type;
 		expression_t *other_expression;
-		if (is_type_pointer(true_type)) {
+		if (is_type_pointer(true_type) &&
+				(!is_type_pointer(false_type) || is_null_pointer_constant(false_expression))) {
 			pointer_type     = true_type;
 			other_type       = false_type;
 			other_expression = false_expression;
@@ -6222,8 +6223,9 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 			other_expression = true_expression;
 		}
 
-		/* TODO Treat (void*)0 as null pointer constant */
-		if (is_type_pointer(other_type)) {
+		if (is_null_pointer_constant(other_expression)) {
+			result_type = pointer_type;
+		} else if (is_type_pointer(other_type)) {
 			type_t *to1 = skip_typeref(pointer_type->pointer.points_to);
 			type_t *to2 = skip_typeref(other_type->pointer.points_to);
 
@@ -6249,8 +6251,6 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 				free_type(copy);
 
 			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
-		} else if(is_null_pointer_constant(other_expression)) {
-			result_type = pointer_type;
 		} else if(is_type_integer(other_type)) {
 			warningf(&expression->base.source_position,
 					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
