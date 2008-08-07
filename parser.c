@@ -1224,8 +1224,8 @@ static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute) {
 				return;
 			}
 		}
+		errorf(HERE, "'%s' is an unrecognized tls model", string.begin);
 	}
-	errorf(HERE, "'%s' is an unrecognized tls model", string.begin);
 	attribute->invalid = true;
 }
 
@@ -1248,8 +1248,8 @@ static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute) {
 				return;
 			}
 		}
+		errorf(HERE, "'%s' is an unrecognized visibility", string.begin);
 	}
-	errorf(HERE, "'%s' is an unrecognized visibility", string.begin);
 	attribute->invalid = true;
 }
 
@@ -1271,8 +1271,8 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute) {
 				return;
 			}
 		}
+		errorf(HERE, "'%s' is an unrecognized model", string.begin);
 	}
-	errorf(HERE, "'%s' is an unrecognized model", string.begin);
 	attribute->invalid = true;
 }
 
@@ -1311,8 +1311,8 @@ static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute) {
 				return;
 			}
 		}
+		errorf(HERE, "'%s' is not an interrupt", string.begin);
 	}
-	errorf(HERE, "'%s' is an interrupt", string.begin);
 	attribute->invalid = true;
 }
 
