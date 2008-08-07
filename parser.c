@@ -3425,8 +3425,6 @@ static declaration_t *parse_parameter(void)
 
 	declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/true);
 
-	semantic_parameter(declaration);
-
 	return declaration;
 }
 
@@ -3451,10 +3449,6 @@ static declaration_t *parse_parameters(function_type_t *type)
 		type->unspecified_parameters = 1;
 		goto parameters_finished;
 	}
-	if(token.type == T_void && look_ahead(1)->type == ')') {
-		next_token();
-		goto parameters_finished;
-	}
 
 	declaration_t        *declaration;
 	declaration_t        *last_declaration = NULL;
@@ -3472,6 +3466,14 @@ static declaration_t *parse_parameters(function_type_t *type)
 		case T___extension__:
 		DECLARATION_START
 			declaration = parse_parameter();
+
+			/* func(void) is not a parameter */
+			if (last_parameter == NULL
+					&& token.type == ')'
+					&& skip_typeref(declaration->type) == type_void) {
+				goto parameters_finished;
+			}
+			semantic_parameter(declaration);
 
 			parameter       = obstack_alloc(type_obst, sizeof(parameter[0]));
 			memset(parameter, 0, sizeof(parameter[0]));

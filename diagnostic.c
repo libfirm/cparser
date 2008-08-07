@@ -94,7 +94,10 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 
 				case 'Y': {
 					const symbol_t *const symbol = va_arg(ap, const symbol_t*);
-					fputs(symbol->string, stderr);
+					if (symbol == NULL)
+						fputs("(null)", stderr);
+					else
+						fputs(symbol->string, stderr);
 					break;
 				}
 
