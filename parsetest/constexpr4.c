@@ -1,4 +1,6 @@
-int qftol(void);
+int qftol(void) {
+	return 0;
+}
 
 static int ftolPtr = (int) qftol;
 

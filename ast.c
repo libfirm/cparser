@@ -1514,10 +1514,17 @@ bool is_address_constant(const expression_t *expression)
 		/* fallthrough */
 	}
 
-	case EXPR_UNARY_CAST:
-		return is_type_pointer(skip_typeref(expression->base.type))
-			&& (is_constant_expression(expression->unary.value)
+	case EXPR_UNARY_CAST: {
+		type_t *dest = skip_typeref(expression->base.type);
+		if (!is_type_pointer(dest) &&
+				! (dest->kind == TYPE_ATOMIC
+					&& (get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER)
+					&& (get_atomic_type_size(dest->atomic.akind) >= get_atomic_type_size(get_intptr_kind()))))
+			return false;
+
+		return (is_constant_expression(expression->unary.value)
 			|| is_address_constant(expression->unary.value));
+	}
 
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_SUB: {
