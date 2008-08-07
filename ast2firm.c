@@ -1021,7 +1021,8 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	bool                const has_body      = declaration->init.statement != NULL;
 	if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
 		set_entity_visibility(entity, visibility_external_visible);
-	} else if (storage_class == STORAGE_CLASS_STATIC || is_inline) {
+	} else if (storage_class == STORAGE_CLASS_STATIC ||
+	           (is_inline && has_body)) {
 		if (!has_body) {
 			/* this entity was declared, but is defined nowhere */
 			set_entity_peculiarity(entity, peculiarity_description);
