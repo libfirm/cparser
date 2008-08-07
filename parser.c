@@ -6214,8 +6214,8 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 		/* TODO Treat (void*)0 as null pointer constant */
 		if (is_type_pointer(other_type)) {
-			type_t *to1 = pointer_type->pointer.points_to;
-			type_t *to2 = other_type->pointer.points_to;
+			type_t *to1 = skip_typeref(pointer_type->pointer.points_to);
+			type_t *to2 = skip_typeref(other_type->pointer.points_to);
 
 			type_t *to;
 			if (is_type_atomic(to1, ATOMIC_TYPE_VOID) ||
