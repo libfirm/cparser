@@ -219,8 +219,6 @@ static unsigned get_array_type_size(array_type_t *type)
 
 static unsigned get_type_size_const(type_t *type)
 {
-	type = skip_typeref(type);
-
 	switch(type->kind) {
 	case TYPE_ERROR:
 		panic("error type occurred");
@@ -2098,7 +2096,7 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 		ir_node *value, type_t *type)
 {
 	pointer_type_t *const pointer_type = &type->pointer;
-	type_t         *const points_to    = pointer_type->points_to;
+	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
 	unsigned              elem_size    = get_type_size_const(points_to);
 
 	/* gcc extension */
