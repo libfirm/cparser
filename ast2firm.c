@@ -1016,19 +1016,18 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	 * extern inline             => local
 	 * inline without definition => local
 	 * inline with definition    => external_visible */
-
-	if (declaration->is_inline && declaration->storage_class == STORAGE_CLASS_NONE
-			&& declaration->init.statement != NULL) {
+	storage_class_tag_t const storage_class = declaration->storage_class;
+	bool                const is_inline     = declaration->is_inline;
+	bool                const has_body      = declaration->init.statement != NULL;
+	if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
 		set_entity_visibility(entity, visibility_external_visible);
-	}
-	else if (declaration->storage_class == STORAGE_CLASS_STATIC
-			|| declaration->is_inline) {
-		if (declaration->init.statement == NULL) {
+	} else if (storage_class == STORAGE_CLASS_STATIC || is_inline) {
+		if (has_body) {
 			/* this entity was declared, but is defined nowhere */
 			set_entity_peculiarity(entity, peculiarity_description);
 		}
 		set_entity_visibility(entity, visibility_local);
-	} else if (declaration->init.statement != NULL) {
+	} else if (has_body) {
 		set_entity_visibility(entity, visibility_external_visible);
 	} else {
 		set_entity_visibility(entity, visibility_external_allocated);
