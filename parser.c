@@ -1071,7 +1071,7 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_DESTRUCTOR]             = "destructor",
 	[GNU_AK_NOTHROW]                = "nothrow",
 	[GNU_AK_TRANSPARENT_UNION]      = "transparent_union",
-	[GNU_AK_COMMON]                 = "coommon",
+	[GNU_AK_COMMON]                 = "common",
 	[GNU_AK_NOCOMMON]               = "nocommon",
 	[GNU_AK_PACKED]                 = "packed",
 	[GNU_AK_SHARED]                 = "shared",
@@ -1126,9 +1126,10 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
  */
 static int strcmp_underscore(const char *s1, const char *s2) {
 	if(s2[0] == '_' && s2[1] == '_') {
-		size_t len = strlen(s2);
-		if(s2[len-2] == '_' && s2[len-1] == '_') {
-			return strncmp(s1, s2+2, len-4);
+		size_t len2 = strlen(s2);
+		size_t len1 = strlen(s1);
+		if(len1 == len2-4 && s2[len2-2] == '_' && s2[len2-1] == '_') {
+			return strncmp(s1, s2+2, len2-4);
 		}
 	}
 
