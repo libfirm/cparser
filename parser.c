@@ -1614,6 +1614,12 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 
 				case GNU_AK_ALIGNED:
+					/* __align__ may be used without an argument */
+					if (attribute->have_arguments) {
+						parse_gnu_attribute_const_arg(attribute);
+					}
+					break;
+
 				case GNU_AK_FORMAT_ARG:
 				case GNU_AK_REGPARM:
 				case GNU_AK_TRAP_EXIT:
