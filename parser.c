@@ -4029,6 +4029,7 @@ static declaration_t *internal_record_declaration(
 				switch (old_storage_class) {
 				case STORAGE_CLASS_NONE:
 					old_storage_class = STORAGE_CLASS_EXTERN;
+					/* FALLTHROUGH */
 
 				case STORAGE_CLASS_EXTERN:
 					if (is_function_definition) {
@@ -4066,9 +4067,9 @@ warn_redundant_declaration:
 				} else if (old_storage_class != STORAGE_CLASS_EXTERN
 						&& !is_function_definition) {
 					goto warn_redundant_declaration;
-				} else if (new_storage_class == STORAGE_CLASS_NONE) {
-						previous_declaration->storage_class = STORAGE_CLASS_NONE;
-						previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
+				} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
+					previous_declaration->storage_class          = STORAGE_CLASS_NONE;
+					previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
 				}
 			} else if (old_storage_class == new_storage_class) {
 				errorf(&declaration->source_position,
