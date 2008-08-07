@@ -1126,14 +1126,12 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
  */
 static int strcmp_underscore(const char *s1, const char *s2) {
 	if(s2[0] == '_' && s2[1] == '_') {
-		s2 += 2;
-		size_t l1 = strlen(s1);
-		if(l1 + 2 != strlen(s2)) {
-			/* not equal */
-			return 1;
+		size_t len = strlen(s2);
+		if(s2[len-2] == '_' && s2[len-1] == '_') {
+			return strncmp(s1, s2+2, len-4);
 		}
-		return strncmp(s1, s2, l1);
 	}
+
 	return strcmp(s1, s2);
 }
 
@@ -1472,19 +1470,21 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 		/* non-empty attribute list */
 		while(true) {
 			const char *name;
-			if(token.type == T_const) {
+			if (token.type == T_const) {
 				name = "const";
 			} else if(token.type == T_volatile) {
 				name = "volatile";
 			} else if(token.type == T_cdecl) {
 				/* __attribute__((cdecl)), WITH ms mode */
 				name = "cdecl";
-			} else if(token.type != T_IDENTIFIER) {
+			} else if (token.type == T_IDENTIFIER) {
+				const symbol_t *sym = token.v.symbol;
+				name = sym->string;
+			} else {
 				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER, NULL);
 				break;
 			}
-			const symbol_t *sym = token.v.symbol;
-			name = sym->string;
+
 			next_token();
 
 			int i;
