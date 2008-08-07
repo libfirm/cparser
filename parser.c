@@ -3470,6 +3470,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 			/* func(void) is not a parameter */
 			if (last_parameter == NULL
 					&& token.type == ')'
+					&& declaration->symbol == NULL
 					&& skip_typeref(declaration->type) == type_void) {
 				goto parameters_finished;
 			}
