@@ -3663,6 +3663,8 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	construct_type_t *last  = NULL;
 	gnu_attribute_t  *attributes = NULL;
 
+	decl_modifiers_t modifiers = parse_attributes(&attributes);
+
 	/* pointers */
 	while(token.type == '*') {
 		construct_type_t *type = parse_pointer_declarator();
@@ -3674,10 +3676,10 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 			last->next = type;
 			last       = type;
 		}
-	}
 
-	/* TODO: find out if this is correct */
-	decl_modifiers_t modifiers = parse_attributes(&attributes);
+		/* TODO: find out if this is correct */
+		modifiers |= parse_attributes(&attributes);
+	}
 
 	construct_type_t *inner_types = NULL;
 
@@ -3741,7 +3743,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 declarator_finished:
-	modifiers = parse_attributes(&attributes);
+	modifiers |= parse_attributes(&attributes);
 	if (declaration != NULL) {
 		declaration->modifiers |= modifiers;
 	}
