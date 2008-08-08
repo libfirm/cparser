@@ -1733,10 +1733,10 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 
 	while(true) {
 		switch(token.type) {
-		case T___attribute__: {
+		case T___attribute__:
 			modifiers |= parse_gnu_attribute(attributes);
 			break;
-		}
+
 		case T_asm:
 			next_token();
 			expect('(');
@@ -1750,6 +1750,16 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 			}
 			expect(')');
 			break;
+
+		case T_cdecl:
+		case T__fastcall:
+		case T__stdcall:
+		case T___thiscall:
+			/* TODO record modifier */
+			warningf(HERE, "Ignoring declaration modifier %K", &token);
+			next_token();
+			break;
+
 		default:
 			goto attributes_finished;
 		}
