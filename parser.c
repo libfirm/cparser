@@ -2326,7 +2326,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				if(type == NULL) {
 					if (env->declaration != NULL) {
 						errorf(HERE, "extra brace group at end of initializer for '%Y'",
-				        	env->declaration->symbol);
+						       env->declaration->symbol);
 					} else {
 						errorf(HERE, "extra brace group at end of initializer");
 					}
