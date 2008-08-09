@@ -2324,11 +2324,12 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			} else {
 				eat('{');
 				if(type == NULL) {
-					if (env->declaration != NULL)
+					if (env->declaration != NULL) {
 						errorf(HERE, "extra brace group at end of initializer for '%Y'",
 				        	env->declaration->symbol);
-			    	else
-				  		errorf(HERE, "extra brace group at end of initializer");
+					} else {
+						errorf(HERE, "extra brace group at end of initializer");
+					}
 				} else
 					descend_into_subtype(path);
 
