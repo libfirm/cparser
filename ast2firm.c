@@ -4714,6 +4714,11 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	}
 
 	/* create output projs & connect them */
+	if (needs_memory) {
+		ir_node *projm = new_Proj(node, mode_M, out_size+1);
+		set_store(projm);
+	}
+
 	size_t i;
 	for (i = 0; i < out_size; ++i) {
 		const expression_t *out_expr = out_exprs[i];
@@ -4723,10 +4728,6 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 		ir_node            *addr     = out_addrs[i];
 
 		set_value_for_expression_addr(out_expr, proj, addr);
-	}
-	if (needs_memory) {
-		ir_node *projm = new_Proj(node, mode_M, i);
-		set_store(projm);
 	}
 }
 
