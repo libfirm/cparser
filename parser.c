@@ -291,10 +291,10 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_VA_ARG]                  = sizeof(va_arg_expression_t),
 		[EXPR_STATEMENT]               = sizeof(statement_expression_t),
 	};
-	if(kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
+	if (kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
 		return sizes[EXPR_UNARY_FIRST];
 	}
-	if(kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
+	if (kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
 	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
@@ -513,7 +513,7 @@ static void rem_anchor_token(int token_type) {
 }
 
 static bool at_anchor(void) {
-	if(token.type < 0)
+	if (token.type < 0)
 		return false;
 	return token_anchor_set[token.type];
 }
@@ -527,11 +527,11 @@ static void eat_until_matching_token(int type) {
 	unsigned bracket_count = 0;
 	int end_token = type;
 
-	if(type == '(')
+	if (type == '(')
 		end_token = ')';
-	else if(type == '{')
+	else if (type == '{')
 		end_token = '}';
-	else if(type == '[')
+	else if (type == '[')
 		end_token = ']';
 
 	while(token.type != end_token ||
@@ -543,15 +543,15 @@ static void eat_until_matching_token(int type) {
 		case '{': ++brace_count;       break;
 		case '[': ++bracket_count;     break;
 		case ')':
-			if(parenthesis_count > 0)
+			if (parenthesis_count > 0)
 				--parenthesis_count;
 			break;
 		case '}':
-			if(brace_count > 0)
+			if (brace_count > 0)
 				--brace_count;
 			break;
 		case ']':
-			if(bracket_count > 0)
+			if (bracket_count > 0)
 				--bracket_count;
 			break;
 		default:
@@ -565,12 +565,12 @@ static void eat_until_matching_token(int type) {
  * Eat input tokens until an anchor is found.
  */
 static void eat_until_anchor(void) {
-	if(token.type == T_EOF)
+	if (token.type == T_EOF)
 		return;
 	while(token_anchor_set[token.type] == 0) {
-		if(token.type == '(' || token.type == '{' || token.type == '[')
+		if (token.type == '(' || token.type == '{' || token.type == '[')
 			eat_until_matching_token(token.type);
-		if(token.type == T_EOF)
+		if (token.type == T_EOF)
 			break;
 		next_token();
 	}
@@ -578,7 +578,7 @@ static void eat_until_anchor(void) {
 
 static void eat_block(void) {
 	eat_until_matching_token('{');
-	if(token.type == '}')
+	if (token.type == '}')
 		next_token();
 }
 
@@ -587,7 +587,7 @@ static void eat_block(void) {
  */
 static void eat_statement(void) {
 	eat_until_matching_token(';');
-	if(token.type == ';')
+	if (token.type == ';')
 		next_token();
 }
 
@@ -602,7 +602,7 @@ __attribute__((sentinel))
 #endif
 void parse_error_expected(const char *message, ...)
 {
-	if(message != NULL) {
+	if (message != NULL) {
 		errorf(HERE, "%s", message);
 	}
 	va_list ap;
@@ -637,7 +637,7 @@ static void type_error_incompatible(const char *msg,
  */
 #define expect(expected)                              \
 	do {                                              \
-    if(UNLIKELY(token.type != (expected))) {          \
+    if (UNLIKELY(token.type != (expected))) {          \
         parse_error_expected(NULL, (expected), NULL); \
 		add_anchor_token(expected);                   \
         eat_until_anchor();                           \
@@ -651,7 +651,7 @@ static void type_error_incompatible(const char *msg,
 
 static void set_scope(scope_t *new_scope)
 {
-	if(scope != NULL) {
+	if (scope != NULL) {
 		scope->last_declaration = last_declaration;
 	}
 	scope = new_scope;
@@ -668,7 +668,7 @@ static declaration_t *get_declaration(const symbol_t *const symbol,
 {
 	declaration_t *declaration = symbol->declaration;
 	for( ; declaration != NULL; declaration = declaration->symbol_next) {
-		if(declaration->namespc == namespc)
+		if (declaration->namespc == namespc)
 			return declaration;
 	}
 
@@ -692,8 +692,8 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 		declaration_t *iter_last = NULL;
 		for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 			/* replace an entry? */
-			if(iter->namespc == namespc) {
-				if(iter_last == NULL) {
+			if (iter->namespc == namespc) {
+				if (iter_last == NULL) {
 					symbol->declaration = declaration;
 				} else {
 					iter_last->symbol_next = declaration;
@@ -702,7 +702,7 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 				break;
 			}
 		}
-		if(iter == NULL) {
+		if (iter == NULL) {
 			assert(iter_last->symbol_next == NULL);
 			iter_last->symbol_next = declaration;
 		}
@@ -739,7 +739,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 	size_t         i;
 
 	assert(new_top <= top);
-	if(new_top == top)
+	if (new_top == top)
 		return;
 
 	for(i = top; i > new_top; --i) {
@@ -752,8 +752,8 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 		/* replace/remove declaration */
 		declaration_t *declaration = symbol->declaration;
 		assert(declaration != NULL);
-		if(declaration->namespc == namespc) {
-			if(old_declaration == NULL) {
+		if (declaration->namespc == namespc) {
+			if (old_declaration == NULL) {
 				symbol->declaration = declaration->symbol_next;
 			} else {
 				symbol->declaration = old_declaration;
@@ -763,10 +763,10 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 			declaration_t *iter      = declaration->symbol_next;
 			for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
 				/* replace an entry? */
-				if(iter->namespc == namespc) {
+				if (iter->namespc == namespc) {
 					assert(iter_last != NULL);
 					iter_last->symbol_next = old_declaration;
-					if(old_declaration != NULL) {
+					if (old_declaration != NULL) {
 						old_declaration->symbol_next = iter->symbol_next;
 					}
 					break;
@@ -798,7 +798,7 @@ static int get_rank(const type_t *type)
 	 * can't decide whether unsigned int is possible, while int always works.
 	 * (unsigned int would be preferable when possible... for stuff like
 	 *  struct { enum { ... } bla : 4; } ) */
-	if(type->kind == TYPE_ENUM)
+	if (type->kind == TYPE_ENUM)
 		return ATOMIC_TYPE_INT;
 
 	assert(type->kind == TYPE_ATOMIC);
@@ -807,10 +807,10 @@ static int get_rank(const type_t *type)
 
 static type_t *promote_integer(type_t *type)
 {
-	if(type->kind == TYPE_BITFIELD)
+	if (type->kind == TYPE_BITFIELD)
 		type = type->bitfield.base_type;
 
-	if(get_rank(type) < ATOMIC_TYPE_INT)
+	if (get_rank(type) < ATOMIC_TYPE_INT)
 		type = type_int;
 
 	return type;
@@ -839,7 +839,7 @@ static expression_t *create_cast_expression(expression_t *expression,
 static bool is_null_pointer_constant(const expression_t *expression)
 {
 	/* skip void* cast */
-	if(expression->kind == EXPR_UNARY_CAST
+	if (expression->kind == EXPR_UNARY_CAST
 			|| expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		expression = expression->unary.value;
 	}
@@ -946,10 +946,10 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 	type_t *const type_left       = skip_typeref(orig_type_left);
 	type_t *const type_right      = skip_typeref(orig_type_right);
 
-	if(is_type_pointer(type_left)) {
-		if(is_null_pointer_constant(right)) {
+	if (is_type_pointer(type_left)) {
+		if (is_null_pointer_constant(right)) {
 			return ASSIGN_SUCCESS;
-		} else if(is_type_pointer(type_right)) {
+		} else if (is_type_pointer(type_right)) {
 			type_t *points_to_left
 				= skip_typeref(type_left->pointer.points_to);
 			type_t *points_to_right
@@ -958,7 +958,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			/* the left type has all qualifiers from the right type */
 			unsigned missing_qualifiers
 				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
-			if(missing_qualifiers != 0) {
+			if (missing_qualifiers != 0) {
 				return ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
 			}
 
@@ -975,7 +975,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			}
 
 			return ASSIGN_SUCCESS;
-		} else if(is_type_integer(type_right)) {
+		} else if (is_type_integer(type_right)) {
 			return ASSIGN_WARNING_POINTER_FROM_INT;
 		}
 	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
@@ -1004,7 +1004,7 @@ static expression_t *parse_constant_expression(void)
 	/* start parsing at precedence 7 (conditional expression) */
 	expression_t *result = parse_sub_expression(7);
 
-	if(!is_constant_expression(result)) {
+	if (!is_constant_expression(result)) {
 		errorf(&result->base.source_position,
 		       "expression '%E' is not constant\n", result);
 	}
@@ -1125,10 +1125,10 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
  * compare two string, ignoring double underscores on the second.
  */
 static int strcmp_underscore(const char *s1, const char *s2) {
-	if(s2[0] == '_' && s2[1] == '_') {
+	if (s2[0] == '_' && s2[1] == '_') {
 		size_t len2 = strlen(s2);
 		size_t len1 = strlen(s1);
-		if(len1 == len2-4 && s2[len2-2] == '_' && s2[len2-1] == '_') {
+		if (len1 == len2-4 && s2[len2-2] == '_' && s2[len2-1] == '_') {
 			return strncmp(s1, s2+2, len2-4);
 		}
 	}
@@ -1173,7 +1173,7 @@ static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute) {
 	add_anchor_token(',');
 	while(true){
 		expression = parse_constant_expression();
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		next_token();
 	}
@@ -1193,7 +1193,7 @@ static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute,
                                            string_t *string)
 {
 	add_anchor_token('(');
-	if(token.type != T_STRING_LITERAL) {
+	if (token.type != T_STRING_LITERAL) {
 		parse_error_expected("while parsing attribute directive",
 		                     T_STRING_LITERAL, NULL);
 		goto end_error;
@@ -1218,9 +1218,9 @@ static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute) {
 	};
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
-	if(string.begin != NULL) {
+	if (string.begin != NULL) {
 		for(size_t i = 0; i < 4; ++i) {
-			if(strcmp(tls_models[i], string.begin) == 0) {
+			if (strcmp(tls_models[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
 			}
@@ -1242,9 +1242,9 @@ static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute) {
 	};
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
-	if(string.begin != NULL) {
+	if (string.begin != NULL) {
 		for(size_t i = 0; i < 4; ++i) {
-			if(strcmp(visibilities[i], string.begin) == 0) {
+			if (strcmp(visibilities[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
 			}
@@ -1265,9 +1265,9 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute) {
 	};
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
-	if(string.begin != NULL) {
+	if (string.begin != NULL) {
 		for(int i = 0; i < 3; ++i) {
-			if(strcmp(visibilities[i], string.begin) == 0) {
+			if (strcmp(visibilities[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
 			}
@@ -1305,9 +1305,9 @@ static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute) {
 	};
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
-	if(string.begin != NULL) {
+	if (string.begin != NULL) {
 		for(size_t i = 0; i < 5; ++i) {
-			if(strcmp(interrupts[i], string.begin) == 0) {
+			if (strcmp(interrupts[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
 			}
@@ -1329,17 +1329,17 @@ static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute) {
 	};
 	int i;
 
-	if(token.type != T_IDENTIFIER) {
+	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER, NULL);
 		goto end_error;
 	}
 	const char *name = token.v.symbol->string;
 	for(i = 0; i < 4; ++i) {
-		if(strcmp_underscore(format_names[i], name) == 0)
+		if (strcmp_underscore(format_names[i], name) == 0)
 			break;
 	}
-	if(i >= 4) {
-		if(warning.attribute)
+	if (i >= 4) {
+		if (warning.attribute)
 			warningf(HERE, "'%s' is an unrecognized format function type", name);
 	}
 	next_token();
@@ -1363,7 +1363,7 @@ end_error:
 
 static void check_no_argument(gnu_attribute_t *attribute, const char *name)
 {
-	if(!attribute->have_arguments)
+	if (!attribute->have_arguments)
 		return;
 
 	/* should have no arguments */
@@ -1461,9 +1461,9 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 	expect('(');
 	expect('(');
 
-	if(token.type != ')') {
+	if (token.type != ')') {
 		/* find the end of the list */
-		if(last != NULL) {
+		if (last != NULL) {
 			while(last->next != NULL)
 				last = last->next;
 		}
@@ -1473,9 +1473,9 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 			const char *name;
 			if (token.type == T_const) {
 				name = "const";
-			} else if(token.type == T_volatile) {
+			} else if (token.type == T_volatile) {
 				name = "volatile";
-			} else if(token.type == T_cdecl) {
+			} else if (token.type == T_cdecl) {
 				/* __attribute__((cdecl)), WITH ms mode */
 				name = "cdecl";
 			} else if (token.type == T_IDENTIFIER) {
@@ -1490,26 +1490,26 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 
 			int i;
 			for(i = 0; i < GNU_AK_LAST; ++i) {
-				if(strcmp_underscore(gnu_attribute_names[i], name) == 0)
+				if (strcmp_underscore(gnu_attribute_names[i], name) == 0)
 					break;
 			}
 			gnu_attribute_kind_t kind = (gnu_attribute_kind_t)i;
 
 			attribute = NULL;
-			if(kind == GNU_AK_LAST) {
-				if(warning.attribute)
+			if (kind == GNU_AK_LAST) {
+				if (warning.attribute)
 					warningf(HERE, "'%s' attribute directive ignored", name);
 
 				/* skip possible arguments */
-				if(token.type == '(') {
+				if (token.type == '(') {
 					eat_until_matching_token(')');
 				}
 			} else {
 				/* check for arguments */
 				attribute = allocate_gnu_attribute(kind);
-				if(token.type == '(') {
+				if (token.type == '(') {
 					next_token();
-					if(token.type == ')') {
+					if (token.type == ')') {
 						/* empty args are allowed */
 						next_token();
 					} else
@@ -1623,7 +1623,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_FORMAT_ARG:
 				case GNU_AK_REGPARM:
 				case GNU_AK_TRAP_EXIT:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1633,7 +1633,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_ALIAS:
 				case GNU_AK_SECTION:
 				case GNU_AK_SP_SWITCH:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1641,7 +1641,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_FORMAT:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1650,29 +1650,29 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 				case GNU_AK_WEAKREF:
 					/* may have one string argument */
-					if(attribute->have_arguments)
+					if (attribute->have_arguments)
 						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_NONNULL:
-					if(attribute->have_arguments)
+					if (attribute->have_arguments)
 						parse_gnu_attribute_const_arg_list(attribute);
 					break;
 				case GNU_AK_TLS_MODEL:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
 						parse_gnu_attribute_tls_model_arg(attribute);
 					break;
 				case GNU_AK_VISIBILITY:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
 						parse_gnu_attribute_visibility_arg(attribute);
 					break;
 				case GNU_AK_MODEL:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else {
@@ -1680,7 +1680,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					}
 					break;
 				case GNU_AK_MODE:
-					if(!attribute->have_arguments) {
+					if (!attribute->have_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else {
@@ -1689,12 +1689,12 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 				case GNU_AK_INTERRUPT:
 					/* may have one string argument */
-					if(attribute->have_arguments)
+					if (attribute->have_arguments)
 						parse_gnu_attribute_interrupt_arg(attribute);
 					break;
 				case GNU_AK_SENTINEL:
 					/* may have one string argument */
-					if(attribute->have_arguments)
+					if (attribute->have_arguments)
 						parse_gnu_attribute_const_arg(attribute);
 					break;
 				case GNU_AK_LAST:
@@ -1702,8 +1702,8 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 				}
 			}
-			if(attribute != NULL) {
-				if(last != NULL) {
+			if (attribute != NULL) {
+				if (last != NULL) {
 					last->next = attribute;
 					last       = attribute;
 				} else {
@@ -1711,7 +1711,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				}
 			}
 
-			if(token.type != ',')
+			if (token.type != ',')
 				break;
 			next_token();
 		}
@@ -1740,7 +1740,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 		case T_asm:
 			next_token();
 			expect('(');
-			if(token.type != T_STRING_LITERAL) {
+			if (token.type != T_STRING_LITERAL) {
 				parse_error_expected("while parsing assembler attribute",
 				                     T_STRING_LITERAL, NULL);
 				eat_until_matching_token('(');
@@ -1791,7 +1791,7 @@ static designator_t *parse_designation(void)
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = token.source_position;
 			next_token();
-			if(token.type != T_IDENTIFIER) {
+			if (token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing designator",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
@@ -1805,7 +1805,7 @@ static designator_t *parse_designation(void)
 		}
 
 		assert(designator != NULL);
-		if(last != NULL) {
+		if (last != NULL) {
 			last->next = designator;
 		} else {
 			result = designator;
@@ -1922,7 +1922,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	}
 
 	expression_t *expression = parse_assignment_expression();
-	if(must_be_constant && !is_initializer_constant(expression)) {
+	if (must_be_constant && !is_initializer_constant(expression)) {
 		errorf(&expression->base.source_position,
 		       "Initialisation expression '%E' is not constant\n",
 		       expression);
@@ -1930,7 +1930,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	initializer_t *initializer = initializer_from_expression(type, expression);
 
-	if(initializer == NULL) {
+	if (initializer == NULL) {
 		errorf(&expression->base.source_position,
 		       "expression '%E' (type '%T') doesn't match expected type '%T'",
 		       expression, expression->base.type, type);
@@ -1940,11 +1940,11 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	bool additional_warning_displayed = false;
 	while(braces > 0) {
-		if(token.type == ',') {
+		if (token.type == ',') {
 			next_token();
 		}
-		if(token.type != '}') {
-			if(!additional_warning_displayed) {
+		if (token.type != '}') {
+			if (!additional_warning_displayed) {
 				warningf(HERE, "additional elements in scalar initializer");
 				additional_warning_displayed = true;
 			}
@@ -1990,20 +1990,20 @@ static __attribute__((unused)) void debug_print_type_path(
 		const type_path_entry_t *entry = & path->path[i];
 
 		type_t *type = skip_typeref(entry->type);
-		if(is_type_compound(type)) {
+		if (is_type_compound(type)) {
 			/* in gcc mode structs can have no members */
-			if(entry->v.compound_entry == NULL) {
+			if (entry->v.compound_entry == NULL) {
 				assert(i == len-1);
 				continue;
 			}
 			fprintf(stderr, ".%s", entry->v.compound_entry->symbol->string);
-		} else if(is_type_array(type)) {
+		} else if (is_type_array(type)) {
 			fprintf(stderr, "[%zd]", entry->v.index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}
 	}
-	if(path->top_type != NULL) {
+	if (path->top_type != NULL) {
 		fprintf(stderr, "  (");
 		print_type(path->top_type);
 		fprintf(stderr, ")");
@@ -2048,12 +2048,12 @@ static void descend_into_subtype(type_path_t *path)
 	type_path_entry_t *top = append_to_type_path(path);
 	top->type              = top_type;
 
-	if(is_type_compound(top_type)) {
+	if (is_type_compound(top_type)) {
 		declaration_t *declaration = top_type->compound.declaration;
 		declaration_t *entry       = declaration->scope.declarations;
 		top->v.compound_entry      = entry;
 
-		if(entry != NULL) {
+		if (entry != NULL) {
 			path->top_type         = entry->type;
 		} else {
 			path->top_type         = NULL;
@@ -2103,10 +2103,10 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 
 		type_t *type = skip_typeref(orig_type);
 
-		if(designator->symbol != NULL) {
+		if (designator->symbol != NULL) {
 			symbol_t *symbol = designator->symbol;
-			if(!is_type_compound(type)) {
-				if(is_type_valid(type)) {
+			if (!is_type_compound(type)) {
+				if (is_type_valid(type)) {
 					errorf(&designator->source_position,
 					       "'.%Y' designator used for non-compound type '%T'",
 					       symbol, orig_type);
@@ -2117,18 +2117,18 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			declaration_t *declaration = type->compound.declaration;
 			declaration_t *iter        = declaration->scope.declarations;
 			for( ; iter != NULL; iter = iter->next) {
-				if(iter->symbol == symbol) {
+				if (iter->symbol == symbol) {
 					break;
 				}
 			}
-			if(iter == NULL) {
+			if (iter == NULL) {
 				errorf(&designator->source_position,
 				       "'%T' has no member named '%Y'", orig_type, symbol);
 				goto failed;
 			}
-			if(used_in_offsetof) {
+			if (used_in_offsetof) {
 				type_t *real_type = skip_typeref(iter->type);
-				if(real_type->kind == TYPE_BITFIELD) {
+				if (real_type->kind == TYPE_BITFIELD) {
 					errorf(&designator->source_position,
 					       "offsetof designator '%Y' may not specify bitfield",
 					       symbol);
@@ -2143,28 +2143,28 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			expression_t *array_index = designator->array_index;
 			assert(designator->array_index != NULL);
 
-			if(!is_type_array(type)) {
-				if(is_type_valid(type)) {
+			if (!is_type_array(type)) {
+				if (is_type_valid(type)) {
 					errorf(&designator->source_position,
 					       "[%E] designator used for non-array type '%T'",
 					       array_index, orig_type);
 				}
 				goto failed;
 			}
-			if(!is_type_valid(array_index->base.type)) {
+			if (!is_type_valid(array_index->base.type)) {
 				goto failed;
 			}
 
 			long index = fold_constant(array_index);
-			if(!used_in_offsetof) {
-				if(index < 0) {
+			if (!used_in_offsetof) {
+				if (index < 0) {
 					errorf(&designator->source_position,
 					       "array index [%E] must be positive", array_index);
 					goto failed;
 				}
-				if(type->array.size_constant == true) {
+				if (type->array.size_constant == true) {
 					long array_size = type->array.size;
-					if(index >= array_size) {
+					if (index >= array_size) {
 						errorf(&designator->source_position,
 		 				       "designator [%E] (%d) exceeds array size %d",
 			 			       array_index, index, array_size);
@@ -2179,7 +2179,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 		}
 		path->top_type = orig_type;
 
-		if(designator->next != NULL) {
+		if (designator->next != NULL) {
 			descend_into_subtype(path);
 		}
 	}
@@ -2194,15 +2194,15 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 	type_path_entry_t *top = get_type_path_top(path);
 
 	type_t *type = skip_typeref(top->type);
-	if(is_type_union(type)) {
+	if (is_type_union(type)) {
 		/* in unions only the first element is initialized */
 		top->v.compound_entry = NULL;
-	} else if(is_type_struct(type)) {
+	} else if (is_type_struct(type)) {
 		declaration_t *entry = top->v.compound_entry;
 
 		entry                 = entry->next;
 		top->v.compound_entry = entry;
-		if(entry != NULL) {
+		if (entry != NULL) {
 			path->top_type = entry->type;
 			return;
 		}
@@ -2211,7 +2211,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 
 		top->v.index++;
 
-		if(!type->array.size_constant || top->v.index < type->array.size) {
+		if (!type->array.size_constant || top->v.index < type->array.size) {
 			return;
 		}
 	}
@@ -2220,7 +2220,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 	 * can ascend in the type hierarchy and continue with another subobject */
 	size_t len = ARR_LEN(path->path);
 
-	if(len > top_path_level) {
+	if (len > top_path_level) {
 		ascend_from_subtype(path);
 		advance_current_object(path, top_path_level);
 	} else {
@@ -2233,7 +2233,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
  */
 static void skip_until(int type) {
 	while(token.type != type) {
-		if(token.type == T_EOF)
+		if (token.type == T_EOF)
 			return;
 		next_token();
 	}
@@ -2244,13 +2244,13 @@ static void skip_until(int type) {
  */
 static void skip_initializers(void)
 {
-	if(token.type == '{')
+	if (token.type == '{')
 		next_token();
 
 	while(token.type != '}') {
-		if(token.type == T_EOF)
+		if (token.type == T_EOF)
 			return;
-		if(token.type == '{') {
+		if (token.type == '{') {
 			eat_block();
 			continue;
 		}
@@ -2272,7 +2272,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		type_t *outer_type, size_t top_path_level,
 		parse_initializer_env_t *env)
 {
-	if(token.type == '}') {
+	if (token.type == '}') {
 		/* empty initializer */
 		return create_empty_initializer();
 	}
@@ -2287,7 +2287,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 		/* we can't do usefull stuff if we didn't even parse the type. Skip the
 		 * initializers in this case. */
-		if(!is_type_valid(type)) {
+		if (!is_type_valid(type)) {
 			skip_initializers();
 			return create_empty_initializer();
 		}
@@ -2297,12 +2297,12 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 	while(true) {
 		designator_t *designator = NULL;
-		if(token.type == '.' || token.type == '[') {
+		if (token.type == '.' || token.type == '[') {
 			designator = parse_designation();
 
 			/* reset path to toplevel, evaluate designator from there */
 			ascend_to(path, top_path_level);
-			if(!walk_designator(path, designator, false)) {
+			if (!walk_designator(path, designator, false)) {
 				/* can't continue after designation error */
 				goto end_error;
 			}
@@ -2318,12 +2318,12 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 		initializer_t *sub;
 
-		if(token.type == '{') {
-			if(type != NULL && is_type_scalar(type)) {
+		if (token.type == '{') {
+			if (type != NULL && is_type_scalar(type)) {
 				sub = parse_scalar_initializer(type, env->must_be_constant);
 			} else {
 				eat('{');
-				if(type == NULL) {
+				if (type == NULL) {
 					if (env->declaration != NULL) {
 						errorf(HERE, "extra brace group at end of initializer for '%Y'",
 						       env->declaration->symbol);
@@ -2338,7 +2338,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				                            env);
 				rem_anchor_token('}');
 
-				if(type != NULL) {
+				if (type != NULL) {
 					ascend_from_subtype(path);
 					expect('}');
 				} else {
@@ -2350,27 +2350,27 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
 
-			if(env->must_be_constant && !is_initializer_constant(expression)) {
+			if (env->must_be_constant && !is_initializer_constant(expression)) {
 				errorf(&expression->base.source_position,
 				       "Initialisation expression '%E' is not constant\n",
 				       expression);
 			}
 
-			if(type == NULL) {
+			if (type == NULL) {
 				/* we are already outside, ... */
 				goto error_excess;
 			}
 
 			/* handle { "string" } special case */
-			if((expression->kind == EXPR_STRING_LITERAL
+			if ((expression->kind == EXPR_STRING_LITERAL
 					|| expression->kind == EXPR_WIDE_STRING_LITERAL)
 					&& outer_type != NULL) {
 				sub = initializer_from_expression(outer_type, expression);
-				if(sub != NULL) {
-					if(token.type == ',') {
+				if (sub != NULL) {
+					if (token.type == ',') {
 						next_token();
 					}
-					if(token.type != '}') {
+					if (token.type != '}') {
 						warningf(HERE, "excessive elements in initializer for type '%T'",
 								 orig_type);
 					}
@@ -2385,13 +2385,13 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 				type      = skip_typeref(orig_type);
 
 				sub = initializer_from_expression(orig_type, expression);
-				if(sub != NULL) {
+				if (sub != NULL) {
 					break;
 				}
-				if(!is_type_valid(type)) {
+				if (!is_type_valid(type)) {
 					goto end_error;
 				}
-				if(is_type_scalar(type)) {
+				if (is_type_scalar(type)) {
 					errorf(&expression->base.source_position,
 							"expression '%E' doesn't match expected type '%T'",
 							expression, orig_type);
@@ -2406,18 +2406,18 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		const type_path_entry_t *first      = &path->path[0];
 		type_t                  *first_type = first->type;
 		first_type                          = skip_typeref(first_type);
-		if(is_type_array(first_type)) {
+		if (is_type_array(first_type)) {
 			size_t index = first->v.index;
-			if(index > path->max_index)
+			if (index > path->max_index)
 				path->max_index = index;
 		}
 
-		if(type != NULL) {
+		if (type != NULL) {
 			/* append to initializers list */
 			ARR_APP1(initializer_t*, initializers, sub);
 		} else {
 error_excess:
-			if(env->declaration != NULL)
+			if (env->declaration != NULL)
 				warningf(HERE, "excess elements in struct initializer for '%Y'",
 			         env->declaration->symbol);
 			else
@@ -2425,19 +2425,19 @@ error_excess:
 		}
 
 error_parse_next:
-		if(token.type == '}') {
+		if (token.type == '}') {
 			break;
 		}
 		expect(',');
-		if(token.type == '}') {
+		if (token.type == '}') {
 			break;
 		}
 
-		if(type != NULL) {
+		if (type != NULL) {
 			/* advance to the next declaration if we are not at the end */
 			advance_current_object(path, top_path_level);
 			orig_type = path->top_type;
-			if(orig_type != NULL)
+			if (orig_type != NULL)
 				type = skip_typeref(orig_type);
 			else
 				type = NULL;
@@ -2474,9 +2474,9 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	initializer_t *result = NULL;
 	size_t         max_index;
 
-	if(is_type_scalar(type)) {
+	if (is_type_scalar(type)) {
 		result = parse_scalar_initializer(type, env->must_be_constant);
-	} else if(token.type == '{') {
+	} else if (token.type == '{') {
 		eat('{');
 
 		type_path_t path;
@@ -2502,7 +2502,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 
 	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
 	 * the array type size */
-	if(is_type_array(type) && type->array.size_expression == NULL
+	if (is_type_array(type) && type->array.size_expression == NULL
 			&& result != NULL) {
 		size_t size;
 		switch (result->kind) {
@@ -2551,7 +2551,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 {
 	gnu_attribute_t  *attributes = NULL;
 	decl_modifiers_t  modifiers  = 0;
-	if(is_struct) {
+	if (is_struct) {
 		eat(T_struct);
 	} else {
 		eat(T_union);
@@ -2564,17 +2564,17 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		modifiers |= parse_attributes(&attributes);
 	}
 
-	if(token.type == T_IDENTIFIER) {
+	if (token.type == T_IDENTIFIER) {
 		symbol = token.v.symbol;
 		next_token();
 
-		if(is_struct) {
+		if (is_struct) {
 			declaration = get_declaration(symbol, NAMESPACE_STRUCT);
 		} else {
 			declaration = get_declaration(symbol, NAMESPACE_UNION);
 		}
-	} else if(token.type != '{') {
-		if(is_struct) {
+	} else if (token.type != '{') {
+		if (is_struct) {
 			parse_error_expected("while parsing struct type specifier",
 			                     T_IDENTIFIER, '{', NULL);
 		} else {
@@ -2585,7 +2585,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		return NULL;
 	}
 
-	if(declaration == NULL) {
+	if (declaration == NULL) {
 		declaration = allocate_declaration_zero();
 		declaration->namespc         =
 			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
@@ -2598,7 +2598,7 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		append_declaration(declaration);
 	}
 
-	if(token.type == '{') {
+	if (token.type == '{') {
 		if (declaration->init.complete) {
 			assert(symbol != NULL);
 			errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
@@ -2620,7 +2620,7 @@ static void parse_enum_entries(type_t *const enum_type)
 {
 	eat('{');
 
-	if(token.type == '}') {
+	if (token.type == '}') {
 		next_token();
 		errorf(HERE, "empty enum not allowed");
 		return;
@@ -2628,7 +2628,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 	add_anchor_token('}');
 	do {
-		if(token.type != T_IDENTIFIER) {
+		if (token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing enum entry", T_IDENTIFIER, NULL);
 			eat_block();
 			rem_anchor_token('}');
@@ -2642,7 +2642,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		entry->source_position = token.source_position;
 		next_token();
 
-		if(token.type == '=') {
+		if (token.type == '=') {
 			next_token();
 			expression_t *value = parse_constant_expression();
 
@@ -2654,7 +2654,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 		record_declaration(entry);
 
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		next_token();
 	} while(token.type != '}');
@@ -2673,12 +2673,12 @@ static type_t *parse_enum_specifier(void)
 	symbol_t        *symbol;
 
 	eat(T_enum);
-	if(token.type == T_IDENTIFIER) {
+	if (token.type == T_IDENTIFIER) {
 		symbol = token.v.symbol;
 		next_token();
 
 		declaration = get_declaration(symbol, NAMESPACE_ENUM);
-	} else if(token.type != '{') {
+	} else if (token.type != '{') {
 		parse_error_expected("while parsing enum type specifier",
 		                     T_IDENTIFIER, '{', NULL);
 		return NULL;
@@ -2687,7 +2687,7 @@ static type_t *parse_enum_specifier(void)
 		symbol      = NULL;
 	}
 
-	if(declaration == NULL) {
+	if (declaration == NULL) {
 		declaration = allocate_declaration_zero();
 		declaration->namespc         = NAMESPACE_ENUM;
 		declaration->source_position = token.source_position;
@@ -2698,8 +2698,8 @@ static type_t *parse_enum_specifier(void)
 	type_t *const type      = allocate_type_zero(TYPE_ENUM, &declaration->source_position);
 	type->enumt.declaration = declaration;
 
-	if(token.type == '{') {
-		if(declaration->init.complete) {
+	if (token.type == '{') {
+		if (declaration->init.complete) {
 			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
 		if (symbol != NULL) {
@@ -2749,7 +2749,7 @@ restart:
 		goto restart;
 
 	case T_IDENTIFIER:
-		if(is_typedef_symbol(token.v.symbol)) {
+		if (is_typedef_symbol(token.v.symbol)) {
 			type = parse_typename();
 		} else {
 			expression = parse_expression();
@@ -2808,7 +2808,7 @@ static type_t *create_builtin_type(symbol_t *const symbol,
 	type->builtin.real_type = real_type;
 
 	type_t *result = typehash_insert(type);
-	if(type != result) {
+	if (type != result) {
 		free_type(type);
 	}
 
@@ -2818,7 +2818,7 @@ static type_t *create_builtin_type(symbol_t *const symbol,
 static type_t *get_typedef_type(symbol_t *symbol)
 {
 	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
-	if(declaration == NULL ||
+	if (declaration == NULL ||
 	   declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
@@ -2832,7 +2832,7 @@ static type_t *get_typedef_type(symbol_t *symbol)
  * check for the allowed MS alignment values.
  */
 static bool check_elignment_value(long long intvalue) {
-	if(intvalue < 1 || intvalue > 8192) {
+	if (intvalue < 1 || intvalue > 8192) {
 		errorf(HERE, "illegal alignment value");
 		return false;
 	}
@@ -2846,7 +2846,7 @@ static bool check_elignment_value(long long intvalue) {
 }
 
 #define DET_MOD(name, tag) do { \
-	if(*modifiers & tag) warningf(HERE, #name " used more than once"); \
+	if (*modifiers & tag) warningf(HERE, #name " used more than once"); \
 	*modifiers |= tag; \
 } while(0)
 
@@ -2855,113 +2855,113 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 	decl_modifiers_t *modifiers = &specifiers->modifiers;
 
 	while(true) {
-		if(token.type == T_restrict) {
+		if (token.type == T_restrict) {
 			next_token();
 			DET_MOD(restrict, DM_RESTRICT);
 			goto end_loop;
-		} else if(token.type != T_IDENTIFIER)
+		} else if (token.type != T_IDENTIFIER)
 			break;
 		symbol_t *symbol = token.v.symbol;
-		if(symbol == sym_align) {
+		if (symbol == sym_align) {
 			next_token();
 			expect('(');
-			if(token.type != T_INTEGER)
+			if (token.type != T_INTEGER)
 				goto end_error;
-			if(check_elignment_value(token.v.intvalue)) {
-				if(specifiers->alignment != 0)
+			if (check_elignment_value(token.v.intvalue)) {
+				if (specifiers->alignment != 0)
 					warningf(HERE, "align used more than once");
 				specifiers->alignment = (unsigned char)token.v.intvalue;
 			}
 			next_token();
 			expect(')');
-		} else if(symbol == sym_allocate) {
+		} else if (symbol == sym_allocate) {
 			next_token();
 			expect('(');
-			if(token.type != T_IDENTIFIER)
+			if (token.type != T_IDENTIFIER)
 				goto end_error;
 			(void)token.v.symbol;
 			expect(')');
-		} else if(symbol == sym_dllimport) {
+		} else if (symbol == sym_dllimport) {
 			next_token();
 			DET_MOD(dllimport, DM_DLLIMPORT);
-		} else if(symbol == sym_dllexport) {
+		} else if (symbol == sym_dllexport) {
 			next_token();
 			DET_MOD(dllexport, DM_DLLEXPORT);
-		} else if(symbol == sym_thread) {
+		} else if (symbol == sym_thread) {
 			next_token();
 			DET_MOD(thread, DM_THREAD);
-		} else if(symbol == sym_naked) {
+		} else if (symbol == sym_naked) {
 			next_token();
 			DET_MOD(naked, DM_NAKED);
-		} else if(symbol == sym_noinline) {
+		} else if (symbol == sym_noinline) {
 			next_token();
 			DET_MOD(noinline, DM_NOINLINE);
-		} else if(symbol == sym_noreturn) {
+		} else if (symbol == sym_noreturn) {
 			next_token();
 			DET_MOD(noreturn, DM_NORETURN);
-		} else if(symbol == sym_nothrow) {
+		} else if (symbol == sym_nothrow) {
 			next_token();
 			DET_MOD(nothrow, DM_NOTHROW);
-		} else if(symbol == sym_novtable) {
+		} else if (symbol == sym_novtable) {
 			next_token();
 			DET_MOD(novtable, DM_NOVTABLE);
-		} else if(symbol == sym_property) {
+		} else if (symbol == sym_property) {
 			next_token();
 			expect('(');
 			for(;;) {
 				bool is_get = false;
-				if(token.type != T_IDENTIFIER)
+				if (token.type != T_IDENTIFIER)
 					goto end_error;
-				if(token.v.symbol == sym_get) {
+				if (token.v.symbol == sym_get) {
 					is_get = true;
-				} else if(token.v.symbol == sym_put) {
+				} else if (token.v.symbol == sym_put) {
 				} else {
 					errorf(HERE, "Bad property name '%Y'", token.v.symbol);
 					goto end_error;
 				}
 				next_token();
 				expect('=');
-				if(token.type != T_IDENTIFIER)
+				if (token.type != T_IDENTIFIER)
 					goto end_error;
-				if(is_get) {
-					if(specifiers->get_property_sym != NULL) {
+				if (is_get) {
+					if (specifiers->get_property_sym != NULL) {
 						errorf(HERE, "get property name already specified");
 					} else {
 						specifiers->get_property_sym = token.v.symbol;
 					}
 				} else {
-					if(specifiers->put_property_sym != NULL) {
+					if (specifiers->put_property_sym != NULL) {
 						errorf(HERE, "put property name already specified");
 					} else {
 						specifiers->put_property_sym = token.v.symbol;
 					}
 				}
 				next_token();
-				if(token.type == ',') {
+				if (token.type == ',') {
 					next_token();
 					continue;
 				}
 				break;
 			}
 			expect(')');
-		} else if(symbol == sym_selectany) {
+		} else if (symbol == sym_selectany) {
 			next_token();
 			DET_MOD(selectany, DM_SELECTANY);
-		} else if(symbol == sym_uuid) {
+		} else if (symbol == sym_uuid) {
 			next_token();
 			expect('(');
-			if(token.type != T_STRING_LITERAL)
+			if (token.type != T_STRING_LITERAL)
 				goto end_error;
 			next_token();
 			expect(')');
-		} else if(symbol == sym_deprecated) {
+		} else if (symbol == sym_deprecated) {
 			next_token();
-			if(specifiers->deprecated != 0)
+			if (specifiers->deprecated != 0)
 				warningf(HERE, "deprecated used more than once");
 			specifiers->deprecated = 1;
-			if(token.type == '(') {
+			if (token.type == '(') {
 				next_token();
-				if(token.type == T_STRING_LITERAL) {
+				if (token.type == T_STRING_LITERAL) {
 					specifiers->deprecated_string = token.v.string.begin;
 					next_token();
 				} else {
@@ -2969,13 +2969,13 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 				}
 				expect(')');
 			}
-		} else if(symbol == sym_noalias) {
+		} else if (symbol == sym_noalias) {
 			next_token();
 			DET_MOD(noalias, DM_NOALIAS);
 		} else {
 			warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
 			next_token();
-			if(token.type == '(')
+			if (token.type == '(')
 				skip_until(')');
 		}
 end_loop:
@@ -3002,7 +3002,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* storage class */
 #define MATCH_STORAGE_CLASS(token, class)                                  \
 		case token:                                                        \
-			if(specifiers->declared_storage_class != STORAGE_CLASS_NONE) { \
+			if (specifiers->declared_storage_class != STORAGE_CLASS_NONE) { \
 				errorf(HERE, "multiple storage classes in declaration specifiers"); \
 			}                                                              \
 			specifiers->declared_storage_class = class;                    \
@@ -3070,7 +3070,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 #define MATCH_SPECIFIER(token, specifier, name)                         \
 		case token:                                                     \
 			next_token();                                               \
-			if(type_specifiers & specifier) {                           \
+			if (type_specifiers & specifier) {                           \
 				errorf(HERE, "multiple " name " type specifiers given"); \
 			} else {                                                    \
 				type_specifiers |= specifier;                           \
@@ -3105,9 +3105,9 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		case T_long:
 			next_token();
-			if(type_specifiers & SPECIFIER_LONG_LONG) {
+			if (type_specifiers & SPECIFIER_LONG_LONG) {
 				errorf(HERE, "multiple type specifiers given");
-			} else if(type_specifiers & SPECIFIER_LONG) {
+			} else if (type_specifiers & SPECIFIER_LONG) {
 				type_specifiers |= SPECIFIER_LONG_LONG;
 			} else {
 				type_specifiers |= SPECIFIER_LONG;
@@ -3147,12 +3147,12 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		case T_IDENTIFIER: {
 			/* only parse identifier if we haven't found a type yet */
-			if(type != NULL || type_specifiers != 0)
+			if (type != NULL || type_specifiers != 0)
 				goto finish_specifiers;
 
 			type_t *typedef_type = get_typedef_type(token.v.symbol);
 
-			if(typedef_type == NULL)
+			if (typedef_type == NULL)
 				goto finish_specifiers;
 
 			next_token();
@@ -3168,7 +3168,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 finish_specifiers:
 
-	if(type == NULL) {
+	if (type == NULL) {
 		atomic_type_kind_t atomic_type;
 
 		/* match valid basic types */
@@ -3298,7 +3298,7 @@ finish_specifiers:
 			break;
 		default:
 			/* invalid specifier combination, give an error message */
-			if(type_specifiers == 0) {
+			if (type_specifiers == 0) {
 				if (! strict_mode) {
 					if (warning.implicit_int) {
 						warningf(HERE, "no type specifiers in declaration, using 'int'");
@@ -3308,10 +3308,10 @@ finish_specifiers:
 				} else {
 					errorf(HERE, "no type specifiers given in declaration");
 				}
-			} else if((type_specifiers & SPECIFIER_SIGNED) &&
+			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
 				errorf(HERE, "signed and unsigned specifiers gives");
-			} else if(type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
+			} else if (type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
 				errorf(HERE, "only integer types can be signed or unsigned");
 			} else {
 				errorf(HERE, "multiple datatypes in declaration");
@@ -3319,11 +3319,11 @@ finish_specifiers:
 			atomic_type = ATOMIC_TYPE_INVALID;
 		}
 
-		if(type_specifiers & SPECIFIER_COMPLEX &&
+		if (type_specifiers & SPECIFIER_COMPLEX &&
 		   atomic_type != ATOMIC_TYPE_INVALID) {
 			type                = allocate_type_zero(TYPE_COMPLEX, &builtin_source_position);
 			type->complex.akind = atomic_type;
-		} else if(type_specifiers & SPECIFIER_IMAGINARY &&
+		} else if (type_specifiers & SPECIFIER_IMAGINARY &&
 		          atomic_type != ATOMIC_TYPE_INVALID) {
 			type                  = allocate_type_zero(TYPE_IMAGINARY, &builtin_source_position);
 			type->imaginary.akind = atomic_type;
@@ -3333,7 +3333,7 @@ finish_specifiers:
 		}
 		newtype = 1;
 	} else {
-		if(type_specifiers != 0) {
+		if (type_specifiers != 0) {
 			errorf(HERE, "multiple datatypes in declaration");
 		}
 	}
@@ -3344,7 +3344,7 @@ finish_specifiers:
 	type->base.modifiers  = modifiers;
 
 	type_t *result = typehash_insert(type);
-	if(newtype && result != type) {
+	if (newtype && result != type) {
 		free_type(type);
 	}
 
@@ -3387,7 +3387,7 @@ static declaration_t *parse_identifier_list(void)
 		declaration->symbol          = token.v.symbol;
 		next_token();
 
-		if(last_declaration != NULL) {
+		if (last_declaration != NULL) {
 			last_declaration->next = declaration;
 		} else {
 			declarations = declaration;
@@ -3407,9 +3407,9 @@ static void semantic_parameter(declaration_t *declaration)
 {
 	/* TODO: improve error messages */
 
-	if(declaration->declared_storage_class == STORAGE_CLASS_TYPEDEF) {
+	if (declaration->declared_storage_class == STORAGE_CLASS_TYPEDEF) {
 		errorf(HERE, "typedef not allowed in parameter list");
-	} else if(declaration->declared_storage_class != STORAGE_CLASS_NONE
+	} else if (declaration->declared_storage_class != STORAGE_CLASS_NONE
 			&& declaration->declared_storage_class != STORAGE_CLASS_REGISTER) {
 		errorf(HERE, "parameter may only have none or register storage class");
 	}
@@ -3427,7 +3427,7 @@ static void semantic_parameter(declaration_t *declaration)
 		declaration->type = type;
 	}
 
-	if(is_type_incomplete(type)) {
+	if (is_type_incomplete(type)) {
 		errorf(HERE, "incomplete type '%T' not allowed for parameter '%Y'",
 		       orig_type, declaration->symbol);
 	}
@@ -3453,16 +3453,16 @@ static declaration_t *parse_parameters(function_type_t *type)
 	add_anchor_token(')');
 	int saved_comma_state = save_and_reset_anchor_state(',');
 
-	if(token.type == T_IDENTIFIER) {
+	if (token.type == T_IDENTIFIER) {
 		symbol_t *symbol = token.v.symbol;
-		if(!is_typedef_symbol(symbol)) {
+		if (!is_typedef_symbol(symbol)) {
 			type->kr_style_parameters = true;
 			declarations = parse_identifier_list();
 			goto parameters_finished;
 		}
 	}
 
-	if(token.type == ')') {
+	if (token.type == ')') {
 		type->unspecified_parameters = 1;
 		goto parameters_finished;
 	}
@@ -3497,7 +3497,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 			memset(parameter, 0, sizeof(parameter[0]));
 			parameter->type = declaration->type;
 
-			if(last_parameter != NULL) {
+			if (last_parameter != NULL) {
 				last_declaration->next = declaration;
 				last_parameter->next   = parameter;
 			} else {
@@ -3591,24 +3591,24 @@ static construct_type_t *parse_array_declarator(void)
 	memset(array, 0, sizeof(array[0]));
 	array->construct_type.kind = CONSTRUCT_ARRAY;
 
-	if(token.type == T_static) {
+	if (token.type == T_static) {
 		array->is_static = true;
 		next_token();
 	}
 
 	type_qualifiers_t type_qualifiers = parse_type_qualifiers();
-	if(type_qualifiers != 0) {
-		if(token.type == T_static) {
+	if (type_qualifiers != 0) {
+		if (token.type == T_static) {
 			array->is_static = true;
 			next_token();
 		}
 	}
 	array->type_qualifiers = type_qualifiers;
 
-	if(token.type == '*' && look_ahead(1)->type == ']') {
+	if (token.type == '*' && look_ahead(1)->type == ']') {
 		array->is_variable = true;
 		next_token();
-	} else if(token.type != ']') {
+	} else if (token.type != ']') {
 		array->size = parse_assignment_expression();
 	}
 
@@ -3623,14 +3623,14 @@ end_error:
 static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	type_t *type;
-	if(declaration != NULL) {
+	if (declaration != NULL) {
 		type = allocate_type_zero(TYPE_FUNCTION, &declaration->source_position);
 	} else {
 		type = allocate_type_zero(TYPE_FUNCTION, HERE);
 	}
 
 	declaration_t *parameters = parse_parameters(&type->function);
-	if(declaration != NULL) {
+	if (declaration != NULL) {
 		declaration->scope.declarations = parameters;
 	}
 
@@ -3680,7 +3680,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	while(token.type == '*') {
 		construct_type_t *type = parse_pointer_declarator();
 
-		if(last == NULL) {
+		if (last == NULL) {
 			first = type;
 			last  = type;
 		} else {
@@ -3696,7 +3696,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 
 	switch(token.type) {
 	case T_IDENTIFIER:
-		if(declaration == NULL) {
+		if (declaration == NULL) {
 			errorf(HERE, "no identifier expected in typename");
 		} else {
 			declaration->symbol          = token.v.symbol;
@@ -3712,12 +3712,12 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		expect(')');
 		break;
 	default:
-		if(may_be_abstract)
+		if (may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
 		/* avoid a loop in the outermost scope, because eat_statement doesn't
 		 * eat '}' */
-		if(token.type == '}' && current_function == NULL) {
+		if (token.type == '}' && current_function == NULL) {
 			next_token();
 		} else {
 			eat_statement();
@@ -3741,14 +3741,14 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		}
 
 		/* insert in the middle of the list (behind p) */
-		if(p != NULL) {
+		if (p != NULL) {
 			type->next = p->next;
 			p->next    = type;
 		} else {
 			type->next = first;
 			first      = type;
 		}
-		if(last == p) {
+		if (last == p) {
 			last = type;
 		}
 	}
@@ -3761,7 +3761,7 @@ declarator_finished:
 
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
-	if(last == NULL) {
+	if (last == NULL) {
 		assert(first == NULL);
 		first = inner_types;
 	} else {
@@ -3817,7 +3817,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, &null_position);
 
 			expression_t *size_expression = parsed_array->size;
-			if(size_expression != NULL) {
+			if (size_expression != NULL) {
 				size_expression
 					= create_implicit_cast(size_expression, type_size_t);
 			}
@@ -3828,8 +3828,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			array_type->array.is_variable     = parsed_array->is_variable;
 			array_type->array.size_expression = size_expression;
 
-			if(size_expression != NULL) {
-				if(is_constant_expression(size_expression)) {
+			if (size_expression != NULL) {
+				if (is_constant_expression(size_expression)) {
 					array_type->array.size_constant = true;
 					array_type->array.size
 						= fold_constant(size_expression);
@@ -3850,10 +3850,10 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		}
 
 		type_t *hashed_type = typehash_insert(type);
-		if(hashed_type != type) {
+		if (hashed_type != type) {
 			/* the function type was constructed earlier freeing it here will
 			 * destroy other types... */
-			if(iter->kind != CONSTRUCT_FUNCTION) {
+			if (iter->kind != CONSTRUCT_FUNCTION) {
 				free_type(type);
 			}
 			type = hashed_type;
@@ -3876,12 +3876,12 @@ static declaration_t *parse_declarator(
 	declaration->is_inline              = specifiers->is_inline;
 
 	declaration->storage_class          = specifiers->declared_storage_class;
-	if(declaration->storage_class == STORAGE_CLASS_NONE
+	if (declaration->storage_class == STORAGE_CLASS_NONE
 			&& scope != global_scope) {
 		declaration->storage_class = STORAGE_CLASS_AUTO;
 	}
 
-	if(specifiers->alignment != 0) {
+	if (specifiers->alignment != 0) {
 		/* TODO: add checks here */
 		declaration->alignment = specifiers->alignment;
 	}
@@ -3893,7 +3893,7 @@ static declaration_t *parse_declarator(
 
 	fix_declaration_type(declaration);
 
-	if(construct_type != NULL) {
+	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
 	}
 
@@ -3905,7 +3905,7 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 	construct_type_t *construct_type = parse_inner_declarator(NULL, 1);
 
 	type_t *result = construct_declarator_type(construct_type, base_type);
-	if(construct_type != NULL) {
+	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
 	}
 
@@ -4180,12 +4180,12 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	type_t *orig_type = declaration->type;
 	type_t *type      = skip_typeref(orig_type);
 
-	if(declaration->init.initializer != NULL) {
+	if (declaration->init.initializer != NULL) {
 		parser_error_multiple_definition(declaration, HERE);
 	}
 
 	bool must_be_constant = false;
-	if(declaration->storage_class == STORAGE_CLASS_STATIC
+	if (declaration->storage_class == STORAGE_CLASS_STATIC
 			|| declaration->storage_class == STORAGE_CLASS_THREAD_STATIC
 			|| declaration->parent_scope == global_scope) {
 		must_be_constant = true;
@@ -4198,13 +4198,13 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	initializer_t *initializer = parse_initializer(&env);
 
-	if(env.type != orig_type) {
+	if (env.type != orig_type) {
 		orig_type         = env.type;
 		type              = skip_typeref(orig_type);
 		declaration->type = env.type;
 	}
 
-	if(is_type_function(type)) {
+	if (is_type_function(type)) {
 		errorf(&declaration->source_position,
 		       "initializers not allowed for function types at declator '%Y' (type '%T')",
 		       declaration->symbol, orig_type);
@@ -4274,11 +4274,11 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 			         "variable '%Y' declared 'inline'\n", declaration->symbol);
 		}
 
-		if(token.type == '=') {
+		if (token.type == '=') {
 			parse_init_declarator_rest(declaration);
 		}
 
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		eat(',');
 
@@ -4295,24 +4295,24 @@ end_error:
 static declaration_t *finished_kr_declaration(declaration_t *declaration)
 {
 	symbol_t *symbol  = declaration->symbol;
-	if(symbol == NULL) {
+	if (symbol == NULL) {
 		errorf(HERE, "anonymous declaration not valid as function parameter");
 		return declaration;
 	}
 	namespace_t namespc = (namespace_t) declaration->namespc;
-	if(namespc != NAMESPACE_NORMAL) {
+	if (namespc != NAMESPACE_NORMAL) {
 		return record_declaration(declaration);
 	}
 
 	declaration_t *previous_declaration = get_declaration(symbol, namespc);
-	if(previous_declaration == NULL ||
+	if (previous_declaration == NULL ||
 			previous_declaration->parent_scope != scope) {
 		errorf(HERE, "expected declaration of a function parameter, found '%Y'",
 		       symbol);
 		return declaration;
 	}
 
-	if(previous_declaration->type == NULL) {
+	if (previous_declaration->type == NULL) {
 		previous_declaration->type          = declaration->type;
 		previous_declaration->declared_storage_class = declaration->declared_storage_class;
 		previous_declaration->storage_class = declaration->storage_class;
@@ -4329,7 +4329,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
 
-	if(token.type == ';') {
+	if (token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers, append_declaration);
 	} else {
 		declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
@@ -4342,9 +4342,9 @@ static type_t *get_default_promoted_type(type_t *orig_type)
 	type_t *result = orig_type;
 
 	type_t *type = skip_typeref(orig_type);
-	if(is_type_integer(type)) {
+	if (is_type_integer(type)) {
 		result = promote_integer(type);
-	} else if(type == type_float) {
+	} else if (type == type_float) {
 		result = type_double;
 	}
 
@@ -4392,7 +4392,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	for( ; parameter_declaration != NULL;
 			parameter_declaration = parameter_declaration->next) {
 		type_t *parameter_type = parameter_declaration->type;
-		if(parameter_type == NULL) {
+		if (parameter_type == NULL) {
 			if (strict_mode) {
 				errorf(HERE, "no type specified for function parameter '%Y'",
 				       parameter_declaration->symbol);
@@ -4419,7 +4419,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 		memset(function_parameter, 0, sizeof(function_parameter[0]));
 
 		function_parameter->type = parameter_type;
-		if(last_parameter != NULL) {
+		if (last_parameter != NULL) {
 			last_parameter->next = function_parameter;
 		} else {
 			parameters = function_parameter;
@@ -4433,7 +4433,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	new_type->function.unspecified_parameters = true;
 
 	type = typehash_insert(new_type);
-	if(type != new_type) {
+	if (type != new_type) {
 		obstack_free(type_obst, new_type);
 	}
 
@@ -4524,7 +4524,7 @@ static void parse_external_declaration(void)
 	rem_anchor_token(';');
 
 	/* must be a declaration */
-	if(token.type == ';') {
+	if (token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers, append_declaration);
 		return;
 	}
@@ -4541,7 +4541,7 @@ static void parse_external_declaration(void)
 	rem_anchor_token(';');
 
 	/* must be a declaration */
-	if(token.type == ',' || token.type == '=' || token.type == ';') {
+	if (token.type == ',' || token.type == '=' || token.type == ';') {
 		parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
 		return;
 	}
@@ -4549,7 +4549,7 @@ static void parse_external_declaration(void)
 	/* must be a function definition */
 	parse_kr_declaration_list(ndeclaration);
 
-	if(token.type != '{') {
+	if (token.type != '{') {
 		parse_error_expected("while parsing function definition", '{', NULL);
 		eat_until_matching_token(';');
 		return;
@@ -4559,7 +4559,7 @@ static void parse_external_declaration(void)
 
 	/* note that we don't skip typerefs: the standard doesn't allow them here
 	 * (so we can't use is_type_function here) */
-	if(type->kind != TYPE_FUNCTION) {
+	if (type->kind != TYPE_FUNCTION) {
 		if (is_type_valid(type)) {
 			errorf(HERE, "declarator '%#T' has a body but is not a function type",
 			       type, ndeclaration->symbol);
@@ -4570,21 +4570,21 @@ static void parse_external_declaration(void)
 
 	/* § 6.7.5.3 (14) a function definition with () means no
 	 * parameters (and not unspecified parameters) */
-	if(type->function.unspecified_parameters
+	if (type->function.unspecified_parameters
 			&& type->function.parameters == NULL
 			&& !type->function.kr_style_parameters) {
 		type_t *duplicate = duplicate_type(type);
 		duplicate->function.unspecified_parameters = false;
 
 		type = typehash_insert(duplicate);
-		if(type != duplicate) {
+		if (type != duplicate) {
 			obstack_free(type_obst, duplicate);
 		}
 		ndeclaration->type = type;
 	}
 
 	declaration_t *const declaration = record_function_definition(ndeclaration);
-	if(ndeclaration != declaration) {
+	if (ndeclaration != declaration) {
 		declaration->scope = ndeclaration->scope;
 	}
 	type = skip_typeref(declaration->type);
@@ -4596,7 +4596,7 @@ static void parse_external_declaration(void)
 
 	declaration_t *parameter = declaration->scope.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
-		if(parameter->parent_scope == &ndeclaration->scope) {
+		if (parameter->parent_scope == &ndeclaration->scope) {
 			parameter->parent_scope = scope;
 		}
 		assert(parameter->parent_scope == NULL
@@ -4609,7 +4609,7 @@ static void parse_external_declaration(void)
 		environment_push(parameter);
 	}
 
-	if(declaration->init.statement != NULL) {
+	if (declaration->init.statement != NULL) {
 		parser_error_multiple_definition(declaration, HERE);
 		eat_block();
 		goto end_of_parse_external_declaration;
@@ -4651,21 +4651,21 @@ static declaration_t *find_compound_entry(declaration_t *compound_declaration,
 {
 	declaration_t *iter = compound_declaration->scope.declarations;
 	for( ; iter != NULL; iter = iter->next) {
-		if(iter->namespc != NAMESPACE_NORMAL)
+		if (iter->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		if(iter->symbol == NULL) {
+		if (iter->symbol == NULL) {
 			type_t *type = skip_typeref(iter->type);
-			if(is_type_compound(type)) {
+			if (is_type_compound(type)) {
 				declaration_t *result
 					= find_compound_entry(type->compound.declaration, symbol);
-				if(result != NULL)
+				if (result != NULL)
 					return result;
 			}
 			continue;
 		}
 
-		if(iter->symbol == symbol) {
+		if (iter->symbol == symbol) {
 			return iter;
 		}
 	}
@@ -4677,7 +4677,7 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 		const declaration_specifiers_t *specifiers)
 {
 	declaration_t *last_declaration = struct_declaration->scope.declarations;
-	if(last_declaration != NULL) {
+	if (last_declaration != NULL) {
 		while(last_declaration->next != NULL) {
 			last_declaration = last_declaration->next;
 		}
@@ -4686,14 +4686,14 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 	while(1) {
 		declaration_t *declaration;
 
-		if(token.type == ':') {
+		if (token.type == ':') {
 			source_position_t source_position = *HERE;
 			next_token();
 
 			type_t *base_type = specifiers->type;
 			expression_t *size = parse_constant_expression();
 
-			if(!is_type_integer(skip_typeref(base_type))) {
+			if (!is_type_integer(skip_typeref(base_type))) {
 				errorf(HERE, "bitfield base type '%T' is not an integer type",
 				       base_type);
 			}
@@ -4713,12 +4713,12 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			type_t *orig_type = declaration->type;
 			type_t *type      = skip_typeref(orig_type);
 
-			if(token.type == ':') {
+			if (token.type == ':') {
 				source_position_t source_position = *HERE;
 				next_token();
 				expression_t *size = parse_constant_expression();
 
-				if(!is_type_integer(type)) {
+				if (!is_type_integer(type)) {
 					errorf(HERE, "bitfield base type '%T' is not an "
 					       "integer type", orig_type);
 				}
@@ -4728,11 +4728,11 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			} else {
 				/* TODO we ignore arrays for now... what is missing is a check
 				 * that they're at the end of the struct */
-				if(is_type_incomplete(type) && !is_type_array(type)) {
+				if (is_type_incomplete(type) && !is_type_array(type)) {
 					errorf(HERE,
 					       "compound member '%Y' has incomplete type '%T'",
 					       declaration->symbol, orig_type);
-				} else if(is_type_function(type)) {
+				} else if (is_type_function(type)) {
 					errorf(HERE, "compound member '%Y' must not have function "
 					       "type '%T'", declaration->symbol, orig_type);
 				}
@@ -4741,11 +4741,11 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 
 		/* make sure we don't define a symbol multiple times */
 		symbol_t *symbol = declaration->symbol;
-		if(symbol != NULL) {
+		if (symbol != NULL) {
 			declaration_t *prev_decl
 				= find_compound_entry(struct_declaration, symbol);
 
-			if(prev_decl != NULL) {
+			if (prev_decl != NULL) {
 				assert(prev_decl->symbol == symbol);
 				errorf(&declaration->source_position,
 				       "multiple declarations of symbol '%Y' (declared %P)",
@@ -4754,14 +4754,14 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 		}
 
 		/* append declaration */
-		if(last_declaration != NULL) {
+		if (last_declaration != NULL) {
 			last_declaration->next = declaration;
 		} else {
 			struct_declaration->scope.declarations = declaration;
 		}
 		last_declaration = declaration;
 
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		next_token();
 	}
@@ -4785,7 +4785,7 @@ static void parse_compound_type_entries(declaration_t *compound_declaration)
 	}
 	rem_anchor_token('}');
 
-	if(token.type == T_EOF) {
+	if (token.type == T_EOF) {
 		errorf(HERE, "EOF while parsing struct");
 	}
 	next_token();
@@ -4796,7 +4796,7 @@ static type_t *parse_typename(void)
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
-	if(specifiers.declared_storage_class != STORAGE_CLASS_NONE) {
+	if (specifiers.declared_storage_class != STORAGE_CLASS_NONE) {
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
@@ -4974,7 +4974,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	ntype->function.unspecified_parameters = true;
 
 	type_t *type = typehash_insert(ntype);
-	if(type != ntype) {
+	if (type != ntype) {
 		free_type(ntype);
 	}
 
@@ -5016,7 +5016,7 @@ static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
 	type->function.parameters  = parameter1;
 
 	type_t *result = typehash_insert(type);
-	if(result != type) {
+	if (result != type) {
 		free_type(type);
 	}
 
@@ -5042,7 +5042,7 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	type->function.parameters  = parameter;
 
 	type_t *result = typehash_insert(type);
-	if(result != type) {
+	if (result != type) {
 		free_type(type);
 	}
 
@@ -5056,7 +5056,7 @@ static type_t *make_function_0_type(type_t *return_type)
 	type->function.parameters  = NULL;
 
 	type_t *result = typehash_insert(type);
-	if(result != type) {
+	if (result != type) {
 		free_type(type);
 	}
 
@@ -5098,7 +5098,7 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 static type_t *automatic_type_conversion(type_t *orig_type)
 {
 	type_t *type = skip_typeref(orig_type);
-	if(is_type_array(type)) {
+	if (is_type_array(type)) {
 		array_type_t *array_type   = &type->array;
 		type_t       *element_type = array_type->element_type;
 		unsigned      qualifiers   = array_type->base.qualifiers;
@@ -5106,7 +5106,7 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 		return make_pointer_type(element_type, qualifiers);
 	}
 
-	if(is_type_function(type)) {
+	if (is_type_function(type)) {
 		return make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 	}
 
@@ -5173,7 +5173,7 @@ static expression_t *parse_reference(void)
 	source_position_t source_position = token.source_position;
 	next_token();
 
-	if(declaration == NULL) {
+	if (declaration == NULL) {
 		if (! strict_mode && token.type == '(') {
 			/* an implicitly defined function */
 			if (warning.implicit_function_declaration) {
@@ -5202,7 +5202,7 @@ static expression_t *parse_reference(void)
 	declaration->used = true;
 
 	/* check for deprecated functions */
-	if(declaration->deprecated != 0) {
+	if (declaration->deprecated != 0) {
 		const char *prefix = "";
 		if (is_type_function(declaration->type))
 			prefix = "function ";
@@ -5258,7 +5258,7 @@ static expression_t *parse_cast(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	if(token.type == '{') {
+	if (token.type == '{') {
 		return parse_compound_literal(type);
 	}
 
@@ -5327,7 +5327,7 @@ static expression_t *parse_brace_expression(void)
 	TYPE_SPECIFIERS
 		return parse_cast();
 	case T_IDENTIFIER:
-		if(is_typedef_symbol(token.v.symbol)) {
+		if (is_typedef_symbol(token.v.symbol)) {
 			return parse_cast();
 		}
 	}
@@ -5407,7 +5407,7 @@ static designator_t *parse_designator(void)
 	designator_t *result    = allocate_ast_zero(sizeof(result[0]));
 	result->source_position = *HERE;
 
-	if(token.type != T_IDENTIFIER) {
+	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
 		                     T_IDENTIFIER, NULL);
 		return NULL;
@@ -5417,9 +5417,9 @@ static designator_t *parse_designator(void)
 
 	designator_t *last_designator = result;
 	while(true) {
-		if(token.type == '.') {
+		if (token.type == '.') {
 			next_token();
-			if(token.type != T_IDENTIFIER) {
+			if (token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
@@ -5433,7 +5433,7 @@ static designator_t *parse_designator(void)
 			last_designator       = designator;
 			continue;
 		}
-		if(token.type == '[') {
+		if (token.type == '[') {
 			next_token();
 			add_anchor_token(']');
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
@@ -5441,7 +5441,7 @@ static designator_t *parse_designator(void)
 			designator->array_index     = parse_expression();
 			rem_anchor_token(']');
 			expect(']');
-			if(designator->array_index == NULL) {
+			if (designator->array_index == NULL) {
 				return NULL;
 			}
 
@@ -5487,7 +5487,7 @@ static expression_t *parse_offsetof(void)
 
 	descend_into_subtype(&path);
 
-	if(!walk_designator(&path, designator, true)) {
+	if (!walk_designator(&path, designator, true)) {
 		return create_invalid_expression();
 	}
 
@@ -5660,7 +5660,7 @@ static expression_t *parse_compare_builtin(void)
 
 	type_t *const type_left  = skip_typeref(orig_type_left);
 	type_t *const type_right = skip_typeref(orig_type_right);
-	if(!is_type_float(type_left) && !is_type_float(type_right)) {
+	if (!is_type_float(type_left) && !is_type_float(type_right)) {
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			type_error_incompatible("invalid operands in comparison",
 				&expression->base.source_position, orig_type_left, orig_type_right);
@@ -5733,10 +5733,10 @@ static expression_t *parse_noop_expression(void) {
 		add_anchor_token(')');
 		add_anchor_token(',');
 
-		if(token.type != ')') {
+		if (token.type != ')') {
 			while(true) {
 				(void)parse_assignment_expression();
-				if(token.type != ',')
+				if (token.type != ',')
 					break;
 				next_token();
 			}
@@ -5862,7 +5862,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 	}
 
 	rem_anchor_token(']');
-	if(token.type != ']') {
+	if (token.type != ']') {
 		parse_error_expected("Problem while parsing array access", ']', NULL);
 		return expression;
 	}
@@ -6096,21 +6096,21 @@ static expression_t *parse_call_expression(unsigned precedence,
 	add_anchor_token(')');
 	add_anchor_token(',');
 
-	if(token.type != ')') {
+	if (token.type != ')') {
 		call_argument_t *last_argument = NULL;
 
 		while(true) {
 			call_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
 			argument->expression = parse_assignment_expression();
-			if(last_argument == NULL) {
+			if (last_argument == NULL) {
 				call->arguments = argument;
 			} else {
 				last_argument->next = argument;
 			}
 			last_argument = argument;
 
-			if(token.type != ',')
+			if (token.type != ',')
 				break;
 			next_token();
 		}
@@ -6119,7 +6119,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	rem_anchor_token(')');
 	expect(')');
 
-	if(function_type == NULL)
+	if (function_type == NULL)
 		return result;
 
 	function_parameter_t *parameter = function_type->parameters;
@@ -6200,7 +6200,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	/* 6.5.15.3 */
 	type_t *result_type;
-	if(is_type_atomic(true_type, ATOMIC_TYPE_VOID) ||
+	if (is_type_atomic(true_type, ATOMIC_TYPE_VOID) ||
 		is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
 		if (!is_type_atomic(true_type, ATOMIC_TYPE_VOID)
 		    || !is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
@@ -6264,7 +6264,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 				free_type(copy);
 
 			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
-		} else if(is_type_integer(other_type)) {
+		} else if (is_type_integer(other_type)) {
 			warningf(&expression->base.source_position,
 					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
 			result_type = pointer_type;
@@ -6367,7 +6367,7 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	if(!is_type_arithmetic(type)) {
+	if (!is_type_arithmetic(type)) {
 		if (is_type_valid(type)) {
 			/* TODO: improve error message */
 			errorf(HERE, "operation needs an arithmetic type");
@@ -6410,7 +6410,7 @@ static void semantic_dereference(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	if(!is_type_pointer(type)) {
+	if (!is_type_pointer(type)) {
 		if (is_type_valid(type)) {
 			errorf(HERE, "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
 		}
@@ -6424,12 +6424,12 @@ static void semantic_dereference(unary_expression_t *expression)
 
 static void set_address_taken(expression_t *expression, bool may_be_register)
 {
-	if(expression->kind != EXPR_REFERENCE)
+	if (expression->kind != EXPR_REFERENCE)
 		return;
 
 	declaration_t *const declaration = expression->reference.declaration;
 	/* happens for parse errors */
-	if(declaration == NULL)
+	if (declaration == NULL)
 		return;
 
 	if (declaration->storage_class == STORAGE_CLASS_REGISTER && !may_be_register) {
@@ -6450,7 +6450,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 	value->base.type    = revert_automatic_type_conversion(value);
 
 	type_t *orig_type = value->base.type;
-	if(!is_type_valid(orig_type))
+	if (!is_type_valid(orig_type))
 		return;
 
 	set_address_taken(value, false);
@@ -6519,32 +6519,32 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	/* TODO: handle complex + imaginary types */
 
 	/* § 6.3.1.8 Usual arithmetic conversions */
-	if(type_left == type_long_double || type_right == type_long_double) {
+	if (type_left == type_long_double || type_right == type_long_double) {
 		return type_long_double;
-	} else if(type_left == type_double || type_right == type_double) {
+	} else if (type_left == type_double || type_right == type_double) {
 		return type_double;
-	} else if(type_left == type_float || type_right == type_float) {
+	} else if (type_left == type_float || type_right == type_float) {
 		return type_float;
 	}
 
 	type_right = promote_integer(type_right);
 	type_left  = promote_integer(type_left);
 
-	if(type_left == type_right)
+	if (type_left == type_right)
 		return type_left;
 
 	bool signed_left  = is_type_signed(type_left);
 	bool signed_right = is_type_signed(type_right);
 	int  rank_left    = get_rank(type_left);
 	int  rank_right   = get_rank(type_right);
-	if(rank_left < rank_right) {
-		if(signed_left == signed_right || !signed_right) {
+	if (rank_left < rank_right) {
+		if (signed_left == signed_right || !signed_right) {
 			return type_right;
 		} else {
 			return type_left;
 		}
 	} else {
-		if(signed_left == signed_right || !signed_left) {
+		if (signed_left == signed_right || !signed_left) {
 			return type_left;
 		} else {
 			return type_right;
@@ -6564,7 +6564,7 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			errorf(HERE, "operation needs arithmetic types");
@@ -6587,7 +6587,7 @@ static void semantic_shift_op(binary_expression_t *expression)
 	type_t       *      type_left       = skip_typeref(orig_type_left);
 	type_t       *      type_right      = skip_typeref(orig_type_right);
 
-	if(!is_type_integer(type_left) || !is_type_integer(type_right)) {
+	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			errorf(HERE, "operation needs integer types");
@@ -6644,17 +6644,17 @@ static void semantic_sub(binary_expression_t *expression)
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	/* § 5.6.5 */
-	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->left        = create_implicit_cast(left, arithmetic_type);
 		expression->right       = create_implicit_cast(right, arithmetic_type);
 		expression->base.type =  arithmetic_type;
 		return;
-	} else if(is_type_pointer(type_left) && is_type_integer(type_right)) {
+	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		check_pointer_arithmetic(&expression->base.source_position,
 		                         type_left, orig_type_left);
 		expression->base.type = type_left;
-	} else if(is_type_pointer(type_left) && is_type_pointer(type_right)) {
+	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		type_t *const unqual_left  = get_unqualified_type(skip_typeref(type_left->pointer.points_to));
 		type_t *const unqual_right = get_unqualified_type(skip_typeref(type_right->pointer.points_to));
 		if (!types_compatible(unqual_left, unqual_right)) {
@@ -6694,7 +6694,7 @@ static void semantic_comparison(binary_expression_t *expression)
 	type_t *type_right = skip_typeref(orig_type_right);
 
 	/* TODO non-arithmetic types */
-	if(is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
+	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		/* test for signed vs unsigned compares */
 		if (warning.sign_compare &&
 		    (expression->base.kind != EXPR_BINARY_EQUAL &&
@@ -6707,15 +6707,15 @@ static void semantic_comparison(binary_expression_t *expression)
 			expression_t *const_expr = NULL;
 			expression_t *other_expr = NULL;
 
-			if(is_constant_expression(left)) {
+			if (is_constant_expression(left)) {
 				const_expr = left;
 				other_expr = right;
-			} else if(is_constant_expression(right)) {
+			} else if (is_constant_expression(right)) {
 				const_expr = right;
 				other_expr = left;
 			}
 
-			if(const_expr != NULL) {
+			if (const_expr != NULL) {
 				type_t *other_type = skip_typeref(other_expr->base.type);
 				long    val        = fold_constant(const_expr);
 				/* TODO: check if val can be represented by other_type */
@@ -6831,7 +6831,7 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	type_t *type_left  = skip_typeref(orig_type_left);
 	type_t *type_right = skip_typeref(orig_type_right);
 
-	if(!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
+	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			errorf(HERE, "operation needs arithmetic types");
@@ -7139,7 +7139,7 @@ CREATE_BINEXPR_PARSER(T_CARETEQUAL, EXPR_BINARY_BITWISE_XOR_ASSIGN,
 
 static expression_t *parse_sub_expression(unsigned precedence)
 {
-	if(token.type < 0) {
+	if (token.type < 0) {
 		return expected_expression_error();
 	}
 
@@ -7148,7 +7148,7 @@ static expression_t *parse_sub_expression(unsigned precedence)
 	source_position_t             source_position = token.source_position;
 	expression_t                 *left;
 
-	if(parser->parser != NULL) {
+	if (parser->parser != NULL) {
 		left = parser->parser(parser->precedence);
 	} else {
 		left = parse_primary_expression();
@@ -7157,14 +7157,14 @@ static expression_t *parse_sub_expression(unsigned precedence)
 	left->base.source_position = source_position;
 
 	while(true) {
-		if(token.type < 0) {
+		if (token.type < 0) {
 			return expected_expression_error();
 		}
 
 		parser = &expression_parsers[token.type];
-		if(parser->infix_parser == NULL)
+		if (parser->infix_parser == NULL)
 			break;
-		if(parser->infix_precedence < precedence)
+		if (parser->infix_precedence < precedence)
 			break;
 
 		left = parser->infix_parser(parser->infix_precedence, left);
@@ -7197,7 +7197,7 @@ static void register_expression_parser(parse_expression_function parser,
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
-	if(entry->parser != NULL) {
+	if (entry->parser != NULL) {
 		diagnosticf("for token '%k'\n", (token_type_t)token_type);
 		panic("trying to register multiple expression parsers for a token");
 	}
@@ -7217,7 +7217,7 @@ static void register_infix_parser(parse_expression_infix_function parser,
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
-	if(entry->infix_parser != NULL) {
+	if (entry->infix_parser != NULL) {
 		diagnosticf("for token '%k'\n", (token_type_t)token_type);
 		panic("trying to register multiple infix expression parsers for a "
 		      "token");
@@ -7363,14 +7363,14 @@ static asm_clobber_t *parse_asm_clobbers(void)
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 		clobber->clobber       = parse_string_literals();
 
-		if(last != NULL) {
+		if (last != NULL) {
 			last->next = clobber;
 		} else {
 			result = clobber;
 		}
 		last = clobber;
 
-		if(token.type != ',')
+		if (token.type != ',')
 			break;
 		eat(',');
 	}
@@ -7390,7 +7390,7 @@ static statement_t *parse_asm_statement(void)
 
 	asm_statement_t *asm_statement = &statement->asms;
 
-	if(token.type == T_volatile) {
+	if (token.type == T_volatile) {
 		next_token();
 		asm_statement->is_volatile = true;
 	}
@@ -7400,21 +7400,21 @@ static statement_t *parse_asm_statement(void)
 	add_anchor_token(':');
 	asm_statement->asm_text = parse_string_literals();
 
-	if(token.type != ':') {
+	if (token.type != ':') {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
 	eat(':');
 
 	asm_statement->outputs = parse_asm_arguments(true);
-	if(token.type != ':') {
+	if (token.type != ':') {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
 	eat(':');
 
 	asm_statement->inputs = parse_asm_arguments(false);
-	if(token.type != ':') {
+	if (token.type != ':') {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
@@ -7538,7 +7538,7 @@ static declaration_t *get_label(symbol_t *symbol)
 	assert(current_function != NULL);
 	/* if we found a label in the same function, then we already created the
 	 * declaration */
-	if(candidate != NULL
+	if (candidate != NULL
 			&& candidate->parent_scope == &current_function->scope) {
 		return candidate;
 	}
@@ -7566,7 +7566,7 @@ static statement_t *parse_label_statement(void)
 
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
-	if(label->source_position.input_name != NULL) {
+	if (label->source_position.input_name != NULL) {
 		errorf(HERE, "duplicate label '%Y' (declared %P)",
 		       symbol, &label->source_position);
 	} else {
@@ -7580,9 +7580,9 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
-	if(token.type == '}') {
+	if (token.type == '}') {
 		/* TODO only warn? */
-		if(false) {
+		if (false) {
 			warningf(HERE, "label at end of compound statement");
 			statement->label.statement = create_empty_statement();
 		} else {
@@ -7633,7 +7633,7 @@ static statement_t *parse_if(void)
 	statement->ifs.true_statement = parse_statement();
 	rem_anchor_token(T_else);
 
-	if(token.type == T_else) {
+	if (token.type == T_else) {
 		next_token();
 		statement->ifs.false_statement = parse_statement();
 	}
@@ -7671,7 +7671,7 @@ static statement_t *parse_switch(void)
 	statement->switchs.body = parse_statement();
 	current_switch          = rem;
 
-	if(warning.switch_default &&
+	if (warning.switch_default &&
 	   find_default_label(&statement->switchs) == NULL) {
 		warningf(&statement->base.source_position, "switch has no default case");
 	}
@@ -7760,8 +7760,8 @@ static statement_t *parse_for(void)
 	expect('(');
 	add_anchor_token(')');
 
-	if(token.type != ';') {
-		if(is_declaration_specifier(&token, false)) {
+	if (token.type != ';') {
+		if (is_declaration_specifier(&token, false)) {
 			parse_declaration(record_declaration);
 		} else {
 			add_anchor_token(';');
@@ -7778,13 +7778,13 @@ static statement_t *parse_for(void)
 		expect(';');
 	}
 
-	if(token.type != ';') {
+	if (token.type != ';') {
 		add_anchor_token(';');
 		statement->fors.condition = parse_expression();
 		rem_anchor_token(';');
 	}
 	expect(';');
-	if(token.type != ')') {
+	if (token.type != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
 		if (warning.unused_value && !expression_has_effect(step)) {
@@ -7818,7 +7818,7 @@ static statement_t *parse_goto(void)
 {
 	eat(T_goto);
 
-	if(token.type != T_IDENTIFIER) {
+	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_statement();
 		goto end_error;
@@ -7925,7 +7925,7 @@ static bool is_local_var_declaration(const declaration_t *declaration) {
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER: {
 		const type_t *type = skip_typeref(declaration->type);
-		if(is_type_function(type)) {
+		if (is_type_function(type)) {
 			return false;
 		} else {
 			return true;
@@ -7940,7 +7940,7 @@ static bool is_local_var_declaration(const declaration_t *declaration) {
  * Check if a given declaration represents a variable.
  */
 static bool is_var_declaration(const declaration_t *declaration) {
-	if(declaration->storage_class == STORAGE_CLASS_TYPEDEF)
+	if (declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 		return false;
 
 	const type_t *type = skip_typeref(declaration->type);
@@ -7985,7 +7985,7 @@ static statement_t *parse_return(void)
 	eat(T_return);
 
 	expression_t *return_value = NULL;
-	if(token.type != ';') {
+	if (token.type != ';') {
 		return_value = parse_expression();
 	}
 	expect(';');
@@ -7994,10 +7994,10 @@ static statement_t *parse_return(void)
 	assert(is_type_function(func_type));
 	type_t *const return_type = skip_typeref(func_type->function.return_type);
 
-	if(return_value != NULL) {
+	if (return_value != NULL) {
 		type_t *return_value_type = skip_typeref(return_value->base.type);
 
-		if(is_type_atomic(return_type, ATOMIC_TYPE_VOID)
+		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)
 				&& !is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
 			warningf(&statement->base.source_position,
 			         "'return' with a value, in function returning void");
@@ -8018,7 +8018,7 @@ static statement_t *parse_return(void)
 			}
 		}
 	} else {
-		if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 			warningf(&statement->base.source_position,
 			         "'return' without value, in function returning non-void");
 		}
@@ -8042,7 +8042,7 @@ static statement_t *parse_declaration_statement(void)
 	declaration_t *before = last_declaration;
 	parse_declaration(record_declaration);
 
-	if(before == NULL) {
+	if (before == NULL) {
 		statement->declaration.declarations_begin = scope->declarations;
 	} else {
 		statement->declaration.declarations_begin = before->next;
@@ -8085,7 +8085,7 @@ static statement_t *parse_ms_try_statment(void) {
 	statement->ms_try.try_statement = parse_compound_statement(false);
 	current_try = rem;
 
-	if(token.type == T___except) {
+	if (token.type == T___except) {
 		eat(T___except);
 		expect('(');
 		add_anchor_token(')');
@@ -8102,7 +8102,7 @@ static statement_t *parse_ms_try_statment(void) {
 		rem_anchor_token(')');
 		expect(')');
 		statement->ms_try.final_statement = parse_compound_statement(false);
-	} else if(token.type == T__finally) {
+	} else if (token.type == T__finally) {
 		eat(T___finally);
 		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
@@ -8143,7 +8143,7 @@ static statement_t *intern_parse_statement(void)
 		break;
 
 	case T_if:
-		statement = parse_if();
+		statement = parse_if ();
 		break;
 
 	case T_switch:
@@ -8183,7 +8183,7 @@ static statement_t *intern_parse_statement(void)
 		break;
 
 	case ';':
-		if(warning.empty_statement) {
+		if (warning.empty_statement) {
 			warningf(HERE, "statement is empty");
 		}
 		statement = create_empty_statement();
@@ -8191,12 +8191,12 @@ static statement_t *intern_parse_statement(void)
 		break;
 
 	case T_IDENTIFIER:
-		if(look_ahead(1)->type == ':') {
+		if (look_ahead(1)->type == ':') {
 			statement = parse_label_statement();
 			break;
 		}
 
-		if(is_typedef_symbol(token.v.symbol)) {
+		if (is_typedef_symbol(token.v.symbol)) {
 			statement = parse_declaration_statement();
 			break;
 		}
@@ -8243,9 +8243,9 @@ static statement_t *parse_statement(void)
 {
 	statement_t *statement = intern_parse_statement();
 
-	if(statement->kind == STATEMENT_EXPRESSION && warning.unused_value) {
+	if (statement->kind == STATEMENT_EXPRESSION && warning.unused_value) {
 		expression_t *expression = statement->expression.expression;
-		if(!expression_has_effect(expression)) {
+		if (!expression_has_effect(expression)) {
 			warningf(&expression->base.source_position,
 					"statement has no effect");
 		}
@@ -8274,14 +8274,14 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	while(token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
-		if(is_invalid_statement(sub_statement)) {
+		if (is_invalid_statement(sub_statement)) {
 			/* an error occurred. if we are at an anchor, return */
-			if(at_anchor())
+			if (at_anchor())
 				goto end_error;
 			continue;
 		}
 
-		if(last_statement != NULL) {
+		if (last_statement != NULL) {
 			last_statement->base.next = sub_statement;
 		} else {
 			statement->compound.statements = sub_statement;
@@ -8293,7 +8293,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		last_statement = sub_statement;
 	}
 
-	if(token.type == '}') {
+	if (token.type == '}') {
 		next_token();
 	} else {
 		errorf(&statement->base.source_position,
@@ -8301,18 +8301,18 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	}
 
 	/* look over all statements again to produce no effect warnings */
-	if(warning.unused_value) {
+	if (warning.unused_value) {
 		statement_t *sub_statement = statement->compound.statements;
 		for( ; sub_statement != NULL; sub_statement = sub_statement->base.next) {
-			if(sub_statement->kind != STATEMENT_EXPRESSION)
+			if (sub_statement->kind != STATEMENT_EXPRESSION)
 				continue;
 			/* don't emit a warning for the last expression in an expression
 			 * statement as it has always an effect */
-			if(inside_expression_statement && sub_statement->base.next == NULL)
+			if (inside_expression_statement && sub_statement->base.next == NULL)
 				continue;
 
 			expression_t *expression = sub_statement->expression.expression;
-			if(!expression_has_effect(expression)) {
+			if (!expression_has_effect(expression)) {
 				warningf(&expression->base.source_position,
 				         "statement has no effect");
 			}
@@ -8455,7 +8455,7 @@ void parse(void)
  */
 void init_parser(void)
 {
-	if(c_mode & _MS) {
+	if (c_mode & _MS) {
 		/* add predefined symbols for extended-decl-modifier */
 		sym_align      = symbol_table_insert("align");
 		sym_allocate   = symbol_table_insert("allocate");
