@@ -1293,13 +1293,16 @@ static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
 	/* This isn't really correct, the backend should provide a list of machine
 	 * specific modes (according to gcc philosophy that is...) */
 	const char *symbol_str = token.v.symbol->string;
-	if(strcmp_underscore("QI", symbol_str) == 0) {
+	if (strcmp_underscore("QI",   symbol_str) == 0 ||
+	    strcmp_underscore("byte", symbol_str) == 0) {
 		attribute->u.akind = ATOMIC_TYPE_CHAR;
 	} else if (strcmp_underscore("HI", symbol_str) == 0) {
 		attribute->u.akind = ATOMIC_TYPE_SHORT;
-	} else if(strcmp_underscore("SI", symbol_str) == 0) {
+	} else if (strcmp_underscore("SI",      symbol_str) == 0
+	        || strcmp_underscore("word",    symbol_str) == 0
+	        || strcmp_underscore("pointer", symbol_str) == 0) {
 		attribute->u.akind = ATOMIC_TYPE_INT;
-	} else if(strcmp_underscore("DI", symbol_str) == 0) {
+	} else if (strcmp_underscore("DI", symbol_str) == 0) {
 		attribute->u.akind = ATOMIC_TYPE_LONGLONG;
 	} else {
 		warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
