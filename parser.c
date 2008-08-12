@@ -55,8 +55,9 @@ struct gnu_attribute_t {
 	bool                 invalid;
 	bool                 have_arguments;
 	union {
-		size_t   value;
-		string_t string;
+		size_t              value;
+		string_t            string;
+		atomic_type_kind_t  akind;
 	} u;
 };
 
@@ -1284,7 +1285,28 @@ static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
 	/* at least: byte, word, pointer, list of machine modes
 	 * __XXX___ is interpreted as XXX */
 	add_anchor_token(')');
-	expect(T_IDENTIFIER);
+
+	if (token.type != T_IDENTIFIER) {
+		expect(T_IDENTIFIER);
+	}
+
+	/* This isn't really correct, the backend should provide a list of machine
+	 * specific modes (according to gcc philosophy that is...) */
+	const char *symbol_str = token.v.symbol->string;
+	if(strcmp_underscore("QI", symbol_str) == 0) {
+		attribute->u.akind = ATOMIC_TYPE_CHAR;
+	} else if (strcmp_underscore("HI", symbol_str) == 0) {
+		attribute->u.akind = ATOMIC_TYPE_SHORT;
+	} else if(strcmp_underscore("SI", symbol_str) == 0) {
+		attribute->u.akind = ATOMIC_TYPE_INT;
+	} else if(strcmp_underscore("DI", symbol_str) == 0) {
+		attribute->u.akind = ATOMIC_TYPE_LONGLONG;
+	} else {
+		warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
+		attribute->invalid = true;
+	}
+	next_token();
+
 	rem_anchor_token(')');
 	expect(')');
 	return;
@@ -3754,11 +3776,6 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	}
 
 declarator_finished:
-	modifiers |= parse_attributes(&attributes);
-	if (declaration != NULL) {
-		declaration->modifiers |= modifiers;
-	}
-
 	/* append inner_types at the end of the list, we don't to set last anymore
 	 * as it's not needed anymore */
 	if (last == NULL) {
@@ -3771,6 +3788,41 @@ declarator_finished:
 	return first;
 end_error:
 	return NULL;
+}
+
+static void parse_declaration_attributes(declaration_t *declaration)
+{
+	gnu_attribute_t  *attributes = NULL;
+	decl_modifiers_t  modifiers  = parse_attributes(&attributes);
+
+	if (declaration == NULL)
+		return;
+
+	declaration->modifiers |= modifiers;
+	/* check if we have these stupid mode attributes... */
+	type_t *old_type = declaration->type;
+	if (old_type == NULL)
+		return;
+
+	gnu_attribute_t *attribute = attributes;
+	for ( ; attribute != NULL; attribute = attribute->next) {
+		if (attribute->kind != GNU_AK_MODE || attribute->invalid)
+			continue;
+
+		atomic_type_kind_t  akind = attribute->u.akind;
+		if (!is_type_signed(old_type)) {
+			switch(akind) {
+			case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
+			case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
+			case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
+			case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
+			default:
+				panic("invalid akind in mode attribute");
+			}
+		}
+		declaration->type
+			= make_atomic_type(akind, old_type->base.qualifiers);
+	}
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list,
@@ -3890,6 +3942,8 @@ static declaration_t *parse_declarator(
 		= parse_inner_declarator(declaration, may_be_abstract);
 	type_t *const type = specifiers->type;
 	declaration->type = construct_declarator_type(construct_type, type);
+
+	parse_declaration_attributes(declaration);
 
 	fix_declaration_type(declaration);
 

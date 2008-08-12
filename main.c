@@ -739,7 +739,8 @@ int main(int argc, char **argv)
 			} else if(strcmp(option, "pg") == 0) {
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
-			} else if(strcmp(option, "pedantic") == 0) {
+			} else if(strcmp(option, "pedantic") == 0
+					|| strcmp(option, "ansi") == 0) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if(strcmp(option, "shared") == 0) {
 				add_flag(&ldflags_obst, "-shared");
