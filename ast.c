@@ -1468,7 +1468,8 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 		return is_address_constant(expression->unary.value);
 
 	case EXPR_SELECT: {
-		if(is_type_pointer(expression->select.compound->base.type)) {
+		type_t *base_type = skip_typeref(expression->select.compound->base.type);
+		if(is_type_pointer(base_type)) {
 			/* it's a -> */
 			return is_address_constant(expression->select.compound);
 		} else {

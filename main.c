@@ -628,6 +628,7 @@ int main(int argc, char **argv)
 						|| strcmp(opt, "unroll-loops") == 0
 						|| strcmp(opt, "expensive-optimizations") == 0
 						|| strcmp(opt, "no-common") == 0
+						|| strcmp(opt, "PIC") == 0
 						|| strncmp(opt, "align-loops=", sizeof("align-loops=")-1) == 0
 						|| strncmp(opt, "align-jumps=", sizeof("align-jumps=")-1) == 0
 						|| strncmp(opt, "align-functions=", sizeof("align-functions=")-1) == 0) {
