@@ -1555,7 +1555,6 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_NOCOMMON:
 				case GNU_AK_SHARED:
 				case GNU_AK_NOTSHARED:
-				case GNU_AK_USED:
 				case GNU_AK_UNUSED:
 				case GNU_AK_NO_INSTRUMENT_FUNCTION:
 				case GNU_AK_WARN_UNUSED_RESULT:
@@ -1580,6 +1579,11 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_MAY_ALIAS:
 				case GNU_AK_MS_STRUCT:
 				case GNU_AK_GCC_STRUCT:
+					check_no_argument(attribute, name);
+					break;
+
+				case GNU_AK_USED:
+					modifiers |= DM_USED;
 					check_no_argument(attribute, name);
 					break;
 

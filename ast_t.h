@@ -510,24 +510,25 @@ typedef enum gnu_attribute_kind_t {
  * Extended microsoft modifier.
  */
 typedef enum {
-	DM_DLLIMPORT         = (1 <<  0),
-	DM_DLLEXPORT         = (1 <<  1),
-	DM_THREAD            = (1 <<  2),
-	DM_NAKED             = (1 <<  3),
-	DM_MICROSOFT_INLINE  = (1 <<  4),
-	DM_FORCEINLINE       = (1 <<  5),
-	DM_SELECTANY         = (1 <<  6),
-	DM_NOTHROW           = (1 <<  7),
-	DM_NOVTABLE          = (1 <<  8),
-	DM_NORETURN          = (1 <<  9),
-	DM_NOINLINE          = (1 << 10),
-	DM_RESTRICT          = (1 << 11),
-	DM_NOALIAS           = (1 << 12),
-	DM_PACKED            = (1 << 13),
-	DM_TRANSPARENT_UNION = (1 << 14),
-	DM_PURE              = (1 << 15),
-	DM_CONSTRUCTOR       = (1 << 16),
-	DM_DESTRUCTOR        = (1 << 17)
+	DM_DLLIMPORT         = 1 <<  0,
+	DM_DLLEXPORT         = 1 <<  1,
+	DM_THREAD            = 1 <<  2,
+	DM_NAKED             = 1 <<  3,
+	DM_MICROSOFT_INLINE  = 1 <<  4,
+	DM_FORCEINLINE       = 1 <<  5,
+	DM_SELECTANY         = 1 <<  6,
+	DM_NOTHROW           = 1 <<  7,
+	DM_NOVTABLE          = 1 <<  8,
+	DM_NORETURN          = 1 <<  9,
+	DM_NOINLINE          = 1 << 10,
+	DM_RESTRICT          = 1 << 11,
+	DM_NOALIAS           = 1 << 12,
+	DM_PACKED            = 1 << 13,
+	DM_TRANSPARENT_UNION = 1 << 14,
+	DM_PURE              = 1 << 15,
+	DM_CONSTRUCTOR       = 1 << 16,
+	DM_DESTRUCTOR        = 1 << 17,
+	DM_USED              = 1 << 18
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;

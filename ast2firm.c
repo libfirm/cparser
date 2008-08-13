@@ -1012,6 +1012,10 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 
+	if (declaration->modifiers & DM_USED) {
+		set_entity_stickyness(entity, stickyness_sticky);
+	}
+
 	/* static inline             => local
 	 * extern inline             => local
 	 * inline without definition => local
