@@ -1544,9 +1544,6 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				switch(kind) {
 				case GNU_AK_CONST:
 				case GNU_AK_VOLATILE:
-				case GNU_AK_CDECL:
-				case GNU_AK_STDCALL:
-				case GNU_AK_FASTCALL:
 				case GNU_AK_DEPRECATED:
 				case GNU_AK_NAKED:
 				case GNU_AK_MALLOC:
@@ -1579,68 +1576,23 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_MAY_ALIAS:
 				case GNU_AK_MS_STRUCT:
 				case GNU_AK_GCC_STRUCT:
-					check_no_argument(attribute, name);
-					break;
+					goto no_arg;
 
-				case GNU_AK_USED:
-					modifiers |= DM_USED;
-					check_no_argument(attribute, name);
-					break;
-
-				case GNU_AK_PURE:
-					check_no_argument(attribute, name);
-					modifiers |= DM_PURE;
-					break;
-
-				case GNU_AK_ALWAYS_INLINE:
-					check_no_argument(attribute, name);
-					modifiers |= DM_FORCEINLINE;
-					break;
-
-				case GNU_AK_DLLIMPORT:
-					check_no_argument(attribute, name);
-					modifiers |= DM_DLLIMPORT;
-					break;
-
-				case GNU_AK_DLLEXPORT:
-					check_no_argument(attribute, name);
-					modifiers |= DM_DLLEXPORT;
-					break;
-
-				case GNU_AK_PACKED:
-					check_no_argument(attribute, name);
-					modifiers |= DM_PACKED;
-					break;
-
-				case GNU_AK_NOINLINE:
-					check_no_argument(attribute, name);
-					modifiers |= DM_NOINLINE;
-					break;
-
-				case GNU_AK_NORETURN:
-					check_no_argument(attribute, name);
-					modifiers |= DM_NORETURN;
-					break;
-
-				case GNU_AK_NOTHROW:
-					check_no_argument(attribute, name);
-					modifiers |= DM_NOTHROW;
-					break;
-
-				case GNU_AK_TRANSPARENT_UNION:
-					check_no_argument(attribute, name);
-					modifiers |= DM_TRANSPARENT_UNION;
-					break;
-
-				case GNU_AK_CONSTRUCTOR:
-					check_no_argument(attribute, name);
-					modifiers |= DM_CONSTRUCTOR;
-					break;
-
-				case GNU_AK_DESTRUCTOR:
-					check_no_argument(attribute, name);
-					modifiers |= DM_DESTRUCTOR;
-					break;
+				case GNU_AK_CDECL:             modifiers |= DM_CDECL;             goto no_arg;
+				case GNU_AK_FASTCALL:          modifiers |= DM_FASTCALL;          goto no_arg;
+				case GNU_AK_STDCALL:           modifiers |= DM_STDCALL;           goto no_arg;
+				case GNU_AK_USED:              modifiers |= DM_USED;              goto no_arg;
+				case GNU_AK_PURE:              modifiers |= DM_PURE;              goto no_arg;
+				case GNU_AK_ALWAYS_INLINE:     modifiers |= DM_FORCEINLINE;       goto no_arg;
+				case GNU_AK_DLLIMPORT:         modifiers |= DM_DLLIMPORT;         goto no_arg;
+				case GNU_AK_DLLEXPORT:         modifiers |= DM_DLLEXPORT;         goto no_arg;
+				case GNU_AK_PACKED:            modifiers |= DM_PACKED;            goto no_arg;
+				case GNU_AK_NOINLINE:          modifiers |= DM_NOINLINE;          goto no_arg;
+				case GNU_AK_NORETURN:          modifiers |= DM_NORETURN;          goto no_arg;
+				case GNU_AK_NOTHROW:           modifiers |= DM_NOTHROW;           goto no_arg;
+				case GNU_AK_TRANSPARENT_UNION: modifiers |= DM_TRANSPARENT_UNION; goto no_arg;
+				case GNU_AK_CONSTRUCTOR:       modifiers |= DM_CONSTRUCTOR;       goto no_arg;
+				case GNU_AK_DESTRUCTOR:        modifiers |= DM_DESTRUCTOR;        goto no_arg;
 
 				case GNU_AK_ALIGNED:
 					/* __align__ may be used without an argument */
@@ -1729,6 +1681,9 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_LAST:
 					/* already handled */
 					break;
+
+no_arg:
+					check_no_argument(attribute, name);
 				}
 			}
 			if (attribute != NULL) {
@@ -1764,7 +1719,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 		switch(token.type) {
 		case T___attribute__:
 			modifiers |= parse_gnu_attribute(attributes);
-			break;
+			continue;
 
 		case T_asm:
 			next_token();
@@ -1778,25 +1733,23 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 				parse_string_literals();
 			}
 			expect(')');
-			break;
+			continue;
 
-		case T_cdecl:
-		case T__fastcall:
-		case T__stdcall:
+		case T_cdecl:     modifiers |= DM_CDECL;    break;
+		case T__fastcall: modifiers |= DM_FASTCALL; break;
+		case T__stdcall:  modifiers |= DM_STDCALL;  break;
+
 		case T___thiscall:
 			/* TODO record modifier */
 			warningf(HERE, "Ignoring declaration modifier %K", &token);
-			next_token();
 			break;
 
-		default:
-			goto attributes_finished;
-		}
-	}
-
-attributes_finished:
 end_error:
-	return modifiers;
+		default: return modifiers;
+		}
+
+		next_token();
+	}
 }
 
 static designator_t *parse_designation(void)
@@ -3026,6 +2979,11 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	specifiers->source_position = token.source_position;
 
 	while(true) {
+		specifiers->modifiers
+			|= parse_attributes(&specifiers->gnu_attributes);
+		if (specifiers->modifiers & DM_TRANSPARENT_UNION)
+			modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
+
 		switch(token.type) {
 
 		/* storage class */
@@ -3165,13 +3123,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T___builtin_va_list:
 			type = duplicate_type(type_valist);
 			next_token();
-			break;
-
-		case T___attribute__:
-			specifiers->modifiers
-				|= parse_attributes(&specifiers->gnu_attributes);
-			if (specifiers->modifiers & DM_TRANSPARENT_UNION)
-				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 			break;
 
 		case T_IDENTIFIER: {

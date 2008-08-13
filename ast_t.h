@@ -528,7 +528,10 @@ typedef enum {
 	DM_PURE              = 1 << 15,
 	DM_CONSTRUCTOR       = 1 << 16,
 	DM_DESTRUCTOR        = 1 << 17,
-	DM_USED              = 1 << 18
+	DM_USED              = 1 << 18,
+	DM_CDECL             = 1 << 19,
+	DM_FASTCALL          = 1 << 20,
+	DM_STDCALL           = 1 << 21
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;
