@@ -531,7 +531,8 @@ typedef enum {
 	DM_USED              = 1 << 18,
 	DM_CDECL             = 1 << 19,
 	DM_FASTCALL          = 1 << 20,
-	DM_STDCALL           = 1 << 21
+	DM_STDCALL           = 1 << 21,
+	DM_THISCALL          = 1 << 22
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;

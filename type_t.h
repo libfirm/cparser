@@ -108,15 +108,31 @@ struct array_type_t {
 	unsigned      is_vla            : 1; /**< it's a variable length array */
 };
 
+/**
+ * An entry in the parameter list of a function type.
+ */
 struct function_parameter_t {
-	type_t               *type;
-	function_parameter_t *next;
+	type_t               *type;  /**< The parameter type. */
+	function_parameter_t *next;  /**< Points to the next type inthe parameter list.*/
 };
 
+/** Calling conventions. */
+typedef enum {
+	CC_DEFAULT,      /**< defualt calling convention. */
+	CC_CDECL,        /**< cdecl calling convention. */
+	CC_STDCALL,      /**< stdcall calling convention. */
+	CC_FASTCALL,     /**< fastcall calling convention. */
+	CC_THISCALL      /**< thiscall calling convention. */
+} cc_kind_t;
+
+/**
+ * A function type.
+ */
 struct function_type_t {
 	type_base_t           base;
-	type_t               *return_type;
-	function_parameter_t *parameters;
+	type_t               *return_type;        /**< The return type. */
+	function_parameter_t *parameters;         /**< A linst of the parameter types. */
+	cc_kind_t             calling_convention; /**< The specified calling convention. */
 	unsigned              variadic : 1;
 	unsigned              unspecified_parameters : 1;
 	unsigned              kr_style_parameters : 1;
