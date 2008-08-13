@@ -981,6 +981,26 @@ typedef ident* (*create_ld_ident_func)(ir_entity *entity,
 create_ld_ident_func  create_ld_ident = create_ld_ident_linux_elf;
 
 /**
+ * Handle GNU attributes for entities
+ *
+ * @param ent   the entity
+ * @param decl  the routine declaration
+ */
+static void handle_gnu_attributes_ent(ir_entity *ent, declaration_t *decl)
+{
+	if (decl->modifiers & DM_PURE) {
+		/* TRUE if the declaration includes the GNU
+		   __attribute__((pure)) specifier. */
+		set_entity_additional_property(ent, mtp_property_pure);
+	}
+	if (decl->modifiers & DM_USED) {
+		/* TRUE if the declaration includes the GNU
+		   __attribute__((used)) specifier. */
+		set_entity_stickyness(ent, stickyness_sticky);
+	}
+}
+
+/**
  * Creates an entity representing a function.
  *
  * @param declaration  the function declaration
@@ -1012,9 +1032,7 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	entity               = new_d_entity(global_type, id, ir_type_method, dbgi);
 	set_entity_ld_ident(entity, create_ld_ident(entity, declaration));
 
-	if (declaration->modifiers & DM_USED) {
-		set_entity_stickyness(entity, stickyness_sticky);
-	}
+	handle_gnu_attributes_ent(entity, declaration);
 
 	/* static inline             => local
 	 * extern inline             => local
