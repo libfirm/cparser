@@ -749,7 +749,8 @@ union statement_t {
 };
 
 struct translation_unit_t {
-	scope_t scope;
+	scope_t      scope;
+	statement_t *global_asm;
 };
 
 static inline

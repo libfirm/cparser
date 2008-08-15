@@ -526,14 +526,14 @@ static void eat_until_matching_token(int type) {
 	unsigned parenthesis_count = 0;
 	unsigned brace_count = 0;
 	unsigned bracket_count = 0;
-	int end_token = type;
 
-	if (type == '(')
-		end_token = ')';
-	else if (type == '{')
-		end_token = '}';
-	else if (type == '[')
-		end_token = ']';
+	int end_token;
+	switch (type) {
+		case '(': end_token = ')';  break;
+		case '{': end_token = '}';  break;
+		case '[': end_token = ']';  break;
+		default:  end_token = type; break;
+	}
 
 	while(token.type != end_token ||
 	      (parenthesis_count > 0 || brace_count > 0 || bracket_count > 0)) {
@@ -8391,18 +8391,43 @@ static void check_unused_globals(void)
 	}
 }
 
+static void parse_global_asm(void)
+{
+	eat(T_asm);
+	expect('(');
+
+	statement_t *statement          = allocate_statement_zero(STATEMENT_ASM);
+	statement->base.source_position = token.source_position;
+	statement->asms.asm_text        = parse_string_literals();
+	statement->base.next            = unit->global_asm;
+	unit->global_asm                = statement;
+
+	expect(')');
+	expect(';');
+
+end_error:;
+}
+
 /**
  * Parse a translation unit.
  */
 static void parse_translation_unit(void)
 {
 	while(token.type != T_EOF) {
-		if (token.type == ';') {
-			/* TODO error in strict mode */
-			warningf(HERE, "stray ';' outside of function");
-			next_token();
-		} else {
-			parse_external_declaration();
+		switch (token.type) {
+			case ';':
+				/* TODO error in strict mode */
+				warningf(HERE, "stray ';' outside of function");
+				next_token();
+				break;
+
+			case T_asm:
+				parse_global_asm();
+				break;
+
+			default:
+				parse_external_declaration();
+				break;
 		}
 	}
 }

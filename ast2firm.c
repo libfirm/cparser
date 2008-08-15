@@ -5409,6 +5409,23 @@ void exit_ast2firm(void)
 	obstack_free(&asm_obst, NULL);
 }
 
+static void global_asm_to_firm(statement_t *s)
+{
+	for (; s != NULL; s = s->base.next) {
+		assert(s->kind == STATEMENT_ASM);
+
+		char const *const text = s->asms.asm_text.begin;
+		size_t            size = s->asms.asm_text.size;
+
+		/* skip the last \0 */
+		if (text[size - 1] == '\0')
+			--size;
+
+		ident *const id = new_id_from_chars(text, size);
+		add_irp_asm(id);
+	}
+}
+
 void translation_unit_to_firm(translation_unit_t *unit)
 {
 	/* just to be sure */
@@ -5419,4 +5436,5 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	init_ir_types();
 
 	scope_to_firm(&unit->scope);
+	global_asm_to_firm(unit->global_asm);
 }
