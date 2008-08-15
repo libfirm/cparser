@@ -51,13 +51,15 @@ void init_tokens(void)
 		assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                \
 		symbol               = symbol_table_insert(str);           \
 		symbol->ID           = T_##x;                              \
-		token_symbols[T_##x] = symbol;                             \
+		if (token_symbols[T_##x] == NULL)                          \
+			token_symbols[T_##x] = symbol;                         \
 	}
 
 #define TS(x,str,val)                                              \
 	assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                    \
 	symbol               = symbol_table_insert(str);               \
-	token_symbols[T_##x] = symbol;
+	if (token_symbols[T_##x] == NULL)                              \
+		token_symbols[T_##x] = symbol;                             \
 
 #include "tokens.inc"
 
@@ -68,12 +70,14 @@ void init_tokens(void)
 	assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);                 \
 	symbol                   = symbol_table_insert(str);           \
 	symbol->pp_ID            = TP_##x;                             \
-	pp_token_symbols[TP_##x] = symbol;
+	if (pp_token_symbols[TP_##x] == NULL)                          \
+		pp_token_symbols[TP_##x] = symbol;
 
 #define TS(x,str,val)                                              \
 	assert(TP_##x >= 0 && TP_##x < T_LAST_TOKEN);                  \
 	symbol                   = symbol_table_insert(str);           \
-	pp_token_symbols[TP_##x] = symbol;
+	if (pp_token_symbols[TP_##x] == NULL)                          \
+		pp_token_symbols[TP_##x] = symbol;
 
 #include "tokens_preprocessor.inc"
 
