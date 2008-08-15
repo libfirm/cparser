@@ -2550,10 +2550,21 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		symbol = token.v.symbol;
 		next_token();
 
-		if (is_struct) {
-			declaration = get_declaration(symbol, NAMESPACE_STRUCT);
-		} else {
-			declaration = get_declaration(symbol, NAMESPACE_UNION);
+		namespace_t const namespc =
+			is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION;
+		declaration = get_declaration(symbol, namespc);
+		if (declaration != NULL) {
+			if (declaration->parent_scope != scope &&
+			    (token.type == '{' || token.type == ';')) {
+				declaration = NULL;
+			} else if (declaration->init.complete &&
+			           token.type == '{') {
+				assert(symbol != NULL);
+				errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
+				       is_struct ? "struct" : "union", symbol,
+				       &declaration->source_position);
+				declaration->scope.declarations = NULL;
+			}
 		}
 	} else if (token.type != '{') {
 		if (is_struct) {
@@ -2581,13 +2592,6 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (token.type == '{') {
-		if (declaration->init.complete) {
-			assert(symbol != NULL);
-			errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
-			       is_struct ? "struct" : "union", symbol,
-			       &declaration->source_position);
-			declaration->scope.declarations = NULL;
-		}
 		declaration->init.complete = true;
 
 		parse_compound_type_entries(declaration);
