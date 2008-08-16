@@ -47,7 +47,7 @@
  *  %Y  const symbol_t *
  *  %E  const expression_t *
  *  %Q  unsigned  (qualifier)
- *  %T  type_t
+ *  %T  const type_t*
  *  %K  const token_t*
  *  %k  token_kind_t
  *  %P  const source_position_t *
