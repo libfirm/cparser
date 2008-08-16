@@ -4663,7 +4663,6 @@ static void parse_external_declaration(void)
 	if (declaration->init.statement != NULL) {
 		parser_error_multiple_definition(declaration, HERE);
 		eat_block();
-		goto end_of_parse_external_declaration;
 	} else {
 		/* parse function body */
 		int            label_stack_top      = label_top();
@@ -4680,7 +4679,6 @@ static void parse_external_declaration(void)
 		label_pop_to(label_stack_top);
 	}
 
-end_of_parse_external_declaration:
 	assert(scope == &declaration->scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
@@ -7653,7 +7651,7 @@ static statement_t *parse_label_statement(void)
 		}
 	}
 
-	/* remember the labels's in a list for later checking */
+	/* remember the labels in a list for later checking */
 	if (label_last == NULL) {
 		label_first = &statement->label;
 	} else {
