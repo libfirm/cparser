@@ -33,7 +33,7 @@
 
 extern struct obstack *type_obst;
 
-typedef enum {
+typedef enum type_kind_t {
 	TYPE_INVALID,
 	TYPE_ERROR,
 	TYPE_ATOMIC,
@@ -51,7 +51,7 @@ typedef enum {
 	TYPE_TYPEOF,
 } type_kind_t;
 
-typedef enum {
+typedef enum type_modifier_t {
 	TYPE_MODIFIER_NONE              = 0,
 	TYPE_MODIFIER_TRANSPARENT_UNION = 1 << 0,
 } type_modifier_t;
@@ -117,8 +117,8 @@ struct function_parameter_t {
 };
 
 /** Calling conventions. */
-typedef enum {
-	CC_DEFAULT,      /**< defualt calling convention. */
+typedef enum cc_kind_t {
+	CC_DEFAULT,      /**< default calling convention. */
 	CC_CDECL,        /**< cdecl calling convention. */
 	CC_STDCALL,      /**< stdcall calling convention. */
 	CC_FASTCALL,     /**< fastcall calling convention. */

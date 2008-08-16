@@ -27,7 +27,7 @@
 
 /* note that the constant values represent the rank of the types as defined
  * in § 6.3.1 */
-typedef enum {
+typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
 	ATOMIC_TYPE_CHAR,
@@ -49,7 +49,7 @@ typedef enum {
 	ATOMIC_TYPE_LAST = ATOMIC_TYPE_BOOL
 } atomic_type_kind_t;
 
-typedef enum {
+typedef enum atomic_type_flag_t {
 	ATOMIC_TYPE_FLAG_NONE       = 0,
 	ATOMIC_TYPE_FLAG_SIGNED     = 1 << 0,
 	ATOMIC_TYPE_FLAG_INTEGER    = 1 << 1,
@@ -58,7 +58,7 @@ typedef enum {
 	ATOMIC_TYPE_FLAG_COMPLEX    = 1 << 4,
 } atomic_type_flag_t;
 
-typedef enum {
+typedef enum type_qualifier_t {
 	TYPE_QUALIFIER_NONE     = 0,
 	TYPE_QUALIFIER_CONST    = 1 << 0,
 	TYPE_QUALIFIER_RESTRICT = 1 << 1,

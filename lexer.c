@@ -1227,7 +1227,7 @@ static void parse_line_directive(void)
 /**
  * STDC pragmas.
  */
-typedef enum {
+typedef enum stdc_pragma_kind_t {
 	STDC_UNKNOWN,
 	STDC_FP_CONTRACT,
 	STDC_FENV_ACCESS,
@@ -1237,7 +1237,7 @@ typedef enum {
 /**
  * STDC pragma values.
  */
-typedef enum {
+typedef enum stdc_pragma_value_kind_t {
 	STDC_VALUE_UNKNOWN,
 	STDC_VALUE_ON,
 	STDC_VALUE_OFF,

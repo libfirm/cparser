@@ -2765,7 +2765,7 @@ end_error:
 	return NULL;
 }
 
-typedef enum {
+typedef enum specifiers_t {
 	SPECIFIER_SIGNED    = 1 << 0,
 	SPECIFIER_UNSIGNED  = 1 << 1,
 	SPECIFIER_LONG      = 1 << 2,
@@ -3512,7 +3512,7 @@ end_error:
 	return NULL;
 }
 
-typedef enum {
+typedef enum construct_type_kind_t {
 	CONSTRUCT_INVALID,
 	CONSTRUCT_POINTER,
 	CONSTRUCT_FUNCTION,

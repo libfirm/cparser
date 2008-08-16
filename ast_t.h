@@ -35,7 +35,7 @@ extern struct obstack ast_obstack;
 /**
  * Expression kinds.
  */
-typedef enum {
+typedef enum expression_kind_t {
 	EXPR_UNKNOWN = 0,
 	EXPR_INVALID,
 	EXPR_REFERENCE,
@@ -120,7 +120,7 @@ typedef enum {
 	EXPR_BINARY_LAST = EXPR_BINARY_ISUNORDERED,
 } expression_kind_t;
 
-typedef enum {
+typedef enum funcname_kind_t {
 	FUNCNAME_FUNCTION,           /**< C99 __func__, older __FUNCTION__ */
 	FUNCNAME_PRETTY_FUNCTION,    /**< GNUC __PRETTY_FUNCTION__ */
 	FUNCNAME_FUNCSIG,            /**< MS __FUNCSIG__ */
@@ -365,7 +365,7 @@ union expression_t {
 	classify_type_expression_t       classify_type;
 };
 
-typedef enum {
+typedef enum storage_class_tag_t {
 	STORAGE_CLASS_NONE,
 	STORAGE_CLASS_EXTERN,
 	STORAGE_CLASS_STATIC,
@@ -378,7 +378,7 @@ typedef enum {
 	STORAGE_CLASS_THREAD_STATIC,
 } storage_class_tag_t;
 
-typedef enum {
+typedef enum namespace_t {
 	NAMESPACE_NORMAL,
 	NAMESPACE_STRUCT,
 	NAMESPACE_UNION,
@@ -386,7 +386,7 @@ typedef enum {
 	NAMESPACE_LABEL,
 } namespace_t;
 
-typedef enum {
+typedef enum initializer_kind_t {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
@@ -509,7 +509,7 @@ typedef enum gnu_attribute_kind_t {
 /**
  * Extended microsoft modifier.
  */
-typedef enum {
+typedef enum decl_modifier_t {
 	DM_DLLIMPORT         = 1 <<  0,
 	DM_DLLEXPORT         = 1 <<  1,
 	DM_THREAD            = 1 <<  2,
@@ -579,7 +579,7 @@ struct declaration_t {
 	} v;
 };
 
-typedef enum {
+typedef enum statement_kind_t {
 	STATEMENT_INVALID,
 	STATEMENT_EMPTY,
 	STATEMENT_COMPOUND,

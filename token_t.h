@@ -26,7 +26,7 @@
 #include "symbol_table.h"
 #include "type.h"
 
-typedef enum {
+typedef enum token_type_t {
 	T_NULL  =  0,
 	T_EOF   = -1,
 	T_ERROR = -2,
@@ -38,7 +38,7 @@ typedef enum {
 	T_LAST_TOKEN
 } token_type_t;
 
-typedef enum {
+typedef enum preprocessor_token_type_t {
 	TP_NULL  = T_NULL,
 	TP_EOF   = T_EOF,
 	TP_ERROR = T_ERROR,
