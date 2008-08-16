@@ -380,6 +380,34 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
+	unsigned cc;
+	switch (function_type->calling_convention) {
+	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typical cdelc */
+	case CC_CDECL:
+is_cdecl:
+		cc = get_method_calling_convention(irtype);
+		set_method_calling_convention(irtype, SET_CDECL(cc));
+		break;
+	case CC_STDCALL:
+		if (function_type->variadic || function_type->unspecified_parameters)
+			goto is_cdecl;
+
+  		/* only non-variadic function can use stdcall, else use cdecl */
+		cc = get_method_calling_convention(irtype);
+		set_method_calling_convention(irtype, SET_STDCALL(cc));
+		break;
+	case CC_FASTCALL:
+		if (function_type->variadic || function_type->unspecified_parameters)
+			goto is_cdecl;
+		/* only non-variadic function can use fastcall, else use cdecl */
+		cc = get_method_calling_convention(irtype);
+		set_method_calling_convention(irtype, SET_FASTCALL(cc));
+		break;
+	case CC_THISCALL:
+		/* Hmm, leave default, not accepted by the parser yet. */
+		warningf(&function_type->base.source_position, "THISCALL calling convention not supported yet");
+		break;
+	}
 	return irtype;
 }
 
@@ -1017,14 +1045,6 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	ir_type  *global_type    = get_glob_type();
 	ir_type  *ir_type_method = get_ir_type(declaration->type);
 	assert(is_Method_type(ir_type_method));
-
-	if (declaration->modifiers & DM_CDECL) {
-		set_method_calling_convention(ir_type_method, cc_fixed | cc_cdecl_set);
-	} else if (declaration->modifiers & DM_FASTCALL) {
-		set_method_calling_convention(ir_type_method, cc_fixed | cc_fastcall_set);
-	} else if (declaration->modifiers & DM_STDCALL) {
-		set_method_calling_convention(ir_type_method, cc_fixed | cc_stdcall_set);
-	}
 
 	/* already an entity defined? */
 	ir_entity *entity = entitymap_get(&entitymap, symbol);

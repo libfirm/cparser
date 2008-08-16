@@ -391,6 +391,9 @@ static size_t get_type_struct_size(type_kind_t kind)
 /**
  * Allocate a type node of given kind and initialize all
  * fields with zero.
+ *
+ * @param kind             type kind to allocate
+ * @param source_position  the source position of the type definition
  */
 static type_t *allocate_type_zero(type_kind_t kind, const source_position_t *source_position)
 {
@@ -3607,6 +3610,40 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	type_t *type;
 	if (declaration != NULL) {
 		type = allocate_type_zero(TYPE_FUNCTION, &declaration->source_position);
+
+		unsigned mask = declaration->modifiers & (DM_CDECL|DM_STDCALL|DM_FASTCALL|DM_THISCALL);
+
+		if (mask & (mask-1)) {
+			const char *first = NULL, *second = NULL;
+
+			/* more than one calling convention set */
+			if (declaration->modifiers & DM_CDECL) {
+				if (first == NULL)       first = "cdecl";
+				else if (second == NULL) second = "cdecl";
+			}
+			if (declaration->modifiers & DM_STDCALL) {
+				if (first == NULL)       first = "stdcall";
+				else if (second == NULL) second = "stdcall";
+			}
+			if (declaration->modifiers & DM_FASTCALL) {
+				if (first == NULL)       first = "faslcall";
+				else if (second == NULL) second = "fastcall";
+			}
+			if (declaration->modifiers & DM_THISCALL) {
+				if (first == NULL)       first = "thiscall";
+				else if (second == NULL) second = "thiscall";
+			}
+			errorf(&declaration->source_position, "%s and %s attributes are not compatible", first, second);
+		}
+
+		if (declaration->modifiers & DM_CDECL)
+			type->function.calling_convention = CC_CDECL;
+		else if (declaration->modifiers & DM_STDCALL)
+			type->function.calling_convention = CC_STDCALL;
+		else if (declaration->modifiers & DM_FASTCALL)
+			type->function.calling_convention = CC_FASTCALL;
+		else if (declaration->modifiers & DM_THISCALL)
+			type->function.calling_convention = CC_THISCALL;
 	} else {
 		type = allocate_type_zero(TYPE_FUNCTION, HERE);
 	}
@@ -3622,7 +3659,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	construct_function_type->construct_type.kind = CONSTRUCT_FUNCTION;
 	construct_function_type->function_type       = type;
 
-	return (construct_type_t*) construct_function_type;
+	return &construct_function_type->construct_type;
 }
 
 static void fix_declaration_type(declaration_t *declaration)

@@ -279,6 +279,23 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 
 	intern_print_type_pre(type->return_type, false);
 
+	switch (type->calling_convention) {
+	case CC_CDECL:
+		fputs(" __cdecl ", out);
+		break;
+	case CC_STDCALL:
+		fputs(" __stdcall ", out);
+		break;
+	case CC_FASTCALL:
+		fputs(" __fastcall ", out);
+		break;
+	case CC_THISCALL:
+		fputs(" __thiscall ", out);
+		break;
+	case CC_DEFAULT:
+		break;
+	}
+
 	/* don't emit braces if we're the toplevel type... */
 	if (!top)
 		fputc('(', out);
@@ -920,6 +937,9 @@ static bool function_types_compatible(const function_type_t *func1,
 		return true;
 
 	if (func1->variadic != func2->variadic)
+		return false;
+
+	if (func1->calling_convention != func2->calling_convention)
 		return false;
 
 	/* TODO: handling of unspecified parameters not correct yet */
