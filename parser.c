@@ -3387,6 +3387,8 @@ static declaration_t *parse_identifier_list(void)
 	return declarations;
 }
 
+static type_t *automatic_type_conversion(type_t *orig_type);
+
 static void semantic_parameter(declaration_t *declaration)
 {
 	/* TODO: improve error messages */
@@ -3399,19 +3401,15 @@ static void semantic_parameter(declaration_t *declaration)
 	}
 
 	type_t *const orig_type = declaration->type;
-	type_t *      type      = skip_typeref(orig_type);
+	/* §6.7.5.3(7): Array as last part of a parameter type is just syntactic
+	 * sugar.  Turn it into a pointer.
+	 * §6.7.5.3(8): A declaration of a parameter as ``function returning type''
+	 * shall be adjusted to ``pointer to function returning type'', as in 6.3.2.1.
+	 */
+	type_t *const type = automatic_type_conversion(orig_type);
+	declaration->type = type;
 
-	/* Array as last part of a parameter type is just syntactic sugar.  Turn it
-	 * into a pointer. § 6.7.5.3 (7) */
-	if (is_type_array(type)) {
-		type_t *const element_type = type->array.element_type;
-
-		type = make_pointer_type(element_type, type->base.qualifiers);
-
-		declaration->type = type;
-	}
-
-	if (is_type_incomplete(type)) {
+	if (is_type_incomplete(skip_typeref(type))) {
 		errorf(HERE, "incomplete type '%T' not allowed for parameter '%Y'",
 		       orig_type, declaration->symbol);
 	}
