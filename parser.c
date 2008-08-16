@@ -4126,32 +4126,33 @@ static declaration_t *internal_record_declaration(
 			if (old_storage_class == STORAGE_CLASS_EXTERN &&
 					new_storage_class == STORAGE_CLASS_EXTERN) {
 warn_redundant_declaration:
-				if (warning.redundant_decls && strcmp(previous_declaration->source_position.input_name, "<builtin>") != 0) {
+				if (!is_function_definition &&
+				    warning.redundant_decls &&
+				    strcmp(previous_declaration->source_position.input_name, "<builtin>") != 0) {
 					warningf(&declaration->source_position,
-							 "redundant declaration for '%Y' (declared %P)",
-							 symbol, &previous_declaration->source_position);
+					         "redundant declaration for '%Y' (declared %P)",
+					         symbol, &previous_declaration->source_position);
 				}
 			} else if (current_function == NULL) {
 				if (old_storage_class != STORAGE_CLASS_STATIC &&
-						new_storage_class == STORAGE_CLASS_STATIC) {
+				    new_storage_class == STORAGE_CLASS_STATIC) {
 					errorf(&declaration->source_position,
-						   "static declaration of '%Y' follows non-static declaration (declared %P)",
-						   symbol, &previous_declaration->source_position);
-				} else if (old_storage_class != STORAGE_CLASS_EXTERN
-						&& !is_function_definition) {
-					goto warn_redundant_declaration;
+					       "static declaration of '%Y' follows non-static declaration (declared %P)",
+					       symbol, &previous_declaration->source_position);
 				} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
 					previous_declaration->storage_class          = STORAGE_CLASS_NONE;
 					previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
+				} else {
+					goto warn_redundant_declaration;
 				}
 			} else if (old_storage_class == new_storage_class) {
 				errorf(&declaration->source_position,
-					   "redeclaration of '%Y' (declared %P)",
-					   symbol, &previous_declaration->source_position);
+				       "redeclaration of '%Y' (declared %P)",
+				       symbol, &previous_declaration->source_position);
 			} else {
 				errorf(&declaration->source_position,
-					   "redeclaration of '%Y' with different linkage (declared %P)",
-					   symbol, &previous_declaration->source_position);
+				       "redeclaration of '%Y' with different linkage (declared %P)",
+				       symbol, &previous_declaration->source_position);
 			}
 		}
 
