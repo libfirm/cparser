@@ -94,10 +94,11 @@ static unsigned hash_function_type(const function_type_t *type)
 	unsigned result = hash_ptr(type->return_type);
 
 	function_parameter_t *parameter = type->parameters;
-	while(parameter != NULL) {
+	while (parameter != NULL) {
 		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
 	}
+	result += type->calling_convention;
 
 	return result;
 }
@@ -207,10 +208,12 @@ static bool function_types_equal(const function_type_t *type1,
 		return false;
 	if (type1->kr_style_parameters != type2->kr_style_parameters)
 		return false;
+	if (type1->calling_convention != type2->calling_convention)
+		return false;
 
 	function_parameter_t *param1 = type1->parameters;
 	function_parameter_t *param2 = type2->parameters;
-	while(param1 != NULL && param2 != NULL) {
+	while (param1 != NULL && param2 != NULL) {
 		if (param1->type != param2->type)
 			return false;
 		param1 = param1->next;
