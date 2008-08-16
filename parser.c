@@ -8373,7 +8373,9 @@ static void check_unused_globals(void)
 		return;
 
 	for (const declaration_t *decl = global_scope->declarations; decl != NULL; decl = decl->next) {
-		if (decl->used || decl->storage_class != STORAGE_CLASS_STATIC)
+		if (decl->used                ||
+		    decl->modifiers & DM_USED ||
+		    decl->storage_class != STORAGE_CLASS_STATIC)
 			continue;
 
 		type_t *const type = decl->type;
