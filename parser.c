@@ -6602,29 +6602,50 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 		return type_float;
 	}
 
-	type_right = promote_integer(type_right);
 	type_left  = promote_integer(type_left);
+	type_right = promote_integer(type_right);
 
 	if (type_left == type_right)
 		return type_left;
 
-	bool signed_left  = is_type_signed(type_left);
-	bool signed_right = is_type_signed(type_right);
-	int  rank_left    = get_rank(type_left);
-	int  rank_right   = get_rank(type_right);
-	if (rank_left < rank_right) {
-		if (signed_left == signed_right || !signed_right) {
-			return type_right;
-		} else {
-			return type_left;
-		}
+	bool const signed_left  = is_type_signed(type_left);
+	bool const signed_right = is_type_signed(type_right);
+	int  const rank_left    = get_rank(type_left);
+	int  const rank_right   = get_rank(type_right);
+
+	if (signed_left == signed_right)
+		return rank_left >= rank_right ? type_left : type_right;
+
+	int     s_rank;
+	int     u_rank;
+	type_t *s_type;
+	type_t *u_type;
+	if (signed_left) {
+		s_rank = rank_left;
+		s_type = type_left;
+		u_rank = rank_right;
+		u_type = type_right;
 	} else {
-		if (signed_left == signed_right || !signed_left) {
-			return type_left;
-		} else {
-			return type_right;
-		}
+		s_rank = rank_right;
+		s_type = type_right;
+		u_rank = rank_left;
+		u_type = type_left;
 	}
+
+	if (u_rank >= s_rank)
+		return u_type;
+
+	if (get_atomic_type_size(s_rank) > get_atomic_type_size(u_rank))
+		return s_type;
+
+	type_t *const type = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
+	type->atomic.akind = find_unsigned_int_atomic_type_kind_for_size(s_rank);
+
+	type_t* const result = typehash_insert(type);
+	if (result != type)
+		free_type(type);
+
+	return result;
 }
 
 /**
