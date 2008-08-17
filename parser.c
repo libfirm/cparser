@@ -48,16 +48,24 @@ typedef struct {
 	unsigned short namespc;
 } stack_entry_t;
 
+typedef struct argument_list_t argument_list_t;
+struct argument_list_t {
+	long              argument;
+	argument_list_t  *next;
+};
+
 typedef struct gnu_attribute_t gnu_attribute_t;
 struct gnu_attribute_t {
-	gnu_attribute_kind_t kind;
+	gnu_attribute_kind_t kind;           /**< The kind of the GNU attribute. */
 	gnu_attribute_t     *next;
-	bool                 invalid;
-	bool                 have_arguments;
+	bool                 invalid;        /**< Set if this attribute had argument errors, */
+	bool                 have_arguments; /**< True, if this attribute has arguments. */
 	union {
 		size_t              value;
 		string_t            string;
 		atomic_type_kind_t  akind;
+		long                argument;  /**< Single argument. */
+		argument_list_t    *arguments; /**< List of argument expressions. */
 	} u;
 };
 
@@ -727,6 +735,11 @@ static void environment_push(declaration_t *declaration)
 	stack_push(&environment_stack, declaration);
 }
 
+/**
+ * Push a declaration of the label stack.
+ *
+ * @param declaration  the declaration
+ */
 static void label_push(declaration_t *declaration)
 {
 	declaration->parent_scope = &current_function->scope;
@@ -788,6 +801,12 @@ static void environment_pop_to(size_t new_top)
 	stack_pop_to(&environment_stack, new_top);
 }
 
+/**
+ * Pop all entries on the label stack until the new_top
+ * is reached.
+ *
+ * @param new_top  the new stack top
+ */
 static void label_pop_to(size_t new_top)
 {
 	stack_pop_to(&label_stack, new_top);
@@ -1162,7 +1181,7 @@ static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute) {
 	expression = parse_constant_expression();
 	rem_anchor_token(')');
 	expect(')');
-	(void)expression;
+	attribute->u.argument = fold_constant(expression);
 	return;
 end_error:
 	attribute->invalid = true;
@@ -1172,11 +1191,18 @@ end_error:
  * parse a list of constant expressions arguments.
  */
 static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute) {
-	expression_t *expression;
+	argument_list_t **list = &attribute->u.arguments;
+	argument_list_t  *entry;
+	expression_t     *expression;
 	add_anchor_token(')');
 	add_anchor_token(',');
-	while(true){
+	while (true) {
 		expression = parse_constant_expression();
+		entry = obstack_alloc(&temp_obst, sizeof(entry));
+		entry->argument = fold_constant(expression);
+		entry->next     = NULL;
+		*list = entry;
+		list = &entry->next;
 		if (token.type != ',')
 			break;
 		next_token();
@@ -1184,7 +1210,6 @@ static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute) {
 	rem_anchor_token(',');
 	rem_anchor_token(')');
 	expect(')');
-	(void)expression;
 	return;
 end_error:
 	attribute->invalid = true;
@@ -7581,6 +7606,8 @@ end_error:
 
 /**
  * Return the declaration for a given label symbol or create a new one.
+ *
+ * @param symbol  the symbol of the label
  */
 static declaration_t *get_label(symbol_t *symbol)
 {
