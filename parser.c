@@ -4042,11 +4042,11 @@ static void check_type_of_main(const declaration_t *const decl, const function_t
 					         "third argument of 'main' should be 'char**', but is '%T'", third_type);
 				}
 				parm = parm->next;
-				if (parm != NULL) {
-					warningf(&decl->source_position, "'main' takes only zero, two or three arguments");
-				}
+				if (parm != NULL)
+					goto warn_arg_count;
 			}
 		} else {
+warn_arg_count:
 			warningf(&decl->source_position, "'main' takes only zero, two or three arguments");
 		}
 	}
