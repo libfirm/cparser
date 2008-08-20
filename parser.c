@@ -4062,7 +4062,7 @@ static bool is_sym_main(const symbol_t *const sym)
 
 static declaration_t *internal_record_declaration(
 	declaration_t *const declaration,
-	const bool is_function_definition)
+	const bool is_definition)
 {
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
@@ -4081,7 +4081,7 @@ static declaration_t *internal_record_declaration(
 		         orig_type, declaration->symbol);
 	}
 
-	if (is_function_definition && warning.main && is_sym_main(symbol)) {
+	if (warning.main && is_type_function(type) && is_sym_main(symbol)) {
 		check_type_of_main(declaration, &type->function);
 	}
 
@@ -4130,10 +4130,10 @@ static declaration_t *internal_record_declaration(
 					/* FALLTHROUGH */
 
 				case STORAGE_CLASS_EXTERN:
-					if (is_function_definition) {
+					if (is_definition) {
 						if (warning.missing_prototypes &&
-							prev_type->function.unspecified_parameters &&
-							!is_sym_main(symbol)) {
+						    prev_type->function.unspecified_parameters &&
+						    !is_sym_main(symbol)) {
 							warningf(&declaration->source_position,
 									 "no previous prototype for '%#T'",
 									 orig_type, symbol);
@@ -4151,7 +4151,7 @@ static declaration_t *internal_record_declaration(
 			if (old_storage_class == STORAGE_CLASS_EXTERN &&
 					new_storage_class == STORAGE_CLASS_EXTERN) {
 warn_redundant_declaration:
-				if (!is_function_definition &&
+				if (!is_definition          &&
 				    warning.redundant_decls &&
 				    strcmp(previous_declaration->source_position.input_name, "<builtin>") != 0) {
 					warningf(&declaration->source_position,
@@ -4184,8 +4184,9 @@ warn_redundant_declaration:
 		if (declaration->is_inline)
 			previous_declaration->is_inline = true;
 		return previous_declaration;
-	} else if (is_function_definition) {
-		if (declaration->storage_class != STORAGE_CLASS_STATIC) {
+	} else if (is_type_function(type)) {
+		if (is_definition &&
+		    declaration->storage_class != STORAGE_CLASS_STATIC) {
 			if (warning.missing_prototypes && !is_sym_main(symbol)) {
 				warningf(&declaration->source_position,
 				         "no previous prototype for '%#T'", orig_type, symbol);
@@ -4195,14 +4196,15 @@ warn_redundant_declaration:
 				         symbol);
 			}
 		}
-	} else if (warning.missing_declarations &&
-	    scope == global_scope &&
-	    !is_type_function(type) && (
-	      declaration->storage_class == STORAGE_CLASS_NONE ||
-	      declaration->storage_class == STORAGE_CLASS_THREAD
-	    )) {
-		warningf(&declaration->source_position,
-		         "no previous declaration for '%#T'", orig_type, symbol);
+	} else {
+		if (warning.missing_declarations &&
+		    scope == global_scope && (
+		      declaration->storage_class == STORAGE_CLASS_NONE ||
+		      declaration->storage_class == STORAGE_CLASS_THREAD
+		    )) {
+			warningf(&declaration->source_position,
+			         "no previous declaration for '%#T'", orig_type, symbol);
+		}
 	}
 
 	assert(declaration->parent_scope == NULL);
@@ -4219,7 +4221,7 @@ static declaration_t *record_declaration(declaration_t *declaration)
 	return internal_record_declaration(declaration, false);
 }
 
-static declaration_t *record_function_definition(declaration_t *declaration)
+static declaration_t *record_definition(declaration_t *declaration)
 {
 	return internal_record_declaration(declaration, true);
 }
@@ -4618,9 +4620,15 @@ static void parse_external_declaration(void)
 	rem_anchor_token(';');
 
 	/* must be a declaration */
-	if (token.type == ',' || token.type == '=' || token.type == ';') {
-		parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
-		return;
+	switch (token.type) {
+		case ',':
+		case ';':
+			parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
+			return;
+
+		case '=':
+			parse_declaration_rest(ndeclaration, &specifiers, record_definition);
+			return;
 	}
 
 	/* must be a function definition */
@@ -4660,7 +4668,7 @@ static void parse_external_declaration(void)
 		ndeclaration->type = type;
 	}
 
-	declaration_t *const declaration = record_function_definition(ndeclaration);
+	declaration_t *const declaration = record_definition(ndeclaration);
 	if (ndeclaration != declaration) {
 		declaration->scope = ndeclaration->scope;
 	}
