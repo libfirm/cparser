@@ -7445,7 +7445,9 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 
 		argument->constraints = parse_string_literals();
 		expect('(');
+		add_anchor_token(')');
 		expression_t *expression = parse_expression();
+		rem_anchor_token(')');
 		if (is_out) {
 			/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
 			 * change size or type representation (e.g. int -> long is ok, but
