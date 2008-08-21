@@ -511,15 +511,18 @@ static void do_firm_optimizations(const char *input_filename)
 
   do_irp_opt("rts");
 
-  for (i = 0; i < get_irp_n_irgs(); i++) {
-  	ir_graph *irg = get_irp_irg(i);
-    do_irg_opt(irg, "combo");
-    do_irg_opt(irg, "local");
-
-    /* Confirm construction currently can only handle blocks with only one control
-       flow predecessor. Calling optimize_cf here removes Bad predecessors and help
-       the optimization of switch constructs. */
-    do_irg_opt(irg, "controlflow");
+  /* first step: kill dead code */
+  if (firm_opt.combo) {
+    for (i = 0; i < get_irp_n_irgs(); i++) {
+      ir_graph *irg = get_irp_irg(i);
+      do_irg_opt(irg, "combo");
+    }
+  } else {
+    for (i = 0; i < get_irp_n_irgs(); i++) {
+      ir_graph *irg = get_irp_irg(i);
+      do_irg_opt(irg, "local");
+      do_irg_opt(irg, "controlflow");
+    }
   }
 
   do_irp_opt("gc_irgs");
@@ -531,16 +534,16 @@ static void do_firm_optimizations(const char *input_filename)
     ir_graph *irg = get_irp_irg(i);
 
 #ifdef FIRM_EXT_GRS
-	/* If SIMD optimization is on, make sure we have only 1 return */
-	if (firm_ext_grs.create_pattern || firm_ext_grs.simd_opt)
-	  do_irg_opt("onereturn");
+    /* If SIMD optimization is on, make sure we have only 1 return */
+    if (firm_ext_grs.create_pattern || firm_ext_grs.simd_opt)
+      do_irg_opt("onereturn");
 #endif
 
-	do_irg_opt(irg, "scalar");
-	do_irg_opt(irg, "local");
-	do_irg_opt(irg, "reassoc");
-	do_irg_opt(irg, "local");
-	do_irg_opt(irg, "gcse");
+    do_irg_opt(irg, "scalar");
+    do_irg_opt(irg, "local");
+    do_irg_opt(irg, "reassoc");
+    do_irg_opt(irg, "local");
+    do_irg_opt(irg, "gcse");
 
     if (firm_opt.confirm) {
       /* Confirm construction currently can only handle blocks with only one control
@@ -561,7 +564,7 @@ static void do_firm_optimizations(const char *input_filename)
     do_irg_opt(irg, "remove_confirms");
     do_irg_opt(irg, "gvnpre");
     do_irg_opt(irg, "place");
-	do_irg_opt(irg, "controlflow");
+    do_irg_opt(irg, "controlflow");
 
     if (firm_opt.if_conversion) {
       do_irg_opt(irg, "ifconv");
