@@ -4108,6 +4108,16 @@ static declaration_t *internal_record_declaration(
 				return previous_declaration;
 			}
 
+			if (warning.redundant_decls                                     &&
+			    is_definition                                               &&
+			    previous_declaration->storage_class == STORAGE_CLASS_STATIC &&
+			    !(previous_declaration->modifiers & DM_USED)                &&
+			    !previous_declaration->used) {
+				warningf(&previous_declaration->source_position,
+				         "unnecessary static forward declaration for '%#T'",
+				         previous_declaration->type, symbol);
+			}
+
 			unsigned new_storage_class = declaration->storage_class;
 
 			if (is_type_incomplete(prev_type)) {
