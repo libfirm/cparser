@@ -384,13 +384,10 @@ static ir_type *create_method_type(const function_type_t *function_type)
 
 	unsigned cc = get_method_calling_convention(irtype);
 	switch (function_type->calling_convention) {
-	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typical cdecl */
+	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
+	case CC_CDECL:
 is_cdecl:
 		set_method_calling_convention(irtype, SET_CDECL(cc));
-		break;
-
-	case CC_CDECL:
-		set_method_calling_convention(irtype, cc_fixed | SET_CDECL(cc));
 		break;
 
 	case CC_STDCALL:
@@ -398,14 +395,14 @@ is_cdecl:
 			goto is_cdecl;
 
 		/* only non-variadic function can use stdcall, else use cdecl */
-		set_method_calling_convention(irtype, cc_fixed | SET_STDCALL(cc));
+		set_method_calling_convention(irtype, SET_STDCALL(cc));
 		break;
 
 	case CC_FASTCALL:
 		if (function_type->variadic || function_type->unspecified_parameters)
 			goto is_cdecl;
 		/* only non-variadic function can use fastcall, else use cdecl */
-		set_method_calling_convention(irtype, cc_fixed | SET_FASTCALL(cc));
+		set_method_calling_convention(irtype, SET_FASTCALL(cc));
 		break;
 
 	case CC_THISCALL:
