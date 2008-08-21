@@ -7596,6 +7596,13 @@ end_of_asm:
 	rem_anchor_token(')');
 	expect(')');
 	expect(';');
+
+	if (asm_statement->outputs == NULL) {
+		/* GCC: An 'asm' instruction without any output operands will be treated
+		 * identically to a volatile 'asm' instruction. */
+		asm_statement->is_volatile = true;
+	}
+
 	return statement;
 end_error:
 	return create_invalid_statement();
