@@ -7446,11 +7446,57 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		argument->constraints = parse_string_literals();
 		expect('(');
 		expression_t *expression = parse_expression();
-		argument->expression     = expression;
-		if (is_out && !is_lvalue(expression)) {
-			errorf(&expression->base.source_position,
-			       "asm output argument is not an lvalue");
+		if (is_out) {
+			/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
+			 * change size or type representation (e.g. int -> long is ok, but
+			 * int -> float is not) */
+			if (expression->kind == EXPR_UNARY_CAST) {
+				type_t      *const type = expression->base.type;
+				type_kind_t  const kind = type->kind;
+				if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
+					unsigned flags;
+					unsigned size;
+					if (kind == TYPE_ATOMIC) {
+						atomic_type_kind_t const akind = type->atomic.akind;
+						flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+						size  = get_atomic_type_size(akind);
+					} else {
+						flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+						size  = get_atomic_type_size(get_intptr_kind());
+					}
+
+					do {
+						expression_t *const value      = expression->unary.value;
+						type_t       *const value_type = value->base.type;
+						type_kind_t   const value_kind = value_type->kind;
+
+						unsigned value_flags;
+						unsigned value_size;
+						if (value_kind == TYPE_ATOMIC) {
+							atomic_type_kind_t const value_akind = value_type->atomic.akind;
+							value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+							value_size  = get_atomic_type_size(value_akind);
+						} else if (value_kind == TYPE_POINTER) {
+							value_flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+							value_size  = get_atomic_type_size(get_intptr_kind());
+						} else {
+							break;
+						}
+
+						if (value_flags != flags || value_size != size)
+							break;
+
+						expression = value;
+					} while (expression->kind == EXPR_UNARY_CAST);
+				}
+			}
+
+			if (!is_lvalue(expression)) {
+				errorf(&expression->base.source_position,
+				       "asm output argument is not an lvalue");
+			}
 		}
+		argument->expression = expression;
 		expect(')');
 
 		set_address_taken(expression, true);
