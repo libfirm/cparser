@@ -1339,14 +1339,13 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 static void print_normal_declaration(const declaration_t *declaration)
 {
 	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
-	if(declaration->is_inline) {
-		if(declaration->modifiers & DM_FORCEINLINE)
+	if (declaration->is_inline) {
+		if (declaration->modifiers & DM_FORCEINLINE) {
 			fputs("__forceinline ", out);
-		else {
-			if(declaration->modifiers & DM_MICROSOFT_INLINE)
-				fputs("__inline ", out);
-			else
-				fputs("inline ", out);
+		} else if (declaration->modifiers & DM_MICROSOFT_INLINE) {
+			fputs("__inline ", out);
+		} else {
+			fputs("inline ", out);
 		}
 	}
 	print_ms_modifiers(declaration);
