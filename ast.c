@@ -463,11 +463,6 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		fputs("--", out);
 		return;
 	case EXPR_UNARY_CAST_IMPLICIT:
-		if(!print_implicit_casts) {
-			print_expression_prec(unexpr->value, prec);
-			return;
-		}
-		/* fallthrough */
 	case EXPR_UNARY_CAST:
 		fputc('(', out);
 		print_type(unexpr->base.type);
@@ -505,12 +500,12 @@ static void print_array_expression(const array_access_expression_t *expression)
 	if(!expression->flipped) {
 		print_expression_prec(expression->array_ref, prec);
 		fputc('[', out);
-		print_expression_prec(expression->index, prec);
+		print_expression_prec(expression->index, PREC_BOTTOM);
 		fputc(']', out);
 	} else {
 		print_expression_prec(expression->index, prec);
 		fputc('[', out);
-		print_expression_prec(expression->array_ref, prec);
+		print_expression_prec(expression->array_ref, PREC_BOTTOM);
 		fputc(']', out);
 	}
 }
@@ -667,7 +662,7 @@ static void print_designator(const designator_t *designator)
 	for ( ; designator != NULL; designator = designator->next) {
 		if (designator->symbol == NULL) {
 			fputc('[', out);
-			print_expression_prec(designator->array_index, PREC_ACCESS);
+			print_expression_prec(designator->array_index, PREC_BOTTOM);
 			fputc(']', out);
 		} else {
 			fputc('.', out);
@@ -711,6 +706,9 @@ static void print_statement_expression(const statement_expression_t *expression)
  */
 static void print_expression_prec(const expression_t *expression, unsigned top_prec)
 {
+	if (expression->kind == EXPR_UNARY_CAST_IMPLICIT && !print_implicit_casts) {
+		expression = expression->unary.value;
+	}
 	unsigned prec = get_expression_precedence(expression->base.kind);
 	if (print_parenthesis && top_prec != PREC_BOTTOM)
 		top_prec = PREC_TOP;
