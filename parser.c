@@ -3147,6 +3147,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case T__forceinline:
 			/* only in microsoft mode */
 			specifiers->modifiers |= DM_FORCEINLINE;
+			/* FALLTHROUGH */
 
 		case T_inline:
 			next_token();
