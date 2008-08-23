@@ -8569,22 +8569,32 @@ end_error:;
  */
 static void parse_translation_unit(void)
 {
-	while (token.type != T_EOF) {
-		switch (token.type) {
-			case ';':
-				/* TODO error in strict mode */
-				warningf(HERE, "stray ';' outside of function");
-				next_token();
-				break;
+	for (;;) switch (token.type) {
+		DECLARATION_START
+		case T_IDENTIFIER:
+		case T___extension__:
+			parse_external_declaration();
+			break;
 
-			case T_asm:
-				parse_global_asm();
-				break;
+		case T_asm:
+			parse_global_asm();
+			break;
 
-			default:
-				parse_external_declaration();
-				break;
-		}
+		case T_EOF:
+			return;
+
+		case ';':
+			/* TODO error in strict mode */
+			warningf(HERE, "stray ';' outside of function");
+			next_token();
+			break;
+
+		default:
+			errorf(HERE, "stray %K outside of function", &token);
+			if (token.type == '(' || token.type == '{' || token.type == '[')
+				eat_until_matching_token(token.type);
+			next_token();
+			break;
 	}
 }
 
