@@ -2008,7 +2008,7 @@ static __attribute__((unused)) void debug_print_type_path(
 			}
 			fprintf(stderr, ".%s", entry->v.compound_entry->symbol->string);
 		} else if (is_type_array(type)) {
-			fprintf(stderr, "[%zd]", entry->v.index);
+			fprintf(stderr, "[%zu]", entry->v.index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}
