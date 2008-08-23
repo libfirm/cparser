@@ -4585,8 +4585,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	ir_node *ins[n_inputs + n_outputs + 1];
 	size_t   in_size = 0;
 
-	ir_asm_constraint *tmp_in_constraints
-		= xmalloc(n_outputs * sizeof(tmp_in_constraints[0]));
+	ir_asm_constraint tmp_in_constraints[n_outputs];
 
 	const expression_t *out_exprs[n_outputs];
 	ir_node            *out_addrs[n_outputs];
@@ -4682,7 +4681,6 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 	obstack_grow(&asm_obst, tmp_in_constraints,
 	             in_size * sizeof(tmp_in_constraints[0]));
-	free(tmp_in_constraints);
 	/* find and count input and output arguments */
 	argument = statement->inputs;
 	for( ; argument != NULL; argument = argument->next) {
