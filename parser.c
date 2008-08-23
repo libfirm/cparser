@@ -1580,7 +1580,6 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_NOCOMMON:
 				case GNU_AK_SHARED:
 				case GNU_AK_NOTSHARED:
-				case GNU_AK_UNUSED:
 				case GNU_AK_NO_INSTRUMENT_FUNCTION:
 				case GNU_AK_WARN_UNUSED_RESULT:
 				case GNU_AK_LONGCALL:
@@ -1609,6 +1608,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_CDECL:             modifiers |= DM_CDECL;             goto no_arg;
 				case GNU_AK_FASTCALL:          modifiers |= DM_FASTCALL;          goto no_arg;
 				case GNU_AK_STDCALL:           modifiers |= DM_STDCALL;           goto no_arg;
+				case GNU_AK_UNUSED:            modifiers |= DM_UNUSED;            goto no_arg;
 				case GNU_AK_USED:              modifiers |= DM_USED;              goto no_arg;
 				case GNU_AK_PURE:              modifiers |= DM_PURE;              goto no_arg;
 				case GNU_AK_ALWAYS_INLINE:     modifiers |= DM_FORCEINLINE;       goto no_arg;
@@ -8534,8 +8534,9 @@ static void check_unused_globals(void)
 		return;
 
 	for (const declaration_t *decl = global_scope->declarations; decl != NULL; decl = decl->next) {
-		if (decl->used                ||
-		    decl->modifiers & DM_USED ||
+		if (decl->used                  ||
+		    decl->modifiers & DM_UNUSED ||
+		    decl->modifiers & DM_USED   ||
 		    decl->storage_class != STORAGE_CLASS_STATIC)
 			continue;
 
