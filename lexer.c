@@ -1584,15 +1584,13 @@ void lexer_next_preprocessing_token(void)
 void lexer_next_token(void)
 {
 	lexer_next_preprocessing_token();
-	if(lexer_token.type != '\n')
-		return;
 
+	while (lexer_token.type == '\n') {
 newline_found:
-	do {
 		lexer_next_preprocessing_token();
-	} while(lexer_token.type == '\n');
+	}
 
-	if(lexer_token.type == '#') {
+	if (lexer_token.type == '#') {
 		parse_preprocessor_directive();
 		goto newline_found;
 	}

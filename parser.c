@@ -499,19 +499,22 @@ static inline const token_t *look_ahead(int num)
 /**
  * Adds a token to the token anchor set (a multi-set).
  */
-static void add_anchor_token(int token_type) {
+static void add_anchor_token(int token_type)
+{
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
 	++token_anchor_set[token_type];
 }
 
-static int save_and_reset_anchor_state(int token_type) {
+static int save_and_reset_anchor_state(int token_type)
+{
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
 	int count = token_anchor_set[token_type];
 	token_anchor_set[token_type] = 0;
 	return count;
 }
 
-static void restore_anchor_state(int token_type, int count) {
+static void restore_anchor_state(int token_type, int count)
+{
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
 	token_anchor_set[token_type] = count;
 }
@@ -519,12 +522,14 @@ static void restore_anchor_state(int token_type, int count) {
 /**
  * Remove a token from the token anchor set (a multi-set).
  */
-static void rem_anchor_token(int token_type) {
+static void rem_anchor_token(int token_type)
+{
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
 	--token_anchor_set[token_type];
 }
 
-static bool at_anchor(void) {
+static bool at_anchor(void)
+{
 	if (token.type < 0)
 		return false;
 	return token_anchor_set[token.type];
@@ -533,7 +538,8 @@ static bool at_anchor(void) {
 /**
  * Eat tokens until a matching token is found.
  */
-static void eat_until_matching_token(int type) {
+static void eat_until_matching_token(int type)
+{
 	unsigned parenthesis_count = 0;
 	unsigned brace_count = 0;
 	unsigned bracket_count = 0;
@@ -546,7 +552,7 @@ static void eat_until_matching_token(int type) {
 		default:  end_token = type; break;
 	}
 
-	while(token.type != end_token ||
+	while (token.type != end_token ||
 	      (parenthesis_count > 0 || brace_count > 0 || bracket_count > 0)) {
 
 		switch(token.type) {
@@ -576,10 +582,11 @@ static void eat_until_matching_token(int type) {
 /**
  * Eat input tokens until an anchor is found.
  */
-static void eat_until_anchor(void) {
+static void eat_until_anchor(void)
+{
 	if (token.type == T_EOF)
 		return;
-	while(token_anchor_set[token.type] == 0) {
+	while (token_anchor_set[token.type] == 0) {
 		if (token.type == '(' || token.type == '{' || token.type == '[')
 			eat_until_matching_token(token.type);
 		if (token.type == T_EOF)
@@ -588,7 +595,8 @@ static void eat_until_anchor(void) {
 	}
 }
 
-static void eat_block(void) {
+static void eat_block(void)
+{
 	eat_until_matching_token('{');
 	if (token.type == '}')
 		next_token();
@@ -597,13 +605,14 @@ static void eat_block(void) {
 /**
  * eat all token until a ';' is reached or a stop token is found.
  */
-static void eat_statement(void) {
+static void eat_statement(void)
+{
 	eat_until_matching_token(';');
 	if (token.type == ';')
 		next_token();
 }
 
-#define eat(token_type)  do { assert(token.type == token_type); next_token(); } while(0)
+#define eat(token_type)  do { assert(token.type == token_type); next_token(); } while (0)
 
 /**
  * Report a parse error because an expected token was not found.
@@ -659,7 +668,7 @@ static void type_error_incompatible(const char *msg,
         goto end_error;                               \
     }                                                 \
     next_token();                                     \
-	} while(0)
+	} while (0)
 
 static void set_scope(scope_t *new_scope)
 {
@@ -1076,7 +1085,7 @@ static string_t parse_string_literals(void)
 	return result;
 }
 
-static const char *gnu_attribute_names[GNU_AK_LAST] = {
+static const char *const gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_CONST]                  = "const",
 	[GNU_AK_VOLATILE]               = "volatile",
 	[GNU_AK_CDECL]                  = "cdecl",
@@ -1090,7 +1099,7 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_ALWAYS_INLINE]          = "always_inline",
 	[GNU_AK_MALLOC]                 = "malloc",
 	[GNU_AK_WEAK]                   = "weak",
- 	[GNU_AK_CONSTRUCTOR]            = "constructor",
+	[GNU_AK_CONSTRUCTOR]            = "constructor",
 	[GNU_AK_DESTRUCTOR]             = "destructor",
 	[GNU_AK_NOTHROW]                = "nothrow",
 	[GNU_AK_TRANSPARENT_UNION]      = "transparent_union",
@@ -1104,15 +1113,15 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
 	[GNU_AK_WARN_UNUSED_RESULT]     = "warn_unused_result",
 	[GNU_AK_LONGCALL]               = "longcall",
- 	[GNU_AK_SHORTCALL]              = "shortcall",
+	[GNU_AK_SHORTCALL]              = "shortcall",
 	[GNU_AK_LONG_CALL]              = "long_call",
- 	[GNU_AK_SHORT_CALL]             = "short_call",
+	[GNU_AK_SHORT_CALL]             = "short_call",
 	[GNU_AK_FUNCTION_VECTOR]        = "function_vector",
- 	[GNU_AK_INTERRUPT]				= "interrupt",
- 	[GNU_AK_INTERRUPT_HANDLER]      = "interrupt_handler",
- 	[GNU_AK_NMI_HANDLER]            = "nmi_handler",
- 	[GNU_AK_NESTING]                = "nesting",
- 	[GNU_AK_NEAR]                   = "near",
+	[GNU_AK_INTERRUPT]              = "interrupt",
+	[GNU_AK_INTERRUPT_HANDLER]      = "interrupt_handler",
+	[GNU_AK_NMI_HANDLER]            = "nmi_handler",
+	[GNU_AK_NESTING]                = "nesting",
+	[GNU_AK_NEAR]                   = "near",
 	[GNU_AK_FAR]                    = "far",
 	[GNU_AK_SIGNAL]                 = "signal",
 	[GNU_AK_EIGTHBIT_DATA]          = "eightbit_data",
@@ -1147,7 +1156,8 @@ static const char *gnu_attribute_names[GNU_AK_LAST] = {
 /**
  * compare two string, ignoring double underscores on the second.
  */
-static int strcmp_underscore(const char *s1, const char *s2) {
+static int strcmp_underscore(const char *s1, const char *s2)
+{
 	if (s2[0] == '_' && s2[1] == '_') {
 		size_t len2 = strlen(s2);
 		size_t len1 = strlen(s1);
@@ -1162,7 +1172,8 @@ static int strcmp_underscore(const char *s1, const char *s2) {
 /**
  * Allocate a new gnu temporal attribute.
  */
-static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind) {
+static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind)
+{
 	gnu_attribute_t *attribute = obstack_alloc(&temp_obst, sizeof(*attribute));
 	attribute->kind            = kind;
 	attribute->next            = NULL;
@@ -1175,7 +1186,8 @@ static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind) {
 /**
  * parse one constant expression argument.
  */
-static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute) {
+static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute)
+{
 	expression_t *expression;
 	add_anchor_token(')');
 	expression = parse_constant_expression();
@@ -1190,7 +1202,8 @@ end_error:
 /**
  * parse a list of constant expressions arguments.
  */
-static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute) {
+static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute)
+{
 	argument_list_t **list = &attribute->u.arguments;
 	argument_list_t  *entry;
 	expression_t     *expression;
@@ -1238,8 +1251,9 @@ end_error:
 /**
  * parse one tls model.
  */
-static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute) {
-	static const char *tls_models[] = {
+static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute)
+{
+	static const char *const tls_models[] = {
 		"global-dynamic",
 		"local-dynamic",
 		"initial-exec",
@@ -1262,8 +1276,9 @@ static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute) {
 /**
  * parse one tls model.
  */
-static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute) {
-	static const char *visibilities[] = {
+static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute)
+{
+	static const char *const visibilities[] = {
 		"default",
 		"protected",
 		"hidden",
@@ -1286,8 +1301,9 @@ static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute) {
 /**
  * parse one (code) model.
  */
-static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute) {
-	static const char *visibilities[] = {
+static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
+{
+	static const char *const visibilities[] = {
 		"small",
 		"medium",
 		"large"
@@ -1348,8 +1364,9 @@ end_error:
 /**
  * parse one interrupt argument.
  */
-static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute) {
-	static const char *interrupts[] = {
+static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute)
+{
+	static const char *const interrupts[] = {
 		"IRQ",
 		"FIQ",
 		"SWI",
@@ -1373,8 +1390,9 @@ static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute) {
 /**
  * parse ( identifier, const expression, const expression )
  */
-static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute) {
-	static const char *format_names[] = {
+static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute)
+{
+	static const char *const format_names[] = {
 		"printf",
 		"scanf",
 		"strftime",
@@ -1517,12 +1535,12 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 	if (token.type != ')') {
 		/* find the end of the list */
 		if (last != NULL) {
-			while(last->next != NULL)
+			while (last->next != NULL)
 				last = last->next;
 		}
 
 		/* non-empty attribute list */
-		while(true) {
+		while (true) {
 			const char *name;
 			if (token.type == T_const) {
 				name = "const";
@@ -1743,7 +1761,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 {
 	decl_modifiers_t modifiers = 0;
 
-	while(true) {
+	while (true) {
 		switch(token.type) {
 		case T___attribute__:
 			modifiers |= parse_gnu_attribute(attributes);
@@ -1785,7 +1803,7 @@ static designator_t *parse_designation(void)
 	designator_t *result = NULL;
 	designator_t *last   = NULL;
 
-	while(true) {
+	while (true) {
 		designator_t *designator;
 		switch(token.type) {
 		case '[':
@@ -1949,7 +1967,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	}
 
 	bool additional_warning_displayed = false;
-	while(braces > 0) {
+	while (braces > 0) {
 		if (token.type == ',') {
 			next_token();
 		}
@@ -2098,7 +2116,7 @@ static void ascend_to(type_path_t *path, size_t top_path_level)
 {
 	size_t len = ARR_LEN(path->path);
 
-	while(len > top_path_level) {
+	while (len > top_path_level) {
 		ascend_from_subtype(path);
 		len = ARR_LEN(path->path);
 	}
@@ -2241,8 +2259,9 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 /**
  * skip until token is found.
  */
-static void skip_until(int type) {
-	while(token.type != type) {
+static void skip_until(int type)
+{
+	while (token.type != type) {
 		if (token.type == T_EOF)
 			return;
 		next_token();
@@ -2257,7 +2276,7 @@ static void skip_initializers(void)
 	if (token.type == '{')
 		next_token();
 
-	while(token.type != '}') {
+	while (token.type != '}') {
 		if (token.type == T_EOF)
 			return;
 		if (token.type == '{') {
@@ -2305,7 +2324,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 	initializer_t **initializers = NEW_ARR_F(initializer_t*, 0);
 
-	while(true) {
+	while (true) {
 		designator_t *designator = NULL;
 		if (token.type == '.' || token.type == '[') {
 			designator = parse_designation();
@@ -2390,7 +2409,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			}
 
 			/* descend into subtypes until expression matches type */
-			while(true) {
+			while (true) {
 				orig_type = path->top_type;
 				type      = skip_typeref(orig_type);
 
@@ -2671,7 +2690,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		if (token.type != ',')
 			break;
 		next_token();
-	} while(token.type != '}');
+	} while (token.type != '}');
 	rem_anchor_token('}');
 
 	expect('}');
@@ -2755,11 +2774,11 @@ static type_t *parse_typeof(void)
 restart:
 	switch(token.type) {
 	case T___extension__:
-		/* this can be a prefix to a typename or an expression */
-		/* we simply eat it now. */
+		/* This can be a prefix to a typename or an expression.  We simply eat
+		 * it now. */
 		do {
 			next_token();
-		} while(token.type == T___extension__);
+		} while (token.type == T___extension__);
 		goto restart;
 
 	case T_IDENTIFIER:
@@ -2845,7 +2864,8 @@ static type_t *get_typedef_type(symbol_t *symbol)
 /**
  * check for the allowed MS alignment values.
  */
-static bool check_elignment_value(long long intvalue) {
+static bool check_alignment_value(long long intvalue)
+{
 	if (intvalue < 1 || intvalue > 8192) {
 		errorf(HERE, "illegal alignment value");
 		return false;
@@ -2862,13 +2882,13 @@ static bool check_elignment_value(long long intvalue) {
 #define DET_MOD(name, tag) do { \
 	if (*modifiers & tag) warningf(HERE, #name " used more than once"); \
 	*modifiers |= tag; \
-} while(0)
+} while (0)
 
 static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *specifiers)
 {
 	decl_modifiers_t *modifiers = &specifiers->modifiers;
 
-	while(true) {
+	while (true) {
 		if (token.type == T_restrict) {
 			next_token();
 			DET_MOD(restrict, DM_RESTRICT);
@@ -2881,7 +2901,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			expect('(');
 			if (token.type != T_INTEGER)
 				goto end_error;
-			if (check_elignment_value(token.v.intvalue)) {
+			if (check_alignment_value(token.v.intvalue)) {
 				if (specifiers->alignment != 0)
 					warningf(HERE, "align used more than once");
 				specifiers->alignment = (unsigned char)token.v.intvalue;
@@ -3010,7 +3030,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 	specifiers->source_position = token.source_position;
 
-	while(true) {
+	while (true) {
 		specifiers->modifiers
 			|= parse_attributes(&specifiers->gnu_attributes);
 		if (specifiers->modifiers & DM_TRANSPARENT_UNION)
@@ -3069,7 +3089,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		case token:                                                     \
 			qualifiers |= qualifier;                                    \
 			next_token();                                               \
-			break;
+			break
 
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
@@ -3094,24 +3114,24 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			} else {                                                    \
 				type_specifiers |= specifier;                           \
 			}                                                           \
-			break;
+			break
 
-		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void")
-		MATCH_SPECIFIER(T_char,       SPECIFIER_CHAR,      "char")
-		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short")
-		MATCH_SPECIFIER(T_int,        SPECIFIER_INT,       "int")
-		MATCH_SPECIFIER(T_float,      SPECIFIER_FLOAT,     "float")
-		MATCH_SPECIFIER(T_double,     SPECIFIER_DOUBLE,    "double")
-		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed")
-		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned")
-		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool")
-		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8")
-		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16")
-		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32")
-		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64")
-		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128")
-		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex")
-		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary")
+		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
+		MATCH_SPECIFIER(T_char,       SPECIFIER_CHAR,      "char");
+		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short");
+		MATCH_SPECIFIER(T_int,        SPECIFIER_INT,       "int");
+		MATCH_SPECIFIER(T_float,      SPECIFIER_FLOAT,     "float");
+		MATCH_SPECIFIER(T_double,     SPECIFIER_DOUBLE,    "double");
+		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
+		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
+		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
+		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8");
+		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16");
+		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32");
+		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64");
+		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128");
+		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex");
+		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary");
 
 		case T__forceinline:
 			/* only in microsoft mode */
@@ -3369,7 +3389,7 @@ static type_qualifiers_t parse_type_qualifiers(void)
 {
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 
-	while(true) {
+	while (true) {
 		switch(token.type) {
 		/* type qualifiers */
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
@@ -3410,7 +3430,7 @@ static declaration_t *parse_identifier_list(void)
 			break;
 		}
 		next_token();
-	} while(token.type == T_IDENTIFIER);
+	} while (token.type == T_IDENTIFIER);
 
 	return declarations;
 }
@@ -3482,7 +3502,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 	function_parameter_t *parameter;
 	function_parameter_t *last_parameter = NULL;
 
-	while(true) {
+	while (true) {
 		switch(token.type) {
 		case T_DOTDOTDOT:
 			next_token();
@@ -3721,7 +3741,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
 
 	/* pointers */
-	while(token.type == '*') {
+	while (token.type == '*') {
 		construct_type_t *type = parse_pointer_declarator();
 
 		if (last == NULL) {
@@ -4535,7 +4555,8 @@ static bool first_err = true;
  * When called with first_err set, prints the name of the current function,
  * else does noting.
  */
-static void print_in_function(void) {
+static void print_in_function(void)
+{
 	if (first_err) {
 		first_err = false;
 		diagnosticf("%s: In function '%Y':\n",
@@ -5795,7 +5816,8 @@ end_error:
 /**
  * Parses a MS assume() expression.
  */
-static expression_t *parse_assume(void) {
+static expression_t *parse_assume(void)
+{
 	eat(T__assume);
 
 	expression_t *expression
@@ -5816,7 +5838,8 @@ end_error:
 /**
  * Parse a microsoft __noop expression.
  */
-static expression_t *parse_noop_expression(void) {
+static expression_t *parse_noop_expression(void)
+{
 	source_position_t source_position = *HERE;
 	eat(T___noop);
 
@@ -5901,7 +5924,8 @@ static expression_t *parse_primary_expression(void)
 /**
  * Check if the expression has the character type and issue a warning then.
  */
-static void check_for_char_index_type(const expression_t *expression) {
+static void check_for_char_index_type(const expression_t *expression)
+{
 	type_t       *const type      = expression->base.type;
 	const type_t *const base_type = skip_typeref(type);
 
@@ -7767,16 +7791,14 @@ static statement_t *parse_label_statement(void)
 			errorf(HERE, "label at end of compound statement");
 			statement->label.statement = create_invalid_statement();
 		}
+	} else if (token.type == ';') {
+		/* Eat an empty statement here, to avoid the warning about an empty
+		 * statement after a label.  label:; is commonly used to have a label
+		 * before a closing brace. */
+		statement->label.statement = create_empty_statement();
+		next_token();
 	} else {
-		if (token.type == ';') {
-			/* eat an empty statement here, to avoid the warning about an empty
-			 * after a label.  label:; is commonly used to have a label before
-			 * a }. */
-			statement->label.statement = create_empty_statement();
-			next_token();
-		} else {
-			statement->label.statement = parse_statement();
-		}
+		statement->label.statement = parse_statement();
 	}
 
 	/* remember the labels in a list for later checking */
@@ -8097,7 +8119,8 @@ end_error:
 /**
  * Check if a given declaration represents a local variable.
  */
-static bool is_local_var_declaration(const declaration_t *declaration) {
+static bool is_local_var_declaration(const declaration_t *declaration)
+{
 	switch ((storage_class_tag_t) declaration->storage_class) {
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER: {
@@ -8116,7 +8139,8 @@ static bool is_local_var_declaration(const declaration_t *declaration) {
 /**
  * Check if a given declaration represents a variable.
  */
-static bool is_var_declaration(const declaration_t *declaration) {
+static bool is_var_declaration(const declaration_t *declaration)
+{
 	if (declaration->storage_class == STORAGE_CLASS_TYPEDEF)
 		return false;
 
@@ -8251,7 +8275,8 @@ end_error:
  * Parse a microsoft __try { } __finally { } or
  * __try{ } __except() { }
  */
-static statement_t *parse_ms_try_statment(void) {
+static statement_t *parse_ms_try_statment(void)
+{
 	statement_t *statement = allocate_statement_zero(STATEMENT_MS_TRY);
 
 	statement->base.source_position  = token.source_position;
@@ -8291,6 +8316,15 @@ end_error:
 	return create_invalid_statement();
 }
 
+static statement_t *parse_empty_statement(void)
+{
+	if (warning.empty_statement) {
+		warningf(HERE, "statement is empty");
+	}
+	eat(';');
+	return create_empty_statement();
+}
+
 /**
  * Parse a statement.
  * There's also parse_statement() which additionally checks for
@@ -8302,91 +8336,23 @@ static statement_t *intern_parse_statement(void)
 
 	/* declaration or statement */
 	add_anchor_token(';');
-	switch(token.type) {
-	case T_asm:
-		statement = parse_asm_statement();
-		break;
-
-	case T_case:
-		statement = parse_case_statement();
-		break;
-
-	case T_default:
-		statement = parse_default_statement();
-		break;
-
-	case '{':
-		statement = parse_compound_statement(false);
-		break;
-
-	case T_if:
-		statement = parse_if ();
-		break;
-
-	case T_switch:
-		statement = parse_switch();
-		break;
-
-	case T_while:
-		statement = parse_while();
-		break;
-
-	case T_do:
-		statement = parse_do();
-		break;
-
-	case T_for:
-		statement = parse_for();
-		break;
-
-	case T_goto:
-		statement = parse_goto();
-		break;
-
-	case T_continue:
-		statement = parse_continue();
-		break;
-
-	case T_break:
-		statement = parse_break();
-		break;
-
-	case T___leave:
-		statement = parse_leave();
-		break;
-
-	case T_return:
-		statement = parse_return();
-		break;
-
-	case ';':
-		if (warning.empty_statement) {
-			warningf(HERE, "statement is empty");
-		}
-		statement = create_empty_statement();
-		next_token();
-		break;
-
+	switch (token.type) {
 	case T_IDENTIFIER:
 		if (look_ahead(1)->type == ':') {
 			statement = parse_label_statement();
-			break;
-		}
-
-		if (is_typedef_symbol(token.v.symbol)) {
+		} else if (is_typedef_symbol(token.v.symbol)) {
 			statement = parse_declaration_statement();
-			break;
+		} else {
+			statement = parse_expression_statement();
 		}
-
-		statement = parse_expression_statement();
 		break;
 
 	case T___extension__:
-		/* this can be a prefix to a declaration or an expression statement */
-		/* we simply eat it now and parse the rest with tail recursion */
+		/* This can be a prefix to a declaration or an expression statement.
+		 * We simply eat it now and parse the rest with tail recursion. */
 		do {
 			next_token();
-		} while(token.type == T___extension__);
+		} while (token.type == T___extension__);
 		statement = parse_statement();
 		break;
 
@@ -8394,13 +8360,23 @@ static statement_t *intern_parse_statement(void)
 		statement = parse_declaration_statement();
 		break;
 
-	case T___try:
-		statement = parse_ms_try_statment();
-		break;
-
-	default:
-		statement = parse_expression_statement();
-		break;
+	case ';':        statement = parse_empty_statement();         break;
+	case '{':        statement = parse_compound_statement(false); break;
+	case T___leave:  statement = parse_leave();                   break;
+	case T___try:    statement = parse_ms_try_statment();         break;
+	case T_asm:      statement = parse_asm_statement();           break;
+	case T_break:    statement = parse_break();                   break;
+	case T_case:     statement = parse_case_statement();          break;
+	case T_continue: statement = parse_continue();                break;
+	case T_default:  statement = parse_default_statement();       break;
+	case T_do:       statement = parse_do();                      break;
+	case T_for:      statement = parse_for();                     break;
+	case T_goto:     statement = parse_goto();                    break;
+	case T_if:       statement = parse_if ();                     break;
+	case T_return:   statement = parse_return();                  break;
+	case T_switch:   statement = parse_switch();                  break;
+	case T_while:    statement = parse_while();                   break;
+	default:         statement = parse_expression_statement();    break;
 	}
 	rem_anchor_token(';');
 
@@ -8449,7 +8425,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	statement_t *last_statement = NULL;
 
-	while(token.type != '}' && token.type != T_EOF) {
+	while (token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
 		if (is_invalid_statement(sub_statement)) {
 			/* an error occurred. if we are at an anchor, return */
@@ -8464,7 +8440,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 			statement->compound.statements = sub_statement;
 		}
 
-		while(sub_statement->base.next != NULL)
+		while (sub_statement->base.next != NULL)
 			sub_statement = sub_statement->base.next;
 
 		last_statement = sub_statement;
@@ -8581,7 +8557,7 @@ end_error:;
  */
 static void parse_translation_unit(void)
 {
-	while(token.type != T_EOF) {
+	while (token.type != T_EOF) {
 		switch (token.type) {
 			case ';':
 				/* TODO error in strict mode */
