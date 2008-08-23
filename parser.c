@@ -165,7 +165,8 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_extern:          \
 	case T_static:          \
 	case T_auto:            \
-	case T_register:
+	case T_register:        \
+	case T___thread:
 
 #define TYPE_QUALIFIERS     \
 	case T_const:           \
