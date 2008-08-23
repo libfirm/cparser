@@ -7767,7 +7767,6 @@ static statement_t *parse_label_statement(void)
 			errorf(HERE, "label at end of compound statement");
 			statement->label.statement = create_invalid_statement();
 		}
-		return statement;
 	} else {
 		if (token.type == ';') {
 			/* eat an empty statement here, to avoid the warning about an empty
