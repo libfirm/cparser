@@ -540,10 +540,6 @@ static bool at_anchor(void)
  */
 static void eat_until_matching_token(int type)
 {
-	unsigned parenthesis_count = 0;
-	unsigned brace_count = 0;
-	unsigned bracket_count = 0;
-
 	int end_token;
 	switch (type) {
 		case '(': end_token = ')';  break;
@@ -552,26 +548,40 @@ static void eat_until_matching_token(int type)
 		default:  end_token = type; break;
 	}
 
-	while (token.type != end_token ||
-	      (parenthesis_count > 0 || brace_count > 0 || bracket_count > 0)) {
-
-		switch(token.type) {
+	unsigned parenthesis_count = 0;
+	unsigned brace_count       = 0;
+	unsigned bracket_count     = 0;
+	while (token.type        != end_token ||
+	       parenthesis_count != 0         ||
+	       brace_count       != 0         ||
+	       bracket_count     != 0) {
+		switch (token.type) {
 		case T_EOF: return;
 		case '(': ++parenthesis_count; break;
 		case '{': ++brace_count;       break;
 		case '[': ++bracket_count;     break;
+
 		case ')':
 			if (parenthesis_count > 0)
 				--parenthesis_count;
-			break;
+			goto check_stop;
+
 		case '}':
 			if (brace_count > 0)
 				--brace_count;
-			break;
+			goto check_stop;
+
 		case ']':
 			if (bracket_count > 0)
 				--bracket_count;
+check_stop:
+			if (token.type        == end_token &&
+			    parenthesis_count == 0         &&
+			    brace_count       == 0         &&
+			    bracket_count     == 0)
+				return;
 			break;
+
 		default:
 			break;
 		}
