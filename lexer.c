@@ -1573,8 +1573,8 @@ void lexer_next_preprocessing_token(void)
 			return;
 
 		default:
+			errorf(&lexer_token.source_position, "unknown character '%c' found", c);
 			next_char();
-			errorf(&lexer_token.source_position, "unknown character '%c' found\n", c);
 			lexer_token.type = T_ERROR;
 			return;
 		}
