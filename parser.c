@@ -2339,7 +2339,16 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		designator_t *designator = NULL;
 		if (token.type == '.' || token.type == '[') {
 			designator = parse_designation();
+			goto finish_designator;
+		} else if (token.type == T_IDENTIFIER && look_ahead(1)->type == ':') {
+			/* GNU-style designator ("identifier: value") */
+			designator = allocate_ast_zero(sizeof(designator[0]));
+			designator->source_position = token.source_position;
+			designator->symbol          = token.v.symbol;
+			eat(T_IDENTIFIER);
+			eat(':');
 
+finish_designator:
 			/* reset path to toplevel, evaluate designator from there */
 			ascend_to(path, top_path_level);
 			if (!walk_designator(path, designator, false)) {
