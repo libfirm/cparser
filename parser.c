@@ -7693,11 +7693,11 @@ static statement_t *parse_case_statement(void)
 
 		/* link all cases into the switch statement */
 		if (current_switch->last_case == NULL) {
-			current_switch->first_case =
-				current_switch->last_case = &statement->case_label;
+			current_switch->first_case      = &statement->case_label;
 		} else {
 			current_switch->last_case->next = &statement->case_label;
 		}
+		current_switch->last_case = &statement->case_label;
 	} else {
 		errorf(pos, "case label not within a switch statement");
 	}
@@ -7747,11 +7747,11 @@ static statement_t *parse_default_statement(void)
 		} else {
 			/* link all cases into the switch statement */
 			if (current_switch->last_case == NULL) {
-				current_switch->first_case =
-					current_switch->last_case  = &statement->case_label;
+				current_switch->first_case      = &statement->case_label;
 			} else {
 				current_switch->last_case->next = &statement->case_label;
 			}
+			current_switch->last_case = &statement->case_label;
 		}
 	} else {
 		errorf(&statement->base.source_position,
