@@ -65,81 +65,81 @@ void set_warning_opt(const char *const opt)
 
 	if (0) {}
 #define OPTX(x)   else if (strcmp(s, x) == 0)
-#define SET(y)    warning.y = state;
+#define SET(y)    (void)(warning.y = state)
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
-		SET(attribute)
-		SET(char_subscripts)
-		SET(empty_statement)
-		SET(format)
-		SET(implicit_function_declaration)
-		SET(implicit_int)
-		SET(main)
-		SET(nonnull)
-		SET(redundant_decls)
-		SET(return_type)
-		SET(shadow)
-		SET(sign_compare)
-		SET(strict_prototypes)
-		SET(unknown_pragmas)
-		SET(unreachable_code)
-		SET(unused_function)
-		SET(unused_label)
-		SET(unused_parameter)
-		SET(unused_value)
-		SET(unused_variable)
+		SET(attribute);
+		SET(char_subscripts);
+		SET(empty_statement);
+		SET(format);
+		SET(implicit_function_declaration);
+		SET(implicit_int);
+		SET(main);
+		SET(nonnull);
+		SET(redundant_decls);
+		SET(return_type);
+		SET(shadow);
+		SET(sign_compare);
+		SET(strict_prototypes);
+		SET(unknown_pragmas);
+		SET(unreachable_code);
+		SET(unused_function);
+		SET(unused_label);
+		SET(unused_parameter);
+		SET(unused_value);
+		SET(unused_variable);
 	}
-	OPT("attribute",                     attribute)
-	OPT("char-subscripts",               char_subscripts)
-	OPT("empty-statement",               empty_statement)
-	OPT("error",                         s_are_errors)
+	OPT("attribute",                     attribute);
+	OPT("char-subscripts",               char_subscripts);
+	OPT("empty-statement",               empty_statement);
+	OPT("error",                         s_are_errors);
 	OPTX("extra") {
 		/* TODO */
-		// TODO SET(function_end_without_return)
-		SET(empty_statement)
-		// TODO SET(incomplete_aggregate_init)
-		// TODO SET(pointless_comparison)
-		SET(unused_parameter)
-		SET(unused_value)
+		// TODO SET(function_end_without_return);
+		SET(empty_statement);
+		// TODO SET(incomplete_aggregate_init);
+		// TODO SET(pointless_comparison);
+		SET(unused_parameter);
+		SET(unused_value);
 	}
-	OPT("fatal-errors",                  fatal_errors)
-	OPT("float-equal",                   float_equal)
+	OPT("fatal-errors",                  fatal_errors);
+	OPT("float-equal",                   float_equal);
 	OPTX("format") {
-		SET(format)
-		SET(nonnull)
+		SET(format);
+		SET(nonnull);
 	}
-	OPT("nonnull",                       nonnull)
+	OPT("nonnull",                       nonnull);
 	OPTX("implicit") {
-		SET(implicit_function_declaration)
-		SET(implicit_int)
+		SET(implicit_function_declaration);
+		SET(implicit_int);
 	}
-	OPT("implicit-function-declaration", implicit_function_declaration)
-	OPT("implicit-int",                  implicit_int)
-	OPT("main",                          main)
-	OPT("missing-declarations",          missing_declarations)
-	OPT("missing-prototypes",            missing_prototypes)
-	OPT("multichar",                     multichar)
-	OPT("redundant-decls",               redundant_decls)
-	OPT("return-type",                   return_type)
-	OPT("shadow",                        shadow)
-	OPT("sign-compare",                  sign_compare)
-	OPT("strict-prototypes",             strict_prototypes)
-	OPT("switch-default",                switch_default)
-	OPT("unknown-pragmas",               unknown_pragmas)
-	OPT("unreachable-code",              unreachable_code)
+	OPT("implicit-function-declaration", implicit_function_declaration);
+	OPT("implicit-int",                  implicit_int);
+	OPT("main",                          main);
+	OPT("missing-declarations",          missing_declarations);
+	OPT("missing-prototypes",            missing_prototypes);
+	OPT("multichar",                     multichar);
+	OPT("redundant-decls",               redundant_decls);
+	OPT("return-type",                   return_type);
+	OPT("shadow",                        shadow);
+	OPT("sign-compare",                  sign_compare);
+	OPT("strict-prototypes",             strict_prototypes);
+	OPT("switch-default",                switch_default);
+	OPT("unknown-pragmas",               unknown_pragmas);
+	OPT("unreachable-code",              unreachable_code);
 	OPTX("unused") {
-		SET(unused_function)
-		SET(unused_label)
-		SET(unused_parameter)
-		SET(unused_value)
-		SET(unused_variable)
+		SET(unused_function);
+		SET(unused_label);
+		SET(unused_parameter);
+		SET(unused_value);
+		SET(unused_variable);
 	}
-	OPT("unused-function",               unused_function)
-	OPT("unused-label",                  unused_label)
-	OPT("unused-parameter",              unused_parameter)
-	OPT("unused-value",                  unused_value)
-	OPT("unused-variable",               unused_variable)
+	OPT("unused-function",               unused_function);
+	OPT("unused-label",                  unused_label);
+	OPT("unused-parameter",              unused_parameter);
+	OPT("unused-value",                  unused_value);
+	OPT("unused-variable",               unused_variable);
 #undef OPT
 #undef SET
 #undef OPT_X
