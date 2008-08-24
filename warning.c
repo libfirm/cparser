@@ -100,7 +100,6 @@ void set_warning_opt(const char *const opt)
 		SET(empty_statement)
 		// TODO SET(incomplete_aggregate_init)
 		// TODO SET(pointless_comparison)
-		// TODO SET(sign_compare)
 		SET(unused_parameter)
 		SET(unused_value)
 	}
