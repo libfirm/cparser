@@ -7683,7 +7683,7 @@ static statement_t *parse_case_statement(void)
 		long const val = fold_constant(statement->case_label.expression);
 		for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
 			expression_t const* const e = l->expression;
-			if (!is_constant_expression(e) || fold_constant(e) != val)
+			if (e == NULL || !is_constant_expression(e) || fold_constant(e) != val)
 				continue;
 
 			errorf(pos, "duplicate case value");
