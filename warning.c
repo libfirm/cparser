@@ -43,6 +43,7 @@ warning_t warning = {
 	.strict_prototypes             = true,
 	.switch_default                = false,
 	.unknown_pragmas               = true,
+	.unreachable_code              = false,
 	.unused_function               = false,
 	.unused_label                  = false,
 	.unused_parameter              = false,
@@ -82,6 +83,7 @@ void set_warning_opt(const char *const opt)
 		SET(sign_compare)
 		SET(strict_prototypes)
 		SET(unknown_pragmas)
+		SET(unreachable_code)
 		SET(unused_function)
 		SET(unused_label)
 		SET(unused_parameter)
@@ -126,6 +128,7 @@ void set_warning_opt(const char *const opt)
 	OPT("strict-prototypes",             strict_prototypes)
 	OPT("switch-default",                switch_default)
 	OPT("unknown-pragmas",               unknown_pragmas)
+	OPT("unreachable-code",              unreachable_code)
 	OPTX("unused") {
 		SET(unused_function)
 		SET(unused_label)

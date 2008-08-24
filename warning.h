@@ -91,9 +91,7 @@ typedef struct warning_t {
 	bool uninitialized:1;                 /**< Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call. */
 #endif
 	bool unknown_pragmas:1;               /**< Warn when a #pragma directive is encountered which is not understood */
-#if 0 // TODO
 	bool unreachable_code:1;              /**< Warn if the compiler detects that code will never be executed */
-#endif
 	bool unused_function:1;               /**< Warn whenever a static function is declared but not defined or a non-inline static function is unused */
 	bool unused_label:1;                  /**< Warn whenever a label is declared but not used */
 	bool unused_parameter:1;              /**< Warn whenever a function parameter is unused aside from its declaration */

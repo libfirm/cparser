@@ -5277,11 +5277,6 @@ static void create_function(declaration_t *declaration)
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
-				if (warning.return_type) {
-					warningf(&declaration->source_position,
-						"missing return statement at end of non-void function '%Y'",
-						declaration->symbol);
-				}
 			}
 			ret = new_Return(get_store(), 1, in);
 		}

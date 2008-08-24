@@ -108,6 +108,7 @@ static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
 static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
+static statement_t        *current_parent    = NULL;
 static ms_try_statement_t *current_try       = NULL;
 static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
@@ -115,6 +116,11 @@ static label_statement_t  *label_first       = NULL;
 static label_statement_t  *label_last        = NULL;
 static translation_unit_t *unit              = NULL;
 static struct obstack      temp_obst;
+
+#define PUSH_PARENT(stmt)                          \
+	statement_t *const prev_parent = current_parent; \
+	current_parent = (stmt);
+#define POP_PARENT ((void)(current_parent = prev_parent))
 
 static source_position_t null_position = { NULL, 0 };
 
@@ -321,7 +327,8 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 	size_t       size = get_statement_struct_size(kind);
 	statement_t *res  = allocate_ast_zero(size);
 
-	res->base.kind = kind;
+	res->base.kind   = kind;
+	res->base.parent = current_parent;
 	return res;
 }
 
@@ -4643,6 +4650,423 @@ static void check_declarations(void)
 	}
 }
 
+static int determine_truth(expression_t const* const cond)
+{
+	return
+		!is_constant_expression(cond) ? 0 :
+		fold_constant(cond) != 0      ? 1 :
+		-1;
+}
+
+static void check_reachable(statement_t *const stmt)
+{
+	if (stmt->base.reachable)
+		return;
+	if (stmt->kind != STATEMENT_DO_WHILE)
+		stmt->base.reachable = true;
+
+	statement_t *last = stmt;
+	statement_t *next;
+	switch (stmt->kind) {
+		case STATEMENT_INVALID:
+		case STATEMENT_EMPTY:
+		case STATEMENT_DECLARATION:
+		case STATEMENT_ASM:
+			next = stmt->base.next;
+			break;
+
+		case STATEMENT_COMPOUND:
+			next = stmt->compound.statements;
+			break;
+
+		case STATEMENT_RETURN:
+			return;
+
+		case STATEMENT_IF: {
+			if_statement_t const* const ifs = &stmt->ifs;
+			int            const        val = determine_truth(ifs->condition);
+
+			if (val >= 0)
+				check_reachable(ifs->true_statement);
+
+			if (val > 0)
+				return;
+
+			if (ifs->false_statement != NULL) {
+				check_reachable(ifs->false_statement);
+				return;
+			}
+
+			next = stmt->base.next;
+			break;
+		}
+
+		case STATEMENT_SWITCH: {
+			switch_statement_t const *const switchs = &stmt->switchs;
+			expression_t       const *const expr    = switchs->expression;
+
+			if (is_constant_expression(expr)) {
+				long                    const val      = fold_constant(expr);
+				case_label_statement_t *      defaults = NULL;
+				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
+					if (i->expression == NULL) {
+						defaults = i;
+						continue;
+					}
+
+					expression_t *const case_expr = i->expression;
+					if (is_constant_expression(case_expr) &&
+					    fold_constant(case_expr) == val) {
+						check_reachable((statement_t*)i);
+						return;
+					}
+				}
+
+				if (defaults != NULL) {
+					check_reachable((statement_t*)defaults);
+					return;
+				}
+			} else {
+				bool has_default = false;
+				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
+					if (i->expression == NULL)
+						has_default = true;
+
+					check_reachable((statement_t*)i);
+				}
+
+				if (has_default)
+					return;
+			}
+
+			next = stmt->base.next;
+			break;
+		}
+
+		case STATEMENT_EXPRESSION: {
+			/* Check for noreturn function call */
+			expression_t const *const expr = stmt->expression.expression;
+			if (expr->kind == EXPR_CALL) {
+				expression_t const *const func = expr->call.function;
+				if (func->kind == EXPR_REFERENCE) {
+					declaration_t const *const decl = func->reference.declaration;
+					if (decl != NULL && decl->modifiers & DM_NORETURN) {
+						return;
+					}
+				}
+			}
+
+			next = stmt->base.next;
+			break;
+		}
+
+		case STATEMENT_CONTINUE: {
+			statement_t *parent = stmt;
+			for (;;) {
+				parent = parent->base.parent;
+				if (parent == NULL) /* continue not within loop */
+					return;
+
+				next = parent;
+				switch (parent->kind) {
+					case STATEMENT_WHILE:    goto continue_while;
+					case STATEMENT_DO_WHILE: goto continue_do_while;
+					case STATEMENT_FOR:      goto continue_for;
+
+					default: break;
+				}
+			}
+		}
+
+		case STATEMENT_BREAK: {
+			statement_t *parent = stmt;
+			for (;;) {
+				parent = parent->base.parent;
+				if (parent == NULL) /* break not within loop/switch */
+					return;
+
+				switch (parent->kind) {
+					case STATEMENT_SWITCH:
+					case STATEMENT_WHILE:
+					case STATEMENT_DO_WHILE:
+					case STATEMENT_FOR:
+						next = parent->base.next;
+						goto found_break_parent;
+
+					default: break;
+				}
+			}
+found_break_parent:
+			break;
+		}
+
+		case STATEMENT_GOTO:
+			next = stmt->gotos.label->init.statement;
+			if (next == NULL) /* missing label */
+				return;
+			break;
+
+		case STATEMENT_LABEL:
+			next = stmt->label.statement;
+			break;
+
+		case STATEMENT_CASE_LABEL:
+			next = stmt->case_label.statement;
+			break;
+
+		case STATEMENT_WHILE: {
+			while_statement_t const *const whiles = &stmt->whiles;
+			int                      const val    = determine_truth(whiles->condition);
+
+			if (val >= 0)
+				check_reachable(whiles->body);
+
+			if (val > 0)
+				return;
+
+			next = stmt->base.next;
+			break;
+		}
+
+		case STATEMENT_DO_WHILE:
+			next = stmt->do_while.body;
+			break;
+
+		case STATEMENT_FOR: {
+			for_statement_t *const fors = &stmt->fors;
+
+			if (fors->condition_reachable)
+				return;
+			fors->condition_reachable = true;
+
+			expression_t const *const cond = fors->condition;
+			int          const        val  =
+				cond == NULL ? 1 : determine_truth(cond);
+
+			if (val >= 0)
+				check_reachable(fors->body);
+
+			if (val > 0)
+				return;
+
+			next = stmt->base.next;
+			break;
+		}
+
+		case STATEMENT_MS_TRY:
+		case STATEMENT_LEAVE:
+			panic("unimplemented");
+	}
+
+	while (next == NULL) {
+		next = last->base.parent;
+		if (next == NULL) {
+			type_t *const type = current_function->type;
+			assert(is_type_function(type));
+			type_t *const ret  = skip_typeref(type->function.return_type);
+			if (warning.return_type                    &&
+			    !is_type_atomic(ret, ATOMIC_TYPE_VOID) &&
+			    !is_sym_main(current_function->symbol)) {
+				warningf(&stmt->base.source_position,
+				         "control reaches end of non-void function");
+			}
+			return;
+		}
+
+		switch (next->kind) {
+			case STATEMENT_INVALID:
+			case STATEMENT_EMPTY:
+			case STATEMENT_DECLARATION:
+			case STATEMENT_EXPRESSION:
+			case STATEMENT_ASM:
+			case STATEMENT_RETURN:
+			case STATEMENT_CONTINUE:
+			case STATEMENT_BREAK:
+			case STATEMENT_GOTO:
+			case STATEMENT_LEAVE:
+				panic("invalid control flow in function");
+
+			case STATEMENT_COMPOUND:
+			case STATEMENT_IF:
+			case STATEMENT_SWITCH:
+			case STATEMENT_LABEL:
+			case STATEMENT_CASE_LABEL:
+				last = next;
+				next = next->base.next;
+				break;
+
+			case STATEMENT_WHILE: {
+continue_while:
+				if (next->base.reachable)
+					return;
+				next->base.reachable = true;
+
+				while_statement_t const *const whiles = &next->whiles;
+				int                      const val    = determine_truth(whiles->condition);
+
+				if (val >= 0)
+					check_reachable(whiles->body);
+
+				if (val > 0)
+					return;
+
+				last = next;
+				next = next->base.next;
+				break;
+			}
+
+			case STATEMENT_DO_WHILE: {
+continue_do_while:
+				if (next->base.reachable)
+					return;
+				next->base.reachable = true;
+
+				do_while_statement_t const *const dw  = &next->do_while;
+				int                  const        val = determine_truth(dw->condition);
+
+				if (val >= 0)
+					check_reachable(dw->body);
+
+				if (val > 0)
+					return;
+
+				last = next;
+				next = next->base.next;
+				break;
+			}
+
+			case STATEMENT_FOR: {
+continue_for:;
+				for_statement_t *const fors = &next->fors;
+
+				fors->step_reachable = true;
+
+				if (fors->condition_reachable)
+					return;
+				fors->condition_reachable = true;
+
+				expression_t const *const cond = fors->condition;
+				int          const        val  =
+					cond == NULL ? 1 : determine_truth(cond);
+
+				if (val >= 0)
+					check_reachable(fors->body);
+
+				if (val > 0)
+					return;
+
+				last = next;
+				next = next->base.next;
+				break;
+			}
+
+			case STATEMENT_MS_TRY:
+				panic("unimplemented");
+		}
+	}
+
+	if (next == NULL) {
+		next = stmt->base.parent;
+		if (next == NULL) {
+			warningf(&stmt->base.source_position,
+			         "control reaches end of non-void function");
+		}
+	}
+
+	check_reachable(next);
+}
+
+static void check_unreachable(statement_t const* const stmt)
+{
+	if (!stmt->base.reachable            &&
+	    stmt->kind != STATEMENT_COMPOUND &&
+	    stmt->kind != STATEMENT_DO_WHILE &&
+	    stmt->kind != STATEMENT_FOR) {
+		warningf(&stmt->base.source_position,
+		         "statement is unreachable");
+	}
+
+	switch (stmt->kind) {
+		case STATEMENT_INVALID:
+		case STATEMENT_EMPTY:
+		case STATEMENT_RETURN:
+		case STATEMENT_DECLARATION:
+		case STATEMENT_EXPRESSION:
+		case STATEMENT_CONTINUE:
+		case STATEMENT_BREAK:
+		case STATEMENT_GOTO:
+		case STATEMENT_ASM:
+		case STATEMENT_LEAVE:
+			break;
+
+		case STATEMENT_COMPOUND:
+			if (stmt->compound.statements)
+				check_unreachable(stmt->compound.statements);
+			break;
+
+		case STATEMENT_IF:
+			check_unreachable(stmt->ifs.true_statement);
+			if (stmt->ifs.false_statement != NULL)
+				check_unreachable(stmt->ifs.false_statement);
+			break;
+
+		case STATEMENT_SWITCH:
+			check_unreachable(stmt->switchs.body);
+			break;
+
+		case STATEMENT_LABEL:
+			check_unreachable(stmt->label.statement);
+			break;
+
+		case STATEMENT_CASE_LABEL:
+			check_unreachable(stmt->case_label.statement);
+			break;
+
+		case STATEMENT_WHILE:
+			check_unreachable(stmt->whiles.body);
+			break;
+
+		case STATEMENT_DO_WHILE:
+			check_unreachable(stmt->do_while.body);
+			if (!stmt->base.reachable) {
+				expression_t const *const cond = stmt->do_while.condition;
+				if (determine_truth(cond) >= 0) {
+					warningf(&cond->base.source_position,
+					         "condition of do-while-loop is unreachable");
+				}
+			}
+			break;
+
+		case STATEMENT_FOR: {
+			for_statement_t const* const fors = &stmt->fors;
+
+			if (!stmt->base.reachable && fors->initialisation != NULL) {
+				warningf(&fors->initialisation->base.source_position,
+				         "initialisation of for-statement is unreachable");
+			}
+
+			if (!fors->condition_reachable && fors->condition != NULL) {
+				warningf(&fors->condition->base.source_position,
+				         "condition of for-statement is unreachable");
+			}
+
+			if (!fors->step_reachable && fors->step != NULL) {
+				warningf(&fors->step->base.source_position,
+				         "step of for-statement is unreachable");
+			}
+
+			check_unreachable(stmt->fors.body);
+			break;
+		}
+
+		case STATEMENT_MS_TRY:
+			panic("unimplemented");
+	}
+
+	if (stmt->base.next)
+		check_unreachable(stmt->base.next);
+}
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -4754,12 +5178,20 @@ static void parse_external_declaration(void)
 		int            label_stack_top      = label_top();
 		declaration_t *old_current_function = current_function;
 		current_function                    = declaration;
+		current_parent                      = NULL;
 
-		declaration->init.statement = parse_compound_statement(false);
+		statement_t *const body = parse_compound_statement(false);
+		declaration->init.statement = body;
 		first_err = true;
 		check_labels();
 		check_declarations();
+		if (warning.return_type || warning.unreachable_code) {
+			check_reachable(body);
+			if (warning.unreachable_code)
+				check_unreachable(body);
+		}
 
+		assert(current_parent   == NULL);
 		assert(current_function == declaration);
 		current_function = old_current_function;
 		label_pop_to(label_stack_top);
@@ -7666,6 +8098,8 @@ static statement_t *parse_case_statement(void)
 	*pos                             = token.source_position;
 	statement->case_label.expression = parse_expression();
 
+	PUSH_PARENT(statement);
+
 	if (c_mode & _GNUC) {
 		if (token.type == T_DOTDOTDOT) {
 			next_token();
@@ -7708,8 +8142,10 @@ static statement_t *parse_case_statement(void)
 		errorf(&inner_stmt->base.source_position, "declaration after case label");
 	}
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7735,8 +8171,9 @@ static statement_t *parse_default_statement(void)
 	eat(T_default);
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
-
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement);
 
 	expect(':');
 	if (current_switch != NULL) {
@@ -7764,8 +8201,10 @@ static statement_t *parse_default_statement(void)
 		errorf(&inner_stmt->base.source_position, "declaration after default label");
 	}
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7806,6 +8245,12 @@ static statement_t *parse_label_statement(void)
 
 	declaration_t *label = get_label(symbol);
 
+	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
+	statement->base.source_position = token.source_position;
+	statement->label.label          = label;
+
+	PUSH_PARENT(statement);
+
 	/* if source position is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto so far */
 	if (label->source_position.input_name != NULL) {
@@ -7813,12 +8258,8 @@ static statement_t *parse_label_statement(void)
 		       symbol, &label->source_position);
 	} else {
 		label->source_position = token.source_position;
+		label->init.statement  = statement;
 	}
-
-	statement_t *statement = allocate_statement_zero(STATEMENT_LABEL);
-
-	statement->base.source_position = token.source_position;
-	statement->label.label          = label;
 
 	eat(':');
 
@@ -7853,6 +8294,7 @@ static statement_t *parse_label_statement(void)
 	}
 	label_last = &statement->label;
 
+	POP_PARENT;
 	return statement;
 }
 
@@ -7865,6 +8307,8 @@ static statement_t *parse_if(void)
 
 	statement_t *statement          = allocate_statement_zero(STATEMENT_IF);
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement);
 
 	expect('(');
 	add_anchor_token(')');
@@ -7881,8 +8325,10 @@ static statement_t *parse_if(void)
 		statement->ifs.false_statement = parse_statement();
 	}
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7895,6 +8341,8 @@ static statement_t *parse_switch(void)
 
 	statement_t *statement          = allocate_statement_zero(STATEMENT_SWITCH);
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement);
 
 	expect('(');
 	expression_t *const expr = parse_expression();
@@ -7919,8 +8367,10 @@ static statement_t *parse_switch(void)
 		warningf(&statement->base.source_position, "switch has no default case");
 	}
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7945,6 +8395,8 @@ static statement_t *parse_while(void)
 	statement_t *statement          = allocate_statement_zero(STATEMENT_WHILE);
 	statement->base.source_position = token.source_position;
 
+	PUSH_PARENT(statement);
+
 	expect('(');
 	add_anchor_token(')');
 	statement->whiles.condition = parse_expression();
@@ -7953,8 +8405,10 @@ static statement_t *parse_while(void)
 
 	statement->whiles.body = parse_loop_body(statement);
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7966,8 +8420,9 @@ static statement_t *parse_do(void)
 	eat(T_do);
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_DO_WHILE);
-
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement)
 
 	add_anchor_token(T_while);
 	statement->do_while.body = parse_loop_body(statement);
@@ -7981,8 +8436,10 @@ static statement_t *parse_do(void)
 	expect(')');
 	expect(';');
 
+	POP_PARENT;
 	return statement;
 end_error:
+	POP_PARENT;
 	return create_invalid_statement();
 }
 
@@ -7995,6 +8452,8 @@ static statement_t *parse_for(void)
 
 	statement_t *statement          = allocate_statement_zero(STATEMENT_FOR);
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement);
 
 	int      top        = environment_top();
 	scope_t *last_scope = scope;
@@ -8043,9 +8502,11 @@ static statement_t *parse_for(void)
 	set_scope(last_scope);
 	environment_pop_to(top);
 
+	POP_PARENT;
 	return statement;
 
 end_error:
+	POP_PARENT;
 	rem_anchor_token(')');
 	assert(scope == &statement->fors.scope);
 	set_scope(last_scope);
@@ -8457,8 +8918,9 @@ static statement_t *parse_statement(void)
 static statement_t *parse_compound_statement(bool inside_expression_statement)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_COMPOUND);
-
 	statement->base.source_position = token.source_position;
+
+	PUSH_PARENT(statement);
 
 	eat('{');
 	add_anchor_token('}');
@@ -8522,6 +8984,7 @@ end_error:
 	set_scope(last_scope);
 	environment_pop_to(top);
 
+	POP_PARENT;
 	return statement;
 }
 

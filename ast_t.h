@@ -606,6 +606,8 @@ struct statement_base_t {
 	statement_kind_t   kind;
 	statement_t       *next;
 	source_position_t  source_position;
+	statement_t       *parent;
+	bool               reachable;
 #ifndef NDEBUG
 	bool               transformed;
 #endif
@@ -695,6 +697,8 @@ struct for_statement_t {
 	expression_t     *step;
 	statement_t      *body;
 	scope_t           scope;
+	bool              condition_reachable:1;
+	bool              step_reachable:1;
 };
 
 struct asm_argument_t {
