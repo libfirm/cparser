@@ -7692,7 +7692,12 @@ static statement_t *parse_case_statement(void)
 			       "case label not within a switch statement");
 		}
 	}
-	statement->case_label.statement = parse_statement();
+
+	statement_t *const inner_stmt = parse_statement();
+	statement->case_label.statement = inner_stmt;
+	if (inner_stmt->kind == STATEMENT_DECLARATION) {
+		errorf(&inner_stmt->base.source_position, "declaration after case label");
+	}
 
 	return statement;
 end_error:
@@ -7743,7 +7748,12 @@ static statement_t *parse_default_statement(void)
 		errorf(&statement->base.source_position,
 			"'default' label not within a switch statement");
 	}
-	statement->case_label.statement = parse_statement();
+
+	statement_t *const inner_stmt = parse_statement();
+	statement->case_label.statement = inner_stmt;
+	if (inner_stmt->kind == STATEMENT_DECLARATION) {
+		errorf(&inner_stmt->base.source_position, "declaration after default label");
+	}
 
 	return statement;
 end_error:
@@ -7819,7 +7829,11 @@ static statement_t *parse_label_statement(void)
 		statement->label.statement = create_empty_statement();
 		next_token();
 	} else {
-		statement->label.statement = parse_statement();
+		statement_t *const inner_stmt = parse_statement();
+		statement->label.statement = inner_stmt;
+		if (inner_stmt->kind == STATEMENT_DECLARATION) {
+			errorf(&inner_stmt->base.source_position, "declaration after label");
+		}
 	}
 
 	/* remember the labels in a list for later checking */

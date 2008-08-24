@@ -30,7 +30,6 @@ ast2firm:
 - merge functions entities declared in lokal scope
 
 Missing Errors:
-- label: declaration; is no valid C99 but we parse it anyway
 - check switches for double cases
 
 Missing Warnings:
