@@ -27,7 +27,6 @@ ast2firm:
 - output source file positions for panics.
 - handle bitfield members with 0 correctly (standard says they finish the
   current unit)
-- create asm nodes.
 - merge functions entities declared in lokal scope
 
 Missing Errors:
@@ -36,7 +35,6 @@ Missing Errors:
 
 Missing Warnings:
 - dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
-- unused label
 - check switches for all enums values
 - catch the if(k = b) cases, maybe require all assignments to be in parentheses
   (but some few exceptions like toplevel, nested assignments)
