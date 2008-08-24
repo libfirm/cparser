@@ -1702,7 +1702,8 @@ static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 	tarval *all_one   = get_mode_all_one(mode);
 	int     mode_size = get_mode_size_bits(mode);
 
-	assert(offset >= 0 && size >= 0);
+	assert(offset >= 0);
+	assert(size   >= 0);
 	assert(offset + size <= mode_size);
 	if (size == mode_size) {
 		return all_one;
@@ -2292,12 +2293,11 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	if (is_constant_expression(expression->left)) {
 		long val = fold_constant(expression->left);
 		expression_kind_t ekind = expression->base.kind;
-		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0)
-				|| (ekind == EXPR_BINARY_LOGICAL_OR && val == 0)) {
+		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
+		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0) ||
+		    (ekind == EXPR_BINARY_LOGICAL_OR  && val == 0)) {
 			return expression_to_firm(expression->right);
 		} else {
-			assert((ekind == EXPR_BINARY_LOGICAL_AND && val == 0)
-					|| (ekind == EXPR_BINARY_LOGICAL_OR && val != 0));
 			return new_Const(mode, get_mode_one(mode));
 		}
 	}
@@ -3470,7 +3470,8 @@ static ir_initializer_t *create_ir_initializer_string(
 	type = skip_typeref(type);
 
 	size_t            string_len    = initializer->string.size;
-	assert(type->kind == TYPE_ARRAY && type->array.size_constant);
+	assert(type->kind == TYPE_ARRAY);
+	assert(type->array.size_constant);
 	size_t            len           = type->array.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
@@ -3495,7 +3496,8 @@ static ir_initializer_t *create_ir_initializer_wide_string(
 		const initializer_wide_string_t *initializer, type_t *type)
 {
 	size_t            string_len    = initializer->string.size;
-	assert(type->kind == TYPE_ARRAY && type->array.size_constant);
+	assert(type->kind == TYPE_ARRAY);
+	assert(type->array.size_constant);
 	size_t            len           = type->array.size;
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
