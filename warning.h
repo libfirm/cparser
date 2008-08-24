@@ -72,9 +72,7 @@ typedef struct warning_t {
 	bool pointer_arith:1;                 /**< Warn about anything that depends on the "size of" a function type or of 'void' */
 #endif
 	bool redundant_decls:1;               /**< Warn about redundant declarations */
-#if 0 // TODO
-	bool return_type:1;                   /**< Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'. */
-#endif
+	bool return_type:1;                   /* TODO not fully implemented */ /**< Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'. */
 	bool s_are_errors:1;                  /**< Treat warnings as errors */
 #if 0 // TODO
 	bool sequence_point:1;                /**< Warn about code that may have undefined semantics because of violations of sequence point rules */
@@ -104,7 +102,6 @@ typedef struct warning_t {
 #if 0 // TODO
 	bool write_strings:1;                 /**< Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char *' pointer will get a warning */
 #endif
-	bool return_type:1;                   /**< Warn whenever a function is defined with a return-type that defaults to `int'.  Also warn about any `return' statement with no return-value in a function whose return-type is not `void'. */
 } warning_t;
 
 extern warning_t warning;

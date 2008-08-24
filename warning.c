@@ -36,6 +36,7 @@ warning_t warning = {
 	.missing_prototypes            = false,
 	.multichar                     = true,
 	.redundant_decls               = true,
+	.return_type                   = true,
 	.s_are_errors                  = false,
 	.shadow                        = false,
 	.sign_compare                  = false,
@@ -46,8 +47,7 @@ warning_t warning = {
 	.unused_label                  = false,
 	.unused_parameter              = false,
 	.unused_value                  = true,
-	.unused_variable               = false,
-	.return_type                   = true
+	.unused_variable               = false
 };
 
 void set_warning_opt(const char *const opt)
@@ -70,13 +70,14 @@ void set_warning_opt(const char *const opt)
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
 		SET(attribute)
 		SET(char_subscripts)
-		SET(format)
-		SET(nonnull)
 		SET(empty_statement)
+		SET(format)
 		SET(implicit_function_declaration)
 		SET(implicit_int)
 		SET(main)
+		SET(nonnull)
 		SET(redundant_decls)
+		SET(return_type)
 		SET(shadow)
 		SET(sign_compare)
 		SET(strict_prototypes)
@@ -86,7 +87,6 @@ void set_warning_opt(const char *const opt)
 		SET(unused_parameter)
 		SET(unused_value)
 		SET(unused_variable)
-		SET(return_type)
 	}
 	OPT("attribute",                     attribute)
 	OPT("char-subscripts",               char_subscripts)
@@ -120,6 +120,7 @@ void set_warning_opt(const char *const opt)
 	OPT("missing-prototypes",            missing_prototypes)
 	OPT("multichar",                     multichar)
 	OPT("redundant-decls",               redundant_decls)
+	OPT("return-type",                   return_type)
 	OPT("shadow",                        shadow)
 	OPT("sign-compare",                  sign_compare)
 	OPT("strict-prototypes",             strict_prototypes)
@@ -137,7 +138,6 @@ void set_warning_opt(const char *const opt)
 	OPT("unused-parameter",              unused_parameter)
 	OPT("unused-value",                  unused_value)
 	OPT("unused-variable",               unused_variable)
-	OPT("return-type",                   return_type)
 #undef OPT
 #undef SET
 #undef OPT_X
