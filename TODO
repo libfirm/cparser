@@ -30,7 +30,6 @@ ast2firm:
 - merge functions entities declared in lokal scope
 
 Missing Errors:
-- check switches for double cases
 
 Missing Warnings:
 - dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)

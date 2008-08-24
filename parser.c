@@ -7660,9 +7660,10 @@ static statement_t *parse_case_statement(void)
 {
 	eat(T_case);
 
-	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
+	statement_t       *const statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
+	source_position_t *const pos       = &statement->base.source_position;
 
-	statement->base.source_position  = token.source_position;
+	*pos                             = token.source_position;
 	statement->case_label.expression = parse_expression();
 
 	if (c_mode & _GNUC) {
@@ -7675,22 +7676,30 @@ static statement_t *parse_case_statement(void)
 	expect(':');
 
 	if (! is_constant_expression(statement->case_label.expression)) {
-		errorf(&statement->base.source_position,
-		       "case label does not reduce to an integer constant");
-	} else {
-		/* TODO: check if the case label is already known */
-		if (current_switch != NULL) {
-			/* link all cases into the switch statement */
-			if (current_switch->last_case == NULL) {
-				current_switch->first_case =
-				current_switch->last_case  = &statement->case_label;
-			} else {
-				current_switch->last_case->next = &statement->case_label;
-			}
-		} else {
-			errorf(&statement->base.source_position,
-			       "case label not within a switch statement");
+		errorf(pos, "case label does not reduce to an integer constant");
+	} else if (current_switch != NULL) {
+		/* Check for duplicate case values */
+		/* FIXME slow */
+		long const val = fold_constant(statement->case_label.expression);
+		for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
+			expression_t const* const e = l->expression;
+			if (!is_constant_expression(e) || fold_constant(e) != val)
+				continue;
+
+			errorf(pos, "duplicate case value");
+			errorf(&l->base.source_position, "previously used here");
+			break;
 		}
+
+		/* link all cases into the switch statement */
+		if (current_switch->last_case == NULL) {
+			current_switch->first_case =
+				current_switch->last_case = &statement->case_label;
+		} else {
+			current_switch->last_case->next = &statement->case_label;
+		}
+	} else {
+		errorf(pos, "case label not within a switch statement");
 	}
 
 	statement_t *const inner_stmt = parse_statement();
