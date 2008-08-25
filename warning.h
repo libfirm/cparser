@@ -66,8 +66,8 @@ typedef struct warning_t {
 #endif
 	bool missing_prototypes:1;            /**< Warn if a global function is defined without a previous prototype declaration */
 	bool multichar:1;                     /**< Warn if a multicharacter constant ('FOOF') is used. */
-#if 0 // TODO
 	bool nested_externs:1;                /**< Warn if an 'extern' declaration is encountered within a function */
+#if 0 // TODO
 	bool packed:1;                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	bool padded:1;                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */
 	bool parentheses:1;                   /**< Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces) */

@@ -4114,7 +4114,7 @@ static declaration_t *internal_record_declaration(
 	const symbol_t *const symbol  = declaration->symbol;
 	const namespace_t     namespc = (namespace_t)declaration->namespc;
 
-	assert(declaration->symbol != NULL);
+	assert(symbol != NULL);
 	declaration_t *previous_declaration = get_declaration(symbol, namespc);
 
 	type_t *const orig_type = declaration->type;
@@ -4130,6 +4130,13 @@ static declaration_t *internal_record_declaration(
 
 	if (warning.main && is_type_function(type) && is_sym_main(symbol)) {
 		check_type_of_main(declaration, &type->function);
+	}
+
+	if (warning.nested_externs                             &&
+	    declaration->storage_class == STORAGE_CLASS_EXTERN &&
+	    scope                      != global_scope) {
+		warningf(&declaration->source_position,
+		         "nested extern declaration of '%#T'", declaration->type, symbol);
 	}
 
 	assert(declaration != previous_declaration);

@@ -36,6 +36,7 @@ warning_t warning = {
 	.missing_declarations          = false,
 	.missing_prototypes            = false,
 	.multichar                     = true,
+	.nested_externs                = false,
 	.nonnull                       = true,
 	.redundant_decls               = true,
 	.return_type                   = true,
@@ -123,6 +124,7 @@ void set_warning_opt(const char *const opt)
 	OPT("missing-declarations",          missing_declarations);
 	OPT("missing-prototypes",            missing_prototypes);
 	OPT("multichar",                     multichar);
+	OPT("nested-externs",                nested_externs);
 	OPT("nonnull",                       nonnull);
 	OPT("redundant-decls",               redundant_decls);
 	OPT("return-type",                   return_type);
