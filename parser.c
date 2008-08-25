@@ -4239,8 +4239,8 @@ warn_redundant_declaration:
 			}
 		}
 
-		if (declaration->is_inline)
-			previous_declaration->is_inline = true;
+		previous_declaration->modifiers |= declaration->modifiers;
+		previous_declaration->is_inline |= declaration->is_inline;
 		return previous_declaration;
 	} else if (is_type_function(type)) {
 		if (is_definition &&
