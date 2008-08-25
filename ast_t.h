@@ -533,7 +533,8 @@ typedef enum decl_modifier_t {
 	DM_CDECL             = 1 << 20,
 	DM_FASTCALL          = 1 << 21,
 	DM_STDCALL           = 1 << 22,
-	DM_THISCALL          = 1 << 23
+	DM_THISCALL          = 1 << 23,
+	DM_DEPRECATED        = 1 << 24
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;
@@ -550,7 +551,6 @@ struct declaration_t {
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */
-	unsigned int        deprecated    : 1;  /**< Microsoft or GNU deprecated attribute. */
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;

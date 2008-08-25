@@ -38,7 +38,9 @@ typedef struct warning_t {
 	bool cast_qual:1;                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
 	bool conversion:1;                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */
-	bool deprecated_declarations:1;       /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
+#endif
+	bool deprecated_declarations:1;       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
+#if 0 // TODO
 	bool div_by_zero:1;                   /**< Warn about compile-time integer division by zero */
 #endif
 	bool empty_statement:1;               /**< Warn about empty statements, i.e. lone ';'  */

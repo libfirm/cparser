@@ -1269,9 +1269,10 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 	decl_modifiers_t modifiers = declaration->modifiers;
 
 	/* DM_FORCEINLINE handled outside. */
-	if((modifiers & ~DM_FORCEINLINE) != 0 ||
-	    declaration->alignment != 0 || declaration->deprecated != 0 ||
-	    declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
+	if ((modifiers & ~DM_FORCEINLINE) != 0    ||
+	    declaration->alignment        != 0    ||
+	    declaration->get_property_sym != NULL ||
+	    declaration->put_property_sym != NULL) {
 		char *next = "(";
 
 		fputs("__declspec", out);
@@ -1302,7 +1303,7 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		if(modifiers & DM_NOINLINE) {
 			fputs(next, out); next = ", "; fputs("noinline", out);
 		}
-		if(declaration->deprecated != 0) {
+		if (modifiers & DM_DEPRECATED) {
 			fputs(next, out); next = ", "; fputs("deprecated", out);
 			if(declaration->deprecated_string != NULL)
 				fprintf(out, "(\"%s\")", declaration->deprecated_string);

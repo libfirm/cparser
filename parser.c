@@ -1608,7 +1608,6 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				switch(kind) {
 				case GNU_AK_CONST:
 				case GNU_AK_VOLATILE:
-				case GNU_AK_DEPRECATED:
 				case GNU_AK_NAKED:
 				case GNU_AK_MALLOC:
 				case GNU_AK_WEAK:
@@ -1657,6 +1656,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_TRANSPARENT_UNION: modifiers |= DM_TRANSPARENT_UNION; goto no_arg;
 				case GNU_AK_CONSTRUCTOR:       modifiers |= DM_CONSTRUCTOR;       goto no_arg;
 				case GNU_AK_DESTRUCTOR:        modifiers |= DM_DESTRUCTOR;        goto no_arg;
+				case GNU_AK_DEPRECATED:        modifiers |= DM_DEPRECATED;        goto no_arg;
 
 				case GNU_AK_ALIGNED:
 					/* __align__ may be used without an argument */
@@ -3991,7 +3991,6 @@ static declaration_t *parse_declarator(
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->modifiers              = specifiers->modifiers;
-	declaration->deprecated             = specifiers->deprecated;
 	declaration->deprecated_string      = specifiers->deprecated_string;
 	declaration->get_property_sym       = specifiers->get_property_sym;
 	declaration->put_property_sym       = specifiers->put_property_sym;
@@ -5769,18 +5768,20 @@ static expression_t *parse_reference(void)
 	declaration->used = true;
 
 	/* check for deprecated functions */
-	if (declaration->deprecated != 0) {
-		const char *prefix = "";
-		if (is_type_function(declaration->type))
-			prefix = "function ";
+	if (warning.deprecated_declarations &&
+	    declaration->modifiers & DM_DEPRECATED) {
+		char const *const prefix = is_type_function(declaration->type) ?
+			"function" : "variable";
 
 		if (declaration->deprecated_string != NULL) {
 			warningf(&source_position,
-				"%s'%Y' was declared 'deprecated(\"%s\")'", prefix, declaration->symbol,
+				"%s '%Y' is deprecated (declared %P): \"%s\"", prefix,
+				declaration->symbol, &declaration->source_position,
 				declaration->deprecated_string);
 		} else {
 			warningf(&source_position,
-				"%s'%Y' was declared 'deprecated'", prefix, declaration->symbol);
+				"%s '%Y' is deprecated (declared %P)", prefix,
+				declaration->symbol, &declaration->source_position);
 		}
 	}
 

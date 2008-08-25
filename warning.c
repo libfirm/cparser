@@ -24,6 +24,7 @@
 warning_t warning = {
 	.attribute                     = true,
 	.char_subscripts               = true,
+	.deprecated_declarations       = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
 	.float_equal                   = false,
@@ -92,6 +93,7 @@ void set_warning_opt(const char *const opt)
 	}
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
+	OPT("deprecated-declarations",       deprecated_declarations);
 	OPT("empty-statement",               empty_statement);
 	OPT("error",                         s_are_errors);
 	OPTX("extra") {
