@@ -1433,16 +1433,7 @@ void lexer_next_preprocessing_token(void)
 
 		case '.':
 			MAYBE_PROLOG
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9':
+				DIGITS
 					put_back(c);
 					c = '.';
 					parse_number_dec();
