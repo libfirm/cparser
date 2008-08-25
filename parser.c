@@ -3274,17 +3274,24 @@ finish_specifiers:
 		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONG;
 			break;
+
 		case SPECIFIER_LONG | SPECIFIER_LONG_LONG:
 		case SPECIFIER_SIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG:
 		case SPECIFIER_LONG | SPECIFIER_LONG_LONG | SPECIFIER_INT:
 		case SPECIFIER_SIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG
 			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_LONGLONG;
-			break;
+			goto warn_about_long_long;
+
 		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG:
 		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG
 			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONGLONG;
+warn_about_long_long:
+			if (warning.long_long) {
+				warningf(&specifiers->source_position,
+				         "ISO C90 does not support 'long long'");
+			}
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT8:

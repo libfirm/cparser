@@ -32,6 +32,7 @@ warning_t warning = {
 	.format                        = true,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
+	.long_long                     = false,
 	.main                          = true,
 	.missing_declarations          = false,
 	.missing_prototypes            = false,
@@ -120,6 +121,7 @@ void set_warning_opt(const char *const opt)
 	}
 	OPT("implicit-function-declaration", implicit_function_declaration);
 	OPT("implicit-int",                  implicit_int);
+	OPT("long-long",                     long_long);
 	OPT("main",                          main);
 	OPT("missing-declarations",          missing_declarations);
 	OPT("missing-prototypes",            missing_prototypes);

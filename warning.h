@@ -53,8 +53,8 @@ typedef struct warning_t {
 	bool implicit_int:1;                  /**< Warn when a declaration does not specify a type */
 #if 0 // TODO
 	bool inline:1;                        /**< Warn if a function can not be inlined and it was declared as inline */
-	bool long_long:1;                     /**< Warn if 'long long' type is used */
 #endif
+	bool long_long:1;                     /**< Warn if 'long long' type is used */
 	bool main:1;                          /**< Warn if the type of 'main' is suspicious */
 #if 0 // TODO
 	bool missing_braces:1;                /**< Warn if an aggregate or union initializer is not fully bracketed */
