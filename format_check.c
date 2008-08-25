@@ -247,6 +247,7 @@ break_fmt_flags:
 
 			/* minimum field width */
 			if (fmt == '*') {
+				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' field width in conversion specification");
 					return;
@@ -267,6 +268,7 @@ break_fmt_flags:
 		if (fmt == '.') {
 			fmt = vchar.next(&vchar);
 			if (fmt == '*') {
+				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' precision in conversion specification");
 					return;
