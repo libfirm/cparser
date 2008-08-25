@@ -24,17 +24,17 @@
 warning_t warning = {
 	.attribute                     = true,
 	.char_subscripts               = true,
-	.format                        = true,
-	.nonnull                       = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
 	.float_equal                   = false,
+	.format                        = true,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
 	.main                          = true,
 	.missing_declarations          = false,
 	.missing_prototypes            = false,
 	.multichar                     = true,
+	.nonnull                       = true,
 	.redundant_decls               = true,
 	.return_type                   = true,
 	.s_are_errors                  = false,
@@ -109,7 +109,6 @@ void set_warning_opt(const char *const opt)
 		SET(format);
 		SET(nonnull);
 	}
-	OPT("nonnull",                       nonnull);
 	OPTX("implicit") {
 		SET(implicit_function_declaration);
 		SET(implicit_int);
@@ -120,6 +119,7 @@ void set_warning_opt(const char *const opt)
 	OPT("missing-declarations",          missing_declarations);
 	OPT("missing-prototypes",            missing_prototypes);
 	OPT("multichar",                     multichar);
+	OPT("nonnull",                       nonnull);
 	OPT("redundant-decls",               redundant_decls);
 	OPT("return-type",                   return_type);
 	OPT("shadow",                        shadow);
