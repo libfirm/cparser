@@ -4809,6 +4809,7 @@ static void check_reachable(statement_t *const stmt)
 					case STATEMENT_WHILE:
 					case STATEMENT_DO_WHILE:
 					case STATEMENT_FOR:
+						last = parent;
 						next = parent->base.next;
 						goto found_break_parent;
 
