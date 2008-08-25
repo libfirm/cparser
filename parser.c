@@ -8154,8 +8154,8 @@ static statement_t *parse_case_statement(void)
 			if (e == NULL || !is_constant_expression(e) || fold_constant(e) != val)
 				continue;
 
-			errorf(pos, "duplicate case value");
-			errorf(&l->base.source_position, "previously used here");
+			errorf(pos, "duplicate case value (previously used %P)",
+			       &l->base.source_position);
 			break;
 		}
 
