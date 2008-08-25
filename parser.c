@@ -4674,6 +4674,8 @@ static int determine_truth(expression_t const* const cond)
 		-1;
 }
 
+static bool noreturn_candidate;
+
 static void check_reachable(statement_t *const stmt)
 {
 	if (stmt->base.reachable)
@@ -4696,6 +4698,7 @@ static void check_reachable(statement_t *const stmt)
 			break;
 
 		case STATEMENT_RETURN:
+			noreturn_candidate = false;
 			return;
 
 		case STATEMENT_IF: {
@@ -4877,6 +4880,8 @@ found_break_parent:
 	while (next == NULL) {
 		next = last->base.parent;
 		if (next == NULL) {
+			noreturn_candidate = false;
+
 			type_t *const type = current_function->type;
 			assert(is_type_function(type));
 			type_t *const ret  = skip_typeref(type->function.return_type);
@@ -5201,10 +5206,20 @@ static void parse_external_declaration(void)
 		first_err = true;
 		check_labels();
 		check_declarations();
-		if (warning.return_type || warning.unreachable_code) {
+		if (warning.return_type      ||
+		    warning.unreachable_code ||
+		    (warning.missing_noreturn && !(declaration->modifiers & DM_NORETURN))) {
+			noreturn_candidate = true;
 			check_reachable(body);
 			if (warning.unreachable_code)
 				check_unreachable(body);
+			if (warning.missing_noreturn &&
+			    noreturn_candidate       &&
+			    !(declaration->modifiers & DM_NORETURN)) {
+				warningf(&body->base.source_position,
+				         "function '%#T' is candidate for attribute 'noreturn'",
+				         type, declaration->symbol);
+			}
 		}
 
 		assert(current_parent   == NULL);
