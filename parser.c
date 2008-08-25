@@ -3766,7 +3766,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 	construct_type_t *last  = NULL;
 	gnu_attribute_t  *attributes = NULL;
 
-	decl_modifiers_t modifiers = parse_attributes(&attributes);
+	declaration->modifiers |= parse_attributes(&attributes);
 
 	/* pointers */
 	while (token.type == '*') {
@@ -3781,7 +3781,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		}
 
 		/* TODO: find out if this is correct */
-		modifiers |= parse_attributes(&attributes);
+		declaration->modifiers |= parse_attributes(&attributes);
 	}
 
 	construct_type_t *inner_types = NULL;
