@@ -8932,6 +8932,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	statement_t *last_statement = NULL;
 
+	bool only_decls_so_far = true;
 	while (token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
 		if (is_invalid_statement(sub_statement)) {
@@ -8939,6 +8940,15 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 			if (at_anchor())
 				goto end_error;
 			continue;
+		}
+
+		if (warning.declaration_after_statement) {
+			if (sub_statement->kind != STATEMENT_DECLARATION) {
+				only_decls_so_far = false;
+			} else if (!only_decls_so_far) {
+				warningf(&sub_statement->base.source_position,
+				         "ISO C90 forbids mixed declarations and code");
+			}
 		}
 
 		if (last_statement != NULL) {
