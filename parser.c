@@ -7119,7 +7119,8 @@ static expression_t *parse_##unexpression_type(unsigned precedence,           \
                                                                               \
 	expression_t *unary_expression                                            \
 		= allocate_expression_zero(unexpression_type);                        \
-	unary_expression->unary.value = left;                                     \
+	unary_expression->base.source_position = *HERE;                           \
+	unary_expression->unary.value          = left;                            \
 	                                                                          \
 	sfunc(&unary_expression->unary);                                          \
                                                                               \
