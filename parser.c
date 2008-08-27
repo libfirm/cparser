@@ -3715,7 +3715,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 				else if (second == NULL) second = "stdcall";
 			}
 			if (declaration->modifiers & DM_FASTCALL) {
-				if (first == NULL)       first = "faslcall";
+				if (first == NULL)       first = "fastcall";
 				else if (second == NULL) second = "fastcall";
 			}
 			if (declaration->modifiers & DM_THISCALL) {
