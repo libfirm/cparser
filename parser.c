@@ -3475,12 +3475,21 @@ static type_t *automatic_type_conversion(type_t *orig_type);
 static void semantic_parameter(declaration_t *declaration)
 {
 	/* TODO: improve error messages */
+	source_position_t const* const pos = &declaration->source_position;
 
-	if (declaration->declared_storage_class == STORAGE_CLASS_TYPEDEF) {
-		errorf(HERE, "typedef not allowed in parameter list");
-	} else if (declaration->declared_storage_class != STORAGE_CLASS_NONE
-			&& declaration->declared_storage_class != STORAGE_CLASS_REGISTER) {
-		errorf(HERE, "parameter may only have none or register storage class");
+	switch (declaration->declared_storage_class) {
+		case STORAGE_CLASS_TYPEDEF:
+			errorf(pos, "typedef not allowed in parameter list");
+			break;
+
+		/* Allowed storage classes */
+		case STORAGE_CLASS_NONE:
+		case STORAGE_CLASS_REGISTER:
+			break;
+
+		default:
+			errorf(pos, "parameter may only have none or register storage class");
+			break;
 	}
 
 	type_t *const orig_type = declaration->type;
@@ -3493,7 +3502,7 @@ static void semantic_parameter(declaration_t *declaration)
 	declaration->type = type;
 
 	if (is_type_incomplete(skip_typeref(type))) {
-		errorf(HERE, "incomplete type '%T' not allowed for parameter '%Y'",
+		errorf(pos, "incomplete type '%T' not allowed for parameter '%Y'",
 		       orig_type, declaration->symbol);
 	}
 }
@@ -6966,7 +6975,8 @@ static void semantic_incdec(unary_expression_t *expression)
 		                         type, orig_type);
 	} else if (!is_type_real(type) && is_type_valid(type)) {
 		/* TODO: improve error message */
-		errorf(HERE, "operation needs an arithmetic or pointer type");
+		errorf(&expression->base.source_position,
+		       "operation needs an arithmetic or pointer type");
 	}
 	expression->base.type = orig_type;
 }
@@ -6978,7 +6988,8 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 	if (!is_type_arithmetic(type)) {
 		if (is_type_valid(type)) {
 			/* TODO: improve error message */
-			errorf(HERE, "operation needs an arithmetic type");
+			errorf(&expression->base.source_position,
+			       "operation needs an arithmetic type");
 		}
 		return;
 	}
@@ -6991,7 +7002,8 @@ static void semantic_not(unary_expression_t *expression)
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_scalar(type) && is_type_valid(type)) {
-		errorf(HERE, "operand of ! must be of scalar type");
+		errorf(&expression->base.source_position,
+		       "operand of ! must be of scalar type");
 	}
 
 	expression->base.type = type_int;
@@ -7003,7 +7015,8 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_integer(type)) {
 		if (is_type_valid(type)) {
-			errorf(HERE, "operand of ~ must be of integer type");
+			errorf(&expression->base.source_position,
+			       "operand of ~ must be of integer type");
 		}
 		return;
 	}
@@ -7017,7 +7030,8 @@ static void semantic_dereference(unary_expression_t *expression)
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_pointer(type)) {
 		if (is_type_valid(type)) {
-			errorf(HERE, "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
+			errorf(&expression->base.source_position,
+			       "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
 		}
 		return;
 	}
@@ -7200,7 +7214,8 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(HERE, "operation needs arithmetic types");
+			errorf(&expression->base.source_position,
+			       "operation needs arithmetic types");
 		}
 		return;
 	}
@@ -7223,7 +7238,8 @@ static void semantic_shift_op(binary_expression_t *expression)
 	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(HERE, "operation needs integer types");
+			errorf(&expression->base.source_position,
+			       "operands of shift operation must have integer types");
 		}
 		return;
 	}
@@ -7269,12 +7285,13 @@ static void semantic_add(binary_expression_t *expression)
 
 static void semantic_sub(binary_expression_t *expression)
 {
-	expression_t *const left            = expression->left;
-	expression_t *const right           = expression->right;
-	type_t       *const orig_type_left  = left->base.type;
-	type_t       *const orig_type_right = right->base.type;
-	type_t       *const type_left       = skip_typeref(orig_type_left);
-	type_t       *const type_right      = skip_typeref(orig_type_right);
+	expression_t            *const left            = expression->left;
+	expression_t            *const right           = expression->right;
+	type_t                  *const orig_type_left  = left->base.type;
+	type_t                  *const orig_type_right = right->base.type;
+	type_t                  *const type_left       = skip_typeref(orig_type_left);
+	type_t                  *const type_right      = skip_typeref(orig_type_right);
+	source_position_t const *const pos             = &expression->base.source_position;
 
 	/* § 5.6.5 */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -7291,22 +7308,20 @@ static void semantic_sub(binary_expression_t *expression)
 		type_t *const unqual_left  = get_unqualified_type(skip_typeref(type_left->pointer.points_to));
 		type_t *const unqual_right = get_unqualified_type(skip_typeref(type_right->pointer.points_to));
 		if (!types_compatible(unqual_left, unqual_right)) {
-			errorf(&expression->base.source_position,
+			errorf(pos,
 			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
 		} else if (!is_type_object(unqual_left)) {
 			if (is_type_atomic(unqual_left, ATOMIC_TYPE_VOID)) {
-				warningf(&expression->base.source_position,
-				         "subtracting pointers to void");
+				warningf(pos, "subtracting pointers to void");
 			} else {
-				errorf(&expression->base.source_position,
-				       "subtracting pointers to non-object types '%T'",
+				errorf(pos, "subtracting pointers to non-object types '%T'",
 				       orig_type_left);
 			}
 		}
 		expression->base.type = type_ptrdiff_t;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
-		errorf(HERE, "invalid operands of types '%T' and '%T' to binary '-'",
+		errorf(pos, "invalid operands of types '%T' and '%T' to binary '-'",
 		       orig_type_left, orig_type_right);
 	}
 }
@@ -7467,7 +7482,8 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(HERE, "operation needs arithmetic types");
+			errorf(&expression->base.source_position,
+			       "operation needs arithmetic types");
 		}
 		return;
 	}
@@ -7506,7 +7522,9 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 		                         type_left, orig_type_left);
 		expression->base.type = type_left;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
-		errorf(HERE, "incompatible types '%T' and '%T' in assignment", orig_type_left, orig_type_right);
+		errorf(&expression->base.source_position,
+		       "incompatible types '%T' and '%T' in assignment",
+		       orig_type_left, orig_type_right);
 	}
 }
 
@@ -7525,7 +7543,8 @@ static void semantic_logical_op(binary_expression_t *expression)
 	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(HERE, "operation needs scalar types");
+			errorf(&expression->base.source_position,
+			       "operation needs scalar types");
 		}
 		return;
 	}
