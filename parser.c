@@ -6973,7 +6973,7 @@ static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	type_t *      res_type  = type;
+	type_t *      res_type  = orig_type;
 	if (is_type_pointer(type)) {
 		if (!check_pointer_arithmetic(&expression->base.source_position,
 		                              type, orig_type)) {
