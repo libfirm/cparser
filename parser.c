@@ -7182,21 +7182,13 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	if (get_atomic_type_size(s_rank) > get_atomic_type_size(u_rank))
 		return s_type;
 
-	/* FIXME ugly */
-	type_t *const type = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
 	switch (s_rank) {
-		case ATOMIC_TYPE_INT:      type->atomic.akind = ATOMIC_TYPE_UINT;      break;
-		case ATOMIC_TYPE_LONG:     type->atomic.akind = ATOMIC_TYPE_ULONG;     break;
-		case ATOMIC_TYPE_LONGLONG: type->atomic.akind = ATOMIC_TYPE_ULONGLONG; break;
+		case ATOMIC_TYPE_INT:      return type_int;
+		case ATOMIC_TYPE_LONG:     return type_long;
+		case ATOMIC_TYPE_LONGLONG: return type_long_long;
 
 		default: panic("invalid atomic type");
 	}
-
-	type_t* const result = typehash_insert(type);
-	if (result != type)
-		free_type(type);
-
-	return result;
 }
 
 /**
