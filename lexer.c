@@ -246,7 +246,8 @@ end_of_next_char:;
 	case 'X':         \
 	case 'Y':         \
 	case 'Z':         \
-	case '_':
+	case '_':         \
+	case '$': // TODO add option to deactivate $ in identifers
 
 #define DIGITS        \
 	case '0':         \
