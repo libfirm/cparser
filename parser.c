@@ -6792,13 +6792,14 @@ static bool same_compound_type(const type_t *type1, const type_t *type2)
 static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
 {
-	eat('?');
-	add_anchor_token(':');
-
 	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
 
 	conditional_expression_t *conditional = &result->conditional;
-	conditional->condition = expression;
+	conditional->base.source_position = *HERE;
+	conditional->condition            = expression;
+
+	eat('?');
+	add_anchor_token(':');
 
 	/* 6.5.15.2 */
 	type_t *const condition_type_orig = expression->base.type;
@@ -6824,7 +6825,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
 		if (!is_type_atomic(true_type, ATOMIC_TYPE_VOID)
 		    || !is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
-			warningf(&expression->base.source_position,
+			warningf(&conditional->base.source_position,
 					"ISO C forbids conditional expression with only one void side");
 		}
 		result_type = type_void;
@@ -6870,7 +6871,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 			                            get_unqualified_type(to2))) {
 				to = to1;
 			} else {
-				warningf(&expression->base.source_position,
+				warningf(&conditional->base.source_position,
 					"pointer types '%T' and '%T' in conditional expression are incompatible",
 					true_type, false_type);
 				to = type_void;
@@ -6885,7 +6886,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
 		} else if (is_type_integer(other_type)) {
-			warningf(&expression->base.source_position,
+			warningf(&conditional->base.source_position,
 					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
 			result_type = pointer_type;
 		} else {
@@ -6898,7 +6899,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 		if (is_type_valid(true_type) && is_type_valid(false_type)) {
 			type_error_incompatible("while parsing conditional",
-			                        &expression->base.source_position, true_type,
+			                        &conditional->base.source_position, true_type,
 			                        false_type);
 		}
 		result_type = type_error_type;
