@@ -4010,6 +4010,7 @@ static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract)
 {
 	declaration_t *const declaration    = allocate_declaration_zero();
+	declaration->source_position        = specifiers->source_position;
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->modifiers              = specifiers->modifiers;
 	declaration->deprecated_string      = specifiers->deprecated_string;
@@ -5201,7 +5202,7 @@ static void parse_external_declaration(void)
 				|| parameter->parent_scope == scope);
 		parameter->parent_scope = scope;
 		if (parameter->symbol == NULL) {
-			errorf(&ndeclaration->source_position, "parameter name omitted");
+			errorf(&parameter->source_position, "parameter name omitted");
 			continue;
 		}
 		environment_push(parameter);
