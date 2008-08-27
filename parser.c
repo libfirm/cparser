@@ -6990,11 +6990,8 @@ static void semantic_not(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	if (!is_type_scalar(type)) {
-		if (is_type_valid(type)) {
-			errorf(HERE, "operand of ! must be of scalar type");
-		}
-		return;
+	if (!is_type_scalar(type) && is_type_valid(type)) {
+		errorf(HERE, "operand of ! must be of scalar type");
 	}
 
 	expression->base.type = type_int;
