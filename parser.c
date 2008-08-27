@@ -6946,7 +6946,7 @@ end_error:
 	return create_invalid_expression();
 }
 
-static void check_pointer_arithmetic(const source_position_t *source_position,
+static bool check_pointer_arithmetic(const source_position_t *source_position,
                                      type_t *pointer_type,
                                      type_t *orig_pointer_type)
 {
@@ -6959,26 +6959,33 @@ static void check_pointer_arithmetic(const source_position_t *source_position,
 		errorf(source_position,
 			   "arithmetic with pointer to incomplete type '%T' not allowed",
 			   orig_pointer_type);
+		return false;
 	} else if (is_type_function(points_to)) {
 		errorf(source_position,
 			   "arithmetic with pointer to function type '%T' not allowed",
 			   orig_pointer_type);
+		return false;
 	}
+	return true;
 }
 
 static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
+	type_t *      res_type  = type;
 	if (is_type_pointer(type)) {
-		check_pointer_arithmetic(&expression->base.source_position,
-		                         type, orig_type);
+		if (!check_pointer_arithmetic(&expression->base.source_position,
+		                              type, orig_type)) {
+			res_type = type_error_type;
+		}
 	} else if (!is_type_real(type) && is_type_valid(type)) {
 		/* TODO: improve error message */
 		errorf(&expression->base.source_position,
 		       "operation needs an arithmetic or pointer type");
+		res_type = type_error_type;
 	}
-	expression->base.type = orig_type;
+	expression->base.type = res_type;
 }
 
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
