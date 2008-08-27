@@ -6973,19 +6973,18 @@ static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	type_t *      res_type  = orig_type;
 	if (is_type_pointer(type)) {
 		if (!check_pointer_arithmetic(&expression->base.source_position,
 		                              type, orig_type)) {
-			res_type = type_error_type;
+			return;
 		}
 	} else if (!is_type_real(type) && is_type_valid(type)) {
 		/* TODO: improve error message */
 		errorf(&expression->base.source_position,
 		       "operation needs an arithmetic or pointer type");
-		res_type = type_error_type;
+		return;
 	}
-	expression->base.type = res_type;
+	expression->base.type = orig_type;
 }
 
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
