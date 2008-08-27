@@ -7719,14 +7719,13 @@ static void semantic_comma(binary_expression_t *expression)
 static expression_t *parse_##binexpression_type(unsigned precedence,      \
                                                 expression_t *left)       \
 {                                                                         \
+	expression_t *binexpr = allocate_expression_zero(binexpression_type); \
+	binexpr->base.source_position = *HERE;                                \
+	binexpr->binary.left          = left;                                 \
 	eat(token_type);                                                      \
-	source_position_t pos = *HERE;                                        \
                                                                           \
 	expression_t *right = parse_sub_expression(precedence + lr);          \
                                                                           \
-	expression_t *binexpr = allocate_expression_zero(binexpression_type); \
-	binexpr->base.source_position = pos;                                  \
-	binexpr->binary.left  = left;                                         \
 	binexpr->binary.right = right;                                        \
 	sfunc(&binexpr->binary);                                              \
                                                                           \
