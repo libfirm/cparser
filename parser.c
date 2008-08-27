@@ -6986,7 +6986,7 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 	expression->base.type = orig_type;
 }
 
-static void semantic_unexpr_scalar(unary_expression_t *expression)
+static void semantic_not(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -6997,7 +6997,7 @@ static void semantic_unexpr_scalar(unary_expression_t *expression)
 		return;
 	}
 
-	expression->base.type = orig_type;
+	expression->base.type = type_int;
 }
 
 static void semantic_unexpr_integer(unary_expression_t *expression)
@@ -7086,7 +7086,7 @@ CREATE_UNARY_EXPRESSION_PARSER('-', EXPR_UNARY_NEGATE,
 CREATE_UNARY_EXPRESSION_PARSER('+', EXPR_UNARY_PLUS,
                                semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER('!', EXPR_UNARY_NOT,
-                               semantic_unexpr_scalar)
+                               semantic_not)
 CREATE_UNARY_EXPRESSION_PARSER('*', EXPR_UNARY_DEREFERENCE,
                                semantic_dereference)
 CREATE_UNARY_EXPRESSION_PARSER('&', EXPR_UNARY_TAKE_ADDRESS,
