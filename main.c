@@ -599,9 +599,10 @@ int main(int argc, char **argv)
 			} else if(strcmp(option, "M") == 0) {
 				mode = PreprocessOnly;
 				add_flag(&cppflags_obst, "-M");
-			} else if(strcmp(option, "MMD") == 0
-					|| strcmp(option, "MD") == 0
-					|| strcmp(option, "MM") == 0) {
+			} else if (strcmp(option, "MMD") == 0 ||
+			           strcmp(option, "MD")  == 0 ||
+			           strcmp(option, "MM")  == 0 ||
+			           strcmp(option, "MP")  == 0) {
 				add_flag(&cppflags_obst, "-%s", option);
 			} else if(strcmp(option, "MT") == 0
 					|| strcmp(option, "MQ") == 0
