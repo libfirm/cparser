@@ -311,12 +311,8 @@ static void print_function_type_post(const function_type_t *type,
                                      const scope_t *scope, bool top)
 {
 	intern_print_type_post(type->return_type, false);
-	/* don't emit braces if we're the toplevel type... */
-	if (!top)
-		fputc(')', out);
 
 	fputc('(', out);
-
 	bool first = true;
 	if (scope == NULL) {
 		function_parameter_t *parameter = type->parameters;
@@ -352,6 +348,10 @@ static void print_function_type_post(const function_type_t *type,
 		fputs("void", out);
 	}
 	fputc(')', out);
+
+	/* don't emit braces if we're the toplevel type... */
+	if (!top)
+		fputc(')', out);
 }
 
 /**
