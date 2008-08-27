@@ -7086,11 +7086,10 @@ static void semantic_take_addr(unary_expression_t *expression)
 #define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc)   \
 static expression_t *parse_##unexpression_type(unsigned precedence)            \
 {                                                                              \
-	eat(token_type);                                                           \
-	                                                                           \
 	expression_t *unary_expression                                             \
 		= allocate_expression_zero(unexpression_type);                         \
 	unary_expression->base.source_position = *HERE;                            \
+	eat(token_type);                                                           \
 	unary_expression->unary.value = parse_sub_expression(precedence);          \
 	                                                                           \
 	sfunc(&unary_expression->unary);                                           \
@@ -7121,11 +7120,11 @@ static expression_t *parse_##unexpression_type(unsigned precedence,           \
                                                expression_t *left)            \
 {                                                                             \
 	(void) precedence;                                                        \
-	eat(token_type);                                                          \
                                                                               \
 	expression_t *unary_expression                                            \
 		= allocate_expression_zero(unexpression_type);                        \
 	unary_expression->base.source_position = *HERE;                           \
+	eat(token_type);                                                          \
 	unary_expression->unary.value          = left;                            \
 	                                                                          \
 	sfunc(&unary_expression->unary);                                          \
