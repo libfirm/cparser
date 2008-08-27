@@ -5004,8 +5004,7 @@ static void check_unreachable(statement_t const* const stmt)
 	    stmt->kind != STATEMENT_COMPOUND &&
 	    stmt->kind != STATEMENT_DO_WHILE &&
 	    stmt->kind != STATEMENT_FOR) {
-		warningf(&stmt->base.source_position,
-		         "statement is unreachable");
+		warningf(&stmt->base.source_position, "statement is unreachable");
 	}
 
 	switch (stmt->kind) {
@@ -5062,19 +5061,24 @@ static void check_unreachable(statement_t const* const stmt)
 		case STATEMENT_FOR: {
 			for_statement_t const* const fors = &stmt->fors;
 
-			if (!stmt->base.reachable && fors->initialisation != NULL) {
-				warningf(&fors->initialisation->base.source_position,
-				         "initialisation of for-statement is unreachable");
-			}
+			// if init and step are unreachable, cond is unreachable, too
+			if (!stmt->base.reachable && !fors->step_reachable) {
+				warningf(&stmt->base.source_position, "statement is unreachable");
+			} else {
+				if (!stmt->base.reachable && fors->initialisation != NULL) {
+					warningf(&fors->initialisation->base.source_position,
+					         "initialisation of for-statement is unreachable");
+				}
 
-			if (!fors->condition_reachable && fors->condition != NULL) {
-				warningf(&fors->condition->base.source_position,
-				         "condition of for-statement is unreachable");
-			}
+				if (!fors->condition_reachable && fors->condition != NULL) {
+					warningf(&fors->condition->base.source_position,
+					         "condition of for-statement is unreachable");
+				}
 
-			if (!fors->step_reachable && fors->step != NULL) {
-				warningf(&fors->step->base.source_position,
-				         "step of for-statement is unreachable");
+				if (!fors->step_reachable && fors->step != NULL) {
+					warningf(&fors->step->base.source_position,
+					         "step of for-statement is unreachable");
+				}
 			}
 
 			check_unreachable(stmt->fors.body);
