@@ -106,6 +106,9 @@ bool strict_mode = false;
 /** use builtins for some libc functions */
 bool use_builtins = false;
 
+/** allow dollar signs in symbols */
+extern bool allow_dollar_in_symbols;
+
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
 
@@ -878,7 +881,7 @@ int main(int argc, char **argv)
 	init_types();
 	init_typehash();
 	init_basic_types();
-	init_lexer();
+	init_lexer(allow_dollar_in_symbols);
 	init_ast();
 	init_parser();
 	init_ast2firm();

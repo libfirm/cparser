@@ -56,6 +56,7 @@ static char        buf[1024 + MAX_PUTBACK];
 static const char *bufend;
 static const char *bufpos;
 static strset_t    stringset;
+bool               allow_dollar_in_symbol = true;
 
 /**
  * Prints a parse error message at the current token.
@@ -194,6 +195,7 @@ end_of_next_char:;
 }
 
 #define SYMBOL_CHARS  \
+	case '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
 	case 'a':         \
 	case 'b':         \
 	case 'c':         \
@@ -246,8 +248,7 @@ end_of_next_char:;
 	case 'X':         \
 	case 'Y':         \
 	case 'Z':         \
-	case '_':         \
-	case '$': // TODO add option to deactivate $ in identifers
+	case '_':
 
 #define DIGITS        \
 	case '0':         \
@@ -282,6 +283,7 @@ static void parse_symbol(void)
 			break;
 
 		default:
+dollar_sign:
 			goto end_symbol;
 		}
 	}
@@ -1565,6 +1567,7 @@ void lexer_next_preprocessing_token(void)
 			return;
 
 		default:
+dollar_sign:
 			errorf(&lexer_token.source_position, "unknown character '%c' found", c);
 			next_char();
 			lexer_token.type = T_ERROR;
