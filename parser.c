@@ -8151,34 +8151,54 @@ static statement_t *parse_case_statement(void)
 
 	*pos                             = token.source_position;
 	statement->case_label.expression = parse_expression();
-
-	PUSH_PARENT(statement);
+	if (! is_constant_expression(statement->case_label.expression)) {
+		errorf(pos, "case label does not reduce to an integer constant");
+		statement->case_label.is_bad = true;
+	} else {
+		long const val = fold_constant(statement->case_label.expression);
+		statement->case_label.first_case = val;
+		statement->case_label.last_case  = val;
+	}
 
 	if (c_mode & _GNUC) {
 		if (token.type == T_DOTDOTDOT) {
 			next_token();
 			statement->case_label.end_range = parse_expression();
+			if (! is_constant_expression(statement->case_label.end_range)) {
+				errorf(pos, "case range does not reduce to an integer constant");
+				statement->case_label.is_bad = true;
+			} else {
+				long const val = fold_constant(statement->case_label.end_range);
+				statement->case_label.last_case = val;
+
+				if (val < statement->case_label.first_case) {
+					statement->case_label.is_empty = true;
+					warningf(pos, "empty range specified");
+				}
+			}
 		}
 	}
 
+	PUSH_PARENT(statement);
+
 	expect(':');
 
-	if (! is_constant_expression(statement->case_label.expression)) {
-		errorf(pos, "case label does not reduce to an integer constant");
-	} else if (current_switch != NULL) {
-		/* Check for duplicate case values */
-		/* FIXME slow */
-		long const val = fold_constant(statement->case_label.expression);
-		for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
-			expression_t const* const e = l->expression;
-			if (e == NULL || !is_constant_expression(e) || fold_constant(e) != val)
-				continue;
+	if (current_switch != NULL) {
+		if (! statement->case_label.is_bad) {
+			/* Check for duplicate case values */
+			case_label_statement_t *c = &statement->case_label;
+			for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
+				if (l->is_bad || l->is_empty)
+					continue;
 
-			errorf(pos, "duplicate case value (previously used %P)",
-			       &l->base.source_position);
-			break;
+				if (c->last_case < l->first_case || c->first_case > l->last_case)
+					continue;
+
+				errorf(pos, "duplicate case value (previously used %P)",
+				       &l->base.source_position);
+				break;
+			}
 		}
-
 		/* link all cases into the switch statement */
 		if (current_switch->last_case == NULL) {
 			current_switch->first_case      = &statement->case_label;

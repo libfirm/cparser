@@ -662,8 +662,12 @@ struct case_label_statement_t {
 	statement_base_t        base;
 	expression_t           *expression;  /**< The case label expression, NULL for default label. */
 	expression_t           *end_range;   /**< For GNUC case a .. b: the end range expression, NULL else. */
+	case_label_statement_t *next;        /**< link to the next case label in switch */
 	statement_t            *statement;
-	case_label_statement_t *next; /**< link to the next case label in switch */
+	long                   first_case;   /**< The folded value of expression. */
+	long                   last_case;    /**< The folded value of end_range. */
+	bool                   is_bad;       /**< If set marked as bad to supress warnings. */
+	bool                   is_empty;     /**< If set marked this is a empty range. */
 };
 
 struct label_statement_t {

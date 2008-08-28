@@ -4443,6 +4443,9 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 
 static void case_label_to_firm(const case_label_statement_t *statement)
 {
+	if (statement->is_empty)
+		return;
+
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
@@ -4455,11 +4458,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 	set_cur_block(old_block);
 	if (statement->expression != NULL) {
-		long start_pn = fold_constant(statement->expression);
-		long end_pn = start_pn;
-		if (statement->end_range != NULL) {
-			end_pn = fold_constant(statement->end_range);
-		}
+		long start_pn = statement->first_case;
+		long end_pn   = statement->last_case;
 		assert(start_pn <= end_pn);
 		/* create jumps for all cases in the given range */
 		for (long pn = start_pn; pn <= end_pn; ++pn) {
