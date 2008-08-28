@@ -3377,7 +3377,7 @@ warn_about_long_long:
 				}
 			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
-				errorf(HERE, "signed and unsigned specifiers gives");
+				errorf(HERE, "signed and unsigned specifiers given");
 			} else if (type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
 				errorf(HERE, "only integer types can be signed or unsigned");
 			} else {
