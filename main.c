@@ -106,9 +106,6 @@ bool strict_mode = false;
 /** use builtins for some libc functions */
 bool use_builtins = false;
 
-/** allow dollar signs in symbols */
-extern bool allow_dollar_in_symbols;
-
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
 
@@ -620,7 +617,11 @@ int main(int argc, char **argv)
 				const char *opt;
 				GET_ARG_AFTER(opt, "-f");
 
-				if(strcmp(opt, "syntax-only") == 0) {
+				if (strcmp(opt, "dollars-in-identifiers") == 0) {
+					allow_dollar_in_symbol = true;
+				} else if (strcmp(opt, "no-dollars-in-identifiers") == 0) {
+					allow_dollar_in_symbol = false;
+				} else if (strcmp(opt, "syntax-only") == 0) {
 					mode = ParseOnly;
 				} else if(strcmp(opt, "omit-frame-pointer") == 0) {
 					set_be_option("omitfp");

@@ -24,7 +24,7 @@
 #include "token_t.h"
 
 extern token_t lexer_token;
-extern bool allow_dollar_in_symbols;
+extern bool    allow_dollar_in_symbol;
 
 void lexer_next_token(void);
 
