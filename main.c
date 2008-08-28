@@ -881,7 +881,7 @@ int main(int argc, char **argv)
 	init_types();
 	init_typehash();
 	init_basic_types();
-	init_lexer(allow_dollar_in_symbols);
+	init_lexer();
 	init_ast();
 	init_parser();
 	init_ast2firm();
