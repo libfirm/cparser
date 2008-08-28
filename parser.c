@@ -4898,6 +4898,7 @@ found_break_parent:
 			type_t *const ret  = skip_typeref(type->function.return_type);
 			if (warning.return_type                    &&
 			    !is_type_atomic(ret, ATOMIC_TYPE_VOID) &&
+			    is_type_valid(ret)                     &&
 			    !is_sym_main(current_function->symbol)) {
 				warningf(&stmt->base.source_position,
 				         "control reaches end of non-void function");
