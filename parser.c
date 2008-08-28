@@ -3399,10 +3399,8 @@ warn_about_long_long:
 			type->atomic.akind = atomic_type;
 		}
 		newtype = true;
-	} else {
-		if (type_specifiers != 0) {
-			errorf(HERE, "multiple datatypes in declaration");
-		}
+	} else if (type_specifiers != 0) {
+		errorf(HERE, "multiple datatypes in declaration");
 	}
 
 	/* FIXME: check type qualifiers here */
