@@ -47,7 +47,6 @@ struct a_firm_opt firm_opt = {
   /* precise_exc     = */ FALSE,	/* never needed for C */
   /* use_DivMod      = */ FALSE,
   /* remove_unused   = */ TRUE,
-  /* jmp_tbls        = */ TRUE,
   /* cloning         = */ FALSE,
   /* auto_sync       = */ TRUE,
   /* alias_analysis  = */ TRUE,
@@ -165,8 +164,6 @@ static const struct params {
   { X("no-opt-load-store"),      &firm_opt.load_store,       0, "firm: disable load store optimization" },
   { X("opt-modes"),              &firm_opt.modes,            1, "firm: optimize integer modes" },
   { X("no-opt-modes"),           &firm_opt.modes,            0, "firm: disable integer modes optimization" },
-  { X("jmptbls"),                &firm_opt.jmp_tbls,         1, "firm: create jump table for switch" },
-  { X("no-jmptbls"),             &firm_opt.jmp_tbls,         0, "firm: do not create jump table for switch" },
   { X("sync"),                   &firm_opt.auto_sync,        1, "firm: automatically create Sync nodes" },
   { X("no-sync"),                &firm_opt.auto_sync,        0, "firm: do not create Sync nodes" },
   { X("opt-alias"),              &firm_opt.alias_analysis,   1, "firm: enable alias analysis" },

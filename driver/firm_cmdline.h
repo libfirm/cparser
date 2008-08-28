@@ -54,7 +54,6 @@ struct a_firm_opt {
   a_byte   precise_exc;     /**< use precise exception context */
   a_byte   use_DivMod;      /**< use DivMod nodes */
   a_byte   remove_unused;   /**< remove unused functions */
-  a_byte   jmp_tbls;        /**< create jump table for switch */
   a_byte   cloning;         /**< enable procedure cloning */
   a_byte   auto_sync;       /**< automatically create Sync nodes */
   a_byte   alias_analysis;  /**< enable Alias Analysis */
