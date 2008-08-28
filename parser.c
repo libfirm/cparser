@@ -3054,6 +3054,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	type_modifiers_t   modifiers       = TYPE_MODIFIER_NONE;
 	unsigned           type_specifiers = 0;
 	bool               newtype         = false;
+	bool               saw_error       = false;
 
 	specifiers->source_position = token.source_position;
 
@@ -3207,13 +3208,50 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 		case T_IDENTIFIER: {
 			/* only parse identifier if we haven't found a type yet */
-			if (type != NULL || type_specifiers != 0)
-				goto finish_specifiers;
+			if (type != NULL || type_specifiers != 0) {
+				/* Be somewhat resilient to typos like 'unsigned lng* f()' in a
+				 * declaration, so it doesn't generate errors about expecting '(' or
+				 * '{' later on. */
+				switch (look_ahead(1)->type) {
+					STORAGE_CLASSES
+					TYPE_SPECIFIERS
+					case T_const:
+					case T_restrict:
+					case T_volatile:
+					case T_inline:
+					case T__forceinline: /* ^ DECLARATION_START except for __attribute__ */
+					case T_IDENTIFIER:
+					case '*':
+						errorf(HERE, "discarding stray %K in declaration specifer", &token);
+						next_token();
+						continue;
 
-			type_t *typedef_type = get_typedef_type(token.v.symbol);
+					default:
+						goto finish_specifiers;
+				}
+			}
 
-			if (typedef_type == NULL)
-				goto finish_specifiers;
+			type_t *const typedef_type = get_typedef_type(token.v.symbol);
+			if (typedef_type == NULL) {
+				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
+				 * declaration, so it doesn't generate 'implicit int' followed by more
+				 * errors later on. */
+				token_type_t const la1_type = look_ahead(1)->type;
+				switch (la1_type) {
+					DECLARATION_START
+					case T_IDENTIFIER:
+					case '*':
+						errorf(HERE, "%K does not name a type", &token);
+						next_token();
+						saw_error = true;
+						if (la1_type == '*')
+							goto finish_specifiers;
+						continue;
+
+					default:
+						goto finish_specifiers;
+				}
+			}
 
 			next_token();
 			type = typedef_type;
@@ -3366,7 +3404,12 @@ warn_about_long_long:
 		default:
 			/* invalid specifier combination, give an error message */
 			if (type_specifiers == 0) {
-				if (! strict_mode) {
+				if (saw_error) {
+					specifiers->type = type_error_type;
+					return;
+				}
+
+				if (!strict_mode) {
 					if (warning.implicit_int) {
 						warningf(HERE, "no type specifiers in declaration, using 'int'");
 					}
