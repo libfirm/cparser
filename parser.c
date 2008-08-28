@@ -3053,7 +3053,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	type_qualifiers_t  qualifiers      = TYPE_QUALIFIER_NONE;
 	type_modifiers_t   modifiers       = TYPE_MODIFIER_NONE;
 	unsigned           type_specifiers = 0;
-	int                newtype         = 0;
+	bool               newtype         = false;
 
 	specifiers->source_position = token.source_position;
 
@@ -3398,7 +3398,7 @@ warn_about_long_long:
 			type               = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
 			type->atomic.akind = atomic_type;
 		}
-		newtype = 1;
+		newtype = true;
 	} else {
 		if (type_specifiers != 0) {
 			errorf(HERE, "multiple datatypes in declaration");
