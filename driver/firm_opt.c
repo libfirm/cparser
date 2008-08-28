@@ -340,7 +340,7 @@ static void do_cloning(void)
 
 static void do_lower_switch(ir_graph *irg)
 {
-	lower_switch(irg, 128);
+	lower_switch(irg, firm_opt.spare_size);
 }
 
 typedef enum opt_target {
