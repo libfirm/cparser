@@ -646,10 +646,11 @@ struct if_statement_t {
 };
 
 struct switch_statement_t {
-	statement_base_t       base;
+	statement_base_t        base;
 	expression_t           *expression;
 	statement_t            *body;
 	case_label_statement_t *first_case, *last_case;
+	unsigned long           def_proj_nr;  /**< the Proj-number for the default Proj. */
 };
 
 struct goto_statement_t {

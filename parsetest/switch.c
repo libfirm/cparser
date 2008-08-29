@@ -6,6 +6,11 @@ static int switch1(int k) {
 		return 5;
 	case 13:
 		return 7;
+	case 0x7FFFFFFF:
+		return 8;
+	case -1:
+	case -314159265:
+		return 9;
 	}
 	return 3;
 }

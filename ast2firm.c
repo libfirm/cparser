@@ -44,8 +44,6 @@
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 
-#define MAGIC_DEFAULT_PN_NUMBER	    (long) -314159265
-
 /* some idents needed for name mangling */
 static ident *id_underscore;
 static ident *id_imp;
@@ -68,6 +66,7 @@ static bool constant_folding;
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
 static ir_node             *current_funcsig;
+static switch_statement_t  *current_switch;
 
 static entitymap_t  entitymap;
 
@@ -4398,7 +4397,7 @@ static ir_node *get_break_label(void)
 	return break_label;
 }
 
-static void switch_statement_to_firm(const switch_statement_t *statement)
+static void switch_statement_to_firm(switch_statement_t *statement)
 {
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
@@ -4413,6 +4412,57 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	saw_default_label                    = false;
 	current_switch_cond                  = cond;
 	break_label                          = NULL;
+	switch_statement_t *const old_switch = current_switch;
+	current_switch                       = statement;
+
+	/* determine a free number for the default label */
+	unsigned long num_cases = 0;
+	long def_nr = 0;
+	for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
+		if (l->expression == NULL) {
+			/* default case */
+			continue;
+		}
+		for (long cns = l->first_case; cns <= l->last_case; ++cns)
+			++num_cases;
+		if (l->last_case > def_nr)
+			def_nr = l->last_case;
+	}
+
+	if (def_nr + 1 < 0) {
+		/* Bad: an overflow occurred, we cannot be sure that the
+    	 * maximum + 1 is a free number. Scan the values a second
+    	 * time to find a free number.
+    	 */
+		unsigned char *bits = xmalloc((num_cases + 7) >> 3);
+		unsigned long i;
+
+ 		memset(bits, 0, (num_cases + 7) >> 3);
+		for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
+			if (l->expression == NULL) {
+				/* default case */
+				continue;
+			}
+			for (long cns = l->first_case; cns <= l->last_case; ++cns) {
+				if (cns >= 0 && (unsigned long)cns < num_cases)
+					bits[cns >> 3] |= (1 << (cns & 7));
+			}
+		}
+		/* We look at the first num_cases constants:
+		 * Either they are densed, so we took the last (num_cases)
+		 * one, or they are non densed, so we will find one free
+		 * there...
+		 */
+		for (i = 0; i < num_cases; ++i)
+			if ((bits[i >> 3] & (i & 7)) == 0)
+				break;
+
+		free(bits);
+		def_nr = i;
+	} else {
+		++def_nr;
+	}
+	statement->def_proj_nr = def_nr;
 
 	if (statement->body != NULL) {
 		statement_to_firm(statement->body);
@@ -4426,7 +4476,7 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	if (!saw_default_label) {
 		set_cur_block(get_nodes_block(cond));
 		ir_node *const proj = new_d_defaultProj(dbgi, cond,
-		                                        MAGIC_DEFAULT_PN_NUMBER);
+		                                        statement->def_proj_nr);
 		add_immBlock_pred(get_break_label(), proj);
 	}
 
@@ -4436,6 +4486,7 @@ static void switch_statement_to_firm(const switch_statement_t *statement)
 	set_cur_block(break_label);
 
 	assert(current_switch_cond == cond);
+	current_switch      = old_switch;
 	current_switch_cond = old_switch_cond;
 	break_label         = old_break_label;
 	saw_default_label   = old_saw_default_label;
@@ -4450,8 +4501,6 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
-	/* let's create a node and hope firm constant folding creates a Const
-	 * node... */
 	ir_node *proj;
 	ir_node *old_block = get_nodes_block(current_switch_cond);
 	ir_node *block     = new_immBlock();
@@ -4463,17 +4512,13 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		assert(start_pn <= end_pn);
 		/* create jumps for all cases in the given range */
 		for (long pn = start_pn; pn <= end_pn; ++pn) {
-			if (pn == MAGIC_DEFAULT_PN_NUMBER) {
-				/* oops someone detected our cheating... */
-				panic("magic default pn used");
-			}
 			proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
 			add_immBlock_pred(block, proj);
 		}
 	} else {
 		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
-		                         MAGIC_DEFAULT_PN_NUMBER);
+		                         current_switch->def_proj_nr);
 
 		add_immBlock_pred(block, proj);
 	}
