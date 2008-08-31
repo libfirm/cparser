@@ -71,8 +71,8 @@ typedef struct warning_t {
 	bool packed:1;                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	bool padded:1;                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */
 	bool parentheses:1;                   /**< Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces) */
-	bool pointer_arith:1;                 /**< Warn about anything that depends on the "size of" a function type or of 'void' */
 #endif
+	bool pointer_arith:1;                 /**< Warn about anything that depends on the "size of" a function type or of 'void' */
 	bool redundant_decls:1;               /**< Warn about redundant declarations */
 	bool return_type:1;                   /* TODO not fully implemented */ /**< Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'. */
 	bool s_are_errors:1;                  /**< Treat warnings as errors */

@@ -41,6 +41,7 @@ warning_t warning = {
 	.nested_externs                = false,
 	.nonnull                       = true,
 	.redundant_decls               = true,
+	.pointer_arith                 = true,
 	.return_type                   = true,
 	.s_are_errors                  = false,
 	.shadow                        = false,
@@ -84,6 +85,7 @@ void set_warning_opt(const char *const opt)
 		SET(main);
 		SET(nonnull);
 		SET(redundant_decls);
+		SET(pointer_arith);
 		SET(return_type);
 		SET(shadow);
 		SET(sign_compare);
@@ -133,6 +135,7 @@ void set_warning_opt(const char *const opt)
 	OPT("nested-externs",                nested_externs);
 	OPT("nonnull",                       nonnull);
 	OPT("redundant-decls",               redundant_decls);
+	OPT("pointer_arith",                 pointer_arith);
 	OPT("return-type",                   return_type);
 	OPT("shadow",                        shadow);
 	OPT("sign-compare",                  sign_compare);
