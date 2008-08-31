@@ -652,7 +652,7 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "omit-frame-pointer")) {
 						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "strength-reduce")) {
-						firm_option("strength-red");
+						firm_option(truth_value ? "strength-red" : "no-strength-red");
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
 					           streq(opt, "unroll-loops")            ||
