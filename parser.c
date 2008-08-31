@@ -840,7 +840,7 @@ static void label_pop_to(size_t new_top)
 }
 
 
-static int get_rank(const type_t *type)
+static atomic_type_kind_t get_rank(const type_t *type)
 {
 	assert(!is_typeref(type));
 	/* The C-standard allows promoting enums to int or unsigned int (see § 7.2.2
@@ -3233,10 +3233,10 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 			type_t *const typedef_type = get_typedef_type(token.v.symbol);
 			if (typedef_type == NULL) {
-				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
+				/* Be somewhat resilient to typos like 'void f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
 				 * errors later on. */
-				token_type_t const la1_type = look_ahead(1)->type;
+				token_type_t const la1_type = (token_type_t)look_ahead(1)->type;
 				switch (la1_type) {
 					DECLARATION_START
 					case T_IDENTIFIER:
@@ -7206,16 +7206,16 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 
 	bool const signed_left  = is_type_signed(type_left);
 	bool const signed_right = is_type_signed(type_right);
-	int  const rank_left    = get_rank(type_left);
-	int  const rank_right   = get_rank(type_right);
+	atomic_type_kind_t const rank_left  = get_rank(type_left);
+	atomic_type_kind_t const rank_right = get_rank(type_right);
 
 	if (signed_left == signed_right)
 		return rank_left >= rank_right ? type_left : type_right;
 
-	int     s_rank;
-	int     u_rank;
-	type_t *s_type;
-	type_t *u_type;
+	atomic_type_kind_t  s_rank;
+	atomic_type_kind_t  u_rank;
+	type_t             *s_type;
+	type_t             *u_type;
 	if (signed_left) {
 		s_rank = rank_left;
 		s_type = type_left;

@@ -1067,7 +1067,7 @@ static ir_entity *get_function_entity(declaration_t *declaration)
 	 * extern inline             => local
 	 * inline without definition => local
 	 * inline with definition    => external_visible */
-	storage_class_tag_t const storage_class = declaration->storage_class;
+	storage_class_tag_t const storage_class = (storage_class_tag_t)declaration->storage_class;
 	bool                const is_inline     = declaration->is_inline;
 	bool                const has_body      = declaration->init.statement != NULL;
 	if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
