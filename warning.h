@@ -86,8 +86,8 @@ typedef struct warning_t {
 #endif
 	bool strict_prototypes:1;             /**< Warn if a function declaration has an unspecified parameter list */
 	bool switch_default:1;                /**< Warn whenever a 'switch' statement does not have a 'default' case */
-#if 0 // TODO
 	bool switch_enum:1;                   /**< Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch? */
+#if 0 // TODO
 	bool traditional:1;                   /**< Warn about certain constructs that behave differently in traditional and ISO C */
 	bool undef:1;                         /**< Warn if an undefined identifier is evaluated in an '#if' directive */
 	bool uninitialized:1;                 /**< Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call. */

@@ -47,6 +47,7 @@ warning_t warning = {
 	.sign_compare                  = false,
 	.strict_prototypes             = true,
 	.switch_default                = false,
+	.switch_enum                   = false,
 	.unknown_pragmas               = true,
 	.unreachable_code              = false,
 	.unused_function               = false,
@@ -94,6 +95,7 @@ void set_warning_opt(const char *const opt)
 		SET(unused_parameter);
 		SET(unused_value);
 		SET(unused_variable);
+		SET(switch_enum);
 	}
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
@@ -136,6 +138,7 @@ void set_warning_opt(const char *const opt)
 	OPT("sign-compare",                  sign_compare);
 	OPT("strict-prototypes",             strict_prototypes);
 	OPT("switch-default",                switch_default);
+	OPT("switch-enum",                   switch_enum);
 	OPT("unknown-pragmas",               unknown_pragmas);
 	OPT("unreachable-code",              unreachable_code);
 	OPTX("unused") {

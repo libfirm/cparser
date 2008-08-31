@@ -4462,7 +4462,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	} else {
 		++def_nr;
 	}
-	statement->def_proj_nr = def_nr;
+	statement->default_proj_nr = def_nr;
 
 	if (statement->body != NULL) {
 		statement_to_firm(statement->body);
@@ -4476,7 +4476,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	if (!saw_default_label) {
 		set_cur_block(get_nodes_block(cond));
 		ir_node *const proj = new_d_defaultProj(dbgi, cond,
-		                                        statement->def_proj_nr);
+		                                        statement->default_proj_nr);
 		add_immBlock_pred(get_break_label(), proj);
 	}
 
@@ -4518,7 +4518,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	} else {
 		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
-		                         current_switch->def_proj_nr);
+		                         current_switch->default_proj_nr);
 
 		add_immBlock_pred(block, proj);
 	}

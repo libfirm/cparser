@@ -3233,7 +3233,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 			type_t *const typedef_type = get_typedef_type(token.v.symbol);
 			if (typedef_type == NULL) {
-				/* Be somewhat resilient to typos like 'void f()' at the beginning of a
+				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
 				 * errors later on. */
 				token_type_t const la1_type = (token_type_t)look_ahead(1)->type;
@@ -4786,9 +4786,7 @@ static void check_reachable(statement_t *const stmt)
 						continue;
 					}
 
-					expression_t *const case_expr = i->expression;
-					if (is_constant_expression(case_expr) &&
-					    fold_constant(case_expr) == val) {
+					if (i->first_case <= val && val <= i->last_case) {
 						check_reachable((statement_t*)i);
 						return;
 					}
@@ -8267,20 +8265,6 @@ end_error:
 }
 
 /**
- * Finds an existing default label of a switch statement.
- */
-static case_label_statement_t *
-find_default_label(const switch_statement_t *statement)
-{
-	case_label_statement_t *label = statement->first_case;
-	for ( ; label != NULL; label = label->next) {
-		if (label->expression == NULL)
-			return label;
-	}
-	return NULL;
-}
-
-/**
  * Parse a default statement.
  */
 static statement_t *parse_default_statement(void)
@@ -8294,11 +8278,13 @@ static statement_t *parse_default_statement(void)
 
 	expect(':');
 	if (current_switch != NULL) {
-		const case_label_statement_t *def_label = find_default_label(current_switch);
+		const case_label_statement_t *def_label = current_switch->default_label;
 		if (def_label != NULL) {
 			errorf(HERE, "multiple default labels in one switch (previous declared %P)",
 			       &def_label->base.source_position);
 		} else {
+			current_switch->default_label = &statement->case_label;
+
 			/* link all cases into the switch statement */
 			if (current_switch->last_case == NULL) {
 				current_switch->first_case      = &statement->case_label;
@@ -8450,6 +8436,46 @@ end_error:
 }
 
 /**
+ * Check that all enums are handled in a switch.
+ *
+ * @param statement  the switch statement to check
+ */
+static void check_enum_cases(const switch_statement_t *statement) {
+	const type_t *type = skip_typeref(statement->expression->base.type);
+	if (! is_type_enum(type))
+		return;
+	const enum_type_t *enumt = &type->enumt;
+
+	/* if we have a default, no warnings */
+	if (statement->default_label != NULL)
+		return;
+
+	/* FIXME: calculation of value should be done while parsing */
+	const declaration_t *declaration;
+	long last_value = -1;
+	for (declaration = enumt->declaration->next;
+	     declaration != NULL && declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY;
+		 declaration = declaration->next) {
+		const expression_t *expression = declaration->init.enum_value;
+		long                value      = expression != NULL ? fold_constant(expression) : last_value + 1;
+		bool                found      = false;
+		for (const case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
+			if (l->expression == NULL)
+				continue;
+			if (l->first_case <= value && value <= l->last_case) {
+				found = true;
+				break;
+			}
+		}
+		if (! found) {
+			warningf(&statement->base.source_position,
+				"enumeration value '%Y' not handled in switch", declaration->symbol);
+		}
+		last_value = value;
+	}
+}
+
+/**
  * Parse a switch statement.
  */
 static statement_t *parse_switch(void)
@@ -8462,6 +8488,7 @@ static statement_t *parse_switch(void)
 	PUSH_PARENT(statement);
 
 	expect('(');
+	add_anchor_token(')');
 	expression_t *const expr = parse_expression();
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
@@ -8473,6 +8500,7 @@ static statement_t *parse_switch(void)
 	}
 	statement->switchs.expression = create_implicit_cast(expr, type);
 	expect(')');
+	rem_anchor_token(')');
 
 	switch_statement_t *rem = current_switch;
 	current_switch          = &statement->switchs;
@@ -8480,9 +8508,11 @@ static statement_t *parse_switch(void)
 	current_switch          = rem;
 
 	if (warning.switch_default &&
-	   find_default_label(&statement->switchs) == NULL) {
+	    statement->switchs.default_label == NULL) {
 		warningf(&statement->base.source_position, "switch has no default case");
 	}
+	if (warning.switch_enum)
+		check_enum_cases(&statement->switchs);
 
 	POP_PARENT;
 	return statement;
