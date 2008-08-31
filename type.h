@@ -118,6 +118,11 @@ void inc_type_visited(void);
 bool is_type_integer(const type_t *type);
 
 /**
+ * Returns true if the given type is an enum type.
+ */
+bool is_type_enum(const type_t *type);
+
+/**
  * return true if type contains signed numbers
  */
 bool is_type_signed(const type_t *type);

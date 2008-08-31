@@ -775,6 +775,18 @@ bool is_type_integer(const type_t *type)
 }
 
 /**
+ * Returns true if the given type is an enum type.
+ *
+ * @param type  The type to check.
+ * @return True if type is an enum type.
+ */
+bool is_type_enum(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_ENUM;
+}
+
+/**
  * Returns true if the given type is an floating point type.
  *
  * @param type  The type to check.
@@ -837,6 +849,12 @@ bool is_type_arithmetic(const type_t *type)
 	}
 }
 
+/**
+ * Returns true if the given type is an integer or float type.
+ *
+ * @param type  The type to check.
+ * @return True if type is an integer or float type.
+ */
 bool is_type_real(const type_t *type)
 {
 	/* 6.2.5.17 */
