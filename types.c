@@ -25,6 +25,7 @@
 type_t *type_error_type;
 
 type_t *type_char;
+type_t *type_const_char;
 type_t *type_double;
 type_t *type_float;
 type_t *type_int;
@@ -39,6 +40,7 @@ type_t *type_unsigned_long;
 type_t *type_void;
 
 type_t *type_char_ptr;
+type_t *type_const_char_ptr;
 type_t *type_int_ptr;
 type_t *type_long_long_ptr;
 type_t *type_long_ptr;
@@ -55,12 +57,14 @@ type_t *type_ssize_t;
 type_t *type_uintmax_t;
 type_t *type_uptrdiff_t;
 type_t *type_wchar_t;
+type_t *type_const_wchar_t;
 type_t *type_wint_t;
 
 type_t *type_intmax_t_ptr;
 type_t *type_ptrdiff_t_ptr;
 type_t *type_ssize_t_ptr;
 type_t *type_wchar_t_ptr;
+type_t *type_const_wchar_t_ptr;
 
 /* microsoft types */
 atomic_type_kind_t int8_type_kind            = ATOMIC_TYPE_INVALID;
@@ -135,4 +139,8 @@ void init_basic_types(void)
 	type_long_long_ptr      = make_pointer_type(type_long_long,         TYPE_QUALIFIER_NONE);
 
 	type_char_ptr_ptr       = make_pointer_type(type_char_ptr,          TYPE_QUALIFIER_NONE);
+
+	/* const character types */
+	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);
+	type_const_char_ptr     = make_pointer_type(type_const_char,        TYPE_QUALIFIER_NONE);
 }

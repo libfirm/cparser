@@ -55,7 +55,8 @@ warning_t warning = {
 	.unused_label                  = false,
 	.unused_parameter              = false,
 	.unused_value                  = true,
-	.unused_variable               = false
+	.unused_variable               = false,
+	.write_strings                 = false
 };
 
 void set_warning_opt(const char *const opt)
@@ -156,6 +157,7 @@ void set_warning_opt(const char *const opt)
 	OPT("unused-parameter",              unused_parameter);
 	OPT("unused-value",                  unused_value);
 	OPT("unused-variable",               unused_variable);
+	OPT("write-strings",                 write_strings);
 #undef OPT
 #undef SET
 #undef OPT_X

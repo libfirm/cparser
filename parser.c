@@ -5512,7 +5512,7 @@ static expression_t *parse_string_const(void)
 			/* note: that we use type_char_ptr here, which is already the
 			 * automatic converted type. revert_automatic_type_conversion
 			 * will construct the array type */
-			cnst->base.type    = type_char_ptr;
+			cnst->base.type    = warning.write_strings ? type_const_char_ptr : type_char_ptr;
 			cnst->string.value = res;
 			return cnst;
 		}
@@ -5535,7 +5535,7 @@ static expression_t *parse_string_const(void)
 
 			default: {
 				expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
-				cnst->base.type         = type_wchar_t_ptr;
+				cnst->base.type         = warning.write_strings ? type_const_char_ptr : type_wchar_t_ptr;
 				cnst->wide_string.value = wres;
 				return cnst;
 			}
@@ -9174,6 +9174,13 @@ static void initialize_builtin_types(void)
 	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
 	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
 	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
+
+	/* const version of wchar_t */
+	type_const_wchar_t = allocate_type_zero(TYPE_TYPEDEF, &builtin_source_position);
+	type_const_wchar_t->typedeft.declaration = type_wchar_t->typedeft.declaration;
+	type_const_wchar_t->base.modifiers |= TYPE_QUALIFIER_CONST;
+
+	type_const_wchar_t_ptr = make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
 }
 
 /**

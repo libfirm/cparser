@@ -25,6 +25,7 @@
 extern type_t *type_error_type;
 
 extern type_t *type_char;
+extern type_t *type_const_char;
 extern type_t *type_double;
 extern type_t *type_float;
 extern type_t *type_int;
@@ -39,6 +40,7 @@ extern type_t *type_unsigned_long;
 extern type_t *type_void;
 
 extern type_t *type_char_ptr;
+extern type_t *type_const_char_ptr;
 extern type_t *type_int_ptr;
 extern type_t *type_long_long_ptr;
 extern type_t *type_long_ptr;
@@ -55,6 +57,7 @@ extern type_t *type_ssize_t;
 extern type_t *type_uintmax_t;
 extern type_t *type_uptrdiff_t;
 extern type_t *type_wchar_t;
+extern type_t *type_const_wchar_t;
 extern type_t *type_wchar_ptr_t;
 extern type_t *type_wint_t;
 
@@ -62,6 +65,7 @@ extern type_t *type_intmax_t_ptr;
 extern type_t *type_ptrdiff_t_ptr;
 extern type_t *type_ssize_t_ptr;
 extern type_t *type_wchar_t_ptr;
+extern type_t *type_const_wchar_t_ptr;
 
 /* microsoft types */
 extern atomic_type_kind_t int8_type_kind;
