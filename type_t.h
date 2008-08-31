@@ -131,7 +131,7 @@ typedef enum cc_kind_t {
 struct function_type_t {
 	type_base_t           base;
 	type_t               *return_type;        /**< The return type. */
-	function_parameter_t *parameters;         /**< A linst of the parameter types. */
+	function_parameter_t *parameters;         /**< A list of the parameter types. */
 	cc_kind_t             calling_convention; /**< The specified calling convention. */
 	unsigned              variadic : 1;
 	unsigned              unspecified_parameters : 1;
