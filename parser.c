@@ -9091,9 +9091,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	scope_t *last_scope = scope;
 	set_scope(&statement->compound.scope);
 
-	statement_t *last_statement = NULL;
-
-	bool only_decls_so_far = true;
+	statement_t **anchor            = &statement->compound.statements;
+	bool          only_decls_so_far = true;
 	while (token.type != '}' && token.type != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
 		if (is_invalid_statement(sub_statement)) {
@@ -9112,16 +9111,12 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 			}
 		}
 
-		if (last_statement != NULL) {
-			last_statement->base.next = sub_statement;
-		} else {
-			statement->compound.statements = sub_statement;
-		}
+		*anchor = sub_statement;
 
 		while (sub_statement->base.next != NULL)
 			sub_statement = sub_statement->base.next;
 
-		last_statement = sub_statement;
+		anchor = &sub_statement->base.next;
 	}
 
 	if (token.type == '}') {
