@@ -9181,8 +9181,8 @@ static void initialize_builtin_types(void)
 
 	/* const version of wchar_t */
 	type_const_wchar_t = allocate_type_zero(TYPE_TYPEDEF, &builtin_source_position);
-	type_const_wchar_t->typedeft.declaration = type_wchar_t->typedeft.declaration;
-	type_const_wchar_t->base.modifiers |= TYPE_QUALIFIER_CONST;
+	type_const_wchar_t->typedeft.declaration  = type_wchar_t->typedeft.declaration;
+	type_const_wchar_t->base.qualifiers      |= TYPE_QUALIFIER_CONST;
 
 	type_const_wchar_t_ptr = make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
 }
