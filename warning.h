@@ -31,8 +31,6 @@ typedef struct warning_t {
 #endif
 	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 	bool char_subscripts:1;               /**< Warn if an array subscript has the type 'char' */
-	bool format:1;                        /**< Check printf-style format strings */
-	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull */
 #if 0 // TODO
 	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 	bool cast_qual:1;                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
@@ -49,6 +47,7 @@ typedef struct warning_t {
 #endif
 	bool fatal_errors:1;                  /**< First error stops the compilation */
 	bool float_equal:1;                   /**< Warn if floating point values are used in equality comparisons */
+	bool format:1;                        /**< Check printf-style format strings */
 	bool implicit_function_declaration:1; /**< Warn whenever a function is used before being declared */
 	bool implicit_int:1;                  /**< Warn when a declaration does not specify a type */
 #if 0 // TODO
@@ -67,6 +66,7 @@ typedef struct warning_t {
 	bool missing_prototypes:1;            /**< Warn if a global function is defined without a previous prototype declaration */
 	bool multichar:1;                     /**< Warn if a multicharacter constant ('FOOF') is used. */
 	bool nested_externs:1;                /**< Warn if an 'extern' declaration is encountered within a function */
+	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull */
 #if 0 // TODO
 	bool packed:1;                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	bool padded:1;                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */

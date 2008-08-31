@@ -40,8 +40,8 @@ warning_t warning = {
 	.multichar                     = true,
 	.nested_externs                = false,
 	.nonnull                       = true,
-	.redundant_decls               = true,
 	.pointer_arith                 = true,
+	.redundant_decls               = true,
 	.return_type                   = true,
 	.s_are_errors                  = false,
 	.shadow                        = false,
@@ -85,12 +85,13 @@ void set_warning_opt(const char *const opt)
 		SET(implicit_int);
 		SET(main);
 		SET(nonnull);
-		SET(redundant_decls);
 		SET(pointer_arith);
+		SET(redundant_decls);
 		SET(return_type);
 		SET(shadow);
 		SET(sign_compare);
 		SET(strict_prototypes);
+		SET(switch_enum);
 		SET(unknown_pragmas);
 		SET(unreachable_code);
 		SET(unused_function);
@@ -98,7 +99,6 @@ void set_warning_opt(const char *const opt)
 		SET(unused_parameter);
 		SET(unused_value);
 		SET(unused_variable);
-		SET(switch_enum);
 	}
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
@@ -135,8 +135,8 @@ void set_warning_opt(const char *const opt)
 	OPT("multichar",                     multichar);
 	OPT("nested-externs",                nested_externs);
 	OPT("nonnull",                       nonnull);
-	OPT("redundant-decls",               redundant_decls);
 	OPT("pointer_arith",                 pointer_arith);
+	OPT("redundant-decls",               redundant_decls);
 	OPT("return-type",                   return_type);
 	OPT("shadow",                        shadow);
 	OPT("sign-compare",                  sign_compare);
