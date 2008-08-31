@@ -650,7 +650,7 @@ int main(int argc, char **argv)
 				           streq(opt, "jump-tables")             ||
 				           streq(opt, "unroll-loops")            ||
 				           streq(opt, "expensive-optimizations") ||
-				           streq(opt, "no-common")               ||
+				           streq(opt, "common")                  ||
 				           streq(opt, "PIC")                     ||
 				           strstart(opt, "align-loops=")         ||
 				           strstart(opt, "align-jumps=")         ||
