@@ -5535,7 +5535,7 @@ static expression_t *parse_string_const(void)
 
 			default: {
 				expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
-				cnst->base.type         = warning.write_strings ? type_const_char_ptr : type_wchar_t_ptr;
+				cnst->base.type         = warning.write_strings ? type_const_wchar_t_ptr : type_wchar_t_ptr;
 				cnst->wide_string.value = wres;
 				return cnst;
 			}
