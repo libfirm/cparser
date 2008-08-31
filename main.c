@@ -628,9 +628,11 @@ int main(int argc, char **argv)
 			} else if (streq(option, "pipe")) {
 				/* here for gcc compatibility */
 			} else if (option[0] == 'f') {
-				bool truth_value = true;
-				const char *opt;
-				GET_ARG_AFTER(opt, "-f");
+				char const *orig_opt;
+				GET_ARG_AFTER(orig_opt, "-f");
+
+				char const *opt         = orig_opt;
+				bool        truth_value = true;
 				if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
 					truth_value = false;
 					opt += 3;
@@ -655,14 +657,12 @@ int main(int argc, char **argv)
 				           strstart(opt, "align-loops=")         ||
 				           strstart(opt, "align-jumps=")         ||
 				           strstart(opt, "align-functions=")) {
-					fprintf(stderr, "ignoring gcc option '-f%s'\n", truth_value ? opt : opt - 3);
+					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 				} else {
-					if (! truth_value)
-						opt -= 3;
-					int res = firm_option(opt);
+					int res = firm_option(orig_opt);
 					if (res == 0) {
-						fprintf(stderr, "error: unknown Firm option '-f %s'\n",
-						        opt);
+						fprintf(stderr, "error: unknown Firm option '-f%s'\n",
+						        orig_opt);
 						argument_errors = true;
 						continue;
 					} else if (res == -1) {
