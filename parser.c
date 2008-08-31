@@ -5972,9 +5972,9 @@ end_error:
 }
 
 /**
- * Parse a braced expression.
+ * Parse a parenthesized expression.
  */
-static expression_t *parse_brace_expression(void)
+static expression_t *parse_parenthesized_expression(void)
 {
 	eat('(');
 	add_anchor_token(')');
@@ -6460,7 +6460,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
 		case T__assume:                  return parse_assume();
 
-		case '(':                        return parse_brace_expression();
+		case '(':                        return parse_parenthesized_expression();
 		case T___noop:                   return parse_noop_expression();
 	}
 
