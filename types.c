@@ -33,6 +33,7 @@ type_t *type_long_double;
 type_t *type_long_long;
 type_t *type_long;
 type_t *type_short;
+type_t *type_unsigned_short;
 type_t *type_signed_char;
 type_t *type_unsigned_int;
 type_t *type_unsigned_long_long;
@@ -97,6 +98,7 @@ void init_basic_types(void)
 	type_error_type         = (type_t*)&error;
 	type_signed_char        = make_atomic_type(ATOMIC_TYPE_SCHAR,       TYPE_QUALIFIER_NONE);
 	type_short              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
+	type_unsigned_short     = make_atomic_type(ATOMIC_TYPE_USHORT,      TYPE_QUALIFIER_NONE);
 	type_int                = make_atomic_type(ATOMIC_TYPE_INT,         TYPE_QUALIFIER_NONE);
 	type_unsigned_int       = make_atomic_type(ATOMIC_TYPE_UINT,        TYPE_QUALIFIER_NONE);
 	type_long               = make_atomic_type(ATOMIC_TYPE_LONG,        TYPE_QUALIFIER_NONE);
