@@ -648,7 +648,7 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "short-wchar")) {
 						opt_short_wchar_t = truth_value;
 					} else if (streq(opt, "syntax-only")) {
-						mode = ParseOnly;
+						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "omit-frame-pointer")) {
 						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "strength-reduce")) {
