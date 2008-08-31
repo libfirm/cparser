@@ -41,4 +41,7 @@ extern bool char_is_signed;
 /* true for strict language checking. */
 extern bool strict_mode;
 
+/* true if wchar_t is equal to unsigned short. */
+extern bool opt_short_wchar_t;
+
 #endif

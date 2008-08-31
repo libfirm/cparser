@@ -39,6 +39,14 @@
 #include "adt/error.h"
 #include "adt/array.h"
 
+/** if wchar_t is equal to unsigned short. */
+bool opt_short_wchar_t =
+#ifdef _WIN32
+	true;
+#else
+	false;
+#endif
+
 //#define PRINT_TOKENS
 #define MAX_LOOKAHEAD 2
 
@@ -9166,7 +9174,7 @@ static void initialize_builtin_types(void)
 	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",  type_long);
 	type_uintmax_t   = make_global_typedef("__uintmax_t__",     type_unsigned_long_long);
 	type_uptrdiff_t  = make_global_typedef("__UPTRDIFF_TYPE__", type_unsigned_long);
-	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__",    type_int);
+	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__",    opt_short_wchar_t ? type_unsigned_short : type_int);
 	type_wint_t      = make_global_typedef("__WINT_TYPE__",     type_int);
 
 	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);

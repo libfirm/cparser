@@ -613,23 +613,27 @@ int main(int argc, char **argv)
 				add_flag(&cppflags_obst, "%s", opt);
 			} else if(strcmp(option, "pipe") == 0) {
 				/* here for gcc compatibility */
-			} else if(option[0] == 'f') {
+			} else if (option[0] == 'f') {
+				bool truth_value = true;
 				const char *opt;
 				GET_ARG_AFTER(opt, "-f");
+				if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
+					truth_value = false;
+					opt += 3;
+				}
 
 				if (strcmp(opt, "dollars-in-identifiers") == 0) {
-					allow_dollar_in_symbol = true;
-				} else if (strcmp(opt, "no-dollars-in-identifiers") == 0) {
-					allow_dollar_in_symbol = false;
+					allow_dollar_in_symbol = truth_value;
+				} else if (strcmp(opt, "short-wchar") == 0) {
+					opt_short_wchar_t = truth_value;
 				} else if (strcmp(opt, "syntax-only") == 0) {
 					mode = ParseOnly;
 				} else if(strcmp(opt, "omit-frame-pointer") == 0) {
-					set_be_option("omitfp");
-				} else if(strcmp(opt, "no-omit-frame-pointer") == 0) {
-					set_be_option("omitfp=no");
+					set_be_option(truth_value ? "omitfp" : "omitfp=no");
 				} else if(strcmp(opt, "strength-reduce") == 0) {
 					firm_option("strength-red");
-				} else if(strcmp(opt, "fast-math") == 0
+				} else if (strcmp(opt, "fast-math") == 0
+						|| strcmp(opt, "jump-tables") == 0
 						|| strcmp(opt, "unroll-loops") == 0
 						|| strcmp(opt, "expensive-optimizations") == 0
 						|| strcmp(opt, "no-common") == 0
@@ -637,8 +641,10 @@ int main(int argc, char **argv)
 						|| strncmp(opt, "align-loops=", sizeof("align-loops=")-1) == 0
 						|| strncmp(opt, "align-jumps=", sizeof("align-jumps=")-1) == 0
 						|| strncmp(opt, "align-functions=", sizeof("align-functions=")-1) == 0) {
-					fprintf(stderr, "ignoring gcc option '-f %s'\n", opt);
+							fprintf(stderr, "ignoring gcc option '-f %s'\n", truth_value ? opt : opt - 3);
 				} else {
+					if (! truth_value)
+						opt -= 3;
 					int res = firm_option(opt);
 					if (res == 0) {
 						fprintf(stderr, "error: unknown Firm option '-f %s'\n",
@@ -649,7 +655,7 @@ int main(int argc, char **argv)
 						help_displayed = true;
 					}
 				}
-			} else if(option[0] == 'b') {
+			} else if (option[0] == 'b') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-b");
 				int res = firm_be_option(opt);
@@ -663,8 +669,8 @@ int main(int argc, char **argv)
 					if (strncmp(opt, "isa=", 4) == 0)
 						strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
-			} else if(option[0] == 'W') {
-				if(strncmp(option + 1, "l,", 2) == 0)	// a gcc-style linker option
+			} else if (option[0] == 'W') {
+				if (strncmp(option + 1, "l,", 2) == 0)	// a gcc-style linker option
 				{
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
@@ -677,7 +683,7 @@ int main(int argc, char **argv)
 				char arch_opt[64];
 
 				GET_ARG_AFTER(opt, "-m");
-				if(strncmp(opt, "arch=", 5) == 0) {
+				if (strncmp(opt, "arch=", 5) == 0) {
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
@@ -820,7 +826,7 @@ int main(int argc, char **argv)
 			if (type == FILETYPE_AUTODETECT) {
 				size_t      len      = strlen(arg);
 				if (len < 2 && arg[0] == '-') {
-					/* - implicitely means C source file */
+					/* - implicitly means C source file */
 					type     = FILETYPE_C;
 					filename = NULL;
 				} else if (len > 2 && arg[len-2] == '.') {
