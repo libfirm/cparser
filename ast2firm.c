@@ -2571,6 +2571,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 }
 
 static void init_ir_types(void);
+
 long fold_constant(const expression_t *expression)
 {
 	bool constant_folding_old = constant_folding;
