@@ -53,8 +53,6 @@ static ir_type *ir_type_wchar_t;
 static ir_type *ir_type_void;
 static ir_type *ir_type_int;
 
-static type_t *type_const_char;
-
 static int       next_value_number_function;
 static ir_node  *continue_label;
 static ir_node  *break_label;
@@ -5456,7 +5454,6 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	type_const_char = make_atomic_type(ATOMIC_TYPE_CHAR, TYPE_QUALIFIER_CONST);
 	type_void       = make_atomic_type(ATOMIC_TYPE_VOID, TYPE_QUALIFIER_NONE);
 	type_int        = make_atomic_type(ATOMIC_TYPE_INT,  TYPE_QUALIFIER_NONE);
 
