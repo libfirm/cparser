@@ -959,9 +959,9 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 		/* the left type has all qualifiers from the right type */
 		unsigned missing_qualifiers
 			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
-		errorf(source_position,
-		       "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type",
-		       orig_type_left, context, orig_type_right, missing_qualifiers);
+		warningf(source_position,
+		         "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type",
+		         orig_type_left, context, orig_type_right, missing_qualifiers);
 		return;
 	}
 
