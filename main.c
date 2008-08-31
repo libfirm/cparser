@@ -438,9 +438,23 @@ static void copy_file(FILE *dest, FILE *input)
 	}
 }
 
+static inline bool streq(char const* a, char const* b)
+{
+	return strcmp(a, b) == 0;
+}
+
+static inline bool strstart(char const* str, char const* start)
+{
+	do {
+		if (*start == '\0')
+			return true;
+	} while (*str++ == *start++);
+	return false;
+}
+
 static FILE *open_file(const char *filename)
 {
-	if (strcmp(filename, "-") == 0) {
+	if (streq(filename, "-")) {
 		return stdin;
 	}
 
@@ -456,13 +470,13 @@ static FILE *open_file(const char *filename)
 
 static filetype_t get_filetype_from_string(const char *string)
 {
-	if (strcmp(string, "c") == 0 || strcmp(string, "c-header") == 0)
+	if (streq(string, "c") || streq(string, "c-header"))
 		return FILETYPE_C;
-	if (strcmp(string, "assembler") == 0)
+	if (streq(string, "assembler"))
 		return FILETYPE_PREPROCESSED_ASSEMBLER;
-	if (strcmp(string, "assembler-with-cpp") == 0)
+	if (streq(string, "assembler-with-cpp"))
 		return FILETYPE_ASSEMBLER;
-	if (strcmp(string, "none") == 0)
+	if (streq(string, "none"))
 		return FILETYPE_AUTODETECT;
 
 	return FILETYPE_UNKNOWN;
@@ -596,22 +610,22 @@ int main(int argc, char **argv)
 					fprintf(stderr, "Unknown language '%s'\n", opt);
 					argument_errors = true;
 				}
-			} else if(strcmp(option, "M") == 0) {
+			} else if (streq(option, "M")) {
 				mode = PreprocessOnly;
 				add_flag(&cppflags_obst, "-M");
-			} else if (strcmp(option, "MMD") == 0 ||
-			           strcmp(option, "MD")  == 0 ||
-			           strcmp(option, "MM")  == 0 ||
-			           strcmp(option, "MP")  == 0) {
+			} else if (streq(option, "MMD") ||
+			           streq(option, "MD")  ||
+			           streq(option, "MM")  ||
+			           streq(option, "MP")) {
 				add_flag(&cppflags_obst, "-%s", option);
-			} else if(strcmp(option, "MT") == 0
-					|| strcmp(option, "MQ") == 0
-					|| strcmp(option, "MF") == 0) {
+			} else if (streq(option, "MT") ||
+			           streq(option, "MQ") ||
+			           streq(option, "MF")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-MT");
 				add_flag(&cppflags_obst, "-%s", option);
 				add_flag(&cppflags_obst, "%s", opt);
-			} else if(strcmp(option, "pipe") == 0) {
+			} else if (streq(option, "pipe")) {
 				/* here for gcc compatibility */
 			} else if (option[0] == 'f') {
 				bool truth_value = true;
@@ -622,26 +636,26 @@ int main(int argc, char **argv)
 					opt += 3;
 				}
 
-				if (strcmp(opt, "dollars-in-identifiers") == 0) {
+				if (streq(opt, "dollars-in-identifiers")) {
 					allow_dollar_in_symbol = truth_value;
-				} else if (strcmp(opt, "short-wchar") == 0) {
+				} else if (streq(opt, "short-wchar")) {
 					opt_short_wchar_t = truth_value;
-				} else if (strcmp(opt, "syntax-only") == 0) {
+				} else if (streq(opt, "syntax-only")) {
 					mode = ParseOnly;
-				} else if(strcmp(opt, "omit-frame-pointer") == 0) {
+				} else if (streq(opt, "omit-frame-pointer")) {
 					set_be_option(truth_value ? "omitfp" : "omitfp=no");
-				} else if(strcmp(opt, "strength-reduce") == 0) {
+				} else if (streq(opt, "strength-reduce")) {
 					firm_option("strength-red");
-				} else if (strcmp(opt, "fast-math") == 0
-						|| strcmp(opt, "jump-tables") == 0
-						|| strcmp(opt, "unroll-loops") == 0
-						|| strcmp(opt, "expensive-optimizations") == 0
-						|| strcmp(opt, "no-common") == 0
-						|| strcmp(opt, "PIC") == 0
-						|| strncmp(opt, "align-loops=", sizeof("align-loops=")-1) == 0
-						|| strncmp(opt, "align-jumps=", sizeof("align-jumps=")-1) == 0
-						|| strncmp(opt, "align-functions=", sizeof("align-functions=")-1) == 0) {
-							fprintf(stderr, "ignoring gcc option '-f %s'\n", truth_value ? opt : opt - 3);
+				} else if (streq(opt, "fast-math")               ||
+				           streq(opt, "jump-tables")             ||
+				           streq(opt, "unroll-loops")            ||
+				           streq(opt, "expensive-optimizations") ||
+				           streq(opt, "no-common")               ||
+				           streq(opt, "PIC")                     ||
+				           strstart(opt, "align-loops=")         ||
+				           strstart(opt, "align-jumps=")         ||
+				           strstart(opt, "align-functions=")) {
+					fprintf(stderr, "ignoring gcc option '-f%s'\n", truth_value ? opt : opt - 3);
 				} else {
 					if (! truth_value)
 						opt -= 3;
@@ -665,12 +679,11 @@ int main(int argc, char **argv)
 					argument_errors = true;
 				} else if (res == -1) {
 					help_displayed = true;
-				} else {
-					if (strncmp(opt, "isa=", 4) == 0)
-						strncpy(cpu_arch, opt, sizeof(cpu_arch));
+				} else if (strstart(opt, "isa=")) {
+					strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if (option[0] == 'W') {
-				if (strncmp(option + 1, "l,", 2) == 0)	// a gcc-style linker option
+				if (strstart(option + 1, "l,")) // a gcc-style linker option
 				{
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
@@ -683,7 +696,7 @@ int main(int argc, char **argv)
 				char arch_opt[64];
 
 				GET_ARG_AFTER(opt, "-m");
-				if (strncmp(opt, "arch=", 5) == 0) {
+				if (strstart(opt, "arch=")) {
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
@@ -695,23 +708,23 @@ int main(int argc, char **argv)
 						if (res == 0)
 							argument_errors = true;
 					}
-				} else if(strncmp(opt, "tune=", 5) == 0) {
+				} else if (strstart(opt, "tune=")) {
 					GET_ARG_AFTER(opt, "-mtune=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if(strncmp(opt, "cpu=", 4) == 0) {
+				} else if (strstart(opt, "cpu=")) {
 					GET_ARG_AFTER(opt, "-mcpu=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if(strncmp(opt, "fpmath=", 7) == 0) {
+				} else if (strstart(opt, "fpmath=")) {
 					GET_ARG_AFTER(opt, "-mfpmath=");
-					if(strcmp(opt, "387") == 0)
+					if (streq(opt, "387"))
 						opt = "x87";
-					else if(strcmp(opt, "sse") == 0)
+					else if (streq(opt, "sse"))
 						opt = "sse2";
 					else {
 						fprintf(stderr, "error: option -mfpumath supports only 387 or sse\n");
@@ -723,15 +736,15 @@ int main(int argc, char **argv)
 						if (res == 0)
 							argument_errors = true;
 					}
-				} else if(strncmp(opt, "preferred-stack-boundary=", 25) == 0) {
+				} else if (strstart(opt, "preferred-stack-boundary=")) {
 					GET_ARG_AFTER(opt, "-mpreferred-stack-boundary=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-stackalign=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if(strcmp(opt, "omit-leaf-frame-pointer") == 0) {
+				} else if (streq(opt, "omit-leaf-frame-pointer")) {
 					set_be_option("omitleaffp=1");
-				} else if(strcmp(opt, "no-omit-leaf-frame-pointer") == 0) {
+				} else if (streq(opt, "no-omit-leaf-frame-pointer")) {
 					set_be_option("omitleaffp=0");
 				} else {
 					char *endptr;
@@ -747,62 +760,62 @@ int main(int argc, char **argv)
 						machine_size = (unsigned int)value;
 					}
 				}
-			} else if(strcmp(option, "pg") == 0) {
+			} else if (streq(option, "pg")) {
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
-			} else if(strcmp(option, "pedantic") == 0
-					|| strcmp(option, "ansi") == 0) {
+			} else if (streq(option, "pedantic") ||
+			           streq(option, "ansi")) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
-			} else if(strcmp(option, "shared") == 0) {
+			} else if (streq(option, "shared")) {
 				add_flag(&ldflags_obst, "-shared");
-			} else if(strncmp(option, "std=", 4) == 0) {
-				if(strcmp(&option[4], "c99") == 0) {
+			} else if (strstart(option, "std=")) {
+				if (streq(&option[4], "c99")) {
 					c_mode = _C89|_C99;
-				} else if(strcmp(&option[4], "c89") == 0) {
+				} else if (streq(&option[4], "c89")) {
 					c_mode = _C89;
-				} else if(strcmp(&option[4], "gnu99") == 0) {
+				} else if (streq(&option[4], "gnu99")) {
 					c_mode = _C89|_C99|_GNUC;
-				} else if(strcmp(&option[4], "microsoft") == 0) {
+				} else if (streq(&option[4], "microsoft")) {
 					c_mode = _C89|_C99|_MS;
 				} else
 					fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
-			} else if(strcmp(option, "version") == 0) {
+			} else if (streq(option, "version")) {
 				print_cparser_version();
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;
-				if(strcmp(option, "gcc") == 0) {
+				if (streq(option, "gcc")) {
 					c_mode |= _GNUC;
-				} else if(strcmp(option, "no-gcc") == 0) {
+				} else if (streq(option, "no-gcc")) {
 					c_mode &= ~_GNUC;
-				} else if(strcmp(option, "ms") == 0) {
+				} else if (streq(option, "ms")) {
 					c_mode |= _MS;
-				} else if(strcmp(option, "no-ms") == 0) {
+				} else if (streq(option, "no-ms")) {
 					c_mode &= ~_MS;
-				} else if(strcmp(option, "signed-chars") == 0) {
+				} else if (streq(option, "signed-chars")) {
 					char_is_signed = true;
-				} else if(strcmp(option, "unsigned-chars") == 0) {
+				} else if (streq(option, "unsigned-chars")) {
 					char_is_signed = false;
-				} else if(strcmp(option, "strict") == 0) {
+				} else if (streq(option, "strict")) {
 					strict_mode = true;
-				} else if(strcmp(option, "lextest") == 0) {
+				} else if (streq(option, "lextest")) {
 					mode = LexTest;
-				} else if(strcmp(option, "benchmark") == 0) {
+				} else if (streq(option, "benchmark")) {
 					mode = BenchmarkParser;
-				} else if(strcmp(option, "print-ast") == 0) {
+				} else if (streq(option, "print-ast")) {
 					mode = PrintAst;
-				} else if(strcmp(option, "print-implicit-cast") == 0) {
+				} else if (streq(option, "print-implicit-cast")) {
 					print_implicit_casts = true;
-				} else if(strcmp(option, "print-parenthesis") == 0) {
+				} else if (streq(option, "print-parenthesis")) {
 					print_parenthesis = true;
-				} else if(strcmp(option, "print-fluffy") == 0) {
+				} else if (streq(option, "print-fluffy")) {
 					mode = PrintFluffy;
-				} else if(strcmp(option, "print-caml") == 0) {
+				} else if (streq(option, "print-caml")) {
 					mode = PrintCaml;
-				} else if(strcmp(option, "version") == 0) {
+				} else if (streq(option, "version")) {
 					print_cparser_version();
 					exit(EXIT_SUCCESS);
-				} else if(strcmp(option, "dump-function") == 0) {
+				} else if (streq(option, "dump-function")) {
 					++i;
 					if(i >= argc) {
 						fprintf(stderr, "error: "
@@ -840,7 +853,7 @@ int main(int argc, char **argv)
 					case 'o': type = FILETYPE_OBJECT;                 break;
 					}
 				} else if (len > 3 && arg[len - 3] == '.') {
-					if (strcmp(arg + len - 2, "so") == 0) {
+					if (streq(arg + len - 2, "so")) {
 						type = FILETYPE_OBJECT;
 					}
 				}
@@ -934,7 +947,7 @@ int main(int argc, char **argv)
 	assert(outname != NULL);
 
 	FILE *out;
-	if(strcmp(outname, "-") == 0) {
+	if (streq(outname, "-")) {
 		out = stdout;
 	} else {
 		out = fopen(outname, "w");
