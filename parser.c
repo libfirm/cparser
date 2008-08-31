@@ -7001,25 +7001,24 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 	type_t *points_to = pointer_type->pointer.points_to;
 	points_to = skip_typeref(points_to);
 
-	if (is_type_incomplete(points_to) &&
-			!((c_mode & _GNUC)
-			 && is_type_atomic(points_to, ATOMIC_TYPE_VOID))) {
-		errorf(source_position,
-		       "arithmetic with pointer to incomplete type '%T' not allowed",
-		       orig_pointer_type);
-		return false;
-	} else if (!(c_mode & _GNUC) && is_type_function(points_to)) {
-		errorf(source_position,
-		       "arithmetic with pointer to function type '%T' not allowed",
-		       orig_pointer_type);
-		return false;
-	}
-	if (warning.pointer_arith) {
-		if (is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+	if (is_type_incomplete(points_to)) {
+		if (!(c_mode & _GNUC) || !is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+			errorf(source_position,
+			       "arithmetic with pointer to incomplete type '%T' not allowed",
+			       orig_pointer_type);
+			return false;
+		} else if (warning.pointer_arith) {
 			warningf(source_position,
 			         "pointer of type '%T' used in arithmetic",
 			         orig_pointer_type);
-		} else if (is_type_function(points_to)) {
+		}
+	} else if (is_type_function(points_to)) {
+		if (!(c_mode && _GNUC)) {
+			errorf(source_position,
+			       "arithmetic with pointer to function type '%T' not allowed",
+			       orig_pointer_type);
+			return false;
+		} else if (warning.pointer_arith) {
 			warningf(source_position,
 			         "pointer to a function '%T' used in arithmetic",
 			         orig_pointer_type);
