@@ -558,6 +558,7 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 	switch(type->kind) {
 	case TYPE_ERROR:
 		fputs("<error>", out);
+		return;
 	case TYPE_INVALID:
 		fputs("<invalid>", out);
 		return;
