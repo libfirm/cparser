@@ -824,23 +824,23 @@ int main(int argc, char **argv)
 			filetype_t  type     = forced_filetype;
 			const char *filename = arg;
 			if (type == FILETYPE_AUTODETECT) {
-				size_t      len      = strlen(arg);
+				size_t const len = strlen(arg);
 				if (len < 2 && arg[0] == '-') {
 					/* - implicitly means C source file */
 					type     = FILETYPE_C;
 					filename = NULL;
-				} else if (len > 2 && arg[len-2] == '.') {
-					switch(arg[len-1]) {
-					case 'c': type = FILETYPE_C; break;
-					case 'h': type = FILETYPE_C; break;
+				} else if (len > 2 && arg[len - 2] == '.') {
+					switch (arg[len - 1]) {
+					case 'c': type = FILETYPE_C;                      break;
+					case 'h': type = FILETYPE_C;                      break;
 					case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
-					case 'S': type = FILETYPE_ASSEMBLER; break;
+					case 'S': type = FILETYPE_ASSEMBLER;              break;
 
 					case 'a':
-					case 'o': type = FILETYPE_OBJECT; break;
+					case 'o': type = FILETYPE_OBJECT;                 break;
 					}
-				} else if (len > 3 && arg[len-3] == '.') {
-					if(strcmp(arg + len - 2, "so") == 0) {
+				} else if (len > 3 && arg[len - 3] == '.') {
+					if (strcmp(arg + len - 2, "so") == 0) {
 						type = FILETYPE_OBJECT;
 					}
 				}
