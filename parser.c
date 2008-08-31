@@ -8987,8 +8987,9 @@ static statement_t *parse_empty_statement(void)
 	if (warning.empty_statement) {
 		warningf(HERE, "statement is empty");
 	}
+	statement_t *const statement = create_empty_statement();
 	eat(';');
-	return create_empty_statement();
+	return statement;
 }
 
 /**
