@@ -2152,9 +2152,8 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	unsigned              elem_size    = get_type_size_const(points_to);
 
 	/* gcc extension: allow arithmetic with void * and function * */
-	if (elem_size == 0 &&
-	    (is_type_atomic(points_to, ATOMIC_TYPE_VOID) ||
-	     is_type_function(points_to)))  {
+	if ((elem_size == 0 && is_type_atomic(points_to, ATOMIC_TYPE_VOID)) ||
+	    is_type_function(points_to))  {
 		elem_size = 1;
 	}
 
