@@ -631,42 +631,48 @@ int main(int argc, char **argv)
 				char const *orig_opt;
 				GET_ARG_AFTER(orig_opt, "-f");
 
-				char const *opt         = orig_opt;
-				bool        truth_value = true;
-				if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
-					truth_value = false;
-					opt += 3;
-				}
-
-				if (streq(opt, "dollars-in-identifiers")) {
-					allow_dollar_in_symbol = truth_value;
-				} else if (streq(opt, "short-wchar")) {
-					opt_short_wchar_t = truth_value;
-				} else if (streq(opt, "syntax-only")) {
-					mode = ParseOnly;
-				} else if (streq(opt, "omit-frame-pointer")) {
-					set_be_option(truth_value ? "omitfp" : "omitfp=no");
-				} else if (streq(opt, "strength-reduce")) {
-					firm_option("strength-red");
-				} else if (streq(opt, "fast-math")               ||
-				           streq(opt, "jump-tables")             ||
-				           streq(opt, "unroll-loops")            ||
-				           streq(opt, "expensive-optimizations") ||
-				           streq(opt, "common")                  ||
-				           streq(opt, "PIC")                     ||
-				           strstart(opt, "align-loops=")         ||
-				           strstart(opt, "align-jumps=")         ||
-				           strstart(opt, "align-functions=")) {
+				if (strstart(orig_opt, "align-loops=") ||
+				    strstart(orig_opt, "align-jumps=") ||
+				    strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 				} else {
-					int res = firm_option(orig_opt);
-					if (res == 0) {
-						fprintf(stderr, "error: unknown Firm option '-f%s'\n",
-						        orig_opt);
-						argument_errors = true;
-						continue;
-					} else if (res == -1) {
-						help_displayed = true;
+					char const *opt         = orig_opt;
+					bool        truth_value = true;
+					if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
+						truth_value = false;
+						opt += 3;
+					}
+
+					if (streq(opt, "dollars-in-identifiers")) {
+						allow_dollar_in_symbol = truth_value;
+					} else if (streq(opt, "short-wchar")) {
+						opt_short_wchar_t = truth_value;
+					} else if (streq(opt, "syntax-only")) {
+						mode = ParseOnly;
+					} else if (streq(opt, "omit-frame-pointer")) {
+						set_be_option(truth_value ? "omitfp" : "omitfp=no");
+					} else if (streq(opt, "strength-reduce")) {
+						firm_option("strength-red");
+					} else if (streq(opt, "fast-math")               ||
+					           streq(opt, "jump-tables")             ||
+					           streq(opt, "unroll-loops")            ||
+					           streq(opt, "expensive-optimizations") ||
+					           streq(opt, "common")                  ||
+					           streq(opt, "PIC")                     ||
+					           streq(opt, "align-loops")             ||
+					           streq(opt, "align-jumps")             ||
+					           streq(opt, "align-functions")) {
+						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+					} else {
+						int res = firm_option(orig_opt);
+						if (res == 0) {
+							fprintf(stderr, "error: unknown Firm option '-f%s'\n",
+							        orig_opt);
+							argument_errors = true;
+							continue;
+						} else if (res == -1) {
+							help_displayed = true;
+						}
 					}
 				}
 			} else if (option[0] == 'b') {
