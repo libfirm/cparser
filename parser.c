@@ -4706,6 +4706,10 @@ static void check_declarations(void)
 	if (warning.unused_parameter) {
 		const scope_t *scope = &current_function->scope;
 
+		if (is_sym_main(current_function->symbol)) {
+			/* do not issue unused warnings for main */
+			return;
+		}
 		const declaration_t *parameter = scope->declarations;
 		for (; parameter != NULL; parameter = parameter->next) {
 			if (! parameter->used) {
