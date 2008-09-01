@@ -752,7 +752,7 @@ static int parse_escape_sequence(void)
 	int ec = c;
 	next_char();
 
-	switch(ec) {
+	switch (ec) {
 	case '"':  return '"';
 	case '\'': return '\'';
 	case '\\': return '\\';
@@ -778,6 +778,10 @@ static int parse_escape_sequence(void)
 	case EOF:
 		parse_error("reached end of file while parsing escape sequence");
 		return EOF;
+	case 'e':
+		if (c_mode & _GNUC)
+			return 27;   /* hopefully 27 is ALWAYS the code for ESACAPE */
+		/*fallthrough*/
 	default:
 		parse_error("unknown escape sequence");
 		return EOF;

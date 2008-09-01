@@ -210,11 +210,12 @@ static void print_const(const const_expression_t *cnst)
  *
  * @param string  the string constant
  * @param border  the border char
+ * @param skip    number of chars to skip at the end
  */
-static void print_quoted_string(const string_t *const string, char border)
+static void print_quoted_string(const string_t *const string, char border, int skip)
 {
 	fputc(border, out);
-	const char *end = string->begin + string->size - 1;
+	const char *end = string->begin + string->size - skip;
 	for (const char *c = string->begin; c != end; ++c) {
 		if (*c == border) {
 			fputc('\\', out);
@@ -229,6 +230,11 @@ static void print_quoted_string(const string_t *const string, char border)
 		case '\t':  fputs("\\t", out); break;
 		case '\v':  fputs("\\v", out); break;
 		case '\?':  fputs("\\?", out); break;
+		case 27:
+			if (c_mode & _GNUC) {
+				fputs("\\e", out); break;
+			}
+			/*fallthrough*/
 		default:
 			if(!isprint(*c)) {
 				fprintf(out, "\\%03o", *c);
@@ -244,15 +250,17 @@ static void print_quoted_string(const string_t *const string, char border)
 /**
  * Prints a wide string literal expression.
  *
- * @param wstr  the wide string literal expression
+ * @param wstr    the wide string literal expression
+ * @param border  the border char
+ * @param skip    number of chars to skip at the end
  */
 static void print_quoted_wide_string(const wide_string_t *const wstr,
-                                     char border)
+                                     char border, int skip)
 {
 	fputc('L', out);
 	fputc(border, out);
-	for (const wchar_rep_t *c = wstr->begin, *end = wstr->begin + wstr->size-1;
-	     c != end; ++c) {
+	const wchar_rep_t *end = wstr->begin + wstr->size - skip;
+	for (const wchar_rep_t *c = wstr->begin; c != end; ++c) {
 		switch (*c) {
 			case L'\"':  fputs("\\\"", out); break;
 			case L'\\':  fputs("\\\\", out); break;
@@ -264,6 +272,11 @@ static void print_quoted_wide_string(const wide_string_t *const wstr,
 			case L'\t':  fputs("\\t",  out); break;
 			case L'\v':  fputs("\\v",  out); break;
 			case L'\?':  fputs("\\?",  out); break;
+			case 27:
+				if (c_mode & _GNUC) {
+					fputs("\\e", out); break;
+				}
+				/*fallthrough*/
 			default: {
 				const unsigned tc = *c;
 				if (tc < 0x80U) {
@@ -298,12 +311,12 @@ static void print_quoted_wide_string(const wide_string_t *const wstr,
  */
 static void print_character_constant(const const_expression_t *cnst)
 {
-	print_quoted_string(&cnst->v.character, '\'');
+	print_quoted_string(&cnst->v.character, '\'', 0);
 }
 
 static void print_wide_character_constant(const const_expression_t *cnst)
 {
-	print_quoted_wide_string(&cnst->v.wide_character, '\'');
+	print_quoted_wide_string(&cnst->v.wide_character, '\'', 0);
 }
 
 /**
@@ -314,7 +327,7 @@ static void print_wide_character_constant(const const_expression_t *cnst)
 static void print_string_literal(
 		const string_literal_expression_t *string_literal)
 {
-	print_quoted_string(&string_literal->value, '"');
+	print_quoted_string(&string_literal->value, '"', 1);
 }
 
 /**
@@ -338,7 +351,7 @@ static void print_funcname(
 static void print_wide_string_literal(
 	const wide_string_literal_expression_t *const wstr)
 {
-	print_quoted_wide_string(&wstr->value, '"');
+	print_quoted_wide_string(&wstr->value, '"', 1);
 }
 
 static void print_compound_literal(
@@ -1036,7 +1049,7 @@ static void print_asm_arguments(asm_argument_t *arguments)
 		if(argument->symbol) {
 			fprintf(out, "[%s] ", argument->symbol->string);
 		}
-		print_quoted_string(&argument->constraints, '"');
+		print_quoted_string(&argument->constraints, '"', 1);
 		fputs(" (", out);
 		print_expression(argument->expression);
 		fputs(")", out);
@@ -1055,7 +1068,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 		if(clobber != clobbers)
 			fputs(", ", out);
 
-		print_quoted_string(&clobber->clobber, '"');
+		print_quoted_string(&clobber->clobber, '"', 1);
 	}
 }
 
@@ -1071,7 +1084,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 		fputs("volatile ", out);
 	}
 	fputs("(", out);
-	print_quoted_string(&statement->asm_text, '"');
+	print_quoted_string(&statement->asm_text, '"', 1);
 	if(statement->inputs == NULL && statement->outputs == NULL
 			&& statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
@@ -1249,10 +1262,10 @@ void print_initializer(const initializer_t *initializer)
 		return;
 	}
 	case INITIALIZER_STRING:
-		print_quoted_string(&initializer->string.string, '"');
+		print_quoted_string(&initializer->string.string, '"', 1);
 		return;
 	case INITIALIZER_WIDE_STRING:
-		print_quoted_wide_string(&initializer->wide_string.string, '"');
+		print_quoted_wide_string(&initializer->wide_string.string, '"', 1);
 		return;
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
