@@ -8256,7 +8256,7 @@ static statement_t *parse_case_statement(void)
 			/* Check for duplicate case values */
 			case_label_statement_t *c = &statement->case_label;
 			for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
-				if (l->is_bad || l->is_empty)
+				if (l->is_bad || l->is_empty || l->expression == NULL)
 					continue;
 
 				if (c->last_case < l->first_case || c->first_case > l->last_case)
