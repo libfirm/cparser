@@ -1669,9 +1669,9 @@ static void statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
-static void create_condition_evaluation(const expression_t *expression,
-                                        ir_node *true_block,
-                                        ir_node *false_block);
+static ir_node *create_condition_evaluation(const expression_t *expression,
+                                            ir_node *true_block,
+                                            ir_node *false_block);
 
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
@@ -2622,7 +2622,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	/* create the true block */
 	ir_node *true_block  = new_immBlock();
 
-	ir_node *true_val = expression_to_firm(expression->true_expression);
+	ir_node *true_val = expression->true_expression != NULL ?
+		expression_to_firm(expression->true_expression) : NULL;
 	ir_node *true_jmp = new_Jmp();
 
 	/* create the false block */
@@ -2633,7 +2634,17 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	/* create the condition evaluation */
 	set_cur_block(cur_block);
-	create_condition_evaluation(expression->condition, true_block, false_block);
+	ir_node *const cond_expr = create_condition_evaluation(expression->condition, true_block, false_block);
+	if (expression->true_expression == NULL) {
+		if (cond_expr != NULL) {
+			true_val = cond_expr;
+		} else {
+			/* Condition ended with a short circuit (&&, ||, !) operation.
+			 * Generate a "1" as value for the true branch. */
+			ir_mode *const mode = mode_Is;
+			true_val = new_Const(mode, get_mode_one(mode));
+		}
+	}
 	mature_immBlock(true_block);
 	mature_immBlock(false_block);
 
@@ -3044,28 +3055,20 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	return produce_condition_result(expression, dbgi);
 }
 
-static ir_node *expression_to_modeb(const expression_t *expression)
-{
-	ir_node *res = _expression_to_firm(expression);
-	res          = create_conv(NULL, res, mode_b);
-
-	return res;
-}
-
 /**
  * create a short-circuit expression evaluation that tries to construct
  * efficient control flow structures for &&, || and ! expressions
  */
-static void create_condition_evaluation(const expression_t *expression,
-                                        ir_node *true_block,
-                                        ir_node *false_block)
+static ir_node *create_condition_evaluation(const expression_t *expression,
+                                            ir_node *true_block,
+                                            ir_node *false_block)
 {
 	switch(expression->kind) {
 	case EXPR_UNARY_NOT: {
 		const unary_expression_t *unary_expression = &expression->unary;
 		create_condition_evaluation(unary_expression->value, false_block,
 		                            true_block);
-		return;
+		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_AND: {
 		const binary_expression_t *binary_expression = &expression->binary;
@@ -3079,7 +3082,7 @@ static void create_condition_evaluation(const expression_t *expression,
 		set_cur_block(extra_block);
 		create_condition_evaluation(binary_expression->right, true_block,
 		                            false_block);
-		return;
+		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_OR: {
 		const binary_expression_t *binary_expression = &expression->binary;
@@ -3093,14 +3096,15 @@ static void create_condition_evaluation(const expression_t *expression,
 		set_cur_block(extra_block);
 		create_condition_evaluation(binary_expression->right, true_block,
 		                            false_block);
-		return;
+		return NULL;
 	}
 	default:
 		break;
 	}
 
 	dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
-	ir_node  *condition  = expression_to_modeb(expression);
+	ir_node  *cond_expr  = _expression_to_firm(expression);
+	ir_node  *condition  = create_conv(NULL, cond_expr, mode_b);
 	ir_node  *cond       = new_d_Cond(dbgi, condition);
 	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
@@ -3124,6 +3128,7 @@ static void create_condition_evaluation(const expression_t *expression,
 	}
 
 	set_cur_block(NULL);
+	return cond_expr;
 }
 
 
