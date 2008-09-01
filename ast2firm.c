@@ -4431,8 +4431,8 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 			/* default case */
 			continue;
 		}
-		for (long cns = l->first_case; cns <= l->last_case; ++cns)
-			++num_cases;
+		if (l->last_case >= l->first_case)
+			num_cases += l->last_case - l->first_case;
 		if (l->last_case > def_nr)
 			def_nr = l->last_case;
 	}
@@ -4515,14 +4515,14 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 	set_cur_block(old_block);
 	if (statement->expression != NULL) {
-		long start_pn = statement->first_case;
-		long end_pn   = statement->last_case;
-		assert(start_pn <= end_pn);
+		long pn     = statement->first_case;
+		long end_pn = statement->last_case;
+		assert(pn <= end_pn);
 		/* create jumps for all cases in the given range */
-		for (long pn = start_pn; pn <= end_pn; ++pn) {
+		do {
 			proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
 			add_immBlock_pred(block, proj);
-		}
+		} while(pn++ < end_pn);
 	} else {
 		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
