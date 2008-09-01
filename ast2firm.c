@@ -2611,7 +2611,10 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	if (is_constant_expression(expression->condition)) {
 		long val = fold_constant(expression->condition);
 		if (val) {
-			return expression_to_firm(expression->true_expression);
+			expression_t *true_expression = expression->true_expression;
+			if (true_expression == NULL)
+				true_expression = expression->condition;
+			return expression_to_firm(true_expression);
 		} else {
 			return expression_to_firm(expression->false_expression);
 		}
