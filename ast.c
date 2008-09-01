@@ -588,8 +588,12 @@ static void print_conditional(const conditional_expression_t *expression)
 	fputs("(", out);
 	print_expression_prec(expression->condition, prec);
 	fputs(" ? ", out);
-	print_expression_prec(expression->true_expression, prec);
-	fputs(" : ", out);
+	if (expression->true_expression != NULL) {
+		print_expression_prec(expression->true_expression, prec);
+		fputs(" : ", out);
+	} else {
+		fputs(": ", out);
+	}
 	print_expression_prec(expression->false_expression, prec);
 	fputs(")", out);
 }

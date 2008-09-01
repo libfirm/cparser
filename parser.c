@@ -3230,7 +3230,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 					case T__forceinline: /* ^ DECLARATION_START except for __attribute__ */
 					case T_IDENTIFIER:
 					case '*':
-						errorf(HERE, "discarding stray %K in declaration specifer", &token);
+						errorf(HERE, "discarding stray %K in declaration specifier", &token);
 						next_token();
 						continue;
 
@@ -6861,7 +6861,12 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		           &expression->base.source_position, condition_type_orig);
 	}
 
-	expression_t *true_expression = parse_expression();
+	expression_t *true_expression = expression;
+	bool          gnu_cond = false;
+	if ((c_mode & _GNUC) && token.type == ':') {
+		gnu_cond = true;
+	} else
+		true_expression = parse_expression();
 	rem_anchor_token(':');
 	expect(':');
 	expression_t *false_expression = parse_sub_expression(precedence);
@@ -6958,7 +6963,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 	}
 
 	conditional->true_expression
-		= create_implicit_cast(true_expression, result_type);
+		= gnu_cond ? NULL : create_implicit_cast(true_expression, result_type);
 	conditional->false_expression
 		= create_implicit_cast(false_expression, result_type);
 	conditional->base.type = result_type;
