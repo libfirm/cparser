@@ -1639,13 +1639,23 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_WIDE_CHARACTER_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
-	case EXPR_SIZEOF:
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_FUNCNAME:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:
 		return true;
+
+	case EXPR_SIZEOF: {
+		type_t *type = expression->typeprop.type;
+		if (type == NULL)
+			type = expression->typeprop.tp_expression->base.type;
+
+		type = skip_typeref(type);
+		if (is_type_array(type) && type->array.is_vla)
+			return false;
+		return true;
+	}
 
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_BUILTIN_PREFETCH:
