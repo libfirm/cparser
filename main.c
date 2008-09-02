@@ -115,6 +115,7 @@ extern bool print_parenthesis;
 static int             verbose;
 static struct obstack  cppflags_obst, ldflags_obst;
 static char            dep_target[1024];
+static const char     *outname;
 
 typedef struct file_list_entry_t file_list_entry_t;
 
@@ -259,12 +260,17 @@ static FILE *preprocess(const char *fname)
 
 	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
 	if (dep_target[0] != '\0') {
-		obstack_printf(&cppflags_obst, " -MF %s", dep_target);
+		add_flag(&cppflags_obst, "-MF");
+		add_flag(&cppflags_obst, "%s", dep_target);
+		if (outname != NULL) {
+				add_flag(&cppflags_obst, "-MQ");
+				add_flag(&cppflags_obst, "%s", outname);
+		}
 	}
 	if (flags[0] != '\0') {
 		obstack_printf(&cppflags_obst, " %s", flags);
 	}
-	obstack_printf(&cppflags_obst, " %s", fname);
+	add_flag(&cppflags_obst, "%s", fname);
 
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *buf = obstack_finish(&cppflags_obst);
@@ -497,7 +503,6 @@ int main(int argc, char **argv)
 {
 	initialize_firm();
 
-	const char        *outname              = NULL;
 	const char        *dumpfunction         = NULL;
 	compile_mode_t     mode                 = CompileAssembleLink;
 	int                opt_level            = 1;
