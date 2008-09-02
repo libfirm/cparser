@@ -112,8 +112,9 @@ extern bool print_implicit_casts;
 /* to switch on printing of parenthesis to indicate operator precedence */
 extern bool print_parenthesis;
 
-static int            verbose;
-static struct obstack cppflags_obst, ldflags_obst;
+static int             verbose;
+static struct obstack  cppflags_obst, ldflags_obst;
+static char            dep_target[1024];
 
 typedef struct file_list_entry_t file_list_entry_t;
 
@@ -253,11 +254,20 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 
 static FILE *preprocess(const char *fname)
 {
-	char buf[4096];
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
 
-	snprintf(buf, sizeof(buf), PREPROCESSOR " %s %s", flags, fname);
+	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
+	if (dep_target[0] != '\0') {
+		obstack_printf(&cppflags_obst, " -MF %s", dep_target);
+	}
+	if (flags[0] != '\0') {
+		obstack_printf(&cppflags_obst, " %s", flags);
+	}
+	obstack_printf(&cppflags_obst, " %s", fname);
+
+	obstack_1grow(&cppflags_obst, '\0');
+	const char *buf = obstack_finish(&cppflags_obst);
 	if(verbose) {
 		puts(buf);
 	}
@@ -267,6 +277,7 @@ static FILE *preprocess(const char *fname)
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(1);
 	}
+
 	return f;
 }
 
@@ -486,14 +497,15 @@ int main(int argc, char **argv)
 {
 	initialize_firm();
 
-	const char        *outname      = NULL;
-	const char        *dumpfunction = NULL;
-	compile_mode_t     mode         = CompileAssembleLink;
-	int                opt_level    = 1;
-	int                result       = EXIT_SUCCESS;
-	char               cpu_arch[16] = "ia32";
-	file_list_entry_t *files        = NULL;
-	file_list_entry_t *last_file    = NULL;
+	const char        *outname              = NULL;
+	const char        *dumpfunction         = NULL;
+	compile_mode_t     mode                 = CompileAssembleLink;
+	int                opt_level            = 1;
+	int                result               = EXIT_SUCCESS;
+	char               cpu_arch[16]         = "ia32";
+	file_list_entry_t *files                = NULL;
+	file_list_entry_t *last_file            = NULL;
+	bool               construct_dep_target = false;
 	struct obstack     file_obst;
 
 	obstack_init(&cppflags_obst);
@@ -614,8 +626,10 @@ int main(int argc, char **argv)
 				mode = PreprocessOnly;
 				add_flag(&cppflags_obst, "-M");
 			} else if (streq(option, "MMD") ||
-			           streq(option, "MD")  ||
-			           streq(option, "MM")  ||
+			           streq(option, "MD")) {
+			    construct_dep_target = true;
+				add_flag(&cppflags_obst, "-%s", option);
+			} else if(streq(option, "MM")  ||
 			           streq(option, "MP")) {
 				add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MT") ||
@@ -911,6 +925,16 @@ int main(int argc, char **argv)
 	init_ast();
 	init_parser();
 	init_ast2firm();
+
+	if (construct_dep_target) {
+		if (outname != 0 && strlen(outname) >= 2) {
+			get_output_name(dep_target, sizeof(dep_target), outname, ".d");
+		} else {
+			get_output_name(dep_target, sizeof(dep_target), files->name, ".d");
+		}
+	} else {
+		dep_target[0] = '\0';
+	}
 
 	char outnamebuf[4096];
 	if (outname == NULL) {
