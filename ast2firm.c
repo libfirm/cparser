@@ -4176,7 +4176,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	}
 
 	mature_immBlock(true_block);
-	if (false_block != fallthrough_block) {
+	if (false_block != fallthrough_block && false_block != NULL) {
 		mature_immBlock(false_block);
 	}
 	if (fallthrough_block != NULL) {
