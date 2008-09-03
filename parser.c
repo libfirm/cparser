@@ -5065,9 +5065,9 @@ continue_for:;
 static void check_unreachable(statement_t const* const stmt)
 {
 	if (!stmt->base.reachable            &&
-	    stmt->kind != STATEMENT_COMPOUND &&
 	    stmt->kind != STATEMENT_DO_WHILE &&
-	    stmt->kind != STATEMENT_FOR) {
+	    stmt->kind != STATEMENT_FOR      &&
+	    (stmt->kind != STATEMENT_COMPOUND || stmt->compound.statements == NULL)) {
 		warningf(&stmt->base.source_position, "statement is unreachable");
 	}
 
