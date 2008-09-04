@@ -52,7 +52,7 @@ struct a_firm_opt firm_opt = {
   /* alias_analysis  = */ TRUE,
   /* strict_alias    = */ FALSE,
   /* no_alias        = */ FALSE,
-  /* luffig          = */ FALSE,
+  /* sync            = */ FALSE,
   /* deconv          = */ FALSE,
   /* cc_opt          = */ TRUE,
   /* bool_opt        = */ FALSE,
@@ -184,8 +184,8 @@ static const struct params {
   { X("fp-precise"),             &firm_opt.fp_model,         fp_model_precise, "firm: precise fp model" },
   { X("fp-fast"),                &firm_opt.fp_model,         fp_model_fast,    "firm: fast fp model" },
   { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
-  { X("luffig"),                 &firm_opt.luffig,           1, "firm: enable the fluffy load/store optimization" },
-  { X("no-luffig"),              &firm_opt.luffig,           0, "firm: disable the fluffy load/store optimization" },
+  { X("sync"),                   &firm_opt.sync,             1, "firm: use Syncs to remove unnecessary memory dependencies" },
+  { X("no-sync"),                &firm_opt.sync,             0, "firm: do not use Syncs to remove unnecessary memory dependencies" },
   { X("deconv"),                 &firm_opt.deconv,           1, "firm: enable the conv node optimization" },
   { X("no-deconv"),              &firm_opt.deconv,           0, "firm: disable the conv node optimization" },
   { X("opt-cc"),                 &firm_opt.cc_opt,           1, "firm: enable calling conventions optimization" },
@@ -313,7 +313,7 @@ static void disable_opts(void) {
   firm_opt.alias_analysis  = FALSE;
   firm_opt.strict_alias    = FALSE;
   firm_opt.no_alias        = FALSE;
-  firm_opt.luffig          = FALSE;
+  firm_opt.sync            = FALSE;
   firm_opt.deconv          = FALSE;
   firm_opt.cc_opt          = FALSE;
   firm_opt.bool_opt        = FALSE;

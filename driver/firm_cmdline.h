@@ -59,7 +59,7 @@ struct a_firm_opt {
   a_byte   alias_analysis;  /**< enable Alias Analysis */
   a_byte   strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
   a_byte   no_alias;        /**< no aliasing possible. */
-  a_byte   luffig;          /**< enable fluffy load/store optimization */
+  a_byte   sync;            /**< use Syncs to remove unnecessary memory dependencies */
   a_byte   deconv;          /**< enable conv node optimization */
   a_byte   cc_opt;          /**< optimize calling conventions */
   a_byte   bool_opt;        /**< perform bool simplification */

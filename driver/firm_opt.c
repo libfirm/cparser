@@ -378,7 +378,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "place",       (func_ptr_t) place_code,              true, true,  true,  TV_CODE_PLACE },
 	{ OPT_TARGET_IRG, "confirm",     (func_ptr_t) construct_confirms,      true, true,  true,  TV_CONFIRM_CREATE },
 	{ OPT_TARGET_IRG, "ldst",        (func_ptr_t) optimize_load_store,     true, true,  true,  TV_LOAD_STORE },
-	{ OPT_TARGET_IRG, "ldst2",       (func_ptr_t) opt_ldst2,               true, true,  true,  -1 },
+	{ OPT_TARGET_IRG, "sync",        (func_ptr_t) opt_sync,                true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "lower",       (func_ptr_t) do_lower_highlevel,      true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "deconv",      (func_ptr_t) conv_opt,                true, true,  true,  TV_DECONV },
 	{ OPT_TARGET_IRG, "condeval",    (func_ptr_t) opt_cond_eval,           true, true,  true,  TV_COND_EVAL },
@@ -496,7 +496,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_opt_enabled("place", !firm_opt.gcse);
   set_opt_enabled("confirm", firm_opt.confirm);
   set_opt_enabled("remove_confirms", firm_opt.confirm);
-  set_opt_enabled("ldst2", firm_opt.luffig);
+  set_opt_enabled("sync", firm_opt.sync);
   set_opt_enabled("ldst", firm_opt.load_store);
   set_opt_enabled("deconv", firm_opt.deconv);
   set_opt_enabled("condeval", firm_opt.cond_eval);
@@ -554,7 +554,6 @@ static void do_firm_optimizations(const char *input_filename)
       do_irg_opt(irg, "local");
     }
 
-    do_irg_opt(irg, "ldst2");
     do_irg_opt(irg, "controlflow");
     do_irg_opt(irg, "ldst");
     do_irg_opt(irg, "lower");
@@ -914,6 +913,8 @@ static void do_firm_lowering(const char *input_filename)
         DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "after_if");
         CHECK_ONE(firm_opt.check_all, current_ir_graph);
       }
+
+			do_irg_opt(current_ir_graph, "sync");
     }
     timer_stop(TV_ALL_OPT);
 
