@@ -842,14 +842,9 @@ static void do_firm_lowering(const char *input_filename)
     /* run reassociation first on all graphs BEFORE the architecture dependent optimizations
        are enabled */
     for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-      current_ir_graph = get_irp_irg(i);
-
-      timer_push(TV_REASSOCIATION);
-        optimize_reassociation(current_ir_graph);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "reassoc");
-      CHECK_ONE(firm_opt.check_all, current_ir_graph);
-    }
+      ir_graph *irg = get_irp_irg(i);
+	  do_irg_opt(irg, "reassoc");
+	}
 
     /* enable architecture dependent optimizations */
     arch_dep_set_opts((arch_dep_opts_t)
@@ -858,63 +853,23 @@ static void do_firm_lowering(const char *input_filename)
                       (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
 
     for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-      current_ir_graph = get_irp_irg(i);
+      ir_graph *irg = get_irp_irg(i);
 
-      if (firm_opt.gcse)
-        set_opt_global_cse(1);
+      current_ir_graph = irg;
 
-      timer_push(TV_LOCAL_OPT);
-        optimize_graph_df(current_ir_graph);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "lopt");
-      if (! firm_opt.gcse)
-        CHECK_ONE(firm_opt.check_all, current_ir_graph);
-
-      if (firm_opt.gcse) {
-        timer_push(TV_CODE_PLACE);
-          place_code(current_ir_graph);
-          set_opt_global_cse(0);
-        timer_pop();
-        DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "place");
-        CHECK_ONE(firm_opt.check_all, current_ir_graph);
-      }
-
-      timer_push(TV_LOAD_STORE);
-        optimize_load_store(current_ir_graph);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "ldst");
-      CHECK_ONE(firm_opt.check_all, current_ir_graph);
-
-
-      timer_push(TV_LOCAL_OPT);
-        optimize_graph_df(current_ir_graph);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "lopt");
-
-      timer_push(TV_CF_OPT);
-        optimize_cf(current_ir_graph);
-      timer_pop();
-      DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "cf");
-      CHECK_ONE(firm_opt.check_all, current_ir_graph);
+	  do_irg_opt(irg, "local");
+	  do_irg_opt(irg, "gcse");
+	  do_irg_opt(irg, "ldst");
+	  do_irg_opt(irg, "local");
+	  do_irg_opt(irg, "controlflow");
 
       if (firm_opt.if_conversion) {
-        timer_push(TV_IF_CONV);
-          opt_if_conv(current_ir_graph, if_conv_info);
-        timer_pop();
-        DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "if");
-        CHECK_ONE(firm_opt.check_all, current_ir_graph);
+		  do_irg_opt(irg, "ifconv");
+		  do_irg_opt(irg, "local");
+		  do_irg_opt(irg, "controlflow");
+	  }
 
-        timer_push(TV_LOCAL_OPT);
-          optimize_graph_df(current_ir_graph);
-        timer_pop();
-        timer_push(TV_CF_OPT);
-          optimize_cf(current_ir_graph);
-        timer_pop();
-        DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, current_ir_graph, "after_if");
-        CHECK_ONE(firm_opt.check_all, current_ir_graph);
-      }
-
-			do_irg_opt(current_ir_graph, "sync");
+	  do_irg_opt(current_ir_graph, "sync");
     }
     timer_stop(TV_ALL_OPT);
 
