@@ -7260,9 +7260,9 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 		return s_type;
 
 	switch (s_rank) {
-		case ATOMIC_TYPE_INT:      return type_int;
-		case ATOMIC_TYPE_LONG:     return type_long;
-		case ATOMIC_TYPE_LONGLONG: return type_long_long;
+		case ATOMIC_TYPE_INT:      return type_unsigned_int;
+		case ATOMIC_TYPE_LONG:     return type_unsigned_long;
+		case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
 
 		default: panic("invalid atomic type");
 	}
