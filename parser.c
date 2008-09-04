@@ -847,8 +847,12 @@ static void label_pop_to(size_t new_top)
 	stack_pop_to(&label_stack, new_top);
 }
 
+static int get_akind_rank(atomic_type_kind_t akind)
+{
+	return (int) akind;
+}
 
-static atomic_type_kind_t get_rank(const type_t *type)
+static int get_rank(const type_t *type)
 {
 	assert(!is_typeref(type));
 	/* The C-standard allows promoting enums to int or unsigned int (see § 7.2.2
@@ -857,10 +861,10 @@ static atomic_type_kind_t get_rank(const type_t *type)
 	 * (unsigned int would be preferable when possible... for stuff like
 	 *  struct { enum { ... } bla : 4; } ) */
 	if (type->kind == TYPE_ENUM)
-		return ATOMIC_TYPE_INT;
+		return get_akind_rank(ATOMIC_TYPE_INT);
 
 	assert(type->kind == TYPE_ATOMIC);
-	return type->atomic.akind;
+	return get_akind_rank(type->atomic.akind);
 }
 
 static type_t *promote_integer(type_t *type)
@@ -868,7 +872,7 @@ static type_t *promote_integer(type_t *type)
 	if (type->kind == TYPE_BITFIELD)
 		type = type->bitfield.base_type;
 
-	if (get_rank(type) < ATOMIC_TYPE_INT)
+	if (get_rank(type) < get_akind_rank(ATOMIC_TYPE_INT))
 		type = type_int;
 
 	return type;
@@ -7231,16 +7235,16 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 
 	bool const signed_left  = is_type_signed(type_left);
 	bool const signed_right = is_type_signed(type_right);
-	atomic_type_kind_t const rank_left  = get_rank(type_left);
-	atomic_type_kind_t const rank_right = get_rank(type_right);
+	int const  rank_left    = get_rank(type_left);
+	int const  rank_right   = get_rank(type_right);
 
 	if (signed_left == signed_right)
 		return rank_left >= rank_right ? type_left : type_right;
 
-	atomic_type_kind_t  s_rank;
-	atomic_type_kind_t  u_rank;
-	type_t             *s_type;
-	type_t             *u_type;
+	int     s_rank;
+	int     u_rank;
+	type_t *s_type;
+	type_t *u_type;
 	if (signed_left) {
 		s_rank = rank_left;
 		s_type = type_left;
@@ -7256,7 +7260,10 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	if (u_rank >= s_rank)
 		return u_type;
 
-	if (get_atomic_type_size(s_rank) > get_atomic_type_size(u_rank))
+	/* casting rank to atomic_type_kind is a bit hacky, but makes things
+	 * easier here... */
+	if (get_atomic_type_size((atomic_type_kind_t) s_rank)
+			> get_atomic_type_size((atomic_type_kind_t) u_rank))
 		return s_type;
 
 	switch (s_rank) {
