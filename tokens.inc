@@ -74,6 +74,20 @@ S(_MS, __FUNCSIG__)
 S(_MS, __FUNCDNAME__)
 #undef S
 
+/* needed on darwin... */
+#ifdef __signed
+#undef __signed
+#endif
+#ifdef __volatile
+#undef __volatile
+#endif
+#ifdef __const
+#undef __const
+#endif
+#ifdef __restrict
+#undef __restrict
+#endif
+
 #define S(mode, x, val) T(mode, x, #x, val)
 S(_ANSI|_C99,   signed,               )
 S(_ALL,       __signed,               = T_signed)

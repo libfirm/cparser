@@ -15,7 +15,11 @@
 #ifdef _WIN32
 #define DEFAULT_OS OS_SUPPORT_MINGW
 #else
+#ifdef __APPLE__
+#define DEFAULT_OS OS_SUPPORT_MACHO
+#else
 #define DEFAULT_OS OS_SUPPORT_LINUX
+#endif
 #endif
 
 /* optimization settings */

@@ -5420,6 +5420,12 @@ static void scope_to_firm(scope_t *scope)
 	}
 }
 
+static void set_be_option(const char *option)
+{
+	int res = firm_be_option(option);
+	assert(res);
+}
+
 void init_ast2firm(void)
 {
 	obstack_init(&asm_obst);
@@ -5429,24 +5435,22 @@ void init_ast2firm(void)
 	id_imp        = new_id_from_chars("__imp_", 6);
 
 	/* OS option must be set to the backend */
-	const char *s = "ia32-gasmode=linux";
 	switch (firm_opt.os_support) {
 	case OS_SUPPORT_MINGW:
 		create_ld_ident = create_ld_ident_win32;
-		s = "ia32-gasmode=mingw";
+		set_be_option("ia32-gasmode=mingw");
 		break;
 	case OS_SUPPORT_LINUX:
 		create_ld_ident = create_ld_ident_linux_elf;
-		s = "ia32-gasmode=elf";
+		set_be_option("ia32-gasmode=linux");
 		break;
 	case OS_SUPPORT_MACHO:
 		create_ld_ident = create_ld_ident_macho;
-		s = "ia32-gasmode=macho";
+		set_be_option("ia32-gasmode=macho");
+		set_be_option("ia32-stackalign=4");
+		set_be_option("pic");
 		break;
 	}
-	int res = firm_be_option(s);
-	(void) res;
-	assert(res);
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {

@@ -80,7 +80,11 @@
 #include "warning.h"
 
 #ifndef PREPROCESSOR
-#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -U__SIZE_TYPE__ -D__SIZE_TYPE__=__SIZE_TYPE__ -m32 -U__STRICT_ANSI__"
+#ifdef __APPLE__
+#define PREPROCESSOR "gcc -E -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -U__SIZE_TYPE__ -D__SIZE_TYPE__=unsigned\\ long -m32 -U__STRICT_ANSI__"
+#else
+#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -U__SIZE_TYPE__ -D__SIZE_TYPE__=unsigned\\ long -m32 -U__STRICT_ANSI__"
+#endif
 #endif
 
 #ifndef LINKER
@@ -88,7 +92,11 @@
 #endif
 
 #ifndef ASSEMBLER
+#ifdef __APPLE__
+#define ASSEMBLER "gcc -c -xassembler"
+#else
 #define ASSEMBLER "as --32"
+#endif
 #endif
 
 /** The current c mode/dialect. */

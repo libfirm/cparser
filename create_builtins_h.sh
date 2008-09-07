@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 cat <<__EOF__
 /* WARNING: automatically generated file. Generated from builtins/builtins.c */
@@ -6,7 +6,7 @@ cat <<__EOF__
 static const char builtins[] =
 __EOF__
 
-cat builtins/builtins.c | sed -e 's/^/\t\"/g' -e 's/$/\\n\"/g'
+cat builtins/builtins.c | sed -e "s/^/\\\"/g" -e "s/$/\\\n\\\"/g"
 
 cat << __EOF__
 ;

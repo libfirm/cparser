@@ -148,8 +148,8 @@ cparser.bootstrap2: $(CPARSEROS2)
 
 build/%.o: %.c
 	@echo '===> CC $<'
-	$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
-	$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
+#$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
+#$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
