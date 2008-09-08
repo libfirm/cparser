@@ -20,7 +20,7 @@ static inline char *strrchr(const char *s, int c)
 
 static inline int strcmp(const char *s1, const char *s2)
 {
-	for( ; (*s1 | *s2) != 0; ++s1, ++s2) {
+	for( ; *s1 != 0; ++s1, ++s2) {
 		if(*s1 != *s2)
 			break;
 	}
