@@ -5442,7 +5442,7 @@ void init_ast2firm(void)
 		break;
 	case OS_SUPPORT_LINUX:
 		create_ld_ident = create_ld_ident_linux_elf;
-		set_be_option("ia32-gasmode=linux");
+		set_be_option("ia32-gasmode=elf");
 		break;
 	case OS_SUPPORT_MACHO:
 		create_ld_ident = create_ld_ident_macho;
