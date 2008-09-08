@@ -116,7 +116,7 @@ $(DIRS):
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 
-builtins.h: builtins/builtins.c
+builtins.h: builtins/builtins.c create_builtins_h.sh
 	@echo '===> CREATE_BUILTINS $<'
 	$(Q)./create_builtins_h.sh > $@
 
