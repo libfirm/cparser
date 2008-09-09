@@ -2311,9 +2311,9 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
 	const expression_t *left_expr = expression->left;
 	ir_mode            *left_mode = get_ir_mode(left_expr->base.type);
+	ir_node            *right     = expression_to_firm(expression->right);
 	ir_node            *left_addr = expression_to_addr(left_expr);
 	ir_node            *left      = get_value_from_lvalue(left_expr, left_addr);
-	ir_node            *right     = expression_to_firm(expression->right);
 	ir_node            *result    = create_op(dbgi, expression, left, right);
 
 	result = create_conv(dbgi, result, left_mode);
