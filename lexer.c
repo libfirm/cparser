@@ -487,34 +487,74 @@ end:
  */
 static void parse_number_hex(void)
 {
+	bool is_float = false;
 	assert(c == 'x' || c == 'X');
 	next_char();
+
+	obstack_1grow(&symbol_obstack, '0');
+	obstack_1grow(&symbol_obstack, 'x');
 
 	while(isxdigit(c)) {
 		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 	}
+
+	if (c == '.') {
+		obstack_1grow(&symbol_obstack, (char) c);
+		next_char();
+
+		while (isxdigit(c)) {
+			obstack_1grow(&symbol_obstack, (char) c);
+			next_char();
+		}
+		is_float = true;
+	}
+	if (c == 'p' || c == 'P') {
+		obstack_1grow(&symbol_obstack, (char) c);
+		next_char();
+
+		if (c == '-' || c == '+') {
+			obstack_1grow(&symbol_obstack, (char) c);
+			next_char();
+		}
+
+		while (isxdigit(c)) {
+			obstack_1grow(&symbol_obstack, (char) c);
+			next_char();
+		}
+		is_float = true;
+	}
+
 	obstack_1grow(&symbol_obstack, '\0');
 	char *string = obstack_finish(&symbol_obstack);
-
-	if(c == '.' || c == 'p' || c == 'P') {
-		next_char();
-		internal_error("Hex floating point numbers not implemented yet");
-	}
 	if(*string == '\0') {
 		parse_error("invalid hex number");
 		lexer_token.type = T_ERROR;
+		obstack_free(&symbol_obstack, string);
+		return;
 	}
 
-	const char *endptr;
-	lexer_token.type       = T_INTEGER;
-	lexer_token.v.intvalue = parse_int_string(string, &endptr, 16);
-	if(*endptr != '\0') {
-		parse_error("hex number literal too long");
+	if (is_float) {
+		char *endptr;
+		lexer_token.type         = T_FLOATINGPOINT;
+		lexer_token.v.floatvalue = strtold(string, &endptr);
+
+		if(*endptr != '\0') {
+			parse_error("invalid hex float literal");
+		}
+
+		parse_floating_suffix();
+	} else {
+		const char *endptr;
+		lexer_token.type       = T_INTEGER;
+		lexer_token.v.intvalue = parse_int_string(string + 2, &endptr, 16);
+		if(*endptr != '\0') {
+			parse_error("hex number literal too long");
+		}
+		parse_integer_suffix(true);
 	}
 
 	obstack_free(&symbol_obstack, string);
-	parse_integer_suffix(true);
 }
 
 /**
@@ -569,23 +609,23 @@ static void parse_number_oct(void)
 static void parse_number_dec(void)
 {
 	bool is_float = false;
-	while(isdigit(c)) {
+	while (isdigit(c)) {
 		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 	}
 
-	if(c == '.') {
+	if (c == '.') {
 		obstack_1grow(&symbol_obstack, '.');
 		next_char();
 
-		while(isdigit(c)) {
+		while (isdigit(c)) {
 			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 		}
 		is_float = true;
 	}
 	if(c == 'e' || c == 'E') {
-		obstack_1grow(&symbol_obstack, 'e');
+		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
 
 		if(c == '-' || c == '+') {
