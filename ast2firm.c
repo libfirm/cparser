@@ -4226,6 +4226,8 @@ static void while_statement_to_firm(while_statement_t *statement)
 		add_immBlock_pred(body_block, header_jmp);
 
 		keep_alive(body_block);
+		set_cur_block(body_block);
+		keep_alive(get_store());
 	} else {
 		if (false_block == NULL) {
 			false_block = new_immBlock();
@@ -4369,6 +4371,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		                            false_block);
 	} else {
 		keep_alive(header_block);
+		keep_alive(get_store());
 		jmp = new_Jmp();
 		add_immBlock_pred(body_block, jmp);
 	}
@@ -4573,6 +4576,7 @@ static void label_to_firm(const label_statement_t *statement)
 	}
 
 	set_cur_block(block);
+	keep_alive(get_store());
 	keep_alive(block);
 
 	if (statement->statement != NULL) {
@@ -5507,4 +5511,6 @@ void translation_unit_to_firm(translation_unit_t *unit)
 
 	scope_to_firm(&unit->scope);
 	global_asm_to_firm(unit->global_asm);
+
+	current_ir_graph = NULL;
 }
