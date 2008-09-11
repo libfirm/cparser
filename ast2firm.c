@@ -1662,6 +1662,15 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		result           = new_d_Proj(dbgi, resproj, mode, 0);
 	}
 
+	if (function->kind == EXPR_REFERENCE &&
+	    function->reference.declaration->modifiers & DM_NORETURN) {
+		/* A dead end:  Keep the Call and the Block.  Also place all further
+		 * nodes into a new and unreachable block. */
+		keep_alive(node);
+		keep_alive(get_cur_block());
+		new_Block(0, NULL);
+	}
+
 	return result;
 }
 
