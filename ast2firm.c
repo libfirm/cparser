@@ -58,7 +58,7 @@ static ir_node  *continue_label;
 static ir_node  *break_label;
 static ir_node  *current_switch_cond;
 static bool      saw_default_label;
-static ir_node **imature_blocks;
+static ir_node **immature_blocks;
 static bool constant_folding;
 
 static const declaration_t *current_function_decl;
@@ -4566,7 +4566,7 @@ static ir_node *get_label_block(declaration_t *label)
 	label->declaration_kind = DECLARATION_KIND_LABEL_BLOCK;
 	label->v.block          = block;
 
-	ARR_APP1(ir_node *, imature_blocks, block);
+	ARR_APP1(ir_node *, immature_blocks, block);
 
 	return block;
 }
@@ -5290,8 +5290,8 @@ static void create_function(declaration_t *declaration)
 	current_function_name = NULL;
 	current_funcsig       = NULL;
 
-	assert(imature_blocks == NULL);
-	imature_blocks = NEW_ARR_F(ir_node*, 0);
+	assert(immature_blocks == NULL);
+	immature_blocks = NEW_ARR_F(ir_node*, 0);
 
 	int       n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
@@ -5345,11 +5345,11 @@ static void create_function(declaration_t *declaration)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	for(int i = 0; i < ARR_LEN(imature_blocks); ++i) {
-		mature_immBlock(imature_blocks[i]);
+	for(int i = 0; i < ARR_LEN(immature_blocks); ++i) {
+		mature_immBlock(immature_blocks[i]);
 	}
-	DEL_ARR_F(imature_blocks);
-	imature_blocks = NULL;
+	DEL_ARR_F(immature_blocks);
+	immature_blocks = NULL;
 
 	mature_immBlock(first_block);
 	mature_immBlock(end_block);
