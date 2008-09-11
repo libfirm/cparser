@@ -38,9 +38,7 @@ typedef struct warning_t {
 #endif
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */
 	bool deprecated_declarations:1;       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
-#if 0 // TODO
 	bool div_by_zero:1;                   /**< Warn about compile-time integer division by zero */
-#endif
 	bool empty_statement:1;               /**< Warn about empty statements, i.e. lone ';'  */
 #if 0 // TODO
 	bool endif_labels:1;                  /**< Warn whenever an '#else' or an '#endif' are followed by text */

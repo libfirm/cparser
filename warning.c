@@ -26,6 +26,7 @@ warning_t warning = {
 	.char_subscripts               = true,
 	.declaration_after_statement   = false,
 	.deprecated_declarations       = true,
+	.div_by_zero                   = true,
 	.empty_statement               = false,
 	.fatal_errors                  = false,
 	.float_equal                   = false,
@@ -104,6 +105,7 @@ void set_warning_opt(const char *const opt)
 	OPT("char-subscripts",               char_subscripts);
 	OPT("declaration-after-statement",   declaration_after_statement);
 	OPT("deprecated-declarations",       deprecated_declarations);
+	OPT("div_by_zero",                   div_by_zero);
 	OPT("empty-statement",               empty_statement);
 	OPT("error",                         s_are_errors);
 	OPTX("extra") {

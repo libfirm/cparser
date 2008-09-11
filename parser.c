@@ -7302,6 +7302,18 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	expression->base.type = arithmetic_type;
 }
 
+/**
+ * Check the semantic restrictions for a div/mod expression.
+ */
+static void semantic_divmod_arithmetic(binary_expression_t *expression) {
+	semantic_binexpr_arithmetic(expression);
+	if (warning.div_by_zero && is_type_integer(expression->base.type)) {
+		if (is_constant_expression(expression->right) &&
+		    fold_constant(expression->right) == 0)
+			warningf(&expression->base.source_position, "division by zero");
+	}
+}
+
 static void semantic_shift_op(binary_expression_t *expression)
 {
 	expression_t *const left            = expression->left;
@@ -7573,6 +7585,16 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 	expression->base.type   = type_left;
 }
 
+static void semantic_divmod_assign(binary_expression_t *expression)
+{
+	semantic_arithmetic_assign(expression);
+	if (warning.div_by_zero && is_type_integer(expression->base.type)) {
+		if (is_constant_expression(expression->right) &&
+		    fold_constant(expression->right) == 0)
+			warningf(&expression->base.source_position, "division by zero");
+	}
+}
+
 static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 {
 	expression_t *const left            = expression->left;
@@ -7812,8 +7834,8 @@ static expression_t *parse_##binexpression_type(unsigned precedence,      \
 
 CREATE_BINEXPR_PARSER(',', EXPR_BINARY_COMMA,    semantic_comma, 1)
 CREATE_BINEXPR_PARSER('*', EXPR_BINARY_MUL,      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER('/', EXPR_BINARY_DIV,      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER('%', EXPR_BINARY_MOD,      semantic_binexpr_arithmetic, 1)
+CREATE_BINEXPR_PARSER('/', EXPR_BINARY_DIV,      semantic_divmod_arithmetic, 1)
+CREATE_BINEXPR_PARSER('%', EXPR_BINARY_MOD,      semantic_divmod_arithmetic, 1)
 CREATE_BINEXPR_PARSER('+', EXPR_BINARY_ADD,      semantic_add, 1)
 CREATE_BINEXPR_PARSER('-', EXPR_BINARY_SUB,      semantic_sub, 1)
 CREATE_BINEXPR_PARSER('<', EXPR_BINARY_LESS,     semantic_comparison, 1)
@@ -7850,9 +7872,9 @@ CREATE_BINEXPR_PARSER(T_MINUSEQUAL, EXPR_BINARY_SUB_ASSIGN,
 CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, EXPR_BINARY_MUL_ASSIGN,
                       semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_SLASHEQUAL, EXPR_BINARY_DIV_ASSIGN,
-                      semantic_arithmetic_assign, 0)
+                      semantic_divmod_assign, 0)
 CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, EXPR_BINARY_MOD_ASSIGN,
-                      semantic_arithmetic_assign, 0)
+                      semantic_divmod_assign, 0)
 CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, EXPR_BINARY_SHIFTLEFT_ASSIGN,
                       semantic_arithmetic_assign, 0)
 CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, EXPR_BINARY_SHIFTRIGHT_ASSIGN,
