@@ -580,6 +580,11 @@ int main(int argc, char **argv)
 		break;
 	}
 
+#ifdef __APPLE__
+	/* Darwin expects the stack to be aligned to 16byte boundary */
+	firm_be_option("ia32-stackalign=4");
+#endif
+
 	/* parse rest of options */
 	filetype_t  forced_filetype = FILETYPE_AUTODETECT;
 	bool        help_displayed  = false;
