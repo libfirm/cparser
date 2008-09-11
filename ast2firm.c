@@ -1566,17 +1566,17 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 			if (declaration->v.entity == rts_entities[rts_alloca]) {
 				/* handle alloca() call */
 				expression_t *argument = call->arguments->expression;
-			   	ir_node      *size     = expression_to_firm(argument);
+				ir_node      *size     = expression_to_firm(argument);
 
-			   	size = create_conv(dbgi, size, get_ir_mode(type_size_t));
+				size = create_conv(dbgi, size, get_ir_mode(type_size_t));
 
-	   			ir_node *store  = get_store();
-				dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
-				ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
-                                              stack_alloc);
-				ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+				ir_node  *store  = get_store();
+				dbg_info *dbgi   = get_dbg_info(&call->base.source_position);
+				ir_node  *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+				                               stack_alloc);
+				ir_node  *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
 				set_store(proj_m);
-				ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+				ir_node  *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
 
 				return res;
 			}
