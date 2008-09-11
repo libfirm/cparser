@@ -2140,10 +2140,8 @@ static ir_node *produce_condition_result(const expression_t *expression,
 	mature_immBlock(one_block);
 	mature_immBlock(zero_block);
 
-	ir_node *common_block = new_immBlock();
-	add_immBlock_pred(common_block, jmp_one);
-	add_immBlock_pred(common_block, jmp_zero);
-	mature_immBlock(common_block);
+	ir_node *in_cf[2] = { jmp_one, jmp_zero };
+	new_Block(2, in_cf);
 
 	ir_node *in[2] = { one, zero };
 	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
@@ -2661,10 +2659,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	mature_immBlock(false_block);
 
 	/* create the common block */
-	ir_node *common_block = new_immBlock();
-	add_immBlock_pred(common_block, true_jmp);
-	add_immBlock_pred(common_block, false_jmp);
-	mature_immBlock(common_block);
+	ir_node *in_cf[2] = { true_jmp, false_jmp };
+	new_Block(2, in_cf);
 
 	/* TODO improve static semantics, so either both or no values are NULL */
 	if (true_val == NULL || false_val == NULL)
