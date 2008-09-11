@@ -69,10 +69,19 @@ S(_ALL, __builtin_prefetch)
 S(_ALL, __builtin_huge_val)
 S(_ALL, __PRETTY_FUNCTION__)
 S(_ALL, __FUNCTION__)
+S(_ALL, __label__)
 S(_C99, __func__)
 S(_MS, __FUNCSIG__)
 S(_MS, __FUNCDNAME__)
 #undef S
+
+/* needed on Windows */
+#ifdef __w64
+#undef __w64
+#endif
+#ifdef __ptr64
+#undef __ptr64
+#endif
 
 /* needed on darwin... */
 #ifdef __signed
