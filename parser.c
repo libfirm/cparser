@@ -1807,7 +1807,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 				eat_until_matching_token('(');
 				break;
 			} else {
-				parse_string_literals();
+				string_t asm_string = parse_string_literals();
 			}
 			expect(')');
 			continue;
@@ -5924,16 +5924,18 @@ static expression_t *parse_reference(void)
 	return expression;
 }
 
-static void semantic_cast(expression_t *expression, type_t *orig_dest_type)
+static bool semantic_cast(expression_t *cast)
 {
+	expression_t            *expression      = cast->unary.value;
+	type_t                  *orig_dest_type  = cast->base.type;
 	type_t                  *orig_type_right = expression->base.type;
 	type_t            const *dst_type        = skip_typeref(orig_dest_type);
 	type_t            const *src_type        = skip_typeref(orig_type_right);
-	source_position_t const *pos             = &expression->base.source_position;
+	source_position_t const *pos             = &cast->base.source_position;
 
 	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
 	if (dst_type == type_void)
-		return;
+		return true;
 
 	/* only integer and pointer can be casted to pointer */
 	if (is_type_pointer(dst_type)  &&
@@ -5941,17 +5943,17 @@ static void semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	    !is_type_integer(src_type) &&
 	    is_type_valid(src_type)) {
 		errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
-		return;
+		return false;
 	}
 
 	if (!is_type_scalar(dst_type) && is_type_valid(dst_type)) {
 		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
-		return;
+		return false;
 	}
 
 	if (!is_type_scalar(src_type) && is_type_valid(src_type)) {
 		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
-		return;
+		return false;
 	}
 
 	if (warning.cast_qual &&
@@ -5964,9 +5966,10 @@ static void semantic_cast(expression_t *expression, type_t *orig_dest_type)
 		if (missing_qualifiers != 0) {
 			warningf(pos,
 			         "cast discards qualifiers '%Q' in pointer target type of '%T'",
-	             missing_qualifiers, orig_type_right);
+			         missing_qualifiers, orig_type_right);
 		}
 	}
+	return true;
 }
 
 static expression_t *parse_compound_literal(type_t *type)
@@ -6011,7 +6014,9 @@ static expression_t *parse_cast(void)
 	cast->base.type   = type;
 	cast->unary.value = value;
 
-	semantic_cast(value, type);
+	if (! semantic_cast(cast)) {
+		/* TODO: record the error in the AST. else it is impossible to detect it */
+	}
 
 	return cast;
 end_error:
@@ -9123,7 +9128,7 @@ static statement_t *intern_parse_statement(void)
 	add_anchor_token(';');
 	switch (token.type) {
 	case T_IDENTIFIER: {
-		token_type_t la1_type = look_ahead(1)->type;
+		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ':') {
 			statement = parse_label_statement();
 		} else if (is_typedef_symbol(token.v.symbol)) {
