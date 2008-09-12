@@ -1807,7 +1807,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 				eat_until_matching_token('(');
 				break;
 			} else {
-				string_t asm_string = parse_string_literals();
+				parse_string_literals();
 			}
 			expect(')');
 			continue;
