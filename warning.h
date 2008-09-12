@@ -26,10 +26,10 @@ void set_warning_opt(const char *opt);
 
 typedef struct warning_t {
 	bool aggregate_return:1;              /**< Warn if any functions that return structures or unions are defined or called */
+	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 #if 0 // TODO
 	bool bad_function_cast:1;             /**< Warn whenever a function call is cast to a non-matching type */
 #endif
-	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 	bool char_subscripts:1;               /**< Warn if an array subscript has the type 'char' */
 #if 0 // TODO
 	bool cpp_compat:1;                    /**< Warn about ISO C constructs that are outside of the common subset of ISO C and ISO C++. */
@@ -38,6 +38,7 @@ typedef struct warning_t {
 #if 0 // TODO
 	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 	bool conversion:1;                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
+	bool comment:1;                       /**< Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment. */
 #endif
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */
 	bool deprecated_declarations:1;       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
@@ -49,10 +50,15 @@ typedef struct warning_t {
 	bool fatal_errors:1;                  /**< First error stops the compilation */
 	bool float_equal:1;                   /**< Warn if floating point values are used in equality comparisons */
 	bool format:1;                        /**< Check printf-style format strings */
+#if 0 // TODO
+	bool init_self:1;                     /**< Warn about uninitialized variables which are initialized with themselves. */
+#endif
 	bool implicit_function_declaration:1; /**< Warn whenever a function is used before being declared */
 	bool implicit_int:1;                  /**< Warn when a declaration does not specify a type */
 #if 0 // TODO
 	bool inline:1;                        /**< Warn if a function can not be inlined and it was declared as inline */
+	bool int_to_pointer_cast:1;           /**< Warn if cast from integer to pointer of different size. */
+	bool pointer_to_int_cast:1;           /**< Warn if cast from pointer to integer of different size. */
 #endif
 	bool long_long:1;                     /**< Warn if 'long long' type is used */
 	bool main:1;                          /**< Warn if the type of 'main' is suspicious */
@@ -62,12 +68,14 @@ typedef struct warning_t {
 	bool missing_declarations:1;          /**< Warn if a global function is defined without a previous declaration */
 #if 0 // TODO
 	bool missing_format_attribute:1;      /**< If '-Wformat' is enabled, also warn about functions which might be candidates for 'format' attributes */
+	bool missing_field_initializers:1;    /**< Warn if a structure's initializer has some fields missing. */
 #endif
 	bool missing_noreturn:1;              /**< Warn about functions which might be candidates for attribute 'noreturn' */
 	bool missing_prototypes:1;            /**< Warn if a global function is defined without a previous prototype declaration */
 	bool multichar:1;                     /**< Warn if a multicharacter constant ('FOOF') is used. */
-	bool nested_externs:1;                /**< Warn if an 'extern' declaration is encountered within a function */
-	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull */
+	bool nested_externs:1;                /**< Warn if an 'extern' declaration is encountered within a function. */
+	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull. */
+	bool old_style_definition:1;          /**< Warn if an old-style function definition is used. */
 #if 0 // TODO
 	bool packed:1;                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	bool padded:1;                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */

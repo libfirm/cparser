@@ -82,6 +82,7 @@ void set_warning_opt(const char *const opt)
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
 		SET(attribute);
 		SET(char_subscripts);
+		// TODO SET(comment);
 		SET(empty_statement);
 		SET(format);
 		SET(implicit_function_declaration);
@@ -117,6 +118,7 @@ void set_warning_opt(const char *const opt)
 		// TODO SET(function_end_without_return);
 		SET(empty_statement);
 		// TODO SET(incomplete_aggregate_init);
+		// TODO SET(missing_field_initializers);
 		// TODO SET(pointless_comparison);
 		SET(unused_parameter);
 		SET(unused_value);
