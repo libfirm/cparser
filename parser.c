@@ -6772,7 +6772,8 @@ static expression_t *parse_select_expression(unsigned precedence,
 	declaration_t *iter = find_compound_entry(declaration, symbol);
 	if (iter == NULL) {
 		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
-		return create_invalid_expression();
+		iter         = allocate_declaration_zero();
+		iter->symbol = symbol;
 	}
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
