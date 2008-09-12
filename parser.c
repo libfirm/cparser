@@ -5444,8 +5444,8 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 				expression_t *size = parse_constant_expression();
 
 				if (!is_type_integer(type)) {
-					errorf(HERE, "bitfield base type '%T' is not an "
-					       "integer type", orig_type);
+					errorf(HERE, "bitfield base type '%T' is not an integer type",
+					       orig_type);
 				}
 
 				type_t *bitfield_type = make_bitfield_type(orig_type, size, &source_position);
@@ -5458,8 +5458,8 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 					       "compound member '%Y' has incomplete type '%T'",
 					       declaration->symbol, orig_type);
 				} else if (is_type_function(type)) {
-					errorf(HERE, "compound member '%Y' must not have function "
-					       "type '%T'", declaration->symbol, orig_type);
+					errorf(HERE, "compound member '%Y' must not have function type '%T'",
+					       declaration->symbol, orig_type);
 				}
 			}
 		}
