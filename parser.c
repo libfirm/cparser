@@ -7149,6 +7149,20 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 	return true;
 }
 
+static bool is_lvalue(const expression_t *expression)
+{
+	switch (expression->kind) {
+	case EXPR_REFERENCE:
+	case EXPR_ARRAY_ACCESS:
+	case EXPR_SELECT:
+	case EXPR_UNARY_DEREFERENCE:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
 static void semantic_incdec(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
@@ -7163,6 +7177,10 @@ static void semantic_incdec(unary_expression_t *expression)
 		errorf(&expression->base.source_position,
 		       "operation needs an arithmetic or pointer type");
 		return;
+	}
+	if (!is_lvalue(expression->value)) {
+		/* TODO: improve error message */
+		errorf(&expression->base.source_position, "lvalue required as operand");
 	}
 	expression->base.type = orig_type;
 }
@@ -7615,20 +7633,6 @@ static bool has_const_fields(const compound_type_t *type)
 	}
 	/* TODO */
 	return false;
-}
-
-static bool is_lvalue(const expression_t *expression)
-{
-	switch (expression->kind) {
-	case EXPR_REFERENCE:
-	case EXPR_ARRAY_ACCESS:
-	case EXPR_SELECT:
-	case EXPR_UNARY_DEREFERENCE:
-		return true;
-
-	default:
-		return false;
-	}
 }
 
 static bool is_valid_assignment_lhs(expression_t const* const left)
