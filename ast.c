@@ -26,6 +26,7 @@
 #include "lang_features.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -199,10 +200,28 @@ static void print_const(const const_expression_t *cnst)
 	if (is_type_integer(type)) {
 		fprintf(out, "%lld", cnst->v.int_value);
 	} else if (is_type_float(type)) {
-		fprintf(out, "%Lf", cnst->v.float_value);
+		long double const val = cnst->v.float_value;
+		fprintf(out, "%.20Lg", val);
+		if (isfinite(val) && truncl(val) == val)
+			fputs(".0", out);
 	} else {
 		panic("unknown constant");
 	}
+
+	char const* suffix;
+	switch (type->atomic.akind) {
+		case ATOMIC_TYPE_UINT:        suffix = "U";   break;
+		case ATOMIC_TYPE_LONG:        suffix = "L";   break;
+		case ATOMIC_TYPE_ULONG:       suffix = "UL";  break;
+		case ATOMIC_TYPE_LONGLONG:    suffix = "LL";  break;
+		case ATOMIC_TYPE_ULONGLONG:   suffix = "ULL"; break;
+		case ATOMIC_TYPE_FLOAT:       suffix = "F";   break;
+		case ATOMIC_TYPE_LONG_DOUBLE: suffix = "L";   break;
+
+		default: suffix = NULL; break;
+	}
+	if (suffix != NULL)
+		fputs(suffix, out);
 }
 
 /**
