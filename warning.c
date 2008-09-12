@@ -26,6 +26,7 @@ warning_t warning = {
 	.attribute                     = true,
 	.char_subscripts               = true,
 	.cast_qual                     = false,
+	.comment                       = false,
 	.declaration_after_statement   = false,
 	.deprecated_declarations       = true,
 	.div_by_zero                   = true,
@@ -82,7 +83,7 @@ void set_warning_opt(const char *const opt)
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
 		SET(attribute);
 		SET(char_subscripts);
-		// TODO SET(comment);
+		SET(comment);
 		SET(empty_statement);
 		SET(format);
 		SET(implicit_function_declaration);
@@ -108,6 +109,7 @@ void set_warning_opt(const char *const opt)
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
 	OPT("cast-qual",                     cast_qual);
+	OPT("comment",                       comment);
 	OPT("declaration-after-statement",   declaration_after_statement);
 	OPT("deprecated-declarations",       deprecated_declarations);
 	OPT("div_by_zero",                   div_by_zero);

@@ -38,8 +38,8 @@ typedef struct warning_t {
 #if 0 // TODO
 	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 	bool conversion:1;                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
-	bool comment:1;                       /**< Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment. */
 #endif
+	bool comment:1;                       /**< Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment. */
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */
 	bool deprecated_declarations:1;       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
 	bool div_by_zero:1;                   /**< Warn about compile-time integer division by zero */

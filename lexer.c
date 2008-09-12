@@ -1150,7 +1150,10 @@ static void skip_multiline_comment(void)
 		case '/':
 			next_char();
 			if (c == '*') {
-				/* TODO: nested comment, warn here */
+				/* nested comment, warn here */
+				if (warning.comment) {
+					warningf(&lexer_token.source_position, "'/*' within comment");
+				}
 			}
 			break;
 		case '*':
@@ -1191,6 +1194,15 @@ static void skip_line_comment(void)
 		case '\n':
 		case '\r':
 			return;
+
+		case '\\':
+			next_char();
+			if (c == '\n' || c == '\r') {
+				if (warning.comment)
+					warningf(&lexer_token.source_position, "multi-line comment");
+				return;
+			}
+			break;
 
 		default:
 			next_char();
