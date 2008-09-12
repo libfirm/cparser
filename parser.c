@@ -3606,7 +3606,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 
 	if (token.type == T_IDENTIFIER &&
 	    !is_typedef_symbol(token.v.symbol)) {
-		token_type_t la1_type = look_ahead(1)->type;
+		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ',' || la1_type == ')') {
 			type->kr_style_parameters = true;
 			declarations = parse_identifier_list();
@@ -5278,6 +5278,10 @@ static void parse_external_declaration(void)
 		warningf(HERE, "function '%Y' returns an aggregate",
 		         ndeclaration->symbol);
 	}
+	if (warning.traditional && !type->function.unspecified_parameters) {
+		warningf(HERE, "traditional C rejects ISO C style function definition of function '%Y'",
+			ndeclaration->symbol);
+	}
 
 	/* § 6.7.5.3 (14) a function definition with () means no
 	 * parameters (and not unspecified parameters) */
@@ -6807,12 +6811,13 @@ create_error_entry:
 }
 
 static void check_call_argument(const function_parameter_t *parameter,
-                                call_argument_t *argument)
+                                call_argument_t *argument, unsigned pos)
 {
 	type_t         *expected_type      = parameter->type;
 	type_t         *expected_type_skip = skip_typeref(expected_type);
 	assign_error_t  error              = ASSIGN_ERROR_INCOMPATIBLE;
 	expression_t   *arg_expr           = argument->expression;
+	type_t         *arg_type           = skip_typeref(arg_expr->base.type);
 
 	/* handle transparent union gnu extension */
 	if (is_type_union(expected_type_skip)
@@ -6845,9 +6850,34 @@ static void check_call_argument(const function_parameter_t *parameter,
 	argument->expression = create_implicit_cast(argument->expression,
 	                                            expected_type);
 
-	/* TODO report exact scope in error messages (like "in 3rd parameter") */
-	report_assign_error(error, expected_type, arg_expr,	"function call",
-	                    &arg_expr->base.source_position);
+	if (error != ASSIGN_SUCCESS) {
+		/* report exact scope in error messages (like "in argument 3") */
+		char buf[64];
+		snprintf(buf, sizeof(buf), "call argument %u", pos);
+		report_assign_error(error, expected_type, arg_expr,	buf,
+							&arg_expr->base.source_position);
+	} else if (warning.traditional | warning.conversion) {
+		if (
+		    /* passing as integer instead of float or complex */
+		    (is_type_integer(expected_type) &&
+		     (is_type_float(arg_type) || is_type_complex(arg_type))) ||
+		    /* passing as complex instead of integer or float */
+		    (is_type_complex(expected_type) &&
+		     (is_type_integer(arg_type) || is_type_float(arg_type))) ||
+		    /* passing as float instead of integer or complex */
+		    (is_type_float(expected_type) &&
+		     (is_type_integer(arg_type) || is_type_complex(arg_type))) ||
+		    /* passing as float instead of double */
+		    (is_type_float(expected_type) && expected_type != type_double &&
+		     is_type_float(arg_type))) {
+			warningf(&arg_expr->base.source_position,
+				"passing call argument %u as '%T' rather than '%T' due to prototype",
+				pos, expected_type, arg_type);
+		}
+		if (is_type_integer(expected_type) && is_type_integer(arg_type)) {
+			/* TODO check for size HERE */
+		}
+	}
 }
 
 /**
@@ -6890,7 +6920,7 @@ static expression_t *parse_call_expression(unsigned precedence,
 	if (token.type != ')') {
 		call_argument_t *last_argument = NULL;
 
-		while(true) {
+		while (true) {
 			call_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
 			argument->expression = parse_assignment_expression();
@@ -6916,9 +6946,9 @@ static expression_t *parse_call_expression(unsigned precedence,
 	function_parameter_t *parameter = function_type->parameters;
 	call_argument_t      *argument  = call->arguments;
 	if (!function_type->unspecified_parameters) {
-		for( ; parameter != NULL && argument != NULL;
+		for (unsigned pos = 0; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
-			check_call_argument(parameter, argument);
+			check_call_argument(parameter, argument, ++pos);
 		}
 
 		if (parameter != NULL) {
@@ -7209,12 +7239,20 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 		if (is_type_valid(type)) {
 			/* TODO: improve error message */
 			errorf(&expression->base.source_position,
-			       "operation needs an arithmetic type");
+				"operation needs an arithmetic type");
 		}
 		return;
 	}
 
 	expression->base.type = orig_type;
+}
+
+static void semantic_unexpr_plus(unary_expression_t *expression)
+{
+	semantic_unexpr_arithmetic(expression);
+	if (warning.traditional)
+		warningf(&expression->base.source_position,
+			"traditional C rejects the unary plus operator");
 }
 
 static void semantic_not(unary_expression_t *expression)
@@ -7320,7 +7358,7 @@ static expression_t *parse_##unexpression_type(unsigned precedence)            \
 CREATE_UNARY_EXPRESSION_PARSER('-', EXPR_UNARY_NEGATE,
                                semantic_unexpr_arithmetic)
 CREATE_UNARY_EXPRESSION_PARSER('+', EXPR_UNARY_PLUS,
-                               semantic_unexpr_arithmetic)
+                               semantic_unexpr_plus)
 CREATE_UNARY_EXPRESSION_PARSER('!', EXPR_UNARY_NOT,
                                semantic_not)
 CREATE_UNARY_EXPRESSION_PARSER('*', EXPR_UNARY_DEREFERENCE,
@@ -8682,6 +8720,13 @@ static statement_t *parse_switch(void)
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
+		if (warning.traditional) {
+			if (get_rank(type) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
+				warningf(&expr->base.source_position,
+					"'%T' switch expression not converted to '%T' in ISO C",
+					type, type_int);
+			}
+		}
 	} else if (is_type_valid(type)) {
 		errorf(&expr->base.source_position,
 		       "switch quantity is not an integer, but '%T'", type);

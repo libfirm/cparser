@@ -27,6 +27,7 @@ warning_t warning = {
 	.cast_qual                     = false,
 	.char_subscripts               = true,
 	.comment                       = false,
+	.conversion                    = false,
 	.declaration_after_statement   = false,
 	.deprecated_declarations       = true,
 	.div_by_zero                   = true,
@@ -54,6 +55,7 @@ warning_t warning = {
 	.strict_prototypes             = true,
 	.switch_default                = false,
 	.switch_enum                   = false,
+	.traditional                   = false,
 	.unknown_pragmas               = true,
 	.unreachable_code              = false,
 	.unused_function               = false,
@@ -112,6 +114,7 @@ void set_warning_opt(const char *const opt)
 	OPT("cast-qual",                     cast_qual);
 	OPT("char-subscripts",               char_subscripts);
 	OPT("comment",                       comment);
+	OPT("conversion",                    conversion);
 	OPT("declaration-after-statement",   declaration_after_statement);
 	OPT("deprecated-declarations",       deprecated_declarations);
 	OPT("div_by_zero",                   div_by_zero);
@@ -156,6 +159,7 @@ void set_warning_opt(const char *const opt)
 	OPT("strict-prototypes",             strict_prototypes);
 	OPT("switch-default",                switch_default);
 	OPT("switch-enum",                   switch_enum);
+	OPT("traditional",                   traditional);
 	OPT("unknown-pragmas",               unknown_pragmas);
 	OPT("unreachable-code",              unreachable_code);
 	OPTX("unused") {

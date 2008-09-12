@@ -65,7 +65,7 @@ bool               allow_dollar_in_symbol = true;
  */
 static void parse_error(const char *msg)
 {
-	errorf(&lexer_token.source_position,  "%s", msg);
+	errorf(&lexer_token.source_position, "%s", msg);
 }
 
 /**
@@ -75,7 +75,7 @@ static void parse_error(const char *msg)
  */
 static NORETURN internal_error(const char *msg)
 {
-	internal_errorf(&lexer_token.source_position,  "%s", msg);
+	internal_errorf(&lexer_token.source_position, "%s", msg);
 }
 
 static inline void next_real_char(void)
@@ -304,60 +304,78 @@ end_symbol:
 
 static void parse_integer_suffix(bool is_oct_hex)
 {
-	bool is_unsigned  = false;
-	bool min_long     = false;
-	bool min_longlong = false;
+	bool is_unsigned     = false;
+	bool min_long        = false;
+	bool min_longlong    = false;
+	bool not_traditional = false;
+	int  pos             = 0;
+	char suffix[4];
 
-	if(c == 'U' || c == 'u') {
-		is_unsigned = true;
+	if (c == 'U' || c == 'u') {
+		not_traditional = true;
+		suffix[pos++]   = toupper(c);
+		is_unsigned     = true;
 		next_char();
-		if(c == 'L' || c == 'l') {
+		if (c == 'L' || c == 'l') {
+			suffix[pos++] = toupper(c);
 			min_long = true;
 			next_char();
-			if(c == 'L' || c == 'l') {
+			if (c == 'L' || c == 'l') {
+				suffix[pos++] = toupper(c);
 				min_longlong = true;
 				next_char();
 			}
 		}
-	} else if(c == 'l' || c == 'L') {
+	} else if (c == 'l' || c == 'L') {
+		suffix[pos++] = toupper(c);
 		min_long = true;
 		next_char();
-		if(c == 'l' || c == 'L') {
-			min_longlong = true;
+		if (c == 'l' || c == 'L') {
+			not_traditional = true;
+			suffix[pos++]   = toupper(c);
+			min_longlong    = true;
 			next_char();
-			if(c == 'u' || c == 'U') {
-				is_unsigned = true;
+			if (c == 'u' || c == 'U') {
+				suffix[pos++] = toupper(c);
+				is_unsigned   = true;
 				next_char();
 			}
-		} else if(c == 'u' || c == 'U') {
-			is_unsigned = true;
+		} else if (c == 'u' || c == 'U') {
+			not_traditional = true;
+			suffix[pos++]   = toupper(c);
+			is_unsigned     = true;
 			next_char();
 			lexer_token.datatype = type_unsigned_long;
 		}
 	}
 
-	if(!is_unsigned) {
+	if (warning.traditional && not_traditional) {
+		suffix[pos] = '\0';
+		warningf(&lexer_token.source_position,
+			"traditional C rejects the '%s' suffix", suffix);
+	}
+	if (!is_unsigned) {
 		long long v = lexer_token.v.intvalue;
-		if(!min_long) {
-			if(v >= TARGET_INT_MIN && v <= TARGET_INT_MAX) {
+		if (!min_long) {
+			if (v >= TARGET_INT_MIN && v <= TARGET_INT_MAX) {
 				lexer_token.datatype = type_int;
 				return;
-			} else if(is_oct_hex && v >= 0 && v <= TARGET_UINT_MAX) {
+			} else if (is_oct_hex && v >= 0 && v <= TARGET_UINT_MAX) {
 				lexer_token.datatype = type_unsigned_int;
 				return;
 			}
 		}
-		if(!min_longlong) {
-			if(v >= TARGET_LONG_MIN && v <= TARGET_LONG_MAX) {
+		if (!min_longlong) {
+			if (v >= TARGET_LONG_MIN && v <= TARGET_LONG_MAX) {
 				lexer_token.datatype = type_long;
 				return;
-			} else if(is_oct_hex && v >= 0 && (unsigned long long)v <= (unsigned long long)TARGET_ULONG_MAX) {
+			} else if (is_oct_hex && v >= 0 && (unsigned long long)v <= (unsigned long long)TARGET_ULONG_MAX) {
 				lexer_token.datatype = type_unsigned_long;
 				return;
 			}
 		}
 		unsigned long long uv = (unsigned long long) v;
-		if(is_oct_hex && uv > (unsigned long long) TARGET_LONGLONG_MAX) {
+		if (is_oct_hex && uv > (unsigned long long) TARGET_LONGLONG_MAX) {
 			lexer_token.datatype = type_unsigned_long_long;
 			return;
 		}
@@ -365,11 +383,11 @@ static void parse_integer_suffix(bool is_oct_hex)
 		lexer_token.datatype = type_long_long;
 	} else {
 		unsigned long long v = (unsigned long long) lexer_token.v.intvalue;
-		if(!min_long && v <= TARGET_UINT_MAX) {
+		if (!min_long && v <= TARGET_UINT_MAX) {
 			lexer_token.datatype = type_unsigned_int;
 			return;
 		}
-		if(!min_longlong && v <= TARGET_ULONG_MAX) {
+		if (!min_longlong && v <= TARGET_ULONG_MAX) {
 			lexer_token.datatype = type_unsigned_long;
 			return;
 		}
@@ -383,11 +401,19 @@ static void parse_floating_suffix(void)
 	/* TODO: do something useful with the suffixes... */
 	case 'f':
 	case 'F':
+		if (warning.traditional) {
+			warningf(&lexer_token.source_position,
+				"traditional C rejects the 'F' suffix");
+		}
 		next_char();
 		lexer_token.datatype = type_float;
 		break;
 	case 'l':
 	case 'L':
+		if (warning.traditional) {
+			warningf(&lexer_token.source_position,
+				"traditional C rejects the 'F' suffix");
+		}
 		next_char();
 		lexer_token.datatype = type_long_double;
 		break;
@@ -840,6 +866,10 @@ string_t concat_strings(const string_t *const s1, const string_t *const s2)
 	memcpy(concat, s1->begin, len1);
 	memcpy(concat + len1, s2->begin, len2 + 1);
 
+	if (warning.traditional) {
+		warningf(&lexer_token.source_position,
+			"traditional C rejects string constant concatenation");
+	}
 #if 0 /* TODO hash */
 	const char *result = strset_insert(&stringset, concat);
 	if(result != concat) {
@@ -866,6 +896,10 @@ wide_string_t concat_string_wide_string(const string_t *const s1, const wide_str
 		concat[i] = src[i];
 	}
 	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
+	if (warning.traditional) {
+		warningf(&lexer_token.source_position,
+			"traditional C rejects string constant concatenation");
+	}
 
 	return (wide_string_t){ concat, len1 + len2 + 1 };
 }
@@ -881,6 +915,10 @@ wide_string_t concat_wide_strings(const wide_string_t *const s1, const wide_stri
 	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
 	memcpy(concat,        s1->begin, len1       * sizeof(*concat));
 	memcpy(concat + len1, s2->begin, (len2 + 1) * sizeof(*concat));
+	if (warning.traditional) {
+		warningf(&lexer_token.source_position,
+			"traditional C rejects string constant concatenation");
+	}
 
 	return (wide_string_t){ concat, len1 + len2 + 1 };
 }
@@ -898,6 +936,10 @@ wide_string_t concat_wide_string_string(const wide_string_t *const s1, const str
 	const char *const src = s2->begin;
 	for (size_t i = 0; i != len2 + 1; ++i) {
 		concat[i] = src[i];
+	}
+	if (warning.traditional) {
+		warningf(&lexer_token.source_position,
+			"traditional C rejects string constant concatenation");
 	}
 
 	return (wide_string_t){ concat, len1 + len2 + 1 };

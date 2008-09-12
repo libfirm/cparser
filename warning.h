@@ -34,8 +34,8 @@ typedef struct warning_t {
 	bool cast_qual:1;                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
 	bool char_subscripts:1;               /**< Warn if an array subscript has the type 'char' */
 	bool comment:1;                       /**< Warn whenever a comment-start sequence appears in a comment, or whenever a Backslash-Newline appears in a '//' comment. */
-#if 0 // TODO
 	bool conversion:1;                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
+#if 0 // TODO
 	bool cpp_compat:1;                    /**< Warn about ISO C constructs that are outside of the common subset of ISO C and ISO C++. */
 #endif
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */
@@ -94,8 +94,8 @@ typedef struct warning_t {
 	bool strict_prototypes:1;             /**< Warn if a function declaration has an unspecified parameter list */
 	bool switch_default:1;                /**< Warn whenever a 'switch' statement does not have a 'default' case */
 	bool switch_enum:1;                   /**< Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch? */
-#if 0 // TODO
 	bool traditional:1;                   /**< Warn about certain constructs that behave differently in traditional and ISO C */
+#if 0 // TODO
 	bool undef:1;                         /**< Warn if an undefined identifier is evaluated in an '#if' directive */
 	bool uninitialized:1;                 /**< Warn if an automatic variable is used without being initialized or if a variable may be clobbered by a 'setjmp' call. */
 #endif
