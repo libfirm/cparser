@@ -6733,8 +6733,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
 		return select;
 	}
-	symbol_t *symbol      = token.v.symbol;
-	select->select.symbol = symbol;
+	symbol_t *symbol = token.v.symbol;
 	next_token();
 
 	type_t *const orig_type = compound->base.type;

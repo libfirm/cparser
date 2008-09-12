@@ -670,7 +670,7 @@ static void print_select(const select_expression_t *expression)
 	} else {
 		fputc('.', out);
 	}
-	fputs(expression->symbol->string, out);
+	fputs(expression->compound_entry->symbol->string, out);
 }
 
 /**

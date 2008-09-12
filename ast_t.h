@@ -280,8 +280,6 @@ struct binary_expression_t {
 struct select_expression_t {
 	expression_base_t  base;
 	expression_t      *compound;
-	symbol_t          *symbol;
-
 	declaration_t     *compound_entry;
 };
 
