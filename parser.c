@@ -4448,7 +4448,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	if (is_type_function(type)) {
 		errorf(&declaration->source_position,
-		       "initializers not allowed for function types at declator '%Y' (type '%T')",
+		       "initializers not allowed for function types at declarator '%Y' (type '%T')",
 		       declaration->symbol, orig_type);
 	} else {
 		declaration->init.initializer = initializer;
@@ -7253,6 +7253,12 @@ static void semantic_dereference(unary_expression_t *expression)
 	expression->base.type = result_type;
 }
 
+/**
+ * Record that an address is taken (expression represents an lvalue).
+ *
+ * @param expression       the expression
+ * @param may_be_register  if true, the expression might be an register
+ */
 static void set_address_taken(expression_t *expression, bool may_be_register)
 {
 	if (expression->kind != EXPR_REFERENCE)
