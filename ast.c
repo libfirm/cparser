@@ -61,23 +61,24 @@ void print_indent(void)
 
 enum precedence_t {
 	PREC_BOTTOM  =  0,
-	PREC_COMMA   =  2, /* ,                                    left to right */
-	PREC_ASSIGN  =  4, /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
-	PREC_COND    =  6, /* ?:                                   right to left */
-	PREC_LOG_OR  =  8, /* ||                                   left to right */
-	PREC_LOG_AND = 10, /* &&                                   left to right */
-	PREC_BIT_OR  = 12, /* |                                    left to right */
-	PREC_BIT_XOR = 14, /* ^                                    left to right */
-	PREC_BIT_AND = 16, /* &                                    left to right */
-	PREC_EQ      = 18, /* == !=                                left to right */
-	PREC_CMP     = 20, /* < <= > >=                            left to right */
-	PREC_SHF     = 22, /* << >>                                left to right */
-	PREC_PLUS    = 24, /* + -                                  left to right */
-	PREC_MUL     = 26, /* * / %                                left to right */
-	PREC_UNARY   = 28, /* ! ~ ++ -- + - (type) * & sizeof      right to left */
-	PREC_ACCESS  = 30, /* () [] -> .                           left to right */
-	PREC_PRIM    = 32, /* primary */
-	PREC_TOP     = 34
+	PREC_EXPR    =  2,
+	PREC_COMMA   =  4, /* ,                                    left to right */
+	PREC_ASSIGN  =  6, /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
+	PREC_COND    =  8, /* ?:                                   right to left */
+	PREC_LOG_OR  = 10, /* ||                                   left to right */
+	PREC_LOG_AND = 12, /* &&                                   left to right */
+	PREC_BIT_OR  = 14, /* |                                    left to right */
+	PREC_BIT_XOR = 16, /* ^                                    left to right */
+	PREC_BIT_AND = 18, /* &                                    left to right */
+	PREC_EQ      = 20, /* == !=                                left to right */
+	PREC_CMP     = 22, /* < <= > >=                            left to right */
+	PREC_SHF     = 24, /* << >>                                left to right */
+	PREC_PLUS    = 26, /* + -                                  left to right */
+	PREC_MUL     = 28, /* * / %                                left to right */
+	PREC_UNARY   = 30, /* ! ~ ++ -- + - (type) * & sizeof      right to left */
+	PREC_ACCESS  = 32, /* () [] -> .                           left to right */
+	PREC_PRIM    = 34, /* primary */
+	PREC_TOP     = 36
 };
 
 /**
@@ -616,18 +617,15 @@ static void print_builtin_prefetch(const builtin_prefetch_expression_t *expressi
  */
 static void print_conditional(const conditional_expression_t *expression)
 {
-	unsigned prec = get_expression_precedence(expression->base.kind);
-	fputs("(", out);
-	print_expression_prec(expression->condition, prec);
+	print_expression_prec(expression->condition, PREC_LOG_OR);
 	fputs(" ? ", out);
 	if (expression->true_expression != NULL) {
-		print_expression_prec(expression->true_expression, prec);
+		print_expression_prec(expression->true_expression, PREC_EXPR);
 		fputs(" : ", out);
 	} else {
 		fputs(": ", out);
 	}
-	print_expression_prec(expression->false_expression, prec);
-	fputs(")", out);
+	print_expression_prec(expression->false_expression, PREC_COND);
 }
 
 /**
