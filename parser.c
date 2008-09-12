@@ -5902,9 +5902,9 @@ static expression_t *parse_reference(void)
 
 static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 {
-	type_t *orig_type_right = expression->base.type;
-	const type_t *dest_type = skip_typeref(orig_dest_type);
-	const type_t *orig_type = skip_typeref(orig_type_right);
+	type_t       *orig_type_right = expression->base.type;
+	type_t const *dest_type       = skip_typeref(orig_dest_type);
+	type_t const *orig_type       = skip_typeref(orig_type_right);
 
 	if (!is_type_valid(dest_type) || !is_type_valid(orig_type))
 		return true;
@@ -5915,32 +5915,29 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 
 	if (is_type_pointer(dest_type)) {
 		/* only integer and pointer can be casted to pointer */
-		if (! is_type_pointer(orig_type) && ! is_type_integer(orig_type)) {
+		if (!is_type_pointer(orig_type) && !is_type_integer(orig_type)) {
 			errorf(HERE, "cannot convert type '%T' to a pointer type", orig_type_right);
 			return false;
 		}
-	}
-	else if (!is_type_scalar(dest_type)) {
+	} else if (!is_type_scalar(dest_type)) {
 		errorf(HERE, "conversion to non-scalar type '%T' requested", orig_dest_type);
 		return false;
-	}
-	else if (!is_type_scalar(orig_type)) {
+	} else if (!is_type_scalar(orig_type)) {
 		errorf(HERE, "conversion from non-scalar type '%T' requested", orig_type_right);
 		return false;
 	}
 
-	if (warning.cast_qual) {
-		if (is_type_pointer(orig_type) &&
-		    is_type_pointer(dest_type)) {
-			type_t *src = skip_typeref(orig_type->pointer.points_to);
-                        type_t *dst = skip_typeref(dest_type->pointer.points_to);
-			unsigned missing_qualifiers
-				= src->base.qualifiers & ~dst->base.qualifiers;
-		    	if (missing_qualifiers != 0) {
-				warningf(HERE,
-				         "cast discards qualifiers '%Q' in pointer target type of '%T'",
-		       		         missing_qualifiers, orig_type_right);
-			}
+	if (warning.cast_qual &&
+	    is_type_pointer(orig_type) &&
+	    is_type_pointer(dest_type)) {
+		type_t *src = skip_typeref(orig_type->pointer.points_to);
+		type_t *dst = skip_typeref(dest_type->pointer.points_to);
+		unsigned missing_qualifiers =
+			src->base.qualifiers & ~dst->base.qualifiers;
+		if (missing_qualifiers != 0) {
+			warningf(HERE,
+			         "cast discards qualifiers '%Q' in pointer target type of '%T'",
+	             missing_qualifiers, orig_type_right);
 		}
 	}
 	return true;
