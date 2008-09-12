@@ -3065,10 +3065,10 @@ static declaration_t *create_error_declaration(symbol_t *symbol, storage_class_t
 {
 	declaration_t *const decl    = allocate_declaration_zero();
 	decl->source_position        = *HERE;
+	decl->declared_storage_class = storage_class;
 	decl->storage_class          =
 		storage_class != STORAGE_CLASS_NONE || scope == global_scope ?
 			storage_class : STORAGE_CLASS_AUTO;
-	decl->declared_storage_class = decl->storage_class;
 	decl->symbol                 = symbol;
 	decl->implicit               = true;
 	record_declaration(decl);
