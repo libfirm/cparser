@@ -3602,9 +3602,10 @@ static declaration_t *parse_parameters(function_type_t *type)
 	add_anchor_token(')');
 	int saved_comma_state = save_and_reset_anchor_state(',');
 
-	if (token.type == T_IDENTIFIER) {
-		symbol_t *symbol = token.v.symbol;
-		if (!is_typedef_symbol(symbol)) {
+	if (token.type == T_IDENTIFIER &&
+	    !is_typedef_symbol(token.v.symbol)) {
+		token_type_t la1_type = look_ahead(1)->type;
+		if (la1_type == ',' || la1_type == ')') {
 			type->kr_style_parameters = true;
 			declarations = parse_identifier_list();
 			goto parameters_finished;
