@@ -551,6 +551,7 @@ struct declaration_t {
 	unsigned int        address_taken : 1;
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */
+	unsigned int        implicit      : 1;
 	type_t             *type;
 	symbol_t           *symbol;
 	source_position_t   source_position;

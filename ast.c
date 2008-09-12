@@ -963,6 +963,8 @@ static void print_declaration_statement(
 	     declaration = declaration->next) {
 		if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
 			continue;
+		if (declaration->implicit)
+			continue;
 
 		if (!first) {
 			print_indent();
@@ -1010,10 +1012,13 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for (", out);
-	if(statement->scope.declarations != NULL) {
+	declaration_t *decl = statement->scope.declarations;
+	while (decl != NULL && decl->implicit)
+		decl = decl->next;
+	if (decl != NULL) {
 		assert(statement->initialisation == NULL);
-		print_declaration(statement->scope.declarations);
-		if(statement->scope.declarations->next != NULL) {
+		print_declaration(decl);
+		if (decl->next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 		fputc(' ', out);
@@ -1446,6 +1451,8 @@ void print_ast(const translation_unit_t *unit)
 			continue;
 		if(declaration->namespc != NAMESPACE_NORMAL &&
 				declaration->symbol == NULL)
+			continue;
+		if (declaration->implicit)
 			continue;
 
 		print_indent();

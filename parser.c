@@ -5662,6 +5662,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 	declaration->type                   = type;
 	declaration->symbol                 = symbol;
 	declaration->source_position        = *source_position;
+	declaration->implicit               = true;
 
 	bool strict_prototypes_old = warning.strict_prototypes;
 	warning.strict_prototypes  = false;
