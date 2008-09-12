@@ -6771,8 +6771,9 @@ static expression_t *parse_select_expression(unsigned precedence,
 	} else {
 		if (is_type_valid(type_left) &&
 		    (!is_pointer || is_type_pointer(type))) {
-			errorf(HERE, "request for member '%Y' in something not a struct or "
-			       "union, but '%T'", symbol, type_left);
+			errorf(HERE,
+			       "request for member '%Y' in something not a struct or union, but '%T'",
+			       symbol, type_left);
 		}
 create_error_entry:
 		entry         = allocate_declaration_zero();
