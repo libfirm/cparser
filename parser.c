@@ -5919,10 +5919,14 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 			errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
 			return false;
 		}
-	} else if (!is_type_scalar(dest_type) && is_type_valid(dest_type)) {
+	}
+
+	if (!is_type_scalar(dest_type) && is_type_valid(dest_type)) {
 		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
 		return false;
-	} else if (!is_type_scalar(orig_type) && is_type_valid(orig_type)) {
+	}
+
+	if (!is_type_scalar(orig_type) && is_type_valid(orig_type)) {
 		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
 		return false;
 	}
