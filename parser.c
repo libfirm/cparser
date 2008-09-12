@@ -1092,6 +1092,7 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 	declaration->type                   = type;
 	declaration->symbol                 = symbol;
 	declaration->source_position        = builtin_source_position;
+	declaration->implicit               = true;
 
 	record_declaration(declaration);
 
