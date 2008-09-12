@@ -5911,14 +5911,13 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	if (dst_type == type_void)
 		return true;
 
-	if (is_type_pointer(dst_type)) {
-		/* only integer and pointer can be casted to pointer */
-		if (!is_type_pointer(src_type) &&
-		    !is_type_integer(src_type) &&
-		    is_type_valid(src_type)) {
-			errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
-			return false;
-		}
+	/* only integer and pointer can be casted to pointer */
+	if (is_type_pointer(dst_type)  &&
+	    !is_type_pointer(src_type) &&
+	    !is_type_integer(src_type) &&
+	    is_type_valid(src_type)) {
+		errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
+		return false;
 	}
 
 	if (!is_type_scalar(dst_type) && is_type_valid(dst_type)) {
