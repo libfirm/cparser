@@ -5900,7 +5900,7 @@ static expression_t *parse_reference(void)
 	return expression;
 }
 
-static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
+static void semantic_cast(expression_t *expression, type_t *orig_dest_type)
 {
 	type_t                  *orig_type_right = expression->base.type;
 	type_t            const *dst_type        = skip_typeref(orig_dest_type);
@@ -5909,7 +5909,7 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 
 	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
 	if (dst_type == type_void)
-		return true;
+		return;
 
 	/* only integer and pointer can be casted to pointer */
 	if (is_type_pointer(dst_type)  &&
@@ -5917,17 +5917,17 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	    !is_type_integer(src_type) &&
 	    is_type_valid(src_type)) {
 		errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
-		return false;
+		return;
 	}
 
 	if (!is_type_scalar(dst_type) && is_type_valid(dst_type)) {
 		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
-		return false;
+		return;
 	}
 
 	if (!is_type_scalar(src_type) && is_type_valid(src_type)) {
 		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
-		return false;
+		return;
 	}
 
 	if (warning.cast_qual &&
@@ -5943,7 +5943,6 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	             missing_qualifiers, orig_type_right);
 		}
 	}
-	return true;
 }
 
 static expression_t *parse_compound_literal(type_t *type)
@@ -5985,12 +5984,10 @@ static expression_t *parse_cast(void)
 	cast->base.source_position = source_position;
 
 	expression_t *value = parse_sub_expression(20);
-
-	if (! semantic_cast(value, type))
-		goto end_error;
-
 	cast->base.type   = type;
 	cast->unary.value = value;
+
+	semantic_cast(value, type);
 
 	return cast;
 end_error:
