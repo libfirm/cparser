@@ -8843,22 +8843,18 @@ end_error:
  */
 static statement_t *parse_continue(void)
 {
-	statement_t *statement;
 	if (current_loop == NULL) {
 		errorf(HERE, "continue statement not within loop");
-		statement = create_invalid_statement();
-	} else {
-		statement = allocate_statement_zero(STATEMENT_CONTINUE);
-
-		statement->base.source_position = token.source_position;
 	}
+
+	statement_t *statement = allocate_statement_zero(STATEMENT_CONTINUE);
+	statement->base.source_position = token.source_position;
 
 	eat(T_continue);
 	expect(';');
 
-	return statement;
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
@@ -8866,22 +8862,18 @@ end_error:
  */
 static statement_t *parse_break(void)
 {
-	statement_t *statement;
 	if (current_switch == NULL && current_loop == NULL) {
 		errorf(HERE, "break statement not within loop or switch");
-		statement = create_invalid_statement();
-	} else {
-		statement = allocate_statement_zero(STATEMENT_BREAK);
-
-		statement->base.source_position = token.source_position;
 	}
+
+	statement_t *statement = allocate_statement_zero(STATEMENT_BREAK);
+	statement->base.source_position = token.source_position;
 
 	eat(T_break);
 	expect(';');
 
-	return statement;
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
@@ -8889,22 +8881,18 @@ end_error:
  */
 static statement_t *parse_leave(void)
 {
-	statement_t *statement;
 	if (current_try == NULL) {
 		errorf(HERE, "__leave statement not within __try");
-		statement = create_invalid_statement();
-	} else {
-		statement = allocate_statement_zero(STATEMENT_LEAVE);
-
-		statement->base.source_position = token.source_position;
 	}
+
+	statement_t *statement = allocate_statement_zero(STATEMENT_LEAVE);
+	statement->base.source_position = token.source_position;
 
 	eat(T___leave);
 	expect(';');
 
-	return statement;
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
@@ -8980,7 +8968,6 @@ static statement_t *parse_return(void)
 	if (token.type != ';') {
 		return_value = parse_expression();
 	}
-	expect(';');
 
 	const type_t *const func_type = current_function->type;
 	assert(is_type_function(func_type));
@@ -9017,9 +9004,10 @@ static statement_t *parse_return(void)
 	}
 	statement->returns.value = return_value;
 
-	return statement;
+	expect(';');
+
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
@@ -9057,9 +9045,8 @@ static statement_t *parse_expression_statement(void)
 
 	expect(';');
 
-	return statement;
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
