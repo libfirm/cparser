@@ -1035,7 +1035,7 @@ static void print_for_statement(const for_statement_t *statement)
 	if(statement->step != NULL) {
 		print_expression(statement->step);
 	}
-	fputs(")", out);
+	fputs(") ", out);
 	print_statement(statement->body);
 }
 
