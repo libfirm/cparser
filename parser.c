@@ -4964,9 +4964,28 @@ found_break_parent:
 			break;
 		}
 
-		case STATEMENT_MS_TRY:
-		case STATEMENT_LEAVE:
-			panic("unimplemented");
+		case STATEMENT_MS_TRY: {
+			ms_try_statement_t const *const ms_try = &stmt->ms_try;
+			check_reachable(ms_try->try_statement);
+			next = ms_try->final_statement;
+			break;
+		}
+
+		case STATEMENT_LEAVE: {
+			statement_t *parent = stmt;
+			for (;;) {
+				parent = parent->base.parent;
+				if (parent == NULL) /* __leave not within __try */
+					return;
+
+				if (parent->kind == STATEMENT_MS_TRY) {
+					last = parent;
+					next = parent->ms_try.final_statement;
+					break;
+				}
+			}
+			break;
+		}
 	}
 
 	while (next == NULL) {
@@ -5075,7 +5094,9 @@ continue_for:;
 			}
 
 			case STATEMENT_MS_TRY:
-				panic("unimplemented");
+				last = next;
+				next = next->ms_try.final_statement;
+				break;
 		}
 	}
 
@@ -5173,12 +5194,15 @@ static void check_unreachable(statement_t const* const stmt)
 				}
 			}
 
-			check_unreachable(stmt->fors.body);
+			check_unreachable(fors->body);
 			break;
 		}
 
-		case STATEMENT_MS_TRY:
-			panic("unimplemented");
+		case STATEMENT_MS_TRY: {
+			ms_try_statement_t const *const ms_try = &stmt->ms_try;
+			check_unreachable(ms_try->try_statement);
+			check_unreachable(ms_try->final_statement);
+		}
 	}
 
 	if (stmt->base.next)
@@ -9056,14 +9080,17 @@ end_error:
 static statement_t *parse_ms_try_statment(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_MS_TRY);
-
 	statement->base.source_position  = token.source_position;
 	eat(T___try);
+
+	PUSH_PARENT(statement);
 
 	ms_try_statement_t *rem = current_try;
 	current_try = &statement->ms_try;
 	statement->ms_try.try_statement = parse_compound_statement(false);
 	current_try = rem;
+
+	POP_PARENT;
 
 	if (token.type == T___except) {
 		eat(T___except);
