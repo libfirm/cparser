@@ -25,8 +25,8 @@
 void set_warning_opt(const char *opt);
 
 typedef struct warning_t {
-#if 0 // TODO
 	bool aggregate_return:1;              /**< Warn if any functions that return structures or unions are defined or called */
+#if 0 // TODO
 	bool bad_function_cast:1;             /**< Warn whenever a function call is cast to a non-matching type */
 #endif
 	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */

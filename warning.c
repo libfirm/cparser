@@ -22,6 +22,7 @@
 #include "warning.h"
 
 warning_t warning = {
+	.aggregate_return              = false,
 	.attribute                     = true,
 	.char_subscripts               = true,
 	.declaration_after_statement   = false,
@@ -101,6 +102,7 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value);
 		SET(unused_variable);
 	}
+	OPT("aggregate-return",              aggregate_return);
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
 	OPT("declaration-after-statement",   declaration_after_statement);

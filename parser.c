@@ -5223,6 +5223,13 @@ static void parse_external_declaration(void)
 		return;
 	}
 
+	if (warning.aggregate_return) {
+		const type_t *return_type = type->function.return_type;
+		if (is_type_compound(return_type))
+			warningf(HERE, "function '%Y' returns an aggregate",
+			         ndeclaration->symbol);
+	}
+
 	/* § 6.7.5.3 (14) a function definition with () means no
 	 * parameters (and not unspecified parameters) */
 	if (type->function.unspecified_parameters
@@ -6824,6 +6831,12 @@ static expression_t *parse_call_expression(unsigned precedence,
 	}
 
 	check_format(&result->call);
+
+	if (warning.aggregate_return) {
+		const type_t *return_type = function_type->return_type;
+		if (is_type_compound(return_type))
+			warningf(&result->base.source_position, "function call has aggregate value");
+	}
 
 	return result;
 end_error:
