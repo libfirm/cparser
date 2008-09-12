@@ -957,17 +957,17 @@ static void print_case_label(const case_label_statement_t *statement)
 static void print_declaration_statement(
 		const declaration_statement_t *statement)
 {
-	int first = 1;
-	declaration_t *declaration = statement->declarations_begin;
-	for( ; declaration != statement->declarations_end->next;
-	       declaration = declaration->next) {
-	    if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
-	    	continue;
+	bool first = true;
+	for (declaration_t *declaration = statement->declarations_begin;
+	     declaration != statement->declarations_end->next;
+	     declaration = declaration->next) {
+		if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+			continue;
 
-		if(!first) {
+		if (!first) {
 			print_indent();
 		} else {
-			first = 0;
+			first = false;
 		}
 		print_declaration(declaration);
 		fputc('\n', out);
