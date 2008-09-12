@@ -36,6 +36,7 @@ warning_t warning = {
 	.format                        = true,
 	.implicit_function_declaration = true,
 	.implicit_int                  = true,
+	.init_self                     = true,
 	.long_long                     = false,
 	.main                          = true,
 	.missing_declarations          = false,
@@ -88,6 +89,7 @@ void set_warning_opt(const char *const opt)
 		SET(format);
 		SET(implicit_function_declaration);
 		SET(implicit_int);
+		SET(init_self);
 		SET(main);
 		SET(nonnull);
 		SET(pointer_arith);
@@ -137,6 +139,7 @@ void set_warning_opt(const char *const opt)
 	}
 	OPT("implicit-function-declaration", implicit_function_declaration);
 	OPT("implicit-int",                  implicit_int);
+	OPT("init-self",                     init_self);
 	OPT("long-long",                     long_long);
 	OPT("main",                          main);
 	OPT("missing-declarations",          missing_declarations);

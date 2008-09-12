@@ -114,6 +114,7 @@ static scope_t            *global_scope      = NULL;
 static scope_t            *scope             = NULL;
 static declaration_t      *last_declaration  = NULL;
 static declaration_t      *current_function  = NULL;
+static declaration_t      *current_init_decl = NULL;
 static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
 static statement_t        *current_parent    = NULL;
@@ -4436,9 +4437,10 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	parse_initializer_env_t env;
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
-	env.declaration      = declaration;
+	env.declaration      = current_init_decl = declaration;
 
 	initializer_t *initializer = parse_initializer(&env);
+	current_init_decl = NULL;
 
 	if (env.type != orig_type) {
 		orig_type         = env.type;
@@ -5945,6 +5947,12 @@ static expression_t *parse_reference(void)
 				"%s '%Y' is deprecated (declared %P)", prefix,
 				declaration->symbol, &declaration->source_position);
 		}
+	}
+	if (warning.init_self && declaration == current_init_decl) {
+		current_init_decl = NULL;
+		warningf(&source_position,
+			"variable '%#T' is initialized by itself",
+			declaration->type, declaration->symbol);
 	}
 
 	return expression;

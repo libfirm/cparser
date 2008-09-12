@@ -50,8 +50,8 @@ typedef struct warning_t {
 	bool format:1;                        /**< Check printf-style format strings */
 	bool implicit_function_declaration:1; /**< Warn whenever a function is used before being declared */
 	bool implicit_int:1;                  /**< Warn when a declaration does not specify a type */
-#if 0 // TODO
 	bool init_self:1;                     /**< Warn about uninitialized variables which are initialized with themselves. */
+#if 0 // TODO
 	bool inline:1;                        /**< Warn if a function can not be inlined and it was declared as inline */
 	bool int_to_pointer_cast:1;           /**< Warn if cast from integer to pointer of different size. */
 #endif
