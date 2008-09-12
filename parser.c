@@ -5914,7 +5914,6 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	if (dest_type == type_void)
 		return true;
 
-	/* TODO check if explicit cast is allowed and issue warnings/errors */
 	if (is_type_pointer(dest_type)) {
 		/* only integer and pointer can be casted to pointer */
 		if (! is_type_pointer(orig_type) && ! is_type_integer(orig_type)) {
