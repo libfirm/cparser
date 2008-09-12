@@ -5907,23 +5907,22 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	type_t            const *orig_type       = skip_typeref(orig_type_right);
 	source_position_t const *pos             = &expression->base.source_position;
 
-	if (!is_type_valid(dest_type) || !is_type_valid(orig_type))
-		return true;
-
 	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
 	if (dest_type == type_void)
 		return true;
 
 	if (is_type_pointer(dest_type)) {
 		/* only integer and pointer can be casted to pointer */
-		if (!is_type_pointer(orig_type) && !is_type_integer(orig_type)) {
+		if (!is_type_pointer(orig_type) &&
+		    !is_type_integer(orig_type) &&
+		    is_type_valid(orig_type)) {
 			errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
 			return false;
 		}
-	} else if (!is_type_scalar(dest_type)) {
+	} else if (!is_type_scalar(dest_type) && is_type_valid(dest_type)) {
 		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
 		return false;
-	} else if (!is_type_scalar(orig_type)) {
+	} else if (!is_type_scalar(orig_type) && is_type_valid(orig_type)) {
 		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
 		return false;
 	}
