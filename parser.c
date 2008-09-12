@@ -6740,16 +6740,19 @@ static expression_t *parse_select_expression(unsigned precedence,
 	type_t *const type      = skip_typeref(orig_type);
 
 	type_t *type_left = type;
+	bool    saw_error = false;
 	if (is_type_pointer(type)) {
 		if (!is_pointer) {
 			errorf(HERE,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, type_left);
+			saw_error = true;
 		}
 		type_left = type->pointer.points_to;
 	} else if (is_pointer) {
 		if (is_type_valid(type)) {
 			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
+			saw_error = true;
 		}
 		type_left = type;
 	}
@@ -6772,8 +6775,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 			goto create_error_entry;
 		}
 	} else {
-		if (is_type_valid(type_left) &&
-		    (is_pointer == is_type_pointer(type))) {
+		if (is_type_valid(type_left) && !saw_error) {
 			errorf(HERE,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, type_left);
