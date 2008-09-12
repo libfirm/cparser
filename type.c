@@ -193,9 +193,19 @@ void inc_type_visited(void)
 
 void print_type_qualifiers(type_qualifiers_t qualifiers)
 {
-	if (qualifiers & TYPE_QUALIFIER_CONST)    fputs("const ",    out);
-	if (qualifiers & TYPE_QUALIFIER_VOLATILE) fputs("volatile ", out);
-	if (qualifiers & TYPE_QUALIFIER_RESTRICT) fputs("restrict ", out);
+	int first = 1;
+	if (qualifiers & TYPE_QUALIFIER_CONST) {
+		fputs(" const" + first,    out);
+		first = 0;
+	}
+	if (qualifiers & TYPE_QUALIFIER_VOLATILE) {
+		fputs(" volatile" + first, out);
+		first = 0;
+	}
+	if (qualifiers & TYPE_QUALIFIER_RESTRICT) {
+		fputs(" restrict" + first, out);
+		first = 0;
+	}
 }
 
 /**
@@ -238,6 +248,8 @@ static
 void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers);
+	if (type->base.qualifiers != 0)
+		fputc(' ', out);
 	print_atomic_kinds(type->akind);
 }
 
@@ -249,8 +261,9 @@ void print_atomic_type(const atomic_type_t *type)
 static
 void print_complex_type(const complex_type_t *type)
 {
+	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs("_Complex ", out);
+	fputs(" _Complex " + empty, out);
 	print_atomic_kinds(type->akind);
 }
 
@@ -262,8 +275,9 @@ void print_complex_type(const complex_type_t *type)
 static
 void print_imaginary_type(const imaginary_type_t *type)
 {
+	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs("_Imaginary ", out);
+	fputs(" _Imaginary " + empty, out);
 	print_atomic_kinds(type->akind);
 }
 
@@ -276,21 +290,24 @@ void print_imaginary_type(const imaginary_type_t *type)
 static void print_function_type_pre(const function_type_t *type, bool top)
 {
 	print_type_qualifiers(type->base.qualifiers);
+	if (type->base.qualifiers != 0)
+		fputc(' ', out);
+
 
 	intern_print_type_pre(type->return_type, false);
 
 	switch (type->calling_convention) {
 	case CC_CDECL:
-		fputs(" __cdecl ", out);
+		fputs("__cdecl ", out);
 		break;
 	case CC_STDCALL:
-		fputs(" __stdcall ", out);
+		fputs("__stdcall ", out);
 		break;
 	case CC_FASTCALL:
-		fputs(" __fastcall ", out);
+		fputs("__fastcall ", out);
 		break;
 	case CC_THISCALL:
-		fputs(" __thiscall ", out);
+		fputs("__thiscall ", out);
 		break;
 	case CC_DEFAULT:
 		break;
@@ -364,6 +381,8 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 	intern_print_type_pre(type->points_to, false);
 	fputs("*", out);
 	print_type_qualifiers(type->base.qualifiers);
+	if (type->base.qualifiers != 0)
+		fputc(' ', out);
 }
 
 /**
@@ -398,6 +417,8 @@ static void print_array_type_post(const array_type_t *type)
 		fputs("static ", out);
 	}
 	print_type_qualifiers(type->base.qualifiers);
+	if (type->base.qualifiers != 0)
+		fputc(' ', out);
 	if (type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
@@ -460,8 +481,9 @@ void print_enum_definition(const declaration_t *declaration)
  */
 static void print_type_enum(const enum_type_t *type)
 {
+	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs("enum ", out);
+	fputs(" enum " + empty, out);
 
 	declaration_t *declaration = type->declaration;
 	symbol_t      *symbol      = declaration->symbol;
@@ -501,13 +523,14 @@ void print_compound_definition(const declaration_t *declaration)
  */
 static void print_compound_type(const compound_type_t *type)
 {
+	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
 
 	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
-		fputs("struct ", out);
+		fputs(" struct " + empty, out);
 	} else {
 		assert(type->base.kind == TYPE_COMPOUND_UNION);
-		fputs("union ", out);
+		fputs(" union " + empty, out);
 	}
 
 	declaration_t *declaration = type->declaration;
@@ -527,6 +550,8 @@ static void print_compound_type(const compound_type_t *type)
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
 	print_type_qualifiers(type->base.qualifiers);
+	if (type->base.qualifiers != 0)
+		fputc(' ', out);
 	fputs(type->declaration->symbol->string, out);
 }
 
