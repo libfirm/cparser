@@ -92,6 +92,12 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					break;
 				}
 
+				case 'u': {
+					const unsigned int val = va_arg(ap, unsigned int);
+					fprintf(stderr, "%u", val);
+					break;
+				}
+
 				case 'Y': {
 					const symbol_t *const symbol = va_arg(ap, const symbol_t*);
 					if (symbol == NULL)
