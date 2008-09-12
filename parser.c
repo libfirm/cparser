@@ -6742,48 +6742,50 @@ static expression_t *parse_select_expression(unsigned precedence,
 
 	type_t *type_left = type;
 	if (is_pointer) {
-		if (!is_type_pointer(type)) {
+		if (is_type_pointer(type)) {
+			type_left = type->pointer.points_to;
+		} else {
 			if (is_type_valid(type)) {
 				errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
 			}
-			return create_invalid_expression();
+			type_left = type;
 		}
-		type_left = type->pointer.points_to;
 	}
 	type_left = skip_typeref(type_left);
 
-	if (type_left->kind != TYPE_COMPOUND_STRUCT &&
-	    type_left->kind != TYPE_COMPOUND_UNION) {
-		if (is_type_valid(type_left)) {
+	declaration_t *entry;
+	if (type_left->kind == TYPE_COMPOUND_STRUCT ||
+	    type_left->kind == TYPE_COMPOUND_UNION) {
+		declaration_t *const declaration = type_left->compound.declaration;
+
+		if (!declaration->init.complete) {
+			errorf(HERE, "request for member '%Y' of incomplete type '%T'",
+			       symbol, type_left);
+			return create_invalid_expression();
+		}
+
+		entry = find_compound_entry(declaration, symbol);
+		if (entry == NULL) {
+			errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
+			goto create_error_entry;
+		}
+	} else {
+		if (is_type_valid(type_left) &&
+		    (!is_pointer || is_type_pointer(type))) {
 			errorf(HERE, "request for member '%Y' in something not a struct or "
 			       "union, but '%T'", symbol, type_left);
 		}
-		return create_invalid_expression();
+create_error_entry:
+		entry         = allocate_declaration_zero();
+		entry->symbol = symbol;
 	}
 
-	declaration_t *const declaration = type_left->compound.declaration;
-
-	if (!declaration->init.complete) {
-		errorf(HERE, "request for member '%Y' of incomplete type '%T'",
-		       symbol, type_left);
-		return create_invalid_expression();
-	}
-
-	declaration_t *iter = find_compound_entry(declaration, symbol);
-	if (iter == NULL) {
-		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
-		iter         = allocate_declaration_zero();
-		iter->symbol = symbol;
-	}
-
+	select->select.compound_entry = entry;
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
-	type_t *expression_type = automatic_type_conversion(iter->type);
+	select->base.type = automatic_type_conversion(entry->type);
 
-	select->select.compound_entry = iter;
-	select->base.type             = expression_type;
-
-	type_t *skipped = skip_typeref(iter->type);
+	type_t *skipped = skip_typeref(entry->type);
 	if (skipped->kind == TYPE_BITFIELD) {
 		select->base.type = skipped->bitfield.base_type;
 	}
