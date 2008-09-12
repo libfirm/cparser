@@ -5903,39 +5903,39 @@ static expression_t *parse_reference(void)
 static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 {
 	type_t                  *orig_type_right = expression->base.type;
-	type_t            const *dest_type       = skip_typeref(orig_dest_type);
-	type_t            const *orig_type       = skip_typeref(orig_type_right);
+	type_t            const *dst_type        = skip_typeref(orig_dest_type);
+	type_t            const *src_type        = skip_typeref(orig_type_right);
 	source_position_t const *pos             = &expression->base.source_position;
 
 	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
-	if (dest_type == type_void)
+	if (dst_type == type_void)
 		return true;
 
-	if (is_type_pointer(dest_type)) {
+	if (is_type_pointer(dst_type)) {
 		/* only integer and pointer can be casted to pointer */
-		if (!is_type_pointer(orig_type) &&
-		    !is_type_integer(orig_type) &&
-		    is_type_valid(orig_type)) {
+		if (!is_type_pointer(src_type) &&
+		    !is_type_integer(src_type) &&
+		    is_type_valid(src_type)) {
 			errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
 			return false;
 		}
 	}
 
-	if (!is_type_scalar(dest_type) && is_type_valid(dest_type)) {
+	if (!is_type_scalar(dst_type) && is_type_valid(dst_type)) {
 		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
 		return false;
 	}
 
-	if (!is_type_scalar(orig_type) && is_type_valid(orig_type)) {
+	if (!is_type_scalar(src_type) && is_type_valid(src_type)) {
 		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
 		return false;
 	}
 
 	if (warning.cast_qual &&
-	    is_type_pointer(orig_type) &&
-	    is_type_pointer(dest_type)) {
-		type_t *src = skip_typeref(orig_type->pointer.points_to);
-		type_t *dst = skip_typeref(dest_type->pointer.points_to);
+	    is_type_pointer(src_type) &&
+	    is_type_pointer(dst_type)) {
+		type_t *src = skip_typeref(src_type->pointer.points_to);
+		type_t *dst = skip_typeref(dst_type->pointer.points_to);
 		unsigned missing_qualifiers =
 			src->base.qualifiers & ~dst->base.qualifiers;
 		if (missing_qualifiers != 0) {
