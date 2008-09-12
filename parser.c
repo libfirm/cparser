@@ -3060,6 +3060,20 @@ end_error:
 	return;
 }
 
+static declaration_t *create_error_declaration(symbol_t *symbol, storage_class_tag_t storage_class)
+{
+	declaration_t *const decl    = allocate_declaration_zero();
+	decl->source_position        = *HERE;
+	decl->storage_class          =
+		storage_class != STORAGE_CLASS_NONE || scope == global_scope ?
+			storage_class : STORAGE_CLASS_AUTO;
+	decl->declared_storage_class = decl->storage_class;
+	decl->symbol                 = symbol;
+	decl->implicit               = true;
+	record_declaration(decl);
+	return decl;
+}
+
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t            *type            = NULL;
@@ -3253,13 +3267,21 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 				switch (la1_type) {
 					DECLARATION_START
 					case T_IDENTIFIER:
-					case '*':
+					case '*': {
 						errorf(HERE, "%K does not name a type", &token);
+
+						declaration_t *const decl =
+							create_error_declaration(token.v.symbol, STORAGE_CLASS_TYPEDEF);
+
+						type = allocate_type_zero(TYPE_TYPEDEF, HERE);
+						type->typedeft.declaration = decl;
+
 						next_token();
 						saw_error = true;
 						if (la1_type == '*')
 							goto finish_specifiers;
 						continue;
+					}
 
 					default:
 						goto finish_specifiers;
@@ -3278,8 +3300,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	}
 
 finish_specifiers:
-
-	if (type == NULL) {
+	if (type == NULL || (saw_error && type_specifiers != 0)) {
 		atomic_type_kind_t atomic_type;
 
 		/* match valid basic types */
@@ -5853,9 +5874,11 @@ static expression_t *parse_reference(void)
 	next_token();
 
 	if (declaration == NULL) {
-		if (! strict_mode && token.type == '(') {
-			/* an implicitly defined function */
-			if (warning.implicit_function_declaration) {
+		if (token.type == '(') {
+			/* an implicitly declared function */
+			if (strict_mode) {
+				errorf(HERE, "unknown symbol '%Y' found.", symbol);
+			} else if (warning.implicit_function_declaration) {
 				warningf(HERE, "implicit declaration of function '%Y'",
 					symbol);
 			}
@@ -5864,11 +5887,11 @@ static expression_t *parse_reference(void)
 			                                       &source_position);
 		} else {
 			errorf(HERE, "unknown symbol '%Y' found.", symbol);
-			return create_invalid_expression();
+			declaration = create_error_declaration(symbol, STORAGE_CLASS_NONE);
 		}
 	}
 
-	type_t *type         = declaration->type;
+	type_t *type = declaration->type;
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
@@ -9099,15 +9122,25 @@ static statement_t *intern_parse_statement(void)
 	/* declaration or statement */
 	add_anchor_token(';');
 	switch (token.type) {
-	case T_IDENTIFIER:
-		if (look_ahead(1)->type == ':') {
+	case T_IDENTIFIER: {
+		token_type_t la1_type = look_ahead(1)->type;
+		if (la1_type == ':') {
 			statement = parse_label_statement();
 		} else if (is_typedef_symbol(token.v.symbol)) {
 			statement = parse_declaration_statement();
-		} else {
-			statement = parse_expression_statement();
+		} else switch (la1_type) {
+			DECLARATION_START
+			case T_IDENTIFIER:
+			case '*':
+				statement = parse_declaration_statement();
+				break;
+
+			default:
+				statement = parse_expression_statement();
+				break;
 		}
 		break;
+	}
 
 	case T___extension__:
 		/* This can be a prefix to a declaration or an expression statement.
