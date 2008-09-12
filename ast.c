@@ -109,7 +109,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_STRING_LITERAL]            = PREC_PRIM,
 		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
 		[EXPR_COMPOUND_LITERAL]          = PREC_UNARY,
-		[EXPR_CALL]                      = PREC_PRIM,
+		[EXPR_CALL]                      = PREC_ACCESS,
 		[EXPR_CONDITIONAL]               = PREC_COND,
 		[EXPR_SELECT]                    = PREC_ACCESS,
 		[EXPR_ARRAY_ACCESS]              = PREC_ACCESS,
