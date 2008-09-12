@@ -32,8 +32,11 @@ typedef struct warning_t {
 	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 	bool char_subscripts:1;               /**< Warn if an array subscript has the type 'char' */
 #if 0 // TODO
-	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
+	bool cpp_compat:1;                    /**< Warn about ISO C constructs that are outside of the common subset of ISO C and ISO C++. */
+#endif
 	bool cast_qual:1;                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */
+#if 0 // TODO
+	bool cast_align:1;                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 	bool conversion:1;                    /**< Warn if a prototype causes a type conversion that is different from what would happen to the same argument in the absence of a prototype */
 #endif
 	bool declaration_after_statement:1;   /**< Warn when a declaration is found after a statement in a block */

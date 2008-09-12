@@ -25,6 +25,7 @@ warning_t warning = {
 	.aggregate_return              = false,
 	.attribute                     = true,
 	.char_subscripts               = true,
+	.cast_qual                     = false,
 	.declaration_after_statement   = false,
 	.deprecated_declarations       = true,
 	.div_by_zero                   = true,
@@ -105,6 +106,7 @@ void set_warning_opt(const char *const opt)
 	OPT("aggregate-return",              aggregate_return);
 	OPT("attribute",                     attribute);
 	OPT("char-subscripts",               char_subscripts);
+	OPT("cast-qual",                     cast_qual);
 	OPT("declaration-after-statement",   declaration_after_statement);
 	OPT("deprecated-declarations",       deprecated_declarations);
 	OPT("div_by_zero",                   div_by_zero);

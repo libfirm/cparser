@@ -972,7 +972,7 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 		unsigned missing_qualifiers
 			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 		warningf(source_position,
-		         "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointed-to type",
+		         "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointer target type",
 		         orig_type_left, context, orig_type_right, missing_qualifiers);
 		return;
 	}
@@ -1016,12 +1016,13 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 				= skip_typeref(type_left->pointer.points_to);
 			type_t *points_to_right
 				= skip_typeref(type_right->pointer.points_to);
+			assign_error_t res = ASSIGN_SUCCESS;
 
 			/* the left type has all qualifiers from the right type */
 			unsigned missing_qualifiers
 				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
 			if (missing_qualifiers != 0) {
-				return ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
+				res = ASSIGN_ERROR_POINTER_QUALIFIER_MISSING;
 			}
 
 			points_to_left  = get_unqualified_type(points_to_left);
@@ -1029,14 +1030,14 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 
 			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
 					is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
-				return ASSIGN_SUCCESS;
+				return res;
 			}
 
 			if (!types_compatible(points_to_left, points_to_right)) {
 				return ASSIGN_WARNING_POINTER_INCOMPATIBLE;
 			}
 
-			return ASSIGN_SUCCESS;
+			return res;
 		} else if (is_type_integer(type_right)) {
 			return ASSIGN_WARNING_POINTER_FROM_INT;
 		}
@@ -5900,11 +5901,51 @@ static expression_t *parse_reference(void)
 	return expression;
 }
 
-static void check_cast_allowed(expression_t *expression, type_t *dest_type)
+static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 {
-	(void) expression;
-	(void) dest_type;
+	type_t *orig_type_right = expression->base.type;
+	const type_t *dest_type = skip_typeref(orig_dest_type);
+	const type_t *orig_type = skip_typeref(orig_type_right);
+
+	if (!is_type_valid(dest_type) || !is_type_valid(orig_type))
+		return true;
+
+	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
+	if (dest_type == type_void)
+		return true;
+
 	/* TODO check if explicit cast is allowed and issue warnings/errors */
+	if (is_type_pointer(dest_type)) {
+		/* only integer and pointer can be casted to pointer */
+		if (! is_type_pointer(orig_type) && ! is_type_integer(orig_type)) {
+			errorf(HERE, "cannot convert type '%T' to a pointer type", orig_type_right);
+			return false;
+		}
+	}
+	else if (!is_type_scalar(dest_type)) {
+		errorf(HERE, "conversion to non-scalar type '%T' requested", orig_dest_type);
+		return false;
+	}
+	else if (!is_type_scalar(orig_type)) {
+		errorf(HERE, "conversion from non-scalar type '%T' requested", orig_type_right);
+		return false;
+	}
+
+	if (warning.cast_qual) {
+		if (is_type_pointer(orig_type) &&
+		    is_type_pointer(dest_type)) {
+			type_t *src = skip_typeref(orig_type->pointer.points_to);
+                        type_t *dst = skip_typeref(dest_type->pointer.points_to);
+			unsigned missing_qualifiers
+				= src->base.qualifiers & ~dst->base.qualifiers;
+		    	if (missing_qualifiers != 0) {
+				warningf(HERE,
+				         "cast discards qualifiers '%Q' in pointer target type of '%T'",
+		       		         missing_qualifiers, orig_type_right);
+			}
+		}
+	}
+	return true;
 }
 
 static expression_t *parse_compound_literal(type_t *type)
@@ -5947,7 +5988,8 @@ static expression_t *parse_cast(void)
 
 	expression_t *value = parse_sub_expression(20);
 
-	check_cast_allowed(value, type);
+	if (! semantic_cast(value, type))
+		goto end_error;
 
 	cast->base.type   = type;
 	cast->unary.value = value;
