@@ -5902,9 +5902,10 @@ static expression_t *parse_reference(void)
 
 static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 {
-	type_t       *orig_type_right = expression->base.type;
-	type_t const *dest_type       = skip_typeref(orig_dest_type);
-	type_t const *orig_type       = skip_typeref(orig_type_right);
+	type_t                  *orig_type_right = expression->base.type;
+	type_t            const *dest_type       = skip_typeref(orig_dest_type);
+	type_t            const *orig_type       = skip_typeref(orig_type_right);
+	source_position_t const *pos             = &expression->base.source_position;
 
 	if (!is_type_valid(dest_type) || !is_type_valid(orig_type))
 		return true;
@@ -5916,14 +5917,14 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 	if (is_type_pointer(dest_type)) {
 		/* only integer and pointer can be casted to pointer */
 		if (!is_type_pointer(orig_type) && !is_type_integer(orig_type)) {
-			errorf(HERE, "cannot convert type '%T' to a pointer type", orig_type_right);
+			errorf(pos, "cannot convert type '%T' to a pointer type", orig_type_right);
 			return false;
 		}
 	} else if (!is_type_scalar(dest_type)) {
-		errorf(HERE, "conversion to non-scalar type '%T' requested", orig_dest_type);
+		errorf(pos, "conversion to non-scalar type '%T' requested", orig_dest_type);
 		return false;
 	} else if (!is_type_scalar(orig_type)) {
-		errorf(HERE, "conversion from non-scalar type '%T' requested", orig_type_right);
+		errorf(pos, "conversion from non-scalar type '%T' requested", orig_type_right);
 		return false;
 	}
 
@@ -5935,7 +5936,7 @@ static bool semantic_cast(expression_t *expression, type_t *orig_dest_type)
 		unsigned missing_qualifiers =
 			src->base.qualifiers & ~dst->base.qualifiers;
 		if (missing_qualifiers != 0) {
-			warningf(HERE,
+			warningf(pos,
 			         "cast discards qualifiers '%Q' in pointer target type of '%T'",
 	             missing_qualifiers, orig_type_right);
 		}
