@@ -7356,16 +7356,22 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	expression->base.type = arithmetic_type;
 }
 
+static void warn_div_by_zero(binary_expression_t const *const expression)
+{
+	if (warning.div_by_zero                       &&
+	    is_type_integer(expression->base.type)    &&
+	    is_constant_expression(expression->right) &&
+	    fold_constant(expression->right) == 0) {
+		warningf(&expression->base.source_position, "division by zero");
+	}
+}
+
 /**
  * Check the semantic restrictions for a div/mod expression.
  */
 static void semantic_divmod_arithmetic(binary_expression_t *expression) {
 	semantic_binexpr_arithmetic(expression);
-	if (warning.div_by_zero && is_type_integer(expression->base.type)) {
-		if (is_constant_expression(expression->right) &&
-		    fold_constant(expression->right) == 0)
-			warningf(&expression->base.source_position, "division by zero");
-	}
+	warn_div_by_zero(expression);
 }
 
 static void semantic_shift_op(binary_expression_t *expression)
@@ -7642,11 +7648,7 @@ static void semantic_arithmetic_assign(binary_expression_t *expression)
 static void semantic_divmod_assign(binary_expression_t *expression)
 {
 	semantic_arithmetic_assign(expression);
-	if (warning.div_by_zero && is_type_integer(expression->base.type)) {
-		if (is_constant_expression(expression->right) &&
-		    fold_constant(expression->right) == 0)
-			warningf(&expression->base.source_position, "division by zero");
-	}
+	warn_div_by_zero(expression);
 }
 
 static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
