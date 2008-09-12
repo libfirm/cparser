@@ -829,6 +829,22 @@ bool is_type_float(const type_t *type)
 }
 
 /**
+ * Returns true if the given type is an complex type.
+ *
+ * @param type  The type to check.
+ * @return True if type is a complex type.
+ */
+bool is_type_complex(const type_t *type)
+{
+	assert(!is_typeref(type));
+
+	if (type->kind != TYPE_ATOMIC)
+		return false;
+
+	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_COMPLEX);
+}
+
+/**
  * Returns true if the given type is a signed type.
  *
  * @param type  The type to check.

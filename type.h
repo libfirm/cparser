@@ -132,6 +132,11 @@ bool is_type_signed(const type_t *type);
  */
 bool is_type_float(const type_t *type);
 
+/**
+ * returns true if type contains complex numbers
+ */
+bool is_type_complex(const type_t *type);
+
 bool is_type_real(const type_t *type);
 
 /**
