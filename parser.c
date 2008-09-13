@@ -5848,7 +5848,10 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
 	switch (expression->kind) {
 		case EXPR_REFERENCE: return expression->reference.declaration->type;
-		case EXPR_SELECT:    return expression->select.compound_entry->type;
+
+		case EXPR_SELECT:
+			return get_qualified_type(expression->select.compound_entry->type,
+			                          expression->base.type->base.qualifiers);
 
 		case EXPR_UNARY_DEREFERENCE: {
 			const expression_t *const value = expression->unary.value;
@@ -6793,16 +6796,8 @@ create_error_entry:
 
 	select->select.compound_entry = entry;
 
-	type_t            *res_type = entry->type;
-	type_qualifiers_t  qual     = type_left->base.qualifiers;
-	if (qual != 0) {
-		type_t *const copy = duplicate_type(res_type);
-		copy->base.qualifiers |= qual;
-
-		res_type = typehash_insert(copy);
-		if (type != copy)
-			free_type(copy);
-	}
+	type_t *const res_type =
+		get_qualified_type(entry->type, type_left->base.qualifiers);
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
@@ -7095,13 +7090,8 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 				to = type_void;
 			}
 
-			type_t *const copy = duplicate_type(to);
-			copy->base.qualifiers = to1->base.qualifiers | to2->base.qualifiers;
-
-			type_t *const type = typehash_insert(copy);
-			if (type != copy)
-				free_type(copy);
-
+			type_t *const type =
+				get_qualified_type(to, to1->base.qualifiers | to2->base.qualifiers);
 			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
 		} else if (is_type_integer(other_type)) {
 			warningf(&conditional->base.source_position,

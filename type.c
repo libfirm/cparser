@@ -761,6 +761,36 @@ type_t *get_unqualified_type(type_t *type)
 	return result;
 }
 
+type_t *get_qualified_type(type_t *type, type_qualifiers_t const qual)
+{
+	assert(!is_typeref(type));
+
+	type_t *copy;
+	if (is_type_array(type)) {
+		/* For array types the element type has to be adjusted */
+		type_t *element_type      = type->array.element_type;
+		type_t *qual_element_type = get_qualified_type(element_type, qual);
+
+		if (qual_element_type == element_type)
+			return type;
+
+		copy                     = duplicate_type(type);
+		copy->array.element_type = qual_element_type;
+	} else {
+		if ((type->base.qualifiers & qual) == qual)
+			return type;
+
+		copy                   = duplicate_type(type);
+		copy->base.qualifiers |= qual;
+	}
+
+	type = typehash_insert(copy);
+	if (type != copy)
+		obstack_free(type_obst, copy);
+
+	return type;
+}
+
 /**
  * Check if a type is valid.
  *
