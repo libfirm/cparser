@@ -889,8 +889,12 @@ static void print_expression_statement(const expression_statement_t *statement)
 static void print_goto_statement(const goto_statement_t *statement)
 {
 	fprintf(out, "goto ");
-	fputs(statement->label->symbol->string, out);
-	fprintf(stderr, "(%p)", (void*) statement->label);
+	if (statement->expression != NULL) {
+		fputc('*', out);
+		print_expression(statement->expression);
+	} else {
+		fputs(statement->label->symbol->string, out);
+	}
 	fputs(";\n", out);
 }
 
@@ -901,7 +905,6 @@ static void print_goto_statement(const goto_statement_t *statement)
  */
 static void print_label_statement(const label_statement_t *statement)
 {
-	fprintf(stderr, "(%p)", (void*) statement->label);
 	fprintf(out, "%s:\n", statement->label->symbol->string);
 	print_statement(statement->statement);
 }
