@@ -6792,11 +6792,23 @@ create_error_entry:
 	}
 
 	select->select.compound_entry = entry;
+
+	type_t            *res_type = entry->type;
+	type_qualifiers_t  qual     = type_left->base.qualifiers;
+	if (qual != 0) {
+		type_t *const copy = duplicate_type(res_type);
+		copy->base.qualifiers |= qual;
+
+		res_type = typehash_insert(copy);
+		if (type != copy)
+			free_type(copy);
+	}
+
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
-	select->base.type = automatic_type_conversion(entry->type);
+	select->base.type = automatic_type_conversion(res_type);
 
-	type_t *skipped = skip_typeref(entry->type);
+	type_t *skipped = skip_typeref(res_type);
 	if (skipped->kind == TYPE_BITFIELD) {
 		select->base.type = skipped->bitfield.base_type;
 	}
