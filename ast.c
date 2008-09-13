@@ -55,8 +55,8 @@ void change_indent(int delta)
 
 void print_indent(void)
 {
-	for(int i = 0; i < indent; ++i)
-		fprintf(out, "\t");
+	for (int i = 0; i < indent; ++i)
+		fputc('\t', out);
 }
 
 enum precedence_t {
@@ -392,12 +392,12 @@ static void print_call_expression(const call_expression_t *call)
 {
 	unsigned prec = get_expression_precedence(call->base.kind);
 	print_expression_prec(call->function, prec);
-	fprintf(out, "(");
+	fputc('(', out);
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
 	while(argument != NULL) {
 		if(!first) {
-			fprintf(out, ", ");
+			fputs(", ", out);
 		} else {
 			first = 0;
 		}
@@ -405,7 +405,7 @@ static void print_call_expression(const call_expression_t *call)
 
 		argument = argument->next;
 	}
-	fprintf(out, ")");
+	fputc(')', out);
 }
 
 /**
@@ -519,7 +519,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
  */
 static void print_reference_expression(const reference_expression_t *ref)
 {
-	fprintf(out, "%s", ref->declaration->symbol->string);
+	fputs(ref->declaration->symbol->string, out);
 }
 
 /**
@@ -751,7 +751,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	switch(expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
-		fprintf(out, "$invalid expression$");
+		fputs("$invalid expression$", out);
 		break;
 	case EXPR_CHARACTER_CONSTANT:
 		print_character_constant(&expression->conste);
@@ -864,7 +864,7 @@ static void print_compound_statement(const compound_statement_t *block)
  */
 static void print_return_statement(const return_statement_t *statement)
 {
-	fprintf(out, "return ");
+	fputs("return ", out);
 	if(statement->value != NULL)
 		print_expression(statement->value);
 	fputs(";\n", out);
@@ -888,7 +888,7 @@ static void print_expression_statement(const expression_statement_t *statement)
  */
 static void print_goto_statement(const goto_statement_t *statement)
 {
-	fprintf(out, "goto ");
+	fputs("goto ", out);
 	if (statement->expression != NULL) {
 		fputc('*', out);
 		print_expression(statement->expression);
@@ -1225,7 +1225,7 @@ void print_statement(const statement_t *statement)
 		print_leave_statement(&statement->leave);
 		break;
 	case STATEMENT_INVALID:
-		fprintf(out, "$invalid statement$");
+		fputs("$invalid statement$", out);
 		break;
 	}
 }
@@ -1359,15 +1359,15 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		if(modifiers & DM_NOALIAS) {
 			fputs(next, out); next = ", "; fputs("noalias", out);
 		}
-	    if(declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
-	    	char *comma = "";
-			fputs(next, out); next = ", "; fprintf(out, "property(");
-	    	if(declaration->get_property_sym != NULL) {
-	    		fprintf(out, "get=%s", declaration->get_property_sym->string);
-	    		comma = ", ";
+		if(declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
+			char *comma = "";
+			fputs(next, out); next = ", "; fputs("property(", out);
+			if(declaration->get_property_sym != NULL) {
+				fprintf(out, "get=%s", declaration->get_property_sym->string);
+				comma = ", ";
 			}
-	    	if(declaration->put_property_sym != NULL)
-	    		fprintf(out, "%sput=%s", comma, declaration->put_property_sym->string);
+			if(declaration->put_property_sym != NULL)
+				fprintf(out, "%sput=%s", comma, declaration->put_property_sym->string);
 			fputc(')', out);
 		}
 		fputs(") ", out);
