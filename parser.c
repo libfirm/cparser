@@ -6746,24 +6746,23 @@ static expression_t *parse_select_expression(unsigned precedence,
 	type_t *const orig_type = compound->base.type;
 	type_t *const type      = skip_typeref(orig_type);
 
-	type_t *type_left = type;
+	type_t *type_left;
 	bool    saw_error = false;
 	if (is_type_pointer(type)) {
 		if (!is_pointer) {
 			errorf(HERE,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
-			       symbol, type_left);
+			       symbol, orig_type);
 			saw_error = true;
 		}
-		type_left = type->pointer.points_to;
-	} else if (is_pointer) {
-		if (is_type_valid(type)) {
+		type_left = skip_typeref(type->pointer.points_to);
+	} else {
+		if (is_pointer && is_type_valid(type)) {
 			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
 			saw_error = true;
 		}
 		type_left = type;
 	}
-	type_left = skip_typeref(type_left);
 
 	declaration_t *entry;
 	if (type_left->kind == TYPE_COMPOUND_STRUCT ||
