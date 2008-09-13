@@ -3579,7 +3579,7 @@ static void semantic_parameter(declaration_t *declaration)
 	declaration->type = type;
 
 	if (is_type_incomplete(skip_typeref(type))) {
-		errorf(pos, "incomplete type '%T' not allowed for parameter '%Y'",
+		errorf(pos, "parameter '%#T' is of incomplete type",
 		       orig_type, declaration->symbol);
 	}
 }
@@ -4426,7 +4426,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 	if (is_type_function(type)) {
 		errorf(&declaration->source_position,
-		       "function %#T is initialized like a variable",
+		       "function '%#T' is initialized like a variable",
 		       orig_type, declaration->symbol);
 		orig_type = type_error_type;
 	}
