@@ -1089,7 +1089,7 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	if (type1->kind != type2->kind)
 		return false;
 
-	switch(type1->kind) {
+	switch (type1->kind) {
 	case TYPE_FUNCTION:
 		return function_types_compatible(&type1->function, &type2->function);
 	case TYPE_ATOMIC:
@@ -1141,8 +1141,8 @@ type_t *skip_typeref(type_t *type)
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 	type_modifiers_t  modifiers  = TYPE_MODIFIER_NONE;
 
-	while(true) {
-		switch(type->kind) {
+	while (true) {
+		switch (type->kind) {
 		case TYPE_ERROR:
 			return type;
 		case TYPE_TYPEDEF: {
@@ -1313,8 +1313,9 @@ type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 	memset(type, 0, sizeof(atomic_type_t));
 
 	type->kind            = TYPE_ATOMIC;
-	type->base.qualifiers = qualifiers;
+	type->base.size       = get_atomic_type_size(akind);
 	type->base.alignment  = get_atomic_type_alignment(akind);
+	type->base.qualifiers = qualifiers;
 	type->atomic.akind    = akind;
 
 	return identify_new_type(type);

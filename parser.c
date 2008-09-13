@@ -3076,6 +3076,95 @@ static declaration_t *create_error_declaration(symbol_t *symbol, storage_class_t
 	return decl;
 }
 
+/**
+ * Finish the construction of a struct type by calculating
+ * its size, offsets, alignment.
+ */
+static void finish_struct_type(compound_type_t *type) {
+	if (type->declaration == NULL)
+		return;
+	declaration_t *struct_decl = type->declaration;
+	if (! struct_decl->init.complete)
+		return;
+
+	il_size_t      size      = 0;
+	il_size_t      new_size;
+	il_alignment_t alignment = 1;
+	bool           need_pad  = false;
+
+	declaration_t *entry = struct_decl->scope.declarations;
+	for (; entry != NULL; entry = entry->next) {
+		if (entry->namespc != NAMESPACE_NORMAL)
+			continue;
+
+		type_t         *m_type      = skip_typeref(entry->type);
+		il_alignment_t  m_alignment = m_type->base.alignment;
+
+		new_size = (size + m_alignment - 1) & -m_alignment;
+		if (m_alignment > alignment)
+			alignment = m_alignment;
+		if (new_size > size)
+			need_pad = true;
+		entry->offset = new_size;
+		size = new_size + m_type->base.size;
+	}
+	if (type->base.alignment != 0) {
+		alignment = type->base.alignment;
+	}
+
+	new_size = (size + alignment - 1) & -alignment;
+	if (new_size > size)
+		need_pad = true;
+
+	if (warning.padded && need_pad) {
+		warningf(&struct_decl->source_position,
+			"'%#T' needs padding", type, struct_decl->symbol);
+	}
+	if (warning.packed && !need_pad) {
+		warningf(&struct_decl->source_position,
+			"superfluous packed attribute on '%#T'",
+			type, struct_decl->symbol);
+	}
+
+	type->base.size      = new_size;
+	type->base.alignment = alignment;
+}
+
+/**
+ * Finish the construction of an union type by calculating
+ * its size and alignment.
+ */
+static void finish_union_type(compound_type_t *type) {
+	if (type->declaration == NULL)
+		return;
+	declaration_t *union_decl = type->declaration;
+	if (! union_decl->init.complete)
+		return;
+
+	il_size_t      size      = 0;
+	il_alignment_t alignment = 1;
+
+	declaration_t *entry = union_decl->scope.declarations;
+	for (; entry != NULL; entry = entry->next) {
+		if (entry->namespc != NAMESPACE_NORMAL)
+			continue;
+
+		type_t *m_type = skip_typeref(entry->type);
+
+		entry->offset = 0;
+		if (m_type->base.size > size)
+			size = m_type->base.size;
+		if (m_type->base.alignment > alignment)
+			alignment = m_type->base.alignment;
+	}
+	if (type->base.alignment != 0) {
+		alignment = type->base.alignment;
+	}
+	size = (size + alignment - 1) & -alignment;
+	type->base.size      = size;
+	type->base.alignment = alignment;
+}
+
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t            *type            = NULL;
@@ -3215,6 +3304,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			type = allocate_type_zero(TYPE_COMPOUND_STRUCT, HERE);
 
 			type->compound.declaration = parse_compound_type_specifier(true);
+			finish_struct_type(&type->compound);
 			break;
 		}
 		case T_union: {
@@ -3223,6 +3313,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			if (type->compound.declaration->modifiers & DM_TRANSPARENT_UNION)
 				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 			break;
+			finish_union_type(&type->compound);
 		}
 		case T_enum:
 			type = parse_enum_specifier();
@@ -5404,12 +5495,12 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 {
 	declaration_t *last_declaration = struct_declaration->scope.declarations;
 	if (last_declaration != NULL) {
-		while(last_declaration->next != NULL) {
+		while (last_declaration->next != NULL) {
 			last_declaration = last_declaration->next;
 		}
 	}
 
-	while(1) {
+	while (true) {
 		declaration_t *declaration;
 
 		if (token.type == ':') {
@@ -5502,7 +5593,7 @@ static void parse_compound_type_entries(declaration_t *compound_declaration)
 	eat('{');
 	add_anchor_token('}');
 
-	while(token.type != '}' && token.type != T_EOF) {
+	while (token.type != '}' && token.type != T_EOF) {
 		declaration_specifiers_t specifiers;
 		memset(&specifiers, 0, sizeof(specifiers));
 		parse_declaration_specifiers(&specifiers);

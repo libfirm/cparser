@@ -47,6 +47,8 @@ warning_t warning = {
 	.nested_externs                = false,
 	.nonnull                       = true,
 	.old_style_definition          = false,
+	.packed                        = false,
+	.padded                        = false,
 	.pointer_arith                 = true,
 	.redundant_decls               = true,
 	.return_type                   = true,
@@ -153,6 +155,8 @@ void set_warning_opt(const char *const opt)
 	OPT("nested-externs",                nested_externs);
 	OPT("nonnull",                       nonnull);
 	OPT("old-style-definition",          old_style_definition);
+	OPT("packed",                        packed);
+	OPT("padded",                        padded);
 	OPT("pointer_arith",                 pointer_arith);
 	OPT("redundant-decls",               redundant_decls);
 	OPT("return-type",                   return_type);

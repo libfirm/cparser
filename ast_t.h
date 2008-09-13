@@ -546,12 +546,14 @@ struct declaration_t {
 	const char         *deprecated_string;  /**< MS deprecated string if any. */
 	symbol_t           *get_property_sym;   /**< MS get property. */
 	symbol_t           *put_property_sym;   /**< MS put property. */
-	unsigned int        address_taken : 1;
+	unsigned int        address_taken : 1;  /**< Set if the address of this declaration was taken. */
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */
-	unsigned int        implicit      : 1;
+	unsigned int        implicit      : 1;  /**< Set for implicit (not found in source code) declarations. */
 	type_t             *type;
+	il_size_t           offset;             /**< The offset of this member inside a compound. */
 	symbol_t           *symbol;
+	string_t           *asm_name;           /**< GCC extension: ASM label. */
 	source_position_t   source_position;
 	union {
 		bool            complete;           /**< used to indicate whether struct/union types are already defined or if just the name is declared */
@@ -655,8 +657,9 @@ struct switch_statement_t {
 
 struct goto_statement_t {
 	statement_base_t  base;
-	declaration_t    *label;     /**< The destination label. */
-	goto_statement_t *next;      /**< links all goto statements of a function */
+	declaration_t    *label;      /**< The destination label. */
+	expression_t     *expression; /**< The expression for an assigned goto. */
+	goto_statement_t *next;       /**< links all goto statements of a function */
 };
 
 struct case_label_statement_t {
