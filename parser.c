@@ -4424,6 +4424,13 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 		must_be_constant = true;
 	}
 
+	if (is_type_function(type)) {
+		errorf(&declaration->source_position,
+		       "function %#T is initialized like a variable",
+		       orig_type, declaration->symbol);
+		orig_type = type_error_type;
+	}
+
 	parse_initializer_env_t env;
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
@@ -4432,17 +4439,10 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	initializer_t *initializer = parse_initializer(&env);
 	current_init_decl = NULL;
 
-	if (env.type != orig_type) {
-		orig_type         = env.type;
-		type              = skip_typeref(orig_type);
-		declaration->type = env.type;
-	}
-
-	if (is_type_function(type)) {
-		errorf(&declaration->source_position,
-		       "initializers not allowed for function types at declarator '%Y' (type '%T')",
-		       declaration->symbol, orig_type);
-	} else {
+	if (!is_type_function(type)) {
+		/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
+		 * the array type size */
+		declaration->type             = env.type;
 		declaration->init.initializer = initializer;
 	}
 }
