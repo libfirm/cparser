@@ -70,8 +70,8 @@ typedef struct warning_t {
 	bool multichar:1;                     /**< Warn if a multicharacter constant ('FOOF') is used. */
 	bool nested_externs:1;                /**< Warn if an 'extern' declaration is encountered within a function. */
 	bool nonnull:1;                       /**< Warn about passing a null pointer for arguments marked nonnull. */
-#if 0 // TODO
 	bool old_style_definition:1;          /**< Warn if an old-style function definition is used. */
+#if 0 // TODO
 	bool packed:1;                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	bool padded:1;                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */
 	bool parentheses:1;                   /**< Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces) */

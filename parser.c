@@ -5282,6 +5282,10 @@ static void parse_external_declaration(void)
 		warningf(HERE, "traditional C rejects ISO C style function definition of function '%Y'",
 			ndeclaration->symbol);
 	}
+	if (warning.old_style_definition && type->function.unspecified_parameters) {
+		warningf(HERE, "old-style function definition '%Y'",
+			ndeclaration->symbol);
+	}
 
 	/* § 6.7.5.3 (14) a function definition with () means no
 	 * parameters (and not unspecified parameters) */
