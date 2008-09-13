@@ -103,7 +103,7 @@ typedef struct parse_initializer_env_t {
 	bool           must_be_constant;
 } parse_initializer_env_t;
 
-typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration);
+typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration, bool is_definition);
 
 static token_t             token;
 static token_t             lookahead_buffer[MAX_LOOKAHEAD];
@@ -171,7 +171,7 @@ static type_t       *parse_typename(void);
 static void parse_compound_type_entries(declaration_t *compound_declaration);
 static declaration_t *parse_declarator(
 		const declaration_specifiers_t *specifiers, bool may_be_abstract);
-static declaration_t *record_declaration(declaration_t *declaration);
+static declaration_t *record_declaration(declaration_t *declaration, bool is_definition);
 
 static void semantic_comparison(binary_expression_t *expression);
 
@@ -1095,7 +1095,7 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 	declaration->source_position        = builtin_source_position;
 	declaration->implicit               = true;
 
-	record_declaration(declaration);
+	record_declaration(declaration, false);
 
 	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF, &builtin_source_position);
 	typedef_type->typedeft.declaration = declaration;
@@ -2727,7 +2727,7 @@ static void parse_enum_entries(type_t *const enum_type)
 			/* TODO semantic */
 		}
 
-		record_declaration(entry);
+		record_declaration(entry, false);
 
 		if (token.type != ',')
 			break;
@@ -3072,7 +3072,7 @@ static declaration_t *create_error_declaration(symbol_t *symbol, storage_class_t
 			storage_class : STORAGE_CLASS_AUTO;
 	decl->symbol                 = symbol;
 	decl->implicit               = true;
-	record_declaration(decl);
+	record_declaration(decl, false);
 	return decl;
 }
 
@@ -4207,7 +4207,7 @@ static bool is_sym_main(const symbol_t *const sym)
 	return strcmp(sym->string, "main") == 0;
 }
 
-static declaration_t *internal_record_declaration(
+static declaration_t *record_declaration(
 	declaration_t *const declaration,
 	const bool is_definition)
 {
@@ -4380,16 +4380,6 @@ warn_redundant_declaration:
 	return append_declaration(declaration);
 }
 
-static declaration_t *record_declaration(declaration_t *declaration)
-{
-	return internal_record_declaration(declaration, false);
-}
-
-static declaration_t *record_definition(declaration_t *declaration)
-{
-	return internal_record_declaration(declaration, true);
-}
-
 static void parser_error_multiple_definition(declaration_t *declaration,
 		const source_position_t *source_position)
 {
@@ -4505,7 +4495,8 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 	add_anchor_token('=');
 	add_anchor_token(',');
 	while(true) {
-		declaration_t *declaration = finished_declaration(ndeclaration);
+		declaration_t *declaration =
+			finished_declaration(ndeclaration, token.type == '=');
 
 		type_t *orig_type = declaration->type;
 		type_t *type      = skip_typeref(orig_type);
@@ -4535,7 +4526,7 @@ end_error:
 	rem_anchor_token(',');
 }
 
-static declaration_t *finished_kr_declaration(declaration_t *declaration)
+static declaration_t *finished_kr_declaration(declaration_t *declaration, bool is_definition)
 {
 	symbol_t *symbol  = declaration->symbol;
 	if (symbol == NULL) {
@@ -4544,7 +4535,7 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 	}
 	namespace_t namespc = (namespace_t) declaration->namespc;
 	if (namespc != NAMESPACE_NORMAL) {
-		return record_declaration(declaration);
+		return record_declaration(declaration, false);
 	}
 
 	declaration_t *previous_declaration = get_declaration(symbol, namespc);
@@ -4555,6 +4546,10 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 		return declaration;
 	}
 
+	if (is_definition) {
+		errorf(HERE, "parameter %Y is initialised", declaration->symbol);
+	}
+
 	if (previous_declaration->type == NULL) {
 		previous_declaration->type          = declaration->type;
 		previous_declaration->declared_storage_class = declaration->declared_storage_class;
@@ -4562,7 +4557,7 @@ static declaration_t *finished_kr_declaration(declaration_t *declaration)
 		previous_declaration->parent_scope  = scope;
 		return previous_declaration;
 	} else {
-		return record_declaration(declaration);
+		return record_declaration(declaration, false);
 	}
 }
 
@@ -5242,11 +5237,8 @@ static void parse_external_declaration(void)
 	switch (token.type) {
 		case ',':
 		case ';':
-			parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
-			return;
-
 		case '=':
-			parse_declaration_rest(ndeclaration, &specifiers, record_definition);
+			parse_declaration_rest(ndeclaration, &specifiers, record_declaration);
 			return;
 	}
 
@@ -5301,7 +5293,7 @@ static void parse_external_declaration(void)
 		ndeclaration->type = type;
 	}
 
-	declaration_t *const declaration = record_definition(ndeclaration);
+	declaration_t *const declaration = record_declaration(ndeclaration, true);
 	if (ndeclaration != declaration) {
 		declaration->scope = ndeclaration->scope;
 	}
@@ -5722,7 +5714,7 @@ static declaration_t *create_implicit_function(symbol_t *symbol,
 
 	bool strict_prototypes_old = warning.strict_prototypes;
 	warning.strict_prototypes  = false;
-	record_declaration(declaration);
+	record_declaration(declaration, false);
 	warning.strict_prototypes = strict_prototypes_old;
 
 	return declaration;
