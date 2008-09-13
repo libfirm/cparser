@@ -4459,8 +4459,7 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 
 /* parse rest of a declaration without any declarator */
 static void parse_anonymous_declaration_rest(
-		const declaration_specifiers_t *specifiers,
-		parsed_declaration_func finished_declaration)
+		const declaration_specifiers_t *specifiers)
 {
 	eat(';');
 
@@ -4495,7 +4494,7 @@ static void parse_anonymous_declaration_rest(
 			break;
 	}
 
-	finished_declaration(declaration);
+	append_declaration(declaration);
 }
 
 static void parse_declaration_rest(declaration_t *ndeclaration,
@@ -4574,7 +4573,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	parse_declaration_specifiers(&specifiers);
 
 	if (token.type == ';') {
-		parse_anonymous_declaration_rest(&specifiers, append_declaration);
+		parse_anonymous_declaration_rest(&specifiers);
 	} else {
 		declaration_t *declaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
 		parse_declaration_rest(declaration, &specifiers, finished_declaration);
@@ -5224,7 +5223,7 @@ static void parse_external_declaration(void)
 
 	/* must be a declaration */
 	if (token.type == ';') {
-		parse_anonymous_declaration_rest(&specifiers, append_declaration);
+		parse_anonymous_declaration_rest(&specifiers);
 		return;
 	}
 
