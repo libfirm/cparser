@@ -7835,9 +7835,6 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 	expression_t *left           = expression->left;
 	type_t       *orig_type_left = left->base.type;
 
-	type_t *type_left = revert_automatic_type_conversion(left);
-	type_left         = skip_typeref(orig_type_left);
-
 	if (!is_valid_assignment_lhs(left))
 		return;
 
