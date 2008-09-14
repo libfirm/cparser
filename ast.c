@@ -208,7 +208,12 @@ static void print_const(const const_expression_t *cnst)
 		fprintf(out, "%lld", cnst->v.int_value);
 	} else if (is_type_float(type)) {
 		long double const val = cnst->v.float_value;
+#ifdef _WIN32
+		/* ARG, no way to print long double */
+		fprintf(out, "%.20g", (double)val);
+#else
 		fprintf(out, "%.20Lg", val);
+#endif
 		if (isfinite(val) && truncl(val) == val)
 			fputs(".0", out);
 	} else {
