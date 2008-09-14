@@ -26,10 +26,15 @@
 #include "lang_features.h"
 
 #include <assert.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+#ifdef __INTEL_COMPILER
+#include <mathimf.h>
+#else
+#include <math.h>
+#endif
 
 #include "adt/error.h"
 
