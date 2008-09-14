@@ -389,6 +389,7 @@ typedef enum namespace_t {
 	NAMESPACE_UNION,
 	NAMESPACE_ENUM,
 	NAMESPACE_LABEL,
+	NAMESPACE_LOCAL_LABEL
 } namespace_t;
 
 typedef enum initializer_kind_t {

@@ -110,6 +110,7 @@ static token_t             lookahead_buffer[MAX_LOOKAHEAD];
 static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
+static stack_entry_t      *local_label_stack = NULL;
 static scope_t            *global_scope      = NULL;
 static scope_t            *scope             = NULL;
 static declaration_t      *last_declaration  = NULL;
@@ -480,11 +481,19 @@ static size_t environment_top(void)
 }
 
 /**
- * Returns the index of the top element of the label stack.
+ * Returns the index of the top element of the global label stack.
  */
 static size_t label_top(void)
 {
 	return ARR_LEN(label_stack);
+}
+
+/**
+ * Returns the index of the top element of the local label stack.
+ */
+static size_t local_label_top(void)
+{
+	return ARR_LEN(local_label_stack);
 }
 
 /**
@@ -765,6 +774,11 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 }
 
+/**
+ * Push a declaration on the environment stack.
+ *
+ * @param declaration  the declaration
+ */
 static void environment_push(declaration_t *declaration)
 {
 	assert(declaration->source_position.input_name != NULL);
@@ -773,7 +787,7 @@ static void environment_push(declaration_t *declaration)
 }
 
 /**
- * Push a declaration of the label stack.
+ * Push a declaration on the global label stack.
  *
  * @param declaration  the declaration
  */
@@ -781,6 +795,17 @@ static void label_push(declaration_t *declaration)
 {
 	declaration->parent_scope = &current_function->scope;
 	stack_push(&label_stack, declaration);
+}
+
+/**
+ * Push a declaration of the local label stack.
+ *
+ * @param declaration  the declaration
+ */
+static void local_label_push(declaration_t *declaration)
+{
+	assert(declaration->parent_scope != NULL);
+	stack_push(&local_label_stack, declaration);
 }
 
 /**
@@ -833,13 +858,19 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 	ARR_SHRINKLEN(*stack_ptr, (int) new_top);
 }
 
+/**
+ * Pop all entries from the environment stack until the new_top
+ * is reached.
+ *
+ * @param new_top  the new stack top
+ */
 static void environment_pop_to(size_t new_top)
 {
 	stack_pop_to(&environment_stack, new_top);
 }
 
 /**
- * Pop all entries on the label stack until the new_top
+ * Pop all entries from the global label stack until the new_top
  * is reached.
  *
  * @param new_top  the new stack top
@@ -848,6 +879,18 @@ static void label_pop_to(size_t new_top)
 {
 	stack_pop_to(&label_stack, new_top);
 }
+
+/**
+ * Pop all entries from the local label stack until the new_top
+ * is reached.
+ *
+ * @param new_top  the new stack top
+ */
+static void local_label_pop_to(size_t new_top)
+{
+	stack_pop_to(&local_label_stack, new_top);
+}
+
 
 static int get_akind_rank(atomic_type_kind_t akind)
 {
@@ -6613,8 +6656,17 @@ end_error:
  */
 static declaration_t *get_label(symbol_t *symbol)
 {
-	declaration_t *candidate = get_declaration(symbol, NAMESPACE_LABEL);
+	declaration_t *candidate;
 	assert(current_function != NULL);
+
+	candidate = get_declaration(symbol, NAMESPACE_LOCAL_LABEL);
+	/* if we found a local label, we already created the declaration */
+	if (candidate != NULL) {
+		assert(candidate->parent_scope == scope);
+		return candidate;
+	}
+
+	candidate = get_declaration(symbol, NAMESPACE_LABEL);
 	/* if we found a label in the same function, then we already created the
 	 * declaration */
 	if (candidate != NULL
@@ -8712,9 +8764,9 @@ static statement_t *parse_label_statement(void)
 
 	PUSH_PARENT(statement);
 
-	/* if source position is already set then the label is defined twice,
-	 * otherwise it was just mentioned in a goto so far */
-	if (label->source_position.input_name != NULL) {
+	/* if statement is already set then the label is defined twice,
+	 * otherwise it was just mentioned in a goto/local label declaration so far */
+	if (label->init.statement != NULL) {
 		errorf(HERE, "duplicate label '%Y' (declared %P)",
 		       symbol, &label->source_position);
 	} else {
@@ -9130,7 +9182,7 @@ end_error:
 /**
  * Parse a __leave statement.
  */
-static statement_t *parse_leave(void)
+static statement_t *parse_leave_statement(void)
 {
 	if (current_try == NULL) {
 		errorf(HERE, "__leave statement not within __try");
@@ -9358,6 +9410,54 @@ static statement_t *parse_empty_statement(void)
 	return statement;
 }
 
+static statement_t *parse_local_label_declaration(void) {
+	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
+	statement->base.source_position = token.source_position;
+
+	eat(T___label__);
+
+	declaration_t *begin = NULL, *end = NULL;
+
+	while (true) {
+		if (token.type != T_IDENTIFIER) {
+			parse_error_expected("while parsing local label declaration",
+				T_IDENTIFIER, NULL);
+			goto end_error;
+		}
+		symbol_t      *symbol      = token.v.symbol;
+		declaration_t *declaration = get_declaration(symbol, NAMESPACE_LOCAL_LABEL);
+		if (declaration != NULL) {
+			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition at %P)",
+				symbol,	&declaration->source_position);
+		} else {
+			declaration = allocate_declaration_zero();
+			declaration->namespc         = NAMESPACE_LOCAL_LABEL;
+			declaration->source_position = token.source_position;
+			declaration->symbol          = symbol;
+			declaration->parent_scope    = scope;
+			declaration->init.statement  = NULL;
+
+			if (end != NULL)
+				end->next = declaration;
+			end = declaration;
+			if (begin == NULL)
+				begin = declaration;
+
+			local_label_push(declaration);
+		}
+		next_token();
+
+		if (token.type != ',')
+			break;
+		next_token();
+	}
+	eat(';');
+end_error:
+	statement->declaration.declarations_begin = begin;
+	statement->declaration.declarations_end   = end;
+	return statement;
+}
+
 /**
  * Parse a statement.
  * There's also parse_statement() which additionally checks for
@@ -9403,9 +9503,13 @@ static statement_t *intern_parse_statement(void)
 		statement = parse_declaration_statement();
 		break;
 
+	case T___label__:
+		statement = parse_local_label_declaration();
+		break;
+
 	case ';':        statement = parse_empty_statement();         break;
 	case '{':        statement = parse_compound_statement(false); break;
-	case T___leave:  statement = parse_leave();                   break;
+	case T___leave:  statement = parse_leave_statement();                   break;
 	case T___try:    statement = parse_ms_try_statment();         break;
 	case T_asm:      statement = parse_asm_statement();           break;
 	case T_break:    statement = parse_break();                   break;
@@ -9464,6 +9568,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token('}');
 
 	int      top        = environment_top();
+	int      top_local  = local_label_top();
 	scope_t *last_scope = scope;
 	set_scope(&statement->compound.scope);
 
@@ -9526,6 +9631,7 @@ end_error:
 	assert(scope == &statement->compound.scope);
 	set_scope(last_scope);
 	environment_pop_to(top);
+	local_label_pop_to(top_local);
 
 	POP_PARENT;
 	return statement;
@@ -9652,6 +9758,7 @@ void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
+	local_label_stack = NEW_ARR_F(stack_entry_t, 0);
 	diagnostic_count  = 0;
 	error_count       = 0;
 	warning_count     = 0;
@@ -9683,6 +9790,7 @@ translation_unit_t *finish_parsing(void)
 
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
+	DEL_ARR_F(local_label_stack);
 
 	translation_unit_t *result = unit;
 	unit = NULL;
@@ -9692,7 +9800,7 @@ translation_unit_t *finish_parsing(void)
 void parse(void)
 {
 	lookahead_bufpos = 0;
-	for(int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
+	for (int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
 		next_token();
 	}
 	parse_translation_unit();

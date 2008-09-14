@@ -999,21 +999,38 @@ static void print_declaration_statement(
 		const declaration_statement_t *statement)
 {
 	bool first = true;
-	for (declaration_t *declaration = statement->declarations_begin;
-	     declaration != statement->declarations_end->next;
-	     declaration = declaration->next) {
-		if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
-			continue;
-		if (declaration->implicit)
-			continue;
+	declaration_t *declaration = statement->declarations_begin;
 
-		if (!first) {
-			print_indent();
-		} else {
-			first = false;
+	if (declaration->namespc == NAMESPACE_LOCAL_LABEL) {
+		fputs("__label__ ", out);
+		for (;
+			declaration != statement->declarations_end->next;
+			declaration = declaration->next) {
+			if (!first) {
+				fputs(", ", out);
+			} else {
+				first = false;
+			}
+			fputs(declaration->symbol->string, out);
 		}
-		print_declaration(declaration);
-		fputc('\n', out);
+		fputs(";\n", out);
+	} else {
+		for (;
+			 declaration != statement->declarations_end->next;
+			 declaration = declaration->next) {
+			if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+				continue;
+			if (declaration->implicit)
+				continue;
+
+			if (!first) {
+				print_indent();
+			} else {
+				first = false;
+			}
+			print_declaration(declaration);
+			fputc('\n', out);
+		}
 	}
 }
 
@@ -1445,11 +1462,11 @@ void print_expression(const expression_t *expression) {
  */
 void print_declaration(const declaration_t *declaration)
 {
-	if(declaration->namespc != NAMESPACE_NORMAL &&
-			declaration->symbol == NULL)
+	if (declaration->namespc != NAMESPACE_NORMAL &&
+	    declaration->symbol == NULL)
 		return;
 
-	switch(declaration->namespc) {
+	switch (declaration->namespc) {
 	case NAMESPACE_NORMAL:
 		print_normal_declaration(declaration);
 		break;

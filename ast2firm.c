@@ -2956,7 +2956,7 @@ static ir_node *builtin_prefetch_to_firm(
 
 static ir_node *get_label_block(declaration_t *label)
 {
-	assert(label->namespc == NAMESPACE_LABEL);
+	assert(label->namespc == NAMESPACE_LABEL || label->namespc == NAMESPACE_LOCAL_LABEL);
 
 	if (label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
 		return label->v.block;

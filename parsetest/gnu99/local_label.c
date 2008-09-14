@@ -5,6 +5,7 @@ int test(int a, int b) {
       goto label;
     b = 1;
 label:
+label2:
     ++b;
   }
   if (a) {
@@ -13,6 +14,7 @@ label:
       goto label;
     b = 1;
 label:
+label2:
     ++b;
   }
   return b;
