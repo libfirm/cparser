@@ -8022,6 +8022,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_WIDE_CHARACTER_CONSTANT:   return false;
 		case EXPR_STRING_LITERAL:            return false;
 		case EXPR_WIDE_STRING_LITERAL:       return false;
+		case EXPR_LABEL_ADDRESS:             return false;
 
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;

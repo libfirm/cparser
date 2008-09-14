@@ -5078,6 +5078,7 @@ static int count_decls_in_expression(const expression_t *expression) {
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
+	case EXPR_LABEL_ADDRESS:
 		break;
 	}
 
