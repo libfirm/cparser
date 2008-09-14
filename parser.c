@@ -6992,7 +6992,7 @@ static expression_t *parse_select_expression(unsigned precedence,
 		if (!declaration->init.complete) {
 			errorf(HERE, "request for member '%Y' of incomplete type '%T'",
 			       symbol, type_left);
-			return create_invalid_expression();
+			goto create_error_entry;
 		}
 
 		entry = find_compound_entry(declaration, symbol);
