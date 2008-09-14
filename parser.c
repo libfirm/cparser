@@ -7069,26 +7069,15 @@ static void check_call_argument(const function_parameter_t *parameter,
 		snprintf(buf, sizeof(buf), "call argument %u", pos);
 		report_assign_error(error, expected_type, arg_expr,	buf,
 							&arg_expr->base.source_position);
-	} else if (warning.traditional | warning.conversion) {
-		if (
-		    /* passing as integer instead of float or complex */
-		    (is_type_integer(expected_type) &&
-		     (is_type_float(arg_type) || is_type_complex(arg_type))) ||
-		    /* passing as complex instead of integer or float */
-		    (is_type_complex(expected_type) &&
-		     (is_type_integer(arg_type) || is_type_float(arg_type))) ||
-		    /* passing as float instead of integer or complex */
-		    (is_type_float(expected_type) &&
-		     (is_type_integer(arg_type) || is_type_complex(arg_type))) ||
-		    /* passing as float instead of double */
-		    (is_type_float(expected_type) && expected_type != type_double &&
-		     is_type_float(arg_type))) {
+	} else if (warning.traditional || warning.conversion) {
+		type_t *const promoted_type = get_default_promoted_type(arg_type);
+		if (!types_compatible(expected_type_skip, promoted_type) &&
+		    !types_compatible(expected_type_skip, type_void_ptr) &&
+		    !types_compatible(type_void_ptr,      promoted_type)) {
+			/* Deliberately show the skipped types in this warning */
 			warningf(&arg_expr->base.source_position,
 				"passing call argument %u as '%T' rather than '%T' due to prototype",
-				pos, expected_type, arg_type);
-		}
-		if (is_type_integer(expected_type) && is_type_integer(arg_type)) {
-			/* TODO check for size HERE */
+				pos, expected_type_skip, promoted_type);
 		}
 	}
 }
