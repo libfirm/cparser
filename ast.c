@@ -1640,6 +1640,15 @@ bool is_address_constant(const expression_t *expression)
 		return false;
 	}
 
+	case EXPR_ARRAY_ACCESS: {
+		type_t *const type =
+			skip_typeref(revert_automatic_type_conversion(expression));
+		return
+			is_type_array(type)                                    &&
+			is_constant_expression(expression->array_access.index) &&
+			is_address_constant(expression->array_access.array_ref);
+	}
+
 	default:
 		return false;
 	}
