@@ -1084,6 +1084,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	if (type1 == type2)
 		return true;
 
+	if (!is_type_valid(type1) || !is_type_valid(type2))
+		return true;
+
 	if (type1->base.qualifiers != type2->base.qualifiers)
 		return false;
 	if (type1->kind != type2->kind)

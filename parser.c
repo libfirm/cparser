@@ -4452,8 +4452,9 @@ static declaration_t *record_declaration(
 			if (old_storage_class == STORAGE_CLASS_EXTERN &&
 					new_storage_class == STORAGE_CLASS_EXTERN) {
 warn_redundant_declaration:
-				if (!is_definition          &&
-				    warning.redundant_decls &&
+				if (!is_definition           &&
+				    warning.redundant_decls  &&
+				    is_type_valid(prev_type) &&
 				    strcmp(previous_declaration->source_position.input_name, "<builtin>") != 0) {
 					warningf(&declaration->source_position,
 					         "redundant declaration for '%Y' (declared %P)",
@@ -4471,14 +4472,16 @@ warn_redundant_declaration:
 				} else {
 					goto warn_redundant_declaration;
 				}
-			} else if (old_storage_class == new_storage_class) {
-				errorf(&declaration->source_position,
-				       "redeclaration of '%Y' (declared %P)",
-				       symbol, &previous_declaration->source_position);
-			} else {
-				errorf(&declaration->source_position,
-				       "redeclaration of '%Y' with different linkage (declared %P)",
-				       symbol, &previous_declaration->source_position);
+			} else if (is_type_valid(prev_type)) {
+				if (old_storage_class == new_storage_class) {
+					errorf(&declaration->source_position,
+					       "redeclaration of '%Y' (declared %P)",
+					       symbol, &previous_declaration->source_position);
+				} else {
+					errorf(&declaration->source_position,
+					       "redeclaration of '%Y' with different linkage (declared %P)",
+					       symbol, &previous_declaration->source_position);
+				}
 			}
 		}
 
