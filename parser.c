@@ -8624,12 +8624,18 @@ static statement_t *parse_case_statement(void)
 	source_position_t *const pos       = &statement->base.source_position;
 
 	*pos                             = token.source_position;
-	statement->case_label.expression = parse_expression();
-	if (! is_constant_expression(statement->case_label.expression)) {
-		errorf(pos, "case label does not reduce to an integer constant");
+	expression_t *const expression   = parse_expression();
+	statement->case_label.expression = expression;
+	if (!is_constant_expression(expression)) {
+		/* This check does not prevent the error message in all cases of an
+		 * prior error while parsing the expression.  At least it catches the
+		 * common case of a mistyped enum entry. */
+		if (is_type_valid(expression->base.type)) {
+			errorf(pos, "case label does not reduce to an integer constant");
+		}
 		statement->case_label.is_bad = true;
 	} else {
-		long const val = fold_constant(statement->case_label.expression);
+		long const val = fold_constant(expression);
 		statement->case_label.first_case = val;
 		statement->case_label.last_case  = val;
 	}
@@ -8637,12 +8643,18 @@ static statement_t *parse_case_statement(void)
 	if (c_mode & _GNUC) {
 		if (token.type == T_DOTDOTDOT) {
 			next_token();
-			statement->case_label.end_range = parse_expression();
-			if (! is_constant_expression(statement->case_label.end_range)) {
-				errorf(pos, "case range does not reduce to an integer constant");
+			expression_t *const end_range   = parse_expression();
+			statement->case_label.end_range = end_range;
+			if (!is_constant_expression(end_range)) {
+				/* This check does not prevent the error message in all cases of an
+				 * prior error while parsing the expression.  At least it catches the
+				 * common case of a mistyped enum entry. */
+				if (is_type_valid(end_range->base.type)) {
+					errorf(pos, "case range does not reduce to an integer constant");
+				}
 				statement->case_label.is_bad = true;
 			} else {
-				long const val = fold_constant(statement->case_label.end_range);
+				long const val = fold_constant(end_range);
 				statement->case_label.last_case = val;
 
 				if (val < statement->case_label.first_case) {
