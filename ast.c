@@ -125,6 +125,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_VA_START]                  = PREC_PRIM,
 		[EXPR_VA_ARG]                    = PREC_PRIM,
 		[EXPR_STATEMENT]                 = PREC_ACCESS,
+		[EXPR_LABEL_ADDRESS]             = PREC_PRIM,
 
 		[EXPR_UNARY_NEGATE]              = PREC_UNARY,
 		[EXPR_UNARY_PLUS]                = PREC_UNARY,
@@ -478,14 +479,14 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch(unexpr->base.kind) {
-	case EXPR_UNARY_NEGATE:           fputs("-", out);  break;
-	case EXPR_UNARY_PLUS:             fputs("+", out);  break;
-	case EXPR_UNARY_NOT:              fputs("!", out);  break;
-	case EXPR_UNARY_BITWISE_NEGATE:   fputs("~", out);  break;
+	case EXPR_UNARY_NEGATE:           fputc('-', out);  break;
+	case EXPR_UNARY_PLUS:             fputc('+', out);  break;
+	case EXPR_UNARY_NOT:              fputc('!', out);  break;
+	case EXPR_UNARY_BITWISE_NEGATE:   fputc('~', out);  break;
 	case EXPR_UNARY_PREFIX_INCREMENT: fputs("++", out); break;
 	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--", out); break;
-	case EXPR_UNARY_DEREFERENCE:      fputs("*", out);  break;
-	case EXPR_UNARY_TAKE_ADDRESS:     fputs("&", out);  break;
+	case EXPR_UNARY_DEREFERENCE:      fputc('*', out);  break;
+	case EXPR_UNARY_TAKE_ADDRESS:     fputc('&', out);  break;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 		print_expression_prec(unexpr->value, prec);
@@ -520,6 +521,16 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 static void print_reference_expression(const reference_expression_t *ref)
 {
 	fputs(ref->declaration->symbol->string, out);
+}
+
+/**
+ * Prints a label address expression.
+ *
+ * @param ref   the reference expression
+ */
+static void print_label_address_expression(const label_address_expression_t *le)
+{
+	fprintf(out, "&&%s", le->declaration->symbol->string);
 }
 
 /**
@@ -785,6 +796,9 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	case EXPR_ARRAY_ACCESS:
 		print_array_expression(&expression->array_access);
+		break;
+	case EXPR_LABEL_ADDRESS:
+		print_label_address_expression(&expression->label_address);
 		break;
 	EXPR_UNARY_CASES
 		print_unary_expression(&expression->unary);
@@ -1659,7 +1673,7 @@ static bool is_object_with_constant_address(const expression_t *expression)
 
 bool is_constant_expression(const expression_t *expression)
 {
-	switch(expression->kind) {
+	switch (expression->kind) {
 
 	case EXPR_CONST:
 	case EXPR_CHARACTER_CONSTANT:
@@ -1671,6 +1685,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:
+	case EXPR_LABEL_ADDRESS:
 		return true;
 
 	case EXPR_SIZEOF: {

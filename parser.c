@@ -315,6 +315,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_VA_START]                = sizeof(va_start_expression_t),
 		[EXPR_VA_ARG]                  = sizeof(va_arg_expression_t),
 		[EXPR_STATEMENT]               = sizeof(statement_expression_t),
+		[EXPR_LABEL_ADDRESS]           = sizeof(label_address_expression_t),
 	};
 	if (kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
 		return sizes[EXPR_UNARY_FIRST];
@@ -4794,6 +4795,10 @@ static void check_labels(void)
 	for (const goto_statement_t *goto_statement = goto_first;
 	    goto_statement != NULL;
 	    goto_statement = goto_statement->next) {
+		/* skip computed gotos */
+		if (goto_statement->expression != NULL)
+			continue;
+
 		declaration_t *label = goto_statement->label;
 
 		label->used = true;
@@ -4999,9 +5004,16 @@ found_break_parent:
 		}
 
 		case STATEMENT_GOTO:
-			next = stmt->gotos.label->init.statement;
-			if (next == NULL) /* missing label */
-				return;
+			if (stmt->gotos.expression) {
+				statement_t *parent = stmt->base.parent;
+				if (parent == NULL) /* top level goto */
+					return;
+				next = parent;
+			} else {
+				next = stmt->gotos.label->init.statement;
+				if (next == NULL) /* missing label */
+					return;
+			}
 			break;
 
 		case STATEMENT_LABEL:
@@ -6595,6 +6607,62 @@ end_error:
 }
 
 /**
+ * Return the declaration for a given label symbol or create a new one.
+ *
+ * @param symbol  the symbol of the label
+ */
+static declaration_t *get_label(symbol_t *symbol)
+{
+	declaration_t *candidate = get_declaration(symbol, NAMESPACE_LABEL);
+	assert(current_function != NULL);
+	/* if we found a label in the same function, then we already created the
+	 * declaration */
+	if (candidate != NULL
+			&& candidate->parent_scope == &current_function->scope) {
+		return candidate;
+	}
+
+	/* otherwise we need to create a new one */
+	declaration_t *const declaration = allocate_declaration_zero();
+	declaration->namespc       = NAMESPACE_LABEL;
+	declaration->symbol        = symbol;
+
+	label_push(declaration);
+
+	return declaration;
+}
+
+/**
+ * Parses a GNU && label address expression.
+ */
+static expression_t *parse_label_address(void)
+{
+	source_position_t source_position = token.source_position;
+	eat(T_ANDAND);
+	if (token.type != T_IDENTIFIER) {
+		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
+		goto end_error;
+	}
+	symbol_t *symbol = token.v.symbol;
+	next_token();
+
+	declaration_t *label = get_label(symbol);
+
+	label->used          = true;
+	label->address_taken = true;
+
+	expression_t *expression = allocate_expression_zero(EXPR_LABEL_ADDRESS);
+	expression->base.source_position = source_position;
+
+	/* label address is threaten as a void pointer */
+	expression->base.type                 = type_void_ptr;
+	expression->label_address.declaration = label;
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+/**
  * Parse a microsoft __noop expression.
  */
 static expression_t *parse_noop_expression(void)
@@ -6671,6 +6739,10 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_constant_p:     return parse_builtin_constant();
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
 		case T__assume:                  return parse_assume();
+		case T_ANDAND:
+			if (c_mode & _GNUC)
+				return parse_label_address();
+			break;
 
 		case '(':                        return parse_parenthesized_expression();
 		case T___noop:                   return parse_noop_expression();
@@ -7376,7 +7448,7 @@ static void semantic_dereference(unary_expression_t *expression)
 	if (!is_type_pointer(type)) {
 		if (is_type_valid(type)) {
 			errorf(&expression->base.source_position,
-			       "Unary '*' needs pointer or arrray type, but type '%T' given", orig_type);
+			       "Unary '*' needs pointer or array type, but type '%T' given", orig_type);
 		}
 		return;
 	}
@@ -8623,32 +8695,6 @@ end_error:
 }
 
 /**
- * Return the declaration for a given label symbol or create a new one.
- *
- * @param symbol  the symbol of the label
- */
-static declaration_t *get_label(symbol_t *symbol)
-{
-	declaration_t *candidate = get_declaration(symbol, NAMESPACE_LABEL);
-	assert(current_function != NULL);
-	/* if we found a label in the same function, then we already created the
-	 * declaration */
-	if (candidate != NULL
-			&& candidate->parent_scope == &current_function->scope) {
-		return candidate;
-	}
-
-	/* otherwise we need to create a new one */
-	declaration_t *const declaration = allocate_declaration_zero();
-	declaration->namespc       = NAMESPACE_LABEL;
-	declaration->symbol        = symbol;
-
-	label_push(declaration);
-
-	return declaration;
-}
-
-/**
  * Parse a label statement.
  */
 static statement_t *parse_label_statement(void)
@@ -8985,22 +9031,47 @@ end_error:
  */
 static statement_t *parse_goto(void)
 {
+	source_position_t source_position = token.source_position;
 	eat(T_goto);
 
-	if (token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
-		eat_statement();
-		goto end_error;
+	statement_t *statement;
+	if (c_mode & _GNUC && token.type == '*') {
+		next_token();
+		expression_t *expression = parse_expression();
+
+		/* Argh: although documentation say the expression must be of type void *,
+		 * gcc excepts anything that can be casted into void * without error */
+		type_t *type = expression->base.type;
+
+		if (type != type_error_type) {
+			if (!is_type_pointer(type) && !is_type_integer(type)) {
+				errorf(&source_position, "cannot convert to a pointer type");
+			} else if (type != type_void_ptr) {
+				warningf(&source_position,
+					"type of computed goto expression should be 'void*' not '%T'", type);
+			}
+			expression = create_implicit_cast(expression, type_void_ptr);
+		}
+
+		statement                       = allocate_statement_zero(STATEMENT_GOTO);
+		statement->base.source_position = source_position;
+		statement->gotos.expression     = expression;
+	} else {
+		if (token.type != T_IDENTIFIER) {
+			if (c_mode & _GNUC)
+				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
+			else
+				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
+			eat_statement();
+			goto end_error;
+		}
+		symbol_t *symbol = token.v.symbol;
+		next_token();
+
+		statement                       = allocate_statement_zero(STATEMENT_GOTO);
+		statement->base.source_position = source_position;
+		statement->gotos.label          = get_label(symbol);
 	}
-	symbol_t *symbol = token.v.symbol;
-	next_token();
-
-	declaration_t *label = get_label(symbol);
-
-	statement_t *statement          = allocate_statement_zero(STATEMENT_GOTO);
-	statement->base.source_position = token.source_position;
-
-	statement->gotos.label = label;
 
 	/* remember the goto's in a list for later checking */
 	if (goto_last == NULL) {

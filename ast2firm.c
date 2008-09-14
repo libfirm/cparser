@@ -53,18 +53,20 @@ static ir_type *ir_type_wchar_t;
 static ir_type *ir_type_void;
 static ir_type *ir_type_int;
 
-static int       next_value_number_function;
-static ir_node  *continue_label;
-static ir_node  *break_label;
-static ir_node  *current_switch_cond;
-static bool      saw_default_label;
-static ir_node **immature_blocks;
-static bool constant_folding;
+static int             next_value_number_function;
+static ir_node        *continue_label;
+static ir_node        *break_label;
+static ir_node        *current_switch_cond;
+static bool            saw_default_label;
+static declaration_t **all_labels;
+static ir_node        *ijmp_list;
+static bool            constant_folding;
 
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
 static ir_node             *current_funcsig;
 static switch_statement_t  *current_switch;
+static ir_graph            *current_function;
 
 static entitymap_t  entitymap;
 
@@ -1388,6 +1390,18 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	return new_d_Conv(dbgi, value, dest_mode);
 }
 
+/**
+ * Keep all memory edges of the given block.
+ */
+static void keep_all_memory(ir_node *block) {
+	ir_node *old = get_cur_block();
+
+	set_cur_block(block);
+	keep_alive(get_store());
+	/* TODO: keep all memory edges from restricted pointers */
+	set_cur_block(old);
+}
+
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
 	dbg_info      *dbgi        = get_dbg_info(&ref->base.source_position);
@@ -1397,7 +1411,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	/* make sure the type is constructed */
 	(void) get_ir_type(type);
 
-	switch((declaration_kind_t) declaration->declaration_kind) {
+	switch ((declaration_kind_t)declaration->declaration_kind) {
 	case DECLARATION_KIND_TYPE:
 	case DECLARATION_KIND_UNKNOWN:
 		break;
@@ -2940,6 +2954,52 @@ static ir_node *builtin_prefetch_to_firm(
 	return NULL;
 }
 
+static ir_node *get_label_block(declaration_t *label)
+{
+	assert(label->namespc == NAMESPACE_LABEL);
+
+	if (label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
+		return label->v.block;
+	}
+	assert(label->declaration_kind == DECLARATION_KIND_UNKNOWN);
+
+	/* beware: might be called from create initializer with current_ir_graph
+	 * set to const_code_irg. */
+	ir_graph *rem    = current_ir_graph;
+	current_ir_graph = current_function;
+
+	ir_node *old_cur_block = get_cur_block();
+	ir_node *block         = new_immBlock();
+	set_cur_block(old_cur_block);
+
+	label->declaration_kind = DECLARATION_KIND_LABEL_BLOCK;
+	label->v.block          = block;
+
+	ARR_APP1(declaration_t *, all_labels, label);
+
+	current_ir_graph = rem;
+	return block;
+}
+
+/**
+ * Pointer to a label.  This is used for the
+ * GNU address-of-label extension.
+ */
+static ir_node *label_address_to_firm(
+		const label_address_expression_t *label)
+{
+	ir_node    *block = get_label_block(label->declaration);
+	ir_label_t  nr    = get_Block_label(block);
+
+	if (nr == 0) {
+		nr = get_irp_next_label_nr();
+		set_Block_label(block, nr);
+	}
+	symconst_symbol value;
+	value.label = nr;
+	return new_SymConst(mode_P_code, value, symconst_label);
+}
+
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
@@ -2954,7 +3014,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	}
 #endif
 
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_CHARACTER_CONSTANT:
 		return character_constant_to_firm(&expression->conste);
 	case EXPR_WIDE_CHARACTER_CONSTANT:
@@ -3003,6 +3063,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return offsetof_to_firm(&expression->offsetofe);
 	case EXPR_COMPOUND_LITERAL:
 		return compound_literal_to_firm(&expression->compound_literal);
+	case EXPR_LABEL_ADDRESS:
+		return label_address_to_firm(&expression->label_address);
 
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
@@ -4231,8 +4293,8 @@ static void while_statement_to_firm(while_statement_t *statement)
 		add_immBlock_pred(body_block, header_jmp);
 
 		keep_alive(body_block);
+		keep_all_memory(body_block);
 		set_cur_block(body_block);
-		keep_alive(get_store());
 	} else {
 		if (false_block == NULL) {
 			false_block = new_immBlock();
@@ -4376,7 +4438,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		                            false_block);
 	} else {
 		keep_alive(header_block);
-		keep_alive(get_store());
+		keep_all_memory(header_block);
 		jmp = new_Jmp();
 		add_immBlock_pred(body_block, jmp);
 	}
@@ -4550,27 +4612,6 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	}
 }
 
-static ir_node *get_label_block(declaration_t *label)
-{
-	assert(label->namespc == NAMESPACE_LABEL);
-
-	if (label->declaration_kind == DECLARATION_KIND_LABEL_BLOCK) {
-		return label->v.block;
-	}
-	assert(label->declaration_kind == DECLARATION_KIND_UNKNOWN);
-
-	ir_node *old_cur_block = get_cur_block();
-	ir_node *block         = new_immBlock();
-	set_cur_block(old_cur_block);
-
-	label->declaration_kind = DECLARATION_KIND_LABEL_BLOCK;
-	label->v.block          = block;
-
-	ARR_APP1(ir_node *, immature_blocks, block);
-
-	return block;
-}
-
 static void label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
@@ -4581,8 +4622,8 @@ static void label_to_firm(const label_statement_t *statement)
 	}
 
 	set_cur_block(block);
-	keep_alive(get_store());
 	keep_alive(block);
+	keep_all_memory(block);
 
 	if (statement->statement != NULL) {
 		statement_to_firm(statement->statement);
@@ -4594,10 +4635,18 @@ static void goto_to_firm(const goto_statement_t *statement)
 	if (get_cur_block() == NULL)
 		return;
 
-	ir_node *block = get_label_block(statement->label);
-	ir_node *jmp   = new_Jmp();
-	add_immBlock_pred(block, jmp);
+	if (statement->expression) {
+		ir_node  *irn  = expression_to_firm(statement->expression);
+		dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
+		ir_node  *ijmp = new_d_IJmp(dbgi, irn);
 
+		set_irn_link(ijmp, ijmp_list);
+		ijmp_list = ijmp;
+	} else {
+		ir_node *block = get_label_block(statement->label);
+		ir_node *jmp   = new_Jmp();
+		add_immBlock_pred(block, jmp);
+	}
 	set_cur_block(NULL);
 }
 
@@ -5268,6 +5317,16 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 }
 
 /**
+ * Generate possible IJmp branches to a given label block.
+ */
+static void gen_ijmp_branches(ir_node *block) {
+	ir_node *ijmp;
+	for (ijmp = ijmp_list; ijmp != NULL; ijmp = get_irn_link(ijmp)) {
+		add_immBlock_pred(block, ijmp);
+	}
+}
+
+/**
  * Create code for a function.
  */
 static void create_function(declaration_t *declaration)
@@ -5290,11 +5349,15 @@ static void create_function(declaration_t *declaration)
 	current_function_name = NULL;
 	current_funcsig       = NULL;
 
-	assert(immature_blocks == NULL);
-	immature_blocks = NEW_ARR_F(ir_node*, 0);
+	assert(all_labels == NULL);
+	all_labels = NEW_ARR_F(declaration_t *, 0);
+	ijmp_list  = NULL;
 
 	int       n_local_vars = get_function_n_local_vars(declaration);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
+
+	ir_graph *old_current_function = current_function;
+	current_function = irg;
 
 	set_irg_fp_model(irg, firm_opt.fp_model);
 	tarval_enable_fp_ops((firm_opt.fp_model & fp_strict_algebraic) == 0);
@@ -5345,11 +5408,27 @@ static void create_function(declaration_t *declaration)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	for(int i = 0; i < ARR_LEN(immature_blocks); ++i) {
-		mature_immBlock(immature_blocks[i]);
+	bool has_computed_gotos = false;
+	for (int i = ARR_LEN(all_labels) - 1; i >= 0; --i) {
+		declaration_t *label = all_labels[i];
+		if (label->address_taken) {
+			gen_ijmp_branches(label->v.block);
+			has_computed_gotos = true;
+		}
+		mature_immBlock(label->v.block);
 	}
-	DEL_ARR_F(immature_blocks);
-	immature_blocks = NULL;
+	if (has_computed_gotos) {
+		/* if we have computed goto's in the function, we cannot inline it */
+		if (get_irg_inline_property(irg) >= irg_inline_recomended) {
+			warningf(&declaration->source_position,
+				"function '%Y' can never be inlined because it contains a computed goto",
+				declaration->symbol);
+		}
+		set_irg_inline_property(irg, irg_inline_forbidden);
+	}
+
+	DEL_ARR_F(all_labels);
+	all_labels = NULL;
 
 	mature_immBlock(first_block);
 	mature_immBlock(end_block);
@@ -5383,6 +5462,7 @@ static void create_function(declaration_t *declaration)
 	set_type_alignment_bytes(frame_type, align_all);
 
 	irg_vrfy(irg);
+	current_function = old_current_function;
 }
 
 static void scope_to_firm(scope_t *scope)

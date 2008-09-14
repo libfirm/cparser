@@ -61,6 +61,7 @@ typedef enum expression_kind_t {
 	EXPR_VA_START,
 	EXPR_VA_ARG,
 	EXPR_STATEMENT,
+	EXPR_LABEL_ADDRESS, /**< GCC extension &&label operator */
 
 	EXPR_UNARY_FIRST,
 	EXPR_UNARY_NEGATE = EXPR_UNARY_FIRST,
@@ -337,6 +338,11 @@ struct classify_type_expression_t {
 	expression_t      *type_expression;
 };
 
+struct label_address_expression_t {
+	expression_base_t  base;
+	declaration_t     *declaration;
+};
+
 union expression_t {
 	expression_kind_t                kind;
 	expression_base_t                base;
@@ -361,6 +367,7 @@ union expression_t {
 	conditional_expression_t         conditional;
 	statement_expression_t           statement;
 	classify_type_expression_t       classify_type;
+	label_address_expression_t       label_address;
 };
 
 typedef enum storage_class_tag_t {
