@@ -1030,7 +1030,7 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 
 	case ASSIGN_WARNING_POINTER_FROM_INT:
 		warningf(source_position,
-		         "%s makes integer '%T' from pointer '%T' without a cast",
+		         "%s makes pointer '%T' from integer '%T' without a cast",
 				 context, orig_type_left, orig_type_right);
 		return;
 
