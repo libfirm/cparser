@@ -6051,11 +6051,8 @@ static expression_t *parse_reference(void)
 
 	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
 
-	source_position_t source_position = token.source_position;
-	next_token();
-
 	if (declaration == NULL) {
-		if (token.type == '(') {
+		if (look_ahead(1)->type == '(') {
 			/* an implicitly declared function */
 			if (strict_mode) {
 				errorf(HERE, "unknown symbol '%Y' found.", symbol);
@@ -6064,8 +6061,7 @@ static expression_t *parse_reference(void)
 					symbol);
 			}
 
-			declaration = create_implicit_function(symbol,
-			                                       &source_position);
+			declaration = create_implicit_function(symbol, HERE);
 		} else {
 			errorf(HERE, "unknown symbol '%Y' found.", symbol);
 			declaration = create_error_declaration(symbol, STORAGE_CLASS_NONE);
@@ -6091,23 +6087,21 @@ static expression_t *parse_reference(void)
 			"function" : "variable";
 
 		if (declaration->deprecated_string != NULL) {
-			warningf(&source_position,
-				"%s '%Y' is deprecated (declared %P): \"%s\"", prefix,
-				declaration->symbol, &declaration->source_position,
+			warningf(HERE, "%s '%Y' is deprecated (declared %P): \"%s\"",
+				prefix, declaration->symbol, &declaration->source_position,
 				declaration->deprecated_string);
 		} else {
-			warningf(&source_position,
-				"%s '%Y' is deprecated (declared %P)", prefix,
+			warningf(HERE, "%s '%Y' is deprecated (declared %P)", prefix,
 				declaration->symbol, &declaration->source_position);
 		}
 	}
 	if (warning.init_self && declaration == current_init_decl) {
 		current_init_decl = NULL;
-		warningf(&source_position,
-			"variable '%#T' is initialized by itself",
+		warningf(HERE, "variable '%#T' is initialized by itself",
 			declaration->type, declaration->symbol);
 	}
 
+	next_token();
 	return expression;
 }
 
