@@ -4032,8 +4032,10 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		next_token();
 		add_anchor_token(')');
 		inner_types = parse_inner_declarator(declaration, may_be_abstract);
-		/* All later declarators only modify the return type, not declaration */
-		declaration = NULL;
+		if (inner_types != NULL) {
+			/* All later declarators only modify the return type, not declaration */
+			declaration = NULL;
+		}
 		rem_anchor_token(')');
 		expect(')');
 		break;
