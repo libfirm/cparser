@@ -863,10 +863,11 @@ static void print_compound_statement(const compound_statement_t *block)
 	++indent;
 
 	statement_t *statement = block->statements;
-	while(statement != NULL) {
+	while (statement != NULL) {
 		if (statement->base.kind == STATEMENT_CASE_LABEL)
 			--indent;
-		print_indent();
+		if (statement->kind != STATEMENT_LABEL)
+			print_indent();
 		print_statement(statement);
 
 		statement = statement->base.next;
@@ -925,6 +926,7 @@ static void print_goto_statement(const goto_statement_t *statement)
 static void print_label_statement(const label_statement_t *statement)
 {
 	fprintf(out, "%s:\n", statement->label->symbol->string);
+	print_indent();
 	print_statement(statement->statement);
 }
 
@@ -1188,7 +1190,7 @@ static void print_leave_statement(const leave_statement_t *statement)
  */
 void print_statement(const statement_t *statement)
 {
-	switch(statement->kind) {
+	switch (statement->kind) {
 	case STATEMENT_EMPTY:
 		fputs(";\n", out);
 		break;
