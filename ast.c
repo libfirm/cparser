@@ -1634,6 +1634,9 @@ bool is_address_constant(const expression_t *expression)
 		if(is_type_array(type)) {
 			return is_object_with_linker_constant_address(expression);
 		}
+		/* Prevent stray errors */
+		if (!is_type_valid(type))
+			return true;
 		return false;
 	}
 
