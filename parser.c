@@ -2148,8 +2148,6 @@ static void descend_into_subtype(type_path_t *path)
 	type_t *orig_top_type = path->top_type;
 	type_t *top_type      = skip_typeref(orig_top_type);
 
-	assert(is_type_compound(top_type) || is_type_array(top_type));
-
 	type_path_entry_t *top = append_to_type_path(path);
 	top->type              = top_type;
 
@@ -2163,11 +2161,11 @@ static void descend_into_subtype(type_path_t *path)
 		} else {
 			path->top_type         = NULL;
 		}
-	} else {
-		assert(is_type_array(top_type));
-
+	} else if (is_type_array(top_type)) {
 		top->v.index   = 0;
 		path->top_type = top_type->array.element_type;
+	} else {
+		assert(!is_type_valid(top_type));
 	}
 }
 
