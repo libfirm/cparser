@@ -313,7 +313,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 		break;
 	}
 
-	/* don't emit braces if we're the toplevel type... */
+	/* don't emit parenthesis if we're the toplevel type... */
 	if (!top)
 		fputc('(', out);
 }
@@ -327,7 +327,9 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 static void print_function_type_post(const function_type_t *type,
                                      const scope_t *scope, bool top)
 {
-	intern_print_type_post(type->return_type, false);
+	/* don't emit parenthesis if we're the toplevel type... */
+	if (!top)
+		fputc(')', out);
 
 	fputc('(', out);
 	bool first = true;
@@ -366,9 +368,7 @@ static void print_function_type_post(const function_type_t *type,
 	}
 	fputc(')', out);
 
-	/* don't emit braces if we're the toplevel type... */
-	if (!top)
-		fputc(')', out);
+	intern_print_type_post(type->return_type, false);
 }
 
 /**
