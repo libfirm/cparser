@@ -1747,6 +1747,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
 	case EXPR_BINARY_BITWISE_OR_ASSIGN:
 	case EXPR_BINARY_COMMA:
+	case EXPR_ARRAY_ACCESS:
 		return false;
 
 	case EXPR_UNARY_TAKE_ADDRESS:
@@ -1808,10 +1809,6 @@ bool is_constant_expression(const expression_t *expression)
 		else
 			return is_constant_expression(expression->conditional.false_expression);
 	}
-
-	case EXPR_ARRAY_ACCESS:
-		return is_constant_expression(expression->array_access.array_ref)
-			&& is_constant_expression(expression->array_access.index);
 
 	case EXPR_REFERENCE: {
 		declaration_t *declaration = expression->reference.declaration;
