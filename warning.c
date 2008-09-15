@@ -157,7 +157,7 @@ void set_warning_opt(const char *const opt)
 	OPT("old-style-definition",          old_style_definition);
 	OPT("packed",                        packed);
 	OPT("padded",                        padded);
-	OPT("pointer_arith",                 pointer_arith);
+	OPT("pointer-arith",                 pointer_arith);
 	OPT("redundant-decls",               redundant_decls);
 	OPT("return-type",                   return_type);
 	OPT("shadow",                        shadow);
