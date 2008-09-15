@@ -435,7 +435,7 @@ static void print_array_type_post(const array_type_t *type)
 static void print_bitfield_type_post(const bitfield_type_t *type)
 {
 	fputs(" : ", out);
-	print_expression(type->size);
+	print_expression(type->size_expression);
 	intern_print_type_post(type->base_type, false);
 }
 

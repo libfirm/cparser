@@ -530,7 +530,7 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 	assert(base->kind == TYPE_ATOMIC || base->kind == TYPE_ENUM);
 	ir_type *irbase = get_ir_type(base);
 
-	unsigned size = fold_constant(type->size);
+	unsigned size = type->bit_size;
 
 	assert(!is_type_float(base));
 	if (is_type_signed(base)) {
@@ -650,7 +650,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 		size_t base;
 		size_t bits_remainder;
 		if (entry_type->kind == TYPE_BITFIELD) {
-			size_t size_bits      = fold_constant(entry_type->bitfield.size);
+			size_t size_bits      = entry_type->bitfield.bit_size;
 			size_t rest_size_bits = (entry_alignment - misalign)*8 - bit_offset;
 
 			if (size_bits > rest_size_bits) {

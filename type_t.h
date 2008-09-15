@@ -141,6 +141,7 @@ struct function_type_t {
 
 struct compound_type_t {
 	type_base_t    base;
+	unsigned       packed:1;       /** Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
 	declaration_t *declaration;
@@ -170,7 +171,8 @@ struct typeof_type_t {
 struct bitfield_type_t {
 	type_base_t   base;
 	type_t       *base_type;
-	expression_t *size;
+	expression_t *size_expression; /**< The expression for the bit size. */
+	il_size_t     bit_size;        /**< Size of this bitfield in bits. */
 };
 
 union type_t {

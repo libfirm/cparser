@@ -3129,33 +3129,38 @@ static void finish_struct_type(compound_type_t *type) {
 	if (! struct_decl->init.complete)
 		return;
 
-	il_size_t      size      = 0;
-	il_size_t      new_size;
-	il_alignment_t alignment = 1;
-	bool           need_pad  = false;
+	il_size_t      size           = 0;
+	il_size_t      offset;
+	il_alignment_t alignment      = 1;
+	bool           need_pad       = false;
 
 	declaration_t *entry = struct_decl->scope.declarations;
 	for (; entry != NULL; entry = entry->next) {
 		if (entry->namespc != NAMESPACE_NORMAL)
 			continue;
 
-		type_t         *m_type      = skip_typeref(entry->type);
-		il_alignment_t  m_alignment = m_type->base.alignment;
-
-		new_size = (size + m_alignment - 1) & -m_alignment;
+		type_t *m_type = skip_typeref(entry->type);
+		if (! is_type_valid(m_type)) {
+			/* simply ignore errors here */
+			continue;
+		}
+		il_alignment_t m_alignment = m_type->base.alignment;
 		if (m_alignment > alignment)
 			alignment = m_alignment;
-		if (new_size > size)
+
+		offset = (size + m_alignment - 1) & -m_alignment;
+
+		if (offset > size)
 			need_pad = true;
-		entry->offset = new_size;
-		size = new_size + m_type->base.size;
+		entry->offset = offset;
+		size = offset + m_type->base.size;
 	}
 	if (type->base.alignment != 0) {
 		alignment = type->base.alignment;
 	}
 
-	new_size = (size + alignment - 1) & -alignment;
-	if (new_size > size)
+	offset = (size + alignment - 1) & -alignment;
+	if (offset > size)
 		need_pad = true;
 
 	if (warning.padded && need_pad) {
@@ -3168,7 +3173,7 @@ static void finish_struct_type(compound_type_t *type) {
 			type, struct_decl->symbol);
 	}
 
-	type->base.size      = new_size;
+	type->base.size      = offset;
 	type->base.alignment = alignment;
 }
 
@@ -3192,6 +3197,8 @@ static void finish_union_type(compound_type_t *type) {
 			continue;
 
 		type_t *m_type = skip_typeref(entry->type);
+		if (! is_type_valid(m_type))
+			continue;
 
 		entry->offset = 0;
 		if (m_type->base.size > size)
@@ -5515,8 +5522,12 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 {
 	type_t *type = allocate_type_zero(TYPE_BITFIELD, source_position);
 
-	type->bitfield.base_type = base_type;
-	type->bitfield.size      = size;
+	type->bitfield.base_type       = base_type;
+	type->bitfield.size_expression = size;
+
+	if (is_constant_expression(size)) {
+		type->bitfield.bit_size = fold_constant(size);
+	}
 
 	return type;
 }
