@@ -134,6 +134,9 @@ static struct obstack      temp_obst;
 
 static source_position_t null_position = { NULL, 0 };
 
+/** special symbol used for anonymous entities. */
+static const symbol_t *sym_anonymous = NULL;
+
 /* symbols for Microsoft extended-decl-modifier */
 static const symbol_t *sym_align      = NULL;
 static const symbol_t *sym_allocate   = NULL;
@@ -5518,15 +5521,39 @@ static void parse_external_declaration(void)
 }
 
 static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
-                                  source_position_t *source_position)
+                                  source_position_t *source_position,
+                                  const symbol_t *symbol)
 {
 	type_t *type = allocate_type_zero(TYPE_BITFIELD, source_position);
 
 	type->bitfield.base_type       = base_type;
 	type->bitfield.size_expression = size;
 
+	il_size_t bit_size;
+	type_t *skipped_type = skip_typeref(base_type);
+	if (!is_type_integer(skipped_type)) {
+		errorf(HERE, "bitfield base type '%T' is not an integer type",
+			base_type);
+		bit_size = 0;
+	} else {
+		bit_size = skipped_type->base.size * 8;
+	}
+
 	if (is_constant_expression(size)) {
-		type->bitfield.bit_size = fold_constant(size);
+		long v = fold_constant(size);
+
+		if (v < 0) {
+			errorf(source_position, "negative width in bit-field '%Y'",
+				symbol);
+		} else if (v == 0) {
+			errorf(source_position, "zero width for bit-field '%Y'",
+				symbol);
+		} else if (bit_size > 0 && (il_size_t)v > bit_size) {
+			errorf(source_position, "width of '%Y' exceeds its type",
+				symbol);
+		} else {
+			type->bitfield.bit_size = v;
+		}
 	}
 
 	return type;
@@ -5579,12 +5606,8 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 			type_t *base_type = specifiers->type;
 			expression_t *size = parse_constant_expression();
 
-			if (!is_type_integer(skip_typeref(base_type))) {
-				errorf(HERE, "bitfield base type '%T' is not an integer type",
-				       base_type);
-			}
-
-			type_t *type = make_bitfield_type(base_type, size, &source_position);
+			type_t *type = make_bitfield_type(base_type, size,
+					&source_position, sym_anonymous);
 
 			declaration                         = allocate_declaration_zero();
 			declaration->namespc                = NAMESPACE_NORMAL;
@@ -5604,12 +5627,8 @@ static void parse_compound_declarators(declaration_t *struct_declaration,
 				next_token();
 				expression_t *size = parse_constant_expression();
 
-				if (!is_type_integer(type)) {
-					errorf(HERE, "bitfield base type '%T' is not an integer type",
-					       orig_type);
-				}
-
-				type_t *bitfield_type = make_bitfield_type(orig_type, size, &source_position);
+				type_t *bitfield_type = make_bitfield_type(orig_type, size,
+						&source_position, declaration->symbol);
 				declaration->type = bitfield_type;
 			} else {
 				/* TODO we ignore arrays for now... what is missing is a check
@@ -9830,6 +9849,8 @@ void parse(void)
  */
 void init_parser(void)
 {
+	sym_anonymous = symbol_table_insert("<anonymous>");
+
 	if (c_mode & _MS) {
 		/* add predefined symbols for extended-decl-modifier */
 		sym_align      = symbol_table_insert("align");
