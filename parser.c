@@ -7597,6 +7597,9 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 {
 	/* TODO: handle complex + imaginary types */
 
+	type_left  = get_unqualified_type(type_left);
+	type_right = get_unqualified_type(type_right);
+
 	/* § 6.3.1.8 Usual arithmetic conversions */
 	if (type_left == type_long_double || type_right == type_long_double) {
 		return type_long_double;
