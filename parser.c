@@ -9480,13 +9480,18 @@ static statement_t *intern_parse_statement(void)
 		} else if (is_typedef_symbol(token.v.symbol)) {
 			statement = parse_declaration_statement();
 		} else switch (la1_type) {
+			case '*':
+				if (get_declaration(token.v.symbol, NAMESPACE_NORMAL) != NULL)
+					goto expression_statment;
+				/* FALLTHROUGH */
+
 			DECLARATION_START
 			case T_IDENTIFIER:
-			case '*':
 				statement = parse_declaration_statement();
 				break;
 
 			default:
+expression_statment:
 				statement = parse_expression_statement();
 				break;
 		}
