@@ -6855,19 +6855,18 @@ static expression_t *parse_array_expression(unsigned precedence,
 				orig_type_left, orig_type_inside);
 		}
 		return_type             = type_error_type;
-		array_access->array_ref = create_invalid_expression();
+		array_access->array_ref = left;
+		array_access->index     = inside;
 	}
+
+	expression->base.type = automatic_type_conversion(return_type);
 
 	rem_anchor_token(']');
-	if (token.type != ']') {
+	if (token.type == ']') {
+		next_token();
+	} else {
 		parse_error_expected("Problem while parsing array access", ']', NULL);
-		return expression;
 	}
-	next_token();
-
-	return_type           = automatic_type_conversion(return_type);
-	expression->base.type = return_type;
-
 	return expression;
 }
 
