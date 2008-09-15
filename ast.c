@@ -1701,9 +1701,17 @@ static bool is_object_with_constant_address(const expression_t *expression)
 			return is_object_with_constant_address(compound);
 		}
 	}
-	case EXPR_ARRAY_ACCESS:
-		return is_constant_pointer(expression->array_access.array_ref)
-			&& is_constant_expression(expression->array_access.index);
+
+	case EXPR_ARRAY_ACCESS: {
+		array_access_expression_t const* const array_access =
+			&expression->array_access;
+		return
+			is_constant_expression(array_access->index) && (
+				is_object_with_constant_address(array_access->array_ref) ||
+				is_constant_pointer(array_access->array_ref)
+			);
+	}
+
 	case EXPR_UNARY_DEREFERENCE:
 		return is_constant_pointer(expression->unary.value);
 	default:
