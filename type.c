@@ -1025,14 +1025,14 @@ static bool function_types_compatible(const function_type_t *func1,
 	if (!types_compatible(ret1, ret2))
 		return false;
 
+	if (func1->calling_convention != func2->calling_convention)
+		return false;
+
 	/* can parameters be compared? */
 	if (func1->unspecified_parameters || func2->unspecified_parameters)
 		return true;
 
 	if (func1->variadic != func2->variadic)
-		return false;
-
-	if (func1->calling_convention != func2->calling_convention)
 		return false;
 
 	/* TODO: handling of unspecified parameters not correct yet */
