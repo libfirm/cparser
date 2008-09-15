@@ -1602,10 +1602,11 @@ bool is_address_constant(const expression_t *expression)
 
 	case EXPR_UNARY_CAST: {
 		type_t *dest = skip_typeref(expression->base.type);
-		if (!is_type_pointer(dest) &&
-				! (dest->kind == TYPE_ATOMIC
-					&& (get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER)
-					&& (get_atomic_type_size(dest->atomic.akind) >= get_atomic_type_size(get_intptr_kind()))))
+		if (!is_type_pointer(dest) && (
+		    	dest->kind != TYPE_ATOMIC                                               ||
+		    	!(get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER) ||
+		    	(get_atomic_type_size(dest->atomic.akind) < get_atomic_type_size(get_intptr_kind())
+		    )))
 			return false;
 
 		return (is_constant_expression(expression->unary.value)
