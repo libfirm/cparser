@@ -747,6 +747,8 @@ type_t *duplicate_type(const type_t *type)
  */
 type_t *get_unqualified_type(type_t *type)
 {
+	assert(!is_typeref(type));
+
 	if (type->base.qualifiers == TYPE_QUALIFIER_NONE)
 		return type;
 
