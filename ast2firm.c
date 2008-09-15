@@ -4378,12 +4378,13 @@ static void for_statement_to_firm(for_statement_t *statement)
 	for( ; declaration != NULL; declaration = declaration->next) {
 		create_local_declaration(declaration);
 	}
-	declaration = statement->scope.declarations;
-	for( ; declaration != NULL; declaration = declaration->next) {
-		initialize_local_declaration(declaration);
-	}
 
 	if (get_cur_block() != NULL) {
+		declaration = statement->scope.declarations;
+		for( ; declaration != NULL; declaration = declaration->next) {
+			initialize_local_declaration(declaration);
+		}
+
 		if (statement->initialisation != NULL) {
 			expression_to_firm(statement->initialisation);
 		}
