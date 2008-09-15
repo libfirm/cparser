@@ -807,7 +807,9 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch (type->kind) {
 	case TYPE_ERROR:
-		panic("error type occurred");
+		/* Happens while constant folding, when there was an error */
+		return create_atomic_type(&type_void->atomic);
+
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(&type->atomic);
 		break;

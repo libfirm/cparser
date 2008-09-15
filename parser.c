@@ -7684,10 +7684,15 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 
 static void warn_div_by_zero(binary_expression_t const *const expression)
 {
-	if (warning.div_by_zero                       &&
-	    is_type_integer(expression->base.type)    &&
-	    is_constant_expression(expression->right) &&
-	    fold_constant(expression->right) == 0) {
+	if (!warning.div_by_zero ||
+	    !is_type_integer(expression->base.type))
+		return;
+
+	expression_t const *const right = expression->right;
+	/* The type of the right operand can be different for /= */
+	if (is_type_integer(right->base.type) &&
+	    is_constant_expression(right)     &&
+	    fold_constant(right) == 0) {
 		warningf(&expression->base.source_position, "division by zero");
 	}
 }
