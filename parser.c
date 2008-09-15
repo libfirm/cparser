@@ -6050,11 +6050,9 @@ static expression_t *parse_reference(void)
 	declaration_t *declaration = get_declaration(symbol, NAMESPACE_NORMAL);
 
 	if (declaration == NULL) {
-		if (look_ahead(1)->type == '(') {
+		if (!strict_mode && look_ahead(1)->type == '(') {
 			/* an implicitly declared function */
-			if (strict_mode) {
-				errorf(HERE, "unknown symbol '%Y' found.", symbol);
-			} else if (warning.implicit_function_declaration) {
+			if (warning.implicit_function_declaration) {
 				warningf(HERE, "implicit declaration of function '%Y'",
 					symbol);
 			}
