@@ -933,9 +933,8 @@ bool is_type_arithmetic(const type_t *type)
  */
 bool is_type_real(const type_t *type)
 {
-	/* 6.2.5.17 */
-	return is_type_integer(type)
-		|| (type->kind == TYPE_ATOMIC && is_type_float(type));
+	/* 6.2.5 (17) */
+	return is_type_integer(type) || is_type_float(type);
 }
 
 /**
