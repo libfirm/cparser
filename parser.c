@@ -1501,12 +1501,12 @@ static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute)
 	add_anchor_token(',');
 	parse_constant_expression();
 	rem_anchor_token(',');
-	rem_anchor_token('(');
+	rem_anchor_token(')');
 
 	expect(',');
 	add_anchor_token(')');
 	parse_constant_expression();
-	rem_anchor_token('(');
+	rem_anchor_token(')');
 	expect(')');
 	return;
 end_error:
