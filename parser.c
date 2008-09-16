@@ -2687,12 +2687,18 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		namespace_t const namespc =
 			is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION;
 		declaration = get_declaration(symbol, namespc);
-		if (declaration != NULL &&
-			declaration->init.complete && token.type == '{') {
-			assert(symbol != NULL);
-			errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
-			       is_struct ? "struct" : "union", symbol,
-			       &declaration->source_position);
+		if (declaration != NULL) {
+			if (declaration->parent_scope != scope &&
+			    (token.type == '{' || token.type == ';')) {
+				declaration = NULL;
+			} else if (declaration->init.complete &&
+			           token.type == '{') {
+				assert(symbol != NULL);
+				errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
+				       is_struct ? "struct" : "union", symbol,
+				       &declaration->source_position);
+				declaration->scope.declarations = NULL;
+			}
 		}
 	} else if (token.type != '{') {
 		if (is_struct) {
@@ -2706,17 +2712,18 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		return NULL;
 	}
 
-	/* always create a new declaration, do NOT modify old one */
-	declaration = allocate_declaration_zero();
-	declaration->namespc         =
-		(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
-	declaration->source_position = token.source_position;
-	declaration->symbol          = symbol;
-	declaration->parent_scope    = scope;
-	if (symbol != NULL) {
-		environment_push(declaration);
+	if (declaration == NULL) {
+		declaration = allocate_declaration_zero();
+		declaration->namespc         =
+			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
+		declaration->source_position = token.source_position;
+		declaration->symbol          = symbol;
+		declaration->parent_scope    = scope;
+		if (symbol != NULL) {
+			environment_push(declaration);
+		}
+		append_declaration(declaration);
 	}
-	append_declaration(declaration);
 
 	if (token.type == '{') {
 		declaration->init.complete = true;
@@ -2779,14 +2786,11 @@ end_error:
 	;
 }
 
-/**
- * Parse enum specifier and return the enum type or NULL on error.
- */
 static type_t *parse_enum_specifier(void)
 {
-	gnu_attribute_t *attributes  = NULL;
-	declaration_t   *declaration = NULL;
-	symbol_t        *symbol      = NULL;
+	gnu_attribute_t *attributes = NULL;
+	declaration_t   *declaration;
+	symbol_t        *symbol;
 
 	eat(T_enum);
 	if (token.type == T_IDENTIFIER) {
@@ -2794,36 +2798,34 @@ static type_t *parse_enum_specifier(void)
 		next_token();
 
 		declaration = get_declaration(symbol, NAMESPACE_ENUM);
-		if (declaration != NULL &&
-		    declaration->init.complete && token.type == '{') {
-			assert(symbol != NULL);
-			errorf(HERE, "multiple definitions of 'enum %Y' (previous definition at %P)",
-			       symbol, &declaration->source_position);
-		}
 	} else if (token.type != '{') {
 		parse_error_expected("while parsing enum type specifier",
 		                     T_IDENTIFIER, '{', NULL);
 		return NULL;
+	} else {
+		declaration = NULL;
+		symbol      = NULL;
 	}
 
-	declaration = allocate_declaration_zero();
-	declaration->namespc         = NAMESPACE_ENUM;
-	declaration->source_position = token.source_position;
-	declaration->symbol          = symbol;
-	declaration->parent_scope    = scope;
-	if (symbol != NULL) {
-		environment_push(declaration);
+	if (declaration == NULL) {
+		declaration = allocate_declaration_zero();
+		declaration->namespc         = NAMESPACE_ENUM;
+		declaration->source_position = token.source_position;
+		declaration->symbol          = symbol;
+		declaration->parent_scope  = scope;
 	}
-	append_declaration(declaration);
 
 	type_t *const type      = allocate_type_zero(TYPE_ENUM, &declaration->source_position);
 	type->enumt.declaration = declaration;
 
 	if (token.type == '{') {
 		if (declaration->init.complete) {
-			errorf(HERE, "multiple definitions of enum '%Y' (previous definition at %P)",
-			       symbol, &declaration->source_position);
+			errorf(HERE, "multiple definitions of enum %Y", symbol);
 		}
+		if (symbol != NULL) {
+			environment_push(declaration);
+		}
+		append_declaration(declaration);
 		declaration->init.complete = true;
 
 		parse_enum_entries(type);
@@ -4599,26 +4601,24 @@ static void parse_anonymous_declaration_rest(
 {
 	eat(';');
 
-	if (specifiers->declared_storage_class != STORAGE_CLASS_NONE) {
-		warningf(&specifiers->source_position,
-			"useless storage class in empty declaration");
-	}
-
-#ifdef RECORD_EMPTY_DECLARARTIONS
 	declaration_t *const declaration    = allocate_declaration_zero();
 	declaration->type                   = specifiers->type;
 	declaration->declared_storage_class = specifiers->declared_storage_class;
 	declaration->source_position        = specifiers->source_position;
 	declaration->modifiers              = specifiers->modifiers;
-	declaration->storage_class          = STORAGE_CLASS_NONE;
-#endif
 
-	type_t *type = specifiers->type;
+	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
+		warningf(&declaration->source_position,
+		         "useless storage class in empty declaration");
+	}
+	declaration->storage_class = STORAGE_CLASS_NONE;
+
+	type_t *type = declaration->type;
 	switch (type->kind) {
 		case TYPE_COMPOUND_STRUCT:
 		case TYPE_COMPOUND_UNION: {
 			if (type->compound.declaration->symbol == NULL) {
-				warningf(&specifiers->source_position,
+				warningf(&declaration->source_position,
 				         "unnamed struct/union that defines no instances");
 			}
 			break;
@@ -4628,13 +4628,11 @@ static void parse_anonymous_declaration_rest(
 			break;
 
 		default:
-			warningf(&specifiers->source_position, "empty declaration");
+			warningf(&declaration->source_position, "empty declaration");
 			break;
 	}
 
-#ifdef RECORD_EMPTY_DECLARARTIONS
 	append_declaration(declaration);
-#endif
 }
 
 static void parse_declaration_rest(declaration_t *ndeclaration,
