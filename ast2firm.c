@@ -4575,7 +4575,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 static void case_label_to_firm(const case_label_statement_t *statement)
 {
-	if (statement->is_empty)
+	if (statement->is_empty_range)
 		return;
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);

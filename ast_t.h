@@ -607,8 +607,8 @@ typedef enum statement_kind_t {
 	STATEMENT_DO_WHILE,
 	STATEMENT_FOR,
 	STATEMENT_ASM,
-	STATEMENT_MS_TRY,
-	STATEMENT_LEAVE
+	STATEMENT_MS_TRY,          /**< MS __try/__finally or __try/__except */
+	STATEMENT_LEAVE            /**< MS __leave */
 } statement_kind_t;
 
 struct statement_base_t {
@@ -659,8 +659,8 @@ struct switch_statement_t {
 	expression_t           *expression;
 	statement_t            *body;
 	case_label_statement_t *first_case, *last_case;  /**< List of all cases, including default. */
-	case_label_statement_t *default_label;    /**< The default label if existent. */
-	unsigned long           default_proj_nr;  /**< The Proj-number for the default Proj. */
+	case_label_statement_t *default_label;           /**< The default label if existent. */
+	unsigned long           default_proj_nr;         /**< The Proj-number for the default Proj. */
 };
 
 struct goto_statement_t {
@@ -672,14 +672,14 @@ struct goto_statement_t {
 
 struct case_label_statement_t {
 	statement_base_t        base;
-	expression_t           *expression;  /**< The case label expression, NULL for default label. */
-	expression_t           *end_range;   /**< For GNUC case a .. b: the end range expression, NULL else. */
-	case_label_statement_t *next;        /**< link to the next case label in switch */
+	expression_t           *expression;    /**< The case label expression, NULL for default label. */
+	expression_t           *end_range;     /**< For GNUC case a .. b: the end range expression, NULL else. */
+	case_label_statement_t *next;          /**< link to the next case label in switch */
 	statement_t            *statement;
-	long                   first_case;   /**< The folded value of expression. */
-	long                   last_case;    /**< The folded value of end_range. */
-	bool                   is_bad;       /**< If set marked as bad to supress warnings. */
-	bool                   is_empty;     /**< If set marked this is a empty range. */
+	long                   first_case;     /**< The folded value of expression. */
+	long                   last_case;      /**< The folded value of end_range. */
+	bool                   is_bad;         /**< If set marked as bad to suppress warnings. */
+	bool                   is_empty_range; /**< If set marked this as an empty range. */
 };
 
 struct label_statement_t {

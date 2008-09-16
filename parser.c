@@ -8682,7 +8682,7 @@ static statement_t *parse_case_statement(void)
 				statement->case_label.last_case = val;
 
 				if (val < statement->case_label.first_case) {
-					statement->case_label.is_empty = true;
+					statement->case_label.is_empty_range = true;
 					warningf(pos, "empty range specified");
 				}
 			}
@@ -8698,7 +8698,7 @@ static statement_t *parse_case_statement(void)
 			/* Check for duplicate case values */
 			case_label_statement_t *c = &statement->case_label;
 			for (case_label_statement_t *l = current_switch->first_case; l != NULL; l = l->next) {
-				if (l->is_bad || l->is_empty || l->expression == NULL)
+				if (l->is_bad || l->is_empty_range || l->expression == NULL)
 					continue;
 
 				if (c->last_case < l->first_case || c->first_case > l->last_case)
