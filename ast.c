@@ -439,44 +439,42 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	}
 
 	print_expression_prec(binexpr->left, prec + r2l);
-	if (binexpr->base.kind != EXPR_BINARY_COMMA) {
-		fputc(' ', out);
-	}
+	char const* op;
 	switch (binexpr->base.kind) {
-	case EXPR_BINARY_COMMA:              fputs(",", out);     break;
-	case EXPR_BINARY_ASSIGN:             fputs("=", out);     break;
-	case EXPR_BINARY_ADD:                fputs("+", out);     break;
-	case EXPR_BINARY_SUB:                fputs("-", out);     break;
-	case EXPR_BINARY_MUL:                fputs("*", out);     break;
-	case EXPR_BINARY_MOD:                fputs("%", out);     break;
-	case EXPR_BINARY_DIV:                fputs("/", out);     break;
-	case EXPR_BINARY_BITWISE_OR:         fputs("|", out);     break;
-	case EXPR_BINARY_BITWISE_AND:        fputs("&", out);     break;
-	case EXPR_BINARY_BITWISE_XOR:        fputs("^", out);     break;
-	case EXPR_BINARY_LOGICAL_OR:         fputs("||", out);    break;
-	case EXPR_BINARY_LOGICAL_AND:        fputs("&&", out);    break;
-	case EXPR_BINARY_NOTEQUAL:           fputs("!=", out);    break;
-	case EXPR_BINARY_EQUAL:              fputs("==", out);    break;
-	case EXPR_BINARY_LESS:               fputs("<", out);     break;
-	case EXPR_BINARY_LESSEQUAL:          fputs("<=", out);    break;
-	case EXPR_BINARY_GREATER:            fputs(">", out);     break;
-	case EXPR_BINARY_GREATEREQUAL:       fputs(">=", out);    break;
-	case EXPR_BINARY_SHIFTLEFT:          fputs("<<", out);    break;
-	case EXPR_BINARY_SHIFTRIGHT:         fputs(">>", out);    break;
+	case EXPR_BINARY_COMMA:              op = ", ";    break;
+	case EXPR_BINARY_ASSIGN:             op = " = ";   break;
+	case EXPR_BINARY_ADD:                op = " + ";   break;
+	case EXPR_BINARY_SUB:                op = " - ";   break;
+	case EXPR_BINARY_MUL:                op = " * ";   break;
+	case EXPR_BINARY_MOD:                op = " % ";   break;
+	case EXPR_BINARY_DIV:                op = " / ";   break;
+	case EXPR_BINARY_BITWISE_OR:         op = " | ";   break;
+	case EXPR_BINARY_BITWISE_AND:        op = " & ";   break;
+	case EXPR_BINARY_BITWISE_XOR:        op = " ^ ";   break;
+	case EXPR_BINARY_LOGICAL_OR:         op = " || ";  break;
+	case EXPR_BINARY_LOGICAL_AND:        op = " && ";  break;
+	case EXPR_BINARY_NOTEQUAL:           op = " != ";  break;
+	case EXPR_BINARY_EQUAL:              op = " == ";  break;
+	case EXPR_BINARY_LESS:               op = " < ";   break;
+	case EXPR_BINARY_LESSEQUAL:          op = " <= ";  break;
+	case EXPR_BINARY_GREATER:            op = " > ";   break;
+	case EXPR_BINARY_GREATEREQUAL:       op = " >= ";  break;
+	case EXPR_BINARY_SHIFTLEFT:          op = " << ";  break;
+	case EXPR_BINARY_SHIFTRIGHT:         op = " >> ";  break;
 
-	case EXPR_BINARY_ADD_ASSIGN:         fputs("+=", out);    break;
-	case EXPR_BINARY_SUB_ASSIGN:         fputs("-=", out);    break;
-	case EXPR_BINARY_MUL_ASSIGN:         fputs("*=", out);    break;
-	case EXPR_BINARY_MOD_ASSIGN:         fputs("%=", out);    break;
-	case EXPR_BINARY_DIV_ASSIGN:         fputs("/=", out);    break;
-	case EXPR_BINARY_BITWISE_OR_ASSIGN:  fputs("|=", out);    break;
-	case EXPR_BINARY_BITWISE_AND_ASSIGN: fputs("&=", out);    break;
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN: fputs("^=", out);    break;
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:   fputs("<<=", out);   break;
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  fputs(">>=", out);   break;
+	case EXPR_BINARY_ADD_ASSIGN:         op = " += ";  break;
+	case EXPR_BINARY_SUB_ASSIGN:         op = " -= ";  break;
+	case EXPR_BINARY_MUL_ASSIGN:         op = " *= ";  break;
+	case EXPR_BINARY_MOD_ASSIGN:         op = " %= ";  break;
+	case EXPR_BINARY_DIV_ASSIGN:         op = " /= ";  break;
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:  op = " |= ";  break;
+	case EXPR_BINARY_BITWISE_AND_ASSIGN: op = " &= ";  break;
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN: op = " ^= ";  break;
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:   op = " <<= "; break;
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  op = " >>= "; break;
 	default: panic("invalid binexpression found");
 	}
-	fputc(' ', out);
+	fputs(op, out);
 	print_expression_prec(binexpr->right, prec - r2l);
 }
 
