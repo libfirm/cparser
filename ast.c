@@ -660,7 +660,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 	print_expression_prec(expression->ap, PREC_COMMA + 1);
 	fputs(", ", out);
 	fputs(expression->parameter->symbol->string, out);
-	fputs(")", out);
+	fputc(')', out);
 }
 
 /**
@@ -674,7 +674,7 @@ static void print_va_arg(const va_arg_expression_t *expression)
 	print_expression_prec(expression->ap, PREC_COMMA + 1);
 	fputs(", ", out);
 	print_type(expression->base.type);
-	fputs(")", out);
+	fputc(')', out);
 }
 
 /**
@@ -1120,7 +1120,7 @@ static void print_asm_arguments(asm_argument_t *arguments)
 		print_quoted_string(&argument->constraints, '"', 1);
 		fputs(" (", out);
 		print_expression(argument->expression);
-		fputs(")", out);
+		fputc(')', out);
 	}
 }
 
@@ -1151,7 +1151,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 	if(statement->is_volatile) {
 		fputs("volatile ", out);
 	}
-	fputs("(", out);
+	fputc('(', out);
 	print_quoted_string(&statement->asm_text, '"', 1);
 	if (statement->outputs  == NULL &&
 	    statement->inputs   == NULL &&
