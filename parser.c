@@ -9819,7 +9819,7 @@ static void parse_translation_unit(void)
 			}
 		}
 		if (anchor_leak)
-			exit(1);
+			abort();
 #endif
 
 		switch (token.type) {
