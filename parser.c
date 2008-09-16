@@ -3641,7 +3641,10 @@ warn_about_long_long:
 	}
 
 	specifiers->type = result;
+	return;
+
 end_error:
+	specifiers->type = type_error_type;
 	return;
 }
 
