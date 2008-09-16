@@ -3588,10 +3588,8 @@ warn_about_long_long:
 		default:
 			/* invalid specifier combination, give an error message */
 			if (type_specifiers == 0) {
-				if (saw_error) {
-					specifiers->type = type_error_type;
-					return;
-				}
+				if (saw_error)
+					goto end_error;
 
 				if (!strict_mode) {
 					if (warning.implicit_int) {
@@ -3610,15 +3608,13 @@ warn_about_long_long:
 			} else {
 				errorf(HERE, "multiple datatypes in declaration");
 			}
-			atomic_type = ATOMIC_TYPE_INVALID;
+			goto end_error;
 		}
 
-		if (type_specifiers & SPECIFIER_COMPLEX &&
-		   atomic_type != ATOMIC_TYPE_INVALID) {
+		if (type_specifiers & SPECIFIER_COMPLEX) {
 			type                = allocate_type_zero(TYPE_COMPLEX, &builtin_source_position);
 			type->complex.akind = atomic_type;
-		} else if (type_specifiers & SPECIFIER_IMAGINARY &&
-		          atomic_type != ATOMIC_TYPE_INVALID) {
+		} else if (type_specifiers & SPECIFIER_IMAGINARY) {
 			type                  = allocate_type_zero(TYPE_IMAGINARY, &builtin_source_position);
 			type->imaginary.akind = atomic_type;
 		} else {
