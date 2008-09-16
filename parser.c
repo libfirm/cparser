@@ -4311,7 +4311,7 @@ static void check_type_of_main(const declaration_t *const decl, const function_t
 		warningf(&decl->source_position,
 		         "'main' is normally a non-static function");
 	}
-	if (skip_typeref(func_type->return_type) != type_int) {
+	if (!types_compatible(skip_typeref(func_type->return_type), type_int)) {
 		warningf(&decl->source_position,
 		         "return type of 'main' should be 'int', but is '%T'",
 		         func_type->return_type);
