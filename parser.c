@@ -696,18 +696,18 @@ static void type_error_incompatible(const char *msg,
  * If not, generate an error, eat the current statement,
  * and goto the end_error label.
  */
-#define expect(expected)                              \
-	do {                                              \
-    if (UNLIKELY(token.type != (expected))) {          \
-        parse_error_expected(NULL, (expected), NULL); \
-		add_anchor_token(expected);                   \
-        eat_until_anchor();                           \
-        if (token.type == expected)                   \
-        	next_token();                             \
-		rem_anchor_token(expected);                   \
-        goto end_error;                               \
-    }                                                 \
-    next_token();                                     \
+#define expect(expected)                                  \
+	do {                                                  \
+		if (UNLIKELY(token.type != (expected))) {         \
+			parse_error_expected(NULL, (expected), NULL); \
+			add_anchor_token(expected);                   \
+			eat_until_anchor();                           \
+			if (token.type == expected)                   \
+				next_token();                             \
+			rem_anchor_token(expected);                   \
+			goto end_error;                               \
+		}                                                 \
+		next_token();                                     \
 	} while (0)
 
 static void set_scope(scope_t *new_scope)
