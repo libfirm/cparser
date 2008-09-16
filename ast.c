@@ -1268,7 +1268,7 @@ void print_statement(const statement_t *statement)
 		print_leave_statement(&statement->leave);
 		break;
 	case STATEMENT_INVALID:
-		fputs("$invalid statement$", out);
+		fputs("$invalid statement$\n", out);
 		break;
 	}
 }
