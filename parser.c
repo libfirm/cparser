@@ -555,6 +555,7 @@ static void restore_anchor_state(int token_type, int count)
 static void rem_anchor_token(int token_type)
 {
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
+	assert(token_anchor_set[token_type] != 0);
 	--token_anchor_set[token_type];
 }
 
@@ -9754,32 +9755,47 @@ end_error:;
  */
 static void parse_translation_unit(void)
 {
-	for (;;) switch (token.type) {
-		DECLARATION_START
-		case T_IDENTIFIER:
-		case T___extension__:
-			parse_external_declaration();
-			break;
+	for (;;) {
+#ifndef NDEBUG
+		bool anchor_leak = false;
+		for (token_type_t i = 0; i != T_LAST_TOKEN; ++i) {
+			unsigned char count = token_anchor_set[i];
+			if (count != 0) {
+				errorf(HERE, "Leaked anchor token %k %d times", i, count);
+				anchor_leak = true;
+			}
+		}
+		if (anchor_leak)
+			exit(1);
+#endif
 
-		case T_asm:
-			parse_global_asm();
-			break;
+		switch (token.type) {
+			DECLARATION_START
+			case T_IDENTIFIER:
+			case T___extension__:
+				parse_external_declaration();
+				break;
 
-		case T_EOF:
-			return;
+			case T_asm:
+				parse_global_asm();
+				break;
 
-		case ';':
-			/* TODO error in strict mode */
-			warningf(HERE, "stray ';' outside of function");
-			next_token();
-			break;
+			case T_EOF:
+				return;
 
-		default:
-			errorf(HERE, "stray %K outside of function", &token);
-			if (token.type == '(' || token.type == '{' || token.type == '[')
-				eat_until_matching_token(token.type);
-			next_token();
-			break;
+			case ';':
+				/* TODO error in strict mode */
+				warningf(HERE, "stray ';' outside of function");
+				next_token();
+				break;
+
+			default:
+				errorf(HERE, "stray %K outside of function", &token);
+				if (token.type == '(' || token.type == '{' || token.type == '[')
+					eat_until_matching_token(token.type);
+				next_token();
+				break;
+		}
 	}
 }
 
