@@ -2687,17 +2687,12 @@ static declaration_t *parse_compound_type_specifier(bool is_struct)
 		namespace_t const namespc =
 			is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION;
 		declaration = get_declaration(symbol, namespc);
-		if (declaration != NULL) {
-			if (declaration->parent_scope != scope &&
-			    (token.type == '{' || token.type == ';')) {
-				declaration = NULL;
-			} else if (declaration->init.complete &&
-			           token.type == '{') {
-				assert(symbol != NULL);
-				errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
-				       is_struct ? "struct" : "union", symbol,
-				       &declaration->source_position);
-			}
+		if (declaration != NULL &&
+			declaration->init.complete && token.type == '{') {
+			assert(symbol != NULL);
+			errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
+			       is_struct ? "struct" : "union", symbol,
+			       &declaration->source_position);
 		}
 	} else if (token.type != '{') {
 		if (is_struct) {
@@ -2799,15 +2794,16 @@ static type_t *parse_enum_specifier(void)
 		next_token();
 
 		declaration = get_declaration(symbol, NAMESPACE_ENUM);
+		if (declaration != NULL &&
+		    declaration->init.complete && token.type == '{') {
+			assert(symbol != NULL);
+			errorf(HERE, "multiple definitions of 'enum %Y' (previous definition at %P)",
+			       symbol, &declaration->source_position);
+		}
 	} else if (token.type != '{') {
 		parse_error_expected("while parsing enum type specifier",
 		                     T_IDENTIFIER, '{', NULL);
 		return NULL;
-	}
-
-	if (token.type == '{' && declaration != NULL && declaration->init.complete) {
-		errorf(HERE, "multiple definitions of enum '%Y' (previous definition at %P)",
-			symbol, &declaration->source_position);
 	}
 
 	declaration = allocate_declaration_zero();
