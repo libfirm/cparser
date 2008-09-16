@@ -9548,7 +9548,7 @@ expression_statment:
 
 	case ';':        statement = parse_empty_statement();         break;
 	case '{':        statement = parse_compound_statement(false); break;
-	case T___leave:  statement = parse_leave_statement();                   break;
+	case T___leave:  statement = parse_leave_statement();         break;
 	case T___try:    statement = parse_ms_try_statment();         break;
 	case T_asm:      statement = parse_asm_statement();           break;
 	case T_break:    statement = parse_break();                   break;
@@ -9562,7 +9562,58 @@ expression_statment:
 	case T_return:   statement = parse_return();                  break;
 	case T_switch:   statement = parse_switch();                  break;
 	case T_while:    statement = parse_while();                   break;
-	default:         statement = parse_expression_statement();    break;
+
+	case '!':
+	case '&':
+	case '(':
+	case '*':
+	case '+':
+	case '-':
+	case '~':
+	case T_ANDAND:
+	case T_CHARACTER_CONSTANT:
+	case T_FLOATINGPOINT:
+	case T_INTEGER:
+	case T_MINUSMINUS:
+	case T_PLUSPLUS:
+	case T_STRING_LITERAL:
+	case T_WIDE_CHARACTER_CONSTANT:
+	case T_WIDE_STRING_LITERAL:
+	case T___FUNCDNAME__:
+	case T___FUNCSIG__:
+	case T___FUNCTION__:
+	case T___PRETTY_FUNCTION__:
+	case T___builtin_alloca:
+	case T___builtin_classify_type:
+	case T___builtin_constant_p:
+	case T___builtin_expect:
+	case T___builtin_huge_val:
+	case T___builtin_isgreater:
+	case T___builtin_isgreaterequal:
+	case T___builtin_isless:
+	case T___builtin_islessequal:
+	case T___builtin_islessgreater:
+	case T___builtin_isunordered:
+	case T___builtin_nan:
+	case T___builtin_nand:
+	case T___builtin_nanf:
+	case T___builtin_offsetof:
+	case T___builtin_prefetch:
+	case T___builtin_va_arg:
+	case T___builtin_va_end:
+	case T___builtin_va_start:
+	case T___func__:
+	case T___noop:
+	case T__assume:
+		statement = parse_expression_statement();
+		break;
+
+	default:
+		errorf(HERE, "unexpected token %K while parsing statement", &token);
+		statement = create_invalid_statement();
+		if (!at_anchor())
+			next_token();
+		break;
 	}
 	rem_anchor_token(';');
 
