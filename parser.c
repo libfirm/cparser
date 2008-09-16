@@ -4167,6 +4167,10 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				errorf(HERE, "function returning array is not allowed");
 				type = type_error_type;
 			} else {
+				if (skipped_return_type->base.qualifiers != 0) {
+					warningf(HERE,
+						"type qualifiers in return type of function type are meaningless");
+				}
 				type = function_type;
 			}
 			break;
