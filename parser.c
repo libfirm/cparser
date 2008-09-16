@@ -6258,9 +6258,8 @@ static expression_t *parse_statement_expression(void)
 
 	expect(')');
 
-	return expression;
 end_error:
-	return create_invalid_expression();
+	return expression;
 }
 
 /**
@@ -6289,9 +6288,8 @@ static expression_t *parse_parenthesized_expression(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	return result;
 end_error:
-	return create_invalid_expression();
+	return result;
 }
 
 static expression_t *parse_function_keyword(void)
@@ -6947,9 +6945,8 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 		tp_expression->typeprop.tp_expression = expression;
 	}
 
-	return tp_expression;
 end_error:
-	return create_invalid_expression();
+	return tp_expression;
 }
 
 static expression_t *parse_sizeof(unsigned precedence)
@@ -7205,9 +7202,8 @@ static expression_t *parse_call_expression(unsigned precedence,
 		         "function call has aggregate value");
 	}
 
-	return result;
 end_error:
-	return create_invalid_expression();
+	return result;
 }
 
 static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right);
