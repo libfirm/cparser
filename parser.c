@@ -2475,6 +2475,10 @@ finish_designator:
 
 			if (type == NULL) {
 				/* we are already outside, ... */
+				if (is_type_compound(outer_type) &&
+				    !outer_type->compound.declaration->init.complete) {
+					goto error_parse_next;
+				}
 				goto error_excess;
 			}
 
