@@ -1478,22 +1478,28 @@ void print_declaration(const declaration_t *declaration)
 	case NAMESPACE_STRUCT:
 		fputs("struct ", out);
 		fputs(declaration->symbol->string, out);
-		fputc(' ', out);
-		print_compound_definition(declaration);
+		if (declaration->init.complete) {
+			fputc(' ', out);
+			print_compound_definition(declaration);
+		}
 		fputc(';', out);
 		break;
 	case NAMESPACE_UNION:
 		fputs("union ", out);
 		fputs(declaration->symbol->string, out);
-		fputc(' ', out);
-		print_compound_definition(declaration);
+		if (declaration->init.complete) {
+			fputc(' ', out);
+			print_compound_definition(declaration);
+		}
 		fputc(';', out);
 		break;
 	case NAMESPACE_ENUM:
 		fputs("enum ", out);
 		fputs(declaration->symbol->string, out);
-		fputc(' ', out);
-		print_enum_definition(declaration);
+		if (declaration->init.complete) {
+			fputc(' ', out);
+			print_enum_definition(declaration);
+		}
 		fputc(';', out);
 		break;
 	}
