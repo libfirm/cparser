@@ -1153,18 +1153,19 @@ static void print_asm_statement(const asm_statement_t *statement)
 	}
 	fputs("(", out);
 	print_quoted_string(&statement->asm_text, '"', 1);
-	if(statement->inputs == NULL && statement->outputs == NULL
-			&& statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
-
-	fputs(" : ", out);
-	print_asm_arguments(statement->inputs);
-	if(statement->outputs == NULL && statement->clobbers == NULL)
+	if (statement->outputs  == NULL &&
+	    statement->inputs   == NULL &&
+	    statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
 	fputs(" : ", out);
 	print_asm_arguments(statement->outputs);
-	if(statement->clobbers == NULL)
+	if (statement->inputs == NULL && statement->clobbers == NULL)
+		goto end_of_print_asm_statement;
+
+	fputs(" : ", out);
+	print_asm_arguments(statement->inputs);
+	if (statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
 	fputs(" : ", out);
