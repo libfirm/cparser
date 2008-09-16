@@ -5384,7 +5384,7 @@ static void parse_external_declaration(void)
 
 	add_anchor_token(',');
 	add_anchor_token('=');
-	rem_anchor_token(';');
+	add_anchor_token(';');
 
 	/* declarator is common to both function-definitions and declarations */
 	declaration_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false);
