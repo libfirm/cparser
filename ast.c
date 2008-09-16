@@ -390,7 +390,7 @@ static void print_compound_literal(
 {
 	fputc('(', out);
 	print_type(expression->type);
-	fputs(") ", out);
+	fputc(')', out);
 	print_initializer(expression->initializer);
 }
 
