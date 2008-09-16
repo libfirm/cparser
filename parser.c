@@ -6203,11 +6203,12 @@ static expression_t *parse_compound_literal(type_t *type)
  */
 static expression_t *parse_cast(void)
 {
+	add_anchor_token(')');
+
 	source_position_t source_position = token.source_position;
 
 	type_t *type  = parse_typename();
 
-	/* matching add_anchor_token() is at call site */
 	rem_anchor_token(')');
 	expect(')');
 
@@ -6236,6 +6237,8 @@ end_error:
  */
 static expression_t *parse_statement_expression(void)
 {
+	add_anchor_token(')');
+
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
 	statement_t *statement           = parse_compound_statement(true);
@@ -6257,6 +6260,7 @@ static expression_t *parse_statement_expression(void)
 	}
 	expression->base.type = type;
 
+	rem_anchor_token(')');
 	expect(')');
 
 end_error:
@@ -6269,7 +6273,6 @@ end_error:
 static expression_t *parse_parenthesized_expression(void)
 {
 	eat('(');
-	add_anchor_token(')');
 
 	switch(token.type) {
 	case '{':
@@ -6285,6 +6288,7 @@ static expression_t *parse_parenthesized_expression(void)
 		}
 	}
 
+	add_anchor_token(')');
 	expression_t *result = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
