@@ -7496,6 +7496,46 @@ static void semantic_unexpr_plus(unary_expression_t *expression)
 			"traditional C rejects the unary plus operator");
 }
 
+static expression_t const *get_reference_address(expression_t const *expr)
+{
+	bool regular_take_address = true;
+	for (;;) {
+		if (expr->kind == EXPR_UNARY_TAKE_ADDRESS) {
+			expr = expr->unary.value;
+		} else {
+			regular_take_address = false;
+		}
+
+		if (expr->kind != EXPR_UNARY_DEREFERENCE)
+			break;
+
+		expr = expr->unary.value;
+	}
+
+	if (expr->kind != EXPR_REFERENCE)
+		return NULL;
+
+	if (!regular_take_address &&
+	    !is_type_function(skip_typeref(expr->reference.declaration->type))) {
+		return NULL;
+	}
+
+	return expr;
+}
+
+static void warn_function_address_as_bool(expression_t const* expr)
+{
+	if (!warning.address)
+		return;
+
+	expr = get_reference_address(expr);
+	if (expr != NULL) {
+		warningf(&expr->base.source_position,
+			"the address of '%Y' will always evaluate as 'true'",
+			expr->reference.declaration->symbol);
+	}
+}
+
 static void semantic_not(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
@@ -7504,6 +7544,8 @@ static void semantic_not(unary_expression_t *expression)
 		errorf(&expression->base.source_position,
 		       "operand of ! must be of scalar type");
 	}
+
+	warn_function_address_as_bool(expression->value);
 
 	expression->base.type = type_int;
 }
@@ -7852,6 +7894,22 @@ static void semantic_sub(binary_expression_t *expression)
 	}
 }
 
+static void warn_string_literal_address(expression_t const* expr)
+{
+	while (expr->kind == EXPR_UNARY_TAKE_ADDRESS) {
+		expr = expr->unary.value;
+		if (expr->kind != EXPR_UNARY_DEREFERENCE)
+			return;
+		expr = expr->unary.value;
+	}
+
+	if (expr->kind == EXPR_STRING_LITERAL ||
+	    expr->kind == EXPR_WIDE_STRING_LITERAL) {
+		warningf(&expr->base.source_position,
+			"comparison with string literal results in unspecified behaviour");
+	}
+}
+
 /**
  * Check the semantics of comparison expressions.
  *
@@ -7859,13 +7917,32 @@ static void semantic_sub(binary_expression_t *expression)
  */
 static void semantic_comparison(binary_expression_t *expression)
 {
-	expression_t *left            = expression->left;
-	expression_t *right           = expression->right;
-	type_t       *orig_type_left  = left->base.type;
-	type_t       *orig_type_right = right->base.type;
+	expression_t *left  = expression->left;
+	expression_t *right = expression->right;
 
-	type_t *type_left  = skip_typeref(orig_type_left);
-	type_t *type_right = skip_typeref(orig_type_right);
+	if (warning.address) {
+		warn_string_literal_address(left);
+		warn_string_literal_address(right);
+
+		expression_t const* const func_left = get_reference_address(left);
+		if (func_left != NULL && is_null_pointer_constant(right)) {
+			warningf(&expression->base.source_position,
+				"the address of '%Y' will never be NULL",
+				func_left->reference.declaration->symbol);
+		}
+
+		expression_t const* const func_right = get_reference_address(right);
+		if (func_right != NULL && is_null_pointer_constant(right)) {
+			warningf(&expression->base.source_position,
+				"the address of '%Y' will never be NULL",
+				func_right->reference.declaration->symbol);
+		}
+	}
+
+	type_t *orig_type_left  = left->base.type;
+	type_t *orig_type_right = right->base.type;
+	type_t *type_left       = skip_typeref(orig_type_left);
+	type_t *type_right      = skip_typeref(orig_type_right);
 
 	/* TODO non-arithmetic types */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
@@ -8057,6 +8134,9 @@ static void semantic_logical_op(binary_expression_t *expression)
 	type_t       *const orig_type_right = right->base.type;
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
+
+	warn_function_address_as_bool(left);
+	warn_function_address_as_bool(right);
 
 	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */

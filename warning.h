@@ -25,6 +25,7 @@
 void set_warning_opt(const char *opt);
 
 typedef struct warning_t {
+	bool address:1;                       /**< Warn about suspicious uses of memory addresses */
 	bool aggregate_return:1;              /**< Warn if any functions that return structures or unions are defined or called */
 	bool attribute:1;                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 #if 0 // TODO

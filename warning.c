@@ -22,6 +22,7 @@
 #include "warning.h"
 
 warning_t warning = {
+	.address                       = true,
 	.aggregate_return              = false,
 	.attribute                     = true,
 	.cast_qual                     = false,
@@ -87,6 +88,7 @@ void set_warning_opt(const char *const opt)
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
+		SET(address);
 		SET(attribute);
 		SET(char_subscripts);
 		SET(comment);
@@ -112,6 +114,7 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value);
 		SET(unused_variable);
 	}
+	OPT("address",                       address);
 	OPT("aggregate-return",              aggregate_return);
 	OPT("attribute",                     attribute);
 	OPT("cast-qual",                     cast_qual);
