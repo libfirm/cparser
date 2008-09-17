@@ -4160,6 +4160,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			function_type->function.return_type = type;
 
 			type_t *skipped_return_type = skip_typeref(type);
+			/* §6.7.5.3(1) */
 			if (is_type_function(skipped_return_type)) {
 				errorf(HERE, "function returning function is not allowed");
 			} else if (is_type_array(skipped_return_type)) {
@@ -4212,8 +4213,12 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			}
 
 			type_t *skipped_type = skip_typeref(type);
-			if (is_type_atomic(skipped_type, ATOMIC_TYPE_VOID))
-				errorf(HERE, "array of void is not allowed");
+			/* §6.7.5.2(1) */
+			if (is_type_incomplete(skipped_type)) {
+				errorf(HERE, "array of incomplete type '%T' is not allowed", type);
+			} else if (is_type_function(skipped_type)) {
+				errorf(HERE, "array of functions is not allowed");
+			}
 			type = array_type;
 			break;
 		}
