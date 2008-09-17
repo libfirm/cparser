@@ -114,9 +114,12 @@ static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
 static stack_entry_t      *local_label_stack = NULL;
+/** The global file scope. */
 static scope_t            *global_scope      = NULL;
+/** The current scope. */
 static scope_t            *scope             = NULL;
 static declaration_t      *last_declaration  = NULL;
+/** Point to the current function declaration if inside a function. */
 static declaration_t      *current_function  = NULL;
 static declaration_t      *current_init_decl = NULL;
 static switch_statement_t *current_switch    = NULL;
@@ -713,14 +716,23 @@ static void type_error_incompatible(const char *msg,
 		next_token();                                     \
 	} while (0)
 
-static void set_scope(scope_t *new_scope)
+static void scope_push(scope_t *new_scope)
 {
 	if (scope != NULL) {
 		scope->last_declaration = last_declaration;
+		new_scope->depth        = scope->depth + 1;
 	}
-	scope = new_scope;
+	new_scope->parent = scope;
+	scope             = new_scope;
 
 	last_declaration = new_scope->last_declaration;
+}
+
+static void scope_pop(void)
+{
+	scope->last_declaration = last_declaration;
+	scope = scope->parent;
+	last_declaration = scope->last_declaration;
 }
 
 /**
@@ -3674,7 +3686,13 @@ static type_qualifiers_t parse_type_qualifiers(void)
 	}
 }
 
-static declaration_t *parse_identifier_list(void)
+/**
+ * Parses an K&R identifier list and return a list of declarations.
+ *
+ * @param last  points to the last declaration in the list
+ * @return the list of declarations
+ */
+static declaration_t *parse_identifier_list(declaration_t **last)
 {
 	declaration_t *declarations     = NULL;
 	declaration_t *last_declaration = NULL;
@@ -3698,6 +3716,7 @@ static declaration_t *parse_identifier_list(void)
 		next_token();
 	} while (token.type == T_IDENTIFIER);
 
+	*last = last_declaration;
 	return declarations;
 }
 
@@ -3750,7 +3769,13 @@ static declaration_t *parse_parameter(void)
 	return declaration;
 }
 
-static declaration_t *parse_parameters(function_type_t *type)
+/**
+ * Parses a function type parameter list and return a list of declarations.
+ *
+ * @param last  point to the last element of the list
+ * @return the parameter list
+ */
+static declaration_t *parse_parameters(function_type_t *type, declaration_t **last)
 {
 	declaration_t *declarations = NULL;
 
@@ -3763,7 +3788,7 @@ static declaration_t *parse_parameters(function_type_t *type)
 		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ',' || la1_type == ')') {
 			type->kr_style_parameters = true;
-			declarations = parse_identifier_list();
+			declarations = parse_identifier_list(last);
 			goto parameters_finished;
 		}
 	}
@@ -3829,10 +3854,12 @@ parameters_finished:
 	expect(')');
 
 	restore_anchor_state(',', saved_comma_state);
+	*last = last_declaration;
 	return declarations;
 
 end_error:
 	restore_anchor_state(',', saved_comma_state);
+	*last = NULL;
 	return NULL;
 }
 
@@ -3968,9 +3995,12 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 		type = allocate_type_zero(TYPE_FUNCTION, HERE);
 	}
 
-	declaration_t *parameters = parse_parameters(&type->function);
+	declaration_t *last;
+	declaration_t *parameters = parse_parameters(&type->function, &last);
 	if (declaration != NULL) {
-		declaration->scope.declarations = parameters;
+		declaration->scope.declarations     = parameters;
+		declaration->scope.last_declaration = last;
+		declaration->scope.is_parameter     = true;
 	}
 
 	construct_function_type_t *construct_function_type =
@@ -4394,8 +4424,16 @@ static declaration_t *record_declaration(
 	}
 
 	assert(declaration != previous_declaration);
-	if (previous_declaration != NULL
-			&& previous_declaration->parent_scope == scope) {
+	if (previous_declaration != NULL &&
+	    previous_declaration->parent_scope->is_parameter) {
+		errorf(&declaration->source_position,
+			"declaration '%#T' redeclares the parameter '%#T' (declared %P)",
+			orig_type, symbol, previous_declaration->type, symbol,
+			&previous_declaration->source_position);
+		goto finish;
+	}
+	if (previous_declaration != NULL &&
+	    previous_declaration->parent_scope == scope) {
 		/* can happen for K&R style declarations */
 		if (previous_declaration->type == NULL) {
 			previous_declaration->type = declaration->type;
@@ -4527,7 +4565,7 @@ warn_redundant_declaration:
 			         "no previous declaration for '%#T'", orig_type, symbol);
 		}
 	}
-
+finish:
 	assert(declaration->parent_scope == NULL);
 	assert(scope != NULL);
 
@@ -4764,8 +4802,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 	/* push function parameters */
 	int       top        = environment_top();
-	scope_t  *last_scope = scope;
-	set_scope(&declaration->scope);
+	scope_push(&declaration->scope);
 
 	declaration_t *parameter = declaration->scope.declarations;
 	for ( ; parameter != NULL; parameter = parameter->next) {
@@ -4781,7 +4818,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 
 	/* pop function parameters */
 	assert(scope == &declaration->scope);
-	set_scope(last_scope);
+	scope_pop();
 	environment_pop_to(top);
 
 	/* update function type */
@@ -5479,9 +5516,8 @@ static void parse_external_declaration(void)
 	type = skip_typeref(declaration->type);
 
 	/* push function parameters and switch scope */
-	int       top        = environment_top();
-	scope_t  *last_scope = scope;
-	set_scope(&declaration->scope);
+	int top = environment_top();
+	scope_push(&declaration->scope);
 
 	declaration_t *parameter = declaration->scope.declarations;
 	for( ; parameter != NULL; parameter = parameter->next) {
@@ -5536,7 +5572,7 @@ static void parse_external_declaration(void)
 	}
 
 	assert(scope == &declaration->scope);
-	set_scope(last_scope);
+	scope_pop();
 	environment_pop_to(top);
 }
 
@@ -6123,6 +6159,12 @@ static expression_t *parse_reference(void)
 
 	/* this declaration is used */
 	declaration->used = true;
+
+	if (declaration->parent_scope != global_scope &&
+		declaration->parent_scope->depth < current_function->scope.depth) {
+		/* access of a variable from an outer function */
+		declaration->address_taken = true;
+	}
 
 	/* check for deprecated functions */
 	if (warning.deprecated_declarations &&
@@ -9153,9 +9195,8 @@ static statement_t *parse_for(void)
 
 	PUSH_PARENT(statement);
 
-	int      top        = environment_top();
-	scope_t *last_scope = scope;
-	set_scope(&statement->fors.scope);
+	int top = environment_top();
+	scope_push(&statement->fors.scope);
 
 	expect('(');
 	add_anchor_token(')');
@@ -9197,7 +9238,7 @@ static statement_t *parse_for(void)
 	statement->fors.body = parse_loop_body(statement);
 
 	assert(scope == &statement->fors.scope);
-	set_scope(last_scope);
+	scope_pop();
 	environment_pop_to(top);
 
 	POP_PARENT;
@@ -9207,7 +9248,7 @@ end_error:
 	POP_PARENT;
 	rem_anchor_token(')');
 	assert(scope == &statement->fors.scope);
-	set_scope(last_scope);
+	scope_pop();
 	environment_pop_to(top);
 
 	return create_invalid_statement();
@@ -9763,10 +9804,9 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	eat('{');
 	add_anchor_token('}');
 
-	int      top        = environment_top();
-	int      top_local  = local_label_top();
-	scope_t *last_scope = scope;
-	set_scope(&statement->compound.scope);
+	int top       = environment_top();
+	int top_local = local_label_top();
+	scope_push(&statement->compound.scope);
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
@@ -9825,7 +9865,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 end_error:
 	rem_anchor_token('}');
 	assert(scope == &statement->compound.scope);
-	set_scope(last_scope);
+	scope_pop();
 	environment_pop_to(top);
 	local_label_pop_to(top_local);
 
@@ -9989,15 +10029,16 @@ void start_parsing(void)
 	global_scope = &unit->scope;
 
 	assert(scope == NULL);
-	set_scope(&unit->scope);
+	scope_push(&unit->scope);
 
 	initialize_builtin_types();
 }
 
 translation_unit_t *finish_parsing(void)
 {
+	/* do NOT use scope_pop() here, this will crash, will it by hand */
 	assert(scope == &unit->scope);
-	scope          = NULL;
+	scope            = NULL;
 	last_declaration = NULL;
 
 	assert(global_scope == &unit->scope);

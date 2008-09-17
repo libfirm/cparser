@@ -189,6 +189,9 @@ typedef enum funcname_kind_t {
 struct scope_t {
 	declaration_t *declarations;      /**< List of declarations in this scope. */
 	declaration_t *last_declaration;  /**< last declaration in this scope. */
+	scope_t       *parent;            /**< points to the parent scope. */
+	unsigned      depth;              /**< while parsing, the depth of this scope in the scope stack. */
+	bool          is_parameter;       /**< Set if this scope is a parameter scope. */
 };
 
 struct expression_base_t {
