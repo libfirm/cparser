@@ -105,8 +105,11 @@ typedef struct parse_initializer_env_t {
 
 typedef declaration_t* (*parsed_declaration_func) (declaration_t *declaration, bool is_definition);
 
+/** The current token. */
 static token_t             token;
+/** The lookahead ring-buffer. */
 static token_t             lookahead_buffer[MAX_LOOKAHEAD];
+/** Position of the next token in the lookahead buffer. */
 static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
@@ -124,8 +127,14 @@ static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
 static label_statement_t  *label_last        = NULL;
+/** current translation unit. */
 static translation_unit_t *unit              = NULL;
+/** true if we are in a type property context (evaluation only for type. */
+static bool                in_type_prop      = false;
+/** true in we are in a __extension__ context. */
+static bool                in_gcc_extension  = false;
 static struct obstack      temp_obst;
+
 
 #define PUSH_PARENT(stmt)                          \
 	statement_t *const prev_parent = current_parent; \
@@ -162,6 +171,9 @@ static unsigned char token_anchor_set[T_LAST_TOKEN];
 
 /** The current source position. */
 #define HERE (&token.source_position)
+
+/** true if we are in GCC mode. */
+#define GNU_MODE ((c_mode & _GNUC) || in_gcc_extension)
 
 static type_t *type_valist;
 
@@ -2853,16 +2865,17 @@ static type_t *parse_typeof(void)
 
 	expression_t *expression  = NULL;
 
-restart:
-	switch(token.type) {
-	case T___extension__:
+	bool old_type_prop     = in_type_prop;
+	bool old_gcc_extension = in_gcc_extension;
+	in_type_prop           = true;
+
+	while (token.type == T___extension__) {
 		/* This can be a prefix to a typename or an expression.  We simply eat
 		 * it now. */
-		do {
-			next_token();
-		} while (token.type == T___extension__);
-		goto restart;
-
+		next_token();
+		in_gcc_extension = true;
+	}
+	switch (token.type) {
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(token.v.symbol)) {
 			type = parse_typename();
@@ -2881,6 +2894,8 @@ restart:
 		type       = expression->base.type;
 		break;
 	}
+	in_type_prop     = old_type_prop;
+	in_gcc_extension = old_gcc_extension;
 
 	rem_anchor_token(')');
 	expect(')');
@@ -3214,12 +3229,13 @@ static void finish_union_type(compound_type_t *type) {
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t            *type            = NULL;
-	type_qualifiers_t  qualifiers      = TYPE_QUALIFIER_NONE;
-	type_modifiers_t   modifiers       = TYPE_MODIFIER_NONE;
-	unsigned           type_specifiers = 0;
-	bool               newtype         = false;
-	bool               saw_error       = false;
+	type_t            *type              = NULL;
+	type_qualifiers_t  qualifiers        = TYPE_QUALIFIER_NONE;
+	type_modifiers_t   modifiers         = TYPE_MODIFIER_NONE;
+	unsigned           type_specifiers   = 0;
+	bool               newtype           = false;
+	bool               saw_error         = false;
+	bool               old_gcc_extension = in_gcc_extension;
 
 	specifiers->source_position = token.source_position;
 
@@ -3229,7 +3245,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		if (specifiers->modifiers & DM_TRANSPARENT_UNION)
 			modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 
-		switch(token.type) {
+		switch (token.type) {
 
 		/* storage class */
 #define MATCH_STORAGE_CLASS(token, class)                                  \
@@ -3294,8 +3310,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
 
 		case T___extension__:
-			/* TODO */
 			next_token();
+			in_gcc_extension = true;
 			break;
 
 		/* type specifiers */
@@ -3440,6 +3456,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	}
 
 finish_specifiers:
+	in_gcc_extension = old_gcc_extension;
+
 	if (type == NULL || (saw_error && type_specifiers != 0)) {
 		atomic_type_kind_t atomic_type;
 
@@ -4530,7 +4548,7 @@ static void parser_error_multiple_definition(declaration_t *declaration,
 static bool is_declaration_specifier(const token_t *token,
                                      bool only_specifiers_qualifiers)
 {
-	switch(token->type) {
+	switch (token->type) {
 		TYPE_SPECIFIERS
 		TYPE_QUALIFIERS
 			return true;
@@ -5818,8 +5836,7 @@ static expression_t *parse_character_constant(void)
 	cnst->conste.v.character   = token.v.string;
 
 	if (cnst->conste.v.character.size != 1) {
-		if (warning.multichar && (c_mode & _GNUC)) {
-			/* TODO */
+		if (warning.multichar && GNU_MODE) {
 			warningf(HERE, "multi-character character constant");
 		} else {
 			errorf(HERE, "more than 1 characters in character constant");
@@ -5842,8 +5859,7 @@ static expression_t *parse_wide_character_constant(void)
 	cnst->conste.v.wide_character = token.v.wide_string;
 
 	if (cnst->conste.v.wide_character.size != 1) {
-		if (warning.multichar && (c_mode & _GNUC)) {
-			/* TODO */
+		if (warning.multichar && GNU_MODE) {
 			warningf(HERE, "multi-character character constant");
 		} else {
 			errorf(HERE, "more than 1 characters in character constant");
@@ -6118,7 +6134,7 @@ static expression_t *parse_reference(void)
 				declaration->symbol, &declaration->source_position);
 		}
 	}
-	if (warning.init_self && declaration == current_init_decl) {
+	if (warning.init_self && declaration == current_init_decl && !in_type_prop) {
 		current_init_decl = NULL;
 		warningf(HERE, "variable '%#T' is initialized by itself",
 			declaration->type, declaration->symbol);
@@ -6814,7 +6830,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
 		case T__assume:                  return parse_assume();
 		case T_ANDAND:
-			if (c_mode & _GNUC)
+			if (GNU_MODE)
 				return parse_label_address();
 			break;
 
@@ -6905,10 +6921,9 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 
 	char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 
-	/* we only refer to a type property, not the value, so do not warn
-	 * when using current_init_decl */
-	declaration_t *old = current_init_decl;
-	current_init_decl  = NULL;
+	/* we only refer to a type property, mark this case */
+	bool old     = in_type_prop;
+	in_type_prop = true;
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		add_anchor_token(')');
@@ -6949,7 +6964,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 	}
 
 end_error:
-	current_init_decl  = old;
+	in_type_prop = old;
 	return tp_expression;
 }
 
@@ -7247,7 +7262,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 
 	expression_t *true_expression = expression;
 	bool          gnu_cond = false;
-	if ((c_mode & _GNUC) && token.type == ':') {
+	if (GNU_MODE && token.type == ':') {
 		gnu_cond = true;
 	} else
 		true_expression = parse_expression();
@@ -7358,9 +7373,10 @@ static expression_t *parse_extension(unsigned precedence)
 {
 	eat(T___extension__);
 
-	/* TODO enable extensions */
+	bool old_gcc_extension   = in_gcc_extension;
+	in_gcc_extension         = true;
 	expression_t *expression = parse_sub_expression(precedence);
-	/* TODO disable extensions */
+	in_gcc_extension         = old_gcc_extension;
 	return expression;
 }
 
@@ -7394,7 +7410,7 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 	points_to = skip_typeref(points_to);
 
 	if (is_type_incomplete(points_to)) {
-		if (!(c_mode & _GNUC) || !is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+		if (!GNU_MODE || !is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
 			errorf(source_position,
 			       "arithmetic with pointer to incomplete type '%T' not allowed",
 			       orig_pointer_type);
@@ -7405,7 +7421,7 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 			         orig_pointer_type);
 		}
 	} else if (is_type_function(points_to)) {
-		if (!(c_mode && _GNUC)) {
+		if (!GNU_MODE) {
 			errorf(source_position,
 			       "arithmetic with pointer to function type '%T' not allowed",
 			       orig_pointer_type);
@@ -8664,7 +8680,7 @@ static statement_t *parse_case_statement(void)
 		statement->case_label.last_case  = val;
 	}
 
-	if (c_mode & _GNUC) {
+	if (GNU_MODE) {
 		if (token.type == T_DOTDOTDOT) {
 			next_token();
 			expression_t *const end_range   = parse_expression();
@@ -9121,7 +9137,7 @@ static statement_t *parse_goto(void)
 	eat(T_goto);
 
 	statement_t *statement;
-	if (c_mode & _GNUC && token.type == '*') {
+	if (GNU_MODE && token.type == '*') {
 		next_token();
 		expression_t *expression = parse_expression();
 
@@ -9144,7 +9160,7 @@ static statement_t *parse_goto(void)
 		statement->gotos.expression     = expression;
 	} else {
 		if (token.type != T_IDENTIFIER) {
-			if (c_mode & _GNUC)
+			if (GNU_MODE)
 				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
 			else
 				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
@@ -9356,7 +9372,7 @@ static statement_t *parse_declaration_statement(void)
 	statement->base.source_position = token.source_position;
 
 	declaration_t *before = last_declaration;
-	if (c_mode & _GNUC)
+	if (GNU_MODE)
 		parse_external_declaration();
 	else
 		parse_declaration(record_declaration);
@@ -9537,7 +9553,10 @@ expression_statment:
 		do {
 			next_token();
 		} while (token.type == T___extension__);
+		bool old_gcc_extension = in_gcc_extension;
+		in_gcc_extension       = true;
 		statement = parse_statement();
+		in_gcc_extension = false;
 		break;
 
 	DECLARATION_START
@@ -9815,13 +9834,18 @@ static void parse_translation_unit(void)
 	for (;;) {
 #ifndef NDEBUG
 		bool anchor_leak = false;
-		for (token_type_t i = 0; i != T_LAST_TOKEN; ++i) {
+		for (int i = 0; i != T_LAST_TOKEN; ++i) {
 			unsigned char count = token_anchor_set[i];
 			if (count != 0) {
 				errorf(HERE, "Leaked anchor token %k %d times", i, count);
 				anchor_leak = true;
 			}
 		}
+		if (in_gcc_extension) {
+			errorf(HERE, "Leaked __extension__");
+			anchor_leak = true;
+		}
+
 		if (anchor_leak)
 			abort();
 #endif
