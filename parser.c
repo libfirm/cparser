@@ -6910,12 +6910,16 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
                                     source_position_t const pos,
                                     unsigned const precedence)
 {
-	expression_t *tp_expression = allocate_expression_zero(kind);
+	expression_t  *tp_expression = allocate_expression_zero(kind);
 	tp_expression->base.type            = type_size_t;
 	tp_expression->base.source_position = pos;
 
 	char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 
+	/* we only refer to a type property, not the value, so do not warn
+	 * when using current_init_decl */
+	declaration_t *old = current_init_decl;
+	current_init_decl  = NULL;
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		add_anchor_token(')');
@@ -6956,6 +6960,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 	}
 
 end_error:
+	current_init_decl  = old;
 	return tp_expression;
 }
 
