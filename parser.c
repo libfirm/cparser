@@ -4609,24 +4609,17 @@ static void parse_anonymous_declaration_rest(
 {
 	eat(';');
 
-	declaration_t *const declaration    = allocate_declaration_zero();
-	declaration->type                   = specifiers->type;
-	declaration->declared_storage_class = specifiers->declared_storage_class;
-	declaration->source_position        = specifiers->source_position;
-	declaration->modifiers              = specifiers->modifiers;
-
-	if (declaration->declared_storage_class != STORAGE_CLASS_NONE) {
-		warningf(&declaration->source_position,
+	if (specifiers->declared_storage_class != STORAGE_CLASS_NONE) {
+		warningf(&specifiers->source_position,
 		         "useless storage class in empty declaration");
 	}
-	declaration->storage_class = STORAGE_CLASS_NONE;
 
-	type_t *type = declaration->type;
+	type_t *type = specifiers->type;
 	switch (type->kind) {
 		case TYPE_COMPOUND_STRUCT:
 		case TYPE_COMPOUND_UNION: {
 			if (type->compound.declaration->symbol == NULL) {
-				warningf(&declaration->source_position,
+				warningf(&specifiers->source_position,
 				         "unnamed struct/union that defines no instances");
 			}
 			break;
@@ -4636,11 +4629,20 @@ static void parse_anonymous_declaration_rest(
 			break;
 
 		default:
-			warningf(&declaration->source_position, "empty declaration");
+			warningf(&specifiers->source_position, "empty declaration");
 			break;
 	}
 
+#ifdef RECORD_EMPTY_DECLARATIONS
+	declaration_t *const declaration    = allocate_declaration_zero();
+	declaration->type                   = specifiers->type;
+	declaration->declared_storage_class = specifiers->declared_storage_class;
+	declaration->source_position        = specifiers->source_position;
+	declaration->modifiers              = specifiers->modifiers;
+	declaration->storage_class          = STORAGE_CLASS_NONE;
+
 	append_declaration(declaration);
+#endif
 }
 
 static void parse_declaration_rest(declaration_t *ndeclaration,
