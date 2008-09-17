@@ -3914,9 +3914,8 @@ static construct_type_t *parse_array_declarator(void)
 	rem_anchor_token(']');
 	expect(']');
 
-	return (construct_type_t*) array;
 end_error:
-	return NULL;
+	return (construct_type_t*) array;
 }
 
 static construct_type_t *parse_function_declarator(declaration_t *declaration)
