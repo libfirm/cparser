@@ -4707,7 +4707,10 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 {
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
+
+	add_anchor_token(';');
 	parse_declaration_specifiers(&specifiers);
+	rem_anchor_token(';');
 
 	if (token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers);
@@ -9353,7 +9356,10 @@ static statement_t *parse_declaration_statement(void)
 	statement->base.source_position = token.source_position;
 
 	declaration_t *before = last_declaration;
-	parse_declaration(record_declaration);
+	if (c_mode & _GNUC)
+		parse_external_declaration();
+	else
+		parse_declaration(record_declaration);
 
 	if (before == NULL) {
 		statement->declaration.declarations_begin = scope->declarations;
