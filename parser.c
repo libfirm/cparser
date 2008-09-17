@@ -4378,7 +4378,7 @@ static declaration_t *record_declaration(
 			previous_declaration == NULL) {
 		warningf(&declaration->source_position,
 		         "function declaration '%#T' is not a prototype",
-		         orig_type, declaration->symbol);
+		         orig_type, symbol);
 	}
 
 	if (warning.main && is_type_function(type) && is_sym_main(symbol)) {
