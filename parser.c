@@ -2870,8 +2870,7 @@ static type_t *parse_typeof(void)
 	in_type_prop           = true;
 
 	while (token.type == T___extension__) {
-		/* This can be a prefix to a typename or an expression.  We simply eat
-		 * it now. */
+		/* This can be a prefix to a typename or an expression. */
 		next_token();
 		in_gcc_extension = true;
 	}
@@ -2968,7 +2967,7 @@ static bool check_alignment_value(long long intvalue)
 		return false;
 	}
 	unsigned v = (unsigned)intvalue;
-	for(unsigned i = 1; i <= 8192; i += i) {
+	for (unsigned i = 1; i <= 8192; i += i) {
 		if (i == v)
 			return true;
 	}
@@ -3039,7 +3038,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 		} else if (symbol == sym_property) {
 			next_token();
 			expect('(');
-			for(;;) {
+			for (;;) {
 				bool is_get = false;
 				if (token.type != T_IDENTIFIER)
 					goto end_error;

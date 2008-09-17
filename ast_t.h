@@ -288,7 +288,7 @@ struct array_access_expression_t {
 	expression_base_t  base;
 	expression_t      *array_ref;
 	expression_t      *index;
-	bool               flipped; /* index/ref was written in a 5[a] way */
+	bool               flipped; /**< index/ref was written in a 5[a] way */
 };
 
 struct typeprop_expression_t {
