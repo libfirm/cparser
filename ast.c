@@ -1440,6 +1440,7 @@ static void print_normal_declaration(const declaration_t *declaration)
 	if(declaration->type->kind == TYPE_FUNCTION) {
 		if(declaration->init.statement != NULL) {
 			fputs("\n", out);
+			print_indent();
 			print_statement(declaration->init.statement);
 			return;
 		}
