@@ -4634,7 +4634,6 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		parsed_declaration_func finished_declaration)
 {
 	add_anchor_token(';');
-	add_anchor_token('=');
 	add_anchor_token(',');
 	while(true) {
 		declaration_t *declaration =
@@ -4658,13 +4657,14 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 			break;
 		eat(',');
 
+		add_anchor_token('=');
 		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false);
+		rem_anchor_token('=');
 	}
 	expect(';');
 
 end_error:
 	rem_anchor_token(';');
-	rem_anchor_token('=');
 	rem_anchor_token(',');
 }
 
