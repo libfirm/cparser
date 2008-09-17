@@ -643,16 +643,6 @@ static void eat_block(void)
 		next_token();
 }
 
-/**
- * eat all token until a ';' is reached or a stop token is found.
- */
-static void eat_statement(void)
-{
-	eat_until_matching_token(';');
-	if (token.type == ';')
-		next_token();
-}
-
 #define eat(token_type)  do { assert(token.type == token_type); next_token(); } while (0)
 
 /**
@@ -4054,13 +4044,7 @@ static construct_type_t *parse_inner_declarator(declaration_t *declaration,
 		if (may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
-		/* avoid a loop in the outermost scope, because eat_statement doesn't
-		 * eat '}' */
-		if (token.type == '}' && current_function == NULL) {
-			next_token();
-		} else {
-			eat_statement();
-		}
+		eat_until_anchor();
 		return NULL;
 	}
 
@@ -9161,7 +9145,7 @@ static statement_t *parse_goto(void)
 				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
 			else
 				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
-			eat_statement();
+			eat_until_anchor();
 			goto end_error;
 		}
 		symbol_t *symbol = token.v.symbol;
