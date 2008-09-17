@@ -4162,17 +4162,16 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			type_t *skipped_return_type = skip_typeref(type);
 			if (is_type_function(skipped_return_type)) {
 				errorf(HERE, "function returning function is not allowed");
-				type = type_error_type;
 			} else if (is_type_array(skipped_return_type)) {
 				errorf(HERE, "function returning array is not allowed");
-				type = type_error_type;
 			} else {
 				if (skipped_return_type->base.qualifiers != 0) {
 					warningf(HERE,
 						"type qualifiers in return type of function type are meaningless");
 				}
-				type = function_type;
 			}
+
+			type = function_type;
 			break;
 		}
 
@@ -4213,12 +4212,9 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			}
 
 			type_t *skipped_type = skip_typeref(type);
-			if (is_type_atomic(skipped_type, ATOMIC_TYPE_VOID)) {
+			if (is_type_atomic(skipped_type, ATOMIC_TYPE_VOID))
 				errorf(HERE, "array of void is not allowed");
-				type = type_error_type;
-			} else {
-				type = array_type;
-			}
+			type = array_type;
 			break;
 		}
 		}
