@@ -4760,6 +4760,8 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	if (!type->function.kr_style_parameters)
 		return;
 
+	add_anchor_token('{');
+
 	/* push function parameters */
 	int       top        = environment_top();
 	scope_t  *last_scope = scope;
@@ -4838,6 +4840,8 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	}
 
 	declaration->type = type;
+
+	rem_anchor_token('{');
 }
 
 static bool first_err = true;
