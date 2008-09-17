@@ -9557,7 +9557,7 @@ expression_statment:
 		bool old_gcc_extension = in_gcc_extension;
 		in_gcc_extension       = true;
 		statement = parse_statement();
-		in_gcc_extension = false;
+		in_gcc_extension = old_gcc_extension;
 		break;
 
 	DECLARATION_START
