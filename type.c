@@ -1202,6 +1202,44 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
+type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type) {
+	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
+
+	while (true) {
+		switch (type->base.kind) {
+		case TYPE_ERROR:
+			return TYPE_QUALIFIER_NONE;
+		case TYPE_TYPEDEF:
+			qualifiers |= type->base.qualifiers;
+			const typedef_type_t *typedef_type = &type->typedeft;
+			if (typedef_type->resolved_type != NULL)
+				type = typedef_type->resolved_type;
+			else
+				type = typedef_type->declaration->type;
+			continue;
+		case TYPE_TYPEOF: {
+			const typeof_type_t *typeof_type = &type->typeoft;
+			if (typeof_type->typeof_type != NULL) {
+				type = typeof_type->typeof_type;
+			} else {
+				type = typeof_type->expression->base.type;
+			}
+			continue;
+		}
+		case TYPE_ARRAY:
+			if (skip_array_type) {
+				type = type->array.element_type;
+				continue;
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	}
+	return type->base.qualifiers | qualifiers;
+}
+
 unsigned get_atomic_type_size(atomic_type_kind_t kind)
 {
 	assert(kind <= ATOMIC_TYPE_LAST);

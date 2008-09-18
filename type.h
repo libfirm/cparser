@@ -170,6 +170,12 @@ type_t *get_qualified_type(type_t*, type_qualifiers_t);
 type_t *skip_typeref(type_t *type);
 
 /**
+ * Return the type qualifier set of a type. If skip_array_type
+ * is true, skip all array types.
+ */
+type_qualifiers_t get_type_qualifier(type_t *type, bool skip_array_type);
+
+/**
  * returns size of an atomic type kind in bytes
  */
 unsigned get_atomic_type_size(atomic_type_kind_t kind);
