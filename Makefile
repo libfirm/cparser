@@ -90,7 +90,7 @@ REVISION ?= $(shell svnversion -n .)
 DIRS = build build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver build/cpbe build/cpbe/adt build/cpbe/driver
 UNUSED := $(shell mkdir -p $(DIRS))
 
-$(GOAL): $(OBJECTS)
+$(GOAL): $(OBJECTS) $(LIBFIRM_FILE)
 	@echo "===> LD $@"
 	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
 
