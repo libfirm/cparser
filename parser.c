@@ -640,13 +640,9 @@ check_stop:
  */
 static void eat_until_anchor(void)
 {
-	if (token.type == T_EOF)
-		return;
 	while (token_anchor_set[token.type] == 0) {
 		if (token.type == '(' || token.type == '{' || token.type == '[')
 			eat_until_matching_token(token.type);
-		if (token.type == T_EOF)
-			break;
 		next_token();
 	}
 }
@@ -5720,7 +5716,11 @@ static void parse_compound_type_entries(declaration_t *compound_declaration)
 	eat('{');
 	add_anchor_token('}');
 
-	while (token.type != '}' && token.type != T_EOF) {
+	while (token.type != '}') {
+		if (token.type == T_EOF) {
+			errorf(HERE, "EOF while parsing struct");
+			break;
+		}
 		declaration_specifiers_t specifiers;
 		memset(&specifiers, 0, sizeof(specifiers));
 		parse_declaration_specifiers(&specifiers);
@@ -5728,10 +5728,6 @@ static void parse_compound_type_entries(declaration_t *compound_declaration)
 		parse_compound_declarators(compound_declaration, &specifiers);
 	}
 	rem_anchor_token('}');
-
-	if (token.type == T_EOF) {
-		errorf(HERE, "EOF while parsing struct");
-	}
 	next_token();
 }
 
@@ -9803,7 +9799,12 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
-	while (token.type != '}' && token.type != T_EOF) {
+	while (token.type != '}') {
+		if (token.type == T_EOF) {
+			errorf(&statement->base.source_position,
+			       "EOF while parsing compound statement");
+			break;
+		}
 		statement_t *sub_statement = intern_parse_statement();
 		if (is_invalid_statement(sub_statement)) {
 			/* an error occurred. if we are at an anchor, return */
@@ -9828,13 +9829,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 		anchor = &sub_statement->base.next;
 	}
-
-	if (token.type == '}') {
-		next_token();
-	} else {
-		errorf(&statement->base.source_position,
-		       "end of file while looking for closing '}'");
-	}
+	next_token();
 
 	/* look over all statements again to produce no effect warnings */
 	if (warning.unused_value) {
@@ -9949,11 +9944,17 @@ end_error:;
  */
 static void parse_translation_unit(void)
 {
+	add_anchor_token(T_EOF);
+
+#ifndef NDEBUG
+	unsigned char token_anchor_copy[T_LAST_TOKEN];
+	memcpy(token_anchor_copy, token_anchor_set, sizeof(token_anchor_copy));
+#endif
 	for (;;) {
 #ifndef NDEBUG
 		bool anchor_leak = false;
 		for (int i = 0; i != T_LAST_TOKEN; ++i) {
-			unsigned char count = token_anchor_set[i];
+			unsigned char count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
 				errorf(HERE, "Leaked anchor token %k %d times", i, count);
 				anchor_leak = true;
@@ -9996,6 +9997,8 @@ static void parse_translation_unit(void)
 				break;
 		}
 	}
+
+	rem_anchor_token(T_EOF);
 }
 
 /**

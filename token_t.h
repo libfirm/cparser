@@ -27,9 +27,9 @@
 #include "type.h"
 
 typedef enum token_type_t {
+	T_ERROR = -1,
 	T_NULL  =  0,
-	T_EOF   = -1,
-	T_ERROR = -2,
+	T_EOF   = '\x04', // EOT
 #define T(mode,x,str,val) T_##x val,
 #define TS(x,str,val) T_##x val,
 #include "tokens.inc"
