@@ -761,28 +761,20 @@ static void stack_push(stack_entry_t **stack_ptr, declaration_t *declaration)
 	namespace_t  namespc = (namespace_t) declaration->namespc;
 
 	/* replace/add declaration into declaration list of the symbol */
-	declaration_t *iter = symbol->declaration;
-	if (iter == NULL) {
-		symbol->declaration = declaration;
-	} else {
-		declaration_t *iter_last = NULL;
-		for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
-			/* replace an entry? */
-			if (iter->namespc == namespc) {
-				if (iter_last == NULL) {
-					symbol->declaration = declaration;
-				} else {
-					iter_last->symbol_next = declaration;
-				}
-				declaration->symbol_next = iter->symbol_next;
-				break;
-			}
-		}
-		if (iter == NULL) {
-			assert(iter_last->symbol_next == NULL);
-			iter_last->symbol_next = declaration;
+	declaration_t **anchor;
+	declaration_t  *iter;
+	for (anchor = &symbol->declaration;; anchor = &iter->symbol_next) {
+		iter = *anchor;
+		if (iter == NULL)
+			break;
+
+		/* replace an entry? */
+		if (iter->namespc == namespc) {
+			declaration->symbol_next = iter->symbol_next;
+			break;
 		}
 	}
+	*anchor = declaration;
 
 	/* remember old declaration */
 	stack_entry_t entry;
