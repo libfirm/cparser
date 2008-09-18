@@ -9984,10 +9984,12 @@ static void parse_translation_unit(void)
 				return;
 
 			case ';':
-				/* TODO error in strict mode */
-				warningf(HERE, "stray ';' outside of function");
-				next_token();
-				break;
+				if (!strict_mode) {
+					warningf(HERE, "stray ';' outside of function");
+					next_token();
+					break;
+				}
+				/* FALLTHROUGH */
 
 			default:
 				errorf(HERE, "stray %K outside of function", &token);
