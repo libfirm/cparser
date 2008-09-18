@@ -3364,8 +3364,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			type->compound.declaration = parse_compound_type_specifier(false);
 			if (type->compound.declaration->modifiers & DM_TRANSPARENT_UNION)
 				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
-			break;
 			finish_union_type(&type->compound);
+			break;
 		}
 		case T_enum:
 			type = parse_enum_specifier();
@@ -6639,7 +6639,6 @@ static expression_t *parse_compare_builtin(void)
 		break;
 	default:
 		internal_errorf(HERE, "invalid compare builtin found");
-		break;
 	}
 	expression->base.source_position = *HERE;
 	next_token();
@@ -9981,6 +9980,7 @@ static void parse_translation_unit(void)
 				break;
 
 			case T_EOF:
+				rem_anchor_token(T_EOF);
 				return;
 
 			case ';':
@@ -9997,8 +9997,6 @@ static void parse_translation_unit(void)
 				break;
 		}
 	}
-
-	rem_anchor_token(T_EOF);
 }
 
 /**
