@@ -1470,7 +1470,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 			panic("Trampoline code not implemented");
 			return create_symconst(dbgi, mode, declaration->v.entity);
 		}
-									}
+	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
 		return deref_address(dbgi, declaration->type, addr);
@@ -1509,11 +1509,6 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		/* you can store to a local variable (so we don't panic but return NULL
 		 * as an indicator for no real address) */
 		return NULL;
-	case DECLARATION_KIND_FUNCTION: {
-		type_t *const  type = skip_typeref(ref->base.type);
-		ir_mode *const mode = get_ir_mode(type);
-		return create_symconst(dbgi, mode, declaration->v.entity);
-	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr = get_global_var_address(dbgi, declaration);
 		return addr;
@@ -1532,6 +1527,8 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_ENUM_ENTRY:
 		panic("trying to reference enum entry");
 
+	case DECLARATION_KIND_FUNCTION:
+	case DECLARATION_KIND_INNER_FUNCTION:
 	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
 	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
 	case DECLARATION_KIND_COMPOUND_MEMBER:
