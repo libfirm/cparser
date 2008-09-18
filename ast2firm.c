@@ -59,6 +59,8 @@ static ir_node        *break_label;
 static ir_node        *current_switch_cond;
 static bool            saw_default_label;
 static declaration_t **all_labels;
+static declaration_t **inner_functions;
+static int             inner_function_idx;
 static ir_node        *ijmp_list;
 static bool            constant_folding;
 
@@ -84,12 +86,33 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_ENUM_ENTRY,
 	DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE,
 	DECLARATION_KIND_COMPOUND_TYPE_COMPLETE,
-	DECLARATION_KIND_TYPE
+	DECLARATION_KIND_TYPE,
+	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
 
 static ir_type *get_ir_type(type_t *type);
 static ir_type *get_ir_type_incomplete(type_t *type);
 static int count_decls_in_stmts(const statement_t *stmt);
+
+static void enqueue_inner_function(declaration_t *declaration) {
+	if (inner_functions == NULL) {
+		inner_functions = NEW_ARR_F(declaration_t *, 16);
+		inner_functions[0] = declaration;
+		inner_function_idx = 1;
+	} else {
+		int size = ARR_LEN(inner_functions);
+		if (inner_function_idx >= size) {
+			ARR_RESIZE(declaration_t *, inner_functions, size + 16);
+		}
+		inner_functions[inner_function_idx++] = declaration;
+	}
+}
+
+static declaration_t *next_inner_function(void) {
+	if (inner_function_idx == 0)
+		return 0;
+	return inner_functions[--inner_function_idx];
+}
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
@@ -1038,7 +1061,8 @@ static void handle_gnu_attributes_ent(ir_entity *ent, declaration_t *decl)
  */
 static ir_entity *get_function_entity(declaration_t *declaration)
 {
-	if (declaration->declaration_kind == DECLARATION_KIND_FUNCTION)
+	if (declaration->declaration_kind == DECLARATION_KIND_FUNCTION ||
+	    declaration->declaration_kind == DECLARATION_KIND_INNER_FUNCTION)
 		return declaration->v.entity;
 	assert(declaration->declaration_kind == DECLARATION_KIND_UNKNOWN);
 
@@ -1420,7 +1444,12 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 	case DECLARATION_KIND_ENUM_ENTRY: {
 		ir_mode *const mode = get_ir_mode(type);
-		return new_Const(mode, declaration->v.enum_val);
+		if (ref->is_outer_ref) {
+			/* reference to an outer variable */
+			panic("Outer variable reference not implemented");
+		} else {
+			return new_Const(mode, declaration->v.enum_val);
+		}
 	}
 
 	case DECLARATION_KIND_LOCAL_VARIABLE: {
@@ -1431,6 +1460,17 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		ir_mode *const mode = get_ir_mode(type);
 		return create_symconst(dbgi, mode, declaration->v.entity);
 	}
+	case DECLARATION_KIND_INNER_FUNCTION: {
+		ir_mode *const mode = get_ir_mode(type);
+		if (! declaration->goto_to_outer && !declaration->need_closure) {
+			/* inner function not using the closure */
+			return create_symconst(dbgi, mode, declaration->v.entity);
+		} else {
+			/* TODO: need trampoline here */
+			panic("Trampoline code not implemented");
+			return create_symconst(dbgi, mode, declaration->v.entity);
+		}
+									}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		ir_node *const addr   = get_global_var_address(dbgi, declaration);
 		return deref_address(dbgi, declaration->type, addr);
@@ -4130,7 +4170,9 @@ static void create_local_declaration(declaration_t *declaration)
 	case STORAGE_CLASS_REGISTER:
 		if (is_type_function(type)) {
 			if (declaration->init.statement != NULL) {
-				panic("nested functions not supported yet");
+				get_function_entity(declaration);
+				declaration->declaration_kind = DECLARATION_KIND_INNER_FUNCTION;
+				enqueue_inner_function(declaration);
 			} else {
 				get_function_entity(declaration);
 			}
@@ -4176,10 +4218,11 @@ static void initialize_local_declaration(declaration_t *declaration)
 	case DECLARATION_KIND_FUNCTION:
 	case DECLARATION_KIND_TYPE:
 	case DECLARATION_KIND_ENUM_ENTRY:
+	case DECLARATION_KIND_INNER_FUNCTION:
 		return;
 
 	case DECLARATION_KIND_UNKNOWN:
-		panic("can't initialize unknwon declaration");
+		panic("can't initialize unknown declaration");
 	}
 	panic("invalid declaration kind");
 }
@@ -4646,9 +4689,14 @@ static void goto_to_firm(const goto_statement_t *statement)
 		set_irn_link(ijmp, ijmp_list);
 		ijmp_list = ijmp;
 	} else {
-		ir_node *block = get_label_block(statement->label);
-		ir_node *jmp   = new_Jmp();
-		add_immBlock_pred(block, jmp);
+		if (statement->outer_fkt_jmp) {
+			/* TODO: this is a outer function jmp */
+			panic("outer function jump not implemented");
+		} else {
+			ir_node *block = get_label_block(statement->label);
+			ir_node *jmp   = new_Jmp();
+			add_immBlock_pred(block, jmp);
+		}
 	}
 	set_cur_block(NULL);
 }
@@ -5504,6 +5552,10 @@ static void scope_to_firm(scope_t *scope)
 		type_t *type = declaration->type;
 		if (type->kind == TYPE_FUNCTION) {
 			create_function(declaration);
+			declaration_t *inner;
+			for (inner = next_inner_function(); inner != NULL;
+			     inner = next_inner_function())
+				 create_function(inner);
 		} else {
 			assert(declaration->declaration_kind
 					== DECLARATION_KIND_GLOBAL_VARIABLE);

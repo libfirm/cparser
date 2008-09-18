@@ -6148,11 +6148,11 @@ static expression_t *parse_reference(void)
 		}
 	}
 
-	type_t *type = declaration->type;
+	type_t *orig_type = declaration->type;
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
-	type = automatic_type_conversion(type);
+	type_t *type = automatic_type_conversion(orig_type);
 
 	ref->declaration = declaration;
 	ref->base.type   = type;
@@ -6161,9 +6161,12 @@ static expression_t *parse_reference(void)
 	declaration->used = true;
 
 	if (declaration->parent_scope != global_scope &&
-		declaration->parent_scope->depth < current_function->scope.depth) {
+	    declaration->parent_scope->depth < current_function->scope.depth &&
+	    is_type_valid(orig_type) && !is_type_function(orig_type)) {
 		/* access of a variable from an outer function */
-		declaration->address_taken = true;
+		declaration->address_taken     = true;
+		ref->is_outer_ref              = true;
+		current_function->need_closure = true;
 	}
 
 	/* check for deprecated functions */
@@ -6747,7 +6750,10 @@ static declaration_t *get_label(symbol_t *symbol)
 	candidate = get_declaration(symbol, NAMESPACE_LOCAL_LABEL);
 	/* if we found a local label, we already created the declaration */
 	if (candidate != NULL) {
-		assert(candidate->parent_scope == scope);
+		if (candidate->parent_scope != scope) {
+			assert(candidate->parent_scope->depth < scope->depth);
+			current_function->goto_to_outer = true;
+		}
 		return candidate;
 	}
 
@@ -9299,6 +9305,10 @@ static statement_t *parse_goto(void)
 		statement                       = allocate_statement_zero(STATEMENT_GOTO);
 		statement->base.source_position = source_position;
 		statement->gotos.label          = get_label(symbol);
+
+		if (statement->gotos.label->parent_scope->depth < current_function->scope.depth) {
+			statement->gotos.outer_fkt_jmp = true;
+		}
 	}
 
 	/* remember the goto's in a list for later checking */
