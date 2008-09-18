@@ -173,7 +173,7 @@ type_t *skip_typeref(type_t *type);
  * Return the type qualifier set of a type. If skip_array_type
  * is true, skip all array types.
  */
-type_qualifiers_t get_type_qualifier(type_t *type, bool skip_array_type);
+type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type);
 
 /**
  * returns size of an atomic type kind in bytes
