@@ -839,30 +839,20 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 		namespace_t    namespc         = (namespace_t)entry->namespc;
 
 		/* replace/remove declaration */
-		declaration_t *declaration = symbol->declaration;
-		assert(declaration != NULL);
-		if (declaration->namespc == namespc) {
-			if (old_declaration == NULL) {
-				symbol->declaration = declaration->symbol_next;
-			} else {
-				symbol->declaration = old_declaration;
-			}
-		} else {
-			declaration_t *iter_last = declaration;
-			declaration_t *iter      = declaration->symbol_next;
-			for( ; iter != NULL; iter_last = iter, iter = iter->symbol_next) {
-				/* replace an entry? */
-				if (iter->namespc == namespc) {
-					assert(iter_last != NULL);
-					iter_last->symbol_next = old_declaration;
-					if (old_declaration != NULL) {
-						old_declaration->symbol_next = iter->symbol_next;
-					}
-					break;
-				}
-			}
+		declaration_t **anchor;
+		declaration_t  *iter;
+		for (anchor = &symbol->declaration;; anchor = &iter->symbol_next) {
+			iter = *anchor;
 			assert(iter != NULL);
+			/* replace an entry? */
+			if (iter->namespc == namespc)
+				break;
 		}
+
+		/* Because of scopes and appending other namespaces to the end of
+		 * the list, this must hold. */
+		assert((old_declaration != NULL ? old_declaration->symbol_next : NULL) == iter->symbol_next);
+		*anchor = old_declaration;
 	}
 
 	ARR_SHRINKLEN(*stack_ptr, (int) new_top);
