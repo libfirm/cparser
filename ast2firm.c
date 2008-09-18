@@ -3862,7 +3862,8 @@ static void create_declaration_initializer(declaration_t *declaration)
 		return;
 	}
 
-	type_t *type = skip_typeref(declaration->type);
+	type_t            *type = declaration->type;
+	type_qualifiers_t  tq   = get_type_qualifier(type, true);
 
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
@@ -3879,7 +3880,7 @@ static void create_declaration_initializer(declaration_t *declaration)
 
 			ir_entity *entity = declaration->v.entity;
 
-			if (type->base.qualifiers & TYPE_QUALIFIER_CONST) {
+			if (tq & TYPE_QUALIFIER_CONST) {
 				set_entity_variability(entity, variability_constant);
 			} else {
 				set_entity_variability(entity, variability_initialized);
@@ -3887,14 +3888,14 @@ static void create_declaration_initializer(declaration_t *declaration)
 			set_atomic_ent_value(entity, value);
 		}
 	} else {
-		assert(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY
-				|| declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
+		assert(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY ||
+		       declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 		ir_entity        *entity        = declaration->v.entity;
 		ir_initializer_t *irinitializer
 			= create_ir_initializer(initializer, type);
 
-		if (type->base.qualifiers & TYPE_QUALIFIER_CONST) {
+		if (tq & TYPE_QUALIFIER_CONST) {
 			set_entity_variability(entity, variability_constant);
 		} else {
 			set_entity_variability(entity, variability_initialized);
