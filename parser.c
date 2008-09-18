@@ -4425,7 +4425,8 @@ static declaration_t *record_declaration(
 
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL &&
-	    previous_declaration->parent_scope->is_parameter) {
+	    previous_declaration->parent_scope->is_parameter &&
+	    scope->depth == previous_declaration->parent_scope->depth + 1) {
 		errorf(&declaration->source_position,
 			"declaration '%#T' redeclares the parameter '%#T' (declared %P)",
 			orig_type, symbol, previous_declaration->type, symbol,
