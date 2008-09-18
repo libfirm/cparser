@@ -115,7 +115,7 @@ static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
 static stack_entry_t      *local_label_stack = NULL;
 /** The global file scope. */
-static scope_t            *global_scope      = NULL;
+static scope_t            *file_scope        = NULL;
 /** The current scope. */
 static scope_t            *scope             = NULL;
 static declaration_t      *last_declaration  = NULL;
@@ -3112,7 +3112,7 @@ static declaration_t *create_error_declaration(symbol_t *symbol, storage_class_t
 	decl->source_position        = *HERE;
 	decl->declared_storage_class = storage_class;
 	decl->storage_class          =
-		storage_class != STORAGE_CLASS_NONE || scope == global_scope ?
+		storage_class != STORAGE_CLASS_NONE || scope == file_scope ?
 			storage_class : STORAGE_CLASS_AUTO;
 	decl->symbol                 = symbol;
 	decl->implicit               = true;
@@ -4259,8 +4259,8 @@ static declaration_t *parse_declarator(
 	declaration->is_inline              = specifiers->is_inline;
 
 	declaration->storage_class          = specifiers->declared_storage_class;
-	if (declaration->storage_class == STORAGE_CLASS_NONE
-			&& scope != global_scope) {
+	if (declaration->storage_class == STORAGE_CLASS_NONE &&
+	    scope != file_scope) {
 		declaration->storage_class = STORAGE_CLASS_AUTO;
 	}
 
@@ -4396,7 +4396,7 @@ static declaration_t *record_declaration(
 
 	if (warning.nested_externs                             &&
 	    declaration->storage_class == STORAGE_CLASS_EXTERN &&
-	    scope                      != global_scope) {
+	    scope                      != file_scope) {
 		warningf(&declaration->source_position,
 		         "nested extern declaration of '%#T'", declaration->type, symbol);
 	}
@@ -4536,7 +4536,7 @@ warn_redundant_declaration:
 		}
 	} else {
 		if (warning.missing_declarations &&
-		    scope == global_scope && (
+		    scope == file_scope && (
 		      declaration->storage_class == STORAGE_CLASS_NONE ||
 		      declaration->storage_class == STORAGE_CLASS_THREAD
 		    )) {
@@ -4592,9 +4592,9 @@ static void parse_init_declarator_rest(declaration_t *declaration)
 	}
 
 	bool must_be_constant = false;
-	if (declaration->storage_class == STORAGE_CLASS_STATIC
-			|| declaration->storage_class == STORAGE_CLASS_THREAD_STATIC
-			|| declaration->parent_scope == global_scope) {
+	if (declaration->storage_class == STORAGE_CLASS_STATIC        ||
+	    declaration->storage_class == STORAGE_CLASS_THREAD_STATIC ||
+	    declaration->parent_scope  == file_scope) {
 		must_be_constant = true;
 	}
 
@@ -6139,7 +6139,7 @@ static expression_t *parse_reference(void)
 	/* this declaration is used */
 	declaration->used = true;
 
-	if (declaration->parent_scope != global_scope &&
+	if (declaration->parent_scope != file_scope                          &&
 	    declaration->parent_scope->depth < current_function->scope.depth &&
 	    is_type_valid(orig_type) && !is_type_function(orig_type)) {
 		/* access of a variable from an outer function */
@@ -9895,7 +9895,7 @@ static void check_unused_globals(void)
 	if (!warning.unused_function && !warning.unused_variable)
 		return;
 
-	for (const declaration_t *decl = global_scope->declarations; decl != NULL; decl = decl->next) {
+	for (const declaration_t *decl = file_scope->declarations; decl != NULL; decl = decl->next) {
 		if (decl->used                  ||
 		    decl->modifiers & DM_UNUSED ||
 		    decl->modifiers & DM_USED   ||
@@ -10019,8 +10019,8 @@ void start_parsing(void)
 	assert(unit == NULL);
 	unit = allocate_ast_zero(sizeof(unit[0]));
 
-	assert(global_scope == NULL);
-	global_scope = &unit->scope;
+	assert(file_scope == NULL);
+	file_scope = &unit->scope;
 
 	assert(scope == NULL);
 	scope_push(&unit->scope);
@@ -10035,9 +10035,9 @@ translation_unit_t *finish_parsing(void)
 	scope            = NULL;
 	last_declaration = NULL;
 
-	assert(global_scope == &unit->scope);
+	assert(file_scope == &unit->scope);
 	check_unused_globals();
-	global_scope = NULL;
+	file_scope = NULL;
 
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
