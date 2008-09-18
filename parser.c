@@ -4794,7 +4794,7 @@ static void parse_kr_declaration_list(declaration_t *declaration)
 	add_anchor_token('{');
 
 	/* push function parameters */
-	int       top        = environment_top();
+	size_t const top = environment_top();
 	scope_push(&declaration->scope);
 
 	declaration_t *parameter = declaration->scope.declarations;
@@ -5509,7 +5509,7 @@ static void parse_external_declaration(void)
 	type = skip_typeref(declaration->type);
 
 	/* push function parameters and switch scope */
-	int top = environment_top();
+	size_t const top = environment_top();
 	scope_push(&declaration->scope);
 
 	declaration_t *parameter = declaration->scope.declarations;
@@ -9194,7 +9194,7 @@ static statement_t *parse_for(void)
 
 	PUSH_PARENT(statement);
 
-	int top = environment_top();
+	size_t const top = environment_top();
 	scope_push(&statement->fors.scope);
 
 	expect('(');
@@ -9807,8 +9807,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	eat('{');
 	add_anchor_token('}');
 
-	int top       = environment_top();
-	int top_local = local_label_top();
+	size_t const top       = environment_top();
+	size_t const top_local = local_label_top();
 	scope_push(&statement->compound.scope);
 
 	statement_t **anchor            = &statement->compound.statements;
