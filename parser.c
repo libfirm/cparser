@@ -8705,10 +8705,10 @@ static asm_clobber_t *parse_asm_clobbers(void)
  */
 static statement_t *parse_asm_statement(void)
 {
-	eat(T_asm);
-
 	statement_t     *statement     = allocate_statement_zero(STATEMENT_ASM);
 	asm_statement_t *asm_statement = &statement->asms;
+
+	eat(T_asm);
 
 	if (token.type == T_volatile) {
 		next_token();
@@ -8764,10 +8764,10 @@ end_error:
  */
 static statement_t *parse_case_statement(void)
 {
-	eat(T_case);
-
 	statement_t       *const statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
 	source_position_t *const pos       = &statement->base.source_position;
+
+	eat(T_case);
 
 	expression_t *const expression   = parse_expression();
 	statement->case_label.expression = expression;
@@ -8859,9 +8859,9 @@ end_error:
  */
 static statement_t *parse_default_statement(void)
 {
-	eat(T_default);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
+
+	eat(T_default);
 
 	PUSH_PARENT(statement);
 
@@ -8906,13 +8906,13 @@ end_error:
 static statement_t *parse_label_statement(void)
 {
 	assert(token.type == T_IDENTIFIER);
-	symbol_t *symbol = token.v.symbol;
-	next_token();
-
-	declaration_t *label = get_label(symbol);
+	symbol_t      *symbol = token.v.symbol;
+	declaration_t *label  = get_label(symbol);
 
 	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
 	statement->label.label       = label;
+
+	next_token();
 
 	PUSH_PARENT(statement);
 
@@ -8968,9 +8968,9 @@ static statement_t *parse_label_statement(void)
  */
 static statement_t *parse_if(void)
 {
-	eat(T_if);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_IF);
+
+	eat(T_if);
 
 	PUSH_PARENT(statement);
 
@@ -9041,9 +9041,9 @@ static void check_enum_cases(const switch_statement_t *statement) {
  */
 static statement_t *parse_switch(void)
 {
-	eat(T_switch);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_SWITCH);
+
+	eat(T_switch);
 
 	PUSH_PARENT(statement);
 
@@ -9104,9 +9104,9 @@ static statement_t *parse_loop_body(statement_t *const loop)
  */
 static statement_t *parse_while(void)
 {
-	eat(T_while);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_WHILE);
+
+	eat(T_while);
 
 	PUSH_PARENT(statement);
 
@@ -9130,9 +9130,9 @@ end_error:
  */
 static statement_t *parse_do(void)
 {
-	eat(T_do);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_DO_WHILE);
+
+	eat(T_do);
 
 	PUSH_PARENT(statement)
 
@@ -9160,9 +9160,9 @@ end_error:
  */
 static statement_t *parse_for(void)
 {
-	eat(T_for);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_FOR);
+
+	eat(T_for);
 
 	PUSH_PARENT(statement);
 
@@ -9405,9 +9405,9 @@ declaration_t *expr_is_variable(const expression_t *expression)
  */
 static statement_t *parse_return(void)
 {
-	statement_t *statement = allocate_statement_zero(STATEMENT_RETURN);
-
 	eat(T_return);
+
+	statement_t *statement = allocate_statement_zero(STATEMENT_RETURN);
 
 	expression_t *return_value = NULL;
 	if (token.type != ';') {
@@ -9896,10 +9896,11 @@ static void check_unused_globals(void)
 
 static void parse_global_asm(void)
 {
+	statement_t *statement = allocate_statement_zero(STATEMENT_ASM);
+
 	eat(T_asm);
 	expect('(');
 
-	statement_t *statement   = allocate_statement_zero(STATEMENT_ASM);
 	statement->asms.asm_text = parse_string_literals();
 	statement->base.next     = unit->global_asm;
 	unit->global_asm         = statement;
