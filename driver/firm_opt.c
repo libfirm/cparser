@@ -309,6 +309,7 @@ static void do_optimize_funccalls(void)
 static void do_gcse(ir_graph *irg)
 {
 	set_opt_global_cse(1);
+	optimize_graph_df(irg);
 	place_code(irg);
 	set_opt_global_cse(0);
 }
