@@ -356,8 +356,9 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 	size_t       size = get_statement_struct_size(kind);
 	statement_t *res  = allocate_ast_zero(size);
 
-	res->base.kind   = kind;
-	res->base.parent = current_parent;
+	res->base.kind            = kind;
+	res->base.parent          = current_parent;
+	res->base.source_position = token.source_position;
 	return res;
 }
 
@@ -390,9 +391,7 @@ static expression_t *create_invalid_expression(void)
  */
 static statement_t *create_invalid_statement(void)
 {
-	statement_t *statement          = allocate_statement_zero(STATEMENT_INVALID);
-	statement->base.source_position = token.source_position;
-	return statement;
+	return allocate_statement_zero(STATEMENT_INVALID);
 }
 
 /**
@@ -400,9 +399,7 @@ static statement_t *create_invalid_statement(void)
  */
 static statement_t *create_empty_statement(void)
 {
-	statement_t *statement          = allocate_statement_zero(STATEMENT_EMPTY);
-	statement->base.source_position = token.source_position;
-	return statement;
+	return allocate_statement_zero(STATEMENT_EMPTY);
 }
 
 /**
@@ -8710,9 +8707,7 @@ static statement_t *parse_asm_statement(void)
 {
 	eat(T_asm);
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_ASM);
-	statement->base.source_position = token.source_position;
-
+	statement_t     *statement     = allocate_statement_zero(STATEMENT_ASM);
 	asm_statement_t *asm_statement = &statement->asms;
 
 	if (token.type == T_volatile) {
@@ -8774,7 +8769,6 @@ static statement_t *parse_case_statement(void)
 	statement_t       *const statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
 	source_position_t *const pos       = &statement->base.source_position;
 
-	*pos                             = token.source_position;
 	expression_t *const expression   = parse_expression();
 	statement->case_label.expression = expression;
 	if (!is_constant_expression(expression)) {
@@ -8868,7 +8862,6 @@ static statement_t *parse_default_statement(void)
 	eat(T_default);
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_CASE_LABEL);
-	statement->base.source_position = token.source_position;
 
 	PUSH_PARENT(statement);
 
@@ -8919,8 +8912,7 @@ static statement_t *parse_label_statement(void)
 	declaration_t *label = get_label(symbol);
 
 	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
-	statement->base.source_position = token.source_position;
-	statement->label.label          = label;
+	statement->label.label       = label;
 
 	PUSH_PARENT(statement);
 
@@ -8978,8 +8970,7 @@ static statement_t *parse_if(void)
 {
 	eat(T_if);
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_IF);
-	statement->base.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_IF);
 
 	PUSH_PARENT(statement);
 
@@ -9052,8 +9043,7 @@ static statement_t *parse_switch(void)
 {
 	eat(T_switch);
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_SWITCH);
-	statement->base.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_SWITCH);
 
 	PUSH_PARENT(statement);
 
@@ -9116,8 +9106,7 @@ static statement_t *parse_while(void)
 {
 	eat(T_while);
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_WHILE);
-	statement->base.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_WHILE);
 
 	PUSH_PARENT(statement);
 
@@ -9144,7 +9133,6 @@ static statement_t *parse_do(void)
 	eat(T_do);
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_DO_WHILE);
-	statement->base.source_position = token.source_position;
 
 	PUSH_PARENT(statement)
 
@@ -9174,8 +9162,7 @@ static statement_t *parse_for(void)
 {
 	eat(T_for);
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_FOR);
-	statement->base.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_FOR);
 
 	PUSH_PARENT(statement);
 
@@ -9243,10 +9230,9 @@ end_error:
  */
 static statement_t *parse_goto(void)
 {
-	source_position_t source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_GOTO);
 	eat(T_goto);
 
-	statement_t *statement;
 	if (GNU_MODE && token.type == '*') {
 		next_token();
 		expression_t *expression = parse_expression();
@@ -9257,17 +9243,16 @@ static statement_t *parse_goto(void)
 
 		if (type != type_error_type) {
 			if (!is_type_pointer(type) && !is_type_integer(type)) {
-				errorf(&source_position, "cannot convert to a pointer type");
+				errorf(&expression->base.source_position,
+					"cannot convert to a pointer type");
 			} else if (type != type_void_ptr) {
-				warningf(&source_position,
+				warningf(&expression->base.source_position,
 					"type of computed goto expression should be 'void*' not '%T'", type);
 			}
 			expression = create_implicit_cast(expression, type_void_ptr);
 		}
 
-		statement                       = allocate_statement_zero(STATEMENT_GOTO);
-		statement->base.source_position = source_position;
-		statement->gotos.expression     = expression;
+		statement->gotos.expression = expression;
 	} else {
 		if (token.type != T_IDENTIFIER) {
 			if (GNU_MODE)
@@ -9280,9 +9265,7 @@ static statement_t *parse_goto(void)
 		symbol_t *symbol = token.v.symbol;
 		next_token();
 
-		statement                       = allocate_statement_zero(STATEMENT_GOTO);
-		statement->base.source_position = source_position;
-		statement->gotos.label          = get_label(symbol);
+		statement->gotos.label = get_label(symbol);
 
 		if (statement->gotos.label->parent_scope->depth < current_function->scope.depth) {
 			statement->gotos.outer_fkt_jmp = true;
@@ -9314,7 +9297,6 @@ static statement_t *parse_continue(void)
 	}
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_CONTINUE);
-	statement->base.source_position = token.source_position;
 
 	eat(T_continue);
 	expect(';');
@@ -9333,7 +9315,6 @@ static statement_t *parse_break(void)
 	}
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_BREAK);
-	statement->base.source_position = token.source_position;
 
 	eat(T_break);
 	expect(';');
@@ -9352,7 +9333,6 @@ static statement_t *parse_leave_statement(void)
 	}
 
 	statement_t *statement = allocate_statement_zero(STATEMENT_LEAVE);
-	statement->base.source_position = token.source_position;
 
 	eat(T___leave);
 	expect(';');
@@ -9425,8 +9405,7 @@ declaration_t *expr_is_variable(const expression_t *expression)
  */
 static statement_t *parse_return(void)
 {
-	statement_t *statement          = allocate_statement_zero(STATEMENT_RETURN);
-	statement->base.source_position = token.source_position;
+	statement_t *statement = allocate_statement_zero(STATEMENT_RETURN);
 
 	eat(T_return);
 
@@ -9483,8 +9462,6 @@ static statement_t *parse_declaration_statement(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
 
-	statement->base.source_position = token.source_position;
-
 	declaration_t *before = last_declaration;
 	if (GNU_MODE)
 		parse_external_declaration();
@@ -9508,7 +9485,6 @@ static statement_t *parse_expression_statement(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_EXPRESSION);
 
-	statement->base.source_position  = token.source_position;
 	expression_t *const expr         = parse_expression();
 	statement->expression.expression = expr;
 
@@ -9525,7 +9501,6 @@ end_error:
 static statement_t *parse_ms_try_statment(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_MS_TRY);
-	statement->base.source_position  = token.source_position;
 	eat(T___try);
 
 	PUSH_PARENT(statement);
@@ -9578,7 +9553,6 @@ static statement_t *parse_empty_statement(void)
 
 static statement_t *parse_local_label_declaration(void) {
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
-	statement->base.source_position = token.source_position;
 
 	eat(T___label__);
 
@@ -9785,7 +9759,6 @@ static statement_t *parse_statement(void)
 static statement_t *parse_compound_statement(bool inside_expression_statement)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_COMPOUND);
-	statement->base.source_position = token.source_position;
 
 	PUSH_PARENT(statement);
 
@@ -9926,11 +9899,10 @@ static void parse_global_asm(void)
 	eat(T_asm);
 	expect('(');
 
-	statement_t *statement          = allocate_statement_zero(STATEMENT_ASM);
-	statement->base.source_position = token.source_position;
-	statement->asms.asm_text        = parse_string_literals();
-	statement->base.next            = unit->global_asm;
-	unit->global_asm                = statement;
+	statement_t *statement   = allocate_statement_zero(STATEMENT_ASM);
+	statement->asms.asm_text = parse_string_literals();
+	statement->base.next     = unit->global_asm;
+	unit->global_asm         = statement;
 
 	expect(')');
 	expect(';');
