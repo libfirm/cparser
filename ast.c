@@ -88,13 +88,13 @@ enum precedence_t {
 
 /**
  * Returns 1 if a given precedence level has right-to-left
- * associativity, else -1.
+ * associativity, else 0.
  *
  * @param precedence   the operator precedence
  */
 static int right_to_left(unsigned precedence) {
 	return (precedence == PREC_ASSIGN || precedence == PREC_COND ||
-		precedence == PREC_UNARY) ? 1 : -1;
+		precedence == PREC_UNARY) ? 1 : 0;
 }
 
 /**
