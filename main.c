@@ -567,11 +567,11 @@ int main(int argc, char **argv)
 	default:
 	case 4:
 		set_option("strict-aliasing");
+		use_builtins = true;
 		/* fallthrough */
 	case 3:
 		set_option("cond-eval");
 		set_option("if-conv");
-		use_builtins = true;
 		/* fallthrough */
 	case 2:
 		set_option("inline");
@@ -677,6 +677,8 @@ int main(int argc, char **argv)
 
 					if (streq(opt, "dollars-in-identifiers")) {
 						allow_dollar_in_symbol = truth_value;
+					} if (streq(opt, "builtins")) {
+						use_builtins = truth_value;
 					} else if (streq(opt, "short-wchar")) {
 						opt_short_wchar_t = truth_value;
 					} else if (streq(opt, "syntax-only")) {
