@@ -567,7 +567,7 @@ int main(int argc, char **argv)
 	default:
 	case 4:
 		set_option("strict-aliasing");
-		use_builtins = true;
+		/* use_builtins = true; */
 		/* fallthrough */
 	case 3:
 		set_option("cond-eval");
