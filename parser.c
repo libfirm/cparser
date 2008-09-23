@@ -2258,7 +2258,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					       "array index [%E] must be positive", array_index);
 					goto failed;
 				}
-				if (type->array.size_constant == true) {
+				if (type->array.size_constant) {
 					long array_size = type->array.size;
 					if (index >= array_size) {
 						errorf(&designator->source_position,

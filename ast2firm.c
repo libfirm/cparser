@@ -3448,7 +3448,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			long index = fold_constant(array_index);
 			assert(index >= 0);
 #ifndef NDEBUG
-			if (type->array.size_constant == 1) {
+			if (type->array.size_constant) {
 				long array_size = type->array.size;
 				assert(index < array_size);
 			}
