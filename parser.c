@@ -2207,34 +2207,37 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					       "'.%Y' designator used for non-compound type '%T'",
 					       symbol, orig_type);
 				}
-				goto failed;
-			}
 
-			declaration_t *declaration = type->compound.declaration;
-			declaration_t *iter        = declaration->scope.declarations;
-			for( ; iter != NULL; iter = iter->next) {
-				if (iter->symbol == symbol) {
-					break;
+				top->type             = type_error_type;
+				top->v.compound_entry = NULL;
+				orig_type             = type_error_type;
+			} else {
+				declaration_t *declaration = type->compound.declaration;
+				declaration_t *iter        = declaration->scope.declarations;
+				for( ; iter != NULL; iter = iter->next) {
+					if (iter->symbol == symbol) {
+						break;
+					}
 				}
-			}
-			if (iter == NULL) {
-				errorf(&designator->source_position,
-				       "'%T' has no member named '%Y'", orig_type, symbol);
-				goto failed;
-			}
-			if (used_in_offsetof) {
-				type_t *real_type = skip_typeref(iter->type);
-				if (real_type->kind == TYPE_BITFIELD) {
+				if (iter == NULL) {
 					errorf(&designator->source_position,
-					       "offsetof designator '%Y' may not specify bitfield",
-					       symbol);
+					       "'%T' has no member named '%Y'", orig_type, symbol);
 					goto failed;
 				}
-			}
+				if (used_in_offsetof) {
+					type_t *real_type = skip_typeref(iter->type);
+					if (real_type->kind == TYPE_BITFIELD) {
+						errorf(&designator->source_position,
+						       "offsetof designator '%Y' may not specify bitfield",
+						       symbol);
+						goto failed;
+					}
+				}
 
-			top->type             = orig_type;
-			top->v.compound_entry = iter;
-			orig_type             = iter->type;
+				top->type             = orig_type;
+				top->v.compound_entry = iter;
+				orig_type             = iter->type;
+			}
 		} else {
 			expression_t *array_index = designator->array_index;
 			assert(designator->array_index != NULL);
@@ -2247,24 +2250,18 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				}
 				goto failed;
 			}
-			if (!is_type_valid(array_index->base.type)) {
-				goto failed;
-			}
 
 			long index = fold_constant(array_index);
 			if (!used_in_offsetof) {
 				if (index < 0) {
 					errorf(&designator->source_position,
 					       "array index [%E] must be positive", array_index);
-					goto failed;
-				}
-				if (type->array.size_constant) {
+				} else if (type->array.size_constant) {
 					long array_size = type->array.size;
 					if (index >= array_size) {
 						errorf(&designator->source_position,
 		 				       "designator [%E] (%d) exceeds array size %d",
 			 			       array_index, index, array_size);
-						goto failed;
 					}
 				}
 			}
@@ -2302,7 +2299,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 			path->top_type = entry->type;
 			return;
 		}
-	} else {
+	} else if (is_type_array(type)) {
 		assert(is_type_array(type));
 
 		top->v.index++;
@@ -2310,6 +2307,9 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 		if (!type->array.size_constant || top->v.index < type->array.size) {
 			return;
 		}
+	} else {
+		assert(!is_type_valid(type));
+		return;
 	}
 
 	/* we're past the last member of the current sub-aggregate, try if we
@@ -2381,13 +2381,6 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		/* We are initializing an empty compound. */
 	} else {
 		type = skip_typeref(orig_type);
-
-		/* we can't do usefull stuff if we didn't even parse the type. Skip the
-		 * initializers in this case. */
-		if (!is_type_valid(type)) {
-			skip_initializers();
-			return create_empty_initializer();
-		}
 	}
 
 	initializer_t **initializers = NEW_ARR_F(initializer_t*, 0);
@@ -2464,8 +2457,9 @@ finish_designator:
 
 			if (type == NULL) {
 				/* we are already outside, ... */
-				if (is_type_compound(outer_type) &&
-				    !outer_type->compound.declaration->init.complete) {
+				type_t *const outer_type_skip = skip_typeref(outer_type);
+				if (is_type_compound(outer_type_skip) &&
+				    !outer_type_skip->compound.declaration->init.complete) {
 					goto error_parse_next;
 				}
 				goto error_excess;
