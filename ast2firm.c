@@ -64,6 +64,8 @@ static int             inner_function_idx;
 static ir_node        *ijmp_list;
 static bool            constant_folding;
 
+extern bool            have_const_functions;
+
 static const declaration_t *current_function_decl;
 static ir_node             *current_function_name;
 static ir_node             *current_funcsig;
@@ -1049,6 +1051,7 @@ static void handle_gnu_attributes_ent(ir_entity *ent, declaration_t *decl)
 	}
 	if (decl->modifiers & DM_CONST) {
 		set_entity_additional_property(ent, mtp_property_const);
+		have_const_functions = true;
 	}
 	if (decl->modifiers & DM_USED) {
 		/* TRUE if the declaration includes the GNU

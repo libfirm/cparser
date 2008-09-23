@@ -303,7 +303,7 @@ static int firm_const_exists;
 
 static void do_optimize_funccalls(void)
 {
-	optimize_funccalls(true, NULL);
+	optimize_funccalls(firm_const_exists, NULL);
 }
 
 static void do_gcse(ir_graph *irg)

@@ -114,6 +114,9 @@ bool strict_mode = false;
 /** use builtins for some libc functions */
 bool use_builtins = false;
 
+/** we have extern function with const attribute. */
+bool have_const_functions = false;
+
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
 
@@ -1131,7 +1134,7 @@ int main(int argc, char **argv)
 			}
 
 			gen_firm_finish(asm_out, filename, /*c_mode=*/1,
-			                /*firm_const_exists=*/0);
+			                have_const_functions);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
