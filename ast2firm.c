@@ -1047,6 +1047,9 @@ static void handle_gnu_attributes_ent(ir_entity *ent, declaration_t *decl)
 		   __attribute__((pure)) specifier. */
 		set_entity_additional_property(ent, mtp_property_pure);
 	}
+	if (decl->modifiers & DM_CONST) {
+		set_entity_additional_property(ent, mtp_property_const);
+	}
 	if (decl->modifiers & DM_USED) {
 		/* TRUE if the declaration includes the GNU
 		   __attribute__((used)) specifier. */

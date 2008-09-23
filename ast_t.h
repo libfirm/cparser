@@ -536,16 +536,17 @@ typedef enum decl_modifier_t {
 	DM_NOALIAS           = 1 << 12,
 	DM_PACKED            = 1 << 13,
 	DM_TRANSPARENT_UNION = 1 << 14,
-	DM_PURE              = 1 << 15,
-	DM_CONSTRUCTOR       = 1 << 16,
-	DM_DESTRUCTOR        = 1 << 17,
-	DM_UNUSED            = 1 << 18,
-	DM_USED              = 1 << 19,
-	DM_CDECL             = 1 << 20,
-	DM_FASTCALL          = 1 << 21,
-	DM_STDCALL           = 1 << 22,
-	DM_THISCALL          = 1 << 23,
-	DM_DEPRECATED        = 1 << 24
+	DM_CONST             = 1 << 15,
+	DM_PURE              = 1 << 16,
+	DM_CONSTRUCTOR       = 1 << 17,
+	DM_DESTRUCTOR        = 1 << 18,
+	DM_UNUSED            = 1 << 19,
+	DM_USED              = 1 << 20,
+	DM_CDECL             = 1 << 21,
+	DM_FASTCALL          = 1 << 22,
+	DM_STDCALL           = 1 << 23,
+	DM_THISCALL          = 1 << 24,
+	DM_DEPRECATED        = 1 << 25
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;

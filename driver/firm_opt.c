@@ -303,7 +303,7 @@ static int firm_const_exists;
 
 static void do_optimize_funccalls(void)
 {
-	optimize_funccalls(firm_const_exists, NULL);
+	optimize_funccalls(true, NULL);
 }
 
 static void do_gcse(ir_graph *irg)
@@ -331,7 +331,7 @@ static void do_stred(ir_graph *irg)
 
 static void do_inline(void)
 {
-	inline_functions(500, 50);
+	inline_functions(500, 0);
 }
 
 static void do_cloning(void)

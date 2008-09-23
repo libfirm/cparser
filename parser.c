@@ -1658,7 +1658,6 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				}
 
 				switch(kind) {
-				case GNU_AK_CONST:
 				case GNU_AK_VOLATILE:
 				case GNU_AK_NAKED:
 				case GNU_AK_MALLOC:
@@ -1698,6 +1697,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_UNUSED:            modifiers |= DM_UNUSED;            goto no_arg;
 				case GNU_AK_USED:              modifiers |= DM_USED;              goto no_arg;
 				case GNU_AK_PURE:              modifiers |= DM_PURE;              goto no_arg;
+				case GNU_AK_CONST:             modifiers |= DM_CONST;             goto no_arg;
 				case GNU_AK_ALWAYS_INLINE:     modifiers |= DM_FORCEINLINE;       goto no_arg;
 				case GNU_AK_DLLIMPORT:         modifiers |= DM_DLLIMPORT;         goto no_arg;
 				case GNU_AK_DLLEXPORT:         modifiers |= DM_DLLEXPORT;         goto no_arg;
