@@ -3263,6 +3263,8 @@ static void create_declaration_entity(declaration_t *declaration,
 	dbg_info  *const dbgi   = get_dbg_info(&declaration->source_position);
 	ir_entity *const entity = new_d_entity(parent_type, id, irtype, dbgi);
 
+	handle_gnu_attributes_ent(entity, declaration);
+
 	declaration->declaration_kind = (unsigned char) declaration_kind;
 	declaration->v.entity         = entity;
 	set_entity_variability(entity, variability_uninitialized);
