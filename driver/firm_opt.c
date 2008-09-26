@@ -331,7 +331,7 @@ static void do_stred(ir_graph *irg)
 
 static void do_inline(void)
 {
-	inline_functions(750, 0);
+	inline_functions(firm_opt.inline_maxsize, firm_opt.inline_threshold);
 }
 
 static void do_cloning(void)

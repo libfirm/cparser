@@ -72,6 +72,8 @@ struct a_firm_opt firm_opt = {
   /* ycomp_host      = */ FIRM_YCOMP_DEFAULT_HOST,
   /* ycomp_port      = */ FIRM_YCOMP_DEFAULT_PORT,
   /* clone_threshold = */ DEFAULT_CLONE_THRESHOLD,
+  /* inline_maxsize  = */ 750,
+  /* inline_threshold= */ 0,
   /* vrfy_edges      = */ FALSE,
   /* grs_simd_opt    = */ 0,
   /* grs_create_pattern = */ 0,
@@ -146,6 +148,8 @@ static const struct params {
   { X("no-reassociation"),       &firm_opt.reassoc,          0, "firm: disable reassociation" },
   { X("inline"),                 &firm_opt.do_inline,        1, "firm: enable FIRM inlining" },
   { X("no-inline"),              &firm_opt.do_inline,        0, "firm: disable FIRM inlining" },
+  { X("inline-max-size=<size>"), NULL,                       0, "firm: set maximum size for function inlining" },
+  { X("inline-threshold=<size>"),NULL,                       0, "firm: set benefice threshold for function inlining" },
   { X("tail-rec"),               &firm_opt.tail_rec,         1, "firm: enable tail-recursion optimization" },
   { X("no-tail-rec"),            &firm_opt.tail_rec,         0, "firm: disable tail-recursion optimization" },
   { X("strength-red"),           &firm_opt.strength_red,     1, "firm: enable strength reduction for loops" },
@@ -339,6 +343,14 @@ int firm_option(const char *opt)
   else if (strncmp("clone-threshold=", opt, 16) == 0) {
     sscanf(&opt[16], "%d", &firm_opt.clone_threshold);
     firm_opt.cloning = TRUE;
+    return 1;
+  }
+  else if (strncmp("inline-max-size=", opt, 16) == 0) {
+    sscanf(&opt[16], "%u", &firm_opt.inline_maxsize);
+    return 1;
+  }
+  else if (strncmp("inline-threshold=", opt, 17) == 0) {
+    sscanf(&opt[17], "%u", &firm_opt.inline_threshold);
     return 1;
   }
   else if (strncmp("ycomp-host=", opt, 11) == 0) {

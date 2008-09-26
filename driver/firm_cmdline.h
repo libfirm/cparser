@@ -77,6 +77,8 @@ struct a_firm_opt {
   char     *ycomp_host;     /**< The host, yComp is running on */
   int      ycomp_port;      /**< The port, yComp is listening on */
   int      clone_threshold; /**< The threshold value for procedure cloning. */
+  unsigned inline_maxsize;  /**< Maximum function size for inlining. */
+  unsigned inline_threshold;/**< Inlining benefice threshold. */
   a_byte   vrfy_edges;      /**< verify edges */
   a_byte   grs_simd_opt;
   a_byte   grs_create_pattern;
