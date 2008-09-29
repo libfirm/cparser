@@ -479,6 +479,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_opt_scalar_replacement(firm_opt.scalar_replace);
   set_opt_auto_create_sync(firm_opt.auto_sync);
   set_opt_alias_analysis(firm_opt.alias_analysis);
+  set_opt_combo(firm_opt.combo);
 
   aa_opt = aa_opt_no_opt;
   if (firm_opt.strict_alias)
