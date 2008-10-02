@@ -842,10 +842,14 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 				break;
 		}
 
-		/* Because of scopes and appending other namespaces to the end of
-		 * the list, this must hold. */
-		assert((old_declaration != NULL ? old_declaration->symbol_next : NULL) == iter->symbol_next);
-		*anchor = old_declaration;
+		/* Not all declarations adhere scopes (e.g. jump labels), so this
+		 * correction is necessary */
+		if (old_declaration != NULL) {
+			old_declaration->symbol_next = iter->symbol_next;
+			*anchor = old_declaration;
+		} else {
+			*anchor = iter->symbol_next;
+		}
 	}
 
 	ARR_SHRINKLEN(*stack_ptr, (int) new_top);
