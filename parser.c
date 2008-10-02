@@ -7476,7 +7476,10 @@ static bool is_lvalue(const expression_t *expression)
 		return true;
 
 	default:
-		return false;
+		/* Claim it is an lvalue, if the type is invalid.  There was a parse
+		 * error before, which maybe prevented properly recognizing it as
+		 * lvalue. */
+		return !is_type_valid(skip_typeref(expression->base.type));
 	}
 }
 
