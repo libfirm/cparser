@@ -8977,11 +8977,16 @@ static statement_t *parse_if(void)
 
 	PUSH_PARENT(statement);
 
+	add_anchor_token('{');
+
 	expect('(');
 	add_anchor_token(')');
 	statement->ifs.condition = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
+
+end_error:
+	rem_anchor_token('{');
 
 	add_anchor_token(T_else);
 	statement->ifs.true_statement = parse_statement();
@@ -8994,9 +8999,6 @@ static statement_t *parse_if(void)
 
 	POP_PARENT;
 	return statement;
-end_error:
-	POP_PARENT;
-	return create_invalid_statement();
 }
 
 /**
