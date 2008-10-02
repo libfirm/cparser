@@ -1672,9 +1672,12 @@ static bool is_builtin_const_call(const expression_t *expression)
 
 	switch (symbol->ID) {
 	case T___builtin_huge_val:
+	case T___builtin_inf:
+	case T___builtin_inff:
+	case T___builtin_infl:
 	case T___builtin_nan:
 	case T___builtin_nanf:
-	case T___builtin_nand:
+	case T___builtin_nanl:
 		return true;
 	}
 

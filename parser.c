@@ -6005,11 +6005,17 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 		return make_function_1_type(type_void_ptr, type_size_t);
 	case T___builtin_huge_val:
 		return make_function_0_type(type_double);
+	case T___builtin_inf:
+		return make_function_0_type(type_double);
+	case T___builtin_inff:
+		return make_function_0_type(type_float);
+	case T___builtin_infl:
+		return make_function_0_type(type_long_double);
 	case T___builtin_nan:
 		return make_function_1_type(type_double, type_char_ptr);
 	case T___builtin_nanf:
 		return make_function_1_type(type_float, type_char_ptr);
-	case T___builtin_nand:
+	case T___builtin_nanl:
 		return make_function_1_type(type_long_double, type_char_ptr);
 	case T___builtin_va_end:
 		return make_function_1_type(type_void, type_valist);
@@ -6837,9 +6843,12 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_va_arg:         return parse_va_arg();
 		case T___builtin_expect:
 		case T___builtin_alloca:
+		case T___builtin_inf:
+		case T___builtin_inff:
+		case T___builtin_infl:
 		case T___builtin_nan:
-		case T___builtin_nand:
 		case T___builtin_nanf:
+		case T___builtin_nanl:
 		case T___builtin_huge_val:
 		case T___builtin_va_end:         return parse_builtin_symbol();
 		case T___builtin_isgreater:
@@ -9697,9 +9706,12 @@ expression_statment:
 	case T___builtin_islessequal:
 	case T___builtin_islessgreater:
 	case T___builtin_isunordered:
+	case T___builtin_inf:
+	case T___builtin_inff:
+	case T___builtin_infl:
 	case T___builtin_nan:
-	case T___builtin_nand:
 	case T___builtin_nanf:
+	case T___builtin_nanl:
 	case T___builtin_offsetof:
 	case T___builtin_prefetch:
 	case T___builtin_va_arg:

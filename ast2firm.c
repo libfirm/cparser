@@ -1578,7 +1578,11 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 		return res;
 	}
-	case T___builtin_huge_val: {
+
+	case T___builtin_huge_val:
+	case T___builtin_inf:
+	case T___builtin_inff:
+	case T___builtin_infl: {
 		ir_mode *mode = get_ir_mode(function_type->function.return_type);
 		tarval  *tv   = get_mode_infinite(mode);
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
@@ -1586,7 +1590,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case T___builtin_nan:
 	case T___builtin_nanf:
-	case T___builtin_nand: {
+	case T___builtin_nanl: {
 		/* Ignore string for now... */
 		assert(is_type_function(function_type));
 		ir_mode *mode = get_ir_mode(function_type->function.return_type);
