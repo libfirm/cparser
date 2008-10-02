@@ -262,6 +262,7 @@ static inline bool is_type_compound(const type_t *type)
 
 static inline bool is_type_valid(const type_t *type)
 {
+	assert(!is_typeref(type));
 	return type->kind != TYPE_ERROR;
 }
 

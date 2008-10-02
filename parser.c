@@ -8781,7 +8781,7 @@ static statement_t *parse_case_statement(void)
 		/* This check does not prevent the error message in all cases of an
 		 * prior error while parsing the expression.  At least it catches the
 		 * common case of a mistyped enum entry. */
-		if (is_type_valid(expression->base.type)) {
+		if (is_type_valid(skip_typeref(expression->base.type))) {
 			errorf(pos, "case label does not reduce to an integer constant");
 		}
 		statement->case_label.is_bad = true;
