@@ -7653,7 +7653,7 @@ static void semantic_take_addr(unary_expression_t *expression)
 	value->base.type    = revert_automatic_type_conversion(value);
 
 	type_t *orig_type = value->base.type;
-	if (!is_type_valid(orig_type))
+	if (!is_type_valid(skip_typeref(orig_type)))
 		return;
 
 	set_address_taken(value, false);
@@ -8804,7 +8804,7 @@ static statement_t *parse_case_statement(void)
 				/* This check does not prevent the error message in all cases of an
 				 * prior error while parsing the expression.  At least it catches the
 				 * common case of a mistyped enum entry. */
-				if (is_type_valid(end_range->base.type)) {
+				if (is_type_valid(skip_typeref(end_range->base.type))) {
 					errorf(pos, "case range does not reduce to an integer constant");
 				}
 				statement->case_label.is_bad = true;

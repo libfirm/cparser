@@ -2540,7 +2540,6 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			expression_t *array_index = designator->array_index;
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
-			assert(is_type_valid(array_index->base.type));
 
 			long index         = fold_constant(array_index);
 			ir_type *arr_type  = get_ir_type(type);
@@ -2644,6 +2643,8 @@ static void init_ir_types(void);
 
 long fold_constant(const expression_t *expression)
 {
+	assert(is_type_valid(skip_typeref(expression->base.type)));
+
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
 
@@ -3455,7 +3456,6 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			expression_t *array_index = designator->array_index;
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
-			assert(is_type_valid(array_index->base.type));
 
 			long index = fold_constant(array_index);
 			assert(index >= 0);
