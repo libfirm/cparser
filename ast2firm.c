@@ -1533,7 +1533,12 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_ENUM_ENTRY:
 		panic("trying to reference enum entry");
 
-	case DECLARATION_KIND_FUNCTION:
+	case DECLARATION_KIND_FUNCTION: {
+		type_t  *const type = skip_typeref(declaration->type);
+		ir_mode *const mode = get_ir_mode(type);
+		return create_symconst(dbgi, mode, declaration->v.entity);
+	}
+
 	case DECLARATION_KIND_INNER_FUNCTION:
 	case DECLARATION_KIND_COMPOUND_TYPE_INCOMPLETE:
 	case DECLARATION_KIND_COMPOUND_TYPE_COMPLETE:
