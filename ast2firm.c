@@ -25,6 +25,7 @@
 
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
+#include <libfirm/adt/bitfiddle.h>
 #include <libfirm/be.h>
 
 #include "ast2firm.h"
@@ -1793,18 +1794,12 @@ static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 	return mask1;
 }
 
-static void bitfield_store_to_firm(const select_expression_t *expression,
-                                   ir_node *addr, ir_node *value)
+static void bitfield_store_to_firm(dbg_info *dbgi,
+		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile)
 {
-	type_t       *type   = expression->base.type;
-	ir_mode      *mode   = get_ir_mode(type);
-
-	assert(get_irn_mode(value) == mode || is_Bad(value));
-
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	ir_mode *mode = get_irn_mode(value);
 
 	/* kill upper bits of value and shift to right position */
-	ir_entity *entity       = expression->compound_entry->v.entity;
 	int        bitoffset    = get_entity_offset_bits_remainder(entity);
 	ir_type   *entity_type  = get_entity_type(entity);
 	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
@@ -1832,7 +1827,7 @@ static void bitfield_store_to_firm(const select_expression_t *expression,
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
 
-	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (set_volatile) {
 		set_Load_volatility(load, volatility_is_volatile);
 		set_Store_volatility(store, volatility_is_volatile);
 	}
@@ -1905,7 +1900,10 @@ static void set_value_for_expression_addr(const expression_t *expression,
 
 		declaration_t *declaration = select->compound_entry;
 		if (declaration->type->kind == TYPE_BITFIELD) {
-			bitfield_store_to_firm(select, addr, value);
+			ir_entity *entity = select->compound_entry->v.entity;
+			bool       set_volatile
+				= select->base.type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+			bitfield_store_to_firm(dbgi, entity, addr, value, set_volatile);
 			return;
 		}
 	}
@@ -3717,8 +3715,22 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 	}
 }
 
+static bool needs_bitfield_store(ir_entity *entity)
+{
+	int bitoffset = get_entity_offset_bits_remainder(entity);
+	if (bitoffset > 0)
+		return true;
+
+	ir_type *entity_type = get_entity_type(entity);
+	int      bitsize     = get_mode_size_bits(get_type_mode(entity_type));
+	if (!is_po2(bitsize) || bitsize < 8)
+		return true;
+
+	return false;
+}
+
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
-		ir_type *type, dbg_info *dbgi, ir_node *base_addr)
+		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {
 	switch(get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL: {
@@ -3728,9 +3740,13 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	case IR_INITIALIZER_CONST: {
 		ir_node *node = get_initializer_const_value(initializer);
 		ir_mode *mode = get_irn_mode(node);
-		assert(get_type_mode(type) == mode);
 
-		/* TODO: bitfields... */
+		if (needs_bitfield_store(entity)) {
+			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+			return;
+		}
+
+		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
 		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
@@ -3741,9 +3757,13 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		tarval  *tv   = get_initializer_tarval_value(initializer);
 		ir_mode *mode = get_tarval_mode(tv);
 		ir_node *cnst = new_d_Const(dbgi, mode, tv);
-		assert(get_type_mode(type) == mode);
 
-		/* TODO: bitfields... */
+		if (needs_bitfield_store(entity)) {
+			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false);
+			return;
+		}
+
+		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
 		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
@@ -3765,26 +3785,29 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			panic("initializer doesn't match compound type");
 
 		for(int i = 0; i < n_members; ++i) {
-			ir_node *addr;
-			ir_type *irtype;
+			ir_node   *addr;
+			ir_type   *irtype;
+			ir_entity *sub_entity;
 			if (is_Array_type(type)) {
-				ir_entity *entity   = get_array_element_entity(type);
 				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
 				ir_node   *in[1]    = { cnst };
-				irtype = get_array_element_type(type);
-				addr   = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in, entity);
+				irtype     = get_array_element_type(type);
+				sub_entity = get_array_element_entity(type);
+				addr       = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in,
+				                       sub_entity);
 			} else {
-				ir_entity *member = get_compound_member(type, i);
-
-				irtype = get_entity_type(member);
-				addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr, member);
+				sub_entity = get_compound_member(type, i);
+				irtype     = get_entity_type(sub_entity);
+				addr       = new_d_simpleSel(dbgi, new_NoMem(), base_addr,
+				                             sub_entity);
 			}
 
 			ir_initializer_t *sub_init
 				= get_initializer_compound_value(initializer, i);
 
-			create_dynamic_initializer_sub(sub_init, irtype, dbgi, addr);
+			create_dynamic_initializer_sub(sub_init, sub_entity, irtype, dbgi,
+			                               addr);
 		}
 		return;
 	}
@@ -3800,7 +3823,7 @@ static void create_dynamic_initializer(ir_initializer_t *initializer,
 	ir_node *base_addr = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 	ir_type *type      = get_entity_type(entity);
 
-	create_dynamic_initializer_sub(initializer, type, dbgi, base_addr);
+	create_dynamic_initializer_sub(initializer, entity, type, dbgi, base_addr);
 }
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,

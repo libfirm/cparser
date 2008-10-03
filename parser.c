@@ -1991,6 +1991,9 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	                    &expression->base.source_position);
 
 	initializer_t *const result = allocate_initializer_zero(INITIALIZER_VALUE);
+	if (type->kind == TYPE_BITFIELD) {
+		type = type->bitfield.base_type;
+	}
 	result->value.value = create_implicit_cast(expression, type);
 
 	return result;
