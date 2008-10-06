@@ -1797,12 +1797,16 @@ static tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 static void bitfield_store_to_firm(dbg_info *dbgi,
 		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile)
 {
-	ir_mode *mode = get_irn_mode(value);
+	ir_type *entity_type = get_entity_type(entity);
+	ir_type *base_type   = get_primitive_base_type(entity_type);
+	assert(base_type != NULL);
+	ir_mode *mode        = get_type_mode(base_type);
+
+	value = create_conv(dbgi, value, mode);
 
 	/* kill upper bits of value and shift to right position */
-	int        bitoffset    = get_entity_offset_bits_remainder(entity);
-	ir_type   *entity_type  = get_entity_type(entity);
-	int        bitsize      = get_mode_size_bits(get_type_mode(entity_type));
+	int      bitoffset    = get_entity_offset_bits_remainder(entity);
+	int      bitsize      = get_mode_size_bits(get_type_mode(entity_type));
 
 	tarval  *mask            = create_bitfield_mask(mode, 0, bitsize);
 	ir_node *mask_node       = new_d_Const(dbgi, mode, mask);
@@ -3715,20 +3719,6 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 	}
 }
 
-static bool needs_bitfield_store(ir_entity *entity)
-{
-	int bitoffset = get_entity_offset_bits_remainder(entity);
-	if (bitoffset > 0)
-		return true;
-
-	ir_type *entity_type = get_entity_type(entity);
-	int      bitsize     = get_mode_size_bits(get_type_mode(entity_type));
-	if (!is_po2(bitsize) || bitsize < 8)
-		return true;
-
-	return false;
-}
-
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {
@@ -3738,10 +3728,12 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		return;
 	}
 	case IR_INITIALIZER_CONST: {
-		ir_node *node = get_initializer_const_value(initializer);
-		ir_mode *mode = get_irn_mode(node);
+		ir_node *node     = get_initializer_const_value(initializer);
+		ir_mode *mode     = get_irn_mode(node);
+		ir_type *ent_type = get_entity_type(entity);
 
-		if (needs_bitfield_store(entity)) {
+		/* is it a bitfield type? */
+		if (get_primitive_base_type(ent_type) != NULL) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
 			return;
 		}
@@ -3754,11 +3746,13 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		return;
 	}
 	case IR_INITIALIZER_TARVAL: {
-		tarval  *tv   = get_initializer_tarval_value(initializer);
-		ir_mode *mode = get_tarval_mode(tv);
-		ir_node *cnst = new_d_Const(dbgi, mode, tv);
+		tarval  *tv       = get_initializer_tarval_value(initializer);
+		ir_mode *mode     = get_tarval_mode(tv);
+		ir_node *cnst     = new_d_Const(dbgi, mode, tv);
+		ir_type *ent_type = get_entity_type(entity);
 
-		if (needs_bitfield_store(entity)) {
+		/* is it a bitfield type? */
+		if (get_primitive_base_type(ent_type) != NULL) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false);
 			return;
 		}
