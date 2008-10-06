@@ -571,7 +571,9 @@ next_arg:
 			++num_args;
 			arg = arg->next;
 		}
-		warningf(pos, "%u arguments but only %u format string(s)", num_args, num_fmt);
+		warningf(pos, "%u argument%s but only %u format string%s",
+			num_args, num_args != 1 ? "s" : "",
+			num_fmt, num_fmt != 1 ? "s" : "");
 	}
 }
 
