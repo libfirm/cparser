@@ -463,7 +463,7 @@ eval_fmt_mod_unsigned:
 				}
 				expected_type = type_wchar_t_ptr;
 				expected_qual = TYPE_QUALIFIER_CONST;
-				allowed_flags = FMT_FLAG_NONE;
+				allowed_flags = FMT_FLAG_MINUS;
 				break;
 
 			case 's':
@@ -477,7 +477,7 @@ eval_fmt_mod_unsigned:
 						goto next_arg;
 				}
 				expected_qual = TYPE_QUALIFIER_CONST;
-				allowed_flags = FMT_FLAG_NONE;
+				allowed_flags = FMT_FLAG_MINUS;
 				break;
 
 			case 'p':
@@ -512,9 +512,19 @@ eval_fmt_mod_unsigned:
 				goto next_arg;
 		}
 
-		if ((fmt_flags & ~allowed_flags) != 0) {
-			/* TODO better warning message text */
-			warningf(pos, "invalid format flags in conversion specification");
+		format_flags_t wrong_flags = fmt_flags & ~allowed_flags;
+		if (wrong_flags != 0) {
+			char wrong[8];
+			int idx = 0;
+			if (wrong_flags & FMT_FLAG_HASH)  wrong[idx++] = '#';
+			if (wrong_flags & FMT_FLAG_ZERO)  wrong[idx++] = '0';
+			if (wrong_flags & FMT_FLAG_MINUS) wrong[idx++] = '-';
+			if (wrong_flags & FMT_FLAG_SPACE) wrong[idx++] = ' ';
+			if (wrong_flags & FMT_FLAG_PLUS)  wrong[idx++] = '+';
+			if (wrong_flags & FMT_FLAG_TICK)  wrong[idx++] = '\'';
+			wrong[idx] = '\0';
+
+			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c", wrong, fmt);
 		}
 
 		if (arg == NULL) {
