@@ -3733,7 +3733,8 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_type *ent_type = get_entity_type(entity);
 
 		/* is it a bitfield type? */
-		if (get_primitive_base_type(ent_type) != NULL) {
+		if (is_Primitive_type(ent_type) &&
+				get_primitive_base_type(ent_type) != NULL) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
 			return;
 		}
@@ -3752,7 +3753,8 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_type *ent_type = get_entity_type(entity);
 
 		/* is it a bitfield type? */
-		if (get_primitive_base_type(ent_type) != NULL) {
+		if (is_Primitive_type(ent_type) &&
+				get_primitive_base_type(ent_type) != NULL) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false);
 			return;
 		}
