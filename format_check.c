@@ -150,9 +150,10 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 {
 	const call_argument_t *fmt_arg;
 	unsigned idx = 0;
+	unsigned num_fmt = 0;
 
 	/* find format arg */
-	for(idx = 0; idx < idx_fmt; ++idx)
+	for (idx = 0; idx < idx_fmt; ++idx)
 		arg = arg->next;
 	fmt_arg = arg;
 
@@ -190,6 +191,8 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 
 		if (fmt == '%')
 			continue;
+
+		++num_fmt;
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
 		if (fmt == '0') {
@@ -563,7 +566,12 @@ next_arg:
 		warningf(pos, "format string contains NUL");
 	}
 	if (arg != NULL) {
-		warningf(pos, "too many arguments for format string");
+		unsigned num_args = num_fmt;
+		while (arg != NULL) {
+			++num_args;
+			arg = arg->next;
+		}
+		warningf(pos, "%u arguments but only %u format string(s)", num_args, num_fmt);
 	}
 }
 
