@@ -524,9 +524,9 @@ eval_fmt_mod_unsigned:
 
 		{	/* create a scope here to prevent warning about the jump to next_arg */
 			type_t *const arg_type           = arg->expression->base.type;
+			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);
 			if (is_type_pointer(expected_type_skip)) {
-				type_t *const arg_skip = skip_typeref(arg_type);
 				if (is_type_pointer(arg_skip)) {
 					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
 					type_t *const arg_to = skip_typeref(arg_skip->pointer.points_to);
@@ -536,11 +536,11 @@ eval_fmt_mod_unsigned:
 					}
 				}
 			} else {
-				if (get_unqualified_type(skip_typeref(arg_type)) == expected_type_skip) {
+				if (get_unqualified_type(arg_skip) == expected_type_skip) {
 					goto next_arg;
 				}
 			}
-			if (is_type_valid(arg_type)) {
+			if (is_type_valid(arg_skip)) {
 				warningf(pos,
 					"argument type '%T' does not match conversion specifier '%%%s%c'",
 					arg_type, get_length_modifier_name(fmt_mod), (char)fmt);
