@@ -148,16 +148,14 @@ static bool atend(vchar_t *self) {
 static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 		unsigned idx_param)
 {
-	const call_argument_t *fmt_arg;
 	unsigned num_fmt = 0;
 
 	/* find format arg */
 	unsigned idx = 0;
 	for (; idx < idx_fmt; ++idx)
 		arg = arg->next;
-	fmt_arg = arg;
 
-	const expression_t *fmt_expr = fmt_arg->expression;
+	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		fmt_expr = fmt_expr->unary.value;
 	}
