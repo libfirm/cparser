@@ -149,11 +149,11 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 		unsigned idx_param)
 {
 	const call_argument_t *fmt_arg;
-	unsigned idx = 0;
 	unsigned num_fmt = 0;
 
 	/* find format arg */
-	for (idx = 0; idx < idx_fmt; ++idx)
+	unsigned idx = 0;
+	for (; idx < idx_fmt; ++idx)
 		arg = arg->next;
 	fmt_arg = arg;
 
