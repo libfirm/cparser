@@ -148,8 +148,6 @@ static bool atend(vchar_t *self) {
 static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 		unsigned idx_param)
 {
-	unsigned num_fmt = 0;
-
 	/* find format arg */
 	unsigned idx = 0;
 	for (; idx < idx_fmt; ++idx)
@@ -181,7 +179,8 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
-	unsigned fmt = vchar.first(&vchar);
+	unsigned fmt     = vchar.first(&vchar);
+	unsigned num_fmt = 0;
 	for (; fmt != '\0'; fmt = vchar.next(&vchar)) {
 		if (fmt != '%')
 			continue;
@@ -224,14 +223,14 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 
 					case ' ':
 						if (fmt_flags & FMT_FLAG_PLUS) {
-							warningf(pos, "' ' is overridden by prior '+' in conversion specification");
+							warningf(pos, "' ' is overridden by prior '+' in conversion specification %u", num_fmt);
 						}
 						flag = FMT_FLAG_SPACE;
 						break;
 
 					case '+':
 						if (fmt_flags & FMT_FLAG_SPACE) {
-							warningf(pos, "'+' overrides prior ' ' in conversion specification");
+							warningf(pos, "'+' overrides prior ' ' in conversion specification %u", num_fmt);
 						}
 						flag = FMT_FLAG_PLUS;
 						break;
@@ -239,7 +238,7 @@ static void check_format_arguments(const call_argument_t *arg, unsigned idx_fmt,
 					default: goto break_fmt_flags;
 				}
 				if (fmt_flags & flag) {
-					warningf(pos, "repeated flag '%c' in conversion specification", (char)fmt);
+					warningf(pos, "repeated flag '%c' in conversion specification %u", (char)fmt, num_fmt);
 				}
 				fmt_flags |= flag;
 				fmt = vchar.next(&vchar);
@@ -250,12 +249,12 @@ break_fmt_flags:
 			if (fmt == '*') {
 				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
-					warningf(pos, "missing argument for '*' field width in conversion specification");
+					warningf(pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
 					return;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
-					warningf(pos, "argument for '*' field width in conversion specification is not an 'int', but an '%T'", arg_type);
+					warningf(pos, "argument for '*' field width in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -271,12 +270,12 @@ break_fmt_flags:
 			if (fmt == '*') {
 				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
-					warningf(pos, "missing argument for '*' precision in conversion specification");
+					warningf(pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
 					return;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
-					warningf(pos, "argument for '*' precision in conversion specification is not an 'int', but an '%T'", arg_type);
+					warningf(pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -509,7 +508,7 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%C'", (wint_t)fmt);
+				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
 				goto next_arg;
 		}
 
@@ -525,7 +524,7 @@ eval_fmt_mod_unsigned:
 			if (wrong_flags & FMT_FLAG_TICK)  wrong[idx++] = '\'';
 			wrong[idx] = '\0';
 
-			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c", wrong, fmt);
+			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c at position", wrong, fmt, num_fmt);
 		}
 
 		if (arg == NULL) {
@@ -553,8 +552,8 @@ eval_fmt_mod_unsigned:
 			}
 			if (is_type_valid(arg_skip)) {
 				warningf(pos,
-					"argument type '%T' does not match conversion specifier '%%%s%c'",
-					arg_type, get_length_modifier_name(fmt_mod), (char)fmt);
+					"argument type '%T' does not match conversion specifier '%%%s%c' at position",
+					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
 			}
 		}
 next_arg:
