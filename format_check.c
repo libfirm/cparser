@@ -389,7 +389,6 @@ break_fmt_flags:
 			case 'x':
 				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_HASH | FMT_FLAG_ZERO;
 				goto eval_fmt_mod_unsigned;
-				break;
 
 			case 'u':
 				allowed_flags = FMT_FLAG_MINUS | FMT_FLAG_ZERO;
