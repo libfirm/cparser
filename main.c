@@ -1068,12 +1068,6 @@ int main(int argc, char **argv)
 		/* preprocess and compile */
 		if (filetype == FILETYPE_PREPROCESSED_C) {
 			translation_unit_t *const unit = do_parsing(in, filename);
-			if (in == preprocessed_in) {
-				int pp_result = pclose(preprocessed_in);
-				if (pp_result != EXIT_SUCCESS) {
-					exit(EXIT_FAILURE);
-				}
-			}
 
 			/* prints the AST even if errors occurred */
 			if (mode == PrintAst) {
@@ -1090,6 +1084,13 @@ int main(int argc, char **argv)
 				continue;
 			} else if(warning_count > 0) {
 				fprintf(stderr, "%u warning(s)\n", warning_count);
+			}
+
+			if (in == preprocessed_in) {
+				int pp_result = pclose(preprocessed_in);
+				if (pp_result != EXIT_SUCCESS) {
+					exit(EXIT_FAILURE);
+				}
 			}
 
 			if(mode == BenchmarkParser) {
