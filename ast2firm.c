@@ -25,7 +25,6 @@
 
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
-#include <libfirm/adt/bitfiddle.h>
 #include <libfirm/be.h>
 
 #include "ast2firm.h"
