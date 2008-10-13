@@ -3230,7 +3230,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 
 	dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
 	ir_node  *cond_expr  = _expression_to_firm(expression);
-	ir_node  *condition  = create_conv(NULL, cond_expr, mode_b);
+	ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
 	ir_node  *cond       = new_d_Cond(dbgi, condition);
 	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
