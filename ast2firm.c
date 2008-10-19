@@ -176,13 +176,13 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 
 		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 			assert(! (flags & ATOMIC_TYPE_FLAG_FLOAT));
-			snprintf(name, sizeof(name), "i%s%d", is_signed?"":"u", bit_size);
+			snprintf(name, sizeof(name), "i%s%u", is_signed ? "" : "u", bit_size);
 			sort         = irms_int_number;
 			arithmetic   = irma_twos_complement;
 			modulo_shift = bit_size < machine_size ? machine_size : bit_size;
 		} else {
 			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
-			snprintf(name, sizeof(name), "f%d", bit_size);
+			snprintf(name, sizeof(name), "f%u", bit_size);
 			sort         = irms_float_number;
 			arithmetic   = irma_ieee754;
 			modulo_shift = 0;
@@ -217,7 +217,7 @@ static void init_atomic_modes(void)
 	unsigned        modulo_shift
 		= bit_size < machine_size ? machine_size : bit_size;
 
-	snprintf(name, sizeof(name), "p%d", machine_size);
+	snprintf(name, sizeof(name), "p%u", machine_size);
 	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
 	                                modulo_shift);
 
@@ -3317,7 +3317,7 @@ static __attribute__((unused)) void debug_print_type_path(const type_path_t *pat
 		if (is_type_compound(type)) {
 			fprintf(stderr, ".%s", entry->compound_entry->symbol->string);
 		} else if (is_type_array(type)) {
-			fprintf(stderr, "[%zd]", entry->index);
+			fprintf(stderr, "[%zu]", entry->index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}
@@ -4822,7 +4822,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 				char     buf[64];
 				ir_node *value = get_value_from_lvalue(expr, addr);
 
-				snprintf(buf, sizeof(buf), "%d", pos);
+				snprintf(buf, sizeof(buf), "%u", pos);
 
 				ir_asm_constraint constraint;
 				constraint.pos              = pos;
