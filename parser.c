@@ -141,7 +141,7 @@ static struct obstack      temp_obst;
 
 #define PUSH_PARENT(stmt)                          \
 	statement_t *const prev_parent = current_parent; \
-	current_parent = (stmt);
+	((void)(current_parent = (stmt)))
 #define POP_PARENT ((void)(current_parent = prev_parent))
 
 static source_position_t null_position = { NULL, 0 };
@@ -9151,7 +9151,7 @@ static statement_t *parse_do(void)
 
 	eat(T_do);
 
-	PUSH_PARENT(statement)
+	PUSH_PARENT(statement);
 
 	add_anchor_token(T_while);
 	statement->do_while.body = parse_loop_body(statement);
