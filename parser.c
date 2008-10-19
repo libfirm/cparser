@@ -7380,7 +7380,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 			warningf(&conditional->base.source_position,
 					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
 			result_type = pointer_type;
-		} else {
+		} else if (is_type_valid(other_type)) {
 			type_error_incompatible("while parsing conditional",
 					&expression->base.source_position, true_type, false_type);
 			result_type = type_error_type;
