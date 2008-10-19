@@ -523,7 +523,7 @@ eval_fmt_mod_unsigned:
 			if (wrong_flags & FMT_FLAG_TICK)  wrong[idx++] = '\'';
 			wrong[idx] = '\0';
 
-			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c at position", wrong, fmt, num_fmt);
+			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, num_fmt);
 		}
 
 		if (arg == NULL) {
@@ -551,7 +551,7 @@ eval_fmt_mod_unsigned:
 			}
 			if (is_type_valid(arg_skip)) {
 				warningf(pos,
-					"argument type '%T' does not match conversion specifier '%%%s%c' at position",
+					"argument type '%T' does not match conversion specifier '%%%s%c' at position %u",
 					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
 			}
 		}
