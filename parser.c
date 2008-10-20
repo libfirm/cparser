@@ -5320,34 +5320,35 @@ static void check_unreachable(statement_t const* const stmt)
 		case STATEMENT_GOTO:
 		case STATEMENT_ASM:
 		case STATEMENT_LEAVE:
-			break;
+			return;
 
 		case STATEMENT_COMPOUND:
-			if (stmt->compound.statements)
-				check_unreachable(stmt->compound.statements);
-			break;
+			for (statement_t const *s = stmt->compound.statements; s != NULL; s = s->base.next) {
+				check_unreachable(s);
+			}
+			return;
 
 		case STATEMENT_IF:
 			check_unreachable(stmt->ifs.true_statement);
 			if (stmt->ifs.false_statement != NULL)
 				check_unreachable(stmt->ifs.false_statement);
-			break;
+			return;
 
 		case STATEMENT_SWITCH:
 			check_unreachable(stmt->switchs.body);
-			break;
+			return;
 
 		case STATEMENT_LABEL:
 			check_unreachable(stmt->label.statement);
-			break;
+			return;
 
 		case STATEMENT_CASE_LABEL:
 			check_unreachable(stmt->case_label.statement);
-			break;
+			return;
 
 		case STATEMENT_WHILE:
 			check_unreachable(stmt->whiles.body);
-			break;
+			return;
 
 		case STATEMENT_DO_WHILE:
 			check_unreachable(stmt->do_while.body);
@@ -5358,7 +5359,7 @@ static void check_unreachable(statement_t const* const stmt)
 					         "condition of do-while-loop is unreachable");
 				}
 			}
-			break;
+			return;
 
 		case STATEMENT_FOR: {
 			for_statement_t const* const fors = &stmt->fors;
@@ -5384,18 +5385,18 @@ static void check_unreachable(statement_t const* const stmt)
 			}
 
 			check_unreachable(fors->body);
-			break;
+			return;
 		}
 
 		case STATEMENT_MS_TRY: {
 			ms_try_statement_t const *const ms_try = &stmt->ms_try;
 			check_unreachable(ms_try->try_statement);
 			check_unreachable(ms_try->final_statement);
+			return;
 		}
 	}
 
-	if (stmt->base.next)
-		check_unreachable(stmt->base.next);
+	panic("unhandled statement");
 }
 
 static void parse_external_declaration(void)
@@ -9684,7 +9685,7 @@ expression_statment:
 	case T_do:       statement = parse_do();                      break;
 	case T_for:      statement = parse_for();                     break;
 	case T_goto:     statement = parse_goto();                    break;
-	case T_if:       statement = parse_if ();                     break;
+	case T_if:       statement = parse_if();                      break;
 	case T_return:   statement = parse_return();                  break;
 	case T_switch:   statement = parse_switch();                  break;
 	case T_while:    statement = parse_while();                   break;
