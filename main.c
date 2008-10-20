@@ -970,9 +970,8 @@ int main(int argc, char **argv)
 		case PrintCaml:
 		case LexTest:
 		case PreprocessOnly:
-			outname = "-";
-			break;
 		case ParseOnly:
+			outname = "-";
 			break;
 		case Compile:
 			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".s");
