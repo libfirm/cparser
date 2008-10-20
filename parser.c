@@ -1872,6 +1872,206 @@ end_error:
 	}
 }
 
+static void mark_decls_read(expression_t *expr, declaration_t *lhs_decl);
+
+static declaration_t *determine_lhs_decl(expression_t *const expr, declaration_t *lhs_decl)
+{
+	switch (expr->kind) {
+		case EXPR_REFERENCE: {
+			declaration_t *const decl = expr->reference.declaration;
+			return decl;
+		}
+
+		case EXPR_ARRAY_ACCESS: {
+			expression_t  *const ref  = expr->array_access.array_ref;
+			declaration_t *      decl = NULL;
+			if (is_type_array(skip_typeref(ref->base.type))) {
+				decl     = determine_lhs_decl(ref, lhs_decl);
+				lhs_decl = decl;
+			}
+			mark_decls_read(expr->array_access.index, lhs_decl);
+			return decl;
+		}
+
+		case EXPR_SELECT: {
+			if (is_type_compound(skip_typeref(expr->base.type))) {
+				return determine_lhs_decl(expr->select.compound, lhs_decl);
+			} else {
+				mark_decls_read(expr->select.compound, lhs_decl);
+				return NULL;
+			}
+		}
+
+		case EXPR_UNARY_DEREFERENCE: {
+			expression_t *const val = expr->unary.value;
+			if (val->kind == EXPR_UNARY_TAKE_ADDRESS) {
+				/* *&x is a NOP */
+				return determine_lhs_decl(val->unary.value, lhs_decl);
+			} else {
+				mark_decls_read(val, NULL);
+				return NULL;
+			}
+		}
+
+		default:
+			mark_decls_read(expr, NULL);
+			return NULL;
+	}
+}
+
+#define DECL_ANY ((declaration_t*)-1)
+
+/**
+ * Mark declarations, which are read.  This is used to deted variables, which
+ * are never read.
+ * Example:
+ * x = x + 1;
+ *   x is not marked as "read", because it is only read to calculate its own new
+ *   value.
+ *
+ * x += y; y += x;
+ *   x and y are not detected as "not read", because multiple variables are
+ *   involved.
+ */
+static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
+{
+	switch (expr->kind) {
+		case EXPR_REFERENCE: {
+			declaration_t *const decl = expr->reference.declaration;
+			if (lhs_decl != decl && lhs_decl != DECL_ANY)
+				decl->read = true;
+			return;
+		}
+
+		case EXPR_CALL:
+			// TODO respect pure/const
+			mark_decls_read(expr->call.function, NULL);
+			for (call_argument_t *arg = expr->call.arguments; arg != NULL; arg = arg->next) {
+				mark_decls_read(arg->expression, NULL);
+			}
+			return;
+
+		case EXPR_CONDITIONAL:
+			// TODO lhs_decl should depend on whether true/false have an effect
+			mark_decls_read(expr->conditional.condition, NULL);
+			if (expr->conditional.true_expression != NULL)
+				mark_decls_read(expr->conditional.true_expression, lhs_decl);
+			mark_decls_read(expr->conditional.false_expression, lhs_decl);
+			return;
+
+		case EXPR_SELECT:
+			mark_decls_read(expr->select.compound, lhs_decl);
+			return;
+
+		case EXPR_ARRAY_ACCESS: {
+			expression_t *const ref = expr->array_access.array_ref;
+			mark_decls_read(ref, lhs_decl);
+			lhs_decl = determine_lhs_decl(ref, lhs_decl);
+			mark_decls_read(expr->array_access.index, lhs_decl);
+			return;
+		}
+
+		case EXPR_VA_ARG:
+			mark_decls_read(expr->va_arge.ap, lhs_decl);
+			return;
+
+		case EXPR_UNARY_CAST:
+			/* Special case: Use void cast to mark a variable as "read" */
+			if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_VOID))
+				lhs_decl = NULL;
+			/* FALLTHROUGH */
+
+		case EXPR_UNARY_NEGATE:
+		case EXPR_UNARY_PLUS:
+		case EXPR_UNARY_BITWISE_NEGATE:
+		case EXPR_UNARY_NOT:
+		case EXPR_UNARY_DEREFERENCE:
+		case EXPR_UNARY_TAKE_ADDRESS:
+		case EXPR_UNARY_POSTFIX_INCREMENT:
+		case EXPR_UNARY_POSTFIX_DECREMENT:
+		case EXPR_UNARY_PREFIX_INCREMENT:
+		case EXPR_UNARY_PREFIX_DECREMENT:
+		case EXPR_UNARY_CAST_IMPLICIT:
+		case EXPR_UNARY_ASSUME:
+			mark_decls_read(expr->unary.value, lhs_decl);
+			return;
+
+		case EXPR_BINARY_ADD:
+		case EXPR_BINARY_SUB:
+		case EXPR_BINARY_MUL:
+		case EXPR_BINARY_DIV:
+		case EXPR_BINARY_MOD:
+		case EXPR_BINARY_EQUAL:
+		case EXPR_BINARY_NOTEQUAL:
+		case EXPR_BINARY_LESS:
+		case EXPR_BINARY_LESSEQUAL:
+		case EXPR_BINARY_GREATER:
+		case EXPR_BINARY_GREATEREQUAL:
+		case EXPR_BINARY_BITWISE_AND:
+		case EXPR_BINARY_BITWISE_OR:
+		case EXPR_BINARY_BITWISE_XOR:
+		case EXPR_BINARY_LOGICAL_AND:
+		case EXPR_BINARY_LOGICAL_OR:
+		case EXPR_BINARY_SHIFTLEFT:
+		case EXPR_BINARY_SHIFTRIGHT:
+		case EXPR_BINARY_COMMA:
+		case EXPR_BINARY_ISGREATER:
+		case EXPR_BINARY_ISGREATEREQUAL:
+		case EXPR_BINARY_ISLESS:
+		case EXPR_BINARY_ISLESSEQUAL:
+		case EXPR_BINARY_ISLESSGREATER:
+		case EXPR_BINARY_ISUNORDERED:
+			mark_decls_read(expr->binary.left,  lhs_decl);
+			mark_decls_read(expr->binary.right, lhs_decl);
+			return;
+
+		case EXPR_BINARY_ASSIGN:
+		case EXPR_BINARY_MUL_ASSIGN:
+		case EXPR_BINARY_DIV_ASSIGN:
+		case EXPR_BINARY_MOD_ASSIGN:
+		case EXPR_BINARY_ADD_ASSIGN:
+		case EXPR_BINARY_SUB_ASSIGN:
+		case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+		case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+		case EXPR_BINARY_BITWISE_AND_ASSIGN:
+		case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+		case EXPR_BINARY_BITWISE_OR_ASSIGN: {
+			if (lhs_decl == DECL_ANY)
+				lhs_decl = NULL;
+			lhs_decl = determine_lhs_decl(expr->binary.left, lhs_decl);
+			mark_decls_read(expr->binary.right, lhs_decl);
+			return;
+		}
+
+		case EXPR_VA_START:
+			determine_lhs_decl(expr->va_starte.ap, lhs_decl);
+			return;
+
+		case EXPR_UNKNOWN:
+		case EXPR_INVALID:
+		case EXPR_CONST:
+		case EXPR_CHARACTER_CONSTANT:
+		case EXPR_WIDE_CHARACTER_CONSTANT:
+		case EXPR_STRING_LITERAL:
+		case EXPR_WIDE_STRING_LITERAL:
+		case EXPR_COMPOUND_LITERAL: // TODO init?
+		case EXPR_SIZEOF:
+		case EXPR_CLASSIFY_TYPE:
+		case EXPR_ALIGNOF:
+		case EXPR_FUNCNAME:
+		case EXPR_BUILTIN_SYMBOL:
+		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_PREFETCH:
+		case EXPR_OFFSETOF:
+		case EXPR_STATEMENT: // TODO
+		case EXPR_LABEL_ADDRESS:
+		case EXPR_BINARY_BUILTIN_EXPECT:
+			return;
+	}
+
+	panic("unhandled expression");
+}
+
 static designator_t *parse_designation(void)
 {
 	designator_t *result = NULL;
@@ -2029,6 +2229,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	}
 
 	expression_t *expression = parse_assignment_expression();
+	mark_decls_read(expression, NULL);
 	if (must_be_constant && !is_initializer_constant(expression)) {
 		errorf(&expression->base.source_position,
 		       "Initialisation expression '%E' is not constant\n",
@@ -4916,6 +5117,98 @@ static void check_labels(void)
 	label_first = label_last = NULL;
 }
 
+static void warn_unused_decl(declaration_t *decl, declaration_t *end, char const *const what)
+{
+	for (; decl != NULL; decl = decl->next) {
+		if (decl->implicit)
+			continue;
+
+		if (!decl->used) {
+			print_in_function();
+			warningf(&decl->source_position, "%s '%Y' is unused", what, decl->symbol);
+		} else if (!decl->read) {
+			print_in_function();
+			warningf(&decl->source_position, "%s '%Y' is never read", what, decl->symbol);
+		}
+
+		if (decl == end)
+			break;
+	}
+}
+
+static void check_unused_variables(statement_t const *const stmt)
+{
+	// TODO statement expressions
+	switch (stmt->kind) {
+		case STATEMENT_COMPOUND:
+			for (statement_t const *s = stmt->compound.statements; s != NULL; s = s->base.next) {
+				check_unused_variables(s);
+			}
+			return;
+
+		case STATEMENT_FOR: {
+			warn_unused_decl(stmt->fors.scope.declarations, NULL, "variable");
+			check_unused_variables(stmt->fors.body);
+			return;
+		}
+
+		case STATEMENT_IF:
+			check_unused_variables(stmt->ifs.true_statement);
+			if (stmt->ifs.false_statement != NULL)
+				check_unused_variables(stmt->ifs.false_statement);
+			return;
+
+		case STATEMENT_SWITCH:
+			check_unused_variables(stmt->switchs.body);
+			return;
+
+		case STATEMENT_LABEL:
+			check_unused_variables(stmt->label.statement);
+			return;
+
+		case STATEMENT_CASE_LABEL:
+			check_unused_variables(stmt->case_label.statement);
+			return;
+
+		case STATEMENT_WHILE:
+			check_unused_variables(stmt->whiles.body);
+			return;
+
+		case STATEMENT_DO_WHILE:
+			check_unused_variables(stmt->do_while.body);
+			return;
+
+		case STATEMENT_DECLARATION: {
+			declaration_statement_t const *const decls = &stmt->declaration;
+			warn_unused_decl(decls->declarations_begin, decls->declarations_end, "variable");
+			return;
+		}
+
+		case STATEMENT_EXPRESSION:
+			// TODO statement expressions
+			return;
+
+		case STATEMENT_INVALID:
+		case STATEMENT_EMPTY:
+		case STATEMENT_RETURN:
+		case STATEMENT_CONTINUE:
+		case STATEMENT_BREAK:
+		case STATEMENT_GOTO:
+		case STATEMENT_ASM:
+		case STATEMENT_LEAVE:
+			return;
+
+		case STATEMENT_MS_TRY: {
+			ms_try_statement_t const *const ms_try = &stmt->ms_try;
+			check_unused_variables(ms_try->try_statement);
+			check_unused_variables(ms_try->final_statement);
+			return;
+		}
+	}
+
+	panic("unhandled statement");
+}
+
 /**
  * Check declarations of current_function for unused entities.
  */
@@ -4924,20 +5217,13 @@ static void check_declarations(void)
 	if (warning.unused_parameter) {
 		const scope_t *scope = &current_function->scope;
 
-		if (is_sym_main(current_function->symbol)) {
-			/* do not issue unused warnings for main */
-			return;
-		}
-		const declaration_t *parameter = scope->declarations;
-		for (; parameter != NULL; parameter = parameter->next) {
-			if (! parameter->used) {
-				print_in_function();
-				warningf(&parameter->source_position,
-				         "unused parameter '%Y'", parameter->symbol);
-			}
+		/* do not issue unused warnings for main */
+		if (!is_sym_main(current_function->symbol)) {
+			warn_unused_decl(scope->declarations, NULL, "parameter");
 		}
 	}
 	if (warning.unused_variable) {
+		check_unused_variables(current_function->init.statement);
 	}
 }
 
@@ -8666,6 +8952,11 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 				errorf(&expression->base.source_position,
 				       "asm output argument is not an lvalue");
 			}
+
+			if (argument->constraints.begin[0] == '+')
+				mark_decls_read(expression, NULL);
+		} else {
+			mark_decls_read(expression, NULL);
 		}
 		argument->expression = expression;
 		expect(')');
@@ -8994,7 +9285,9 @@ static statement_t *parse_if(void)
 
 	expect('(');
 	add_anchor_token(')');
-	statement->ifs.condition = parse_expression();
+	expression_t *const expr = parse_expression();
+	statement->ifs.condition = expr;
+	mark_decls_read(expr, NULL);
 	rem_anchor_token(')');
 	expect(')');
 
@@ -9068,6 +9361,7 @@ static statement_t *parse_switch(void)
 	expect('(');
 	add_anchor_token(')');
 	expression_t *const expr = parse_expression();
+	mark_decls_read(expr, NULL);
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
@@ -9130,7 +9424,9 @@ static statement_t *parse_while(void)
 
 	expect('(');
 	add_anchor_token(')');
-	statement->whiles.condition = parse_expression();
+	expression_t *const cond = parse_expression();
+	statement->whiles.condition = cond;
+	mark_decls_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
 
@@ -9161,7 +9457,9 @@ static statement_t *parse_do(void)
 	expect(T_while);
 	expect('(');
 	add_anchor_token(')');
-	statement->do_while.condition = parse_expression();
+	expression_t *const cond = parse_expression();
+	statement->do_while.condition = cond;
+	mark_decls_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
 	expect(';');
@@ -9197,6 +9495,7 @@ static statement_t *parse_for(void)
 			add_anchor_token(';');
 			expression_t *const init = parse_expression();
 			statement->fors.initialisation = init;
+			mark_decls_read(init, DECL_ANY);
 			if (warning.unused_value && !expression_has_effect(init)) {
 				warningf(&init->base.source_position,
 				         "initialisation of 'for'-statement has no effect");
@@ -9210,13 +9509,16 @@ static statement_t *parse_for(void)
 
 	if (token.type != ';') {
 		add_anchor_token(';');
-		statement->fors.condition = parse_expression();
+		expression_t *const cond = parse_expression();
+		statement->fors.condition = cond;
+		mark_decls_read(cond, NULL);
 		rem_anchor_token(';');
 	}
 	expect(';');
 	if (token.type != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
+		mark_decls_read(step, DECL_ANY);
 		if (warning.unused_value && !expression_has_effect(step)) {
 			warningf(&step->base.source_position,
 			         "step of 'for'-statement has no effect");
@@ -9254,6 +9556,7 @@ static statement_t *parse_goto(void)
 	if (GNU_MODE && token.type == '*') {
 		next_token();
 		expression_t *expression = parse_expression();
+		mark_decls_read(expression, NULL);
 
 		/* Argh: although documentation say the expression must be of type void *,
 		 * gcc excepts anything that can be casted into void * without error */
@@ -9430,6 +9733,7 @@ static statement_t *parse_return(void)
 	expression_t *return_value = NULL;
 	if (token.type != ';') {
 		return_value = parse_expression();
+		mark_decls_read(return_value, NULL);
 	}
 
 	const type_t *const func_type = current_function->type;
@@ -9505,6 +9809,7 @@ static statement_t *parse_expression_statement(void)
 
 	expression_t *const expr         = parse_expression();
 	statement->expression.expression = expr;
+	mark_decls_read(expr, DECL_ANY);
 
 	expect(';');
 
@@ -9535,6 +9840,7 @@ static statement_t *parse_ms_try_statment(void)
 		expect('(');
 		add_anchor_token(')');
 		expression_t *const expr = parse_expression();
+		mark_decls_read(expr, NULL);
 		type_t       *      type = skip_typeref(expr->base.type);
 		if (is_type_integer(type)) {
 			type = promote_integer(type);

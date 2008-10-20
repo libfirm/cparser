@@ -563,6 +563,7 @@ struct declaration_t {
 	unsigned int        address_taken : 1;  /**< Set if the address of this declaration was taken. */
 	unsigned int        is_inline     : 1;
 	unsigned int        used          : 1;  /**< Set if the declaration is used. */
+	unsigned int        read          : 1;
 	unsigned int        implicit      : 1;  /**< Set for implicit (not found in source code) declarations. */
 	unsigned int        need_closure  : 1;  /**< Inner function needs closure. */
 	unsigned int        goto_to_outer : 1;  /**< Inner function has goto to outer function. */
