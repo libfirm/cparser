@@ -1963,6 +1963,8 @@ static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
 			return;
 
 		case EXPR_SELECT:
+			if (lhs_decl == DECL_ANY && !is_type_compound(skip_typeref(expr->base.type)))
+				lhs_decl = NULL;
 			mark_decls_read(expr->select.compound, lhs_decl);
 			return;
 
@@ -1982,13 +1984,17 @@ static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
 			/* Special case: Use void cast to mark a variable as "read" */
 			if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_VOID))
 				lhs_decl = NULL;
-			/* FALLTHROUGH */
+			goto unary;
+
+		case EXPR_UNARY_DEREFERENCE:
+			if (lhs_decl == DECL_ANY)
+				lhs_decl = NULL;
+			goto unary;
 
 		case EXPR_UNARY_NEGATE:
 		case EXPR_UNARY_PLUS:
 		case EXPR_UNARY_BITWISE_NEGATE:
 		case EXPR_UNARY_NOT:
-		case EXPR_UNARY_DEREFERENCE:
 		case EXPR_UNARY_TAKE_ADDRESS:
 		case EXPR_UNARY_POSTFIX_INCREMENT:
 		case EXPR_UNARY_POSTFIX_DECREMENT:
@@ -1996,6 +2002,7 @@ static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
 		case EXPR_UNARY_PREFIX_DECREMENT:
 		case EXPR_UNARY_CAST_IMPLICIT:
 		case EXPR_UNARY_ASSUME:
+unary:
 			mark_decls_read(expr->unary.value, lhs_decl);
 			return;
 
