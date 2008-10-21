@@ -1886,9 +1886,11 @@ static declaration_t *determine_lhs_decl(expression_t *const expr, declaration_t
 		case EXPR_ARRAY_ACCESS: {
 			expression_t  *const ref  = expr->array_access.array_ref;
 			declaration_t *      decl = NULL;
-			if (is_type_array(skip_typeref(ref->base.type))) {
+			if (is_type_array(revert_automatic_type_conversion(ref))) {
 				decl     = determine_lhs_decl(ref, lhs_decl);
 				lhs_decl = decl;
+			} else {
+				mark_decls_read(expr->select.compound, lhs_decl);
 			}
 			mark_decls_read(expr->array_access.index, lhs_decl);
 			return decl;
