@@ -39,6 +39,7 @@
 #include "diagnostic.h"
 #include "lang_features.h"
 #include "types.h"
+#include "walk_statements.h"
 #include "warning.h"
 #include "entitymap_t.h"
 #include "driver/firm_opt.h"
@@ -94,7 +95,6 @@ typedef enum declaration_kind_t {
 
 static ir_type *get_ir_type(type_t *type);
 static ir_type *get_ir_type_incomplete(type_t *type);
-static int count_decls_in_stmts(const statement_t *stmt);
 
 static void enqueue_inner_function(declaration_t *declaration) {
 	if (inner_functions == NULL) {
@@ -5059,8 +5059,6 @@ static void statement_to_firm(statement_t *statement)
 	panic("Statement not implemented\n");
 }
 
-static int count_decls_in_expression(const expression_t *expression);
-
 static int count_local_declarations(const declaration_t *      decl,
                                     const declaration_t *const end)
 {
@@ -5072,218 +5070,29 @@ static int count_local_declarations(const declaration_t *      decl,
 
 		if (!decl->address_taken && is_type_scalar(type))
 			++count;
-		const initializer_t *initializer = decl->init.initializer;
-		/* FIXME: should walk initializer hierarchies... */
-		if (initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
-			count += count_decls_in_expression(initializer->value.value);
-		}
 	}
 	return count;
 }
 
-static int count_decls_in_expression(const expression_t *expression) {
-	int count = 0;
-
-	if (expression == NULL)
-		return 0;
-
-	switch((expression_kind_t) expression->base.kind) {
-	case EXPR_STATEMENT:
-		return count_decls_in_stmts(expression->statement.statement);
-	EXPR_BINARY_CASES {
-		int count_left  = count_decls_in_expression(expression->binary.left);
-		int count_right = count_decls_in_expression(expression->binary.right);
-		return count_left + count_right;
-	}
-	EXPR_UNARY_CASES
-		return count_decls_in_expression(expression->unary.value);
-	case EXPR_CALL:	{
-		call_argument_t *argument = expression->call.arguments;
-		for( ; argument != NULL; argument = argument->next) {
-			count += count_decls_in_expression(argument->expression);
-		}
-		return count;
-	}
-
-	case EXPR_UNKNOWN:
-	case EXPR_INVALID:
-		panic("unexpected expression kind");
-
-	case EXPR_COMPOUND_LITERAL:
-		/* TODO... */
-		break;
-
-	case EXPR_CONDITIONAL:
-		count += count_decls_in_expression(expression->conditional.condition);
-		count += count_decls_in_expression(expression->conditional.true_expression);
-		count += count_decls_in_expression(expression->conditional.false_expression);
-		return count;
-
-	case EXPR_BUILTIN_PREFETCH:
-		count += count_decls_in_expression(expression->builtin_prefetch.adr);
-		count += count_decls_in_expression(expression->builtin_prefetch.rw);
-		count += count_decls_in_expression(expression->builtin_prefetch.locality);
-		return count;
-
-	case EXPR_BUILTIN_CONSTANT_P:
-		count += count_decls_in_expression(expression->builtin_constant.value);
-		return count;
-
-	case EXPR_SELECT:
-		count += count_decls_in_expression(expression->select.compound);
-		return count;
-
-	case EXPR_ARRAY_ACCESS:
-		count += count_decls_in_expression(expression->array_access.array_ref);
-		count += count_decls_in_expression(expression->array_access.index);
-		return count;
-
-	case EXPR_CLASSIFY_TYPE:
-		count += count_decls_in_expression(expression->classify_type.type_expression);
-		return count;
-
-	case EXPR_SIZEOF:
-	case EXPR_ALIGNOF: {
-		expression_t *tp_expression = expression->typeprop.tp_expression;
-		if (tp_expression != NULL) {
-			count += count_decls_in_expression(tp_expression);
-		}
-		return count;
-	}
-
-	case EXPR_OFFSETOF:
-	case EXPR_REFERENCE:
-	case EXPR_CONST:
-	case EXPR_CHARACTER_CONSTANT:
-	case EXPR_WIDE_CHARACTER_CONSTANT:
-	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
-	case EXPR_FUNCNAME:
-	case EXPR_BUILTIN_SYMBOL:
-	case EXPR_VA_START:
-	case EXPR_VA_ARG:
-	case EXPR_LABEL_ADDRESS:
-		break;
-	}
-
-	/* TODO FIXME: finish/fix that firm patch that allows dynamic value numbers
-	 * (or implement all the missing expressions here/implement a walker)
-	 */
-
-	return 0;
-}
-
-static int count_decls_in_stmts(const statement_t *stmt)
+static void count_decls_in_stmt(statement_t *stmt, void *const env)
 {
-	int count = 0;
-	for (; stmt != NULL; stmt = stmt->base.next) {
-		switch (stmt->kind) {
-			case STATEMENT_EMPTY:
-				break;
+	int *const count = env;
 
-			case STATEMENT_DECLARATION: {
-				const declaration_statement_t *const decl_stmt = &stmt->declaration;
-				count += count_local_declarations(decl_stmt->declarations_begin,
-				                                  decl_stmt->declarations_end->next);
-				break;
-			}
-
-			case STATEMENT_COMPOUND: {
-				const compound_statement_t *const comp =
-					&stmt->compound;
-				count += count_decls_in_stmts(comp->statements);
-				break;
-			}
-
-			case STATEMENT_IF: {
-				const if_statement_t *const if_stmt = &stmt->ifs;
-				count += count_decls_in_expression(if_stmt->condition);
-				count += count_decls_in_stmts(if_stmt->true_statement);
-				count += count_decls_in_stmts(if_stmt->false_statement);
-				break;
-			}
-
-			case STATEMENT_SWITCH: {
-				const switch_statement_t *const switch_stmt = &stmt->switchs;
-				count += count_decls_in_expression(switch_stmt->expression);
-				count += count_decls_in_stmts(switch_stmt->body);
-				break;
-			}
-
-			case STATEMENT_LABEL: {
-				const label_statement_t *const label_stmt = &stmt->label;
-				if (label_stmt->statement != NULL) {
-					count += count_decls_in_stmts(label_stmt->statement);
-				}
-				break;
-			}
-
-			case STATEMENT_WHILE: {
-				const while_statement_t *const while_stmt = &stmt->whiles;
-				count += count_decls_in_expression(while_stmt->condition);
-				count += count_decls_in_stmts(while_stmt->body);
-				break;
-			}
-
-			case STATEMENT_DO_WHILE: {
-				const do_while_statement_t *const do_while_stmt = &stmt->do_while;
-				count += count_decls_in_expression(do_while_stmt->condition);
-				count += count_decls_in_stmts(do_while_stmt->body);
-				break;
-			}
-
-			case STATEMENT_FOR: {
-				const for_statement_t *const for_stmt = &stmt->fors;
-				count += count_local_declarations(for_stmt->scope.declarations, NULL);
-				count += count_decls_in_expression(for_stmt->initialisation);
-				count += count_decls_in_expression(for_stmt->condition);
-				count += count_decls_in_expression(for_stmt->step);
-				count += count_decls_in_stmts(for_stmt->body);
-				break;
-			}
-
-			case STATEMENT_CASE_LABEL: {
-				const case_label_statement_t *label = &stmt->case_label;
-				count += count_decls_in_expression(label->expression);
-				if (label->statement != NULL) {
-					count += count_decls_in_stmts(label->statement);
-				}
-				break;
-			}
-
-			case STATEMENT_ASM:
-			case STATEMENT_BREAK:
-			case STATEMENT_CONTINUE:
-				break;
-
-			case STATEMENT_EXPRESSION: {
-				const expression_statement_t *expr_stmt = &stmt->expression;
-				count += count_decls_in_expression(expr_stmt->expression);
-				break;
-			}
-
-			case STATEMENT_GOTO:
-			case STATEMENT_LEAVE:
-			case STATEMENT_INVALID:
-				break;
-
-			case STATEMENT_RETURN: {
-				const return_statement_t *ret_stmt = &stmt->returns;
-				count += count_decls_in_expression(ret_stmt->value);
-				break;
-			}
-
-			case STATEMENT_MS_TRY: {
-				const ms_try_statement_t *const try_stmt = &stmt->ms_try;
-				count += count_decls_in_stmts(try_stmt->try_statement);
-				if (try_stmt->except_expression != NULL)
-					count += count_decls_in_expression(try_stmt->except_expression);
-				count += count_decls_in_stmts(try_stmt->final_statement);
-				break;
-			}
+	switch (stmt->kind) {
+		case STATEMENT_DECLARATION: {
+			const declaration_statement_t *const decl_stmt = &stmt->declaration;
+			*count += count_local_declarations(decl_stmt->declarations_begin,
+																				 decl_stmt->declarations_end->next);
+			break;
 		}
+
+		case STATEMENT_FOR:
+			*count += count_local_declarations(stmt->fors.scope.declarations, NULL);
+			break;
+
+		default:
+			break;
 	}
-	return count;
 }
 
 static int get_function_n_local_vars(declaration_t *declaration)
@@ -5294,8 +5103,7 @@ static int get_function_n_local_vars(declaration_t *declaration)
 	count += count_local_declarations(declaration->scope.declarations, NULL);
 
 	/* count local variables declared in body */
-	count += count_decls_in_stmts(declaration->init.statement);
-
+	walk_statements(declaration->init.statement, count_decls_in_stmt, &count);
 	return count;
 }
 

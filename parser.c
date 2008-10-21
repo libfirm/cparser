@@ -34,6 +34,7 @@
 #include "type_hash.h"
 #include "ast_t.h"
 #include "lang_features.h"
+#include "walk_statements.h"
 #include "warning.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
@@ -5136,77 +5137,24 @@ static void warn_unused_decl(declaration_t *decl, declaration_t *end, char const
 	}
 }
 
-static void check_unused_variables(statement_t const *const stmt)
+static void check_unused_variables(statement_t *const stmt, void *const env)
 {
-	// TODO statement expressions
+	(void)env;
+
 	switch (stmt->kind) {
-		case STATEMENT_COMPOUND:
-			for (statement_t const *s = stmt->compound.statements; s != NULL; s = s->base.next) {
-				check_unused_variables(s);
-			}
-			return;
-
-		case STATEMENT_FOR: {
-			warn_unused_decl(stmt->fors.scope.declarations, NULL, "variable");
-			check_unused_variables(stmt->fors.body);
-			return;
-		}
-
-		case STATEMENT_IF:
-			check_unused_variables(stmt->ifs.true_statement);
-			if (stmt->ifs.false_statement != NULL)
-				check_unused_variables(stmt->ifs.false_statement);
-			return;
-
-		case STATEMENT_SWITCH:
-			check_unused_variables(stmt->switchs.body);
-			return;
-
-		case STATEMENT_LABEL:
-			check_unused_variables(stmt->label.statement);
-			return;
-
-		case STATEMENT_CASE_LABEL:
-			check_unused_variables(stmt->case_label.statement);
-			return;
-
-		case STATEMENT_WHILE:
-			check_unused_variables(stmt->whiles.body);
-			return;
-
-		case STATEMENT_DO_WHILE:
-			check_unused_variables(stmt->do_while.body);
-			return;
-
 		case STATEMENT_DECLARATION: {
 			declaration_statement_t const *const decls = &stmt->declaration;
 			warn_unused_decl(decls->declarations_begin, decls->declarations_end, "variable");
 			return;
 		}
 
-		case STATEMENT_EXPRESSION:
-			// TODO statement expressions
+		case STATEMENT_FOR:
+			warn_unused_decl(stmt->fors.scope.declarations, NULL, "variable");
 			return;
 
-		case STATEMENT_INVALID:
-		case STATEMENT_EMPTY:
-		case STATEMENT_RETURN:
-		case STATEMENT_CONTINUE:
-		case STATEMENT_BREAK:
-		case STATEMENT_GOTO:
-		case STATEMENT_ASM:
-		case STATEMENT_LEAVE:
+		default:
 			return;
-
-		case STATEMENT_MS_TRY: {
-			ms_try_statement_t const *const ms_try = &stmt->ms_try;
-			check_unused_variables(ms_try->try_statement);
-			check_unused_variables(ms_try->final_statement);
-			return;
-		}
 	}
-
-	panic("unhandled statement");
 }
 
 /**
@@ -5223,7 +5171,7 @@ static void check_declarations(void)
 		}
 	}
 	if (warning.unused_variable) {
-		check_unused_variables(current_function->init.statement);
+		walk_statements(current_function->init.statement, check_unused_variables, NULL);
 	}
 }
 
@@ -5586,58 +5534,12 @@ continue_for:;
 	check_reachable(next);
 }
 
-static void check_unreachable(statement_t const* const stmt)
+static void check_unreachable(statement_t* const stmt, void *const env)
 {
-	if (!stmt->base.reachable            &&
-	    stmt->kind != STATEMENT_DO_WHILE &&
-	    stmt->kind != STATEMENT_FOR      &&
-	    (stmt->kind != STATEMENT_COMPOUND || stmt->compound.statements == NULL)) {
-		warningf(&stmt->base.source_position, "statement is unreachable");
-	}
+	(void)env;
 
 	switch (stmt->kind) {
-		case STATEMENT_INVALID:
-		case STATEMENT_EMPTY:
-		case STATEMENT_RETURN:
-		case STATEMENT_DECLARATION:
-		case STATEMENT_EXPRESSION:
-		case STATEMENT_CONTINUE:
-		case STATEMENT_BREAK:
-		case STATEMENT_GOTO:
-		case STATEMENT_ASM:
-		case STATEMENT_LEAVE:
-			return;
-
-		case STATEMENT_COMPOUND:
-			for (statement_t const *s = stmt->compound.statements; s != NULL; s = s->base.next) {
-				check_unreachable(s);
-			}
-			return;
-
-		case STATEMENT_IF:
-			check_unreachable(stmt->ifs.true_statement);
-			if (stmt->ifs.false_statement != NULL)
-				check_unreachable(stmt->ifs.false_statement);
-			return;
-
-		case STATEMENT_SWITCH:
-			check_unreachable(stmt->switchs.body);
-			return;
-
-		case STATEMENT_LABEL:
-			check_unreachable(stmt->label.statement);
-			return;
-
-		case STATEMENT_CASE_LABEL:
-			check_unreachable(stmt->case_label.statement);
-			return;
-
-		case STATEMENT_WHILE:
-			check_unreachable(stmt->whiles.body);
-			return;
-
 		case STATEMENT_DO_WHILE:
-			check_unreachable(stmt->do_while.body);
 			if (!stmt->base.reachable) {
 				expression_t const *const cond = stmt->do_while.condition;
 				if (determine_truth(cond) >= 0) {
@@ -5669,20 +5571,19 @@ static void check_unreachable(statement_t const* const stmt)
 					         "step of for-statement is unreachable");
 				}
 			}
-
-			check_unreachable(fors->body);
 			return;
 		}
 
-		case STATEMENT_MS_TRY: {
-			ms_try_statement_t const *const ms_try = &stmt->ms_try;
-			check_unreachable(ms_try->try_statement);
-			check_unreachable(ms_try->final_statement);
+		case STATEMENT_COMPOUND:
+			if (stmt->compound.statements != NULL)
+				return;
+			/* FALLTHROUGH*/
+
+		default:
+			if (!stmt->base.reachable)
+				warningf(&stmt->base.source_position, "statement is unreachable");
 			return;
-		}
 	}
-
-	panic("unhandled statement");
 }
 
 static void parse_external_declaration(void)
@@ -5821,7 +5722,7 @@ static void parse_external_declaration(void)
 			noreturn_candidate = true;
 			check_reachable(body);
 			if (warning.unreachable_code)
-				check_unreachable(body);
+				walk_statements(body, check_unreachable, NULL);
 			if (warning.missing_noreturn &&
 			    noreturn_candidate       &&
 			    !(declaration->modifiers & DM_NORETURN)) {

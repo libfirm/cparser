@@ -36,6 +36,7 @@ SOURCES := \
 	lexer.c \
 	main.c \
 	parser.c \
+	walk_statements.c \
 	symbol_table.c \
 	token.c \
 	type.c \
