@@ -570,7 +570,6 @@ struct declaration_t {
 	type_t             *type;
 	il_size_t           offset;             /**< The offset of this member inside a compound. */
 	symbol_t           *symbol;
-	string_t           *asm_name;           /**< GCC extension: ASM label. */
 	source_position_t   source_position;
 	union {
 		bool            complete;           /**< used to indicate whether struct/union types are already defined or if just the name is declared */
