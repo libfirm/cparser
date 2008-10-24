@@ -173,7 +173,9 @@ void init_types(void)
 	props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
 	props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
 
-	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UINT];
+	/* TODO: make this configurable for platforms which do not use byte sized
+	 * bools. */
+	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UCHAR];
 }
 
 void exit_types(void)
