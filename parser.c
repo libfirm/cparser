@@ -4397,12 +4397,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_POINTER: {
 			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
-			type_t           *pointer_type   = allocate_type_zero(TYPE_POINTER, &null_position);
-			pointer_type->pointer.points_to  = type;
-			pointer_type->base.qualifiers    = parsed_pointer->type_qualifiers;
-
-			type = pointer_type;
-			break;
+			type = make_pointer_type(type, parsed_pointer->type_qualifiers);
+			continue;
 		}
 
 		case CONSTRUCT_ARRAY: {
