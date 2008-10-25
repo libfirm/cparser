@@ -7145,8 +7145,7 @@ static expression_t *parse_array_expression(unsigned precedence,
 }
 
 static expression_t *parse_typeprop(expression_kind_t const kind,
-                                    source_position_t const pos,
-                                    unsigned const precedence)
+                                    source_position_t const pos)
 {
 	expression_t  *tp_expression = allocate_expression_zero(kind);
 	tp_expression->base.type            = type_size_t;
@@ -7177,7 +7176,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 		rem_anchor_token(')');
 		expect(')');
 	} else {
-		expression_t *expression = parse_sub_expression(precedence);
+		expression_t *expression = parse_sub_expression(25);
 
 		type_t* const orig_type = revert_automatic_type_conversion(expression);
 		expression->base.type = orig_type;
@@ -7203,16 +7202,20 @@ end_error:
 
 static expression_t *parse_sizeof(unsigned precedence)
 {
+	(void)precedence;
+
 	source_position_t pos = *HERE;
 	eat(T_sizeof);
-	return parse_typeprop(EXPR_SIZEOF, pos, precedence);
+	return parse_typeprop(EXPR_SIZEOF, pos);
 }
 
 static expression_t *parse_alignof(unsigned precedence)
 {
+	(void)precedence;
+
 	source_position_t pos = *HERE;
 	eat(T___alignof__);
-	return parse_typeprop(EXPR_ALIGNOF, pos, precedence);
+	return parse_typeprop(EXPR_ALIGNOF, pos);
 }
 
 static expression_t *parse_select_expression(unsigned precedence,
@@ -7476,6 +7479,8 @@ static bool same_compound_type(const type_t *type1, const type_t *type2)
 static expression_t *parse_conditional_expression(unsigned precedence,
                                                   expression_t *expression)
 {
+	(void)precedence;
+
 	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
 
 	conditional_expression_t *conditional = &result->conditional;
@@ -7501,7 +7506,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		true_expression = parse_expression();
 	rem_anchor_token(':');
 	expect(':');
-	expression_t *false_expression = parse_sub_expression(precedence);
+	expression_t *false_expression = parse_sub_expression(7);
 
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
@@ -7618,6 +7623,8 @@ static expression_t *parse_extension(unsigned precedence)
  */
 static expression_t *parse_builtin_classify_type(const unsigned precedence)
 {
+	(void)precedence;
+
 	eat(T___builtin_classify_type);
 
 	expression_t *result = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
@@ -7625,7 +7632,7 @@ static expression_t *parse_builtin_classify_type(const unsigned precedence)
 
 	expect('(');
 	add_anchor_token(')');
-	expression_t *expression = parse_sub_expression(precedence);
+	expression_t *expression = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
 	result->classify_type.type_expression = expression;
