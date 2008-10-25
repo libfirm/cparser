@@ -64,37 +64,23 @@ void print_indent(void)
 		fputc('\t', out);
 }
 
-enum precedence_t {
-	PREC_BOTTOM  =  0,
-	PREC_EXPR    =  2,
-	PREC_COMMA   =  4, /* ,                                    left to right */
-	PREC_ASSIGN  =  6, /* = += -= *= /= %= <<= >>= &= ^= |=    right to left */
-	PREC_COND    =  8, /* ?:                                   right to left */
-	PREC_LOG_OR  = 10, /* ||                                   left to right */
-	PREC_LOG_AND = 12, /* &&                                   left to right */
-	PREC_BIT_OR  = 14, /* |                                    left to right */
-	PREC_BIT_XOR = 16, /* ^                                    left to right */
-	PREC_BIT_AND = 18, /* &                                    left to right */
-	PREC_EQ      = 20, /* == !=                                left to right */
-	PREC_CMP     = 22, /* < <= > >=                            left to right */
-	PREC_SHF     = 24, /* << >>                                left to right */
-	PREC_PLUS    = 26, /* + -                                  left to right */
-	PREC_MUL     = 28, /* * / %                                left to right */
-	PREC_UNARY   = 30, /* ! ~ ++ -- + - (type) * & sizeof      right to left */
-	PREC_ACCESS  = 32, /* () [] -> .                           left to right */
-	PREC_PRIM    = 34, /* primary */
-	PREC_TOP     = 36
-};
-
 /**
  * Returns 1 if a given precedence level has right-to-left
  * associativity, else 0.
  *
  * @param precedence   the operator precedence
  */
-static int right_to_left(unsigned precedence) {
-	return (precedence == PREC_ASSIGN || precedence == PREC_COND ||
-		precedence == PREC_UNARY) ? 1 : 0;
+static int right_to_left(unsigned precedence)
+{
+	switch (precedence) {
+		case PREC_ASSIGNMENT:
+		case PREC_CONDITIONAL:
+		case PREC_UNARY:
+			return 1;
+
+		default:
+			return 0;
+	}
 }
 
 /**
@@ -105,32 +91,32 @@ static int right_to_left(unsigned precedence) {
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
 	static const unsigned prec[] = {
-		[EXPR_UNKNOWN]                   = PREC_PRIM,
-		[EXPR_INVALID]                   = PREC_PRIM,
-		[EXPR_REFERENCE]                 = PREC_PRIM,
-		[EXPR_CHARACTER_CONSTANT]        = PREC_PRIM,
-		[EXPR_WIDE_CHARACTER_CONSTANT]   = PREC_PRIM,
-		[EXPR_CONST]                     = PREC_PRIM,
-		[EXPR_STRING_LITERAL]            = PREC_PRIM,
-		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIM,
+		[EXPR_UNKNOWN]                   = PREC_PRIMARY,
+		[EXPR_INVALID]                   = PREC_PRIMARY,
+		[EXPR_REFERENCE]                 = PREC_PRIMARY,
+		[EXPR_CHARACTER_CONSTANT]        = PREC_PRIMARY,
+		[EXPR_WIDE_CHARACTER_CONSTANT]   = PREC_PRIMARY,
+		[EXPR_CONST]                     = PREC_PRIMARY,
+		[EXPR_STRING_LITERAL]            = PREC_PRIMARY,
+		[EXPR_WIDE_STRING_LITERAL]       = PREC_PRIMARY,
 		[EXPR_COMPOUND_LITERAL]          = PREC_UNARY,
-		[EXPR_CALL]                      = PREC_ACCESS,
-		[EXPR_CONDITIONAL]               = PREC_COND,
-		[EXPR_SELECT]                    = PREC_ACCESS,
-		[EXPR_ARRAY_ACCESS]              = PREC_ACCESS,
+		[EXPR_CALL]                      = PREC_POSTFIX,
+		[EXPR_CONDITIONAL]               = PREC_CONDITIONAL,
+		[EXPR_SELECT]                    = PREC_POSTFIX,
+		[EXPR_ARRAY_ACCESS]              = PREC_POSTFIX,
 		[EXPR_SIZEOF]                    = PREC_UNARY,
 		[EXPR_CLASSIFY_TYPE]             = PREC_UNARY,
 		[EXPR_ALIGNOF]                   = PREC_UNARY,
 
-		[EXPR_FUNCNAME]                  = PREC_PRIM,
-		[EXPR_BUILTIN_SYMBOL]            = PREC_PRIM,
-		[EXPR_BUILTIN_CONSTANT_P]        = PREC_PRIM,
-		[EXPR_BUILTIN_PREFETCH]          = PREC_PRIM,
-		[EXPR_OFFSETOF]                  = PREC_PRIM,
-		[EXPR_VA_START]                  = PREC_PRIM,
-		[EXPR_VA_ARG]                    = PREC_PRIM,
-		[EXPR_STATEMENT]                 = PREC_ACCESS,
-		[EXPR_LABEL_ADDRESS]             = PREC_PRIM,
+		[EXPR_FUNCNAME]                  = PREC_PRIMARY,
+		[EXPR_BUILTIN_SYMBOL]            = PREC_PRIMARY,
+		[EXPR_BUILTIN_CONSTANT_P]        = PREC_PRIMARY,
+		[EXPR_BUILTIN_PREFETCH]          = PREC_PRIMARY,
+		[EXPR_OFFSETOF]                  = PREC_PRIMARY,
+		[EXPR_VA_START]                  = PREC_PRIMARY,
+		[EXPR_VA_ARG]                    = PREC_PRIMARY,
+		[EXPR_STATEMENT]                 = PREC_PRIMARY,
+		[EXPR_LABEL_ADDRESS]             = PREC_PRIMARY,
 
 		[EXPR_UNARY_NEGATE]              = PREC_UNARY,
 		[EXPR_UNARY_PLUS]                = PREC_UNARY,
@@ -144,46 +130,46 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_PREFIX_DECREMENT]    = PREC_UNARY,
 		[EXPR_UNARY_CAST]                = PREC_UNARY,
 		[EXPR_UNARY_CAST_IMPLICIT]       = PREC_UNARY,
-		[EXPR_UNARY_ASSUME]              = PREC_PRIM,
+		[EXPR_UNARY_ASSUME]              = PREC_PRIMARY,
 
-		[EXPR_BINARY_ADD]                = PREC_PLUS,
-		[EXPR_BINARY_SUB]                = PREC_PLUS,
-		[EXPR_BINARY_MUL]                = PREC_MUL,
-		[EXPR_BINARY_DIV]                = PREC_MUL,
-		[EXPR_BINARY_MOD]                = PREC_MUL,
-		[EXPR_BINARY_EQUAL]              = PREC_EQ,
-		[EXPR_BINARY_NOTEQUAL]           = PREC_EQ,
-		[EXPR_BINARY_LESS]               = PREC_CMP,
-		[EXPR_BINARY_LESSEQUAL]          = PREC_CMP,
-		[EXPR_BINARY_GREATER]            = PREC_CMP,
-		[EXPR_BINARY_GREATEREQUAL]       = PREC_CMP,
-		[EXPR_BINARY_BITWISE_AND]        = PREC_BIT_AND,
-		[EXPR_BINARY_BITWISE_OR]         = PREC_BIT_OR,
-		[EXPR_BINARY_BITWISE_XOR]        = PREC_BIT_XOR,
-		[EXPR_BINARY_LOGICAL_AND]        = PREC_LOG_AND,
-		[EXPR_BINARY_LOGICAL_OR]         = PREC_LOG_OR,
-		[EXPR_BINARY_SHIFTLEFT]          = PREC_SHF,
-		[EXPR_BINARY_SHIFTRIGHT]         = PREC_SHF,
-		[EXPR_BINARY_ASSIGN]             = PREC_ASSIGN,
-		[EXPR_BINARY_MUL_ASSIGN]         = PREC_ASSIGN,
-		[EXPR_BINARY_DIV_ASSIGN]         = PREC_ASSIGN,
-		[EXPR_BINARY_MOD_ASSIGN]         = PREC_ASSIGN,
-		[EXPR_BINARY_ADD_ASSIGN]         = PREC_ASSIGN,
-		[EXPR_BINARY_SUB_ASSIGN]         = PREC_ASSIGN,
-		[EXPR_BINARY_SHIFTLEFT_ASSIGN]   = PREC_ASSIGN,
-		[EXPR_BINARY_SHIFTRIGHT_ASSIGN]  = PREC_ASSIGN,
-		[EXPR_BINARY_BITWISE_AND_ASSIGN] = PREC_ASSIGN,
-		[EXPR_BINARY_BITWISE_XOR_ASSIGN] = PREC_ASSIGN,
-		[EXPR_BINARY_BITWISE_OR_ASSIGN]  = PREC_ASSIGN,
-		[EXPR_BINARY_COMMA]              = PREC_COMMA,
+		[EXPR_BINARY_ADD]                = PREC_ADDITIVE,
+		[EXPR_BINARY_SUB]                = PREC_ADDITIVE,
+		[EXPR_BINARY_MUL]                = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_DIV]                = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_MOD]                = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_EQUAL]              = PREC_EQUALITY,
+		[EXPR_BINARY_NOTEQUAL]           = PREC_EQUALITY,
+		[EXPR_BINARY_LESS]               = PREC_RELATIONAL,
+		[EXPR_BINARY_LESSEQUAL]          = PREC_RELATIONAL,
+		[EXPR_BINARY_GREATER]            = PREC_RELATIONAL,
+		[EXPR_BINARY_GREATEREQUAL]       = PREC_RELATIONAL,
+		[EXPR_BINARY_BITWISE_AND]        = PREC_AND,
+		[EXPR_BINARY_BITWISE_OR]         = PREC_OR,
+		[EXPR_BINARY_BITWISE_XOR]        = PREC_XOR,
+		[EXPR_BINARY_LOGICAL_AND]        = PREC_LOGICAL_AND,
+		[EXPR_BINARY_LOGICAL_OR]         = PREC_LOGICAL_OR,
+		[EXPR_BINARY_SHIFTLEFT]          = PREC_SHIFT,
+		[EXPR_BINARY_SHIFTRIGHT]         = PREC_SHIFT,
+		[EXPR_BINARY_ASSIGN]             = PREC_ASSIGNMENT,
+		[EXPR_BINARY_MUL_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_DIV_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_MOD_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_ADD_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SUB_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SHIFTLEFT_ASSIGN]   = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SHIFTRIGHT_ASSIGN]  = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_AND_ASSIGN] = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_XOR_ASSIGN] = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_OR_ASSIGN]  = PREC_ASSIGNMENT,
+		[EXPR_BINARY_COMMA]              = PREC_EXPRESSION,
 
-		[EXPR_BINARY_BUILTIN_EXPECT]     = PREC_PRIM,
-		[EXPR_BINARY_ISGREATER]          = PREC_PRIM,
-		[EXPR_BINARY_ISGREATEREQUAL]     = PREC_PRIM,
-		[EXPR_BINARY_ISLESS]             = PREC_PRIM,
-		[EXPR_BINARY_ISLESSEQUAL]        = PREC_PRIM,
-		[EXPR_BINARY_ISLESSGREATER]      = PREC_PRIM,
-		[EXPR_BINARY_ISUNORDERED]        = PREC_PRIM
+		[EXPR_BINARY_BUILTIN_EXPECT]     = PREC_PRIMARY,
+		[EXPR_BINARY_ISGREATER]          = PREC_PRIMARY,
+		[EXPR_BINARY_ISGREATEREQUAL]     = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESS]             = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESSEQUAL]        = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESSGREATER]      = PREC_PRIMARY,
+		[EXPR_BINARY_ISUNORDERED]        = PREC_PRIMARY
 	};
 	assert((unsigned)kind < (sizeof(prec)/sizeof(prec[0])));
 	unsigned res = prec[kind];
@@ -412,7 +398,7 @@ static void print_call_expression(const call_expression_t *call)
 		} else {
 			first = 0;
 		}
-		print_expression_prec(argument->expression, PREC_COMMA + 1);
+		print_expression_prec(argument->expression, PREC_ASSIGNMENT);
 
 		argument = argument->next;
 	}
@@ -512,7 +498,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		break;
 	case EXPR_UNARY_ASSUME:
 		fputs("__assume(", out);
-		print_expression_prec(unexpr->value, PREC_COMMA + 1);
+		print_expression_prec(unexpr->value, PREC_ASSIGNMENT);
 		fputc(')', out);
 		return;
 	default:
@@ -552,12 +538,12 @@ static void print_array_expression(const array_access_expression_t *expression)
 	if(!expression->flipped) {
 		print_expression_prec(expression->array_ref, prec);
 		fputc('[', out);
-		print_expression_prec(expression->index, PREC_BOTTOM);
+		print_expression(expression->index);
 		fputc(']', out);
 	} else {
 		print_expression_prec(expression->index, prec);
 		fputc('[', out);
-		print_expression_prec(expression->array_ref, PREC_BOTTOM);
+		print_expression(expression->array_ref);
 		fputc(']', out);
 	}
 }
@@ -578,7 +564,7 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 	if(expression->tp_expression != NULL) {
 		/* always print the '()' here, sizeof x is right but unusual */
 		fputc('(', out);
-		print_expression_prec(expression->tp_expression, PREC_ACCESS);
+		print_expression(expression->tp_expression);
 		fputc(')', out);
 	} else {
 		fputc('(', out);
@@ -605,7 +591,7 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
 	fputs("__builtin_constant_p(", out);
-	print_expression_prec(expression->value, PREC_COMMA + 1);
+	print_expression_prec(expression->value, PREC_ASSIGNMENT);
 	fputc(')', out);
 }
 
@@ -617,14 +603,14 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
 {
 	fputs("__builtin_prefetch(", out);
-	print_expression_prec(expression->adr, PREC_COMMA + 1);
+	print_expression_prec(expression->adr, PREC_ASSIGNMENT);
 	if (expression->rw) {
 		fputc(',', out);
-		print_expression_prec(expression->rw, PREC_COMMA + 1);
+		print_expression_prec(expression->rw, PREC_ASSIGNMENT);
 	}
 	if (expression->locality) {
 		fputc(',', out);
-		print_expression_prec(expression->locality, PREC_COMMA + 1);
+		print_expression_prec(expression->locality, PREC_ASSIGNMENT);
 	}
 	fputc(')', out);
 }
@@ -636,15 +622,15 @@ static void print_builtin_prefetch(const builtin_prefetch_expression_t *expressi
  */
 static void print_conditional(const conditional_expression_t *expression)
 {
-	print_expression_prec(expression->condition, PREC_LOG_OR);
+	print_expression_prec(expression->condition, PREC_LOGICAL_OR);
 	fputs(" ? ", out);
 	if (expression->true_expression != NULL) {
-		print_expression_prec(expression->true_expression, PREC_EXPR);
+		print_expression_prec(expression->true_expression, PREC_EXPRESSION);
 		fputs(" : ", out);
 	} else {
 		fputs(": ", out);
 	}
-	print_expression_prec(expression->false_expression, PREC_COND);
+	print_expression_prec(expression->false_expression, PREC_CONDITIONAL);
 }
 
 /**
@@ -655,7 +641,7 @@ static void print_conditional(const conditional_expression_t *expression)
 static void print_va_start(const va_start_expression_t *const expression)
 {
 	fputs("__builtin_va_start(", out);
-	print_expression_prec(expression->ap, PREC_COMMA + 1);
+	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
 	fputs(", ", out);
 	fputs(expression->parameter->symbol->string, out);
 	fputc(')', out);
@@ -669,7 +655,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 static void print_va_arg(const va_arg_expression_t *expression)
 {
 	fputs("__builtin_va_arg(", out);
-	print_expression_prec(expression->ap, PREC_COMMA + 1);
+	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
 	fputs(", ", out);
 	print_type(expression->base.type);
 	fputc(')', out);
@@ -701,7 +687,7 @@ static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
 {
 	fputs("__builtin_classify_type(", out);
-	print_expression_prec(expr->type_expression, PREC_COMMA + 1);
+	print_expression_prec(expr->type_expression, PREC_ASSIGNMENT);
 	fputc(')', out);
 }
 
@@ -715,7 +701,7 @@ static void print_designator(const designator_t *designator)
 	for ( ; designator != NULL; designator = designator->next) {
 		if (designator->symbol == NULL) {
 			fputc('[', out);
-			print_expression_prec(designator->array_index, PREC_BOTTOM);
+			print_expression(designator->array_index);
 			fputc(']', out);
 		} else {
 			fputc('.', out);
@@ -1456,7 +1442,8 @@ static void print_normal_declaration(const declaration_t *declaration)
  *
  * @param expression  the expression
  */
-void print_expression(const expression_t *expression) {
+void print_expression(const expression_t *expression)
+{
 	print_expression_prec(expression, PREC_BOTTOM);
 }
 

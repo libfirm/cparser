@@ -33,6 +33,31 @@
 extern struct obstack ast_obstack;
 
 /**
+ * Operator precedence classes
+ */
+typedef enum precedence_t {
+	PREC_BOTTOM,
+	PREC_EXPRESSION,     /* ,                                  left to right */
+	PREC_ASSIGNMENT,     /* = += -= *= /= %= <<= >>= &= ^= |=  right to left */
+	PREC_CONDITIONAL,    /* ?:                                 right to left */
+	PREC_LOGICAL_OR,     /* ||                                 left to right */
+	PREC_LOGICAL_AND,    /* &&                                 left to right */
+	PREC_OR,             /* |                                  left to right */
+	PREC_XOR,            /* ^                                  left to right */
+	PREC_AND,            /* &                                  left to right */
+	PREC_EQUALITY,       /* == !=                              left to right */
+	PREC_RELATIONAL,     /* < <= > >=                          left to right */
+	PREC_SHIFT,          /* << >>                              left to right */
+	PREC_ADDITIVE,       /* + -                                left to right */
+	PREC_MULTIPLICATIVE, /* * / %                              left to right */
+	PREC_CAST,           /* (type)                             right to left */
+	PREC_UNARY,          /* ! ~ ++ -- + - * & sizeof           right to left */
+	PREC_POSTFIX,        /* () [] -> .                         left to right */
+	PREC_PRIMARY,
+	PREC_TOP
+} precedence_t;
+
+/**
  * Expression kinds.
  */
 typedef enum expression_kind_t {

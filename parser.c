@@ -184,26 +184,6 @@ static type_t *type_valist;
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
-typedef enum precedence_t {
-	PREC_EXPRESSION,
-	PREC_ASSIGNMENT,
-	PREC_CONDITIONAL,
-	PREC_LOGICAL_OR,
-	PREC_LOGICAL_AND,
-	PREC_OR,
-	PREC_XOR,
-	PREC_AND,
-	PREC_EQUALITY,
-	PREC_RELATIONAL,
-	PREC_SHIFT,
-	PREC_ADDITIVE,
-	PREC_MULTIPLICATIVE,
-	PREC_CAST,
-	PREC_UNARY,
-	PREC_POSTFIX,
-	PREC_PRIMARY
-} precedence_t;
-
 static expression_t *parse_sub_expression(precedence_t);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
