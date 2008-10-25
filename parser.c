@@ -184,7 +184,27 @@ static type_t *type_valist;
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
-static expression_t *parse_sub_expression(unsigned precedence);
+typedef enum precedence_t {
+	PREC_EXPRESSION,
+	PREC_ASSIGNMENT,
+	PREC_CONDITIONAL,
+	PREC_LOGICAL_OR,
+	PREC_LOGICAL_AND,
+	PREC_OR,
+	PREC_XOR,
+	PREC_AND,
+	PREC_EQUALITY,
+	PREC_RELATIONAL,
+	PREC_SHIFT,
+	PREC_ADDITIVE,
+	PREC_MULTIPLICATIVE,
+	PREC_CAST,
+	PREC_UNARY,
+	PREC_POSTFIX,
+	PREC_PRIMARY
+} precedence_t;
+
+static expression_t *parse_sub_expression(precedence_t);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
 
@@ -1107,8 +1127,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 
 static expression_t *parse_constant_expression(void)
 {
-	/* start parsing at precedence 7 (conditional expression) */
-	expression_t *result = parse_sub_expression(7);
+	expression_t *result = parse_sub_expression(PREC_CONDITIONAL);
 
 	if (!is_constant_expression(result)) {
 		errorf(&result->base.source_position,
@@ -1120,8 +1139,7 @@ static expression_t *parse_constant_expression(void)
 
 static expression_t *parse_assignment_expression(void)
 {
-	/* start parsing at precedence 2 (assignment expression) */
-	return parse_sub_expression(2);
+	return parse_sub_expression(PREC_ASSIGNMENT);
 }
 
 static type_t *make_global_typedef(const char *name, type_t *type)
@@ -5943,9 +5961,8 @@ static type_t *parse_typename(void)
 
 
 
-typedef expression_t* (*parse_expression_function) (unsigned precedence);
-typedef expression_t* (*parse_expression_infix_function) (unsigned precedence,
-                                                          expression_t *left);
+typedef expression_t* (*parse_expression_function)(void);
+typedef expression_t* (*parse_expression_infix_function)(expression_t *left);
 
 typedef struct expression_parser_function_t expression_parser_function_t;
 struct expression_parser_function_t {
@@ -6457,7 +6474,7 @@ static expression_t *parse_cast(void)
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->base.source_position = source_position;
 
-	expression_t *value = parse_sub_expression(20);
+	expression_t *value = parse_sub_expression(PREC_CAST);
 	cast->base.type   = type;
 	cast->unary.value = value;
 
@@ -7088,11 +7105,8 @@ static void check_for_char_index_type(const expression_t *expression)
 	}
 }
 
-static expression_t *parse_array_expression(unsigned precedence,
-                                            expression_t *left)
+static expression_t *parse_array_expression(expression_t *left)
 {
-	(void) precedence;
-
 	eat('[');
 	add_anchor_token(']');
 
@@ -7174,7 +7188,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 		rem_anchor_token(')');
 		expect(')');
 	} else {
-		expression_t *expression = parse_sub_expression(25);
+		expression_t *expression = parse_sub_expression(PREC_UNARY);
 
 		type_t* const orig_type = revert_automatic_type_conversion(expression);
 		expression->base.type = orig_type;
@@ -7198,28 +7212,22 @@ end_error:
 	return tp_expression;
 }
 
-static expression_t *parse_sizeof(unsigned precedence)
+static expression_t *parse_sizeof(void)
 {
-	(void)precedence;
-
 	source_position_t pos = *HERE;
 	eat(T_sizeof);
 	return parse_typeprop(EXPR_SIZEOF, pos);
 }
 
-static expression_t *parse_alignof(unsigned precedence)
+static expression_t *parse_alignof(void)
 {
-	(void)precedence;
-
 	source_position_t pos = *HERE;
 	eat(T___alignof__);
 	return parse_typeprop(EXPR_ALIGNOF, pos);
 }
 
-static expression_t *parse_select_expression(unsigned precedence,
-                                             expression_t *compound)
+static expression_t *parse_select_expression(expression_t *compound)
 {
-	(void) precedence;
 	assert(token.type == '.' || token.type == T_MINUSGREATER);
 
 	bool is_pointer = (token.type == T_MINUSGREATER);
@@ -7364,10 +7372,8 @@ static void check_call_argument(const function_parameter_t *parameter,
  *
  * @param expression  the function address
  */
-static expression_t *parse_call_expression(unsigned precedence,
-                                           expression_t *expression)
+static expression_t *parse_call_expression(expression_t *expression)
 {
-	(void) precedence;
 	expression_t *result = allocate_expression_zero(EXPR_CALL);
 	result->base.source_position = expression->base.source_position;
 
@@ -7474,11 +7480,8 @@ static bool same_compound_type(const type_t *type1, const type_t *type2)
  *
  * @param expression  the conditional expression
  */
-static expression_t *parse_conditional_expression(unsigned precedence,
-                                                  expression_t *expression)
+static expression_t *parse_conditional_expression(expression_t *expression)
 {
-	(void)precedence;
-
 	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
 
 	conditional_expression_t *conditional = &result->conditional;
@@ -7504,7 +7507,7 @@ static expression_t *parse_conditional_expression(unsigned precedence,
 		true_expression = parse_expression();
 	rem_anchor_token(':');
 	expect(':');
-	expression_t *false_expression = parse_sub_expression(7);
+	expression_t *false_expression = parse_sub_expression(PREC_CONDITIONAL);
 
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
@@ -7605,13 +7608,13 @@ end_error:
 /**
  * Parse an extension expression.
  */
-static expression_t *parse_extension(unsigned precedence)
+static expression_t *parse_extension(void)
 {
 	eat(T___extension__);
 
 	bool old_gcc_extension   = in_gcc_extension;
 	in_gcc_extension         = true;
-	expression_t *expression = parse_sub_expression(precedence);
+	expression_t *expression = parse_sub_expression(PREC_UNARY);
 	in_gcc_extension         = old_gcc_extension;
 	return expression;
 }
@@ -7619,10 +7622,8 @@ static expression_t *parse_extension(unsigned precedence)
 /**
  * Parse a __builtin_classify_type() expression.
  */
-static expression_t *parse_builtin_classify_type(const unsigned precedence)
+static expression_t *parse_builtin_classify_type(void)
 {
-	(void)precedence;
-
 	eat(T___builtin_classify_type);
 
 	expression_t *result = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
@@ -7864,18 +7865,18 @@ static void semantic_take_addr(unary_expression_t *expression)
 	expression->base.type = make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 }
 
-#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc)   \
-static expression_t *parse_##unexpression_type(unsigned precedence)            \
-{                                                                              \
-	expression_t *unary_expression                                             \
-		= allocate_expression_zero(unexpression_type);                         \
-	unary_expression->base.source_position = *HERE;                            \
-	eat(token_type);                                                           \
-	unary_expression->unary.value = parse_sub_expression(precedence);          \
-	                                                                           \
-	sfunc(&unary_expression->unary);                                           \
-	                                                                           \
-	return unary_expression;                                                   \
+#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc) \
+static expression_t *parse_##unexpression_type(void)                         \
+{                                                                            \
+	expression_t *unary_expression                                           \
+		= allocate_expression_zero(unexpression_type);                       \
+	unary_expression->base.source_position = *HERE;                          \
+	eat(token_type);                                                         \
+	unary_expression->unary.value = parse_sub_expression(PREC_UNARY);        \
+	                                                                         \
+	sfunc(&unary_expression->unary);                                         \
+	                                                                         \
+	return unary_expression;                                                 \
 }
 
 CREATE_UNARY_EXPRESSION_PARSER('-', EXPR_UNARY_NEGATE,
@@ -7897,11 +7898,8 @@ CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, EXPR_UNARY_PREFIX_DECREMENT,
 
 #define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type, \
                                                sfunc)                         \
-static expression_t *parse_##unexpression_type(unsigned precedence,           \
-                                               expression_t *left)            \
+static expression_t *parse_##unexpression_type(expression_t *left)            \
 {                                                                             \
-	(void) precedence;                                                        \
-                                                                              \
 	expression_t *unary_expression                                            \
 		= allocate_expression_zero(unexpression_type);                        \
 	unary_expression->base.source_position = *HERE;                           \
@@ -8553,78 +8551,58 @@ static void semantic_comma(binary_expression_t *expression)
 	expression->base.type = expression->right->base.type;
 }
 
-#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, sfunc, lr)  \
-static expression_t *parse_##binexpression_type(unsigned precedence,      \
-                                                expression_t *left)       \
-{                                                                         \
-	expression_t *binexpr = allocate_expression_zero(binexpression_type); \
-	binexpr->base.source_position = *HERE;                                \
-	binexpr->binary.left          = left;                                 \
-	eat(token_type);                                                      \
-                                                                          \
-	expression_t *right = parse_sub_expression(precedence + lr);          \
-                                                                          \
-	binexpr->binary.right = right;                                        \
-	sfunc(&binexpr->binary);                                              \
-                                                                          \
-	return binexpr;                                                       \
+/**
+ * @param prec_r precedence of the right operand
+ */
+#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, prec_r, sfunc) \
+static expression_t *parse_##binexpression_type(expression_t *left)          \
+{                                                                            \
+	expression_t *binexpr = allocate_expression_zero(binexpression_type);    \
+	binexpr->base.source_position = *HERE;                                   \
+	binexpr->binary.left          = left;                                    \
+	eat(token_type);                                                         \
+                                                                             \
+	expression_t *right = parse_sub_expression(prec_r);                      \
+                                                                             \
+	binexpr->binary.right = right;                                           \
+	sfunc(&binexpr->binary);                                                 \
+                                                                             \
+	return binexpr;                                                          \
 }
 
-CREATE_BINEXPR_PARSER(',', EXPR_BINARY_COMMA,    semantic_comma, 1)
-CREATE_BINEXPR_PARSER('*', EXPR_BINARY_MUL,      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER('/', EXPR_BINARY_DIV,      semantic_divmod_arithmetic, 1)
-CREATE_BINEXPR_PARSER('%', EXPR_BINARY_MOD,      semantic_divmod_arithmetic, 1)
-CREATE_BINEXPR_PARSER('+', EXPR_BINARY_ADD,      semantic_add, 1)
-CREATE_BINEXPR_PARSER('-', EXPR_BINARY_SUB,      semantic_sub, 1)
-CREATE_BINEXPR_PARSER('<', EXPR_BINARY_LESS,     semantic_comparison, 1)
-CREATE_BINEXPR_PARSER('>', EXPR_BINARY_GREATER,  semantic_comparison, 1)
-CREATE_BINEXPR_PARSER('=', EXPR_BINARY_ASSIGN,   semantic_binexpr_assign, 0)
+CREATE_BINEXPR_PARSER('*',                    EXPR_BINARY_MUL,                PREC_CAST,           semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('/',                    EXPR_BINARY_DIV,                PREC_CAST,           semantic_divmod_arithmetic)
+CREATE_BINEXPR_PARSER('%',                    EXPR_BINARY_MOD,                PREC_CAST,           semantic_divmod_arithmetic)
+CREATE_BINEXPR_PARSER('+',                    EXPR_BINARY_ADD,                PREC_MULTIPLICATIVE, semantic_add)
+CREATE_BINEXPR_PARSER('-',                    EXPR_BINARY_SUB,                PREC_MULTIPLICATIVE, semantic_sub)
+CREATE_BINEXPR_PARSER(T_LESSLESS,             EXPR_BINARY_SHIFTLEFT,          PREC_ADDITIVE,       semantic_shift_op)
+CREATE_BINEXPR_PARSER(T_GREATERGREATER,       EXPR_BINARY_SHIFTRIGHT,         PREC_ADDITIVE,       semantic_shift_op)
+CREATE_BINEXPR_PARSER('<',                    EXPR_BINARY_LESS,               PREC_SHIFT,          semantic_comparison)
+CREATE_BINEXPR_PARSER('>',                    EXPR_BINARY_GREATER,            PREC_SHIFT,          semantic_comparison)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL,            EXPR_BINARY_LESSEQUAL,          PREC_SHIFT,          semantic_comparison)
+CREATE_BINEXPR_PARSER(T_GREATEREQUAL,         EXPR_BINARY_GREATEREQUAL,       PREC_SHIFT,          semantic_comparison)
+CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, EXPR_BINARY_NOTEQUAL,           PREC_RELATIONAL,     semantic_comparison)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL,           EXPR_BINARY_EQUAL,              PREC_RELATIONAL,     semantic_comparison)
+CREATE_BINEXPR_PARSER('&',                    EXPR_BINARY_BITWISE_AND,        PREC_EQUALITY,       semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('^',                    EXPR_BINARY_BITWISE_XOR,        PREC_AND,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('|',                    EXPR_BINARY_BITWISE_OR,         PREC_XOR,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER(T_ANDAND,               EXPR_BINARY_LOGICAL_AND,        PREC_OR,             semantic_logical_op)
+CREATE_BINEXPR_PARSER(T_PIPEPIPE,             EXPR_BINARY_LOGICAL_OR,         PREC_LOGICAL_AND,    semantic_logical_op)
+CREATE_BINEXPR_PARSER('=',                    EXPR_BINARY_ASSIGN,             PREC_ASSIGNMENT,     semantic_binexpr_assign)
+CREATE_BINEXPR_PARSER(T_PLUSEQUAL,            EXPR_BINARY_ADD_ASSIGN,         PREC_ASSIGNMENT,     semantic_arithmetic_addsubb_assign)
+CREATE_BINEXPR_PARSER(T_MINUSEQUAL,           EXPR_BINARY_SUB_ASSIGN,         PREC_ASSIGNMENT,     semantic_arithmetic_addsubb_assign)
+CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL,        EXPR_BINARY_MUL_ASSIGN,         PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_SLASHEQUAL,           EXPR_BINARY_DIV_ASSIGN,         PREC_ASSIGNMENT,     semantic_divmod_assign)
+CREATE_BINEXPR_PARSER(T_PERCENTEQUAL,         EXPR_BINARY_MOD_ASSIGN,         PREC_ASSIGNMENT,     semantic_divmod_assign)
+CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL,        EXPR_BINARY_SHIFTLEFT_ASSIGN,   PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL,  EXPR_BINARY_SHIFTRIGHT_ASSIGN,  PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_ANDEQUAL,             EXPR_BINARY_BITWISE_AND_ASSIGN, PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_PIPEEQUAL,            EXPR_BINARY_BITWISE_OR_ASSIGN,  PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_CARETEQUAL,           EXPR_BINARY_BITWISE_XOR_ASSIGN, PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(',',                    EXPR_BINARY_COMMA,              PREC_ASSIGNMENT,     semantic_comma)
 
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL,           EXPR_BINARY_EQUAL,
-                      semantic_comparison, 1)
-CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, EXPR_BINARY_NOTEQUAL,
-                      semantic_comparison, 1)
-CREATE_BINEXPR_PARSER(T_LESSEQUAL,            EXPR_BINARY_LESSEQUAL,
-                      semantic_comparison, 1)
-CREATE_BINEXPR_PARSER(T_GREATEREQUAL,         EXPR_BINARY_GREATEREQUAL,
-                      semantic_comparison, 1)
 
-CREATE_BINEXPR_PARSER('&', EXPR_BINARY_BITWISE_AND,
-                      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER('|', EXPR_BINARY_BITWISE_OR,
-                      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER('^', EXPR_BINARY_BITWISE_XOR,
-                      semantic_binexpr_arithmetic, 1)
-CREATE_BINEXPR_PARSER(T_ANDAND, EXPR_BINARY_LOGICAL_AND,
-                      semantic_logical_op, 1)
-CREATE_BINEXPR_PARSER(T_PIPEPIPE, EXPR_BINARY_LOGICAL_OR,
-                      semantic_logical_op, 1)
-CREATE_BINEXPR_PARSER(T_LESSLESS, EXPR_BINARY_SHIFTLEFT,
-                      semantic_shift_op, 1)
-CREATE_BINEXPR_PARSER(T_GREATERGREATER, EXPR_BINARY_SHIFTRIGHT,
-                      semantic_shift_op, 1)
-CREATE_BINEXPR_PARSER(T_PLUSEQUAL, EXPR_BINARY_ADD_ASSIGN,
-                      semantic_arithmetic_addsubb_assign, 0)
-CREATE_BINEXPR_PARSER(T_MINUSEQUAL, EXPR_BINARY_SUB_ASSIGN,
-                      semantic_arithmetic_addsubb_assign, 0)
-CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL, EXPR_BINARY_MUL_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-CREATE_BINEXPR_PARSER(T_SLASHEQUAL, EXPR_BINARY_DIV_ASSIGN,
-                      semantic_divmod_assign, 0)
-CREATE_BINEXPR_PARSER(T_PERCENTEQUAL, EXPR_BINARY_MOD_ASSIGN,
-                      semantic_divmod_assign, 0)
-CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL, EXPR_BINARY_SHIFTLEFT_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL, EXPR_BINARY_SHIFTRIGHT_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-CREATE_BINEXPR_PARSER(T_ANDEQUAL, EXPR_BINARY_BITWISE_AND_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-CREATE_BINEXPR_PARSER(T_PIPEEQUAL, EXPR_BINARY_BITWISE_OR_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-CREATE_BINEXPR_PARSER(T_CARETEQUAL, EXPR_BINARY_BITWISE_XOR_ASSIGN,
-                      semantic_arithmetic_assign, 0)
-
-static expression_t *parse_sub_expression(unsigned precedence)
+static expression_t *parse_sub_expression(precedence_t precedence)
 {
 	if (token.type < 0) {
 		return expected_expression_error();
@@ -8636,7 +8614,7 @@ static expression_t *parse_sub_expression(unsigned precedence)
 	expression_t                 *left;
 
 	if (parser->parser != NULL) {
-		left = parser->parser(parser->precedence);
+		left = parser->parser();
 	} else {
 		left = parse_primary_expression();
 	}
@@ -8654,7 +8632,7 @@ static expression_t *parse_sub_expression(unsigned precedence)
 		if (parser->infix_precedence < precedence)
 			break;
 
-		left = parser->infix_parser(parser->infix_precedence, left);
+		left = parser->infix_parser(left);
 
 		assert(left != NULL);
 		assert(left->kind != EXPR_UNKNOWN);
@@ -8669,7 +8647,7 @@ static expression_t *parse_sub_expression(unsigned precedence)
  */
 static expression_t *parse_expression(void)
 {
-	return parse_sub_expression(1);
+	return parse_sub_expression(PREC_EXPRESSION);
 }
 
 /**
@@ -8720,69 +8698,56 @@ static void init_expression_parsers(void)
 {
 	memset(&expression_parsers, 0, sizeof(expression_parsers));
 
-	register_infix_parser(parse_array_expression,         '[',              30);
-	register_infix_parser(parse_call_expression,          '(',              30);
-	register_infix_parser(parse_select_expression,        '.',              30);
-	register_infix_parser(parse_select_expression,        T_MINUSGREATER,   30);
-	register_infix_parser(parse_EXPR_UNARY_POSTFIX_INCREMENT,
-	                                                      T_PLUSPLUS,       30);
-	register_infix_parser(parse_EXPR_UNARY_POSTFIX_DECREMENT,
-	                                                      T_MINUSMINUS,     30);
+	register_infix_parser(parse_array_expression,               '[',                    PREC_POSTFIX);
+	register_infix_parser(parse_call_expression,                '(',                    PREC_POSTFIX);
+	register_infix_parser(parse_select_expression,              '.',                    PREC_POSTFIX);
+	register_infix_parser(parse_select_expression,              T_MINUSGREATER,         PREC_POSTFIX);
+	register_infix_parser(parse_EXPR_UNARY_POSTFIX_INCREMENT,   T_PLUSPLUS,             PREC_POSTFIX);
+	register_infix_parser(parse_EXPR_UNARY_POSTFIX_DECREMENT,   T_MINUSMINUS,           PREC_POSTFIX);
+	register_infix_parser(parse_EXPR_BINARY_MUL,                '*',                    PREC_MULTIPLICATIVE);
+	register_infix_parser(parse_EXPR_BINARY_DIV,                '/',                    PREC_MULTIPLICATIVE);
+	register_infix_parser(parse_EXPR_BINARY_MOD,                '%',                    PREC_MULTIPLICATIVE);
+	register_infix_parser(parse_EXPR_BINARY_ADD,                '+',                    PREC_ADDITIVE);
+	register_infix_parser(parse_EXPR_BINARY_SUB,                '-',                    PREC_ADDITIVE);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT,          T_LESSLESS,             PREC_SHIFT);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT,         T_GREATERGREATER,       PREC_SHIFT);
+	register_infix_parser(parse_EXPR_BINARY_LESS,               '<',                    PREC_RELATIONAL);
+	register_infix_parser(parse_EXPR_BINARY_GREATER,            '>',                    PREC_RELATIONAL);
+	register_infix_parser(parse_EXPR_BINARY_LESSEQUAL,          T_LESSEQUAL,            PREC_RELATIONAL);
+	register_infix_parser(parse_EXPR_BINARY_GREATEREQUAL,       T_GREATEREQUAL,         PREC_RELATIONAL);
+	register_infix_parser(parse_EXPR_BINARY_EQUAL,              T_EQUALEQUAL,           PREC_EQUALITY);
+	register_infix_parser(parse_EXPR_BINARY_NOTEQUAL,           T_EXCLAMATIONMARKEQUAL, PREC_EQUALITY);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_AND,        '&',                    PREC_AND);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_XOR,        '^',                    PREC_XOR);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_OR,         '|',                    PREC_OR);
+	register_infix_parser(parse_EXPR_BINARY_LOGICAL_AND,        T_ANDAND,               PREC_LOGICAL_AND);
+	register_infix_parser(parse_EXPR_BINARY_LOGICAL_OR,         T_PIPEPIPE,             PREC_LOGICAL_OR);
+	register_infix_parser(parse_conditional_expression,         '?',                    PREC_CONDITIONAL);
+	register_infix_parser(parse_EXPR_BINARY_ASSIGN,             '=',                    PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_ADD_ASSIGN,         T_PLUSEQUAL,            PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_SUB_ASSIGN,         T_MINUSEQUAL,           PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_MUL_ASSIGN,         T_ASTERISKEQUAL,        PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_DIV_ASSIGN,         T_SLASHEQUAL,           PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_MOD_ASSIGN,         T_PERCENTEQUAL,         PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT_ASSIGN,   T_LESSLESSEQUAL,        PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT_ASSIGN,  T_GREATERGREATEREQUAL,  PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_AND_ASSIGN, T_ANDEQUAL,             PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_OR_ASSIGN,  T_PIPEEQUAL,            PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_BITWISE_XOR_ASSIGN, T_CARETEQUAL,           PREC_ASSIGNMENT);
+	register_infix_parser(parse_EXPR_BINARY_COMMA,              ',',                    PREC_EXPRESSION);
 
-	register_infix_parser(parse_EXPR_BINARY_MUL,          '*',              17);
-	register_infix_parser(parse_EXPR_BINARY_DIV,          '/',              17);
-	register_infix_parser(parse_EXPR_BINARY_MOD,          '%',              17);
-	register_infix_parser(parse_EXPR_BINARY_ADD,          '+',              16);
-	register_infix_parser(parse_EXPR_BINARY_SUB,          '-',              16);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT,    T_LESSLESS,       15);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT,   T_GREATERGREATER, 15);
-	register_infix_parser(parse_EXPR_BINARY_LESS,         '<',              14);
-	register_infix_parser(parse_EXPR_BINARY_GREATER,      '>',              14);
-	register_infix_parser(parse_EXPR_BINARY_LESSEQUAL,    T_LESSEQUAL,      14);
-	register_infix_parser(parse_EXPR_BINARY_GREATEREQUAL, T_GREATEREQUAL,   14);
-	register_infix_parser(parse_EXPR_BINARY_EQUAL,        T_EQUALEQUAL,     13);
-	register_infix_parser(parse_EXPR_BINARY_NOTEQUAL,
-                                                    T_EXCLAMATIONMARKEQUAL, 13);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_AND,  '&',              12);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_XOR,  '^',              11);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_OR,   '|',              10);
-	register_infix_parser(parse_EXPR_BINARY_LOGICAL_AND,  T_ANDAND,          9);
-	register_infix_parser(parse_EXPR_BINARY_LOGICAL_OR,   T_PIPEPIPE,        8);
-	register_infix_parser(parse_conditional_expression,   '?',               7);
-	register_infix_parser(parse_EXPR_BINARY_ASSIGN,       '=',               2);
-	register_infix_parser(parse_EXPR_BINARY_ADD_ASSIGN,   T_PLUSEQUAL,       2);
-	register_infix_parser(parse_EXPR_BINARY_SUB_ASSIGN,   T_MINUSEQUAL,      2);
-	register_infix_parser(parse_EXPR_BINARY_MUL_ASSIGN,   T_ASTERISKEQUAL,   2);
-	register_infix_parser(parse_EXPR_BINARY_DIV_ASSIGN,   T_SLASHEQUAL,      2);
-	register_infix_parser(parse_EXPR_BINARY_MOD_ASSIGN,   T_PERCENTEQUAL,    2);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTLEFT_ASSIGN,
-	                                                        T_LESSLESSEQUAL, 2);
-	register_infix_parser(parse_EXPR_BINARY_SHIFTRIGHT_ASSIGN,
-	                                                  T_GREATERGREATEREQUAL, 2);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_AND_ASSIGN,
-	                                                             T_ANDEQUAL, 2);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_OR_ASSIGN,
-	                                                            T_PIPEEQUAL, 2);
-	register_infix_parser(parse_EXPR_BINARY_BITWISE_XOR_ASSIGN,
-	                                                           T_CARETEQUAL, 2);
-
-	register_infix_parser(parse_EXPR_BINARY_COMMA,        ',',               1);
-
-	register_expression_parser(parse_EXPR_UNARY_NEGATE,           '-',      25);
-	register_expression_parser(parse_EXPR_UNARY_PLUS,             '+',      25);
-	register_expression_parser(parse_EXPR_UNARY_NOT,              '!',      25);
-	register_expression_parser(parse_EXPR_UNARY_BITWISE_NEGATE,   '~',      25);
-	register_expression_parser(parse_EXPR_UNARY_DEREFERENCE,      '*',      25);
-	register_expression_parser(parse_EXPR_UNARY_TAKE_ADDRESS,     '&',      25);
-	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT,
-	                                                          T_PLUSPLUS,   25);
-	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT,
-	                                                          T_MINUSMINUS, 25);
-	register_expression_parser(parse_sizeof,                      T_sizeof, 25);
-	register_expression_parser(parse_alignof,                T___alignof__, 25);
-	register_expression_parser(parse_extension,            T___extension__, 25);
-	register_expression_parser(parse_builtin_classify_type,
-	                                             T___builtin_classify_type, 25);
+	register_expression_parser(parse_EXPR_UNARY_NEGATE,           '-',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_PLUS,             '+',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_NOT,              '!',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_BITWISE_NEGATE,   '~',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_DEREFERENCE,      '*',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_TAKE_ADDRESS,     '&',                       PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT, T_PLUSPLUS,                PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT, T_MINUSMINUS,              PREC_UNARY);
+	register_expression_parser(parse_sizeof,                      T_sizeof,                  PREC_UNARY);
+	register_expression_parser(parse_alignof,                     T___alignof__,             PREC_UNARY);
+	register_expression_parser(parse_extension,                   T___extension__,           PREC_UNARY);
+	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type, PREC_UNARY);
 }
 
 /**
