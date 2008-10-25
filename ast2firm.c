@@ -1450,12 +1450,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 	case DECLARATION_KIND_ENUM_ENTRY: {
 		ir_mode *const mode = get_ir_mode(type);
-		if (ref->is_outer_ref) {
-			/* reference to an outer variable */
-			panic("Outer variable reference not implemented");
-		} else {
-			return new_Const(mode, declaration->v.enum_val);
-		}
+		return new_Const(mode, declaration->v.enum_val);
 	}
 
 	case DECLARATION_KIND_LOCAL_VARIABLE: {
@@ -4722,14 +4717,9 @@ static void goto_to_firm(const goto_statement_t *statement)
 		set_irn_link(ijmp, ijmp_list);
 		ijmp_list = ijmp;
 	} else {
-		if (statement->outer_fkt_jmp) {
-			/* TODO: this is a outer function jmp */
-			panic("outer function jump not implemented");
-		} else {
-			ir_node *block = get_label_block(statement->label);
-			ir_node *jmp   = new_Jmp();
-			add_immBlock_pred(block, jmp);
-		}
+		ir_node *block = get_label_block(statement->label);
+		ir_node *jmp   = new_Jmp();
+		add_immBlock_pred(block, jmp);
 	}
 	set_cur_block(NULL);
 }

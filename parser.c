@@ -4189,7 +4189,6 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 	if (declaration != NULL) {
 		declaration->scope.declarations     = parameters;
 		declaration->scope.last_declaration = last;
-		declaration->scope.is_parameter     = true;
 	}
 
 	construct_function_type_t *construct_function_type =
@@ -4610,7 +4609,7 @@ static declaration_t *record_declaration(
 
 	assert(declaration != previous_declaration);
 	if (previous_declaration != NULL &&
-	    previous_declaration->parent_scope->is_parameter &&
+	    previous_declaration->parent_scope == &current_function->scope &&
 	    scope->depth == previous_declaration->parent_scope->depth + 1) {
 		errorf(&declaration->source_position,
 			"declaration '%#T' redeclares the parameter '%#T' (declared %P)",
@@ -6343,7 +6342,6 @@ static expression_t *parse_reference(void)
 	    is_type_valid(orig_type) && !is_type_function(orig_type)) {
 		/* access of a variable from an outer function */
 		declaration->address_taken     = true;
-		ref->is_outer_ref              = true;
 		current_function->need_closure = true;
 	}
 
@@ -9500,10 +9498,6 @@ static statement_t *parse_goto(void)
 		next_token();
 
 		statement->gotos.label = get_label(symbol);
-
-		if (statement->gotos.label->parent_scope->depth < current_function->scope.depth) {
-			statement->gotos.outer_fkt_jmp = true;
-		}
 	}
 
 	/* remember the goto's in a list for later checking */

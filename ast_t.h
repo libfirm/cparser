@@ -191,7 +191,6 @@ struct scope_t {
 	declaration_t *last_declaration;  /**< last declaration in this scope. */
 	scope_t       *parent;            /**< points to the parent scope. */
 	unsigned      depth;              /**< while parsing, the depth of this scope in the scope stack. */
-	bool          is_parameter;       /**< Set if this scope is a parameter scope. */
 };
 
 struct expression_base_t {
@@ -257,8 +256,6 @@ struct builtin_prefetch_expression_t {
 struct reference_expression_t {
 	expression_base_t  base;
 	declaration_t     *declaration;
-	bool               is_outer_ref;  /**< Set, if this referenced a variable
-	                                       outside of an inner function */
 };
 
 struct call_argument_t {
@@ -676,7 +673,6 @@ struct goto_statement_t {
 	declaration_t    *label;         /**< The destination label. */
 	expression_t     *expression;    /**< The expression for an assigned goto. */
 	goto_statement_t *next;          /**< links all goto statements of a function */
-	bool              outer_fkt_jmp; /**< Set if this goto jump to an outer function. */
 };
 
 struct case_label_statement_t {
