@@ -89,7 +89,7 @@ void set_warning_opt(const char *const opt)
 #define SET(y)    (void)(warning.y = state)
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
-		/* Note: this switched on a lot of more warnings than gcc's -Wall */
+		/* Note: this switched on a lot more warnings than gcc's -Wall */
 		SET(other);
 
 		SET(address);
