@@ -5946,7 +5946,6 @@ typedef expression_t* (*parse_expression_infix_function)(expression_t *left);
 
 typedef struct expression_parser_function_t expression_parser_function_t;
 struct expression_parser_function_t {
-	unsigned                         precedence;
 	parse_expression_function        parser;
 	unsigned                         infix_precedence;
 	parse_expression_infix_function  infix_parser;
@@ -8631,14 +8630,13 @@ static expression_t *parse_expression(void)
 }
 
 /**
- * Register a parser for a prefix-like operator with given precedence.
+ * Register a parser for a prefix-like operator.
  *
  * @param parser      the parser function
  * @param token_type  the token type of the prefix token
- * @param precedence  the precedence of the operator
  */
 static void register_expression_parser(parse_expression_function parser,
-                                       int token_type, unsigned precedence)
+                                       int token_type)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
@@ -8646,8 +8644,7 @@ static void register_expression_parser(parse_expression_function parser,
 		diagnosticf("for token '%k'\n", (token_type_t)token_type);
 		panic("trying to register multiple expression parsers for a token");
 	}
-	entry->parser     = parser;
-	entry->precedence = precedence;
+	entry->parser = parser;
 }
 
 /**
@@ -8716,18 +8713,18 @@ static void init_expression_parsers(void)
 	register_infix_parser(parse_EXPR_BINARY_BITWISE_XOR_ASSIGN, T_CARETEQUAL,           PREC_ASSIGNMENT);
 	register_infix_parser(parse_EXPR_BINARY_COMMA,              ',',                    PREC_EXPRESSION);
 
-	register_expression_parser(parse_EXPR_UNARY_NEGATE,           '-',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_PLUS,             '+',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_NOT,              '!',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_BITWISE_NEGATE,   '~',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_DEREFERENCE,      '*',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_TAKE_ADDRESS,     '&',                       PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT, T_PLUSPLUS,                PREC_UNARY);
-	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT, T_MINUSMINUS,              PREC_UNARY);
-	register_expression_parser(parse_sizeof,                      T_sizeof,                  PREC_UNARY);
-	register_expression_parser(parse_alignof,                     T___alignof__,             PREC_UNARY);
-	register_expression_parser(parse_extension,                   T___extension__,           PREC_UNARY);
-	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type, PREC_UNARY);
+	register_expression_parser(parse_EXPR_UNARY_NEGATE,           '-');
+	register_expression_parser(parse_EXPR_UNARY_PLUS,             '+');
+	register_expression_parser(parse_EXPR_UNARY_NOT,              '!');
+	register_expression_parser(parse_EXPR_UNARY_BITWISE_NEGATE,   '~');
+	register_expression_parser(parse_EXPR_UNARY_DEREFERENCE,      '*');
+	register_expression_parser(parse_EXPR_UNARY_TAKE_ADDRESS,     '&');
+	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT, T_PLUSPLUS);
+	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT, T_MINUSMINUS);
+	register_expression_parser(parse_sizeof,                      T_sizeof);
+	register_expression_parser(parse_alignof,                     T___alignof__);
+	register_expression_parser(parse_extension,                   T___extension__);
+	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type);
 }
 
 /**
