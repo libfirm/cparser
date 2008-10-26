@@ -4576,7 +4576,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 			continue;
 		}
 		if (l->last_case >= l->first_case)
-			num_cases += l->last_case - l->first_case;
+			num_cases += l->last_case - l->first_case + 1;
 		if (l->last_case > def_nr)
 			def_nr = l->last_case;
 	}
@@ -4595,9 +4595,13 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 				/* default case */
 				continue;
 			}
-			for (long cns = l->first_case; cns <= l->last_case; ++cns) {
-				if (cns >= 0 && (unsigned long)cns < num_cases)
+			if (l->first_case < num_cases && l->last_case >= 0) {
+				long start = l->first_case > 0 ? l->first_case : 0;
+				long end   = (unsigned long)l->last_case < num_cases ?
+					l->last_case : num_cases - 1;
+				for (long cns = start; cns <= end; ++cns) {
 					bits[cns >> 3] |= (1 << (cns & 7));
+				}
 			}
 		}
 		/* We look at the first num_cases constants:
@@ -4606,7 +4610,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		 * there...
 		 */
 		for (i = 0; i < num_cases; ++i)
-			if ((bits[i >> 3] & (i & 7)) == 0)
+			if ((bits[i >> 3] & (1 << (i & 7))) == 0)
 				break;
 
 		free(bits);
