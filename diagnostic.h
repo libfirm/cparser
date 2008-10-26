@@ -62,7 +62,4 @@ extern unsigned diagnostic_count;
 extern unsigned error_count;
 extern unsigned warning_count;
 
-/* true if warnings should be inhibited */
-extern bool inhibit_all_warnings;
-
 #endif

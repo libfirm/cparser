@@ -634,7 +634,7 @@ int main(int argc, char **argv)
 			} else if(SINGLE_OPTION('v')) {
 				verbose = 1;
 			} else if(SINGLE_OPTION('w')) {
-				inhibit_all_warnings = true;
+				memset(&warning, 0, sizeof(warning));
 			} else if(option[0] == 'x') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-x");

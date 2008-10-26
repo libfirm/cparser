@@ -34,8 +34,6 @@ unsigned diagnostic_count = 0;
 unsigned error_count      = 0;
 /** Number of occurred warnings. */
 unsigned warning_count    = 0;
-/** true if warnings should be inhibited */
-bool inhibit_all_warnings = false;
 
 static const source_position_t *curr_pos = NULL;
 
@@ -217,9 +215,6 @@ static void warningvf(const source_position_t *pos,
 
 void warningf(const source_position_t *pos, const char *const fmt, ...)
 {
-	if (inhibit_all_warnings)
-		return;
-
 	va_list ap;
 	va_start(ap, fmt);
 	curr_pos = pos;

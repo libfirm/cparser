@@ -22,6 +22,8 @@
 #include "warning.h"
 
 warning_t warning = {
+	.other                         = true,
+
 	.address                       = true,
 	.aggregate_return              = false,
 	.attribute                     = true,
@@ -88,6 +90,8 @@ void set_warning_opt(const char *const opt)
 #define OPT(x, y) OPTX(x) SET(y)
 	OPTX("all") {
 		/* Note: this switched on a lot of more warnings than gcc's -Wall */
+		SET(other);
+
 		SET(address);
 		SET(attribute);
 		SET(char_subscripts);

@@ -1002,36 +1002,42 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 		return;
 
 	case ASSIGN_ERROR_POINTER_QUALIFIER_MISSING: {
-		type_t *points_to_left
-			= skip_typeref(type_left->pointer.points_to);
-		type_t *points_to_right
-			= skip_typeref(type_right->pointer.points_to);
+		if (warning.other) {
+			type_t *points_to_left  = skip_typeref(type_left->pointer.points_to);
+			type_t *points_to_right = skip_typeref(type_right->pointer.points_to);
 
-		/* the left type has all qualifiers from the right type */
-		unsigned missing_qualifiers
-			= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
-		warningf(source_position,
-		         "destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointer target type",
-		         orig_type_left, context, orig_type_right, missing_qualifiers);
+			/* the left type has all qualifiers from the right type */
+			unsigned missing_qualifiers
+				= points_to_right->base.qualifiers & ~points_to_left->base.qualifiers;
+			warningf(source_position,
+					"destination type '%T' in %s from type '%T' lacks qualifiers '%Q' in pointer target type",
+					orig_type_left, context, orig_type_right, missing_qualifiers);
+		}
 		return;
 	}
 
 	case ASSIGN_WARNING_POINTER_INCOMPATIBLE:
-		warningf(source_position,
-		         "destination type '%T' in %s is incompatible with '%E' of type '%T'",
-			 	 orig_type_left, context, right, orig_type_right);
+		if (warning.other) {
+			warningf(source_position,
+					"destination type '%T' in %s is incompatible with '%E' of type '%T'",
+					orig_type_left, context, right, orig_type_right);
+		}
 		return;
 
 	case ASSIGN_WARNING_POINTER_FROM_INT:
-		warningf(source_position,
-		         "%s makes pointer '%T' from integer '%T' without a cast",
-				 context, orig_type_left, orig_type_right);
+		if (warning.other) {
+			warningf(source_position,
+					"%s makes pointer '%T' from integer '%T' without a cast",
+					context, orig_type_left, orig_type_right);
+		}
 		return;
 
 	case ASSIGN_WARNING_INT_FROM_POINTER:
-		warningf(source_position,
-				"%s makes integer '%T' from pointer '%T' without a cast",
-				context, orig_type_left, orig_type_right);
+		if (warning.other) {
+			warningf(source_position,
+					"%s makes integer '%T' from pointer '%T' without a cast",
+					context, orig_type_left, orig_type_right);
+		}
 		return;
 
 	default:
@@ -1418,7 +1424,8 @@ static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
 	} else if (strcmp_underscore("DI", symbol_str) == 0) {
 		attribute->u.akind = ATOMIC_TYPE_LONGLONG;
 	} else {
-		warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
+		if (warning.other)
+			warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
 		attribute->invalid = true;
 	}
 	next_token();
@@ -1856,7 +1863,8 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 
 		case T___thiscall:
 			/* TODO record modifier */
-			warningf(HERE, "Ignoring declaration modifier %K", &token);
+			if (warning.other)
+				warningf(HERE, "Ignoring declaration modifier %K", &token);
 			break;
 
 end_error:
@@ -2225,7 +2233,8 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	/* there might be extra {} hierarchies */
 	int braces = 0;
 	if (token.type == '{') {
-		warningf(HERE, "extra curly braces around scalar initializer");
+		if (warning.other)
+			warningf(HERE, "extra curly braces around scalar initializer");
 		do {
 			++braces;
 			next_token();
@@ -2256,7 +2265,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 			next_token();
 		}
 		if (token.type != '}') {
-			if (!additional_warning_displayed) {
+			if (!additional_warning_displayed && warning.other) {
 				warningf(HERE, "additional elements in scalar initializer");
 				additional_warning_displayed = true;
 			}
@@ -2688,7 +2697,7 @@ finish_designator:
 					if (token.type == ',') {
 						next_token();
 					}
-					if (token.type != '}') {
+					if (token.type != '}' && warning.other) {
 						warningf(HERE, "excessive elements in initializer for type '%T'",
 								 orig_type);
 					}
@@ -2735,11 +2744,14 @@ finish_designator:
 			ARR_APP1(initializer_t*, initializers, sub);
 		} else {
 error_excess:
-			if (env->declaration != NULL)
-				warningf(HERE, "excess elements in struct initializer for '%Y'",
-			         env->declaration->symbol);
-			else
-				warningf(HERE, "excess elements in struct initializer");
+			if (warning.other) {
+				if (env->declaration != NULL) {
+					warningf(HERE, "excess elements in struct initializer for '%Y'",
+				           env->declaration->symbol);
+				} else {
+					warningf(HERE, "excess elements in struct initializer");
+				}
+			}
 		}
 
 error_parse_next:
@@ -3171,7 +3183,7 @@ static bool check_alignment_value(long long intvalue)
 }
 
 #define DET_MOD(name, tag) do { \
-	if (*modifiers & tag) warningf(HERE, #name " used more than once"); \
+	if (*modifiers & tag && warning.other) warningf(HERE, #name " used more than once"); \
 	*modifiers |= tag; \
 } while (0)
 
@@ -3193,7 +3205,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			if (token.type != T_INTEGER)
 				goto end_error;
 			if (check_alignment_value(token.v.intvalue)) {
-				if (specifiers->alignment != 0)
+				if (specifiers->alignment != 0 && warning.other)
 					warningf(HERE, "align used more than once");
 				specifiers->alignment = (unsigned char)token.v.intvalue;
 			}
@@ -3281,7 +3293,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			expect(')');
 		} else if (symbol == sym_deprecated) {
 			next_token();
-			if (specifiers->deprecated != 0)
+			if (specifiers->deprecated != 0 && warning.other)
 				warningf(HERE, "deprecated used more than once");
 			specifiers->deprecated = 1;
 			if (token.type == '(') {
@@ -3298,7 +3310,8 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			next_token();
 			DET_MOD(noalias, DM_NOALIAS);
 		} else {
-			warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
+			if (warning.other)
+				warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
 			next_token();
 			if (token.type == '(')
 				skip_until(')');
@@ -4378,7 +4391,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			} else if (is_type_array(skipped_return_type)) {
 				errorf(HERE, "function returning array is not allowed");
 			} else {
-				if (skipped_return_type->base.qualifiers != 0) {
+				if (skipped_return_type->base.qualifiers != 0 && warning.other) {
 					warningf(HERE,
 						"type qualifiers in return type of function type are meaningless");
 				}
@@ -4827,28 +4840,30 @@ static void parse_anonymous_declaration_rest(
 {
 	eat(';');
 
-	if (specifiers->declared_storage_class != STORAGE_CLASS_NONE) {
-		warningf(&specifiers->source_position,
-		         "useless storage class in empty declaration");
-	}
-
-	type_t *type = specifiers->type;
-	switch (type->kind) {
-		case TYPE_COMPOUND_STRUCT:
-		case TYPE_COMPOUND_UNION: {
-			if (type->compound.declaration->symbol == NULL) {
-				warningf(&specifiers->source_position,
-				         "unnamed struct/union that defines no instances");
-			}
-			break;
+	if (warning.other) {
+		if (specifiers->declared_storage_class != STORAGE_CLASS_NONE) {
+			warningf(&specifiers->source_position,
+			         "useless storage class in empty declaration");
 		}
 
-		case TYPE_ENUM:
-			break;
+		type_t *type = specifiers->type;
+		switch (type->kind) {
+			case TYPE_COMPOUND_STRUCT:
+			case TYPE_COMPOUND_UNION: {
+				if (type->compound.declaration->symbol == NULL) {
+					warningf(&specifiers->source_position,
+					         "unnamed struct/union that defines no instances");
+				}
+				break;
+			}
 
-		default:
-			warningf(&specifiers->source_position, "empty declaration");
-			break;
+			case TYPE_ENUM:
+				break;
+
+			default:
+				warningf(&specifiers->source_position, "empty declaration");
+				break;
+		}
 	}
 
 #ifdef RECORD_EMPTY_DECLARATIONS
@@ -4876,8 +4891,9 @@ static void parse_declaration_rest(declaration_t *ndeclaration,
 		type_t *orig_type = declaration->type;
 		type_t *type      = skip_typeref(orig_type);
 
-		if (type->kind != TYPE_FUNCTION &&
-		    declaration->is_inline &&
+		if (warning.other               &&
+				type->kind != TYPE_FUNCTION &&
+		    declaration->is_inline      &&
 		    is_type_valid(type)) {
 			warningf(&declaration->source_position,
 			         "variable '%Y' declared 'inline'\n", declaration->symbol);
@@ -6485,7 +6501,7 @@ static expression_t *parse_statement_expression(void)
 		if (stmt->kind == STATEMENT_EXPRESSION) {
 			type = stmt->expression.expression->base.type;
 		}
-	} else {
+	} else if (warning.other) {
 		warningf(&expression->base.source_position, "empty statement expression ({})");
 	}
 	expression->base.type = type;
@@ -7491,10 +7507,12 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 
 	/* 6.5.15.3 */
 	type_t *result_type;
-	if (is_type_atomic(true_type, ATOMIC_TYPE_VOID) ||
-		is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
-		if (!is_type_atomic(true_type, ATOMIC_TYPE_VOID)
-		    || !is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+	if (is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
+			is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+		if (warning.other && (
+					!is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
+					!is_type_atomic(false_type, ATOMIC_TYPE_VOID)
+				)) {
 			warningf(&conditional->base.source_position,
 					"ISO C forbids conditional expression with only one void side");
 		}
@@ -7541,9 +7559,11 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 			                            get_unqualified_type(to2))) {
 				to = to1;
 			} else {
-				warningf(&conditional->base.source_position,
-					"pointer types '%T' and '%T' in conditional expression are incompatible",
-					true_type, false_type);
+				if (warning.other) {
+					warningf(&conditional->base.source_position,
+							"pointer types '%T' and '%T' in conditional expression are incompatible",
+							true_type, false_type);
+				}
 				to = type_void;
 			}
 
@@ -7551,8 +7571,10 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 				get_qualified_type(to, to1->base.qualifiers | to2->base.qualifiers);
 			result_type = make_pointer_type(type, TYPE_QUALIFIER_NONE);
 		} else if (is_type_integer(other_type)) {
-			warningf(&conditional->base.source_position,
-					"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
+			if (warning.other) {
+				warningf(&conditional->base.source_position,
+						"pointer/integer type mismatch in conditional expression ('%T' and '%T')", true_type, false_type);
+			}
 			result_type = pointer_type;
 		} else {
 			if (is_type_valid(other_type)) {
@@ -8093,11 +8115,11 @@ static void semantic_sub(binary_expression_t *expression)
 			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
 		} else if (!is_type_object(unqual_left)) {
-			if (is_type_atomic(unqual_left, ATOMIC_TYPE_VOID)) {
-				warningf(pos, "subtracting pointers to void");
-			} else {
+			if (!is_type_atomic(unqual_left, ATOMIC_TYPE_VOID)) {
 				errorf(pos, "subtracting pointers to non-object types '%T'",
 				       orig_type_left);
+			} else if (warning.other) {
+				warningf(pos, "subtracting pointers to void");
 			}
 		}
 		expression->base.type = type_ptrdiff_t;
@@ -8958,7 +8980,7 @@ static statement_t *parse_case_statement(void)
 				long const val = fold_constant(end_range);
 				statement->case_label.last_case = val;
 
-				if (val < statement->case_label.first_case) {
+				if (warning.other && val < statement->case_label.first_case) {
 					statement->case_label.is_empty_range = true;
 					warningf(pos, "empty range specified");
 				}
@@ -9086,7 +9108,7 @@ static statement_t *parse_label_statement(void)
 
 	if (token.type == '}') {
 		/* TODO only warn? */
-		if (false) {
+		if (warning.other && false) {
 			warningf(HERE, "label at end of compound statement");
 			statement->label.statement = create_empty_statement();
 		} else {
@@ -9415,7 +9437,7 @@ static statement_t *parse_goto(void)
 			if (!is_type_pointer(type) && !is_type_integer(type)) {
 				errorf(&expression->base.source_position,
 					"cannot convert to a pointer type");
-			} else if (type != type_void_ptr) {
+			} else if (warning.other && type != type_void_ptr) {
 				warningf(&expression->base.source_position,
 					"type of computed goto expression should be 'void*' not '%T'", type);
 			}
@@ -9588,10 +9610,12 @@ static statement_t *parse_return(void)
 	if (return_value != NULL) {
 		type_t *return_value_type = skip_typeref(return_value->base.type);
 
-		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)
-				&& !is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
-			warningf(&statement->base.source_position,
-			         "'return' with a value, in function returning void");
+		if (is_type_atomic(return_type,        ATOMIC_TYPE_VOID) &&
+				!is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
+			if (warning.other) {
+				warningf(&statement->base.source_position,
+						"'return' with a value, in function returning void");
+			}
 			return_value = NULL;
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
@@ -9600,7 +9624,8 @@ static statement_t *parse_return(void)
 			return_value = create_implicit_cast(return_value, return_type);
 		}
 		/* check for returning address of a local var */
-		if (return_value != NULL &&
+		if (warning.other        &&
+				return_value != NULL &&
 				return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (is_local_variable(expression)) {
@@ -9608,11 +9633,9 @@ static statement_t *parse_return(void)
 				         "function returns address of local variable");
 			}
 		}
-	} else {
-		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			warningf(&statement->base.source_position,
-			         "'return' without value, in function returning non-void");
-		}
+	} else if (warning.other && !is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		warningf(&statement->base.source_position,
+				"'return' without value, in function returning non-void");
 	}
 	statement->returns.value = return_value;
 
@@ -10130,7 +10153,8 @@ static void parse_translation_unit(void)
 
 			case ';':
 				if (!strict_mode) {
-					warningf(HERE, "stray ';' outside of function");
+					if (warning.other)
+						warningf(HERE, "stray ';' outside of function");
 					next_token();
 					break;
 				}
