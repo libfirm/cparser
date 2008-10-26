@@ -12,9 +12,11 @@ TS(WIDE_STRING_LITERAL,     "wide string literal",)
 TS(PUNCTUATOR,              "punctuator",)
 TS(NEWLINE,                 "newline", = '\n')
 
-#define PUNCTUATOR(name,string,val)   T(_ALL,name,string,val)
+#define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
+#define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
 #include "tokens_punctuator.inc"
 #undef PUNCTUATOR
+#undef ALTERNATE
 
 #define S(x)   T(_ALL,x,#x,)
 
