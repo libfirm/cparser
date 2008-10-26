@@ -1177,7 +1177,7 @@ end_of_char_constant:;
 	lexer_token.type           = T_CHARACTER_CONSTANT;
 	lexer_token.v.string.begin = string;
 	lexer_token.v.string.size  = size;
-	lexer_token.datatype       = type_int;
+	lexer_token.datatype       = c_mode & _CXX && size == 1 ? type_char : type_int;
 }
 
 /**
