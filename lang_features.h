@@ -20,17 +20,18 @@
 #ifndef LANG_FEATURES_H
 #define LANG_FEATURES_H
 
-enum lang_features {
-	_C89  = 1,
-	_ANSI = 2,
-	_C99  = 4,
-	_GNUC = 8,
-	_MS   = 16,
+typedef enum lang_features_t {
+	_C89  = 1U << 0,
+	_ANSI = 1U << 1,
+	_C99  = 1U << 2,
+	_CXX  = 1U << 3,
+	_GNUC = 1U << 4,
+	_MS   = 1U << 5,
 	_ALL  = 0xFF
-};
+} lang_features_t;
 
 /* the current C mode/dialect */
-extern unsigned int c_mode;
+extern lang_features_t c_mode;
 
 /* the 'machine size', 16, 32 or 64 bit */
 extern unsigned int machine_size;

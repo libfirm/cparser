@@ -100,7 +100,7 @@
 #endif
 
 /** The current c mode/dialect. */
-unsigned int c_mode = _C89|_C99|_GNUC;
+lang_features_t c_mode;
 
 /** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
 unsigned int machine_size = 32;
@@ -134,6 +134,8 @@ typedef enum filetype_t {
 	FILETYPE_AUTODETECT,
 	FILETYPE_C,
 	FILETYPE_PREPROCESSED_C,
+	FILETYPE_CXX,
+	FILETYPE_PREPROCESSED_CXX,
 	FILETYPE_ASSEMBLER,
 	FILETYPE_PREPROCESSED_ASSEMBLER,
 	FILETYPE_OBJECT,
@@ -500,6 +502,8 @@ static filetype_t get_filetype_from_string(const char *string)
 {
 	if (streq(string, "c") || streq(string, "c-header"))
 		return FILETYPE_C;
+	if (streq(string, "c++") || streq(string, "c++-header"))
+		return FILETYPE_CXX;
 	if (streq(string, "assembler"))
 		return FILETYPE_PREPROCESSED_ASSEMBLER;
 	if (streq(string, "assembler-with-cpp"))
@@ -509,6 +513,18 @@ static filetype_t get_filetype_from_string(const char *string)
 
 	return FILETYPE_UNKNOWN;
 }
+
+typedef enum lang_standard_t {
+	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
+	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
+	STANDARD_C89,     /* ISO C90 (sic) */
+	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
+	STANDARD_C99,     /* ISO C99 */
+	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
+	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
+	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
+	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
+} lang_standard_t;
 
 int main(int argc, char **argv)
 {
@@ -589,12 +605,15 @@ int main(int argc, char **argv)
 #endif
 
 	/* parse rest of options */
-	filetype_t  forced_filetype = FILETYPE_AUTODETECT;
-	bool        help_displayed  = false;
-	bool        argument_errors = false;
+	lang_standard_t standard        = STANDARD_DEFAULT;
+	lang_features_t features_on     = 0;
+	lang_features_t features_off    = 0;
+	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
+	bool            help_displayed  = false;
+	bool            argument_errors = false;
 	for(int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
-		if(arg[0] == '-' && arg[1] != 0) {
+		if (arg[0] == '-' && arg[1] != '\0') {
 			/* an option */
 			const char *option = &arg[1];
 			if(option[0] == 'o') {
@@ -812,29 +831,38 @@ int main(int argc, char **argv)
 			} else if (streq(option, "shared")) {
 				add_flag(&ldflags_obst, "-shared");
 			} else if (strstart(option, "std=")) {
-				if (streq(&option[4], "c99")) {
-					c_mode = _C89|_C99;
-				} else if (streq(&option[4], "c89")) {
-					c_mode = _C89;
-				} else if (streq(&option[4], "gnu99")) {
-					c_mode = _C89|_C99|_GNUC;
-				} else if (streq(&option[4], "microsoft")) {
-					c_mode = _C89|_C99|_MS;
-				} else
-					fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+				const char *const o = &option[4];
+				standard =
+					streq(o, "c++98")          ? STANDARD_CXX98   :
+					streq(o, "c89")            ? STANDARD_C89     :
+					streq(o, "c99")            ? STANDARD_C99     :
+					streq(o, "c9x")            ? STANDARD_C99     : // deprecated
+					streq(o, "gnu++98")        ? STANDARD_GNUXX98 :
+					streq(o, "gnu89")          ? STANDARD_GNU89   :
+					streq(o, "gnu99")          ? STANDARD_GNU99   :
+					streq(o, "gnu9x")          ? STANDARD_GNU99   : // deprecated
+					streq(o, "iso9899:1990")   ? STANDARD_C89     :
+					streq(o, "iso9899:199409") ? STANDARD_C90     :
+					streq(o, "iso9899:1999")   ? STANDARD_C99     :
+					streq(o, "iso9899:199x")   ? STANDARD_C99     : // deprecated
+					(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
 			} else if (streq(option, "version")) {
 				print_cparser_version();
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;
 				if (streq(option, "gcc")) {
-					c_mode |= _GNUC;
+					features_on  |=  _GNUC;
+					features_off &= ~_GNUC;
 				} else if (streq(option, "no-gcc")) {
-					c_mode &= ~_GNUC;
+					features_on  &= ~_GNUC;
+					features_off |=  _GNUC;
 				} else if (streq(option, "ms")) {
-					c_mode |= _MS;
+					features_on  |=  _MS;
+					features_off &= ~_MS;
 				} else if (streq(option, "no-ms")) {
-					c_mode &= ~_MS;
+					features_on  &= ~_MS;
+					features_off |=  _MS;
 				} else if (streq(option, "signed-chars")) {
 					char_is_signed = true;
 				} else if (streq(option, "unsigned-chars")) {
@@ -879,23 +907,26 @@ int main(int argc, char **argv)
 		} else {
 			filetype_t type = forced_filetype;
 			if (type == FILETYPE_AUTODETECT) {
-				size_t const len = strlen(arg);
-				if (len < 2 && arg[0] == '-') {
+				if (streq(arg, "-")) {
 					/* - implicitly means C source file */
 					type = FILETYPE_C;
-				} else if (len > 2 && arg[len - 2] == '.') {
-					switch (arg[len - 1]) {
-					case 'c': type = FILETYPE_C;                      break;
-					case 'h': type = FILETYPE_C;                      break;
-					case 's': type = FILETYPE_PREPROCESSED_ASSEMBLER; break;
-					case 'S': type = FILETYPE_ASSEMBLER;              break;
-
-					case 'a':
-					case 'o': type = FILETYPE_OBJECT;                 break;
-					}
-				} else if (len > 3 && arg[len - 3] == '.') {
-					if (streq(arg + len - 2, "so")) {
-						type = FILETYPE_OBJECT;
+				} else {
+					const char *suffix = strrchr(arg, '.');
+					/* Ensure there is at least one char before the suffix */
+					if (suffix != NULL && suffix != arg) {
+						++suffix;
+						type =
+							streq(suffix, "S")   ? FILETYPE_ASSEMBLER              :
+							streq(suffix, "a")   ? FILETYPE_OBJECT                 :
+							streq(suffix, "c")   ? FILETYPE_C                      :
+							streq(suffix, "cc")  ? FILETYPE_CXX                    :
+							streq(suffix, "cpp") ? FILETYPE_CXX                    :
+							streq(suffix, "cxx") ? FILETYPE_CXX                    :
+							streq(suffix, "h")   ? FILETYPE_C                      :
+							streq(suffix, "o")   ? FILETYPE_OBJECT                 :
+							streq(suffix, "s")   ? FILETYPE_PREPROCESSED_ASSEMBLER :
+							streq(suffix, "so")  ? FILETYPE_OBJECT                 :
+							FILETYPE_AUTODETECT;
 					}
 				}
 
@@ -938,7 +969,6 @@ int main(int argc, char **argv)
 
 	gen_firm_init();
 	init_symbol_table();
-	init_tokens();
 	init_types();
 	init_typehash();
 	init_basic_types();
@@ -1014,7 +1044,7 @@ int main(int argc, char **argv)
 		const char *filename = file->name;
 		filetype_t  filetype = file->type;
 
-		if (file->type == FILETYPE_OBJECT)
+		if (filetype == FILETYPE_OBJECT)
 			continue;
 
 		FILE *in = NULL;
@@ -1027,36 +1057,35 @@ int main(int argc, char **argv)
 		}
 
 		FILE *preprocessed_in = NULL;
-		if (filetype == FILETYPE_C || filetype == FILETYPE_ASSEMBLER) {
-			/* no support for input on FILE* yet */
-			if (in != NULL)
-				panic("internal compiler error: in for preprocessor != NULL");
+		switch (filetype) {
+			case FILETYPE_C:         filetype = FILETYPE_PREPROCESSED_C;         goto preprocess;
+			case FILETYPE_CXX:       filetype = FILETYPE_PREPROCESSED_CXX;       goto preprocess;
+			case FILETYPE_ASSEMBLER: filetype = FILETYPE_PREPROCESSED_ASSEMBLER; goto preprocess;
+preprocess:
+				/* no support for input on FILE* yet */
+				if (in != NULL)
+					panic("internal compiler error: in for preprocessor != NULL");
 
-			preprocessed_in = preprocess(filename);
-			if (mode == PreprocessOnly) {
-				copy_file(out, preprocessed_in);
-				int result = pclose(preprocessed_in);
-				fclose(out);
-				return result;
-			}
+				preprocessed_in = preprocess(filename);
+				if (mode == PreprocessOnly) {
+					copy_file(out, preprocessed_in);
+					int result = pclose(preprocessed_in);
+					fclose(out);
+					return result;
+				}
 
-			if (filetype == FILETYPE_C) {
-				filetype = FILETYPE_PREPROCESSED_C;
-			} else if (filetype == FILETYPE_ASSEMBLER) {
-				filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
-			} else {
-				panic("internal compiler error: unknown filetype at preproc");
-			}
+				in = preprocessed_in;
+				break;
 
-			in = preprocessed_in;
+			default:
+				break;
 		}
 
 		FILE *asm_out;
 		if(mode == Compile) {
 			asm_out = out;
 		} else {
-			asm_out = make_temp_file(asm_tempfile, sizeof(asm_tempfile),
-			                         "ccs");
+			asm_out = make_temp_file(asm_tempfile, sizeof(asm_tempfile), "ccs");
 		}
 
 		if (in == NULL)
@@ -1064,6 +1093,51 @@ int main(int argc, char **argv)
 
 		/* preprocess and compile */
 		if (filetype == FILETYPE_PREPROCESSED_C) {
+			char const* invalid_mode;
+			switch (standard) {
+				case STANDARD_ANSI:
+				case STANDARD_C89:   c_mode = _C89;                break;
+				/* TODO ^v determine difference between these two */
+				case STANDARD_C90:   c_mode = _C89;                break;
+				case STANDARD_C99:   c_mode = _C89 | _C99;         break;
+				case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
+
+default_c_warn:
+					fprintf(stderr,
+							"warning: command line option \"-std=%s\" is not valid for C\n",
+							invalid_mode);
+					/* FALLTHROUGH */
+				case STANDARD_DEFAULT:
+				case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
+
+				case STANDARD_CXX98:   invalid_mode = "c++98"; goto default_c_warn;
+				case STANDARD_GNUXX98: invalid_mode = "gnu98"; goto default_c_warn;
+			}
+			goto do_parsing;
+		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
+			char const* invalid_mode;
+			switch (standard) {
+				case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
+				case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
+				case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
+				case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
+				case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
+
+				case STANDARD_ANSI:
+				case STANDARD_CXX98: c_mode = _CXX; break;
+
+default_cxx_warn:
+					fprintf(stderr,
+							"warning: command line option \"-std=%s\" is not valid for C++\n",
+							invalid_mode);
+				case STANDARD_DEFAULT:
+				case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+			}
+
+do_parsing:
+			c_mode |= features_on;
+			c_mode &= ~features_off;
+			init_tokens();
 			translation_unit_t *const unit = do_parsing(in, filename);
 
 			/* prints the AST even if errors occurred */
@@ -1136,7 +1210,6 @@ int main(int argc, char **argv)
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
-
 		} else if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
 			copy_file(asm_out, in);
 			if (in == preprocessed_in) {
