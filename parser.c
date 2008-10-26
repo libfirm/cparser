@@ -7498,7 +7498,8 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 		true_expression = parse_expression();
 	rem_anchor_token(':');
 	expect(':');
-	expression_t *false_expression = parse_sub_expression(PREC_CONDITIONAL);
+	expression_t *false_expression =
+		parse_sub_expression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
 
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
