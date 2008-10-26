@@ -320,11 +320,10 @@ static unsigned count_parameters(const function_type_t *function_type)
  */
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
-	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
-	atomic_type_kind_t  kind      = type->akind;
-	ir_mode            *mode      = _atomic_modes[kind];
-	ident              *id        = get_mode_ident(mode);
-	ir_type            *irtype    = new_d_type_primitive(id, mode, dbgi);
+	atomic_type_kind_t  kind   = type->akind;
+	ir_mode            *mode   = _atomic_modes[kind];
+	ident              *id     = get_mode_ident(mode);
+	ir_type            *irtype = new_type_primitive(id, mode);
 
 	set_type_alignment_bytes(irtype, type->base.alignment);
 
@@ -336,13 +335,11 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
  */
 static ir_type *create_complex_type(const complex_type_t *type)
 {
-	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
-	atomic_type_kind_t  kind      = type->akind;
-	ir_mode            *mode      = _atomic_modes[kind];
-	ident              *id        = get_mode_ident(mode);
+	atomic_type_kind_t  kind = type->akind;
+	ir_mode            *mode = _atomic_modes[kind];
+	ident              *id   = get_mode_ident(mode);
 
 	(void) id;
-	(void) dbgi;
 
 	/* FIXME: finish the array */
 	return NULL;
@@ -353,11 +350,10 @@ static ir_type *create_complex_type(const complex_type_t *type)
  */
 static ir_type *create_imaginary_type(const imaginary_type_t *type)
 {
-	dbg_info           *dbgi      = get_dbg_info(&type->base.source_position);
 	atomic_type_kind_t  kind      = type->akind;
 	ir_mode            *mode      = _atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
-	ir_type            *irtype    = new_d_type_primitive(id, mode, dbgi);
+	ir_type            *irtype    = new_type_primitive(id, mode);
 
 	set_type_alignment_bytes(irtype, type->base.alignment);
 
@@ -386,8 +382,7 @@ static ir_type *create_method_type(const function_type_t *function_type)
 	ident   *id           = id_unique("functiontype.%u");
 	int      n_parameters = count_parameters(function_type);
 	int      n_results    = return_type == type_void ? 0 : 1;
-	dbg_info *dbgi        = get_dbg_info(&function_type->base.source_position);
-	ir_type *irtype       = new_d_type_method(id, n_parameters, n_results, dbgi);
+	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
 
 	if (return_type != type_void) {
 		ir_type *restype = get_ir_type(return_type);
@@ -432,7 +427,6 @@ is_cdecl:
 
 	case CC_THISCALL:
 		/* Hmm, leave default, not accepted by the parser yet. */
-		warningf(&function_type->base.source_position, "THISCALL calling convention not supported yet");
 		break;
 	}
 	return irtype;
@@ -442,9 +436,8 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 {
 	type_t   *points_to    = type->points_to;
 	ir_type  *ir_points_to = get_ir_type_incomplete(points_to);
-	dbg_info *dbgi         = get_dbg_info(&type->base.source_position);
-	ir_type  *ir_type      = new_d_type_pointer(id_unique("pointer.%u"),
-	                                            ir_points_to, mode_P_data, dbgi);
+	ir_type  *ir_type      = new_type_pointer(id_unique("pointer.%u"),
+	                                          ir_points_to, mode_P_data);
 
 	return ir_type;
 }
@@ -455,8 +448,7 @@ static ir_type *create_array_type(array_type_t *type)
 	ir_type *ir_element_type = get_ir_type(element_type);
 
 	ident    *id      = id_unique("array.%u");
-	dbg_info *dbgi    = get_dbg_info(&type->base.source_position);
-	ir_type  *ir_type = new_d_type_array(id, 1, ir_element_type, dbgi);
+	ir_type  *ir_type = new_type_array(id, 1, ir_element_type);
 
 	const int align = get_type_alignment_bytes(ir_element_type);
 	set_type_alignment_bytes(ir_type, align);
@@ -609,7 +601,7 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 				id = id_unique("__anonymous_struct.%u");
 			}
 		}
-		dbg_info *dbgi  = get_dbg_info(&type->base.source_position);
+		dbg_info *dbgi = get_dbg_info(&declaration->source_position);
 
 		if (is_union) {
 			irtype = new_d_type_union(id, dbgi);

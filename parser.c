@@ -145,8 +145,6 @@ static struct obstack      temp_obst;
 	((void)(current_parent = (stmt)))
 #define POP_PARENT ((void)(current_parent = prev_parent))
 
-static source_position_t null_position = { NULL, 0 };
-
 /** special symbol used for anonymous entities. */
 static const symbol_t *sym_anonymous = NULL;
 
@@ -436,16 +434,14 @@ static size_t get_type_struct_size(type_kind_t kind)
  * fields with zero.
  *
  * @param kind             type kind to allocate
- * @param source_position  the source position of the type definition
  */
-static type_t *allocate_type_zero(type_kind_t kind, const source_position_t *source_position)
+static type_t *allocate_type_zero(type_kind_t kind)
 {
 	size_t  size = get_type_struct_size(kind);
 	type_t *res  = obstack_alloc(type_obst, size);
 	memset(res, 0, size);
+	res->base.kind = kind;
 
-	res->base.kind            = kind;
-	res->base.source_position = *source_position;
 	return res;
 }
 
@@ -1137,7 +1133,7 @@ static type_t *make_global_typedef(const char *name, type_t *type)
 
 	record_declaration(declaration, false);
 
-	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF, &builtin_source_position);
+	type_t *typedef_type               = allocate_type_zero(TYPE_TYPEDEF);
 	typedef_type->typedeft.declaration = declaration;
 
 	return typedef_type;
@@ -3021,7 +3017,7 @@ static type_t *parse_enum_specifier(void)
 		declaration->parent_scope  = scope;
 	}
 
-	type_t *const type      = allocate_type_zero(TYPE_ENUM, &declaration->source_position);
+	type_t *const type      = allocate_type_zero(TYPE_ENUM);
 	type->enumt.declaration = declaration;
 
 	if (token.type == '{') {
@@ -3098,7 +3094,7 @@ static type_t *parse_typeof(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF, &expression->base.source_position);
+	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF);
 	typeof_type->typeoft.expression  = expression;
 	typeof_type->typeoft.typeof_type = type;
 
@@ -3131,7 +3127,7 @@ typedef enum specifiers_t {
 static type_t *create_builtin_type(symbol_t *const symbol,
                                    type_t *const real_type)
 {
-	type_t *type            = allocate_type_zero(TYPE_BUILTIN, &builtin_source_position);
+	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
 	type->builtin.symbol    = symbol;
 	type->builtin.real_type = real_type;
 
@@ -3150,7 +3146,7 @@ static type_t *get_typedef_type(symbol_t *symbol)
 	   declaration->storage_class != STORAGE_CLASS_TYPEDEF)
 		return NULL;
 
-	type_t *type               = allocate_type_zero(TYPE_TYPEDEF, &declaration->source_position);
+	type_t *type               = allocate_type_zero(TYPE_TYPEDEF);
 	type->typedeft.declaration = declaration;
 
 	return type;
@@ -3562,14 +3558,14 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T_struct: {
-			type = allocate_type_zero(TYPE_COMPOUND_STRUCT, HERE);
+			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
 
 			type->compound.declaration = parse_compound_type_specifier(true);
 			finish_struct_type(&type->compound);
 			break;
 		}
 		case T_union: {
-			type = allocate_type_zero(TYPE_COMPOUND_UNION, HERE);
+			type = allocate_type_zero(TYPE_COMPOUND_UNION);
 			type->compound.declaration = parse_compound_type_specifier(false);
 			if (type->compound.declaration->modifiers & DM_TRANSPARENT_UNION)
 				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
@@ -3627,7 +3623,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 						declaration_t *const decl =
 							create_error_declaration(token.v.symbol, STORAGE_CLASS_TYPEDEF);
 
-						type = allocate_type_zero(TYPE_TYPEDEF, HERE);
+						type = allocate_type_zero(TYPE_TYPEDEF);
 						type->typedeft.declaration = decl;
 
 						next_token();
@@ -3818,13 +3814,13 @@ warn_about_long_long:
 		}
 
 		if (type_specifiers & SPECIFIER_COMPLEX) {
-			type                = allocate_type_zero(TYPE_COMPLEX, &builtin_source_position);
+			type                = allocate_type_zero(TYPE_COMPLEX);
 			type->complex.akind = atomic_type;
 		} else if (type_specifiers & SPECIFIER_IMAGINARY) {
-			type                  = allocate_type_zero(TYPE_IMAGINARY, &builtin_source_position);
+			type                  = allocate_type_zero(TYPE_IMAGINARY);
 			type->imaginary.akind = atomic_type;
 		} else {
-			type               = allocate_type_zero(TYPE_ATOMIC, &builtin_source_position);
+			type               = allocate_type_zero(TYPE_ATOMIC);
 			type->atomic.akind = atomic_type;
 		}
 		newtype = true;
@@ -4143,7 +4139,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 {
 	type_t *type;
 	if (declaration != NULL) {
-		type = allocate_type_zero(TYPE_FUNCTION, &declaration->source_position);
+		type = allocate_type_zero(TYPE_FUNCTION);
 
 		unsigned mask = declaration->modifiers & (DM_CDECL|DM_STDCALL|DM_FASTCALL|DM_THISCALL);
 
@@ -4179,7 +4175,7 @@ static construct_type_t *parse_function_declarator(declaration_t *declaration)
 		else if (declaration->modifiers & DM_THISCALL)
 			type->function.calling_convention = CC_THISCALL;
 	} else {
-		type = allocate_type_zero(TYPE_FUNCTION, HERE);
+		type = allocate_type_zero(TYPE_FUNCTION);
 	}
 
 	declaration_t *last;
@@ -4400,7 +4396,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_ARRAY: {
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
-			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY, &null_position);
+			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY);
 
 			expression_t *size_expression = parsed_array->size;
 			if (size_expression != NULL) {
@@ -5749,7 +5745,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
                                   source_position_t *source_position,
                                   const symbol_t *symbol)
 {
-	type_t *type = allocate_type_zero(TYPE_BITFIELD, source_position);
+	type_t *type = allocate_type_zero(TYPE_BITFIELD);
 
 	type->bitfield.base_type       = base_type;
 	type->bitfield.size_expression = size;
@@ -6095,7 +6091,7 @@ static expression_t *parse_float_const(void)
 static declaration_t *create_implicit_function(symbol_t *symbol,
 		const source_position_t *source_position)
 {
-	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION, source_position);
+	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
 	ntype->function.return_type            = type_int;
 	ntype->function.unspecified_parameters = true;
 
@@ -6138,7 +6134,7 @@ static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
 	parameter1->type = argument_type1;
 	parameter1->next = parameter2;
 
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION, &builtin_source_position);
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter1;
 
@@ -6164,7 +6160,7 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	memset(parameter, 0, sizeof(parameter[0]));
 	parameter->type = argument_type;
 
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION, &builtin_source_position);
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 
@@ -6178,7 +6174,7 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 
 static type_t *make_function_0_type(type_t *return_type)
 {
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION, &builtin_source_position);
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = NULL;
 
@@ -10029,7 +10025,7 @@ static void initialize_builtin_types(void)
 	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
 
 	/* const version of wchar_t */
-	type_const_wchar_t = allocate_type_zero(TYPE_TYPEDEF, &builtin_source_position);
+	type_const_wchar_t = allocate_type_zero(TYPE_TYPEDEF);
 	type_const_wchar_t->typedeft.declaration  = type_wchar_t->typedeft.declaration;
 	type_const_wchar_t->base.qualifiers      |= TYPE_QUALIFIER_CONST;
 

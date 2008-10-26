@@ -59,7 +59,6 @@ typedef unsigned short type_modifiers_t;
 
 struct type_base_t {
 	type_kind_t       kind;
-	source_position_t source_position;
 	il_size_t         size;           /**< The size of this type. */
 	type_qualifiers_t qualifiers;
 	type_modifiers_t  modifiers;

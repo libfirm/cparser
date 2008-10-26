@@ -91,7 +91,7 @@ type_t *type_unsigned_int64;
 
 void init_basic_types(void)
 {
-	static const type_base_t error = { TYPE_ERROR, { NULL, 0 }, 0, TYPE_QUALIFIER_NONE,
+	static const type_base_t error = { TYPE_ERROR, 0, TYPE_QUALIFIER_NONE,
 	                                   TYPE_MODIFIER_NONE, 0, NULL };
 
 	type_error_type         = (type_t*)&error;
