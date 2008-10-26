@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
 
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
@@ -4581,13 +4582,12 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 			def_nr = l->last_case;
 	}
 
-	if (def_nr + 1 < 0) {
-		/* Bad: an overflow occurred, we cannot be sure that the
-    	 * maximum + 1 is a free number. Scan the values a second
-    	 * time to find a free number.
-    	 */
+	if (def_nr == INT_MAX) {
+		/* Bad: an overflow will occurr, we cannot be sure that the
+		 * maximum + 1 is a free number. Scan the values a second
+		 * time to find a free number.
+		 */
 		unsigned char *bits = xmalloc((num_cases + 7) >> 3);
-		unsigned long i;
 
  		memset(bits, 0, (num_cases + 7) >> 3);
 		for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
@@ -4595,11 +4595,11 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 				/* default case */
 				continue;
 			}
-			if (l->first_case < num_cases && l->last_case >= 0) {
-				long start = l->first_case > 0 ? l->first_case : 0;
-				long end   = (unsigned long)l->last_case < num_cases ?
-					l->last_case : num_cases - 1;
-				for (long cns = start; cns <= end; ++cns) {
+			unsigned long start = l->first_case > 0 ? (unsigned long)l->first_case : 0;
+			if (start < num_cases && l->last_case >= 0) {
+				unsigned long end  = (unsigned long)l->last_case < num_cases ?
+					(unsigned long)l->last_case : num_cases - 1;
+				for (unsigned long cns = start; cns <= end; ++cns) {
 					bits[cns >> 3] |= (1 << (cns & 7));
 				}
 			}
@@ -4609,6 +4609,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		 * one, or they are non densed, so we will find one free
 		 * there...
 		 */
+		unsigned long i;
 		for (i = 0; i < num_cases; ++i)
 			if ((bits[i >> 3] & (1 << (i & 7))) == 0)
 				break;
