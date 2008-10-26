@@ -9884,20 +9884,21 @@ expression_statment:
 	case T___FUNCSIG__:
 	case T___FUNCTION__:
 	case T___PRETTY_FUNCTION__:
+	case T___alignof__:
 	case T___builtin_alloca:
 	case T___builtin_classify_type:
 	case T___builtin_constant_p:
 	case T___builtin_expect:
 	case T___builtin_huge_val:
+	case T___builtin_inf:
+	case T___builtin_inff:
+	case T___builtin_infl:
 	case T___builtin_isgreater:
 	case T___builtin_isgreaterequal:
 	case T___builtin_isless:
 	case T___builtin_islessequal:
 	case T___builtin_islessgreater:
 	case T___builtin_isunordered:
-	case T___builtin_inf:
-	case T___builtin_inff:
-	case T___builtin_infl:
 	case T___builtin_nan:
 	case T___builtin_nanf:
 	case T___builtin_nanl:
@@ -9909,6 +9910,7 @@ expression_statment:
 	case T___func__:
 	case T___noop:
 	case T__assume:
+	case T_sizeof:
 		statement = parse_expression_statement();
 		break;
 
