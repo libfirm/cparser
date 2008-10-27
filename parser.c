@@ -1123,9 +1123,12 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			points_to_left  = get_unqualified_type(points_to_left);
 			points_to_right = get_unqualified_type(points_to_right);
 
-			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID) ||
-					is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
+			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID))
 				return res;
+
+			if (is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
+				/* ISO/IEC 14882:1998(E) §C.3.5:6 */
+				return c_mode & _CXX ? ASSIGN_ERROR_INCOMPATIBLE : res;
 			}
 
 			if (!types_compatible(points_to_left, points_to_right)) {
