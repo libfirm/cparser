@@ -4045,7 +4045,9 @@ static declaration_t *parse_parameters(function_type_t *type, declaration_t **la
 	}
 
 	if (token.type == ')') {
-		type->unspecified_parameters = 1;
+		/* ISO/IEC 14882:1998(E) §C.1.6:1 */
+		if (!(c_mode & _CXX))
+			type->unspecified_parameters = 1;
 		goto parameters_finished;
 	}
 
