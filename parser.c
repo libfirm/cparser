@@ -4774,10 +4774,14 @@ warn_redundant_declaration:
 					previous_declaration->storage_class          = STORAGE_CLASS_NONE;
 					previous_declaration->declared_storage_class = STORAGE_CLASS_NONE;
 				} else {
+					/* ISO/IEC 14882:1998(E) §C.1.2:1 */
+					if (c_mode & _CXX)
+						goto error_redeclaration;
 					goto warn_redundant_declaration;
 				}
 			} else if (is_type_valid(prev_type)) {
 				if (old_storage_class == new_storage_class) {
+error_redeclaration:
 					errorf(&declaration->source_position,
 					       "redeclaration of '%Y' (declared %P)",
 					       symbol, &previous_declaration->source_position);
