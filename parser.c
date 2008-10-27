@@ -9618,8 +9618,8 @@ static statement_t *parse_for(void)
 			         "step of 'for'-statement has no effect");
 		}
 	}
-	rem_anchor_token(')');
 	expect(')');
+	rem_anchor_token(')');
 	statement->fors.body = parse_loop_body(statement);
 
 	assert(scope == &statement->fors.scope);
