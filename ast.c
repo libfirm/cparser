@@ -131,6 +131,8 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_CAST]                = PREC_UNARY,
 		[EXPR_UNARY_CAST_IMPLICIT]       = PREC_UNARY,
 		[EXPR_UNARY_ASSUME]              = PREC_PRIMARY,
+		[EXPR_UNARY_DELETE]              = PREC_UNARY,
+		[EXPR_UNARY_DELETE_ARRAY]        = PREC_UNARY,
 		[EXPR_UNARY_THROW]               = PREC_ASSIGNMENT,
 
 		[EXPR_BINARY_ADD]                = PREC_ADDITIVE,
@@ -475,14 +477,16 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch(unexpr->base.kind) {
-	case EXPR_UNARY_NEGATE:           fputc('-', out);  break;
-	case EXPR_UNARY_PLUS:             fputc('+', out);  break;
-	case EXPR_UNARY_NOT:              fputc('!', out);  break;
-	case EXPR_UNARY_BITWISE_NEGATE:   fputc('~', out);  break;
-	case EXPR_UNARY_PREFIX_INCREMENT: fputs("++", out); break;
-	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--", out); break;
-	case EXPR_UNARY_DEREFERENCE:      fputc('*', out);  break;
-	case EXPR_UNARY_TAKE_ADDRESS:     fputc('&', out);  break;
+	case EXPR_UNARY_NEGATE:           fputc('-',          out); break;
+	case EXPR_UNARY_PLUS:             fputc('+',          out); break;
+	case EXPR_UNARY_NOT:              fputc('!',          out); break;
+	case EXPR_UNARY_BITWISE_NEGATE:   fputc('~',          out); break;
+	case EXPR_UNARY_PREFIX_INCREMENT: fputs("++",         out); break;
+	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--",         out); break;
+	case EXPR_UNARY_DEREFERENCE:      fputc('*',          out); break;
+	case EXPR_UNARY_TAKE_ADDRESS:     fputc('&',          out); break;
+	case EXPR_UNARY_DELETE:           fputs("delete ",    out); break;
+	case EXPR_UNARY_DELETE_ARRAY:     fputs("delete [] ", out); break;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 		print_expression_prec(unexpr->value, prec);
@@ -1766,6 +1770,8 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
 	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_DELETE:
+	case EXPR_UNARY_DELETE_ARRAY:
 	case EXPR_UNARY_THROW:
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:

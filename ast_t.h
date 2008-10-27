@@ -102,6 +102,8 @@ typedef enum expression_kind_t {
 	EXPR_UNARY_CAST,
 	EXPR_UNARY_CAST_IMPLICIT, /**< compiler generated cast */
 	EXPR_UNARY_ASSUME,        /**< MS __assume() */
+	EXPR_UNARY_DELETE,
+	EXPR_UNARY_DELETE_ARRAY,
 	EXPR_UNARY_THROW,
 	EXPR_UNARY_LAST = EXPR_UNARY_THROW,
 
@@ -210,7 +212,9 @@ typedef enum funcname_kind_t {
 	case EXPR_UNARY_PREFIX_DECREMENT:      \
 	case EXPR_UNARY_CAST:                  \
 	case EXPR_UNARY_CAST_IMPLICIT:         \
-	case EXPR_UNARY_ASSUME:
+	case EXPR_UNARY_ASSUME:                \
+	case EXPR_UNARY_DELETE:                \
+	case EXPR_UNARY_DELETE_ARRAY:
 
 /**
  * unary expression with optinal operand

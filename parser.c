@@ -296,6 +296,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T___noop:                   \
 	case T__assume:                  \
 	case T_sizeof:                   \
+	case T_delete:                   \
 	case T_throw:
 
 /**
@@ -2041,14 +2042,16 @@ static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
 				lhs_decl = NULL;
 			goto unary;
 
-		case EXPR_UNARY_DEREFERENCE:
-			if (lhs_decl == DECL_ANY)
-				lhs_decl = NULL;
-			goto unary;
 
 		case EXPR_UNARY_THROW:
 			if (expr->unary.value == NULL)
 				return;
+			/* FALLTHROUGH */
+		case EXPR_UNARY_DEREFERENCE:
+		case EXPR_UNARY_DELETE:
+		case EXPR_UNARY_DELETE_ARRAY:
+			if (lhs_decl == DECL_ANY)
+				lhs_decl = NULL;
 			goto unary;
 
 		case EXPR_UNARY_NEGATE:
@@ -7780,6 +7783,41 @@ end_error:
 }
 
 /**
+ * Parse a delete expression
+ * ISO/IEC 14882:1998(E) §5.3.5
+ */
+static expression_t *parse_delete(void)
+{
+	expression_t *const result = allocate_expression_zero(EXPR_UNARY_DELETE);
+	result->base.source_position = *HERE;
+	result->base.type            = type_void;
+
+	eat(T_delete);
+
+	if (token.type == '[') {
+		next_token();
+		result->kind = EXPR_UNARY_DELETE_ARRAY;
+		expect(']');
+end_error:;
+	}
+
+	expression_t *const value = parse_sub_expression(PREC_CAST);
+	result->unary.value = value;
+
+	type_t *const type = skip_typeref(value->base.type);
+	if (!is_type_pointer(type)) {
+		errorf(&value->base.source_position,
+				"operand of delete must have pointer type");
+	} else if (warning.other &&
+			is_type_atomic(skip_typeref(type->pointer.points_to), ATOMIC_TYPE_VOID)) {
+		warningf(&value->base.source_position,
+				"deleting 'void*' is undefined");
+	}
+
+	return result;
+}
+
+/**
  * Parse a throw expression
  * ISO/IEC 14882:1998(E) §15:1
  */
@@ -8666,6 +8704,8 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_UNARY_CAST_IMPLICIT:       return true;
 		case EXPR_UNARY_ASSUME:              return true;
+		case EXPR_UNARY_DELETE:              return true;
+		case EXPR_UNARY_DELETE_ARRAY:        return true;
 		case EXPR_UNARY_THROW:               return true;
 
 		case EXPR_BINARY_ADD:                return false;
@@ -8925,6 +8965,7 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_alignof,                     T___alignof__);
 	register_expression_parser(parse_extension,                   T___extension__);
 	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type);
+	register_expression_parser(parse_delete,                      T_delete);
 	register_expression_parser(parse_throw,                       T_throw);
 }
 
