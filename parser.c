@@ -5537,14 +5537,6 @@ continue_for:;
 		}
 	}
 
-	if (next == NULL) {
-		next = stmt->base.parent;
-		if (next == NULL) {
-			warningf(&stmt->base.source_position,
-			         "control reaches end of non-void function");
-		}
-	}
-
 	check_reachable(next);
 }
 
