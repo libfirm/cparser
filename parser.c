@@ -7295,43 +7295,42 @@ static expression_t *parse_typeprop(expression_kind_t const kind,
 	/* we only refer to a type property, mark this case */
 	bool old     = in_type_prop;
 	in_type_prop = true;
+
+	type_t       *orig_type;
+	expression_t *expression;
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
 		next_token();
 		add_anchor_token(')');
-		type_t* const orig_type = parse_typename();
-		tp_expression->typeprop.type = orig_type;
-
-		type_t const* const type = skip_typeref(orig_type);
-		char const* const wrong_type =
-			is_type_incomplete(type)    ? "incomplete"          :
-			type->kind == TYPE_FUNCTION ? "function designator" :
-			type->kind == TYPE_BITFIELD ? "bitfield"            :
-			NULL;
-		if (wrong_type != NULL) {
-			errorf(&pos, "operand of %s expression must not be %s type '%T'",
-			       what, wrong_type, type);
-		}
-
+		orig_type = parse_typename();
 		rem_anchor_token(')');
 		expect(')');
-	} else {
-		expression_t *expression = parse_sub_expression(PREC_UNARY);
 
-		type_t* const orig_type = revert_automatic_type_conversion(expression);
-		expression->base.type = orig_type;
-
-		type_t const* const type = skip_typeref(orig_type);
-		char const* const wrong_type =
-			is_type_incomplete(type)    ? "incomplete"          :
-			type->kind == TYPE_FUNCTION ? "function designator" :
-			type->kind == TYPE_BITFIELD ? "bitfield"            :
-			NULL;
-		if (wrong_type != NULL) {
-			errorf(&pos, "operand of %s expression must not be expression of %s type '%T'", what, wrong_type, type);
+		if (token.type == '{') {
+			/* It was not sizeof(type) after all.  It is sizeof of an expression
+			 * starting with a compound literal */
+			expression = parse_compound_literal(orig_type);
+			goto typeprop_expression;
 		}
+	} else {
+		expression = parse_sub_expression(PREC_UNARY);
 
-		tp_expression->typeprop.type          = expression->base.type;
+typeprop_expression:
 		tp_expression->typeprop.tp_expression = expression;
+
+		orig_type = revert_automatic_type_conversion(expression);
+		expression->base.type = orig_type;
+	}
+
+	tp_expression->typeprop.type   = orig_type;
+	type_t const* const type       = skip_typeref(orig_type);
+	char   const* const wrong_type =
+		is_type_incomplete(type)    ? "incomplete"          :
+		type->kind == TYPE_FUNCTION ? "function designator" :
+		type->kind == TYPE_BITFIELD ? "bitfield"            :
+		NULL;
+	if (wrong_type != NULL) {
+		errorf(&pos, "operand of %s expression must not be of %s type '%T'",
+				what, wrong_type, orig_type);
 	}
 
 end_error:
