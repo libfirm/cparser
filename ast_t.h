@@ -102,7 +102,8 @@ typedef enum expression_kind_t {
 	EXPR_UNARY_CAST,
 	EXPR_UNARY_CAST_IMPLICIT, /**< compiler generated cast */
 	EXPR_UNARY_ASSUME,        /**< MS __assume() */
-	EXPR_UNARY_LAST = EXPR_UNARY_ASSUME,
+	EXPR_UNARY_THROW,
+	EXPR_UNARY_LAST = EXPR_UNARY_THROW,
 
 	EXPR_BINARY_FIRST,
 	EXPR_BINARY_ADD = EXPR_BINARY_FIRST,
@@ -193,7 +194,10 @@ typedef enum funcname_kind_t {
 	case EXPR_BINARY_ISLESSGREATER:        \
 	case EXPR_BINARY_ISUNORDERED:
 
-#define EXPR_UNARY_CASES                   \
+/**
+ * unary expression with mandatory operand
+ */
+#define EXPR_UNARY_CASES_MANDATORY         \
 	case EXPR_UNARY_NEGATE:                \
 	case EXPR_UNARY_PLUS:                  \
 	case EXPR_UNARY_BITWISE_NEGATE:        \
@@ -207,6 +211,16 @@ typedef enum funcname_kind_t {
 	case EXPR_UNARY_CAST:                  \
 	case EXPR_UNARY_CAST_IMPLICIT:         \
 	case EXPR_UNARY_ASSUME:
+
+/**
+ * unary expression with optinal operand
+ */
+#define EXPR_UNARY_CASES_OPTIONAL \
+	case EXPR_UNARY_THROW:        \
+
+#define EXPR_UNARY_CASES       \
+	EXPR_UNARY_CASES_MANDATORY \
+	EXPR_UNARY_CASES_OPTIONAL
 
 /**
  * A scope containing declarations.

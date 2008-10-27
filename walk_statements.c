@@ -15,7 +15,11 @@ static void walk_expression(expression_t const *const expr, statement_callback c
 			walk_expression(expr->binary.right, callback, env);
 			return;
 
-		EXPR_UNARY_CASES
+		EXPR_UNARY_CASES_OPTIONAL
+			if (expr->unary.value == NULL)
+				return;
+			/* FALLTHROUGH */
+		EXPR_UNARY_CASES_MANDATORY
 			walk_expression(expr->unary.value, callback, env);
 			return;
 

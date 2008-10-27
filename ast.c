@@ -131,6 +131,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_CAST]                = PREC_UNARY,
 		[EXPR_UNARY_CAST_IMPLICIT]       = PREC_UNARY,
 		[EXPR_UNARY_ASSUME]              = PREC_PRIMARY,
+		[EXPR_UNARY_THROW]               = PREC_ASSIGNMENT,
 
 		[EXPR_BINARY_ADD]                = PREC_ADDITIVE,
 		[EXPR_BINARY_SUB]                = PREC_ADDITIVE,
@@ -502,6 +503,15 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		print_expression_prec(unexpr->value, 2 * PREC_ASSIGNMENT);
 		fputc(')', out);
 		return;
+
+	case EXPR_UNARY_THROW:
+		if (unexpr->value == NULL) {
+			fputs("throw", out);
+			return;
+		}
+		fputs("throw ", out);
+		break;
+
 	default:
 		panic("invalid unary expression found");
 	}
@@ -1756,6 +1766,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 	case EXPR_UNARY_ASSUME: /* has VOID type */
 	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_THROW:
 	case EXPR_BINARY_ASSIGN:
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_DIV_ASSIGN:

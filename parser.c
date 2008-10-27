@@ -248,6 +248,56 @@ static void semantic_comparison(binary_expression_t *expression);
 	TYPE_QUALIFIERS         \
 	TYPE_SPECIFIERS
 
+#define EXPRESSION_START           \
+	case '!':                        \
+	case '&':                        \
+	case '(':                        \
+	case '*':                        \
+	case '+':                        \
+	case '-':                        \
+	case '~':                        \
+	case T_ANDAND:                   \
+	case T_CHARACTER_CONSTANT:       \
+	case T_FLOATINGPOINT:            \
+	case T_INTEGER:                  \
+	case T_MINUSMINUS:               \
+	case T_PLUSPLUS:                 \
+	case T_STRING_LITERAL:           \
+	case T_WIDE_CHARACTER_CONSTANT:  \
+	case T_WIDE_STRING_LITERAL:      \
+	case T___FUNCDNAME__:            \
+	case T___FUNCSIG__:              \
+	case T___FUNCTION__:             \
+	case T___PRETTY_FUNCTION__:      \
+	case T___alignof__:              \
+	case T___builtin_alloca:         \
+	case T___builtin_classify_type:  \
+	case T___builtin_constant_p:     \
+	case T___builtin_expect:         \
+	case T___builtin_huge_val:       \
+	case T___builtin_inf:            \
+	case T___builtin_inff:           \
+	case T___builtin_infl:           \
+	case T___builtin_isgreater:      \
+	case T___builtin_isgreaterequal: \
+	case T___builtin_isless:         \
+	case T___builtin_islessequal:    \
+	case T___builtin_islessgreater:  \
+	case T___builtin_isunordered:    \
+	case T___builtin_nan:            \
+	case T___builtin_nanf:           \
+	case T___builtin_nanl:           \
+	case T___builtin_offsetof:       \
+	case T___builtin_prefetch:       \
+	case T___builtin_va_arg:         \
+	case T___builtin_va_end:         \
+	case T___builtin_va_start:       \
+	case T___func__:                 \
+	case T___noop:                   \
+	case T__assume:                  \
+	case T_sizeof:                   \
+	case T_throw:
+
 /**
  * Allocate an AST node with given size and
  * initialize all fields with zero.
@@ -1991,6 +2041,11 @@ static void mark_decls_read(expression_t *const expr, declaration_t *lhs_decl)
 		case EXPR_UNARY_DEREFERENCE:
 			if (lhs_decl == DECL_ANY)
 				lhs_decl = NULL;
+			goto unary;
+
+		case EXPR_UNARY_THROW:
+			if (expr->unary.value == NULL)
+				return;
 			goto unary;
 
 		case EXPR_UNARY_NEGATE:
@@ -5197,6 +5252,89 @@ static int determine_truth(expression_t const* const cond)
 		-1;
 }
 
+static bool expression_returns(expression_t const *const expr)
+{
+	switch (expr->kind) {
+		case EXPR_CALL: {
+			expression_t const *const func = expr->call.function;
+			if (func->kind == EXPR_REFERENCE) {
+				declaration_t const *const decl = func->reference.declaration;
+				if (decl != NULL && decl->modifiers & DM_NORETURN)
+					return false;
+			}
+
+			if (!expression_returns(func))
+				return false;
+
+			for (call_argument_t const* arg = expr->call.arguments; arg != NULL; arg = arg->next) {
+				if (!expression_returns(arg->expression))
+					return false;
+			}
+
+			return true;
+		}
+
+		case EXPR_REFERENCE:
+		case EXPR_CONST:
+		case EXPR_CHARACTER_CONSTANT:
+		case EXPR_WIDE_CHARACTER_CONSTANT:
+		case EXPR_STRING_LITERAL:
+		case EXPR_WIDE_STRING_LITERAL:
+		case EXPR_COMPOUND_LITERAL: // TODO descend into initialisers
+		case EXPR_LABEL_ADDRESS:
+		case EXPR_CLASSIFY_TYPE:
+		case EXPR_SIZEOF: // TODO handle obscure VLA case
+		case EXPR_ALIGNOF:
+		case EXPR_FUNCNAME:
+		case EXPR_BUILTIN_SYMBOL:
+		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_PREFETCH:
+		case EXPR_OFFSETOF:
+		case EXPR_STATEMENT: // TODO implement
+			return true;
+
+		case EXPR_CONDITIONAL:
+			// TODO handle constant expression
+			return
+				expression_returns(expr->conditional.condition) && (
+					expression_returns(expr->conditional.true_expression) ||
+					expression_returns(expr->conditional.false_expression)
+				);
+
+		case EXPR_SELECT:
+			return expression_returns(expr->select.compound);
+
+		case EXPR_ARRAY_ACCESS:
+			return
+				expression_returns(expr->array_access.array_ref) &&
+				expression_returns(expr->array_access.index);
+
+		case EXPR_VA_START:
+			return expression_returns(expr->va_starte.ap);
+
+		case EXPR_VA_ARG:
+			return expression_returns(expr->va_arge.ap);
+
+		EXPR_UNARY_CASES_MANDATORY
+			return expression_returns(expr->unary.value);
+
+		case EXPR_UNARY_THROW:
+			return false;
+
+		EXPR_BINARY_CASES
+			// TODO handle constant lhs of && and ||
+			return
+				expression_returns(expr->binary.left) &&
+				expression_returns(expr->binary.right);
+
+		case EXPR_UNKNOWN:
+		case EXPR_INVALID:
+			break;
+	}
+
+	panic("unhandled expression");
+}
+
 static bool noreturn_candidate;
 
 static void check_reachable(statement_t *const stmt)
@@ -5286,15 +5424,8 @@ static void check_reachable(statement_t *const stmt)
 		case STATEMENT_EXPRESSION: {
 			/* Check for noreturn function call */
 			expression_t const *const expr = stmt->expression.expression;
-			if (expr->kind == EXPR_CALL) {
-				expression_t const *const func = expr->call.function;
-				if (func->kind == EXPR_REFERENCE) {
-					declaration_t const *const decl = func->reference.declaration;
-					if (decl != NULL && decl->modifiers & DM_NORETURN) {
-						return;
-					}
-				}
-			}
+			if (!expression_returns(expr))
+				return;
 
 			next = stmt->base.next;
 			break;
@@ -7502,14 +7633,21 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	type_t *result_type;
 	if (is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
 			is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
-		if (warning.other && (
-					!is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
-					!is_type_atomic(false_type, ATOMIC_TYPE_VOID)
-				)) {
-			warningf(&conditional->base.source_position,
-					"ISO C forbids conditional expression with only one void side");
+		/* ISO/IEC 14882:1998(E) §5.16:2 */
+		if (true_expression->kind == EXPR_UNARY_THROW) {
+			result_type = false_type;
+		} else if (false_expression->kind == EXPR_UNARY_THROW) {
+			result_type = true_type;
+		} else {
+			if (warning.other && (
+						!is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
+						!is_type_atomic(false_type, ATOMIC_TYPE_VOID)
+					)) {
+				warningf(&conditional->base.source_position,
+						"ISO C forbids conditional expression with only one void side");
+			}
+			result_type = type_void;
 		}
-		result_type = type_void;
 	} else if (is_type_arithmetic(true_type)
 	           && is_type_arithmetic(false_type)) {
 		result_type = semantic_arithmetic(true_type, false_type);
@@ -7629,6 +7767,46 @@ static expression_t *parse_builtin_classify_type(void)
 	return result;
 end_error:
 	return create_invalid_expression();
+}
+
+/**
+ * Parse a throw expression
+ * ISO/IEC 14882:1998(E) §15:1
+ */
+static expression_t *parse_throw(void)
+{
+	expression_t *const result = allocate_expression_zero(EXPR_UNARY_THROW);
+	result->base.source_position = *HERE;
+	result->base.type            = type_void;
+
+	eat(T_throw);
+
+	expression_t *value = NULL;
+	switch (token.type) {
+		EXPRESSION_START {
+			value = parse_assignment_expression();
+			/* ISO/IEC 14882:1998(E) §15.1:3 */
+			type_t *const orig_type = value->base.type;
+			type_t *const type      = skip_typeref(orig_type);
+			if (is_type_incomplete(type)) {
+				errorf(&value->base.source_position,
+						"cannot throw object of incomplete type '%T'", orig_type);
+			} else if (is_type_pointer(type)) {
+				type_t *const points_to = skip_typeref(type->pointer.points_to);
+				if (is_type_incomplete(points_to) &&
+						!is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+					errorf(&value->base.source_position,
+							"cannot throw pointer to incomplete type '%T'", orig_type);
+				}
+			}
+		}
+
+		default:
+			break;
+	}
+	result->unary.value = value;
+
+	return result;
 }
 
 static bool check_pointer_arithmetic(const source_position_t *source_position,
@@ -8478,6 +8656,7 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_UNARY_CAST_IMPLICIT:       return true;
 		case EXPR_UNARY_ASSUME:              return true;
+		case EXPR_UNARY_THROW:               return true;
 
 		case EXPR_BINARY_ADD:                return false;
 		case EXPR_BINARY_SUB:                return false;
@@ -8736,6 +8915,7 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_alignof,                     T___alignof__);
 	register_expression_parser(parse_extension,                   T___extension__);
 	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type);
+	register_expression_parser(parse_throw,                       T_throw);
 }
 
 /**
@@ -9857,53 +10037,7 @@ expression_statment:
 	case T_switch:   statement = parse_switch();                  break;
 	case T_while:    statement = parse_while();                   break;
 
-	case '!':
-	case '&':
-	case '(':
-	case '*':
-	case '+':
-	case '-':
-	case '~':
-	case T_ANDAND:
-	case T_CHARACTER_CONSTANT:
-	case T_FLOATINGPOINT:
-	case T_INTEGER:
-	case T_MINUSMINUS:
-	case T_PLUSPLUS:
-	case T_STRING_LITERAL:
-	case T_WIDE_CHARACTER_CONSTANT:
-	case T_WIDE_STRING_LITERAL:
-	case T___FUNCDNAME__:
-	case T___FUNCSIG__:
-	case T___FUNCTION__:
-	case T___PRETTY_FUNCTION__:
-	case T___alignof__:
-	case T___builtin_alloca:
-	case T___builtin_classify_type:
-	case T___builtin_constant_p:
-	case T___builtin_expect:
-	case T___builtin_huge_val:
-	case T___builtin_inf:
-	case T___builtin_inff:
-	case T___builtin_infl:
-	case T___builtin_isgreater:
-	case T___builtin_isgreaterequal:
-	case T___builtin_isless:
-	case T___builtin_islessequal:
-	case T___builtin_islessgreater:
-	case T___builtin_isunordered:
-	case T___builtin_nan:
-	case T___builtin_nanf:
-	case T___builtin_nanl:
-	case T___builtin_offsetof:
-	case T___builtin_prefetch:
-	case T___builtin_va_arg:
-	case T___builtin_va_end:
-	case T___builtin_va_start:
-	case T___func__:
-	case T___noop:
-	case T__assume:
-	case T_sizeof:
+	EXPRESSION_START
 		statement = parse_expression_statement();
 		break;
 
