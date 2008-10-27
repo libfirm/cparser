@@ -73,9 +73,9 @@ void print_indent(void)
 static int right_to_left(unsigned precedence)
 {
 	switch (precedence) {
-		case PREC_ASSIGNMENT:
-		case PREC_CONDITIONAL:
-		case PREC_UNARY:
+		case 2*PREC_ASSIGNMENT:
+		case 2*PREC_CONDITIONAL:
+		case 2*PREC_UNARY:
 			return 1;
 
 		default:
