@@ -1127,7 +1127,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 				return res;
 
 			if (is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
-				/* ISO/IEC 14882:1998(E) §C.3.5:6 */
+				/* ISO/IEC 14882:1998(E) §C.1.2:6 */
 				return c_mode & _CXX ? ASSIGN_ERROR_INCOMPATIBLE : res;
 			}
 
@@ -3864,7 +3864,8 @@ warn_about_long_long:
 				if (saw_error)
 					goto end_error;
 
-				if (!strict_mode) {
+				/* ISO/IEC 14882:1998(E) §C.1.5:4 */
+				if (!(c_mode & _CXX) && !strict_mode) {
 					if (warning.implicit_int) {
 						warningf(HERE, "no type specifiers in declaration, using 'int'");
 					}
