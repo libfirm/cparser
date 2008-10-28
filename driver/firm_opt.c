@@ -387,6 +387,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "gvnpre",      (func_ptr_t) do_gvn_pre,              true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "ifconv",      (func_ptr_t) do_if_conv,              true, true,  true,  TV_IF_CONV },
 	{ OPT_TARGET_IRG, "bool",        (func_ptr_t) opt_bool,                true, true,  true,  -1 },
+	{ OPT_TARGET_IRG, "end-melt",    (func_ptr_t) melt_end_blocks,         true, true,  true,  TV_END_MELT },
 	{ OPT_TARGET_IRG, "stred",       (func_ptr_t) do_stred,                true, true,  true,  TV_OSR },
 	{ OPT_TARGET_IRG, "dead",        (func_ptr_t) dead_node_elimination,   true, false, true,  TV_DEAD_NODE },
 	{ OPT_TARGET_IRP, "inline",      (func_ptr_t) do_inline,               true, true,  true,  -1 },
@@ -505,6 +506,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_opt_enabled("gvnpre", firm_opt.gvn_pre);
   set_opt_enabled("ifconv", firm_opt.if_conversion);
   set_opt_enabled("bool", firm_opt.bool_opt);
+  set_opt_enabled("end-melt", firm_opt.end_melt);
   set_opt_enabled("inline", firm_opt.do_inline);
   set_opt_enabled("clone", firm_opt.cloning);
   set_opt_enabled("combo", firm_opt.combo);
@@ -574,6 +576,7 @@ static void do_firm_optimizations(const char *input_filename)
     }
 
     do_irg_opt(irg, "bool");
+    do_irg_opt(irg, "end-melt");
     do_irg_opt(irg, "stred");
     do_irg_opt(irg, "local");
     do_irg_opt(irg, "dead");

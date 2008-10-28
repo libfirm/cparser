@@ -58,6 +58,7 @@ struct a_firm_opt firm_opt = {
   /* deconv          = */ FALSE,
   /* cc_opt          = */ TRUE,
   /* bool_opt        = */ FALSE,
+  /* end_melt        = */ FALSE,
   /* freestanding;   = */ FALSE,
   /* fp_model        = */ fp_model_precise,
   /* lower_ll        = */ FALSE,
@@ -198,6 +199,8 @@ static const struct params {
   { X("no-opt-cc"),              &firm_opt.cc_opt,           0, "firm: disable calling conventions optimization" },
   { X("bool"),                   &firm_opt.bool_opt,         1, "firm: enable bool simplification optimization" },
   { X("no-bool"),                &firm_opt.bool_opt,         0, "firm: disable bool simplification optimization" },
+  { X("end-melt"),               &firm_opt.end_melt,         1, "firm: enable end block melting" },
+  { X("no-end-melt"),            &firm_opt.end_melt,         0, "firm: disable end block melting" },
   { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
   { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
 
@@ -323,6 +326,7 @@ static void disable_opts(void) {
   firm_opt.deconv          = FALSE;
   firm_opt.cc_opt          = FALSE;
   firm_opt.bool_opt        = FALSE;
+  firm_opt.end_melt        = FALSE;
   firm_opt.freestanding    = TRUE;
 }  /* disable_opts */
 
