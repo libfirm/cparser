@@ -17,22 +17,21 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
-#ifndef PARSER_H
-#define PARSER_H
+#ifndef ENTITY_H
+#define ENTITY_H
 
-#include "ast.h"
-#include "type.h"
+typedef struct scope_t                      scope_t;
 
-typedef struct environment_entry_t environment_entry_t;
-
-void init_parser(void);
-void exit_parser(void);
-
-void start_parsing(void);
-void parse(void);
-translation_unit_t *finish_parsing(void);
-
-type_t   *revert_automatic_type_conversion(const expression_t *expression);
-entity_t *expression_is_variable(const expression_t *expression);
+typedef struct entity_base_t                entity_base_t;
+typedef struct compound_t                   compound_t;
+typedef struct enum_t                       enum_t;
+typedef struct enum_value_t                 enum_value_t;
+typedef struct label_t                      label_t;
+typedef struct declaration_t                declaration_t;
+typedef struct typedef_t                    typedef_t;
+typedef struct variable_t                   variable_t;
+typedef struct function_t                   function_t;
+typedef struct compound_member_t            compound_member_t;
+typedef union  entity_t                     entity_t;
 
 #endif

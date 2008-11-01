@@ -4,7 +4,7 @@ CPARSER=../build/cparser
 CPARSER_FLAGS="-O3 -fno-inline"
 
 rm -f messages.cparser messages.gcc
-for i in *.c shouldpass/*.c; do
+for i in *.c should_pass/*.c; do
 	echo -n "Compile $i..."
 	"$CPARSER" $i $CPARSER_FLAGS -std=c99 -o prog.cparser >> messages.cparser 2>&1 || echo -n " CPARSER COMPILE FAILED"
 	gcc -m32 -std=c99 $i -O3 -o prog.gcc >> messages.gcc 2>&1 || echo -n " GCC COMPILE FAILED"
@@ -44,7 +44,7 @@ for i in should_warn/*.c; do
 	fi
 done
 
-for i in shouldfail/*.c; do
+for i in should_fail/*.c; do
 	echo -n "Compile $i..."
 	"$CPARSER" $CPARSER_FLAGS $i -std=c99 -o prog.cparser >> messages.cparser 2>&1 && echo -n " CPARSER COMPILED"
 	gcc -m32 -std=c99 $i -O3 -o prog.gcc >> messages.gcc 2>&1 && echo -n " GCC COMPILED"

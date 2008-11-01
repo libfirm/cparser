@@ -22,7 +22,7 @@
 
 #include <stdbool.h>
 #include "symbol.h"
-#include "ast.h"
+#include "entity.h"
 #include "token_t.h"
 
 struct pp_definition_t {
@@ -41,7 +41,7 @@ struct symbol_t {
 	const char       *string;
 	unsigned short    ID;
 	unsigned short    pp_ID;
-	declaration_t    *declaration;
+	entity_t         *entity;
 	pp_definition_t  *pp_definition;
 };
 

@@ -102,12 +102,12 @@ void print_type(const type_t *type);
  * if symbol is NULL
  */
 void print_type_ext(const type_t *type, const symbol_t *symbol,
-                    const scope_t *scope);
+                    const scope_t *parameters);
 
 void print_type_qualifiers(type_qualifiers_t qualifiers);
 
-void print_enum_definition(const declaration_t *declaration);
-void print_compound_definition(const declaration_t *declaration);
+void print_enum_definition(const enum_t *enume);
+void print_compound_definition(const compound_t *compound);
 
 /**
  * set output stream for the type printer

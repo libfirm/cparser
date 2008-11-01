@@ -27,6 +27,7 @@
 #include "symbol.h"
 #include "token_t.h"
 #include "type.h"
+#include "entity.h"
 #include "adt/obst.h"
 
 /** The AST obstack contains all data that must stay in the AST. */
@@ -64,6 +65,7 @@ typedef enum expression_kind_t {
 	EXPR_UNKNOWN = 0,
 	EXPR_INVALID,
 	EXPR_REFERENCE,
+	EXPR_REFERENCE_ENUM_VALUE,
 	EXPR_CONST,
 	EXPR_CHARACTER_CONSTANT,
 	EXPR_WIDE_CHARACTER_CONSTANT,
@@ -230,10 +232,10 @@ typedef enum funcname_kind_t {
  * A scope containing declarations.
  */
 struct scope_t {
-	declaration_t *declarations;      /**< List of declarations in this scope. */
-	declaration_t *last_declaration;  /**< last declaration in this scope. */
-	scope_t       *parent;            /**< points to the parent scope. */
-	unsigned      depth;              /**< while parsing, the depth of this scope in the scope stack. */
+	entity_t *entities;     /**< List of declarations in this scope. */
+	entity_t *last_entity;  /**< last declaration in this scope. */
+	scope_t  *parent;       /**< points to the parent scope. */
+	unsigned  depth;        /**< while parsing, the depth of this scope in the scope stack. */
 };
 
 struct expression_base_t {
@@ -298,7 +300,7 @@ struct builtin_prefetch_expression_t {
 
 struct reference_expression_t {
 	expression_base_t  base;
-	declaration_t     *declaration;
+	entity_t          *entity;
 };
 
 struct call_argument_t {
@@ -326,7 +328,7 @@ struct binary_expression_t {
 struct select_expression_t {
 	expression_base_t  base;
 	expression_t      *compound;
-	declaration_t     *compound_entry;
+	entity_t          *compound_entry;
 };
 
 struct array_access_expression_t {
@@ -358,7 +360,7 @@ struct offsetof_expression_t {
 struct va_start_expression_t {
 	expression_base_t  base;
 	expression_t      *ap;
-	declaration_t     *parameter;
+	variable_t        *parameter;
 };
 
 struct va_arg_expression_t {
@@ -385,7 +387,7 @@ struct classify_type_expression_t {
 
 struct label_address_expression_t {
 	expression_base_t  base;
-	declaration_t     *declaration;
+	label_t           *label;
 };
 
 union expression_t {
@@ -414,28 +416,6 @@ union expression_t {
 	classify_type_expression_t       classify_type;
 	label_address_expression_t       label_address;
 };
-
-typedef enum storage_class_tag_t {
-	STORAGE_CLASS_NONE,
-	STORAGE_CLASS_EXTERN,
-	STORAGE_CLASS_STATIC,
-	STORAGE_CLASS_TYPEDEF,
-	STORAGE_CLASS_AUTO,
-	STORAGE_CLASS_REGISTER,
-	STORAGE_CLASS_ENUM_ENTRY,
-	STORAGE_CLASS_THREAD,
-	STORAGE_CLASS_THREAD_EXTERN,
-	STORAGE_CLASS_THREAD_STATIC,
-} storage_class_tag_t;
-
-typedef enum namespace_t {
-	NAMESPACE_NORMAL,
-	NAMESPACE_STRUCT,
-	NAMESPACE_UNION,
-	NAMESPACE_ENUM,
-	NAMESPACE_LABEL,
-	NAMESPACE_LOCAL_LABEL
-} namespace_t;
 
 typedef enum initializer_kind_t {
 	INITIALIZER_VALUE,
@@ -557,92 +537,13 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
-/**
- * Extended microsoft modifier.
- */
-typedef enum decl_modifier_t {
-	DM_DLLIMPORT         = 1 <<  0,
-	DM_DLLEXPORT         = 1 <<  1,
-	DM_THREAD            = 1 <<  2,
-	DM_NAKED             = 1 <<  3,
-	DM_MICROSOFT_INLINE  = 1 <<  4,
-	DM_FORCEINLINE       = 1 <<  5,
-	DM_SELECTANY         = 1 <<  6,
-	DM_NOTHROW           = 1 <<  7,
-	DM_NOVTABLE          = 1 <<  8,
-	DM_NORETURN          = 1 <<  9,
-	DM_NOINLINE          = 1 << 10,
-	DM_RESTRICT          = 1 << 11,
-	DM_NOALIAS           = 1 << 12,
-	DM_PACKED            = 1 << 13,
-	DM_TRANSPARENT_UNION = 1 << 14,
-	DM_CONST             = 1 << 15,
-	DM_PURE              = 1 << 16,
-	DM_CONSTRUCTOR       = 1 << 17,
-	DM_DESTRUCTOR        = 1 << 18,
-	DM_UNUSED            = 1 << 19,
-	DM_USED              = 1 << 20,
-	DM_CDECL             = 1 << 21,
-	DM_FASTCALL          = 1 << 22,
-	DM_STDCALL           = 1 << 23,
-	DM_THISCALL          = 1 << 24,
-	DM_DEPRECATED        = 1 << 25
-} decl_modifier_t;
-
-typedef unsigned decl_modifiers_t;
-
-struct declaration_t {
-	unsigned char       namespc;
-	unsigned char       declared_storage_class;
-	unsigned char       storage_class;
-	unsigned char       alignment;          /**< Alignment of the declaration, 0 for default. */
-	decl_modifiers_t    modifiers;          /**< modifiers. */
-	const char         *deprecated_string;  /**< MS deprecated string if any. */
-	symbol_t           *get_property_sym;   /**< MS get property. */
-	symbol_t           *put_property_sym;   /**< MS put property. */
-	unsigned int        address_taken : 1;  /**< Set if the address of this declaration was taken. */
-	unsigned int        is_inline     : 1;
-	unsigned int        used          : 1;  /**< Set if the declaration is used. */
-	unsigned int        read          : 1;
-	unsigned int        implicit      : 1;  /**< Set for implicit (not found in source code) declarations. */
-	unsigned int        need_closure  : 1;  /**< Inner function needs closure. */
-	unsigned int        goto_to_outer : 1;  /**< Inner function has goto to outer function. */
-	type_t             *type;
-	il_size_t           offset;             /**< The offset of this member inside a compound. */
-	symbol_t           *symbol;
-	source_position_t   source_position;
-	union {
-		bool            complete;           /**< used to indicate whether struct/union types are already defined or if just the name is declared */
-		statement_t    *statement;
-		initializer_t  *initializer;
-		expression_t   *enum_value;
-	} init;
-	scope_t             scope;              /**< The scope that this declaration opens. */
-	scope_t            *parent_scope;       /**< The parent scope where this declaration lives. */
-
-	/** next declaration in a scope */
-	declaration_t      *next;
-	/** next declaration with same symbol */
-	declaration_t      *symbol_next;
-
-	/* the following fields are used in ast2firm module */
-	unsigned char       declaration_kind;
-	union {
-		unsigned int  value_number;
-		ir_entity    *entity;
-		ir_node      *block;
-		ir_node      *vla_base;
-		tarval       *enum_val;
-		ir_type      *irtype;
-	} v;
-};
-
 typedef enum statement_kind_t {
 	STATEMENT_INVALID,
 	STATEMENT_EMPTY,
 	STATEMENT_COMPOUND,
 	STATEMENT_RETURN,
 	STATEMENT_DECLARATION,
+	STATEMENT_LOCAL_LABEL,
 	STATEMENT_IF,
 	STATEMENT_SWITCH,
 	STATEMENT_EXPRESSION,
@@ -691,8 +592,14 @@ struct compound_statement_t {
 
 struct declaration_statement_t {
 	statement_base_t  base;
-	declaration_t    *declarations_begin;
-	declaration_t    *declarations_end;
+	entity_t         *declarations_begin;
+	entity_t         *declarations_end;
+};
+
+struct local_label_statement_t {
+	statement_base_t  base;
+	entity_t         *labels_begin;
+	entity_t         *labels_end;
 };
 
 struct if_statement_t {
@@ -713,7 +620,7 @@ struct switch_statement_t {
 
 struct goto_statement_t {
 	statement_base_t  base;
-	declaration_t    *label;         /**< The destination label. */
+	label_t          *label;         /**< The destination label. */
 	expression_t     *expression;    /**< The expression for an assigned goto. */
 	goto_statement_t *next;          /**< links all goto statements of a function */
 };
@@ -732,7 +639,7 @@ struct case_label_statement_t {
 
 struct label_statement_t {
 	statement_base_t   base;
-	declaration_t     *label;
+	label_t           *label;
 	statement_t       *statement;
 	label_statement_t *next;    /**< links all label statements of a function */
 };
@@ -803,6 +710,7 @@ union statement_t {
 	return_statement_t       returns;
 	compound_statement_t     compound;
 	declaration_statement_t  declaration;
+	local_label_statement_t  local_label;
 	if_statement_t           ifs;
 	switch_statement_t       switchs;
 	goto_statement_t         gotos;

@@ -23,6 +23,7 @@
 #include <assert.h>
 
 #include "type_t.h"
+#include "entity_t.h"
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "adt/error.h"
@@ -327,7 +328,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
  * @param top    true, if this is the top type, false if it's an embedded type.
  */
 static void print_function_type_post(const function_type_t *type,
-                                     const scope_t *scope, bool top)
+                                     const scope_t *parameters, bool top)
 {
 	/* don't emit parenthesis if we're the toplevel type... */
 	if (!top)
@@ -335,7 +336,7 @@ static void print_function_type_post(const function_type_t *type,
 
 	fputc('(', out);
 	bool first = true;
-	if (scope == NULL) {
+	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
 			if (first) {
@@ -346,15 +347,16 @@ static void print_function_type_post(const function_type_t *type,
 			print_type(parameter->type);
 		}
 	} else {
-		declaration_t *parameter = scope->declarations;
-		for( ; parameter != NULL; parameter = parameter->next) {
+		entity_t *parameter = parameters->entities;
+		for( ; parameter != NULL; parameter = parameter->base.next) {
 			if (first) {
 				first = false;
 			} else {
 				fputs(", ", out);
 			}
-			print_type_ext(parameter->type, parameter->symbol,
-			               &parameter->scope);
+			assert(is_declaration(parameter));
+			print_type_ext(parameter->declaration.type, parameter->base.symbol,
+			               NULL);
 		}
 	}
 	if (type->variadic) {
@@ -446,23 +448,23 @@ static void print_bitfield_type_post(const bitfield_type_t *type)
  *
  * @param declaration  The enum's type declaration.
  */
-void print_enum_definition(const declaration_t *declaration)
+void print_enum_definition(const enum_t *enume)
 {
 	fputs("{\n", out);
 
 	change_indent(1);
 
-	declaration_t *entry = declaration->next;
-	for( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
-	       entry = entry->next) {
+	entity_t *entry = enume->base.next;
+	for( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	       entry = entry->base.next) {
 
 		print_indent();
-		fprintf(out, "%s", entry->symbol->string);
-		if (entry->init.initializer != NULL) {
+		fprintf(out, "%s", entry->base.symbol->string);
+		if (entry->enum_value.value != NULL) {
 			fprintf(out, " = ");
 
 			/* skip the implicit cast */
-			expression_t *expression = entry->init.enum_value;
+			expression_t *expression = entry->enum_value.value;
 			if (expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
 				expression = expression->unary.value;
 			}
@@ -487,29 +489,30 @@ static void print_type_enum(const enum_type_t *type)
 	print_type_qualifiers(type->base.qualifiers);
 	fputs(" enum " + empty, out);
 
-	declaration_t *declaration = type->declaration;
-	symbol_t      *symbol      = declaration->symbol;
+	enum_t   *enume  = type->enume;
+	symbol_t *symbol = enume->base.symbol;
 	if (symbol != NULL) {
 		fputs(symbol->string, out);
 	} else {
-		print_enum_definition(declaration);
+		print_enum_definition(enume);
 	}
 }
 
 /**
  * Print the compound part of a compound type.
- *
- * @param declaration  The declaration of the compound type.
  */
-void print_compound_definition(const declaration_t *declaration)
+void print_compound_definition(const compound_t *compound)
 {
 	fputs("{\n", out);
 	change_indent(1);
 
-	declaration_t *iter = declaration->scope.declarations;
-	for( ; iter != NULL; iter = iter->next) {
+	entity_t *entity = compound->members.entities;
+	for( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
 		print_indent();
-		print_declaration(iter);
+		print_entity(entity);
 		fputc('\n', out);
 	}
 
@@ -535,12 +538,12 @@ static void print_compound_type(const compound_type_t *type)
 		fputs(" union " + empty, out);
 	}
 
-	declaration_t *declaration = type->declaration;
-	symbol_t      *symbol      = declaration->symbol;
+	compound_t *compound = type->compound;
+	symbol_t   *symbol   = compound->base.symbol;
 	if (symbol != NULL) {
 		fputs(symbol->string, out);
 	} else {
-		print_compound_definition(declaration);
+		print_compound_definition(compound);
 	}
 }
 
@@ -554,7 +557,7 @@ static void print_typedef_type_pre(const typedef_type_t *const type)
 	print_type_qualifiers(type->base.qualifiers);
 	if (type->base.qualifiers != 0)
 		fputc(' ', out);
-	fputs(type->declaration->symbol->string, out);
+	fputs(type->typedefe->base.symbol->string, out);
 }
 
 /**
@@ -677,7 +680,7 @@ void print_type(const type_t *const type)
 }
 
 void print_type_ext(const type_t *const type, const symbol_t *symbol,
-                    const scope_t *scope)
+                    const scope_t *parameters)
 {
 	if (type == NULL) {
 		fputs("nil type", out);
@@ -690,7 +693,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 		fputs(symbol->string, out);
 	}
 	if (type->kind == TYPE_FUNCTION) {
-		print_function_type_post(&type->function, scope, true);
+		print_function_type_post(&type->function, parameters, true);
 	} else {
 		intern_print_type_post(type, true);
 	}
@@ -972,14 +975,10 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
 		const compound_type_t *compound_type = &type->compound;
-		declaration_t         *declaration   = compound_type->declaration;
-		return !declaration->init.complete;
+		return !compound_type->compound->complete;
 	}
-	case TYPE_ENUM: {
-		const enum_type_t *enum_type   = &type->enumt;
-		declaration_t     *declaration = enum_type->declaration;
-		return !declaration->init.complete;
-	}
+	case TYPE_ENUM:
+		return false;
 
 	case TYPE_ARRAY:
 		return type->array.size_expression == NULL
@@ -1161,7 +1160,7 @@ type_t *skip_typeref(type_t *type)
 				type = typedef_type->resolved_type;
 				break;
 			}
-			type = typedef_type->declaration->type;
+			type = typedef_type->typedefe->type;
 			continue;
 		}
 		case TYPE_TYPEOF: {
@@ -1217,7 +1216,7 @@ type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type) {
 			if (typedef_type->resolved_type != NULL)
 				type = typedef_type->resolved_type;
 			else
-				type = typedef_type->declaration->type;
+				type = typedef_type->typedefe->type;
 			continue;
 		case TYPE_TYPEOF: {
 			const typeof_type_t *typeof_type = &type->typeoft;

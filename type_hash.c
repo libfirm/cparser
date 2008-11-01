@@ -84,7 +84,7 @@ static unsigned hash_array_type(const array_type_t *type)
 
 static unsigned hash_compound_type(const compound_type_t *type)
 {
-	return hash_ptr(type->declaration);
+	return hash_ptr(type->compound);
 }
 
 static unsigned hash_type(const type_t *type);
@@ -105,7 +105,7 @@ static unsigned hash_function_type(const function_type_t *type)
 
 static unsigned hash_enum_type(const enum_type_t *type)
 {
-	return hash_ptr(type->declaration);
+	return hash_ptr(type->enume);
 }
 
 static unsigned hash_typeof_type(const typeof_type_t *type)
@@ -163,7 +163,7 @@ static unsigned hash_type(const type_t *type)
 		hash = hash_ptr(type->builtin.symbol);
 		break;
 	case TYPE_TYPEDEF:
-		hash = hash_ptr(type->typedeft.declaration);
+		hash = hash_ptr(type->typedeft.typedefe);
 		break;
 	case TYPE_TYPEOF:
 		hash = hash_typeof_type(&type->typeoft);
@@ -262,19 +262,19 @@ static bool builtin_types_equal(const builtin_type_t *type1,
 static bool compound_types_equal(const compound_type_t *type1,
                                  const compound_type_t *type2)
 {
-	return type1->declaration == type2->declaration;
+	return type1->compound == type2->compound;
 }
 
 static bool enum_types_equal(const enum_type_t *type1,
                              const enum_type_t *type2)
 {
-	return type1->declaration == type2->declaration;
+	return type1->enume == type2->enume;
 }
 
 static bool typedef_types_equal(const typedef_type_t *type1,
                                 const typedef_type_t *type2)
 {
-	return type1->declaration == type2->declaration;
+	return type1->typedefe == type2->typedefe;
 }
 
 static bool typeof_types_equal(const typeof_type_t *type1,

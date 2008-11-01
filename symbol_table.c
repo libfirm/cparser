@@ -30,10 +30,10 @@ struct obstack symbol_obstack;
 static inline
 void init_symbol_table_entry(symbol_t *entry, const char *string)
 {
-	entry->string      = string;
-	entry->ID          = T_IDENTIFIER;
-	entry->pp_ID       = TP_IDENTIFIER;
-	entry->declaration = NULL;
+	entry->string = string;
+	entry->ID     = T_IDENTIFIER;
+	entry->pp_ID  = TP_IDENTIFIER;
+	entry->entity = NULL;
 }
 
 #define HashSet                    symbol_table_t

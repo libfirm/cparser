@@ -23,6 +23,7 @@
 #include "format_check.h"
 #include "symbol_t.h"
 #include "ast_t.h"
+#include "entity_t.h"
 #include "diagnostic.h"
 #include "types.h"
 #include "type_t.h"
@@ -636,8 +637,8 @@ void check_format(const call_expression_t *const call)
 	if (func_expr->kind != EXPR_REFERENCE)
 		return;
 
-	const declaration_t   *const decl = func_expr->reference.declaration;
-	const call_argument_t *      arg  = call->arguments;
+	const entity_t        *const entity = func_expr->reference.entity;
+	const call_argument_t *      arg    = call->arguments;
 
 	if(false) {
 		/* the declaration has a GNU format attribute, check it */
@@ -646,7 +647,7 @@ void check_format(const call_expression_t *const call)
 		 * For some functions we always check the format, even if it was not specified.
 		 * This allows to check format even in MS mode or without header included.
 		 */
-		const char            *const name = decl->symbol->string;
+		const char *const name = entity->base.symbol->string;
 		for(size_t i = 0; i < sizeof(builtin_table) / sizeof(builtin_table[0]); ++i) {
 			if(strcmp(name, builtin_table[i].name) == 0) {
 				if(builtin_table[i].fmt_kind == FORMAT_PRINTF) {

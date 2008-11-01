@@ -1,5 +1,8 @@
+#include <config.h>
+
 #include "adt/error.h"
 #include "ast_t.h"
+#include "entity_t.h"
 #include "walk_statements.h"
 
 
@@ -77,6 +80,7 @@ static void walk_expression(expression_t const *const expr, statement_callback c
 
 		case EXPR_OFFSETOF:
 		case EXPR_REFERENCE:
+		case EXPR_REFERENCE_ENUM_VALUE:
 		case EXPR_CONST:
 		case EXPR_CHARACTER_CONSTANT:
 		case EXPR_WIDE_CHARACTER_CONSTANT:
@@ -93,20 +97,34 @@ static void walk_expression(expression_t const *const expr, statement_callback c
 	/* TODO FIXME: implement all the missing expressions here */
 }
 
+static void walk_initializer(const initializer_t  *initializer,
+                             statement_callback    callback,
+							 void                 *env)
+{
+	switch(initializer->kind) {
+	case INITIALIZER_VALUE:
+		walk_expression(initializer->value.value, callback, env);
+		return;
+	default:
+		/* FIXME: should walk initializer hierarchies... */
+		break;
+	}
+}
 
-static void walk_declarations(const declaration_t *      decl,
-                              const declaration_t *const end,
+static void walk_declarations(const entity_t*            entity,
+                              const entity_t*      const end,
                               statement_callback   const callback,
                               void                *const env)
 {
-	for (; decl != end; decl = decl->next) {
-		if (decl->namespc != NAMESPACE_NORMAL)
+	for (; entity != end; entity = entity->base.next) {
+		/* we only look at variables */
+		if (entity->kind != ENTITY_VARIABLE)
 			continue;
 
-		const initializer_t *initializer = decl->init.initializer;
-		/* FIXME: should walk initializer hierarchies... */
-		if (initializer != NULL && initializer->kind == INITIALIZER_VALUE) {
-			walk_expression(initializer->value.value, callback, env);
+		const variable_t    *variable    = &entity->variable;
+		const initializer_t *initializer = variable->initializer;
+		if (initializer != NULL) {
+			walk_initializer(initializer, callback, env);
 		}
 	}
 }
@@ -124,7 +142,7 @@ void walk_statements(statement_t *const stmt, statement_callback const callback,
 			return;
 
 		case STATEMENT_FOR:
-			walk_declarations(stmt->fors.scope.declarations, NULL, callback, env);
+			walk_declarations(stmt->fors.scope.entities, NULL, callback, env);
 			if (stmt->fors.initialisation != NULL)
 				walk_expression(stmt->fors.initialisation, callback, env);
 			if (stmt->fors.condition != NULL)
@@ -175,7 +193,7 @@ void walk_statements(statement_t *const stmt, statement_callback const callback,
 
 		case STATEMENT_DECLARATION:
 			walk_declarations(stmt->declaration.declarations_begin,
-			                  stmt->declaration.declarations_end->next,
+			                  stmt->declaration.declarations_end->base.next,
 			                  callback, env);
 			return;
 
@@ -184,6 +202,7 @@ void walk_statements(statement_t *const stmt, statement_callback const callback,
 			walk_statements(stmt->ms_try.final_statement, callback, env);
 			return;
 
+		case STATEMENT_LOCAL_LABEL:
 		case STATEMENT_INVALID:
 		case STATEMENT_EMPTY:
 		case STATEMENT_CONTINUE:

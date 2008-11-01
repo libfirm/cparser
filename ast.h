@@ -22,8 +22,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-
-typedef struct scope_t                          scope_t;
+#include "entity.h"
 
 typedef struct expression_base_t                expression_base_t;
 typedef struct const_expression_t               const_expression_t;
@@ -65,8 +64,6 @@ typedef struct initializer_wide_string_t    initializer_wide_string_t;
 typedef struct initializer_designator_t     initializer_designator_t;
 typedef union  initializer_t                initializer_t;
 
-typedef struct declaration_t                declaration_t;
-
 typedef struct statement_base_t             statement_base_t;
 typedef struct invalid_statement_t          invalid_statement_t;
 typedef struct empty_statement_t            empty_statement_t;
@@ -75,6 +72,7 @@ typedef struct return_statement_t           return_statement_t;
 typedef struct if_statement_t               if_statement_t;
 typedef struct switch_statement_t           switch_statement_t;
 typedef struct declaration_statement_t      declaration_statement_t;
+typedef struct local_label_statement_t      local_label_statement_t;
 typedef struct expression_statement_t       expression_statement_t;
 typedef struct goto_statement_t             goto_statement_t;
 typedef struct label_statement_t            label_statement_t;
@@ -99,7 +97,8 @@ void  print_expression(const expression_t *expression);
 void  print_initializer(const initializer_t *initializer);
 void  print_ast(const translation_unit_t *unit);
 void  print_indent(void);
-void  print_declaration(const declaration_t *declaration);
+void  print_declaration(const entity_t *entity);
+void  print_entity(const entity_t *entity);
 void  change_indent(int delta);
 void *allocate_ast(size_t size);
 

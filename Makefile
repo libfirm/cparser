@@ -29,13 +29,11 @@ SOURCES := \
 	adt/obstack_printf.c \
 	adt/xmalloc.c \
 	ast.c \
-	ast2firm.c \
 	diagnostic.c \
 	entitymap.c \
 	format_check.c \
 	lexer.c \
 	main.c \
-	parser.c \
 	walk_statements.c \
 	symbol_table.c \
 	token.c \
@@ -43,6 +41,8 @@ SOURCES := \
 	types.c \
 	type_hash.c \
 	warning.c \
+	parser.c \
+	ast2firm.c \
 	write_fluffy.c \
 	write_caml.c \
 	driver/firm_cmdline.c \

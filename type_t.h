@@ -101,11 +101,11 @@ struct array_type_t {
 
 	ir_node      *size_node; /**< used by ast2firm phase */
 
-	unsigned      is_static         : 1; /**< a [static] type */
-	unsigned      is_variable       : 1; /**< a [*] type */
-	unsigned      has_implicit_size : 1;
-	unsigned      size_constant     : 1; /**< size expression is constant */
-	unsigned      is_vla            : 1; /**< it's a variable length array */
+	bool          is_static         : 1; /**< a [static] type */
+	bool          is_variable       : 1; /**< a [*] type */
+	bool          has_implicit_size : 1;
+	bool          size_constant     : 1; /**< size expression is constant */
+	bool          is_vla            : 1; /**< it's a variable length array */
 };
 
 /**
@@ -133,31 +133,31 @@ struct function_type_t {
 	type_t               *return_type;        /**< The return type. */
 	function_parameter_t *parameters;         /**< A list of the parameter types. */
 	cc_kind_t             calling_convention; /**< The specified calling convention. */
-	unsigned              variadic : 1;
-	unsigned              unspecified_parameters : 1;
-	unsigned              kr_style_parameters : 1;
+	bool                  variadic : 1;
+	bool                  unspecified_parameters : 1;
+	bool                  kr_style_parameters : 1;
 };
 
 struct compound_type_t {
-	type_base_t    base;
-	unsigned       packed:1;       /** Set if packed was specified. */
+	type_base_t  base;
+	bool         packed : 1;       /** Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
-	declaration_t *declaration;
+	compound_t  *compound;
 };
 
 struct enum_type_t {
-	type_base_t    base;
-	/** the declaration of the enum type. You can find the enum entries by
-	 *  walking the declaration->next list until you don't find
-	 *  STORAGE_CLASS_ENUM_ENTRY declarations anymore */
-	declaration_t *declaration;
+	type_base_t  base;
+	/** the enum entity. You can find the enum entries by walking the
+	 *  enum->base.next list until you don't find ENTITY_ENUM_VALUE entities
+	 *  anymore */
+	enum_t      *enume;
 };
 
 struct typedef_type_t {
-	type_base_t    base;
-	declaration_t *declaration;
-	type_t        *resolved_type;
+	type_base_t  base;
+	typedef_t   *typedefe;
+	type_t      *resolved_type;
 };
 
 struct typeof_type_t {

@@ -24,6 +24,7 @@
 #include "type_t.h"
 #include "parser.h"
 #include "lang_features.h"
+#include "entity_t.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -241,7 +242,7 @@ static void print_quoted_string(const string_t *const string, char border, int s
 		if (*c == border) {
 			fputc('\\', out);
 		}
-		switch(*c) {
+		switch (*c) {
 		case '\\':  fputs("\\\\", out); break;
 		case '\a':  fputs("\\a", out); break;
 		case '\b':  fputs("\\b", out); break;
@@ -358,7 +359,7 @@ static void print_funcname(
 		const funcname_expression_t *funcname)
 {
 	const char *s = "";
-	switch(funcname->kind) {
+	switch (funcname->kind) {
 	case FUNCNAME_FUNCTION:        s = (c_mode & _C99) ? "__func__" : "__FUNCTION__"; break;
 	case FUNCNAME_PRETTY_FUNCTION: s = "__PRETTY_FUNCTION__"; break;
 	case FUNCNAME_FUNCSIG:         s = "__FUNCSIG__"; break;
@@ -476,7 +477,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
-	switch(unexpr->base.kind) {
+	switch (unexpr->base.kind) {
 	case EXPR_UNARY_NEGATE:           fputc('-',          out); break;
 	case EXPR_UNARY_PLUS:             fputc('+',          out); break;
 	case EXPR_UNARY_NOT:              fputc('!',          out); break;
@@ -529,7 +530,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
  */
 static void print_reference_expression(const reference_expression_t *ref)
 {
-	fputs(ref->declaration->symbol->string, out);
+	fputs(ref->entity->base.symbol->string, out);
 }
 
 /**
@@ -539,7 +540,7 @@ static void print_reference_expression(const reference_expression_t *ref)
  */
 static void print_label_address_expression(const label_address_expression_t *le)
 {
-	fprintf(out, "&&%s", le->declaration->symbol->string);
+	fprintf(out, "&&%s", le->label->base.symbol->string);
 }
 
 /**
@@ -658,7 +659,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 	fputs("__builtin_va_start(", out);
 	print_expression_prec(expression->ap, 2 * PREC_ASSIGNMENT);
 	fputs(", ", out);
-	fputs(expression->parameter->symbol->string, out);
+	fputs(expression->parameter->base.base.symbol->string, out);
 	fputc(')', out);
 }
 
@@ -690,7 +691,7 @@ static void print_select(const select_expression_t *expression)
 	} else {
 		fputc('.', out);
 	}
-	fputs(expression->compound_entry->symbol->string, out);
+	fputs(expression->compound_entry->base.symbol->string, out);
 }
 
 /**
@@ -768,7 +769,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		top_prec = PREC_TOP;
 	if (top_prec > prec)
 		fputc('(', out);
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
 		fputs("$invalid expression$", out);
@@ -917,7 +918,7 @@ static void print_goto_statement(const goto_statement_t *statement)
 		fputc('*', out);
 		print_expression(statement->expression);
 	} else {
-		fputs(statement->label->symbol->string, out);
+		fputs(statement->label->base.symbol->string, out);
 	}
 	fputs(";\n", out);
 }
@@ -929,7 +930,7 @@ static void print_goto_statement(const goto_statement_t *statement)
  */
 static void print_label_statement(const label_statement_t *statement)
 {
-	fprintf(out, "%s:\n", statement->label->symbol->string);
+	fprintf(out, "%s:\n", statement->label->base.symbol->string);
 	print_indent();
 	print_statement(statement->statement);
 }
@@ -994,6 +995,47 @@ static void print_case_label(const case_label_statement_t *statement)
 	}
 }
 
+static void print_local_label(const local_label_statement_t *statement)
+{
+	fputs("__label__ ", out);
+
+	bool      first  = true;
+	entity_t *entity = statement->labels_begin;
+	for (;
+		entity != statement->labels_end->base.next;
+		entity = entity->base.next) {
+		if (!first) {
+			fputs(", ", out);
+		} else {
+			first = false;
+		}
+		fputs(entity->base.symbol->string, out);
+	}
+	fputs(";\n", out);
+}
+
+static void print_typedef(const entity_t *entity)
+{
+	fputs("typedef ", out);
+	print_type_ext(entity->typedefe.type, entity->base.symbol, NULL);
+	fputs(";", out);
+}
+
+/**
+ * returns true if the entity is a compiler generated one and has no real
+ * correspondenc in the source file
+ */
+static bool is_generated_entity(const entity_t *entity)
+{
+	if (entity->kind == ENTITY_TYPEDEF)
+		return entity->typedefe.builtin;
+
+	if (is_declaration(entity))
+		return entity->declaration.implicit;
+
+	return false;
+}
+
 /**
  * Print a declaration statement.
  *
@@ -1003,38 +1045,29 @@ static void print_declaration_statement(
 		const declaration_statement_t *statement)
 {
 	bool first = true;
-	declaration_t *declaration = statement->declarations_begin;
+	entity_t *entity = statement->declarations_begin;
+	for (;
+		 entity != statement->declarations_end->base.next;
+		 entity = entity->base.next) {
+		if (!is_declaration(entity) && entity->kind != ENTITY_TYPEDEF)
+			continue;
+		if (is_generated_entity(entity))
+			continue;
 
-	if (declaration->namespc == NAMESPACE_LOCAL_LABEL) {
-		fputs("__label__ ", out);
-		for (;
-			declaration != statement->declarations_end->next;
-			declaration = declaration->next) {
-			if (!first) {
-				fputs(", ", out);
-			} else {
-				first = false;
-			}
-			fputs(declaration->symbol->string, out);
+		if (!first) {
+			print_indent();
+		} else {
+			first = false;
 		}
-		fputs(";\n", out);
-	} else {
-		for (;
-			 declaration != statement->declarations_end->next;
-			 declaration = declaration->next) {
-			if (declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
-				continue;
-			if (declaration->implicit)
-				continue;
 
-			if (!first) {
-				print_indent();
-			} else {
-				first = false;
-			}
-			print_declaration(declaration);
-			fputc('\n', out);
+		if (entity->kind == ENTITY_TYPEDEF) {
+			print_typedef(entity);
+		} else {
+			assert(is_declaration(entity));
+			print_declaration(entity);
 		}
+
+		fputc('\n', out);
 	}
 }
 
@@ -1074,13 +1107,15 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for (", out);
-	declaration_t *decl = statement->scope.declarations;
-	while (decl != NULL && decl->implicit)
-		decl = decl->next;
-	if (decl != NULL) {
+	entity_t *entity = statement->scope.entities;
+	while (entity != NULL && is_generated_entity(entity))
+		entity = entity->base.next;
+
+	if (entity != NULL) {
 		assert(statement->initialisation == NULL);
-		print_declaration(decl);
-		if (decl->next != NULL) {
+		assert(is_declaration(entity));
+		print_declaration(entity);
+		if (entity->base.next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
 		fputc(' ', out);
@@ -1228,6 +1263,9 @@ void print_statement(const statement_t *statement)
 	case STATEMENT_LABEL:
 		print_label_statement(&statement->label);
 		break;
+	case STATEMENT_LOCAL_LABEL:
+		print_local_label(&statement->local_label);
+		break;
 	case STATEMENT_GOTO:
 		print_goto_statement(&statement->gotos);
 		break;
@@ -1280,8 +1318,7 @@ void print_statement(const statement_t *statement)
  */
 static void print_storage_class(storage_class_tag_t storage_class)
 {
-	switch(storage_class) {
-	case STORAGE_CLASS_ENUM_ENTRY:
+	switch (storage_class) {
 	case STORAGE_CLASS_NONE:
 		break;
 	case STORAGE_CLASS_TYPEDEF:       fputs("typedef ",        out); break;
@@ -1307,7 +1344,7 @@ void print_initializer(const initializer_t *initializer)
 		return;
 	}
 
-	switch(initializer->kind) {
+	switch (initializer->kind) {
 	case INITIALIZER_VALUE: {
 		const initializer_value_t *value = &initializer->value;
 		print_expression(value->value);
@@ -1347,20 +1384,50 @@ void print_initializer(const initializer_t *initializer)
 /**
  * Print microsoft extended declaration modifiers.
  */
-static void print_ms_modifiers(const declaration_t *declaration) {
+static void print_ms_modifiers(const declaration_t *declaration)
+{
 	if((c_mode & _MS) == 0)
 		return;
 
 	decl_modifiers_t modifiers = declaration->modifiers;
 
-	/* DM_FORCEINLINE handled outside. */
-	if ((modifiers & ~DM_FORCEINLINE) != 0    ||
-	    declaration->alignment        != 0    ||
-	    declaration->get_property_sym != NULL ||
-	    declaration->put_property_sym != NULL) {
-		char *next = "(";
+	bool        ds_shown = false;
+	const char *next     = "(";
 
-		fputs("__declspec", out);
+	if (declaration->base.kind == ENTITY_VARIABLE) {
+		variable_t *variable = (variable_t*) declaration;
+		if (variable->alignment != 0
+				|| variable->get_property_sym != NULL
+				|| variable->put_property_sym != NULL) {
+			if (!ds_shown) {
+				fputs("__declspec", out);
+				ds_shown = true;
+			}
+
+			if(variable->alignment != 0) {
+				fputs(next, out); next = ", "; fprintf(out, "align(%u)", variable->alignment);
+			}
+			if(variable->get_property_sym != NULL
+					|| variable->put_property_sym != NULL) {
+				char *comma = "";
+				fputs(next, out); next = ", "; fputs("property(", out);
+				if(variable->get_property_sym != NULL) {
+					fprintf(out, "get=%s", variable->get_property_sym->string);
+					comma = ", ";
+				}
+				if(variable->put_property_sym != NULL)
+					fprintf(out, "%sput=%s", comma, variable->put_property_sym->string);
+				fputc(')', out);
+			}
+		}
+	}
+
+	/* DM_FORCEINLINE handled outside. */
+	if ((modifiers & ~DM_FORCEINLINE) != 0) {
+		if (!ds_shown) {
+			fputs("__declspec", out);
+			ds_shown = true;
+		}
 		if(modifiers & DM_DLLIMPORT) {
 			fputs(next, out); next = ", "; fputs("dllimport", out);
 		}
@@ -1391,10 +1458,8 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		if (modifiers & DM_DEPRECATED) {
 			fputs(next, out); next = ", "; fputs("deprecated", out);
 			if(declaration->deprecated_string != NULL)
-				fprintf(out, "(\"%s\")", declaration->deprecated_string);
-		}
-		if(declaration->alignment != 0) {
-			fputs(next, out); next = ", "; fprintf(out, "align(%u)", declaration->alignment);
+				fprintf(out, "(\"%s\")",
+				        declaration->deprecated_string);
 		}
 		if(modifiers & DM_RESTRICT) {
 			fputs(next, out); next = ", "; fputs("restrict", out);
@@ -1402,52 +1467,52 @@ static void print_ms_modifiers(const declaration_t *declaration) {
 		if(modifiers & DM_NOALIAS) {
 			fputs(next, out); next = ", "; fputs("noalias", out);
 		}
-		if(declaration->get_property_sym != NULL || declaration->put_property_sym != NULL) {
-			char *comma = "";
-			fputs(next, out); next = ", "; fputs("property(", out);
-			if(declaration->get_property_sym != NULL) {
-				fprintf(out, "get=%s", declaration->get_property_sym->string);
-				comma = ", ";
-			}
-			if(declaration->put_property_sym != NULL)
-				fprintf(out, "%sput=%s", comma, declaration->put_property_sym->string);
-			fputc(')', out);
-		}
-		fputs(") ", out);
 	}
+
+	if (ds_shown)
+		fputs(") ", out);
 }
 
 /**
- * Print a declaration in the NORMAL namespace.
- *
- * @param declaration  the declaration
+ * Print a variable or function declaration
  */
-static void print_normal_declaration(const declaration_t *declaration)
+void print_declaration(const entity_t *entity)
 {
+	assert(is_declaration(entity));
+	const declaration_t *declaration = &entity->declaration;
+
 	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
-	if (declaration->is_inline) {
-		if (declaration->modifiers & DM_FORCEINLINE) {
-			fputs("__forceinline ", out);
-		} else if (declaration->modifiers & DM_MICROSOFT_INLINE) {
-			fputs("__inline ", out);
-		} else {
-			fputs("inline ", out);
+	if (entity->kind == ENTITY_FUNCTION) {
+		function_t *function = (function_t*) declaration;
+		if (function->is_inline) {
+			if (declaration->modifiers & DM_FORCEINLINE) {
+				fputs("__forceinline ", out);
+			} else if (declaration->modifiers & DM_MICROSOFT_INLINE) {
+				fputs("__inline ", out);
+			} else {
+				fputs("inline ", out);
+			}
 		}
 	}
 	print_ms_modifiers(declaration);
-	print_type_ext(declaration->type, declaration->symbol,
-	               &declaration->scope);
+	if (entity->kind == ENTITY_FUNCTION) {
+		print_type_ext(entity->declaration.type, entity->base.symbol,
+		               &entity->function.parameters);
 
-	if(declaration->type->kind == TYPE_FUNCTION) {
-		if(declaration->init.statement != NULL) {
+		if (entity->function.statement != NULL) {
 			fputs("\n", out);
 			print_indent();
-			print_statement(declaration->init.statement);
+			print_statement(entity->function.statement);
 			return;
 		}
-	} else if(declaration->init.initializer != NULL) {
-		fputs(" = ", out);
-		print_initializer(declaration->init.initializer);
+	} else {
+		print_type_ext(declaration->type, declaration->base.symbol, NULL);
+
+		if (entity->kind == ENTITY_VARIABLE
+				&& entity->variable.initializer != NULL) {
+			fputs(" = ", out);
+			print_initializer(entity->variable.initializer);
+		}
 	}
 	fputc(';', out);
 }
@@ -1467,44 +1532,53 @@ void print_expression(const expression_t *expression)
  *
  * @param declaration  the declaration
  */
-void print_declaration(const declaration_t *declaration)
+void print_entity(const entity_t *entity)
 {
-	if (declaration->namespc != NAMESPACE_NORMAL &&
-	    declaration->symbol == NULL)
+	if (entity->base.namespc != NAMESPACE_NORMAL && entity->base.symbol == NULL)
 		return;
 
-	switch (declaration->namespc) {
-	case NAMESPACE_NORMAL:
-		print_normal_declaration(declaration);
-		break;
-	case NAMESPACE_STRUCT:
+	switch ((entity_kind_tag_t) entity->kind) {
+	case ENTITY_VARIABLE:
+	case ENTITY_FUNCTION:
+	case ENTITY_COMPOUND_MEMBER:
+		print_declaration(entity);
+		return;
+	case ENTITY_TYPEDEF:
+		print_typedef(entity);
+		return;
+	case ENTITY_STRUCT:
 		fputs("struct ", out);
-		fputs(declaration->symbol->string, out);
-		if (declaration->init.complete) {
+		fputs(entity->base.symbol->string, out);
+		if (entity->structe.complete) {
 			fputc(' ', out);
-			print_compound_definition(declaration);
+			print_compound_definition(&entity->structe);
 		}
 		fputc(';', out);
-		break;
-	case NAMESPACE_UNION:
+		return;
+	case ENTITY_UNION:
 		fputs("union ", out);
-		fputs(declaration->symbol->string, out);
-		if (declaration->init.complete) {
+		fputs(entity->base.symbol->string, out);
+		if (entity->unione.complete) {
 			fputc(' ', out);
-			print_compound_definition(declaration);
+			print_compound_definition(&entity->unione);
 		}
 		fputc(';', out);
-		break;
-	case NAMESPACE_ENUM:
+		return;
+	case ENTITY_ENUM:
 		fputs("enum ", out);
-		fputs(declaration->symbol->string, out);
-		if (declaration->init.complete) {
-			fputc(' ', out);
-			print_enum_definition(declaration);
-		}
+		fputs(entity->base.symbol->string, out);
+		fputc(' ', out);
+		print_enum_definition(&entity->enume);
 		fputc(';', out);
+		return;
+	case ENTITY_LABEL:
+	case ENTITY_ENUM_VALUE:
+	case ENTITY_LOCAL_LABEL:
+		panic("print_entity used on unexpected entity type");
+	case ENTITY_INVALID:
 		break;
 	}
+	panic("Invalid entity type encountered");
 }
 
 /**
@@ -1516,25 +1590,25 @@ void print_ast(const translation_unit_t *unit)
 {
 	inc_type_visited();
 
-	declaration_t *declaration = unit->scope.declarations;
-	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+	entity_t *entity = unit->scope.entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind == ENTITY_ENUM_VALUE)
 			continue;
-		if(declaration->namespc != NAMESPACE_NORMAL &&
-				declaration->symbol == NULL)
+		if (entity->base.namespc != NAMESPACE_NORMAL
+				&& entity->base.symbol == NULL)
 			continue;
-		if (declaration->implicit)
+		if (is_generated_entity(entity))
 			continue;
 
 		print_indent();
-		print_declaration(declaration);
+		print_entity(entity);
 		fputc('\n', out);
 	}
 }
 
 bool is_constant_initializer(const initializer_t *initializer)
 {
-	switch(initializer->kind) {
+	switch (initializer->kind) {
 	case INITIALIZER_STRING:
 	case INITIALIZER_WIDE_STRING:
 	case INITIALIZER_DESIGNATOR:
@@ -1556,7 +1630,7 @@ bool is_constant_initializer(const initializer_t *initializer)
 
 static bool is_object_with_linker_constant_address(const expression_t *expression)
 {
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_UNARY_DEREFERENCE:
 		return is_address_constant(expression->unary.value);
 
@@ -1575,15 +1649,24 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 			&& is_address_constant(expression->array_access.array_ref);
 
 	case EXPR_REFERENCE: {
-		declaration_t *declaration = expression->reference.declaration;
-		switch((storage_class_tag_t) declaration->storage_class) {
-		case STORAGE_CLASS_NONE:
-		case STORAGE_CLASS_EXTERN:
-		case STORAGE_CLASS_STATIC:
-			return true;
-		default:
-			return false;
+		entity_t *entity = expression->reference.entity;
+		if (is_declaration(entity)) {
+			switch ((storage_class_tag_t) entity->declaration.storage_class) {
+			case STORAGE_CLASS_NONE:
+			case STORAGE_CLASS_EXTERN:
+			case STORAGE_CLASS_STATIC:
+				return true;
+
+			case STORAGE_CLASS_REGISTER:
+			case STORAGE_CLASS_TYPEDEF:
+			case STORAGE_CLASS_AUTO:
+			case STORAGE_CLASS_THREAD:
+			case STORAGE_CLASS_THREAD_EXTERN:
+			case STORAGE_CLASS_THREAD_STATIC:
+				break;
+			}
 		}
+		return false;
 	}
 
 	default:
@@ -1593,7 +1676,7 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 
 bool is_address_constant(const expression_t *expression)
 {
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_linker_constant_address(expression->unary.value);
 
@@ -1636,8 +1719,11 @@ bool is_address_constant(const expression_t *expression)
 	}
 
 	case EXPR_REFERENCE: {
-		declaration_t *declaration = expression->reference.declaration;
-		type_t *type = skip_typeref(declaration->type);
+		entity_t *entity = expression->reference.entity;
+		if (!is_declaration(entity))
+			return false;
+
+		type_t *type = skip_typeref(entity->declaration.type);
 		if(is_type_function(type))
 			return true;
 		if(is_type_array(type)) {
@@ -1701,7 +1787,7 @@ static bool is_constant_pointer(const expression_t *expression)
 
 static bool is_object_with_constant_address(const expression_t *expression)
 {
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_SELECT: {
 		expression_t *compound      = expression->select.compound;
 		type_t       *compound_type = compound->base.type;
@@ -1745,6 +1831,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:
 	case EXPR_LABEL_ADDRESS:
+	case EXPR_REFERENCE_ENUM_VALUE:
 		return true;
 
 	case EXPR_SIZEOF: {
@@ -1764,6 +1851,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
 	case EXPR_STATEMENT:
+	case EXPR_REFERENCE:
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 	case EXPR_UNARY_POSTFIX_DECREMENT:
 	case EXPR_UNARY_PREFIX_INCREMENT:
@@ -1846,14 +1934,6 @@ bool is_constant_expression(const expression_t *expression)
 			return is_constant_expression(expression->conditional.true_expression);
 		else
 			return is_constant_expression(expression->conditional.false_expression);
-	}
-
-	case EXPR_REFERENCE: {
-		declaration_t *declaration = expression->reference.declaration;
-		if(declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
-			return true;
-
-		return false;
 	}
 
 	case EXPR_INVALID:

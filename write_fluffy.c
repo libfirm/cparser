@@ -26,6 +26,7 @@
 #include "symbol_t.h"
 #include "ast_t.h"
 #include "type_t.h"
+#include "entity_t.h"
 #include "type.h"
 #include "adt/error.h"
 
@@ -68,33 +69,30 @@ static void write_pointer_type(const pointer_type_t *type)
 	fputc('*', out);
 }
 
-static declaration_t *find_typedef(const type_t *type)
+static entity_t *find_typedef(const type_t *type)
 {
 	/* first: search for a matching typedef in the global type... */
-	declaration_t *declaration = global_scope->declarations;
-	while(declaration != NULL) {
-		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
-			declaration = declaration->next;
+	entity_t *entity = global_scope->entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
-		}
-		if(declaration->type == type)
+		if (entity->typedefe.type == type)
 			break;
-		declaration = declaration->next;
 	}
 
-	return declaration;
+	return entity;
 }
 
 static void write_compound_type(const compound_type_t *type)
 {
-	declaration_t *declaration = find_typedef((const type_t*) type);
-	if(declaration != NULL) {
-		fprintf(out, "%s", declaration->symbol->string);
+	entity_t *entity = find_typedef((const type_t*) type);
+	if(entity != NULL) {
+		fprintf(out, "%s", entity->base.symbol->string);
 		return;
 	}
 
 	/* does the struct have a name? */
-	symbol_t *symbol = type->declaration->symbol;
+	symbol_t *symbol = type->compound->base.symbol;
 	if(symbol != NULL) {
 		/* TODO: make sure we create a struct for it... */
 		fprintf(out, "%s", symbol->string);
@@ -106,15 +104,15 @@ static void write_compound_type(const compound_type_t *type)
 
 static void write_enum_type(const enum_type_t *type)
 {
-	declaration_t *declaration = find_typedef((const type_t*) type);
-	if(declaration != NULL) {
-		fprintf(out, "%s", declaration->symbol->string);
+	entity_t *entity = find_typedef((const type_t*) type);
+	if (entity != NULL) {
+		fprintf(out, "%s", entity->base.symbol->string);
 		return;
 	}
 
 	/* does the enum have a name? */
-	symbol_t *symbol = type->declaration->symbol;
-	if(symbol != NULL) {
+	symbol_t *symbol = type->enume->base.symbol;
+	if (symbol != NULL) {
 		/* TODO: make sure we create an enum for it... */
 		fprintf(out, "%s", symbol->string);
 		return;
@@ -185,34 +183,22 @@ static void write_type(const type_t *type)
 	}
 }
 
-static void write_struct_entry(const declaration_t *declaration)
+static void write_compound_entry(const entity_t *entity)
 {
-	fprintf(out, "\t%s : ", declaration->symbol->string);
-	write_type(declaration->type);
+	fprintf(out, "\t%s : ", entity->base.symbol->string);
+	write_type(entity->declaration.type);
 	fprintf(out, "\n");
 }
 
-static void write_struct(const symbol_t *symbol, const compound_type_t *type)
+static void write_compound(const symbol_t *symbol, const compound_type_t *type)
 {
-	fprintf(out, "struct %s:\n", symbol->string);
+	fprintf(out, "%s %s:\n",
+	        type->base.kind == TYPE_COMPOUND_STRUCT ? "struct" : "union",
+			symbol->string);
 
-	const declaration_t *declaration = type->declaration->scope.declarations;
-	while(declaration != NULL) {
-		write_struct_entry(declaration);
-		declaration = declaration->next;
-	}
-
-	fprintf(out, "\n");
-}
-
-static void write_union(const symbol_t *symbol, const compound_type_t *type)
-{
-	fprintf(out, "union %s:\n", symbol->string);
-
-	const declaration_t *declaration = type->declaration->scope.declarations;
-	while(declaration != NULL) {
-		write_struct_entry(declaration);
-		declaration = declaration->next;
+	const entity_t *entity = type->compound->members.entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		write_compound_entry(entity);
 	}
 
 	fprintf(out, "\n");
@@ -260,13 +246,13 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 {
 	fprintf(out, "enum %s:\n", symbol->string);
 
-	declaration_t *entry = type->declaration->next;
-	for ( ; entry != NULL && entry->storage_class == STORAGE_CLASS_ENUM_ENTRY;
-			entry = entry->next) {
-		fprintf(out, "\t%s", entry->symbol->string);
-		if(entry->init.initializer != NULL) {
+	entity_t *entry = type->enume->base.next;
+	for ( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+			entry = entry->base.next) {
+		fprintf(out, "\t%s", entry->base.symbol->string);
+		if(entry->enum_value.value != NULL) {
 			fprintf(out, " <- ");
-			write_expression(entry->init.enum_value);
+			write_expression(entry->enum_value.value);
 		}
 		fputc('\n', out);
 	}
@@ -274,41 +260,40 @@ static void write_enum(const symbol_t *symbol, const enum_type_t *type)
 	fprintf(out, "\n");
 }
 
-static void write_variable(const declaration_t *declaration)
+static void write_variable(const entity_t *entity)
 {
-	fprintf(out, "var %s : ", declaration->symbol->string);
-	write_type(declaration->type);
-	/* TODO: initializers */
+	fprintf(out, "var %s : ", entity->base.symbol->string);
+	write_type(entity->declaration.type);
 	fprintf(out, "\n");
 }
 
-static void write_function(const declaration_t *declaration)
+static void write_function(const entity_t *entity)
 {
-	if(declaration->init.statement != NULL) {
+	if (entity->function.statement != NULL) {
 		fprintf(stderr, "Warning: can't convert function bodies (at %s)\n",
-		        declaration->symbol->string);
+		        entity->base.symbol->string);
 	}
 
-	fprintf(out, "func extern %s(",
-	        declaration->symbol->string);
+	fprintf(out, "func extern %s(", entity->base.symbol->string);
 
 	const function_type_t *function_type
-		= (const function_type_t*) declaration->type;
+		= (const function_type_t*) entity->declaration.type;
 
-	declaration_t *parameter = declaration->scope.declarations;
-	int            first     = 1;
-	for( ; parameter != NULL; parameter = parameter->next) {
+	entity_t *parameter = entity->function.parameters.entities;
+	int       first     = 1;
+	for( ; parameter != NULL; parameter = parameter->base.next) {
+		assert(parameter->kind == ENTITY_VARIABLE);
 		if(!first) {
 			fprintf(out, ", ");
 		} else {
 			first = 0;
 		}
-		if(parameter->symbol != NULL) {
-			fprintf(out, "%s : ", parameter->symbol->string);
+		if(parameter->base.symbol != NULL) {
+			fprintf(out, "%s : ", parameter->base.symbol->string);
 		} else {
 			fputs("_ : ", out);
 		}
-		write_type(parameter->type);
+		write_type(parameter->declaration.type);
 	}
 	if(function_type->variadic) {
 		if(!first) {
@@ -338,51 +323,35 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 
 	/* write structs,unions + enums */
-	declaration_t *declaration = unit->scope.declarations;
-	for( ; declaration != NULL; declaration = declaration->next) {
-		//fprintf(out, "// Decl: %s\n", declaration->symbol->string);
-		if(! (declaration->storage_class == STORAGE_CLASS_TYPEDEF)) {
+	entity_t *entity = unit->scope.entities;
+	for( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind != ENTITY_TYPEDEF)
 			continue;
-		}
-		type_t *type = declaration->type;
-		if(type->kind == TYPE_COMPOUND_STRUCT) {
-			write_struct(declaration->symbol, &type->compound);
-		} else if(type->kind == TYPE_COMPOUND_UNION) {
-			write_union(declaration->symbol, &type->compound);
+
+		type_t *type = entity->typedefe.type;
+		if(type->kind == TYPE_COMPOUND_STRUCT
+				|| type->kind == TYPE_COMPOUND_UNION) {
+			write_compound(entity->base.symbol, &type->compound);
 		} else if(type->kind == TYPE_ENUM) {
-			write_enum(declaration->symbol, &type->enumt);
+			write_enum(entity->base.symbol, &type->enumt);
 		}
 	}
 
 	/* write global variables */
-	declaration = unit->scope.declarations;
-	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
-			continue;
-		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
-				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+	entity = unit->scope.entities;
+	for( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind != ENTITY_VARIABLE)
 			continue;
 
-		type_t *type = declaration->type;
-		if(type->kind == TYPE_FUNCTION)
-			continue;
-
-		write_variable(declaration);
+		write_variable(entity);
 	}
 
 	/* write functions */
-	declaration = unit->scope.declarations;
-	for( ; declaration != NULL; declaration = declaration->next) {
-		if(declaration->namespc != NAMESPACE_NORMAL)
-			continue;
-		if(declaration->storage_class == STORAGE_CLASS_TYPEDEF
-				|| declaration->storage_class == STORAGE_CLASS_ENUM_ENTRY)
+	entity = unit->scope.entities;
+	for( ; entity != NULL; entity = entity->base.next) {
+		if (entity->kind != ENTITY_FUNCTION)
 			continue;
 
-		type_t *type = declaration->type;
-		if(type->kind != TYPE_FUNCTION)
-			continue;
-
-		write_function(declaration);
+		write_function(entity);
 	}
 }
