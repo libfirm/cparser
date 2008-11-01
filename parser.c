@@ -3016,7 +3016,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 				compound = NULL;
 			} else if (compound->complete && token.type == '{') {
 				assert(symbol != NULL);
-				errorf(HERE, "multiple definitions of '%s %Y' (previous definition at %P)",
+				errorf(HERE, "multiple definitions of '%s %Y' (previous definition %P)",
 				       is_struct ? "struct" : "union", symbol,
 				       &compound->base.source_position);
 				/* clear members in the hope to avoid further errors */
@@ -3146,7 +3146,7 @@ static type_t *parse_enum_specifier(void)
 
 	if (token.type == '{') {
 		if (entity->enume.complete) {
-			errorf(HERE, "multiple definitions of enum %Y (previous definition at %P)",
+			errorf(HERE, "multiple definitions of enum %Y (previous definition %P)",
 			       symbol, &entity->base.source_position);
 		}
 		if (symbol != NULL) {
@@ -10137,11 +10137,12 @@ static statement_t *parse_local_label_declaration(void)
 		symbol_t *symbol = token.v.symbol;
 		entity_t *entity = get_entity(symbol, NAMESPACE_LOCAL_LABEL);
 		if (entity != NULL) {
-			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition at %P)",
+			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition %P)",
 			       symbol, &entity->base.source_position);
 		} else {
 			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL);
 
+			entity->base.parent_scope    = scope;
 			entity->base.namespc         = NAMESPACE_LOCAL_LABEL;
 			entity->base.source_position = token.source_position;
 			entity->base.symbol          = symbol;

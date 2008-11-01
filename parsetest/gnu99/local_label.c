@@ -10,11 +10,15 @@ label2:
   }
   if (a) {
     __label__ label;
+    if (a) {
+    	__label__ label;
+		label:
+			;
+	}
     if (b)
       goto label;
     b = 1;
 label:
-label2:
     ++b;
   }
   return b;
