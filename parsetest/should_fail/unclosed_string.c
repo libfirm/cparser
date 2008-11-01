@@ -1,1 +1,0 @@
-char s[] = "unclosed string
