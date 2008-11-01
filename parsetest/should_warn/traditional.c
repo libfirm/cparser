@@ -32,4 +32,10 @@ int suff() {
 	float f = 1.0F;
 	double d = 1.0L;
 	unsigned long long bla = 1ULL;
+	return (int) a;
+}
+
+int main(void)
+{
+	return 0;
 }
