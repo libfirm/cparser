@@ -6,92 +6,96 @@
 #include "walk_statements.h"
 
 
-static void walk_expression(expression_t const *const expr, statement_callback const callback, void *const env)
+static void walk_expression(expression_t const *const expr,
+                            statement_callback const callback, void *const env)
 {
 	switch (expr->base.kind) {
-		case EXPR_STATEMENT:
-			walk_statements(expr->statement.statement, callback, env);
+	case EXPR_STATEMENT:
+		walk_statements(expr->statement.statement, callback, env);
+		return;
+
+	EXPR_BINARY_CASES
+		walk_expression(expr->binary.left,  callback, env);
+		walk_expression(expr->binary.right, callback, env);
+		return;
+
+	EXPR_UNARY_CASES_OPTIONAL
+		if (expr->unary.value == NULL)
 			return;
+		/* FALLTHROUGH */
+	EXPR_UNARY_CASES_MANDATORY
+		walk_expression(expr->unary.value, callback, env);
+		return;
 
-		EXPR_BINARY_CASES
-			walk_expression(expr->binary.left,  callback, env);
-			walk_expression(expr->binary.right, callback, env);
-			return;
-
-		EXPR_UNARY_CASES_OPTIONAL
-			if (expr->unary.value == NULL)
-				return;
-			/* FALLTHROUGH */
-		EXPR_UNARY_CASES_MANDATORY
-			walk_expression(expr->unary.value, callback, env);
-			return;
-
-		case EXPR_CALL:
-			for (call_argument_t *arg = expr->call.arguments; arg != NULL; arg = arg->next) {
-				walk_expression(arg->expression, callback, env);
-			}
-			return;
-
-		case EXPR_UNKNOWN:
-		case EXPR_INVALID:
-			panic("unexpected expr kind");
-
-		case EXPR_COMPOUND_LITERAL:
-			/* TODO... */
-			break;
-
-		case EXPR_CONDITIONAL:
-			walk_expression(expr->conditional.condition,        callback, env);
-			walk_expression(expr->conditional.true_expression,  callback, env);
-			walk_expression(expr->conditional.false_expression, callback, env);
-			return;
-
-		case EXPR_BUILTIN_PREFETCH:
-			walk_expression(expr->builtin_prefetch.adr,      callback, env);
-			walk_expression(expr->builtin_prefetch.rw,       callback, env);
-			walk_expression(expr->builtin_prefetch.locality, callback, env);
-			return;
-
-		case EXPR_BUILTIN_CONSTANT_P:
-			walk_expression(expr->builtin_constant.value, callback, env);
-			return;
-
-		case EXPR_SELECT:
-			walk_expression(expr->select.compound, callback, env);
-			return;
-
-		case EXPR_ARRAY_ACCESS:
-			walk_expression(expr->array_access.array_ref, callback, env);
-			walk_expression(expr->array_access.index,     callback, env);
-			return;
-
-		case EXPR_CLASSIFY_TYPE:
-			walk_expression(expr->classify_type.type_expression, callback, env);
-			return;
-
-		case EXPR_SIZEOF:
-		case EXPR_ALIGNOF: {
-			expression_t *tp_expression = expr->typeprop.tp_expression;
-			if (tp_expression != NULL) {
-				walk_expression(tp_expression, callback, env);
-			}
-			return;
+	case EXPR_CALL:
+		for (call_argument_t *arg = expr->call.arguments; arg != NULL;
+		     arg = arg->next) {
+			walk_expression(arg->expression, callback, env);
 		}
+		return;
 
-		case EXPR_OFFSETOF:
-		case EXPR_REFERENCE:
-		case EXPR_REFERENCE_ENUM_VALUE:
-		case EXPR_CONST:
-		case EXPR_CHARACTER_CONSTANT:
-		case EXPR_WIDE_CHARACTER_CONSTANT:
-		case EXPR_STRING_LITERAL:
-		case EXPR_WIDE_STRING_LITERAL:
-		case EXPR_FUNCNAME:
-		case EXPR_BUILTIN_SYMBOL:
-		case EXPR_VA_START:
-		case EXPR_VA_ARG:
-		case EXPR_LABEL_ADDRESS:
-			break;
+	case EXPR_UNKNOWN:
+	case EXPR_INVALID:
+		panic("unexpected expr kind");
+
+	case EXPR_COMPOUND_LITERAL:
+		/* TODO... */
+		break;
+
+	case EXPR_CONDITIONAL:
+		walk_expression(expr->conditional.condition,        callback, env);
+		/* may be NULL because of gnu extension */
+		if (expr->conditional.true_expression != NULL)
+			walk_expression(expr->conditional.true_expression,  callback, env);
+		walk_expression(expr->conditional.false_expression, callback, env);
+		return;
+
+	case EXPR_BUILTIN_PREFETCH:
+		walk_expression(expr->builtin_prefetch.adr,      callback, env);
+		walk_expression(expr->builtin_prefetch.rw,       callback, env);
+		walk_expression(expr->builtin_prefetch.locality, callback, env);
+		return;
+
+	case EXPR_BUILTIN_CONSTANT_P:
+		walk_expression(expr->builtin_constant.value, callback, env);
+		return;
+
+	case EXPR_SELECT:
+		walk_expression(expr->select.compound, callback, env);
+		return;
+
+	case EXPR_ARRAY_ACCESS:
+		walk_expression(expr->array_access.array_ref, callback, env);
+		walk_expression(expr->array_access.index,     callback, env);
+		return;
+
+	case EXPR_CLASSIFY_TYPE:
+		walk_expression(expr->classify_type.type_expression, callback, env);
+		return;
+
+	case EXPR_SIZEOF:
+	case EXPR_ALIGNOF: {
+		expression_t *tp_expression = expr->typeprop.tp_expression;
+		if (tp_expression != NULL) {
+			walk_expression(tp_expression, callback, env);
+		}
+		return;
+	}
+
+	case EXPR_OFFSETOF:
+	case EXPR_REFERENCE:
+	case EXPR_REFERENCE_ENUM_VALUE:
+	case EXPR_CONST:
+	case EXPR_CHARACTER_CONSTANT:
+	case EXPR_WIDE_CHARACTER_CONSTANT:
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_FUNCNAME:
+	case EXPR_BUILTIN_SYMBOL:
+	case EXPR_VA_START:
+	case EXPR_VA_ARG:
+	case EXPR_LABEL_ADDRESS:
+		break;
 	}
 
 	/* TODO FIXME: implement all the missing expressions here */

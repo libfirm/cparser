@@ -7773,8 +7773,9 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	bool          gnu_cond = false;
 	if (GNU_MODE && token.type == ':') {
 		gnu_cond = true;
-	} else
+	} else {
 		true_expression = parse_expression();
+	}
 	rem_anchor_token(':');
 	expect(':');
 	expression_t *false_expression =
