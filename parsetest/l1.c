@@ -6,5 +6,5 @@ struct x a[] = { {}, {} };
 int size = sizeof(a);
 
 int main() {
-	printf("%d\n", sizeof(a));
+	printf("%u\n", (unsigned) sizeof(a));
 }
