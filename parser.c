@@ -2960,9 +2960,10 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 
 		type_t *new_type = duplicate_type(type);
 
-		new_type->array.size_expression = cnst;
-		new_type->array.size_constant   = true;
-		new_type->array.size            = size;
+		new_type->array.size_expression   = cnst;
+		new_type->array.size_constant     = true;
+		new_type->array.has_implicit_size = true;
+		new_type->array.size              = size;
 		env->type = new_type;
 	}
 
