@@ -2926,7 +2926,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		result = parse_scalar_initializer(type, env->must_be_constant);
 	}
 
-	/* § 6.7.5 (22)  array initializers for arrays with unknown size determine
+	/* § 6.7.8 (22) array initializers for arrays with unknown size determine
 	 * the array type size */
 	if (is_type_array(type) && type->array.size_expression == NULL
 			&& result != NULL) {
@@ -3443,6 +3443,7 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	entity->base.source_position = *HERE;
 	entity->base.symbol          = symbol;
 	if (is_declaration(entity)) {
+		entity->declaration.type     = type_error_type;
 		entity->declaration.implicit = true;
 	}
 	record_entity(entity, false);
@@ -6107,30 +6108,17 @@ static void parse_compound_declarators(compound_t *compound,
 			entity->declaration.type                   = type;
 		} else {
 			entity = parse_declarator(specifiers,/*may_be_abstract=*/true, true);
-
-			assert(is_declaration(entity));
-			type_t *orig_type = entity->declaration.type;
-			type_t *type      = skip_typeref(orig_type);
+			assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 
 			if (token.type == ':') {
 				source_position_t source_position = *HERE;
 				next_token();
 				expression_t *size = parse_constant_expression();
 
-				type_t *bitfield_type = make_bitfield_type(orig_type, size,
+				type_t *type = entity->declaration.type;
+				type_t *bitfield_type = make_bitfield_type(type, size,
 						&source_position, entity->base.symbol);
 				entity->declaration.type = bitfield_type;
-			} else {
-				/* TODO we ignore arrays for now... what is missing is a check
-				 * that they're at the end of the struct */
-				if (is_type_incomplete(type) && !is_type_array(type)) {
-					errorf(HERE,
-					       "compound member '%Y' has incomplete type '%T'",
-					       entity->base.symbol, orig_type);
-				} else if (is_type_function(type)) {
-					errorf(HERE, "compound member '%Y' must not have function type '%T'",
-					       entity->base.symbol, orig_type);
-				}
 			}
 		}
 
@@ -6159,6 +6147,32 @@ end_error:
 	;
 }
 
+static void semantic_compound(compound_t *compound)
+{
+	entity_t *entity = compound->members.entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		assert(entity->kind == ENTITY_COMPOUND_MEMBER);
+
+		type_t *orig_type = entity->declaration.type;
+		type_t *type      = skip_typeref(orig_type);
+
+		if (is_type_function(type)) {
+			errorf(HERE,
+			       "compound member '%Y' must not have function type '%T'",
+			       entity->base.symbol, orig_type);
+		} else if (is_type_incomplete(type)) {
+			/* §6.7.2.1 (16) flexible array member */
+			if (is_type_array(type) && entity->base.next == NULL) {
+				compound->has_flexible_member = true;
+			} else {
+				errorf(HERE,
+				       "compound member '%Y' has incomplete type '%T'",
+				       entity->base.symbol, orig_type);
+			}
+		}
+	}
+}
+
 static void parse_compound_type_entries(compound_t *compound)
 {
 	eat('{');
@@ -6175,6 +6189,7 @@ static void parse_compound_type_entries(compound_t *compound)
 
 		parse_compound_declarators(compound, &specifiers);
 	}
+	semantic_compound(compound);
 	rem_anchor_token('}');
 	next_token();
 }

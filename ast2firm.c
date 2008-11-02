@@ -235,7 +235,6 @@ static unsigned get_array_type_size(array_type_t *type)
 	return get_type_size_bytes(irtype);
 }
 
-
 static unsigned get_type_size_const(type_t *type)
 {
 	switch(type->kind) {

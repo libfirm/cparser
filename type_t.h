@@ -140,7 +140,7 @@ struct function_type_t {
 
 struct compound_type_t {
 	type_base_t  base;
-	bool         packed : 1;       /** Set if packed was specified. */
+	bool         packed : 1; /**< Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
 	compound_t  *compound;
