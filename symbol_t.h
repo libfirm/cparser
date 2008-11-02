@@ -25,18 +25,6 @@
 #include "entity.h"
 #include "token_t.h"
 
-struct pp_definition_t {
-	symbol_t          *symbol;
-	source_position_t  source_position;
-	pp_definition_t   *parent_expansion;
-	size_t             expand_pos;
-	bool               is_variadic;
-	size_t             argument_count;
-	token_t           *arguments;
-	size_t             list_len;
-	token_t           *replacement_list;
-};
-
 struct symbol_t {
 	const char       *string;
 	unsigned short    ID;

@@ -540,6 +540,12 @@ int main(int argc, char **argv)
 	bool               construct_dep_target = false;
 	struct obstack     file_obst;
 
+	/* hack for now... */
+	if (strstr(argv[0], "pptest") != NULL) {
+		extern int pptest_main(int argc, char **argv);
+		return pptest_main(argc, argv);
+	}
+
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
 	obstack_init(&file_obst);

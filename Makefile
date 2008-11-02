@@ -50,6 +50,7 @@ SOURCES := \
 	driver/firm_codegen.c \
 	driver/firm_opt.c \
 	driver/gen_firm_asm.c \
+	preprocessor.c
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
 
