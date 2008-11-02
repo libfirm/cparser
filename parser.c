@@ -5419,6 +5419,7 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
+		case EXPR_INVALID:
 		case EXPR_STATEMENT: // TODO implement
 			return true;
 
@@ -5457,7 +5458,6 @@ static bool expression_returns(expression_t const *const expr)
 				expression_returns(expr->binary.right);
 
 		case EXPR_UNKNOWN:
-		case EXPR_INVALID:
 			break;
 	}
 
