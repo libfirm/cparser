@@ -1,7 +1,5 @@
 Refactoring:
 - eliminate target_architecture.h and replace with stuff in lang_features.h
-- create structures for variables and functions, removing the omnipotent
-  declaration
 
 Lexer:
 - Add preprocessor code.
@@ -23,11 +21,9 @@ Parser:
 - print initialisation type_path for initializer errors
 
 ast2firm:
-- handle non-constant initializers
 - output source file positions for panics.
 - handle bitfield members with 0 correctly (standard says they finish the
   current unit)
-- merge functions entities declared in lokal scope
 
 Missing Errors:
 
@@ -38,15 +34,4 @@ Missing Warnings:
 
 main/driver:
 - delete output file if we had an error
-
-Spec-Status:
-164.gzip:    works
-175.vpr:     works
-176.gcc:     sometimes works...
-181.mcf:     works
-186.crafty:  works
-253.perlbmk: works
-254.gap:     works
-255.vortex:  works
-256.bzip2:   works
-300.twolf:   works
+- delete temp files!

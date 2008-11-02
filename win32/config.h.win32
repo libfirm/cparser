@@ -18,6 +18,5 @@
  * 02111-1307, USA.
  */
 
-#define INLINE inline
 #define __attribute__(x)
 #define snprintf _snprintf
