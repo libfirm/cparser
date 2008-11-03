@@ -31,6 +31,15 @@ struct pp_definition_t {
 	token_t           *replacement_list;
 };
 
+typedef struct pp_conditional_t pp_conditional_t;
+struct pp_conditional_t {
+	source_position_t  source_position;
+	bool               condition;
+	bool               in_else;
+	bool               skip; /**< conditional in skip mode (then+else gets skipped) */
+	pp_conditional_t  *parent;
+};
+
 typedef struct pp_input_t pp_input_t;
 struct pp_input_t {
 	FILE              *file;
@@ -50,16 +59,19 @@ static pp_input_t     *input_stack;
 static unsigned        n_inputs;
 static struct obstack  input_obstack;
 
+static pp_conditional_t *conditional_stack;
+
 token_t                   pp_token;
 static bool               resolve_escape_sequences = false;
 static bool               do_print_spaces          = true;
+static bool               do_expansions;
+static bool               skip_mode;
 static FILE              *out;
 static struct obstack     pp_obstack;
 static unsigned           counted_newlines;
 static unsigned           counted_spaces;
 static const char        *printed_input_name = NULL;
 static pp_definition_t   *current_expansion  = NULL;
-static bool               do_expansions;
 
 static inline void next_char(void);
 static void next_preprocessing_token(void);
@@ -1180,6 +1192,9 @@ static void print_spaces(void)
 
 static void emit_pp_token(void)
 {
+	if (skip_mode)
+		return;
+
 	if (pp_token.type != '\n') {
 		print_spaces();
 		input.had_non_space = true;
@@ -1492,30 +1507,193 @@ static void parse_include_directive(void)
 	}
 }
 
+static pp_conditional_t *push_conditional(void)
+{
+	pp_conditional_t *conditional
+		= obstack_alloc(&pp_obstack, sizeof(*conditional));
+	memset(conditional, 0, sizeof(*conditional));
+
+	conditional->parent = conditional_stack;
+	conditional_stack   = conditional;
+
+	return conditional;
+}
+
+static void pop_conditional(void)
+{
+	assert(conditional_stack != NULL);
+	conditional_stack = conditional_stack->parent;
+}
+
+static void check_unclosed_conditionals(void)
+{
+	while (conditional_stack != NULL) {
+		pp_conditional_t *conditional = conditional_stack;
+
+		if (conditional->in_else) {
+			errorf(&conditional->source_position, "unterminated #else");
+		} else {
+			errorf(&conditional->source_position, "unterminated condition");
+		}
+		pop_conditional();
+	}
+}
+
+static void parse_ifdef_ifndef_directive(void)
+{
+	bool is_ifndef = (pp_token.type == TP_ifndef);
+	bool condition;
+	next_preprocessing_token();
+
+	if (skip_mode) {
+		eat_pp_directive();
+		pp_conditional_t *conditional = push_conditional();
+		conditional->source_position  = pp_token.source_position;
+		conditional->skip             = true;
+		return;
+	}
+
+	if (pp_token.type != TP_IDENTIFIER) {
+		errorf(&pp_token.source_position,
+		       "expected identifier after #%s, got '%T'",
+		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
+		eat_pp_directive();
+
+		/* just take the true case in the hope to avoid further errors */
+		condition = true;
+	} else {
+		symbol_t        *symbol        = pp_token.v.symbol;
+		pp_definition_t *pp_definition = symbol->pp_definition;
+		next_preprocessing_token();
+
+		if (pp_token.type != '\n') {
+			errorf(&pp_token.source_position,
+			       "extra tokens at end of #%s",
+			       is_ifndef ? "ifndef" : "ifdef");
+			eat_pp_directive();
+		}
+
+		/* evaluate wether we are in true or false case */
+		condition = is_ifndef ? pp_definition == NULL : pp_definition != NULL;
+	}
+
+	pp_conditional_t *conditional = push_conditional();
+	conditional->source_position  = pp_token.source_position;
+	conditional->condition        = condition;
+
+	if (!condition) {
+		skip_mode = true;
+	}
+}
+
+static void parse_else_directive(void)
+{
+	eat_pp(TP_else);
+
+	if (pp_token.type != '\n') {
+		if (!skip_mode) {
+			warningf(&pp_token.source_position, "extra tokens at end of #else");
+		}
+		eat_pp_directive();
+	}
+
+	pp_conditional_t *conditional = conditional_stack;
+	if (conditional == NULL) {
+		errorf(&pp_token.source_position, "#else without prior #if");
+		return;
+	}
+
+	if (conditional->in_else) {
+		errorf(&pp_token.source_position,
+		       "#else after #else (condition started %P)",
+		       conditional->source_position);
+		skip_mode = true;
+		return;
+	}
+
+	conditional->in_else = true;
+	if (!conditional->skip) {
+		skip_mode = conditional->condition;
+	}
+	conditional->source_position = pp_token.source_position;
+}
+
+static void parse_endif_directive(void)
+{
+	eat_pp(TP_endif);
+
+	if (pp_token.type != '\n') {
+		if (!skip_mode) {
+			warningf(&pp_token.source_position,
+			         "extra tokens at end of #endif");
+		}
+		eat_pp_directive();
+	}
+
+	pp_conditional_t *conditional = conditional_stack;
+	if (conditional == NULL) {
+		errorf(&pp_token.source_position, "#endif without prior #if");
+		return;
+	}
+
+	if (!conditional->skip) {
+		skip_mode = false;
+	}
+	pop_conditional();
+}
+
 static void parse_preprocessing_directive(void)
 {
 	do_print_spaces = false;
 	do_expansions   = false;
 	eat_pp('#');
 
-	switch(pp_token.type) {
-	case TP_define:
-		parse_define_directive();
-		break;
-	case TP_undef:
-		parse_undef_directive();
-		break;
-	case TP_include:
-		parse_include_directive();
-		/* no need to parse ending '\n' */
-		do_print_spaces = true;
-		do_expansions   = true;
-		return;
-	default:
-		errorf(&pp_token.source_position,
-		       "invalid preprocessing directive #%T", &pp_token);
-		eat_pp_directive();
-		break;
+	if (skip_mode) {
+		switch(pp_token.type) {
+		case TP_ifdef:
+		case TP_ifndef:
+			parse_ifdef_ifndef_directive();
+			break;
+		case TP_else:
+			parse_else_directive();
+			break;
+		case TP_endif:
+			parse_endif_directive();
+			break;
+		default:
+			eat_pp_directive();
+			break;
+		}
+	} else {
+		switch(pp_token.type) {
+		case TP_define:
+			parse_define_directive();
+			break;
+		case TP_undef:
+			parse_undef_directive();
+			break;
+		case TP_ifdef:
+		case TP_ifndef:
+			parse_ifdef_ifndef_directive();
+			break;
+		case TP_else:
+			parse_else_directive();
+			break;
+		case TP_endif:
+			parse_endif_directive();
+			break;
+		case TP_include:
+			parse_include_directive();
+			/* no need to parse ending '\n' */
+			do_print_spaces = true;
+			do_expansions   = true;
+			return;
+		default:
+			errorf(&pp_token.source_position,
+				   "invalid preprocessing directive #%T", &pp_token);
+			eat_pp_directive();
+			break;
+		}
 	}
 
 	do_print_spaces = true;
@@ -1571,6 +1749,7 @@ int pptest_main(int argc, char **argv)
 	}
 end_of_main_loop:
 
+	check_unclosed_conditionals();
 	close_input();
 
 	obstack_free(&input_obstack, NULL);

@@ -67,11 +67,13 @@ void init_tokens(void)
 #undef T
 
 #define T(mode,x,str,val)                                          \
-	assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);                 \
-	symbol                   = symbol_table_insert(str);           \
-	symbol->pp_ID            = TP_##x;                             \
-	if (pp_token_symbols[TP_##x] == NULL)                          \
-		pp_token_symbols[TP_##x] = symbol;
+	if (c_mode & (mode)) {                                         \
+		assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);             \
+		symbol                   = symbol_table_insert(str);       \
+		symbol->pp_ID            = TP_##x;                         \
+		if (pp_token_symbols[TP_##x] == NULL)                      \
+			pp_token_symbols[TP_##x] = symbol;                     \
+	}
 
 #define TS(x,str,val)                                              \
 	assert(TP_##x >= 0 && TP_##x < T_LAST_TOKEN);                  \
@@ -157,10 +159,10 @@ void print_pp_token_type(FILE *f, preprocessor_token_type_t token_type)
 
 	const symbol_t *symbol = pp_token_symbols[token_type];
 	if(symbol != NULL) {
-		fprintf(f, "'%s'", symbol->string);
+		fprintf(f, "%s", symbol->string);
 	} else {
 		if(token_type >= 0 && token_type < 256) {
-			fprintf(f, "'%c'", token_type);
+			fprintf(f, "%c", token_type);
 			return;
 		}
 		fputs("unknown token", f);

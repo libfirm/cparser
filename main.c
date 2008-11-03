@@ -100,7 +100,7 @@
 #endif
 
 /** The current c mode/dialect. */
-lang_features_t c_mode;
+lang_features_t c_mode = _C89 | _ANSI | _C99 | _GNUC;
 
 /** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
 unsigned int machine_size = 32;
