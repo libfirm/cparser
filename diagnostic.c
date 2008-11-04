@@ -127,6 +127,12 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					break;
 				}
 
+				case 't': {
+					const token_t *const token = va_arg(ap, const token_t*);
+					print_pp_token(stderr, token);
+					break;
+				}
+
 				case 'K': {
 					const token_t* const token = va_arg(ap, const token_t*);
 					print_token(stderr, token);
