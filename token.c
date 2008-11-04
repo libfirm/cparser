@@ -109,10 +109,10 @@ void print_token_type(FILE *f, token_type_t token_type)
 
 	const symbol_t *symbol = token_symbols[token_type];
 	if(symbol != NULL) {
-		fprintf(f, "'%s'", symbol->string);
+		fprintf(f, "%s", symbol->string);
 	} else {
 		if(token_type >= 0 && token_type < 256) {
-			fprintf(f, "'%c'", token_type);
+			fprintf(f, "%c", token_type);
 			return;
 		}
 		fputs("unknown token", f);
@@ -123,7 +123,7 @@ void print_token(FILE *f, const token_t *token)
 {
 	switch(token->type) {
 	case T_IDENTIFIER:
-		fprintf(f, "symbol '%s'", token->v.symbol->string);
+		fprintf(f, "symbol %s", token->v.symbol->string);
 		break;
 	case T_INTEGER:
 		fprintf(f, "integer number %lld", token->v.intvalue);
@@ -132,7 +132,7 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "floatingpointer number %LF", token->v.floatvalue);
 		break;
 	case T_STRING_LITERAL:
-		fprintf(f, "string '%s'", token->v.string.begin); /* TODO suboptimal */
+		fprintf(f, "string \"%s\"", token->v.string.begin);
 		break;
 	default:
 		print_token_type(f, (token_type_t)token->type);
@@ -173,13 +173,13 @@ void print_pp_token(FILE *f, const token_t *token)
 {
 	switch((preprocessor_token_type_t) token->type) {
 	case TP_IDENTIFIER:
-		fprintf(f, "symbol '%s'", token->v.symbol->string);
+		fprintf(f, "symbol %s", token->v.symbol->string);
 		break;
 	case TP_NUMBER:
 		fprintf(f, "number %s", token->v.string.begin);
 		break;
 	case TP_STRING_LITERAL:
-		fprintf(f, "string '%s'", token->v.string.begin);
+		fprintf(f, "string \"%s\"", token->v.string.begin);
 		break;
 	default:
 		print_pp_token_type(f, (preprocessor_token_type_t) token->type);
