@@ -95,6 +95,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNKNOWN]                   = PREC_PRIMARY,
 		[EXPR_INVALID]                   = PREC_PRIMARY,
 		[EXPR_REFERENCE]                 = PREC_PRIMARY,
+		[EXPR_REFERENCE_ENUM_VALUE]      = PREC_PRIMARY,
 		[EXPR_CHARACTER_CONSTANT]        = PREC_PRIMARY,
 		[EXPR_WIDE_CHARACTER_CONSTANT]   = PREC_PRIMARY,
 		[EXPR_CONST]                     = PREC_PRIMARY,
@@ -802,6 +803,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		print_binary_expression(&expression->binary);
 		break;
 	case EXPR_REFERENCE:
+	case EXPR_REFERENCE_ENUM_VALUE:
 		print_reference_expression(&expression->reference);
 		break;
 	case EXPR_ARRAY_ACCESS:
