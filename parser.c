@@ -6604,6 +6604,11 @@ static expression_t *parse_reference(void)
 		orig_type = entity->declaration.type;
 	} else if (entity->kind == ENTITY_ENUM_VALUE) {
 		orig_type = entity->enum_value.enum_type;
+	} else if (entity->kind == ENTITY_TYPEDEF) {
+		errorf(HERE, "encountered typedef name '%Y' while parsing expression",
+			symbol);
+		next_token();
+		return create_invalid_expression();
 	} else {
 		panic("expected declaration or enum value in reference");
 	}
