@@ -3444,6 +3444,8 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	if (is_declaration(entity)) {
 		entity->declaration.type     = type_error_type;
 		entity->declaration.implicit = true;
+	} else if (kind == ENTITY_TYPEDEF) {
+		entity->typedefe.type = type_error_type;
 	}
 	record_entity(entity, false);
 	return entity;
