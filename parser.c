@@ -443,8 +443,9 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 	size_t        size = get_expression_struct_size(kind);
 	expression_t *res  = allocate_ast_zero(size);
 
-	res->base.kind = kind;
-	res->base.type = type_error_type;
+	res->base.kind            = kind;
+	res->base.type            = type_error_type;
+	res->base.source_position = token.source_position;
 	return res;
 }
 
@@ -453,9 +454,7 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
  */
 static expression_t *create_invalid_expression(void)
 {
-	expression_t *expression         = allocate_expression_zero(EXPR_INVALID);
-	expression->base.source_position = token.source_position;
-	return expression;
+	return allocate_expression_zero(EXPR_INVALID);
 }
 
 /**
@@ -721,7 +720,7 @@ static void eat_block(void)
 		next_token();
 }
 
-#define eat(token_type)  do { assert(token.type == token_type); next_token(); } while (0)
+#define eat(token_type)  do { assert(token.type == (token_type)); next_token(); } while (0)
 
 /**
  * Report a parse error because an expected token was not found.
@@ -6295,10 +6294,9 @@ static expression_t *parse_string_const(void)
  */
 static expression_t *parse_int_const(void)
 {
-	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
-	cnst->base.source_position = *HERE;
-	cnst->base.type            = token.datatype;
-	cnst->conste.v.int_value   = token.v.intvalue;
+	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
+	cnst->base.type          = token.datatype;
+	cnst->conste.v.int_value = token.v.intvalue;
 
 	next_token();
 
@@ -6311,10 +6309,8 @@ static expression_t *parse_int_const(void)
 static expression_t *parse_character_constant(void)
 {
 	expression_t *cnst = allocate_expression_zero(EXPR_CHARACTER_CONSTANT);
-
-	cnst->base.source_position = *HERE;
-	cnst->base.type            = token.datatype;
-	cnst->conste.v.character   = token.v.string;
+	cnst->base.type          = token.datatype;
+	cnst->conste.v.character = token.v.string;
 
 	if (cnst->conste.v.character.size != 1) {
 		if (warning.multichar && GNU_MODE) {
@@ -6334,8 +6330,6 @@ static expression_t *parse_character_constant(void)
 static expression_t *parse_wide_character_constant(void)
 {
 	expression_t *cnst = allocate_expression_zero(EXPR_WIDE_CHARACTER_CONSTANT);
-
-	cnst->base.source_position    = *HERE;
 	cnst->base.type               = token.datatype;
 	cnst->conste.v.wide_character = token.v.wide_string;
 
@@ -6746,7 +6740,7 @@ static expression_t *parse_cast(void)
 
 	source_position_t source_position = token.source_position;
 
-	type_t *type  = parse_typename();
+	type_t *type = parse_typename();
 
 	rem_anchor_token(')');
 	expect(')');
@@ -6780,9 +6774,8 @@ static expression_t *parse_statement_expression(void)
 
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
-	statement_t *statement           = parse_compound_statement(true);
-	expression->statement.statement  = statement;
-	expression->base.source_position = statement->base.source_position;
+	statement_t *statement          = parse_compound_statement(true);
+	expression->statement.statement = statement;
 
 	/* find last statement and use its type */
 	type_t *type = type_void;
@@ -6838,7 +6831,6 @@ end_error:
 
 static expression_t *parse_function_keyword(void)
 {
-	next_token();
 	/* TODO */
 
 	if (current_function == NULL) {
@@ -6849,13 +6841,13 @@ static expression_t *parse_function_keyword(void)
 	expression->base.type     = type_char_ptr;
 	expression->funcname.kind = FUNCNAME_FUNCTION;
 
+	next_token();
+
 	return expression;
 }
 
 static expression_t *parse_pretty_function_keyword(void)
 {
-	eat(T___PRETTY_FUNCTION__);
-
 	if (current_function == NULL) {
 		errorf(HERE, "'__PRETTY_FUNCTION__' used outside of a function");
 	}
@@ -6864,13 +6856,13 @@ static expression_t *parse_pretty_function_keyword(void)
 	expression->base.type     = type_char_ptr;
 	expression->funcname.kind = FUNCNAME_PRETTY_FUNCTION;
 
+	eat(T___PRETTY_FUNCTION__);
+
 	return expression;
 }
 
 static expression_t *parse_funcsig_keyword(void)
 {
-	eat(T___FUNCSIG__);
-
 	if (current_function == NULL) {
 		errorf(HERE, "'__FUNCSIG__' used outside of a function");
 	}
@@ -6879,13 +6871,13 @@ static expression_t *parse_funcsig_keyword(void)
 	expression->base.type     = type_char_ptr;
 	expression->funcname.kind = FUNCNAME_FUNCSIG;
 
+	eat(T___FUNCSIG__);
+
 	return expression;
 }
 
 static expression_t *parse_funcdname_keyword(void)
 {
-	eat(T___FUNCDNAME__);
-
 	if (current_function == NULL) {
 		errorf(HERE, "'__FUNCDNAME__' used outside of a function");
 	}
@@ -6893,6 +6885,8 @@ static expression_t *parse_funcdname_keyword(void)
 	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
 	expression->base.type     = type_char_ptr;
 	expression->funcname.kind = FUNCNAME_FUNCDNAME;
+
+	eat(T___FUNCDNAME__);
 
 	return expression;
 }
@@ -6957,10 +6951,10 @@ end_error:
  */
 static expression_t *parse_offsetof(void)
 {
-	eat(T___builtin_offsetof);
-
 	expression_t *expression = allocate_expression_zero(EXPR_OFFSETOF);
 	expression->base.type    = type_size_t;
+
+	eat(T___builtin_offsetof);
 
 	expect('(');
 	add_anchor_token(',');
@@ -6998,9 +6992,9 @@ end_error:
  */
 static expression_t *parse_va_start(void)
 {
-	eat(T___builtin_va_start);
-
 	expression_t *expression = allocate_expression_zero(EXPR_VA_START);
+
+	eat(T___builtin_va_start);
 
 	expect('(');
 	add_anchor_token(',');
@@ -7031,9 +7025,9 @@ end_error:
  */
 static expression_t *parse_va_arg(void)
 {
-	eat(T___builtin_va_arg);
-
 	expression_t *expression = allocate_expression_zero(EXPR_VA_ARG);
+
+	eat(T___builtin_va_arg);
 
 	expect('(');
 	expression->va_arge.ap = parse_assignment_expression();
@@ -7067,9 +7061,9 @@ static expression_t *parse_builtin_symbol(void)
  */
 static expression_t *parse_builtin_constant(void)
 {
-	eat(T___builtin_constant_p);
-
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_CONSTANT_P);
+
+	eat(T___builtin_constant_p);
 
 	expect('(');
 	add_anchor_token(')');
@@ -7088,9 +7082,9 @@ end_error:
  */
 static expression_t *parse_builtin_prefetch(void)
 {
-	eat(T___builtin_prefetch);
-
 	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_PREFETCH);
+
+	eat(T___builtin_prefetch);
 
 	expect('(');
 	add_anchor_token(')');
@@ -7175,10 +7169,10 @@ end_error:
  */
 static expression_t *parse_builtin_expect(void)
 {
-	eat(T___builtin_expect);
-
 	expression_t *expression
 		= allocate_expression_zero(EXPR_BINARY_BUILTIN_EXPECT);
+
+	eat(T___builtin_expect);
 
 	expect('(');
 	expression->binary.left = parse_assignment_expression();
@@ -7199,10 +7193,9 @@ end_error:
  */
 static expression_t *parse_assume(void)
 {
-	eat(T__assume);
+	expression_t *expression = allocate_expression_zero(EXPR_UNARY_ASSUME);
 
-	expression_t *expression
-		= allocate_expression_zero(EXPR_UNARY_ASSUME);
+	eat(T__assume);
 
 	expect('(');
 	add_anchor_token(')');
@@ -7288,7 +7281,12 @@ end_error:
  */
 static expression_t *parse_noop_expression(void)
 {
-	source_position_t source_position = *HERE;
+	/* the result is a (int)0 */
+	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
+	cnst->base.type            = type_int;
+	cnst->conste.v.int_value   = 0;
+	cnst->conste.is_ms_noop    = true;
+
 	eat(T___noop);
 
 	if (token.type == '(') {
@@ -7310,17 +7308,8 @@ static expression_t *parse_noop_expression(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	/* the result is a (int)0 */
-	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
-	cnst->base.source_position = source_position;
-	cnst->base.type            = type_int;
-	cnst->conste.v.int_value   = 0;
-	cnst->conste.is_ms_noop    = true;
-
-	return cnst;
-
 end_error:
-	return create_invalid_expression();
+	return cnst;
 }
 
 /**
@@ -7393,14 +7382,12 @@ static void check_for_char_index_type(const expression_t *expression)
 
 static expression_t *parse_array_expression(expression_t *left)
 {
+	expression_t *expression = allocate_expression_zero(EXPR_ARRAY_ACCESS);
+
 	eat('[');
 	add_anchor_token(']');
 
 	expression_t *inside = parse_expression();
-
-	expression_t *expression = allocate_expression_zero(EXPR_ARRAY_ACCESS);
-
-	array_access_expression_t *array_access = &expression->array_access;
 
 	type_t *const orig_type_left   = left->base.type;
 	type_t *const orig_type_inside = inside->base.type;
@@ -7408,7 +7395,8 @@ static expression_t *parse_array_expression(expression_t *left)
 	type_t *const type_left   = skip_typeref(orig_type_left);
 	type_t *const type_inside = skip_typeref(orig_type_inside);
 
-	type_t *return_type;
+	type_t                    *return_type;
+	array_access_expression_t *array_access = &expression->array_access;
 	if (is_type_pointer(type_left)) {
 		return_type             = type_left->pointer.points_to;
 		array_access->array_ref = left;
@@ -7442,12 +7430,12 @@ static expression_t *parse_array_expression(expression_t *left)
 	return expression;
 }
 
-static expression_t *parse_typeprop(expression_kind_t const kind,
-                                    source_position_t const pos)
+static expression_t *parse_typeprop(expression_kind_t const kind)
 {
 	expression_t  *tp_expression = allocate_expression_zero(kind);
-	tp_expression->base.type            = type_size_t;
-	tp_expression->base.source_position = pos;
+	tp_expression->base.type     = type_size_t;
+
+	eat(kind == EXPR_SIZEOF ? T_sizeof : T___alignof__);
 
 	char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 
@@ -7488,7 +7476,8 @@ typeprop_expression:
 		type->kind == TYPE_BITFIELD ? "bitfield"            :
 		NULL;
 	if (wrong_type != NULL) {
-		errorf(&pos, "operand of %s expression must not be of %s type '%T'",
+		errorf(&tp_expression->base.source_position,
+				"operand of %s expression must not be of %s type '%T'",
 				what, wrong_type, orig_type);
 	}
 
@@ -7499,27 +7488,22 @@ end_error:
 
 static expression_t *parse_sizeof(void)
 {
-	source_position_t pos = *HERE;
-	eat(T_sizeof);
-	return parse_typeprop(EXPR_SIZEOF, pos);
+	return parse_typeprop(EXPR_SIZEOF);
 }
 
 static expression_t *parse_alignof(void)
 {
-	source_position_t pos = *HERE;
-	eat(T___alignof__);
-	return parse_typeprop(EXPR_ALIGNOF, pos);
+	return parse_typeprop(EXPR_ALIGNOF);
 }
 
 static expression_t *parse_select_expression(expression_t *compound)
 {
-	assert(token.type == '.' || token.type == T_MINUSGREATER);
-
-	bool is_pointer = (token.type == T_MINUSGREATER);
-	next_token();
-
 	expression_t *select    = allocate_expression_zero(EXPR_SELECT);
 	select->select.compound = compound;
+
+	assert(token.type == '.' || token.type == T_MINUSGREATER);
+	bool is_pointer = (token.type == T_MINUSGREATER);
+	next_token();
 
 	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
@@ -7660,11 +7644,9 @@ static void check_call_argument(const function_parameter_t *parameter,
  */
 static expression_t *parse_call_expression(expression_t *expression)
 {
-	expression_t *result = allocate_expression_zero(EXPR_CALL);
-	result->base.source_position = expression->base.source_position;
-
-	call_expression_t *call = &result->call;
-	call->function          = expression;
+	expression_t      *result = allocate_expression_zero(EXPR_CALL);
+	call_expression_t *call   = &result->call;
+	call->function            = expression;
 
 	type_t *const orig_type = expression->base.type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -7771,8 +7753,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	expression_t *result = allocate_expression_zero(EXPR_CONDITIONAL);
 
 	conditional_expression_t *conditional = &result->conditional;
-	conditional->base.source_position = *HERE;
-	conditional->condition            = expression;
+	conditional->condition                = expression;
 
 	eat('?');
 	add_anchor_token(':');
@@ -7925,10 +7906,10 @@ static expression_t *parse_extension(void)
  */
 static expression_t *parse_builtin_classify_type(void)
 {
-	eat(T___builtin_classify_type);
-
 	expression_t *result = allocate_expression_zero(EXPR_CLASSIFY_TYPE);
 	result->base.type    = type_int;
+
+	eat(T___builtin_classify_type);
 
 	expect('(');
 	add_anchor_token(')');
@@ -7949,8 +7930,7 @@ end_error:
 static expression_t *parse_delete(void)
 {
 	expression_t *const result = allocate_expression_zero(EXPR_UNARY_DELETE);
-	result->base.source_position = *HERE;
-	result->base.type            = type_void;
+	result->base.type          = type_void;
 
 	eat(T_delete);
 
@@ -7984,8 +7964,7 @@ end_error:;
 static expression_t *parse_throw(void)
 {
 	expression_t *const result = allocate_expression_zero(EXPR_UNARY_THROW);
-	result->base.source_position = *HERE;
-	result->base.type            = type_void;
+	result->base.type          = type_void;
 
 	eat(T_throw);
 
@@ -8261,7 +8240,6 @@ static expression_t *parse_##unexpression_type(void)                         \
 {                                                                            \
 	expression_t *unary_expression                                           \
 		= allocate_expression_zero(unexpression_type);                       \
-	unary_expression->base.source_position = *HERE;                          \
 	eat(token_type);                                                         \
 	unary_expression->unary.value = parse_sub_expression(PREC_UNARY);        \
 	                                                                         \
@@ -8293,9 +8271,8 @@ static expression_t *parse_##unexpression_type(expression_t *left)            \
 {                                                                             \
 	expression_t *unary_expression                                            \
 		= allocate_expression_zero(unexpression_type);                        \
-	unary_expression->base.source_position = *HERE;                           \
 	eat(token_type);                                                          \
-	unary_expression->unary.value          = left;                            \
+	unary_expression->unary.value = left;                                     \
 	                                                                          \
 	sfunc(&unary_expression->unary);                                          \
                                                                               \
@@ -8953,8 +8930,7 @@ static void semantic_comma(binary_expression_t *expression)
 static expression_t *parse_##binexpression_type(expression_t *left)          \
 {                                                                            \
 	expression_t *binexpr = allocate_expression_zero(binexpression_type);    \
-	binexpr->base.source_position = *HERE;                                   \
-	binexpr->binary.left          = left;                                    \
+	binexpr->binary.left  = left;                                            \
 	eat(token_type);                                                         \
                                                                              \
 	expression_t *right = parse_sub_expression(prec_r);                      \
