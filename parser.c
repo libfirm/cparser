@@ -7422,11 +7422,8 @@ static expression_t *parse_array_expression(expression_t *left)
 	expression->base.type = automatic_type_conversion(return_type);
 
 	rem_anchor_token(']');
-	if (token.type == ']') {
-		next_token();
-	} else {
-		parse_error_expected("Problem while parsing array access", ']', NULL);
-	}
+	expect(']');
+end_error:
 	return expression;
 }
 
