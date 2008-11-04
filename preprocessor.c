@@ -23,10 +23,11 @@ struct pp_definition_t {
 	source_position_t  source_position;
 	pp_definition_t   *parent_expansion;
 	size_t             expand_pos;
-	bool               is_variadic  : 1;
-	bool               is_expanding : 1;
-	size_t             argument_count;
-	token_t           *arguments;
+	bool               is_variadic   : 1;
+	bool               is_expanding  : 1;
+	bool               has_arguments : 1;
+	size_t             n_arguments;
+	symbol_t          *arguments;
 	size_t             list_len;
 	token_t           *replacement_list;
 };
@@ -845,8 +846,10 @@ end_number:
 
 static void skip_multiline_comment(void)
 {
-	unsigned start_linenr = input.position.linenr;
+	if(do_print_spaces)
+		counted_spaces++;
 
+	unsigned start_linenr = input.position.linenr;
 	while(1) {
 		switch(CC) {
 		case '/':
@@ -888,6 +891,9 @@ static void skip_multiline_comment(void)
 
 static void skip_line_comment(void)
 {
+	if(do_print_spaces)
+		counted_spaces++;
+
 	while(1) {
 		switch(CC) {
 		case EOF:
@@ -1028,14 +1034,10 @@ restart:
 			case '*':
 				next_char();
 				skip_multiline_comment();
-				if(do_print_spaces)
-					counted_spaces++;
 				goto restart;
 			case '/':
 				next_char();
 				skip_line_comment();
-				if(do_print_spaces)
-					counted_spaces++;
 				goto restart;
 		ELSE('/')
 	case '%':
@@ -1174,7 +1176,7 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 
 static void print_spaces(void)
 {
-	if (counted_newlines >= 9) {
+	if (counted_newlines >= 8) {
 		if (input.had_non_space) {
 			fputc('\n', out);
 		}
@@ -1309,12 +1311,12 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 static void parse_define_directive(void)
 {
 	eat_pp(TP_define);
+	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if(pp_token.type != TP_IDENTIFIER) {
+	if (pp_token.type != TP_IDENTIFIER) {
 		errorf(&pp_token.source_position,
-		       "expected identifier after #define, got '%T'", &pp_token);
-		eat_pp_directive();
-		return;
+		       "expected identifier after #define, got '%t'", &pp_token);
+		goto error_out;
 	}
 	symbol_t *symbol = pp_token.v.symbol;
 
@@ -1326,22 +1328,54 @@ static void parse_define_directive(void)
 	/* this is probably the only place where spaces are significant in the
 	 * lexer (except for the fact that they separate tokens). #define b(x)
 	 * is something else than #define b (x) */
-	//token_t *arguments = NULL;
-	if(CC == '(') {
+	if (CC == '(') {
+		/* eat the '(' */
 		next_preprocessing_token();
-		while(pp_token.type != ')') {
-			if(pp_token.type == TP_DOTDOTDOT) {
+		/* get next token after '(' */
+		next_preprocessing_token();
+
+		while (true) {
+			switch (pp_token.type) {
+			case TP_DOTDOTDOT:
 				new_definition->is_variadic = true;
 				next_preprocessing_token();
-				if(pp_token.type != ')') {
+				if (pp_token.type != ')') {
 					errorf(&input.position,
 							"'...' not at end of macro argument list");
-					continue;
+					goto error_out;
 				}
-			} else if(pp_token.type != TP_IDENTIFIER) {
+				break;
+			case TP_IDENTIFIER:
+				obstack_ptr_grow(&pp_obstack, pp_token.v.symbol);
 				next_preprocessing_token();
+
+				if (pp_token.type == ',') {
+					next_preprocessing_token();
+					break;
+				}
+
+				if (pp_token.type != ')') {
+					errorf(&pp_token.source_position,
+					       "expected ',' or ')' after identifier, got '%t'",
+					       &pp_token);
+					goto error_out;
+				}
+				break;
+			case ')':
+				goto finish_argument_list;
+			default:
+				errorf(&pp_token.source_position,
+				       "expected identifier, '...' or ')' in #define argument list, got '%t'",
+				       &pp_token);
+				goto error_out;
 			}
 		}
+
+	finish_argument_list:
+		new_definition->has_arguments = true;
+		new_definition->n_arguments
+			= obstack_object_size(&pp_obstack) / sizeof(new_definition->arguments[0]);
+		new_definition->arguments = obstack_finish(&pp_obstack);
 	} else {
 		next_preprocessing_token();
 	}
@@ -1349,7 +1383,7 @@ static void parse_define_directive(void)
 	/* construct a new pp_definition on the obstack */
 	assert(obstack_object_size(&pp_obstack) == 0);
 	size_t list_len = 0;
-	while(pp_token.type != '\n' && pp_token.type != TP_EOF) {
+	while (pp_token.type != '\n' && pp_token.type != TP_EOF) {
 		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 		++list_len;
 		next_preprocessing_token();
@@ -1359,8 +1393,8 @@ static void parse_define_directive(void)
 	new_definition->replacement_list = obstack_finish(&pp_obstack);
 
 	pp_definition_t *old_definition = symbol->pp_definition;
-	if(old_definition != NULL) {
-		if(!pp_definitions_equal(old_definition, new_definition)) {
+	if (old_definition != NULL) {
+		if (!pp_definitions_equal(old_definition, new_definition)) {
 			warningf(&input.position, "multiple definition of macro '%Y' (first defined %P)",
 	   		         symbol, &old_definition->source_position);
 		} else {
@@ -1371,6 +1405,14 @@ static void parse_define_directive(void)
 	}
 
 	symbol->pp_definition = new_definition;
+	return;
+
+error_out:
+	if (obstack_object_size(&pp_obstack) > 0) {
+		char *ptr = obstack_finish(&pp_obstack);
+		obstack_free(&pp_obstack, ptr);
+	}
+	eat_pp_directive();
 }
 
 static void parse_undef_directive(void)
@@ -1379,7 +1421,7 @@ static void parse_undef_directive(void)
 
 	if(pp_token.type != TP_IDENTIFIER) {
 		errorf(&input.position,
-		       "expected identifier after #undef, got '%T'", &pp_token);
+		       "expected identifier after #undef, got '%t'", &pp_token);
 		eat_pp_directive();
 		return;
 	}
@@ -1395,18 +1437,51 @@ static void parse_undef_directive(void)
 	eat_pp_directive();
 }
 
+/* skip spaces advancing at the start of the next preprocessing token */
+static void skip_spaces(void)
+{
+	while (true) {
+		switch (CC) {
+		case ' ':
+		case '\t':
+	 		if(do_print_spaces)
+				counted_spaces++;
+	 		next_char();
+			continue;
+		case '/':
+			next_char();
+			if (CC == '/') {
+				next_char();
+				skip_line_comment();
+				continue;
+			} else if (CC == '*') {
+				next_char();
+				skip_multiline_comment();
+				continue;
+			} else {
+				put_back(CC);
+				CC = '/';
+			}
+			return;
+		default:
+			return;
+		}
+	}
+}
+
 static const char *parse_headername(void)
 {
-	/* behind an #include we can have the special headername lexems, check
-	 * for them here */
+	/* behind an #include we can have the special headername lexems.
+	 * They're only allowed behind an #include so they're not recognized
+	 * by the normal next_preprocessing_token. We handle them as a special
+	 * exception here */
 
-	/* skip spaces */
-	while (CC == ' ' || CC == '\t') {
-		next_char();
-	}
+	/* skip spaces so we reach start of next preprocessing token */
+	skip_spaces();
 
 	assert(obstack_object_size(&input_obstack) == 0);
 
+	/* check wether we have a "... or <... headername */
 	switch (CC) {
 	case '<':
 		/* for now until we have proper searchpath handling */
@@ -1470,7 +1545,7 @@ finished_headername:
 	return headername;
 }
 
-static void parse_include_directive(void)
+static bool parse_include_directive(void)
 {
 	/* don't eat the TP_include here!
 	 * we need an alternative parsing for the next token */
@@ -1480,7 +1555,7 @@ static void parse_include_directive(void)
 	const char *headername = parse_headername();
 	if (headername == NULL) {
 		eat_pp_directive();
-		return;
+		return false;
 	}
 
 	if (pp_token.type != '\n' && pp_token.type != TP_EOF) {
@@ -1493,8 +1568,15 @@ static void parse_include_directive(void)
 		errorf(&pp_token.source_position, "#include nested too deeply");
 		/* eat \n or EOF */
 		next_preprocessing_token();
-		return;
+		return false;
 	}
+
+	/* we have to reenable space counting and macro expansion here,
+	 * because it is still disabled in directive parsing,
+	 * but we will trigger a preprocessing token reading of the new file
+	 * now and need expansions/space counting */
+	do_print_spaces = true;
+	do_expansions   = true;
 
 	/* switch inputs */
 	push_input();
@@ -1503,8 +1585,10 @@ static void parse_include_directive(void)
 		errorf(&pp_token.source_position,
 		       "failed including '%s': %s", headername, strerror(errno));
 		pop_restore_input();
-		return;
+		return false;
 	}
+
+	return true;
 }
 
 static pp_conditional_t *push_conditional(void)
@@ -1555,7 +1639,7 @@ static void parse_ifdef_ifndef_directive(void)
 
 	if (pp_token.type != TP_IDENTIFIER) {
 		errorf(&pp_token.source_position,
-		       "expected identifier after #%s, got '%T'",
+		       "expected identifier after #%s, got '%t'",
 		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
 		eat_pp_directive();
 
@@ -1682,15 +1766,19 @@ static void parse_preprocessing_directive(void)
 		case TP_endif:
 			parse_endif_directive();
 			break;
-		case TP_include:
-			parse_include_directive();
-			/* no need to parse ending '\n' */
-			do_print_spaces = true;
-			do_expansions   = true;
-			return;
+		case TP_include: {
+			bool in_new_source = parse_include_directive();
+			/* no need to do anything if source file switched */
+			if (in_new_source)
+				return;
+			break;
+		}
+		case '\n':
+			/* the nop directive */
+			break;
 		default:
 			errorf(&pp_token.source_position,
-				   "invalid preprocessing directive #%T", &pp_token);
+				   "invalid preprocessing directive #%t", &pp_token);
 			eat_pp_directive();
 			break;
 		}
