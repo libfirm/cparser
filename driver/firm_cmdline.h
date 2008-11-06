@@ -63,7 +63,7 @@ struct a_firm_opt {
   a_byte   deconv;          /**< enable conv node optimization */
   a_byte   cc_opt;          /**< optimize calling conventions */
   a_byte   bool_opt;        /**< perform bool simplification */
-  a_byte   end_melt;        /**< end block melting */
+  a_byte   shape_blocks;    /**< block shaping */
   a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
   a_byte   lower_ll;        /**< lower double word access */
