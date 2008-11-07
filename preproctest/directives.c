@@ -6,10 +6,14 @@
 #/*blup*/	/*bla*/define FOO5 bar
 #/*blup
   */define FOO6 bar
+#define FO\
+O7 bar
 #//foobar
-define FOO7 bar
-#
 define FOO8 bar
+#
+define FOO9 bar
+#define FOO10\
+(x) bar(x)
 
 FOO1
 FOO2
@@ -19,6 +23,8 @@ FOO5
 FOO6
 FOO7
 FOO8
+FOO9
+FOO10
 
 #define foo foo1
 #/*inc*/include/* haha

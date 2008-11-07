@@ -18,18 +18,26 @@
 #define MAX_PUTBACK 3
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */
 
+struct pp_argument_t {
+	size_t   list_len;
+	token_t *token_list;
+};
+
 struct pp_definition_t {
 	symbol_t          *symbol;
 	source_position_t  source_position;
 	pp_definition_t   *parent_expansion;
 	size_t             expand_pos;
-	bool               is_variadic   : 1;
-	bool               is_expanding  : 1;
-	bool               has_arguments : 1;
-	size_t             n_arguments;
-	symbol_t          *arguments;
+	bool               is_variadic    : 1;
+	bool               is_expanding   : 1;
+	bool               has_parameters : 1;
+	size_t             n_parameters;
+	symbol_t          *parameters;
+
+	/* replacement */
 	size_t             list_len;
-	token_t           *replacement_list;
+	token_t           *token_list;
+
 };
 
 typedef struct pp_conditional_t pp_conditional_t;
@@ -732,7 +740,7 @@ restart:
 		current_expansion = definition;
 		goto restart;
 	}
-	pp_token = definition->replacement_list[definition->expand_pos];
+	pp_token = definition->token_list[definition->expand_pos];
 	++definition->expand_pos;
 
 	if(pp_token.type != TP_IDENTIFIER)
@@ -750,98 +758,25 @@ restart:
 	}
 }
 
-static void parse_symbol(void)
+static void skip_line_comment(void)
 {
-	obstack_1grow(&symbol_obstack, (char) CC);
-	next_char();
+	if(do_print_spaces)
+		counted_spaces++;
 
 	while(1) {
 		switch(CC) {
-		DIGITS
-		SYMBOL_CHARS
-			obstack_1grow(&symbol_obstack, (char) CC);
-			next_char();
-			break;
+		case EOF:
+			return;
+
+		case '\n':
+		case '\r':
+			return;
 
 		default:
-			goto end_symbol;
-		}
-	}
-
-end_symbol:
-	obstack_1grow(&symbol_obstack, '\0');
-	char *string = obstack_finish(&symbol_obstack);
-
-	/* might be a wide string or character constant ( L"string"/L'c' ) */
-	if(CC == '"' && string[0] == 'L' && string[1] == '\0') {
-		obstack_free(&symbol_obstack, string);
-		parse_wide_string_literal();
-		return;
-	} else if(CC == '\'' && string[0] == 'L' && string[1] == '\0') {
-		obstack_free(&symbol_obstack, string);
-		parse_wide_character_constant();
-		return;
-	}
-
-	symbol_t *symbol = symbol_table_insert(string);
-
-	pp_token.type     = symbol->pp_ID;
-	pp_token.v.symbol = symbol;
-
-	/* we can free the memory from symbol obstack if we already had an entry in
-	 * the symbol table */
-	if(symbol->string != string) {
-		obstack_free(&symbol_obstack, string);
-	}
-
-	pp_definition_t *pp_definition = symbol->pp_definition;
-	if(do_expansions && pp_definition != NULL) {
-		pp_definition->expand_pos   = 0;
-		pp_definition->is_expanding = true,
-		current_expansion           = pp_definition;
-		expand_next();
-	}
-}
-
-static void parse_number(void)
-{
-	obstack_1grow(&symbol_obstack, (char) CC);
-	next_char();
-
-	while(1) {
-		switch(CC) {
-		case '.':
-		DIGITS
-		SYMBOL_CHARS_WITHOUT_E_P
-			obstack_1grow(&symbol_obstack, (char) CC);
 			next_char();
 			break;
-
-		case 'e':
-		case 'p':
-		case 'E':
-		case 'P':
-			obstack_1grow(&symbol_obstack, (char) CC);
-			next_char();
-			if(CC == '+' || CC == '-') {
-				obstack_1grow(&symbol_obstack, (char) CC);
-				next_char();
-			}
-			break;
-
-		default:
-			goto end_number;
 		}
 	}
-
-end_number:
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t  size   = obstack_object_size(&symbol_obstack);
-	char   *string = obstack_finish(&symbol_obstack);
-
-	pp_token.type           = TP_NUMBER;
-	pp_token.v.string.begin = string;
-	pp_token.v.string.size  = size;
 }
 
 static void skip_multiline_comment(void)
@@ -889,25 +824,178 @@ static void skip_multiline_comment(void)
 	}
 }
 
-static void skip_line_comment(void)
+/* skip spaces advancing at the start of the next preprocessing token */
+static void skip_spaces(bool skip_newline)
 {
-	if(do_print_spaces)
-		counted_spaces++;
+	while (true) {
+		switch (CC) {
+		case ' ':
+		case '\t':
+	 		if(do_print_spaces)
+				counted_spaces++;
+	 		next_char();
+			continue;
+		case '/':
+			next_char();
+			if (CC == '/') {
+				next_char();
+				skip_line_comment();
+				continue;
+			} else if (CC == '*') {
+				next_char();
+				skip_multiline_comment();
+				continue;
+			} else {
+				put_back(CC);
+				CC = '/';
+			}
+			return;
+
+		case '\r':
+			if (!skip_newline)
+				return;
+
+			next_char();
+			if(CC == '\n') {
+				next_char();
+			}
+			++input.position.linenr;
+			if (do_print_spaces)
+				++counted_newlines;
+			continue;
+
+		case '\n':
+			if (!skip_newline)
+				return;
+
+			next_char();
+			++input.position.linenr;
+			if (do_print_spaces)
+				++counted_newlines;
+			continue;
+
+		default:
+			return;
+		}
+	}
+}
+
+static void eat_pp(preprocessor_token_type_t type)
+{
+	(void) type;
+	assert(pp_token.type == type);
+	next_preprocessing_token();
+}
+
+static void parse_symbol(void)
+{
+	obstack_1grow(&symbol_obstack, (char) CC);
+	next_char();
 
 	while(1) {
 		switch(CC) {
-		case EOF:
-			return;
-
-		case '\n':
-		case '\r':
-			return;
-
-		default:
+		DIGITS
+		SYMBOL_CHARS
+			obstack_1grow(&symbol_obstack, (char) CC);
 			next_char();
 			break;
+
+		default:
+			goto end_symbol;
 		}
 	}
+
+end_symbol:
+	obstack_1grow(&symbol_obstack, '\0');
+	char *string = obstack_finish(&symbol_obstack);
+
+	/* might be a wide string or character constant ( L"string"/L'c' ) */
+	if (CC == '"' && string[0] == 'L' && string[1] == '\0') {
+		obstack_free(&symbol_obstack, string);
+		parse_wide_string_literal();
+		return;
+	} else if (CC == '\'' && string[0] == 'L' && string[1] == '\0') {
+		obstack_free(&symbol_obstack, string);
+		parse_wide_character_constant();
+		return;
+	}
+
+	symbol_t *symbol = symbol_table_insert(string);
+
+	pp_token.type     = symbol->pp_ID;
+	pp_token.v.symbol = symbol;
+
+	/* we can free the memory from symbol obstack if we already had an entry in
+	 * the symbol table */
+	if (symbol->string != string) {
+		obstack_free(&symbol_obstack, string);
+	}
+	if (!do_expansions)
+		return;
+
+	pp_definition_t *pp_definition = symbol->pp_definition;
+	if (pp_definition == NULL)
+		return;
+
+	if (pp_definition->has_parameters) {
+		skip_spaces(true);
+		/* no opening brace -> no expansion */
+		if (CC != '(')
+			return;
+		next_preprocessing_token();
+		eat_pp('(');
+
+		/* parse arguments (TODO) */
+		while (pp_token.type != TP_EOF && pp_token.type != ')')
+			next_preprocessing_token();
+		next_preprocessing_token();
+	}
+
+	pp_definition->expand_pos   = 0;
+	pp_definition->is_expanding = true,
+	current_expansion           = pp_definition;
+	expand_next();
+}
+
+static void parse_number(void)
+{
+	obstack_1grow(&symbol_obstack, (char) CC);
+	next_char();
+
+	while(1) {
+		switch(CC) {
+		case '.':
+		DIGITS
+		SYMBOL_CHARS_WITHOUT_E_P
+			obstack_1grow(&symbol_obstack, (char) CC);
+			next_char();
+			break;
+
+		case 'e':
+		case 'p':
+		case 'E':
+		case 'P':
+			obstack_1grow(&symbol_obstack, (char) CC);
+			next_char();
+			if(CC == '+' || CC == '-') {
+				obstack_1grow(&symbol_obstack, (char) CC);
+				next_char();
+			}
+			break;
+
+		default:
+			goto end_number;
+		}
+	}
+
+end_number:
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t  size   = obstack_object_size(&symbol_obstack);
+	char   *string = obstack_finish(&symbol_obstack);
+
+	pp_token.type           = TP_NUMBER;
+	pp_token.v.string.begin = string;
+	pp_token.v.string.size  = size;
 }
 
 
@@ -1222,13 +1310,6 @@ static void emit_pp_token(void)
 	}
 }
 
-static void eat_pp(preprocessor_token_type_t type)
-{
-	(void) type;
-	assert(pp_token.type == type);
-	next_preprocessing_token();
-}
-
 static void eat_pp_directive(void)
 {
 	while(pp_token.type != '\n' && pp_token.type != TP_EOF) {
@@ -1299,8 +1380,8 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 		return false;
 
 	size_t         len = definition1->list_len;
-	const token_t *t1  = definition1->replacement_list;
-	const token_t *t2  = definition2->replacement_list;
+	const token_t *t1  = definition1->token_list;
+	const token_t *t2  = definition2->token_list;
 	for(size_t i = 0; i < len; ++i, ++t1, ++t2) {
 		if(!pp_tokens_equal(t1, t2))
 			return false;
@@ -1362,6 +1443,7 @@ static void parse_define_directive(void)
 				}
 				break;
 			case ')':
+				next_preprocessing_token();
 				goto finish_argument_list;
 			default:
 				errorf(&pp_token.source_position,
@@ -1372,10 +1454,10 @@ static void parse_define_directive(void)
 		}
 
 	finish_argument_list:
-		new_definition->has_arguments = true;
-		new_definition->n_arguments
-			= obstack_object_size(&pp_obstack) / sizeof(new_definition->arguments[0]);
-		new_definition->arguments = obstack_finish(&pp_obstack);
+		new_definition->has_parameters = true;
+		new_definition->n_parameters
+			= obstack_object_size(&pp_obstack) / sizeof(new_definition->parameters[0]);
+		new_definition->parameters = obstack_finish(&pp_obstack);
 	} else {
 		next_preprocessing_token();
 	}
@@ -1389,8 +1471,8 @@ static void parse_define_directive(void)
 		next_preprocessing_token();
 	}
 
-	new_definition->list_len         = list_len;
-	new_definition->replacement_list = obstack_finish(&pp_obstack);
+	new_definition->list_len   = list_len;
+	new_definition->token_list = obstack_finish(&pp_obstack);
 
 	pp_definition_t *old_definition = symbol->pp_definition;
 	if (old_definition != NULL) {
@@ -1437,38 +1519,6 @@ static void parse_undef_directive(void)
 	eat_pp_directive();
 }
 
-/* skip spaces advancing at the start of the next preprocessing token */
-static void skip_spaces(void)
-{
-	while (true) {
-		switch (CC) {
-		case ' ':
-		case '\t':
-	 		if(do_print_spaces)
-				counted_spaces++;
-	 		next_char();
-			continue;
-		case '/':
-			next_char();
-			if (CC == '/') {
-				next_char();
-				skip_line_comment();
-				continue;
-			} else if (CC == '*') {
-				next_char();
-				skip_multiline_comment();
-				continue;
-			} else {
-				put_back(CC);
-				CC = '/';
-			}
-			return;
-		default:
-			return;
-		}
-	}
-}
-
 static const char *parse_headername(void)
 {
 	/* behind an #include we can have the special headername lexems.
@@ -1477,7 +1527,7 @@ static const char *parse_headername(void)
 	 * exception here */
 
 	/* skip spaces so we reach start of next preprocessing token */
-	skip_spaces();
+	skip_spaces(false);
 
 	assert(obstack_object_size(&input_obstack) == 0);
 
