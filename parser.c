@@ -8167,7 +8167,7 @@ static void semantic_not(unary_expression_t *expression)
 
 	warn_function_address_as_bool(expression->value);
 
-	expression->base.type = type_int;
+	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
 static void semantic_unexpr_integer(unary_expression_t *expression)
@@ -8628,7 +8628,7 @@ static void semantic_comparison(binary_expression_t *expression)
 		                        &expression->base.source_position,
 		                        type_left, type_right);
 	}
-	expression->base.type = type_int;
+	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
 /**
@@ -8777,7 +8777,7 @@ static void semantic_logical_op(binary_expression_t *expression)
 		return;
 	}
 
-	expression->base.type = type_int;
+	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
 /**
