@@ -221,22 +221,23 @@ static void semantic_comparison(binary_expression_t *expression);
 #endif
 
 #define TYPE_SPECIFIERS       \
-	case T_void:              \
+	case T__Bool:             \
+	case T___builtin_va_list: \
+	case T___typeof__:        \
+	case T__declspec:         \
+	case T_bool:              \
 	case T_char:              \
-	case T_short:             \
+	case T_double:            \
+	case T_enum:              \
+	case T_float:             \
 	case T_int:               \
 	case T_long:              \
-	case T_float:             \
-	case T_double:            \
+	case T_short:             \
 	case T_signed:            \
-	case T_unsigned:          \
-	case T__Bool:             \
 	case T_struct:            \
 	case T_union:             \
-	case T_enum:              \
-	case T___typeof__:        \
-	case T___builtin_va_list: \
-	case T__declspec:         \
+	case T_unsigned:          \
+	case T_void:              \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -296,9 +297,11 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T___func__:                 \
 	case T___noop:                   \
 	case T__assume:                  \
-	case T_sizeof:                   \
 	case T_delete:                   \
-	case T_throw:
+	case T_false:                    \
+	case T_sizeof:                   \
+	case T_throw:                    \
+	case T_true:
 
 /**
  * Allocate an AST node with given size and
@@ -3647,22 +3650,23 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			}                                                           \
 			break
 
-		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
-		MATCH_SPECIFIER(T_char,       SPECIFIER_CHAR,      "char");
-		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short");
-		MATCH_SPECIFIER(T_int,        SPECIFIER_INT,       "int");
-		MATCH_SPECIFIER(T_float,      SPECIFIER_FLOAT,     "float");
-		MATCH_SPECIFIER(T_double,     SPECIFIER_DOUBLE,    "double");
-		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
-		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
-		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8");
+		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex");
+		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary");
+		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128");
 		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16");
 		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32");
 		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64");
-		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128");
-		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex");
-		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary");
+		MATCH_SPECIFIER(T__int8,      SPECIFIER_INT8,      "_int8");
+		MATCH_SPECIFIER(T_bool,       SPECIFIER_BOOL,      "bool");
+		MATCH_SPECIFIER(T_char,       SPECIFIER_CHAR,      "char");
+		MATCH_SPECIFIER(T_double,     SPECIFIER_DOUBLE,    "double");
+		MATCH_SPECIFIER(T_float,      SPECIFIER_FLOAT,     "float");
+		MATCH_SPECIFIER(T_int,        SPECIFIER_INT,       "int");
+		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short");
+		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
+		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
+		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
 
 		case T__forceinline:
 			/* only in microsoft mode */
@@ -6292,6 +6296,20 @@ static expression_t *parse_string_const(void)
 }
 
 /**
+ * Parse a boolean constant.
+ */
+static expression_t *parse_bool_const(bool value)
+{
+	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
+	cnst->base.type          = type_bool;
+	cnst->conste.v.int_value = value;
+
+	next_token();
+
+	return cnst;
+}
+
+/**
  * Parse an integer constant.
  */
 static expression_t *parse_int_const(void)
@@ -7325,6 +7343,8 @@ end_error:
 static expression_t *parse_primary_expression(void)
 {
 	switch (token.type) {
+		case T_false:                    return parse_bool_const(false);
+		case T_true:                     return parse_bool_const(true);
 		case T_INTEGER:                  return parse_int_const();
 		case T_CHARACTER_CONSTANT:       return parse_character_constant();
 		case T_WIDE_CHARACTER_CONSTANT:  return parse_wide_character_constant();

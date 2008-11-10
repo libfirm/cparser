@@ -24,6 +24,7 @@
 
 extern type_t *type_error_type;
 
+extern type_t *type_bool;
 extern type_t *type_char;
 extern type_t *type_const_char;
 extern type_t *type_double;

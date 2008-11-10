@@ -58,7 +58,9 @@ S(_CXX, delete)
 S(_CXX, dynamic_cast)
 S(_CXX, explicit)
 S(_CXX, export)
+#undef false
 S(_CXX, false)
+#define false 0
 S(_CXX, friend)
 S(_CXX, mutable)
 S(_CXX, namespace)
@@ -72,7 +74,9 @@ S(_CXX, static_cast)
 S(_CXX, template)
 S(_CXX, this)
 S(_CXX, throw)
+#undef true
 S(_CXX, true)
+#define true 1
 S(_CXX, try)
 S(_CXX, typeid)
 S(_CXX, typename)

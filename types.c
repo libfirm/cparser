@@ -24,6 +24,7 @@
 /** The error type. */
 type_t *type_error_type;
 
+type_t *type_bool;
 type_t *type_char;
 type_t *type_const_char;
 type_t *type_double;
@@ -95,6 +96,7 @@ void init_basic_types(void)
 	                                   TYPE_MODIFIER_NONE, 0, NULL };
 
 	type_error_type         = (type_t*)&error;
+	type_bool               = make_atomic_type(ATOMIC_TYPE_BOOL,        TYPE_QUALIFIER_NONE);
 	type_signed_char        = make_atomic_type(ATOMIC_TYPE_SCHAR,       TYPE_QUALIFIER_NONE);
 	type_short              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
 	type_unsigned_short     = make_atomic_type(ATOMIC_TYPE_USHORT,      TYPE_QUALIFIER_NONE);

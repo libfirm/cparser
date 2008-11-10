@@ -196,7 +196,9 @@ static void print_const(const const_expression_t *cnst)
 
 	const type_t *const type = skip_typeref(cnst->base.type);
 
-	if (is_type_integer(type)) {
+	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
+		fputs(cnst->v.int_value ? "true" : "false", out);
+	} else if (is_type_integer(type)) {
 		fprintf(out, "%lld", cnst->v.int_value);
 	} else if (is_type_float(type)) {
 		long double const val = cnst->v.float_value;
