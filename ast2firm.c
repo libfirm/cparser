@@ -145,7 +145,7 @@ static dbg_info *get_dbg_info(const source_position_t *pos)
 	return (dbg_info*) pos;
 }
 
-static ir_mode *_atomic_modes[ATOMIC_TYPE_LAST+1];
+static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
 
@@ -193,13 +193,13 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 static void init_atomic_modes(void)
 {
 	for (int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
-		_atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
+		atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
 	}
-	mode_int  = _atomic_modes[ATOMIC_TYPE_INT];
-	mode_uint = _atomic_modes[ATOMIC_TYPE_UINT];
+	mode_int  = atomic_modes[ATOMIC_TYPE_INT];
+	mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	/* there's no real void type in firm */
-	_atomic_modes[ATOMIC_TYPE_VOID] = mode_int;
+	atomic_modes[ATOMIC_TYPE_VOID] = mode_int;
 
 	/* initialize pointer modes */
 	char            name[64];
@@ -214,12 +214,18 @@ static void init_atomic_modes(void)
 	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
 	                                modulo_shift);
 
-	set_reference_mode_signed_eq(ptr_mode, _atomic_modes[get_intptr_kind()]);
-	set_reference_mode_unsigned_eq(ptr_mode, _atomic_modes[get_uintptr_kind()]);
+	set_reference_mode_signed_eq(ptr_mode, atomic_modes[get_intptr_kind()]);
+	set_reference_mode_unsigned_eq(ptr_mode, atomic_modes[get_uintptr_kind()]);
 
 	/* Hmm, pointers should be machine size */
 	set_modeP_data(ptr_mode);
 	set_modeP_code(ptr_mode);
+}
+
+ir_mode *get_atomic_mode(atomic_type_kind_t kind)
+{
+	assert(kind <= ATOMIC_TYPE_LAST);
+	return atomic_modes[kind];
 }
 
 static unsigned get_compound_type_size(compound_type_t *type)
@@ -312,7 +318,7 @@ static unsigned count_parameters(const function_type_t *function_type)
 static ir_type *create_atomic_type(const atomic_type_t *type)
 {
 	atomic_type_kind_t  kind   = type->akind;
-	ir_mode            *mode   = _atomic_modes[kind];
+	ir_mode            *mode   = atomic_modes[kind];
 	ident              *id     = get_mode_ident(mode);
 	ir_type            *irtype = new_type_primitive(id, mode);
 
@@ -327,7 +333,7 @@ static ir_type *create_atomic_type(const atomic_type_t *type)
 static ir_type *create_complex_type(const complex_type_t *type)
 {
 	atomic_type_kind_t  kind = type->akind;
-	ir_mode            *mode = _atomic_modes[kind];
+	ir_mode            *mode = atomic_modes[kind];
 	ident              *id   = get_mode_ident(mode);
 
 	(void) id;
@@ -342,7 +348,7 @@ static ir_type *create_complex_type(const complex_type_t *type)
 static ir_type *create_imaginary_type(const imaginary_type_t *type)
 {
 	atomic_type_kind_t  kind      = type->akind;
-	ir_mode            *mode      = _atomic_modes[kind];
+	ir_mode            *mode      = atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
 	ir_type            *irtype    = new_type_primitive(id, mode);
 

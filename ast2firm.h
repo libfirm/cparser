@@ -20,11 +20,15 @@
 #ifndef AST2FIRM_H
 #define AST2FIRM_H
 
+#include <libfirm/firm_types.h>
 #include "ast.h"
+#include "type.h"
 
 void translation_unit_to_firm(translation_unit_t *unit);
 
 void init_ast2firm(void);
 void exit_ast2firm(void);
+
+ir_mode *get_atomic_mode(atomic_type_kind_t kind);
 
 #endif

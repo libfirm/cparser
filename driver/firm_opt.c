@@ -19,6 +19,7 @@
 #include "firm_codegen.h"
 #include "firm_cmdline.h"
 #include "firm_timing.h"
+#include "ast2firm.h"
 
 #ifdef _WIN32
 #define snprintf _snprintf
@@ -801,21 +802,14 @@ static void do_firm_lowering(const char *input_filename)
 {
   int i;
 
-  /* do class lowering and vtbl creation */
-//  lower_classes_to_struct("vtbl", "m");
-
-#if 0
-  timer_push(TV_LOWER);
-  lower_highlevel();
-  timer_pop();
-#endif
-
   if (firm_opt.lower_ll) {
     lwrdw_param_t init = {
       1,
       1,
-      mode_Ls, mode_Lu,
-      mode_Is, mode_Iu,
+      get_atomic_mode(ATOMIC_TYPE_LONGLONG),
+      get_atomic_mode(ATOMIC_TYPE_ULONGLONG),
+      get_atomic_mode(ATOMIC_TYPE_INT),
+      get_atomic_mode(ATOMIC_TYPE_UINT),
       def_create_intrinsic_fkt,
       NULL
     };
