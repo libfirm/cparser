@@ -10118,7 +10118,7 @@ static statement_t *parse_local_label_declaration(void)
 			goto end_error;
 		}
 		symbol_t *symbol = token.v.symbol;
-		entity_t *entity = get_entity(symbol, NAMESPACE_LOCAL_LABEL);
+		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 		if (entity != NULL && entity->base.parent_scope == scope) {
 			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition %P)",
 			       symbol, &entity->base.source_position);
@@ -10126,7 +10126,7 @@ static statement_t *parse_local_label_declaration(void)
 			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL);
 
 			entity->base.parent_scope    = scope;
-			entity->base.namespc         = NAMESPACE_LOCAL_LABEL;
+			entity->base.namespc         = NAMESPACE_LABEL;
 			entity->base.source_position = token.source_position;
 			entity->base.symbol          = symbol;
 

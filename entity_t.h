@@ -43,8 +43,7 @@ typedef enum namespace_tag_t {
 	NAMESPACE_STRUCT,
 	NAMESPACE_UNION,
 	NAMESPACE_ENUM,
-	NAMESPACE_LABEL,
-	NAMESPACE_LOCAL_LABEL
+	NAMESPACE_LABEL
 } namespace_tag_t;
 typedef unsigned char namespace_t;
 
