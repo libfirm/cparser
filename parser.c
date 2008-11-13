@@ -328,7 +328,7 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_LABEL]           = sizeof(label_t),
 		[ENTITY_LOCAL_LABEL]     = sizeof(label_t)
 	};
-	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -370,7 +370,7 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t),
 		[STATEMENT_LEAVE]       = sizeof(leave_statement_t)
 	};
-	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -417,7 +417,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 	if (kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
-	assert(kind <= sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
