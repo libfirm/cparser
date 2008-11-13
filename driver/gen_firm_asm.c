@@ -69,16 +69,16 @@ static void generate_header(FILE *f, ir_graph *irg)
   if (get_method_n_ress(tp) == 0)
     fprintf(f, "void");
   else
-    fprintf(f, get_type_name(get_method_res_type(tp, 0)));
+    fputs(get_type_name(get_method_res_type(tp, 0)), f);
   fprintf(f, " %s(", s);
   n = get_method_n_params(tp);
   if (n == 0)
-    fprintf(f, get_method_variadicity(tp) == variadicity_variadic ? "" : "void");
+    fputs(get_method_variadicity(tp) == variadicity_variadic ? "" : "void", f);
   else {
     for (i = 0; i < n; ++i) {
       if (i > 0)
         fprintf(f, ", ");
-      fprintf(f, get_type_name(get_method_param_type(tp, i)));
+      fputs(get_type_name(get_method_param_type(tp, i)), f);
     }
     if (get_method_variadicity(tp) == variadicity_variadic)
       fprintf(f, ", ...");
