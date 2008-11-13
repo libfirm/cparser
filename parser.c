@@ -115,7 +115,6 @@ static token_t             lookahead_buffer[MAX_LOOKAHEAD];
 static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
-static stack_entry_t      *local_label_stack = NULL;
 /** The global file scope. */
 static scope_t            *file_scope        = NULL;
 /** The current scope. */
@@ -576,14 +575,6 @@ static size_t label_top(void)
 }
 
 /**
- * Returns the index of the top element of the local label stack.
- */
-static size_t local_label_top(void)
-{
-	return ARR_LEN(local_label_stack);
-}
-
-/**
  * Return the next token.
  */
 static inline void next_token(void)
@@ -866,18 +857,6 @@ static void label_push(entity_t *label)
 }
 
 /**
- * Push a declaration of the local label stack.
- *
- * @param declaration  the declaration
- */
-static void local_label_push(entity_t *label)
-{
-	assert(label->base.parent_scope != NULL);
-	label->base.parent_scope = scope;
-	stack_push(&local_label_stack, label);
-}
-
-/**
  * pops symbols from the environment stack until @p new_top is the top element
  */
 static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
@@ -942,18 +921,6 @@ static void label_pop_to(size_t new_top)
 {
 	stack_pop_to(&label_stack, new_top);
 }
-
-/**
- * Pop all entries from the local label stack until the new_top
- * is reached.
- *
- * @param new_top  the new stack top
- */
-static void local_label_pop_to(size_t new_top)
-{
-	stack_pop_to(&local_label_stack, new_top);
-}
-
 
 static int get_akind_rank(atomic_type_kind_t akind)
 {
@@ -7244,7 +7211,7 @@ static label_t *get_label(symbol_t *symbol)
 	entity_t *label;
 	assert(current_function != NULL);
 
-	label = get_entity(symbol, NAMESPACE_LOCAL_LABEL);
+	label = get_entity(symbol, NAMESPACE_LABEL);
 	/* if we found a local label, we already created the declaration */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != scope) {
@@ -10169,7 +10136,7 @@ static statement_t *parse_local_label_declaration(void)
 			if (begin == NULL)
 				begin = entity;
 
-			local_label_push(entity);
+			environment_push(entity);
 		}
 		next_token();
 
@@ -10316,8 +10283,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	eat('{');
 	add_anchor_token('}');
 
-	size_t const top       = environment_top();
-	size_t const top_local = local_label_top();
+	size_t const top = environment_top();
 	scope_push(&statement->compound.scope);
 
 	statement_t **anchor            = &statement->compound.statements;
@@ -10378,7 +10344,6 @@ end_error:
 	assert(scope == &statement->compound.scope);
 	scope_pop();
 	environment_pop_to(top);
-	local_label_pop_to(top_local);
 
 	POP_PARENT;
 	return statement;
@@ -10538,7 +10503,6 @@ void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
-	local_label_stack = NEW_ARR_F(stack_entry_t, 0);
 	diagnostic_count  = 0;
 	error_count       = 0;
 	warning_count     = 0;
@@ -10570,7 +10534,6 @@ translation_unit_t *finish_parsing(void)
 
 	DEL_ARR_F(environment_stack);
 	DEL_ARR_F(label_stack);
-	DEL_ARR_F(local_label_stack);
 
 	translation_unit_t *result = unit;
 	unit = NULL;
