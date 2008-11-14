@@ -10405,6 +10405,8 @@ static void parse_translation_unit(void)
 			DECLARATION_START
 			case T_IDENTIFIER:
 			case T___extension__:
+			case '(': /* for function declarations with implicit return type and
+			           * parenthesized declarator, i.e. (f)(void); */
 				parse_external_declaration();
 				break;
 
