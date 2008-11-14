@@ -34,6 +34,7 @@ SOURCES := \
 	format_check.c \
 	lexer.c \
 	main.c \
+	mangle.c \
 	walk_statements.c \
 	symbol_table.c \
 	token.c \

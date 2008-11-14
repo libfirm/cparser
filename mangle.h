@@ -17,19 +17,17 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
-#ifndef AST2FIRM_H
-#define AST2FIRM_H
+#ifndef MANGLE_H
+#define MANGLE_H
 
+#include "entity.h"
 #include <libfirm/firm_types.h>
-#include "ast.h"
-#include "type.h"
 
-void translation_unit_to_firm(translation_unit_t *unit);
+ident *create_name_linux_elf(entity_t *entity);
+ident *create_name_macho(entity_t *entity);
+ident *create_name_win32(entity_t *entity);
 
-void init_ast2firm(void);
-void exit_ast2firm(void);
-
-ir_mode *get_atomic_mode(atomic_type_kind_t kind);
-ir_type *get_ir_type(type_t *type);
+void init_mangle(void);
+void exit_mangle(void);
 
 #endif

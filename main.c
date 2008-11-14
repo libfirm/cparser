@@ -56,10 +56,6 @@
 #define HAVE_MKSTEMP
 #endif
 
-#ifndef WITH_LIBCORE
-#define WITH_LIBCORE
-#endif
-
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
@@ -79,6 +75,7 @@
 #include "write_caml.h"
 #include "revision.h"
 #include "warning.h"
+#include "mangle.h"
 
 #ifndef PREPROCESSOR
 #ifdef __APPLE__
@@ -117,6 +114,8 @@ bool use_builtins = false;
 
 /** we have extern function with const attribute. */
 bool have_const_functions = false;
+
+atomic_type_kind_t wchar_atomic_kind = ATOMIC_TYPE_INT;
 
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
@@ -1053,6 +1052,7 @@ int main(int argc, char **argv)
 	init_ast();
 	init_parser();
 	init_ast2firm();
+	init_mangle();
 
 	if (construct_dep_target) {
 		if (outname != 0 && strlen(outname) >= 2) {
@@ -1371,6 +1371,7 @@ do_parsing:
 	obstack_free(&ldflags_obst, NULL);
 	obstack_free(&file_obst, NULL);
 
+	exit_mangle();
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();

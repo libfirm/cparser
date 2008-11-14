@@ -538,12 +538,6 @@ static void do_firm_optimizations(const char *input_filename)
   for (i = 0; i < get_irp_n_irgs(); i++) {
     ir_graph *irg = get_irp_irg(i);
 
-#ifdef FIRM_EXT_GRS
-    /* If SIMD optimization is on, make sure we have only 1 return */
-    if (firm_ext_grs.create_pattern || firm_ext_grs.simd_opt)
-      do_irg_opt("onereturn");
-#endif
-
     do_irg_opt(irg, "scalar");
     do_irg_opt(irg, "local");
     do_irg_opt(irg, "reassoc");
@@ -915,13 +909,6 @@ void gen_firm_init(void)
   params.cc_mask               = 0; /* no regparam, cdecl */
   params.builtin_dbg           = NULL;
 
-  #ifdef FIRM_EXT_GRS
-  /* Activate Graph rewriting if SIMD optimization is turned on */
-  /* This has to be done before init_firm() is called! */
-  if (firm_ext_grs.simd_opt)
-    ext_grs_activate();
-#endif
-
   init_firm(&params);
 
   if (firm_be_opt.selection == BE_FIRM_BE) {
@@ -939,23 +926,9 @@ void gen_firm_init(void)
     if (be_params->has_imm_fp_mode)
       firm_imm_fp_mode = be_params->imm_fp_mode;
   }
-  /* OS option must be set to the backend */
-  switch (firm_opt.os_support) {
-  case OS_SUPPORT_MINGW:
-    firm_be_option("ia32-gasmode=mingw");
-    break;
-  case OS_SUPPORT_MACHO:
-    firm_be_option("ia32-gasmode=macho");
-    break;
-  case OS_SUPPORT_LINUX:
-  default:
-    firm_be_option("ia32-gasmode=linux");
-    break;
-  }
 
   dbg_init(NULL, NULL, dbg_snprint);
   edges_init_dbg(firm_opt.vrfy_edges);
-  //cbackend_set_debug_retrieve(dbg_retrieve);
 
   set_opt_precise_exc_context(firm_opt.precise_exc);
   set_opt_fragile_ops(firm_opt.fragile_ops);
@@ -1090,23 +1063,6 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
   for (i = get_irp_n_irgs() - 1; i >= 0; --i)
     set_irg_phase_low(get_irp_irg(i));
 
-
-#ifdef FIRM_EXT_GRS
-  /** SIMD Optimization  Extensions **/
-
-  /* Pattern creation step. No code has to be generated, so
-     exit after pattern creation */
-  if (firm_ext_grs.create_pattern) {
-    ext_grs_create_pattern();
-    exit(0);
-  }
-
-  /* SIMD optimization step. Uses graph patterns to find
-     rich instructions and rewrite */
-  if (firm_ext_grs.simd_opt)
-    ext_grs_simd_opt();
-#endif
-
   if (firm_dump.statistic & STAT_FINAL_IR)
     stat_dump_snapshot(input_filename, "final-ir");
 
@@ -1116,18 +1072,14 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
 
   if (firm_dump.statistic & STAT_FINAL)
     stat_dump_snapshot(input_filename, "final");
-
-#if 0
-  if (firm_opt.ycomp_dbg)
-    firm_finish_ycomp_debugger();
-#endif
-}  /* gen_firm_finish */
+}
 
 /**
  * Do very early initializations
  */
-void firm_early_init(void) {
+void firm_early_init(void)
+{
   /* arg: need this here for command line options */
   be_opt_register();
   firm_init_options(NULL, 0, NULL);
-}  /* firm_early_init */
+}

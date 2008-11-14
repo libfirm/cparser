@@ -27,6 +27,7 @@ typedef struct compound_t                   compound_t;
 typedef struct enum_t                       enum_t;
 typedef struct enum_value_t                 enum_value_t;
 typedef struct label_t                      label_t;
+typedef struct namespace_t                  namespace_t;
 typedef struct declaration_t                declaration_t;
 typedef struct typedef_t                    typedef_t;
 typedef struct variable_t                   variable_t;

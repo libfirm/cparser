@@ -1264,7 +1264,7 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 
 static void print_spaces(void)
 {
-	if (counted_newlines >= 8) {
+	if (counted_newlines >= 9) {
 		if (input.had_non_space) {
 			fputc('\n', out);
 		}

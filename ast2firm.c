@@ -41,15 +41,13 @@
 #include "diagnostic.h"
 #include "lang_features.h"
 #include "types.h"
+#include "type_hash.h"
+#include "mangle.h"
 #include "walk_statements.h"
 #include "warning.h"
 #include "entitymap_t.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
-
-/* some idents needed for name mangling */
-static ident *id_underscore;
-static ident *id_imp;
 
 static ir_type *ir_type_const_char;
 static ir_type *ir_type_wchar_t;
@@ -65,6 +63,7 @@ static label_t  **all_labels;
 static entity_t **inner_functions;
 static ir_node   *ijmp_list;
 static bool       constant_folding;
+static symbol_t  *sym_C;
 
 extern bool       have_const_functions;
 
@@ -73,6 +72,7 @@ static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
 static switch_statement_t *current_switch;
 static ir_graph           *current_function;
+static translation_unit_t *current_translation_unit;
 
 static entitymap_t  entitymap;
 
@@ -89,7 +89,7 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
 
-static ir_type *get_ir_type(type_t *type);
+static ir_mode *get_ir_mode(type_t *type);
 static ir_type *get_ir_type_incomplete(type_t *type);
 
 static void enqueue_inner_function(entity_t *entity)
@@ -151,7 +151,6 @@ static ir_mode *mode_int, *mode_uint;
 
 static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
-static inline ir_mode *get_ir_mode(type_t *type);
 static void create_local_declaration(entity_t *entity);
 
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
@@ -399,6 +398,8 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
+#if 0
+	/* TODO: revive this with linkage stuff */
 	unsigned cc = get_method_calling_convention(irtype);
 	switch (function_type->calling_convention) {
 	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
@@ -426,6 +427,8 @@ is_cdecl:
 		/* Hmm, leave default, not accepted by the parser yet. */
 		break;
 	}
+#endif
+
 	return irtype;
 }
 
@@ -497,7 +500,7 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 	snprintf(name, sizeof(name), "I%u", size);
 	ident *id = new_id_from_str(name);
 	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
-	res = new_d_type_primitive(mangle_u(get_type_ident(base_tp), id), mode, dbgi);
+	res = new_d_type_primitive(id_mangle_u(get_type_ident(base_tp), id), mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -533,7 +536,7 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 	snprintf(name, sizeof(name), "U%u", size);
 	ident *id = new_id_from_str(name);
 	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
-	res = new_d_type_primitive(mangle_u(get_type_ident(base_tp), id), mode, dbgi);
+	res = new_d_type_primitive(id_mangle_u(get_type_ident(base_tp), id), mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -803,7 +806,7 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 	}
 }
 
-static ir_type *get_ir_type(type_t *type)
+ir_type *get_ir_type(type_t *type)
 {
 	assert(type != NULL);
 
@@ -868,7 +871,7 @@ static ir_type *get_ir_type(type_t *type)
 	return firm_type;
 }
 
-static inline ir_mode *get_ir_mode(type_t *type)
+ir_mode *get_ir_mode(type_t *type)
 {
 	ir_type *irtype = get_ir_type(type);
 
@@ -966,59 +969,8 @@ static const struct {
 
 static ident *rts_idents[sizeof(rts_data) / sizeof(rts_data[0])];
 
-/**
- * Mangles an entity linker (ld) name for win32 usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-static ident *create_ld_ident_win32(ir_entity *irentity, entity_t *entity)
-{
-	ident *id;
-
-	if (is_Method_type(get_entity_type(irentity)))
-		id = decorate_win32_c_fkt(irentity, get_entity_ident(irentity));
-	else {
-		/* always add an underscore in win32 */
-		id = mangle(id_underscore, get_entity_ident(irentity));
-	}
-
-	assert(is_declaration(entity));
-	decl_modifiers_t decl_modifiers = entity->declaration.modifiers;
-	if (decl_modifiers & DM_DLLIMPORT) {
-		/* add prefix for imported symbols */
-		id = mangle(id_imp, id);
-	}
-	return id;
-}
-
-/**
- * Mangles an entity linker (ld) name for Linux ELF usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-static ident *create_ld_ident_linux_elf(ir_entity *irentity, entity_t *entity)
-{
-	(void) entity;
-	return get_entity_ident(irentity);
-}
-
-/**
- * Mangles an entity linker (ld) name for Mach-O usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-static ident *create_ld_ident_macho(ir_entity *irentity, entity_t *entity)
-{
-	(void) entity;
-	ident *id = mangle(id_underscore, get_entity_ident(irentity));
-	return id;
-}
-
-typedef ident* (*create_ld_ident_func)(ir_entity *irentity, entity_t *entity);
-create_ld_ident_func create_ld_ident = create_ld_ident_linux_elf;
+typedef ident* (*create_ld_ident_func)(entity_t *entity);
+create_ld_ident_func create_ld_ident = create_name_linux_elf;
 
 /**
  * Handle GNU attributes for entities
@@ -1046,6 +998,22 @@ static void handle_gnu_attributes_ent(ir_entity *irentity, entity_t *entity)
 	}
 }
 
+static bool is_main(entity_t *entity)
+{
+	static symbol_t *sym_main = NULL;
+	if (sym_main == NULL) {
+		sym_main = symbol_table_insert("main");
+	}
+
+	if (entity->base.symbol != sym_main)
+		return false;
+	/* must be in outermost scope */
+	if (entity->base.parent_scope != &current_translation_unit->scope)
+		return false;
+
+	return true;
+}
+
 /**
  * Creates an entity representing a function.
  *
@@ -1056,6 +1024,27 @@ static ir_entity *get_function_entity(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	if (entity->function.entity != NULL) {
 		return entity->function.entity;
+	}
+
+	if (is_main(entity)) {
+		/* force main to C linkage */
+		type_t *type = entity->declaration.type;
+		assert(is_type_function(type));
+		if (type->function.linkage != NULL && type->function.linkage != sym_C) {
+			errorf(&entity->base.source_position,
+			       "main must have \"C\" linkage");
+		}
+
+		if (type->function.linkage == NULL || type->function.linkage != sym_C) {
+			type_t *new_type           = duplicate_type(type);
+			new_type->function.linkage = sym_C;
+
+			type = typehash_insert(new_type);
+			if (type != new_type) {
+				obstack_free(type_obst, new_type);
+			}
+			entity->declaration.type = type;
+		}
 	}
 
 	symbol_t *symbol = entity->base.symbol;
@@ -1077,7 +1066,7 @@ static ir_entity *get_function_entity(entity_t *entity)
 
 	dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
 	irentity             = new_d_entity(global_type, id, ir_type_method, dbgi);
-	set_entity_ld_ident(irentity, create_ld_ident(irentity, entity));
+	set_entity_ld_ident(irentity, create_ld_ident(entity));
 
 	handle_gnu_attributes_ent(irentity, entity);
 
@@ -3270,7 +3259,7 @@ static void create_variable_entity(entity_t *variable,
 	variable->declaration.kind  = (unsigned char) declaration_kind;
 	variable->variable.v.entity = irentity;
 	set_entity_variability(irentity, variability_uninitialized);
-	set_entity_ld_ident(irentity, create_ld_ident(irentity, variable));
+	set_entity_ld_ident(irentity, create_ld_ident(variable));
 	if (parent_type == get_tls_type())
 		set_entity_allocation(irentity, allocation_automatic);
 	else if (declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
@@ -4028,7 +4017,7 @@ static void create_local_static_variable(entity_t *entity)
 
 	entity->declaration.kind  = DECLARATION_KIND_GLOBAL_VARIABLE;
 	entity->variable.v.entity = irentity;
-	set_entity_ld_ident(irentity, create_ld_ident(irentity, entity));
+	set_entity_ld_ident(irentity, id);
 	set_entity_variability(irentity, variability_uninitialized);
 	set_entity_visibility(irentity, visibility_local);
 	set_entity_allocation(irentity, allocation_static);
@@ -5305,7 +5294,7 @@ static void create_function(entity_t *entity)
 
 			ir_node *in[1];
 			/* §5.1.2.2.3 main implicitly returns 0 */
-			if (strcmp(entity->base.symbol->string, "main") == 0) {
+			if (is_main(entity)) {
 				in[0] = new_Const(mode, get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
@@ -5416,26 +5405,27 @@ void init_ast2firm(void)
 	obstack_init(&asm_obst);
 	init_atomic_modes();
 
-	id_underscore = new_id_from_chars("_", 1);
-	id_imp        = new_id_from_chars("__imp_", 6);
-
 	/* OS option must be set to the backend */
 	switch (firm_opt.os_support) {
 	case OS_SUPPORT_MINGW:
-		create_ld_ident = create_ld_ident_win32;
+		create_ld_ident = create_name_win32;
 		break;
 	case OS_SUPPORT_LINUX:
-		create_ld_ident = create_ld_ident_linux_elf;
+		create_ld_ident = create_name_linux_elf;
 		break;
 	case OS_SUPPORT_MACHO:
-		create_ld_ident = create_ld_ident_macho;
+		create_ld_ident = create_name_macho;
 		break;
+	default:
+		panic("unexpected OS support mode");
 	}
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
+
+	sym_C = symbol_table_insert("C");
 
 	entitymap_init(&entitymap);
 }
@@ -5479,9 +5469,10 @@ static void global_asm_to_firm(statement_t *s)
 void translation_unit_to_firm(translation_unit_t *unit)
 {
 	/* just to be sure */
-	continue_label      = NULL;
-	break_label         = NULL;
-	current_switch_cond = NULL;
+	continue_label           = NULL;
+	break_label              = NULL;
+	current_switch_cond      = NULL;
+	current_translation_unit = unit;
 
 	init_ir_types();
 	inner_functions = NEW_ARR_F(entity_t *, 0);
@@ -5492,5 +5483,6 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	DEL_ARR_F(inner_functions);
 	inner_functions  = NULL;
 
-	current_ir_graph = NULL;
+	current_ir_graph         = NULL;
+	current_translation_unit = NULL;
 }

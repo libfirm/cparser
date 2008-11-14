@@ -45,9 +45,9 @@
 #define MAX_LOOKAHEAD 2
 
 typedef struct {
-	entity_t    *old_entity;
-	symbol_t    *symbol;
-	namespace_t  namespc;
+	entity_t           *old_entity;
+	symbol_t           *symbol;
+	entity_namespace_t  namespc;
 } stack_entry_t;
 
 typedef struct argument_list_t argument_list_t;
@@ -107,10 +107,8 @@ static token_t             lookahead_buffer[MAX_LOOKAHEAD];
 static int                 lookahead_bufpos;
 static stack_entry_t      *environment_stack = NULL;
 static stack_entry_t      *label_stack       = NULL;
-/** The global file scope. */
 static scope_t            *file_scope        = NULL;
-/** The current scope. */
-static scope_t            *scope             = NULL;
+static scope_t            *current_scope     = NULL;
 /** Point to the current function declaration if inside a function. */
 static function_t         *current_function  = NULL;
 static entity_t           *current_init_decl = NULL;
@@ -118,6 +116,7 @@ static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
 static statement_t        *current_parent    = NULL;
 static ms_try_statement_t *current_try       = NULL;
+static symbol_t           *current_linkage   = NULL;
 static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
@@ -176,6 +175,8 @@ static statement_t *parse_statement(void);
 static expression_t *parse_sub_expression(precedence_t);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
+static void          parse_externals(void);
+static void          parse_external(void);
 
 static void parse_compound_type_entries(compound_t *compound_declaration);
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
@@ -188,6 +189,13 @@ static void semantic_comparison(binary_expression_t *expression);
 #define STORAGE_CLASSES     \
 	case T_typedef:         \
 	case T_extern:          \
+	case T_static:          \
+	case T_auto:            \
+	case T_register:        \
+	case T___thread:
+
+#define STORAGE_CLASSES_NO_EXTERN \
+	case T_typedef:         \
 	case T_static:          \
 	case T_auto:            \
 	case T_register:        \
@@ -230,6 +238,11 @@ static void semantic_comparison(binary_expression_t *expression);
 #define DECLARATION_START   \
 	STORAGE_CLASSES         \
 	TYPE_QUALIFIERS         \
+	TYPE_SPECIFIERS
+
+#define DECLARATION_START_NO_EXTERN \
+	STORAGE_CLASSES_NO_EXTERN       \
+	TYPE_QUALIFIERS                 \
 	TYPE_SPECIFIERS
 
 #define TYPENAME_START      \
@@ -312,7 +325,8 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_ENUM]            = sizeof(enum_t),
 		[ENTITY_ENUM_VALUE]      = sizeof(enum_value_t),
 		[ENTITY_LABEL]           = sizeof(label_t),
-		[ENTITY_LOCAL_LABEL]     = sizeof(label_t)
+		[ENTITY_LOCAL_LABEL]     = sizeof(label_t),
+		[ENTITY_NAMESPACE]       = sizeof(namespace_t)
 	};
 	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
 	assert(sizes[kind] != 0);
@@ -761,22 +775,23 @@ static void type_error_incompatible(const char *msg,
 
 static void scope_push(scope_t *new_scope)
 {
-	if (scope != NULL) {
-		new_scope->depth = scope->depth + 1;
+	if (current_scope != NULL) {
+		new_scope->depth = current_scope->depth + 1;
 	}
-	new_scope->parent = scope;
-	scope             = new_scope;
+	new_scope->parent = current_scope;
+	current_scope     = new_scope;
 }
 
 static void scope_pop(void)
 {
-	scope = scope->parent;
+	current_scope = current_scope->parent;
 }
 
 /**
  * Search an entity by its symbol in a given namespace.
  */
-static entity_t *get_entity(const symbol_t *const symbol, namespace_t namespc)
+static entity_t *get_entity(const symbol_t *const symbol,
+                            namespace_tag_t namespc)
 {
 	entity_t *entity = symbol->entity;
 	for( ; entity != NULL; entity = entity->base.symbol_next) {
@@ -793,8 +808,8 @@ static entity_t *get_entity(const symbol_t *const symbol, namespace_t namespc)
  */
 static void stack_push(stack_entry_t **stack_ptr, entity_t *entity)
 {
-	symbol_t    *symbol  = entity->base.symbol;
-	namespace_t  namespc = entity->base.namespc;
+	symbol_t           *symbol  = entity->base.symbol;
+	entity_namespace_t  namespc = entity->base.namespc;
 	assert(namespc != NAMESPACE_INVALID);
 
 	/* replace/add entity into entity list of the symbol */
@@ -859,9 +874,9 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 	for(i = top; i > new_top; --i) {
 		stack_entry_t *entry = &stack[i - 1];
 
-		entity_t    *old_entity = entry->old_entity;
-		symbol_t    *symbol     = entry->symbol;
-		namespace_t  namespc    = entry->namespc;
+		entity_t           *old_entity = entry->old_entity;
+		symbol_t           *symbol     = entry->symbol;
+		entity_namespace_t  namespc    = entry->namespc;
 
 		/* replace with old_entity/remove */
 		entity_t **anchor;
@@ -2941,13 +2956,13 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		symbol = token.v.symbol;
 		next_token();
 
-		namespace_t const namespc =
+		namespace_tag_t const namespc =
 			is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION;
 		entity_t *entity = get_entity(symbol, namespc);
 		if (entity != NULL) {
 			assert(entity->kind == (is_struct ? ENTITY_STRUCT : ENTITY_UNION));
 			compound = &entity->compound;
-			if (compound->base.parent_scope != scope &&
+			if (compound->base.parent_scope != current_scope &&
 			    (token.type == '{' || token.type == ';')) {
 				/* we're in an inner scope and have a definition. Override
 				   existing definition in outer scope */
@@ -2982,11 +2997,11 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
 		compound->base.source_position = token.source_position;
 		compound->base.symbol          = symbol;
-		compound->base.parent_scope    = scope;
+		compound->base.parent_scope    = current_scope;
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
-		append_entity(scope, entity);
+		append_entity(current_scope, entity);
 	}
 
 	if (token.type == '{') {
@@ -3076,7 +3091,7 @@ static type_t *parse_enum_specifier(void)
 		entity->base.namespc         = NAMESPACE_ENUM;
 		entity->base.source_position = token.source_position;
 		entity->base.symbol          = symbol;
-		entity->base.parent_scope    = scope;
+		entity->base.parent_scope    = current_scope;
 	}
 
 	type_t *const type = allocate_type_zero(TYPE_ENUM);
@@ -3090,7 +3105,7 @@ static type_t *parse_enum_specifier(void)
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
-		append_entity(scope, entity);
+		append_entity(current_scope, entity);
 		entity->enume.complete = true;
 
 		parse_enum_entries(type);
@@ -4190,6 +4205,8 @@ static construct_type_t *parse_function_declarator(scope_t *scope)
 {
 	type_t *type = allocate_type_zero(TYPE_FUNCTION);
 
+	type->function.linkage = current_linkage;
+
 	/* TODO: revive this... once we know exactly how to do it */
 #if 0
 	decl_modifiers_t  modifiers = entity->declaration.modifiers;
@@ -4576,7 +4593,8 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		storage_class_t storage_class = specifiers->storage_class;
 		entity->declaration.declared_storage_class = storage_class;
 
-		if (storage_class == STORAGE_CLASS_NONE && scope != file_scope) {
+		if (storage_class == STORAGE_CLASS_NONE
+				&& current_scope != file_scope) {
 			storage_class = STORAGE_CLASS_AUTO;
 		}
 		entity->declaration.storage_class = storage_class;
@@ -4668,6 +4686,34 @@ static bool is_sym_main(const symbol_t *const sym)
 	return strcmp(sym->string, "main") == 0;
 }
 
+static const char *get_entity_kind_name(entity_kind_t kind)
+{
+	switch ((entity_kind_tag_t) kind) {
+	case ENTITY_FUNCTION:        return "function";
+	case ENTITY_VARIABLE:        return "variable";
+	case ENTITY_COMPOUND_MEMBER: return "compound type member";
+	case ENTITY_STRUCT:          return "struct";
+	case ENTITY_UNION:           return "union";
+	case ENTITY_ENUM:            return "enum";
+	case ENTITY_ENUM_VALUE:      return "enum value";
+	case ENTITY_LABEL:           return "label";
+	case ENTITY_LOCAL_LABEL:     return "local label";
+	case ENTITY_TYPEDEF:         return "typedef";
+	case ENTITY_NAMESPACE:       return "namespace";
+	case ENTITY_INVALID:         break;
+	}
+
+	panic("Invalid entity kind encountered in get_entity_kind_name");
+}
+
+static void error_redefined_as_different_kind(const source_position_t *pos,
+		const entity_t *old, entity_kind_t new_kind)
+{
+	errorf(pos, "redeclaration of %s '%Y' as %s (declared %P)",
+	       get_entity_kind_name(old->kind), old->base.symbol, new_kind,
+	       &old->base.source_position);
+}
+
 /**
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
@@ -4675,7 +4721,7 @@ static bool is_sym_main(const symbol_t *const sym)
 static entity_t *record_entity(entity_t *entity, const bool is_definition)
 {
 	const symbol_t *const    symbol  = entity->base.symbol;
-	const namespace_t        namespc = entity->base.namespc;
+	const namespace_tag_t    namespc = entity->base.namespc;
 	const source_position_t *pos     = &entity->base.source_position;
 
 	assert(symbol != NULL);
@@ -4695,7 +4741,8 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 					 orig_type, symbol);
 		}
 
-		if (warning.main && scope == file_scope && is_sym_main(symbol)) {
+		if (warning.main && current_scope == file_scope
+				&& is_sym_main(symbol)) {
 			check_type_of_main(entity);
 		}
 	}
@@ -4703,7 +4750,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	if (is_declaration(entity)) {
 		if (warning.nested_externs
 				&& entity->declaration.storage_class == STORAGE_CLASS_EXTERN
-				&& scope != file_scope) {
+				&& current_scope != file_scope) {
 			warningf(pos, "nested extern declaration of '%#T'",
 			         entity->declaration.type, symbol);
 		}
@@ -4711,7 +4758,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 	if (previous_entity != NULL
 	    && previous_entity->base.parent_scope == &current_function->parameters
-		&& scope->depth == previous_entity->base.parent_scope->depth + 1) {
+		&& current_scope->depth == previous_entity->base.parent_scope->depth+1){
 
 		assert(previous_entity->kind == ENTITY_VARIABLE);
 		errorf(pos,
@@ -4723,12 +4770,11 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	}
 
 	if (previous_entity != NULL
-			&& previous_entity->base.parent_scope == scope) {
+			&& previous_entity->base.parent_scope == current_scope) {
 
 		if (previous_entity->kind != entity->kind) {
-			errorf(pos,
-			       "redeclaration of '%Y' as different kind of symbol (declared %P)",
-			       symbol, &previous_entity->base.source_position);
+			error_redefined_as_different_kind(pos, previous_entity,
+			                                  entity->kind);
 			goto finish;
 		}
 		if (previous_entity->kind == ENTITY_ENUM_VALUE) {
@@ -4885,7 +4931,7 @@ error_redeclaration:
 		}
 	} else if (warning.missing_declarations
 			&& entity->kind == ENTITY_VARIABLE
-			&& scope == file_scope) {
+			&& current_scope == file_scope) {
 		declaration_t *declaration = &entity->declaration;
 		if (declaration->storage_class == STORAGE_CLASS_NONE ||
 				declaration->storage_class == STORAGE_CLASS_THREAD) {
@@ -4896,12 +4942,12 @@ error_redeclaration:
 
 finish:
 	assert(entity->base.parent_scope == NULL);
-	assert(scope != NULL);
+	assert(current_scope != NULL);
 
-	entity->base.parent_scope = scope;
+	entity->base.parent_scope = current_scope;
 	entity->base.namespc      = NAMESPACE_NORMAL;
 	environment_push(entity);
-	append_entity(scope, entity);
+	append_entity(current_scope, entity);
 
 	return entity;
 }
@@ -5050,7 +5096,7 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	assert(entity->base.namespc == NAMESPACE_NORMAL);
 	entity_t *previous_entity = get_entity(symbol, NAMESPACE_NORMAL);
 	if (previous_entity == NULL
-			|| previous_entity->base.parent_scope != scope) {
+			|| previous_entity->base.parent_scope != current_scope) {
 		errorf(HERE, "expected declaration of a function parameter, found '%Y'",
 		       symbol);
 		return entity;
@@ -5114,7 +5160,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->base.parent_scope == NULL);
-		parameter->base.parent_scope = scope;
+		parameter->base.parent_scope = current_scope;
 		environment_push(parameter);
 	}
 
@@ -5124,7 +5170,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 	}
 
 	/* pop function parameters */
-	assert(scope == &entity->function.parameters);
+	assert(current_scope == &entity->function.parameters);
 	scope_pop();
 	environment_pop_to(top);
 
@@ -5843,11 +5889,9 @@ static void parse_external_declaration(void)
 	}
 
 	assert(is_declaration(ndeclaration));
-	type_t *type = ndeclaration->declaration.type;
+	type_t *type = skip_typeref(ndeclaration->declaration.type);
 
-	/* note that we don't skip typerefs: the standard doesn't allow them here
-	 * (so we can't use is_type_function here) */
-	if (type->kind != TYPE_FUNCTION) {
+	if (!is_type_function(type)) {
 		if (is_type_valid(type)) {
 			errorf(HERE, "declarator '%#T' has a body but is not a function type",
 			       type, ndeclaration->base.symbol);
@@ -5903,11 +5947,11 @@ static void parse_external_declaration(void)
 	entity_t *parameter = function->parameters.entities;
 	for( ; parameter != NULL; parameter = parameter->base.next) {
 		if (parameter->base.parent_scope == &ndeclaration->function.parameters) {
-			parameter->base.parent_scope = scope;
+			parameter->base.parent_scope = current_scope;
 		}
 		assert(parameter->base.parent_scope == NULL
-				|| parameter->base.parent_scope == scope);
-		parameter->base.parent_scope = scope;
+				|| parameter->base.parent_scope == current_scope);
+		parameter->base.parent_scope = current_scope;
 		if (parameter->base.symbol == NULL) {
 			errorf(&parameter->base.source_position, "parameter name omitted");
 			continue;
@@ -5953,7 +5997,7 @@ static void parse_external_declaration(void)
 		label_pop_to(label_stack_top);
 	}
 
-	assert(scope == &function->parameters);
+	assert(current_scope == &function->parameters);
 	scope_pop();
 	environment_pop_to(top);
 }
@@ -7182,8 +7226,8 @@ static label_t *get_label(symbol_t *symbol)
 	label = get_entity(symbol, NAMESPACE_LABEL);
 	/* if we found a local label, we already created the declaration */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
-		if (label->base.parent_scope != scope) {
-			assert(label->base.parent_scope->depth < scope->depth);
+		if (label->base.parent_scope != current_scope) {
+			assert(label->base.parent_scope->depth < current_scope->depth);
 			current_function->goto_to_outer = true;
 		}
 		return &label->label;
@@ -9736,7 +9780,7 @@ static statement_t *parse_for(void)
 	rem_anchor_token(')');
 	statement->fors.body = parse_loop_body(statement);
 
-	assert(scope == &statement->fors.scope);
+	assert(current_scope == &statement->fors.scope);
 	scope_pop();
 	environment_pop_to(top);
 
@@ -9746,7 +9790,7 @@ static statement_t *parse_for(void)
 end_error:
 	POP_PARENT;
 	rem_anchor_token(')');
-	assert(scope == &statement->fors.scope);
+	assert(current_scope == &statement->fors.scope);
 	scope_pop();
 	environment_pop_to(top);
 
@@ -9932,7 +9976,7 @@ static statement_t *parse_return(void)
 		mark_vars_read(return_value, NULL);
 	}
 
-	const type_t *const func_type = current_function->base.type;
+	const type_t *const func_type = skip_typeref(current_function->base.type);
 	assert(is_type_function(func_type));
 	type_t *const return_type = skip_typeref(func_type->function.return_type);
 
@@ -9980,18 +10024,18 @@ static statement_t *parse_declaration_statement(void)
 {
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
 
-	entity_t *before = scope->last_entity;
+	entity_t *before = current_scope->last_entity;
 	if (GNU_MODE)
 		parse_external_declaration();
 	else
 		parse_declaration(record_entity);
 
 	if (before == NULL) {
-		statement->declaration.declarations_begin = scope->entities;
+		statement->declaration.declarations_begin = current_scope->entities;
 	} else {
 		statement->declaration.declarations_begin = before->base.next;
 	}
-	statement->declaration.declarations_end = scope->last_entity;
+	statement->declaration.declarations_end = current_scope->last_entity;
 
 	return statement;
 }
@@ -10087,13 +10131,13 @@ static statement_t *parse_local_label_declaration(void)
 		}
 		symbol_t *symbol = token.v.symbol;
 		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
-		if (entity != NULL && entity->base.parent_scope == scope) {
+		if (entity != NULL && entity->base.parent_scope == current_scope) {
 			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition %P)",
 			       symbol, &entity->base.source_position);
 		} else {
 			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL);
 
-			entity->base.parent_scope    = scope;
+			entity->base.parent_scope    = current_scope;
 			entity->base.namespc         = NAMESPACE_LABEL;
 			entity->base.source_position = token.source_position;
 			entity->base.symbol          = symbol;
@@ -10117,6 +10161,55 @@ end_error:
 	statement->declaration.declarations_begin = begin;
 	statement->declaration.declarations_end   = end;
 	return statement;
+}
+
+static void parse_namespace_definition(void)
+{
+	eat(T_namespace);
+
+	entity_t *entity = NULL;
+	symbol_t *symbol = NULL;
+
+	if (token.type == T_IDENTIFIER) {
+		symbol = token.v.symbol;
+		next_token();
+
+		entity = get_entity(symbol, NAMESPACE_NORMAL);
+		if (entity != NULL && entity->kind != ENTITY_NAMESPACE
+				&& entity->base.parent_scope == current_scope) {
+			error_redefined_as_different_kind(&token.source_position,
+			                                  entity, ENTITY_NAMESPACE);
+			entity = NULL;
+		}
+	}
+
+	if (entity == NULL) {
+		entity                       = allocate_entity_zero(ENTITY_NAMESPACE);
+		entity->base.symbol          = symbol;
+		entity->base.source_position = token.source_position;
+		entity->base.namespc         = NAMESPACE_NORMAL;
+		entity->base.parent_scope    = current_scope;
+	}
+
+	if (token.type == '=') {
+		/* TODO: parse namespace alias */
+		panic("namespace alias definition not supported yet");
+	}
+
+	environment_push(entity);
+	append_entity(current_scope, entity);
+
+	size_t const top = environment_top();
+	scope_push(&entity->namespacee.members);
+
+	expect('{');
+	parse_externals();
+	expect('}');
+
+end_error:
+	assert(current_scope == &entity->namespacee.members);
+	scope_pop();
+	environment_pop_to(top);
 }
 
 /**
@@ -10182,22 +10275,22 @@ expression_statment:
 		statement = parse_local_label_declaration();
 		break;
 
-	case ';':        statement = parse_empty_statement();         break;
-	case '{':        statement = parse_compound_statement(false); break;
-	case T___leave:  statement = parse_leave_statement();         break;
-	case T___try:    statement = parse_ms_try_statment();         break;
-	case T_asm:      statement = parse_asm_statement();           break;
-	case T_break:    statement = parse_break();                   break;
-	case T_case:     statement = parse_case_statement();          break;
-	case T_continue: statement = parse_continue();                break;
-	case T_default:  statement = parse_default_statement();       break;
-	case T_do:       statement = parse_do();                      break;
-	case T_for:      statement = parse_for();                     break;
-	case T_goto:     statement = parse_goto();                    break;
-	case T_if:       statement = parse_if();                      break;
-	case T_return:   statement = parse_return();                  break;
-	case T_switch:   statement = parse_switch();                  break;
-	case T_while:    statement = parse_while();                   break;
+	case ';':         statement = parse_empty_statement();         break;
+	case '{':         statement = parse_compound_statement(false); break;
+	case T___leave:   statement = parse_leave_statement();         break;
+	case T___try:     statement = parse_ms_try_statment();         break;
+	case T_asm:       statement = parse_asm_statement();           break;
+	case T_break:     statement = parse_break();                   break;
+	case T_case:      statement = parse_case_statement();          break;
+	case T_continue:  statement = parse_continue();                break;
+	case T_default:   statement = parse_default_statement();       break;
+	case T_do:        statement = parse_do();                      break;
+	case T_for:       statement = parse_for();                     break;
+	case T_goto:      statement = parse_goto();                    break;
+	case T_if:        statement = parse_if();                      break;
+	case T_return:    statement = parse_return();                  break;
+	case T_switch:    statement = parse_switch();                  break;
+	case T_while:     statement = parse_while();                   break;
 
 	EXPRESSION_START
 		statement = parse_expression_statement();
@@ -10309,7 +10402,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 end_error:
 	rem_anchor_token('}');
-	assert(scope == &statement->compound.scope);
+	assert(current_scope == &statement->compound.scope);
 	scope_pop();
 	environment_pop_to(top);
 
@@ -10371,18 +10464,88 @@ static void parse_global_asm(void)
 end_error:;
 }
 
-/**
- * Parse a translation unit.
- */
-static void parse_translation_unit(void)
+static void parse_linkage_specification(void)
 {
+	eat(T_extern);
+	assert(token.type == T_STRING_LITERAL);
+
+	string_t  linkage = parse_string_literals();
+	/* convert to symbol for easier handling... */
+	symbol_t *symbol = symbol_table_insert(linkage.begin);
+
+
+	symbol_t *old_linkage = current_linkage;
+	current_linkage       = symbol;
+
+	if (token.type == '{') {
+		next_token();
+		parse_externals();
+		expect('}');
+	} else {
+		parse_external();
+	}
+
+end_error:
+	assert(current_linkage == symbol);
+	current_linkage = old_linkage;
+}
+
+static void parse_external(void)
+{
+	switch (token.type) {
+		DECLARATION_START_NO_EXTERN
+		case T_IDENTIFIER:
+		case T___extension__:
+		case '(': /* for function declarations with implicit return type and
+			           * parenthesized declarator, i.e. (f)(void); */
+			parse_external_declaration();
+			return;
+
+		case T_extern:
+			if (look_ahead(1)->type == T_STRING_LITERAL) {
+				parse_linkage_specification();
+			} else {
+				parse_external_declaration();
+			}
+			return;
+
+		case T_asm:
+			parse_global_asm();
+			return;
+
+		case T_namespace:
+			parse_namespace_definition();
+			return;
+
+		case ';':
+			if (!strict_mode) {
+				if (warning.other)
+					warningf(HERE, "stray ';' outside of function");
+				next_token();
+				return;
+			}
+			/* FALLTHROUGH */
+
+		default:
+			errorf(HERE, "stray %K outside of function", &token);
+			if (token.type == '(' || token.type == '{' || token.type == '[')
+				eat_until_matching_token(token.type);
+			next_token();
+			return;
+	}
+}
+
+static void parse_externals(void)
+{
+	add_anchor_token('}');
 	add_anchor_token(T_EOF);
 
 #ifndef NDEBUG
 	unsigned char token_anchor_copy[T_LAST_TOKEN];
 	memcpy(token_anchor_copy, token_anchor_set, sizeof(token_anchor_copy));
 #endif
-	for (;;) {
+
+	while (token.type != T_EOF && token.type != '}') {
 #ifndef NDEBUG
 		bool anchor_leak = false;
 		for (int i = 0; i != T_LAST_TOKEN; ++i) {
@@ -10401,39 +10564,30 @@ static void parse_translation_unit(void)
 			abort();
 #endif
 
-		switch (token.type) {
-			DECLARATION_START
-			case T_IDENTIFIER:
-			case T___extension__:
-			case '(': /* for function declarations with implicit return type and
-			           * parenthesized declarator, i.e. (f)(void); */
-				parse_external_declaration();
-				break;
+		parse_external();
+	}
 
-			case T_asm:
-				parse_global_asm();
-				break;
+	rem_anchor_token(T_EOF);
+	rem_anchor_token('}');
+}
 
-			case T_EOF:
-				rem_anchor_token(T_EOF);
-				return;
+/**
+ * Parse a translation unit.
+ */
+static void parse_translation_unit(void)
+{
+	add_anchor_token(T_EOF);
 
-			case ';':
-				if (!strict_mode) {
-					if (warning.other)
-						warningf(HERE, "stray ';' outside of function");
-					next_token();
-					break;
-				}
-				/* FALLTHROUGH */
+	while (true) {
+		parse_externals();
 
-			default:
-				errorf(HERE, "stray %K outside of function", &token);
-				if (token.type == '(' || token.type == '{' || token.type == '[')
-					eat_until_matching_token(token.type);
-				next_token();
-				break;
-		}
+		if (token.type == T_EOF)
+			break;
+
+		errorf(HERE, "stray %K outside of function", &token);
+		if (token.type == '(' || token.type == '{' || token.type == '[')
+			eat_until_matching_token(token.type);
+		next_token();
 	}
 }
 
@@ -10459,15 +10613,15 @@ void start_parsing(void)
 	assert(file_scope == NULL);
 	file_scope = &unit->scope;
 
-	assert(scope == NULL);
+	assert(current_scope == NULL);
 	scope_push(&unit->scope);
 }
 
 translation_unit_t *finish_parsing(void)
 {
 	/* do NOT use scope_pop() here, this will crash, will it by hand */
-	assert(scope == &unit->scope);
-	scope            = NULL;
+	assert(current_scope == &unit->scope);
+	current_scope = NULL;
 
 	assert(file_scope == &unit->scope);
 	check_unused_globals();

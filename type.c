@@ -295,14 +295,21 @@ void print_imaginary_type(const imaginary_type_t *type)
  */
 static void print_function_type_pre(const function_type_t *type, bool top)
 {
+	if (type->linkage != NULL) {
+		fputs("extern \"", out);
+		fputs(type->linkage->string, out);
+		fputs("\" ", out);
+	}
+
 	print_type_qualifiers(type->base.qualifiers);
 	if (type->base.qualifiers != 0)
 		fputc(' ', out);
 
-
 	intern_print_type_pre(type->return_type, false);
 
-	switch (type->calling_convention) {
+#if 0
+	/* TODO: revive with linkage */
+	switch (type->linkage) {
 	case CC_CDECL:
 		fputs("__cdecl ", out);
 		break;
@@ -318,6 +325,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 	case CC_DEFAULT:
 		break;
 	}
+#endif
 
 	/* don't emit parenthesis if we're the toplevel type... */
 	if (!top)
@@ -1029,7 +1037,7 @@ static bool function_types_compatible(const function_type_t *func1,
 	if (!types_compatible(ret1, ret2))
 		return false;
 
-	if (func1->calling_convention != func2->calling_convention)
+	if (func1->linkage != func2->linkage)
 		return false;
 
 	/* can parameters be compared? */

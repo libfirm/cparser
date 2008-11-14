@@ -20,6 +20,8 @@
 #ifndef ENTITY_T_H
 #define ENTITY_T_H
 
+#include "lexer.h"
+#include "symbol.h"
 #include "entity.h"
 
 typedef enum {
@@ -33,7 +35,8 @@ typedef enum {
 	ENTITY_ENUM,
 	ENTITY_ENUM_VALUE,
 	ENTITY_LABEL,
-	ENTITY_LOCAL_LABEL
+	ENTITY_LOCAL_LABEL,
+	ENTITY_NAMESPACE
 } entity_kind_tag_t;
 typedef unsigned char entity_kind_t;
 
@@ -45,7 +48,7 @@ typedef enum namespace_tag_t {
 	NAMESPACE_ENUM,
 	NAMESPACE_LABEL
 } namespace_tag_t;
-typedef unsigned char namespace_t;
+typedef unsigned char entity_namespace_t;
 
 typedef enum storage_class_tag_t {
 	STORAGE_CLASS_NONE,
@@ -92,12 +95,23 @@ typedef enum decl_modifier_t {
 typedef unsigned decl_modifiers_t;
 
 /**
+ * A scope containing entities.
+ */
+struct scope_t {
+	entity_t *entities;
+	entity_t *last_entity;
+	scope_t  *parent;       /**< points to the parent scope. */
+	unsigned  depth;        /**< while parsing, the depth of this scope in the
+	                             scope stack. */
+};
+
+/**
  * a named entity is something which can be referenced by its name
  * (a symbol)
  */
 struct entity_base_t {
 	entity_kind_t       kind;
-	namespace_t         namespc;
+	entity_namespace_t  namespc;
 	symbol_t           *symbol;
 	source_position_t   source_position;
 	scope_t            *parent_scope;       /**< The parent scope where this declaration lives. */
@@ -145,6 +159,11 @@ struct label_t {
 
 	/* ast2firm info */
 	ir_node       *block;
+};
+
+struct namespace_t {
+	entity_base_t  base;
+	scope_t        members;
 };
 
 struct typedef_t {
@@ -217,6 +236,7 @@ union entity_t {
 	enum_t             enume;
 	enum_value_t       enum_value;
 	label_t            label;
+	namespace_t        namespacee;
 	typedef_t          typedefe;
 	declaration_t      declaration;
 	variable_t         variable;

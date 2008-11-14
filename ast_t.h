@@ -27,7 +27,7 @@
 #include "symbol.h"
 #include "token_t.h"
 #include "type.h"
-#include "entity.h"
+#include "entity_t.h"
 #include "adt/obst.h"
 
 /** The AST obstack contains all data that must stay in the AST. */
@@ -227,16 +227,6 @@ typedef enum funcname_kind_t {
 #define EXPR_UNARY_CASES       \
 	EXPR_UNARY_CASES_MANDATORY \
 	EXPR_UNARY_CASES_OPTIONAL
-
-/**
- * A scope containing declarations.
- */
-struct scope_t {
-	entity_t *entities;     /**< List of declarations in this scope. */
-	entity_t *last_entity;  /**< last declaration in this scope. */
-	scope_t  *parent;       /**< points to the parent scope. */
-	unsigned  depth;        /**< while parsing, the depth of this scope in the scope stack. */
-};
 
 struct expression_base_t {
 	expression_kind_t   kind;

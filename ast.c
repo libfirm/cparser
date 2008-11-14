@@ -1477,6 +1477,34 @@ static void print_ms_modifiers(const declaration_t *declaration)
 		fputs(") ", out);
 }
 
+static void print_scope(const scope_t *scope)
+{
+	const entity_t *entity = scope->entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		print_indent();
+		print_entity(entity);
+		fputs("\n", out);
+	}
+}
+
+static void print_namespace(const namespace_t *namespace)
+{
+	fputs("namespace ", out);
+	if (namespace->base.symbol != NULL) {
+		fputs(namespace->base.symbol->string, out);
+		fputc(' ', out);
+	}
+
+	fputs("{\n", out);
+	++indent;
+
+	print_scope(&namespace->members);
+
+	--indent;
+	print_indent();
+	fputs("}\n", out);
+}
+
 /**
  * Print a variable or function declaration
  */
@@ -1543,8 +1571,10 @@ void print_entity(const entity_t *entity)
 
 	switch ((entity_kind_tag_t) entity->kind) {
 	case ENTITY_VARIABLE:
-	case ENTITY_FUNCTION:
 	case ENTITY_COMPOUND_MEMBER:
+		print_declaration(entity);
+		return;
+	case ENTITY_FUNCTION:
 		print_declaration(entity);
 		return;
 	case ENTITY_TYPEDEF:
@@ -1574,6 +1604,9 @@ void print_entity(const entity_t *entity)
 		fputc(' ', out);
 		print_enum_definition(&entity->enume);
 		fputc(';', out);
+		return;
+	case ENTITY_NAMESPACE:
+		print_namespace(&entity->namespacee);
 		return;
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:

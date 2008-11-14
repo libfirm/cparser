@@ -22,8 +22,6 @@
 #include "lang_features.h"
 #include "entity_t.h"
 
-atomic_type_kind_t wchar_atomic_kind = ATOMIC_TYPE_INT;
-
 /** The error type. */
 type_t *type_error_type;
 
