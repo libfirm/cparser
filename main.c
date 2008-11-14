@@ -144,10 +144,12 @@ typedef enum filetype_t {
 } filetype_t;
 
 struct file_list_entry_t {
-	const char        *name; /**< filename or NULL for stdin */
-	filetype_t         type;
+	const char  *name; /**< filename or NULL for stdin */
+	filetype_t   type;
 	file_list_entry_t *next;
 };
+
+static file_list_entry_t *temp_files;
 
 #if defined(_DEBUG) || defined(FIRM_DEBUG)
 /**
@@ -404,7 +406,32 @@ static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
 		exit(1);
 	}
 
+	file_list_entry_t *entry = xmalloc(sizeof(*entry));
+	memset(entry, 0, sizeof(*entry));
+
+	size_t  name_len = strlen(buffer) + 1;
+	char   *name     = malloc(name_len);
+	memcpy(name, buffer, name_len);
+	entry->name      = name;
+
+	entry->next = temp_files;
+	temp_files  = entry;
+
 	return out;
+}
+
+static void free_temp_files(void)
+{
+	file_list_entry_t *entry = temp_files;
+	file_list_entry_t *next;
+	for ( ; entry != NULL; entry = next) {
+		next = entry->next;
+
+		unlink(entry->name);
+		free((char*) entry->name);
+		free(entry);
+	}
+	temp_files = NULL;
 }
 
 /**
@@ -574,6 +601,8 @@ int main(int argc, char **argv)
 	file_list_entry_t *last_file            = NULL;
 	bool               construct_dep_target = false;
 	struct obstack     file_obst;
+
+	atexit(free_temp_files);
 
 	/* hack for now... */
 	if (strstr(argv[0], "pptest") != NULL) {

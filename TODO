@@ -34,4 +34,3 @@ Missing Warnings:
 
 main/driver:
 - delete output file if we had an error
-- delete temp files!
