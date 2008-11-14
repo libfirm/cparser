@@ -3527,6 +3527,21 @@ static ir_initializer_t *create_ir_initializer_value(
 	return create_initializer_const(value);
 }
 
+/** test wether type can be initialized by a string constant */
+static bool is_string_type(type_t *type)
+{
+	type_t *inner;
+	if (is_type_pointer(type)) {
+		inner = skip_typeref(type->pointer.points_to);
+	} else if(is_type_array(type)) {
+		inner = skip_typeref(type->array.element_type);
+	} else {
+		return false;
+	}
+
+	return is_type_integer(inner);
+}
+
 static ir_initializer_t *create_ir_initializer_list(
 		const initializer_list_t *initializer, type_t *type)
 {
@@ -3553,6 +3568,18 @@ static ir_initializer_t *create_ir_initializer_list(
 				type_t *top_type      = skip_typeref(orig_top_type);
 
 				if (is_type_scalar(top_type))
+					break;
+				descend_into_subtype(&path);
+			}
+		} else if (sub_initializer->kind == INITIALIZER_STRING
+				|| sub_initializer->kind == INITIALIZER_WIDE_STRING) {
+			/* we might have to descend into types until we're at a scalar
+			 * type */
+			while (true) {
+				type_t *orig_top_type = path.top_type;
+				type_t *top_type      = skip_typeref(orig_top_type);
+
+				if (is_string_type(top_type))
 					break;
 				descend_into_subtype(&path);
 			}
