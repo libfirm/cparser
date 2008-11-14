@@ -20,6 +20,9 @@
 #include "type_t.h"
 #include "types.h"
 #include "lang_features.h"
+#include "entity_t.h"
+
+atomic_type_kind_t wchar_atomic_kind = ATOMIC_TYPE_INT;
 
 /** The error type. */
 type_t *type_error_type;
@@ -146,4 +149,23 @@ void init_basic_types(void)
 	/* const character types */
 	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);
 	type_const_char_ptr     = make_pointer_type(type_const_char,        TYPE_QUALIFIER_NONE);
+
+	/* other types */
+	type_intmax_t    = type_long_long;
+	type_size_t      = type_unsigned_long;
+	type_ssize_t     = type_long;
+	type_ptrdiff_t   = type_long;
+	type_uintmax_t   = type_unsigned_long_long;
+	type_uptrdiff_t  = type_unsigned_long;
+	type_wchar_t     = make_atomic_type(wchar_atomic_kind, TYPE_QUALIFIER_NONE);
+	type_wint_t      = type_int;
+	type_const_wchar_t
+		= make_atomic_type(wchar_atomic_kind, TYPE_QUALIFIER_CONST);
+
+	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);
+	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
+	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
+	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
+	type_const_wchar_t_ptr
+		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
 }

@@ -68,6 +68,7 @@
 #include "types.h"
 #include "type_hash.h"
 #include "parser.h"
+#include "type_t.h"
 #include "ast2firm.h"
 #include "diagnostic.h"
 #include "lang_features.h"
@@ -81,9 +82,9 @@
 
 #ifndef PREPROCESSOR
 #ifdef __APPLE__
-#define PREPROCESSOR "gcc -E -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -U__SIZE_TYPE__ -D__SIZE_TYPE__=unsigned\\ long -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "gcc -E -std=c99 -m32 -U__STRICT_ANSI__"
 #else
-#define PREPROCESSOR "cpp -std=c99 -U__WCHAR_TYPE__ -D__WCHAR_TYPE__=int -U__SIZE_TYPE__ -D__SIZE_TYPE__=unsigned\\ long -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "cpp -std=c99 -m32 -U__STRICT_ANSI__"
 #endif
 #endif
 
@@ -266,12 +267,27 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 	va_end(ap);
 }
 
+static const char *type_to_string(type_t *type)
+{
+	assert(type->kind == TYPE_ATOMIC);
+	return get_atomic_kind_name(type->atomic.akind);
+}
+
 static FILE *preprocess(const char *fname)
 {
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
 
 	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
+
+	/* setup default defines */
+	add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
+	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s",
+	         type_to_string(type_wchar_t));
+	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
+	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+
+	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
 		add_flag(&cppflags_obst, "-MF");
 		add_flag(&cppflags_obst, "%s", dep_target);
@@ -514,6 +530,24 @@ static filetype_t get_filetype_from_string(const char *string)
 	return FILETYPE_UNKNOWN;
 }
 
+static void init_os_support(void)
+{
+	/* OS option must be set to the backend */
+	switch (firm_opt.os_support) {
+	case OS_SUPPORT_MINGW:
+		set_be_option("ia32-gasmode=mingw");
+		break;
+	case OS_SUPPORT_LINUX:
+		set_be_option("ia32-gasmode=elf");
+		break;
+	case OS_SUPPORT_MACHO:
+		set_be_option("ia32-gasmode=macho");
+		set_be_option("ia32-stackalign=4");
+		set_be_option("pic");
+		break;
+	}
+}
+
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
 	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
@@ -569,17 +603,27 @@ int main(int argc, char **argv)
 
 #define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
 
-	/* early options parsing (find out optimisation level) */
-	for(int i = 1; i < argc; ++i) {
+	/* early options parsing (find out optimisation level and OS) */
+	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if(arg[0] != '-')
 			continue;
 
 		const char *option = &arg[1];
-		if(option[0] == 'O') {
+		if (option[0] == 'O') {
 			sscanf(&option[1], "%d", &opt_level);
 		}
+		if (strcmp(arg, "-fwin32") == 0) {
+			firm_opt.os_support = OS_SUPPORT_MINGW;
+		} else if (strcmp(arg, "-fmac") == 0) {
+			firm_opt.os_support = OS_SUPPORT_MACHO;
+		} else if (strcmp(arg, "-flinux") == 0) {
+			firm_opt.os_support = OS_SUPPORT_LINUX;
+		}
 	}
+
+	/* set target/os specific stuff */
+	init_os_support();
 
 	/* apply optimisation level */
 	switch(opt_level) {
@@ -604,11 +648,6 @@ int main(int argc, char **argv)
 		set_be_option("omitfp");
 		break;
 	}
-
-#ifdef __APPLE__
-	/* Darwin expects the stack to be aligned to 16byte boundary */
-	firm_be_option("ia32-stackalign=4");
-#endif
 
 	/* parse rest of options */
 	lang_standard_t standard        = STANDARD_DEFAULT;
@@ -708,7 +747,8 @@ int main(int argc, char **argv)
 					} if (streq(opt, "builtins")) {
 						use_builtins = truth_value;
 					} else if (streq(opt, "short-wchar")) {
-						opt_short_wchar_t = truth_value;
+						wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
+							: ATOMIC_TYPE_INT;
 					} else if (streq(opt, "syntax-only")) {
 						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "omit-frame-pointer")) {
@@ -839,6 +879,7 @@ int main(int argc, char **argv)
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
 				standard =
+					streq(o, "c++")            ? STANDARD_CXX98   :
 					streq(o, "c++98")          ? STANDARD_CXX98   :
 					streq(o, "c89")            ? STANDARD_C89     :
 					streq(o, "c99")            ? STANDARD_C99     :

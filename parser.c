@@ -1163,25 +1163,6 @@ static expression_t *parse_assignment_expression(void)
 	return parse_sub_expression(PREC_ASSIGNMENT);
 }
 
-static type_t *make_global_typedef(const char *name, type_t *type)
-{
-	symbol_t *const symbol = symbol_table_insert(name);
-
-	entity_t *const entity       = allocate_entity_zero(ENTITY_TYPEDEF);
-	entity->base.symbol          = symbol;
-	entity->base.source_position = builtin_source_position;
-	entity->base.namespc         = NAMESPACE_NORMAL;
-	entity->typedefe.type        = type;
-	entity->typedefe.builtin     = true;
-
-	record_entity(entity, false);
-
-	type_t *typedef_type            = allocate_type_zero(TYPE_TYPEDEF);
-	typedef_type->typedeft.typedefe = &entity->typedefe;
-
-	return typedef_type;
-}
-
 static string_t parse_string_literals(void)
 {
 	assert(token.type == T_STRING_LITERAL);
@@ -10350,33 +10331,6 @@ end_error:
 }
 
 /**
- * Initialize builtin types.
- */
-static void initialize_builtin_types(void)
-{
-	type_intmax_t    = make_global_typedef("__intmax_t__",      type_long_long);
-	type_size_t      = make_global_typedef("__SIZE_TYPE__",     type_unsigned_long);
-	type_ssize_t     = make_global_typedef("__SSIZE_TYPE__",    type_long);
-	type_ptrdiff_t   = make_global_typedef("__PTRDIFF_TYPE__",  type_long);
-	type_uintmax_t   = make_global_typedef("__uintmax_t__",     type_unsigned_long_long);
-	type_uptrdiff_t  = make_global_typedef("__UPTRDIFF_TYPE__", type_unsigned_long);
-	type_wchar_t     = make_global_typedef("__WCHAR_TYPE__",    opt_short_wchar_t ? type_unsigned_short : type_int);
-	type_wint_t      = make_global_typedef("__WINT_TYPE__",     type_int);
-
-	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);
-	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
-	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
-	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
-
-	/* const version of wchar_t */
-	type_const_wchar_t = allocate_type_zero(TYPE_TYPEDEF);
-	type_const_wchar_t->typedeft.typedefe  = type_wchar_t->typedeft.typedefe;
-	type_const_wchar_t->base.qualifiers   |= TYPE_QUALIFIER_CONST;
-
-	type_const_wchar_t_ptr = make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
-}
-
-/**
  * Check for unused global static functions and variables
  */
 static void check_unused_globals(void)
@@ -10518,8 +10472,6 @@ void start_parsing(void)
 
 	assert(scope == NULL);
 	scope_push(&unit->scope);
-
-	initialize_builtin_types();
 }
 
 translation_unit_t *finish_parsing(void)

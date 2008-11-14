@@ -20,6 +20,8 @@
 #ifndef LANG_FEATURES_H
 #define LANG_FEATURES_H
 
+#include "type.h"
+
 typedef enum lang_features_t {
 	_C89  = 1U << 0,
 	_ANSI = 1U << 1,
@@ -42,7 +44,7 @@ extern bool char_is_signed;
 /* true for strict language checking. */
 extern bool strict_mode;
 
-/* true if wchar_t is equal to unsigned short. */
-extern bool opt_short_wchar_t;
+/* atomic type of wchar_t */
+extern atomic_type_kind_t wchar_atomic_kind;
 
 #endif

@@ -211,34 +211,38 @@ void print_type_qualifiers(type_qualifiers_t qualifiers)
 	}
 }
 
+const char *get_atomic_kind_name(atomic_type_kind_t kind)
+{
+	switch(kind) {
+	case ATOMIC_TYPE_INVALID: break;
+	case ATOMIC_TYPE_VOID:        return "void";
+	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
+	case ATOMIC_TYPE_CHAR:        return "char";
+	case ATOMIC_TYPE_SCHAR:       return "signed char";
+	case ATOMIC_TYPE_UCHAR:       return "unsigned char";
+	case ATOMIC_TYPE_INT:         return "int";
+	case ATOMIC_TYPE_UINT:        return "unsigned int";
+	case ATOMIC_TYPE_SHORT:       return "short";
+	case ATOMIC_TYPE_USHORT:      return "unsigned short";
+	case ATOMIC_TYPE_LONG:        return "long";
+	case ATOMIC_TYPE_ULONG:       return "unsigned long";
+	case ATOMIC_TYPE_LONGLONG:    return "long long";
+	case ATOMIC_TYPE_ULONGLONG:   return "unsigned long long";
+	case ATOMIC_TYPE_LONG_DOUBLE: return "long double";
+	case ATOMIC_TYPE_FLOAT:       return "float";
+	case ATOMIC_TYPE_DOUBLE:      return "double";
+	}
+	return "INVALIDATOMIC";
+}
+
 /**
  * Prints the name of an atomic type kinds.
  *
  * @param kind  The type kind.
  */
-static
-void print_atomic_kinds(atomic_type_kind_t kind)
+static void print_atomic_kinds(atomic_type_kind_t kind)
 {
-	const char *s = "INVALIDATOMIC";
-	switch(kind) {
-	case ATOMIC_TYPE_INVALID:                                           break;
-	case ATOMIC_TYPE_VOID:        s = "void";                           break;
-	case ATOMIC_TYPE_BOOL:        s = c_mode & _CXX ? "bool" : "_Bool"; break;
-	case ATOMIC_TYPE_CHAR:        s = "char";                           break;
-	case ATOMIC_TYPE_SCHAR:       s = "signed char";                    break;
-	case ATOMIC_TYPE_UCHAR:       s = "unsigned char";                  break;
-	case ATOMIC_TYPE_INT:         s = "int";                            break;
-	case ATOMIC_TYPE_UINT:        s = "unsigned int";                   break;
-	case ATOMIC_TYPE_SHORT:       s = "short";                          break;
-	case ATOMIC_TYPE_USHORT:      s = "unsigned short";                 break;
-	case ATOMIC_TYPE_LONG:        s = "long";                           break;
-	case ATOMIC_TYPE_ULONG:       s = "unsigned long";                  break;
-	case ATOMIC_TYPE_LONGLONG:    s = "long long";                      break;
-	case ATOMIC_TYPE_ULONGLONG:   s = "unsigned long long";             break;
-	case ATOMIC_TYPE_LONG_DOUBLE: s = "long double";                    break;
-	case ATOMIC_TYPE_FLOAT:       s = "float";                          break;
-	case ATOMIC_TYPE_DOUBLE:      s = "double";                         break;
-	}
+	const char *s = get_atomic_kind_name(kind);
 	fputs(s, out);
 }
 
@@ -247,8 +251,7 @@ void print_atomic_kinds(atomic_type_kind_t kind)
  *
  * @param type  The type.
  */
-static
-void print_atomic_type(const atomic_type_t *type)
+static void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers);
 	if (type->base.qualifiers != 0)

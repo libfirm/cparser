@@ -93,5 +93,6 @@ extern type_t *type_unsigned_int64;
 extern type_t *type_unsigned_int128;
 
 void init_basic_types(void);
+void init_builtin_types(void);
 
 #endif

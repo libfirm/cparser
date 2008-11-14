@@ -203,4 +203,6 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size);
  */
 atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 
+const char *get_atomic_kind_name(atomic_type_kind_t kind);
+
 #endif
