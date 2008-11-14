@@ -5423,6 +5423,7 @@ void init_ast2firm(void)
 	switch (firm_opt.os_support) {
 	case OS_SUPPORT_MINGW:
 		create_ld_ident = create_ld_ident_win32;
+		break;
 	case OS_SUPPORT_LINUX:
 		create_ld_ident = create_ld_ident_linux_elf;
 		break;
