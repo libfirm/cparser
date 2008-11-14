@@ -39,46 +39,46 @@ static struct obstack  obst;
 
 static void mangle_type(type_t *type);
 
-static const char *get_atomic_type_mangle(atomic_type_kind_t kind)
+static char get_atomic_type_mangle(atomic_type_kind_t kind)
 {
 	switch (kind) {
 	case ATOMIC_TYPE_INVALID: break;
-	case ATOMIC_TYPE_VOID:        return "v";
-	case ATOMIC_TYPE_BOOL:        return "b";
-	case ATOMIC_TYPE_CHAR:        return "c";
-	case ATOMIC_TYPE_SCHAR:       return "a";
-	case ATOMIC_TYPE_UCHAR:       return "h";
-	case ATOMIC_TYPE_INT:         return "i";
-	case ATOMIC_TYPE_UINT:        return "j";
-	case ATOMIC_TYPE_SHORT:       return "s";
-	case ATOMIC_TYPE_USHORT:      return "t";
-	case ATOMIC_TYPE_LONG:        return "l";
-	case ATOMIC_TYPE_ULONG:       return "m";
-	case ATOMIC_TYPE_LONGLONG:    return "x";
-	case ATOMIC_TYPE_ULONGLONG:   return "y";
-	case ATOMIC_TYPE_LONG_DOUBLE: return "e";
-	case ATOMIC_TYPE_FLOAT:       return "f";
-	case ATOMIC_TYPE_DOUBLE:      return "d";
+	case ATOMIC_TYPE_VOID:        return 'v';
+	case ATOMIC_TYPE_BOOL:        return 'b';
+	case ATOMIC_TYPE_CHAR:        return 'c';
+	case ATOMIC_TYPE_SCHAR:       return 'a';
+	case ATOMIC_TYPE_UCHAR:       return 'h';
+	case ATOMIC_TYPE_INT:         return 'i';
+	case ATOMIC_TYPE_UINT:        return 'j';
+	case ATOMIC_TYPE_SHORT:       return 's';
+	case ATOMIC_TYPE_USHORT:      return 't';
+	case ATOMIC_TYPE_LONG:        return 'l';
+	case ATOMIC_TYPE_ULONG:       return 'm';
+	case ATOMIC_TYPE_LONGLONG:    return 'x';
+	case ATOMIC_TYPE_ULONGLONG:   return 'y';
+	case ATOMIC_TYPE_LONG_DOUBLE: return 'e';
+	case ATOMIC_TYPE_FLOAT:       return 'f';
+	case ATOMIC_TYPE_DOUBLE:      return 'd';
 	}
 	panic("invalid atomic type in mangler");
 }
 
 static void mangle_atomic_type(const atomic_type_t *type)
 {
-	obstack_printf(&obst, "%s", get_atomic_type_mangle(type->akind));
+	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
 }
 
 static void mangle_pointer_type(const pointer_type_t *type)
 {
-	obstack_printf(&obst, "P");
+	obstack_1grow(&obst, 'P');
 	mangle_type(type->points_to);
 }
 
 static void mangle_function_type(const function_type_t *type)
 {
-	obstack_printf(&obst, "F");
+	obstack_1grow(&obst, 'F');
 	if (type->linkage == sym_C) {
-		obstack_printf(&obst, "Y");
+		obstack_1grow(&obst, 'Y');
 	}
 
 	mangle_type(type->return_type);
@@ -88,24 +88,24 @@ static void mangle_function_type(const function_type_t *type)
 		mangle_type(parameter->type);
 	}
 	if (type->variadic) {
-		obstack_printf(&obst, "z");
+		obstack_1grow(&obst, 'z');
 	}
 	if (type->unspecified_parameters)
 		panic("can't mangle unspecified parameter types");
 	if (type->kr_style_parameters)
 		panic("can't mangle kr_style_parameters type");
 
-	obstack_printf(&obst, "E");
+	obstack_1grow(&obst, 'E');
 }
 
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
 {
 	if (qualifiers & TYPE_QUALIFIER_CONST)
-		obstack_printf(&obst, "K");
+		obstack_1grow(&obst, 'K');
 	if (qualifiers & TYPE_QUALIFIER_VOLATILE)
-		obstack_printf(&obst, "V");
+		obstack_1grow(&obst, 'V');
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT)
-		obstack_printf(&obst, "r");
+		obstack_1grow(&obst, 'r');
 
 	/* handle MS extended qualifiers? */
 }
@@ -188,7 +188,8 @@ ident *create_name_win32(entity_t *entity)
 static void mangle_entity(entity_t *entity)
 {
 	assert(obstack_object_size(&obst) == 0);
-	obstack_printf(&obst, "_Z");
+	obstack_1grow(&obst, '_');
+	obstack_1grow(&obst, 'Z');
 
 	/* TODO: mangle scope */
 
