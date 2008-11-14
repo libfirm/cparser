@@ -5411,12 +5411,6 @@ static void scope_to_firm(scope_t *scope)
 	}
 }
 
-static void set_be_option(const char *option)
-{
-	int res = firm_be_option(option);
-	assert(res);
-}
-
 void init_ast2firm(void)
 {
 	obstack_init(&asm_obst);
@@ -5429,17 +5423,11 @@ void init_ast2firm(void)
 	switch (firm_opt.os_support) {
 	case OS_SUPPORT_MINGW:
 		create_ld_ident = create_ld_ident_win32;
-		set_be_option("ia32-gasmode=mingw");
-		break;
 	case OS_SUPPORT_LINUX:
 		create_ld_ident = create_ld_ident_linux_elf;
-		set_be_option("ia32-gasmode=elf");
 		break;
 	case OS_SUPPORT_MACHO:
 		create_ld_ident = create_ld_ident_macho;
-		set_be_option("ia32-gasmode=macho");
-		set_be_option("ia32-stackalign=4");
-		set_be_option("pic");
 		break;
 	}
 
