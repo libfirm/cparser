@@ -536,6 +536,7 @@ static void init_os_support(void)
 	switch (firm_opt.os_support) {
 	case OS_SUPPORT_MINGW:
 		set_be_option("ia32-gasmode=mingw");
+		wchar_atomic_kind = ATOMIC_TYPE_USHORT;
 		break;
 	case OS_SUPPORT_LINUX:
 		set_be_option("ia32-gasmode=elf");
