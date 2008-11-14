@@ -41,14 +41,6 @@
 #include "adt/error.h"
 #include "adt/array.h"
 
-/** if wchar_t is equal to unsigned short. */
-bool opt_short_wchar_t =
-#ifdef _WIN32
-	true;
-#else
-	false;
-#endif
-
 //#define PRINT_TOKENS
 #define MAX_LOOKAHEAD 2
 
@@ -209,15 +201,10 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T__forceinline:    \
 	case T___attribute__:
 
-#ifdef PROVIDE_COMPLEX
 #define COMPLEX_SPECIFIERS  \
 	case T__Complex:
 #define IMAGINARY_SPECIFIERS \
 	case T__Imaginary:
-#else
-#define COMPLEX_SPECIFIERS
-#define IMAGINARY_SPECIFIERS
-#endif
 
 #define TYPE_SPECIFIERS       \
 	case T__Bool:             \
