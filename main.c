@@ -50,6 +50,7 @@
 #define fdopen(fd, mode)         _fdopen(fd, mode)
 #define popen(cmd, mode)         _popen(cmd, mode)
 #define pclose(file)             _pclose(file)
+#define unlink(filename)         _unlink(filename)
 
 #else
 #include <unistd.h>
@@ -98,7 +99,7 @@
 #endif
 
 /** The current c mode/dialect. */
-lang_features_t c_mode = _C89 | _ANSI | _C99 | _GNUC;
+unsigned int c_mode = _C89 | _ANSI | _C99 | _GNUC;
 
 /** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
 unsigned int machine_size = 32;
@@ -680,8 +681,8 @@ int main(int argc, char **argv)
 
 	/* parse rest of options */
 	lang_standard_t standard        = STANDARD_DEFAULT;
-	lang_features_t features_on     = 0;
-	lang_features_t features_off    = 0;
+	unsigned        features_on     = 0;
+	unsigned        features_off    = 0;
 	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
 	bool            help_displayed  = false;
 	bool            argument_errors = false;

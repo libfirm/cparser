@@ -184,7 +184,7 @@ static inline void next_real_char(void)
 	if (input.bufpos >= input.bufend) {
 		size_t s = fread(input.buf + MAX_PUTBACK, 1,
 		                 sizeof(input.buf) - MAX_PUTBACK, input.file);
-		if(s == 0) {
+		if (s == 0) {
 			CC = EOF;
 			return;
 		}
@@ -880,7 +880,7 @@ static void skip_spaces(bool skip_newline)
 	}
 }
 
-static void eat_pp(preprocessor_token_type_t type)
+static void eat_pp(int type)
 {
 	(void) type;
 	assert(pp_token.type == type);

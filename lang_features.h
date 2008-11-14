@@ -33,7 +33,7 @@ typedef enum lang_features_t {
 } lang_features_t;
 
 /* the current C mode/dialect */
-extern lang_features_t c_mode;
+extern unsigned int c_mode;
 
 /* the 'machine size', 16, 32 or 64 bit */
 extern unsigned int machine_size;

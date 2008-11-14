@@ -140,25 +140,25 @@ void print_token(FILE *f, const token_t *token)
 	}
 }
 
-void print_pp_token_type(FILE *f, preprocessor_token_type_t token_type)
+void print_pp_token_type(FILE *f, int token_type)
 {
-	if(token_type == TP_EOF) {
+	if (token_type == TP_EOF) {
 		fputs("end of file", f);
 		return;
 	}
-	if(token_type == TP_ERROR) {
+	if (token_type == TP_ERROR) {
 		fputs("error", f);
 		return;
 	}
 
 	int token_symbols_len = TP_LAST_TOKEN;
-	if(token_type < 0 || token_type >= token_symbols_len) {
+	if (token_type < 0 || token_type >= token_symbols_len) {
 		fputs("invalid token", f);
 		return;
 	}
 
 	const symbol_t *symbol = pp_token_symbols[token_type];
-	if(symbol != NULL) {
+	if (symbol != NULL) {
 		fprintf(f, "%s", symbol->string);
 	} else {
 		if(token_type >= 0 && token_type < 256) {

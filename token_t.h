@@ -77,7 +77,7 @@ void exit_tokens(void);
 void print_token_type(FILE *out, token_type_t token_type);
 void print_token(FILE *out, const token_t *token);
 
-void print_pp_token_type(FILE *out, preprocessor_token_type_t type);
+void print_pp_token_type(FILE *out, int type);
 void print_pp_token(FILE *out, const token_t *token);
 
 #endif
