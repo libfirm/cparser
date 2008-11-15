@@ -80,11 +80,15 @@ static void mangle_function_type(const function_type_t *type)
 	mangle_type(type->return_type);
 
 	function_parameter_t *parameter = type->parameters;
-	for ( ; parameter != NULL; parameter = parameter->next) {
-		mangle_type(parameter->type);
-	}
-	if (type->variadic) {
-		obstack_1grow(&obst, 'z');
+	if (parameter != NULL) {
+		for ( ; parameter != NULL; parameter = parameter->next) {
+			mangle_type(parameter->type);
+		}
+		if (type->variadic) {
+			obstack_1grow(&obst, 'z');
+		}
+	} else {
+		obstack_1grow(&obst, 'v');
 	}
 	if (type->unspecified_parameters)
 		panic("can't mangle unspecified parameter types");
