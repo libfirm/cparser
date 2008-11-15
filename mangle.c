@@ -70,16 +70,14 @@ static void mangle_pointer_type(const pointer_type_t *type)
 	mangle_type(type->points_to);
 }
 
-static void mangle_function_type(const function_type_t *type)
+static void mangle_parameters(const function_type_t *type)
 {
-	obstack_1grow(&obst, 'F');
-	if (type->linkage == LINKAGE_C) {
-		obstack_1grow(&obst, 'Y');
-	}
+	if (type->unspecified_parameters)
+		panic("can't mangle unspecified parameter types");
+	if (type->kr_style_parameters)
+		panic("can't mangle kr_style_parameters type");
 
-	mangle_type(type->return_type);
-
-	function_parameter_t *parameter = type->parameters;
+	const function_parameter_t *parameter = type->parameters;
 	if (parameter != NULL) {
 		for ( ; parameter != NULL; parameter = parameter->next) {
 			mangle_type(parameter->type);
@@ -90,10 +88,17 @@ static void mangle_function_type(const function_type_t *type)
 	} else {
 		obstack_1grow(&obst, 'v');
 	}
-	if (type->unspecified_parameters)
-		panic("can't mangle unspecified parameter types");
-	if (type->kr_style_parameters)
-		panic("can't mangle kr_style_parameters type");
+}
+
+static void mangle_function_type(const function_type_t *type)
+{
+	obstack_1grow(&obst, 'F');
+	if (type->linkage == LINKAGE_C) {
+		obstack_1grow(&obst, 'Y');
+	}
+
+	mangle_type(type->return_type);
+	mangle_parameters(type);
 
 	obstack_1grow(&obst, 'E');
 }
@@ -159,7 +164,7 @@ static void mangle_entity(entity_t *entity)
 	obstack_printf(&obst, "%u%s", strlen(symbol->string), symbol->string);
 
 	if (entity->kind == ENTITY_FUNCTION) {
-		mangle_type(entity->declaration.type);
+		mangle_parameters(&entity->declaration.type->function);
 	}
 }
 
