@@ -147,46 +147,8 @@ static void mangle_type(type_t *orig_type)
 	panic("invalid type encountered while mangling");
 }
 
-
-/**
- * Mangles an entity linker (ld) name for win32 usage.
- *
- * @param ent          the entity to be mangled
- * @param declaration  the declaration
- */
-ident *create_name_win32(entity_t *entity)
-{
-	ident *id = new_id_from_str(entity->base.symbol->string);
-
-	if (entity->kind == ENTITY_FUNCTION) {
-		if (entity->declaration.type->function.calling_convention == CC_STDCALL) {
-			char     buf[16];
-			ir_type *irtype = get_ir_type(entity->declaration.type);
-			size_t   size   = 0;
-   			for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
-				size += get_type_size_bytes(get_method_param_type(irtype, i));
-			}
-
-			snprintf(buf, sizeof(buf), "@%d", size);
-			return id_mangle3("_", id, buf);
-		}
-	} else {
-		/* always add an underscore in win32 */
-		id = id_mangle(id_underscore, id);
-	}
-
-	assert(is_declaration(entity));
-	decl_modifiers_t decl_modifiers = entity->declaration.modifiers;
-	if (decl_modifiers & DM_DLLIMPORT) {
-		/* add prefix for imported symbols */
-		id = id_mangle(id_imp, id);
-	}
-	return id;
-}
-
 static void mangle_entity(entity_t *entity)
 {
-	assert(obstack_object_size(&obst) == 0);
 	obstack_1grow(&obst, '_');
 	obstack_1grow(&obst, 'Z');
 
@@ -198,6 +160,72 @@ static void mangle_entity(entity_t *entity)
 	if (entity->kind == ENTITY_FUNCTION) {
 		mangle_type(entity->declaration.type);
 	}
+}
+
+/**
+ * Mangles an entity linker (ld) name for win32 usage.
+ *
+ * @param ent          the entity to be mangled
+ * @param declaration  the declaration
+ */
+ident *create_name_win32(entity_t *entity)
+{
+	struct obstack *o = &obst;
+
+	assert(is_declaration(entity));
+
+	if (entity->declaration.modifiers & DM_DLLIMPORT) {
+		/* add prefix for imported symbols */
+		obstack_printf(o, "__imp_");
+	}
+
+	if (entity->kind == ENTITY_FUNCTION) {
+		cc_kind_t cc = entity->declaration.type->function.calling_convention;
+
+		/* calling convention prefix */
+		switch (cc) {
+			case CC_DEFAULT:
+			case CC_CDECL:
+			case CC_STDCALL:  obstack_1grow(o, '_'); break;
+			case CC_FASTCALL: obstack_1grow(o, '@'); break;
+			default:          panic("unhandled calling convention");
+		}
+
+		if (c_mode & _CXX && entity->declaration.type->function.linkage == NULL) {
+			mangle_entity(entity);
+		} else {
+			obstack_printf(o, "%s", entity->base.symbol->string);
+		}
+
+		/* calling convention suffix */
+		switch (cc) {
+			case CC_DEFAULT:
+			case CC_CDECL:
+				break;
+
+			case CC_STDCALL:
+			case CC_FASTCALL: {
+				ir_type *irtype = get_ir_type(entity->declaration.type);
+				size_t   size   = 0;
+				for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
+					size += get_type_size_bytes(get_method_param_type(irtype, i));
+				}
+				obstack_printf(o, "@%zu\n", size);
+				break;
+			}
+
+			default:
+				panic("unhandled calling convention");
+		}
+	} else {
+		obstack_printf(o, "_%s", entity->base.symbol->string);
+	}
+
+	size_t  size = obstack_object_size(o);
+	char   *str  = obstack_finish(o);
+	ident  *id   = new_id_from_chars(str, size);
+	obstack_free(o, str);
+	return id;
 }
 
 /**
