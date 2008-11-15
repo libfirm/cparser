@@ -4710,8 +4710,8 @@ static void error_redefined_as_different_kind(const source_position_t *pos,
 		const entity_t *old, entity_kind_t new_kind)
 {
 	errorf(pos, "redeclaration of %s '%Y' as %s (declared %P)",
-	       get_entity_kind_name(old->kind), old->base.symbol, new_kind,
-	       &old->base.source_position);
+	       get_entity_kind_name(old->kind), old->base.symbol,
+	       get_entity_kind_name(new_kind), &old->base.source_position);
 }
 
 /**
