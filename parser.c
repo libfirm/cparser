@@ -3629,7 +3629,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T_long:
-			next_token();
 			if (type_specifiers & SPECIFIER_LONG_LONG) {
 				errorf(HERE, "multiple type specifiers given");
 			} else if (type_specifiers & SPECIFIER_LONG) {
@@ -3637,6 +3636,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			} else {
 				type_specifiers |= SPECIFIER_LONG;
 			}
+			next_token();
 			break;
 
 		case T_struct: {
