@@ -160,8 +160,8 @@ static void mangle_entity(entity_t *entity)
 
 	/* TODO: mangle scope */
 
-	symbol_t *symbol = entity->base.symbol;
-	obstack_printf(&obst, "%u%s", strlen(symbol->string), symbol->string);
+	const char *name = entity->base.symbol->string;
+	obstack_printf(&obst, "%zu%s", strlen(name), name);
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		mangle_parameters(&entity->declaration.type->function);
