@@ -969,8 +969,7 @@ static const struct {
 
 static ident *rts_idents[sizeof(rts_data) / sizeof(rts_data[0])];
 
-typedef ident* (*create_ld_ident_func)(entity_t *entity);
-create_ld_ident_func create_ld_ident = create_name_linux_elf;
+static ident* (*create_ld_ident)(entity_t*) = create_name_linux_elf;
 
 /**
  * Handle GNU attributes for entities
