@@ -307,25 +307,13 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 
 	intern_print_type_pre(type->return_type, false);
 
-#if 0
-	/* TODO: revive with linkage */
-	switch (type->linkage) {
-	case CC_CDECL:
-		fputs("__cdecl ", out);
-		break;
-	case CC_STDCALL:
-		fputs("__stdcall ", out);
-		break;
-	case CC_FASTCALL:
-		fputs("__fastcall ", out);
-		break;
-	case CC_THISCALL:
-		fputs("__thiscall ", out);
-		break;
-	case CC_DEFAULT:
-		break;
+	switch (type->calling_convention) {
+	case CC_CDECL:    fputs("__cdecl ",    out); break;
+	case CC_STDCALL:  fputs("__stdcall ",  out); break;
+	case CC_FASTCALL: fputs("__fastcall ", out); break;
+	case CC_THISCALL: fputs("__thiscall ", out); break;
+	case CC_DEFAULT:  break;
 	}
-#endif
 
 	/* don't emit parenthesis if we're the toplevel type... */
 	if (!top)
@@ -1038,6 +1026,9 @@ static bool function_types_compatible(const function_type_t *func1,
 		return false;
 
 	if (func1->linkage != func2->linkage)
+		return false;
+
+	if (func1->calling_convention != func2->calling_convention)
 		return false;
 
 	/* can parameters be compared? */

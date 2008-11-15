@@ -133,6 +133,7 @@ struct function_type_t {
 	type_t               *return_type;        /**< The return type. */
 	function_parameter_t *parameters;         /**< A list of the parameter types. */
 	symbol_t             *linkage;
+	cc_kind_t             calling_convention; /**< The specified calling convention. */
 	bool                  variadic : 1;
 	bool                  unspecified_parameters : 1;
 	bool                  kr_style_parameters : 1;

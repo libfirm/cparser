@@ -34,7 +34,6 @@
 static ident          *id_underscore;
 static ident          *id_imp;
 static symbol_t       *sym_C;
-static symbol_t       *sym_stdcall;
 static struct obstack  obst;
 
 static void mangle_type(type_t *type);
@@ -160,7 +159,7 @@ ident *create_name_win32(entity_t *entity)
 	ident *id = new_id_from_str(entity->base.symbol->string);
 
 	if (entity->kind == ENTITY_FUNCTION) {
-		if (entity->declaration.type->function.linkage == sym_stdcall) {
+		if (entity->declaration.type->function.calling_convention == CC_STDCALL) {
 			char     buf[16];
 			ir_type *irtype = get_ir_type(entity->declaration.type);
 			size_t   size   = 0;
@@ -253,7 +252,6 @@ void init_mangle(void)
 	id_underscore = new_id_from_chars("_", 1);
 	id_imp        = new_id_from_chars("__imp_", 6);
 	sym_C         = symbol_table_insert("C");
-	sym_stdcall   = symbol_table_insert("stdcall");
 
 	obstack_init(&obst);
 }

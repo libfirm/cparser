@@ -398,8 +398,6 @@ static ir_type *create_method_type(const function_type_t *function_type)
 		set_method_variadicity(irtype, variadicity_variadic);
 	}
 
-#if 0
-	/* TODO: revive this with linkage stuff */
 	unsigned cc = get_method_calling_convention(irtype);
 	switch (function_type->calling_convention) {
 	case CC_DEFAULT: /* unspecified calling convention, equal to one of the other, typically cdecl */
@@ -427,7 +425,6 @@ is_cdecl:
 		/* Hmm, leave default, not accepted by the parser yet. */
 		break;
 	}
-#endif
 
 	return irtype;
 }
