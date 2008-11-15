@@ -253,12 +253,10 @@ ident *create_name_linux_elf(entity_t *entity)
 
 	if (needs_mangling) {
 		mangle_entity(entity);
-		obstack_1grow(&obst, '\0');
-		char *str = obstack_finish(&obst);
-
-		ident *id = new_id_from_str(str);
+		size_t  size = obstack_object_size(&obst);
+		char   *str  = obstack_finish(&obst);
+		ident  *id   = new_id_from_chars(str, size);
 		obstack_free(&obst, str);
-
 		return id;
 	}
 
