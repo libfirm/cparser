@@ -98,7 +98,7 @@ static unsigned hash_function_type(const function_type_t *type)
 		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
 	}
-	result ^= hash_ptr(type->linkage);
+	result += type->linkage;
 	result += type->calling_convention;
 
 	return result;

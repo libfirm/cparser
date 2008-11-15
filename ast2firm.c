@@ -63,7 +63,6 @@ static label_t  **all_labels;
 static entity_t **inner_functions;
 static ir_node   *ijmp_list;
 static bool       constant_folding;
-static symbol_t  *sym_C;
 
 extern bool       have_const_functions;
 
@@ -1026,14 +1025,9 @@ static ir_entity *get_function_entity(entity_t *entity)
 		/* force main to C linkage */
 		type_t *type = entity->declaration.type;
 		assert(is_type_function(type));
-		if (type->function.linkage != NULL && type->function.linkage != sym_C) {
-			errorf(&entity->base.source_position,
-			       "main must have \"C\" linkage");
-		}
-
-		if (type->function.linkage == NULL || type->function.linkage != sym_C) {
+		if (type->function.linkage != LINKAGE_C) {
 			type_t *new_type           = duplicate_type(type);
-			new_type->function.linkage = sym_C;
+			new_type->function.linkage = LINKAGE_C;
 
 			type = typehash_insert(new_type);
 			if (type != new_type) {
@@ -5447,8 +5441,6 @@ void init_ast2firm(void)
 	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
-
-	sym_C = symbol_table_insert("C");
 
 	entitymap_init(&entitymap);
 }

@@ -116,7 +116,7 @@ static switch_statement_t *current_switch    = NULL;
 static statement_t        *current_loop      = NULL;
 static statement_t        *current_parent    = NULL;
 static ms_try_statement_t *current_try       = NULL;
-static symbol_t           *current_linkage   = NULL;
+static linkage_kind_t      current_linkage   = LINKAGE_INVALID;
 static goto_statement_t   *goto_first        = NULL;
 static goto_statement_t   *goto_last         = NULL;
 static label_statement_t  *label_first       = NULL;
@@ -10469,13 +10469,19 @@ static void parse_linkage_specification(void)
 	eat(T_extern);
 	assert(token.type == T_STRING_LITERAL);
 
-	string_t  linkage = parse_string_literals();
-	/* convert to symbol for easier handling... */
-	symbol_t *symbol = symbol_table_insert(linkage.begin);
+	const char *linkage = parse_string_literals().begin;
 
-
-	symbol_t *old_linkage = current_linkage;
-	current_linkage       = symbol;
+	linkage_kind_t old_linkage = current_linkage;
+	linkage_kind_t new_linkage;
+	if (strcmp(linkage, "C") == 0) {
+		new_linkage = LINKAGE_C;
+	} else if (strcmp(linkage, "C++") == 0) {
+		new_linkage = LINKAGE_CXX;
+	} else {
+		errorf(HERE, "linkage string \"%s\" not recognized", linkage);
+		new_linkage = LINKAGE_INVALID;
+	}
+	current_linkage = new_linkage;
 
 	if (token.type == '{') {
 		next_token();
@@ -10486,7 +10492,7 @@ static void parse_linkage_specification(void)
 	}
 
 end_error:
-	assert(current_linkage == symbol);
+	assert(current_linkage == new_linkage);
 	current_linkage = old_linkage;
 }
 
@@ -10641,6 +10647,7 @@ void parse(void)
 	for (int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
 		next_token();
 	}
+	current_linkage = c_mode & _CXX ? LINKAGE_CXX : LINKAGE_C;
 	parse_translation_unit();
 }
 

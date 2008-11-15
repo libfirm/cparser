@@ -295,10 +295,19 @@ void print_imaginary_type(const imaginary_type_t *type)
  */
 static void print_function_type_pre(const function_type_t *type, bool top)
 {
-	if (type->linkage != NULL) {
-		fputs("extern \"", out);
-		fputs(type->linkage->string, out);
-		fputs("\" ", out);
+	switch (type->linkage) {
+		case LINKAGE_INVALID:
+			break;
+
+		case LINKAGE_C:
+			if (c_mode & _CXX)
+				fputs("extern \"C\" ",   out);
+			break;
+
+		case LINKAGE_CXX:
+			if (!(c_mode & _CXX))
+				fputs("extern \"C++\" ", out);
+			break;
 	}
 
 	print_type_qualifiers(type->base.qualifiers);

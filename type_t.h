@@ -116,6 +116,13 @@ struct function_parameter_t {
 	function_parameter_t *next;  /**< Points to the next type inthe parameter list.*/
 };
 
+/** Linkage specifications. */
+typedef enum linkage_kind_t {
+	LINKAGE_INVALID,
+	LINKAGE_C,       /**< C linkage. */
+	LINKAGE_CXX      /**< C++ linkage. */
+} linkage_kind_t;
+
 /** Calling conventions. */
 typedef enum cc_kind_t {
 	CC_DEFAULT,      /**< default calling convention. */
@@ -132,7 +139,7 @@ struct function_type_t {
 	type_base_t           base;
 	type_t               *return_type;        /**< The return type. */
 	function_parameter_t *parameters;         /**< A list of the parameter types. */
-	symbol_t             *linkage;
+	linkage_kind_t        linkage;
 	cc_kind_t             calling_convention; /**< The specified calling convention. */
 	bool                  variadic : 1;
 	bool                  unspecified_parameters : 1;

@@ -32,8 +32,6 @@
 #include "adt/error.h"
 
 static ident          *id_underscore;
-static ident          *id_imp;
-static symbol_t       *sym_C;
 static struct obstack  obst;
 
 static void mangle_type(type_t *type);
@@ -76,7 +74,7 @@ static void mangle_pointer_type(const pointer_type_t *type)
 static void mangle_function_type(const function_type_t *type)
 {
 	obstack_1grow(&obst, 'F');
-	if (type->linkage == sym_C) {
+	if (type->linkage == LINKAGE_C) {
 		obstack_1grow(&obst, 'Y');
 	}
 
@@ -191,10 +189,17 @@ ident *create_name_win32(entity_t *entity)
 			default:          panic("unhandled calling convention");
 		}
 
-		if (c_mode & _CXX && entity->declaration.type->function.linkage == NULL) {
-			mangle_entity(entity);
-		} else {
-			obstack_printf(o, "%s", entity->base.symbol->string);
+		switch (entity->declaration.type->function.linkage) {
+			case LINKAGE_INVALID:
+				break;
+
+			case LINKAGE_C:
+				obstack_printf(o, "%s", entity->base.symbol->string);
+				break;
+
+			case LINKAGE_CXX:
+				mangle_entity(entity);
+				break;
 		}
 
 		/* calling convention suffix */
@@ -238,14 +243,11 @@ ident *create_name_linux_elf(entity_t *entity)
 {
 	bool needs_mangling = false;
 
-	if (entity->kind == ENTITY_FUNCTION && (c_mode & _CXX)) {
-		symbol_t *linkage = entity->declaration.type->function.linkage;
-
-		if (linkage == NULL) {
-			needs_mangling = true;
-		} else if (linkage != sym_C) {
-			errorf(&entity->base.source_position,
-			       "Unknown linkage type \"%Y\" found\n", linkage);
+	if (entity->kind == ENTITY_FUNCTION) {
+		switch (entity->declaration.type->function.linkage) {
+			case LINKAGE_INVALID: break;
+			case LINKAGE_C:       break;
+			case LINKAGE_CXX:     needs_mangling = true; break;
 		}
 	}
 
@@ -278,8 +280,6 @@ ident *create_name_macho(entity_t *entity)
 void init_mangle(void)
 {
 	id_underscore = new_id_from_chars("_", 1);
-	id_imp        = new_id_from_chars("__imp_", 6);
-	sym_C         = symbol_table_insert("C");
 
 	obstack_init(&obst);
 }
