@@ -31,8 +31,7 @@
 #include "lang_features.h"
 #include "adt/error.h"
 
-static ident          *id_underscore;
-static struct obstack  obst;
+static struct obstack obst;
 
 static void mangle_type(type_t *type);
 
@@ -160,6 +159,15 @@ static void mangle_entity(entity_t *entity)
 	}
 }
 
+static ident *make_id_from_obst(void)
+{
+	size_t  size = obstack_object_size(&obst);
+	char   *str  = obstack_finish(&obst);
+	ident  *id   = new_id_from_chars(str, size);
+	obstack_free(&obst, str);
+	return id;
+}
+
 /**
  * Mangles an entity linker (ld) name for win32 usage.
  *
@@ -226,11 +234,7 @@ ident *create_name_win32(entity_t *entity)
 		obstack_printf(o, "_%s", entity->base.symbol->string);
 	}
 
-	size_t  size = obstack_object_size(o);
-	char   *str  = obstack_finish(o);
-	ident  *id   = new_id_from_chars(str, size);
-	obstack_free(o, str);
-	return id;
+	return make_id_from_obst();
 }
 
 /**
@@ -253,11 +257,7 @@ ident *create_name_linux_elf(entity_t *entity)
 
 	if (needs_mangling) {
 		mangle_entity(entity);
-		size_t  size = obstack_object_size(&obst);
-		char   *str  = obstack_finish(&obst);
-		ident  *id   = new_id_from_chars(str, size);
-		obstack_free(&obst, str);
-		return id;
+		return make_id_from_obst();
 	}
 
 	return new_id_from_str(entity->base.symbol->string);
@@ -271,14 +271,12 @@ ident *create_name_linux_elf(entity_t *entity)
  */
 ident *create_name_macho(entity_t *entity)
 {
-	ident *id = new_id_from_str(entity->base.symbol->string);
-	return id_mangle(id_underscore, id);
+	obstack_printf(&obst, "_%s", entity->base.symbol->string);
+	return make_id_from_obst();
 }
 
 void init_mangle(void)
 {
-	id_underscore = new_id_from_chars("_", 1);
-
 	obstack_init(&obst);
 }
 
