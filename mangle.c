@@ -96,12 +96,12 @@ static void mangle_function_type(const function_type_t *type)
 
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
 {
-	if (qualifiers & TYPE_QUALIFIER_CONST)
-		obstack_1grow(&obst, 'K');
-	if (qualifiers & TYPE_QUALIFIER_VOLATILE)
-		obstack_1grow(&obst, 'V');
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT)
 		obstack_1grow(&obst, 'r');
+	if (qualifiers & TYPE_QUALIFIER_VOLATILE)
+		obstack_1grow(&obst, 'V');
+	if (qualifiers & TYPE_QUALIFIER_CONST)
+		obstack_1grow(&obst, 'K');
 
 	/* handle MS extended qualifiers? */
 }
