@@ -3592,12 +3592,12 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		/* type specifiers */
 #define MATCH_SPECIFIER(token, specifier, name)                         \
 		case token:                                                     \
-			next_token();                                               \
 			if (type_specifiers & specifier) {                           \
 				errorf(HERE, "multiple " name " type specifiers given"); \
 			} else {                                                    \
 				type_specifiers |= specifier;                           \
 			}                                                           \
+			next_token();                                               \
 			break
 
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
