@@ -7442,8 +7442,6 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 
 	eat(kind == EXPR_SIZEOF ? T_sizeof : T___alignof__);
 
-	char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
-
 	/* we only refer to a type property, mark this case */
 	bool old     = in_type_prop;
 	in_type_prop = true;
@@ -7481,6 +7479,7 @@ typeprop_expression:
 		type->kind == TYPE_BITFIELD ? "bitfield"            :
 		NULL;
 	if (wrong_type != NULL) {
+		char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 		errorf(&tp_expression->base.source_position,
 				"operand of %s expression must not be of %s type '%T'",
 				what, wrong_type, orig_type);
