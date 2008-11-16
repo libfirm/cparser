@@ -108,7 +108,7 @@ static void mangle_class_enum_type(const entity_base_t *ent)
 	const symbol_t *sym = ent->symbol;
 	if (sym != NULL) {
 		const char *name = sym->string;
-		obstack_printf(&obst, SIZET_FMT "%s", strlen(name), name);
+		obstack_printf(&obst, "%u%s", (unsigned) strlen(name), name);
 	} else {
 		/* TODO need the first typedef name here */
 		panic("mangling of unnamed class/enum types not implemented yet");
@@ -121,7 +121,7 @@ static void mangle_array_type(const array_type_t *type)
 		obstack_1grow(&obst, 'A');
 		obstack_1grow(&obst, '_');
 	} else if (type->size_constant) {
-		obstack_printf(&obst, "A" SIZET_FMT "_", type->size);
+		obstack_printf(&obst, "A%u_", (unsigned) type->size);
 	} else {
 		panic("mangling of non-constant sized array types not implemented yet");
 	}
@@ -208,7 +208,7 @@ static void mangle_entity(entity_t *entity)
 	/* TODO: mangle scope */
 
 	const char *name = entity->base.symbol->string;
-	obstack_printf(&obst, SIZET_FMT "%s", strlen(name), name);
+	obstack_printf(&obst, "%u%s", (unsigned) strlen(name), name);
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		mangle_parameters(&entity->declaration.type->function);
