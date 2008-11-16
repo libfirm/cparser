@@ -103,9 +103,9 @@ static void mangle_function_type(const function_type_t *type)
 	obstack_1grow(&obst, 'E');
 }
 
-static void mangle_compound_type(const compound_type_t *type)
+static void mangle_class_enum_type(const entity_base_t *ent)
 {
-	const symbol_t *sym = type->compound->base.symbol;
+	const symbol_t *sym = ent->symbol;
 	if (sym != NULL) {
 		const char *name = sym->string;
 		obstack_printf(&obst, "%zu%s", strlen(name), name);
@@ -145,7 +145,10 @@ static void mangle_type(type_t *orig_type)
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		mangle_compound_type(&type->compound);
+		mangle_class_enum_type(&type->compound.compound->base);
+		return;
+	case TYPE_ENUM:
+		mangle_class_enum_type(&type->enumt.enume->base);
 		return;
 	case TYPE_INVALID:
 		panic("invalid type encountered while mangling");
@@ -159,7 +162,6 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_BITFIELD:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
-	case TYPE_ENUM:
 	case TYPE_ARRAY:
 		panic("no mangling for this type implemented yet");
 		break;
