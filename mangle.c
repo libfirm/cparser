@@ -103,6 +103,18 @@ static void mangle_function_type(const function_type_t *type)
 	obstack_1grow(&obst, 'E');
 }
 
+static void mangle_compound_type(const compound_type_t *type)
+{
+	const symbol_t *sym = type->compound->base.symbol;
+	if (sym != NULL) {
+		const char *name = sym->string;
+		obstack_printf(&obst, "%zu%s", strlen(name), name);
+	} else {
+		/* TODO need the first typedef name here */
+		panic("mangling of unnamed compound types not implemented yet");
+	}
+}
+
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
 {
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT)
@@ -131,6 +143,10 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_FUNCTION:
 		mangle_function_type(&type->function);
 		return;
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+		mangle_compound_type(&type->compound);
+		return;
 	case TYPE_INVALID:
 		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
@@ -143,8 +159,6 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_BITFIELD:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:
 	case TYPE_ENUM:
 	case TYPE_ARRAY:
 		panic("no mangling for this type implemented yet");
