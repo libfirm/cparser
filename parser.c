@@ -5272,8 +5272,6 @@ static void check_labels(void)
 			       "label '%Y' used but not defined", label->base.symbol);
 		 }
 	}
-	goto_first  = NULL;
-	goto_anchor = &goto_first;
 
 	if (warning.unused_label) {
 		for (const label_statement_t *label_statement = label_first;
@@ -5288,8 +5286,6 @@ static void check_labels(void)
 			}
 		}
 	}
-	label_first  = NULL;
-	label_anchor = &label_first;
 }
 
 static void warn_unused_decl(entity_t *entity, entity_t *end,
@@ -5970,7 +5966,12 @@ static void parse_external_declaration(void)
 		current_function                 = function;
 		current_parent                   = NULL;
 
-		statement_t *const body     = parse_compound_statement(false);
+		goto_first   = NULL;
+		goto_anchor  = &goto_first;
+		label_first  = NULL;
+		label_anchor = &label_first;
+
+		statement_t *const body = parse_compound_statement(false);
 		function->statement = body;
 		first_err = true;
 		check_labels();
