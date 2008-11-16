@@ -6314,10 +6314,10 @@ static expression_t *parse_character_constant(void)
 	cnst->conste.v.character = token.v.string;
 
 	if (cnst->conste.v.character.size != 1) {
-		if (warning.multichar && GNU_MODE) {
+		if (!GNU_MODE) {
+			errorf(HERE, "more than 1 character in character constant");
+		} else if (warning.multichar) {
 			warningf(HERE, "multi-character character constant");
-		} else {
-			errorf(HERE, "more than 1 characters in character constant");
 		}
 	}
 	next_token();
@@ -6335,10 +6335,10 @@ static expression_t *parse_wide_character_constant(void)
 	cnst->conste.v.wide_character = token.v.wide_string;
 
 	if (cnst->conste.v.wide_character.size != 1) {
-		if (warning.multichar && GNU_MODE) {
+		if (!GNU_MODE) {
+			errorf(HERE, "more than 1 character in character constant");
+		} else if (warning.multichar) {
 			warningf(HERE, "multi-character character constant");
-		} else {
-			errorf(HERE, "more than 1 characters in character constant");
 		}
 	}
 	next_token();
