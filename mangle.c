@@ -108,7 +108,7 @@ static void mangle_class_enum_type(const entity_base_t *ent)
 	const symbol_t *sym = ent->symbol;
 	if (sym != NULL) {
 		const char *name = sym->string;
-		obstack_printf(&obst, "%zu%s", strlen(name), name);
+		obstack_printf(&obst, SIZET_FMT "%s", strlen(name), name);
 	} else {
 		/* TODO need the first typedef name here */
 		panic("mangling of unnamed class/enum types not implemented yet");
@@ -118,23 +118,26 @@ static void mangle_class_enum_type(const entity_base_t *ent)
 static void mangle_array_type(const array_type_t *type)
 {
 	if (type->is_vla) {
-		obstack_printf(&obst, "A_");
+		obstack_1grow(&obst, 'A');
+		obstack_1grow(&obst, '_');
 	} else if (type->size_constant) {
-		obstack_printf(&obst, "A%zu_", type->size);
+		obstack_printf(&obst, "A" SIZET_FMT "_", type->size);
 	} else {
-		panic("mangling of non-constant sized arrray types not implemented yet");
+		panic("mangling of non-constant sized array types not implemented yet");
 	}
 	mangle_type(type->element_type);
 }
 
 static void mangle_complex_type(const complex_type_t *type)
 {
-	obstack_printf(&obst, "C%c", get_atomic_type_mangle(type->akind));
+	obstack_1grow(&obst, 'C');
+	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
 }
 
 static void mangle_imaginary_type(const imaginary_type_t *type)
 {
-	obstack_printf(&obst, "G%c", get_atomic_type_mangle(type->akind));
+	obstack_1grow(&obst, 'G');
+	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
 }
 
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
@@ -205,7 +208,7 @@ static void mangle_entity(entity_t *entity)
 	/* TODO: mangle scope */
 
 	const char *name = entity->base.symbol->string;
-	obstack_printf(&obst, "%zu%s", strlen(name), name);
+	obstack_printf(&obst, SIZET_FMT "%s", strlen(name), name);
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		mangle_parameters(&entity->declaration.type->function);
@@ -271,12 +274,12 @@ ident *create_name_win32(entity_t *entity)
 
 			case CC_STDCALL:
 			case CC_FASTCALL: {
-				ir_type *irtype = get_ir_type(entity->declaration.type);
-				size_t   size   = 0;
+				ir_type  *irtype = get_ir_type(entity->declaration.type);
+				unsigned size    = 0;
 				for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
 					size += get_type_size_bytes(get_method_param_type(irtype, i));
 				}
-				obstack_printf(o, "@%zu", size);
+				obstack_printf(o, "@%u", size);
 				break;
 			}
 

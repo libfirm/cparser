@@ -3287,7 +3287,7 @@ static __attribute__((unused)) void debug_print_type_path(const type_path_t *pat
 		if (is_type_compound(type)) {
 			fprintf(stderr, ".%s", entry->compound_entry->base.symbol->string);
 		} else if (is_type_array(type)) {
-			fprintf(stderr, "[%zu]", entry->index);
+			fprintf(stderr, "[" SIZET_FMT "]", entry->index);
 		} else {
 			fprintf(stderr, "-INVALID-");
 		}
