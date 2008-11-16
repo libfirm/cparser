@@ -100,34 +100,34 @@ typedef struct parse_initializer_env_t {
 typedef entity_t* (*parsed_declaration_func) (entity_t *declaration, bool is_definition);
 
 /** The current token. */
-static token_t             token;
+static token_t              token;
 /** The lookahead ring-buffer. */
-static token_t             lookahead_buffer[MAX_LOOKAHEAD];
+static token_t              lookahead_buffer[MAX_LOOKAHEAD];
 /** Position of the next token in the lookahead buffer. */
-static int                 lookahead_bufpos;
-static stack_entry_t      *environment_stack = NULL;
-static stack_entry_t      *label_stack       = NULL;
-static scope_t            *file_scope        = NULL;
-static scope_t            *current_scope     = NULL;
+static int                  lookahead_bufpos;
+static stack_entry_t       *environment_stack = NULL;
+static stack_entry_t       *label_stack       = NULL;
+static scope_t             *file_scope        = NULL;
+static scope_t             *current_scope     = NULL;
 /** Point to the current function declaration if inside a function. */
-static function_t         *current_function  = NULL;
-static entity_t           *current_init_decl = NULL;
-static switch_statement_t *current_switch    = NULL;
-static statement_t        *current_loop      = NULL;
-static statement_t        *current_parent    = NULL;
-static ms_try_statement_t *current_try       = NULL;
-static linkage_kind_t      current_linkage   = LINKAGE_INVALID;
-static goto_statement_t   *goto_first        = NULL;
-static goto_statement_t   *goto_last         = NULL;
-static label_statement_t  *label_first       = NULL;
-static label_statement_t  *label_last        = NULL;
+static function_t          *current_function  = NULL;
+static entity_t            *current_init_decl = NULL;
+static switch_statement_t  *current_switch    = NULL;
+static statement_t         *current_loop      = NULL;
+static statement_t         *current_parent    = NULL;
+static ms_try_statement_t  *current_try       = NULL;
+static linkage_kind_t       current_linkage   = LINKAGE_INVALID;
+static goto_statement_t    *goto_first        = NULL;
+static goto_statement_t    *goto_last         = NULL;
+static label_statement_t   *label_first       = NULL;
+static label_statement_t  **label_anchor      = NULL;
 /** current translation unit. */
-static translation_unit_t *unit              = NULL;
+static translation_unit_t  *unit              = NULL;
 /** true if we are in a type property context (evaluation only for type. */
-static bool                in_type_prop      = false;
+static bool                 in_type_prop      = false;
 /** true in we are in a __extension__ context. */
-static bool                in_gcc_extension  = false;
-static struct obstack      temp_obst;
+static bool                 in_gcc_extension  = false;
+static struct obstack       temp_obst;
 
 
 #define PUSH_PARENT(stmt)                          \
@@ -5288,7 +5288,8 @@ static void check_labels(void)
 			}
 		}
 	}
-	label_first = label_last = NULL;
+	label_first  = NULL;
+	label_anchor = &label_first;
 }
 
 static void warn_unused_decl(entity_t *entity, entity_t *end,
@@ -9508,12 +9509,8 @@ static statement_t *parse_label_statement(void)
 	}
 
 	/* remember the labels in a list for later checking */
-	if (label_last == NULL) {
-		label_first = &statement->label;
-	} else {
-		label_last->next = &statement->label;
-	}
-	label_last = &statement->label;
+	*label_anchor = &statement->label;
+	label_anchor  = &statement->label.next;
 
 	POP_PARENT;
 	return statement;
