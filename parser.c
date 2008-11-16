@@ -8112,14 +8112,17 @@ static expression_t const *get_reference_address(expression_t const *expr)
 		expr = expr->unary.value;
 	}
 
+	if (expr->kind != EXPR_REFERENCE)
+		return NULL;
+
 	/* special case for functions which are automatically converted to a
 	 * pointer to function without an extra TAKE_ADDRESS operation */
-	if (!regular_take_address && expr->kind == EXPR_REFERENCE
-			&& expr->reference.entity->kind == ENTITY_FUNCTION) {
-		return expr;
+	if (!regular_take_address &&
+			expr->reference.entity->kind != ENTITY_FUNCTION) {
+		return NULL;
 	}
 
-	return NULL;
+	return expr;
 }
 
 static void warn_function_address_as_bool(expression_t const* expr)
