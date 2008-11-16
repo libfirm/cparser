@@ -232,7 +232,7 @@ ident *create_name_win32(entity_t *entity)
 				for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
 					size += get_type_size_bytes(get_method_param_type(irtype, i));
 				}
-				obstack_printf(o, "@%zu\n", size);
+				obstack_printf(o, "@%zu", size);
 				break;
 			}
 
