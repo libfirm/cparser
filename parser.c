@@ -9684,6 +9684,7 @@ static statement_t *parse_while(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->whiles.condition = cond;
+	warn_reference_address_as_bool(cond);
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
@@ -9717,6 +9718,7 @@ static statement_t *parse_do(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->do_while.condition = cond;
+	warn_reference_address_as_bool(cond);
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
@@ -9769,6 +9771,7 @@ static statement_t *parse_for(void)
 		add_anchor_token(';');
 		expression_t *const cond = parse_expression();
 		statement->fors.condition = cond;
+		warn_reference_address_as_bool(cond);
 		mark_vars_read(cond, NULL);
 		rem_anchor_token(';');
 	}
