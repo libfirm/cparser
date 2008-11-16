@@ -8226,11 +8226,8 @@ static void semantic_take_addr(unary_expression_t *expression)
 		return;
 
 	/* §6.5.3.2 */
-	if (value->kind != EXPR_ARRAY_ACCESS
-			&& value->kind != EXPR_UNARY_DEREFERENCE
-			&& !is_lvalue(value)) {
-		errorf(&expression->base.source_position,
-		       "'&' requires an lvalue");
+	if (!is_lvalue(value)) {
+		errorf(&expression->base.source_position, "'&' requires an lvalue");
 	}
 	if (type->kind == TYPE_BITFIELD) {
 		errorf(&expression->base.source_position,
