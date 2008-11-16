@@ -9131,8 +9131,8 @@ static void init_expression_parsers(void)
  */
 static asm_argument_t *parse_asm_arguments(bool is_out)
 {
-	asm_argument_t *result = NULL;
-	asm_argument_t *last   = NULL;
+	asm_argument_t  *result = NULL;
+	asm_argument_t **anchor = &result;
 
 	while (token.type == T_STRING_LITERAL || token.type == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
@@ -9215,12 +9215,8 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 
 		set_address_taken(expression, true);
 
-		if (last != NULL) {
-			last->next = argument;
-		} else {
-			result = argument;
-		}
-		last = argument;
+		*anchor = argument;
+		anchor  = &argument->next;
 
 		if (token.type != ',')
 			break;
