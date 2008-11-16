@@ -35,7 +35,6 @@ static void walk_expression(expression_t const *const expr,
 		return;
 
 	case EXPR_UNKNOWN:
-	case EXPR_INVALID:
 		panic("unexpected expr kind");
 
 	case EXPR_COMPOUND_LITERAL:
@@ -82,6 +81,7 @@ static void walk_expression(expression_t const *const expr,
 		return;
 	}
 
+	case EXPR_INVALID:
 	case EXPR_OFFSETOF:
 	case EXPR_REFERENCE:
 	case EXPR_REFERENCE_ENUM_VALUE:
