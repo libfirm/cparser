@@ -9809,8 +9809,8 @@ static statement_t *parse_goto(void)
 		expression_t *expression = parse_expression();
 		mark_vars_read(expression, NULL);
 
-		/* Argh: although documentation say the expression must be of type void *,
-		 * gcc excepts anything that can be casted into void * without error */
+		/* Argh: although documentation says the expression must be of type void*,
+		 * gcc accepts anything that can be casted into void* without error */
 		type_t *type = expression->base.type;
 
 		if (type != type_error_type) {
