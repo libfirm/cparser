@@ -8125,7 +8125,7 @@ static expression_t const *get_reference_address(expression_t const *expr)
 	return expr;
 }
 
-static void warn_function_address_as_bool(expression_t const* expr)
+static void warn_reference_address_as_bool(expression_t const* expr)
 {
 	if (!warning.address)
 		return;
@@ -8147,7 +8147,7 @@ static void semantic_not(unary_expression_t *expression)
 		       "operand of ! must be of scalar type");
 	}
 
-	warn_function_address_as_bool(expression->value);
+	warn_reference_address_as_bool(expression->value);
 
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
@@ -8747,8 +8747,8 @@ static void semantic_logical_op(binary_expression_t *expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	warn_function_address_as_bool(left);
-	warn_function_address_as_bool(right);
+	warn_reference_address_as_bool(left);
+	warn_reference_address_as_bool(right);
 
 	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
 		/* TODO: improve error message */
