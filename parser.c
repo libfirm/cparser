@@ -7746,6 +7746,48 @@ static bool same_compound_type(const type_t *type1, const type_t *type2)
 		type1->compound.compound == type2->compound.compound;
 }
 
+static expression_t const *get_reference_address(expression_t const *expr)
+{
+	bool regular_take_address = true;
+	for (;;) {
+		if (expr->kind == EXPR_UNARY_TAKE_ADDRESS) {
+			expr = expr->unary.value;
+		} else {
+			regular_take_address = false;
+		}
+
+		if (expr->kind != EXPR_UNARY_DEREFERENCE)
+			break;
+
+		expr = expr->unary.value;
+	}
+
+	if (expr->kind != EXPR_REFERENCE)
+		return NULL;
+
+	/* special case for functions which are automatically converted to a
+	 * pointer to function without an extra TAKE_ADDRESS operation */
+	if (!regular_take_address &&
+			expr->reference.entity->kind != ENTITY_FUNCTION) {
+		return NULL;
+	}
+
+	return expr;
+}
+
+static void warn_reference_address_as_bool(expression_t const* expr)
+{
+	if (!warning.address)
+		return;
+
+	expr = get_reference_address(expr);
+	if (expr != NULL) {
+		warningf(&expr->base.source_position,
+		         "the address of '%Y' will always evaluate as 'true'",
+		         expr->reference.entity->base.symbol);
+	}
+}
+
 /**
  * Parse a conditional expression, ie. 'expression ? ... : ...'.
  *
@@ -7757,6 +7799,8 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 
 	conditional_expression_t *conditional = &result->conditional;
 	conditional->condition                = expression;
+
+	warn_reference_address_as_bool(expression);
 
 	eat('?');
 	add_anchor_token(':');
@@ -8094,48 +8138,6 @@ static void semantic_unexpr_plus(unary_expression_t *expression)
 	if (warning.traditional)
 		warningf(&expression->base.source_position,
 			"traditional C rejects the unary plus operator");
-}
-
-static expression_t const *get_reference_address(expression_t const *expr)
-{
-	bool regular_take_address = true;
-	for (;;) {
-		if (expr->kind == EXPR_UNARY_TAKE_ADDRESS) {
-			expr = expr->unary.value;
-		} else {
-			regular_take_address = false;
-		}
-
-		if (expr->kind != EXPR_UNARY_DEREFERENCE)
-			break;
-
-		expr = expr->unary.value;
-	}
-
-	if (expr->kind != EXPR_REFERENCE)
-		return NULL;
-
-	/* special case for functions which are automatically converted to a
-	 * pointer to function without an extra TAKE_ADDRESS operation */
-	if (!regular_take_address &&
-			expr->reference.entity->kind != ENTITY_FUNCTION) {
-		return NULL;
-	}
-
-	return expr;
-}
-
-static void warn_reference_address_as_bool(expression_t const* expr)
-{
-	if (!warning.address)
-		return;
-
-	expr = get_reference_address(expr);
-	if (expr != NULL) {
-		warningf(&expr->base.source_position,
-		         "the address of '%Y' will always evaluate as 'true'",
-		         expr->reference.entity->base.symbol);
-	}
 }
 
 static void semantic_not(unary_expression_t *expression)
@@ -9541,6 +9543,7 @@ static statement_t *parse_if(void)
 	add_anchor_token(')');
 	expression_t *const expr = parse_expression();
 	statement->ifs.condition = expr;
+	warn_reference_address_as_bool(expr);
 	mark_vars_read(expr, NULL);
 	rem_anchor_token(')');
 	expect(')');
