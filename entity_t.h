@@ -64,6 +64,7 @@ typedef enum storage_class_tag_t {
 typedef unsigned char storage_class_t;
 
 typedef enum decl_modifier_t {
+	DM_NONE              = 0,
 	DM_DLLIMPORT         = 1 <<  0,
 	DM_DLLEXPORT         = 1 <<  1,
 	DM_THREAD            = 1 <<  2,

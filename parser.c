@@ -4201,53 +4201,27 @@ end_error:
 	return (construct_type_t*) array;
 }
 
-static construct_type_t *parse_function_declarator(scope_t *scope)
+static construct_type_t *parse_function_declarator(scope_t *scope,
+                                                   decl_modifiers_t modifiers)
 {
-	type_t *type = allocate_type_zero(TYPE_FUNCTION);
+	type_t          *type  = allocate_type_zero(TYPE_FUNCTION);
+	function_type_t *ftype = &type->function;
 
-	type->function.linkage = current_linkage;
+	ftype->linkage = current_linkage;
 
-	/* TODO: revive this... once we know exactly how to do it */
-#if 0
-	decl_modifiers_t  modifiers = entity->declaration.modifiers;
+	switch (modifiers & (DM_CDECL | DM_STDCALL | DM_FASTCALL | DM_THISCALL)) {
+		case DM_NONE:     break;
+		case DM_CDECL:    ftype->calling_convention = CC_CDECL;    break;
+		case DM_STDCALL:  ftype->calling_convention = CC_STDCALL;  break;
+		case DM_FASTCALL: ftype->calling_convention = CC_FASTCALL; break;
+		case DM_THISCALL: ftype->calling_convention = CC_THISCALL; break;
 
-	unsigned mask = modifiers & (DM_CDECL|DM_STDCALL|DM_FASTCALL|DM_THISCALL);
-
-	if (mask & (mask-1)) {
-		const char *first = NULL, *second = NULL;
-
-		/* more than one calling convention set */
-		if (modifiers & DM_CDECL) {
-			if (first == NULL)       first = "cdecl";
-			else if (second == NULL) second = "cdecl";
-		}
-		if (modifiers & DM_STDCALL) {
-			if (first == NULL)       first = "stdcall";
-			else if (second == NULL) second = "stdcall";
-		}
-		if (modifiers & DM_FASTCALL) {
-			if (first == NULL)       first = "fastcall";
-			else if (second == NULL) second = "fastcall";
-		}
-		if (modifiers & DM_THISCALL) {
-			if (first == NULL)       first = "thiscall";
-			else if (second == NULL) second = "thiscall";
-		}
-		errorf(&entity->base.source_position,
-			   "%s and %s attributes are not compatible", first, second);
+		default:
+			errorf(HERE, "multiple calling conventions in declaration");
+			break;
 	}
 
-	if (modifiers & DM_CDECL)
-		type->function.calling_convention = CC_CDECL;
-	else if (modifiers & DM_STDCALL)
-		type->function.calling_convention = CC_STDCALL;
-	else if (modifiers & DM_FASTCALL)
-		type->function.calling_convention = CC_FASTCALL;
-	else if (modifiers & DM_THISCALL)
-		type->function.calling_convention = CC_THISCALL;
-#endif
-
-	parse_parameters(&type->function, scope);
+	parse_parameters(ftype, scope);
 
 	construct_function_type_t *construct_function_type =
 		obstack_alloc(&temp_obst, sizeof(construct_function_type[0]));
@@ -4292,8 +4266,10 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		modifiers |= parse_attributes(&attributes);
 	}
 
-	if (env != NULL)
-		env->modifiers |= modifiers;
+	if (env != NULL) {
+		modifiers      |= env->modifiers;
+		env->modifiers  = modifiers;
+	}
 
 	construct_type_t *inner_types = NULL;
 
@@ -4336,7 +4312,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 			if (env != NULL)
 				scope = &env->parameters;
 
-			type = parse_function_declarator(scope);
+			type = parse_function_declarator(scope, modifiers);
 			break;
 		}
 		case '[':
@@ -4544,6 +4520,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 {
 	parse_declarator_env_t env;
 	memset(&env, 0, sizeof(env));
+	env.modifiers = specifiers->modifiers;
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(&env, may_be_abstract);
@@ -4583,11 +4560,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			}
 		}
 
-		entity->base.source_position  = env.source_position;
-		entity->base.symbol           = env.symbol;
-		entity->base.namespc          = NAMESPACE_NORMAL;
-		entity->declaration.type      = type;
-		entity->declaration.modifiers = env.modifiers | specifiers->modifiers;
+		entity->base.source_position          = env.source_position;
+		entity->base.symbol                   = env.symbol;
+		entity->base.namespc                  = NAMESPACE_NORMAL;
+		entity->declaration.type              = type;
+		entity->declaration.modifiers         = env.modifiers;
 		entity->declaration.deprecated_string = specifiers->deprecated_string;
 
 		storage_class_t storage_class = specifiers->storage_class;
