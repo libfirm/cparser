@@ -118,7 +118,7 @@ static statement_t         *current_parent    = NULL;
 static ms_try_statement_t  *current_try       = NULL;
 static linkage_kind_t       current_linkage   = LINKAGE_INVALID;
 static goto_statement_t    *goto_first        = NULL;
-static goto_statement_t    *goto_last         = NULL;
+static goto_statement_t   **goto_anchor       = NULL;
 static label_statement_t   *label_first       = NULL;
 static label_statement_t  **label_anchor      = NULL;
 /** current translation unit. */
@@ -5272,8 +5272,8 @@ static void check_labels(void)
 			       "label '%Y' used but not defined", label->base.symbol);
 		 }
 	}
-	goto_first = NULL;
-	goto_last  = NULL;
+	goto_first  = NULL;
+	goto_anchor = &goto_first;
 
 	if (warning.unused_label) {
 		for (const label_statement_t *label_statement = label_first;
@@ -9841,12 +9841,8 @@ static statement_t *parse_goto(void)
 	}
 
 	/* remember the goto's in a list for later checking */
-	if (goto_last == NULL) {
-		goto_first = &statement->gotos;
-	} else {
-		goto_last->next = &statement->gotos;
-	}
-	goto_last = &statement->gotos;
+	*goto_anchor = &statement->gotos;
+	goto_anchor  = &statement->gotos.next;
 
 	expect(';');
 
