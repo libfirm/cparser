@@ -127,6 +127,16 @@ static void mangle_array_type(const array_type_t *type)
 	mangle_type(type->element_type);
 }
 
+static void mangle_complex_type(const complex_type_t *type)
+{
+	obstack_printf(&obst, "C%c", get_atomic_type_mangle(type->akind));
+}
+
+static void mangle_imaginary_type(const imaginary_type_t *type)
+{
+	obstack_printf(&obst, "G%c", get_atomic_type_mangle(type->akind));
+}
+
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
 {
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT)
@@ -165,6 +175,12 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_ARRAY:
 		mangle_array_type(&type->array);
 		return;
+	case TYPE_COMPLEX:
+		mangle_complex_type(&type->complex);
+		return;
+	case TYPE_IMAGINARY:
+		mangle_imaginary_type(&type->imaginary);
+		return;
 	case TYPE_INVALID:
 		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
@@ -175,8 +191,6 @@ static void mangle_type(type_t *orig_type)
 		panic("typeref not resolved while manging?!?");
 
 	case TYPE_BITFIELD:
-	case TYPE_COMPLEX:
-	case TYPE_IMAGINARY:
 		panic("no mangling for this type implemented yet");
 		break;
 	}
