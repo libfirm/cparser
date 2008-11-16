@@ -111,8 +111,20 @@ static void mangle_class_enum_type(const entity_base_t *ent)
 		obstack_printf(&obst, "%zu%s", strlen(name), name);
 	} else {
 		/* TODO need the first typedef name here */
-		panic("mangling of unnamed compound types not implemented yet");
+		panic("mangling of unnamed class/enum types not implemented yet");
 	}
+}
+
+static void mangle_array_type(const array_type_t *type)
+{
+	if (type->is_vla) {
+		obstack_printf(&obst, "A_");
+	} else if (type->size_constant) {
+		obstack_printf(&obst, "A%zu_", type->size);
+	} else {
+		panic("mangling of non-constant sized arrray types not implemented yet");
+	}
+	mangle_type(type->element_type);
 }
 
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
@@ -150,6 +162,9 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_ENUM:
 		mangle_class_enum_type(&type->enumt.enume->base);
 		return;
+	case TYPE_ARRAY:
+		mangle_array_type(&type->array);
+		return;
 	case TYPE_INVALID:
 		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
@@ -162,7 +177,6 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_BITFIELD:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
-	case TYPE_ARRAY:
 		panic("no mangling for this type implemented yet");
 		break;
 	}
