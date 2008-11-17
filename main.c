@@ -183,25 +183,25 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 	size_t last_dot = 0xffffffff;
 	size_t i = 0;
 
-	if(inputname == NULL) {
+	if (inputname == NULL) {
 		snprintf(buf, buflen, "a%s", newext);
 		return;
 	}
 
-	for(const char *c = inputname; *c != 0; ++c) {
-		if(*c == '.')
+	for (const char *c = inputname; *c != 0; ++c) {
+		if (*c == '.')
 			last_dot = i;
 		++i;
 	}
-	if(last_dot == 0xffffffff)
+	if (last_dot == 0xffffffff)
 		last_dot = i;
 
-	if(last_dot >= buflen)
+	if (last_dot >= buflen)
 		panic("filename too long");
 	memcpy(buf, inputname, last_dot);
 
 	size_t extlen = strlen(newext) + 1;
-	if(extlen + last_dot >= buflen)
+	if (extlen + last_dot >= buflen)
 		panic("filename too long");
 	memcpy(buf+last_dot, newext, extlen);
 }
@@ -232,7 +232,7 @@ static void lextest(FILE *in, const char *fname)
 		lexer_next_preprocessing_token();
 		print_token(stdout, &lexer_token);
 		puts("");
-	} while(lexer_token.type != T_EOF);
+	} while (lexer_token.type != T_EOF);
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -265,8 +265,18 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 			break;
 		}
 	}
-
 	va_end(ap);
+}
+
+static void add_quoted_string(struct obstack *obst, const char *s)
+{
+#ifdef _WIN32
+	obstack_1grow(obst, '"');
+	obstack_grow(obst, s, strlen(s));
+	obstack_1grow(obst, '"');
+#else
+	add_flag(obst, "%s", s);
+#endif
 }
 
 static const char *type_to_string(type_t *type)
@@ -284,33 +294,35 @@ static FILE *preprocess(const char *fname)
 
 	/* setup default defines */
 	add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
-	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s",
-	         type_to_string(type_wchar_t));
+	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=");
+	add_quoted_string(&cppflags_obst, type_to_string(type_wchar_t));
 	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
-	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=");
+	add_quoted_string(&cppflags_obst, type_to_string(type_size_t));
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
 		add_flag(&cppflags_obst, "-MF");
-		add_flag(&cppflags_obst, "%s", dep_target);
+		add_quoted_string(&cppflags_obst, dep_target);
 		if (outname != NULL) {
 				add_flag(&cppflags_obst, "-MQ");
-				add_flag(&cppflags_obst, "%s", outname);
+				add_quoted_string(&cppflags_obst, outname);
 		}
 	}
 	if (flags[0] != '\0') {
 		obstack_printf(&cppflags_obst, " %s", flags);
 	}
-	add_flag(&cppflags_obst, "%s", fname);
+	obstack_1grow(&cppflags_obst, ' ');
+	add_quoted_string(&cppflags_obst, fname);
 
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *buf = obstack_finish(&cppflags_obst);
-	if(verbose) {
+	if (verbose) {
 		puts(buf);
 	}
 
 	FILE *f = popen(buf, "r");
-	if(f == NULL) {
+	if (f == NULL) {
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(1);
 	}
@@ -323,12 +335,12 @@ static void assemble(const char *out, const char *in)
 	char buf[4096];
 
 	snprintf(buf, sizeof(buf), "%s %s -o %s", ASSEMBLER, in, out);
-	if(verbose) {
+	if (verbose) {
 		puts(buf);
 	}
 
 	int err = system(buf);
-	if(err != 0) {
+	if (err != 0) {
 		fprintf(stderr, "assembler reported an error\n");
 		exit(1);
 	}
@@ -336,9 +348,9 @@ static void assemble(const char *out, const char *in)
 
 static const char *try_dir(const char *dir)
 {
-	if(dir == NULL)
+	if (dir == NULL)
 		return dir;
-	if(access(dir, R_OK | W_OK | X_OK) == 0)
+	if (access(dir, R_OK | W_OK | X_OK) == 0)
 		return dir;
 	return NULL;
 }
@@ -347,29 +359,29 @@ static const char *get_tempdir(void)
 {
 	static const char *tmpdir = NULL;
 
-	if(tmpdir != NULL)
+	if (tmpdir != NULL)
 		return tmpdir;
 
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir(getenv("TMPDIR"));
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir(getenv("TMP"));
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir(getenv("TEMP"));
 
 #ifdef P_tmpdir
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir(P_tmpdir);
 #endif
 
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir("/var/tmp");
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir("/usr/tmp");
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = try_dir("/tmp");
 
-	if(tmpdir == NULL)
+	if (tmpdir == NULL)
 		tmpdir = ".";
 
 	return tmpdir;
@@ -395,13 +407,13 @@ static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
 	snprintf(buffer, buflen, "%s/%sXXXXXX", tempdir, prefix);
 
 	int fd = mkstemp(buffer);
-	if(fd == -1) {
+	if (fd == -1) {
 		fprintf(stderr, "couldn't create temporary file: %s\n",
 		        strerror(errno));
 		exit(1);
 	}
 	FILE *out = fdopen(fd, "w");
-	if(out == NULL) {
+	if (out == NULL) {
 		fprintf(stderr, "couldn't create temporary file FILE*\n");
 		exit(1);
 	}
@@ -474,11 +486,11 @@ static void print_cparser_version(void) {
 
 	printf("cparser (%s) using libFirm (%u.%u",
 		cparser_REVISION, ver.major, ver.minor);
-	if(ver.revision[0] != 0) {
+	if (ver.revision[0] != 0) {
 		putchar(' ');
 		fputs(ver.revision, stdout);
 	}
-	if(ver.build[0] != 0) {
+	if (ver.build[0] != 0) {
 		putchar(' ');
 		fputs(ver.build, stdout);
 	}
@@ -505,7 +517,7 @@ static void copy_file(FILE *dest, FILE *input)
 
 	while (!feof(input) && !ferror(dest)) {
 		size_t read = fread(buf, 1, sizeof(buf), input);
-		if(fwrite(buf, 1, read, dest) != read) {
+		if (fwrite(buf, 1, read, dest) != read) {
 			perror("couldn't write output");
 		}
 	}
@@ -532,7 +544,7 @@ static FILE *open_file(const char *filename)
 	}
 
 	FILE *in = fopen(filename, "r");
-	if(in == NULL) {
+	if (in == NULL) {
 		fprintf(stderr, "Couldn't open '%s': %s\n", filename,
 				strerror(errno));
 		exit(1);
@@ -616,15 +628,15 @@ int main(int argc, char **argv)
 
 #define GET_ARG_AFTER(def, args)                                             \
 	def = &arg[sizeof(args)-1];                                              \
-	if(def[0] == '\0') {                                                     \
+	if (def[0] == '\0') {                                                     \
 		++i;                                                                 \
-		if(i >= argc) {                                                      \
+		if (i >= argc) {                                                      \
 			fprintf(stderr, "error: expected argument after '" args "'\n");  \
 			argument_errors = true;                                          \
 			break;                                                           \
 		}                                                                    \
 		def = argv[i];                                                       \
-		if(def[0] == '-' && def[1] != '\0') {                                \
+		if (def[0] == '-' && def[1] != '\0') {                                \
 			fprintf(stderr, "error: expected argument after '" args "'\n");  \
 			argument_errors = true;                                          \
 			continue;                                                        \
@@ -636,7 +648,7 @@ int main(int argc, char **argv)
 	/* early options parsing (find out optimisation level and OS) */
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
-		if(arg[0] != '-')
+		if (arg[0] != '-')
 			continue;
 
 		const char *option = &arg[1];
@@ -686,50 +698,50 @@ int main(int argc, char **argv)
 	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
 	bool            help_displayed  = false;
 	bool            argument_errors = false;
-	for(int i = 1; i < argc; ++i) {
+	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
 			/* an option */
 			const char *option = &arg[1];
-			if(option[0] == 'o') {
+			if (option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
-			} else if(option[0] == 'g') {
+			} else if (option[0] == 'g') {
 				set_be_option("debuginfo=stabs");
 				set_be_option("omitfp=no");
 				set_be_option("ia32-nooptcc=yes");
-			} else if(SINGLE_OPTION('c')) {
+			} else if (SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
-			} else if(SINGLE_OPTION('E')) {
+			} else if (SINGLE_OPTION('E')) {
 				mode = PreprocessOnly;
-			} else if(SINGLE_OPTION('S')) {
+			} else if (SINGLE_OPTION('S')) {
 				mode = Compile;
-			} else if(option[0] == 'O') {
+			} else if (option[0] == 'O') {
 				continue;
-			} else if(option[0] == 'I') {
+			} else if (option[0] == 'I') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-I");
 				add_flag(&cppflags_obst, "-I%s", opt);
-			} else if(option[0] == 'D') {
+			} else if (option[0] == 'D') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-D");
 				add_flag(&cppflags_obst, "-D%s", opt);
-			} else if(option[0] == 'U') {
+			} else if (option[0] == 'U') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-U");
 				add_flag(&cppflags_obst, "-U%s", opt);
-			} else if(option[0] == 'l') {
+			} else if (option[0] == 'l') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-l");
 				add_flag(&ldflags_obst, "-l%s", opt);
-			} else if(option[0] == 'L') {
+			} else if (option[0] == 'L') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-L");
 				add_flag(&ldflags_obst, "-L%s", opt);
-			} else if(SINGLE_OPTION('v')) {
+			} else if (SINGLE_OPTION('v')) {
 				verbose = 1;
-			} else if(SINGLE_OPTION('w')) {
+			} else if (SINGLE_OPTION('w')) {
 				memset(&warning, 0, sizeof(warning));
-			} else if(option[0] == 'x') {
+			} else if (option[0] == 'x') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-x");
 				forced_filetype = get_filetype_from_string(opt);
@@ -744,7 +756,7 @@ int main(int argc, char **argv)
 			           streq(option, "MD")) {
 			    construct_dep_target = true;
 				add_flag(&cppflags_obst, "-%s", option);
-			} else if(streq(option, "MM")  ||
+			} else if (streq(option, "MM")  ||
 			           streq(option, "MP")) {
 				add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MT") ||
@@ -828,7 +840,7 @@ int main(int argc, char **argv)
 					add_flag(&ldflags_obst, "-Wl,%s", opt);
 				}
 				else set_warning_opt(&option[1]);
-			} else if(option[0] == 'm') {
+			} else if (option[0] == 'm') {
 				/* -m options */
 				const char *opt;
 				char arch_opt[64];
@@ -868,7 +880,7 @@ int main(int argc, char **argv)
 						fprintf(stderr, "error: option -mfpumath supports only 387 or sse\n");
 						argument_errors = true;
 					}
-					if(!argument_errors) {
+					if (!argument_errors) {
 						snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
 						int res = firm_be_option(arch_opt);
 						if (res == 0)
@@ -965,7 +977,7 @@ int main(int argc, char **argv)
 					exit(EXIT_SUCCESS);
 				} else if (streq(option, "dump-function")) {
 					++i;
-					if(i >= argc) {
+					if (i >= argc) {
 						fprintf(stderr, "error: "
 						        "expected argument after '--dump-function'\n");
 						argument_errors = true;
@@ -1109,7 +1121,7 @@ int main(int argc, char **argv)
 		out = stdout;
 	} else {
 		out = fopen(outname, "w");
-		if(out == NULL) {
+		if (out == NULL) {
 			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
 					strerror(errno));
 			return 1;
@@ -1160,7 +1172,7 @@ preprocess:
 		}
 
 		FILE *asm_out;
-		if(mode == Compile) {
+		if (mode == Compile) {
 			asm_out = out;
 		} else {
 			asm_out = make_temp_file(asm_tempfile, sizeof(asm_tempfile), "ccs");
@@ -1225,13 +1237,13 @@ do_parsing:
 				print_ast(unit);
 			}
 
-			if(error_count > 0) {
+			if (error_count > 0) {
 				/* parsing failed because of errors */
 				fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
 				        warning_count);
 				result = EXIT_FAILURE;
 				continue;
-			} else if(warning_count > 0) {
+			} else if (warning_count > 0) {
 				fprintf(stderr, "%u warning(s)\n", warning_count);
 			}
 
@@ -1242,9 +1254,9 @@ do_parsing:
 				}
 			}
 
-			if(mode == BenchmarkParser) {
+			if (mode == BenchmarkParser) {
 				return result;
-			} else if(mode == PrintFluffy) {
+			} else if (mode == PrintFluffy) {
 				write_fluffy_decls(out, unit);
 				continue;
 			} else if (mode == PrintCaml) {
@@ -1263,16 +1275,16 @@ do_parsing:
 				ident    *id     = new_id_from_str(dumpfunction);
 				ir_graph *irg    = NULL;
 				int       n_irgs = get_irp_n_irgs();
-				for(int i = 0; i < n_irgs; ++i) {
+				for (int i = 0; i < n_irgs; ++i) {
 					ir_graph *tirg   = get_irp_irg(i);
 					ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
-					if(irg_id == id) {
+					if (irg_id == id) {
 						irg = tirg;
 						break;
 					}
 				}
 
-				if(irg == NULL) {
+				if (irg == NULL) {
 					fprintf(stderr, "No graph for function '%s' found\n",
 					        dumpfunction);
 					exit(1);
@@ -1296,7 +1308,7 @@ do_parsing:
 					return pp_result;
 				}
 			}
-			if(asm_out != out) {
+			if (asm_out != out) {
 				fclose(asm_out);
 			}
 		}
@@ -1312,7 +1324,7 @@ do_parsing:
 		if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
 			char        temp[1024];
 			const char *filename_o;
-			if(mode == CompileAssemble) {
+			if (mode == CompileAssemble) {
 				fclose(out);
 				filename_o = outname;
 			} else {
@@ -1337,7 +1349,7 @@ do_parsing:
 		return result;
 
 	/* link program file */
-	if(mode == CompileAssembleLink) {
+	if (mode == CompileAssembleLink) {
 		obstack_1grow(&ldflags_obst, '\0');
 		const char *flags = obstack_finish(&ldflags_obst);
 
@@ -1358,11 +1370,11 @@ do_parsing:
 
 		char *commandline = obstack_finish(&file_obst);
 
-		if(verbose) {
+		if (verbose) {
 			puts(commandline);
 		}
 		int err = system(commandline);
-		if(err != EXIT_SUCCESS) {
+		if (err != EXIT_SUCCESS) {
 			fprintf(stderr, "linker reported an error\n");
 			exit(1);
 		}
