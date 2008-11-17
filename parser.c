@@ -795,7 +795,7 @@ static entity_t *get_entity(const symbol_t *const symbol,
                             namespace_tag_t namespc)
 {
 	entity_t *entity = symbol->entity;
-	for( ; entity != NULL; entity = entity->base.symbol_next) {
+	for (; entity != NULL; entity = entity->base.symbol_next) {
 		if (entity->base.namespc == namespc)
 			return entity;
 	}
@@ -872,7 +872,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 	if (new_top == top)
 		return;
 
-	for(i = top; i > new_top; --i) {
+	for (i = top; i > new_top; --i) {
 		stack_entry_t *entry = &stack[i - 1];
 
 		entity_t           *old_entity = entry->old_entity;
@@ -1358,7 +1358,7 @@ static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute)
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
 	if (string.begin != NULL) {
-		for(size_t i = 0; i < 4; ++i) {
+		for (size_t i = 0; i < 4; ++i) {
 			if (strcmp(tls_models[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
@@ -1383,7 +1383,7 @@ static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute)
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
 	if (string.begin != NULL) {
-		for(size_t i = 0; i < 4; ++i) {
+		for (size_t i = 0; i < 4; ++i) {
 			if (strcmp(visibilities[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
@@ -1407,7 +1407,7 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
 	if (string.begin != NULL) {
-		for(int i = 0; i < 3; ++i) {
+		for (int i = 0; i < 3; ++i) {
 			if (strcmp(visibilities[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
@@ -1473,7 +1473,7 @@ static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute)
 	string_t string = { NULL, 0 };
 	parse_gnu_attribute_string_arg(attribute, &string);
 	if (string.begin != NULL) {
-		for(size_t i = 0; i < 5; ++i) {
+		for (size_t i = 0; i < 5; ++i) {
 			if (strcmp(interrupts[i], string.begin) == 0) {
 				attribute->u.value = i;
 				return;
@@ -1502,7 +1502,7 @@ static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute)
 		goto end_error;
 	}
 	const char *name = token.v.symbol->string;
-	for(i = 0; i < 4; ++i) {
+	for (i = 0; i < 4; ++i) {
 		if (strcmp_underscore(format_names[i], name) == 0)
 			break;
 	}
@@ -1657,7 +1657,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 			next_token();
 
 			int i;
-			for(i = 0; i < GNU_AK_LAST; ++i) {
+			for (i = 0; i < GNU_AK_LAST; ++i) {
 				if (strcmp_underscore(gnu_attribute_names[i], name) == 0)
 					break;
 			}
@@ -2346,7 +2346,7 @@ static __attribute__((unused)) void debug_print_type_path(
 {
 	size_t len = ARR_LEN(path->path);
 
-	for(size_t i = 0; i < len; ++i) {
+	for (size_t i = 0; i < len; ++i) {
 		const type_path_entry_t *entry = & path->path[i];
 
 		type_t *type = skip_typeref(entry->type);
@@ -2456,7 +2456,7 @@ static void ascend_to(type_path_t *path, size_t top_path_level)
 static bool walk_designator(type_path_t *path, const designator_t *designator,
                             bool used_in_offsetof)
 {
-	for( ; designator != NULL; designator = designator->next) {
+	for (; designator != NULL; designator = designator->next) {
 		type_path_entry_t *top       = get_type_path_top(path);
 		type_t            *orig_type = top->type;
 
@@ -2477,7 +2477,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			} else {
 				compound_t *compound = type->compound.compound;
 				entity_t   *iter     = compound->members.entities;
-				for( ; iter != NULL; iter = iter->base.next) {
+				for (; iter != NULL; iter = iter->base.next) {
 					if (iter->base.symbol == symbol) {
 						break;
 					}
@@ -3109,7 +3109,7 @@ static type_t *parse_enum_specifier(void)
 
 		parse_enum_entries(type);
 		parse_attributes(&attributes);
-	} else if(!entity->enume.complete && !(c_mode & _GNUC)) {
+	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
 		errorf(HERE, "enum %Y used before definition (incomplete enumes are a GNU extension)",
 		       symbol);
 	}
@@ -4346,7 +4346,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 
 	construct_type_t *p = last;
 
-	while(true) {
+	while (true) {
 		construct_type_t *type;
 		switch (token.type) {
 		case '(': {
@@ -4469,7 +4469,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
                                          type_t *type, variable_t *variable)
 {
 	construct_type_t *iter = construct_list;
-	for( ; iter != NULL; iter = iter->next) {
+	for (; iter != NULL; iter = iter->next) {
 		switch (iter->kind) {
 		case CONSTRUCT_INVALID:
 			internal_errorf(HERE, "invalid type construction found");
@@ -5082,7 +5082,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 {
 	add_anchor_token(';');
 	add_anchor_token(',');
-	while(true) {
+	while (true) {
 		entity_t *entity = finished_declaration(ndeclaration, token.type == '=');
 
 		if (token.type == '=') {
@@ -5200,7 +5200,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 	function_parameter_t *last_parameter = NULL;
 
 	entity_t *parameter_declaration = entity->function.parameters.entities;
-	for( ; parameter_declaration != NULL;
+	for (; parameter_declaration != NULL;
 			parameter_declaration = parameter_declaration->base.next) {
 		type_t *parameter_type = parameter_declaration->declaration.type;
 		if (parameter_type == NULL) {
@@ -5961,7 +5961,7 @@ static void parse_external_declaration(void)
 	scope_push(&function->parameters);
 
 	entity_t *parameter = function->parameters.entities;
-	for( ; parameter != NULL; parameter = parameter->base.next) {
+	for (; parameter != NULL; parameter = parameter->base.next) {
 		if (parameter->base.parent_scope == &ndeclaration->function.parameters) {
 			parameter->base.parent_scope = current_scope;
 		}
@@ -6046,14 +6046,11 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 		long v = fold_constant(size);
 
 		if (v < 0) {
-			errorf(source_position, "negative width in bit-field '%Y'",
-				symbol);
+			errorf(source_position, "negative width in bit-field '%Y'", symbol);
 		} else if (v == 0) {
-			errorf(source_position, "zero width for bit-field '%Y'",
-				symbol);
+			errorf(source_position, "zero width for bit-field '%Y'", symbol);
 		} else if (bit_size > 0 && (il_size_t)v > bit_size) {
-			errorf(source_position, "width of '%Y' exceeds its type",
-				symbol);
+			errorf(source_position, "width of '%Y' exceeds its type", symbol);
 		} else {
 			type->bitfield.bit_size = v;
 		}
@@ -6065,11 +6062,13 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
 {
 	entity_t *iter = compound->members.entities;
-	for( ; iter != NULL; iter = iter->base.next) {
+	for (; iter != NULL; iter = iter->base.next) {
 		if (iter->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
-		if (iter->base.symbol == NULL) {
+		if (iter->base.symbol == symbol) {
+			return iter;
+		} else if (iter->base.symbol == NULL) {
 			type_t *type = skip_typeref(iter->declaration.type);
 			if (is_type_compound(type)) {
 				entity_t *result
@@ -6078,10 +6077,6 @@ static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
 					return result;
 			}
 			continue;
-		}
-
-		if (iter->base.symbol == symbol) {
-			return iter;
 		}
 	}
 
@@ -6925,7 +6920,7 @@ static designator_t *parse_designator(void)
 	next_token();
 
 	designator_t *last_designator = result;
-	while(true) {
+	while (true) {
 		if (token.type == '.') {
 			next_token();
 			if (token.type != T_IDENTIFIER) {
@@ -7316,7 +7311,7 @@ static expression_t *parse_noop_expression(void)
 		add_anchor_token(',');
 
 		if (token.type != ')') {
-			while(true) {
+			while (true) {
 				(void)parse_assignment_expression();
 				if (token.type != ',')
 					break;
@@ -7730,7 +7725,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	}
 
 	/* do default promotion */
-	for( ; argument != NULL; argument = argument->next) {
+	for (; argument != NULL; argument = argument->next) {
 		type_t *type = argument->expression->base.type;
 
 		type = get_default_promoted_type(type);
@@ -9012,7 +9007,7 @@ static expression_t *parse_sub_expression(precedence_t precedence)
 	assert(left != NULL);
 	left->base.source_position = source_position;
 
-	while(true) {
+	while (true) {
 		if (token.type < 0) {
 			return expected_expression_error();
 		}
@@ -9251,7 +9246,7 @@ static asm_clobber_t *parse_asm_clobbers(void)
 	asm_clobber_t *result = NULL;
 	asm_clobber_t *last   = NULL;
 
-	while(token.type == T_STRING_LITERAL) {
+	while (token.type == T_STRING_LITERAL) {
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 		clobber->clobber       = parse_string_literals();
 
@@ -10393,7 +10388,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	/* look over all statements again to produce no effect warnings */
 	if (warning.unused_value) {
 		statement_t *sub_statement = statement->compound.statements;
-		for( ; sub_statement != NULL; sub_statement = sub_statement->base.next) {
+		for (; sub_statement != NULL; sub_statement = sub_statement->base.next) {
 			if (sub_statement->kind != STATEMENT_EXPRESSION)
 				continue;
 			/* don't emit a warning for the last expression in an expression
