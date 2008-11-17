@@ -6142,6 +6142,25 @@ static void parse_compound_declarators(compound_t *compound,
 
 		append_entity(&compound->members, entity);
 
+		type_t *orig_type = entity->declaration.type;
+		type_t *type      = skip_typeref(orig_type);
+		if (is_type_function(type)) {
+			errorf(&entity->base.source_position,
+					"compound member '%Y' must not have function type '%T'",
+					entity->base.symbol, orig_type);
+		} else if (is_type_incomplete(type)) {
+			/* §6.7.2.1:16 flexible array member */
+			if (is_type_array(type) &&
+					token.type == ';'   &&
+					look_ahead(1)->type == '}') {
+				compound->has_flexible_member = true;
+			} else {
+				errorf(&entity->base.source_position,
+						"compound member '%Y' has incomplete type '%T'",
+						entity->base.symbol, orig_type);
+			}
+		}
+
 		if (token.type != ',')
 			break;
 		next_token();
@@ -6150,32 +6169,6 @@ static void parse_compound_declarators(compound_t *compound,
 
 end_error:
 	;
-}
-
-static void semantic_compound(compound_t *compound)
-{
-	entity_t *entity = compound->members.entities;
-	for ( ; entity != NULL; entity = entity->base.next) {
-		assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-
-		type_t *orig_type = entity->declaration.type;
-		type_t *type      = skip_typeref(orig_type);
-
-		if (is_type_function(type)) {
-			errorf(HERE,
-			       "compound member '%Y' must not have function type '%T'",
-			       entity->base.symbol, orig_type);
-		} else if (is_type_incomplete(type)) {
-			/* §6.7.2.1 (16) flexible array member */
-			if (is_type_array(type) && entity->base.next == NULL) {
-				compound->has_flexible_member = true;
-			} else {
-				errorf(HERE,
-				       "compound member '%Y' has incomplete type '%T'",
-				       entity->base.symbol, orig_type);
-			}
-		}
-	}
 }
 
 static void parse_compound_type_entries(compound_t *compound)
@@ -6194,7 +6187,6 @@ static void parse_compound_type_entries(compound_t *compound)
 
 		parse_compound_declarators(compound, &specifiers);
 	}
-	semantic_compound(compound);
 	rem_anchor_token('}');
 	next_token();
 
