@@ -237,14 +237,19 @@ static void lextest(FILE *in, const char *fname)
 
 static void add_flag(struct obstack *obst, const char *format, ...)
 {
+	obstack_1grow(obst, ' ');
+#ifdef _WIN32
+	obstack_1grow(obst, '"');
+	obstack_vprintf(obst, format, ap);
+	obstack_1grow(obst, '"');
+#else
+	char buf[4096];
 	va_list ap;
 	va_start(ap, format);
-
-	char buf[4096];
 	vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
 
 	/* escape stuff... */
-	obstack_1grow(obst, ' ');
 	for (char *c = buf; *c != '\0'; ++c) {
 		switch(*c) {
 		case '"':
@@ -259,23 +264,12 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 		case '(':
 		case ')':
 			obstack_1grow(obst, '\\');
-			/* fallthrough */
+			/* FALLTHROUGH */
 		default:
 			obstack_1grow(obst, *c);
 			break;
 		}
 	}
-	va_end(ap);
-}
-
-static void add_quoted_string(struct obstack *obst, const char *s)
-{
-#ifdef _WIN32
-	obstack_1grow(obst, '"');
-	obstack_grow(obst, s, strlen(s));
-	obstack_1grow(obst, '"');
-#else
-	add_flag(obst, "%s", s);
 #endif
 }
 
@@ -294,26 +288,23 @@ static FILE *preprocess(const char *fname)
 
 	/* setup default defines */
 	add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
-	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=");
-	add_quoted_string(&cppflags_obst, type_to_string(type_wchar_t));
+	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
 	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
-	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=");
-	add_quoted_string(&cppflags_obst, type_to_string(type_size_t));
+	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
 		add_flag(&cppflags_obst, "-MF");
-		add_quoted_string(&cppflags_obst, dep_target);
+		add_flag(&cppflags_obst, dep_target);
 		if (outname != NULL) {
 				add_flag(&cppflags_obst, "-MQ");
-				add_quoted_string(&cppflags_obst, outname);
+				add_flag(&cppflags_obst, outname);
 		}
 	}
 	if (flags[0] != '\0') {
 		obstack_printf(&cppflags_obst, " %s", flags);
 	}
-	obstack_1grow(&cppflags_obst, ' ');
-	add_quoted_string(&cppflags_obst, fname);
+	add_flag(&cppflags_obst, fname);
 
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *buf = obstack_finish(&cppflags_obst);
