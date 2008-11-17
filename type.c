@@ -391,6 +391,12 @@ static void print_function_type_post(const function_type_t *type,
 static void print_pointer_type_pre(const pointer_type_t *type)
 {
 	intern_print_type_pre(type->points_to, false);
+	variable_t *const variable = type->base_variable;
+	if (variable != NULL) {
+		fputs(" __based(", out);
+		fputs(variable->base.base.symbol->string, out);
+		fputs(") ", out);
+	}
 	fputs("*", out);
 	print_type_qualifiers(type->base.qualifiers);
 	if (type->base.qualifiers != 0)
@@ -1426,13 +1432,37 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
 	memset(type, 0, sizeof(pointer_type_t));
 
-	type->kind              = TYPE_POINTER;
-	type->base.qualifiers   = qualifiers;
-	type->base.alignment    = 0;
-	type->pointer.points_to = points_to;
+	type->kind                  = TYPE_POINTER;
+	type->base.qualifiers       = qualifiers;
+	type->base.alignment        = 0;
+	type->pointer.points_to     = points_to;
+	type->pointer.base_variable = NULL;
 
 	return identify_new_type(type);
 }
+
+/**
+ * Creates a new based pointer type.
+ *
+ * @param points_to   The points-to type for the new type.
+ * @param qualifiers  Type qualifiers for the new type.
+ * @param variable    The based variable
+ */
+type_t *make_based_pointer_type(type_t *points_to,
+								type_qualifiers_t qualifiers, variable_t *variable)
+{
+	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
+	memset(type, 0, sizeof(pointer_type_t));
+
+	type->kind                  = TYPE_POINTER;
+	type->base.qualifiers       = qualifiers;
+	type->base.alignment        = 0;
+	type->pointer.points_to     = points_to;
+	type->pointer.base_variable = variable;
+
+	return identify_new_type(type);
+}
+
 
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers)

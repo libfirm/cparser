@@ -84,6 +84,7 @@ struct declaration_specifiers_t {
 	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
 	symbol_t          *put_property_sym;  /**< the name of the put property if set. */
 	type_t            *type;
+	variable_t        *based_variable;    /**< Microsoft __based variable. */
 };
 
 /**
@@ -3404,6 +3405,40 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
+static void parse_microsoft_based(declaration_specifiers_t *specifiers)
+{
+	if (token.type != T_IDENTIFIER) {
+		parse_error_expected("while parsing __based", T_IDENTIFIER, NULL);
+		return;
+	}
+	symbol_t *symbol = token.v.symbol;
+	entity_t *entity = get_entity(symbol, NAMESPACE_NORMAL);
+
+	if (entity == NULL || entity->base.kind != ENTITY_VARIABLE) {
+		errorf(HERE, "'%Y' is not a variable name.", symbol);
+		entity = create_error_entity(symbol, ENTITY_VARIABLE);
+	} else {
+		variable_t *variable = &entity->variable;
+
+		if (specifiers->based_variable != NULL) {
+			errorf(HERE, "__based type qualifier specified more than once");
+		}
+		specifiers->based_variable = variable;
+
+		type_t *const type = variable->base.type;
+
+		if (is_type_valid(type)) {
+			if (! is_type_pointer(skip_typeref(type))) {
+				errorf(HERE, "variable in __based modifier must have pointer type instead of %T", type);
+			}
+			if (variable->base.base.parent_scope != file_scope) {
+				errorf(HERE, "a nonstatic local variable may not be used in a __based specification");
+			}
+		}
+	}
+	next_token();
+}
+
 /**
  * Finish the construction of a struct type by calculating
  * its size, offsets, alignment.
@@ -3543,6 +3578,15 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			expect('(');
 			add_anchor_token(')');
 			parse_microsoft_extended_decl_modifier(specifiers);
+			rem_anchor_token(')');
+			expect(')');
+			break;
+
+		case T__based:
+			next_token();
+			expect('(');
+			add_anchor_token(')');
+			parse_microsoft_based(specifiers);
 			rem_anchor_token(')');
 			expect(')');
 			break;
@@ -4424,7 +4468,7 @@ static void parse_declaration_attributes(entity_t *entity)
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list,
-                                         type_t *type)
+                                         type_t *type, variable_t *variable)
 {
 	construct_type_t *iter = construct_list;
 	for( ; iter != NULL; iter = iter->next) {
@@ -4458,7 +4502,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_POINTER: {
 			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
-			type = make_pointer_type(type, parsed_pointer->type_qualifiers);
+			type = make_based_pointer_type(type, parsed_pointer->type_qualifiers, variable);
 			continue;
 		}
 
@@ -4524,7 +4568,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(&env, may_be_abstract);
-	type_t *type = construct_declarator_type(construct_type, specifiers->type);
+	type_t *type = construct_declarator_type(construct_type, specifiers->type, specifiers->based_variable);
 
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
@@ -4586,7 +4630,7 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 {
 	construct_type_t *construct_type = parse_inner_declarator(NULL, 1);
 
-	type_t *result = construct_declarator_type(construct_type, base_type);
+	type_t *result = construct_declarator_type(construct_type, base_type, NULL);
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
 	}

@@ -91,6 +91,7 @@ struct builtin_type_t {
 struct pointer_type_t {
 	type_base_t  base;
 	type_t      *points_to;
+	variable_t  *base_variable;  /**< Microsoft __based() extension */
 };
 
 struct array_type_t {
@@ -113,7 +114,7 @@ struct array_type_t {
  */
 struct function_parameter_t {
 	type_t               *type;  /**< The parameter type. */
-	function_parameter_t *next;  /**< Points to the next type inthe parameter list.*/
+	function_parameter_t *next;  /**< Points to the next type in the parameter list.*/
 };
 
 /** Linkage specifications. */
@@ -203,6 +204,8 @@ type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_complex_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_imaginary_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
+type_t *make_based_pointer_type(type_t *points_to,
+								type_qualifiers_t qualifiers, variable_t *variable);
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);
 

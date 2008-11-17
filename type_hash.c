@@ -231,7 +231,8 @@ static bool function_types_equal(const function_type_t *type1,
 static bool pointer_types_equal(const pointer_type_t *type1,
                                 const pointer_type_t *type2)
 {
-	return type1->points_to == type2->points_to;
+	return type1->points_to     == type2->points_to &&
+	       type1->base_variable == type2->base_variable;
 }
 
 static bool array_types_equal(const array_type_t *type1,
