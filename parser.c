@@ -5103,6 +5103,19 @@ static void parse_anonymous_declaration_rest(
 	}
 }
 
+static void check_variable_type_complete(entity_t *ent)
+{
+	if (ent->kind != ENTITY_VARIABLE)
+		return;
+
+	type_t *type = ent->declaration.type;
+	if (is_type_incomplete(skip_typeref(type))) {
+		errorf(&ent->base.source_position,
+				"variable '%#T' is of incomplete type", type, ent->base.symbol);
+	}
+}
+
+
 static void parse_declaration_rest(entity_t *ndeclaration,
 		const declaration_specifiers_t *specifiers,
 		parsed_declaration_func finished_declaration)
@@ -5122,6 +5135,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 
 		add_anchor_token('=');
 		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false, false);
+		check_variable_type_complete(ndeclaration);
 		rem_anchor_token('=');
 	}
 	expect(';');
@@ -5169,6 +5183,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 		parse_anonymous_declaration_rest(&specifiers);
 	} else {
 		entity_t *entity = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
+		check_variable_type_complete(entity);
 		parse_declaration_rest(entity, &specifiers, finished_declaration);
 	}
 }
@@ -5908,6 +5923,7 @@ static void parse_external_declaration(void)
 
 	/* declarator is common to both function-definitions and declarations */
 	entity_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
+	check_variable_type_complete(ndeclaration);
 
 	rem_anchor_token('{');
 	rem_anchor_token(';');
