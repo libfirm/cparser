@@ -125,6 +125,7 @@ struct entity_base_t {
 
 struct compound_t {
 	entity_base_t     base;
+	entity_t         *alias; /* used for name mangling of anonymous types */
 	scope_t           members;
 	decl_modifiers_t  modifiers;
 	bool              complete            : 1;
@@ -137,6 +138,7 @@ struct compound_t {
 
 struct enum_t {
 	entity_base_t  base;
+	entity_t      *alias; /* used for name mangling of anonymous types */
 	bool           complete : 1;
 
 	/* ast2firm info */

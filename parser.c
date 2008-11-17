@@ -129,6 +129,7 @@ static bool                 in_type_prop      = false;
 /** true in we are in a __extension__ context. */
 static bool                 in_gcc_extension  = false;
 static struct obstack       temp_obst;
+static entity_t            *anonymous_entity;
 
 
 #define PUSH_PARENT(stmt)                          \
@@ -2946,7 +2947,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		eat(T_union);
 	}
 
-	symbol_t   *symbol      = NULL;
+	symbol_t   *symbol   = NULL;
 	compound_t *compound = NULL;
 
 	if (token.type == T___attribute__) {
@@ -3008,6 +3009,11 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	if (token.type == '{') {
 		parse_compound_type_entries(compound);
 		modifiers |= parse_attributes(&attributes);
+
+		if (symbol == NULL) {
+			assert(anonymous_entity == NULL);
+			anonymous_entity = (entity_t*)compound;
+		}
 	}
 
 	compound->modifiers |= modifiers;
@@ -3109,6 +3115,11 @@ static type_t *parse_enum_specifier(void)
 
 		parse_enum_entries(type);
 		parse_attributes(&attributes);
+
+		if (symbol == NULL) {
+			assert(anonymous_entity == NULL);
+			anonymous_entity = entity;
+		}
 	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
 		errorf(HERE, "enum %Y used before definition (incomplete enumes are a GNU extension)",
 		       symbol);
@@ -4058,6 +4069,7 @@ static entity_t *parse_parameter(void)
 	parse_declaration_specifiers(&specifiers);
 
 	entity_t *entity = parse_declarator(&specifiers, true, false);
+	anonymous_entity = NULL;
 	return entity;
 }
 
@@ -4578,6 +4590,21 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		entity->base.symbol          = env.symbol;
 		entity->base.source_position = env.source_position;
 		entity->typedefe.type        = type;
+
+		if (anonymous_entity != NULL) {
+			if (is_type_compound(type)) {
+				assert(anonymous_entity->compound.alias == NULL);
+				assert(anonymous_entity->kind == ENTITY_STRUCT ||
+				       anonymous_entity->kind == ENTITY_UNION);
+				anonymous_entity->compound.alias = entity;
+				anonymous_entity = NULL;
+			} else if (is_type_enum(type)) {
+				assert(anonymous_entity->enume.alias == NULL);
+				assert(anonymous_entity->kind == ENTITY_ENUM);
+				anonymous_entity->enume.alias = entity;
+				anonymous_entity = NULL;
+			}
+		}
 	} else {
 		if (create_compound_member) {
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
@@ -5100,6 +5127,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 	expect(';');
 
 end_error:
+	anonymous_entity = NULL;
 	rem_anchor_token(';');
 	rem_anchor_token(',');
 }
@@ -6162,7 +6190,7 @@ static void parse_compound_declarators(compound_t *compound,
 	expect(';');
 
 end_error:
-	;
+	anonymous_entity = NULL;
 }
 
 static void parse_compound_type_entries(compound_t *compound)

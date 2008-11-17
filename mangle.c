@@ -103,16 +103,31 @@ static void mangle_function_type(const function_type_t *type)
 	obstack_1grow(&obst, 'E');
 }
 
-static void mangle_class_enum_type(const entity_base_t *ent)
+static void print_name(const char* name)
 {
-	const symbol_t *sym = ent->symbol;
-	if (sym != NULL) {
-		const char *name = sym->string;
-		obstack_printf(&obst, "%u%s", (unsigned) strlen(name), name);
-	} else {
-		/* TODO need the first typedef name here */
-		panic("mangling of unnamed class/enum types not implemented yet");
+	obstack_printf(&obst, "%u%s", (unsigned)strlen(name), name);
+}
+
+static void mangle_class_type(const compound_type_t *type)
+{
+	const symbol_t *sym = type->compound->base.symbol;
+	if (sym == NULL) {
+		if (type->compound->alias == NULL)
+			panic("mangling anonymous type");
+		sym = type->compound->alias->base.symbol;
 	}
+	print_name(sym->string);
+}
+
+static void mangle_enum_type(const enum_type_t *type)
+{
+	const symbol_t *sym = type->enume->base.symbol;
+	if (sym == NULL) {
+		if (type->enume->alias == NULL)
+			panic("mangling anonymous type");
+		sym = type->enume->alias->base.symbol;
+	}
+	print_name(sym->string);
 }
 
 static void mangle_array_type(const array_type_t *type)
@@ -170,10 +185,10 @@ static void mangle_type(type_t *orig_type)
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-		mangle_class_enum_type(&type->compound.compound->base);
+		mangle_class_type(&type->compound);
 		return;
 	case TYPE_ENUM:
-		mangle_class_enum_type(&type->enumt.enume->base);
+		mangle_enum_type(&type->enumt);
 		return;
 	case TYPE_ARRAY:
 		mangle_array_type(&type->array);
@@ -207,8 +222,7 @@ static void mangle_entity(entity_t *entity)
 
 	/* TODO: mangle scope */
 
-	const char *name = entity->base.symbol->string;
-	obstack_printf(&obst, "%u%s", (unsigned) strlen(name), name);
+	print_name(entity->base.symbol->string);
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		mangle_parameters(&entity->declaration.type->function);

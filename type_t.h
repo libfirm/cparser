@@ -148,19 +148,19 @@ struct function_type_t {
 };
 
 struct compound_type_t {
-	type_base_t  base;
-	bool         packed : 1; /**< Set if packed was specified. */
+	type_base_t     base;
+	bool            packed : 1; /**< Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
-	compound_t  *compound;
+	compound_t     *compound;
 };
 
 struct enum_type_t {
-	type_base_t  base;
+	type_base_t     base;
 	/** the enum entity. You can find the enum entries by walking the
 	 *  enum->base.next list until you don't find ENTITY_ENUM_VALUE entities
 	 *  anymore */
-	enum_t      *enume;
+	enum_t         *enume;
 };
 
 struct typedef_type_t {
