@@ -3019,8 +3019,8 @@ static void parse_enum_entries(type_t *const enum_type)
 	eat('{');
 
 	if (token.type == '}') {
-		next_token();
 		errorf(HERE, "empty enum not allowed");
+		next_token();
 		return;
 	}
 
