@@ -157,8 +157,10 @@ static void mangle_imaginary_type(const imaginary_type_t *type)
 
 static void mangle_qualifiers(type_qualifiers_t qualifiers)
 {
+#if 0 /* Do not mangle restrict qualifiers.  GCC doesn't either */
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT)
 		obstack_1grow(&obst, 'r');
+#endif
 	if (qualifiers & TYPE_QUALIFIER_VOLATILE)
 		obstack_1grow(&obst, 'V');
 	if (qualifiers & TYPE_QUALIFIER_CONST)
