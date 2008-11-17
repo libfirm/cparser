@@ -3006,8 +3006,6 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (token.type == '{') {
-		compound->complete = true;
-
 		parse_compound_type_entries(compound);
 		modifiers |= parse_attributes(&attributes);
 	}
@@ -6199,6 +6197,9 @@ static void parse_compound_type_entries(compound_t *compound)
 	semantic_compound(compound);
 	rem_anchor_token('}');
 	next_token();
+
+	/* §6.7.2.1:7 */
+	compound->complete = true;
 }
 
 static type_t *parse_typename(void)
