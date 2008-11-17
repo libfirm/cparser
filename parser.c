@@ -6128,7 +6128,6 @@ static void parse_compound_declarators(compound_t *compound,
 			entity_t *prev = find_compound_entry(compound, symbol);
 
 			if (prev != NULL) {
-				assert(prev->base.symbol == symbol);
 				errorf(&entity->base.source_position,
 				       "multiple declarations of symbol '%Y' (declared %P)",
 				       symbol, &prev->base.source_position);
