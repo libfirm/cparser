@@ -231,7 +231,7 @@ static void lextest(FILE *in, const char *fname)
 	do {
 		lexer_next_preprocessing_token();
 		print_token(stdout, &lexer_token);
-		puts("");
+		putchar('\n');
 	} while (lexer_token.type != T_EOF);
 }
 
