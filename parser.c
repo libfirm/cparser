@@ -745,15 +745,6 @@ void parse_error_expected(const char *message, ...)
 }
 
 /**
- * Report a type error.
- */
-static void type_error(const char *msg, const source_position_t *source_position,
-                       type_t *type)
-{
-	errorf(source_position, "%s, but found type '%T'", msg, type);
-}
-
-/**
  * Report an incompatible type.
  */
 static void type_error_incompatible(const char *msg,
@@ -7915,6 +7906,18 @@ static void warn_reference_address_as_bool(expression_t const* expr)
 	}
 }
 
+static void semantic_condition(expression_t const *const expr,
+                                char const *const context)
+{
+	type_t *const type = skip_typeref(expr->base.type);
+	if (is_type_scalar(type)) {
+		warn_reference_address_as_bool(expr);
+	} else if (is_type_valid(type)) {
+		errorf(&expr->base.source_position,
+				"%s must have scalar type", context);
+	}
+}
+
 /**
  * Parse a conditional expression, ie. 'expression ? ... : ...'.
  *
@@ -7927,18 +7930,11 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	conditional_expression_t *conditional = &result->conditional;
 	conditional->condition                = expression;
 
-	warn_reference_address_as_bool(expression);
-
 	eat('?');
 	add_anchor_token(':');
 
-	/* 6.5.15.2 */
-	type_t *const condition_type_orig = expression->base.type;
-	type_t *const condition_type      = skip_typeref(condition_type_orig);
-	if (!is_type_scalar(condition_type) && is_type_valid(condition_type)) {
-		type_error("expected a scalar type in conditional condition",
-		           &expression->base.source_position, condition_type_orig);
-	}
+	/* §6.5.15:2  The first operand shall have scalar type. */
+	semantic_condition(expression, "condition of conditional operator");
 
 	expression_t *true_expression = expression;
 	bool          gnu_cond = false;
@@ -8269,15 +8265,8 @@ static void semantic_unexpr_plus(unary_expression_t *expression)
 
 static void semantic_not(unary_expression_t *expression)
 {
-	type_t *const orig_type = expression->value->base.type;
-	type_t *const type      = skip_typeref(orig_type);
-	if (!is_type_scalar(type) && is_type_valid(type)) {
-		errorf(&expression->base.source_position,
-		       "operand of ! must be of scalar type");
-	}
-
-	warn_reference_address_as_bool(expression->value);
-
+	/* §6.5.3.3:1  The operand [...] of the ! operator, scalar type. */
+	semantic_condition(expression->value, "operand of !");
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
@@ -8866,25 +8855,10 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
  */
 static void semantic_logical_op(binary_expression_t *expression)
 {
-	expression_t *const left            = expression->left;
-	expression_t *const right           = expression->right;
-	type_t       *const orig_type_left  = left->base.type;
-	type_t       *const orig_type_right = right->base.type;
-	type_t       *const type_left       = skip_typeref(orig_type_left);
-	type_t       *const type_right      = skip_typeref(orig_type_right);
-
-	warn_reference_address_as_bool(left);
-	warn_reference_address_as_bool(right);
-
-	if (!is_type_scalar(type_left) || !is_type_scalar(type_right)) {
-		/* TODO: improve error message */
-		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(&expression->base.source_position,
-			       "operation needs scalar types");
-		}
-		return;
-	}
-
+	/* §6.5.13:2  Each of the operands shall have scalar type.
+	 * §6.5.14:2  Each of the operands shall have scalar type. */
+	semantic_condition(expression->left,   "left operand of logical operator");
+	semantic_condition(expression->right, "right operand of logical operator");
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
@@ -9659,7 +9633,9 @@ static statement_t *parse_if(void)
 	add_anchor_token(')');
 	expression_t *const expr = parse_expression();
 	statement->ifs.condition = expr;
-	warn_reference_address_as_bool(expr);
+	/* §6.8.4.1:1  The controlling expression of an if statement shall have
+	 *             scalar type. */
+	semantic_condition(expr, "condition of 'if'-statment");
 	mark_vars_read(expr, NULL);
 	rem_anchor_token(')');
 	expect(')');
@@ -9785,17 +9761,6 @@ static statement_t *parse_loop_body(statement_t *const loop)
 	return body;
 }
 
-static void check_conditon_type(expression_t const *const expr,
-                                char const *const stmt_name)
-{
-	type_t *const type = skip_typeref(expr->base.type);
-	/* §6.8.5:2 */
-	if (!is_type_scalar(type) && is_type_valid(type)) {
-		errorf(&expr->base.source_position,
-				"condition of %s statement must have scalar type", stmt_name);
-	}
-}
-
 /**
  * Parse a while statement.
  */
@@ -9811,8 +9776,9 @@ static statement_t *parse_while(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->whiles.condition = cond;
-	check_conditon_type(cond, "while");
-	warn_reference_address_as_bool(cond);
+	/* §6.8.5:2    The controlling expression of an iteration statement shall
+	 *             have scalar type. */
+	semantic_condition(cond, "condition of 'while'-statement");
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
@@ -9846,8 +9812,9 @@ static statement_t *parse_do(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->do_while.condition = cond;
-	check_conditon_type(cond, "do-while");
-	warn_reference_address_as_bool(cond);
+	/* §6.8.5:2    The controlling expression of an iteration statement shall
+	 *             have scalar type. */
+	semantic_condition(cond, "condition of 'do-while'-statement");
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
 	expect(')');
@@ -9898,8 +9865,9 @@ static statement_t *parse_for(void)
 		add_anchor_token(';');
 		expression_t *const cond = parse_expression();
 		statement->fors.condition = cond;
-		check_conditon_type(cond, "for");
-		warn_reference_address_as_bool(cond);
+		/* §6.8.5:2    The controlling expression of an iteration statement shall
+		 *             have scalar type. */
+		semantic_condition(cond, "condition of 'for'-statement");
 		mark_vars_read(cond, NULL);
 		rem_anchor_token(';');
 	}
