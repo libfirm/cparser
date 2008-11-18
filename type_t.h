@@ -44,6 +44,7 @@ typedef enum type_kind_t {
 	TYPE_ENUM,
 	TYPE_FUNCTION,
 	TYPE_POINTER,
+	TYPE_REFERENCE,
 	TYPE_ARRAY,
 	TYPE_BITFIELD,
 	TYPE_BUILTIN,
@@ -92,6 +93,11 @@ struct pointer_type_t {
 	type_base_t  base;
 	type_t      *points_to;
 	variable_t  *base_variable;  /**< Microsoft __based() extension */
+};
+
+struct reference_type_t {
+	type_base_t  base;
+	type_t      *refers_to;
 };
 
 struct array_type_t {
@@ -191,6 +197,7 @@ union type_t {
 	imaginary_type_t imaginary;
 	builtin_type_t   builtin;
 	pointer_type_t   pointer;
+	reference_type_t reference;
 	array_type_t     array;
 	function_type_t  function;
 	compound_type_t  compound;
@@ -204,6 +211,7 @@ type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_complex_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_imaginary_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers);
+type_t *make_reference_type(type_t *refers_to);
 type_t *make_based_pointer_type(type_t *points_to,
 								type_qualifiers_t qualifiers, variable_t *variable);
 type_t *make_array_type(type_t *element_type, size_t size,
@@ -231,6 +239,12 @@ static inline bool is_type_pointer(const type_t *type)
 {
 	assert(!is_typeref(type));
 	return type->kind == TYPE_POINTER;
+}
+
+static inline bool is_type_reference(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_REFERENCE;
 }
 
 static inline bool is_type_array(const type_t *type)

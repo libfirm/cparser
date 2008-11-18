@@ -70,6 +70,12 @@ static void mangle_pointer_type(const pointer_type_t *type)
 	mangle_type(type->points_to);
 }
 
+static void mangle_reference_type(const reference_type_t *type)
+{
+	obstack_1grow(&obst, 'R');
+	mangle_type(type->refers_to);
+}
+
 static void mangle_parameters(const function_type_t *type)
 {
 	if (type->unspecified_parameters)
@@ -181,6 +187,9 @@ static void mangle_type(type_t *orig_type)
 		return;
 	case TYPE_POINTER:
 		mangle_pointer_type(&type->pointer);
+		return;
+	case TYPE_REFERENCE:
+		mangle_reference_type(&type->reference);
 		return;
 	case TYPE_FUNCTION:
 		mangle_function_type(&type->function);

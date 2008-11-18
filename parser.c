@@ -3733,6 +3733,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 					case T_inline:
 					case T__forceinline: /* ^ DECLARATION_START except for __attribute__ */
 					case T_IDENTIFIER:
+					case '&':
 					case '*':
 						errorf(HERE, "discarding stray %K in declaration specifier", &token);
 						next_token();
@@ -3752,6 +3753,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 				switch (la1_type) {
 					DECLARATION_START
 					case T_IDENTIFIER:
+					case '&':
 					case '*': {
 						errorf(HERE, "%K does not name a type", &token);
 
@@ -3763,7 +3765,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 
 						next_token();
 						saw_error = true;
-						if (la1_type == '*')
+						if (la1_type == '&' || la1_type == '*')
 							goto finish_specifiers;
 						continue;
 					}
@@ -4169,6 +4171,7 @@ end_error:
 typedef enum construct_type_kind_t {
 	CONSTRUCT_INVALID,
 	CONSTRUCT_POINTER,
+	CONSTRUCT_REFERENCE,
 	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
 } construct_type_kind_t;
@@ -4183,6 +4186,11 @@ typedef struct parsed_pointer_t parsed_pointer_t;
 struct parsed_pointer_t {
 	construct_type_t  construct_type;
 	type_qualifiers_t type_qualifiers;
+};
+
+typedef struct parsed_reference_t parsed_reference_t;
+struct parsed_reference_t {
+	construct_type_t construct_type;
 };
 
 typedef struct construct_function_type_t construct_function_type_t;
@@ -4216,6 +4224,17 @@ static construct_type_t *parse_pointer_declarator(void)
 	pointer->type_qualifiers     = parse_type_qualifiers();
 
 	return (construct_type_t*) pointer;
+}
+
+static construct_type_t *parse_reference_declarator(void)
+{
+	eat('&');
+
+	parsed_reference_t *reference = obstack_alloc(&temp_obst, sizeof(reference[0]));
+	memset(reference, 0, sizeof(reference[0]));
+	reference->construct_type.kind = CONSTRUCT_REFERENCE;
+
+	return (construct_type_t*)reference;
 }
 
 static construct_type_t *parse_array_declarator(void)
@@ -4304,9 +4323,22 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
 
-	/* pointers */
-	while (token.type == '*') {
-		construct_type_t *type = parse_pointer_declarator();
+	for (;;) {
+		construct_type_t *type;
+		switch (token.type) {
+			case '&':
+				if (!(c_mode & _CXX))
+					errorf(HERE, "references are only available for C++");
+				type = parse_reference_declarator();
+				break;
+
+			case '*':
+				type = parse_pointer_declarator();
+				break;
+
+			default:
+				goto ptr_operator_end;
+		}
 
 		if (last == NULL) {
 			first = type;
@@ -4319,6 +4351,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		/* TODO: find out if this is correct */
 		modifiers |= parse_attributes(&attributes);
 	}
+ptr_operator_end:
 
 	if (env != NULL) {
 		modifiers      |= env->modifiers;
@@ -4511,12 +4544,25 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 		}
 
 		case CONSTRUCT_POINTER: {
+			if (is_type_reference(skip_typeref(type)))
+				errorf(HERE, "cannot declare a pointer to reference");
+
 			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
 			type = make_based_pointer_type(type, parsed_pointer->type_qualifiers, variable);
 			continue;
 		}
 
+		case CONSTRUCT_REFERENCE:
+			if (is_type_reference(skip_typeref(type)))
+				errorf(HERE, "cannot declare a reference to reference");
+
+			type = make_reference_type(type);
+			continue;
+
 		case CONSTRUCT_ARRAY: {
+			if (is_type_reference(skip_typeref(type)))
+				errorf(HERE, "cannot declare an array of references");
+
 			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
 			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY);
 
@@ -10283,6 +10329,7 @@ static statement_t *intern_parse_statement(void)
 			 * declaration types, so we guess a bit here to improve robustness
 			 * for incorrect programs */
 			switch (la1_type) {
+			case '&':
 			case '*':
 				if (get_entity(token.v.symbol, NAMESPACE_NORMAL) != NULL)
 					goto expression_statment;

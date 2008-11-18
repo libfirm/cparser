@@ -81,6 +81,7 @@ typedef struct atomic_type_t         atomic_type_t;
 typedef struct complex_type_t        complex_type_t;
 typedef struct imaginary_type_t      imaginary_type_t;
 typedef struct pointer_type_t        pointer_type_t;
+typedef struct reference_type_t      reference_type_t;
 typedef struct function_parameter_t  function_parameter_t;
 typedef struct function_type_t       function_type_t;
 typedef struct compound_type_t       compound_type_t;

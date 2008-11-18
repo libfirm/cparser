@@ -259,6 +259,7 @@ static unsigned get_type_size_const(type_t *type)
 		/* just a pointer to the function */
 		return get_mode_size_bytes(mode_P_code);
 	case TYPE_POINTER:
+	case TYPE_REFERENCE:
 		return get_mode_size_bytes(mode_P_data);
 	case TYPE_ARRAY:
 		return get_array_type_size(&type->array);
@@ -434,6 +435,16 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	ir_type  *ir_points_to = get_ir_type_incomplete(points_to);
 	ir_type  *ir_type      = new_type_pointer(id_unique("pointer.%u"),
 	                                          ir_points_to, mode_P_data);
+
+	return ir_type;
+}
+
+static ir_type *create_reference_type(reference_type_t *type)
+{
+	type_t  *refers_to    = type->refers_to;
+	ir_type *ir_refers_to = get_ir_type_incomplete(refers_to);
+	ir_type *ir_type      = new_type_pointer(id_unique("reference.%u"),
+	                                         ir_refers_to, mode_P_data);
 
 	return ir_type;
 }
@@ -833,6 +844,9 @@ ir_type *get_ir_type(type_t *type)
 		break;
 	case TYPE_POINTER:
 		firm_type = create_pointer_type(&type->pointer);
+		break;
+	case TYPE_REFERENCE:
+		firm_type = create_reference_type(&type->reference);
 		break;
 	case TYPE_ARRAY:
 		firm_type = create_array_type(&type->array);
@@ -2793,71 +2807,78 @@ typedef enum gcc_type_class
 
 static ir_node *classify_type_to_firm(const classify_type_expression_t *const expr)
 {
-	const type_t *const type = skip_typeref(expr->type_expression->base.type);
+	type_t *type = expr->type_expression->base.type;
 
+	/* FIXME gcc returns different values depending on whether compiling C or C++
+	 * e.g. int x[10] is pointer_type_class in C, but array_type_class in C++ */
 	gcc_type_class tc;
-	switch (type->kind)
-	{
-		case TYPE_ATOMIC: {
-			const atomic_type_t *const atomic_type = &type->atomic;
-			switch (atomic_type->akind) {
-				/* should not be reached */
-				case ATOMIC_TYPE_INVALID:
-					tc = no_type_class;
-					goto make_const;
+	for (;;) {
+		type = skip_typeref(type);
+		switch (type->kind) {
+			case TYPE_ATOMIC: {
+				const atomic_type_t *const atomic_type = &type->atomic;
+				switch (atomic_type->akind) {
+					/* should not be reached */
+					case ATOMIC_TYPE_INVALID:
+						tc = no_type_class;
+						goto make_const;
 
-				/* gcc cannot do that */
-				case ATOMIC_TYPE_VOID:
-					tc = void_type_class;
-					goto make_const;
+					/* gcc cannot do that */
+					case ATOMIC_TYPE_VOID:
+						tc = void_type_class;
+						goto make_const;
 
-				case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
-				case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
-				case ATOMIC_TYPE_UCHAR:     /* gcc handles this as integer */
-				case ATOMIC_TYPE_SHORT:
-				case ATOMIC_TYPE_USHORT:
-				case ATOMIC_TYPE_INT:
-				case ATOMIC_TYPE_UINT:
-				case ATOMIC_TYPE_LONG:
-				case ATOMIC_TYPE_ULONG:
-				case ATOMIC_TYPE_LONGLONG:
-				case ATOMIC_TYPE_ULONGLONG:
-				case ATOMIC_TYPE_BOOL:      /* gcc handles this as integer */
-					tc = integer_type_class;
-					goto make_const;
+					case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
+					case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
+					case ATOMIC_TYPE_UCHAR:     /* gcc handles this as integer */
+					case ATOMIC_TYPE_SHORT:
+					case ATOMIC_TYPE_USHORT:
+					case ATOMIC_TYPE_INT:
+					case ATOMIC_TYPE_UINT:
+					case ATOMIC_TYPE_LONG:
+					case ATOMIC_TYPE_ULONG:
+					case ATOMIC_TYPE_LONGLONG:
+					case ATOMIC_TYPE_ULONGLONG:
+					case ATOMIC_TYPE_BOOL:      /* gcc handles this as integer */
+						tc = integer_type_class;
+						goto make_const;
 
-				case ATOMIC_TYPE_FLOAT:
-				case ATOMIC_TYPE_DOUBLE:
-				case ATOMIC_TYPE_LONG_DOUBLE:
-					tc = real_type_class;
-					goto make_const;
+					case ATOMIC_TYPE_FLOAT:
+					case ATOMIC_TYPE_DOUBLE:
+					case ATOMIC_TYPE_LONG_DOUBLE:
+						tc = real_type_class;
+						goto make_const;
+				}
+				panic("Unexpected atomic type in classify_type_to_firm().");
 			}
-			panic("Unexpected atomic type in classify_type_to_firm().");
+
+			case TYPE_COMPLEX:         tc = complex_type_class; goto make_const;
+			case TYPE_IMAGINARY:       tc = complex_type_class; goto make_const;
+			case TYPE_BITFIELD:        tc = integer_type_class; goto make_const;
+			case TYPE_ARRAY:           /* gcc handles this as pointer */
+			case TYPE_FUNCTION:        /* gcc handles this as pointer */
+			case TYPE_POINTER:         tc = pointer_type_class; goto make_const;
+			case TYPE_COMPOUND_STRUCT: tc = record_type_class;  goto make_const;
+			case TYPE_COMPOUND_UNION:  tc = union_type_class;   goto make_const;
+
+			/* gcc handles this as integer */
+			case TYPE_ENUM:            tc = integer_type_class; goto make_const;
+
+			/* gcc classifies the referenced type */
+			case TYPE_REFERENCE: type = type->reference.refers_to; continue;
+
+			case TYPE_BUILTIN:
+			/* typedef/typeof should be skipped already */
+			case TYPE_TYPEDEF:
+			case TYPE_TYPEOF:
+			case TYPE_INVALID:
+			case TYPE_ERROR:
+				break;
 		}
-
-		case TYPE_COMPLEX:         tc = complex_type_class; goto make_const;
-		case TYPE_IMAGINARY:       tc = complex_type_class; goto make_const;
-		case TYPE_BITFIELD:        tc = integer_type_class; goto make_const;
-		case TYPE_ARRAY:           /* gcc handles this as pointer */
-		case TYPE_FUNCTION:        /* gcc handles this as pointer */
-		case TYPE_POINTER:         tc = pointer_type_class; goto make_const;
-		case TYPE_COMPOUND_STRUCT: tc = record_type_class;  goto make_const;
-		case TYPE_COMPOUND_UNION:  tc = union_type_class;   goto make_const;
-
-		/* gcc handles this as integer */
-		case TYPE_ENUM:            tc = integer_type_class; goto make_const;
-
-		case TYPE_BUILTIN:
-		/* typedef/typeof should be skipped already */
-		case TYPE_TYPEDEF:
-		case TYPE_TYPEOF:
-		case TYPE_INVALID:
-		case TYPE_ERROR:
-			break;
+		panic("unexpected TYPE classify_type_to_firm().");
 	}
-	panic("unexpected TYPE classify_type_to_firm().");
 
-make_const: ;
+make_const:;
 	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
 	ir_mode  *const mode = mode_int;
 	tarval   *const tv   = new_tarval_from_long(tc, mode);

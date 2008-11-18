@@ -404,6 +404,17 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 }
 
 /**
+ * Prints the prefix part of a reference type.
+ *
+ * @param type   The reference type.
+ */
+static void print_reference_type_pre(const reference_type_t *type)
+{
+	intern_print_type_pre(type->refers_to, false);
+	fputc('&', out);
+}
+
+/**
  * Prints the postfix part of a pointer type.
  *
  * @param type   The pointer type.
@@ -411,6 +422,16 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 static void print_pointer_type_post(const pointer_type_t *type)
 {
 	intern_print_type_post(type->points_to, false);
+}
+
+/**
+ * Prints the postfix part of a reference type.
+ *
+ * @param type   The reference type.
+ */
+static void print_reference_type_post(const reference_type_t *type)
+{
+	intern_print_type_post(type->refers_to, false);
 }
 
 /**
@@ -631,6 +652,9 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 	case TYPE_POINTER:
 		print_pointer_type_pre(&type->pointer);
 		return;
+	case TYPE_REFERENCE:
+		print_reference_type_pre(&type->reference);
+		return;
 	case TYPE_BITFIELD:
 		intern_print_type_pre(type->bitfield.base_type, top);
 		return;
@@ -661,6 +685,9 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post(&type->pointer);
+		return;
+	case TYPE_REFERENCE:
+		print_reference_type_post(&type->reference);
 		return;
 	case TYPE_ARRAY:
 		print_array_type_post(&type->array);
@@ -729,6 +756,7 @@ static size_t get_type_size(const type_t *type)
 	case TYPE_ENUM:            return sizeof(enum_type_t);
 	case TYPE_FUNCTION:        return sizeof(function_type_t);
 	case TYPE_POINTER:         return sizeof(pointer_type_t);
+	case TYPE_REFERENCE:       return sizeof(reference_type_t);
 	case TYPE_ARRAY:           return sizeof(array_type_t);
 	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
 	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
@@ -1010,6 +1038,7 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_BITFIELD:
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
+	case TYPE_REFERENCE:
 	case TYPE_BUILTIN:
 	case TYPE_ERROR:
 		return false;
@@ -1128,6 +1157,12 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_POINTER: {
 		const type_t *const to1 = skip_typeref(type1->pointer.points_to);
 		const type_t *const to2 = skip_typeref(type2->pointer.points_to);
+		return types_compatible(to1, to2);
+	}
+
+	case TYPE_REFERENCE: {
+		const type_t *const to1 = skip_typeref(type1->reference.refers_to);
+		const type_t *const to2 = skip_typeref(type2->reference.refers_to);
 		return types_compatible(to1, to2);
 	}
 
@@ -1437,6 +1472,24 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 	type->base.alignment        = 0;
 	type->pointer.points_to     = points_to;
 	type->pointer.base_variable = NULL;
+
+	return identify_new_type(type);
+}
+
+/**
+ * Creates a new reference type.
+ *
+ * @param refers_to   The referred-to type for the new type.
+ */
+type_t *make_reference_type(type_t *refers_to)
+{
+	type_t *type = obstack_alloc(type_obst, sizeof(reference_type_t));
+	memset(type, 0, sizeof(reference_type_t));
+
+	type->kind                = TYPE_REFERENCE;
+	type->base.qualifiers     = 0;
+	type->base.alignment      = 0;
+	type->reference.refers_to = refers_to;
 
 	return identify_new_type(type);
 }

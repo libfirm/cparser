@@ -77,6 +77,11 @@ static unsigned hash_pointer_type(const pointer_type_t *type)
 	return hash_ptr(type->points_to);
 }
 
+static unsigned hash_reference_type(const reference_type_t *type)
+{
+	return hash_ptr(type->refers_to);
+}
+
 static unsigned hash_array_type(const array_type_t *type)
 {
 	return hash_ptr(type->element_type);
@@ -157,6 +162,9 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_POINTER:
 		hash = hash_pointer_type(&type->pointer);
 		break;
+	case TYPE_REFERENCE:
+		hash = hash_reference_type(&type->reference);
+		break;
 	case TYPE_ARRAY:
 		hash = hash_array_type(&type->array);
 		break;
@@ -233,6 +241,12 @@ static bool pointer_types_equal(const pointer_type_t *type1,
 {
 	return type1->points_to     == type2->points_to &&
 	       type1->base_variable == type2->base_variable;
+}
+
+static bool reference_types_equal(const reference_type_t *type1,
+                                  const reference_type_t *type2)
+{
+	return type1->refers_to == type2->refers_to;
 }
 
 static bool array_types_equal(const array_type_t *type1,
@@ -333,6 +347,8 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 		return function_types_equal(&type1->function, &type2->function);
 	case TYPE_POINTER:
 		return pointer_types_equal(&type1->pointer, &type2->pointer);
+	case TYPE_REFERENCE:
+		return reference_types_equal(&type1->reference, &type2->reference);
 	case TYPE_ARRAY:
 		return array_types_equal(&type1->array, &type2->array);
 	case TYPE_BUILTIN:
