@@ -5175,13 +5175,14 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 			parse_init_declarator_rest(entity);
 		}
 
+		check_variable_type_complete(entity);
+
 		if (token.type != ',')
 			break;
 		eat(',');
 
 		add_anchor_token('=');
 		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false, false);
-		check_variable_type_complete(ndeclaration);
 		rem_anchor_token('=');
 	}
 	expect(';');
@@ -5229,7 +5230,6 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 		parse_anonymous_declaration_rest(&specifiers);
 	} else {
 		entity_t *entity = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
-		check_variable_type_complete(entity);
 		parse_declaration_rest(entity, &specifiers, finished_declaration);
 	}
 }
@@ -5969,7 +5969,6 @@ static void parse_external_declaration(void)
 
 	/* declarator is common to both function-definitions and declarations */
 	entity_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
-	check_variable_type_complete(ndeclaration);
 
 	rem_anchor_token('{');
 	rem_anchor_token(';');
