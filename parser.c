@@ -9785,6 +9785,17 @@ static statement_t *parse_loop_body(statement_t *const loop)
 	return body;
 }
 
+static void check_conditon_type(expression_t const *const expr,
+                                char const *const stmt_name)
+{
+	type_t *const type = skip_typeref(expr->base.type);
+	/* §6.8.5:2 */
+	if (is_type_scalar(type) && is_type_valid(type)) {
+		errorf(&expr->base.source_position,
+				"condition of %s statement must have scalar type", stmt_name);
+	}
+}
+
 /**
  * Parse a while statement.
  */
@@ -9800,6 +9811,7 @@ static statement_t *parse_while(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->whiles.condition = cond;
+	check_conditon_type(cond, "while");
 	warn_reference_address_as_bool(cond);
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
@@ -9834,6 +9846,7 @@ static statement_t *parse_do(void)
 	add_anchor_token(')');
 	expression_t *const cond = parse_expression();
 	statement->do_while.condition = cond;
+	check_conditon_type(cond, "do-while");
 	warn_reference_address_as_bool(cond);
 	mark_vars_read(cond, NULL);
 	rem_anchor_token(')');
@@ -9885,6 +9898,7 @@ static statement_t *parse_for(void)
 		add_anchor_token(';');
 		expression_t *const cond = parse_expression();
 		statement->fors.condition = cond;
+		check_conditon_type(cond, "for");
 		warn_reference_address_as_bool(cond);
 		mark_vars_read(cond, NULL);
 		rem_anchor_token(';');
