@@ -195,13 +195,9 @@ static entity_t *record_entity(entity_t *entity, bool is_definition);
 
 static void semantic_comparison(binary_expression_t *expression);
 
-#define STORAGE_CLASSES     \
-	case T_typedef:         \
-	case T_extern:          \
-	case T_static:          \
-	case T_auto:            \
-	case T_register:        \
-	case T___thread:
+#define STORAGE_CLASSES       \
+	STORAGE_CLASSES_NO_EXTERN \
+	case T_extern:
 
 #define STORAGE_CLASSES_NO_EXTERN \
 	case T_typedef:         \
