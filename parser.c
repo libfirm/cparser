@@ -4054,7 +4054,7 @@ static void semantic_parameter(declaration_t *declaration)
 	 *             a function declarator that is part of a definition of that
 	 *             function shall not have incomplete type. */
 	if (is_type_incomplete(skip_typeref(type))) {
-		errorf(pos, "parameter '%#T' is of incomplete type",
+		errorf(pos, "parameter '%#T' has incomplete type",
 		       orig_type, declaration->base.symbol);
 	}
 }
@@ -5185,7 +5185,7 @@ static void check_variable_type_complete(entity_t *ent)
 	if (!is_type_incomplete(skip_typeref(type)))
 		return;
 
-	errorf(&ent->base.source_position, "variable '%#T' is of incomplete type",
+	errorf(&ent->base.source_position, "variable '%#T' has incomplete type",
 			type, ent->base.symbol);
 }
 
