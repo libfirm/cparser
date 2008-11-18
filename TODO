@@ -26,6 +26,7 @@ ast2firm:
   current unit)
 
 Missing Errors:
+- goto over VLA declarations
 
 Missing Warnings:
 - dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
