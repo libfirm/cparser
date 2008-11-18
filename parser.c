@@ -9864,22 +9864,20 @@ static statement_t *parse_for(void)
 	expect('(');
 	add_anchor_token(')');
 
-	if (token.type != ';') {
-		if (is_declaration_specifier(&token, false)) {
-			parse_declaration(record_entity);
-		} else {
-			add_anchor_token(';');
-			expression_t *const init = parse_expression();
-			statement->fors.initialisation = init;
-			mark_vars_read(init, VAR_ANY);
-			if (warning.unused_value && !expression_has_effect(init)) {
-				warningf(&init->base.source_position,
-				         "initialisation of 'for'-statement has no effect");
-			}
-			rem_anchor_token(';');
-			expect(';');
-		}
+	if (token.type == ';') {
+		next_token();
+	} else if (is_declaration_specifier(&token, false)) {
+		parse_declaration(record_entity);
 	} else {
+		add_anchor_token(';');
+		expression_t *const init = parse_expression();
+		statement->fors.initialisation = init;
+		mark_vars_read(init, VAR_ANY);
+		if (warning.unused_value && !expression_has_effect(init)) {
+			warningf(&init->base.source_position,
+					"initialisation of 'for'-statement has no effect");
+		}
+		rem_anchor_token(';');
 		expect(';');
 	}
 
