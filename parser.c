@@ -9790,7 +9790,7 @@ static void check_conditon_type(expression_t const *const expr,
 {
 	type_t *const type = skip_typeref(expr->base.type);
 	/* §6.8.5:2 */
-	if (is_type_scalar(type) && is_type_valid(type)) {
+	if (!is_type_scalar(type) && is_type_valid(type)) {
 		errorf(&expr->base.source_position,
 				"condition of %s statement must have scalar type", stmt_name);
 	}
