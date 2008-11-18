@@ -5144,6 +5144,7 @@ static void parse_anonymous_declaration_rest(
 		const declaration_specifiers_t *specifiers)
 {
 	eat(';');
+	anonymous_entity = NULL;
 
 	if (warning.other) {
 		if (specifiers->storage_class != STORAGE_CLASS_NONE) {
