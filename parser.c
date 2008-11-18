@@ -5154,11 +5154,16 @@ static void check_variable_type_complete(entity_t *ent)
 	if (ent->kind != ENTITY_VARIABLE)
 		return;
 
-	type_t *type = ent->declaration.type;
-	if (is_type_incomplete(skip_typeref(type))) {
-		errorf(&ent->base.source_position,
-				"variable '%#T' is of incomplete type", type, ent->base.symbol);
-	}
+	declaration_t *decl = &ent->declaration;
+	if (decl->storage_class == STORAGE_CLASS_EXTERN)
+		return;
+
+	type_t *type = decl->type;
+	if (!is_type_incomplete(skip_typeref(type)))
+		return;
+
+	errorf(&ent->base.source_position,
+			"variable '%#T' is of incomplete type", type, ent->base.symbol);
 }
 
 
