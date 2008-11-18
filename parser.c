@@ -84,7 +84,6 @@ struct declaration_specifiers_t {
 	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
 	symbol_t          *put_property_sym;  /**< the name of the put property if set. */
 	type_t            *type;
-	variable_t        *based_variable;    /**< Microsoft __based variable. */
 };
 
 /**
@@ -97,6 +96,14 @@ typedef struct parse_initializer_env_t {
 	entity_t   *entity; /**< the variable that is initialized if any */
 	bool        must_be_constant;
 } parse_initializer_env_t;
+
+/**
+ * Capture a MS __base extension.
+ */
+typedef struct based_spec_t {
+	source_position_t  source_position;
+	variable_t        *base_variable;
+} based_spec_t;
 
 typedef entity_t* (*parsed_declaration_func) (entity_t *declaration, bool is_definition);
 
@@ -3414,7 +3421,7 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
-static void parse_microsoft_based(declaration_specifiers_t *specifiers)
+static void parse_microsoft_based(based_spec_t *based_spec)
 {
 	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing __based", T_IDENTIFIER, NULL);
@@ -3429,10 +3436,11 @@ static void parse_microsoft_based(declaration_specifiers_t *specifiers)
 	} else {
 		variable_t *variable = &entity->variable;
 
-		if (specifiers->based_variable != NULL) {
+		if (based_spec->base_variable != NULL) {
 			errorf(HERE, "__based type qualifier specified more than once");
 		}
-		specifiers->based_variable = variable;
+		based_spec->source_position = token.source_position;
+		based_spec->base_variable   = variable;
 
 		type_t *const type = variable->base.type;
 
@@ -3587,15 +3595,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			expect('(');
 			add_anchor_token(')');
 			parse_microsoft_extended_decl_modifier(specifiers);
-			rem_anchor_token(')');
-			expect(')');
-			break;
-
-		case T__based:
-			next_token();
-			expect('(');
-			add_anchor_token(')');
-			parse_microsoft_based(specifiers);
 			rem_anchor_token(')');
 			expect(')');
 			break;
@@ -4186,6 +4185,7 @@ typedef struct parsed_pointer_t parsed_pointer_t;
 struct parsed_pointer_t {
 	construct_type_t  construct_type;
 	type_qualifiers_t type_qualifiers;
+	variable_t        *base_variable;  /**< MS __based extension. */
 };
 
 typedef struct parsed_reference_t parsed_reference_t;
@@ -4214,7 +4214,7 @@ struct construct_base_type_t {
 	type_t           *type;
 };
 
-static construct_type_t *parse_pointer_declarator(void)
+static construct_type_t *parse_pointer_declarator(variable_t *base_variable)
 {
 	eat('*');
 
@@ -4222,8 +4222,9 @@ static construct_type_t *parse_pointer_declarator(void)
 	memset(pointer, 0, sizeof(pointer[0]));
 	pointer->construct_type.kind = CONSTRUCT_POINTER;
 	pointer->type_qualifiers     = parse_type_qualifiers();
+	pointer->base_variable       = base_variable;
 
-	return (construct_type_t*) pointer;
+	return &pointer->construct_type;
 }
 
 static construct_type_t *parse_reference_declarator(void)
@@ -4271,7 +4272,7 @@ static construct_type_t *parse_array_declarator(void)
 	expect(']');
 
 end_error:
-	return (construct_type_t*) array;
+	return &array->construct_type;
 }
 
 static construct_type_t *parse_function_declarator(scope_t *scope,
@@ -4323,18 +4324,38 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
 
+	/* MS __based extension */
+	based_spec_t base_spec;
+	base_spec.base_variable = NULL;
+
 	for (;;) {
 		construct_type_t *type;
 		switch (token.type) {
 			case '&':
 				if (!(c_mode & _CXX))
 					errorf(HERE, "references are only available for C++");
+				if (base_spec.base_variable != NULL)
+					warningf(&base_spec.source_position,
+					         "__based does not precede a pointer operator, ignored");
 				type = parse_reference_declarator();
+				/* consumed */
+				base_spec.base_variable = NULL;
 				break;
 
 			case '*':
-				type = parse_pointer_declarator();
+				type = parse_pointer_declarator(base_spec.base_variable);
+				/* consumed */
+				base_spec.base_variable = NULL;
 				break;
+
+			case T__based:
+				next_token();
+				expect('(');
+				add_anchor_token(')');
+				parse_microsoft_based(&base_spec);
+				rem_anchor_token(')');
+				expect(')');
+				continue;
 
 			default:
 				goto ptr_operator_end;
@@ -4352,6 +4373,9 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		modifiers |= parse_attributes(&attributes);
 	}
 ptr_operator_end:
+	if (base_spec.base_variable != NULL)
+		warningf(&base_spec.source_position,
+		         "__based does not precede a pointer operator, ignored");
 
 	if (env != NULL) {
 		modifiers      |= env->modifiers;
@@ -4510,8 +4534,7 @@ static void parse_declaration_attributes(entity_t *entity)
 	}
 }
 
-static type_t *construct_declarator_type(construct_type_t *construct_list,
-                                         type_t *type, variable_t *variable)
+static type_t *construct_declarator_type(construct_type_t *construct_list, type_t *type)
 {
 	construct_type_t *iter = construct_list;
 	for (; iter != NULL; iter = iter->next) {
@@ -4548,7 +4571,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				errorf(HERE, "cannot declare a pointer to reference");
 
 			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
-			type = make_based_pointer_type(type, parsed_pointer->type_qualifiers, variable);
+			type = make_based_pointer_type(type, parsed_pointer->type_qualifiers, parsed_pointer->base_variable);
 			continue;
 		}
 
@@ -4624,7 +4647,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 	construct_type_t *construct_type
 		= parse_inner_declarator(&env, may_be_abstract);
-	type_t *type = construct_declarator_type(construct_type, specifiers->type, specifiers->based_variable);
+	type_t *type = construct_declarator_type(construct_type, specifiers->type);
 
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
@@ -4701,7 +4724,7 @@ static type_t *parse_abstract_declarator(type_t *base_type)
 {
 	construct_type_t *construct_type = parse_inner_declarator(NULL, 1);
 
-	type_t *result = construct_declarator_type(construct_type, base_type, NULL);
+	type_t *result = construct_declarator_type(construct_type, base_type);
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
 	}
