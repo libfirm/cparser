@@ -4026,7 +4026,9 @@ static void semantic_parameter(declaration_t *declaration)
 	/* TODO: improve error messages */
 	source_position_t const* const pos = &declaration->base.source_position;
 
-	/* §6.9.1:6 */
+	/* §6.9.1:6  The declarations in the declaration list shall contain no
+	 *           storage-class specifier other than register and no
+	 *           initializations. */
 	switch (declaration->declared_storage_class) {
 		/* Allowed storage classes */
 		case STORAGE_CLASS_NONE:
@@ -4039,14 +4041,18 @@ static void semantic_parameter(declaration_t *declaration)
 	}
 
 	type_t *const orig_type = declaration->type;
-	/* §6.7.5.3(7): Array as last part of a parameter type is just syntactic
-	 * sugar.  Turn it into a pointer.
-	 * §6.7.5.3(8): A declaration of a parameter as ``function returning type''
-	 * shall be adjusted to ``pointer to function returning type'', as in 6.3.2.1.
+	/* §6.7.5.3:7  A declaration of a parameter as ``array of type'' shall be
+	 *             adjusted to ``qualified pointer to type'', [...]
+	 * §6.7.5.3:8  A declaration of a parameter as ``function returning type''
+	 *             shall be adjusted to ``pointer to function returning type'',
+	 *             as in 6.3.2.1.
 	 */
 	type_t *const type = automatic_type_conversion(orig_type);
 	declaration->type = type;
 
+	/* §6.7.5.3:4  After adjustment, the parameters in a parameter type list in
+	 *             a function declarator that is part of a definition of that
+	 *             function shall not have incomplete type. */
 	if (is_type_incomplete(skip_typeref(type))) {
 		errorf(pos, "parameter '%#T' is of incomplete type",
 		       orig_type, declaration->base.symbol);
@@ -5169,16 +5175,18 @@ static void check_variable_type_complete(entity_t *ent)
 	if (ent->kind != ENTITY_VARIABLE)
 		return;
 
+	/* §6.7:7  If an identifier for an object is declared with no linkage, the
+	 *         type for the object shall be complete [...] */
 	declaration_t *decl = &ent->declaration;
-	if (decl->storage_class == STORAGE_CLASS_EXTERN)
+	if (decl->storage_class != STORAGE_CLASS_NONE)
 		return;
 
 	type_t *type = decl->type;
 	if (!is_type_incomplete(skip_typeref(type)))
 		return;
 
-	errorf(&ent->base.source_position,
-			"variable '%#T' is of incomplete type", type, ent->base.symbol);
+	errorf(&ent->base.source_position, "variable '%#T' is of incomplete type",
+			type, ent->base.symbol);
 }
 
 
@@ -7907,7 +7915,7 @@ static void warn_reference_address_as_bool(expression_t const* expr)
 }
 
 static void semantic_condition(expression_t const *const expr,
-                                char const *const context)
+                               char const *const context)
 {
 	type_t *const type = skip_typeref(expr->base.type);
 	if (is_type_scalar(type)) {
