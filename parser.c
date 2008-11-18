@@ -10369,7 +10369,7 @@ expression_statment:
 		} while (token.type == T___extension__);
 		bool old_gcc_extension = in_gcc_extension;
 		in_gcc_extension       = true;
-		statement = parse_statement();
+		statement = intern_parse_statement();
 		in_gcc_extension = old_gcc_extension;
 		break;
 
