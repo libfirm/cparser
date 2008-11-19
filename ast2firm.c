@@ -1355,17 +1355,12 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 	assert(entity->declaration.kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
 	ir_entity *const irentity = entity->variable.v.entity;
-	switch ((storage_class_tag_t) entity->declaration.storage_class) {
-		case STORAGE_CLASS_THREAD:
-		case STORAGE_CLASS_THREAD_EXTERN:
-		case STORAGE_CLASS_THREAD_STATIC: {
-			ir_node *const no_mem = new_NoMem();
-			ir_node *const tls    = get_irg_tls(current_ir_graph);
-			return new_d_simpleSel(dbgi, no_mem, tls, irentity);
-		}
-
-		default:
-			return create_symconst(dbgi, mode_P_data, irentity);
+	if (entity->variable.thread_local) {
+		ir_node *const no_mem = new_NoMem();
+		ir_node *const tls    = get_irg_tls(current_ir_graph);
+		return new_d_simpleSel(dbgi, no_mem, tls, irentity);
+	} else {
+		return create_symconst(dbgi, mode_P_data, irentity);
 	}
 }
 
@@ -4154,63 +4149,20 @@ static void create_global_variable(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_VARIABLE);
 
-	ir_visibility  vis;
-	ir_type       *var_type;
-	switch ((storage_class_tag_t) entity->declaration.storage_class) {
-		case STORAGE_CLASS_STATIC:
-			vis = visibility_local;
-			goto global_var;
+	ir_visibility vis;
+	switch ((storage_class_tag_t)entity->declaration.storage_class) {
+		case STORAGE_CLASS_STATIC: vis = visibility_local;              break;
+		case STORAGE_CLASS_EXTERN: vis = visibility_external_allocated; break;
+		case STORAGE_CLASS_NONE:   vis = visibility_external_visible;   break;
 
-		case STORAGE_CLASS_EXTERN:
-			vis = visibility_external_allocated;
-			goto global_var;
-
-		case STORAGE_CLASS_NONE:
-			vis = visibility_external_visible;
-			goto global_var;
-
-		case STORAGE_CLASS_THREAD:
-			vis = visibility_external_visible;
-			goto tls_var;
-
-		case STORAGE_CLASS_THREAD_EXTERN:
-			vis = visibility_external_allocated;
-			goto tls_var;
-
-		case STORAGE_CLASS_THREAD_STATIC:
-			vis = visibility_local;
-			goto tls_var;
-
-tls_var:
-			var_type = get_tls_type();
-			goto create_var;
-
-global_var:
-			var_type = get_glob_type();
-			goto create_var;
-
-create_var:
-			create_variable_entity(entity,
-			                       DECLARATION_KIND_GLOBAL_VARIABLE,
-			                       var_type);
-			/* Matze: I'm confused, shouldn't we only be here when creating
-			 * variables? */
-#if 0
-			if (!is_type_function(skip_typeref(entity->declaration.type))) {
-				set_entity_visibility(declaration->v.entity, vis);
-			}
-#else
-			set_entity_visibility(entity->variable.v.entity, vis);
-#endif
-
-			return;
-
-		case STORAGE_CLASS_TYPEDEF:
-		case STORAGE_CLASS_AUTO:
-		case STORAGE_CLASS_REGISTER:
-			break;
+		default: panic("Invalid storage class for global variable");
 	}
-	panic("Invalid storage class for global variable");
+
+	ir_type *var_type = entity->variable.thread_local ?
+		get_tls_type() : get_glob_type();
+	create_variable_entity(entity,
+			DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
+	set_entity_visibility(entity->variable.v.entity, vis);
 }
 
 static void create_local_declaration(entity_t *entity)
@@ -4252,9 +4204,6 @@ static void create_local_declaration(entity_t *entity)
 		}
 		return;
 	case STORAGE_CLASS_TYPEDEF:
-	case STORAGE_CLASS_THREAD:
-	case STORAGE_CLASS_THREAD_EXTERN:
-	case STORAGE_CLASS_THREAD_STATIC:
 		break;
 	}
 	panic("invalid storage class found");

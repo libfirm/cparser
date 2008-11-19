@@ -57,9 +57,6 @@ typedef enum storage_class_tag_t {
 	STORAGE_CLASS_TYPEDEF,
 	STORAGE_CLASS_AUTO,
 	STORAGE_CLASS_REGISTER,
-	STORAGE_CLASS_THREAD,
-	STORAGE_CLASS_THREAD_EXTERN,
-	STORAGE_CLASS_THREAD_STATIC,
 } storage_class_tag_t;
 typedef unsigned char storage_class_t;
 
@@ -201,6 +198,7 @@ struct compound_member_t {
 
 struct variable_t {
 	declaration_t  base;
+	bool           thread_local  : 1;  /**< GCC __thread */
 	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
 	bool           read          : 1;
 	unsigned char  alignment;          /**< Alignment of the declaration, 0 for default. */

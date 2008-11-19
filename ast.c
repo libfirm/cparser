@@ -1322,18 +1322,16 @@ void print_statement(const statement_t *statement)
  */
 static void print_storage_class(storage_class_tag_t storage_class)
 {
+	const char *text;
 	switch (storage_class) {
-	case STORAGE_CLASS_NONE:
-		break;
-	case STORAGE_CLASS_TYPEDEF:       fputs("typedef ",        out); break;
-	case STORAGE_CLASS_EXTERN:        fputs("extern ",         out); break;
-	case STORAGE_CLASS_STATIC:        fputs("static ",         out); break;
-	case STORAGE_CLASS_AUTO:          fputs("auto ",           out); break;
-	case STORAGE_CLASS_REGISTER:      fputs("register ",       out); break;
-	case STORAGE_CLASS_THREAD:        fputs("__thread",        out); break;
-	case STORAGE_CLASS_THREAD_EXTERN: fputs("extern __thread", out); break;
-	case STORAGE_CLASS_THREAD_STATIC: fputs("static __thread", out); break;
+	case STORAGE_CLASS_NONE:     return;
+	case STORAGE_CLASS_TYPEDEF:  text = "typedef ";  break;
+	case STORAGE_CLASS_EXTERN:   text = "extern ";   break;
+	case STORAGE_CLASS_STATIC:   text = "static ";   break;
+	case STORAGE_CLASS_AUTO:     text = "auto ";     break;
+	case STORAGE_CLASS_REGISTER: text = "register "; break;
 	}
+	fputs(text, out);
 }
 
 /**
@@ -1527,24 +1525,32 @@ void print_declaration(const entity_t *entity)
 		}
 	}
 	print_ms_modifiers(declaration);
-	if (entity->kind == ENTITY_FUNCTION) {
-		print_type_ext(entity->declaration.type, entity->base.symbol,
-		               &entity->function.parameters);
+	switch (entity->kind) {
+		case ENTITY_FUNCTION:
+			print_type_ext(entity->declaration.type, entity->base.symbol,
+					&entity->function.parameters);
 
-		if (entity->function.statement != NULL) {
-			fputs("\n", out);
-			print_indent();
-			print_statement(entity->function.statement);
-			return;
-		}
-	} else {
-		print_type_ext(declaration->type, declaration->base.symbol, NULL);
+			if (entity->function.statement != NULL) {
+				fputc('\n', out);
+				print_indent();
+				print_statement(entity->function.statement);
+				return;
+			}
+			break;
 
-		if (entity->kind == ENTITY_VARIABLE
-				&& entity->variable.initializer != NULL) {
-			fputs(" = ", out);
-			print_initializer(entity->variable.initializer);
-		}
+		case ENTITY_VARIABLE:
+			if (entity->variable.thread_local)
+				fputs("__thread ", out);
+			print_type_ext(declaration->type, declaration->base.symbol, NULL);
+			if (entity->variable.initializer != NULL) {
+				fputs(" = ", out);
+				print_initializer(entity->variable.initializer);
+			}
+			break;
+
+		default:
+			print_type_ext(declaration->type, declaration->base.symbol, NULL);
+			break;
 	}
 	fputc(';', out);
 }
@@ -1692,14 +1698,13 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 			case STORAGE_CLASS_NONE:
 			case STORAGE_CLASS_EXTERN:
 			case STORAGE_CLASS_STATIC:
-				return true;
+				return
+					entity->kind != ENTITY_VARIABLE ||
+					!entity->variable.thread_local;
 
 			case STORAGE_CLASS_REGISTER:
 			case STORAGE_CLASS_TYPEDEF:
 			case STORAGE_CLASS_AUTO:
-			case STORAGE_CLASS_THREAD:
-			case STORAGE_CLASS_THREAD_EXTERN:
-			case STORAGE_CLASS_THREAD_STATIC:
 				break;
 			}
 		}

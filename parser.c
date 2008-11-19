@@ -76,8 +76,9 @@ struct declaration_specifiers_t {
 	source_position_t  source_position;
 	storage_class_t    storage_class;
 	unsigned char      alignment;         /**< Alignment, 0 if not set. */
-	bool               is_inline : 1;
-	bool               deprecated : 1;
+	bool               is_inline    : 1;
+	bool               thread_local : 1;  /**< GCC __thread */
+	bool               deprecated   : 1;
 	decl_modifiers_t   modifiers;         /**< declaration modifiers */
 	gnu_attribute_t   *gnu_attributes;    /**< list of GNU attributes */
 	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
@@ -3568,7 +3569,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 
 		switch (token.type) {
-
 		/* storage class */
 #define MATCH_STORAGE_CLASS(token, class)                                  \
 		case token:                                                        \
@@ -3576,6 +3576,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 				errorf(HERE, "multiple storage classes in declaration specifiers"); \
 			}                                                              \
 			specifiers->storage_class = class;                             \
+			if (specifiers->thread_local)                                  \
+				goto check_thread_storage_class;                           \
 			next_token();                                                  \
 			break;
 
@@ -3595,22 +3597,25 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			break;
 
 		case T___thread:
-			switch (specifiers->storage_class) {
-			case STORAGE_CLASS_NONE:
-				specifiers->storage_class = STORAGE_CLASS_THREAD;
-				break;
+			if (specifiers->thread_local) {
+				errorf(HERE, "duplicate '__thread'");
+			} else {
+				specifiers->thread_local = true;
+check_thread_storage_class:
+				switch (specifiers->storage_class) {
+					case STORAGE_CLASS_EXTERN:
+					case STORAGE_CLASS_NONE:
+					case STORAGE_CLASS_STATIC:
+						break;
 
-			case STORAGE_CLASS_EXTERN:
-				specifiers->storage_class = STORAGE_CLASS_THREAD_EXTERN;
-				break;
-
-			case STORAGE_CLASS_STATIC:
-				specifiers->storage_class = STORAGE_CLASS_THREAD_STATIC;
-				break;
-
-			default:
-				errorf(HERE, "multiple storage classes in declaration specifiers");
-				break;
+						char const* wrong;
+					case STORAGE_CLASS_AUTO:     wrong = "auto";     goto wrong_thread_stoarge_class;
+					case STORAGE_CLASS_REGISTER: wrong = "register"; goto wrong_thread_stoarge_class;
+					case STORAGE_CLASS_TYPEDEF:  wrong = "typedef";  goto wrong_thread_stoarge_class;
+wrong_thread_stoarge_class:
+						errorf(HERE, "'__thread' used with '%s'", wrong);
+						break;
+				}
 			}
 			next_token();
 			break;
@@ -4673,6 +4678,18 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	} else {
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
 		  entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
+
+			if (specifiers->is_inline && is_type_valid(type)) {
+				errorf(&env.source_position,
+						"compound member '%Y' declared 'inline'", env.symbol);
+			}
+
+		  if (specifiers->thread_local ||
+		  		specifiers->storage_class != STORAGE_CLASS_NONE) {
+		  	errorf(&env.source_position,
+		  			"compound member '%Y' must have no storage class",
+		  			env.symbol);
+		  }
 		} else if (flags & DECL_IS_PARAMETER) {
 			/* §6.7.5.3:7  A declaration of a parameter as ``array of type''
 			 *             shall be adjusted to ``qualified pointer to type'',
@@ -4687,6 +4704,15 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 			entity->function.is_inline  = specifiers->is_inline;
 			entity->function.parameters = env.parameters;
+
+			if (specifiers->thread_local || (
+						specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+						specifiers->storage_class != STORAGE_CLASS_NONE   &&
+						specifiers->storage_class != STORAGE_CLASS_STATIC)
+					) {
+				errorf(&env.source_position,
+						"invalid storage class for function '%Y'", env.symbol);
+			}
 		} else {
 create_variable:
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
@@ -4698,9 +4724,29 @@ create_variable:
 				entity->variable.alignment = specifiers->alignment;
 			}
 
-			if (warning.other && specifiers->is_inline && is_type_valid(type)) {
-				warningf(&env.source_position,
-						 "variable '%Y' declared 'inline'\n", env.symbol);
+			if (specifiers->is_inline && is_type_valid(type)) {
+				errorf(&env.source_position,
+						"variable '%Y' declared 'inline'", env.symbol);
+			}
+
+			entity->variable.thread_local = specifiers->thread_local;
+
+			bool invalid_storage_class = false;
+			if (current_scope == file_scope) {
+				if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+						specifiers->storage_class != STORAGE_CLASS_NONE   &&
+						specifiers->storage_class != STORAGE_CLASS_STATIC) {
+					invalid_storage_class = true;
+				}
+			} else {
+				if (specifiers->thread_local &&
+						specifiers->storage_class == STORAGE_CLASS_NONE) {
+					invalid_storage_class = true;
+				}
+			}
+			if (invalid_storage_class) {
+				errorf(&env.source_position,
+						"invalid storage class for variable '%Y'", env.symbol);
 			}
 		}
 
@@ -5054,8 +5100,7 @@ error_redeclaration:
 			&& entity->kind == ENTITY_VARIABLE
 			&& current_scope == file_scope) {
 		declaration_t *declaration = &entity->declaration;
-		if (declaration->storage_class == STORAGE_CLASS_NONE ||
-				declaration->storage_class == STORAGE_CLASS_THREAD) {
+		if (declaration->storage_class == STORAGE_CLASS_NONE) {
 			warningf(pos, "no previous declaration for '%#T'",
 			         declaration->type, symbol);
 		}
@@ -5115,8 +5160,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	}
 
 	bool must_be_constant = false;
-	if (declaration->storage_class == STORAGE_CLASS_STATIC        ||
-	    declaration->storage_class == STORAGE_CLASS_THREAD_STATIC ||
+	if (declaration->storage_class == STORAGE_CLASS_STATIC ||
 	    entity->base.parent_scope  == file_scope) {
 		must_be_constant = true;
 	}
@@ -5153,7 +5197,8 @@ static void parse_anonymous_declaration_rest(
 	anonymous_entity = NULL;
 
 	if (warning.other) {
-		if (specifiers->storage_class != STORAGE_CLASS_NONE) {
+		if (specifiers->storage_class != STORAGE_CLASS_NONE ||
+				specifiers->thread_local) {
 			warningf(&specifiers->source_position,
 			         "useless storage class in empty declaration");
 		}
@@ -6332,7 +6377,8 @@ static type_t *parse_typename(void)
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
-	if (specifiers.storage_class != STORAGE_CLASS_NONE) {
+	if (specifiers.storage_class != STORAGE_CLASS_NONE ||
+			specifiers.thread_local) {
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
