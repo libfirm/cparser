@@ -5199,10 +5199,13 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 
 		if (token.type == '=') {
 			parse_init_declarator_rest(entity);
-		} else if (entity->kind == ENTITY_VARIABLE &&
-				is_type_reference(skip_typeref(entity->declaration.type))) {
-			errorf(&entity->base.source_position,
-					"reference %Y must be initialized", entity->base.symbol);
+		} else if (entity->kind == ENTITY_VARIABLE) {
+			type_t *type = entity->declaration.type;
+			if (is_type_reference(skip_typeref(type))) {
+				errorf(&entity->base.source_position,
+						"reference '%#T' must be initialized",
+						type, entity->base.symbol);
+			}
 		}
 
 		check_variable_type_complete(entity);
