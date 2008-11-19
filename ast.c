@@ -74,9 +74,9 @@ void print_indent(void)
 static int right_to_left(unsigned precedence)
 {
 	switch (precedence) {
-		case 2*PREC_ASSIGNMENT:
-		case 2*PREC_CONDITIONAL:
-		case 2*PREC_UNARY:
+		case PREC_ASSIGNMENT:
+		case PREC_CONDITIONAL:
+		case PREC_UNARY:
 			return 1;
 
 		default:
@@ -180,8 +180,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 	unsigned res = prec[kind];
 
 	assert(res != PREC_BOTTOM);
-	/* we need the lowest bit for right-to-left precedence */
-	return 2 * res;
+	return res;
 }
 
 /**
@@ -406,7 +405,7 @@ static void print_call_expression(const call_expression_t *call)
 		} else {
 			first = 0;
 		}
-		print_expression_prec(argument->expression, 2 * PREC_ASSIGNMENT);
+		print_expression_prec(argument->expression, PREC_ASSIGNMENT);
 
 		argument = argument->next;
 	}
@@ -469,7 +468,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	default: panic("invalid binexpression found");
 	}
 	fputs(op, out);
-	print_expression_prec(binexpr->right, prec - r2l);
+	print_expression_prec(binexpr->right, prec + 1 - r2l);
 }
 
 /**
@@ -508,7 +507,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		break;
 	case EXPR_UNARY_ASSUME:
 		fputs("__assume(", out);
-		print_expression_prec(unexpr->value, 2 * PREC_ASSIGNMENT);
+		print_expression_prec(unexpr->value, PREC_ASSIGNMENT);
 		fputc(')', out);
 		return;
 
@@ -610,7 +609,7 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
 	fputs("__builtin_constant_p(", out);
-	print_expression_prec(expression->value, 2 * PREC_ASSIGNMENT);
+	print_expression_prec(expression->value, PREC_ASSIGNMENT);
 	fputc(')', out);
 }
 
@@ -622,14 +621,14 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
 {
 	fputs("__builtin_prefetch(", out);
-	print_expression_prec(expression->adr, 2 * PREC_ASSIGNMENT);
+	print_expression_prec(expression->adr, PREC_ASSIGNMENT);
 	if (expression->rw) {
 		fputc(',', out);
-		print_expression_prec(expression->rw, 2 * PREC_ASSIGNMENT);
+		print_expression_prec(expression->rw, PREC_ASSIGNMENT);
 	}
 	if (expression->locality) {
 		fputc(',', out);
-		print_expression_prec(expression->locality, 2 * PREC_ASSIGNMENT);
+		print_expression_prec(expression->locality, PREC_ASSIGNMENT);
 	}
 	fputc(')', out);
 }
@@ -641,15 +640,15 @@ static void print_builtin_prefetch(const builtin_prefetch_expression_t *expressi
  */
 static void print_conditional(const conditional_expression_t *expression)
 {
-	print_expression_prec(expression->condition, 2 * PREC_LOGICAL_OR);
+	print_expression_prec(expression->condition, PREC_LOGICAL_OR);
 	fputs(" ? ", out);
 	if (expression->true_expression != NULL) {
-		print_expression_prec(expression->true_expression, 2 * PREC_EXPRESSION);
+		print_expression_prec(expression->true_expression, PREC_EXPRESSION);
 		fputs(" : ", out);
 	} else {
 		fputs(": ", out);
 	}
-	print_expression_prec(expression->false_expression, 2 * PREC_CONDITIONAL);
+	print_expression_prec(expression->false_expression, PREC_CONDITIONAL);
 }
 
 /**
@@ -660,7 +659,7 @@ static void print_conditional(const conditional_expression_t *expression)
 static void print_va_start(const va_start_expression_t *const expression)
 {
 	fputs("__builtin_va_start(", out);
-	print_expression_prec(expression->ap, 2 * PREC_ASSIGNMENT);
+	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
 	fputs(", ", out);
 	fputs(expression->parameter->base.base.symbol->string, out);
 	fputc(')', out);
@@ -674,7 +673,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 static void print_va_arg(const va_arg_expression_t *expression)
 {
 	fputs("__builtin_va_arg(", out);
-	print_expression_prec(expression->ap, 2 * PREC_ASSIGNMENT);
+	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
 	fputs(", ", out);
 	print_type(expression->base.type);
 	fputc(')', out);
@@ -706,7 +705,7 @@ static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
 {
 	fputs("__builtin_classify_type(", out);
-	print_expression_prec(expr->type_expression, 2 * PREC_ASSIGNMENT);
+	print_expression_prec(expr->type_expression, PREC_ASSIGNMENT);
 	fputc(')', out);
 }
 
@@ -1562,7 +1561,7 @@ void print_declaration(const entity_t *entity)
  */
 void print_expression(const expression_t *expression)
 {
-	print_expression_prec(expression, 2 * PREC_BOTTOM);
+	print_expression_prec(expression, PREC_BOTTOM);
 }
 
 /**
