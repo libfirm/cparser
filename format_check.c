@@ -976,6 +976,9 @@ void check_format(const call_expression_t *const call)
 				case FORMAT_SCANF:
 					check_scanf_format(arg, &builtin_table[i]);
 					break;
+				default:
+					/* TODO: implement other cases */
+					break;
 				}
 				break;
 			}
