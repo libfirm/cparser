@@ -5211,11 +5211,16 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 		if (token.type == '=') {
 			parse_init_declarator_rest(entity);
 		} else if (entity->kind == ENTITY_VARIABLE) {
-			type_t *type = entity->declaration.type;
-			if (is_type_reference(skip_typeref(type))) {
-				errorf(&entity->base.source_position,
-						"reference '%#T' must be initialized",
-						type, entity->base.symbol);
+			/* ISO/IEC 14882:1998(E) §8.5.3:3  The initializer can be omitted
+			 * [...] where the extern specifier is explicitly used. */
+			declaration_t *decl = &entity->declaration;
+			if (decl->storage_class != STORAGE_CLASS_EXTERN) {
+				type_t *type = decl->type;
+				if (is_type_reference(skip_typeref(type))) {
+					errorf(&entity->base.source_position,
+							"reference '%#T' must be initialized",
+							type, entity->base.symbol);
+				}
 			}
 		}
 
