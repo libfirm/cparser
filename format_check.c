@@ -707,7 +707,6 @@ static void check_scanf_format(const call_argument_t *arg, const format_spec_t *
 		}
 
 		type_t            *expected_type;
-		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
 		switch (fmt) {
 			case 'd':
 			case 'i':
@@ -801,21 +800,20 @@ eval_fmt_mod_unsigned:
 					warn_invalid_length_modifier(pos, fmt_mod, fmt);
 					goto next_arg;
 				}
-				expected_type = type_wchar_t_ptr;
-				expected_qual = TYPE_QUALIFIER_CONST;
+				expected_type = type_wchar_t;
 				break;
 
 			case 's':
+			case '[':
 				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_char_ptr;    break;
-					case FMT_MOD_l:    expected_type = type_wchar_t_ptr; break;
-					case FMT_MOD_w:    expected_type = type_wchar_t_ptr; break;
+					case FMT_MOD_NONE: expected_type = type_char;    break;
+					case FMT_MOD_l:    expected_type = type_wchar_t; break;
+					case FMT_MOD_w:    expected_type = type_wchar_t; break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
 						goto next_arg;
 				}
-				expected_qual = TYPE_QUALIFIER_CONST;
 				break;
 
 			case 'p':
@@ -868,19 +866,12 @@ eval_fmt_mod_unsigned:
 					goto next_arg;
 			}
 
-			if (is_type_pointer(expected_type_skip)) {
-				if (is_type_pointer(ptr_skip)) {
-					type_t *const exp_to = skip_typeref(expected_type_skip->pointer.points_to);
-					type_t *const arg_to = skip_typeref(ptr_skip->pointer.points_to);
-					if ((arg_to->base.qualifiers & ~expected_qual) == 0 &&
-						get_unqualified_type(arg_to) == exp_to) {
-						goto next_arg;
-					}
-				}
-			} else {
-				if (get_unqualified_type(ptr_skip) == expected_type_skip) {
+			if (ptr_skip == expected_type_skip) {
+				goto next_arg;
+			} else if (expected_type_skip == type_char) {
+				/* char matches with unsigned char AND signed char */
+				if (ptr_skip == type_signed_char || ptr_skip == type_unsigned_char)
 					goto next_arg;
-				}
 			}
 error_arg_type:
 			if (is_type_valid(arg_skip)) {
