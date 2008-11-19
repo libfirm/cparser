@@ -4327,9 +4327,10 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 			case '&':
 				if (!(c_mode & _CXX))
 					errorf(HERE, "references are only available for C++");
-				if (base_spec.base_variable != NULL)
+				if (base_spec.base_variable != NULL && warning.other) {
 					warningf(&base_spec.source_position,
 					         "__based does not precede a pointer operator, ignored");
+				}
 				type = parse_reference_declarator();
 				/* consumed */
 				base_spec.base_variable = NULL;
@@ -4366,9 +4367,10 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		modifiers |= parse_attributes(&attributes);
 	}
 ptr_operator_end:
-	if (base_spec.base_variable != NULL)
+	if (base_spec.base_variable != NULL && warning.other) {
 		warningf(&base_spec.source_position,
 		         "__based does not precede a pointer operator, ignored");
+	}
 
 	if (env != NULL) {
 		modifiers      |= env->modifiers;
