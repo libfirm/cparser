@@ -37,6 +37,7 @@ type_t *type_long;
 type_t *type_short;
 type_t *type_unsigned_short;
 type_t *type_signed_char;
+type_t *type_unsigned_char;
 type_t *type_unsigned_int;
 type_t *type_unsigned_long_long;
 type_t *type_unsigned_long;
@@ -99,6 +100,7 @@ void init_basic_types(void)
 	type_error_type         = (type_t*)&error;
 	type_bool               = make_atomic_type(ATOMIC_TYPE_BOOL,        TYPE_QUALIFIER_NONE);
 	type_signed_char        = make_atomic_type(ATOMIC_TYPE_SCHAR,       TYPE_QUALIFIER_NONE);
+	type_unsigned_char      = make_atomic_type(ATOMIC_TYPE_UCHAR,       TYPE_QUALIFIER_NONE);
 	type_short              = make_atomic_type(ATOMIC_TYPE_SHORT,       TYPE_QUALIFIER_NONE);
 	type_unsigned_short     = make_atomic_type(ATOMIC_TYPE_USHORT,      TYPE_QUALIFIER_NONE);
 	type_int                = make_atomic_type(ATOMIC_TYPE_INT,         TYPE_QUALIFIER_NONE);
@@ -114,7 +116,7 @@ void init_basic_types(void)
 	type_void               = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_NONE);
 
 	/* microsoft types */
-	if(c_mode & _MS) {
+	if (c_mode & _MS) {
 		int8_type_kind           = find_signed_int_atomic_type_kind_for_size(1);
 		type_int8                = make_atomic_type(int8_type_kind, TYPE_QUALIFIER_NONE);
 		int16_type_kind          = find_signed_int_atomic_type_kind_for_size(2);

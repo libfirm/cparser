@@ -36,6 +36,7 @@ extern type_t *type_long;
 extern type_t *type_short;
 extern type_t *type_unsigned_short;
 extern type_t *type_signed_char;
+extern type_t *type_unsigned_char;
 extern type_t *type_unsigned_int;
 extern type_t *type_unsigned_long_long;
 extern type_t *type_unsigned_long;
