@@ -866,11 +866,15 @@ eval_fmt_mod_unsigned:
 					goto next_arg;
 			}
 
-			if (ptr_skip == expected_type_skip) {
+			/* do NOT allow const or restrict, all other should be ok */
+			if (ptr_skip->base.qualifiers & (TYPE_QUALIFIER_CONST | TYPE_QUALIFIER_VOLATILE))
+				goto error_arg_type;
+			type_t *const unqual_ptr = get_unqualified_type(ptr_skip);
+			if (unqual_ptr == expected_type_skip) {
 				goto next_arg;
 			} else if (expected_type_skip == type_char) {
 				/* char matches with unsigned char AND signed char */
-				if (ptr_skip == type_signed_char || ptr_skip == type_unsigned_char)
+				if (unqual_ptr == type_signed_char || unqual_ptr == type_unsigned_char)
 					goto next_arg;
 			}
 error_arg_type:
@@ -976,7 +980,8 @@ void check_format(const call_expression_t *const call)
 				case FORMAT_SCANF:
 					check_scanf_format(arg, &builtin_table[i]);
 					break;
-				default:
+				case FORMAT_STRFTIME:
+				case FORMAT_STRFMON:
 					/* TODO: implement other cases */
 					break;
 				}
