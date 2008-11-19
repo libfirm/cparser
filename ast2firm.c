@@ -4032,17 +4032,18 @@ static void create_local_static_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
-	type_t    *const type        = skip_typeref(entity->declaration.type);
-	ir_type   *const global_type = get_glob_type();
-	ir_type   *const irtype      = get_ir_type(type);
-	dbg_info  *const dbgi        = get_dbg_info(&entity->base.source_position);
+	type_t    *const type     = skip_typeref(entity->declaration.type);
+	ir_type   *const var_type = entity->variable.thread_local ?
+		get_tls_type() : get_glob_type();
+	ir_type   *const irtype   = get_ir_type(type);
+	dbg_info  *const dbgi     = get_dbg_info(&entity->base.source_position);
 
 	size_t l = strlen(entity->base.symbol->string);
 	char   buf[l + sizeof(".%u")];
 	snprintf(buf, sizeof(buf), "%s.%%u", entity->base.symbol->string);
 	ident     *const id = id_unique(buf);
 
-	ir_entity *const irentity = new_d_entity(global_type, id, irtype, dbgi);
+	ir_entity *const irentity = new_d_entity(var_type, id, irtype, dbgi);
 
 	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(irentity, volatility_is_volatile);
@@ -4053,7 +4054,8 @@ static void create_local_static_variable(entity_t *entity)
 	set_entity_ld_ident(irentity, id);
 	set_entity_variability(irentity, variability_uninitialized);
 	set_entity_visibility(irentity, visibility_local);
-	set_entity_allocation(irentity, allocation_static);
+	set_entity_allocation(irentity, entity->variable.thread_local ?
+		allocation_automatic : allocation_static);
 
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
