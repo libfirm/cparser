@@ -188,9 +188,16 @@ static void          parse_externals(void);
 static void          parse_external(void);
 
 static void parse_compound_type_entries(compound_t *compound_declaration);
+
+typedef enum declarator_flags_t {
+	DECL_FLAGS_NONE             = 0,
+	DECL_MAY_BE_ABSTRACT        = 1U << 0,
+	DECL_CREATE_COMPOUND_MEMBER = 1U << 1
+} declarator_flags_t;
+
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
-                                  bool may_be_abstract,
-                                  bool create_compound_member);
+                                  declarator_flags_t flags);
+
 static entity_t *record_entity(entity_t *entity, bool is_definition);
 
 static void semantic_comparison(binary_expression_t *expression);
@@ -4062,7 +4069,7 @@ static entity_t *parse_parameter(void)
 
 	parse_declaration_specifiers(&specifiers);
 
-	entity_t *entity = parse_declarator(&specifiers, true, false);
+	entity_t *entity = parse_declarator(&specifiers, DECL_MAY_BE_ABSTRACT);
 	anonymous_entity = NULL;
 	return entity;
 }
@@ -4633,15 +4640,14 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 }
 
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
-                                  bool may_be_abstract,
-                                  bool create_compound_member)
+                                  declarator_flags_t flags)
 {
 	parse_declarator_env_t env;
 	memset(&env, 0, sizeof(env));
 	env.modifiers = specifiers->modifiers;
 
 	construct_type_t *construct_type
-		= parse_inner_declarator(&env, may_be_abstract);
+		= parse_inner_declarator(&env, (flags & DECL_MAY_BE_ABSTRACT) != 0);
 	type_t *type = construct_declarator_type(construct_type, specifiers->type);
 
 	if (construct_type != NULL) {
@@ -4670,7 +4676,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			}
 		}
 	} else {
-		if (create_compound_member) {
+		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
 		} else if (is_type_function(skip_typeref(type))) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION);
@@ -5215,7 +5221,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 		eat(',');
 
 		add_anchor_token('=');
-		ndeclaration = parse_declarator(specifiers, /*may_be_abstract=*/false, false);
+		ndeclaration = parse_declarator(specifiers, DECL_FLAGS_NONE);
 		rem_anchor_token('=');
 	}
 	expect(';');
@@ -5262,7 +5268,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	if (token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers);
 	} else {
-		entity_t *entity = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
+		entity_t *entity = parse_declarator(&specifiers, DECL_FLAGS_NONE);
 		parse_declaration_rest(entity, &specifiers, finished_declaration);
 	}
 }
@@ -6001,7 +6007,7 @@ static void parse_external_declaration(void)
 	add_anchor_token('{');
 
 	/* declarator is common to both function-definitions and declarations */
-	entity_t *ndeclaration = parse_declarator(&specifiers, /*may_be_abstract=*/false, false);
+	entity_t *ndeclaration = parse_declarator(&specifiers, DECL_FLAGS_NONE);
 
 	rem_anchor_token('{');
 	rem_anchor_token(';');
@@ -6229,7 +6235,8 @@ static void parse_compound_declarators(compound_t *compound,
 			entity->declaration.modifiers              = specifiers->modifiers;
 			entity->declaration.type                   = type;
 		} else {
-			entity = parse_declarator(specifiers,/*may_be_abstract=*/true, true);
+			entity = parse_declarator(specifiers,
+					DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
 			assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 
 			if (token.type == ':') {
