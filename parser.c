@@ -4646,9 +4646,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	memset(&env, 0, sizeof(env));
 	env.modifiers = specifiers->modifiers;
 
-	construct_type_t *construct_type
-		= parse_inner_declarator(&env, (flags & DECL_MAY_BE_ABSTRACT) != 0);
-	type_t *type = construct_declarator_type(construct_type, specifiers->type);
+	construct_type_t *construct_type =
+		parse_inner_declarator(&env, (flags & DECL_MAY_BE_ABSTRACT) != 0);
+	type_t           *orig_type      =
+		construct_declarator_type(construct_type, specifiers->type);
+	type_t           *type           = skip_typeref(orig_type);
 
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
@@ -4659,7 +4661,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		entity                       = allocate_entity_zero(ENTITY_TYPEDEF);
 		entity->base.symbol          = env.symbol;
 		entity->base.source_position = env.source_position;
-		entity->typedefe.type        = type;
+		entity->typedefe.type        = orig_type;
 
 		if (anonymous_entity != NULL) {
 			if (is_type_compound(type)) {
@@ -4678,7 +4680,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	} else {
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
-		} else if (is_type_function(skip_typeref(type))) {
+		} else if (is_type_function(type)) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION);
 
 			entity->function.is_inline  = specifiers->is_inline;
@@ -4702,7 +4704,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		entity->base.source_position          = env.source_position;
 		entity->base.symbol                   = env.symbol;
 		entity->base.namespc                  = NAMESPACE_NORMAL;
-		entity->declaration.type              = type;
+		entity->declaration.type              = orig_type;
 		entity->declaration.modifiers         = env.modifiers;
 		entity->declaration.deprecated_string = specifiers->deprecated_string;
 
