@@ -223,10 +223,9 @@ static void print_const(const const_expression_t *cnst)
 		case ATOMIC_TYPE_FLOAT:       suffix = "F";   break;
 		case ATOMIC_TYPE_LONG_DOUBLE: suffix = "L";   break;
 
-		default: suffix = NULL; break;
+		default: return;
 	}
-	if (suffix != NULL)
-		fputs(suffix, out);
+	fputs(suffix, out);
 }
 
 /**
