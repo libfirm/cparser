@@ -192,7 +192,8 @@ static void parse_compound_type_entries(compound_t *compound_declaration);
 typedef enum declarator_flags_t {
 	DECL_FLAGS_NONE             = 0,
 	DECL_MAY_BE_ABSTRACT        = 1U << 0,
-	DECL_CREATE_COMPOUND_MEMBER = 1U << 1
+	DECL_CREATE_COMPOUND_MEMBER = 1U << 1,
+	DECL_IS_PARAMETER           = 1U << 2
 } declarator_flags_t;
 
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
@@ -4022,8 +4023,6 @@ static void parse_identifier_list(scope_t *scope)
 	} while (token.type == T_IDENTIFIER);
 }
 
-static type_t *automatic_type_conversion(type_t *orig_type);
-
 static void semantic_parameter(declaration_t *declaration)
 {
 	/* TODO: improve error messages */
@@ -4043,22 +4042,13 @@ static void semantic_parameter(declaration_t *declaration)
 			break;
 	}
 
-	type_t *const orig_type = declaration->type;
-	/* §6.7.5.3:7  A declaration of a parameter as ``array of type'' shall be
-	 *             adjusted to ``qualified pointer to type'', [...]
-	 * §6.7.5.3:8  A declaration of a parameter as ``function returning type''
-	 *             shall be adjusted to ``pointer to function returning type'',
-	 *             as in 6.3.2.1.
-	 */
-	type_t *const type = automatic_type_conversion(orig_type);
-	declaration->type = type;
-
 	/* §6.7.5.3:4  After adjustment, the parameters in a parameter type list in
 	 *             a function declarator that is part of a definition of that
 	 *             function shall not have incomplete type. */
+	type_t *type = declaration->type;
 	if (is_type_incomplete(skip_typeref(type))) {
 		errorf(pos, "parameter '%#T' has incomplete type",
-		       orig_type, declaration->base.symbol);
+		       type, declaration->base.symbol);
 	}
 }
 
@@ -4069,7 +4059,8 @@ static entity_t *parse_parameter(void)
 
 	parse_declaration_specifiers(&specifiers);
 
-	entity_t *entity = parse_declarator(&specifiers, DECL_MAY_BE_ABSTRACT);
+	entity_t *entity = parse_declarator(&specifiers,
+			DECL_MAY_BE_ABSTRACT | DECL_IS_PARAMETER);
 	anonymous_entity = NULL;
 	return entity;
 }
@@ -4639,6 +4630,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 	return type;
 }
 
+static type_t *automatic_type_conversion(type_t *orig_type);
+
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
                                   declarator_flags_t flags)
 {
@@ -4679,13 +4672,23 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		}
 	} else {
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
-			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
+		  entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
+		} else if (flags & DECL_IS_PARAMETER) {
+			/* §6.7.5.3:7  A declaration of a parameter as ``array of type''
+			 *             shall be adjusted to ``qualified pointer to type'',
+			 *             [...]
+			 * §6.7.5.3:8  A declaration of a parameter as ``function returning
+			 *             type'' shall be adjusted to ``pointer to function
+			 *             returning type'', as in 6.3.2.1. */
+			orig_type = automatic_type_conversion(type);
+			goto create_variable;
 		} else if (is_type_function(type)) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION);
 
 			entity->function.is_inline  = specifiers->is_inline;
 			entity->function.parameters = env.parameters;
 		} else {
+create_variable:
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
 
 			entity->variable.get_property_sym = specifiers->get_property_sym;
