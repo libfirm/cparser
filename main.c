@@ -237,15 +237,18 @@ static void lextest(FILE *in, const char *fname)
 
 static void add_flag(struct obstack *obst, const char *format, ...)
 {
-	obstack_1grow(obst, ' ');
-#ifdef _WIN32
-	obstack_1grow(obst, '"');
-	obstack_vprintf(obst, format, ap);
-	obstack_1grow(obst, '"');
-#else
 	char buf[4096];
 	va_list ap;
 	va_start(ap, format);
+
+	obstack_1grow(obst, ' ');
+#ifdef _WIN32
+	obstack_1grow(obst, '"');
+	int len = vsnprintf(buf, sizeof(buf), format, ap);
+	obstack_grow(obst, buf, len);
+	obstack_1grow(obst, '"');
+#else
+	char buf[4096];
 	vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
@@ -271,6 +274,7 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 		}
 	}
 #endif
+	va_end(ap);
 }
 
 static const char *type_to_string(type_t *type)
