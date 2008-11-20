@@ -190,7 +190,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
  */
 static void print_const(const const_expression_t *cnst)
 {
-	if(cnst->base.type == NULL)
+	if (cnst->base.type == NULL)
 		return;
 
 	const type_t *const type = skip_typeref(cnst->base.type);
@@ -257,9 +257,9 @@ static void print_quoted_string(const string_t *const string, char border, int s
 			if (c_mode & _GNUC) {
 				fputs("\\e", out); break;
 			}
-			/*fallthrough*/
+			/* FALLTHROUGH */
 		default:
-			if(!isprint(*c)) {
+			if (!isprint(*c)) {
 				fprintf(out, "\\%03o", (unsigned)*c);
 				break;
 			}
@@ -299,11 +299,11 @@ static void print_quoted_wide_string(const wide_string_t *const wstr,
 				if (c_mode & _GNUC) {
 					fputs("\\e", out); break;
 				}
-				/*fallthrough*/
+				/* FALLTHROUGH */
 			default: {
 				const unsigned tc = *c;
 				if (tc < 0x80U) {
-					if (!isprint(*c))  {
+					if (!isprint(*c)) {
 						fprintf(out, "\\%03o", (char)*c);
 					} else {
 						fputc(*c, out);
@@ -356,8 +356,7 @@ static void print_string_literal(
 /**
  * Prints a predefined symbol.
  */
-static void print_funcname(
-		const funcname_expression_t *funcname)
+static void print_funcname(const funcname_expression_t *funcname)
 {
 	const char *s = "";
 	switch (funcname->kind) {
@@ -398,8 +397,8 @@ static void print_call_expression(const call_expression_t *call)
 	fputc('(', out);
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
-	while(argument != NULL) {
-		if(!first) {
+	while (argument != NULL) {
+		if (!first) {
 			fputs(", ", out);
 		} else {
 			first = 0;
@@ -421,7 +420,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	unsigned prec = get_expression_precedence(binexpr->base.kind);
 	int      r2l  = right_to_left(prec);
 
-	if(binexpr->base.kind == EXPR_BINARY_BUILTIN_EXPECT) {
+	if (binexpr->base.kind == EXPR_BINARY_BUILTIN_EXPECT) {
 		fputs("__builtin_expect(", out);
 		print_expression_prec(binexpr->left, prec);
 		fputs(", ", out);
@@ -552,7 +551,7 @@ static void print_label_address_expression(const label_address_expression_t *le)
 static void print_array_expression(const array_access_expression_t *expression)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
-	if(!expression->flipped) {
+	if (!expression->flipped) {
 		print_expression_prec(expression->array_ref, prec);
 		fputc('[', out);
 		print_expression(expression->index);
@@ -578,7 +577,7 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 		assert(expression->base.kind == EXPR_ALIGNOF);
 		fputs("__alignof__", out);
 	}
-	if(expression->tp_expression != NULL) {
+	if (expression->tp_expression != NULL) {
 		/* always print the '()' here, sizeof x is right but unusual */
 		fputc('(', out);
 		print_expression(expression->tp_expression);
@@ -688,7 +687,7 @@ static void print_select(const select_expression_t *expression)
 {
 	unsigned prec = get_expression_precedence(expression->base.kind);
 	print_expression_prec(expression->compound, prec);
-	if(is_type_pointer(skip_typeref(expression->compound->base.type))) {
+	if (is_type_pointer(skip_typeref(expression->compound->base.type))) {
 		fputs("->", out);
 	} else {
 		fputc('.', out);
@@ -853,7 +852,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 
 	default:
 		/* TODO */
-		fprintf(out, "some expression of type %d", (int) expression->kind);
+		fprintf(out, "some expression of type %d", (int)expression->kind);
 		break;
 	}
 	if (top_prec > prec)
@@ -893,7 +892,7 @@ static void print_compound_statement(const compound_statement_t *block)
 static void print_return_statement(const return_statement_t *statement)
 {
 	fputs("return ", out);
-	if(statement->value != NULL)
+	if (statement->value != NULL)
 		print_expression(statement->value);
 	fputs(";\n", out);
 }
@@ -950,7 +949,7 @@ static void print_if_statement(const if_statement_t *statement)
 	fputs(") ", out);
 	print_statement(statement->true_statement);
 
-	if(statement->false_statement != NULL) {
+	if (statement->false_statement != NULL) {
 		print_indent();
 		fputs("else ", out);
 		print_statement(statement->false_statement);
@@ -977,7 +976,7 @@ static void print_switch_statement(const switch_statement_t *statement)
  */
 static void print_case_label(const case_label_statement_t *statement)
 {
-	if(statement->expression == NULL) {
+	if (statement->expression == NULL) {
 		fputs("default:\n", out);
 	} else {
 		fputs("case ", out);
@@ -989,7 +988,7 @@ static void print_case_label(const case_label_statement_t *statement)
 		fputs(":\n", out);
 	}
 	++indent;
-	if(statement->statement != NULL) {
+	if (statement->statement != NULL) {
 		if (statement->statement->base.kind == STATEMENT_CASE_LABEL) {
 			--indent;
 		}
@@ -1123,16 +1122,16 @@ static void print_for_statement(const for_statement_t *statement)
 		}
 		fputc(' ', out);
 	} else {
-		if(statement->initialisation) {
+		if (statement->initialisation) {
 			print_expression(statement->initialisation);
 		}
 		fputs("; ", out);
 	}
-	if(statement->condition != NULL) {
+	if (statement->condition != NULL) {
 		print_expression(statement->condition);
 	}
 	fputs("; ", out);
-	if(statement->step != NULL) {
+	if (statement->step != NULL) {
 		print_expression(statement->step);
 	}
 	fputs(") ", out);
@@ -1147,11 +1146,11 @@ static void print_for_statement(const for_statement_t *statement)
 static void print_asm_arguments(asm_argument_t *arguments)
 {
 	asm_argument_t *argument = arguments;
-	for( ; argument != NULL; argument = argument->next) {
-		if(argument != arguments)
+	for (; argument != NULL; argument = argument->next) {
+		if (argument != arguments)
 			fputs(", ", out);
 
-		if(argument->symbol) {
+		if (argument->symbol) {
 			fprintf(out, "[%s] ", argument->symbol->string);
 		}
 		print_quoted_string(&argument->constraints, '"', 1);
@@ -1169,8 +1168,8 @@ static void print_asm_arguments(asm_argument_t *arguments)
 static void print_asm_clobbers(asm_clobber_t *clobbers)
 {
 	asm_clobber_t *clobber = clobbers;
-	for( ; clobber != NULL; clobber = clobber->next) {
-		if(clobber != clobbers)
+	for (; clobber != NULL; clobber = clobber->next) {
+		if (clobber != clobbers)
 			fputs(", ", out);
 
 		print_quoted_string(&clobber->clobber, '"', 1);
@@ -1185,7 +1184,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 static void print_asm_statement(const asm_statement_t *statement)
 {
 	fputs("asm ", out);
-	if(statement->is_volatile) {
+	if (statement->is_volatile) {
 		fputs("volatile ", out);
 	}
 	fputc('(', out);
@@ -1222,7 +1221,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 	fputs("__try ", out);
 	print_statement(statement->try_statement);
 	print_indent();
-	if(statement->except_expression != NULL) {
+	if (statement->except_expression != NULL) {
 		fputs("__except(", out);
 		print_expression(statement->except_expression);
 		fputs(") ", out);
@@ -1239,7 +1238,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
  */
 static void print_leave_statement(const leave_statement_t *statement)
 {
-	(void) statement;
+	(void)statement;
 	fputs("__leave;\n", out);
 }
 
@@ -1340,7 +1339,7 @@ static void print_storage_class(storage_class_tag_t storage_class)
  */
 void print_initializer(const initializer_t *initializer)
 {
-	if(initializer == NULL) {
+	if (initializer == NULL) {
 		fputs("{}", out);
 		return;
 	}
@@ -1356,11 +1355,11 @@ void print_initializer(const initializer_t *initializer)
 		fputs("{ ", out);
 		const initializer_list_t *list = &initializer->list;
 
-		for(size_t i = 0 ; i < list->len; ++i) {
+		for (size_t i = 0 ; i < list->len; ++i) {
 			const initializer_t *sub_init = list->initializers[i];
 			print_initializer(list->initializers[i]);
-			if(i < list->len-1) {
-				if(sub_init == NULL || sub_init->kind != INITIALIZER_DESIGNATOR)
+			if (i < list->len-1) {
+				if (sub_init == NULL || sub_init->kind != INITIALIZER_DESIGNATOR)
 					fputs(", ", out);
 			}
 		}
@@ -1387,7 +1386,7 @@ void print_initializer(const initializer_t *initializer)
  */
 static void print_ms_modifiers(const declaration_t *declaration)
 {
-	if((c_mode & _MS) == 0)
+	if ((c_mode & _MS) == 0)
 		return;
 
 	decl_modifiers_t modifiers = declaration->modifiers;
@@ -1396,7 +1395,7 @@ static void print_ms_modifiers(const declaration_t *declaration)
 	const char *next     = "(";
 
 	if (declaration->base.kind == ENTITY_VARIABLE) {
-		variable_t *variable = (variable_t*) declaration;
+		variable_t *variable = (variable_t*)declaration;
 		if (variable->alignment != 0
 				|| variable->get_property_sym != NULL
 				|| variable->put_property_sym != NULL) {
@@ -1405,18 +1404,18 @@ static void print_ms_modifiers(const declaration_t *declaration)
 				ds_shown = true;
 			}
 
-			if(variable->alignment != 0) {
+			if (variable->alignment != 0) {
 				fputs(next, out); next = ", "; fprintf(out, "align(%u)", variable->alignment);
 			}
-			if(variable->get_property_sym != NULL
+			if (variable->get_property_sym != NULL
 					|| variable->put_property_sym != NULL) {
 				char *comma = "";
 				fputs(next, out); next = ", "; fputs("property(", out);
-				if(variable->get_property_sym != NULL) {
+				if (variable->get_property_sym != NULL) {
 					fprintf(out, "get=%s", variable->get_property_sym->string);
 					comma = ", ";
 				}
-				if(variable->put_property_sym != NULL)
+				if (variable->put_property_sym != NULL)
 					fprintf(out, "%sput=%s", comma, variable->put_property_sym->string);
 				fputc(')', out);
 			}
@@ -1429,43 +1428,43 @@ static void print_ms_modifiers(const declaration_t *declaration)
 			fputs("__declspec", out);
 			ds_shown = true;
 		}
-		if(modifiers & DM_DLLIMPORT) {
+		if (modifiers & DM_DLLIMPORT) {
 			fputs(next, out); next = ", "; fputs("dllimport", out);
 		}
-		if(modifiers & DM_DLLEXPORT) {
+		if (modifiers & DM_DLLEXPORT) {
 			fputs(next, out); next = ", "; fputs("dllexport", out);
 		}
-		if(modifiers & DM_THREAD) {
+		if (modifiers & DM_THREAD) {
 			fputs(next, out); next = ", "; fputs("thread", out);
 		}
-		if(modifiers & DM_NAKED) {
+		if (modifiers & DM_NAKED) {
 			fputs(next, out); next = ", "; fputs("naked", out);
 		}
-		if(modifiers & DM_THREAD) {
+		if (modifiers & DM_THREAD) {
 			fputs(next, out); next = ", "; fputs("thread", out);
 		}
-		if(modifiers & DM_SELECTANY) {
+		if (modifiers & DM_SELECTANY) {
 			fputs(next, out); next = ", "; fputs("selectany", out);
 		}
-		if(modifiers & DM_NOTHROW) {
+		if (modifiers & DM_NOTHROW) {
 			fputs(next, out); next = ", "; fputs("nothrow", out);
 		}
-		if(modifiers & DM_NORETURN) {
+		if (modifiers & DM_NORETURN) {
 			fputs(next, out); next = ", "; fputs("noreturn", out);
 		}
-		if(modifiers & DM_NOINLINE) {
+		if (modifiers & DM_NOINLINE) {
 			fputs(next, out); next = ", "; fputs("noinline", out);
 		}
 		if (modifiers & DM_DEPRECATED) {
 			fputs(next, out); next = ", "; fputs("deprecated", out);
-			if(declaration->deprecated_string != NULL)
+			if (declaration->deprecated_string != NULL)
 				fprintf(out, "(\"%s\")",
 				        declaration->deprecated_string);
 		}
-		if(modifiers & DM_RESTRICT) {
+		if (modifiers & DM_RESTRICT) {
 			fputs(next, out); next = ", "; fputs("restrict", out);
 		}
-		if(modifiers & DM_NOALIAS) {
+		if (modifiers & DM_NOALIAS) {
 			fputs(next, out); next = ", "; fputs("noalias", out);
 		}
 	}
@@ -1510,9 +1509,9 @@ void print_declaration(const entity_t *entity)
 	assert(is_declaration(entity));
 	const declaration_t *declaration = &entity->declaration;
 
-	print_storage_class((storage_class_tag_t) declaration->declared_storage_class);
+	print_storage_class((storage_class_tag_t)declaration->declared_storage_class);
 	if (entity->kind == ENTITY_FUNCTION) {
-		function_t *function = (function_t*) declaration;
+		function_t *function = (function_t*)declaration;
 		if (function->is_inline) {
 			if (declaration->modifiers & DM_FORCEINLINE) {
 				fputs("__forceinline ", out);
@@ -1574,7 +1573,7 @@ void print_entity(const entity_t *entity)
 	if (entity->base.namespc != NAMESPACE_NORMAL && entity->base.symbol == NULL)
 		return;
 
-	switch ((entity_kind_tag_t) entity->kind) {
+	switch ((entity_kind_tag_t)entity->kind) {
 	case ENTITY_VARIABLE:
 	case ENTITY_COMPOUND_MEMBER:
 		print_declaration(entity);
@@ -1660,9 +1659,9 @@ bool is_constant_initializer(const initializer_t *initializer)
 		return is_constant_expression(initializer->value.value);
 
 	case INITIALIZER_LIST:
-		for(size_t i = 0; i < initializer->list.len; ++i) {
+		for (size_t i = 0; i < initializer->list.len; ++i) {
 			initializer_t *sub_initializer = initializer->list.initializers[i];
-			if(!is_constant_initializer(sub_initializer))
+			if (!is_constant_initializer(sub_initializer))
 				return false;
 		}
 		return true;
@@ -1678,7 +1677,7 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 
 	case EXPR_SELECT: {
 		type_t *base_type = skip_typeref(expression->select.compound->base.type);
-		if(is_type_pointer(base_type)) {
+		if (is_type_pointer(base_type)) {
 			/* it's a -> */
 			return is_address_constant(expression->select.compound);
 		} else {
@@ -1693,7 +1692,7 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 	case EXPR_REFERENCE: {
 		entity_t *entity = expression->reference.entity;
 		if (is_declaration(entity)) {
-			switch ((storage_class_tag_t) entity->declaration.storage_class) {
+			switch ((storage_class_tag_t)entity->declaration.storage_class) {
 			case STORAGE_CLASS_NONE:
 			case STORAGE_CLASS_EXTERN:
 			case STORAGE_CLASS_STATIC:
@@ -1725,11 +1724,10 @@ bool is_address_constant(const expression_t *expression)
 		type_t *real_type
 			= revert_automatic_type_conversion(expression->unary.value);
 		/* dereferencing a function is a NOP */
-		if(is_type_function(real_type)) {
+		if (is_type_function(real_type)) {
 			return is_address_constant(expression->unary.value);
 		}
-
-		/* fallthrough */
+		/* FALLTHROUGH */
 	}
 
 	case EXPR_UNARY_CAST: {
@@ -1737,8 +1735,8 @@ bool is_address_constant(const expression_t *expression)
 		if (!is_type_pointer(dest) && (
 		    	dest->kind != TYPE_ATOMIC                                               ||
 		    	!(get_atomic_type_flags(dest->atomic.akind) & ATOMIC_TYPE_FLAG_INTEGER) ||
-		    	(get_atomic_type_size(dest->atomic.akind) < get_atomic_type_size(get_intptr_kind())
-		    )))
+		    	get_atomic_type_size(dest->atomic.akind) < get_atomic_type_size(get_intptr_kind())
+		    ))
 			return false;
 
 		return (is_constant_expression(expression->unary.value)
@@ -1750,9 +1748,9 @@ bool is_address_constant(const expression_t *expression)
 		expression_t *left  = expression->binary.left;
 		expression_t *right = expression->binary.right;
 
-		if(is_type_pointer(skip_typeref(left->base.type))) {
+		if (is_type_pointer(skip_typeref(left->base.type))) {
 			return is_address_constant(left) && is_constant_expression(right);
-		} else if(is_type_pointer(skip_typeref(right->base.type))) {
+		} else if (is_type_pointer(skip_typeref(right->base.type))) {
 			return is_constant_expression(left)	&& is_address_constant(right);
 		}
 
@@ -1765,9 +1763,9 @@ bool is_address_constant(const expression_t *expression)
 			return false;
 
 		type_t *type = skip_typeref(entity->declaration.type);
-		if(is_type_function(type))
+		if (is_type_function(type))
 			return true;
-		if(is_type_array(type)) {
+		if (is_type_array(type)) {
 			return is_object_with_linker_constant_address(expression);
 		}
 		/* Prevent stray errors */
@@ -1833,7 +1831,7 @@ static bool is_object_with_constant_address(const expression_t *expression)
 		expression_t *compound      = expression->select.compound;
 		type_t       *compound_type = compound->base.type;
 		compound_type = skip_typeref(compound_type);
-		if(is_type_pointer(compound_type)) {
+		if (is_type_pointer(compound_type)) {
 			return is_constant_pointer(compound);
 		} else {
 			return is_object_with_constant_address(compound);
@@ -1967,11 +1965,11 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_CONDITIONAL: {
 		expression_t *condition = expression->conditional.condition;
-		if(!is_constant_expression(condition))
+		if (!is_constant_expression(condition))
 			return false;
 
 		long val = fold_constant(condition);
-		if(val != 0)
+		if (val != 0)
 			return is_constant_expression(expression->conditional.true_expression);
 		else
 			return is_constant_expression(expression->conditional.false_expression);
