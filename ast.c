@@ -365,9 +365,7 @@ static void print_funcname(const funcname_expression_t *funcname)
 	case FUNCNAME_FUNCSIG:         s = "__FUNCSIG__"; break;
 	case FUNCNAME_FUNCDNAME:       s = "__FUNCDNAME__"; break;
 	}
-	fputc('"', out);
 	fputs(s, out);
-	fputc('"', out);
 }
 
 static void print_wide_string_literal(
