@@ -647,7 +647,8 @@ static void print_conditional(const conditional_expression_t *expression)
 	} else {
 		fputs(": ", out);
 	}
-	print_expression_prec(expression->false_expression, PREC_CONDITIONAL);
+	precedence_t prec = c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL;
+	print_expression_prec(expression->false_expression, prec);
 }
 
 /**
