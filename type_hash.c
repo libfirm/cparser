@@ -137,7 +137,6 @@ static unsigned hash_type(const type_t *type)
 	switch (type->kind) {
 	case TYPE_INVALID:
 		panic("internalizing void or invalid types not possible");
-		return 0;
 	case TYPE_ERROR:
 		return 0;
 	case TYPE_ATOMIC:

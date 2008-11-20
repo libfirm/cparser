@@ -3479,7 +3479,6 @@ static void advance_current_object(type_path_t *path)
 	if (path->invalid) {
 		/* TODO: handle this... */
 		panic("invalid initializer in ast2firm (excessive elements)");
-		return;
 	}
 
 	type_path_entry_t *top = get_type_path_top(path);
@@ -4983,7 +4982,6 @@ static void statement_to_firm(statement_t *statement)
 	switch (statement->kind) {
 	case STATEMENT_INVALID:
 		panic("invalid statement found");
-		return;
 	case STATEMENT_EMPTY:
 		/* nothing */
 		return;

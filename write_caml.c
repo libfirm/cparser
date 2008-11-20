@@ -181,7 +181,6 @@ static void write_type(const type_t *type)
 		return;
 	case TYPE_INVALID:
 		panic("invalid type found");
-		break;
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
 	default:
