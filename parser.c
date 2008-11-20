@@ -6047,10 +6047,14 @@ continue_for:;
 
 				expression_t const *const cond = fors->condition;
 
-				if (!expression_returns(cond))
+				int val;
+				if (cond == NULL) {
+					val = 1;
+				} else if (expression_returns(cond)) {
+					val = determine_truth(cond);
+				} else {
 					return;
-
-				int const val = cond == NULL ? 1 : determine_truth(cond);
+				}
 
 				if (val >= 0)
 					check_reachable(fors->body);
