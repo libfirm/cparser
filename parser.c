@@ -5564,6 +5564,8 @@ static int determine_truth(expression_t const* const cond)
 		-1;
 }
 
+static void check_reachable(statement_t *);
+
 static bool expression_returns(expression_t const *const expr)
 {
 	switch (expr->kind) {
@@ -5605,7 +5607,11 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
-		case EXPR_STATEMENT: // TODO implement
+			return true;
+
+		case EXPR_STATEMENT:
+			check_reachable(expr->statement.statement);
+			// TODO check if statement can be left
 			return true;
 
 		case EXPR_CONDITIONAL:
@@ -5649,6 +5655,31 @@ static bool expression_returns(expression_t const *const expr)
 	panic("unhandled expression");
 }
 
+static bool initializer_returns(initializer_t const *const init)
+{
+	switch (init->kind) {
+		case INITIALIZER_VALUE:
+			return expression_returns(init->value.value);
+
+		case INITIALIZER_LIST: {
+			initializer_t * const*       i       = init->list.initializers;
+			initializer_t * const* const end     = i + init->list.len;
+			bool                         returns = true;
+			for (; i != end; ++i) {
+				if (!initializer_returns(*i))
+					returns = false;
+			}
+			return returns;
+		}
+
+		case INITIALIZER_STRING:
+		case INITIALIZER_WIDE_STRING:
+		case INITIALIZER_DESIGNATOR: // designators have no payload
+			return true;
+	}
+	panic("unhandled initializer");
+}
+
 static bool noreturn_candidate;
 
 static void check_reachable(statement_t *const stmt)
@@ -5663,23 +5694,47 @@ static void check_reachable(statement_t *const stmt)
 	switch (stmt->kind) {
 		case STATEMENT_INVALID:
 		case STATEMENT_EMPTY:
-		case STATEMENT_DECLARATION:
 		case STATEMENT_LOCAL_LABEL:
 		case STATEMENT_ASM:
 			next = stmt->base.next;
 			break;
 
+		case STATEMENT_DECLARATION: {
+			declaration_statement_t const *const decl = &stmt->declaration;
+			entity_t                const *      ent  = decl->declarations_begin;
+			entity_t                const *const last = decl->declarations_end;
+			for (;; ent = ent->base.next) {
+				if (ent->kind                 == ENTITY_VARIABLE &&
+						ent->variable.initializer != NULL            &&
+						!initializer_returns(ent->variable.initializer)) {
+					return;
+				}
+				if (ent == last)
+					break;
+			}
+			next = stmt->base.next;
+			break;
+		}
+
 		case STATEMENT_COMPOUND:
 			next = stmt->compound.statements;
 			break;
 
-		case STATEMENT_RETURN:
-			noreturn_candidate = false;
+		case STATEMENT_RETURN: {
+			expression_t const *const val = stmt->returns.value;
+			if (val == NULL || expression_returns(val))
+				noreturn_candidate = false;
 			return;
+		}
 
 		case STATEMENT_IF: {
-			if_statement_t const* const ifs = &stmt->ifs;
-			int            const        val = determine_truth(ifs->condition);
+			if_statement_t const *const ifs  = &stmt->ifs;
+			expression_t   const *const cond = ifs->condition;
+
+			if (!expression_returns(cond))
+				return;
+
+			int const val = determine_truth(cond);
 
 			if (val >= 0)
 				check_reachable(ifs->true_statement);
@@ -5699,6 +5754,9 @@ static void check_reachable(statement_t *const stmt)
 		case STATEMENT_SWITCH: {
 			switch_statement_t const *const switchs = &stmt->switchs;
 			expression_t       const *const expr    = switchs->expression;
+
+			if (!expression_returns(expr))
+				return;
 
 			if (is_constant_expression(expr)) {
 				long                    const val      = fold_constant(expr);
@@ -5789,6 +5847,9 @@ found_break_parent:
 
 		case STATEMENT_GOTO:
 			if (stmt->gotos.expression) {
+				if (!expression_returns(stmt->gotos.expression))
+					return;
+
 				statement_t *parent = stmt->base.parent;
 				if (parent == NULL) /* top level goto */
 					return;
@@ -5810,7 +5871,12 @@ found_break_parent:
 
 		case STATEMENT_WHILE: {
 			while_statement_t const *const whiles = &stmt->whiles;
-			int                      const val    = determine_truth(whiles->condition);
+			expression_t      const *const cond   = whiles->condition;
+
+			if (!expression_returns(cond))
+				return;
+
+			int const val = determine_truth(cond);
 
 			if (val >= 0)
 				check_reachable(whiles->body);
@@ -5834,8 +5900,15 @@ found_break_parent:
 			fors->condition_reachable = true;
 
 			expression_t const *const cond = fors->condition;
-			int          const        val  =
-				cond == NULL ? 1 : determine_truth(cond);
+
+			int val;
+			if (cond == NULL) {
+				val = 1;
+			} else if (expression_returns(cond)) {
+				val = determine_truth(cond);
+			} else {
+				return;
+			}
 
 			if (val >= 0)
 				check_reachable(fors->body);
@@ -5919,7 +5992,12 @@ continue_while:
 				next->base.reachable = true;
 
 				while_statement_t const *const whiles = &next->whiles;
-				int                      const val    = determine_truth(whiles->condition);
+				expression_t      const *const cond   = whiles->condition;
+
+				if (!expression_returns(cond))
+					return;
+
+				int const val = determine_truth(cond);
 
 				if (val >= 0)
 					check_reachable(whiles->body);
@@ -5938,8 +6016,13 @@ continue_do_while:
 					return;
 				next->base.reachable = true;
 
-				do_while_statement_t const *const dw  = &next->do_while;
-				int                  const        val = determine_truth(dw->condition);
+				do_while_statement_t const *const dw   = &next->do_while;
+				expression_t         const *const cond = dw->condition;
+
+				if (!expression_returns(cond))
+					return;
+
+				int const val = determine_truth(cond);
 
 				if (val >= 0)
 					check_reachable(dw->body);
@@ -5963,8 +6046,11 @@ continue_for:;
 				fors->condition_reachable = true;
 
 				expression_t const *const cond = fors->condition;
-				int          const        val  =
-					cond == NULL ? 1 : determine_truth(cond);
+
+				if (!expression_returns(cond))
+					return;
+
+				int const val = cond == NULL ? 1 : determine_truth(cond);
 
 				if (val >= 0)
 					check_reachable(fors->body);
