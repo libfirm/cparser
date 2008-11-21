@@ -27,4 +27,4 @@ echo "REVISION = \"$VERSION\"" > "$FULLRELEASEDIR/Makefile"
 cat Makefile >> "$FULLRELEASEDIR/Makefile"
 
 echo "creating $RELEASEFILE"
-tar cjf -C "$WORKDIR" "$RELEASEFILE" "$RELEASEDIR"
+tar cjf "$RELEASEFILE" -C "$WORKDIR" "$RELEASEDIR"
