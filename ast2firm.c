@@ -4777,9 +4777,8 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 			= be_parse_asm_constraints(constraints);
 
 		if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-			errorf(&statement->base.source_position,
+			warningf(&statement->base.source_position,
 			       "some constraints in '%s' are not supported", constraints);
-			continue;
 		}
 		if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
 			errorf(&statement->base.source_position,
