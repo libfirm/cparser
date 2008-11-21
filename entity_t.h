@@ -98,7 +98,6 @@ typedef unsigned decl_modifiers_t;
 struct scope_t {
 	entity_t *entities;
 	entity_t *last_entity;
-	scope_t  *parent;       /**< points to the parent scope. */
 	unsigned  depth;        /**< while parsing, the depth of this scope in the
 	                             scope stack. */
 };
@@ -112,7 +111,8 @@ struct entity_base_t {
 	entity_namespace_t  namespc;
 	symbol_t           *symbol;
 	source_position_t   source_position;
-	scope_t            *parent_scope;       /**< The parent scope where this declaration lives. */
+	scope_t            *parent_scope;    /**< The scope where this entity
+										      is contained in */
 
 	/** next declaration in a scope */
 	entity_t           *next;

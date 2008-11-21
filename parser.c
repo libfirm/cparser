@@ -778,18 +778,20 @@ static void type_error_incompatible(const char *msg,
 		next_token();                                     \
 	} while (0)
 
-static void scope_push(scope_t *new_scope)
+static scope_t *scope_push(scope_t *new_scope)
 {
 	if (current_scope != NULL) {
 		new_scope->depth = current_scope->depth + 1;
 	}
-	new_scope->parent = current_scope;
-	current_scope     = new_scope;
+
+	scope_t *old_scope = current_scope;
+	current_scope      = new_scope;
+	return old_scope;
 }
 
-static void scope_pop(void)
+static void scope_pop(scope_t *old_scope)
 {
-	current_scope = current_scope->parent;
+	current_scope = old_scope;
 }
 
 /**
@@ -5356,8 +5358,8 @@ static void parse_kr_declaration_list(entity_t *entity)
 	add_anchor_token('{');
 
 	/* push function parameters */
-	size_t const top = environment_top();
-	scope_push(&entity->function.parameters);
+	size_t const  top       = environment_top();
+	scope_t      *old_scope = scope_push(&entity->function.parameters);
 
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
@@ -5373,7 +5375,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 
 	/* pop function parameters */
 	assert(current_scope == &entity->function.parameters);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 
 	/* update function type */
@@ -6247,8 +6249,8 @@ static void parse_external_declaration(void)
 	type = skip_typeref(entity->declaration.type);
 
 	/* push function parameters and switch scope */
-	size_t const top = environment_top();
-	scope_push(&function->parameters);
+	size_t const  top       = environment_top();
+	scope_t      *old_scope = scope_push(&function->parameters);
 
 	entity_t *parameter = function->parameters.entities;
 	for (; parameter != NULL; parameter = parameter->base.next) {
@@ -6309,7 +6311,7 @@ static void parse_external_declaration(void)
 	}
 
 	assert(current_scope == &function->parameters);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 }
 
@@ -10026,8 +10028,8 @@ static statement_t *parse_for(void)
 
 	PUSH_PARENT(statement);
 
-	size_t const top = environment_top();
-	scope_push(&statement->fors.scope);
+	size_t const  top       = environment_top();
+	scope_t      *old_scope = scope_push(&statement->fors.scope);
 
 	expect('(');
 	add_anchor_token(')');
@@ -10074,7 +10076,7 @@ static statement_t *parse_for(void)
 	statement->fors.body = parse_loop_body(statement);
 
 	assert(current_scope == &statement->fors.scope);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 
 	POP_PARENT;
@@ -10084,7 +10086,7 @@ end_error:
 	POP_PARENT;
 	rem_anchor_token(')');
 	assert(current_scope == &statement->fors.scope);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 
 	return create_invalid_statement();
@@ -10488,8 +10490,8 @@ static void parse_namespace_definition(void)
 	environment_push(entity);
 	append_entity(current_scope, entity);
 
-	size_t const top = environment_top();
-	scope_push(&entity->namespacee.members);
+	size_t const  top       = environment_top();
+	scope_t      *old_scope = scope_push(&entity->namespacee.members);
 
 	expect('{');
 	parse_externals();
@@ -10497,7 +10499,7 @@ static void parse_namespace_definition(void)
 
 end_error:
 	assert(current_scope == &entity->namespacee.members);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 }
 
@@ -10634,8 +10636,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	eat('{');
 	add_anchor_token('}');
 
-	size_t const top = environment_top();
-	scope_push(&statement->compound.scope);
+	size_t const  top       = environment_top();
+	scope_t      *old_scope = scope_push(&statement->compound.scope);
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
@@ -10693,7 +10695,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 end_error:
 	rem_anchor_token('}');
 	assert(current_scope == &statement->compound.scope);
-	scope_pop();
+	scope_pop(old_scope);
 	environment_pop_to(top);
 
 	POP_PARENT;
@@ -10915,9 +10917,8 @@ void start_parsing(void)
 
 translation_unit_t *finish_parsing(void)
 {
-	/* do NOT use scope_pop() here, this will crash, will it by hand */
 	assert(current_scope == &unit->scope);
-	current_scope = NULL;
+	scope_pop(NULL);
 
 	assert(file_scope == &unit->scope);
 	check_unused_globals();
