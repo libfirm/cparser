@@ -5248,7 +5248,8 @@ static void check_variable_type_complete(entity_t *ent)
 
 static void parse_declaration_rest(entity_t *ndeclaration,
 		const declaration_specifiers_t *specifiers,
-		parsed_declaration_func finished_declaration)
+		parsed_declaration_func         finished_declaration,
+		declarator_flags_t              flags)
 {
 	add_anchor_token(';');
 	add_anchor_token(',');
@@ -5278,7 +5279,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 		eat(',');
 
 		add_anchor_token('=');
-		ndeclaration = parse_declarator(specifiers, DECL_FLAGS_NONE);
+		ndeclaration = parse_declarator(specifiers, flags);
 		rem_anchor_token('=');
 	}
 	expect(';');
@@ -5313,7 +5314,8 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	return record_entity(entity, false);
 }
 
-static void parse_declaration(parsed_declaration_func finished_declaration)
+static void parse_declaration(parsed_declaration_func finished_declaration,
+                              declarator_flags_t      flags)
 {
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
@@ -5325,8 +5327,8 @@ static void parse_declaration(parsed_declaration_func finished_declaration)
 	if (token.type == ';') {
 		parse_anonymous_declaration_rest(&specifiers);
 	} else {
-		entity_t *entity = parse_declarator(&specifiers, DECL_FLAGS_NONE);
-		parse_declaration_rest(entity, &specifiers, finished_declaration);
+		entity_t *entity = parse_declarator(&specifiers, flags);
+		parse_declaration_rest(entity, &specifiers, finished_declaration, flags);
 	}
 }
 
@@ -5370,7 +5372,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 
 	/* parse declaration list */
 	while (is_declaration_specifier(&token, false)) {
-		parse_declaration(finished_kr_declaration);
+		parse_declaration(finished_kr_declaration, DECL_IS_PARAMETER);
 	}
 
 	/* pop function parameters */
@@ -6183,7 +6185,8 @@ static void parse_external_declaration(void)
 		case ',':
 		case ';':
 		case '=':
-			parse_declaration_rest(ndeclaration, &specifiers, record_entity);
+			parse_declaration_rest(ndeclaration, &specifiers, record_entity,
+					DECL_FLAGS_NONE);
 			return;
 	}
 
@@ -10037,7 +10040,7 @@ static statement_t *parse_for(void)
 	if (token.type == ';') {
 		next_token();
 	} else if (is_declaration_specifier(&token, false)) {
-		parse_declaration(record_entity);
+		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	} else {
 		add_anchor_token(';');
 		expression_t *const init = parse_expression();
@@ -10316,10 +10319,11 @@ static statement_t *parse_declaration_statement(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_DECLARATION);
 
 	entity_t *before = current_scope->last_entity;
-	if (GNU_MODE)
+	if (GNU_MODE) {
 		parse_external_declaration();
-	else
-		parse_declaration(record_entity);
+	} else {
+		parse_declaration(record_entity, DECL_FLAGS_NONE);
+	}
 
 	if (before == NULL) {
 		statement->declaration.declarations_begin = current_scope->entities;
