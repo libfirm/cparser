@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 #set -x
 WORKDIR="release"
@@ -27,6 +27,4 @@ echo "REVISION = \"$VERSION\"" > "$FULLRELEASEDIR/Makefile"
 cat Makefile >> "$FULLRELEASEDIR/Makefile"
 
 echo "creating $RELEASEFILE"
-pushd "$WORKDIR"
-tar -cjf "$RELEASEFILE" "$RELEASEDIR"
-popd
+tar cjf -C "$WORKDIR" "$RELEASEFILE" "$RELEASEDIR"
