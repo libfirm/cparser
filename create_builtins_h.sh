@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 cat <<__EOF__
 /* WARNING: automatically generated file. Generated from builtins/builtins.c */
