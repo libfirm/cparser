@@ -9662,6 +9662,7 @@ static statement_t *parse_case_statement(void)
 	PUSH_PARENT(statement);
 
 	expect(':');
+end_error:
 
 	if (current_switch != NULL) {
 		if (! statement->case_label.is_bad) {
@@ -9698,9 +9699,6 @@ static statement_t *parse_case_statement(void)
 
 	POP_PARENT;
 	return statement;
-end_error:
-	POP_PARENT;
-	return create_invalid_statement();
 }
 
 /**
