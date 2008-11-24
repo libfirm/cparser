@@ -10798,8 +10798,11 @@ static void parse_external(void)
 		DECLARATION_START_NO_EXTERN
 		case T_IDENTIFIER:
 		case T___extension__:
-		case '(': /* for function declarations with implicit return type and
-			           * parenthesized declarator, i.e. (f)(void); */
+		/* tokens below are for implicit int */
+		case '&': /* & x; -> int& x; (and error later, because C++ has no
+		             implicit int) */
+		case '*': /* * x; -> int* x; */
+		case '(': /* (x); -> int (x); */
 			parse_external_declaration();
 			return;
 
