@@ -745,7 +745,7 @@ void parse_error_expected(const char *message, ...)
 	}
 	va_list ap;
 	va_start(ap, message);
-	errorf(HERE, "got %K, expected %#k", &token, &ap, ", ");
+	errorf(HERE, "got '%K', expected %#k", &token, &ap, ", ");
 	va_end(ap);
 }
 
@@ -1891,7 +1891,7 @@ static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
 		case T___thiscall:
 			/* TODO record modifier */
 			if (warning.other)
-				warningf(HERE, "Ignoring declaration modifier %K", &token);
+				warningf(HERE, "Ignoring declaration modifier '%K'", &token);
 			break;
 
 end_error:
@@ -3444,7 +3444,7 @@ static void parse_microsoft_based(based_spec_t *based_spec)
 
 		if (is_type_valid(type)) {
 			if (! is_type_pointer(skip_typeref(type))) {
-				errorf(HERE, "variable in __based modifier must have pointer type instead of %T", type);
+				errorf(HERE, "variable in __based modifier must have pointer type instead of '%T'", type);
 			}
 			if (variable->base.base.parent_scope != file_scope) {
 				errorf(HERE, "a nonstatic local variable may not be used in a __based specification");
@@ -3736,7 +3736,7 @@ wrong_thread_stoarge_class:
 					case T_IDENTIFIER:
 					case '&':
 					case '*':
-						errorf(HERE, "discarding stray %K in declaration specifier", &token);
+						errorf(HERE, "discarding stray '%K' in declaration specifier", &token);
 						next_token();
 						continue;
 
@@ -3756,7 +3756,7 @@ wrong_thread_stoarge_class:
 					case T_IDENTIFIER:
 					case '&':
 					case '*': {
-						errorf(HERE, "%K does not name a type", &token);
+						errorf(HERE, "'%K' does not name a type", &token);
 
 						entity_t *entity =
 							create_error_entity(token.v.symbol, ENTITY_TYPEDEF);
@@ -7674,7 +7674,7 @@ static expression_t *parse_primary_expression(void)
 		case T___noop:                   return parse_noop_expression();
 	}
 
-	errorf(HERE, "unexpected token %K, expected an expression", &token);
+	errorf(HERE, "unexpected token '%K', expected an expression", &token);
 	return create_invalid_expression();
 }
 
@@ -10593,7 +10593,7 @@ expression_statment:
 		break;
 
 	default:
-		errorf(HERE, "unexpected token %K while parsing statement", &token);
+		errorf(HERE, "unexpected token '%K' while parsing statement", &token);
 		statement = create_invalid_statement();
 		if (!at_anchor())
 			next_token();
@@ -10829,7 +10829,7 @@ static void parse_external(void)
 			/* FALLTHROUGH */
 
 		default:
-			errorf(HERE, "stray %K outside of function", &token);
+			errorf(HERE, "stray '%K' outside of function", &token);
 			if (token.type == '(' || token.type == '{' || token.type == '[')
 				eat_until_matching_token(token.type);
 			next_token();
@@ -10886,7 +10886,7 @@ static void parse_translation_unit(void)
 		if (token.type == T_EOF)
 			break;
 
-		errorf(HERE, "stray %K outside of function", &token);
+		errorf(HERE, "stray '%K' outside of function", &token);
 		if (token.type == '(' || token.type == '{' || token.type == '[')
 			eat_until_matching_token(token.type);
 		next_token();
