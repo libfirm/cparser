@@ -554,6 +554,9 @@ void print_compound_definition(const compound_t *compound)
 	change_indent(-1);
 	print_indent();
 	fputs("}", out);
+	if (compound->modifiers & DM_TRANSPARENT_UNION) {
+		fputs("__attribute__((__transparent_union__))", out);
+	}
 }
 
 /**
@@ -707,6 +710,10 @@ static void intern_print_type_post(const type_t *const type, const bool top)
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		break;
+	}
+
+	if (type->base.modifiers & DM_TRANSPARENT_UNION) {
+		fputs("__attribute__((__transparent_union__))", out);
 	}
 }
 
