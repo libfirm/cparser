@@ -5622,11 +5622,15 @@ static bool expression_returns(expression_t const *const expr)
 
 		case EXPR_CONDITIONAL:
 			// TODO handle constant expression
-			return
-				expression_returns(expr->conditional.condition) && (
-					expression_returns(expr->conditional.true_expression) ||
-					expression_returns(expr->conditional.false_expression)
-				);
+
+			if (!expression_returns(expr->conditional.condition))
+				return false;
+
+			if (expr->condition.true_expression != NULL
+					&& expression_returns(expr->conditional.true_expression))
+				return true;
+
+			return expression_returns(expr->conditional.false_expression);
 
 		case EXPR_SELECT:
 			return expression_returns(expr->select.compound);
