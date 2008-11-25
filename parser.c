@@ -1912,7 +1912,8 @@ static entity_t *determine_lhs_ent(expression_t *const expr,
 		case EXPR_REFERENCE: {
 			entity_t *const entity = expr->reference.entity;
 			/* we should only find variables as lvalues... */
-			if (entity->base.kind != ENTITY_VARIABLE)
+			if (entity->base.kind != ENTITY_VARIABLE
+					&& entity->base.kind != ENTITY_PARAMETER)
 				return NULL;
 
 			return entity;
