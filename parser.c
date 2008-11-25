@@ -4507,7 +4507,7 @@ static void parse_declaration_attributes(entity_t *entity)
 
 	type_modifiers_t type_modifiers = type->base.modifiers;
 	if (modifiers & DM_TRANSPARENT_UNION)
-		modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
+		type_modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 
 	if (type->base.modifiers != type_modifiers) {
 		type_t *copy = duplicate_type(type);
