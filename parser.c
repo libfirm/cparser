@@ -1162,7 +1162,7 @@ static expression_t *parse_constant_expression(void)
 
 	if (!is_constant_expression(result)) {
 		errorf(&result->base.source_position,
-		       "expression '%E' is not constant\n", result);
+		       "expression '%E' is not constant", result);
 	}
 
 	return result;
@@ -2297,7 +2297,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	mark_vars_read(expression, NULL);
 	if (must_be_constant && !is_initializer_constant(expression)) {
 		errorf(&expression->base.source_position,
-		       "Initialisation expression '%E' is not constant\n",
+		       "Initialisation expression '%E' is not constant",
 		       expression);
 	}
 
@@ -2736,7 +2736,7 @@ finish_designator:
 
 			if (env->must_be_constant && !is_initializer_constant(expression)) {
 				errorf(&expression->base.source_position,
-				       "Initialisation expression '%E' is not constant\n",
+				       "Initialisation expression '%E' is not constant",
 				       expression);
 			}
 
