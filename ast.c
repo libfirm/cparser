@@ -1573,6 +1573,7 @@ void print_entity(const entity_t *entity)
 
 	switch ((entity_kind_tag_t)entity->kind) {
 	case ENTITY_VARIABLE:
+	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 		print_declaration(entity);
 		return;

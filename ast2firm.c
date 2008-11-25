@@ -83,6 +83,8 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_GLOBAL_VARIABLE,
 	DECLARATION_KIND_LOCAL_VARIABLE,
 	DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
+	DECLARATION_KIND_PARAMETER,
+	DECLARATION_KIND_PARAMETER_ENTITY,
 	DECLARATION_KIND_FUNCTION,
 	DECLARATION_KIND_COMPOUND_MEMBER,
 	DECLARATION_KIND_INNER_FUNCTION
@@ -110,12 +112,13 @@ static entity_t *next_inner_function(void)
 
 ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
-	const variable_t *variable = get_irg_loc_description(irg, pos);
+	const entity_t *entity = get_irg_loc_description(irg, pos);
 
-	if (variable != NULL) {
-		warningf(&variable->base.base.source_position,
-		         "variable '%#T' might be used uninitialized",
-		         variable->base.type, variable->base.base.symbol);
+	if (entity != NULL) {
+		warningf(&entity->base.source_position,
+		         "%s '%#T' might be used uninitialized",
+		         get_entity_kind_name(entity->kind),
+		         entity->declaration.type, entity->base.symbol);
 	}
 	return new_r_Unknown(irg, mode);
 }
@@ -1439,6 +1442,10 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		ir_mode *const mode = get_ir_mode(type);
 		return get_value(entity->variable.v.value_number, mode);
 	}
+	case DECLARATION_KIND_PARAMETER: {
+		ir_mode *const mode = get_ir_mode(type);
+		return get_value(entity->parameter.v.value_number, mode);
+	}
 	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode(type);
 		return create_symconst(dbgi, mode, entity->function.entity);
@@ -1465,6 +1472,12 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
 		return deref_address(dbgi, entity->declaration.type, sel);
 	}
+	case DECLARATION_KIND_PARAMETER_ENTITY: {
+		ir_entity *irentity = entity->parameter.v.entity;
+		ir_node   *frame    = get_local_frame(irentity);
+		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
+		return deref_address(dbgi, entity->declaration.type, sel);
+	}
 
 	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
 		return entity->variable.v.vla_base;
@@ -1485,6 +1498,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	switch((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_UNKNOWN:
 		break;
+	case DECLARATION_KIND_PARAMETER:
 	case DECLARATION_KIND_LOCAL_VARIABLE:
 		/* you can store to a local variable (so we don't panic but return NULL
 		 * as an indicator for no real address) */
@@ -1495,6 +1509,13 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
 		ir_entity *irentity = entity->variable.v.entity;
+		ir_node   *frame    = get_local_frame(irentity);
+		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
+
+		return sel;
+	}
+	case DECLARATION_KIND_PARAMETER_ENTITY: {
+		ir_entity *irentity = entity->parameter.v.entity;
 		ir_node   *frame    = get_local_frame(irentity);
 		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
 
@@ -1869,11 +1890,15 @@ static void set_value_for_expression_addr(const expression_t *expression,
 		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(entity->variable.v.value_number, value);
 			return;
+		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
+			set_value(entity->parameter.v.value_number, value);
+			return;
 		}
 	}
 
 	if (addr == NULL)
 		addr = expression_to_addr(expression);
+	assert(addr != NULL);
 
 	type_t *type = skip_typeref(expression->base.type);
 
@@ -1909,12 +1934,17 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 		const reference_expression_t *ref = &expression->reference;
 
 		entity_t *entity = ref->entity;
-		assert(entity->kind == ENTITY_VARIABLE);
+		assert(entity->kind == ENTITY_VARIABLE
+				|| entity->kind == ENTITY_PARAMETER);
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
 		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			assert(addr == NULL);
 			ir_mode *mode = get_ir_mode(expression->base.type);
 			return get_value(entity->variable.v.value_number, mode);
+		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
+			assert(addr == NULL);
+			ir_mode *mode = get_ir_mode(expression->base.type);
+			return get_value(entity->parameter.v.value_number, mode);
 		}
 	}
 
@@ -4021,7 +4051,7 @@ static void create_local_variable(entity_t *entity)
 		entity->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
 		entity->variable.v.value_number = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function,
-		                        (variable_t*) &entity->variable);
+		                        entity);
 		++next_value_number_function;
 	}
 }
@@ -4230,6 +4260,10 @@ static void initialize_local_declaration(entity_t *entity)
 	case DECLARATION_KIND_FUNCTION:
 	case DECLARATION_KIND_INNER_FUNCTION:
 		return;
+
+	case DECLARATION_KIND_PARAMETER:
+	case DECLARATION_KIND_PARAMETER_ENTITY:
+		panic("can't initialize parameters");
 
 	case DECLARATION_KIND_UNKNOWN:
 		panic("can't initialize unknown declaration");
@@ -5048,11 +5082,20 @@ static int count_local_variables(const entity_t *entity,
 {
 	int count = 0;
 	for (; entity != end; entity = entity->base.next) {
-		if (entity->kind != ENTITY_VARIABLE)
-			continue;
-		type_t *type = skip_typeref(entity->declaration.type);
+		type_t *type;
+		bool    address_taken;
 
-		if (!entity->variable.address_taken && is_type_scalar(type))
+		if (entity->kind == ENTITY_VARIABLE) {
+			type          = skip_typeref(entity->declaration.type);
+			address_taken = entity->variable.address_taken;
+		} else if (entity->kind == ENTITY_PARAMETER) {
+			type          = skip_typeref(entity->declaration.type);
+			address_taken = entity->parameter.address_taken;
+		} else {
+			continue;
+		}
+
+		if (!address_taken && is_type_scalar(type))
 			++count;
 	}
 	return count;
@@ -5103,11 +5146,11 @@ static void initialize_function_parameters(entity_t *entity)
 	int       n         = 0;
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
-		assert(parameter->kind == ENTITY_VARIABLE);
+		assert(parameter->kind == ENTITY_PARAMETER);
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		bool needs_entity = parameter->variable.address_taken;
+		bool needs_entity = parameter->parameter.address_taken;
 		assert(!is_type_array(type));
 		if (is_type_compound(type)) {
 			needs_entity = true;
@@ -5119,8 +5162,8 @@ static void initialize_function_parameters(entity_t *entity)
 			set_entity_ident(entity, id);
 
 			parameter->declaration.kind
-				= DECLARATION_KIND_LOCAL_VARIABLE_ENTITY;
-			parameter->variable.v.entity = entity;
+				= DECLARATION_KIND_PARAMETER_ENTITY;
+			parameter->parameter.v.entity = entity;
 			continue;
 		}
 
@@ -5134,13 +5177,13 @@ static void initialize_function_parameters(entity_t *entity)
 		value = create_conv(NULL, value, mode);
 		value = do_strict_conv(NULL, value);
 
-		parameter->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
-		parameter->variable.v.value_number = next_value_number_function;
+		parameter->declaration.kind         = DECLARATION_KIND_PARAMETER;
+		parameter->parameter.v.value_number = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function,
-		                        (variable_t*) &parameter->variable);
+		                        parameter);
 		++next_value_number_function;
 
-		set_value(parameter->variable.v.value_number, value);
+		set_value(parameter->parameter.v.value_number, value);
 	}
 }
 

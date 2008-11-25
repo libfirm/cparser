@@ -23,11 +23,13 @@
 #include "lexer.h"
 #include "symbol.h"
 #include "entity.h"
+#include <libfirm/firm_types.h>
 
 typedef enum {
 	ENTITY_INVALID,
 	ENTITY_VARIABLE,
 	ENTITY_COMPOUND_MEMBER,
+	ENTITY_PARAMETER,
 	ENTITY_FUNCTION,
 	ENTITY_TYPEDEF,
 	ENTITY_STRUCT,
@@ -189,7 +191,8 @@ struct declaration_t {
 
 struct compound_member_t {
 	declaration_t  base;
-	bool           read : 1;
+	bool           read          : 1;
+	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
 
 	/* ast2firm info */
 	ir_entity *entity;
@@ -212,6 +215,18 @@ struct variable_t {
 		unsigned int  value_number;
 		ir_entity    *entity;
 		ir_node      *vla_base;
+	} v;
+};
+
+struct parameter_t {
+	declaration_t  base;
+	bool           address_taken : 1;
+	bool           read          : 1;
+
+	/* ast2firm info */
+	union {
+		unsigned int  value_number;
+		ir_entity    *entity;
 	} v;
 };
 
@@ -241,6 +256,7 @@ union entity_t {
 	typedef_t          typedefe;
 	declaration_t      declaration;
 	variable_t         variable;
+	parameter_t        parameter;
 	function_t         function;
 	compound_member_t  compound_member;
 };
@@ -248,7 +264,11 @@ union entity_t {
 static inline bool is_declaration(const entity_t *entity)
 {
 	return entity->kind == ENTITY_FUNCTION || entity->kind == ENTITY_VARIABLE
+		|| entity->kind == ENTITY_PARAMETER
 		|| entity->kind == ENTITY_COMPOUND_MEMBER;
 }
+
+
+const char *get_entity_kind_name(entity_kind_t kind);
 
 #endif

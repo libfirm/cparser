@@ -331,7 +331,8 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[ENTITY_VARIABLE]        = sizeof(variable_t),
-		[ENTITY_COMPOUND_MEMBER] = sizeof(variable_t),
+		[ENTITY_PARAMETER]       = sizeof(parameter_t),
+		[ENTITY_COMPOUND_MEMBER] = sizeof(compound_member_t),
 		[ENTITY_FUNCTION]        = sizeof(function_t),
 		[ENTITY_TYPEDEF]         = sizeof(typedef_t),
 		[ENTITY_STRUCT]          = sizeof(compound_t),
@@ -1902,39 +1903,39 @@ end_error:
 	}
 }
 
-static void mark_vars_read(expression_t *expr, variable_t *lhs_var);
+static void mark_vars_read(expression_t *expr, entity_t *lhs_ent);
 
-static variable_t *determine_lhs_var(expression_t *const expr,
-                                     variable_t *lhs_var)
+static entity_t *determine_lhs_ent(expression_t *const expr,
+                                   entity_t *lhs_ent)
 {
 	switch (expr->kind) {
 		case EXPR_REFERENCE: {
 			entity_t *const entity = expr->reference.entity;
-			/* we should only find variables as lavlues... */
+			/* we should only find variables as lvalues... */
 			if (entity->base.kind != ENTITY_VARIABLE)
 				return NULL;
 
-			return &entity->variable;
+			return entity;
 		}
 
 		case EXPR_ARRAY_ACCESS: {
-			expression_t  *const ref = expr->array_access.array_ref;
-			variable_t    *      var = NULL;
+			expression_t *const ref = expr->array_access.array_ref;
+			entity_t     *      ent = NULL;
 			if (is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
-				var     = determine_lhs_var(ref, lhs_var);
-				lhs_var = var;
+				ent     = determine_lhs_ent(ref, lhs_ent);
+				lhs_ent = ent;
 			} else {
-				mark_vars_read(expr->select.compound, lhs_var);
+				mark_vars_read(expr->select.compound, lhs_ent);
 			}
-			mark_vars_read(expr->array_access.index, lhs_var);
-			return var;
+			mark_vars_read(expr->array_access.index, lhs_ent);
+			return ent;
 		}
 
 		case EXPR_SELECT: {
 			if (is_type_compound(skip_typeref(expr->base.type))) {
-				return determine_lhs_var(expr->select.compound, lhs_var);
+				return determine_lhs_ent(expr->select.compound, lhs_ent);
 			} else {
-				mark_vars_read(expr->select.compound, lhs_var);
+				mark_vars_read(expr->select.compound, lhs_ent);
 				return NULL;
 			}
 		}
@@ -1943,7 +1944,7 @@ static variable_t *determine_lhs_var(expression_t *const expr,
 			expression_t *const val = expr->unary.value;
 			if (val->kind == EXPR_UNARY_TAKE_ADDRESS) {
 				/* *&x is a NOP */
-				return determine_lhs_var(val->unary.value, lhs_var);
+				return determine_lhs_ent(val->unary.value, lhs_ent);
 			} else {
 				mark_vars_read(val, NULL);
 				return NULL;
@@ -1956,10 +1957,10 @@ static variable_t *determine_lhs_var(expression_t *const expr,
 	}
 }
 
-#define VAR_ANY ((variable_t*)-1)
+#define ENT_ANY ((entity_t*)-1)
 
 /**
- * Mark declarations, which are read.  This is used to deted variables, which
+ * Mark declarations, which are read.  This is used to detect variables, which
  * are never read.
  * Example:
  * x = x + 1;
@@ -1970,17 +1971,21 @@ static variable_t *determine_lhs_var(expression_t *const expr,
  *   x and y are not detected as "not read", because multiple variables are
  *   involved.
  */
-static void mark_vars_read(expression_t *const expr, variable_t *lhs_var)
+static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 {
 	switch (expr->kind) {
 		case EXPR_REFERENCE: {
 			entity_t *const entity = expr->reference.entity;
-			if (entity->kind != ENTITY_VARIABLE)
+			if (entity->kind != ENTITY_VARIABLE
+					&& entity->kind != ENTITY_PARAMETER)
 				return;
 
-			variable_t *variable = &entity->variable;
-			if (lhs_var != variable && lhs_var != VAR_ANY) {
-				variable->read = true;
+			if (lhs_ent != entity && lhs_ent != ENT_ANY) {
+				if (entity->kind == ENTITY_VARIABLE) {
+					entity->variable.read = true;
+				} else {
+					entity->parameter.read = true;
+				}
 			}
 			return;
 		}
@@ -1997,32 +2002,33 @@ static void mark_vars_read(expression_t *const expr, variable_t *lhs_var)
 			// TODO lhs_decl should depend on whether true/false have an effect
 			mark_vars_read(expr->conditional.condition, NULL);
 			if (expr->conditional.true_expression != NULL)
-				mark_vars_read(expr->conditional.true_expression, lhs_var);
-			mark_vars_read(expr->conditional.false_expression, lhs_var);
+				mark_vars_read(expr->conditional.true_expression, lhs_ent);
+			mark_vars_read(expr->conditional.false_expression, lhs_ent);
 			return;
 
 		case EXPR_SELECT:
-			if (lhs_var == VAR_ANY && !is_type_compound(skip_typeref(expr->base.type)))
-				lhs_var = NULL;
-			mark_vars_read(expr->select.compound, lhs_var);
+			if (lhs_ent == ENT_ANY
+					&& !is_type_compound(skip_typeref(expr->base.type)))
+				lhs_ent = NULL;
+			mark_vars_read(expr->select.compound, lhs_ent);
 			return;
 
 		case EXPR_ARRAY_ACCESS: {
 			expression_t *const ref = expr->array_access.array_ref;
-			mark_vars_read(ref, lhs_var);
-			lhs_var = determine_lhs_var(ref, lhs_var);
-			mark_vars_read(expr->array_access.index, lhs_var);
+			mark_vars_read(ref, lhs_ent);
+			lhs_ent = determine_lhs_ent(ref, lhs_ent);
+			mark_vars_read(expr->array_access.index, lhs_ent);
 			return;
 		}
 
 		case EXPR_VA_ARG:
-			mark_vars_read(expr->va_arge.ap, lhs_var);
+			mark_vars_read(expr->va_arge.ap, lhs_ent);
 			return;
 
 		case EXPR_UNARY_CAST:
 			/* Special case: Use void cast to mark a variable as "read" */
 			if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_VOID))
-				lhs_var = NULL;
+				lhs_ent = NULL;
 			goto unary;
 
 
@@ -2033,8 +2039,8 @@ static void mark_vars_read(expression_t *const expr, variable_t *lhs_var)
 		case EXPR_UNARY_DEREFERENCE:
 		case EXPR_UNARY_DELETE:
 		case EXPR_UNARY_DELETE_ARRAY:
-			if (lhs_var == VAR_ANY)
-				lhs_var = NULL;
+			if (lhs_ent == ENT_ANY)
+				lhs_ent = NULL;
 			goto unary;
 
 		case EXPR_UNARY_NEGATE:
@@ -2049,7 +2055,7 @@ static void mark_vars_read(expression_t *const expr, variable_t *lhs_var)
 		case EXPR_UNARY_CAST_IMPLICIT:
 		case EXPR_UNARY_ASSUME:
 unary:
-			mark_vars_read(expr->unary.value, lhs_var);
+			mark_vars_read(expr->unary.value, lhs_ent);
 			return;
 
 		case EXPR_BINARY_ADD:
@@ -2077,8 +2083,8 @@ unary:
 		case EXPR_BINARY_ISLESSEQUAL:
 		case EXPR_BINARY_ISLESSGREATER:
 		case EXPR_BINARY_ISUNORDERED:
-			mark_vars_read(expr->binary.left,  lhs_var);
-			mark_vars_read(expr->binary.right, lhs_var);
+			mark_vars_read(expr->binary.left,  lhs_ent);
+			mark_vars_read(expr->binary.right, lhs_ent);
 			return;
 
 		case EXPR_BINARY_ASSIGN:
@@ -2092,15 +2098,15 @@ unary:
 		case EXPR_BINARY_BITWISE_AND_ASSIGN:
 		case EXPR_BINARY_BITWISE_XOR_ASSIGN:
 		case EXPR_BINARY_BITWISE_OR_ASSIGN: {
-			if (lhs_var == VAR_ANY)
-				lhs_var = NULL;
-			lhs_var = determine_lhs_var(expr->binary.left, lhs_var);
-			mark_vars_read(expr->binary.right, lhs_var);
+			if (lhs_ent == ENT_ANY)
+				lhs_ent = NULL;
+			lhs_ent = determine_lhs_ent(expr->binary.left, lhs_ent);
+			mark_vars_read(expr->binary.right, lhs_ent);
 			return;
 		}
 
 		case EXPR_VA_START:
-			determine_lhs_var(expr->va_starte.ap, lhs_var);
+			determine_lhs_ent(expr->va_starte.ap, lhs_ent);
 			return;
 
 		case EXPR_UNKNOWN:
@@ -4014,7 +4020,7 @@ static type_qualifiers_t parse_type_qualifiers(void)
 static void parse_identifier_list(scope_t *scope)
 {
 	do {
-		entity_t *entity = allocate_entity_zero(ENTITY_VARIABLE);
+		entity_t *entity = allocate_entity_zero(ENTITY_PARAMETER);
 		entity->base.source_position = token.source_position;
 		entity->base.namespc         = NAMESPACE_NORMAL;
 		entity->base.symbol          = token.v.symbol;
@@ -4030,35 +4036,6 @@ static void parse_identifier_list(scope_t *scope)
 	} while (token.type == T_IDENTIFIER);
 }
 
-static void semantic_parameter(declaration_t *declaration)
-{
-	/* TODO: improve error messages */
-	source_position_t const* const pos = &declaration->base.source_position;
-
-	/* §6.9.1:6  The declarations in the declaration list shall contain no
-	 *           storage-class specifier other than register and no
-	 *           initializations. */
-	switch (declaration->declared_storage_class) {
-		/* Allowed storage classes */
-		case STORAGE_CLASS_NONE:
-		case STORAGE_CLASS_REGISTER:
-			break;
-
-		default:
-			errorf(pos, "parameter may only have none or register storage class");
-			break;
-	}
-
-	/* §6.7.5.3:4  After adjustment, the parameters in a parameter type list in
-	 *             a function declarator that is part of a definition of that
-	 *             function shall not have incomplete type. */
-	type_t *type = declaration->type;
-	if (is_type_incomplete(skip_typeref(type))) {
-		errorf(pos, "parameter '%#T' has incomplete type",
-		       type, declaration->base.symbol);
-	}
-}
-
 static entity_t *parse_parameter(void)
 {
 	declaration_specifiers_t specifiers;
@@ -4070,6 +4047,22 @@ static entity_t *parse_parameter(void)
 			DECL_MAY_BE_ABSTRACT | DECL_IS_PARAMETER);
 	anonymous_entity = NULL;
 	return entity;
+}
+
+static void semantic_parameter_incomplete(const entity_t *entity)
+{
+	assert(entity->kind == ENTITY_PARAMETER);
+
+	/* §6.7.5.3:4  After adjustment, the parameters in a parameter type
+	 *             list in a function declarator that is part of a
+	 *             definition of that function shall not have
+	 *             incomplete type. */
+	type_t *type = skip_typeref(entity->declaration.type);
+	if (is_type_incomplete(type)) {
+		errorf(&entity->base.source_position,
+		       "parameter '%Y' has incomplete type %T", entity->base.symbol,
+		       entity->declaration.type);
+	}
 }
 
 /**
@@ -4128,7 +4121,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 					&& skip_typeref(entity->declaration.type) == type_void) {
 				goto parameters_finished;
 			}
-			semantic_parameter(&entity->declaration);
+			semantic_parameter_incomplete(entity);
 
 			parameter = obstack_alloc(type_obst, sizeof(parameter[0]));
 			memset(parameter, 0, sizeof(parameter[0]));
@@ -4639,6 +4632,39 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 
 static type_t *automatic_type_conversion(type_t *orig_type);
 
+static type_t *semantic_parameter(const source_position_t *pos,
+                                  type_t *type,
+                                  const declaration_specifiers_t *specifiers,
+                                  symbol_t *symbol)
+{
+	/* §6.7.5.3:7  A declaration of a parameter as ``array of type''
+	 *             shall be adjusted to ``qualified pointer to type'',
+	 *             [...]
+	 * §6.7.5.3:8  A declaration of a parameter as ``function returning
+	 *             type'' shall be adjusted to ``pointer to function
+	 *             returning type'', as in 6.3.2.1. */
+	type = automatic_type_conversion(type);
+
+	if (specifiers->is_inline && is_type_valid(type)) {
+		errorf(pos, "parameter '%Y' declared 'inline'", symbol);
+	}
+
+	/* §6.9.1:6  The declarations in the declaration list shall contain
+	 *           no storage-class specifier other than register and no
+	 *           initializations. */
+	if (specifiers->thread_local || (
+			specifiers->storage_class != STORAGE_CLASS_NONE   &&
+			specifiers->storage_class != STORAGE_CLASS_REGISTER)
+	   ) {
+		errorf(pos, "invalid storage class for parameter '%Y'", symbol);
+	}
+
+	/* delay test for incomplete type, because we might have (void)
+	 * which is legal but incomplete... */
+
+	return type;
+}
+
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
                                   declarator_flags_t flags)
 {
@@ -4678,29 +4704,26 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			}
 		}
 	} else {
+		/* create a declaration type entity */
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
-		  entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
+			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
 
 			if (specifiers->is_inline && is_type_valid(type)) {
 				errorf(&env.source_position,
 						"compound member '%Y' declared 'inline'", env.symbol);
 			}
 
-		  if (specifiers->thread_local ||
-		  		specifiers->storage_class != STORAGE_CLASS_NONE) {
-		  	errorf(&env.source_position,
-		  			"compound member '%Y' must have no storage class",
-		  			env.symbol);
-		  }
+			if (specifiers->thread_local ||
+				specifiers->storage_class != STORAGE_CLASS_NONE) {
+				errorf(&env.source_position,
+					   "compound member '%Y' must have no storage class",
+					   env.symbol);
+			}
 		} else if (flags & DECL_IS_PARAMETER) {
-			/* §6.7.5.3:7  A declaration of a parameter as ``array of type''
-			 *             shall be adjusted to ``qualified pointer to type'',
-			 *             [...]
-			 * §6.7.5.3:8  A declaration of a parameter as ``function returning
-			 *             type'' shall be adjusted to ``pointer to function
-			 *             returning type'', as in 6.3.2.1. */
-			orig_type = automatic_type_conversion(type);
-			goto create_variable;
+			orig_type = semantic_parameter(&env.source_position, type,
+			                               specifiers, env.symbol);
+
+			entity = allocate_entity_zero(ENTITY_PARAMETER);
 		} else if (is_type_function(type)) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION);
 
@@ -4708,15 +4731,14 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			entity->function.parameters = env.parameters;
 
 			if (specifiers->thread_local || (
-						specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-						specifiers->storage_class != STORAGE_CLASS_NONE   &&
-						specifiers->storage_class != STORAGE_CLASS_STATIC)
-					) {
+					specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+					specifiers->storage_class != STORAGE_CLASS_NONE   &&
+					specifiers->storage_class != STORAGE_CLASS_STATIC)
+			   ) {
 				errorf(&env.source_position,
-						"invalid storage class for function '%Y'", env.symbol);
+					   "invalid storage class for function '%Y'", env.symbol);
 			}
 		} else {
-create_variable:
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
 
 			entity->variable.get_property_sym = specifiers->get_property_sym;
@@ -4728,7 +4750,7 @@ create_variable:
 
 			if (specifiers->is_inline && is_type_valid(type)) {
 				errorf(&env.source_position,
-						"variable '%Y' declared 'inline'", env.symbol);
+					   "variable '%Y' declared 'inline'", env.symbol);
 			}
 
 			entity->variable.thread_local = specifiers->thread_local;
@@ -4762,10 +4784,8 @@ create_variable:
 		storage_class_t storage_class = specifiers->storage_class;
 		entity->declaration.declared_storage_class = storage_class;
 
-		if (storage_class == STORAGE_CLASS_NONE
-				&& current_scope != file_scope) {
+		if (storage_class == STORAGE_CLASS_NONE	&& current_scope != file_scope)
 			storage_class = STORAGE_CLASS_AUTO;
-		}
 		entity->declaration.storage_class = storage_class;
 	}
 
@@ -4855,26 +4875,6 @@ static bool is_sym_main(const symbol_t *const sym)
 	return strcmp(sym->string, "main") == 0;
 }
 
-static const char *get_entity_kind_name(entity_kind_t kind)
-{
-	switch ((entity_kind_tag_t) kind) {
-	case ENTITY_FUNCTION:        return "function";
-	case ENTITY_VARIABLE:        return "variable";
-	case ENTITY_COMPOUND_MEMBER: return "compound type member";
-	case ENTITY_STRUCT:          return "struct";
-	case ENTITY_UNION:           return "union";
-	case ENTITY_ENUM:            return "enum";
-	case ENTITY_ENUM_VALUE:      return "enum value";
-	case ENTITY_LABEL:           return "label";
-	case ENTITY_LOCAL_LABEL:     return "local label";
-	case ENTITY_TYPEDEF:         return "typedef";
-	case ENTITY_NAMESPACE:       return "namespace";
-	case ENTITY_INVALID:         break;
-	}
-
-	panic("Invalid entity kind encountered in get_entity_kind_name");
-}
-
 static void error_redefined_as_different_kind(const source_position_t *pos,
 		const entity_t *old, entity_kind_t new_kind)
 {
@@ -4929,7 +4929,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	    && previous_entity->base.parent_scope == &current_function->parameters
 		&& current_scope->depth == previous_entity->base.parent_scope->depth+1){
 
-		assert(previous_entity->kind == ENTITY_VARIABLE);
+		assert(previous_entity->kind == ENTITY_PARAMETER);
 		errorf(pos,
 		       "declaration '%#T' redeclares the parameter '%#T' (declared %P)",
 		       entity->declaration.type, symbol,
@@ -4964,9 +4964,9 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 		assert(is_declaration(previous_entity) && is_declaration(entity));
 
 		/* can happen for K&R style declarations */
-		if (previous_entity->kind == ENTITY_VARIABLE
+		if (previous_entity->kind == ENTITY_PARAMETER
 				&& previous_entity->declaration.type == NULL
-				&& entity->kind == ENTITY_VARIABLE) {
+				&& entity->kind == ENTITY_PARAMETER) {
 			previous_entity->declaration.type = entity->declaration.type;
 			previous_entity->declaration.storage_class
 				= entity->declaration.storage_class;
@@ -5047,7 +5047,8 @@ warn_redundant_declaration:
 				if (!is_definition           &&
 				    warning.redundant_decls  &&
 				    is_type_valid(prev_type) &&
-				    strcmp(previous_entity->base.source_position.input_name, "<builtin>") != 0) {
+				    strcmp(previous_entity->base.source_position.input_name,
+				           "<builtin>") != 0) {
 					warningf(pos,
 					         "redundant declaration for '%Y' (declared %P)",
 					         symbol, &previous_entity->base.source_position);
@@ -5386,26 +5387,25 @@ static void parse_kr_declaration_list(entity_t *entity)
 	function_parameter_t *parameters     = NULL;
 	function_parameter_t *last_parameter = NULL;
 
-	entity_t *parameter_declaration = entity->function.parameters.entities;
-	for (; parameter_declaration != NULL;
-			parameter_declaration = parameter_declaration->base.next) {
-		type_t *parameter_type = parameter_declaration->declaration.type;
+	parameter = entity->function.parameters.entities;
+	for (; parameter != NULL; parameter = parameter->base.next) {
+		type_t *parameter_type = parameter->declaration.type;
 		if (parameter_type == NULL) {
 			if (strict_mode) {
 				errorf(HERE, "no type specified for function parameter '%Y'",
-				       parameter_declaration->base.symbol);
+				       parameter->base.symbol);
 			} else {
 				if (warning.implicit_int) {
 					warningf(HERE, "no type specified for function parameter '%Y', using 'int'",
-					         parameter_declaration->base.symbol);
+					         parameter->base.symbol);
 				}
-				parameter_type                          = type_int;
-				parameter_declaration->declaration.type = parameter_type;
+				parameter_type              = type_int;
+				parameter->declaration.type = parameter_type;
 			}
 		}
 
-		semantic_parameter(&parameter_declaration->declaration);
-		parameter_type = parameter_declaration->declaration.type;
+		semantic_parameter_incomplete(parameter);
+		parameter_type = parameter->declaration.type;
 
 		/*
 		 * we need the default promoted types for the function type
@@ -5494,8 +5494,7 @@ static void check_labels(void)
 	}
 }
 
-static void warn_unused_decl(entity_t *entity, entity_t *end,
-                             char const *const what)
+static void warn_unused_entity(entity_t *entity, entity_t *end)
 {
 	for (; entity != NULL; entity = entity->base.next) {
 		if (!is_declaration(entity))
@@ -5507,10 +5506,12 @@ static void warn_unused_decl(entity_t *entity, entity_t *end,
 
 		if (!declaration->used) {
 			print_in_function();
+			const char *what = get_entity_kind_name(entity->kind);
 			warningf(&entity->base.source_position, "%s '%Y' is unused",
 			         what, entity->base.symbol);
 		} else if (entity->kind == ENTITY_VARIABLE && !entity->variable.read) {
 			print_in_function();
+			const char *what = get_entity_kind_name(entity->kind);
 			warningf(&entity->base.source_position, "%s '%Y' is never read",
 			         what, entity->base.symbol);
 		}
@@ -5527,13 +5528,13 @@ static void check_unused_variables(statement_t *const stmt, void *const env)
 	switch (stmt->kind) {
 		case STATEMENT_DECLARATION: {
 			declaration_statement_t const *const decls = &stmt->declaration;
-			warn_unused_decl(decls->declarations_begin, decls->declarations_end,
-			                 "variable");
+			warn_unused_entity(decls->declarations_begin,
+			                   decls->declarations_end);
 			return;
 		}
 
 		case STATEMENT_FOR:
-			warn_unused_decl(stmt->fors.scope.entities, NULL, "variable");
+			warn_unused_entity(stmt->fors.scope.entities, NULL);
 			return;
 
 		default:
@@ -5551,7 +5552,7 @@ static void check_declarations(void)
 
 		/* do not issue unused warnings for main */
 		if (!is_sym_main(current_function->base.base.symbol)) {
-			warn_unused_decl(scope->entities, NULL, "parameter");
+			warn_unused_entity(scope->entities, NULL);
 		}
 	}
 	if (warning.unused_variable) {
@@ -6942,6 +6943,8 @@ static expression_t *parse_reference(void)
 		if (entity->kind == ENTITY_VARIABLE) {
 			/* access of a variable from an outer function */
 			entity->variable.address_taken = true;
+		} else if (entity->kind == ENTITY_PARAMETER) {
+			entity->parameter.address_taken = true;
 		}
 		current_function->need_closure = true;
 	}
@@ -7317,7 +7320,7 @@ static expression_t *parse_va_start(void)
 		entity_t *const entity = expr->reference.entity;
 		if (entity->base.parent_scope != &current_function->parameters
 				|| entity->base.next != NULL
-				|| entity->kind != ENTITY_VARIABLE) {
+				|| entity->kind != ENTITY_PARAMETER) {
 			errorf(&expr->base.source_position,
 			       "second argument of 'va_start' must be last parameter of the current function");
 		} else {
@@ -8508,17 +8511,22 @@ static void set_address_taken(expression_t *expression, bool may_be_register)
 
 	entity_t *const entity = expression->reference.entity;
 
-	if (entity->kind != ENTITY_VARIABLE)
+	if (entity->kind != ENTITY_VARIABLE && entity->kind != ENTITY_PARAMETER)
 		return;
 
 	if (entity->declaration.storage_class == STORAGE_CLASS_REGISTER
 			&& !may_be_register) {
 		errorf(&expression->base.source_position,
-				"address of register variable '%Y' requested",
-				entity->base.symbol);
+				"address of register %s '%Y' requested",
+				get_entity_kind_name(entity->kind),	entity->base.symbol);
 	}
 
-	entity->variable.address_taken = true;
+	if (entity->kind == ENTITY_VARIABLE) {
+		entity->variable.address_taken = true;
+	} else {
+		assert(entity->kind == ENTITY_PARAMETER);
+		entity->parameter.address_taken = true;
+	}
 }
 
 /**
@@ -8952,8 +8960,14 @@ static bool is_valid_assignment_lhs(expression_t const* const left)
 		return false;
 	}
 
+	if (left->kind == EXPR_REFERENCE
+			&& left->reference.entity->kind == ENTITY_FUNCTION) {
+		errorf(HERE, "cannot assign to function '%E'", left);
+		return false;
+	}
+
 	if (is_type_array(type_left)) {
-		errorf(HERE, "cannot assign to arrays ('%E')", left);
+		errorf(HERE, "cannot assign to array '%E'", left);
 		return false;
 	}
 	if (type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
@@ -10043,7 +10057,7 @@ static statement_t *parse_for(void)
 		add_anchor_token(';');
 		expression_t *const init = parse_expression();
 		statement->fors.initialisation = init;
-		mark_vars_read(init, VAR_ANY);
+		mark_vars_read(init, ENT_ANY);
 		if (warning.unused_value && !expression_has_effect(init)) {
 			warningf(&init->base.source_position,
 					"initialisation of 'for'-statement has no effect");
@@ -10056,8 +10070,8 @@ static statement_t *parse_for(void)
 		add_anchor_token(';');
 		expression_t *const cond = parse_expression();
 		statement->fors.condition = cond;
-		/* §6.8.5:2    The controlling expression of an iteration statement shall
-		 *             have scalar type. */
+		/* §6.8.5:2    The controlling expression of an iteration statement
+		 *             shall have scalar type. */
 		semantic_condition(cond, "condition of 'for'-statement");
 		mark_vars_read(cond, NULL);
 		rem_anchor_token(';');
@@ -10066,7 +10080,7 @@ static statement_t *parse_for(void)
 	if (token.type != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
-		mark_vars_read(step, VAR_ANY);
+		mark_vars_read(step, ENT_ANY);
 		if (warning.unused_value && !expression_has_effect(step)) {
 			warningf(&step->base.source_position,
 			         "step of 'for'-statement has no effect");
@@ -10342,7 +10356,7 @@ static statement_t *parse_expression_statement(void)
 
 	expression_t *const expr         = parse_expression();
 	statement->expression.expression = expr;
-	mark_vars_read(expr, VAR_ANY);
+	mark_vars_read(expr, ENT_ANY);
 
 	expect(';');
 

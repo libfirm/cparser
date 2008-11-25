@@ -30,6 +30,7 @@ SOURCES := \
 	adt/xmalloc.c \
 	ast.c \
 	diagnostic.c \
+	entity.c \
 	entitymap.c \
 	format_check.c \
 	lexer.c \
