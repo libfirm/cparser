@@ -5626,7 +5626,7 @@ static bool expression_returns(expression_t const *const expr)
 			if (!expression_returns(expr->conditional.condition))
 				return false;
 
-			if (expr->condition.true_expression != NULL
+			if (expr->conditional.true_expression != NULL
 					&& expression_returns(expr->conditional.true_expression))
 				return true;
 
