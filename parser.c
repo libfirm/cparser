@@ -5373,9 +5373,21 @@ static void parse_kr_declaration_list(entity_t *entity)
 	}
 
 	/* parse declaration list */
-	while (is_declaration_specifier(&token, false)) {
-		parse_declaration(finished_kr_declaration, DECL_IS_PARAMETER);
+	for (;;) {
+		switch (token.type) {
+			DECLARATION_START
+			case T___extension__:
+			/* This covers symbols, which are no type, too, and results in
+			 * better error messages.  The typical cases are misspelled type
+			 * names and missing includes. */
+			case T_IDENTIFIER:
+				parse_declaration(finished_kr_declaration, DECL_IS_PARAMETER);
+				break;
+			default:
+				goto decl_list_end;
+		}
 	}
+decl_list_end:
 
 	/* pop function parameters */
 	assert(current_scope == &entity->function.parameters);
