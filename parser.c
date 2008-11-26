@@ -4977,6 +4977,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 				= entity->declaration.modifiers;
 			previous_entity->declaration.deprecated_string
 				= entity->declaration.deprecated_string;
+			return previous_entity;
 		}
 		assert(entity->declaration.type != NULL);
 
