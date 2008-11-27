@@ -168,7 +168,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_BINARY_BITWISE_OR_ASSIGN]  = PREC_ASSIGNMENT,
 		[EXPR_BINARY_COMMA]              = PREC_EXPRESSION,
 
-		[EXPR_BINARY_BUILTIN_EXPECT]     = PREC_PRIMARY,
 		[EXPR_BINARY_ISGREATER]          = PREC_PRIMARY,
 		[EXPR_BINARY_ISGREATEREQUAL]     = PREC_PRIMARY,
 		[EXPR_BINARY_ISLESS]             = PREC_PRIMARY,
@@ -417,15 +416,6 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 {
 	unsigned prec = get_expression_precedence(binexpr->base.kind);
 	int      r2l  = right_to_left(prec);
-
-	if (binexpr->base.kind == EXPR_BINARY_BUILTIN_EXPECT) {
-		fputs("__builtin_expect(", out);
-		print_expression_prec(binexpr->left, prec);
-		fputs(", ", out);
-		print_expression_prec(binexpr->right, prec);
-		fputc(')', out);
-		return;
-	}
 
 	print_expression_prec(binexpr->left, prec + r2l);
 	char const* op;
@@ -1949,7 +1939,6 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_LOGICAL_OR:
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTRIGHT:
-	case EXPR_BINARY_BUILTIN_EXPECT:
 	case EXPR_BINARY_ISGREATER:
 	case EXPR_BINARY_ISGREATEREQUAL:
 	case EXPR_BINARY_ISLESS:

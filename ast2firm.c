@@ -1592,6 +1592,10 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *res  = new_d_Const(dbgi, mode, tv);
 		return res;
 	}
+	case T___builtin_expect: {
+		expression_t *argument = call->arguments->expression;
+		return _expression_to_firm(argument);
+	}
 	case T___builtin_va_end:
 		return NULL;
 	default:
@@ -2484,8 +2488,6 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		return create_assign_binop(expression);
-	case EXPR_BINARY_BUILTIN_EXPECT:
-		return _expression_to_firm(expression->left);
 	default:
 		panic("TODO binexpr type");
 	}
@@ -3075,6 +3077,24 @@ static ir_node *label_address_to_firm(
 	return new_SymConst(mode_P_code, value, symconst_label);
 }
 
+static ir_node *builtin_symbol_to_firm(
+		const builtin_symbol_expression_t *expression)
+{
+	/* for gcc compatibility we have to produce (dummy) addresses for some
+	 * builtins */
+	if (warning.other) {
+		warningf(&expression->base.source_position,
+				 "taking address of builtin '%Y'", expression->symbol);
+	}
+
+	/* simply create a NULL pointer */
+	ir_mode  *mode = get_ir_mode(type_void_ptr);
+	tarval   *tv   = new_tarval_from_long(0, mode);
+	ir_node  *res  = new_Const(mode, tv);
+
+	return res;
+}
+
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
@@ -3131,7 +3151,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_VA_ARG:
 		return va_arg_expression_to_firm(&expression->va_arge);
 	case EXPR_BUILTIN_SYMBOL:
-		panic("unimplemented expression found");
+		return builtin_symbol_to_firm(&expression->builtin_symbol);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
 	case EXPR_BUILTIN_PREFETCH:
@@ -3148,6 +3168,20 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		break;
 	}
 	panic("invalid expression found");
+}
+
+static bool is_builtin_expect(const expression_t *expression)
+{
+	if (expression->kind != EXPR_CALL)
+		return false;
+
+	expression_t *function = expression->call.function;
+	if (function->kind != EXPR_BUILTIN_SYMBOL)
+		return false;
+	if (function->builtin_symbol.symbol->ID != T___builtin_expect)
+		return false;
+
+	return true;
 }
 
 static bool produces_mode_b(const expression_t *expression)
@@ -3168,8 +3202,12 @@ static bool produces_mode_b(const expression_t *expression)
 	case EXPR_UNARY_NOT:
 		return true;
 
-	case EXPR_BINARY_BUILTIN_EXPECT:
-		return produces_mode_b(expression->binary.left);
+	case EXPR_CALL:
+		if (is_builtin_expect(expression)) {
+			expression_t *argument = expression->call.arguments->expression;
+			return produces_mode_b(argument);
+		}
+		return false;
 	case EXPR_BINARY_COMMA:
 		return produces_mode_b(expression->binary.right);
 
@@ -3257,16 +3295,19 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
 	/* set branch prediction info based on __builtin_expect */
-	if (expression->kind == EXPR_BINARY_BUILTIN_EXPECT) {
-		long               cnst = fold_constant(expression->binary.right);
-		cond_jmp_predicate pred;
+	if (is_builtin_expect(expression)) {
+		call_argument_t *argument = expression->call.arguments->next;
+		if (is_constant_expression(argument->expression)) {
+			long               cnst = fold_constant(argument->expression);
+			cond_jmp_predicate pred;
 
-		if (cnst == 0) {
-			pred = COND_JMP_PRED_FALSE;
-		} else {
-			pred = COND_JMP_PRED_TRUE;
+			if (cnst == 0) {
+				pred = COND_JMP_PRED_FALSE;
+			} else {
+				pred = COND_JMP_PRED_TRUE;
+			}
+			set_Cond_jmp_pred(cond, pred);
 		}
-		set_Cond_jmp_pred(cond, pred);
 	}
 
 	add_immBlock_pred(true_block, true_proj);

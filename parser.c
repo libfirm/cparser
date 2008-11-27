@@ -2128,7 +2128,6 @@ unary:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
 		case EXPR_LABEL_ADDRESS:
-		case EXPR_BINARY_BUILTIN_EXPECT:
 		case EXPR_REFERENCE_ENUM_VALUE:
 			return;
 	}
@@ -9221,7 +9220,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_COMMA:
 			return expression_has_effect(expr->binary.right);
 
-		case EXPR_BINARY_BUILTIN_EXPECT:     return true;
 		case EXPR_BINARY_ISGREATER:          return false;
 		case EXPR_BINARY_ISGREATEREQUAL:     return false;
 		case EXPR_BINARY_ISLESS:             return false;
