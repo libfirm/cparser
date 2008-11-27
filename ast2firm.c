@@ -1148,7 +1148,7 @@ static ir_node *const_to_firm(const const_expression_t *cnst)
 		tv = new_tarval_from_str(buf, len, mode);
 	}
 
-	return new_d_Const(dbgi, mode, tv);
+	return new_d_Const(dbgi, tv);
 }
 
 /**
@@ -1171,7 +1171,7 @@ static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
 	tarval *tv = new_tarval_from_str(buf, len, mode);
 
-	return new_d_Const(dbgi, mode, tv);
+	return new_d_Const(dbgi, tv);
 }
 
 /**
@@ -1188,7 +1188,7 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
 	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
 	tarval *tv = new_tarval_from_str(buf, len, mode);
 
-	return new_d_Const(dbgi, mode, tv);
+	return new_d_Const(dbgi, tv);
 }
 
 /**
@@ -1391,7 +1391,7 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 		return value;
 
 	if (dest_mode == mode_b) {
-		ir_node *zero = new_Const(value_mode, get_mode_null(value_mode));
+		ir_node *zero = new_Const(get_mode_null(value_mode));
 		ir_node *cmp  = new_d_Cmp(dbgi, value, zero);
 		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
 		return proj;
@@ -1420,8 +1420,7 @@ static ir_node *reference_expression_enum_value_to_firm(
 	/* make sure the type is constructed */
 	(void) get_ir_type(type);
 
-	ir_mode *const mode = get_ir_mode(type);
-	return new_Const(mode, entity->enum_value.tv);
+	return new_Const(entity->enum_value.tv);
 }
 
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
@@ -1579,7 +1578,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case T___builtin_infl: {
 		ir_mode *mode = get_ir_mode(function_type->function.return_type);
 		tarval  *tv   = get_mode_infinite(mode);
-		ir_node *res  = new_d_Const(dbgi, mode, tv);
+		ir_node *res  = new_d_Const(dbgi, tv);
 		return   res;
 	}
 	case T___builtin_nan:
@@ -1589,7 +1588,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		assert(is_type_function(function_type));
 		ir_mode *mode = get_ir_mode(function_type->function.return_type);
 		tarval  *tv   = get_mode_NAN(mode);
-		ir_node *res  = new_d_Const(dbgi, mode, tv);
+		ir_node *res  = new_d_Const(dbgi, tv);
 		return res;
 	}
 	case T___builtin_expect: {
@@ -1800,10 +1799,10 @@ static void bitfield_store_to_firm(dbg_info *dbgi,
 	int      bitsize      = get_mode_size_bits(get_type_mode(entity_type));
 
 	tarval  *mask            = create_bitfield_mask(mode, 0, bitsize);
-	ir_node *mask_node       = new_d_Const(dbgi, mode, mask);
+	ir_node *mask_node       = new_d_Const(dbgi, mask);
 	ir_node *value_masked    = new_d_And(dbgi, value, mask_node, mode);
 	tarval  *shiftl          = new_tarval_from_long(bitoffset, mode_uint);
-	ir_node *shiftcount      = new_d_Const(dbgi, mode_uint, shiftl);
+	ir_node *shiftcount      = new_d_Const(dbgi, shiftl);
 	ir_node *value_maskshift = new_d_Shl(dbgi, value_masked, shiftcount, mode);
 
 	/* load current value */
@@ -1813,7 +1812,7 @@ static void bitfield_store_to_firm(dbg_info *dbgi,
 	ir_node  *load_res        = new_d_Proj(dbgi, load, mode, pn_Load_res);
 	tarval   *shift_mask      = create_bitfield_mask(mode, bitoffset, bitsize);
 	tarval   *inv_mask        = tarval_not(shift_mask);
-	ir_node  *inv_mask_node   = new_d_Const(dbgi, mode, inv_mask);
+	ir_node  *inv_mask_node   = new_d_Const(dbgi, inv_mask);
 	ir_node  *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node, mode);
 
 	/* construct new value and store */
@@ -1852,13 +1851,13 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	long       shift_bitsl  = machine_size - bitoffset - bitsize;
 	assert(shift_bitsl >= 0);
 	tarval    *tvl          = new_tarval_from_long(shift_bitsl, mode_uint);
-	ir_node   *countl       = new_d_Const(dbgi, mode_uint, tvl);
+	ir_node   *countl       = new_d_Const(dbgi, tvl);
 	ir_node   *shiftl       = new_d_Shl(dbgi, load_res, countl, mode_int);
 
 	long       shift_bitsr  = bitoffset + shift_bitsl;
 	assert(shift_bitsr <= (long) machine_size);
 	tarval    *tvr          = new_tarval_from_long(shift_bitsr, mode_uint);
-	ir_node   *countr       = new_d_Const(dbgi, mode_uint, tvr);
+	ir_node   *countr       = new_d_Const(dbgi, tvr);
 	ir_node   *shiftr;
 	if (mode_is_signed(mode)) {
 		shiftr = new_d_Shrs(dbgi, shiftl, countr, mode_int);
@@ -1984,7 +1983,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		offset                       = get_type_size(pointer_type->points_to);
 	} else {
 		assert(is_type_arithmetic(type));
-		offset = new_Const(mode, get_mode_one(mode));
+		offset = new_Const(get_mode_one(mode));
 	}
 
 	ir_node *result;
@@ -2218,11 +2217,11 @@ static ir_node *produce_condition_result(const expression_t *expression,
 	ir_node *cur_block = get_cur_block();
 
 	ir_node *one_block = new_immBlock();
-	ir_node *one       = new_Const(mode, get_mode_one(mode));
+	ir_node *one       = new_Const(get_mode_one(mode));
 	ir_node *jmp_one   = new_d_Jmp(dbgi);
 
 	ir_node *zero_block = new_immBlock();
-	ir_node *zero       = new_Const(mode, get_mode_null(mode));
+	ir_node *zero       = new_Const(get_mode_null(mode));
 	ir_node *jmp_zero   = new_d_Jmp(dbgi);
 
 	set_cur_block(cur_block);
@@ -2393,7 +2392,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		    (ekind == EXPR_BINARY_LOGICAL_OR  && val == 0)) {
 			return expression_to_firm(expression->right);
 		} else {
-			return new_Const(mode, get_mode_one(mode));
+			return new_Const(get_mode_one(mode));
 		}
 	}
 
@@ -2588,7 +2587,7 @@ static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 	tarval   *tv     = new_tarval_from_long(offset, mode);
 	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
 
-	return new_d_Const(dbgi, mode, tv);
+	return new_d_Const(dbgi, tv);
 }
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
@@ -2742,8 +2741,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		} else {
 			/* Condition ended with a short circuit (&&, ||, !) operation.
 			 * Generate a "1" as value for the true branch. */
-			ir_mode *const mode = mode_Is;
-			true_val = new_Const(mode, get_mode_one(mode));
+			true_val = new_Const(get_mode_one(mode_Is));
 		}
 	}
 	mature_immBlock(true_block);
@@ -2907,9 +2905,8 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 
 make_const:;
 	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
-	ir_mode  *const mode = mode_int;
-	tarval   *const tv   = new_tarval_from_long(tc, mode);
-	return new_d_Const(dbgi, mode, tv);
+	tarval   *const tv   = new_tarval_from_long(tc, mode_int);
+	return new_d_Const(dbgi, tv);
 }
 
 static ir_node *function_name_to_firm(
@@ -3089,8 +3086,7 @@ static ir_node *builtin_symbol_to_firm(
 
 	/* simply create a NULL pointer */
 	ir_mode  *mode = get_ir_mode(type_void_ptr);
-	tarval   *tv   = new_tarval_from_long(0, mode);
-	ir_node  *res  = new_Const(mode, tv);
+	ir_node  *res  = new_Const_long(mode, 0);
 
 	return res;
 }
@@ -3764,7 +3760,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 	if (is_atomic_type(type)) {
 		ir_mode *mode = get_type_mode(type);
 		tarval  *zero = get_mode_null(mode);
-		ir_node *cnst = new_d_Const(dbgi, mode, zero);
+		ir_node *cnst = new_d_Const(dbgi, zero);
 
 		/* TODO: bitfields */
 		ir_node *mem    = get_store();
@@ -3788,7 +3784,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 			if (is_Array_type(type)) {
 				ir_entity *entity   = get_array_element_entity(type);
 				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
-				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
+				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 				ir_node   *in[1]    = { cnst };
 				irtype = get_array_element_type(type);
 				addr   = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in, entity);
@@ -3834,7 +3830,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	case IR_INITIALIZER_TARVAL: {
 		tarval  *tv       = get_initializer_tarval_value(initializer);
 		ir_mode *mode     = get_tarval_mode(tv);
-		ir_node *cnst     = new_d_Const(dbgi, mode, tv);
+		ir_node *cnst     = new_d_Const(dbgi, tv);
 		ir_type *ent_type = get_entity_type(entity);
 
 		/* is it a bitfield type? */
@@ -3871,7 +3867,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			ir_entity *sub_entity;
 			if (is_Array_type(type)) {
 				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
-				ir_node   *cnst     = new_d_Const(dbgi, mode_uint, index_tv);
+				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 				ir_node   *in[1]    = { cnst };
 				irtype     = get_array_element_type(type);
 				sub_entity = get_array_element_entity(type);
@@ -5365,7 +5361,7 @@ static void create_function(entity_t *entity)
 			ir_node *in[1];
 			/* §5.1.2.2.3 main implicitly returns 0 */
 			if (is_main(entity)) {
-				in[0] = new_Const(mode, get_mode_null(mode));
+				in[0] = new_Const(get_mode_null(mode));
 			} else {
 				in[0] = new_Unknown(mode);
 			}
