@@ -1,3 +1,18 @@
+===== cparser 0.9.7 (27.11.2008) =====
+* several bugfixes
+* add/correct semantic checks
+* improved error recovery
+
+===== cparser 0.9.6 (22.11.2008) =====
+* lots of bugfixes
+* add/correct semantic checks
+* more/improved warnings
+* internal cleanups (introduce entity_t types)
+* support more gnu extensions
+* improved error recovery
+* support more switches for gcc compatibility
+* support for libc builtins
+
 ===== cparser 0.9.5 (31.07.2008) =====
 
 * lots of bugfixes
