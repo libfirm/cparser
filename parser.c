@@ -4893,7 +4893,10 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	const namespace_tag_t    namespc = (namespace_tag_t)entity->base.namespc;
 	const source_position_t *pos     = &entity->base.source_position;
 
-	assert(symbol != NULL);
+	/* can happen in error cases */
+	if (symbol == NULL)
+		return entity;
+
 	entity_t *previous_entity = get_entity(symbol, namespc);
 	/* pushing the same entity twice will break the stack structure */
 	assert(previous_entity != entity);
