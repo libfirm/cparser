@@ -138,6 +138,7 @@ static bool                 in_type_prop      = false;
 static bool                 in_gcc_extension  = false;
 static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
+static declaration_t      **incomplete_arrays;
 
 
 #define PUSH_PARENT(stmt)                          \
@@ -5233,12 +5234,22 @@ static void check_variable_type_complete(entity_t *ent)
 	if (decl->storage_class != STORAGE_CLASS_NONE)
 		return;
 
-	type_t *type = decl->type;
-	if (!is_type_incomplete(skip_typeref(type)))
+	type_t *const orig_type = decl->type;
+	type_t *const type      = skip_typeref(orig_type);
+	if (!is_type_incomplete(type))
 		return;
 
+	/* GCC allows global arrays without size and assigns them a length of one,
+	 * if no different declaration follows */
+	if (is_type_array(type) &&
+			c_mode & _GNUC      &&
+			ent->base.parent_scope == file_scope) {
+		ARR_APP1(declaration_t*, incomplete_arrays, decl);
+		return;
+	}
+
 	errorf(&ent->base.source_position, "variable '%#T' has incomplete type",
-			type, ent->base.symbol);
+			orig_type, ent->base.symbol);
 }
 
 
@@ -10961,14 +10972,50 @@ translation_unit_t *finish_parsing(void)
 	return result;
 }
 
+/* GCC allows global arrays without size and assigns them a length of one,
+ * if no different declaration follows */
+static void complete_incomplete_arrays(void)
+{
+	size_t n = ARR_LEN(incomplete_arrays);
+	for (size_t i = 0; i != n; ++i) {
+		declaration_t *const decl      = incomplete_arrays[i];
+		type_t        *const orig_type = decl->type;
+		type_t        *const type      = skip_typeref(orig_type);
+
+		if (!is_type_incomplete(type))
+			continue;
+
+		if (warning.other) {
+			warningf(&decl->base.source_position,
+					"array '%#T' assumed to have one element",
+					orig_type, decl->base.symbol);
+		}
+
+		type_t *const new_type = duplicate_type(type);
+		new_type->array.size_constant     = true;
+		new_type->array.has_implicit_size = true;
+		new_type->array.size              = 1;
+
+		type_t *const result = typehash_insert(new_type);
+		if (type != result)
+			free_type(type);
+
+		decl->type = result;
+	}
+}
+
 void parse(void)
 {
 	lookahead_bufpos = 0;
 	for (int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
 		next_token();
 	}
-	current_linkage = c_mode & _CXX ? LINKAGE_CXX : LINKAGE_C;
+	current_linkage   = c_mode & _CXX ? LINKAGE_CXX : LINKAGE_C;
+	incomplete_arrays = NEW_ARR_F(declaration_t*, 0);
 	parse_translation_unit();
+	complete_incomplete_arrays();
+	DEL_ARR_F(incomplete_arrays);
+	incomplete_arrays = NULL;
 }
 
 /**
