@@ -520,15 +520,15 @@ eval_fmt_mod_unsigned:
 
 		format_flags_t wrong_flags = fmt_flags & ~allowed_flags;
 		if (wrong_flags != 0) {
-			char wrong[8];
-			int idx = 0;
-			if (wrong_flags & FMT_FLAG_HASH)  wrong[idx++] = '#';
-			if (wrong_flags & FMT_FLAG_ZERO)  wrong[idx++] = '0';
-			if (wrong_flags & FMT_FLAG_MINUS) wrong[idx++] = '-';
-			if (wrong_flags & FMT_FLAG_SPACE) wrong[idx++] = ' ';
-			if (wrong_flags & FMT_FLAG_PLUS)  wrong[idx++] = '+';
-			if (wrong_flags & FMT_FLAG_TICK)  wrong[idx++] = '\'';
-			wrong[idx] = '\0';
+			char  wrong[8];
+			char *p = wrong;
+			if (wrong_flags & FMT_FLAG_HASH)  *p++ = '#';
+			if (wrong_flags & FMT_FLAG_ZERO)  *p++ = '0';
+			if (wrong_flags & FMT_FLAG_MINUS) *p++ = '-';
+			if (wrong_flags & FMT_FLAG_SPACE) *p++ = ' ';
+			if (wrong_flags & FMT_FLAG_PLUS)  *p++ = '+';
+			if (wrong_flags & FMT_FLAG_TICK)  *p++ = '\'';
+			*p = '\0';
 
 			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, num_fmt);
 		}
