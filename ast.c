@@ -1008,7 +1008,7 @@ static void print_typedef(const entity_t *entity)
 {
 	fputs("typedef ", out);
 	print_type_ext(entity->typedefe.type, entity->base.symbol, NULL);
-	fputs(";", out);
+	fputc(';', out);
 }
 
 /**

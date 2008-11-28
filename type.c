@@ -397,7 +397,7 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 		fputs(variable->base.base.symbol->string, out);
 		fputs(") ", out);
 	}
-	fputs("*", out);
+	fputc('*', out);
 	print_type_qualifiers(type->base.qualifiers);
 	if (type->base.qualifiers != 0)
 		fputc(' ', out);
@@ -494,9 +494,9 @@ void print_enum_definition(const enum_t *enume)
 	       entry = entry->base.next) {
 
 		print_indent();
-		fprintf(out, "%s", entry->base.symbol->string);
+		fputs(entry->base.symbol->string, out);
 		if (entry->enum_value.value != NULL) {
-			fprintf(out, " = ");
+			fputs(" = ", out);
 
 			/* skip the implicit cast */
 			expression_t *expression = entry->enum_value.value;
@@ -505,12 +505,12 @@ void print_enum_definition(const enum_t *enume)
 			}
 			print_expression(expression);
 		}
-		fprintf(out, ",\n");
+		fputs(",\n", out);
 	}
 
 	change_indent(-1);
 	print_indent();
-	fputs("}", out);
+	fputc('}', out);
 }
 
 /**
@@ -553,7 +553,7 @@ void print_compound_definition(const compound_t *compound)
 
 	change_indent(-1);
 	print_indent();
-	fputs("}", out);
+	fputc('}', out);
 	if (compound->modifiers & DM_TRANSPARENT_UNION) {
 		fputs("__attribute__((__transparent_union__))", out);
 	}

@@ -109,10 +109,10 @@ void print_token_type(FILE *f, token_type_t token_type)
 
 	const symbol_t *symbol = token_symbols[token_type];
 	if(symbol != NULL) {
-		fprintf(f, "%s", symbol->string);
+		fputs(symbol->string, f);
 	} else {
 		if(token_type >= 0 && token_type < 256) {
-			fprintf(f, "%c", token_type);
+			fputc(token_type, f);
 			return;
 		}
 		fputs("unknown token", f);
@@ -159,10 +159,10 @@ void print_pp_token_type(FILE *f, int token_type)
 
 	const symbol_t *symbol = pp_token_symbols[token_type];
 	if (symbol != NULL) {
-		fprintf(f, "%s", symbol->string);
+		fputs(symbol->string, f);
 	} else {
 		if(token_type >= 0 && token_type < 256) {
-			fprintf(f, "%c", token_type);
+			fputc(token_type, f);
 			return;
 		}
 		fputs("unknown token", f);
