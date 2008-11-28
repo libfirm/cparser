@@ -123,19 +123,21 @@ void print_token(FILE *f, const token_t *token)
 {
 	switch(token->type) {
 	case T_IDENTIFIER:
-		fprintf(f, "symbol %s", token->v.symbol->string);
+		fprintf(f, "identifier '%s'", token->v.symbol->string);
 		break;
 	case T_INTEGER:
-		fprintf(f, "integer number %lld", token->v.intvalue);
+		fprintf(f, "integer number '%lld'", token->v.intvalue);
 		break;
 	case T_FLOATINGPOINT:
-		fprintf(f, "floating-point number %LF", token->v.floatvalue);
+		fprintf(f, "floating-point number '%LF'", token->v.floatvalue);
 		break;
 	case T_STRING_LITERAL:
 		fprintf(f, "string \"%s\"", token->v.string.begin);
 		break;
 	default:
+		fputc('\'', f);
 		print_token_type(f, (token_type_t)token->type);
+		fputc('\'', f);
 		break;
 	}
 }
@@ -173,10 +175,10 @@ void print_pp_token(FILE *f, const token_t *token)
 {
 	switch((preprocessor_token_type_t) token->type) {
 	case TP_IDENTIFIER:
-		fprintf(f, "symbol %s", token->v.symbol->string);
+		fprintf(f, "identifier '%s'", token->v.symbol->string);
 		break;
 	case TP_NUMBER:
-		fprintf(f, "number %s", token->v.string.begin);
+		fprintf(f, "number '%s'", token->v.string.begin);
 		break;
 	case TP_STRING_LITERAL:
 		fprintf(f, "string \"%s\"", token->v.string.begin);
