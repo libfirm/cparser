@@ -79,7 +79,7 @@
 #include "mangle.h"
 
 #ifndef PREPROCESSOR
-#ifdef __APPLE__
+#ifndef __WIN32__
 #define PREPROCESSOR "gcc -E -std=c99 -m32 -U__STRICT_ANSI__"
 #else
 #define PREPROCESSOR "cpp -std=c99 -m32 -U__STRICT_ANSI__"
@@ -267,6 +267,8 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 		case '$':
 		case '(':
 		case ')':
+		case '<':
+		case '>':
 			obstack_1grow(obst, '\\');
 			/* FALLTHROUGH */
 		default:
