@@ -328,6 +328,11 @@ static void *allocate_ast_zero(size_t size)
 	return res;
 }
 
+/**
+ * Returns the size of an entity node.
+ *
+ * @param kind  the entity kind
+ */
 static size_t get_entity_struct_size(entity_kind_t kind)
 {
 	static const size_t sizes[] = {
@@ -349,6 +354,10 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 	return sizes[kind];
 }
 
+/**
+ * Allocate an entity of given kind and initialize all
+ * fields with zero.
+ */
 static entity_t *allocate_entity_zero(entity_kind_t kind)
 {
 	size_t    size   = get_entity_struct_size(kind);
@@ -440,7 +449,8 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 
 /**
  * Allocate a statement node of given kind and initialize all
- * fields with zero.
+ * fields with zero. Sets its source position to the position
+ * of the current token.
  */
 static statement_t *allocate_statement_zero(statement_kind_t kind)
 {
@@ -469,7 +479,8 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 }
 
 /**
- * Creates a new invalid expression.
+ * Creates a new invalid expression at the source position
+ * of the current token.
  */
 static expression_t *create_invalid_expression(void)
 {
@@ -619,7 +630,7 @@ static inline const token_t *look_ahead(int num)
 }
 
 /**
- * Adds a token to the token anchor set (a multi-set).
+ * Adds a token type to the token type anchor set (a multi-set).
  */
 static void add_anchor_token(int token_type)
 {
@@ -627,6 +638,10 @@ static void add_anchor_token(int token_type)
 	++token_anchor_set[token_type];
 }
 
+/**
+ * Set the number of tokens types of the given type
+ * to zero and return the old count.
+ */
 static int save_and_reset_anchor_state(int token_type)
 {
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
@@ -635,6 +650,9 @@ static int save_and_reset_anchor_state(int token_type)
 	return count;
 }
 
+/**
+ * Restore the number of token types to the given count.
+ */
 static void restore_anchor_state(int token_type, int count)
 {
 	assert(0 <= token_type && token_type < T_LAST_TOKEN);
@@ -642,7 +660,7 @@ static void restore_anchor_state(int token_type, int count)
 }
 
 /**
- * Remove a token from the token anchor set (a multi-set).
+ * Remove a token type from the token type anchor set (a multi-set).
  */
 static void rem_anchor_token(int token_type)
 {
@@ -651,6 +669,10 @@ static void rem_anchor_token(int token_type)
 	--token_anchor_set[token_type];
 }
 
+/**
+ * Return true if the token type of the current token is
+ * in the anchor set.
+ */
 static bool at_anchor(void)
 {
 	if (token.type < 0)
@@ -659,7 +681,7 @@ static bool at_anchor(void)
 }
 
 /**
- * Eat tokens until a matching token is found.
+ * Eat tokens until a matching token type is found.
  */
 static void eat_until_matching_token(int type)
 {
@@ -724,6 +746,9 @@ static void eat_until_anchor(void)
 	}
 }
 
+/**
+ * Eat a whoel block from input tokens.
+ */
 static void eat_block(void)
 {
 	eat_until_matching_token('{');
@@ -762,7 +787,7 @@ static void type_error_incompatible(const char *msg,
 }
 
 /**
- * Expect the the current token is the expected token.
+ * Expect the current token is the expected token.
  * If not, generate an error, eat the current statement,
  * and goto the end_error label.
  */
@@ -780,6 +805,10 @@ static void type_error_incompatible(const char *msg,
 		next_token();                                     \
 	} while (0)
 
+/**
+ * Push a given scope on the scope stack and make it the
+ * current scope
+ */
 static scope_t *scope_push(scope_t *new_scope)
 {
 	if (current_scope != NULL) {
@@ -791,6 +820,9 @@ static scope_t *scope_push(scope_t *new_scope)
 	return old_scope;
 }
 
+/**
+ * Pop the current scope from the scope stack.
+ */
 static void scope_pop(scope_t *old_scope)
 {
 	current_scope = old_scope;
@@ -938,6 +970,9 @@ static int get_akind_rank(atomic_type_kind_t akind)
 	return (int) akind;
 }
 
+/**
+ * Return the type rank for an atomic type.
+ */
 static int get_rank(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -953,6 +988,12 @@ static int get_rank(const type_t *type)
 	return get_akind_rank(type->atomic.akind);
 }
 
+/**
+ * Do integer promotion for a given type.
+ *
+ * @param type  the type to promote
+ * @return the promoted type
+ */
 static type_t *promote_integer(type_t *type)
 {
 	if (type->kind == TYPE_BITFIELD)
@@ -982,7 +1023,9 @@ static expression_t *create_cast_expression(expression_t *expression,
 }
 
 /**
- * Check if a given expression represents the 0 pointer constant.
+ * Check if a given expression represents the NULL constant.
+ *
+ * @param expression  the expression to check
  */
 static bool is_null_pointer_constant(const expression_t *expression)
 {
@@ -1274,7 +1317,7 @@ static int strcmp_underscore(const char *s1, const char *s2)
 }
 
 /**
- * Allocate a new gnu temporal attribute.
+ * Allocate a new gnu temporal attribute of given kind.
  */
 static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind)
 {
@@ -1288,7 +1331,7 @@ static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind)
 }
 
 /**
- * parse one constant expression argument.
+ * Parse one constant expression argument of the given attribute.
  */
 static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute)
 {
@@ -1304,7 +1347,7 @@ end_error:
 }
 
 /**
- * parse a list of constant expressions arguments.
+ * Parse a list of constant expressions arguments of the given attribute.
  */
 static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute)
 {
@@ -1333,7 +1376,7 @@ end_error:
 }
 
 /**
- * parse one string literal argument.
+ * Parse one string literal argument of the given attribute.
  */
 static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute,
                                            string_t *string)
@@ -1353,7 +1396,7 @@ end_error:
 }
 
 /**
- * parse one tls model.
+ * Parse one tls model of the given attribute.
  */
 static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute)
 {
@@ -1378,7 +1421,7 @@ static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute)
 }
 
 /**
- * parse one tls model.
+ * Parse one tls model of the given attribute.
  */
 static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute)
 {
@@ -1403,7 +1446,7 @@ static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute)
 }
 
 /**
- * parse one (code) model.
+ * Parse one (code) model of the given attribute.
  */
 static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
 {
@@ -1426,6 +1469,9 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
 	attribute->invalid = true;
 }
 
+/**
+ * Parse one mode of the given attribute.
+ */
 static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
 {
 	/* TODO: find out what is allowed here... */
@@ -1467,7 +1513,7 @@ end_error:
 }
 
 /**
- * parse one interrupt argument.
+ * Parse one interrupt argument of the given attribute.
  */
 static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute)
 {
@@ -1493,7 +1539,7 @@ static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute)
 }
 
 /**
- * parse ( identifier, const expression, const expression )
+ * Parse ( identifier, const expression, const expression )
  */
 static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute)
 {
@@ -1537,6 +1583,9 @@ end_error:
 	attribute->u.value = true;
 }
 
+/**
+ * Check that a given GNU attribute has no arguments.
+ */
 static void check_no_argument(gnu_attribute_t *attribute, const char *name)
 {
 	if (!attribute->have_arguments)
