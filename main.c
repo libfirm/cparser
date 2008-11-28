@@ -269,6 +269,7 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 		case ')':
 		case '<':
 		case '>':
+		case '&':
 			obstack_1grow(obst, '\\');
 			/* FALLTHROUGH */
 		default:
@@ -297,6 +298,9 @@ static FILE *preprocess(const char *fname)
 	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
 	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
 	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+
+	/* hack... */
+	add_flag(&cppflags_obst, "-D__builtin_memcpy=memcpy");
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
@@ -788,6 +792,20 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-MT");
 				add_flag(&cppflags_obst, "-%s", option);
 				add_flag(&cppflags_obst, "%s", opt);
+			} else if (streq(option, "include")) {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-include");
+				add_flag(&cppflags_obst, "-include");
+				add_flag(&cppflags_obst, "%s", opt);
+			} else if (streq(option, "isystem")) {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-isystem");
+				add_flag(&cppflags_obst, "-isystem");
+				add_flag(&cppflags_obst, "%s", opt);
+			} else if (streq(option, "nostdinc")
+					|| streq(option, "trigraphs")) {
+				/* pass these through to the preprocessor */
+				add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pipe")) {
 				/* here for gcc compatibility */
 			} else if (option[0] == 'f') {
@@ -798,6 +816,8 @@ int main(int argc, char **argv)
 				    strstart(orig_opt, "align-jumps=") ||
 				    strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+				} else if (streq(orig_opt, "verbose-asm")) {
+					/* ignore: we always print verbose assembler */
 				} else {
 					char const *opt         = orig_opt;
 					bool        truth_value = true;
@@ -865,6 +885,9 @@ int main(int argc, char **argv)
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
 					add_flag(&ldflags_obst, "-Wl,%s", opt);
+				} else if (streq(option + 1, "no-trigraphs")
+							|| streq(option + 1, "undef")) {
+					add_flag(&cppflags_obst, "%s", arg);
 				} else {
 					set_warning_opt(&option[1]);
 				}

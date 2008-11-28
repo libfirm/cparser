@@ -36,3 +36,4 @@ Missing Warnings:
 
 main/driver:
 - delete output file if we had an error
+- go through gcc manual and emulate all the gcc flags...
