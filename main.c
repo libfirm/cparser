@@ -1207,9 +1207,17 @@ int main(int argc, char **argv)
 
 		FILE *preprocessed_in = NULL;
 		switch (filetype) {
-			case FILETYPE_C:         filetype = FILETYPE_PREPROCESSED_C;         goto preprocess;
-			case FILETYPE_CXX:       filetype = FILETYPE_PREPROCESSED_CXX;       goto preprocess;
-			case FILETYPE_ASSEMBLER: filetype = FILETYPE_PREPROCESSED_ASSEMBLER; goto preprocess;
+			case FILETYPE_C:
+				filetype = FILETYPE_PREPROCESSED_C;
+				goto preprocess;
+			case FILETYPE_CXX:
+				filetype = FILETYPE_PREPROCESSED_CXX;
+				goto preprocess;
+			case FILETYPE_ASSEMBLER:
+				filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
+				add_flag(&cppflags_obst, "-x");
+				add_flag(&cppflags_obst, "assembler-with-cpp");
+				goto preprocess;
 preprocess:
 				/* no support for input on FILE* yet */
 				if (in != NULL)
