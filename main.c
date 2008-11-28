@@ -343,6 +343,30 @@ static void assemble(const char *out, const char *in)
 	}
 }
 
+static void print_file_name(const char *file)
+{
+	add_flag(&ldflags_obst, "-print-file-name=%s", file);
+
+	obstack_1grow(&ldflags_obst, '\0');
+	const char *flags = obstack_finish(&ldflags_obst);
+
+	/* construct commandline */
+	obstack_printf(&ldflags_obst, "%s ", LINKER);
+	obstack_printf(&ldflags_obst, "%s", flags);
+	obstack_1grow(&ldflags_obst, '\0');
+
+	char *commandline = obstack_finish(&ldflags_obst);
+
+	if (verbose) {
+		puts(commandline);
+	}
+	int err = system(commandline);
+	if (err != EXIT_SUCCESS) {
+		fprintf(stderr, "linker reported an error\n");
+		exit(1);
+	}
+}
+
 static const char *try_dir(const char *dir)
 {
 	if (dir == NULL)
@@ -602,6 +626,7 @@ int main(int argc, char **argv)
 	initialize_firm();
 
 	const char        *dumpfunction         = NULL;
+	const char        *print_file_name_file = NULL;
 	compile_mode_t     mode                 = CompileAssembleLink;
 	int                opt_level            = 1;
 	int                result               = EXIT_SUCCESS;
@@ -830,7 +855,7 @@ int main(int argc, char **argv)
 					strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if (option[0] == 'W') {
-				if (option[1] == 'p') {
+				if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wp,");
@@ -940,6 +965,8 @@ int main(int argc, char **argv)
 					(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
 			} else if (streq(option, "version")) {
 				print_cparser_version();
+			} else if (strstart(option, "print-file-name=")) {
+				GET_ARG_AFTER(print_file_name_file, "-print-file-name=");
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;
@@ -1041,6 +1068,11 @@ int main(int argc, char **argv)
 			}
 			last_file = entry;
 		}
+	}
+
+	if (print_file_name_file != NULL) {
+		print_file_name(print_file_name_file);
+		return 0;
 	}
 
 	if (files == NULL) {
