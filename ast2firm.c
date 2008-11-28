@@ -165,6 +165,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 		ir_mode_sort    sort;
 		unsigned        bit_size     = size * 8;
 		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
+		unsigned        modulo_shift;
 		ir_mode_arithmetic arithmetic;
 
 		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
@@ -173,16 +174,16 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 			         bit_size);
 			sort         = irms_int_number;
 			arithmetic   = irma_twos_complement;
+			modulo_shift = bit_size < machine_size ? machine_size : bit_size;
 		} else {
 			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
 			snprintf(name, sizeof(name), "F%u", bit_size);
 			sort         = irms_float_number;
 			arithmetic   = irma_ieee754;
+			modulo_shift = 0;
 		}
-		/* note: modulo_shift is 0, as in C it's undefined anyway to shift
-		 * a too big amount */
 		return new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-		                   0);
+		                   modulo_shift);
 	}
 
 	return NULL;
