@@ -915,7 +915,6 @@ void gen_firm_init(void)
     const backend_params *be_params = be_get_backend_param();
 
     firm_opt.lower_ll       = (a_byte) be_params->do_dw_lowering;
-    params.arch_op_settings = be_params->arch_op_settings;
 
     arch_create_intrinsic   = be_params->arch_create_intrinsic_fkt;
     create_intrinsic_ctx    = be_params->create_intrinsic_ctx;
