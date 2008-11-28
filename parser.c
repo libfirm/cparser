@@ -747,7 +747,7 @@ static void eat_until_anchor(void)
 }
 
 /**
- * Eat a whoel block from input tokens.
+ * Eat a whole block from input tokens.
  */
 static void eat_block(void)
 {
@@ -1023,7 +1023,7 @@ static expression_t *create_cast_expression(expression_t *expression,
 }
 
 /**
- * Check if a given expression represents the NULL constant.
+ * Check if a given expression represents a null pointer constant.
  *
  * @param expression  the expression to check
  */
