@@ -256,20 +256,21 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 	/* escape stuff... */
 	for (char *c = buf; *c != '\0'; ++c) {
 		switch(*c) {
-		case '"':
-		case '\'':
-		case '`':
 		case ' ':
-		case '\t':
-		case '\n':
-		case '\r':
-		case '\\':
+		case '"':
 		case '$':
+		case '&':
 		case '(':
 		case ')':
+		case ';':
 		case '<':
 		case '>':
-		case '&':
+		case '\'':
+		case '\\':
+		case '\n':
+		case '\r':
+		case '\t':
+		case '`':
 			obstack_1grow(obst, '\\');
 			/* FALLTHROUGH */
 		default:
@@ -881,7 +882,7 @@ int main(int argc, char **argv)
 					GET_ARG_AFTER(opt, "-Wp,");
 					add_flag(&cppflags_obst, "-Wp,%s", opt);
 				} else if (strstart(option + 1, "l,")) {
-				   	// pass options directly to the linker
+					// pass options directly to the linker
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
 					add_flag(&ldflags_obst, "-Wl,%s", opt);
