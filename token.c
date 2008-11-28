@@ -129,7 +129,7 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "integer number %lld", token->v.intvalue);
 		break;
 	case T_FLOATINGPOINT:
-		fprintf(f, "floatingpointer number %LF", token->v.floatvalue);
+		fprintf(f, "floating-point number %LF", token->v.floatvalue);
 		break;
 	case T_STRING_LITERAL:
 		fprintf(f, "string \"%s\"", token->v.string.begin);
