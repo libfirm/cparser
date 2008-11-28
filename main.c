@@ -828,13 +828,19 @@ int main(int argc, char **argv)
 					strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if (option[0] == 'W') {
-				if (strstart(option + 1, "l,")) // a gcc-style linker option
-				{
+				if (option[1] == 'p') {
+					// pass options directly to the preprocessor
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Wp,");
+					add_flag(&cppflags_obst, "-Wp,%s", opt);
+				} else if (strstart(option + 1, "l,")) {
+				   	// pass options directly to the linker
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wl,");
 					add_flag(&ldflags_obst, "-Wl,%s", opt);
+				} else {
+					set_warning_opt(&option[1]);
 				}
-				else set_warning_opt(&option[1]);
 			} else if (option[0] == 'm') {
 				/* -m options */
 				const char *opt;
