@@ -157,8 +157,11 @@ static void check_printf_format(const call_argument_t *arg, const format_spec_t 
 {
 	/* find format arg */
 	unsigned idx = 0;
-	for (; idx < spec->fmt_idx; ++idx)
+	for (; idx < spec->fmt_idx && arg != NULL; ++idx)
 		arg = arg->next;
+
+	if (arg == NULL)
+		return;
 
 	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
@@ -182,7 +185,7 @@ static void check_printf_format(const call_argument_t *arg, const format_spec_t 
 		return;
 	}
 	/* find the real args */
-	for(; idx < spec->arg_idx; ++idx)
+	for(; idx < spec->arg_idx && arg != NULL; ++idx)
 		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
