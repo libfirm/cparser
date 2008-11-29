@@ -910,7 +910,7 @@ next_arg:
 			++num_args;
 			arg = arg->next;
 		}
-		warningf(pos, "%u argument%s but only %u format string%s",
+		warningf(pos, "%u argument%s but only %u format specifier%s",
 			num_args, num_args != 1 ? "s" : "",
 			num_fmt, num_fmt != 1 ? "s" : "");
 	}
