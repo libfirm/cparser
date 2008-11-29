@@ -580,7 +580,7 @@ next_arg:
 		arg = arg->next;
 	}
 	if (!atend(&vchar)) {
-		warningf(pos, "format string contains NUL");
+		warningf(pos, "format string contains '\\0'");
 	}
 	if (arg != NULL) {
 		unsigned num_args = num_fmt;
@@ -902,7 +902,7 @@ next_arg:
 		arg = arg->next;
 	}
 	if (!atend(&vchar)) {
-		warningf(pos, "format string contains NUL");
+		warningf(pos, "format string contains '\\0'");
 	}
 	if (arg != NULL) {
 		unsigned num_args = num_fmt;
