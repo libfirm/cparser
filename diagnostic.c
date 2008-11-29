@@ -68,7 +68,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 
 				case 'C': {
 					const wint_t val = va_arg(ap, wint_t);
-					fputwc(val, stderr);
+					fprintf(stderr, "%lc", val);
 					break;
 				}
 
