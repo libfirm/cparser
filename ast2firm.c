@@ -4311,12 +4311,15 @@ static void initialize_local_declaration(entity_t *entity)
 
 static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
-	entity_t *entity = statement->declarations_begin;
-	entity_t *end    = statement->declarations_end->base.next;
-	for ( ; entity != end; entity = entity->base.next) {
-		if (!is_declaration(entity))
-			continue;
-		initialize_local_declaration(entity);
+	entity_t *      entity = statement->declarations_begin;
+	entity_t *const last   = statement->declarations_end;
+	if (entity != NULL) {
+		for ( ;; entity = entity->base.next) {
+			if (is_declaration(entity))
+				initialize_local_declaration(entity);
+			if (entity == last)
+				break;
+		}
 	}
 }
 
@@ -5116,10 +5119,10 @@ static void statement_to_firm(statement_t *statement)
 }
 
 static int count_local_variables(const entity_t *entity,
-                                 const entity_t *const end)
+                                 const entity_t *const last)
 {
 	int count = 0;
-	for (; entity != end; entity = entity->base.next) {
+	for (; entity != NULL; entity = entity->base.next) {
 		type_t *type;
 		bool    address_taken;
 
@@ -5135,6 +5138,9 @@ static int count_local_variables(const entity_t *entity,
 
 		if (!address_taken && is_type_scalar(type))
 			++count;
+
+		if (entity == last)
+			break;
 	}
 	return count;
 }
@@ -5147,7 +5153,7 @@ static void count_local_variables_in_stmt(statement_t *stmt, void *const env)
 	case STATEMENT_DECLARATION: {
 		const declaration_statement_t *const decl_stmt = &stmt->declaration;
 		*count += count_local_variables(decl_stmt->declarations_begin,
-										decl_stmt->declarations_end->base.next);
+				decl_stmt->declarations_end);
 		break;
 	}
 

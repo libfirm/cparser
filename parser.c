@@ -5779,14 +5779,16 @@ static void check_reachable(statement_t *const stmt)
 			declaration_statement_t const *const decl = &stmt->declaration;
 			entity_t                const *      ent  = decl->declarations_begin;
 			entity_t                const *const last = decl->declarations_end;
-			for (;; ent = ent->base.next) {
-				if (ent->kind                 == ENTITY_VARIABLE &&
-						ent->variable.initializer != NULL            &&
-						!initializer_returns(ent->variable.initializer)) {
-					return;
+			if (ent != NULL) {
+				for (;; ent = ent->base.next) {
+					if (ent->kind                 == ENTITY_VARIABLE &&
+							ent->variable.initializer != NULL            &&
+							!initializer_returns(ent->variable.initializer)) {
+						return;
+					}
+					if (ent == last)
+						break;
 				}
-				if (ent == last)
-					break;
 			}
 			next = stmt->base.next;
 			break;
