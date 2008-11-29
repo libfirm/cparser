@@ -1036,9 +1036,13 @@ static void print_declaration_statement(
 {
 	bool first = true;
 	entity_t *entity = statement->declarations_begin;
-	for (;
-		 entity != statement->declarations_end->base.next;
-		 entity = entity->base.next) {
+	if (entity == NULL) {
+		fputs("/* empty declaration statement */\n", out);
+		return;
+	}
+
+	entity_t *const end = statement->declarations_end->base.next;
+	for (; entity != end; entity = entity->base.next) {
 		if (!is_declaration(entity) && entity->kind != ENTITY_TYPEDEF)
 			continue;
 		if (is_generated_entity(entity))
