@@ -517,7 +517,7 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%c' at position %u", (char) fmt, num_fmt);
+				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
 				if (arg == NULL) {
 					warningf(pos, "too few arguments for format string");
 					return;
@@ -580,7 +580,7 @@ next_arg:
 		arg = arg->next;
 	}
 	if (!atend(&vchar)) {
-		warningf(pos, "format string contains '\0'");
+		warningf(pos, "format string contains NUL");
 	}
 	if (arg != NULL) {
 		unsigned num_args = num_fmt;
@@ -852,7 +852,7 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%c' at position %u", (char) fmt, num_fmt);
+				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
 				if (arg == NULL) {
 					warningf(pos, "too few arguments for format string");
 					return;
