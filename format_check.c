@@ -157,11 +157,11 @@ static void check_printf_format(const call_argument_t *arg, const format_spec_t 
 {
 	/* find format arg */
 	unsigned idx = 0;
-	for (; idx < spec->fmt_idx && arg != NULL; ++idx)
+	for (; idx < spec->fmt_idx; ++idx) {
+		if (arg == NULL)
+			return;
 		arg = arg->next;
-
-	if (arg == NULL)
-		return;
+	}
 
 	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
@@ -518,6 +518,10 @@ eval_fmt_mod_unsigned:
 
 			default:
 				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
+				if (arg == NULL) {
+					warningf(pos, "too few arguments for format string");
+					return;
+				}
 				goto next_arg;
 		}
 
@@ -597,8 +601,11 @@ static void check_scanf_format(const call_argument_t *arg, const format_spec_t *
 {
 	/* find format arg */
 	unsigned idx = 0;
-	for (; idx < spec->fmt_idx; ++idx)
+	for (; idx < spec->fmt_idx; ++idx) {
+		if (arg == NULL)
+			return;
 		arg = arg->next;
+	}
 
 	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
@@ -622,7 +629,7 @@ static void check_scanf_format(const call_argument_t *arg, const format_spec_t *
 		return;
 	}
 	/* find the real args */
-	for (; idx < spec->arg_idx; ++idx)
+	for (; idx < spec->arg_idx && arg != NULL; ++idx)
 		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
@@ -846,6 +853,10 @@ eval_fmt_mod_unsigned:
 
 			default:
 				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
+				if (arg == NULL) {
+					warningf(pos, "too few arguments for format string");
+					return;
+				}
 				goto next_arg;
 		}
 
