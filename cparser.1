@@ -1,0 +1,231 @@
+.\" Please adjust this date whenever revising the manpage.
+.Dd November 29, 2008
+.Dt CPARSER 1
+.Sh NAME
+.Nm cparser
+.Nd C compiler
+.Sh SYNOPSIS
+.Nm
+.Op Fl c | S | E | -print-ast
+.Op Fl std= Ns Ar standard
+.Op Fl - Ns Oo Cm no- Oc Ns Cm gcc
+.Op Fl - Ns Oo Cm no- Oc Ns Cm ms
+.Op Fl g
+.Op Fl O Ns Ar level
+.Op Fl W Ns Oo Cm no- Oc Ns Ar warn
+.Op Fl w
+.Op Fl I Ar dir
+.Op Fl L Ar dir
+.Op Fl D Ns Ar macro Ns Op Ar =defn
+.Op Fl U Ns Ar macro
+.Op Fl f Ar option
+.Op Fl b Ar option
+.Op Fl l Ar library
+.Op Fl o Ar outfile
+.Op Fl x Ar language
+.Ar
+.Sh DESCRIPTION
+.Nm
+is a C compiler, which can parse C90 and C99 as well as many GCC and some MSC extensions.
+It also provides many useful analyses for warnings and generates concise messages in case of error.
+It uses libFIRM for optimization and code generation.
+The compiler driver is largely compatible with GCC.
+.Sh OPTIONS
+.Bl -tag
+.It Fl c
+Compile the input files to object files.
+The default output filename is the input filename with the extension replaced by .o.
+.It Fl S
+Compile the input files to assembler.
+The default output filename is the input filename with the extension replaced by .s.
+.It Fl E
+Preprocess the input file only.
+By default the result is output to stdout.
+.It Fl -print-ast
+Output the abstract syntax tree of the parsed input file as C again.
+.It Fl std= Ns Ar standard
+Select the language standard.
+Supported values are:
+.Bl -tag -compact -width "iso9899:1990"
+.It Cm c89
+.It Cm iso9899:1990
+ISO C90
+.It Cm gnu89
+ISO C90 with GCC extensions
+.It Cm c99
+.It Cm iso9899:1999
+ISO C99
+.It Cm gnu99
+ISO C99 with GCC extensions
+.It Cm c++98
+ISO C++ 1998.
+Not supported yet.
+.It Cm gnu++98
+ISO C++ 1998 with GCC extensions.
+Not supported yet.
+.El
+.It Fl - Ns Oo Cm no- Oc Ns Cm gcc
+Disable/enable GCC extensions.
+This switch supersedes
+.Fl std .
+.It Fl - Ns Oo Cm no- Oc Ns Cm ms
+Disable/enable MSC extensions.
+.It Fl g
+When compiling C files, add debug information in
+.Tn stabs
+format.
+.It Fl O Ns Ar level
+.\" TODO expand
+Select the optimization level.
+Sensible values are between 0 and 4, inclusive.
+.It Fl W Ns Oo Cm no- Oc Ns Ar warn
+.\" TODO expand
+Disable/enable a specific warning.
+Every warning option has a corresponding
+.Cm no-
+switch to deactivate it.
+.It Fl Waddress
+Warn about suspicious use of addresses, like using the address of a function or variable as boolean condition or comparing with the address of a string literal.
+.It Fl Wall
+Activate most warnings.
+In particular these are
+.Fl Waddress ,
+.Fl Wattribute ,
+.Fl Wchar-subscripts ,
+.Fl Wcomment ,
+.Fl Wempty-statement ,
+.Fl Wformat ,
+.Fl Wimplicit-function-declaration ,
+.Fl Wimplicit-int ,
+.Fl Winit-self ,
+.Fl Wmain ,
+.Fl Wnonnull ,
+.Fl Wpointer-arith ,
+.Fl Wredundant-decls ,
+.Fl Wreturn-type ,
+.Fl Wshadow ,
+.Fl Wsign-compare ,
+.Fl Wstrict-prototypes ,
+.Fl Wswitch-enum ,
+.Fl Wunknown-pragmas ,
+.Fl Wunreachable-code ,
+.Fl Wunused-function ,
+.Fl Wunused-label ,
+.Fl Wunused-parameter ,
+.Fl Wunused-value ,
+.Fl Wunused-variable .
+.It Fl Wdeclaration-after-statement
+Warn about mixing declarations and statements, which is not allowed prior to C99.
+.It Fl Wempty-statement
+Warn about empty statements, i.e. statements which only consist of a single ';'.
+Use {} as replacement to avoid this warning.
+.It Fl Werror
+Treat warnings as errors, i.e. abort compilation when a warning is encountered.
+.It Fl Wextra
+Activate some more warnings.
+In particular these are
+.Fl Wempty-statement ,
+.Fl Wunused-parameter ,
+.Fl Wunused-value .
+.It Fl Wformat
+Check format strings of char and wchar_t functions.
+.It Fl Wimplicit
+Activate
+.Fl Wimplicit-function-declaration ,
+.Fl Wimplicit-int .
+.It Fl Wimplicit-function-declaration
+Warn about calling a function without a prior declaration.
+.It Fl Wimplicit-int
+Warn about declarations whose declaration specifiers do not include a type specifier.
+.It Fl Wredundant-decls
+Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
+.It Fl Wunreachable-code
+Warn when the compiler determines that a statement (or in some cases a part thereof) will never be executed.
+.It Fl Wunused
+Activate
+.Fl Wunused-function ,
+.Fl Wunused-label ,
+.Fl Wunused-parameter ,
+.Fl Wunused-value ,
+.Fl Wunused-variable .
+.It Fl Wunused-parameter
+Warn when a parameter is never used or only ever read to calculate its own new value, e.g. x = x + 1.
+.It Fl Wunused-variable
+Warn when a variable is never used or only ever read to calculate its own new value, e.g. x = x + 1.
+.It Fl w
+Suppress all warnings.
+.It Fl I Ar dir
+Add the directory
+.Ar dir
+to the paths to be searched for include files.
+.It Fl L Ar dir
+Add the directory
+.Ar dir
+to the paths to be searched for libraries.
+.It Fl D Ns Ar macro
+Define the preprocessor macro
+.Ar macro
+which will expand to 1.
+.It Fl D Ns Ar macro=defn
+Define the preprocessor macro
+.Ar macro
+and set its expanded value to
+.Ar defn .
+.It Fl U Ns Ar macro
+Undefine the preprocessor macro
+.Ar macro .
+.It Fl f Ar option
+Set a frontend or optimizer option.
+Use
+.Fl fhelp
+to get a list of supported optimizer options.
+.It Fl b Ar option
+Set a backend option.
+Use
+.Fl bhelp
+to get a list of supported options.
+.It Fl l Ar library
+Link with the specified library.
+.It Fl o Ar outfile
+Specify the output filename.
+This is only valid when using a single input filename.
+.Fl
+as filename uses stdout for output.
+.It Fl x Ar language
+Overwrite the language auto-detection for the following filenames by the
+specified
+.Ar language .
+Supported values are:
+.Bl -tag -compact -width "assembler-with-cpp"
+.It Cm assembler
+Assembler file
+.It Cm assembler-with-cpp
+Assembler file, which needs to be preprocessed
+.It Cm c
+.It Cm c-header
+C file
+.It Cm c++
+.It Cm c++-header
+C++ file
+.It Cm none
+Revert to auto-detection
+.El
+.El
+.Sh SEE ALSO
+.Xr gcc 1 ,
+http://www.libfirm.org/
+.Sh BUGS
+Probably many - if you hit one, please report it.
+.Pp
+.Nm
+needs to support more switches for better GCC compatibility.
+.Sh AUTHORS
+.An -nosplit
+.Nm
+was written by
+.An Matthias Braun
+.Aq matze@braunis.de ,
+.An Christoph Mallon
+.Aq christoph.mallon@gmx.de
+and
+.An Michael Beck .
