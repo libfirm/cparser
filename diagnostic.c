@@ -66,12 +66,6 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					fputc(*f, stderr);
 					break;
 
-				case 'C': {
-					const wint_t val = va_arg(ap, wint_t);
-					fputwc(val, stderr);
-					break;
-				}
-
 				case 'c': {
 					const unsigned char val = (unsigned char) va_arg(ap, int);
 					fputc(val, stderr);
