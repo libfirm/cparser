@@ -6966,9 +6966,10 @@ static expression_t *parse_reference(void)
 	if (entity == NULL) {
 		if (!strict_mode && look_ahead(1)->type == '(') {
 			/* an implicitly declared function */
-			if (warning.implicit_function_declaration) {
-				warningf(HERE, "implicit declaration of function '%Y'",
-					symbol);
+			if (warning.error_implicit_function_declaration) {
+				errorf(HERE, "implicit declaration of function '%Y'", symbol);
+			} else if (warning.implicit_function_declaration) {
+				warningf(HERE, "implicit declaration of function '%Y'", symbol);
 			}
 
 			entity = create_implicit_function(symbol, HERE);

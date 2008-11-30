@@ -22,54 +22,55 @@
 #include "warning.h"
 
 warning_t warning = {
-	.other                         = true,
+	.other                               = true,
 
-	.address                       = true,
-	.aggregate_return              = false,
-	.attribute                     = true,
-	.cast_qual                     = false,
-	.char_subscripts               = true,
-	.comment                       = false,
-	.conversion                    = false,
-	.declaration_after_statement   = false,
-	.deprecated_declarations       = true,
-	.div_by_zero                   = true,
-	.empty_statement               = false,
-	.fatal_errors                  = false,
-	.float_equal                   = false,
-	.format                        = true,
-	.implicit_function_declaration = true,
-	.implicit_int                  = true,
-	.init_self                     = true,
-	.long_long                     = false,
-	.main                          = true,
-	.missing_declarations          = false,
-	.missing_noreturn              = false,
-	.missing_prototypes            = false,
-	.multichar                     = true,
-	.nested_externs                = false,
-	.nonnull                       = true,
-	.old_style_definition          = false,
-	.packed                        = false,
-	.padded                        = false,
-	.pointer_arith                 = true,
-	.redundant_decls               = true,
-	.return_type                   = true,
-	.s_are_errors                  = false,
-	.shadow                        = false,
-	.sign_compare                  = false,
-	.strict_prototypes             = true,
-	.switch_default                = false,
-	.switch_enum                   = false,
-	.traditional                   = false,
-	.unknown_pragmas               = true,
-	.unreachable_code              = false,
-	.unused_function               = false,
-	.unused_label                  = false,
-	.unused_parameter              = false,
-	.unused_value                  = true,
-	.unused_variable               = false,
-	.write_strings                 = false
+	.address                             = true,
+	.aggregate_return                    = false,
+	.attribute                           = true,
+	.cast_qual                           = false,
+	.char_subscripts                     = true,
+	.comment                             = false,
+	.conversion                          = false,
+	.declaration_after_statement         = false,
+	.deprecated_declarations             = true,
+	.div_by_zero                         = true,
+	.empty_statement                     = false,
+	.error_implicit_function_declaration = false,
+	.fatal_errors                        = false,
+	.float_equal                         = false,
+	.format                              = true,
+	.implicit_function_declaration       = true,
+	.implicit_int                        = true,
+	.init_self                           = true,
+	.long_long                           = false,
+	.main                                = true,
+	.missing_declarations                = false,
+	.missing_noreturn                    = false,
+	.missing_prototypes                  = false,
+	.multichar                           = true,
+	.nested_externs                      = false,
+	.nonnull                             = true,
+	.old_style_definition                = false,
+	.packed                              = false,
+	.padded                              = false,
+	.pointer_arith                       = true,
+	.redundant_decls                     = true,
+	.return_type                         = true,
+	.s_are_errors                        = false,
+	.shadow                              = false,
+	.sign_compare                        = false,
+	.strict_prototypes                   = true,
+	.switch_default                      = false,
+	.switch_enum                         = false,
+	.traditional                         = false,
+	.unknown_pragmas                     = true,
+	.unreachable_code                    = false,
+	.unused_function                     = false,
+	.unused_label                        = false,
+	.unused_parameter                    = false,
+	.unused_value                        = true,
+	.unused_variable                     = false,
+	.write_strings                       = false
 };
 
 void set_warning_opt(const char *const opt)
@@ -118,18 +119,19 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value);
 		SET(unused_variable);
 	}
-	OPT("address",                       address);
-	OPT("aggregate-return",              aggregate_return);
-	OPT("attribute",                     attribute);
-	OPT("cast-qual",                     cast_qual);
-	OPT("char-subscripts",               char_subscripts);
-	OPT("comment",                       comment);
-	OPT("conversion",                    conversion);
-	OPT("declaration-after-statement",   declaration_after_statement);
-	OPT("deprecated-declarations",       deprecated_declarations);
-	OPT("div-by-zero",                   div_by_zero);
-	OPT("empty-statement",               empty_statement);
-	OPT("error",                         s_are_errors);
+	OPT("address",                             address);
+	OPT("aggregate-return",                    aggregate_return);
+	OPT("attribute",                           attribute);
+	OPT("cast-qual",                           cast_qual);
+	OPT("char-subscripts",                     char_subscripts);
+	OPT("comment",                             comment);
+	OPT("conversion",                          conversion);
+	OPT("declaration-after-statement",         declaration_after_statement);
+	OPT("deprecated-declarations",             deprecated_declarations);
+	OPT("div-by-zero",                         div_by_zero);
+	OPT("empty-statement",                     empty_statement);
+	OPT("error",                               s_are_errors);
+	OPT("error-implicit-function-declaration", error_implicit_function_declaration);
 	OPTX("extra") {
 		/* TODO */
 		// TODO SET(function_end_without_return);
@@ -140,8 +142,8 @@ void set_warning_opt(const char *const opt)
 		SET(unused_parameter);
 		SET(unused_value);
 	}
-	OPT("fatal-errors",                  fatal_errors);
-	OPT("float-equal",                   float_equal);
+	OPT("fatal-errors",                        fatal_errors);
+	OPT("float-equal",                         float_equal);
 	OPTX("format") {
 		SET(format);
 		SET(nonnull);
@@ -150,31 +152,31 @@ void set_warning_opt(const char *const opt)
 		SET(implicit_function_declaration);
 		SET(implicit_int);
 	}
-	OPT("implicit-function-declaration", implicit_function_declaration);
-	OPT("implicit-int",                  implicit_int);
-	OPT("init-self",                     init_self);
-	OPT("long-long",                     long_long);
-	OPT("main",                          main);
-	OPT("missing-declarations",          missing_declarations);
-	OPT("missing-noreturn",              missing_noreturn);
-	OPT("missing-prototypes",            missing_prototypes);
-	OPT("multichar",                     multichar);
-	OPT("nested-externs",                nested_externs);
-	OPT("nonnull",                       nonnull);
-	OPT("old-style-definition",          old_style_definition);
-	OPT("packed",                        packed);
-	OPT("padded",                        padded);
-	OPT("pointer-arith",                 pointer_arith);
-	OPT("redundant-decls",               redundant_decls);
-	OPT("return-type",                   return_type);
-	OPT("shadow",                        shadow);
-	OPT("sign-compare",                  sign_compare);
-	OPT("strict-prototypes",             strict_prototypes);
-	OPT("switch-default",                switch_default);
-	OPT("switch-enum",                   switch_enum);
-	OPT("traditional",                   traditional);
-	OPT("unknown-pragmas",               unknown_pragmas);
-	OPT("unreachable-code",              unreachable_code);
+	OPT("implicit-function-declaration",       implicit_function_declaration);
+	OPT("implicit-int",                        implicit_int);
+	OPT("init-self",                           init_self);
+	OPT("long-long",                           long_long);
+	OPT("main",                                main);
+	OPT("missing-declarations",                missing_declarations);
+	OPT("missing-noreturn",                    missing_noreturn);
+	OPT("missing-prototypes",                  missing_prototypes);
+	OPT("multichar",                           multichar);
+	OPT("nested-externs",                      nested_externs);
+	OPT("nonnull",                             nonnull);
+	OPT("old-style-definition",                old_style_definition);
+	OPT("packed",                              packed);
+	OPT("padded",                              padded);
+	OPT("pointer-arith",                       pointer_arith);
+	OPT("redundant-decls",                     redundant_decls);
+	OPT("return-type",                         return_type);
+	OPT("shadow",                              shadow);
+	OPT("sign-compare",                        sign_compare);
+	OPT("strict-prototypes",                   strict_prototypes);
+	OPT("switch-default",                      switch_default);
+	OPT("switch-enum",                         switch_enum);
+	OPT("traditional",                         traditional);
+	OPT("unknown-pragmas",                     unknown_pragmas);
+	OPT("unreachable-code",                    unreachable_code);
 	OPTX("unused") {
 		SET(unused_function);
 		SET(unused_label);
@@ -182,12 +184,12 @@ void set_warning_opt(const char *const opt)
 		SET(unused_value);
 		SET(unused_variable);
 	}
-	OPT("unused-function",               unused_function);
-	OPT("unused-label",                  unused_label);
-	OPT("unused-parameter",              unused_parameter);
-	OPT("unused-value",                  unused_value);
-	OPT("unused-variable",               unused_variable);
-	OPT("write-strings",                 write_strings);
+	OPT("unused-function",                     unused_function);
+	OPT("unused-label",                        unused_label);
+	OPT("unused-parameter",                    unused_parameter);
+	OPT("unused-value",                        unused_value);
+	OPT("unused-variable",                     unused_variable);
+	OPT("write-strings",                       write_strings);
 #undef OPT
 #undef SET
 #undef OPT_X
