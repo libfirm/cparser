@@ -7,6 +7,8 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c | S | E | -print-ast
+.Op Fl -print-implicit-cast
+.Op Fl -print-parenthesis
 .Op Fl std= Ns Ar standard
 .Op Fl - Ns Oo Cm no- Oc Ns Cm gcc
 .Op Fl - Ns Oo Cm no- Oc Ns Cm ms
@@ -43,6 +45,14 @@ Preprocess the input file only.
 By default the result is output to stdout.
 .It Fl -print-ast
 Output the abstract syntax tree of the parsed input file as C again.
+.It Fl -print-implicit-cast
+When using
+.Fl -print-ast ,
+show casts, which are inserted by the semantic checks.
+.It Fl -print-parenthesis
+When using
+.Fl -print-ast ,
+show all expressions fully parenthesized.
 .It Fl std= Ns Ar standard
 Select the language standard.
 Supported values are:
@@ -86,6 +96,8 @@ Every warning option has a corresponding
 switch to deactivate it.
 .It Fl Waddress
 Warn about suspicious use of addresses, like using the address of a function or variable as boolean condition or comparing with the address of a string literal.
+.It Fl Waggregate-return
+Warn about defining or calling a function, which returns a struct or union by value.
 .It Fl Wall
 Activate most warnings.
 In particular these are
@@ -114,19 +126,27 @@ In particular these are
 .Fl Wunused-parameter ,
 .Fl Wunused-value ,
 .Fl Wunused-variable .
+.It Fl Wcast-qual
+Warn whenever a pointer cast removes qualifiers from the pointed-to type, e.g. casting a const char* to char*.
+.It Fl char-subscripts
+Warn about using an expression of type char as array subscript, e.g. char c; arr[c].
 .It Fl Wdeclaration-after-statement
 Warn about mixing declarations and statements, which is not allowed prior to C99.
+.It Fl Wdiv-by-zero
+Warn about compile-time integer division by zero.
 .It Fl Wempty-statement
 Warn about empty statements, i.e. statements which only consist of a single ';'.
 Use {} as replacement to avoid this warning.
 .It Fl Werror
-Treat warnings as errors, i.e. abort compilation when a warning is encountered.
+Treat warnings as errors, i.e. do not continue after parsing when a warning is encountered.
 .It Fl Wextra
 Activate some more warnings.
 In particular these are
 .Fl Wempty-statement ,
 .Fl Wunused-parameter ,
 .Fl Wunused-value .
+.It Fl Wfatal-errors
+Immediately abort compilation when encountering an error.
 .It Fl Wformat
 Check format strings of char and wchar_t functions.
 .It Fl Wimplicit
@@ -137,6 +157,23 @@ Activate
 Warn about calling a function without a prior declaration.
 .It Fl Wimplicit-int
 Warn about declarations whose declaration specifiers do not include a type specifier.
+.It Fl Winit-self
+Warn about uninitialized variables which are initialized with themselves.
+.It Fl Wlong-long
+Warn if the type 'long long' is used.
+.It Fl Wmain
+Warn if the type of 'main' is suspicious, i.e. if it is not a non-static function declared as either int\ main(void), int\ main(int,\ char**) or, as an extension, int\ main(int,\ char**,\ char**).
+.It Fl Wmissing-declarations
+Warn if a non-static function or a global variable without a storage class is defined without a prior declaration.
+This is typically a sign of a missing #include or that the object should be static.
+.It Fl Wmissing-noreturn
+Warn about functions, which are candidates for the attribute 'noreturn'.
+.It Fl Wmissing-prototypes
+Warn if a global function is defined without a previous prototype declaration.
+.It Fl Wmultichar
+Warn if a multicharacter constant ('FOOF') is used.
+.It Fl Wnested-externs
+Warn if an 'extern' declaration is encountered within a function.
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
 .It Fl Wunreachable-code
@@ -219,6 +256,8 @@ Probably many - if you hit one, please report it.
 .Pp
 .Nm
 needs to support more switches for better GCC compatibility.
+.Pp
+This manual page is incomplete.
 .Sh AUTHORS
 .An -nosplit
 .Nm
