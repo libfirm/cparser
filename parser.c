@@ -3557,13 +3557,11 @@ static void finish_struct_type(compound_type_t *type)
 		need_pad = true;
 
 	if (warning.padded && need_pad) {
-		warningf(&compound->base.source_position,
-			"'%#T' needs padding", type, compound->base.symbol);
+		warningf(&compound->base.source_position, "'%T' needs padding", type);
 	}
 	if (warning.packed && !need_pad) {
 		warningf(&compound->base.source_position,
-			"superfluous packed attribute on '%#T'",
-			type, compound->base.symbol);
+				"superfluous packed attribute on '%T'", type);
 	}
 
 	type->base.size      = offset;
