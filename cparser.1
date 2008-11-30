@@ -25,6 +25,8 @@
 .Op Fl l Ar library
 .Op Fl o Ar outfile
 .Op Fl x Ar language
+.Op Fl Wl, Ns Ar option
+.Op Fl Wp, Ns Ar option
 .Ar
 .Sh DESCRIPTION
 .Nm
@@ -128,7 +130,7 @@ In particular these are
 .Fl Wunused-variable .
 .It Fl Wcast-qual
 Warn whenever a pointer cast removes qualifiers from the pointed-to type, e.g. casting a const char* to char*.
-.It Fl char-subscripts
+.It Fl Wchar-subscripts
 Warn about using an expression of type char as array subscript, e.g. char c; arr[c].
 .It Fl Wdeclaration-after-statement
 Warn about mixing declarations and statements, which is not allowed prior to C99.
@@ -249,6 +251,14 @@ C++ file
 .It Cm none
 Revert to auto-detection
 .El
+.It Fl Wl, Ns Ar option
+Pass
+.Ar option
+to the linker.
+.It Fl Wp, Ns Ar option
+Pass
+.Ar option
+to the preprocessor.
 .El
 .Sh SEE ALSO
 .Xr gcc 1 ,
