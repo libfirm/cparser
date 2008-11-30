@@ -3165,7 +3165,7 @@ static type_t *parse_enum_specifier(void)
 
 	if (token.type == '{') {
 		if (entity->enume.complete) {
-			errorf(HERE, "multiple definitions of enum %Y (previous definition %P)",
+			errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
 			       symbol, &entity->base.source_position);
 		}
 		if (symbol != NULL) {
@@ -3182,7 +3182,7 @@ static type_t *parse_enum_specifier(void)
 			anonymous_entity = entity;
 		}
 	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
-		errorf(HERE, "enum %Y used before definition (incomplete enumes are a GNU extension)",
+		errorf(HERE, "'enum %Y' used before definition (incomplete enums are a GNU extension)",
 		       symbol);
 	}
 
@@ -3447,7 +3447,7 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 			DET_MOD(noalias, DM_NOALIAS);
 		} else {
 			if (warning.other)
-				warningf(HERE, "Unknown modifier %Y ignored", token.v.symbol);
+				warningf(HERE, "Unknown modifier '%Y' ignored", token.v.symbol);
 			next_token();
 			if (token.type == '(')
 				skip_until(')');
@@ -4110,7 +4110,7 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 	type_t *type = skip_typeref(entity->declaration.type);
 	if (is_type_incomplete(type)) {
 		errorf(&entity->base.source_position,
-		       "parameter '%Y' has incomplete type %T", entity->base.symbol,
+		       "parameter '%Y' has incomplete type '%T'", entity->base.symbol,
 		       entity->declaration.type);
 	}
 }
@@ -5364,7 +5364,7 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	}
 
 	if (is_definition) {
-		errorf(HERE, "parameter %Y is initialised", entity->base.symbol);
+		errorf(HERE, "parameter '%Y' is initialised", entity->base.symbol);
 	}
 
 	return record_entity(entity, false);
