@@ -1,4 +1,4 @@
-===== cparser 0.9.7 (1.12.2008) =====
+===== cparser 0.9.7 (2008-12-01) =====
 * several bugfixes
 * add/correct semantic checks
 * improved error recovery
@@ -6,7 +6,7 @@
 * support more GCC switches
 * add a manpage
 
-===== cparser 0.9.6 (22.11.2008) =====
+===== cparser 0.9.6 (2008-11-22) =====
 * lots of bugfixes
 * add/correct semantic checks
 * more/improved warnings
@@ -16,7 +16,7 @@
 * support more switches for gcc compatibility
 * support for libc builtins
 
-===== cparser 0.9.5 (31.07.2008) =====
+===== cparser 0.9.5 (2008-07-31) =====
 
 * lots of bugfixes
 * sync with latest libfirm
@@ -26,7 +26,7 @@
 * support more gnu extensions
 * parse all gnu extensions
 
-===== cparser 0.9 (18.02.2008) =====
+===== cparser 0.9 (2008-02-08) =====
 
 * initial release
 * cparser is able to bootstrap itself
