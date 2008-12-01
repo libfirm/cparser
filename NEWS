@@ -1,7 +1,10 @@
-===== cparser 0.9.7 (27.11.2008) =====
+===== cparser 0.9.7 (1.12.2008) =====
 * several bugfixes
 * add/correct semantic checks
 * improved error recovery
+* support more GCC extensions
+* support more GCC switches
+* add a manpage
 
 ===== cparser 0.9.6 (22.11.2008) =====
 * lots of bugfixes
