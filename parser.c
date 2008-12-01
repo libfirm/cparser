@@ -5171,7 +5171,7 @@ finish:
 static void parser_error_multiple_definition(entity_t *entity,
 		const source_position_t *source_position)
 {
-	errorf(source_position, "multiple definition of symbol '%Y' (declared %P)",
+	errorf(source_position, "multiple definition of '%Y' (declared %P)",
 	       entity->base.symbol, &entity->base.source_position);
 }
 
@@ -6868,7 +6868,7 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	case T___builtin_expect:
 		return make_function_2_type(type_long, type_long, type_long);
 	default:
-		internal_errorf(HERE, "not implemented builtin symbol found");
+		internal_errorf(HERE, "not implemented builtin identifier found");
 	}
 }
 
@@ -6976,7 +6976,7 @@ static expression_t *parse_reference(void)
 
 			entity = create_implicit_function(symbol, HERE);
 		} else {
-			errorf(HERE, "unknown symbol '%Y' found.", symbol);
+			errorf(HERE, "unknown identifier '%Y' found.", symbol);
 			entity = create_error_entity(symbol, ENTITY_VARIABLE);
 		}
 	}
