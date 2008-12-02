@@ -879,10 +879,14 @@ static void print_compound_statement(const compound_statement_t *block)
  */
 static void print_return_statement(const return_statement_t *statement)
 {
-	fputs("return ", out);
-	if (statement->value != NULL)
-		print_expression(statement->value);
-	fputs(";\n", out);
+	expression_t const *const val = statement->value;
+	if (val != NULL) {
+		fputs("return ", out);
+		print_expression(val);
+		fputs(";\n", out);
+	} else {
+		fputs("return;\n", out);
+	}
 }
 
 /**
