@@ -4772,7 +4772,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 					   env.symbol);
 			}
 		} else if (flags & DECL_IS_PARAMETER) {
-			orig_type = semantic_parameter(&env.source_position, type,
+			orig_type = semantic_parameter(&env.source_position, orig_type,
 			                               specifiers, env.symbol);
 
 			entity = allocate_entity_zero(ENTITY_PARAMETER);
