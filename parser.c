@@ -10727,7 +10727,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	eat('{');
 	add_anchor_token('}');
 	/* tokens, which can start a statement */
-	/* TODO C++, MS, __builtin_FOO */
+	/* TODO MS, __builtin_FOO */
 	add_anchor_token('!');
 	add_anchor_token('&');
 	add_anchor_token('(');
