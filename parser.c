@@ -4440,15 +4440,20 @@ ptr_operator_end:
 		next_token();
 		break;
 	case '(':
-		next_token();
-		add_anchor_token(')');
-		inner_types = parse_inner_declarator(env, may_be_abstract);
-		if (inner_types != NULL) {
-			/* All later declarators only modify the return type */
-			env = NULL;
+		/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
+		 * interpreted as ``function with no parameter specification'', rather
+		 * than redundant parentheses around the omitted identifier. */
+		if (look_ahead(1)->type != ')') {
+			next_token();
+			add_anchor_token(')');
+			inner_types = parse_inner_declarator(env, may_be_abstract);
+			if (inner_types != NULL) {
+				/* All later declarators only modify the return type */
+				env = NULL;
+			}
+			rem_anchor_token(')');
+			expect(')');
 		}
-		rem_anchor_token(')');
-		expect(')');
 		break;
 	default:
 		if (may_be_abstract)
