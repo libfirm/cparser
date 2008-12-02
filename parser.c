@@ -7944,7 +7944,7 @@ static expression_t *parse_select_expression(expression_t *compound)
 			       symbol, type_left);
 		}
 create_error_entry:
-		return create_invalid_expression();
+		entry = create_error_entity(symbol, ENTITY_COMPOUND_MEMBER);
 	}
 
 	assert(is_declaration(entry));
