@@ -10786,6 +10786,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_int);
 	add_anchor_token(T_long);
 	add_anchor_token(T_new);
+	add_anchor_token(T_operator);
 	add_anchor_token(T_register);
 	add_anchor_token(T_reinterpret_cast);
 	add_anchor_token(T_restrict);
@@ -10898,6 +10899,7 @@ end_error:
 	rem_anchor_token(T_restrict);
 	rem_anchor_token(T_reinterpret_cast);
 	rem_anchor_token(T_register);
+	rem_anchor_token(T_operator);
 	rem_anchor_token(T_new);
 	rem_anchor_token(T_long);
 	rem_anchor_token(T_int);
