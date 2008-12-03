@@ -1228,6 +1228,10 @@ preprocess:
 					copy_file(out, preprocessed_in);
 					int result = pclose(preprocessed_in);
 					fclose(out);
+					/* remove output file in case of error */
+					if (out != stdout && result != EXIT_SUCCESS) {
+						unlink(outname);
+					}
 					return result;
 				}
 
@@ -1317,6 +1321,9 @@ do_parsing:
 			if (in == preprocessed_in) {
 				int pp_result = pclose(preprocessed_in);
 				if (pp_result != EXIT_SUCCESS) {
+					/* remove output file */
+					if (out != stdout)
+						unlink(outname);
 					exit(EXIT_FAILURE);
 				}
 			}
@@ -1372,6 +1379,9 @@ do_parsing:
 			if (in == preprocessed_in) {
 				int pp_result = pclose(preprocessed_in);
 				if (pp_result != EXIT_SUCCESS) {
+					/* remove output in error case */
+					if (out != stdout)
+						unlink(outname);
 					return pp_result;
 				}
 			}
@@ -1412,8 +1422,11 @@ do_parsing:
 		file->type = filetype;
 	}
 
-	if (result != EXIT_SUCCESS)
+	if (result != EXIT_SUCCESS) {
+		if (out != stdout)
+			unlink(outname);
 		return result;
+	}
 
 	/* link program file */
 	if (mode == CompileAssembleLink) {
