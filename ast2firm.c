@@ -287,7 +287,6 @@ static ir_node *get_type_size(type_t *type)
 		ir_node *size_node = type->array.size_node;
 		if (size_node == NULL) {
 			size_node = expression_to_firm(type->array.size_expression);
-			assert(!is_Const(size_node));
 			type->array.size_node = size_node;
 		}
 
