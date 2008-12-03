@@ -4079,7 +4079,8 @@ static void parse_identifier_list(scope_t *scope)
 		/* a K&R parameter has no type, yet */
 		next_token();
 
-		append_entity(scope, entity);
+		if (scope != NULL)
+			append_entity(scope, entity);
 
 		if (token.type != ',') {
 			break;
