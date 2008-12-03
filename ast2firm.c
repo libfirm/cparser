@@ -2391,7 +2391,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
 		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0) ||
 		    (ekind == EXPR_BINARY_LOGICAL_OR  && val == 0)) {
-		    return produce_condition_result(expression->right, mode, dbgi);
+			return produce_condition_result(expression->right, mode, dbgi);
 		} else {
 			return new_Const(get_mode_one(mode));
 		}
