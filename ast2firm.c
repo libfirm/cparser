@@ -2315,7 +2315,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 
 	default:
 normal_node:
-		mode = get_irn_mode(right);
+		mode = get_ir_mode(type_right);
 		left = create_conv(dbgi, left, mode);
 		break;
 	}
