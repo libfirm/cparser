@@ -844,11 +844,15 @@ static int parse_escape_sequence(void)
 	case EOF:
 		parse_error("reached end of file while parsing escape sequence");
 		return EOF;
+	/* \E is not documented, but handled, by GCC.  It is acceptable according
+	 * to §6.11.4, whereas \e is not. */
+	case 'E':
 	case 'e':
 		if (c_mode & _GNUC)
-			return 27;   /* hopefully 27 is ALWAYS the code for ESACAPE */
-		/*fallthrough*/
+			return 27;   /* hopefully 27 is ALWAYS the code for ESCAPE */
+		/* FALLTHROUGH */
 	default:
+		/* §6.4.4.4:8 footnote 64 */
 		parse_error("unknown escape sequence");
 		return EOF;
 	}
