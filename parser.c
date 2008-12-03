@@ -10370,34 +10370,54 @@ static statement_t *parse_return(void)
 	assert(is_type_function(func_type));
 	type_t *const return_type = skip_typeref(func_type->function.return_type);
 
+	source_position_t const *const pos = &statement->base.source_position;
 	if (return_value != NULL) {
 		type_t *return_value_type = skip_typeref(return_value->base.type);
 
-		if (is_type_atomic(return_type,        ATOMIC_TYPE_VOID) &&
-				!is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
-			if (warning.other) {
-				warningf(&statement->base.source_position,
-						"'return' with a value, in function returning void");
+		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+			if (is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
+				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
+				/* Only warn in C mode, because GCC does the same */
+				if (c_mode & _CXX || strict_mode) {
+					errorf(pos,
+							"'return' with a value, in function returning 'void'");
+				} else if (warning.other) {
+					warningf(pos,
+							"'return' with a value, in function returning 'void'");
+				}
+			} else if (!(c_mode & _CXX)) { /* ISO/IEC 14882:1998(E) §6.6.3:3 */
+				/* Only warn in C mode, because GCC does the same */
+				if (strict_mode) {
+					errorf(pos,
+							"'return' with expression in function return 'void'");
+				} else if (warning.other) {
+					warningf(pos,
+							"'return' with expression in function return 'void'");
+				}
 			}
-			return_value = NULL;
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
 			report_assign_error(error, return_type,	return_value, "'return'",
-			                    &statement->base.source_position);
-			return_value = create_implicit_cast(return_value, return_type);
+					pos);
 		}
+		return_value = create_implicit_cast(return_value, return_type);
 		/* check for returning address of a local var */
 		if (warning.other && return_value != NULL
 				&& return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (expression_is_local_variable(expression)) {
-				warningf(&statement->base.source_position,
-				         "function returns address of local variable");
+				warningf(pos, "function returns address of local variable");
 			}
 		}
 	} else if (warning.other && !is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-		warningf(&statement->base.source_position,
-				"'return' without value, in function returning non-void");
+		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
+		if (c_mode & _CXX || strict_mode) {
+			errorf(pos,
+					"'return' without value, in function returning non-void");
+		} else {
+			warningf(pos,
+					"'return' without value, in function returning non-void");
+		}
 	}
 	statement->returns.value = return_value;
 
