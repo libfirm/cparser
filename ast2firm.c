@@ -2211,9 +2211,8 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
  * produces a 0/1 depending of the value of a mode_b node
  */
 static ir_node *produce_condition_result(const expression_t *expression,
-                                         dbg_info *dbgi)
+                                         ir_mode *mode, dbg_info *dbgi)
 {
-	ir_mode *mode      = get_ir_mode(expression->base.type);
 	ir_node *cur_block = get_cur_block();
 
 	ir_node *one_block = new_immBlock();
@@ -2390,13 +2389,14 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
 		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0) ||
 		    (ekind == EXPR_BINARY_LOGICAL_OR  && val == 0)) {
-			return expression_to_firm(expression->right);
+		    return produce_condition_result(expression->right, mode, dbgi);
 		} else {
 			return new_Const(get_mode_one(mode));
 		}
 	}
 
-	return produce_condition_result((const expression_t*) expression, dbgi);
+	return produce_condition_result((const expression_t*) expression, mode,
+	                                dbgi);
 }
 
 typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
@@ -3233,7 +3233,8 @@ static ir_node *expression_to_firm(const expression_t *expression)
 
 	/* we have to produce a 0/1 from the mode_b expression */
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
-	return produce_condition_result(expression, dbgi);
+	ir_mode  *mode = get_ir_mode(expression->base.type);
+	return produce_condition_result(expression, mode, dbgi);
 }
 
 /**
