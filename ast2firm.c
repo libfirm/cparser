@@ -1320,7 +1320,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
 
-	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE && !is_Bad(load)) {
 		set_Load_volatility(load, volatility_is_volatile);
 	}
 
@@ -1751,7 +1751,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	if (is_type_scalar(type)) {
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-		if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
+		if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE && !is_Bad(store))
 			set_Store_volatility(store, volatility_is_volatile);
 		set_store(store_mem);
 	} else {
@@ -1822,8 +1822,10 @@ static void bitfield_store_to_firm(dbg_info *dbgi,
 	set_store(store_mem);
 
 	if (set_volatile) {
-		set_Load_volatility(load, volatility_is_volatile);
-		set_Store_volatility(store, volatility_is_volatile);
+		if (!is_Bad(load))
+			set_Load_volatility(load, volatility_is_volatile);
+		if (!is_Bad(store))
+			set_Store_volatility(store, volatility_is_volatile);
 	}
 }
 
