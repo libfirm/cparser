@@ -356,15 +356,19 @@ static void print_function_type_post(const function_type_t *type,
 		}
 	} else {
 		entity_t *parameter = parameters->entities;
-		for( ; parameter != NULL; parameter = parameter->base.next) {
+		for (; parameter != NULL; parameter = parameter->base.next) {
 			if (first) {
 				first = false;
 			} else {
 				fputs(", ", out);
 			}
 			assert(is_declaration(parameter));
-			print_type_ext(parameter->declaration.type, parameter->base.symbol,
-			               NULL);
+			const type_t *const type = parameter->declaration.type;
+			if (type == NULL) {
+				fputs(parameter->base.symbol->string, out);
+			} else {
+				print_type_ext(type, parameter->base.symbol, NULL);
+			}
 		}
 	}
 	if (type->variadic) {
