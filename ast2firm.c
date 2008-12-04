@@ -2242,11 +2242,13 @@ static ir_node *produce_condition_result(const expression_t *expression,
 static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 		ir_node *value, type_t *type)
 {
+	ir_mode        *const mode         = get_ir_mode(type_ptrdiff_t);
+	assert(is_type_pointer(type));
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
 	unsigned              elem_size    = get_type_size_const(points_to);
 
-	value = create_conv(dbgi, value, mode_int);
+	value = create_conv(dbgi, value, mode);
 
 	/* gcc extension: allow arithmetic with void * and function * */
 	if ((elem_size == 0 && is_type_atomic(points_to, ATOMIC_TYPE_VOID)) ||
@@ -2258,8 +2260,8 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	if (elem_size == 1)
 		return value;
 
-	ir_node *const cnst = new_Const_long(mode_int, (long)elem_size);
-	ir_node *const mul  = new_d_Mul(dbgi, value, cnst, mode_int);
+	ir_node *const cnst = new_Const_long(mode, (long)elem_size);
+	ir_node *const mul  = new_d_Mul(dbgi, value, cnst, mode);
 	return mul;
 }
 
@@ -2497,28 +2499,12 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 
 static ir_node *array_access_addr(const array_access_expression_t *expression)
 {
-	dbg_info *dbgi      = get_dbg_info(&expression->base.source_position);
-	ir_node  *base_addr = expression_to_firm(expression->array_ref);
-	ir_node  *offset    = expression_to_firm(expression->index);
-
-	type_t  *offset_type = skip_typeref(expression->index->base.type);
-	ir_mode *mode;
-	if (is_type_signed(offset_type)) {
-		mode = get_ir_mode(type_ssize_t);
-	} else {
-		mode = get_ir_mode(type_size_t);
-	}
-	offset = create_conv(dbgi, offset, mode);
-
-	type_t *ref_type = skip_typeref(expression->array_ref->base.type);
-	assert(is_type_pointer(ref_type));
-	pointer_type_t *pointer_type = &ref_type->pointer;
-
-	ir_node *elem_size_const = get_type_size(pointer_type->points_to);
-	elem_size_const          = create_conv(dbgi, elem_size_const, mode);
-	ir_node *real_offset     = new_d_Mul(dbgi, offset, elem_size_const,
-	                                     mode);
-	ir_node *result          = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
+	dbg_info *dbgi        = get_dbg_info(&expression->base.source_position);
+	ir_node  *base_addr   = expression_to_firm(expression->array_ref);
+	ir_node  *offset      = expression_to_firm(expression->index);
+	type_t   *ref_type    = skip_typeref(expression->array_ref->base.type);
+	ir_node  *real_offset = adjust_for_pointer_arithmetic(dbgi, offset, ref_type);
+	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
 
 	return result;
 }
