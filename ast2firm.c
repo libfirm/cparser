@@ -2246,6 +2246,8 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
 	unsigned              elem_size    = get_type_size_const(points_to);
 
+	value = create_conv(dbgi, value, mode_int);
+
 	/* gcc extension: allow arithmetic with void * and function * */
 	if ((elem_size == 0 && is_type_atomic(points_to, ATOMIC_TYPE_VOID)) ||
 	    is_type_function(points_to))  {
@@ -2256,7 +2258,6 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	if (elem_size == 1)
 		return value;
 
-	value = create_conv(dbgi, value, mode_int);
 	ir_node *const cnst = new_Const_long(mode_int, (long)elem_size);
 	ir_node *const mul  = new_d_Mul(dbgi, value, cnst, mode_int);
 	return mul;
