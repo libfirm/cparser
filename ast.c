@@ -382,6 +382,11 @@ static void print_compound_literal(
 	print_initializer(expression->initializer);
 }
 
+static void print_assignment_expression(const expression_t *const expr)
+{
+	print_expression_prec(expr, PREC_ASSIGNMENT);
+}
+
 /**
  * Prints a call expression.
  *
@@ -400,7 +405,7 @@ static void print_call_expression(const call_expression_t *call)
 		} else {
 			first = 0;
 		}
-		print_expression_prec(argument->expression, PREC_ASSIGNMENT);
+		print_assignment_expression(argument->expression);
 
 		argument = argument->next;
 	}
@@ -493,7 +498,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		break;
 	case EXPR_UNARY_ASSUME:
 		fputs("__assume(", out);
-		print_expression_prec(unexpr->value, PREC_ASSIGNMENT);
+		print_assignment_expression(unexpr->value);
 		fputc(')', out);
 		return;
 
@@ -595,7 +600,7 @@ static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
 	fputs("__builtin_constant_p(", out);
-	print_expression_prec(expression->value, PREC_ASSIGNMENT);
+	print_assignment_expression(expression->value);
 	fputc(')', out);
 }
 
@@ -607,14 +612,14 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
 {
 	fputs("__builtin_prefetch(", out);
-	print_expression_prec(expression->adr, PREC_ASSIGNMENT);
+	print_assignment_expression(expression->adr);
 	if (expression->rw) {
 		fputc(',', out);
-		print_expression_prec(expression->rw, PREC_ASSIGNMENT);
+		print_assignment_expression(expression->rw);
 	}
 	if (expression->locality) {
 		fputc(',', out);
-		print_expression_prec(expression->locality, PREC_ASSIGNMENT);
+		print_assignment_expression(expression->locality);
 	}
 	fputc(')', out);
 }
@@ -646,7 +651,7 @@ static void print_conditional(const conditional_expression_t *expression)
 static void print_va_start(const va_start_expression_t *const expression)
 {
 	fputs("__builtin_va_start(", out);
-	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
+	print_assignment_expression(expression->ap);
 	fputs(", ", out);
 	fputs(expression->parameter->base.base.symbol->string, out);
 	fputc(')', out);
@@ -660,7 +665,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 static void print_va_arg(const va_arg_expression_t *expression)
 {
 	fputs("__builtin_va_arg(", out);
-	print_expression_prec(expression->ap, PREC_ASSIGNMENT);
+	print_assignment_expression(expression->ap);
 	fputs(", ", out);
 	print_type(expression->base.type);
 	fputc(')', out);
@@ -692,7 +697,7 @@ static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
 {
 	fputs("__builtin_classify_type(", out);
-	print_expression_prec(expr->type_expression, PREC_ASSIGNMENT);
+	print_assignment_expression(expr->type_expression);
 	fputc(')', out);
 }
 
