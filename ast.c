@@ -1348,7 +1348,7 @@ void print_initializer(const initializer_t *initializer)
 	switch (initializer->kind) {
 	case INITIALIZER_VALUE: {
 		const initializer_value_t *value = &initializer->value;
-		print_expression(value->value);
+		print_assignment_expression(value->value);
 		return;
 	}
 	case INITIALIZER_LIST: {
