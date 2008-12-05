@@ -6215,13 +6215,15 @@ static void check_unreachable(statement_t* const stmt, void *const env)
 			declaration_statement_t const *const decl = &stmt->declaration;
 			entity_t                const *      ent  = decl->declarations_begin;
 			entity_t                const *const last = decl->declarations_end;
-			for (;; ent = ent->base.next) {
-				if (ent->kind                 == ENTITY_VARIABLE &&
-						ent->variable.initializer != NULL) {
-					goto warn_unreachable;
+			if (ent != NULL) {
+				for (;; ent = ent->base.next) {
+					if (ent->kind                 == ENTITY_VARIABLE &&
+							ent->variable.initializer != NULL) {
+						goto warn_unreachable;
+					}
+					if (ent == last)
+						return;
 				}
-				if (ent == last)
-					return;
 			}
 		}
 
