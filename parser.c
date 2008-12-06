@@ -247,6 +247,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_union:             \
 	case T_unsigned:          \
 	case T_void:              \
+	case T_wchar_t:           \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -3259,18 +3260,19 @@ typedef enum specifiers_t {
 	SPECIFIER_INT       = 1 << 3,
 	SPECIFIER_DOUBLE    = 1 << 4,
 	SPECIFIER_CHAR      = 1 << 5,
-	SPECIFIER_SHORT     = 1 << 6,
-	SPECIFIER_LONG_LONG = 1 << 7,
-	SPECIFIER_FLOAT     = 1 << 8,
-	SPECIFIER_BOOL      = 1 << 9,
-	SPECIFIER_VOID      = 1 << 10,
-	SPECIFIER_INT8      = 1 << 11,
-	SPECIFIER_INT16     = 1 << 12,
-	SPECIFIER_INT32     = 1 << 13,
-	SPECIFIER_INT64     = 1 << 14,
-	SPECIFIER_INT128    = 1 << 15,
-	SPECIFIER_COMPLEX   = 1 << 16,
-	SPECIFIER_IMAGINARY = 1 << 17,
+	SPECIFIER_WCHAR_T   = 1 << 6,
+	SPECIFIER_SHORT     = 1 << 7,
+	SPECIFIER_LONG_LONG = 1 << 8,
+	SPECIFIER_FLOAT     = 1 << 9,
+	SPECIFIER_BOOL      = 1 << 10,
+	SPECIFIER_VOID      = 1 << 11,
+	SPECIFIER_INT8      = 1 << 12,
+	SPECIFIER_INT16     = 1 << 13,
+	SPECIFIER_INT32     = 1 << 14,
+	SPECIFIER_INT64     = 1 << 15,
+	SPECIFIER_INT128    = 1 << 16,
+	SPECIFIER_COMPLEX   = 1 << 17,
+	SPECIFIER_IMAGINARY = 1 << 18,
 } specifiers_t;
 
 static type_t *create_builtin_type(symbol_t *const symbol,
@@ -3729,6 +3731,7 @@ wrong_thread_stoarge_class:
 		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
 		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
 		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
+		MATCH_SPECIFIER(T_wchar_t,    SPECIFIER_WCHAR_T,   "wchar_t");
 
 		case T__forceinline:
 			/* only in microsoft mode */
@@ -3855,6 +3858,9 @@ finish_specifiers:
 		switch (type_specifiers) {
 		case SPECIFIER_VOID:
 			atomic_type = ATOMIC_TYPE_VOID;
+			break;
+		case SPECIFIER_WCHAR_T:
+			atomic_type = ATOMIC_TYPE_WCHAR_T;
 			break;
 		case SPECIFIER_CHAR:
 			atomic_type = ATOMIC_TYPE_CHAR;

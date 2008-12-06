@@ -52,6 +52,12 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		.alignment  = 0,
 		.flags      = ATOMIC_TYPE_FLAG_NONE
 	},
+	[ATOMIC_TYPE_WCHAR_T] = {
+		.size       = (unsigned)-1,
+		.alignment  = (unsigned)-1,
+		/* signed flag will be set when known */
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	},
 	[ATOMIC_TYPE_CHAR] = {
 		.size       = 1,
 		.alignment  = 1,
@@ -177,6 +183,8 @@ void init_types(void)
 	/* TODO: make this configurable for platforms which do not use byte sized
 	 * bools. */
 	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UCHAR];
+
+	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 }
 
 void exit_types(void)
@@ -216,6 +224,7 @@ const char *get_atomic_kind_name(atomic_type_kind_t kind)
 	switch(kind) {
 	case ATOMIC_TYPE_INVALID: break;
 	case ATOMIC_TYPE_VOID:        return "void";
+	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
 	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
 	case ATOMIC_TYPE_CHAR:        return "char";
 	case ATOMIC_TYPE_SCHAR:       return "signed char";

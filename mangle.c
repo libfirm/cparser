@@ -40,6 +40,7 @@ static char get_atomic_type_mangle(atomic_type_kind_t kind)
 	switch (kind) {
 	case ATOMIC_TYPE_INVALID: break;
 	case ATOMIC_TYPE_VOID:        return 'v';
+	case ATOMIC_TYPE_WCHAR_T:     return 'w';
 	case ATOMIC_TYPE_BOOL:        return 'b';
 	case ATOMIC_TYPE_CHAR:        return 'c';
 	case ATOMIC_TYPE_SCHAR:       return 'a';

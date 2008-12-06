@@ -34,6 +34,7 @@ typedef unsigned char il_alignment_t;
 typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
+	ATOMIC_TYPE_WCHAR_T,
 	ATOMIC_TYPE_CHAR,
 	ATOMIC_TYPE_SCHAR,
 	ATOMIC_TYPE_UCHAR,

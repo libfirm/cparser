@@ -2842,6 +2842,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 						tc = void_type_class;
 						goto make_const;
 
+					case ATOMIC_TYPE_WCHAR_T:   /* gcc handles this as integer */
 					case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
 					case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
 					case ATOMIC_TYPE_UCHAR:     /* gcc handles this as integer */
