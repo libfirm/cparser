@@ -271,6 +271,7 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 		case '\r':
 		case '\t':
 		case '`':
+		case '|':
 			obstack_1grow(obst, '\\');
 			/* FALLTHROUGH */
 		default:
