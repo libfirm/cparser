@@ -1596,6 +1596,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return _expression_to_firm(argument);
 	}
 	case T___builtin_va_end:
+		/* evaluate the argument of va_end for its side effects */
+		_expression_to_firm(call->arguments->expression);
 		return NULL;
 	default:
 		panic("Unsupported builtin found\n");
