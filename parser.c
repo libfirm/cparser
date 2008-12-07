@@ -8499,8 +8499,9 @@ static bool is_lvalue(const expression_t *expression)
 {
 	/* TODO: doesn't seem to be consistent with §6.3.2.1 (1) */
 	switch (expression->kind) {
-	case EXPR_REFERENCE:
 	case EXPR_ARRAY_ACCESS:
+	case EXPR_COMPOUND_LITERAL:
+	case EXPR_REFERENCE:
 	case EXPR_SELECT:
 	case EXPR_UNARY_DEREFERENCE:
 		return true;

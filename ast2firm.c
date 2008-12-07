@@ -2987,17 +2987,18 @@ static ir_node *dereference_addr(const unary_expression_t *const expression)
 static ir_node *expression_to_addr(const expression_t *expression)
 {
 	switch(expression->kind) {
-	case EXPR_REFERENCE:
-		return reference_addr(&expression->reference);
 	case EXPR_ARRAY_ACCESS:
 		return array_access_addr(&expression->array_access);
-	case EXPR_SELECT:
-		return select_addr(&expression->select);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
-	case EXPR_UNARY_DEREFERENCE: {
+	case EXPR_COMPOUND_LITERAL:
+		return compound_literal_to_firm(&expression->compound_literal);
+	case EXPR_REFERENCE:
+		return reference_addr(&expression->reference);
+	case EXPR_SELECT:
+		return select_addr(&expression->select);
+	case EXPR_UNARY_DEREFERENCE:
 		return dereference_addr(&expression->unary);
-	}
 	default:
 		break;
 	}
