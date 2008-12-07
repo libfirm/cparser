@@ -53,6 +53,7 @@ warning_t warning = {
 	.old_style_definition                = false,
 	.packed                              = false,
 	.padded                              = false,
+	.parentheses                         = false,
 	.pointer_arith                       = true,
 	.redundant_decls                     = true,
 	.return_type                         = true,
@@ -104,6 +105,7 @@ void set_warning_opt(const char *const opt)
 		SET(init_self);
 		SET(main);
 		SET(nonnull);
+		SET(parentheses);
 		SET(pointer_arith);
 		SET(redundant_decls);
 		SET(return_type);
@@ -166,6 +168,7 @@ void set_warning_opt(const char *const opt)
 	OPT("old-style-definition",                old_style_definition);
 	OPT("packed",                              packed);
 	OPT("padded",                              padded);
+	OPT("parentheses",                         parentheses);
 	OPT("pointer-arith",                       pointer_arith);
 	OPT("redundant-decls",                     redundant_decls);
 	OPT("return-type",                         return_type);

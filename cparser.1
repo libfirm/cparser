@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd November 29, 2008
+.Dd December 7, 2008
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -114,6 +114,7 @@ In particular these are
 .Fl Winit-self ,
 .Fl Wmain ,
 .Fl Wnonnull ,
+.Fl Wparentheses ,
 .Fl Wpointer-arith ,
 .Fl Wredundant-decls ,
 .Fl Wreturn-type ,
@@ -178,6 +179,12 @@ Warn if a global function is defined without a previous prototype declaration.
 Warn if a multicharacter constant ('FOOF') is used.
 .It Fl Wnested-externs
 Warn if an 'extern' declaration is encountered within a function.
+.It Fl Wparentheses
+Warn if parentheses are omitted in certain contexts.
+Warn if an assignment is used as condition, e.g. if\ (x\ =\ 23).
+Warn if && without parentheses is used within ||, e.g. if\ (x\ ||\ y\ &&\ z).
+Warn if it there may be confusion which 'if'-statement an 'else'-branch belongs to, e.g. if\ (x)\ if\ (y)\ {}\ else\ {}.
+Warn if cascaded comparisons appear which do not have their mathematical meaning, e.g. if\ (23\ <=\ x\ <\ 42).
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
 .It Fl Wunreachable-code
@@ -190,9 +197,9 @@ Activate
 .Fl Wunused-value ,
 .Fl Wunused-variable .
 .It Fl Wunused-parameter
-Warn when a parameter is never used or only ever read to calculate its own new value, e.g. x = x + 1.
+Warn when a parameter is never used or only ever read to calculate its own new value, e.g. x\ =\ x\ +\ 1.
 .It Fl Wunused-variable
-Warn when a variable is never used or only ever read to calculate its own new value, e.g. x = x + 1.
+Warn when a variable is never used or only ever read to calculate its own new value, e.g. x\ =\ x\ +\ 1.
 .It Fl w
 Suppress all warnings.
 .It Fl I Ar dir

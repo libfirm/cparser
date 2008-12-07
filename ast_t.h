@@ -230,6 +230,7 @@ struct expression_base_t {
 	expression_kind_t   kind;
 	type_t             *type;
 	source_position_t   source_position;
+	bool                parenthesized;
 #ifndef NDEBUG
 	bool                transformed;
 #endif

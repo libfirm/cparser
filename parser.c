@@ -7227,6 +7227,7 @@ static expression_t *parse_parenthesized_expression(void)
 
 	add_anchor_token(')');
 	expression_t *result = parse_expression();
+	result->base.parenthesized = true;
 	rem_anchor_token(')');
 	expect(')', end_error);
 
@@ -8188,12 +8189,25 @@ static void warn_reference_address_as_bool(expression_t const* expr)
 	}
 }
 
+static void warn_assignment_in_condition(const expression_t *const expr)
+{
+	if (!warning.parentheses)
+		return;
+	if (expr->base.kind != EXPR_BINARY_ASSIGN)
+		return;
+	if (expr->base.parenthesized)
+		return;
+	warningf(&expr->base.source_position,
+			"suggest parentheses around assignment used as truth value");
+}
+
 static void semantic_condition(expression_t const *const expr,
                                char const *const context)
 {
 	type_t *const type = skip_typeref(expr->base.type);
 	if (is_type_scalar(type)) {
 		warn_reference_address_as_bool(expr);
+		warn_assignment_in_condition(expr);
 	} else if (is_type_valid(type)) {
 		errorf(&expr->base.source_position,
 				"%s must have scalar type", context);
@@ -8929,6 +8943,25 @@ static void warn_string_literal_address(expression_t const* expr)
 	}
 }
 
+static void warn_comparison_in_comparison(const expression_t *const expr)
+{
+	if (expr->base.parenthesized)
+		return;
+	switch (expr->base.kind) {
+		case EXPR_BINARY_LESS:
+		case EXPR_BINARY_GREATER:
+		case EXPR_BINARY_LESSEQUAL:
+		case EXPR_BINARY_GREATEREQUAL:
+		case EXPR_BINARY_NOTEQUAL:
+		case EXPR_BINARY_EQUAL:
+			warningf(&expr->base.source_position,
+					"comparisons like 'x <= y < z' do not have their mathematical meaning");
+			break;
+		default:
+			break;
+	}
+}
+
 /**
  * Check the semantics of comparison expressions.
  *
@@ -8956,6 +8989,11 @@ static void semantic_comparison(binary_expression_t *expression)
 			         "the address of '%Y' will never be NULL",
 			         func_right->reference.entity->base.symbol);
 		}
+	}
+
+	if (warning.parentheses) {
+		warn_comparison_in_comparison(left);
+		warn_comparison_in_comparison(right);
 	}
 
 	type_t *orig_type_left  = left->base.type;
@@ -9148,6 +9186,16 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 	}
 }
 
+static void warn_logical_and_within_or(const expression_t *const expr)
+{
+	if (expr->base.kind != EXPR_BINARY_LOGICAL_AND)
+		return;
+	if (expr->base.parenthesized)
+		return;
+	warningf(&expr->base.source_position,
+			"suggest parentheses around && within ||");
+}
+
 /**
  * Check the semantic restrictions of a logical expression.
  */
@@ -9157,6 +9205,11 @@ static void semantic_logical_op(binary_expression_t *expression)
 	 * §6.5.14:2  Each of the operands shall have scalar type. */
 	semantic_condition(expression->left,   "left operand of logical operator");
 	semantic_condition(expression->right, "right operand of logical operator");
+	if (expression->base.kind == EXPR_BINARY_LOGICAL_OR &&
+			warning.parentheses) {
+		warn_logical_and_within_or(expression->left);
+		warn_logical_and_within_or(expression->right);
+	}
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
@@ -9939,12 +9992,18 @@ end_error:
 	rem_anchor_token('{');
 
 	add_anchor_token(T_else);
-	statement->ifs.true_statement = parse_statement();
+	statement_t *const true_stmt = parse_statement();
+	statement->ifs.true_statement = true_stmt;
 	rem_anchor_token(T_else);
 
 	if (token.type == T_else) {
 		next_token();
 		statement->ifs.false_statement = parse_statement();
+	} else if (warning.parentheses &&
+			true_stmt->kind == STATEMENT_IF &&
+			true_stmt->ifs.false_statement != NULL) {
+		warningf(&true_stmt->base.source_position,
+				"suggest explicit braces to avoid ambiguous 'else'");
 	}
 
 	POP_PARENT;

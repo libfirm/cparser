@@ -758,10 +758,13 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	if (expression->kind == EXPR_UNARY_CAST_IMPLICIT && !print_implicit_casts) {
 		expression = expression->unary.value;
 	}
-	unsigned prec = get_expression_precedence(expression->base.kind);
-	if (print_parenthesis && top_prec != PREC_BOTTOM)
-		top_prec = PREC_TOP;
-	if (top_prec > prec)
+
+	bool parenthesized =
+		expression->base.parenthesized                 ||
+		(print_parenthesis && top_prec != PREC_BOTTOM) ||
+		top_prec > get_expression_precedence(expression->base.kind);
+
+	if (parenthesized)
 		fputc('(', out);
 	switch (expression->kind) {
 	case EXPR_UNKNOWN:
@@ -848,7 +851,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		fprintf(out, "some expression of type %d", (int)expression->kind);
 		break;
 	}
-	if (top_prec > prec)
+	if (parenthesized)
 		fputc(')', out);
 }
 
