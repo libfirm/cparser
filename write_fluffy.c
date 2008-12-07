@@ -281,7 +281,7 @@ static void write_function(const entity_t *entity)
 	entity_t *parameter = entity->function.parameters.entities;
 	int       first     = 1;
 	for( ; parameter != NULL; parameter = parameter->base.next) {
-		assert(parameter->kind == ENTITY_VARIABLE);
+		assert(parameter->kind == ENTITY_PARAMETER);
 		if(!first) {
 			fprintf(out, ", ");
 		} else {
@@ -304,7 +304,7 @@ static void write_function(const entity_t *entity)
 	}
 	fprintf(out, ")");
 
-	const type_t *return_type = function_type->return_type;
+	const type_t *return_type = skip_typeref(function_type->return_type);
 	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 		fprintf(out, " : ");
 		write_type(return_type);

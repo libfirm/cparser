@@ -203,7 +203,7 @@ static void write_function(const entity_t *entity)
 
 	entity_t *parameter = entity->function.parameters.entities;
 	for( ; parameter != NULL; parameter = parameter->base.next) {
-		assert(parameter->kind == ENTITY_VARIABLE);
+		assert(parameter->kind == ENTITY_PARAMETER);
 		write_type(parameter->declaration.type);
 		fputs(" -> ", out);
 	}
