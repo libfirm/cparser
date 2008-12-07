@@ -2766,13 +2766,17 @@ static ir_node *select_addr(const select_expression_t *expression)
 	entity_t *entry = expression->compound_entry;
 	assert(entry->kind == ENTITY_COMPOUND_MEMBER);
 	assert(entry->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
-	ir_entity *irentity = entry->compound_member.entity;
 
-	assert(irentity != NULL);
-
-	ir_node *sel = new_d_simpleSel(dbgi, new_NoMem(), compound_addr, irentity);
-
-	return sel;
+	if (constant_folding) {
+		ir_mode *mode = get_irn_mode(compound_addr);
+		/* FIXME: here, we need an integer mode with the same number of bits as mode */
+		ir_node *ofs  = new_Const_long(mode_uint, entry->compound_member.offset);
+		return new_d_Add(dbgi, compound_addr, ofs, mode);
+	} else {
+		ir_entity *irentity = entry->compound_member.entity;
+		assert(irentity != NULL);
+		return new_d_simpleSel(dbgi, new_NoMem(), compound_addr, irentity);
+	}
 }
 
 static ir_node *select_to_firm(const select_expression_t *expression)
