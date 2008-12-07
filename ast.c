@@ -1124,18 +1124,19 @@ static void print_for_statement(const for_statement_t *statement)
 		if (entity->base.next != NULL) {
 			panic("multiple declarations in for statement not supported yet");
 		}
-		fputc(' ', out);
 	} else {
 		if (statement->initialisation) {
 			print_expression(statement->initialisation);
 		}
-		fputs("; ", out);
+		fputc(';', out);
 	}
 	if (statement->condition != NULL) {
+		fputc(' ', out);
 		print_expression(statement->condition);
 	}
-	fputs("; ", out);
+	fputc(';', out);
 	if (statement->step != NULL) {
+		fputc(' ', out);
 		print_expression(statement->step);
 	}
 	fputs(") ", out);
