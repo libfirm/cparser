@@ -8242,6 +8242,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	}
 	rem_anchor_token(':');
 	expect(':', end_error);
+end_error:;
 	expression_t *false_expression =
 		parse_sub_expression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
 
@@ -8350,8 +8351,6 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 		= create_implicit_cast(false_expression, result_type);
 	conditional->base.type = result_type;
 	return result;
-end_error:
-	return create_invalid_expression();
 }
 
 /**
