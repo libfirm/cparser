@@ -31,8 +31,10 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#ifdef __INTEL_COMPILER
+#if defined(__INTEL_COMPILER)
 #include <mathimf.h>
+#elif defined(__CYGWIN__)
+#include "win32/cygwin_math_ext.h"
 #else
 #include <math.h>
 #endif

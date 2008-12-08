@@ -6,6 +6,9 @@
  *
  * $Id$
  */
+
+#include <config.h>
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,10 +23,6 @@
 #include "firm_cmdline.h"
 #include "firm_timing.h"
 #include "ast2firm.h"
-
-#ifdef _WIN32
-#define snprintf _snprintf
-#endif
 
 #if defined(_DEBUG) || defined(FIRM_DEBUG)
 #define DBG(x)  dbg_printf x

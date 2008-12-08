@@ -43,7 +43,7 @@
 //#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 /* No strtold on windows and no replacement yet */
 #define strtold(s, e) strtod(s, e)
 #endif

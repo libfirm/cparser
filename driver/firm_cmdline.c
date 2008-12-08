@@ -12,7 +12,7 @@
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 #define DEFAULT_OS OS_SUPPORT_MINGW
 #elif defined(__APPLE__)
 #define DEFAULT_OS OS_SUPPORT_MACHO
