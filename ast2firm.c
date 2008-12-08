@@ -1600,7 +1600,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		_expression_to_firm(call->arguments->expression);
 		return NULL;
 	default:
-		panic("Unsupported builtin found\n");
+		panic("unsupported builtin found");
 	}
 }
 
@@ -2690,12 +2690,12 @@ long fold_constant(const expression_t *expression)
 	current_ir_graph = old_current_ir_graph;
 
 	if (!is_Const(cnst)) {
-		panic("couldn't fold constant\n");
+		panic("couldn't fold constant");
 	}
 
 	tarval *tv = get_Const_tarval(cnst);
 	if (!tarval_is_long(tv)) {
-		panic("result of constant folding is not integer\n");
+		panic("result of constant folding is not integer");
 	}
 
 	constant_folding = constant_folding_old;
@@ -5120,7 +5120,7 @@ static void statement_to_firm(statement_t *statement)
 		leave_statement_to_firm(&statement->leave);
 		return;
 	}
-	panic("Statement not implemented\n");
+	panic("statement not implemented");
 }
 
 static int count_local_variables(const entity_t *entity,
