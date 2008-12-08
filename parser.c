@@ -2914,7 +2914,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 {
 	type_t        *type   = skip_typeref(env->type);
 	initializer_t *result = NULL;
-	size_t         max_index;
+	size_t         max_index = 0xdeadbeaf;   // TODO: Resolve this uninitialized variable problem
 
 	if (is_type_scalar(type)) {
 		result = parse_scalar_initializer(type, env->must_be_constant);
@@ -2949,6 +2949,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		size_t size;
 		switch (result->kind) {
 		case INITIALIZER_LIST:
+			assert(max_index != 0xdeadbeaf);
 			size = max_index + 1;
 			break;
 
@@ -6035,6 +6036,9 @@ found_break_parent:
 			}
 			break;
 		}
+
+		default:
+			panic("invalid statement kind");
 	}
 
 	while (next == NULL) {

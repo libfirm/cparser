@@ -1335,6 +1335,7 @@ static void print_storage_class(storage_class_tag_t storage_class)
 	case STORAGE_CLASS_STATIC:   text = "static ";   break;
 	case STORAGE_CLASS_AUTO:     text = "auto ";     break;
 	case STORAGE_CLASS_REGISTER: text = "register "; break;
+	default:                     panic("invalid storage class");
 	}
 	fputs(text, out);
 }
