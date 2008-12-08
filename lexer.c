@@ -937,9 +937,10 @@ wide_string_t concat_wide_string_string(const wide_string_t *const s1, const str
 
 	wchar_rep_t *const concat = obstack_alloc(&symbol_obstack, (len1 + len2 + 1) * sizeof(*concat));
 	memcpy(concat, s1->begin, len1 * sizeof(*concat));
-	const char *const src = s2->begin;
+	const char  *const src = s2->begin;
+	wchar_rep_t *const dst = concat + len1;
 	for (size_t i = 0; i != len2 + 1; ++i) {
-		concat[i] = src[i];
+		dst[i] = src[i];
 	}
 	if (warning.traditional) {
 		warningf(&lexer_token.source_position,
