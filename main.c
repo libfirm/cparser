@@ -301,8 +301,12 @@ static FILE *preprocess(const char *fname)
 	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
 	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
 
-	/* hack... */
+	/* TODO hack... */
+	add_flag(&cppflags_obst, "-D__builtin_abort=abort");
+	add_flag(&cppflags_obst, "-D__builtin_malloc=malloc");
+	add_flag(&cppflags_obst, "-D__builtin_memcmp=memcmp");
 	add_flag(&cppflags_obst, "-D__builtin_memcpy=memcpy");
+	add_flag(&cppflags_obst, "-D__builtin_memset=memset");
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
