@@ -303,10 +303,15 @@ static FILE *preprocess(const char *fname)
 
 	/* TODO hack... */
 	add_flag(&cppflags_obst, "-D__builtin_abort=abort");
+	add_flag(&cppflags_obst, "-D__builtin_abs=abs");
+	add_flag(&cppflags_obst, "-D__builtin_exit=exit");
 	add_flag(&cppflags_obst, "-D__builtin_malloc=malloc");
 	add_flag(&cppflags_obst, "-D__builtin_memcmp=memcmp");
 	add_flag(&cppflags_obst, "-D__builtin_memcpy=memcpy");
 	add_flag(&cppflags_obst, "-D__builtin_memset=memset");
+	add_flag(&cppflags_obst, "-D__builtin_strlen=strlen");
+	add_flag(&cppflags_obst, "-D__builtin_strcmp=strcmp");
+	add_flag(&cppflags_obst, "-D__builtin_strcpy=strcpy");
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
