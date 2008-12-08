@@ -96,7 +96,7 @@ static inline void next_real_char(void)
 		bufpos = buf + MAX_PUTBACK;
 		bufend = buf + MAX_PUTBACK + s;
 	}
-	c = *bufpos++;
+	c = (unsigned char)*bufpos++;
 }
 
 /**
