@@ -2394,12 +2394,24 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		long val = fold_constant(expression->left);
 		expression_kind_t ekind = expression->base.kind;
 		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
-		if ((ekind == EXPR_BINARY_LOGICAL_AND && val != 0) ||
-		    (ekind == EXPR_BINARY_LOGICAL_OR  && val == 0)) {
-			return produce_condition_result(expression->right, mode, dbgi);
+		if (ekind == EXPR_BINARY_LOGICAL_AND) {
+			if (val == 0) {
+				return new_Const(get_mode_null(mode));
+			}
 		} else {
-			return new_Const(get_mode_one(mode));
+			if (val != 0) {
+				return new_Const(get_mode_one(mode));
+			}
 		}
+
+		if (is_constant_expression(expression->right)) {
+			long const valr = fold_constant(expression->left);
+			return valr != 0 ?
+				new_Const(get_mode_one(mode)) :
+				new_Const(get_mode_null(mode));
+		}
+
+		return produce_condition_result(expression->right, mode, dbgi);
 	}
 
 	return produce_condition_result((const expression_t*) expression, mode,
