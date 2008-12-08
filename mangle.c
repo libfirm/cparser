@@ -281,7 +281,7 @@ ident *create_name_win32(entity_t *entity)
 
 		switch (entity->declaration.type->function.linkage) {
 			case LINKAGE_INVALID:
-				break;
+				panic("linkage type of function is invalid");
 
 			case LINKAGE_C:
 				obstack_printf(o, "%s", entity->base.symbol->string);
@@ -331,7 +331,9 @@ ident *create_name_linux_elf(entity_t *entity)
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		switch (entity->declaration.type->function.linkage) {
-			case LINKAGE_INVALID: break;
+			case LINKAGE_INVALID:
+				panic("linkage type of function is invalid");
+
 			case LINKAGE_C:       break;
 			case LINKAGE_CXX:     needs_mangling = true; break;
 		}
@@ -353,6 +355,9 @@ ident *create_name_linux_elf(entity_t *entity)
  */
 ident *create_name_macho(entity_t *entity)
 {
+	if (entity->kind == ENTITY_FUNCTION && entity->declaration.type->function.linkage == LINKAGE_INVALID)
+		panic("linkage type of function is invalid");
+
 	obstack_printf(&obst, "_%s", entity->base.symbol->string);
 	return make_id_from_obst();
 }

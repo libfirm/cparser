@@ -6762,6 +6762,7 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
 	ntype->function.return_type            = type_int;
 	ntype->function.unspecified_parameters = true;
+	ntype->function.linkage                = current_linkage;
 
 	type_t *type = typehash_insert(ntype);
 	if (type != ntype) {
