@@ -259,7 +259,7 @@ static void print_quoted_string(const string_t *const string, char border, int s
 			/* FALLTHROUGH */
 		default:
 			if (!isprint(*c)) {
-				fprintf(out, "\\%03o", (unsigned)*c);
+				fprintf(out, "\\%03o", (unsigned)(unsigned char)*c);
 				break;
 			}
 			fputc(*c, out);
