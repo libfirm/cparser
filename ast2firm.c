@@ -3305,9 +3305,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	}
 
 	add_immBlock_pred(true_block, true_proj);
-	if (false_block != NULL) {
-		add_immBlock_pred(false_block, false_proj);
-	}
+	add_immBlock_pred(false_block, false_proj);
 
 	set_cur_block(NULL);
 	return cond_expr;
@@ -4487,9 +4485,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
 	mature_immBlock(header_block);
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
+	mature_immBlock(false_block);
 
 	set_cur_block(false_block);
 }
@@ -4542,7 +4538,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	ir_node *const false_block = new_immBlock();
 
 	/* the loop body */
-	ir_node * body_block;
+	ir_node *body_block;
 	if (statement->body != NULL) {
 		ir_node *const old_continue_label = continue_label;
 		ir_node *const old_break_label    = break_label;
