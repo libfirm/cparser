@@ -125,6 +125,34 @@ S(_MS, __FUNCDNAME__)
 #undef __ptr64
 #endif
 
+/* needed on MinGW */
+#ifdef __MINGW32__
+#ifdef __int8
+#undef __int8
+#endif
+#ifdef __int16
+#undef __int16
+#endif
+#ifdef __int32
+#undef __int32
+#endif
+#ifdef __int64
+#undef __int64
+#endif
+#endif
+
+#if defined(__MINGW32__) || defined(__CYGWIN__)
+#ifdef __cdecl
+#undef __cdecl
+#endif
+#ifdef __stdcall
+#undef __stdcall
+#endif
+#ifdef __fastcall
+#undef __fastcall
+#endif
+#endif
+
 /* needed on darwin... */
 #ifdef __signed
 #undef __signed
@@ -228,3 +256,10 @@ S(_MS,             __int64,                = T__int64)
 S(_MS,              _int128,               )
 S(_MS,             __int128,               = T__int128)
 #undef S
+
+/* Redefine required macros for MinGW headers */
+#if defined(__MINGW32__) || defined(__CYGWIN__)
+#define __stdcall __attribute__((__stdcall__))
+#define __fastcall __attribute__((__fastcall__))
+#define __cdecl __attribute__((__cdecl__))
+#endif
