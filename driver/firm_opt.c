@@ -112,8 +112,6 @@ static create_intrinsic_fkt *arch_create_intrinsic = NULL;
 static void *create_intrinsic_ctx = NULL;
 static const ir_settings_if_conv_t *if_conv_info = NULL;
 
-ir_mode *firm_imm_fp_mode = NULL;
-
 /* entities of runtime functions */
 ir_entity_ptr rts_entities[rts_max];
 
@@ -920,9 +918,6 @@ void gen_firm_init(void)
 
     ad_param                = be_params->dep_param;
     if_conv_info            = be_params->if_conv_info;
-
-    if (be_params->has_imm_fp_mode)
-      firm_imm_fp_mode = be_params->imm_fp_mode;
   }
 
   dbg_init(NULL, NULL, dbg_snprint);
