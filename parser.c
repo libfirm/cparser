@@ -7874,9 +7874,10 @@ typeprop_expression:
 	tp_expression->typeprop.type   = orig_type;
 	type_t const* const type       = skip_typeref(orig_type);
 	char   const* const wrong_type =
-		is_type_incomplete(type)    ? "incomplete"          :
-		type->kind == TYPE_FUNCTION ? "function designator" :
-		type->kind == TYPE_BITFIELD ? "bitfield"            :
+		GNU_MODE && is_type_atomic(type, ATOMIC_TYPE_VOID) ? NULL                  :
+		is_type_incomplete(type)                           ? "incomplete"          :
+		type->kind == TYPE_FUNCTION                        ? "function designator" :
+		type->kind == TYPE_BITFIELD                        ? "bitfield"            :
 		NULL;
 	if (wrong_type != NULL) {
 		char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";

@@ -201,7 +201,7 @@ static void init_atomic_modes(void)
 	mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	/* there's no real void type in firm */
-	atomic_modes[ATOMIC_TYPE_VOID] = mode_int;
+	atomic_modes[ATOMIC_TYPE_VOID] = atomic_modes[ATOMIC_TYPE_CHAR];
 
 	/* initialize pointer modes */
 	char            name[64];
