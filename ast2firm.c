@@ -279,17 +279,22 @@ static unsigned get_type_size_const(type_t *type)
 	panic("Trying to determine size of invalid type");
 }
 
+static ir_node *get_vla_size(array_type_t *const type)
+{
+	ir_node *size_node = type->size_node;
+	if (size_node == NULL) {
+		size_node = expression_to_firm(type->size_expression);
+		type->size_node = size_node;
+	}
+	return size_node;
+}
+
 static ir_node *get_type_size(type_t *type)
 {
 	type = skip_typeref(type);
 
 	if (is_type_array(type) && type->array.is_vla) {
-		ir_node *size_node = type->array.size_node;
-		if (size_node == NULL) {
-			size_node = expression_to_firm(type->array.size_expression);
-			type->array.size_node = size_node;
-		}
-
+		ir_node *size_node = get_vla_size(&type->array);
 		ir_node *elem_size = get_type_size(type->array.element_type);
 		ir_mode *mode      = get_irn_mode(size_node);
 		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
@@ -4322,8 +4327,13 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 	entity_t *const last   = statement->declarations_end;
 	if (entity != NULL) {
 		for ( ;; entity = entity->base.next) {
-			if (is_declaration(entity))
+			if (is_declaration(entity)) {
 				initialize_local_declaration(entity);
+			} else if (entity->kind == ENTITY_TYPEDEF) {
+				type_t *const type = entity->typedefe.type;
+				if (is_type_array(type) && type->array.is_vla)
+					get_vla_size(&type->array);
+			}
 			if (entity == last)
 				break;
 		}
