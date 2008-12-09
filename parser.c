@@ -2912,9 +2912,9 @@ end_error:
  */
 static initializer_t *parse_initializer(parse_initializer_env_t *env)
 {
-	type_t        *type   = skip_typeref(env->type);
-	initializer_t *result = NULL;
+	type_t        *type      = skip_typeref(env->type);
 	size_t         max_index = 0xdeadbeaf;   // TODO: Resolve this uninitialized variable problem
+	initializer_t *result;
 
 	if (is_type_scalar(type)) {
 		result = parse_scalar_initializer(type, env->must_be_constant);
