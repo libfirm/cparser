@@ -1074,5 +1074,4 @@ void firm_early_init(void)
 {
   /* arg: need this here for command line options */
   be_opt_register();
-  firm_init_options(NULL, 0, NULL);
 }

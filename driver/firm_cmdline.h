@@ -139,11 +139,6 @@ extern struct a_firm_ext_grs firm_ext_grs;
 
 
 /**
- * prints the firm version number
- */
-void print_firm_version(FILE *f);
-
-/**
  * called by the generic command line parser
  * to handle the --firm= or -f options
  */
