@@ -1330,14 +1330,13 @@ static void print_storage_class(storage_class_tag_t storage_class)
 	const char *text;
 	switch (storage_class) {
 	case STORAGE_CLASS_NONE:     return;
-	case STORAGE_CLASS_TYPEDEF:  text = "typedef ";  break;
-	case STORAGE_CLASS_EXTERN:   text = "extern ";   break;
-	case STORAGE_CLASS_STATIC:   text = "static ";   break;
-	case STORAGE_CLASS_AUTO:     text = "auto ";     break;
-	case STORAGE_CLASS_REGISTER: text = "register "; break;
-	default:                     panic("invalid storage class");
+	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ", out); return;
+	case STORAGE_CLASS_EXTERN:   fputs("extern ", out); return;
+	case STORAGE_CLASS_STATIC:   fputs("static ", out); return;
+	case STORAGE_CLASS_AUTO:     fputs("auto ", out); return;
+	case STORAGE_CLASS_REGISTER: fputs("register ", out); return;
 	}
-	fputs(text, out);
+	panic("invalid storage class");
 }
 
 /**
