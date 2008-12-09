@@ -8833,6 +8833,19 @@ static void semantic_divmod_arithmetic(binary_expression_t *expression) {
 	warn_div_by_zero(expression);
 }
 
+static void warn_addsub_in_shift(const expression_t *const expr)
+{
+	char op;
+	switch (expr->kind) {
+		case EXPR_BINARY_ADD: op = '+'; break;
+		case EXPR_BINARY_SUB: op = '-'; break;
+		default:              return;
+	}
+
+	warningf(&expr->base.source_position,
+			"suggest parentheses around '%c' inside shift", op);
+}
+
 static void semantic_shift_op(binary_expression_t *expression)
 {
 	expression_t *const left            = expression->left;
@@ -8849,6 +8862,11 @@ static void semantic_shift_op(binary_expression_t *expression)
 			       "operands of shift operation must have integer types");
 		}
 		return;
+	}
+
+	if (warning.parentheses) {
+		warn_addsub_in_shift(left);
+		warn_addsub_in_shift(right);
 	}
 
 	type_left  = promote_integer(type_left);

@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd December 7, 2008
+.Dd December 9, 2008
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -185,6 +185,7 @@ Warn if an assignment is used as condition, e.g. if\ (x\ =\ 23).
 Warn if && without parentheses is used within ||, e.g. if\ (x\ ||\ y\ &&\ z).
 Warn if it there may be confusion which 'if'-statement an 'else'-branch belongs to, e.g. if\ (x)\ if\ (y)\ {}\ else\ {}.
 Warn if cascaded comparisons appear which do not have their mathematical meaning, e.g. if\ (23\ <=\ x\ <\ 42).
+Warn if + or - is used as operand of << or >>, e.g. x\ +\ y\ <<\ z.
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
 .It Fl Wunreachable-code
