@@ -1327,7 +1327,6 @@ void print_statement(const statement_t *statement)
  */
 static void print_storage_class(storage_class_tag_t storage_class)
 {
-	const char *text;
 	switch (storage_class) {
 	case STORAGE_CLASS_NONE:     return;
 	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ", out); return;
