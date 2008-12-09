@@ -8892,7 +8892,6 @@ static void semantic_add(binary_expression_t *expression)
 		expression->left  = create_implicit_cast(left, arithmetic_type);
 		expression->right = create_implicit_cast(right, arithmetic_type);
 		expression->base.type = arithmetic_type;
-		return;
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		check_pointer_arithmetic(&expression->base.source_position,
 		                         type_left, orig_type_left);
@@ -8924,7 +8923,6 @@ static void semantic_sub(binary_expression_t *expression)
 		expression->left        = create_implicit_cast(left, arithmetic_type);
 		expression->right       = create_implicit_cast(right, arithmetic_type);
 		expression->base.type =  arithmetic_type;
-		return;
 	} else if (is_type_pointer(type_left) && is_type_integer(type_right)) {
 		check_pointer_arithmetic(&expression->base.source_position,
 		                         type_left, orig_type_left);
