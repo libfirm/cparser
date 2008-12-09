@@ -518,16 +518,16 @@ static void usage(const char *argv0)
 
 static void print_cparser_version(void) {
 	printf("cparser (%s) using libFirm (%u.%u",
-	       cparser_REVISION, firm_get_version_major(),
-	       firm_get_version_minor());
+	       cparser_REVISION, ir_get_version_major(),
+	       ir_get_version_minor());
 
-	const char *revision = firm_get_version_revision();
+	const char *revision = ir_get_version_revision();
 	if (revision[0] != 0) {
 		putchar(' ');
 		fputs(revision, stdout);
 	}
 
-	const char *build = firm_get_version_build();
+	const char *build = ir_get_version_build();
 	if (build[0] != 0) {
 		putchar(' ');
 		fputs(build, stdout);

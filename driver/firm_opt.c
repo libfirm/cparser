@@ -906,7 +906,7 @@ void gen_firm_init(void)
   params.cc_mask               = 0; /* no regparam, cdecl */
   params.builtin_dbg           = NULL;
 
-  init_firm(&params);
+  ir_init(&params);
 
   if (firm_be_opt.selection == BE_FIRM_BE) {
     const backend_params *be_params = be_get_backend_param();
