@@ -150,24 +150,25 @@ static declaration_t      **incomplete_arrays;
 static const symbol_t *sym_anonymous = NULL;
 
 /* symbols for Microsoft extended-decl-modifier */
-static const symbol_t *sym_align      = NULL;
-static const symbol_t *sym_allocate   = NULL;
-static const symbol_t *sym_dllimport  = NULL;
-static const symbol_t *sym_dllexport  = NULL;
-static const symbol_t *sym_naked      = NULL;
-static const symbol_t *sym_noinline   = NULL;
-static const symbol_t *sym_noreturn   = NULL;
-static const symbol_t *sym_nothrow    = NULL;
-static const symbol_t *sym_novtable   = NULL;
-static const symbol_t *sym_property   = NULL;
-static const symbol_t *sym_get        = NULL;
-static const symbol_t *sym_put        = NULL;
-static const symbol_t *sym_selectany  = NULL;
-static const symbol_t *sym_thread     = NULL;
-static const symbol_t *sym_uuid       = NULL;
-static const symbol_t *sym_deprecated = NULL;
-static const symbol_t *sym_restrict   = NULL;
-static const symbol_t *sym_noalias    = NULL;
+static const symbol_t *sym_align         = NULL;
+static const symbol_t *sym_allocate      = NULL;
+static const symbol_t *sym_dllimport     = NULL;
+static const symbol_t *sym_dllexport     = NULL;
+static const symbol_t *sym_naked         = NULL;
+static const symbol_t *sym_noinline      = NULL;
+static const symbol_t *sym_returns_twice = NULL;
+static const symbol_t *sym_noreturn      = NULL;
+static const symbol_t *sym_nothrow       = NULL;
+static const symbol_t *sym_novtable      = NULL;
+static const symbol_t *sym_property      = NULL;
+static const symbol_t *sym_get           = NULL;
+static const symbol_t *sym_put           = NULL;
+static const symbol_t *sym_selectany     = NULL;
+static const symbol_t *sym_thread        = NULL;
+static const symbol_t *sym_uuid          = NULL;
+static const symbol_t *sym_deprecated    = NULL;
+static const symbol_t *sym_restrict      = NULL;
+static const symbol_t *sym_noalias       = NULL;
 
 /** The token anchor set */
 static unsigned char token_anchor_set[T_LAST_TOKEN];
@@ -1241,6 +1242,7 @@ static const char *const gnu_attribute_names[GNU_AK_LAST] = {
 	[GNU_AK_FASTCALL]               = "fastcall",
 	[GNU_AK_DEPRECATED]             = "deprecated",
 	[GNU_AK_NOINLINE]               = "noinline",
+	[GNU_AK_RETURNS_TWICE]          = "returns_twice",
 	[GNU_AK_NORETURN]               = "noreturn",
 	[GNU_AK_NAKED]                  = "naked",
 	[GNU_AK_PURE]                   = "pure",
@@ -1788,6 +1790,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_DLLEXPORT:         modifiers |= DM_DLLEXPORT;         goto no_arg;
 				case GNU_AK_PACKED:            modifiers |= DM_PACKED;            goto no_arg;
 				case GNU_AK_NOINLINE:          modifiers |= DM_NOINLINE;          goto no_arg;
+				case GNU_AK_RETURNS_TWICE:     modifiers |= DM_RETURNS_TWICE;     goto no_arg;
 				case GNU_AK_NORETURN:          modifiers |= DM_NORETURN;          goto no_arg;
 				case GNU_AK_NOTHROW:           modifiers |= DM_NOTHROW;           goto no_arg;
 				case GNU_AK_TRANSPARENT_UNION: modifiers |= DM_TRANSPARENT_UNION; goto no_arg;
@@ -3372,6 +3375,9 @@ static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *spe
 		} else if (symbol == sym_noinline) {
 			next_token();
 			DET_MOD(noinline, DM_NOINLINE);
+		} else if (symbol == sym_returns_twice) {
+			next_token();
+			DET_MOD(returns_twice, DM_RETURNS_TWICE);
 		} else if (symbol == sym_noreturn) {
 			next_token();
 			DET_MOD(noreturn, DM_NORETURN);
@@ -11373,24 +11379,25 @@ void init_parser(void)
 
 	if (c_mode & _MS) {
 		/* add predefined symbols for extended-decl-modifier */
-		sym_align      = symbol_table_insert("align");
-		sym_allocate   = symbol_table_insert("allocate");
-		sym_dllimport  = symbol_table_insert("dllimport");
-		sym_dllexport  = symbol_table_insert("dllexport");
-		sym_naked      = symbol_table_insert("naked");
-		sym_noinline   = symbol_table_insert("noinline");
-		sym_noreturn   = symbol_table_insert("noreturn");
-		sym_nothrow    = symbol_table_insert("nothrow");
-		sym_novtable   = symbol_table_insert("novtable");
-		sym_property   = symbol_table_insert("property");
-		sym_get        = symbol_table_insert("get");
-		sym_put        = symbol_table_insert("put");
-		sym_selectany  = symbol_table_insert("selectany");
-		sym_thread     = symbol_table_insert("thread");
-		sym_uuid       = symbol_table_insert("uuid");
-		sym_deprecated = symbol_table_insert("deprecated");
-		sym_restrict   = symbol_table_insert("restrict");
-		sym_noalias    = symbol_table_insert("noalias");
+		sym_align         = symbol_table_insert("align");
+		sym_allocate      = symbol_table_insert("allocate");
+		sym_dllimport     = symbol_table_insert("dllimport");
+		sym_dllexport     = symbol_table_insert("dllexport");
+		sym_naked         = symbol_table_insert("naked");
+		sym_noinline      = symbol_table_insert("noinline");
+		sym_returns_twice = symbol_table_insert("returns_twice");
+		sym_noreturn      = symbol_table_insert("noreturn");
+		sym_nothrow       = symbol_table_insert("nothrow");
+		sym_novtable      = symbol_table_insert("novtable");
+		sym_property      = symbol_table_insert("property");
+		sym_get           = symbol_table_insert("get");
+		sym_put           = symbol_table_insert("put");
+		sym_selectany     = symbol_table_insert("selectany");
+		sym_thread        = symbol_table_insert("thread");
+		sym_uuid          = symbol_table_insert("uuid");
+		sym_deprecated    = symbol_table_insert("deprecated");
+		sym_restrict      = symbol_table_insert("restrict");
+		sym_noalias       = symbol_table_insert("noalias");
 	}
 	memset(token_anchor_set, 0, sizeof(token_anchor_set));
 

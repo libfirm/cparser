@@ -5254,6 +5254,10 @@ static void initialize_function_parameters(entity_t *entity)
  */
 static void handle_decl_modifier_irg(ir_graph_ptr irg, decl_modifiers_t decl_modifiers)
 {
+	if (decl_modifiers & DM_RETURNS_TWICE) {
+		/* TRUE if the declaration includes __attribute__((returns_twice)) */
+		set_irg_additional_property(irg, mtp_property_returns_twice);
+	}
 	if (decl_modifiers & DM_NORETURN) {
 		/* TRUE if the declaration includes the Microsoft
 		   __declspec(noreturn) specifier. */

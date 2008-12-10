@@ -89,7 +89,8 @@ typedef enum decl_modifier_t {
 	DM_FASTCALL          = 1 << 22,
 	DM_STDCALL           = 1 << 23,
 	DM_THISCALL          = 1 << 24,
-	DM_DEPRECATED        = 1 << 25
+	DM_DEPRECATED        = 1 << 25,
+	DM_RETURNS_TWICE     = 1 << 26,
 } decl_modifier_t;
 
 typedef unsigned decl_modifiers_t;
