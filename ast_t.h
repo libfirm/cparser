@@ -578,6 +578,7 @@ struct compound_statement_t {
 	statement_base_t  base;
 	statement_t      *statements;
 	scope_t           scope;
+	bool              stmt_expr; /* The compound statement is a statement expression */
 };
 
 struct declaration_statement_t {

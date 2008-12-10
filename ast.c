@@ -879,7 +879,7 @@ static void print_compound_statement(const compound_statement_t *block)
 	}
 	--indent;
 	print_indent();
-	fputs("}\n", out);
+	fputs(block->stmt_expr ? "}" : "}\n", out);
 }
 
 /**

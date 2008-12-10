@@ -5659,6 +5659,7 @@ static int determine_truth(expression_t const* const cond)
 }
 
 static void check_reachable(statement_t *);
+static bool reaches_end;
 
 static bool expression_returns(expression_t const *const expr)
 {
@@ -5703,10 +5704,14 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_INVALID:
 			return true;
 
-		case EXPR_STATEMENT:
+		case EXPR_STATEMENT: {
+			bool old_reaches_end = reaches_end;
+			reaches_end = false;
 			check_reachable(expr->statement.statement);
-			// TODO check if statement can be left
-			return true;
+			bool returns = reaches_end;
+			reaches_end = old_reaches_end;
+			return returns;
+		}
 
 		case EXPR_CONDITIONAL:
 			// TODO handle constant expression
@@ -6080,6 +6085,11 @@ found_break_parent:
 				panic("invalid control flow in function");
 
 			case STATEMENT_COMPOUND:
+				if (next->compound.stmt_expr) {
+					reaches_end = true;
+					return;
+				}
+				/* FALLTHROUGH */
 			case STATEMENT_IF:
 			case STATEMENT_SWITCH:
 			case STATEMENT_LABEL:
@@ -7191,6 +7201,7 @@ static expression_t *parse_statement_expression(void)
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
 
 	statement_t *statement          = parse_compound_statement(true);
+	statement->compound.stmt_expr   = true;
 	expression->statement.statement = statement;
 
 	/* find last statement and use its type */
