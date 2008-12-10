@@ -8852,6 +8852,9 @@ static void semantic_divmod_arithmetic(binary_expression_t *expression) {
 
 static void warn_addsub_in_shift(const expression_t *const expr)
 {
+	if (expr->base.parenthesized)
+		return;
+
 	char op;
 	switch (expr->kind) {
 		case EXPR_BINARY_ADD: op = '+'; break;
