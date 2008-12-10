@@ -74,7 +74,7 @@ static unsigned hash_imaginary_type(const imaginary_type_t *type)
 
 static unsigned hash_pointer_type(const pointer_type_t *type)
 {
-	return hash_ptr(type->points_to);
+	return hash_ptr(type->points_to) ^ hash_ptr(type->base_variable);
 }
 
 static unsigned hash_reference_type(const reference_type_t *type)
