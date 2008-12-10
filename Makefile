@@ -45,8 +45,9 @@ SOURCES := \
 	warning.c \
 	parser.c \
 	ast2firm.c \
-	write_fluffy.c \
-	write_caml.c \
+	wrappergen/write_fluffy.c \
+	wrappergen/write_caml.c \
+	wrappergen/write_jna.c \
 	driver/firm_cmdline.c \
 	driver/firm_timing.c \
 	driver/firm_codegen.c \
@@ -91,7 +92,7 @@ REVISION ?= $(shell svnversion -n .)
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
-DIRS = build build/adt build/driver build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver build/cpbe build/cpbe/adt build/cpbe/driver
+DIRS = build build/adt build/driver build/wrappergen build/cpb build/cpb/adt build/cpb/driver build/cpb2 build/cpb2/adt build/cpb2/driver build/cpbe build/cpbe/adt build/cpbe/driver
 UNUSED := $(shell mkdir -p $(DIRS))
 
 $(GOAL): $(OBJECTS) $(LIBFIRM_FILE)

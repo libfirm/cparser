@@ -72,8 +72,9 @@
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 #include "adt/error.h"
-#include "write_fluffy.h"
-#include "write_caml.h"
+#include "wrappergen/write_fluffy.h"
+#include "wrappergen/write_caml.h"
+#include "wrappergen/write_jna.h"
 #include "revision.h"
 #include "warning.h"
 #include "mangle.h"
@@ -508,7 +509,8 @@ typedef enum compile_mode_t {
 	LexTest,
 	PrintAst,
 	PrintFluffy,
-	PrintCaml
+	PrintCaml,
+	PrintJna
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -1038,6 +1040,8 @@ int main(int argc, char **argv)
 					mode = PrintFluffy;
 				} else if (streq(option, "print-caml")) {
 					mode = PrintCaml;
+				} else if (streq(option, "print-jna")) {
+					mode = PrintJna;
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					exit(EXIT_SUCCESS);
@@ -1157,6 +1161,7 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case PrintCaml:
+		case PrintJna:
 		case LexTest:
 		case PreprocessOnly:
 		case ParseOnly:
@@ -1347,6 +1352,9 @@ do_parsing:
 				continue;
 			} else if (mode == PrintCaml) {
 				write_caml_decls(out, unit);
+				continue;
+			} else if (mode == PrintJna) {
+				write_jna_decls(out, unit);
 				continue;
 			}
 
