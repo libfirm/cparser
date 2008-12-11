@@ -304,10 +304,10 @@ static void print_quoted_wide_string(const wide_string_t *const wstr,
 			default: {
 				const unsigned tc = *c;
 				if (tc < 0x80U) {
-					if (!isprint(*c)) {
-						fprintf(out, "\\%03o", tc);
-					} else {
+					if (isprint(*c)) {
 						fputc(*c, out);
+					} else {
+						fprintf(out, "\\%03o", tc);
 					}
 				} else if (tc < 0x800) {
 					fputc(0xC0 | (tc >> 6),   out);
