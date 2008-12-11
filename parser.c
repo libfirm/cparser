@@ -6963,7 +6963,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 			assert(is_declaration(entity));
 			type_t   *type   = entity->declaration.type;
 			return get_qualified_type(type,
-			                          expression->base.type->base.qualifiers);
+					expression->base.type->base.qualifiers);
 		}
 
 		case EXPR_UNARY_DEREFERENCE: {
@@ -6998,10 +6998,9 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		case EXPR_COMPOUND_LITERAL:
 			return expression->compound_literal.type;
 
-		default: break;
+		default:
+			return expression->base.type;
 	}
-
-	return expression->base.type;
 }
 
 static expression_t *parse_reference(void)
