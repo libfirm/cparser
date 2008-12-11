@@ -92,8 +92,6 @@ static unsigned hash_compound_type(const compound_type_t *type)
 	return hash_ptr(type->compound);
 }
 
-static unsigned hash_type(const type_t *type);
-
 static unsigned hash_function_type(const function_type_t *type)
 {
 	unsigned result = hash_ptr(type->return_type);

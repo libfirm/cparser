@@ -241,7 +241,7 @@ static int generate_predef_node(FILE *f, ir_node *n)
   else if (n == code)                   \
     name(f, "  ", n, " = " #code ";\n");
 
-  if (0);
+  if (0) {}
   X(get_irg_start(irg))
   X(get_irg_start_block(irg))
   X(get_irg_end(irg))

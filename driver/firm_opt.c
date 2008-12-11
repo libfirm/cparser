@@ -27,7 +27,7 @@
 #if defined(_DEBUG) || defined(FIRM_DEBUG)
 #define DBG(x)  dbg_printf x
 #else
-#define DBG(x)
+#define DBG(x) ((void)0)
 #endif /* _DEBUG || FIRM_DEBUG */
 
 

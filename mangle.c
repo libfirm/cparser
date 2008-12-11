@@ -222,7 +222,6 @@ static void mangle_type(type_t *orig_type)
 
 	case TYPE_BITFIELD:
 		panic("no mangling for this type implemented yet");
-		break;
 	}
 	panic("invalid type encountered while mangling");
 }

@@ -414,6 +414,7 @@ int firm_be_option(const char *opt) {
 #ifdef FIRM_BACKEND
   return be_parse_arg(opt);
 #else
+  (void)opt;
   return 0;
 #endif /* FIRM_BACKEND */
 }  /* firm_be_option */

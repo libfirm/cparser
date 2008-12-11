@@ -85,7 +85,6 @@ static pp_definition_t   *current_expansion  = NULL;
 static inline void next_char(void);
 static void next_preprocessing_token(void);
 static void print_line_directive(const source_position_t *pos, const char *add);
-static void print_spaces(void);
 
 static bool open_input(const char *filename)
 {
@@ -1251,7 +1250,7 @@ static void print_quoted_string(const char *const string)
 
 static void print_line_directive(const source_position_t *pos, const char *add)
 {
-	fprintf(out, "# %d ", pos->linenr);
+	fprintf(out, "# %u ", pos->linenr);
 	print_quoted_string(pos->input_name);
 	if (add != NULL) {
 		fputc(' ', out);
