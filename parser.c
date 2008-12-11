@@ -6969,7 +6969,8 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		case EXPR_UNARY_DEREFERENCE: {
 			const expression_t *const value = expression->unary.value;
 			type_t             *const type  = skip_typeref(value->base.type);
-			assert(is_type_pointer(type));
+			if (!is_type_pointer(type))
+				return type_error_type;
 			return type->pointer.points_to;
 		}
 
@@ -6979,9 +6980,8 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		case EXPR_ARRAY_ACCESS: {
 			const expression_t *array_ref = expression->array_access.array_ref;
 			type_t             *type_left = skip_typeref(array_ref->base.type);
-			if (!is_type_valid(type_left))
-				return type_left;
-			assert(is_type_pointer(type_left));
+			if (!is_type_pointer(type_left))
+				return type_error_type;
 			return type_left->pointer.points_to;
 		}
 
