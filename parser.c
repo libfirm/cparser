@@ -4784,16 +4784,18 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
 
-			if (specifiers->is_inline && is_type_valid(type)) {
-				errorf(&env.source_position,
-						"compound member '%Y' declared 'inline'", env.symbol);
-			}
+			if (env.symbol != NULL) {
+				if (specifiers->is_inline && is_type_valid(type)) {
+					errorf(&env.source_position,
+							"compound member '%Y' declared 'inline'", env.symbol);
+				}
 
-			if (specifiers->thread_local ||
-				specifiers->storage_class != STORAGE_CLASS_NONE) {
-				errorf(&env.source_position,
-					   "compound member '%Y' must have no storage class",
-					   env.symbol);
+				if (specifiers->thread_local ||
+						specifiers->storage_class != STORAGE_CLASS_NONE) {
+					errorf(&env.source_position,
+							"compound member '%Y' must have no storage class",
+							env.symbol);
+				}
 			}
 		} else if (flags & DECL_IS_PARAMETER) {
 			orig_type = semantic_parameter(&env.source_position, orig_type,
@@ -4806,13 +4808,15 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			entity->function.is_inline  = specifiers->is_inline;
 			entity->function.parameters = env.parameters;
 
-			if (specifiers->thread_local || (
-					specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-					specifiers->storage_class != STORAGE_CLASS_NONE   &&
-					specifiers->storage_class != STORAGE_CLASS_STATIC)
-			   ) {
-				errorf(&env.source_position,
-					   "invalid storage class for function '%Y'", env.symbol);
+			if (env.symbol != NULL) {
+				if (specifiers->thread_local || (
+							specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+							specifiers->storage_class != STORAGE_CLASS_NONE   &&
+							specifiers->storage_class != STORAGE_CLASS_STATIC
+						)) {
+					errorf(&env.source_position,
+							"invalid storage class for function '%Y'", env.symbol);
+				}
 			}
 		} else {
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
@@ -4824,29 +4828,31 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				entity->variable.alignment = specifiers->alignment;
 			}
 
-			if (specifiers->is_inline && is_type_valid(type)) {
-				errorf(&env.source_position,
-					   "variable '%Y' declared 'inline'", env.symbol);
-			}
-
 			entity->variable.thread_local = specifiers->thread_local;
 
-			bool invalid_storage_class = false;
-			if (current_scope == file_scope) {
-				if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-						specifiers->storage_class != STORAGE_CLASS_NONE   &&
-						specifiers->storage_class != STORAGE_CLASS_STATIC) {
-					invalid_storage_class = true;
+			if (env.symbol != NULL) {
+				if (specifiers->is_inline && is_type_valid(type)) {
+					errorf(&env.source_position,
+							"variable '%Y' declared 'inline'", env.symbol);
 				}
-			} else {
-				if (specifiers->thread_local &&
-						specifiers->storage_class == STORAGE_CLASS_NONE) {
-					invalid_storage_class = true;
+
+				bool invalid_storage_class = false;
+				if (current_scope == file_scope) {
+					if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+							specifiers->storage_class != STORAGE_CLASS_NONE   &&
+							specifiers->storage_class != STORAGE_CLASS_STATIC) {
+						invalid_storage_class = true;
+					}
+				} else {
+					if (specifiers->thread_local &&
+							specifiers->storage_class == STORAGE_CLASS_NONE) {
+						invalid_storage_class = true;
+					}
 				}
-			}
-			if (invalid_storage_class) {
-				errorf(&env.source_position,
-						"invalid storage class for variable '%Y'", env.symbol);
+				if (invalid_storage_class) {
+					errorf(&env.source_position,
+							"invalid storage class for variable '%Y'", env.symbol);
+				}
 			}
 		}
 
