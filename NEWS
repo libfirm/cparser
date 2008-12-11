@@ -1,3 +1,10 @@
+===== cparser 0.9.8 (2008-12-11) =====
+* several bugfixes
+* add/correct semantic checks
+* improve error recovery
+* support more GCC extensions
+* add/improve/correct warnings
+
 ===== cparser 0.9.7 (2008-12-01) =====
 * several bugfixes
 * add/correct semantic checks
