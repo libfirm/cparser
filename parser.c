@@ -3482,7 +3482,8 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 		entity->typedefe.type    = type_error_type;
 		entity->typedefe.builtin = true;
 	}
-	record_entity(entity, false);
+	if (kind != ENTITY_COMPOUND_MEMBER)
+		record_entity(entity, false);
 	return entity;
 }
 
