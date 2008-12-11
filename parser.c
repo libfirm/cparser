@@ -2786,6 +2786,7 @@ finish_designator:
 		} else {
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
+			mark_vars_read(expression, NULL);
 
 			if (env->must_be_constant && !is_initializer_constant(expression)) {
 				errorf(&expression->base.source_position,
