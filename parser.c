@@ -5825,6 +5825,8 @@ static void check_reachable(statement_t *const stmt)
 
 		case STATEMENT_COMPOUND:
 			next = stmt->compound.statements;
+			if (next == NULL)
+				next = stmt->base.next;
 			break;
 
 		case STATEMENT_RETURN: {
