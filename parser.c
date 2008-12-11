@@ -4325,7 +4325,9 @@ static construct_type_t *parse_array_declarator(void)
 		array->is_variable = true;
 		next_token();
 	} else if (token.type != ']') {
-		array->size = parse_assignment_expression();
+		expression_t *const size = parse_assignment_expression();
+		array->size = size;
+		mark_vars_read(size, NULL);
 	}
 
 	rem_anchor_token(']');
