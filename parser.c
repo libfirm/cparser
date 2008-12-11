@@ -6520,50 +6520,55 @@ static void parse_compound_declarators(compound_t *compound,
 		} else {
 			entity = parse_declarator(specifiers,
 					DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
-			assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-
-			/* make sure we don't define a symbol multiple times */
-			symbol_t *symbol = entity->base.symbol;
-			if (symbol != NULL) {
-				entity_t *prev = find_compound_entry(compound, symbol);
-				if (prev != NULL) {
-					errorf(&entity->base.source_position,
-							"multiple declarations of symbol '%Y' (declared %P)",
-							symbol, &prev->base.source_position);
-				}
-			}
-
-			if (token.type == ':') {
-				source_position_t source_position = *HERE;
-				next_token();
-				expression_t *size = parse_constant_expression();
-
-				type_t *type          = entity->declaration.type;
-				type_t *bitfield_type = make_bitfield_type(type, size,
-						&source_position, entity->base.symbol);
-				entity->declaration.type = bitfield_type;
+			if (entity->kind == ENTITY_TYPEDEF) {
+				errorf(&entity->base.source_position,
+						"typedef not allowed as compound member");
 			} else {
-				type_t *orig_type = entity->declaration.type;
-				type_t *type      = skip_typeref(orig_type);
-				if (is_type_function(type)) {
-					errorf(&entity->base.source_position,
-							"compound member '%Y' must not have function type '%T'",
-							entity->base.symbol, orig_type);
-				} else if (is_type_incomplete(type)) {
-					/* §6.7.2.1:16 flexible array member */
-					if (is_type_array(type) &&
-							token.type == ';'   &&
-							look_ahead(1)->type == '}') {
-						compound->has_flexible_member = true;
-					} else {
+				assert(entity->kind == ENTITY_COMPOUND_MEMBER);
+
+				/* make sure we don't define a symbol multiple times */
+				symbol_t *symbol = entity->base.symbol;
+				if (symbol != NULL) {
+					entity_t *prev = find_compound_entry(compound, symbol);
+					if (prev != NULL) {
 						errorf(&entity->base.source_position,
-								"compound member '%Y' has incomplete type '%T'",
-								entity->base.symbol, orig_type);
+								"multiple declarations of symbol '%Y' (declared %P)",
+								symbol, &prev->base.source_position);
 					}
 				}
-			}
 
-			append_entity(&compound->members, entity);
+				if (token.type == ':') {
+					source_position_t source_position = *HERE;
+					next_token();
+					expression_t *size = parse_constant_expression();
+
+					type_t *type          = entity->declaration.type;
+					type_t *bitfield_type = make_bitfield_type(type, size,
+							&source_position, entity->base.symbol);
+					entity->declaration.type = bitfield_type;
+				} else {
+					type_t *orig_type = entity->declaration.type;
+					type_t *type      = skip_typeref(orig_type);
+					if (is_type_function(type)) {
+						errorf(&entity->base.source_position,
+								"compound member '%Y' must not have function type '%T'",
+								entity->base.symbol, orig_type);
+					} else if (is_type_incomplete(type)) {
+						/* §6.7.2.1:16 flexible array member */
+						if (is_type_array(type) &&
+								token.type == ';'   &&
+								look_ahead(1)->type == '}') {
+							compound->has_flexible_member = true;
+						} else {
+							errorf(&entity->base.source_position,
+									"compound member '%Y' has incomplete type '%T'",
+									entity->base.symbol, orig_type);
+						}
+					}
+				}
+
+				append_entity(&compound->members, entity);
+			}
 		}
 
 		if (token.type != ',')
