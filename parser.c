@@ -8434,8 +8434,10 @@ end_error:;
 
 	type_t *const type = skip_typeref(value->base.type);
 	if (!is_type_pointer(type)) {
-		errorf(&value->base.source_position,
-				"operand of delete must have pointer type");
+		if (is_type_valid(type)) {
+			errorf(&value->base.source_position,
+					"operand of delete must have pointer type");
+		}
 	} else if (warning.other &&
 			is_type_atomic(skip_typeref(type->pointer.points_to), ATOMIC_TYPE_VOID)) {
 		warningf(&value->base.source_position,
