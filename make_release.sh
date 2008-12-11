@@ -6,7 +6,7 @@ VERSION="0.9.8"
 RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
-SOURCEDIRS="adt driver builtins ."
+SOURCEDIRS="adt builtins driver win32 wrappergen ."
 ADDFILES="README TODO NEWS AUTHOR COPYING cparser.1"
 
 rm -rf "$FULLRELEASEDIR"
@@ -21,6 +21,7 @@ for dir in $SOURCEDIRS; do
 	cp -p "$dir/"*.def "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.inc "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.[ch] "$FULLRELEASEDIR/$dir"
+	cp -p "$dir/"*.[ch].* "$FULLRELEASEDIR/$dir"
 done
 cp $ADDFILES "$FULLRELEASEDIR"
 echo "REVISION = \"$VERSION\"" > "$FULLRELEASEDIR/Makefile"
