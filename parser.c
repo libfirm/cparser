@@ -5584,9 +5584,10 @@ static void check_labels(void)
 	}
 }
 
-static void warn_unused_entity(entity_t *entity, entity_t *end)
+static void warn_unused_entity(entity_t *entity, entity_t *last)
 {
-	for (; entity != NULL; entity = entity->base.next) {
+	entity_t const *const end = last != NULL ? last->base.next : NULL;
+	for (; entity != end; entity = entity->base.next) {
 		if (!is_declaration(entity))
 			continue;
 
@@ -5605,9 +5606,6 @@ static void warn_unused_entity(entity_t *entity, entity_t *end)
 			warningf(&entity->base.source_position, "%s '%Y' is never read",
 			         what, entity->base.symbol);
 		}
-
-		if (entity == end)
-			break;
 	}
 }
 
