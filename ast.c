@@ -305,7 +305,7 @@ static void print_quoted_wide_string(const wide_string_t *const wstr,
 				const unsigned tc = *c;
 				if (tc < 0x80U) {
 					if (!isprint(*c)) {
-						fprintf(out, "\\%03o", (char)*c);
+						fprintf(out, "\\%03o", tc);
 					} else {
 						fputc(*c, out);
 					}
