@@ -411,9 +411,10 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 		fputs(") ", out);
 	}
 	fputc('*', out);
-	print_type_qualifiers(type->base.qualifiers);
-	if (type->base.qualifiers != 0)
+	type_qualifiers_t const qual = type->base.qualifiers;
+	if (qual != 0)
 		fputc(' ', out);
+	print_type_qualifiers(qual);
 }
 
 /**
