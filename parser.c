@@ -4850,8 +4850,12 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			}
 		}
 
-		entity->base.source_position          = env.source_position;
-		entity->base.symbol                   = env.symbol;
+		if (env.symbol != NULL) {
+			entity->base.symbol          = env.symbol;
+			entity->base.source_position = env.source_position;
+		} else {
+			entity->base.source_position = specifiers->source_position;
+		}
 		entity->base.namespc                  = NAMESPACE_NORMAL;
 		entity->declaration.type              = orig_type;
 		entity->declaration.modifiers         = env.modifiers;
