@@ -217,7 +217,7 @@ typedef enum funcname_kind_t {
 	case EXPR_UNARY_DELETE_ARRAY:
 
 /**
- * unary expression with optinal operand
+ * unary expression with optional operand
  */
 #define EXPR_UNARY_CASES_OPTIONAL \
 	case EXPR_UNARY_THROW:        \
