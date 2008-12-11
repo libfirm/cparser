@@ -6624,7 +6624,7 @@ typedef expression_t* (*parse_expression_infix_function)(expression_t *left);
 typedef struct expression_parser_function_t expression_parser_function_t;
 struct expression_parser_function_t {
 	parse_expression_function        parser;
-	unsigned                         infix_precedence;
+	precedence_t                     infix_precedence;
 	parse_expression_infix_function  infix_parser;
 };
 
@@ -9542,7 +9542,7 @@ static void register_expression_parser(parse_expression_function parser,
  * @param precedence  the precedence of the operator
  */
 static void register_infix_parser(parse_expression_infix_function parser,
-		int token_type,	unsigned precedence)
+		int token_type,	precedence_t precedence)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
