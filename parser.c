@@ -9008,6 +9008,13 @@ static void warn_comparison_in_comparison(const expression_t *const expr)
 	}
 }
 
+static bool maybe_negative(expression_t const *const expr)
+{
+	return
+		!is_constant_expression(expr) ||
+		fold_constant(expr) < 0;
+}
+
 /**
  * Check the semantics of comparison expressions.
  *
@@ -9049,37 +9056,23 @@ static void semantic_comparison(binary_expression_t *expression)
 
 	/* TODO non-arithmetic types */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
-		/* test for signed vs unsigned compares */
-		if (warning.sign_compare &&
-		    (expression->base.kind != EXPR_BINARY_EQUAL &&
-		     expression->base.kind != EXPR_BINARY_NOTEQUAL) &&
-		    (is_type_signed(type_left) != is_type_signed(type_right))) {
-
-			/* check if 1 of the operands is a constant, in this case we just
-			 * check wether we can safely represent the resulting constant in
-			 * the type of the other operand. */
-			expression_t *const_expr = NULL;
-			expression_t *other_expr = NULL;
-
-			if (is_constant_expression(left)) {
-				const_expr = left;
-				other_expr = right;
-			} else if (is_constant_expression(right)) {
-				const_expr = right;
-				other_expr = left;
-			}
-
-			if (const_expr != NULL) {
-				type_t *other_type = skip_typeref(other_expr->base.type);
-				long    val        = fold_constant(const_expr);
-				/* TODO: check if val can be represented by other_type */
-				(void) other_type;
-				(void) val;
-			}
-			warningf(&expression->base.source_position,
-			         "comparison between signed and unsigned");
-		}
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
+
+		/* test for signed vs unsigned compares */
+		if (warning.sign_compare && is_type_integer(arithmetic_type)) {
+			bool const signed_left  = is_type_signed(type_left);
+			bool const signed_right = is_type_signed(type_right);
+			if (signed_left != signed_right) {
+				/* FIXME long long needs better const folding magic */
+				/* TODO check whether constant value can be represented by other type */
+				if ((signed_left  && maybe_negative(left)) ||
+						(signed_right && maybe_negative(right))) {
+					warningf(&expression->base.source_position,
+							"comparison between signed and unsigned");
+				}
+			}
+		}
+
 		expression->left        = create_implicit_cast(left, arithmetic_type);
 		expression->right       = create_implicit_cast(right, arithmetic_type);
 		expression->base.type   = arithmetic_type;
