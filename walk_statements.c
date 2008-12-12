@@ -49,11 +49,16 @@ static void walk_expression(expression_t const *const expr,
 		walk_expression(expr->conditional.false_expression, callback, env);
 		return;
 
-	case EXPR_BUILTIN_PREFETCH:
-		walk_expression(expr->builtin_prefetch.adr,      callback, env);
-		walk_expression(expr->builtin_prefetch.rw,       callback, env);
-		walk_expression(expr->builtin_prefetch.locality, callback, env);
+	case EXPR_BUILTIN_PREFETCH: {
+		builtin_prefetch_expression_t const *const pf = &expr->builtin_prefetch;
+		walk_expression(pf->adr, callback, env);
+		if (pf->rw != NULL) {
+			walk_expression(pf->rw, callback, env);
+			if (pf->locality != NULL)
+				walk_expression(pf->locality, callback, env);
+		}
 		return;
+	}
 
 	case EXPR_BUILTIN_CONSTANT_P:
 		walk_expression(expr->builtin_constant.value, callback, env);
