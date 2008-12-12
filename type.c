@@ -621,7 +621,6 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 {
 	fputs("typeof(", out);
 	if (type->expression != NULL) {
-		assert(type->typeof_type == NULL);
 		print_expression(type->expression);
 	} else {
 		print_type(type->typeof_type);
