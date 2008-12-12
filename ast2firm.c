@@ -2225,10 +2225,12 @@ static ir_node *produce_condition_result(const expression_t *expression,
 	ir_node *cur_block = get_cur_block();
 
 	ir_node *one_block = new_immBlock();
+	set_cur_block(one_block);
 	ir_node *one       = new_Const(get_mode_one(mode));
 	ir_node *jmp_one   = new_d_Jmp(dbgi);
 
 	ir_node *zero_block = new_immBlock();
+	set_cur_block(zero_block);
 	ir_node *zero       = new_Const(get_mode_null(mode));
 	ir_node *jmp_zero   = new_d_Jmp(dbgi);
 
@@ -2729,6 +2731,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	/* create the true block */
 	ir_node *true_block  = new_immBlock();
+	set_cur_block(true_block);
 
 	ir_node *true_val = expression->true_expression != NULL ?
 		expression_to_firm(expression->true_expression) : NULL;
@@ -2736,6 +2739,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	/* create the false block */
 	ir_node *false_block = new_immBlock();
+	set_cur_block(false_block);
 
 	ir_node *false_val = expression_to_firm(expression->false_expression);
 	ir_node *false_jmp = new_Jmp();
@@ -3057,9 +3061,7 @@ static ir_node *get_label_block(label_t *label)
 	ir_graph *rem    = current_ir_graph;
 	current_ir_graph = current_function;
 
-	ir_node *old_cur_block = get_cur_block();
-	ir_node *block         = new_immBlock();
-	set_cur_block(old_cur_block);
+	ir_node *block = new_immBlock();
 
 	label->block = block;
 
@@ -3269,9 +3271,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	case EXPR_BINARY_LOGICAL_AND: {
 		const binary_expression_t *binary_expression = &expression->binary;
 
-		ir_node *cur_block   = get_cur_block();
 		ir_node *extra_block = new_immBlock();
-		set_cur_block(cur_block);
 		create_condition_evaluation(binary_expression->left, extra_block,
 		                            false_block);
 		mature_immBlock(extra_block);
@@ -3283,9 +3283,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	case EXPR_BINARY_LOGICAL_OR: {
 		const binary_expression_t *binary_expression = &expression->binary;
 
-		ir_node *cur_block   = get_cur_block();
 		ir_node *extra_block = new_immBlock();
-		set_cur_block(cur_block);
 		create_condition_evaluation(binary_expression->left, true_block,
 		                            extra_block);
 		mature_immBlock(extra_block);
@@ -4350,6 +4348,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	ir_node *true_block = NULL;
 	if (statement->true_statement != NULL) {
 		true_block = new_immBlock();
+		set_cur_block(true_block);
 		statement_to_firm(statement->true_statement);
 		if (get_cur_block() != NULL) {
 			ir_node *jmp = new_Jmp();
@@ -4363,6 +4362,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	ir_node *false_block = NULL;
 	if (statement->false_statement != NULL) {
 		false_block = new_immBlock();
+		set_cur_block(false_block);
 
 		statement_to_firm(statement->false_statement);
 		if (get_cur_block() != NULL) {
@@ -4420,6 +4420,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	break_label                 = NULL;
 
 	ir_node *body_block = new_immBlock();
+	set_cur_block(body_block);
 	statement_to_firm(statement->body);
 	ir_node *false_block = break_label;
 
@@ -4484,6 +4485,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	continue_label              = header_block;
 	break_label                 = NULL;
 
+	set_cur_block(body_block);
 	statement_to_firm(statement->body);
 	ir_node *false_block = break_label;
 
@@ -4544,6 +4546,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* create the step block */
 	ir_node *const step_block = new_immBlock();
+	set_cur_block(step_block);
 	if (statement->step != NULL) {
 		expression_to_firm(statement->step);
 	}
@@ -4551,6 +4554,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* create the header block */
 	ir_node *const header_block = new_immBlock();
+	set_cur_block(header_block);
 	if (jmp != NULL) {
 		add_immBlock_pred(header_block, jmp);
 	}
@@ -4568,6 +4572,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		break_label    = false_block;
 
 		body_block = new_immBlock();
+		set_cur_block(body_block);
 		statement_to_firm(statement->body);
 
 		assert(continue_label == step_block);
@@ -4620,9 +4625,7 @@ static void create_jump_statement(const statement_t *statement,
 static ir_node *get_break_label(void)
 {
 	if (break_label == NULL) {
-		ir_node *cur_block = get_cur_block();
 		break_label = new_immBlock();
-		set_cur_block(cur_block);
 	}
 	return break_label;
 }
@@ -4736,10 +4739,9 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
 	ir_node *proj;
-	ir_node *old_block = get_nodes_block(current_switch_cond);
 	ir_node *block     = new_immBlock();
 
-	set_cur_block(old_block);
+	set_cur_block(get_nodes_block(current_switch_cond));
 	if (statement->expression != NULL) {
 		long pn     = statement->first_case;
 		long end_pn = statement->last_case;
