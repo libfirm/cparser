@@ -2242,12 +2242,11 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
 		if (is_type_scalar(type)) {
-			ir_mode *mode = get_ir_mode_storage(type);
-			ir_node *node = create_conv(dbgi, value_node, mode);
-			node          = do_strict_conv(dbgi, node);
-
+			ir_mode *mode       = get_ir_mode_storage(type);
+			ir_node *node       = create_conv(dbgi, value_node, mode);
+			node                = do_strict_conv(dbgi, node);
 			ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-			node = create_conv(dbgi, node, mode_arith);
+			node                = create_conv(dbgi, node, mode_arith);
 			return node;
 		} else {
 			/* make sure firm type is constructed */
@@ -2258,8 +2257,11 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_CAST_IMPLICIT: {
 		ir_node *value_node = expression_to_firm(value);
 		if (is_type_scalar(type)) {
-			ir_mode *mode = get_ir_mode_arithmetic(type);
-			return create_conv(dbgi, value_node, mode);
+			ir_mode *mode       = get_ir_mode_storage(type);
+			ir_node *res        = create_conv(dbgi, value_node, mode);
+			ir_mode *mode_arith = get_ir_mode_arithmetic(type);
+			res                 = create_conv(dbgi, res, mode_arith);
+			return res;
 		} else {
 			return value_node;
 		}
