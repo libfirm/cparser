@@ -5419,7 +5419,6 @@ static void create_function(entity_t *entity)
 	current_function = irg;
 
 	set_irg_fp_model(irg, firm_opt.fp_model);
-	//tarval_enable_fp_ops((firm_opt.fp_model & fp_strict_algebraic) == 0);
 	tarval_enable_fp_ops(1);
 	set_irn_dbg_info(get_irg_start_block(irg), get_entity_dbg_info(function_entity));
 
