@@ -533,7 +533,6 @@ typedef enum statement_kind_t {
 	STATEMENT_COMPOUND,
 	STATEMENT_RETURN,
 	STATEMENT_DECLARATION,
-	STATEMENT_LOCAL_LABEL,
 	STATEMENT_IF,
 	STATEMENT_SWITCH,
 	STATEMENT_EXPRESSION,
@@ -585,12 +584,6 @@ struct declaration_statement_t {
 	statement_base_t  base;
 	entity_t         *declarations_begin;
 	entity_t         *declarations_end;
-};
-
-struct local_label_statement_t {
-	statement_base_t  base;
-	entity_t         *labels_begin;
-	entity_t         *labels_end;
 };
 
 struct if_statement_t {
@@ -701,7 +694,6 @@ union statement_t {
 	return_statement_t       returns;
 	compound_statement_t     compound;
 	declaration_statement_t  declaration;
-	local_label_statement_t  local_label;
 	if_statement_t           ifs;
 	switch_statement_t       switchs;
 	goto_statement_t         gotos;

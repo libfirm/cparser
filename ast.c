@@ -999,25 +999,6 @@ static void print_case_label(const case_label_statement_t *statement)
 	}
 }
 
-static void print_local_label(const local_label_statement_t *statement)
-{
-	fputs("__label__ ", out);
-
-	bool      first  = true;
-	entity_t *entity = statement->labels_begin;
-	for (;
-		entity != statement->labels_end->base.next;
-		entity = entity->base.next) {
-		if (!first) {
-			fputs(", ", out);
-		} else {
-			first = false;
-		}
-		fputs(entity->base.symbol->string, out);
-	}
-	fputs(";\n", out);
-}
-
 static void print_typedef(const entity_t *entity)
 {
 	fputs("typedef ", out);
@@ -1271,9 +1252,6 @@ void print_statement(const statement_t *statement)
 		break;
 	case STATEMENT_LABEL:
 		print_label_statement(&statement->label);
-		break;
-	case STATEMENT_LOCAL_LABEL:
-		print_local_label(&statement->local_label);
 		break;
 	case STATEMENT_GOTO:
 		print_goto_statement(&statement->gotos);
@@ -1619,9 +1597,11 @@ void print_entity(const entity_t *entity)
 	case ENTITY_NAMESPACE:
 		print_namespace(&entity->namespacee);
 		return;
+	case ENTITY_LOCAL_LABEL:
+		fprintf(out, "__label__ %s;", entity->base.symbol->string);
+		return;
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:
-	case ENTITY_LOCAL_LABEL:
 		panic("print_entity used on unexpected entity type");
 	case ENTITY_INVALID:
 		break;

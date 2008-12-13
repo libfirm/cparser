@@ -72,7 +72,6 @@ typedef struct return_statement_t           return_statement_t;
 typedef struct if_statement_t               if_statement_t;
 typedef struct switch_statement_t           switch_statement_t;
 typedef struct declaration_statement_t      declaration_statement_t;
-typedef struct local_label_statement_t      local_label_statement_t;
 typedef struct expression_statement_t       expression_statement_t;
 typedef struct goto_statement_t             goto_statement_t;
 typedef struct label_statement_t            label_statement_t;

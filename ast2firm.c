@@ -5115,10 +5115,6 @@ static void statement_to_firm(statement_t *statement)
 	case STATEMENT_LABEL:
 		label_to_firm(&statement->label);
 		return;
-	case STATEMENT_LOCAL_LABEL:
-		/* local labels transform the semantics of labels while parsing
-		 * they don't need any special treatment here */
-		return;
 	case STATEMENT_GOTO:
 		goto_to_firm(&statement->gotos);
 		return;

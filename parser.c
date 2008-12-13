@@ -381,7 +381,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
 		[STATEMENT_RETURN]      = sizeof(return_statement_t),
 		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
-		[STATEMENT_LOCAL_LABEL] = sizeof(local_label_statement_t),
 		[STATEMENT_IF]          = sizeof(if_statement_t),
 		[STATEMENT_SWITCH]      = sizeof(switch_statement_t),
 		[STATEMENT_EXPRESSION]  = sizeof(expression_statement_t),
@@ -5809,7 +5808,6 @@ static void check_reachable(statement_t *const stmt)
 	switch (stmt->kind) {
 		case STATEMENT_INVALID:
 		case STATEMENT_EMPTY:
-		case STATEMENT_LOCAL_LABEL:
 		case STATEMENT_ASM:
 			next = stmt->base.next;
 			break;
@@ -6088,7 +6086,6 @@ found_break_parent:
 			case STATEMENT_INVALID:
 			case STATEMENT_EMPTY:
 			case STATEMENT_DECLARATION:
-			case STATEMENT_LOCAL_LABEL:
 			case STATEMENT_EXPRESSION:
 			case STATEMENT_ASM:
 			case STATEMENT_RETURN:

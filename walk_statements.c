@@ -213,7 +213,6 @@ void walk_statements(statement_t *const stmt, statement_callback const callback,
 			walk_statements(stmt->ms_try.final_statement, callback, env);
 			return;
 
-		case STATEMENT_LOCAL_LABEL:
 		case STATEMENT_INVALID:
 		case STATEMENT_EMPTY:
 		case STATEMENT_CONTINUE:
