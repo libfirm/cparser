@@ -181,6 +181,7 @@ static unsigned hash_type(const type_t *type)
 
 	unsigned some_prime = 99991;
 	hash ^= some_prime * type->base.qualifiers;
+	hash ^= some_prime * type->base.alignment;
 
 	return hash;
 }
@@ -321,6 +322,8 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	if (type1->base.qualifiers != type2->base.qualifiers)
 		return false;
 	if (type1->base.modifiers != type2->base.modifiers)
+		return false;
+	if (type1->base.alignment != type2->base.alignment)
 		return false;
 
 	switch (type1->kind) {
