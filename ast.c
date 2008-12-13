@@ -1927,8 +1927,6 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_BITWISE_AND:
 	case EXPR_BINARY_BITWISE_OR:
 	case EXPR_BINARY_BITWISE_XOR:
-	case EXPR_BINARY_LOGICAL_AND:
-	case EXPR_BINARY_LOGICAL_OR:
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTRIGHT:
 	case EXPR_BINARY_ISGREATER:
@@ -1939,6 +1937,24 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_BINARY_ISUNORDERED:
 		return is_constant_expression(expression->binary.left)
 			&& is_constant_expression(expression->binary.right);
+
+	case EXPR_BINARY_LOGICAL_AND: {
+		expression_t const *const left = expression->binary.left;
+		if (!is_constant_expression(left))
+			return false;
+		if (fold_constant(left) == 0)
+			return true;
+		return is_constant_expression(expression->binary.right);
+	}
+
+	case EXPR_BINARY_LOGICAL_OR: {
+		expression_t const *const left = expression->binary.left;
+		if (!is_constant_expression(left))
+			return false;
+		if (fold_constant(left) != 0)
+			return true;
+		return is_constant_expression(expression->binary.right);
+	}
 
 	case EXPR_COMPOUND_LITERAL:
 		return is_constant_initializer(expression->compound_literal.initializer);
