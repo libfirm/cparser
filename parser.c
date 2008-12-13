@@ -4038,6 +4038,10 @@ warn_about_long_long:
 			type               = allocate_type_zero(TYPE_ATOMIC);
 			type->atomic.akind = atomic_type;
 		}
+		type->base.alignment = get_atomic_type_alignment(atomic_type);
+		unsigned const size  = get_atomic_type_size(atomic_type);
+		type->base.size      =
+			type_specifiers & SPECIFIER_COMPLEX ? size * 2 : size;
 		newtype = true;
 	} else if (type_specifiers != 0) {
 		errorf(HERE, "multiple datatypes in declaration");
