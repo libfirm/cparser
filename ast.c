@@ -1038,7 +1038,7 @@ static void print_declaration_statement(
 
 	entity_t *const end = statement->declarations_end->base.next;
 	for (; entity != end; entity = entity->base.next) {
-		if (!is_declaration(entity) && entity->kind != ENTITY_TYPEDEF)
+		if (entity->kind == ENTITY_ENUM_VALUE)
 			continue;
 		if (is_generated_entity(entity))
 			continue;
@@ -1049,13 +1049,7 @@ static void print_declaration_statement(
 			first = false;
 		}
 
-		if (entity->kind == ENTITY_TYPEDEF) {
-			print_typedef(entity);
-		} else {
-			assert(is_declaration(entity));
-			print_declaration(entity);
-		}
-
+		print_entity(entity);
 		fputc('\n', out);
 	}
 }
