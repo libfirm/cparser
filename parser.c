@@ -1031,21 +1031,18 @@ static expression_t *create_cast_expression(expression_t *expression,
 static bool is_null_pointer_constant(const expression_t *expression)
 {
 	/* skip void* cast */
-	if (expression->kind == EXPR_UNARY_CAST
-			|| expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
-		expression = expression->unary.value;
+	if (expression->kind == EXPR_UNARY_CAST ||
+			expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+		type_t *const type = skip_typeref(expression->base.type);
+		if (types_compatible(type, type_void_ptr))
+			expression = expression->unary.value;
 	}
 
-	/* TODO: not correct yet, should be any constant integer expression
-	 * which evaluates to 0 */
-	if (expression->kind != EXPR_CONST)
-		return false;
-
 	type_t *const type = skip_typeref(expression->base.type);
-	if (!is_type_integer(type))
-		return false;
-
-	return expression->conste.v.int_value == 0;
+	return
+		is_type_integer(type)              &&
+		is_constant_expression(expression) &&
+		fold_constant(expression) == 0;
 }
 
 /**
