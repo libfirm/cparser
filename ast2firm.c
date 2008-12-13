@@ -2492,7 +2492,8 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 {
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
 	const expression_t *left_expr = expression->left;
-	ir_mode            *left_mode = get_ir_mode_storage(left_expr->base.type);
+	type_t             *type      = left_expr->base.type;
+	ir_mode            *left_mode = get_ir_mode_storage(type);
 	ir_node            *right     = expression_to_firm(expression->right);
 	ir_node            *left_addr = expression_to_addr(left_expr);
 	ir_node            *left      = get_value_from_lvalue(left_expr, left_addr);
@@ -2503,7 +2504,8 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 
 	result = set_value_for_expression_addr(left_expr, result, left_addr);
 
-	return result;
+	ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
+	return create_conv(dbgi, result, mode_arithmetic);
 }
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
@@ -2537,7 +2539,9 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 		ir_node *res
 			= set_value_for_expression_addr(expression->left, right, addr);
 
-		return res;
+		type_t  *type            = skip_typeref(expression->base.type);
+		ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
+		return create_conv(NULL, res, mode_arithmetic);
 	}
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_SUB:
