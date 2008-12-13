@@ -2504,8 +2504,11 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 
 	result = set_value_for_expression_addr(left_expr, result, left_addr);
 
-	ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
-	return create_conv(dbgi, result, mode_arithmetic);
+	if (!is_type_compound(type)) {
+		ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
+		result = create_conv(dbgi, result, mode_arithmetic);
+	}
+	return result;
 }
 
 static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
@@ -2540,8 +2543,11 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 			= set_value_for_expression_addr(expression->left, right, addr);
 
 		type_t  *type            = skip_typeref(expression->base.type);
-		ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
-		return create_conv(NULL, res, mode_arithmetic);
+		if (!is_type_compound(type)) {
+			ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
+			res                      = create_conv(NULL, res, mode_arithmetic);
+		}
+		return res;
 	}
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_SUB:
