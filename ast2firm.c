@@ -329,6 +329,24 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
+static type_t *get_aligned_type(type_t *type, int alignment)
+{
+	if (alignment == 0)
+		return type;
+
+	type = skip_typeref(type);
+	if (alignment > type->base.alignment) {
+		type_t *copy = duplicate_type(type);
+		copy->base.alignment = alignment;
+
+		type = typehash_insert(copy);
+		if (type != copy) {
+			obstack_free(type_obst, copy);
+		}
+	}
+	return type;
+}
+
 /**
  * Creates a Firm type for an atomic type
  */
@@ -653,6 +671,8 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 
 		symbol_t *symbol     = entry->base.symbol;
 		type_t   *entry_type = skip_typeref(entry->declaration.type);
+		entry_type
+			= get_aligned_type(entry_type, entry->compound_member.alignment);
 		dbg_info *dbgi       = get_dbg_info(&entry->base.source_position);
 
 		ident    *ident;
@@ -3405,10 +3425,13 @@ static void create_variable_entity(entity_t *variable,
                                    ir_type *parent_type)
 {
 	assert(variable->kind == ENTITY_VARIABLE);
-	type_t    *const type     = skip_typeref(variable->declaration.type);
+	type_t    *type = skip_typeref(variable->declaration.type);
+	type            = get_aligned_type(type, variable->variable.alignment);
+
 	ident     *const id       = new_id_from_str(variable->base.symbol->string);
 	ir_type   *const irtype   = get_ir_type(type);
 	dbg_info  *const dbgi     = get_dbg_info(&variable->base.source_position);
+
 	ir_entity *const irentity = new_d_entity(parent_type, id, irtype, dbgi);
 
 	handle_gnu_attributes_ent(irentity, variable);
@@ -3417,6 +3440,7 @@ static void create_variable_entity(entity_t *variable,
 	variable->variable.v.entity = irentity;
 	set_entity_variability(irentity, variability_uninitialized);
 	set_entity_ld_ident(irentity, create_ld_ident(variable));
+
 	if (parent_type == get_tls_type())
 		set_entity_allocation(irentity, allocation_automatic);
 	else if (declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE)
@@ -4051,6 +4075,8 @@ static void create_initializer_local_variable_entity(entity_t *entity)
 	dbg_info      *dbgi        = get_dbg_info(&entity->base.source_position);
 	ir_entity     *irentity    = entity->variable.v.entity;
 	type_t        *type        = entity->declaration.type;
+
+	type = get_aligned_type(type, entity->variable.alignment);
 	create_local_initializer(initializer, dbgi, irentity, type);
 }
 
@@ -4189,7 +4215,9 @@ static void create_local_static_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
-	type_t    *const type     = skip_typeref(entity->declaration.type);
+	type_t    *type = skip_typeref(entity->declaration.type);
+	type            = get_aligned_type(type, entity->variable.alignment);
+
 	ir_type   *const var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
 	ir_type   *const irtype   = get_ir_type(type);
@@ -4208,6 +4236,7 @@ static void create_local_static_variable(entity_t *entity)
 
 	entity->declaration.kind  = DECLARATION_KIND_GLOBAL_VARIABLE;
 	entity->variable.v.entity = irentity;
+
 	set_entity_ld_ident(irentity, id);
 	set_entity_variability(irentity, variability_uninitialized);
 	set_entity_visibility(irentity, visibility_local);

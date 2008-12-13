@@ -192,6 +192,7 @@ struct declaration_t {
 
 struct compound_member_t {
 	declaration_t  base;
+	unsigned char  alignment;
 	bool           read          : 1;
 	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
 
@@ -205,7 +206,7 @@ struct variable_t {
 	bool           thread_local  : 1;  /**< GCC __thread */
 	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
 	bool           read          : 1;
-	unsigned char  alignment;          /**< Alignment of the declaration, 0 for default. */
+	unsigned char  alignment;
 	symbol_t      *get_property_sym;   /**< MS get property. */
 	symbol_t      *put_property_sym;   /**< MS put property. */
 

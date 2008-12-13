@@ -802,6 +802,7 @@ type_t *duplicate_type(const type_t *type)
 
 	type_t *copy = obstack_alloc(type_obst, size);
 	memcpy(copy, type, size);
+	copy->base.firm_type = NULL;
 
 	return copy;
 }

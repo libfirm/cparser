@@ -58,10 +58,10 @@ struct argument_list_t {
 
 typedef struct gnu_attribute_t gnu_attribute_t;
 struct gnu_attribute_t {
-	gnu_attribute_kind_t kind;           /**< The kind of the GNU attribute. */
+	gnu_attribute_kind_t kind;          /**< The kind of the GNU attribute. */
 	gnu_attribute_t     *next;
-	bool                 invalid;        /**< Set if this attribute had argument errors, */
-	bool                 have_arguments; /**< True, if this attribute has arguments. */
+	bool                 invalid;       /**< Set if this attribute had argument errors, */
+	bool                 has_arguments; /**< True, if this attribute has arguments. */
 	union {
 		size_t              value;
 		string_t            string;
@@ -1324,7 +1324,7 @@ static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind)
 	attribute->kind            = kind;
 	attribute->next            = NULL;
 	attribute->invalid         = false;
-	attribute->have_arguments  = false;
+	attribute->has_arguments   = false;
 
 	return attribute;
 }
@@ -1587,7 +1587,7 @@ end_error:
  */
 static void check_no_argument(gnu_attribute_t *attribute, const char *name)
 {
-	if (!attribute->have_arguments)
+	if (!attribute->has_arguments)
 		return;
 
 	/* should have no arguments */
@@ -1737,7 +1737,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 						/* empty args are allowed */
 						next_token();
 					} else
-						attribute->have_arguments = true;
+						attribute->has_arguments = true;
 				}
 
 				switch (kind) {
@@ -1796,7 +1796,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 
 				case GNU_AK_ALIGNED:
 					/* __align__ may be used without an argument */
-					if (attribute->have_arguments) {
+					if (attribute->has_arguments) {
 						parse_gnu_attribute_const_arg(attribute);
 					}
 					break;
@@ -1804,7 +1804,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_FORMAT_ARG:
 				case GNU_AK_REGPARM:
 				case GNU_AK_TRAP_EXIT:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1814,7 +1814,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				case GNU_AK_ALIAS:
 				case GNU_AK_SECTION:
 				case GNU_AK_SP_SWITCH:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1822,7 +1822,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_FORMAT:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 						attribute->invalid = true;
@@ -1831,29 +1831,29 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 				case GNU_AK_WEAKREF:
 					/* may have one string argument */
-					if (attribute->have_arguments)
+					if (attribute->has_arguments)
 						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
 					break;
 				case GNU_AK_NONNULL:
-					if (attribute->have_arguments)
+					if (attribute->has_arguments)
 						parse_gnu_attribute_const_arg_list(attribute);
 					break;
 				case GNU_AK_TLS_MODEL:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
 						parse_gnu_attribute_tls_model_arg(attribute);
 					break;
 				case GNU_AK_VISIBILITY:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else
 						parse_gnu_attribute_visibility_arg(attribute);
 					break;
 				case GNU_AK_MODEL:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else {
@@ -1861,7 +1861,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					}
 					break;
 				case GNU_AK_MODE:
-					if (!attribute->have_arguments) {
+					if (!attribute->has_arguments) {
 						/* should have arguments */
 						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 					} else {
@@ -1870,12 +1870,12 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 					break;
 				case GNU_AK_INTERRUPT:
 					/* may have one string argument */
-					if (attribute->have_arguments)
+					if (attribute->has_arguments)
 						parse_gnu_attribute_interrupt_arg(attribute);
 					break;
 				case GNU_AK_SENTINEL:
 					/* may have one string argument */
-					if (attribute->have_arguments)
+					if (attribute->has_arguments)
 						parse_gnu_attribute_const_arg(attribute);
 					break;
 				case GNU_AK_LAST:
@@ -4035,8 +4035,8 @@ warn_about_long_long:
 			type                  = allocate_type_zero(TYPE_IMAGINARY);
 			type->imaginary.akind = atomic_type;
 		} else {
-			type               = allocate_type_zero(TYPE_ATOMIC);
-			type->atomic.akind = atomic_type;
+			type                 = allocate_type_zero(TYPE_ATOMIC);
+			type->atomic.akind   = atomic_type;
 		}
 		type->base.alignment = get_atomic_type_alignment(atomic_type);
 		unsigned const size  = get_atomic_type_size(atomic_type);
@@ -4560,31 +4560,50 @@ static void parse_declaration_attributes(entity_t *entity)
 	/* handle these strange/stupid mode attributes */
 	gnu_attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
-		if (attribute->kind != GNU_AK_MODE || attribute->invalid)
+		if (attribute->invalid)
 			continue;
 
-		atomic_type_kind_t  akind = attribute->u.akind;
-		if (!is_type_signed(type)) {
-			switch (akind) {
-			case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
-			case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
-			case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
-			case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
-			default:
-				panic("invalid akind in mode attribute");
+		if (attribute->kind == GNU_AK_MODE) {
+			atomic_type_kind_t  akind = attribute->u.akind;
+			if (!is_type_signed(type)) {
+				switch (akind) {
+				case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
+				case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
+				case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
+				case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
+				default:
+					panic("invalid akind in mode attribute");
+				}
+			} else {
+				switch (akind) {
+				case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_SCHAR; break;
+				case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_SHORT; break;
+				case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_INT; break;
+				case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_LONGLONG; break;
+				default:
+					panic("invalid akind in mode attribute");
+				}
 			}
-		} else {
-			switch (akind) {
-			case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_SCHAR; break;
-			case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_SHORT; break;
-			case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_INT; break;
-			case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_LONGLONG; break;
-			default:
-				panic("invalid akind in mode attribute");
+			type = make_atomic_type(akind, type->base.qualifiers);
+		} else if (attribute->kind == GNU_AK_ALIGNED) {
+			int alignment = 32; /* TODO: fill in maximum usefull alignment for target machine */
+			if (attribute->has_arguments)
+				alignment = attribute->u.argument;
+
+			if (entity->kind == ENTITY_TYPEDEF) {
+				type_t *copy = duplicate_type(type);
+				copy->base.alignment = attribute->u.argument;
+
+				type = typehash_insert(copy);
+				if (type != copy) {
+					obstack_free(type_obst, copy);
+				}
+			} else if(entity->kind == ENTITY_VARIABLE) {
+				entity->variable.alignment = alignment;
+			} else if(entity->kind == ENTITY_COMPOUND_MEMBER) {
+				entity->compound_member.alignment = alignment;
 			}
 		}
-
-		type = make_atomic_type(akind, type->base.qualifiers);
 	}
 
 	type_modifiers_t type_modifiers = type->base.modifiers;
@@ -4830,10 +4849,6 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 			entity->variable.get_property_sym = specifiers->get_property_sym;
 			entity->variable.put_property_sym = specifiers->put_property_sym;
-			if (specifiers->alignment != 0) {
-				/* TODO: add checks here */
-				entity->variable.alignment = specifiers->alignment;
-			}
 
 			entity->variable.thread_local = specifiers->thread_local;
 
