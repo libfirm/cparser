@@ -3029,8 +3029,8 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 			compound = &entity->compound;
 			if (compound->base.parent_scope != current_scope &&
 			    (token.type == '{' || token.type == ';')) {
-				/* we're in an inner scope and have a definition. Override
-				   existing definition in outer scope */
+				/* we're in an inner scope and have a definition. Shadow
+				 * existing definition in outer scope */
 				compound = NULL;
 			} else if (compound->complete && token.type == '{') {
 				assert(symbol != NULL);
@@ -3144,7 +3144,18 @@ static type_t *parse_enum_specifier(void)
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_ENUM);
-		assert(entity == NULL || entity->kind == ENTITY_ENUM);
+		if (entity != NULL) {
+			assert(entity->kind == ENTITY_ENUM);
+			if (entity->base.parent_scope != current_scope &&
+					(token.type == '{' || token.type == ';')) {
+				/* we're in an inner scope and have a definition. Shadow
+				 * existing definition in outer scope */
+				entity = NULL;
+			} else if (entity->enume.complete && token.type == '{') {
+				errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
+						symbol, &entity->base.source_position);
+			}
+		}
 	} else if (token.type != '{') {
 		parse_error_expected("while parsing enum type specifier",
 		                     T_IDENTIFIER, '{', NULL);
@@ -3166,10 +3177,6 @@ static type_t *parse_enum_specifier(void)
 	type->enumt.enume  = &entity->enume;
 
 	if (token.type == '{') {
-		if (entity->enume.complete) {
-			errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
-			       symbol, &entity->base.source_position);
-		}
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
