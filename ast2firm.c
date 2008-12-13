@@ -2472,7 +2472,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 		}
 
 		if (is_constant_expression(expression->right)) {
-			long const valr = fold_constant(expression->left);
+			long const valr = fold_constant(expression->right);
 			return valr != 0 ?
 				new_Const(get_mode_one(mode)) :
 				new_Const(get_mode_null(mode));
