@@ -4411,7 +4411,7 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 			if (is_declaration(entity)) {
 				initialize_local_declaration(entity);
 			} else if (entity->kind == ENTITY_TYPEDEF) {
-				type_t *const type = entity->typedefe.type;
+				type_t *const type = skip_typeref(entity->typedefe.type);
 				if (is_type_array(type) && type->array.is_vla)
 					get_vla_size(&type->array);
 			}
