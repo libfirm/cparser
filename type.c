@@ -1220,17 +1220,18 @@ type_t *skip_typeref(type_t *type)
 {
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 	type_modifiers_t  modifiers  = TYPE_MODIFIER_NONE;
-	unsigned char     alignment  = 0;
+	il_alignment_t    alignment  = 0;
 
 	while (true) {
+		if (alignment < type->base.alignment)
+			alignment = type->base.alignment;
+
 		switch (type->kind) {
 		case TYPE_ERROR:
 			return type;
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
 			modifiers  |= type->base.modifiers;
-			if (type->base.alignment > alignment)
-				alignment = type->base.alignment;
 
 			const typedef_type_t *typedef_type = &type->typedeft;
 			if (typedef_type->resolved_type != NULL) {
@@ -1243,8 +1244,6 @@ type_t *skip_typeref(type_t *type)
 		case TYPE_TYPEOF: {
 			qualifiers |= type->base.qualifiers;
 			modifiers  |= type->base.modifiers;
-			if (type->base.alignment > alignment)
-				alignment = type->base.alignment;
 
 			const typeof_type_t *typeof_type = &type->typeoft;
 			if (typeof_type->typeof_type != NULL) {
@@ -1260,8 +1259,9 @@ type_t *skip_typeref(type_t *type)
 		break;
 	}
 
-	if (qualifiers != TYPE_QUALIFIER_NONE || modifiers != TYPE_MODIFIER_NONE
-			|| (alignment != 0 && alignment > type->base.alignment)) {
+	if (qualifiers != TYPE_QUALIFIER_NONE ||
+			modifiers  != TYPE_MODIFIER_NONE  ||
+			alignment  >  type->base.alignment) {
 		type_t *const copy = duplicate_type(type);
 
 		/* for const with typedefed array type the element type has to be
