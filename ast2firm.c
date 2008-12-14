@@ -2728,28 +2728,60 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	return get_type_size(type);
 }
 
+static entity_t *get_expression_entity(const expression_t *expression)
+{
+	if (expression->kind != EXPR_REFERENCE)
+		return NULL;
+
+	return expression->reference.entity;
+}
+
 /**
  * Transform an alignof expression into Firm code.
  */
 static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
-	type_t *type = expression->type;
-	if (type == NULL) {
-		/* beware: if expression is a variable reference, return the
-		   alignment of the variable. */
-		const expression_t *tp_expression = expression->tp_expression;
-		const entity_t     *entity        = expression_is_variable(tp_expression);
-		if (entity != NULL) {
-			/* TODO: get the alignment of this variable. */
-			(void) entity;
+	ir_type *irtype;
+
+	const expression_t *tp_expression = expression->tp_expression;
+	entity_t           *entity        = get_expression_entity(tp_expression);
+	ir_entity          *irentity      = NULL;
+
+	if (entity != NULL && is_declaration(entity)) {
+		switch (entity->declaration.kind) {
+		case DECLARATION_KIND_UNKNOWN:
+			panic("unknown entity reference found");
+		case DECLARATION_KIND_COMPOUND_MEMBER:
+			irentity = entity->compound_member.entity;
+			break;
+		case DECLARATION_KIND_GLOBAL_VARIABLE:
+		case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
+			irentity = entity->variable.v.entity;
+			break;
+		case DECLARATION_KIND_PARAMETER_ENTITY:
+			irentity = entity->parameter.v.entity;
+			break;
+		case DECLARATION_KIND_FUNCTION:
+		case DECLARATION_KIND_INNER_FUNCTION:
+			irentity = entity->function.entity;
+			break;
+		case DECLARATION_KIND_PARAMETER:
+		case DECLARATION_KIND_LOCAL_VARIABLE:
+		case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+			break;
 		}
-		type = tp_expression->base.type;
-		assert(type != NULL);
+	}
+
+	if (irentity != NULL) {
+		irtype = get_entity_type(irentity);
+	} else {
+		type_t *type = expression->type;
+		irtype = get_ir_type(type);
 	}
 
 	ir_mode *const mode = get_ir_mode_arithmetic(expression->base.type);
 	symconst_symbol sym;
-	sym.type_p = get_ir_type(type);
+	sym.type_p = irtype;
 	return new_SymConst(mode, sym, symconst_type_align);
 }
 
@@ -2767,9 +2799,7 @@ long fold_constant(const expression_t *expression)
 	assert(is_constant_expression(expression));
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
-	if (current_ir_graph == NULL) {
-		current_ir_graph = get_const_code_irg();
-	}
+	current_ir_graph = get_const_code_irg();
 
 	ir_node *cnst = expression_to_firm(expression);
 	current_ir_graph = old_current_ir_graph;
