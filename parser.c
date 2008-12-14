@@ -580,14 +580,6 @@ static initializer_t *allocate_initializer_zero(initializer_kind_t kind)
 }
 
 /**
- * Free a type from the type obstack.
- */
-static void free_type(void *type)
-{
-	obstack_free(type_obst, type);
-}
-
-/**
  * Returns the index of the top element of the environment stack.
  */
 static size_t environment_top(void)
@@ -3289,13 +3281,7 @@ static type_t *create_builtin_type(symbol_t *const symbol,
 	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
 	type->builtin.symbol    = symbol;
 	type->builtin.real_type = real_type;
-
-	type_t *result = typehash_insert(type);
-	if (type != result) {
-		free_type(type);
-	}
-
-	return result;
+	return identify_new_type(type);
 }
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -3658,12 +3644,7 @@ static type_t *handle_mode_attribute(const gnu_attribute_t *attribute,
 
 	type_t *copy       = duplicate_type(type);
 	copy->atomic.akind = akind;
-
-	type = typehash_insert(copy);
-	if (type != copy) {
-		obstack_free(type_obst, copy);
-	}
-	return type;
+	return identify_new_type(copy);
 }
 
 static type_t *handle_type_attributes(const gnu_attribute_t *attributes,
@@ -3678,18 +3659,14 @@ static type_t *handle_type_attributes(const gnu_attribute_t *attributes,
 		if (attribute->kind == GNU_AK_MODE) {
 			type = handle_mode_attribute(attribute, type);
 		} else if (attribute->kind == GNU_AK_ALIGNED) {
-			int alignment = 32; /* TODO: fill in maximum usefull alignment for
+			int alignment = 32; /* TODO: fill in maximum useful alignment for
 			                       target machine */
 			if (attribute->has_arguments)
 				alignment = attribute->u.argument;
 
-			type_t *copy = duplicate_type(type);
+			type_t *copy         = duplicate_type(type);
 			copy->base.alignment = attribute->u.argument;
-
-			type = typehash_insert(copy);
-			if (type != copy) {
-				obstack_free(type_obst, copy);
-			}
+			type                 = identify_new_type(copy);
 		}
 	}
 
@@ -4127,13 +4104,10 @@ warn_about_long_long:
 	type->base.qualifiers = qualifiers;
 	type->base.modifiers  = modifiers;
 
-	type_t *result = typehash_insert(type);
-	if (newtype && result != type) {
-		free_type(type);
-	}
+	type = identify_new_type(type);
 
-	result = handle_type_attributes(specifiers->gnu_attributes, result);
-	specifiers->type = result;
+	type = handle_type_attributes(specifiers->gnu_attributes, type);
+	specifiers->type = type;
 	return;
 
 end_error:
@@ -4647,13 +4621,9 @@ static void parse_declaration_attributes(entity_t *entity)
 				alignment = attribute->u.argument;
 
 			if (entity->kind == ENTITY_TYPEDEF) {
-				type_t *copy = duplicate_type(type);
+				type_t *copy         = duplicate_type(type);
 				copy->base.alignment = attribute->u.argument;
-
-				type = typehash_insert(copy);
-				if (type != copy) {
-					obstack_free(type_obst, copy);
-				}
+				type                 = identify_new_type(copy);
 			} else if(entity->kind == ENTITY_VARIABLE) {
 				entity->variable.alignment = alignment;
 			} else if(entity->kind == ENTITY_COMPOUND_MEMBER) {
@@ -4667,13 +4637,9 @@ static void parse_declaration_attributes(entity_t *entity)
 		type_modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 
 	if (type->base.modifiers != type_modifiers) {
-		type_t *copy = duplicate_type(type);
+		type_t *copy         = duplicate_type(type);
 		copy->base.modifiers = type_modifiers;
-
-		type = typehash_insert(copy);
-		if (type != copy) {
-			obstack_free(type_obst, copy);
-		}
+		type                 = identify_new_type(copy);
 	}
 
 	if (entity->kind == ENTITY_TYPEDEF) {
@@ -4774,14 +4740,12 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 		}
 		}
 
-		type_t *hashed_type = typehash_insert(type);
-		if (hashed_type != type) {
-			/* the function type was constructed earlier freeing it here will
-			 * destroy other types... */
-			if (iter->kind != CONSTRUCT_FUNCTION) {
-				free_type(type);
-			}
-			type = hashed_type;
+		/* The function type was constructed earlier.  Freeing it here will
+		 * destroy other types. */
+		if (iter->kind == CONSTRUCT_FUNCTION) {
+			type = typehash_insert(type);
+		} else {
+			type = identify_new_type(type);
 		}
 	}
 
@@ -5611,12 +5575,9 @@ decl_list_end:
 	new_type->function.parameters             = parameters;
 	new_type->function.unspecified_parameters = true;
 
-	type = typehash_insert(new_type);
-	if (type != new_type) {
-		obstack_free(type_obst, new_type);
-	}
+	new_type = identify_new_type(new_type);
 
-	entity->declaration.type = type;
+	entity->declaration.type = new_type;
 
 	rem_anchor_token('{');
 }
@@ -6426,18 +6387,15 @@ static void parse_external_declaration(void)
 			ndeclaration->base.symbol);
 	}
 
-	/* § 6.7.5.3 (14) a function definition with () means no
+	/* § 6.7.5.3:14 a function definition with () means no
 	 * parameters (and not unspecified parameters) */
-	if (type->function.unspecified_parameters
-			&& type->function.parameters == NULL
-			&& !type->function.kr_style_parameters) {
-		type_t *duplicate = duplicate_type(type);
-		duplicate->function.unspecified_parameters = false;
+	if (type->function.unspecified_parameters &&
+			type->function.parameters == NULL     &&
+			!type->function.kr_style_parameters) {
+		type_t *copy                          = duplicate_type(type);
+		copy->function.unspecified_parameters = false;
+		type                                  = identify_new_type(copy);
 
-		type = typehash_insert(duplicate);
-		if (type != duplicate) {
-			obstack_free(type_obst, duplicate);
-		}
 		ndeclaration->declaration.type = type;
 	}
 
@@ -6878,11 +6836,7 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	ntype->function.return_type            = type_int;
 	ntype->function.unspecified_parameters = true;
 	ntype->function.linkage                = LINKAGE_C;
-
-	type_t *type = typehash_insert(ntype);
-	if (type != ntype) {
-		free_type(ntype);
-	}
+	type_t *type                           = identify_new_type(ntype);
 
 	entity_t *entity = allocate_entity_zero(ENTITY_FUNCTION);
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
@@ -6922,12 +6876,7 @@ static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter1;
 
-	type_t *result = typehash_insert(type);
-	if (result != type) {
-		free_type(type);
-	}
-
-	return result;
+	return identify_new_type(type);
 }
 
 /**
@@ -6948,12 +6897,7 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 
-	type_t *result = typehash_insert(type);
-	if (result != type) {
-		free_type(type);
-	}
-
-	return result;
+	return identify_new_type(type);
 }
 
 static type_t *make_function_0_type(type_t *return_type)
@@ -6962,12 +6906,7 @@ static type_t *make_function_0_type(type_t *return_type)
 	type->function.return_type = return_type;
 	type->function.parameters  = NULL;
 
-	type_t *result = typehash_insert(type);
-	if (result != type) {
-		free_type(type);
-	}
-
-	return result;
+	return identify_new_type(type);
 }
 
 /**
@@ -11451,9 +11390,7 @@ static void complete_incomplete_arrays(void)
 		new_type->array.has_implicit_size = true;
 		new_type->array.size              = 1;
 
-		type_t *const result = typehash_insert(new_type);
-		if (type != result)
-			free_type(type);
+		type_t *const result = identify_new_type(new_type);
 
 		decl->type = result;
 	}

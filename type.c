@@ -823,12 +823,7 @@ type_t *get_unqualified_type(type_t *type)
 	type_t *unqualified_type          = duplicate_type(type);
 	unqualified_type->base.qualifiers = TYPE_QUALIFIER_NONE;
 
-	type_t *result = typehash_insert(unqualified_type);
-	if (result != unqualified_type) {
-		obstack_free(type_obst, unqualified_type);
-	}
-
-	return result;
+	return identify_new_type(unqualified_type);
 }
 
 type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
@@ -856,11 +851,7 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 		return type;
 	}
 
-	type = typehash_insert(copy);
-	if (type != copy)
-		obstack_free(type_obst, copy);
-
-	return type;
+	return identify_new_type(copy);
 }
 
 /**
@@ -1279,10 +1270,7 @@ type_t *skip_typeref(type_t *type)
 			copy->base.alignment   = alignment;
 		}
 
-		type = typehash_insert(copy);
-		if (type != copy) {
-			obstack_free(type_obst, copy);
-		}
+		type = identify_new_type(copy);
 	}
 
 	return type;
@@ -1422,7 +1410,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
  * Hash the given type and return the "singleton" version
  * of it.
  */
-static type_t *identify_new_type(type_t *type)
+type_t *identify_new_type(type_t *type)
 {
 	type_t *result = typehash_insert(type);
 	if (result != type) {
