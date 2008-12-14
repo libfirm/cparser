@@ -3624,6 +3624,78 @@ static void finish_union_type(compound_type_t *type)
 	type->base.alignment = alignment;
 }
 
+static type_t *handle_mode_attribute(const gnu_attribute_t *attribute,
+                                     type_t *orig_type)
+{
+	type_t *type = skip_typeref(orig_type);
+	if (type->kind != TYPE_ATOMIC) {
+		errorf(HERE,
+			   "__attribute__(mode)) only allowed for atomic types");
+		return orig_type;
+	}
+	atomic_type_kind_t  akind = attribute->u.akind;
+	if (!is_type_signed(type)) {
+		switch (akind) {
+		case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
+		case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
+		case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
+		case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
+		default:
+			errorf(HERE, "invalid akind in mode attribute");
+			return orig_type;
+		}
+	} else {
+		switch (akind) {
+		case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_SCHAR; break;
+		case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_SHORT; break;
+		case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_INT; break;
+		case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_LONGLONG; break;
+		default:
+			errorf(HERE, "invalid akind in mode attribute");
+			return orig_type;
+		}
+	}
+
+	type_t *copy       = duplicate_type(type);
+	copy->atomic.akind = akind;
+
+	type = typehash_insert(copy);
+	if (type != copy) {
+		obstack_free(type_obst, copy);
+	}
+	return type;
+}
+
+static type_t *handle_type_attributes(const gnu_attribute_t *attributes,
+                                      type_t *type)
+{
+	/* handle these strange/stupid mode attributes */
+	const gnu_attribute_t *attribute = attributes;
+	for ( ; attribute != NULL; attribute = attribute->next) {
+		if (attribute->invalid)
+			continue;
+
+		if (attribute->kind == GNU_AK_MODE) {
+			type = handle_mode_attribute(attribute, type);
+		} else if (attribute->kind == GNU_AK_ALIGNED) {
+			int alignment = 32; /* TODO: fill in maximum usefull alignment for
+			                       target machine */
+			if (attribute->has_arguments)
+				alignment = attribute->u.argument;
+
+			type_t *copy = duplicate_type(type);
+			copy->base.alignment = attribute->u.argument;
+
+			type = typehash_insert(copy);
+			if (type != copy) {
+				obstack_free(type_obst, copy);
+			}
+		}
+	}
+
+	return type;
+}
+
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t            *type              = NULL;
@@ -3639,8 +3711,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	while (true) {
 		specifiers->modifiers
 			|= parse_attributes(&specifiers->gnu_attributes);
-		if (specifiers->modifiers & DM_TRANSPARENT_UNION)
-			modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 
 		switch (token.type) {
 		/* storage class */
@@ -3861,6 +3931,9 @@ wrong_thread_stoarge_class:
 	}
 
 finish_specifiers:
+	specifiers->modifiers
+		|= parse_attributes(&specifiers->gnu_attributes);
+
 	in_gcc_extension = old_gcc_extension;
 
 	if (type == NULL || (saw_error && type_specifiers != 0)) {
@@ -4049,6 +4122,8 @@ warn_about_long_long:
 
 	/* FIXME: check type qualifiers here */
 
+	if (specifiers->modifiers & DM_TRANSPARENT_UNION)
+		modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 	type->base.qualifiers = qualifiers;
 	type->base.modifiers  = modifiers;
 
@@ -4057,6 +4132,7 @@ warn_about_long_long:
 		free_type(type);
 	}
 
+	result = handle_type_attributes(specifiers->gnu_attributes, result);
 	specifiers->type = result;
 	return;
 
@@ -4564,27 +4640,7 @@ static void parse_declaration_attributes(entity_t *entity)
 			continue;
 
 		if (attribute->kind == GNU_AK_MODE) {
-			atomic_type_kind_t  akind = attribute->u.akind;
-			if (!is_type_signed(type)) {
-				switch (akind) {
-				case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
-				case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
-				case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
-				case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
-				default:
-					panic("invalid akind in mode attribute");
-				}
-			} else {
-				switch (akind) {
-				case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_SCHAR; break;
-				case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_SHORT; break;
-				case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_INT; break;
-				case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_LONGLONG; break;
-				default:
-					panic("invalid akind in mode attribute");
-				}
-			}
-			type = make_atomic_type(akind, type->base.qualifiers);
+			type = handle_mode_attribute(attribute, type);
 		} else if (attribute->kind == GNU_AK_ALIGNED) {
 			int alignment = 32; /* TODO: fill in maximum usefull alignment for target machine */
 			if (attribute->has_arguments)
