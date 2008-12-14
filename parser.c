@@ -2934,7 +2934,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		result = parse_scalar_initializer(type, env->must_be_constant);
 	}
 
-	/* § 6.7.8 (22) array initializers for arrays with unknown size determine
+	/* § 6.7.8:22 array initializers for arrays with unknown size determine
 	 * the array type size */
 	if (is_type_array(type) && type->array.size_expression == NULL
 			&& result != NULL) {
@@ -4667,7 +4667,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 			function_type->function.return_type = type;
 
 			type_t *skipped_return_type = skip_typeref(type);
-			/* §6.7.5.3(1) */
+			/* §6.7.5.3:1 */
 			if (is_type_function(skipped_return_type)) {
 				errorf(HERE, "function returning function is not allowed");
 			} else if (is_type_array(skipped_return_type)) {
@@ -4729,7 +4729,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 			}
 
 			type_t *skipped_type = skip_typeref(type);
-			/* §6.7.5.2(1) */
+			/* §6.7.5.2:1 */
 			if (is_type_incomplete(skipped_type)) {
 				errorf(HERE, "array of incomplete type '%T' is not allowed", type);
 			} else if (is_type_function(skipped_type)) {
@@ -5308,7 +5308,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	current_init_decl = NULL;
 
 	if (entity->kind == ENTITY_VARIABLE) {
-		/* § 6.7.5 (22)  array initializers for arrays with unknown size
+		/* § 6.7.5:22  array initializers for arrays with unknown size
 		 * determine the array type size */
 		declaration->type            = env.type;
 		entity->variable.initializer = initializer;
@@ -8554,7 +8554,7 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 
 static bool is_lvalue(const expression_t *expression)
 {
-	/* TODO: doesn't seem to be consistent with §6.3.2.1 (1) */
+	/* TODO: doesn't seem to be consistent with §6.3.2.1:1 */
 	switch (expression->kind) {
 	case EXPR_ARRAY_ACCESS:
 	case EXPR_COMPOUND_LITERAL:
