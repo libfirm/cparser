@@ -1379,15 +1379,13 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 		return addr;
 	}
 
+	cons_flags     flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
+	                          ? cons_volatile : 0;
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
-	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode);
+	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
 	ir_node *const load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
-
-	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE && !is_Bad(load)) {
-		set_Load_volatility(load, volatility_is_volatile);
-	}
 
 	set_store(load_mem);
 
@@ -1818,10 +1816,10 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_node *memory = get_store();
 
 	if (is_type_scalar(type)) {
-		ir_node  *store     = new_d_Store(dbgi, memory, addr, value);
+		cons_flags flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
+		                      ? cons_volatile : 0;
+		ir_node  *store     = new_d_Store(dbgi, memory, addr, value, flags);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
-		if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE && !is_Bad(store))
-			set_Store_volatility(store, volatility_is_volatile);
 		set_store(store_mem);
 	} else {
 		ir_type *irtype    = get_ir_type(type);
@@ -1876,7 +1874,8 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 
 	/* load current value */
 	ir_node  *mem             = get_store();
-	ir_node  *load            = new_d_Load(dbgi, mem, addr, mode);
+	ir_node  *load            = new_d_Load(dbgi, mem, addr, mode,
+	                                set_volatile ? cons_volatile : 0);
 	ir_node  *load_mem        = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res        = new_d_Proj(dbgi, load, mode, pn_Load_res);
 	tarval   *shift_mask      = create_bitfield_mask(mode, bitoffset, bitsize);
@@ -1886,16 +1885,10 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 
 	/* construct new value and store */
 	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, value_maskshift, mode);
-	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val);
+	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val,
+	                                 set_volatile ? cons_volatile : 0);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
-
-	if (set_volatile) {
-		if (!is_Bad(load))
-			set_Load_volatility(load, volatility_is_volatile);
-		if (!is_Bad(store))
-			set_Store_volatility(store, volatility_is_volatile);
-	}
 
 	return value_masked;
 }
@@ -1907,7 +1900,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	type_t   *type     = expression->base.type;
 	ir_mode  *mode     = get_ir_mode_storage(type);
 	ir_node  *mem      = get_store();
-	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode);
+	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode, 0);
 	ir_node  *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
 
@@ -3875,7 +3868,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 
 		/* TODO: bitfields */
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, 0);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 	} else {
@@ -3933,7 +3926,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 
 		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, 0);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
@@ -3953,7 +3946,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 
 		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, 0);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
