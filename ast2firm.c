@@ -336,13 +336,9 @@ static type_t *get_aligned_type(type_t *type, int alignment)
 
 	type = skip_typeref(type);
 	if (alignment > type->base.alignment) {
-		type_t *copy = duplicate_type(type);
+		type_t *copy         = duplicate_type(type);
 		copy->base.alignment = alignment;
-
-		type = typehash_insert(copy);
-		if (type != copy) {
-			obstack_free(type_obst, copy);
-		}
+		type                 = identify_new_type(copy);
 	}
 	return type;
 }
@@ -1090,12 +1086,8 @@ static ir_entity *get_function_entity(entity_t *entity)
 		if (type->function.linkage != LINKAGE_C) {
 			type_t *new_type           = duplicate_type(type);
 			new_type->function.linkage = LINKAGE_C;
-
-			type = typehash_insert(new_type);
-			if (type != new_type) {
-				obstack_free(type_obst, new_type);
-			}
-			entity->declaration.type = type;
+			type                       = identify_new_type(new_type);
+			entity->declaration.type   = type;
 		}
 	}
 
