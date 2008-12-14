@@ -749,7 +749,7 @@ static void eat_block(void)
 		next_token();
 }
 
-#define eat(token_type)  do { assert(token.type == (token_type)); next_token(); } while (0)
+#define eat(token_type) (assert(token.type == (token_type)), next_token())
 
 /**
  * Report a parse error because an expected token was not found.
