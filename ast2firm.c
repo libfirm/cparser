@@ -265,7 +265,7 @@ static unsigned get_type_size_const(type_t *type)
 	case TYPE_IMAGINARY:
 		return get_atomic_type_size(type->imaginary.akind);
 	case TYPE_ENUM:
-		return get_mode_size_bytes(mode_int);
+		return get_atomic_type_size(type->enumt.akind);
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
 		return get_compound_type_size(&type->compound);
@@ -350,14 +350,13 @@ static type_t *get_aligned_type(type_t *type, int alignment)
 /**
  * Creates a Firm type for an atomic type
  */
-static ir_type *create_atomic_type(const atomic_type_t *type)
+static ir_type *create_atomic_type(atomic_type_kind_t akind, int alignment)
 {
-	atomic_type_kind_t  kind   = type->akind;
-	ir_mode            *mode   = atomic_modes[kind];
+	ir_mode            *mode   = atomic_modes[akind];
 	ident              *id     = get_mode_ident(mode);
 	ir_type            *irtype = new_type_primitive(id, mode);
 
-	set_type_alignment_bytes(irtype, type->base.alignment);
+	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
 }
@@ -826,7 +825,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 	constant_folding = constant_folding_old;
 
-	return ir_type_int;
+	return create_atomic_type(type->akind, type->base.alignment);
 }
 
 static ir_type *get_ir_type_incomplete(type_t *type)
@@ -866,10 +865,11 @@ ir_type *get_ir_type(type_t *type)
 	switch (type->kind) {
 	case TYPE_ERROR:
 		/* Happens while constant folding, when there was an error */
-		return create_atomic_type(&type_void->atomic);
+		return create_atomic_type(ATOMIC_TYPE_VOID, 0);
 
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(&type->atomic);
+		firm_type = create_atomic_type(type->atomic.akind,
+		                               type->base.alignment);
 		break;
 	case TYPE_COMPLEX:
 		firm_type = create_complex_type(&type->complex);

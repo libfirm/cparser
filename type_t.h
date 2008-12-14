@@ -162,11 +162,12 @@ struct compound_type_t {
 };
 
 struct enum_type_t {
-	type_base_t     base;
+	type_base_t         base;
+	atomic_type_kind_t  akind; /**< underlying atomic type */
 	/** the enum entity. You can find the enum entries by walking the
 	 *  enum->base.next list until you don't find ENTITY_ENUM_VALUE entities
 	 *  anymore */
-	enum_t         *enume;
+	enum_t             *enume;
 };
 
 struct typedef_type_t {

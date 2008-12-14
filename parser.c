@@ -65,7 +65,7 @@ struct gnu_attribute_t {
 	union {
 		size_t              value;
 		string_t            string;
-		atomic_type_kind_t  akind;
+		symbol_t           *symbol;
 		long                argument;  /**< Single argument. */
 		argument_list_t    *arguments; /**< List of argument expressions. */
 	} u;
@@ -969,13 +969,8 @@ static int get_akind_rank(atomic_type_kind_t akind)
 static int get_rank(const type_t *type)
 {
 	assert(!is_typeref(type));
-	/* The C-standard allows promoting enums to int or unsigned int (see § 7.2.2
-	 * and esp. footnote 108). However we can't fold constants (yet), so we
-	 * can't decide whether unsigned int is possible, while int always works.
-	 * (unsigned int would be preferable when possible... for stuff like
-	 *  struct { enum { ... } bla : 4; } ) */
 	if (type->kind == TYPE_ENUM)
-		return get_akind_rank(ATOMIC_TYPE_INT);
+		return get_akind_rank(type->enumt.akind);
 
 	assert(type->kind == TYPE_ATOMIC);
 	return get_akind_rank(type->atomic.akind);
@@ -1465,35 +1460,13 @@ static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
  */
 static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
 {
-	/* TODO: find out what is allowed here... */
-
-	/* at least: byte, word, pointer, list of machine modes
-	 * __XXX___ is interpreted as XXX */
 	add_anchor_token(')');
 
 	if (token.type != T_IDENTIFIER) {
 		expect(T_IDENTIFIER, end_error);
 	}
 
-	/* This isn't really correct, the backend should provide a list of machine
-	 * specific modes (according to gcc philosophy that is...) */
-	const char *symbol_str = token.v.symbol->string;
-	if (strcmp_underscore("QI",   symbol_str) == 0 ||
-	    strcmp_underscore("byte", symbol_str) == 0) {
-		attribute->u.akind = ATOMIC_TYPE_CHAR;
-	} else if (strcmp_underscore("HI", symbol_str) == 0) {
-		attribute->u.akind = ATOMIC_TYPE_SHORT;
-	} else if (strcmp_underscore("SI",      symbol_str) == 0
-	        || strcmp_underscore("word",    symbol_str) == 0
-	        || strcmp_underscore("pointer", symbol_str) == 0) {
-		attribute->u.akind = ATOMIC_TYPE_INT;
-	} else if (strcmp_underscore("DI", symbol_str) == 0) {
-		attribute->u.akind = ATOMIC_TYPE_LONGLONG;
-	} else {
-		if (warning.other)
-			warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
-		attribute->invalid = true;
-	}
+	attribute->u.symbol = token.v.symbol;
 	next_token();
 
 	rem_anchor_token(')');
@@ -3167,6 +3140,7 @@ static type_t *parse_enum_specifier(void)
 
 	type_t *const type = allocate_type_zero(TYPE_ENUM);
 	type->enumt.enume  = &entity->enume;
+	type->enumt.akind  = ATOMIC_TYPE_INT;
 
 	if (token.type == '{') {
 		if (symbol != NULL) {
@@ -3610,54 +3584,63 @@ static void finish_union_type(compound_type_t *type)
 	type->base.alignment = alignment;
 }
 
-static type_t *handle_mode_attribute(const gnu_attribute_t *attribute,
+static type_t *handle_attribute_mode(const gnu_attribute_t *attribute,
                                      type_t *orig_type)
 {
 	type_t *type = skip_typeref(orig_type);
-	if (type->kind != TYPE_ATOMIC) {
-		errorf(HERE,
-			   "__attribute__(mode)) only allowed for atomic types");
+
+	/* at least: byte, word, pointer, list of machine modes
+	 * __XXX___ is interpreted as XXX */
+
+	/* This isn't really correct, the backend should provide a list of machine
+	 * specific modes (according to gcc philosophy that is...) */
+	const char         *symbol_str = attribute->u.symbol->string;
+	bool                sign       = is_type_signed(type);
+	atomic_type_kind_t  akind;
+	if (strcmp_underscore("QI",   symbol_str) == 0 ||
+	    strcmp_underscore("byte", symbol_str) == 0) {
+		akind = sign ? ATOMIC_TYPE_CHAR : ATOMIC_TYPE_UCHAR;
+	} else if (strcmp_underscore("HI", symbol_str) == 0) {
+		akind = sign ? ATOMIC_TYPE_SHORT : ATOMIC_TYPE_USHORT;
+	} else if (strcmp_underscore("SI",      symbol_str) == 0
+	        || strcmp_underscore("word",    symbol_str) == 0
+	        || strcmp_underscore("pointer", symbol_str) == 0) {
+		akind = sign ? ATOMIC_TYPE_INT : ATOMIC_TYPE_UINT;
+	} else if (strcmp_underscore("DI", symbol_str) == 0) {
+		akind = sign ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
+	} else {
+		if (warning.other)
+			warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
 		return orig_type;
 	}
-	atomic_type_kind_t  akind = attribute->u.akind;
-	if (!is_type_signed(type)) {
-		switch (akind) {
-		case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_UCHAR; break;
-		case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_USHORT; break;
-		case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_UINT; break;
-		case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_ULONGLONG; break;
-		default:
-			errorf(HERE, "invalid akind in mode attribute");
-			return orig_type;
-		}
-	} else {
-		switch (akind) {
-		case ATOMIC_TYPE_CHAR: akind = ATOMIC_TYPE_SCHAR; break;
-		case ATOMIC_TYPE_SHORT: akind = ATOMIC_TYPE_SHORT; break;
-		case ATOMIC_TYPE_INT: akind = ATOMIC_TYPE_INT; break;
-		case ATOMIC_TYPE_LONGLONG: akind = ATOMIC_TYPE_LONGLONG; break;
-		default:
-			errorf(HERE, "invalid akind in mode attribute");
-			return orig_type;
-		}
+
+	if (type->kind == TYPE_ATOMIC) {
+		type_t *copy       = duplicate_type(type);
+		copy->atomic.akind = akind;
+		return identify_new_type(copy);
+	} else if (type->kind == TYPE_ENUM) {
+		type_t *copy      = duplicate_type(type);
+		copy->enumt.akind = akind;
+		return identify_new_type(copy);
+	} else if (is_type_pointer(type)) {
+		warningf(HERE, "__attribute__((mode)) on pointers not implemented yet (ignored)");
+		return type;
 	}
 
-	type_t *copy       = duplicate_type(type);
-	copy->atomic.akind = akind;
-	return identify_new_type(copy);
+	errorf(HERE, "__attribute__((mode)) only allowed on integer, enum or pointer type");
+	return orig_type;
 }
 
 static type_t *handle_type_attributes(const gnu_attribute_t *attributes,
                                       type_t *type)
 {
-	/* handle these strange/stupid mode attributes */
 	const gnu_attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
 		if (attribute->invalid)
 			continue;
 
 		if (attribute->kind == GNU_AK_MODE) {
-			type = handle_mode_attribute(attribute, type);
+			type = handle_attribute_mode(attribute, type);
 		} else if (attribute->kind == GNU_AK_ALIGNED) {
 			int alignment = 32; /* TODO: fill in maximum useful alignment for
 			                       target machine */
@@ -4607,14 +4590,13 @@ static void parse_declaration_attributes(entity_t *entity)
 	if (type == NULL)
 		return;
 
-	/* handle these strange/stupid mode attributes */
 	gnu_attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
 		if (attribute->invalid)
 			continue;
 
 		if (attribute->kind == GNU_AK_MODE) {
-			type = handle_mode_attribute(attribute, type);
+			type = handle_attribute_mode(attribute, type);
 		} else if (attribute->kind == GNU_AK_ALIGNED) {
 			int alignment = 32; /* TODO: fill in maximum usefull alignment for target machine */
 			if (attribute->has_arguments)
