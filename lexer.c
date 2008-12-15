@@ -162,9 +162,11 @@ static void decode_utf8(void)
 		utf32                min_code;
 
 		if (part_decoded_rest_len != 0) {
-			min_code = part_decoded_min_code;
-			decoded  = part_decoded_char;
-			switch (part_decoded_rest_len) {
+			min_code              = part_decoded_min_code;
+			decoded               = part_decoded_char;
+			size_t const rest_len = part_decoded_rest_len;
+			part_decoded_rest_len = 0;
+			switch (rest_len) {
 				case 4:  goto realign;
 				case 3:  goto three_more;
 				case 2:  goto two_more;
