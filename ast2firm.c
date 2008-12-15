@@ -2741,37 +2741,38 @@ static entity_t *get_expression_entity(const expression_t *expression)
  */
 static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
-	ir_type *irtype;
+	ir_entity *irentity = NULL;
 
 	const expression_t *tp_expression = expression->tp_expression;
-	entity_t           *entity        = get_expression_entity(tp_expression);
-	ir_entity          *irentity      = NULL;
-
-	if (entity != NULL && is_declaration(entity)) {
-		switch (entity->declaration.kind) {
-		case DECLARATION_KIND_UNKNOWN:
-			panic("unknown entity reference found");
-		case DECLARATION_KIND_COMPOUND_MEMBER:
-			irentity = entity->compound_member.entity;
-			break;
-		case DECLARATION_KIND_GLOBAL_VARIABLE:
-		case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
-			irentity = entity->variable.v.entity;
-			break;
-		case DECLARATION_KIND_PARAMETER_ENTITY:
-			irentity = entity->parameter.v.entity;
-			break;
-		case DECLARATION_KIND_FUNCTION:
-		case DECLARATION_KIND_INNER_FUNCTION:
-			irentity = entity->function.entity;
-			break;
-		case DECLARATION_KIND_PARAMETER:
-		case DECLARATION_KIND_LOCAL_VARIABLE:
-		case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
-			break;
+	if (tp_expression != NULL) {
+		entity_t *entity = get_expression_entity(tp_expression);
+		if (entity != NULL && is_declaration(entity)) {
+			switch (entity->declaration.kind) {
+			case DECLARATION_KIND_UNKNOWN:
+				panic("unknown entity reference found");
+			case DECLARATION_KIND_COMPOUND_MEMBER:
+				irentity = entity->compound_member.entity;
+				break;
+			case DECLARATION_KIND_GLOBAL_VARIABLE:
+			case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
+				irentity = entity->variable.v.entity;
+				break;
+			case DECLARATION_KIND_PARAMETER_ENTITY:
+				irentity = entity->parameter.v.entity;
+				break;
+			case DECLARATION_KIND_FUNCTION:
+			case DECLARATION_KIND_INNER_FUNCTION:
+				irentity = entity->function.entity;
+				break;
+			case DECLARATION_KIND_PARAMETER:
+			case DECLARATION_KIND_LOCAL_VARIABLE:
+			case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
+				break;
+			}
 		}
 	}
 
+	ir_type *irtype;
 	if (irentity != NULL) {
 		irtype = get_entity_type(irentity);
 	} else {
