@@ -3413,7 +3413,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
 
 	/* set branch prediction info based on __builtin_expect */
-	if (is_builtin_expect(expression)) {
+	if (is_builtin_expect(expression) && !is_Bad(cond)) {
 		call_argument_t *argument = expression->call.arguments->next;
 		if (is_constant_expression(argument->expression)) {
 			long               cnst = fold_constant(argument->expression);
