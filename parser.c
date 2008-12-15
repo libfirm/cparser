@@ -2247,6 +2247,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 						return initializer_from_string(array_type,
 							&expression->string.value);
 					}
+					break;
 
 				case EXPR_WIDE_STRING_LITERAL: {
 					type_t *bare_wchar_type = skip_typeref(type_wchar_t);
@@ -2254,6 +2255,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 						return initializer_from_wide_string(array_type,
 							&expression->wide_string.value);
 					}
+					break;
 				}
 
 				default:
