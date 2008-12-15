@@ -181,30 +181,24 @@ static void initialize_firm(void)
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
                             const char *newext)
 {
-	size_t last_dot = 0xffffffff;
-	size_t i = 0;
+	if (inputname == NULL)
+		inputname = "a";
 
-	if (inputname == NULL) {
-		snprintf(buf, buflen, "a%s", newext);
-		return;
-	}
+	char const *const last_slash = strrchr(inputname, '/');
+	char const *const filename   =
+		last_slash != NULL ? last_slash + 1 : inputname;
+	char const *const last_dot   = strrchr(filename, '.');
+	char const *const name_end   =
+		last_dot != NULL ? last_dot : strchr(filename, '\0');
 
-	for (const char *c = inputname; *c != 0; ++c) {
-		if (*c == '.')
-			last_dot = i;
-		++i;
-	}
-	if (last_dot == 0xffffffff)
-		last_dot = i;
-
-	if (last_dot >= buflen)
+	int const len = snprintf(buf, buflen, "%.*s%s",
+			(int)(name_end - filename), filename, newext);
+#ifdef _WIN32
+	if (len < 0 || buflen <= (size_t)len)
+#else
+	if (buflen <= (size_t)len)
+#endif
 		panic("filename too long");
-	memcpy(buf, inputname, last_dot);
-
-	size_t extlen = strlen(newext) + 1;
-	if (extlen + last_dot >= buflen)
-		panic("filename too long");
-	memcpy(buf+last_dot, newext, extlen);
 }
 
 #include "builtins.h"
