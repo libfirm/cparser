@@ -1371,7 +1371,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 		return addr;
 	}
 
-	cons_flags     flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
+	ir_cons_flags  flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 	                          ? cons_volatile : 0;
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
@@ -1808,7 +1808,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_node *memory = get_store();
 
 	if (is_type_scalar(type)) {
-		cons_flags flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
+		ir_cons_flags flags = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 		                      ? cons_volatile : 0;
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value, flags);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
