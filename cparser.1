@@ -139,7 +139,8 @@ Warn about mixing declarations and statements, which is not allowed prior to C99
 .It Fl Wdiv-by-zero
 Warn about compile-time integer division by zero.
 .It Fl Wempty-statement
-Warn about empty statements, i.e. statements which only consist of a single ';'.
+Warn about empty statements, i.e. statements which only consist of a single
+.Sq \&; .
 Use {} as replacement to avoid this warning.
 .It Fl Werror
 Treat warnings as errors, i.e. do not continue after parsing when a warning is encountered.
@@ -166,25 +167,38 @@ Warn about declarations whose declaration specifiers do not include a type speci
 .It Fl Winit-self
 Warn about uninitialized variables which are initialized with themselves.
 .It Fl Wlong-long
-Warn if the type 'long long' is used.
+Warn if the type
+.Sq long long
+is used.
 .It Fl Wmain
-Warn if the type of 'main' is suspicious, i.e. if it is not a non-static function declared as either int\ main(void), int\ main(int,\ char**) or, as an extension, int\ main(int,\ char**,\ char**).
+Warn if the type of
+.Sq main
+is suspicious, i.e. if it is not a non-static function declared as either int\ main(void), int\ main(int,\ char**) or, as an extension, int\ main(int,\ char**,\ char**).
 .It Fl Wmissing-declarations
 Warn if a non-static function or a global variable without a storage class is defined without a prior declaration.
 This is typically a sign of a missing #include or that the object should be static.
 .It Fl Wmissing-noreturn
-Warn about functions, which are candidates for the attribute 'noreturn'.
+Warn about functions, which are candidates for the attribute
+.Sq noreturn .
 .It Fl Wmissing-prototypes
 Warn if a global function is defined without a previous prototype declaration.
 .It Fl Wmultichar
-Warn if a multicharacter constant ('FOOF') is used.
+Warn if a multicharacter constant
+.Pf ( Sq FOOF )
+is used.
 .It Fl Wnested-externs
-Warn if an 'extern' declaration is encountered within a function.
+Warn if an
+.Sq extern
+declaration is encountered within a function.
 .It Fl Wparentheses
 Warn if parentheses are omitted in certain contexts.
 Warn if an assignment is used as condition, e.g. if\ (x\ =\ 23).
 Warn if && without parentheses is used within ||, e.g. if\ (x\ ||\ y\ &&\ z).
-Warn if it there may be confusion which 'if'-statement an 'else'-branch belongs to, e.g. if\ (x)\ if\ (y)\ {}\ else\ {}.
+Warn if it there may be confusion which
+.Sq if Ns
+-statement an
+.Sq else Ns
+-branch belongs to, e.g. if\ (x)\ if\ (y)\ {}\ else\ {}.
 Warn if cascaded comparisons appear which do not have their mathematical meaning, e.g. if\ (23\ <=\ x\ <\ 42).
 Warn if + or - is used as operand of << or >>, e.g. x\ +\ y\ <<\ z.
 .It Fl Wredundant-decls
