@@ -42,21 +42,24 @@
 
 //#define DEBUG_CHARS
 #define MAX_PUTBACK 3
+#define BUF_SIZE    1024
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 /* No strtold on windows and no replacement yet */
 #define strtold(s, e) strtod(s, e)
 #endif
 
-static int         c;
-token_t            lexer_token;
-symbol_t          *symbol_L;
-static FILE       *input;
-static char        buf[1024 + MAX_PUTBACK];
-static const char *bufend;
-static const char *bufpos;
-static strset_t    stringset;
-bool               allow_dollar_in_symbol = true;
+typedef unsigned int utf32;
+
+static utf32        c;
+token_t             lexer_token;
+symbol_t           *symbol_L;
+static FILE        *input;
+static utf32        buf[BUF_SIZE + MAX_PUTBACK];
+static const utf32 *bufend;
+static const utf32 *bufpos;
+static strset_t     stringset;
+bool                allow_dollar_in_symbol = true;
 
 /**
  * Prints a parse error message at the current token.
@@ -78,6 +81,215 @@ static NORETURN internal_error(const char *msg)
 	internal_errorf(&lexer_token.source_position, "%s", msg);
 }
 
+static size_t read_block(unsigned char *const read_buf, size_t const n)
+{
+	size_t const s = fread(read_buf, 1, n, input);
+	if (s == 0) {
+		if (ferror(input))
+			parse_error("read from input failed");
+		buf[MAX_PUTBACK] = EOF;
+		bufpos           = buf + MAX_PUTBACK;
+		bufend           = buf + MAX_PUTBACK + 1;
+	}
+	return s;
+}
+
+static void decode_iso_8859_1(void)
+{
+	unsigned char read_buf[BUF_SIZE];
+	size_t const s = read_block(read_buf, sizeof(read_buf));
+	if (s == 0)
+		return;
+
+	unsigned char const *src = read_buf;
+	unsigned char const *end = read_buf + s;
+	utf32               *dst = buf + MAX_PUTBACK;
+	while (src != end)
+		*dst++ = *src++;
+
+	bufpos = buf + MAX_PUTBACK;
+	bufend = dst;
+}
+
+static void decode_iso_8859_15(void)
+{
+	unsigned char read_buf[BUF_SIZE];
+	size_t const s = read_block(read_buf, sizeof(read_buf));
+	if (s == 0)
+		return;
+
+	unsigned char const *src = read_buf;
+	unsigned char const *end = read_buf + s;
+	utf32               *dst = buf + MAX_PUTBACK;
+	while (src != end) {
+		utf32 tc = *src++;
+		switch (tc) {
+			case 0xA4: tc = 0x20AC; break; // €
+			case 0xA6: tc = 0x0160; break; // Š
+			case 0xA8: tc = 0x0161; break; // š
+			case 0xB4: tc = 0x017D; break; // Ž
+			case 0xB8: tc = 0x017E; break; // ž
+			case 0xBC: tc = 0x0152; break; // Œ
+			case 0xBD: tc = 0x0153; break; // œ
+			case 0xBE: tc = 0x0178; break; // Ÿ
+		}
+		*dst++ = tc;
+	}
+
+	bufpos = buf + MAX_PUTBACK;
+	bufend = dst;
+}
+
+static void decode_utf8(void)
+{
+	static utf32  part_decoded_min_code;
+	static utf32  part_decoded_char;
+	static size_t part_decoded_rest_len;
+
+	do {
+		unsigned char read_buf[BUF_SIZE];
+		size_t const s = read_block(read_buf, sizeof(read_buf));
+		if (s == 0) {
+			if (part_decoded_rest_len > 0)
+				parse_error("incomplete input char at end of input");
+			return;
+		}
+
+		unsigned char const *src = read_buf;
+		unsigned char const *end = read_buf + s;
+		utf32               *dst = buf + MAX_PUTBACK;
+		utf32                decoded;
+		utf32                min_code;
+
+		if (part_decoded_rest_len != 0) {
+			min_code = part_decoded_min_code;
+			decoded  = part_decoded_char;
+			switch (part_decoded_rest_len) {
+				case 4:  goto realign;
+				case 3:  goto three_more;
+				case 2:  goto two_more;
+				default: goto one_more;
+			}
+		}
+
+		while (src != end) {
+			if ((*src & 0x80) == 0) {
+				decoded = *src++;
+			} else if ((*src & 0xE0) == 0xC0) {
+				min_code = 0x80;
+				decoded  = *src++ & 0x1F;
+one_more:
+				if (src == end) {
+					part_decoded_min_code = min_code;
+					part_decoded_char     = decoded;
+					part_decoded_rest_len = 1;
+					break;
+				}
+				if ((*src & 0xC0) == 0x80) {
+					decoded = (decoded << 6) | (*src++ & 0x3F);
+				} else {
+					goto invalid_char;
+				}
+				if (decoded < min_code                      ||
+						decoded > 0x10FFFF                      ||
+						(0xD800 <= decoded && decoded < 0xE000) || // high/low surrogates
+						(0xFDD0 <= decoded && decoded < 0xFDF0) || // noncharacters
+						(decoded & 0xFFFE) == 0xFFFE) {            // noncharacters
+					parse_error("invalid byte sequence in input");
+				}
+			} else if ((*src & 0xF0) == 0xE0) {
+				min_code = 0x800;
+				decoded  = *src++ & 0x0F;
+two_more:
+				if (src == end) {
+					part_decoded_min_code = min_code;
+					part_decoded_char     = decoded;
+					part_decoded_rest_len = 2;
+					break;
+				}
+				if ((*src & 0xC0) == 0x80) {
+					decoded = (decoded << 6) | (*src++ & 0x3F);
+				} else {
+					goto invalid_char;
+				}
+				goto one_more;
+			} else if ((*src & 0xF8) == 0xF0) {
+				min_code = 0x10000;
+				decoded  = *src++ & 0x07;
+three_more:
+				if (src == end) {
+					part_decoded_min_code = min_code;
+					part_decoded_char     = decoded;
+					part_decoded_rest_len = 3;
+					break;
+				}
+				if ((*src & 0xC0) == 0x80) {
+					decoded = (decoded << 6) | (*src++ & 0x3F);
+				} else {
+					goto invalid_char;
+				}
+				goto two_more;
+			} else {
+invalid_char:
+				parse_error("invalid byte sequence in input");
+realign:
+				do {
+					++src;
+					if (src == end) {
+						part_decoded_rest_len = 4;
+						break;
+					}
+				} while ((*src & 0xC0) == 0x80 || (*src & 0xF8) == 0xF8);
+				continue;
+			}
+			*dst++ = decoded;
+		}
+
+		bufpos = buf + MAX_PUTBACK;
+		bufend = dst;
+	} while (bufpos == bufend);
+}
+
+typedef void (*decoder_t)(void);
+
+static decoder_t decoder = decode_utf8;
+
+typedef struct named_decoder_t {
+	char const *name;
+	decoder_t   decoder;
+} named_decoder_t;
+
+static named_decoder_t const decoders[] = {
+	{ "CP819",           decode_iso_8859_1  }, // offical alias
+	{ "IBM819",          decode_iso_8859_1  }, // offical alias
+	{ "ISO-8859-1",      decode_iso_8859_1  }, // offical alias
+	{ "ISO-8859-15",     decode_iso_8859_15 }, // offical name
+	{ "ISO8859-1",       decode_iso_8859_1  },
+	{ "ISO8859-15",      decode_iso_8859_15 },
+	{ "ISO_8859-1",      decode_iso_8859_1  }, // offical alias
+	{ "ISO_8859-15",     decode_iso_8859_15 }, // offical alias
+	{ "ISO_8859-1:1987", decode_iso_8859_1  }, // offical name
+	{ "Latin-9",         decode_iso_8859_15 }, // offical alias
+	{ "UTF-8",           decode_utf8        }, // offical name
+	{ "csISOLatin1",     decode_iso_8859_1  }, // offical alias
+	{ "iso-ir-100",      decode_iso_8859_1  }, // offical alias
+	{ "l1",              decode_iso_8859_1  }, // offical alias
+	{ "latin1",          decode_iso_8859_1  }, // offical alias
+
+	{ NULL,              NULL               }
+};
+
+void select_input_encoding(char const* const encoding)
+{
+	for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
+		if (strcasecmp(encoding, i->name) != 0)
+			continue;
+		decoder = i->decoder;
+		return;
+	}
+	fprintf(stderr, "error: input encoding \"%s\" not supported\n", encoding);
+}
+
 static inline void next_real_char(void)
 {
 	assert(bufpos <= bufend);
@@ -86,17 +298,9 @@ static inline void next_real_char(void)
 			c = EOF;
 			return;
 		}
-
-		size_t s = fread(buf + MAX_PUTBACK, 1, sizeof(buf) - MAX_PUTBACK,
-		                 input);
-		if(s == 0) {
-			c = EOF;
-			return;
-		}
-		bufpos = buf + MAX_PUTBACK;
-		bufend = buf + MAX_PUTBACK + s;
+		decoder();
 	}
-	c = (unsigned char)*bufpos++;
+	c = *bufpos++;
 }
 
 /**
@@ -104,13 +308,13 @@ static inline void next_real_char(void)
  *
  * @param pc  the character to put back
  */
-static inline void put_back(int pc)
+static inline void put_back(utf32 const pc)
 {
 	assert(bufpos > buf);
-	*(--bufpos - buf + buf) = (char) pc;
+	*(--bufpos - buf + buf) = pc;
 
 #ifdef DEBUG_CHARS
-	printf("putback '%c'\n", pc);
+	printf("putback '%lc'\n", pc);
 #endif
 }
 
@@ -588,7 +792,7 @@ static void parse_number_hex(void)
  *
  * @param char  the character to check
  */
-static inline bool is_octal_digit(int chr)
+static inline bool is_octal_digit(utf32 chr)
 {
 	switch(chr) {
 	case '0':
@@ -738,7 +942,8 @@ static void parse_number(void)
  * Returns the value of a digit.
  * The only portable way to do it ...
  */
-static int digit_value(int digit) {
+static int digit_value(utf32 const digit)
+{
 	switch (digit) {
 	case '0': return 0;
 	case '1': return 1;
@@ -772,50 +977,40 @@ static int digit_value(int digit) {
  *
  * @param first_digit  the already read first digit
  */
-static int parse_octal_sequence(const int first_digit)
+static utf32 parse_octal_sequence(utf32 const first_digit)
 {
 	assert(is_octal_digit(first_digit));
-	int value = digit_value(first_digit);
+	utf32 value = digit_value(first_digit);
 	if (!is_octal_digit(c)) return value;
 	value = 8 * value + digit_value(c);
 	next_char();
 	if (!is_octal_digit(c)) return value;
 	value = 8 * value + digit_value(c);
 	next_char();
-
-	if(char_is_signed) {
-		return (signed char) value;
-	} else {
-		return (unsigned char) value;
-	}
+	return value;
 }
 
 /**
  * Parses a hex character sequence.
  */
-static int parse_hex_sequence(void)
+static utf32 parse_hex_sequence(void)
 {
-	int value = 0;
+	utf32 value = 0;
 	while(isxdigit(c)) {
 		value = 16 * value + digit_value(c);
 		next_char();
 	}
-
-	if(char_is_signed) {
-		return (signed char) value;
-	} else {
-		return (unsigned char) value;
-	}
+	return value;
 }
 
 /**
  * Parse an escape sequence.
  */
-static int parse_escape_sequence(void)
+static utf32 parse_escape_sequence(void)
 {
 	eat('\\');
 
-	int ec = c;
+	utf32 const ec = c;
 	next_char();
 
 	switch (ec) {
@@ -950,6 +1145,26 @@ wide_string_t concat_wide_string_string(const wide_string_t *const s1, const str
 	return (wide_string_t){ concat, len1 + len2 + 1 };
 }
 
+static void grow_symbol(utf32 const tc)
+{
+	struct obstack *const o  = &symbol_obstack;
+	if (tc < 0x80U) {
+		obstack_1grow(o, tc);
+	} else if (tc < 0x800) {
+		obstack_1grow(o, 0xC0 | (tc >> 6));
+		obstack_1grow(o, 0x80 | (tc & 0x3F));
+	} else if (tc < 0x10000) {
+		obstack_1grow(o, 0xE0 | ( tc >> 12));
+		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
+	} else {
+		obstack_1grow(o, 0xF0 | ( tc >> 18));
+		obstack_1grow(o, 0x80 | ((tc >> 12) & 0x3F));
+		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
+	}
+}
+
 /**
  * Parse a string literal and set lexer_token.
  */
@@ -959,13 +1174,17 @@ static void parse_string_literal(void)
 
 	eat('"');
 
-	int tc;
 	while(1) {
 		switch(c) {
-		case '\\':
-			tc = parse_escape_sequence();
-			obstack_1grow(&symbol_obstack, (char) tc);
+		case '\\': {
+			utf32 const tc = parse_escape_sequence();
+			if (tc >= 0x100) {
+				warningf(&lexer_token.source_position,
+						"escape sequence out of range");
+			}
+			obstack_1grow(&symbol_obstack, tc);
 			break;
+		}
 
 		case EOF: {
 			source_position_t source_position;
@@ -981,7 +1200,7 @@ static void parse_string_literal(void)
 			goto end_of_string;
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) c);
+			grow_symbol(c);
 			next_char();
 			break;
 		}
@@ -1144,8 +1363,12 @@ static void parse_character_constant(void)
 	while(1) {
 		switch(c) {
 		case '\\': {
-			int tc = parse_escape_sequence();
-			obstack_1grow(&symbol_obstack, (char) tc);
+			utf32 const tc = parse_escape_sequence();
+			if (tc >= 0x100) {
+				warningf(&lexer_token.source_position,
+						"escape sequence out of range");
+			}
+			obstack_1grow(&symbol_obstack, tc);
 			break;
 		}
 
@@ -1168,7 +1391,7 @@ static void parse_character_constant(void)
 		}
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) c);
+			grow_symbol(c);
 			next_char();
 			break;
 
@@ -1720,8 +1943,14 @@ void lexer_open_buffer(const char *buffer, size_t len, const char *input_name)
 	lexer_token.source_position.linenr     = 0;
 	lexer_token.source_position.input_name = input_name;
 
+#if 0 // TODO
 	bufpos = buffer;
 	bufend = buffer + len;
+#else
+	(void)buffer;
+	(void)len;
+	panic("builtin lexing not done yet");
+#endif
 
 	/* place a virtual \n at the beginning so the lexer knows that we're
 	 * at the beginning of a line */

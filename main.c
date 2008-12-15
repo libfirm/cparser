@@ -831,6 +831,9 @@ int main(int argc, char **argv)
 				    strstart(orig_opt, "align-jumps=") ||
 				    strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+				} else if (strstart(orig_opt, "input-charset=")) {
+					char const* const encoding = strchr(orig_opt, '=') + 1;
+					select_input_encoding(encoding);
 				} else if (streq(orig_opt, "verbose-asm")) {
 					/* ignore: we always print verbose assembler */
 				} else {

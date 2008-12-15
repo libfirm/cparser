@@ -241,10 +241,11 @@ static void print_quoted_string(const string_t *const string, char border, int s
 	fputc(border, out);
 	const char *end = string->begin + string->size - skip;
 	for (const char *c = string->begin; c != end; ++c) {
-		if (*c == border) {
+		unsigned char const tc = *c;
+		if (tc == border) {
 			fputc('\\', out);
 		}
-		switch (*c) {
+		switch (tc) {
 		case '\\':  fputs("\\\\", out); break;
 		case '\a':  fputs("\\a", out); break;
 		case '\b':  fputs("\\b", out); break;
@@ -260,11 +261,11 @@ static void print_quoted_string(const string_t *const string, char border, int s
 			}
 			/* FALLTHROUGH */
 		default:
-			if (!isprint(*c)) {
-				fprintf(out, "\\%03o", (unsigned)(unsigned char)*c);
-				break;
+			if (tc < 0x80 && !isprint(tc)) {
+				fprintf(out, "\\%03o", (unsigned)tc);
+			} else {
+				fputc(tc, out);
 			}
-			fputc(*c, out);
 			break;
 		}
 	}

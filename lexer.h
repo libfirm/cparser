@@ -34,6 +34,8 @@ void lexer_next_preprocessing_token(void);
 void init_lexer(void);
 void exit_lexer(void);
 
+void select_input_encoding(char const* encoding);
+
 void lexer_open_stream(FILE *stream, const char *input_name);
 void lexer_open_buffer(const char *buffer, size_t len, const char *input_name);
 
