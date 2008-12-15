@@ -459,7 +459,9 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 			if (buf[0] == 0)
 				continue;
 
-			symbol_t *symbol = symbol_table_insert(buf);
+			char   *str = malloc(len);
+			memcpy(str, buf, len);
+			symbol_t *symbol = symbol_table_insert(str);
 			pset_new_insert(&avoid_symbols, symbol);
 		}
 		fclose(avoid);
