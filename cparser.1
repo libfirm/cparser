@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd December 15, 2008
+.Dd December 16, 2008
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -255,6 +255,16 @@ and
 .Cm UTF-8
 (default).
 Case is ignored.
+.It Fl fsigned-char
+Define
+.Sq char
+to have the same range, representation and behaviour as
+.Sq signed char .
+.It Fl funsigned-char
+Define
+.Sq char
+to have the same range, representation and behaviour as
+.Sq unsigned char .
 .It Fl b Ar option
 Set a backend option.
 Use

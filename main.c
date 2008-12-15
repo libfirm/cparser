@@ -845,12 +845,16 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "short-wchar")) {
 						wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
 							: ATOMIC_TYPE_INT;
+					} else if (streq(opt, "signed-char")) {
+						char_is_signed = truth_value;
 					} else if (streq(opt, "syntax-only")) {
 						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "omit-frame-pointer")) {
 						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "strength-reduce")) {
 						firm_option(truth_value ? "strength-red" : "no-strength-red");
+					} else if (streq(opt, "unsigned-char")) {
+						char_is_signed = !truth_value;
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
 					           streq(opt, "unroll-loops")            ||
@@ -1017,10 +1021,6 @@ int main(int argc, char **argv)
 				} else if (streq(option, "no-ms")) {
 					features_on  &= ~_MS;
 					features_off |=  _MS;
-				} else if (streq(option, "signed-chars")) {
-					char_is_signed = true;
-				} else if (streq(option, "unsigned-chars")) {
-					char_is_signed = false;
 				} else if (streq(option, "strict")) {
 					strict_mode = true;
 				} else if (streq(option, "lextest")) {
