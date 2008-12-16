@@ -838,21 +838,21 @@ int main(int argc, char **argv)
 						opt += 3;
 					}
 
-					if (streq(opt, "dollars-in-identifiers")) {
-						allow_dollar_in_symbol = truth_value;
-					} if (streq(opt, "builtins")) {
+					if (streq(opt, "builtins")) {
 						use_builtins = truth_value;
+					} else if (streq(opt, "dollars-in-identifiers")) {
+						allow_dollar_in_symbol = truth_value;
+					} else if (streq(opt, "omit-frame-pointer")) {
+						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "short-wchar")) {
 						wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
 							: ATOMIC_TYPE_INT;
 					} else if (streq(opt, "signed-char")) {
 						char_is_signed = truth_value;
-					} else if (streq(opt, "syntax-only")) {
-						mode = truth_value ? ParseOnly : CompileAssembleLink;
-					} else if (streq(opt, "omit-frame-pointer")) {
-						set_be_option(truth_value ? "omitfp" : "omitfp=no");
 					} else if (streq(opt, "strength-reduce")) {
 						firm_option(truth_value ? "strength-red" : "no-strength-red");
+					} else if (streq(opt, "syntax-only")) {
+						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "unsigned-char")) {
 						char_is_signed = !truth_value;
 					} else if (streq(opt, "fast-math")               ||
