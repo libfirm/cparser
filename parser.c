@@ -6093,7 +6093,7 @@ found_break_parent:
 		if (next == NULL) {
 			noreturn_candidate = false;
 
-			type_t *const type = current_function->base.type;
+			type_t *const type = skip_typeref(current_function->base.type);
 			assert(is_type_function(type));
 			type_t *const ret  = skip_typeref(type->function.return_type);
 			if (warning.return_type                    &&
