@@ -4089,7 +4089,11 @@ warn_about_long_long:
 	type->base.qualifiers = qualifiers;
 	type->base.modifiers  = modifiers;
 
-	type = identify_new_type(type);
+	if (newtype) {
+		type = identify_new_type(type);
+	} else {
+		type = typehash_insert(type);
+	}
 
 	type = handle_type_attributes(specifiers->gnu_attributes, type);
 	specifiers->type = type;
