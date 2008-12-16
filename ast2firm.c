@@ -1216,11 +1216,13 @@ static ir_node *character_constant_to_firm(const const_expression_t *cnst)
 	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
 	ir_mode  *mode = get_ir_mode_arithmetic(cnst->base.type);
 
-	long long int v = 0;
-	for (size_t i = 0; i < cnst->v.character.size; ++i) {
-		if (char_is_signed) {
-			v = (v << 8) | ((signed char)cnst->v.character.begin[i]);
-		} else {
+	long long int v;
+	size_t const  size = cnst->v.character.size;
+	if (size == 1 && char_is_signed) {
+		v = (signed char)cnst->v.character.begin[0];
+	} else {
+		v = 0;
+		for (size_t i = 0; i < size; ++i) {
 			v = (v << 8) | ((unsigned char)cnst->v.character.begin[i]);
 		}
 	}
