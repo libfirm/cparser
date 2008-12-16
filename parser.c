@@ -42,7 +42,7 @@
 #include "adt/array.h"
 
 //#define PRINT_TOKENS
-#define MAX_LOOKAHEAD 2
+#define MAX_LOOKAHEAD 1
 
 typedef struct {
 	entity_t           *old_entity;
