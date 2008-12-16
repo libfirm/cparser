@@ -113,7 +113,7 @@ static token_t              token;
 /** The lookahead ring-buffer. */
 static token_t              lookahead_buffer[MAX_LOOKAHEAD];
 /** Position of the next token in the lookahead buffer. */
-static int                  lookahead_bufpos;
+static size_t               lookahead_bufpos;
 static stack_entry_t       *environment_stack = NULL;
 static stack_entry_t       *label_stack       = NULL;
 static scope_t             *file_scope        = NULL;
@@ -604,7 +604,7 @@ static inline void next_token(void)
 	lookahead_buffer[lookahead_bufpos] = lexer_token;
 	lexer_next_token();
 
-	lookahead_bufpos = (lookahead_bufpos+1) % MAX_LOOKAHEAD;
+	lookahead_bufpos = (lookahead_bufpos + 1) % MAX_LOOKAHEAD;
 
 #ifdef PRINT_TOKENS
 	print_token(stderr, &token);
@@ -615,10 +615,10 @@ static inline void next_token(void)
 /**
  * Return the next token with a given lookahead.
  */
-static inline const token_t *look_ahead(int num)
+static inline const token_t *look_ahead(size_t num)
 {
-	assert(num > 0 && num <= MAX_LOOKAHEAD);
-	int pos = (lookahead_bufpos+num-1) % MAX_LOOKAHEAD;
+	assert(0 < num && num <= MAX_LOOKAHEAD);
+	size_t pos = (lookahead_bufpos + num - 1) % MAX_LOOKAHEAD;
 	return &lookahead_buffer[pos];
 }
 
