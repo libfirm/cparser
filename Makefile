@@ -24,36 +24,36 @@ LFLAGS += $(FIRM_LIBS)
 
 SOURCES := \
 	adt/hashset.c \
-	adt/strset.c \
 	adt/obstack.c \
 	adt/obstack_printf.c \
+	adt/strset.c \
 	adt/xmalloc.c \
 	ast.c \
+	ast2firm.c \
 	diagnostic.c \
+	driver/firm_cmdline.c \
+	driver/firm_codegen.c \
+	driver/firm_opt.c \
+	driver/firm_timing.c \
+	driver/gen_firm_asm.c \
 	entity.c \
 	entitymap.c \
 	format_check.c \
 	lexer.c \
 	main.c \
 	mangle.c \
-	walk_statements.c \
+	parser.c \
+	preprocessor.c \
 	symbol_table.c \
 	token.c \
 	type.c \
-	types.c \
 	type_hash.c \
+	types.c \
+	walk_statements.c \
 	warning.c \
-	parser.c \
-	ast2firm.c \
-	wrappergen/write_fluffy.c \
 	wrappergen/write_caml.c \
-	wrappergen/write_jna.c \
-	driver/firm_cmdline.c \
-	driver/firm_timing.c \
-	driver/firm_codegen.c \
-	driver/firm_opt.c \
-	driver/gen_firm_asm.c \
-	preprocessor.c
+	wrappergen/write_fluffy.c \
+	wrappergen/write_jna.c
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
 
