@@ -6346,7 +6346,8 @@ static void parse_external_declaration(void)
 	}
 
 	assert(is_declaration(ndeclaration));
-	type_t *type = skip_typeref(ndeclaration->declaration.type);
+	type_t *const orig_type = ndeclaration->declaration.type;
+	type_t *      type      = skip_typeref(orig_type);
 
 	if (!is_type_function(type)) {
 		if (is_type_valid(type)) {
@@ -6355,6 +6356,11 @@ static void parse_external_declaration(void)
 		}
 		eat_block();
 		return;
+	} else if (is_typeref(orig_type)) {
+		/* §6.9.1:2 */
+		errorf(&ndeclaration->base.source_position,
+				"type of function definition '%#T' is a typedef",
+				orig_type, ndeclaration->base.symbol);
 	}
 
 	if (warning.aggregate_return &&
