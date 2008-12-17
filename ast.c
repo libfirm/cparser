@@ -40,6 +40,7 @@
 #endif
 
 #include "adt/error.h"
+#include "adt/util.h"
 
 struct obstack ast_obstack;
 
@@ -177,7 +178,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_BINARY_ISLESSGREATER]      = PREC_PRIMARY,
 		[EXPR_BINARY_ISUNORDERED]        = PREC_PRIMARY
 	};
-	assert((unsigned)kind < (sizeof(prec)/sizeof(prec[0])));
+	assert((size_t)kind < lengthof(prec));
 	unsigned res = prec[kind];
 
 	assert(res != PREC_BOTTOM);

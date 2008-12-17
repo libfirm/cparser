@@ -50,4 +50,6 @@
  */
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
+#define lengthof(x) (sizeof(x) / sizeof(*(x)))
+
 #endif

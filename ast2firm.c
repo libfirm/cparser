@@ -32,6 +32,7 @@
 
 #include "adt/error.h"
 #include "adt/array.h"
+#include "adt/util.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "type_t.h"
@@ -1021,7 +1022,7 @@ static const struct {
 	{ rts_strncmp,    1, "strncmp",      3, _C89 }
 };
 
-static ident *rts_idents[sizeof(rts_data) / sizeof(rts_data[0])];
+static ident *rts_idents[lengthof(rts_data)];
 
 static ident* (*create_ld_ident)(entity_t*) = create_name_linux_elf;
 
@@ -1141,7 +1142,7 @@ static ir_entity *get_function_entity(entity_t *entity)
 	   this is not needed. */
 	if (! firm_opt.freestanding) {
 		/* check for a known runtime function */
-		for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
+		for (size_t i = 0; i < lengthof(rts_data); ++i) {
 			if (id != rts_idents[i])
 				continue;
 
@@ -5643,7 +5644,7 @@ void init_ast2firm(void)
 	}
 
 	/* create idents for all known runtime functions */
-	for (size_t i = 0; i < sizeof(rts_data) / sizeof(rts_data[0]); ++i) {
+	for (size_t i = 0; i < lengthof(rts_data); ++i) {
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
 

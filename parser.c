@@ -351,7 +351,7 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_LOCAL_LABEL]     = sizeof(label_t),
 		[ENTITY_NAMESPACE]       = sizeof(namespace_t)
 	};
-	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -396,7 +396,7 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t),
 		[STATEMENT_LEAVE]       = sizeof(leave_statement_t)
 	};
-	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -443,7 +443,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 	if (kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
-	assert(kind < sizeof(sizes) / sizeof(sizes[0]));
+	assert(kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -526,7 +526,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
 	};
-	assert(sizeof(sizes) / sizeof(sizes[0]) == (int) TYPE_TYPEOF + 1);
+	assert(lengthof(sizes) == (int)TYPE_TYPEOF + 1);
 	assert(kind <= TYPE_TYPEOF);
 	assert(sizes[kind] != 0);
 	return sizes[kind];
@@ -562,7 +562,7 @@ static size_t get_initializer_size(initializer_kind_t kind)
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
 		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
-	assert(kind < sizeof(sizes) / sizeof(*sizes));
+	assert(kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }

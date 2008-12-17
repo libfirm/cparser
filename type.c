@@ -27,6 +27,7 @@
 #include "symbol_t.h"
 #include "type_hash.h"
 #include "adt/error.h"
+#include "adt/util.h"
 #include "lang_features.h"
 
 static struct obstack   _type_obst;
@@ -1368,7 +1369,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
 			ATOMIC_TYPE_LONG,
 			ATOMIC_TYPE_LONGLONG
 		};
-		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+		for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
 			if (get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;
@@ -1395,7 +1396,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
 			ATOMIC_TYPE_ULONG,
 			ATOMIC_TYPE_ULONGLONG
 		};
-		for(unsigned i = 0; i < sizeof(possible_kinds)/sizeof(possible_kinds[0]); ++i) {
+		for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
 			if (get_atomic_type_size(possible_kinds[i]) == size) {
 				kind = possible_kinds[i];
 				break;

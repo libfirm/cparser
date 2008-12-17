@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <wctype.h>
 
+#include "adt/util.h"
 #include "format_check.h"
 #include "symbol_t.h"
 #include "ast_t.h"
@@ -86,7 +87,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 		[FMT_MOD_I32]  = "I32",
 		[FMT_MOD_I64]  = "I64"
 	};
-	assert(mod < sizeof(names) / sizeof(*names));
+	assert(mod < lengthof(names));
 	return names[mod];
 }
 
@@ -985,7 +986,7 @@ void check_format(const call_expression_t *const call)
 		 * This allows to check format even in MS mode or without header included.
 		 */
 		const char *const name = entity->base.symbol->string;
-		for (size_t i = 0; i < sizeof(builtin_table) / sizeof(builtin_table[0]); ++i) {
+		for (size_t i = 0; i < lengthof(builtin_table); ++i) {
 			if (strcmp(name, builtin_table[i].name) == 0) {
 				switch (builtin_table[i].fmt_kind) {
 				case FORMAT_PRINTF:
