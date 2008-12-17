@@ -37,9 +37,12 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
-#include <strings.h>
 #include <stdbool.h>
 #include <ctype.h>
+
+#ifndef _WIN32
+#include <strings.h>
+#endif
 
 //#define DEBUG_CHARS
 #define MAX_PUTBACK 3
@@ -47,7 +50,8 @@
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 /* No strtold on windows and no replacement yet */
-#define strtold(s, e) strtod(s, e)
+#define strtold(s, e)     strtod(s, e)
+#define strcasecmp(a, b)  stricmp(a, b)
 #endif
 
 typedef unsigned int utf32;
