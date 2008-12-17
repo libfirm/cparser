@@ -5354,11 +5354,9 @@ static void check_variable_type_complete(entity_t *ent)
 	if (!is_type_incomplete(type))
 		return;
 
-	/* GCC allows global arrays without size and assigns them a length of one,
-	 * if no different declaration follows */
-	if (is_type_array(type) &&
-			c_mode & _GNUC      &&
-			ent->base.parent_scope == file_scope) {
+	/* §6.9.2:2 and §6.9.2:5: At the end of the translation incomplete arrays
+	 * are given length one. */
+	if (is_type_array(type) && ent->base.parent_scope == file_scope) {
 		ARR_APP1(declaration_t*, incomplete_arrays, decl);
 		return;
 	}
@@ -11360,8 +11358,8 @@ translation_unit_t *finish_parsing(void)
 	return result;
 }
 
-/* GCC allows global arrays without size and assigns them a length of one,
- * if no different declaration follows */
+/* §6.9.2:2 and §6.9.2:5: At the end of the translation incomplete arrays
+ * are given length one. */
 static void complete_incomplete_arrays(void)
 {
 	size_t n = ARR_LEN(incomplete_arrays);
