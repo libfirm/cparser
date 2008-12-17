@@ -10582,12 +10582,11 @@ static statement_t *parse_declaration_statement(void)
 		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	}
 
-	if (before == NULL) {
-		statement->declaration.declarations_begin = current_scope->entities;
-	} else {
-		statement->declaration.declarations_begin = before->base.next;
-	}
-	statement->declaration.declarations_end = current_scope->last_entity;
+	declaration_statement_t *const decl  = &statement->declaration;
+	entity_t                *const begin =
+		before != NULL ? before->base.next : current_scope->entities;
+	decl->declarations_begin = begin;
+	decl->declarations_end   = begin != NULL ? current_scope->last_entity : NULL;
 
 	return statement;
 }
