@@ -5132,7 +5132,9 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 			 * declarations (except if the previous declaration is neither
 			 * none nor extern) */
 			if (entity->kind == ENTITY_FUNCTION) {
-				if (prev_type->function.unspecified_parameters)
+				/* the previous declaration could have unspecified parameters or
+				 * be a typedef, so use the new type */
+				if (prev_type->function.unspecified_parameters || is_definition)
 					prev_decl->type = type;
 
 				switch (old_storage_class) {
