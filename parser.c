@@ -430,6 +430,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_FUNCNAME]                = sizeof(funcname_expression_t),
 		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
+		[EXPR_BUILTIN_ADDRESS]         = sizeof(builtin_address_expression_t),
 		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
 		[EXPR_OFFSETOF]                = sizeof(offsetof_expression_t),
 		[EXPR_VA_START]                = sizeof(va_start_expression_t),
@@ -2139,6 +2140,7 @@ unary:
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_ADDRESS:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
@@ -5126,7 +5128,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 				         prev_decl->type, symbol);
 			}
 
-			storage_class_tag_t new_storage_class = decl->storage_class;
+			storage_class_t new_storage_class = decl->storage_class;
 
 			/* pretend no storage class means extern for function
 			 * declarations (except if the previous declaration is neither
@@ -5746,6 +5748,7 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_ADDRESS:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
@@ -6939,6 +6942,9 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 		return make_function_1_type(type_void, type_valist);
 	case T___builtin_expect:
 		return make_function_2_type(type_long, type_long, type_long);
+	case T___builtin_return_address:
+	case T___builtin_frame_address:
+		return make_function_1_type(type_void_ptr, type_unsigned_int);
 	default:
 		internal_errorf(HERE, "not implemented builtin identifier found");
 	}
@@ -7570,6 +7576,32 @@ end_error:
 }
 
 /**
+ * Parses a __buildin_return_address of a __builtin_frame_address() expression.
+ *
+ * @param tok_type  either T___buildin_return_address or T___builtin_frame_address
+ */
+static expression_t *parse_builtin_address(int tok_type)
+{
+	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_ADDRESS);
+
+	expression->builtin_address.kind = tok_type == T___builtin_return_address ?
+		builtin_return_address : builtin_frame_address;
+
+	eat(tok_type);
+
+	expect('(', end_error);
+	add_anchor_token(')');
+	expression->builtin_address.value = parse_constant_expression();
+	rem_anchor_token(')');
+	expect(')', end_error);
+	expression->base.type = type_void_ptr;
+
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+/**
  * Parses a __builtin_is_*() compare expression.
  */
 static expression_t *parse_compare_builtin(void)
@@ -7816,6 +7848,8 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_isunordered:    return parse_compare_builtin();
 		case T___builtin_constant_p:     return parse_builtin_constant();
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
+		case T___builtin_return_address: return parse_builtin_address(T___builtin_return_address);
+		case T___builtin_frame_address:  return parse_builtin_address(T___builtin_frame_address);
 		case T__assume:                  return parse_assume();
 		case T_ANDAND:
 			if (GNU_MODE)

@@ -1375,7 +1375,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	}
 
 	ir_cons_flags  flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
-	                          ? cons_volatile : 0;
+	                          ? cons_volatile : cons_none;
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
 	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
@@ -1389,7 +1389,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 }
 
 /**
- * Creates a strict Conv if neccessary.
+ * Creates a strict Conv if necessary.
  */
 static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 {
@@ -1813,7 +1813,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 
 	if (is_type_scalar(type)) {
 		ir_cons_flags flags = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
-		                      ? cons_volatile : 0;
+		                      ? cons_volatile : cons_none;
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value, flags);
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
@@ -1871,7 +1871,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	/* load current value */
 	ir_node  *mem             = get_store();
 	ir_node  *load            = new_d_Load(dbgi, mem, addr, mode,
-	                                set_volatile ? cons_volatile : 0);
+	                                set_volatile ? cons_volatile : cons_none);
 	ir_node  *load_mem        = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res        = new_d_Proj(dbgi, load, mode, pn_Load_res);
 	tarval   *shift_mask      = create_bitfield_mask(mode, bitoffset, bitsize);
@@ -1882,7 +1882,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	/* construct new value and store */
 	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, value_maskshift, mode);
 	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val,
-	                                 set_volatile ? cons_volatile : 0);
+	                                 set_volatile ? cons_volatile : cons_none);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
 
@@ -1896,7 +1896,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	type_t   *type     = expression->base.type;
 	ir_mode  *mode     = get_ir_mode_storage(type);
 	ir_node  *mem      = get_store();
-	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode, 0);
+	ir_node  *load     = new_d_Load(dbgi, mem, addr, mode, cons_none);
 	ir_node  *load_mem = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res = new_d_Proj(dbgi, load, mode, pn_Load_res);
 
@@ -3156,6 +3156,12 @@ static ir_node *builtin_constant_to_firm(
 	return new_Const_long(mode, v);
 }
 
+static ir_node *builtin_address_to_firm(
+		const builtin_address_expression_t *expression)
+{
+	panic("builtin_address_expression not implemented yet");
+}
+
 static ir_node *builtin_prefetch_to_firm(
 		const builtin_prefetch_expression_t *expression)
 {
@@ -3280,6 +3286,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return builtin_symbol_to_firm(&expression->builtin_symbol);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
+	case EXPR_BUILTIN_ADDRESS:
+		return builtin_address_to_firm(&expression->builtin_address);
 	case EXPR_BUILTIN_PREFETCH:
 		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
 	case EXPR_OFFSETOF:
@@ -3896,7 +3904,7 @@ static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
 
 		/* TODO: bitfields */
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, 0);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 	} else {
@@ -3954,7 +3962,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 
 		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, 0);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
@@ -3974,7 +3982,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 
 		assert(get_type_mode(type) == mode);
 		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, 0);
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
 		set_store(proj_m);
 		return;
