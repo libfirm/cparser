@@ -125,7 +125,8 @@ static void walk_declarations(const entity_t*            entity,
                               statement_callback   const callback,
                               void                *const env)
 {
-	for (; entity != NULL; entity = entity->base.next) {
+	entity_t const *const end = last != NULL ? last->base.next : NULL;
+	for (; entity != end; entity = entity->base.next) {
 		/* we only look at variables */
 		if (entity->kind != ENTITY_VARIABLE)
 			continue;
@@ -135,9 +136,6 @@ static void walk_declarations(const entity_t*            entity,
 		if (initializer != NULL) {
 			walk_initializer(initializer, callback, env);
 		}
-
-		if (entity == last)
-			break;
 	}
 }
 

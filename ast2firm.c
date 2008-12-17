@@ -4456,20 +4456,21 @@ static void initialize_local_declaration(entity_t *entity)
 
 static void declaration_statement_to_firm(declaration_statement_t *statement)
 {
-	entity_t *      entity = statement->declarations_begin;
-	entity_t *const last   = statement->declarations_end;
-	if (entity != NULL) {
-		for ( ;; entity = entity->base.next) {
-			if (is_declaration(entity)) {
-				initialize_local_declaration(entity);
-			} else if (entity->kind == ENTITY_TYPEDEF) {
-				type_t *const type = skip_typeref(entity->typedefe.type);
-				if (is_type_array(type) && type->array.is_vla)
-					get_vla_size(&type->array);
-			}
-			if (entity == last)
-				break;
+	entity_t *entity = statement->declarations_begin;
+	if (entity == NULL)
+		return;
+
+	entity_t *const last = statement->declarations_end;
+	for ( ;; entity = entity->base.next) {
+		if (is_declaration(entity)) {
+			initialize_local_declaration(entity);
+		} else if (entity->kind == ENTITY_TYPEDEF) {
+			type_t *const type = skip_typeref(entity->typedefe.type);
+			if (is_type_array(type) && type->array.is_vla)
+				get_vla_size(&type->array);
 		}
+		if (entity == last)
+			break;
 	}
 }
 
@@ -5272,7 +5273,8 @@ static int count_local_variables(const entity_t *entity,
                                  const entity_t *const last)
 {
 	int count = 0;
-	for (; entity != NULL; entity = entity->base.next) {
+	entity_t const *const end = last != NULL ? last->base.next : NULL;
+	for (; entity != end; entity = entity->base.next) {
 		type_t *type;
 		bool    address_taken;
 
@@ -5288,9 +5290,6 @@ static int count_local_variables(const entity_t *entity,
 
 		if (!address_taken && is_type_scalar(type))
 			++count;
-
-		if (entity == last)
-			break;
 	}
 	return count;
 }
