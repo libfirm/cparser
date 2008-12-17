@@ -4999,6 +4999,16 @@ static void error_redefined_as_different_kind(const source_position_t *pos,
 	       get_entity_kind_name(new_kind), &old->base.source_position);
 }
 
+static bool is_error_entity(entity_t *const ent)
+{
+	if (is_declaration(ent)) {
+		return is_type_valid(skip_typeref(ent->declaration.type));
+	} else if (ent->kind == ENTITY_TYPEDEF) {
+		return is_type_valid(skip_typeref(ent->typedefe.type));
+	}
+	return false;
+}
+
 /**
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
@@ -5058,8 +5068,10 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	if (previous_entity != NULL &&
 			previous_entity->base.parent_scope == current_scope) {
 		if (previous_entity->kind != entity->kind) {
-			error_redefined_as_different_kind(pos, previous_entity,
-			                                  entity->kind);
+			if (!is_error_entity(previous_entity) && !is_error_entity(entity)) {
+				error_redefined_as_different_kind(pos, previous_entity,
+						entity->kind);
+			}
 			goto finish;
 		}
 		if (previous_entity->kind == ENTITY_ENUM_VALUE) {
@@ -10713,10 +10725,13 @@ static void parse_namespace_definition(void)
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
-		if (entity != NULL && entity->kind != ENTITY_NAMESPACE
-				&& entity->base.parent_scope == current_scope) {
-			error_redefined_as_different_kind(&token.source_position,
-			                                  entity, ENTITY_NAMESPACE);
+		if (entity       != NULL             &&
+				entity->kind != ENTITY_NAMESPACE &&
+				entity->base.parent_scope == current_scope) {
+			if (!is_error_entity(entity)) {
+				error_redefined_as_different_kind(&token.source_position,
+						entity, ENTITY_NAMESPACE);
+			}
 			entity = NULL;
 		}
 	}
