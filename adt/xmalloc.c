@@ -42,11 +42,13 @@
 #include "util.h"
 
 static inline __attribute__((noreturn))
-void out_of_memory(void) {
+void out_of_memory(void)
+{
 	panic("out of memory");
 }
 
-void *xmalloc(size_t size) {
+void *xmalloc(size_t size)
+{
 	void *res = malloc(size);
 
 	if (UNLIKELY(res == NULL))
@@ -55,7 +57,8 @@ void *xmalloc(size_t size) {
 	return res;
 }
 
-void *xcalloc(size_t num, size_t size) {
+void *xcalloc(size_t num, size_t size)
+{
 	void *res = calloc(num, size);
 
 	if (UNLIKELY(res == NULL))
@@ -64,7 +67,8 @@ void *xcalloc(size_t num, size_t size) {
 	return res;
 }
 
-void *xrealloc(void *ptr, size_t size) {
+void *xrealloc(void *ptr, size_t size)
+{
 	void *res = realloc (ptr, size);
 
 	if (UNLIKELY(res == NULL))
@@ -73,7 +77,8 @@ void *xrealloc(void *ptr, size_t size) {
 	return res;
 }
 
-char *xstrdup(const char *str) {
+char *xstrdup(const char *str)
+{
   	size_t len = strlen(str) + 1;
 	char *res = xmalloc(len);
 	memcpy(res, str, len);

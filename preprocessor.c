@@ -314,7 +314,8 @@ static inline bool is_octal_digit(int chr)
  * Returns the value of a digit.
  * The only portable way to do it ...
  */
-static int digit_value(int digit) {
+static int digit_value(int digit)
+{
 	switch (digit) {
 	case '0': return 0;
 	case '1': return 1;

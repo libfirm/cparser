@@ -634,7 +634,8 @@ static void parse_floating_suffix(void)
  * A replacement for strtoull. Only those parts needed for
  * our parser are implemented.
  */
-static unsigned long long parse_int_string(const char *s, const char **endptr, int base) {
+static unsigned long long parse_int_string(const char *s, const char **endptr, int base)
+{
 	unsigned long long v = 0;
 
 	switch (base) {
@@ -1579,7 +1580,8 @@ typedef enum stdc_pragma_value_kind_t {
 /**
  * Parse a pragma directive.
  */
-static void parse_pragma(void) {
+static void parse_pragma(void)
+{
 	bool unknown_pragma = true;
 
 	next_pp_token();

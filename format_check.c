@@ -115,39 +115,46 @@ struct vchar_t {
 	int (*is_digit)(unsigned vchar);
 };
 
-static unsigned string_first(vchar_t *self) {
+static unsigned string_first(vchar_t *self)
+{
 	self->position = 0;
 	const string_t *string = self->string;
 	return string->begin[0];
 }
 
-static unsigned string_next(vchar_t *self) {
+static unsigned string_next(vchar_t *self)
+{
 	++self->position;
 	const string_t *string = self->string;
 	return string->begin[self->position];
 }
 
-static int string_isdigit(unsigned vchar) {
+static int string_isdigit(unsigned vchar)
+{
 	return isdigit(vchar);
 }
 
-static unsigned wstring_first(vchar_t *self) {
+static unsigned wstring_first(vchar_t *self)
+{
 	self->position = 0;
 	const wide_string_t *wstring = self->string;
 	return wstring->begin[0];
 }
 
-static unsigned wstring_next(vchar_t *self) {
+static unsigned wstring_next(vchar_t *self)
+{
 	++self->position;
 	const wide_string_t *wstring = self->string;
 	return wstring->begin[self->position];
 }
 
-static int wstring_isdigit(unsigned vchar) {
+static int wstring_isdigit(unsigned vchar)
+{
 	return iswdigit(vchar);
 }
 
-static bool atend(vchar_t *self) {
+static bool atend(vchar_t *self)
+{
 	return self->position + 1 == self->size;
 }
 

@@ -1446,7 +1446,8 @@ static ir_node *get_local_frame(ir_entity *const ent)
 /**
  * Keep all memory edges of the given block.
  */
-static void keep_all_memory(ir_node *block) {
+static void keep_all_memory(ir_node *block)
+{
 	ir_node *old = get_cur_block();
 
 	set_cur_block(block);
@@ -2192,7 +2193,8 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
  * @param dbi    debug info
  * @param expr   the IL assume expression
  */
-static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression) {
+static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression)
+{
 	switch(expression->kind) {
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
@@ -5184,12 +5186,14 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	}
 }
 
-static void	ms_try_statement_to_firm(ms_try_statement_t *statement) {
+static void	ms_try_statement_to_firm(ms_try_statement_t *statement)
+{
 	statement_to_firm(statement->try_statement);
 	warningf(&statement->base.source_position, "structured exception handling ignored");
 }
 
-static void	leave_statement_to_firm(leave_statement_t *statement) {
+static void	leave_statement_to_firm(leave_statement_t *statement)
+{
 	errorf(&statement->base.source_position, "__leave not supported yet");
 }
 
@@ -5437,7 +5441,8 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 /**
  * Generate possible IJmp branches to a given label block.
  */
-static void gen_ijmp_branches(ir_node *block) {
+static void gen_ijmp_branches(ir_node *block)
+{
 	ir_node *ijmp;
 	for (ijmp = ijmp_list; ijmp != NULL; ijmp = get_irn_link(ijmp)) {
 		add_immBlock_pred(block, ijmp);

@@ -512,7 +512,8 @@ static void usage(const char *argv0)
 	fprintf(stderr, "Usage %s input [-o output] [-c]\n", argv0);
 }
 
-static void print_cparser_version(void) {
+static void print_cparser_version(void)
+{
 	printf("cparser (%s) using libFirm (%u.%u",
 	       cparser_REVISION, ir_get_version_major(),
 	       ir_get_version_minor());

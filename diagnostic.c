@@ -40,7 +40,8 @@ static const source_position_t *curr_pos = NULL;
 /**
  * prints an additional source position
  */
-static void print_source_position(FILE *out, const source_position_t *pos) {
+static void print_source_position(FILE *out, const source_position_t *pos)
+{
 	fprintf(out, "at line %u", pos->linenr);
 	if (curr_pos == NULL || curr_pos->input_name != pos->input_name)
 		fprintf(out, " of \"%s\"", pos->input_name);

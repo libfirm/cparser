@@ -8872,7 +8872,8 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 /**
  * Check the semantic restrictions for a div/mod expression.
  */
-static void semantic_divmod_arithmetic(binary_expression_t *expression) {
+static void semantic_divmod_arithmetic(binary_expression_t *expression)
+{
 	semantic_binexpr_arithmetic(expression);
 	warn_div_by_zero(expression);
 }
@@ -10077,7 +10078,8 @@ end_error:
  *
  * @param statement  the switch statement to check
  */
-static void check_enum_cases(const switch_statement_t *statement) {
+static void check_enum_cases(const switch_statement_t *statement)
+{
 	const type_t *type = skip_typeref(statement->expression->base.type);
 	if (! is_type_enum(type))
 		return;

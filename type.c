@@ -1277,7 +1277,8 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
-type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type) {
+type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)
+{
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 
 	while (true) {
@@ -1356,7 +1357,8 @@ atomic_type_kind_t get_uintptr_kind(void)
 /**
  * Find the atomic type kind representing a given size (signed).
  */
-atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
+atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
+{
 	static atomic_type_kind_t kinds[32];
 
 	assert(size < 32);
@@ -1383,7 +1385,8 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size) {
 /**
  * Find the atomic type kind representing a given size (signed).
  */
-atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size) {
+atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
+{
 	static atomic_type_kind_t kinds[32];
 
 	assert(size < 32);
