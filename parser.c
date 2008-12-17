@@ -5095,7 +5095,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 		type_t *const orig_type = decl->type;
 		assert(orig_type != NULL);
 		type_t *const type      = skip_typeref(orig_type);
-		type_t *      prev_type = skip_typeref(prev_decl->type);
+		type_t *const prev_type = skip_typeref(prev_decl->type);
 
 		if (!types_compatible(type, prev_type)) {
 			errorf(pos,
@@ -5114,20 +5114,14 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 				         prev_decl->type, symbol);
 			}
 
-			unsigned new_storage_class = decl->storage_class;
-			if (is_type_incomplete(prev_type)) {
-				prev_decl->type = type;
-				prev_type       = type;
-			}
+			storage_class_tag_t new_storage_class = decl->storage_class;
 
 			/* pretend no storage class means extern for function
 			 * declarations (except if the previous declaration is neither
 			 * none nor extern) */
 			if (entity->kind == ENTITY_FUNCTION) {
-				if (prev_type->function.unspecified_parameters) {
+				if (prev_type->function.unspecified_parameters)
 					prev_decl->type = type;
-					prev_type       = type;
-				}
 
 				switch (old_storage_class) {
 				case STORAGE_CLASS_NONE:
@@ -5150,6 +5144,8 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 				default:
 					break;
 				}
+			} else if (is_type_incomplete(prev_type)) {
+				prev_decl->type = type;
 			}
 
 			if (old_storage_class == STORAGE_CLASS_EXTERN &&
