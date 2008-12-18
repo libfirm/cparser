@@ -409,33 +409,34 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[EXPR_INVALID]                 = sizeof(expression_base_t),
-		[EXPR_REFERENCE]               = sizeof(reference_expression_t),
-		[EXPR_REFERENCE_ENUM_VALUE]    = sizeof(reference_expression_t),
-		[EXPR_CONST]                   = sizeof(const_expression_t),
-		[EXPR_CHARACTER_CONSTANT]      = sizeof(const_expression_t),
-		[EXPR_WIDE_CHARACTER_CONSTANT] = sizeof(const_expression_t),
-		[EXPR_STRING_LITERAL]          = sizeof(string_literal_expression_t),
-		[EXPR_WIDE_STRING_LITERAL]     = sizeof(wide_string_literal_expression_t),
-		[EXPR_COMPOUND_LITERAL]        = sizeof(compound_literal_expression_t),
-		[EXPR_CALL]                    = sizeof(call_expression_t),
-		[EXPR_UNARY_FIRST]             = sizeof(unary_expression_t),
-		[EXPR_BINARY_FIRST]            = sizeof(binary_expression_t),
-		[EXPR_CONDITIONAL]             = sizeof(conditional_expression_t),
-		[EXPR_SELECT]                  = sizeof(select_expression_t),
-		[EXPR_ARRAY_ACCESS]            = sizeof(array_access_expression_t),
-		[EXPR_SIZEOF]                  = sizeof(typeprop_expression_t),
-		[EXPR_ALIGNOF]                 = sizeof(typeprop_expression_t),
-		[EXPR_CLASSIFY_TYPE]           = sizeof(classify_type_expression_t),
-		[EXPR_FUNCNAME]                = sizeof(funcname_expression_t),
-		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
-		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
-		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
-		[EXPR_OFFSETOF]                = sizeof(offsetof_expression_t),
-		[EXPR_VA_START]                = sizeof(va_start_expression_t),
-		[EXPR_VA_ARG]                  = sizeof(va_arg_expression_t),
-		[EXPR_STATEMENT]               = sizeof(statement_expression_t),
-		[EXPR_LABEL_ADDRESS]           = sizeof(label_address_expression_t),
+		[EXPR_INVALID]                    = sizeof(expression_base_t),
+		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
+		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
+		[EXPR_CONST]                      = sizeof(const_expression_t),
+		[EXPR_CHARACTER_CONSTANT]         = sizeof(const_expression_t),
+		[EXPR_WIDE_CHARACTER_CONSTANT]    = sizeof(const_expression_t),
+		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
+		[EXPR_WIDE_STRING_LITERAL]        = sizeof(wide_string_literal_expression_t),
+		[EXPR_COMPOUND_LITERAL]           = sizeof(compound_literal_expression_t),
+		[EXPR_CALL]                       = sizeof(call_expression_t),
+		[EXPR_UNARY_FIRST]                = sizeof(unary_expression_t),
+		[EXPR_BINARY_FIRST]               = sizeof(binary_expression_t),
+		[EXPR_CONDITIONAL]                = sizeof(conditional_expression_t),
+		[EXPR_SELECT]                     = sizeof(select_expression_t),
+		[EXPR_ARRAY_ACCESS]               = sizeof(array_access_expression_t),
+		[EXPR_SIZEOF]                     = sizeof(typeprop_expression_t),
+		[EXPR_ALIGNOF]                    = sizeof(typeprop_expression_t),
+		[EXPR_CLASSIFY_TYPE]              = sizeof(classify_type_expression_t),
+		[EXPR_FUNCNAME]                   = sizeof(funcname_expression_t),
+		[EXPR_BUILTIN_SYMBOL]             = sizeof(builtin_symbol_expression_t),
+		[EXPR_BUILTIN_CONSTANT_P]         = sizeof(builtin_constant_expression_t),
+		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = sizeof(builtin_types_compatible_expression_t),
+		[EXPR_BUILTIN_PREFETCH]           = sizeof(builtin_prefetch_expression_t),
+		[EXPR_OFFSETOF]                   = sizeof(offsetof_expression_t),
+		[EXPR_VA_START]                   = sizeof(va_start_expression_t),
+		[EXPR_VA_ARG]                     = sizeof(va_arg_expression_t),
+		[EXPR_STATEMENT]                  = sizeof(statement_expression_t),
+		[EXPR_LABEL_ADDRESS]              = sizeof(label_address_expression_t),
 	};
 	if (kind >= EXPR_UNARY_FIRST && kind <= EXPR_UNARY_LAST) {
 		return sizes[EXPR_UNARY_FIRST];
@@ -2139,6 +2140,7 @@ unary:
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
@@ -5749,6 +5751,7 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
+		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
@@ -7526,7 +7529,7 @@ static expression_t *parse_builtin_symbol(void)
 }
 
 /**
- * Parses a __builtin_constant() expression.
+ * Parses a __builtin_constant_p() expression.
  */
 static expression_t *parse_builtin_constant(void)
 {
@@ -7537,6 +7540,31 @@ static expression_t *parse_builtin_constant(void)
 	expect('(', end_error);
 	add_anchor_token(')');
 	expression->builtin_constant.value = parse_assignment_expression();
+	rem_anchor_token(')');
+	expect(')', end_error);
+	expression->base.type = type_int;
+
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+/**
+ * Parses a __builtin_types_compatible_p() expression.
+ */
+static expression_t *parse_builtin_types_compatible(void)
+{
+	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_TYPES_COMPATIBLE_P);
+
+	eat(T___builtin_types_compatible_p);
+
+	expect('(', end_error);
+	add_anchor_token(')');
+	add_anchor_token(',');
+	expression->builtin_types_compatible.left = parse_typename();
+	rem_anchor_token(',');
+	expect(',', end_error);
+	expression->builtin_types_compatible.right = parse_typename();
 	rem_anchor_token(')');
 	expect(')', end_error);
 	expression->base.type = type_int;
@@ -7787,23 +7815,23 @@ end_error:
 static expression_t *parse_primary_expression(void)
 {
 	switch (token.type) {
-		case T_false:                    return parse_bool_const(false);
-		case T_true:                     return parse_bool_const(true);
-		case T_INTEGER:                  return parse_int_const();
-		case T_CHARACTER_CONSTANT:       return parse_character_constant();
-		case T_WIDE_CHARACTER_CONSTANT:  return parse_wide_character_constant();
-		case T_FLOATINGPOINT:            return parse_float_const();
+		case T_false:                        return parse_bool_const(false);
+		case T_true:                         return parse_bool_const(true);
+		case T_INTEGER:                      return parse_int_const();
+		case T_CHARACTER_CONSTANT:           return parse_character_constant();
+		case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
+		case T_FLOATINGPOINT:                return parse_float_const();
 		case T_STRING_LITERAL:
-		case T_WIDE_STRING_LITERAL:      return parse_string_const();
-		case T_IDENTIFIER:               return parse_reference();
+		case T_WIDE_STRING_LITERAL:          return parse_string_const();
+		case T_IDENTIFIER:                   return parse_reference();
 		case T___FUNCTION__:
-		case T___func__:                 return parse_function_keyword();
-		case T___PRETTY_FUNCTION__:      return parse_pretty_function_keyword();
-		case T___FUNCSIG__:              return parse_funcsig_keyword();
-		case T___FUNCDNAME__:            return parse_funcdname_keyword();
-		case T___builtin_offsetof:       return parse_offsetof();
-		case T___builtin_va_start:       return parse_va_start();
-		case T___builtin_va_arg:         return parse_va_arg();
+		case T___func__:                     return parse_function_keyword();
+		case T___PRETTY_FUNCTION__:          return parse_pretty_function_keyword();
+		case T___FUNCSIG__:                  return parse_funcsig_keyword();
+		case T___FUNCDNAME__:                return parse_funcdname_keyword();
+		case T___builtin_offsetof:           return parse_offsetof();
+		case T___builtin_va_start:           return parse_va_start();
+		case T___builtin_va_arg:             return parse_va_arg();
 		case T___builtin_expect:
 		case T___builtin_alloca:
 		case T___builtin_inf:
@@ -7815,23 +7843,24 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_huge_val:
 		case T___builtin_va_end:
 		case T___builtin_return_address:
-		case T___builtin_frame_address:  return parse_builtin_symbol();
+		case T___builtin_frame_address:      return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
 		case T___builtin_islessequal:
 		case T___builtin_islessgreater:
-		case T___builtin_isunordered:    return parse_compare_builtin();
-		case T___builtin_constant_p:     return parse_builtin_constant();
-		case T___builtin_prefetch:       return parse_builtin_prefetch();
-		case T__assume:                  return parse_assume();
+		case T___builtin_isunordered:        return parse_compare_builtin();
+		case T___builtin_constant_p:         return parse_builtin_constant();
+		case T___builtin_prefetch:           return parse_builtin_prefetch();
+		case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
+		case T__assume:                      return parse_assume();
 		case T_ANDAND:
 			if (GNU_MODE)
 				return parse_label_address();
 			break;
 
-		case '(':                        return parse_parenthesized_expression();
-		case T___noop:                   return parse_noop_expression();
+		case '(':                            return parse_parenthesized_expression();
+		case T___noop:                       return parse_noop_expression();
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
@@ -9353,17 +9382,17 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
-		case EXPR_UNKNOWN:                   break;
-		case EXPR_INVALID:                   return true; /* do NOT warn */
-		case EXPR_REFERENCE:                 return false;
-		case EXPR_REFERENCE_ENUM_VALUE:      return false;
+		case EXPR_UNKNOWN:                    break;
+		case EXPR_INVALID:                    return true; /* do NOT warn */
+		case EXPR_REFERENCE:                  return false;
+		case EXPR_REFERENCE_ENUM_VALUE:       return false;
 		/* suppress the warning for microsoft __noop operations */
-		case EXPR_CONST:                     return expr->conste.is_ms_noop;
-		case EXPR_CHARACTER_CONSTANT:        return false;
-		case EXPR_WIDE_CHARACTER_CONSTANT:   return false;
-		case EXPR_STRING_LITERAL:            return false;
-		case EXPR_WIDE_STRING_LITERAL:       return false;
-		case EXPR_LABEL_ADDRESS:             return false;
+		case EXPR_CONST:                      return expr->conste.is_ms_noop;
+		case EXPR_CHARACTER_CONSTANT:         return false;
+		case EXPR_WIDE_CHARACTER_CONSTANT:    return false;
+		case EXPR_STRING_LITERAL:             return false;
+		case EXPR_WIDE_STRING_LITERAL:        return false;
+		case EXPR_LABEL_ADDRESS:              return false;
 
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;
@@ -9386,32 +9415,33 @@ static bool expression_has_effect(const expression_t *const expr)
 				expression_has_effect(cond->false_expression);
 		}
 
-		case EXPR_SELECT:                    return false;
-		case EXPR_ARRAY_ACCESS:              return false;
-		case EXPR_SIZEOF:                    return false;
-		case EXPR_CLASSIFY_TYPE:             return false;
-		case EXPR_ALIGNOF:                   return false;
+		case EXPR_SELECT:                     return false;
+		case EXPR_ARRAY_ACCESS:               return false;
+		case EXPR_SIZEOF:                     return false;
+		case EXPR_CLASSIFY_TYPE:              return false;
+		case EXPR_ALIGNOF:                    return false;
 
-		case EXPR_FUNCNAME:                  return false;
-		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
-		case EXPR_BUILTIN_CONSTANT_P:        return false;
-		case EXPR_BUILTIN_PREFETCH:          return true;
-		case EXPR_OFFSETOF:                  return false;
-		case EXPR_VA_START:                  return true;
-		case EXPR_VA_ARG:                    return true;
-		case EXPR_STATEMENT:                 return true; // TODO
-		case EXPR_COMPOUND_LITERAL:          return false;
+		case EXPR_FUNCNAME:                   return false;
+		case EXPR_BUILTIN_SYMBOL:             break; /* handled in EXPR_CALL */
+		case EXPR_BUILTIN_CONSTANT_P:         return false;
+		case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return false;
+		case EXPR_BUILTIN_PREFETCH:           return true;
+		case EXPR_OFFSETOF:                   return false;
+		case EXPR_VA_START:                   return true;
+		case EXPR_VA_ARG:                     return true;
+		case EXPR_STATEMENT:                  return true; // TODO
+		case EXPR_COMPOUND_LITERAL:           return false;
 
-		case EXPR_UNARY_NEGATE:              return false;
-		case EXPR_UNARY_PLUS:                return false;
-		case EXPR_UNARY_BITWISE_NEGATE:      return false;
-		case EXPR_UNARY_NOT:                 return false;
-		case EXPR_UNARY_DEREFERENCE:         return false;
-		case EXPR_UNARY_TAKE_ADDRESS:        return false;
-		case EXPR_UNARY_POSTFIX_INCREMENT:   return true;
-		case EXPR_UNARY_POSTFIX_DECREMENT:   return true;
-		case EXPR_UNARY_PREFIX_INCREMENT:    return true;
-		case EXPR_UNARY_PREFIX_DECREMENT:    return true;
+		case EXPR_UNARY_NEGATE:               return false;
+		case EXPR_UNARY_PLUS:                 return false;
+		case EXPR_UNARY_BITWISE_NEGATE:       return false;
+		case EXPR_UNARY_NOT:                  return false;
+		case EXPR_UNARY_DEREFERENCE:          return false;
+		case EXPR_UNARY_TAKE_ADDRESS:         return false;
+		case EXPR_UNARY_POSTFIX_INCREMENT:    return true;
+		case EXPR_UNARY_POSTFIX_DECREMENT:    return true;
+		case EXPR_UNARY_PREFIX_INCREMENT:     return true;
+		case EXPR_UNARY_PREFIX_DECREMENT:     return true;
 
 		/* Treat void casts as if they have an effect in order to being able to
 		 * suppress the warning */
@@ -9420,39 +9450,39 @@ static bool expression_has_effect(const expression_t *const expr)
 			return is_type_atomic(type, ATOMIC_TYPE_VOID);
 		}
 
-		case EXPR_UNARY_CAST_IMPLICIT:       return true;
-		case EXPR_UNARY_ASSUME:              return true;
-		case EXPR_UNARY_DELETE:              return true;
-		case EXPR_UNARY_DELETE_ARRAY:        return true;
-		case EXPR_UNARY_THROW:               return true;
+		case EXPR_UNARY_CAST_IMPLICIT:        return true;
+		case EXPR_UNARY_ASSUME:               return true;
+		case EXPR_UNARY_DELETE:               return true;
+		case EXPR_UNARY_DELETE_ARRAY:         return true;
+		case EXPR_UNARY_THROW:                return true;
 
-		case EXPR_BINARY_ADD:                return false;
-		case EXPR_BINARY_SUB:                return false;
-		case EXPR_BINARY_MUL:                return false;
-		case EXPR_BINARY_DIV:                return false;
-		case EXPR_BINARY_MOD:                return false;
-		case EXPR_BINARY_EQUAL:              return false;
-		case EXPR_BINARY_NOTEQUAL:           return false;
-		case EXPR_BINARY_LESS:               return false;
-		case EXPR_BINARY_LESSEQUAL:          return false;
-		case EXPR_BINARY_GREATER:            return false;
-		case EXPR_BINARY_GREATEREQUAL:       return false;
-		case EXPR_BINARY_BITWISE_AND:        return false;
-		case EXPR_BINARY_BITWISE_OR:         return false;
-		case EXPR_BINARY_BITWISE_XOR:        return false;
-		case EXPR_BINARY_SHIFTLEFT:          return false;
-		case EXPR_BINARY_SHIFTRIGHT:         return false;
-		case EXPR_BINARY_ASSIGN:             return true;
-		case EXPR_BINARY_MUL_ASSIGN:         return true;
-		case EXPR_BINARY_DIV_ASSIGN:         return true;
-		case EXPR_BINARY_MOD_ASSIGN:         return true;
-		case EXPR_BINARY_ADD_ASSIGN:         return true;
-		case EXPR_BINARY_SUB_ASSIGN:         return true;
-		case EXPR_BINARY_SHIFTLEFT_ASSIGN:   return true;
-		case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  return true;
-		case EXPR_BINARY_BITWISE_AND_ASSIGN: return true;
-		case EXPR_BINARY_BITWISE_XOR_ASSIGN: return true;
-		case EXPR_BINARY_BITWISE_OR_ASSIGN:  return true;
+		case EXPR_BINARY_ADD:                 return false;
+		case EXPR_BINARY_SUB:                 return false;
+		case EXPR_BINARY_MUL:                 return false;
+		case EXPR_BINARY_DIV:                 return false;
+		case EXPR_BINARY_MOD:                 return false;
+		case EXPR_BINARY_EQUAL:               return false;
+		case EXPR_BINARY_NOTEQUAL:            return false;
+		case EXPR_BINARY_LESS:                return false;
+		case EXPR_BINARY_LESSEQUAL:           return false;
+		case EXPR_BINARY_GREATER:             return false;
+		case EXPR_BINARY_GREATEREQUAL:        return false;
+		case EXPR_BINARY_BITWISE_AND:         return false;
+		case EXPR_BINARY_BITWISE_OR:          return false;
+		case EXPR_BINARY_BITWISE_XOR:         return false;
+		case EXPR_BINARY_SHIFTLEFT:           return false;
+		case EXPR_BINARY_SHIFTRIGHT:          return false;
+		case EXPR_BINARY_ASSIGN:              return true;
+		case EXPR_BINARY_MUL_ASSIGN:          return true;
+		case EXPR_BINARY_DIV_ASSIGN:          return true;
+		case EXPR_BINARY_MOD_ASSIGN:          return true;
+		case EXPR_BINARY_ADD_ASSIGN:          return true;
+		case EXPR_BINARY_SUB_ASSIGN:          return true;
+		case EXPR_BINARY_SHIFTLEFT_ASSIGN:    return true;
+		case EXPR_BINARY_SHIFTRIGHT_ASSIGN:   return true;
+		case EXPR_BINARY_BITWISE_AND_ASSIGN:  return true;
+		case EXPR_BINARY_BITWISE_XOR_ASSIGN:  return true;
+		case EXPR_BINARY_BITWISE_OR_ASSIGN:   return true;
 
 		/* Only examine the right hand side of && and ||, because the left hand
 		 * side already has the effect of controlling the execution of the right
@@ -9464,12 +9494,12 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BINARY_COMMA:
 			return expression_has_effect(expr->binary.right);
 
-		case EXPR_BINARY_ISGREATER:          return false;
-		case EXPR_BINARY_ISGREATEREQUAL:     return false;
-		case EXPR_BINARY_ISLESS:             return false;
-		case EXPR_BINARY_ISLESSEQUAL:        return false;
-		case EXPR_BINARY_ISLESSGREATER:      return false;
-		case EXPR_BINARY_ISUNORDERED:        return false;
+		case EXPR_BINARY_ISGREATER:           return false;
+		case EXPR_BINARY_ISGREATEREQUAL:      return false;
+		case EXPR_BINARY_ISLESS:              return false;
+		case EXPR_BINARY_ISLESSEQUAL:         return false;
+		case EXPR_BINARY_ISLESSGREATER:       return false;
+		case EXPR_BINARY_ISUNORDERED:         return false;
 	}
 
 	internal_errorf(HERE, "unexpected expression");

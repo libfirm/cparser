@@ -100,6 +100,7 @@ static void walk_expression(expression_t const *const expr,
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
 	case EXPR_LABEL_ADDRESS:
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		break;
 	}
 

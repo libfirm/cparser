@@ -3166,6 +3166,16 @@ static ir_node *builtin_constant_to_firm(
 	return new_Const_long(mode, v);
 }
 
+static ir_node *builtin_types_compatible_to_firm(
+		const builtin_types_compatible_expression_t *expression)
+{
+	type_t  *const left  = get_unqualified_type(skip_typeref(expression->left));
+	type_t  *const right = get_unqualified_type(skip_typeref(expression->right));
+	long     const value = types_compatible(left, right) ? 1 : 0;
+	ir_mode *const mode  = get_ir_mode_arithmetic(expression->base.type);
+	return new_Const_long(mode, value);
+}
+
 static ir_node *builtin_prefetch_to_firm(
 		const builtin_prefetch_expression_t *expression)
 {
@@ -3290,6 +3300,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return builtin_symbol_to_firm(&expression->builtin_symbol);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
+		return builtin_types_compatible_to_firm(&expression->builtin_types_compatible);
 	case EXPR_BUILTIN_PREFETCH:
 		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
 	case EXPR_OFFSETOF:

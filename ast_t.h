@@ -83,6 +83,7 @@ typedef enum expression_kind_t {
 	EXPR_FUNCNAME,
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
+	EXPR_BUILTIN_TYPES_COMPATIBLE_P,
 	EXPR_BUILTIN_PREFETCH,
 	EXPR_OFFSETOF,
 	EXPR_VA_START,
@@ -280,6 +281,12 @@ struct builtin_constant_expression_t {
 	expression_t      *value;
 };
 
+struct builtin_types_compatible_expression_t {
+	expression_base_t  base;
+	type_t            *left;
+	type_t            *right;
+};
+
 struct builtin_prefetch_expression_t {
 	expression_base_t  base;
 	expression_t      *adr;
@@ -380,30 +387,31 @@ struct label_address_expression_t {
 };
 
 union expression_t {
-	expression_kind_t                kind;
-	expression_base_t                base;
-	const_expression_t               conste;
-	funcname_expression_t            funcname;
-	string_literal_expression_t      string;
-	wide_string_literal_expression_t wide_string;
-	compound_literal_expression_t    compound_literal;
-	builtin_symbol_expression_t      builtin_symbol;
-	builtin_constant_expression_t    builtin_constant;
-	builtin_prefetch_expression_t    builtin_prefetch;
-	reference_expression_t           reference;
-	call_expression_t                call;
-	unary_expression_t               unary;
-	binary_expression_t              binary;
-	select_expression_t              select;
-	array_access_expression_t        array_access;
-	typeprop_expression_t            typeprop;
-	offsetof_expression_t            offsetofe;
-	va_start_expression_t            va_starte;
-	va_arg_expression_t              va_arge;
-	conditional_expression_t         conditional;
-	statement_expression_t           statement;
-	classify_type_expression_t       classify_type;
-	label_address_expression_t       label_address;
+	expression_kind_t                     kind;
+	expression_base_t                     base;
+	const_expression_t                    conste;
+	funcname_expression_t                 funcname;
+	string_literal_expression_t           string;
+	wide_string_literal_expression_t      wide_string;
+	compound_literal_expression_t         compound_literal;
+	builtin_symbol_expression_t           builtin_symbol;
+	builtin_constant_expression_t         builtin_constant;
+	builtin_types_compatible_expression_t builtin_types_compatible;
+	builtin_prefetch_expression_t         builtin_prefetch;
+	reference_expression_t                reference;
+	call_expression_t                     call;
+	unary_expression_t                    unary;
+	binary_expression_t                   binary;
+	select_expression_t                   select;
+	array_access_expression_t             array_access;
+	typeprop_expression_t                 typeprop;
+	offsetof_expression_t                 offsetofe;
+	va_start_expression_t                 va_starte;
+	va_arg_expression_t                   va_arge;
+	conditional_expression_t              conditional;
+	statement_expression_t                statement;
+	classify_type_expression_t            classify_type;
+	label_address_expression_t            label_address;
 };
 
 typedef enum initializer_kind_t {
