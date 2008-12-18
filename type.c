@@ -1235,18 +1235,11 @@ type_t *skip_typeref(type_t *type)
 			type = typedef_type->typedefe->type;
 			continue;
 		}
-		case TYPE_TYPEOF: {
+		case TYPE_TYPEOF:
 			qualifiers |= type->base.qualifiers;
 			modifiers  |= type->base.modifiers;
-
-			const typeof_type_t *typeof_type = &type->typeoft;
-			if (typeof_type->typeof_type != NULL) {
-				type = typeof_type->typeof_type;
-			} else {
-				type = typeof_type->expression->base.type;
-			}
+			type        = type->typeoft.typeof_type;
 			continue;
-		}
 		default:
 			break;
 		}
@@ -1295,15 +1288,9 @@ type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)
 			else
 				type = typedef_type->typedefe->type;
 			continue;
-		case TYPE_TYPEOF: {
-			const typeof_type_t *typeof_type = &type->typeoft;
-			if (typeof_type->typeof_type != NULL) {
-				type = typeof_type->typeof_type;
-			} else {
-				type = typeof_type->expression->base.type;
-			}
+		case TYPE_TYPEOF:
+			type = type->typeoft.typeof_type;
 			continue;
-		}
 		case TYPE_ARRAY:
 			if (skip_array_type) {
 				type = type->array.element_type;
