@@ -1985,10 +1985,12 @@ bool is_constant_expression(const expression_t *expression)
 			return false;
 
 		long val = fold_constant(condition);
-		if (val != 0)
-			return is_constant_expression(expression->conditional.true_expression);
-		else
+		if (val != 0) {
+			expression_t const *const t = expression->conditional.true_expression;
+			return t == NULL || is_constant_expression(t);
+		} else {
 			return is_constant_expression(expression->conditional.false_expression);
+		}
 	}
 
 	case EXPR_INVALID:

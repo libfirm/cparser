@@ -9379,9 +9379,10 @@ static bool expression_has_effect(const expression_t *const expr)
 		/* Generate the warning if either the left or right hand side of a
 		 * conditional expression has no effect */
 		case EXPR_CONDITIONAL: {
-			const conditional_expression_t *const cond = &expr->conditional;
+			conditional_expression_t const *const cond = &expr->conditional;
+			expression_t             const *const t    = cond->true_expression;
 			return
-				expression_has_effect(cond->true_expression) &&
+				(t == NULL || expression_has_effect(t)) &&
 				expression_has_effect(cond->false_expression);
 		}
 
