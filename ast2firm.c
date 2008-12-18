@@ -3159,6 +3159,7 @@ static ir_node *builtin_constant_to_firm(
 static ir_node *builtin_address_to_firm(
 		const builtin_address_expression_t *expression)
 {
+	(void)expression;
 	panic("builtin_address_expression not implemented yet");
 }
 

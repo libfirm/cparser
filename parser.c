@@ -9394,6 +9394,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_FUNCNAME:                  return false;
 		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:        return false;
+		case EXPR_BUILTIN_ADDRESS:           return false;
 		case EXPR_BUILTIN_PREFETCH:          return true;
 		case EXPR_OFFSETOF:                  return false;
 		case EXPR_VA_START:                  return true;
