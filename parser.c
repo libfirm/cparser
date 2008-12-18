@@ -5530,6 +5530,9 @@ decl_list_end:
 
 	parameter = entity->function.parameters.entities;
 	for (; parameter != NULL; parameter = parameter->base.next) {
+		if (parameter->kind != ENTITY_PARAMETER)
+			continue;
+
 		type_t *parameter_type = parameter->declaration.type;
 		if (parameter_type == NULL) {
 			if (strict_mode) {

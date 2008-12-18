@@ -367,12 +367,14 @@ static void print_function_type_post(const function_type_t *type,
 	} else {
 		entity_t *parameter = parameters->entities;
 		for (; parameter != NULL; parameter = parameter->base.next) {
+			if (parameter->kind != ENTITY_PARAMETER)
+				continue;
+
 			if (first) {
 				first = false;
 			} else {
 				fputs(", ", out);
 			}
-			assert(is_declaration(parameter));
 			const type_t *const type = parameter->declaration.type;
 			if (type == NULL) {
 				fputs(parameter->base.symbol->string, out);

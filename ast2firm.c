@@ -5349,7 +5349,9 @@ static void initialize_function_parameters(entity_t *entity)
 	int       n         = 0;
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
-		assert(parameter->kind == ENTITY_PARAMETER);
+		if (parameter->kind != ENTITY_PARAMETER)
+			continue;
+
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
