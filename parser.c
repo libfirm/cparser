@@ -3203,7 +3203,7 @@ static type_t *parse_typeof(void)
 			type = parse_typename();
 		} else {
 			expression = parse_expression();
-			type       = expression->base.type;
+			type       = revert_automatic_type_conversion(expression);
 		}
 		break;
 
