@@ -83,7 +83,6 @@ typedef enum expression_kind_t {
 	EXPR_FUNCNAME,
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
-	EXPR_BUILTIN_ADDRESS,
 	EXPR_BUILTIN_PREFETCH,
 	EXPR_OFFSETOF,
 	EXPR_VA_START,
@@ -281,17 +280,6 @@ struct builtin_constant_expression_t {
 	expression_t      *value;
 };
 
-typedef enum buitin_address_kind {
-	builtin_return_address,
-	builtin_frame_address
-} builtin_address_kind;
-
-struct builtin_address_expression_t {
-	expression_base_t     base;
-	builtin_address_kind  kind;
-	expression_t         *value;
-};
-
 struct builtin_prefetch_expression_t {
 	expression_base_t  base;
 	expression_t      *adr;
@@ -401,7 +389,6 @@ union expression_t {
 	compound_literal_expression_t    compound_literal;
 	builtin_symbol_expression_t      builtin_symbol;
 	builtin_constant_expression_t    builtin_constant;
-	builtin_address_expression_t     builtin_address;
 	builtin_prefetch_expression_t    builtin_prefetch;
 	reference_expression_t           reference;
 	call_expression_t                call;

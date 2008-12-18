@@ -116,7 +116,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_FUNCNAME]                  = PREC_PRIMARY,
 		[EXPR_BUILTIN_SYMBOL]            = PREC_PRIMARY,
 		[EXPR_BUILTIN_CONSTANT_P]        = PREC_PRIMARY,
-		[EXPR_BUILTIN_ADDRESS]           = PREC_PRIMARY,
 		[EXPR_BUILTIN_PREFETCH]          = PREC_PRIMARY,
 		[EXPR_OFFSETOF]                  = PREC_PRIMARY,
 		[EXPR_VA_START]                  = PREC_PRIMARY,
@@ -610,19 +609,6 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 }
 
 /**
- * Prints a builtin address expression.
- *
- * @param expression   the builtin address expression
- */
-static void print_builtin_address(const builtin_address_expression_t *expression)
-{
-	fputs(expression->kind == builtin_return_address ?
-		"__builtin_return_address(" : "__builtin_frame_address(", out);
-	print_assignment_expression(expression->value);
-	fputc(')', out);
-}
-
-/**
  * Prints a builtin prefetch expression.
  *
  * @param expression   the builtin prefetch expression
@@ -838,9 +824,6 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	case EXPR_BUILTIN_CONSTANT_P:
 		print_builtin_constant(&expression->builtin_constant);
-		break;
-	case EXPR_BUILTIN_ADDRESS:
-		print_builtin_address(&expression->builtin_address);
 		break;
 	case EXPR_BUILTIN_PREFETCH:
 		print_builtin_prefetch(&expression->builtin_prefetch);
@@ -1884,7 +1867,6 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_BUILTIN_PREFETCH:
-	case EXPR_BUILTIN_ADDRESS:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:

@@ -50,7 +50,6 @@ typedef struct va_start_expression_t            va_start_expression_t;
 typedef struct va_arg_expression_t              va_arg_expression_t;
 typedef struct builtin_symbol_expression_t      builtin_symbol_expression_t;
 typedef struct builtin_constant_expression_t    builtin_constant_expression_t;
-typedef struct builtin_address_expression_t     builtin_address_expression_t;
 typedef struct builtin_prefetch_expression_t    builtin_prefetch_expression_t;
 typedef struct classify_type_expression_t       classify_type_expression_t;
 typedef struct bitfield_extract_expression_t    bitfield_extract_expression_t;

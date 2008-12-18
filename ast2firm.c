@@ -1645,8 +1645,18 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case T___builtin_va_end:
 		/* evaluate the argument of va_end for its side effects */
-		_expression_to_firm(call->arguments->expression);
+	_expression_to_firm(call->arguments->expression);
 		return NULL;
+	case T___builtin_frame_address: {
+		long val = fold_constant(call->arguments->expression);
+		if (val == 0) {
+			/* this nice case */
+			return get_irg_frame(current_ir_graph);
+		}
+		panic("__builtin_frame_address(!= 0) not implemented yet");
+	}
+	case T___builtin_return_address:
+		panic("__builtin_return_address() not implemented yet");
 	default:
 		panic("unsupported builtin found");
 	}
@@ -3156,13 +3166,6 @@ static ir_node *builtin_constant_to_firm(
 	return new_Const_long(mode, v);
 }
 
-static ir_node *builtin_address_to_firm(
-		const builtin_address_expression_t *expression)
-{
-	(void)expression;
-	panic("builtin_address_expression not implemented yet");
-}
-
 static ir_node *builtin_prefetch_to_firm(
 		const builtin_prefetch_expression_t *expression)
 {
@@ -3287,8 +3290,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return builtin_symbol_to_firm(&expression->builtin_symbol);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
-	case EXPR_BUILTIN_ADDRESS:
-		return builtin_address_to_firm(&expression->builtin_address);
 	case EXPR_BUILTIN_PREFETCH:
 		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
 	case EXPR_OFFSETOF:

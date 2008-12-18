@@ -430,7 +430,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_FUNCNAME]                = sizeof(funcname_expression_t),
 		[EXPR_BUILTIN_SYMBOL]          = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]      = sizeof(builtin_constant_expression_t),
-		[EXPR_BUILTIN_ADDRESS]         = sizeof(builtin_address_expression_t),
 		[EXPR_BUILTIN_PREFETCH]        = sizeof(builtin_prefetch_expression_t),
 		[EXPR_OFFSETOF]                = sizeof(offsetof_expression_t),
 		[EXPR_VA_START]                = sizeof(va_start_expression_t),
@@ -2140,7 +2139,6 @@ unary:
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
-		case EXPR_BUILTIN_ADDRESS:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
@@ -5748,7 +5746,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_FUNCNAME:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
-		case EXPR_BUILTIN_ADDRESS:
 		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
@@ -7576,32 +7573,6 @@ end_error:
 }
 
 /**
- * Parses a __buildin_return_address of a __builtin_frame_address() expression.
- *
- * @param tok_type  either T___buildin_return_address or T___builtin_frame_address
- */
-static expression_t *parse_builtin_address(int tok_type)
-{
-	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_ADDRESS);
-
-	expression->builtin_address.kind = tok_type == T___builtin_return_address ?
-		builtin_return_address : builtin_frame_address;
-
-	eat(tok_type);
-
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression->builtin_address.value = parse_constant_expression();
-	rem_anchor_token(')');
-	expect(')', end_error);
-	expression->base.type = type_void_ptr;
-
-	return expression;
-end_error:
-	return create_invalid_expression();
-}
-
-/**
  * Parses a __builtin_is_*() compare expression.
  */
 static expression_t *parse_compare_builtin(void)
@@ -7839,7 +7810,9 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_nanf:
 		case T___builtin_nanl:
 		case T___builtin_huge_val:
-		case T___builtin_va_end:         return parse_builtin_symbol();
+		case T___builtin_va_end:
+		case T___builtin_return_address:
+		case T___builtin_frame_address:  return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
@@ -7848,8 +7821,6 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_isunordered:    return parse_compare_builtin();
 		case T___builtin_constant_p:     return parse_builtin_constant();
 		case T___builtin_prefetch:       return parse_builtin_prefetch();
-		case T___builtin_return_address: return parse_builtin_address(T___builtin_return_address);
-		case T___builtin_frame_address:  return parse_builtin_address(T___builtin_frame_address);
 		case T__assume:                  return parse_assume();
 		case T_ANDAND:
 			if (GNU_MODE)
@@ -8134,6 +8105,28 @@ static void check_call_argument(const function_parameter_t *parameter,
 }
 
 /**
+ * Handle the semantic restrictions of builtin calls
+ */
+static void handle_builtin_argument_restrictions(call_expression_t *call) {
+	switch (call->function->builtin_symbol.symbol->ID) {
+		case T___builtin_return_address:
+		case T___builtin_frame_address: {
+			/* argument must be constant */
+			call_argument_t *argument = call->arguments;
+
+			if (! is_constant_expression(argument->expression)) {
+				errorf(&call->base.source_position,
+				       "argument of '%Y' must be a constant expression",
+				       call->function->builtin_symbol.symbol);
+			}
+			break;
+		}
+		default:
+			break;
+	}
+}
+
+/**
  * Parse a call expression, ie. expression '( ... )'.
  *
  * @param expression  the function address
@@ -8223,6 +8216,10 @@ static expression_t *parse_call_expression(expression_t *expression)
 	    is_type_compound(skip_typeref(function_type->return_type))) {
 		warningf(&result->base.source_position,
 		         "function call has aggregate value");
+	}
+
+	if (call->function->kind == EXPR_BUILTIN_SYMBOL) {
+		handle_builtin_argument_restrictions(&result->call);
 	}
 
 end_error:
@@ -9395,7 +9392,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_FUNCNAME:                  return false;
 		case EXPR_BUILTIN_SYMBOL:            break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:        return false;
-		case EXPR_BUILTIN_ADDRESS:           return false;
 		case EXPR_BUILTIN_PREFETCH:          return true;
 		case EXPR_OFFSETOF:                  return false;
 		case EXPR_VA_START:                  return true;
