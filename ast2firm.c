@@ -1648,15 +1648,33 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		_expression_to_firm(call->arguments->expression);
 		return NULL;
 	case T___builtin_frame_address: {
-		long val = fold_constant(call->arguments->expression);
+		expression_t *const expression = call->arguments->expression;
+		long val = fold_constant(expression);
 		if (val == 0) {
-			/* this nice case */
+			/* the nice case */
 			return get_irg_frame(current_ir_graph);
+		} else {
+			/* get the argument */
+			ir_node *in[2];
+
+			in[0] = _expression_to_firm(expression);
+			in[1] = get_irg_frame(current_ir_graph);
+			ir_type *tp  = get_ir_type((type_t*) function_type);
+			ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_frame_addess, 2, in, tp);
+			return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 		}
-		panic("__builtin_frame_address(!= 0) not implemented yet");
 	}
-	case T___builtin_return_address:
-		panic("__builtin_return_address() not implemented yet");
+	case T___builtin_return_address: {
+		expression_t *const expression = call->arguments->expression;
+		ir_node *in[2];
+
+		in[0] = _expression_to_firm(expression);
+		in[1] = get_irg_frame(current_ir_graph);
+		ir_type *tp  = get_ir_type((type_t*) function_type);
+		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
+		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
+	}
+
 	default:
 		panic("unsupported builtin found");
 	}
