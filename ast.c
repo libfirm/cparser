@@ -1574,8 +1574,6 @@ void print_entity(const entity_t *entity)
 	case ENTITY_VARIABLE:
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
-		print_declaration(entity);
-		return;
 	case ENTITY_FUNCTION:
 		print_declaration(entity);
 		return;
