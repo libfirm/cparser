@@ -1645,7 +1645,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case T___builtin_va_end:
 		/* evaluate the argument of va_end for its side effects */
-	_expression_to_firm(call->arguments->expression);
+		_expression_to_firm(call->arguments->expression);
 		return NULL;
 	case T___builtin_frame_address: {
 		long val = fold_constant(call->arguments->expression);
