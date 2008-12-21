@@ -1085,22 +1085,17 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 static void print_for_statement(const for_statement_t *statement)
 {
 	fputs("for (", out);
-	entity_t *entity = statement->scope.entities;
-	while (entity != NULL && is_generated_entity(entity))
-		entity = entity->base.next;
-
-	if (entity != NULL) {
-		assert(statement->initialisation == NULL);
-		assert(is_declaration(entity));
-		print_declaration(entity);
-		if (entity->base.next != NULL) {
-			panic("multiple declarations in for statement not supported yet");
-		}
-	} else {
-		if (statement->initialisation) {
-			print_expression(statement->initialisation);
-		}
+	if (statement->initialisation != NULL) {
+		print_expression(statement->initialisation);
 		fputc(';', out);
+	} else {
+		entity_t const *entity = statement->scope.entities;
+		for (; entity != NULL; entity = entity->base.next) {
+			if (is_generated_entity(entity))
+				continue;
+			/* FIXME display of multiple declarations is wrong */
+			print_declaration(entity);
+		}
 	}
 	if (statement->condition != NULL) {
 		fputc(' ', out);
