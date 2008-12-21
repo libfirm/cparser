@@ -576,10 +576,8 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 		fputs("__alignof__", out);
 	}
 	if (expression->tp_expression != NULL) {
-		/* always print the '()' here, sizeof x is right but unusual */
-		fputc('(', out);
-		print_expression(expression->tp_expression);
-		fputc(')', out);
+		/* PREC_TOP: always print the '()' here, sizeof x is right but unusual */
+		print_expression_prec(expression->tp_expression, PREC_TOP);
 	} else {
 		fputc('(', out);
 		print_type(expression->type);
