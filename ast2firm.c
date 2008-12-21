@@ -2853,11 +2853,11 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	set_cur_block(cur_block);
 	ir_node *const cond_expr = create_condition_evaluation(expression->condition, true_block, false_block);
 	if (expression->true_expression == NULL) {
-		if (cond_expr != NULL) {
+		if (cond_expr != NULL && get_irn_mode(cond_expr) != mode_b) {
 			true_val = cond_expr;
 		} else {
-			/* Condition ended with a short circuit (&&, ||, !) operation.
-			 * Generate a "1" as value for the true branch. */
+			/* Condition ended with a short circuit (&&, ||, !) operation or a
+			 * comparison.  Generate a "1" as value for the true branch. */
 			true_val = new_Const(get_mode_one(mode_Is));
 		}
 	}

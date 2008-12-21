@@ -629,12 +629,12 @@ static void print_builtin_types_compatible(
 static void print_conditional(const conditional_expression_t *expression)
 {
 	print_expression_prec(expression->condition, PREC_LOGICAL_OR);
-	fputs(" ? ", out);
 	if (expression->true_expression != NULL) {
+		fputs(" ? ", out);
 		print_expression_prec(expression->true_expression, PREC_EXPRESSION);
 		fputs(" : ", out);
 	} else {
-		fputs(": ", out);
+		fputs(" ?: ", out);
 	}
 	precedence_t prec = c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL;
 	print_expression_prec(expression->false_expression, prec);
