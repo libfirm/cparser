@@ -1687,9 +1687,9 @@ static ir_node *process_builtin_call(const call_expression_t *call)
  * 176.gcc for instance might allocate 2GB instead of 256 MB if alloca is not
  * handled right...
  */
-static ir_node *call_expression_to_firm(const call_expression_t *call)
+static ir_node *call_expression_to_firm(const call_expression_t *const call)
 {
-	dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&call->base.source_position);
 	assert(get_cur_block() != NULL);
 
 	expression_t *function = call->function;
@@ -1710,7 +1710,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 			size = create_conv(dbgi, size, mode);
 
 			ir_node  *store  = get_store();
-			dbg_info *dbgi   = get_dbg_info(&call->base.source_position);
 			ir_node  *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
 			                               stack_alloc);
 			ir_node  *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
@@ -1741,7 +1740,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *call)
 		/* we need to construct a new method type matching the call
 		 * arguments... */
 		int n_res       = get_method_n_ress(ir_method_type);
-		dbg_info *dbgi  = get_dbg_info(&call->base.source_position);
 		new_method_type = new_d_type_method(id_unique("calltype.%u"),
 		                                    n_parameters, n_res, dbgi);
 		set_method_calling_convention(new_method_type,
