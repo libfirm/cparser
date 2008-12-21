@@ -2776,7 +2776,7 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	}
 
 	type = skip_typeref(type);
-	/* § 6.5.3.4 (2) if the type is a VLA, evaluate the expression. */
+	/* §6.5.3.4:2 if the type is a VLA, evaluate the expression. */
 	if (is_type_array(type) && type->array.is_vla
 			&& expression->tp_expression != NULL) {
 		expression_to_firm(expression->tp_expression);

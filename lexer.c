@@ -1697,7 +1697,7 @@ static void parse_preprocessor_directive(void)
 		parse_line_directive();
 		break;
 	case '\n':
-		/* NULL directive, see § 6.10.7 */
+		/* NULL directive, see §6.10.7 */
 		break;
 	default:
 		parse_error("invalid preprocessor directive");

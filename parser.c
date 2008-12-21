@@ -1120,7 +1120,7 @@ static void report_assign_error(assign_error_t error, type_t *orig_type_left,
 	}
 }
 
-/** Implements the rules from § 6.5.16.1 */
+/** Implements the rules from §6.5.16.1 */
 static assign_error_t semantic_assign(type_t *orig_type_left,
                                       const expression_t *const right)
 {
@@ -2229,7 +2229,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 {
 	/* TODO check that expression is a constant expression */
 
-	/* § 6.7.8.14/15 char array may be initialized by string literals */
+	/* §6.7.8.14/15 char array may be initialized by string literals */
 	type_t *type           = skip_typeref(orig_type);
 	type_t *expr_type_orig = expression->base.type;
 	type_t *expr_type      = skip_typeref(expr_type_orig);
@@ -2293,7 +2293,7 @@ static bool is_initializer_constant(const expression_t *expression)
 /**
  * Parses an scalar initializer.
  *
- * § 6.7.8.11; eat {} without warning
+ * §6.7.8.11; eat {} without warning
  */
 static initializer_t *parse_scalar_initializer(type_t *type,
                                                bool must_be_constant)
@@ -2909,7 +2909,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		result = parse_scalar_initializer(type, env->must_be_constant);
 	}
 
-	/* § 6.7.8:22 array initializers for arrays with unknown size determine
+	/* §6.7.8:22 array initializers for arrays with unknown size determine
 	 * the array type size */
 	if (is_type_array(type) && type->array.size_expression == NULL
 			&& result != NULL) {
@@ -5306,7 +5306,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 	current_init_decl = NULL;
 
 	if (entity->kind == ENTITY_VARIABLE) {
-		/* § 6.7.5:22  array initializers for arrays with unknown size
+		/* §6.7.5:22  array initializers for arrays with unknown size
 		 * determine the array type size */
 		declaration->type            = env.type;
 		entity->variable.initializer = initializer;
@@ -5569,7 +5569,7 @@ decl_list_end:
 		last_parameter = function_parameter;
 	}
 
-	/* § 6.9.1.7: A K&R style parameter list does NOT act as a function
+	/* §6.9.1.7: A K&R style parameter list does NOT act as a function
 	 * prototype */
 	new_type->function.parameters             = parameters;
 	new_type->function.unspecified_parameters = true;
@@ -6392,7 +6392,7 @@ static void parse_external_declaration(void)
 			ndeclaration->base.symbol);
 	}
 
-	/* § 6.7.5.3:14 a function definition with () means no
+	/* §6.7.5.3:14 a function definition with () means no
 	 * parameters (and not unspecified parameters) */
 	if (type->function.unspecified_parameters &&
 			type->function.parameters == NULL     &&
@@ -6966,7 +6966,7 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 }
 
 /**
- * Performs automatic type cast as described in § 6.3.2.1.
+ * Performs automatic type cast as described in §6.3.2.1.
  *
  * @param orig_type  the original type
  */
@@ -6990,7 +6990,7 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 
 /**
  * reverts the automatic casts of array to pointer types and function
- * to function-pointer types as defined § 6.3.2.1
+ * to function-pointer types as defined §6.3.2.1
  */
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
@@ -8849,7 +8849,7 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	type_left  = get_unqualified_type(type_left);
 	type_right = get_unqualified_type(type_right);
 
-	/* § 6.3.1.8 Usual arithmetic conversions */
+	/* §6.3.1.8 Usual arithmetic conversions */
 	if (type_left == type_long_double || type_right == type_long_double) {
 		return type_long_double;
 	} else if (type_left == type_double || type_right == type_double) {
@@ -9013,7 +9013,7 @@ static void semantic_add(binary_expression_t *expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	/* § 6.5.6 */
+	/* §6.5.6 */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->left  = create_implicit_cast(left, arithmetic_type);
@@ -9044,7 +9044,7 @@ static void semantic_sub(binary_expression_t *expression)
 	type_t                  *const type_right      = skip_typeref(orig_type_right);
 	source_position_t const *const pos             = &expression->base.source_position;
 
-	/* § 5.6.5 */
+	/* §5.6.5 */
 	if (is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) {
 		type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
 		expression->left        = create_implicit_cast(left, arithmetic_type);
