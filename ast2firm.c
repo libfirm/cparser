@@ -241,55 +241,6 @@ ir_mode *get_atomic_mode(atomic_type_kind_t kind)
 	return atomic_modes[kind];
 }
 
-static unsigned get_compound_type_size(compound_type_t *type)
-{
-	ir_type *irtype = get_ir_type((type_t*) type);
-	return get_type_size_bytes(irtype);
-}
-
-static unsigned get_array_type_size(array_type_t *type)
-{
-	assert(!type->is_vla);
-	ir_type *irtype = get_ir_type((type_t*) type);
-	return get_type_size_bytes(irtype);
-}
-
-static unsigned get_type_size_const(type_t *type)
-{
-	switch(type->kind) {
-	case TYPE_ERROR:
-		panic("error type occurred");
-	case TYPE_ATOMIC:
-		return get_atomic_type_size(type->atomic.akind);
-	case TYPE_COMPLEX:
-		return 2 * get_atomic_type_size(type->complex.akind);
-	case TYPE_IMAGINARY:
-		return get_atomic_type_size(type->imaginary.akind);
-	case TYPE_ENUM:
-		return get_atomic_type_size(type->enumt.akind);
-	case TYPE_COMPOUND_UNION:
-	case TYPE_COMPOUND_STRUCT:
-		return get_compound_type_size(&type->compound);
-	case TYPE_FUNCTION:
-		/* just a pointer to the function */
-		return get_mode_size_bytes(mode_P_code);
-	case TYPE_POINTER:
-	case TYPE_REFERENCE:
-		return get_mode_size_bytes(mode_P_data);
-	case TYPE_ARRAY:
-		return get_array_type_size(&type->array);
-	case TYPE_BUILTIN:
-		return get_type_size_const(type->builtin.real_type);
-	case TYPE_BITFIELD:
-		panic("type size of bitfield request");
-	case TYPE_TYPEDEF:
-	case TYPE_TYPEOF:
-	case TYPE_INVALID:
-		break;
-	}
-	panic("Trying to determine size of invalid type");
-}
-
 static ir_node *get_vla_size(array_type_t *const type)
 {
 	ir_node *size_node = type->size_node;
@@ -2379,22 +2330,10 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	assert(is_type_pointer(type));
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
-	unsigned              elem_size    = get_type_size_const(points_to);
-
-	value = create_conv(dbgi, value, mode);
-
-	/* gcc extension: allow arithmetic with void * and function * */
-	if ((elem_size == 0 && is_type_atomic(points_to, ATOMIC_TYPE_VOID)) ||
-	    is_type_function(points_to))  {
-		elem_size = 1;
-	}
-
-	assert(elem_size >= 1);
-	if (elem_size == 1)
-		return value;
-
-	ir_node *const cnst = new_Const_long(mode, (long)elem_size);
-	ir_node *const mul  = new_d_Mul(dbgi, value, cnst, mode);
+	ir_node        *      elem_size    = get_type_size(points_to);
+	elem_size                          = create_conv(dbgi, elem_size, mode);
+	value                              = create_conv(dbgi, value,     mode);
+	ir_node        *const mul          = new_d_Mul(dbgi, value, elem_size, mode);
 	return mul;
 }
 
