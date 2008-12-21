@@ -5023,7 +5023,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 	if (symbol == NULL)
 		return entity;
 
-	entity_t *previous_entity = get_entity(symbol, namespc);
+	entity_t *const previous_entity = get_entity(symbol, namespc);
 	/* pushing the same entity twice will break the stack structure */
 	assert(previous_entity != entity);
 
@@ -5053,160 +5053,167 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 		         entity->declaration.type, symbol);
 	}
 
-	if (previous_entity != NULL &&
-			previous_entity->base.parent_scope == &current_function->parameters &&
-			previous_entity->base.parent_scope->depth + 1 == current_scope->depth) {
-		assert(previous_entity->kind == ENTITY_PARAMETER);
-		errorf(pos,
-		       "declaration '%#T' redeclares the parameter '%#T' (declared %P)",
-					 entity->declaration.type, symbol,
-					 previous_entity->declaration.type, symbol,
-					 &previous_entity->base.source_position);
-		goto finish;
-	}
+	if (previous_entity != NULL) {
+		if (previous_entity->base.parent_scope == &current_function->parameters &&
+				previous_entity->base.parent_scope->depth + 1 == current_scope->depth) {
+			assert(previous_entity->kind == ENTITY_PARAMETER);
+			errorf(pos,
+					"declaration '%#T' redeclares the parameter '%#T' (declared %P)",
+					entity->declaration.type, symbol,
+					previous_entity->declaration.type, symbol,
+					&previous_entity->base.source_position);
+			goto finish;
+		}
 
-	if (previous_entity != NULL &&
-			previous_entity->base.parent_scope == current_scope) {
-		if (previous_entity->kind != entity->kind) {
-			if (!is_error_entity(previous_entity) && !is_error_entity(entity)) {
-				error_redefined_as_different_kind(pos, previous_entity,
-						entity->kind);
+		if (previous_entity->base.parent_scope == current_scope) {
+			if (previous_entity->kind != entity->kind) {
+				if (!is_error_entity(previous_entity) && !is_error_entity(entity)) {
+					error_redefined_as_different_kind(pos, previous_entity,
+							entity->kind);
+				}
+				goto finish;
 			}
-			goto finish;
-		}
-		if (previous_entity->kind == ENTITY_ENUM_VALUE) {
-			errorf(pos, "redeclaration of enum entry '%Y' (declared %P)",
-				   symbol, &previous_entity->base.source_position);
-			goto finish;
-		}
-		if (previous_entity->kind == ENTITY_TYPEDEF) {
-			/* TODO: C++ allows this for exactly the same type */
-			errorf(pos, "redefinition of typedef '%Y' (declared %P)",
-			       symbol, &previous_entity->base.source_position);
-			goto finish;
-		}
+			if (previous_entity->kind == ENTITY_ENUM_VALUE) {
+				errorf(pos, "redeclaration of enum entry '%Y' (declared %P)",
+						symbol, &previous_entity->base.source_position);
+				goto finish;
+			}
+			if (previous_entity->kind == ENTITY_TYPEDEF) {
+				/* TODO: C++ allows this for exactly the same type */
+				errorf(pos, "redefinition of typedef '%Y' (declared %P)",
+						symbol, &previous_entity->base.source_position);
+				goto finish;
+			}
 
-		/* at this point we should have only VARIABLES or FUNCTIONS */
-		assert(is_declaration(previous_entity) && is_declaration(entity));
+			/* at this point we should have only VARIABLES or FUNCTIONS */
+			assert(is_declaration(previous_entity) && is_declaration(entity));
 
-		declaration_t *const prev_decl = &previous_entity->declaration;
-		declaration_t *const decl      = &entity->declaration;
+			declaration_t *const prev_decl = &previous_entity->declaration;
+			declaration_t *const decl      = &entity->declaration;
 
-		/* can happen for K&R style declarations */
-		if (prev_decl->type       == NULL             &&
-				previous_entity->kind == ENTITY_PARAMETER &&
-				entity->kind          == ENTITY_PARAMETER) {
-			prev_decl->type                   = decl->type;
-			prev_decl->storage_class          = decl->storage_class;
-			prev_decl->declared_storage_class = decl->declared_storage_class;
-			prev_decl->modifiers              = decl->modifiers;
-			prev_decl->deprecated_string      = decl->deprecated_string;
+			/* can happen for K&R style declarations */
+			if (prev_decl->type       == NULL             &&
+					previous_entity->kind == ENTITY_PARAMETER &&
+					entity->kind          == ENTITY_PARAMETER) {
+				prev_decl->type                   = decl->type;
+				prev_decl->storage_class          = decl->storage_class;
+				prev_decl->declared_storage_class = decl->declared_storage_class;
+				prev_decl->modifiers              = decl->modifiers;
+				prev_decl->deprecated_string      = decl->deprecated_string;
+				return previous_entity;
+			}
+
+			type_t *const orig_type = decl->type;
+			assert(orig_type != NULL);
+			type_t *const type      = skip_typeref(orig_type);
+			type_t *const prev_type = skip_typeref(prev_decl->type);
+
+			if (!types_compatible(type, prev_type)) {
+				errorf(pos,
+						"declaration '%#T' is incompatible with '%#T' (declared %P)",
+						orig_type, symbol, prev_decl->type, symbol,
+						&previous_entity->base.source_position);
+			} else {
+				unsigned old_storage_class = prev_decl->storage_class;
+				if (warning.redundant_decls	          &&
+						is_definition                     &&
+						!prev_decl->used                  &&
+						!(prev_decl->modifiers & DM_USED) &&
+						prev_decl->storage_class == STORAGE_CLASS_STATIC) {
+					warningf(&previous_entity->base.source_position,
+							"unnecessary static forward declaration for '%#T'",
+							prev_decl->type, symbol);
+				}
+
+				storage_class_t new_storage_class = decl->storage_class;
+
+				/* pretend no storage class means extern for function
+				 * declarations (except if the previous declaration is neither
+				 * none nor extern) */
+				if (entity->kind == ENTITY_FUNCTION) {
+					/* the previous declaration could have unspecified parameters or
+					 * be a typedef, so use the new type */
+					if (prev_type->function.unspecified_parameters || is_definition)
+						prev_decl->type = type;
+
+					switch (old_storage_class) {
+						case STORAGE_CLASS_NONE:
+							old_storage_class = STORAGE_CLASS_EXTERN;
+							/* FALLTHROUGH */
+
+						case STORAGE_CLASS_EXTERN:
+							if (is_definition) {
+								if (warning.missing_prototypes &&
+										prev_type->function.unspecified_parameters &&
+										!is_sym_main(symbol)) {
+									warningf(pos, "no previous prototype for '%#T'",
+											orig_type, symbol);
+								}
+							} else if (new_storage_class == STORAGE_CLASS_NONE) {
+								new_storage_class = STORAGE_CLASS_EXTERN;
+							}
+							break;
+
+						default:
+							break;
+					}
+				} else if (is_type_incomplete(prev_type)) {
+					prev_decl->type = type;
+				}
+
+				if (old_storage_class == STORAGE_CLASS_EXTERN &&
+						new_storage_class == STORAGE_CLASS_EXTERN) {
+warn_redundant_declaration:
+					if (!is_definition           &&
+							warning.redundant_decls  &&
+							is_type_valid(prev_type) &&
+							strcmp(previous_entity->base.source_position.input_name,
+								"<builtin>") != 0) {
+						warningf(pos,
+								"redundant declaration for '%Y' (declared %P)",
+								symbol, &previous_entity->base.source_position);
+					}
+				} else if (current_function == NULL) {
+					if (old_storage_class != STORAGE_CLASS_STATIC &&
+							new_storage_class == STORAGE_CLASS_STATIC) {
+						errorf(pos,
+								"static declaration of '%Y' follows non-static declaration (declared %P)",
+								symbol, &previous_entity->base.source_position);
+					} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
+						prev_decl->storage_class          = STORAGE_CLASS_NONE;
+						prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
+					} else {
+						/* ISO/IEC 14882:1998(E) §C.1.2:1 */
+						if (c_mode & _CXX)
+							goto error_redeclaration;
+						goto warn_redundant_declaration;
+					}
+				} else if (is_type_valid(prev_type)) {
+					if (old_storage_class == new_storage_class) {
+error_redeclaration:
+						errorf(pos, "redeclaration of '%Y' (declared %P)",
+								symbol, &previous_entity->base.source_position);
+					} else {
+						errorf(pos,
+								"redeclaration of '%Y' with different linkage (declared %P)",
+								symbol, &previous_entity->base.source_position);
+					}
+				}
+			}
+
+			prev_decl->modifiers |= decl->modifiers;
+			if (entity->kind == ENTITY_FUNCTION) {
+				previous_entity->function.is_inline |= entity->function.is_inline;
+			}
 			return previous_entity;
 		}
 
-		type_t *const orig_type = decl->type;
-		assert(orig_type != NULL);
-		type_t *const type      = skip_typeref(orig_type);
-		type_t *const prev_type = skip_typeref(prev_decl->type);
-
-		if (!types_compatible(type, prev_type)) {
-			errorf(pos,
-				   "declaration '%#T' is incompatible with '%#T' (declared %P)",
-				   orig_type, symbol, prev_decl->type, symbol,
-				   &previous_entity->base.source_position);
-		} else {
-			unsigned old_storage_class = prev_decl->storage_class;
-			if (warning.redundant_decls	          &&
-					is_definition                     &&
-					!prev_decl->used                  &&
-					!(prev_decl->modifiers & DM_USED) &&
-					prev_decl->storage_class == STORAGE_CLASS_STATIC) {
-				warningf(&previous_entity->base.source_position,
-				         "unnecessary static forward declaration for '%#T'",
-				         prev_decl->type, symbol);
-			}
-
-			storage_class_t new_storage_class = decl->storage_class;
-
-			/* pretend no storage class means extern for function
-			 * declarations (except if the previous declaration is neither
-			 * none nor extern) */
-			if (entity->kind == ENTITY_FUNCTION) {
-				/* the previous declaration could have unspecified parameters or
-				 * be a typedef, so use the new type */
-				if (prev_type->function.unspecified_parameters || is_definition)
-					prev_decl->type = type;
-
-				switch (old_storage_class) {
-				case STORAGE_CLASS_NONE:
-					old_storage_class = STORAGE_CLASS_EXTERN;
-					/* FALLTHROUGH */
-
-				case STORAGE_CLASS_EXTERN:
-					if (is_definition) {
-						if (warning.missing_prototypes &&
-						    prev_type->function.unspecified_parameters &&
-						    !is_sym_main(symbol)) {
-							warningf(pos, "no previous prototype for '%#T'",
-									 orig_type, symbol);
-						}
-					} else if (new_storage_class == STORAGE_CLASS_NONE) {
-						new_storage_class = STORAGE_CLASS_EXTERN;
-					}
-					break;
-
-				default:
-					break;
-				}
-			} else if (is_type_incomplete(prev_type)) {
-				prev_decl->type = type;
-			}
-
-			if (old_storage_class == STORAGE_CLASS_EXTERN &&
-					new_storage_class == STORAGE_CLASS_EXTERN) {
-warn_redundant_declaration:
-				if (!is_definition           &&
-				    warning.redundant_decls  &&
-				    is_type_valid(prev_type) &&
-				    strcmp(previous_entity->base.source_position.input_name,
-				           "<builtin>") != 0) {
-					warningf(pos,
-					         "redundant declaration for '%Y' (declared %P)",
-					         symbol, &previous_entity->base.source_position);
-				}
-			} else if (current_function == NULL) {
-				if (old_storage_class != STORAGE_CLASS_STATIC &&
-				    new_storage_class == STORAGE_CLASS_STATIC) {
-					errorf(pos,
-					       "static declaration of '%Y' follows non-static declaration (declared %P)",
-					       symbol, &previous_entity->base.source_position);
-				} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
-					prev_decl->storage_class          = STORAGE_CLASS_NONE;
-					prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
-				} else {
-					/* ISO/IEC 14882:1998(E) §C.1.2:1 */
-					if (c_mode & _CXX)
-						goto error_redeclaration;
-					goto warn_redundant_declaration;
-				}
-			} else if (is_type_valid(prev_type)) {
-				if (old_storage_class == new_storage_class) {
-error_redeclaration:
-					errorf(pos, "redeclaration of '%Y' (declared %P)",
-					       symbol, &previous_entity->base.source_position);
-				} else {
-					errorf(pos,
-					       "redeclaration of '%Y' with different linkage (declared %P)",
-					       symbol, &previous_entity->base.source_position);
-				}
-			}
+		if (warning.shadow) {
+			warningf(pos, "%s '%Y' shadows %s (declared %P)",
+					get_entity_kind_name(entity->kind), symbol,
+					get_entity_kind_name(previous_entity->kind),
+					&previous_entity->base.source_position);
 		}
-
-		prev_decl->modifiers |= decl->modifiers;
-		if (entity->kind == ENTITY_FUNCTION) {
-			previous_entity->function.is_inline |= entity->function.is_inline;
-		}
-		return previous_entity;
 	}
 
 	if (entity->kind == ENTITY_FUNCTION) {

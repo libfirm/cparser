@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd December 16, 2008
+.Dd December 21, 2008
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -203,6 +203,8 @@ Warn if cascaded comparisons appear which do not have their mathematical meaning
 Warn if + or - is used as operand of << or >>, e.g. x\ +\ y\ <<\ z.
 .It Fl Wredundant-decls
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
+.It Fl Wshadow
+Warn when a new declaration shadows another declaration with the same name in an outer scope.
 .It Fl Wunreachable-code
 Warn when the compiler determines that a statement (or in some cases a part thereof) will never be executed.
 .It Fl Wunused
