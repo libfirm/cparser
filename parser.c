@@ -431,7 +431,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_BUILTIN_SYMBOL]             = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]         = sizeof(builtin_constant_expression_t),
 		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = sizeof(builtin_types_compatible_expression_t),
-		[EXPR_BUILTIN_PREFETCH]           = sizeof(builtin_prefetch_expression_t),
 		[EXPR_OFFSETOF]                   = sizeof(offsetof_expression_t),
 		[EXPR_VA_START]                   = sizeof(va_start_expression_t),
 		[EXPR_VA_ARG]                     = sizeof(va_arg_expression_t),
@@ -2141,7 +2140,6 @@ unary:
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
 		case EXPR_LABEL_ADDRESS:
@@ -5752,7 +5750,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-		case EXPR_BUILTIN_PREFETCH:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
 			return true;
@@ -6908,6 +6905,19 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	return identify_new_type(type);
 }
 
+static type_t *make_function_1_type_variadic(type_t *return_type, type_t *argument_type)
+{
+	type_t *res = make_function_1_type(return_type, argument_type);
+	res->function.variadic = 1;
+	return res;
+}
+
+/**
+ * Creates a return_type (func)(void) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ */
 static type_t *make_function_0_type(type_t *return_type)
 {
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
@@ -6948,6 +6958,8 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	case T___builtin_return_address:
 	case T___builtin_frame_address:
 		return make_function_1_type(type_void_ptr, type_unsigned_int);
+	case T___builtin_prefetch:
+		return make_function_1_type_variadic(type_float, type_void_ptr);
 	default:
 		internal_errorf(HERE, "not implemented builtin identifier found");
 	}
@@ -7575,35 +7587,6 @@ end_error:
 }
 
 /**
- * Parses a __builtin_prefetch() expression.
- */
-static expression_t *parse_builtin_prefetch(void)
-{
-	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_PREFETCH);
-
-	eat(T___builtin_prefetch);
-
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression->builtin_prefetch.adr = parse_assignment_expression();
-	if (token.type == ',') {
-		next_token();
-		expression->builtin_prefetch.rw = parse_assignment_expression();
-	}
-	if (token.type == ',') {
-		next_token();
-		expression->builtin_prefetch.locality = parse_assignment_expression();
-	}
-	rem_anchor_token(')');
-	expect(')', end_error);
-	expression->base.type = type_void;
-
-	return expression;
-end_error:
-	return create_invalid_expression();
-}
-
-/**
  * Parses a __builtin_is_*() compare expression.
  */
 static expression_t *parse_compare_builtin(void)
@@ -7843,7 +7826,8 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_huge_val:
 		case T___builtin_va_end:
 		case T___builtin_return_address:
-		case T___builtin_frame_address:      return parse_builtin_symbol();
+		case T___builtin_frame_address:
+		case T___builtin_prefetch:           return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
@@ -7851,7 +7835,6 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_islessgreater:
 		case T___builtin_isunordered:        return parse_compare_builtin();
 		case T___builtin_constant_p:         return parse_builtin_constant();
-		case T___builtin_prefetch:           return parse_builtin_prefetch();
 		case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
 		case T__assume:                      return parse_assume();
 		case T_ANDAND:
@@ -8150,6 +8133,29 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				errorf(&call->base.source_position,
 				       "argument of '%Y' must be a constant expression",
 				       call->function->builtin_symbol.symbol);
+			}
+			break;
+		}
+		case T___builtin_prefetch: {
+			/* second and third argument must be constant if existant */
+			call_argument_t *rw = call->arguments->next;
+			call_argument_t *locality = NULL;
+
+			if (rw != NULL) {
+				if (! is_constant_expression(rw->expression)) {
+					errorf(&call->base.source_position,
+					       "second argument of '%Y' must be a constant expression",
+					       call->function->builtin_symbol.symbol);
+				}
+				locality = rw->next;
+			}
+			if (locality != NULL) {
+				if (! is_constant_expression(locality->expression)) {
+					errorf(&call->base.source_position,
+					       "third argument of '%Y' must be a constant expression",
+					       call->function->builtin_symbol.symbol);
+				}
+				locality = rw->next;
 			}
 			break;
 		}
@@ -9400,8 +9406,9 @@ static bool expression_has_effect(const expression_t *const expr)
 				return true;
 
 			switch (call->function->builtin_symbol.symbol->ID) {
-				case T___builtin_va_end: return true;
-				default:                 return false;
+				case T___builtin_prefetch:
+				case T___builtin_va_end:   return true;
+				default:                   return false;
 			}
 		}
 
@@ -9425,7 +9432,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_BUILTIN_SYMBOL:             break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:         return false;
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return false;
-		case EXPR_BUILTIN_PREFETCH:           return true;
 		case EXPR_OFFSETOF:                   return false;
 		case EXPR_VA_START:                   return true;
 		case EXPR_VA_ARG:                     return true;

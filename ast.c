@@ -117,7 +117,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_BUILTIN_SYMBOL]             = PREC_PRIMARY,
 		[EXPR_BUILTIN_CONSTANT_P]         = PREC_PRIMARY,
 		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = PREC_PRIMARY,
-		[EXPR_BUILTIN_PREFETCH]           = PREC_PRIMARY,
 		[EXPR_OFFSETOF]                   = PREC_PRIMARY,
 		[EXPR_VA_START]                   = PREC_PRIMARY,
 		[EXPR_VA_ARG]                     = PREC_PRIMARY,
@@ -623,26 +622,6 @@ static void print_builtin_types_compatible(
 }
 
 /**
- * Prints a builtin prefetch expression.
- *
- * @param expression   the builtin prefetch expression
- */
-static void print_builtin_prefetch(const builtin_prefetch_expression_t *expression)
-{
-	fputs("__builtin_prefetch(", out);
-	print_assignment_expression(expression->adr);
-	if (expression->rw) {
-		fputc(',', out);
-		print_assignment_expression(expression->rw);
-	}
-	if (expression->locality) {
-		fputc(',', out);
-		print_assignment_expression(expression->locality);
-	}
-	fputc(')', out);
-}
-
-/**
  * Prints a conditional expression.
  *
  * @param expression   the conditional expression
@@ -841,9 +820,6 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		print_builtin_types_compatible(&expression->builtin_types_compatible);
-		break;
-	case EXPR_BUILTIN_PREFETCH:
-		print_builtin_prefetch(&expression->builtin_prefetch);
 		break;
 	case EXPR_CONDITIONAL:
 		print_conditional(&expression->conditional);
@@ -1884,7 +1860,6 @@ bool is_constant_expression(const expression_t *expression)
 	}
 
 	case EXPR_BUILTIN_SYMBOL:
-	case EXPR_BUILTIN_PREFETCH:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:

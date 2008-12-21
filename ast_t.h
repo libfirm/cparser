@@ -84,7 +84,6 @@ typedef enum expression_kind_t {
 	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_BUILTIN_TYPES_COMPATIBLE_P,
-	EXPR_BUILTIN_PREFETCH,
 	EXPR_OFFSETOF,
 	EXPR_VA_START,
 	EXPR_VA_ARG,
@@ -290,13 +289,6 @@ struct builtin_types_compatible_expression_t {
 	type_t            *right;
 };
 
-struct builtin_prefetch_expression_t {
-	expression_base_t  base;
-	expression_t      *adr;
-	expression_t      *rw;
-	expression_t      *locality;
-};
-
 struct reference_expression_t {
 	expression_base_t  base;
 	entity_t          *entity;
@@ -400,7 +392,6 @@ union expression_t {
 	builtin_symbol_expression_t           builtin_symbol;
 	builtin_constant_expression_t         builtin_constant;
 	builtin_types_compatible_expression_t builtin_types_compatible;
-	builtin_prefetch_expression_t         builtin_prefetch;
 	reference_expression_t                reference;
 	call_expression_t                     call;
 	unary_expression_t                    unary;

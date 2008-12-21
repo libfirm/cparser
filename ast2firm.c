@@ -1674,7 +1674,33 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
+	case T___builtin_prefetch: {
+		call_argument_t *const args = call->arguments;
+		expression_t *const addr    = args->expression;
+		ir_node *in[3];
 
+		in[0] = _expression_to_firm(addr);
+		if (args->next != NULL) {
+			expression_t *const rw = args->next->expression;
+
+			in[1] = _expression_to_firm(rw);
+
+			if (args->next->next != NULL) {
+				expression_t *const locality = args->next->next->expression;
+
+				in[2] = _expression_to_firm(locality);
+			} else {
+				in[2] = new_Const_long(mode_int, 3);
+			}
+		} else {
+			in[1] = new_Const_long(mode_int, 0);
+			in[2] = new_Const_long(mode_int, 3);
+		}
+		ir_type *tp  = get_ir_type((type_t*) function_type);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_prefetch, 3, in, tp);
+		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
+		return NULL;
+	}
 	default:
 		panic("unsupported builtin found");
 	}
@@ -3192,15 +3218,6 @@ static ir_node *builtin_types_compatible_to_firm(
 	return new_Const_long(mode, value);
 }
 
-static ir_node *builtin_prefetch_to_firm(
-		const builtin_prefetch_expression_t *expression)
-{
-	ir_node *adr = expression_to_firm(expression->adr);
-	/* no Firm support for prefetch yet */
-	(void) adr;
-	return NULL;
-}
-
 static ir_node *get_label_block(label_t *label)
 {
 	if (label->block != NULL)
@@ -3318,8 +3335,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return builtin_constant_to_firm(&expression->builtin_constant);
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		return builtin_types_compatible_to_firm(&expression->builtin_types_compatible);
-	case EXPR_BUILTIN_PREFETCH:
-		return builtin_prefetch_to_firm(&expression->builtin_prefetch);
 	case EXPR_OFFSETOF:
 		return offsetof_to_firm(&expression->offsetofe);
 	case EXPR_COMPOUND_LITERAL:
