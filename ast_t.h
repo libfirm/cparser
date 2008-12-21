@@ -227,13 +227,16 @@ typedef enum funcname_kind_t {
 	EXPR_UNARY_CASES_MANDATORY \
 	EXPR_UNARY_CASES_OPTIONAL
 
+/**
+ * The base class of every expression.
+ */
 struct expression_base_t {
-	expression_kind_t   kind;
-	type_t             *type;
-	source_position_t   source_position;
+	expression_kind_t   kind;            /**< The expression kind. */
+	type_t             *type;            /**< The type of the expression. */
+	source_position_t   source_position; /**< The source position of this expression. */
 	bool                parenthesized;
 #ifndef NDEBUG
-	bool                transformed;
+	bool                transformed;     /**< Set if this expression was transformed. */
 #endif
 };
 
@@ -535,6 +538,9 @@ typedef enum gnu_attribute_kind_t {
 	GNU_AK_LAST
 } gnu_attribute_kind_t;
 
+/**
+ * The statement kinds.
+ */
 typedef enum statement_kind_t {
 	STATEMENT_INVALID,
 	STATEMENT_EMPTY,
@@ -557,6 +563,9 @@ typedef enum statement_kind_t {
 	STATEMENT_LEAVE            /**< MS __leave */
 } statement_kind_t;
 
+/**
+ * The base class of every statement.
+ */
 struct statement_base_t {
 	statement_kind_t   kind;
 	statement_t       *next;
