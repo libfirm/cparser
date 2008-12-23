@@ -5476,7 +5476,7 @@ static type_t *get_default_promoted_type(type_t *orig_type)
 	type_t *type = skip_typeref(orig_type);
 	if (is_type_integer(type)) {
 		result = promote_integer(type);
-	} else if (type == type_float) {
+	} else if (is_type_atomic(type, ATOMIC_TYPE_FLOAT)) {
 		result = type_double;
 	}
 
