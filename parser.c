@@ -6965,6 +6965,12 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 	case T___builtin_return_address:
 	case T___builtin_frame_address:
 		return make_function_1_type(type_void_ptr, type_unsigned_int);
+	case T___builtin_ffs:
+	case T___builtin_clz:
+	case T___builtin_ctz:
+	case T___builtin_popcount:
+	case T___builtin_parity:
+		return make_function_1_type(type_int, type_unsigned_int);
 	case T___builtin_prefetch:
 		return make_function_1_type_variadic(type_float, type_void_ptr);
 	default:
@@ -7834,6 +7840,11 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_va_end:
 		case T___builtin_return_address:
 		case T___builtin_frame_address:
+		case T___builtin_ffs:
+		case T___builtin_clz:
+		case T___builtin_ctz:
+		case T___builtin_popcount:
+		case T___builtin_parity:
 		case T___builtin_prefetch:           return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:

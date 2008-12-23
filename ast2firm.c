@@ -1536,6 +1536,25 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 }
 
 /**
+ * Generate an unary builtin.
+ *
+ * @param kind           the builtin kind to generate
+ * @param op             the operand
+ * @param function_type  the function type for the GNU builtin routine
+ * @param db             debug info
+ */
+static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t *function_type, dbg_info *db)
+{
+	ir_node *in[1];
+	in[0] = expression_to_firm(op);
+
+	ir_type *tp  = get_ir_type(function_type);
+	ir_node *irn = new_d_Builtin(db, get_irg_no_mem(current_ir_graph), kind, 1, in, tp);
+	set_irn_pinned(irn, op_pin_state_floats);
+	return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
+}
+
+/**
  * Transform calls to builtin functions.
  */
 static ir_node *process_builtin_call(const call_expression_t *call)
@@ -1608,9 +1627,9 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			/* get the argument */
 			ir_node *in[2];
 
-			in[0] = _expression_to_firm(expression);
+			in[0] = expression_to_firm(expression);
 			in[1] = get_irg_frame(current_ir_graph);
-			ir_type *tp  = get_ir_type((type_t*) function_type);
+			ir_type *tp  = get_ir_type(function_type);
 			ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_frame_addess, 2, in, tp);
 			return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 		}
@@ -1619,12 +1638,22 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		expression_t *const expression = call->arguments->expression;
 		ir_node *in[2];
 
-		in[0] = _expression_to_firm(expression);
+		in[0] = expression_to_firm(expression);
 		in[1] = get_irg_frame(current_ir_graph);
-		ir_type *tp  = get_ir_type((type_t*) function_type);
+		ir_type *tp  = get_ir_type(function_type);
 		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
+	case T___builtin_ffs:
+		 return gen_unary_builtin(ir_bk_ffs,      call->arguments->expression, function_type, dbgi);
+	case T___builtin_clz:
+		 return gen_unary_builtin(ir_bk_clz,      call->arguments->expression, function_type, dbgi);
+	case T___builtin_ctz:
+		 return gen_unary_builtin(ir_bk_ctz,      call->arguments->expression, function_type, dbgi);
+	case T___builtin_popcount:
+		 return gen_unary_builtin(ir_bk_popcount, call->arguments->expression, function_type, dbgi);
+	case T___builtin_parity:
+		 return gen_unary_builtin(ir_bk_parity,   call->arguments->expression, function_type, dbgi);
 	case T___builtin_prefetch: {
 		call_argument_t *const args = call->arguments;
 		expression_t *const addr    = args->expression;
@@ -1639,7 +1668,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			if (args->next->next != NULL) {
 				expression_t *const locality = args->next->next->expression;
 
-				in[2] = _expression_to_firm(locality);
+				in[2] = expression_to_firm(locality);
 			} else {
 				in[2] = new_Const_long(mode_int, 3);
 			}
