@@ -6973,6 +6973,11 @@ static type_t *get_builtin_symbol_type(symbol_t *symbol)
 		return make_function_1_type(type_int, type_unsigned_int);
 	case T___builtin_prefetch:
 		return make_function_1_type_variadic(type_float, type_void_ptr);
+	case T___builtin_trap: {
+		type_t *type = make_function_0_type(type_void);
+		type->function.base.modifiers |= DM_NORETURN;
+		return type;
+	}
 	default:
 		internal_errorf(HERE, "not implemented builtin identifier found");
 	}
@@ -7845,7 +7850,8 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_ctz:
 		case T___builtin_popcount:
 		case T___builtin_parity:
-		case T___builtin_prefetch:           return parse_builtin_symbol();
+		case T___builtin_prefetch:
+		case T___builtin_trap:               return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
@@ -8155,7 +8161,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 			break;
 		}
 		case T___builtin_prefetch: {
-			/* second and third argument must be constant if existant */
+			/* second and third argument must be constant if existent */
 			call_argument_t *rw = call->arguments->next;
 			call_argument_t *locality = NULL;
 

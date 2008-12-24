@@ -1676,8 +1676,14 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			in[1] = new_Const_long(mode_int, 0);
 			in[2] = new_Const_long(mode_int, 3);
 		}
-		ir_type *tp  = get_ir_type((type_t*) function_type);
+		ir_type *tp  = get_ir_type(function_type);
 		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_prefetch, 3, in, tp);
+		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
+		return NULL;
+	}
+	case T___builtin_trap: {
+		ir_type *tp  = get_ir_type(function_type);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_prefetch, 0, NULL, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
