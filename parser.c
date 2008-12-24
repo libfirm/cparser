@@ -310,6 +310,14 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T___builtin_va_arg:         \
 	case T___builtin_va_end:         \
 	case T___builtin_va_start:       \
+	case T___builtin_return_address: \
+	case T___builtin_frame_address:  \
+	case T___builtin_ffs:            \
+	case T___builtin_clz:            \
+	case T___builtin_ctz:            \
+	case T___builtin_popcount:       \
+	case T___builtin_parity:         \
+	case T___builtin_trap:           \
 	case T___func__:                 \
 	case T___noop:                   \
 	case T__assume:                  \

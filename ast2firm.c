@@ -1683,7 +1683,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case T___builtin_trap: {
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_prefetch, 0, NULL, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_trap, 0, NULL, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
