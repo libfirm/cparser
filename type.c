@@ -36,8 +36,8 @@ struct obstack         *type_obst                 = &_type_obst;
 static int              type_visited              = 0;
 static bool             print_implicit_array_size = false;
 
-static void intern_print_type_pre(const type_t *type, bool top);
-static void intern_print_type_post(const type_t *type, bool top);
+static void intern_print_type_pre(const type_t *type);
+static void intern_print_type_post(const type_t *type);
 
 typedef struct atomic_type_properties_t atomic_type_properties_t;
 struct atomic_type_properties_t {
@@ -301,9 +301,8 @@ void print_imaginary_type(const imaginary_type_t *type)
  * Print the first part (the prefix) of a type.
  *
  * @param type   The type to print.
- * @param top    true, if this is the top type, false if it's an embedded type.
  */
-static void print_function_type_pre(const function_type_t *type, bool top)
+static void print_function_type_pre(const function_type_t *type)
 {
 	switch (type->linkage) {
 		case LINKAGE_INVALID:
@@ -324,7 +323,7 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 	if (type->base.qualifiers != 0)
 		fputc(' ', out);
 
-	intern_print_type_pre(type->return_type, false);
+	intern_print_type_pre(type->return_type);
 
 	switch (type->calling_convention) {
 	case CC_CDECL:    fputs("__cdecl ",    out); break;
@@ -333,25 +332,16 @@ static void print_function_type_pre(const function_type_t *type, bool top)
 	case CC_THISCALL: fputs("__thiscall ", out); break;
 	case CC_DEFAULT:  break;
 	}
-
-	/* don't emit parenthesis if we're the toplevel type... */
-	if (!top)
-		fputc('(', out);
 }
 
 /**
  * Print the second part (the postfix) of a type.
  *
  * @param type   The type to print.
- * @param top    true, if this is the top type, false if it's an embedded type.
  */
 static void print_function_type_post(const function_type_t *type,
-                                     const scope_t *parameters, bool top)
+                                     const scope_t *parameters)
 {
-	/* don't emit parenthesis if we're the toplevel type... */
-	if (!top)
-		fputc(')', out);
-
 	fputc('(', out);
 	bool first = true;
 	if (parameters == NULL) {
@@ -396,7 +386,7 @@ static void print_function_type_post(const function_type_t *type,
 	}
 	fputc(')', out);
 
-	intern_print_type_post(type->return_type, false);
+	intern_print_type_post(type->return_type);
 }
 
 /**
@@ -406,7 +396,10 @@ static void print_function_type_post(const function_type_t *type,
  */
 static void print_pointer_type_pre(const pointer_type_t *type)
 {
-	intern_print_type_pre(type->points_to, false);
+	type_t const *const points_to = type->points_to;
+	intern_print_type_pre(points_to);
+	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
+		fputs(" (", out);
 	variable_t *const variable = type->base_variable;
 	if (variable != NULL) {
 		fputs(" __based(", out);
@@ -421,24 +414,30 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 }
 
 /**
- * Prints the prefix part of a reference type.
- *
- * @param type   The reference type.
- */
-static void print_reference_type_pre(const reference_type_t *type)
-{
-	intern_print_type_pre(type->refers_to, false);
-	fputc('&', out);
-}
-
-/**
  * Prints the postfix part of a pointer type.
  *
  * @param type   The pointer type.
  */
 static void print_pointer_type_post(const pointer_type_t *type)
 {
-	intern_print_type_post(type->points_to, false);
+	type_t const *const points_to = type->points_to;
+	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
+		fputc(')', out);
+	intern_print_type_post(points_to);
+}
+
+/**
+ * Prints the prefix part of a reference type.
+ *
+ * @param type   The reference type.
+ */
+static void print_reference_type_pre(const reference_type_t *type)
+{
+	type_t const *const refers_to = type->refers_to;
+	intern_print_type_pre(refers_to);
+	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
+		fputs(" (", out);
+	fputc('&', out);
 }
 
 /**
@@ -448,7 +447,10 @@ static void print_pointer_type_post(const pointer_type_t *type)
  */
 static void print_reference_type_post(const reference_type_t *type)
 {
-	intern_print_type_post(type->refers_to, false);
+	type_t const *const refers_to = type->refers_to;
+	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
+		fputc(')', out);
+	intern_print_type_post(refers_to);
 }
 
 /**
@@ -458,7 +460,7 @@ static void print_reference_type_post(const reference_type_t *type)
  */
 static void print_array_type_pre(const array_type_t *type)
 {
-	intern_print_type_pre(type->element_type, false);
+	intern_print_type_pre(type->element_type);
 }
 
 /**
@@ -480,7 +482,7 @@ static void print_array_type_post(const array_type_t *type)
 		print_expression(type->size_expression);
 	}
 	fputc(']', out);
-	intern_print_type_post(type->element_type, false);
+	intern_print_type_post(type->element_type);
 }
 
 /**
@@ -492,7 +494,7 @@ static void print_bitfield_type_post(const bitfield_type_t *type)
 {
 	fputs(" : ", out);
 	print_expression(type->size_expression);
-	intern_print_type_post(type->base_type, false);
+	intern_print_type_post(type->base_type);
 }
 
 /**
@@ -635,9 +637,8 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
  * Prints the prefix part of a type.
  *
  * @param type   The type.
- * @param top    true if we print the toplevel type, false else.
  */
-static void intern_print_type_pre(const type_t *const type, const bool top)
+static void intern_print_type_pre(const type_t *const type)
 {
 	switch(type->kind) {
 	case TYPE_ERROR:
@@ -666,7 +667,7 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 		fputs(type->builtin.symbol->string, out);
 		return;
 	case TYPE_FUNCTION:
-		print_function_type_pre(&type->function, top);
+		print_function_type_pre(&type->function);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_pre(&type->pointer);
@@ -675,7 +676,7 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
 		print_reference_type_pre(&type->reference);
 		return;
 	case TYPE_BITFIELD:
-		intern_print_type_pre(type->bitfield.base_type, top);
+		intern_print_type_pre(type->bitfield.base_type);
 		return;
 	case TYPE_ARRAY:
 		print_array_type_pre(&type->array);
@@ -694,13 +695,12 @@ static void intern_print_type_pre(const type_t *const type, const bool top)
  * Prints the postfix part of a type.
  *
  * @param type   The type.
- * @param top    true if we print the toplevel type, false else.
  */
-static void intern_print_type_post(const type_t *const type, const bool top)
+static void intern_print_type_post(const type_t *const type)
 {
 	switch(type->kind) {
 	case TYPE_FUNCTION:
-		print_function_type_post(&type->function, NULL, top);
+		print_function_type_post(&type->function, NULL);
 		return;
 	case TYPE_POINTER:
 		print_pointer_type_post(&type->pointer);
@@ -751,15 +751,15 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 		return;
 	}
 
-	intern_print_type_pre(type, true);
+	intern_print_type_pre(type);
 	if (symbol != NULL) {
 		fputc(' ', out);
 		fputs(symbol->string, out);
 	}
 	if (type->kind == TYPE_FUNCTION) {
-		print_function_type_post(&type->function, parameters, true);
+		print_function_type_post(&type->function, parameters);
 	} else {
-		intern_print_type_post(type, true);
+		intern_print_type_post(type);
 	}
 }
 
