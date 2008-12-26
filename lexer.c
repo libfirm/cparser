@@ -257,6 +257,54 @@ realign:
 	} while (bufpos == bufend);
 }
 
+static void decode_windows_1252(void)
+{
+	unsigned char read_buf[BUF_SIZE];
+	size_t const s = read_block(read_buf, sizeof(read_buf));
+	if (s == 0)
+		return;
+
+	unsigned char const *src = read_buf;
+	unsigned char const *end = read_buf + s;
+	utf32               *dst = buf + MAX_PUTBACK;
+	while (src != end) {
+		utf32 tc = *src++;
+		switch (tc) {
+			case 0x80: tc = 0x20AC; break; // €
+			case 0x82: tc = 0x201A; break; // ‚
+			case 0x83: tc = 0x0192; break; // ƒ
+			case 0x84: tc = 0x201E; break; // „
+			case 0x85: tc = 0x2026; break; // …
+			case 0x86: tc = 0x2020; break; // †
+			case 0x87: tc = 0x2021; break; // ‡
+			case 0x88: tc = 0x02C6; break; // ˆ
+			case 0x89: tc = 0x2030; break; // ‰
+			case 0x8A: tc = 0x0160; break; // Š
+			case 0x8B: tc = 0x2039; break; // ‹
+			case 0x8C: tc = 0x0152; break; // Œ
+			case 0x8E: tc = 0x017D; break; // Ž
+			case 0x91: tc = 0x2018; break; // ‘
+			case 0x92: tc = 0x2019; break; // ’
+			case 0x93: tc = 0x201C; break; // “
+			case 0x94: tc = 0x201D; break; // ”
+			case 0x95: tc = 0x2022; break; // •
+			case 0x96: tc = 0x2013; break; // –
+			case 0x97: tc = 0x2014; break; // —
+			case 0x98: tc = 0x02DC; break; // ˜
+			case 0x99: tc = 0x2122; break; // ™
+			case 0x9A: tc = 0x0161; break; // š
+			case 0x9B: tc = 0x203A; break; // ›
+			case 0x9C: tc = 0x0153; break; // œ
+			case 0x9E: tc = 0x017E; break; // ž
+			case 0x9F: tc = 0x0178; break; // Ÿ
+		}
+		*dst++ = tc;
+	}
+
+	bufpos = buf + MAX_PUTBACK;
+	bufend = dst;
+}
+
 typedef void (*decoder_t)(void);
 
 static decoder_t decoder = decode_utf8;
@@ -267,23 +315,25 @@ typedef struct named_decoder_t {
 } named_decoder_t;
 
 static named_decoder_t const decoders[] = {
-	{ "CP819",           decode_iso_8859_1  }, // offical alias
-	{ "IBM819",          decode_iso_8859_1  }, // offical alias
-	{ "ISO-8859-1",      decode_iso_8859_1  }, // offical alias
-	{ "ISO-8859-15",     decode_iso_8859_15 }, // offical name
-	{ "ISO8859-1",       decode_iso_8859_1  },
-	{ "ISO8859-15",      decode_iso_8859_15 },
-	{ "ISO_8859-1",      decode_iso_8859_1  }, // offical alias
-	{ "ISO_8859-15",     decode_iso_8859_15 }, // offical alias
-	{ "ISO_8859-1:1987", decode_iso_8859_1  }, // offical name
-	{ "Latin-9",         decode_iso_8859_15 }, // offical alias
-	{ "UTF-8",           decode_utf8        }, // offical name
-	{ "csISOLatin1",     decode_iso_8859_1  }, // offical alias
-	{ "iso-ir-100",      decode_iso_8859_1  }, // offical alias
-	{ "l1",              decode_iso_8859_1  }, // offical alias
-	{ "latin1",          decode_iso_8859_1  }, // offical alias
+	{ "CP819",           decode_iso_8859_1   }, // offical alias
+	{ "IBM819",          decode_iso_8859_1   }, // offical alias
+	{ "ISO-8859-1",      decode_iso_8859_1   }, // offical alias
+	{ "ISO-8859-15",     decode_iso_8859_15  }, // offical name
+	{ "ISO8859-1",       decode_iso_8859_1   },
+	{ "ISO8859-15",      decode_iso_8859_15  },
+	{ "ISO_8859-1",      decode_iso_8859_1   }, // offical alias
+	{ "ISO_8859-15",     decode_iso_8859_15  }, // offical alias
+	{ "ISO_8859-1:1987", decode_iso_8859_1   }, // offical name
+	{ "Latin-9",         decode_iso_8859_15  }, // offical alias
+	{ "UTF-8",           decode_utf8         }, // offical name
+	{ "csISOLatin1",     decode_iso_8859_1   }, // offical alias
+	{ "cp1252",          decode_windows_1252 },
+	{ "iso-ir-100",      decode_iso_8859_1   }, // offical alias
+	{ "l1",              decode_iso_8859_1   }, // offical alias
+	{ "latin1",          decode_iso_8859_1   }, // offical alias
+	{ "windows-1252",    decode_windows_1252 }, // official name
 
-	{ NULL,              NULL               }
+	{ NULL,              NULL                }
 };
 
 void select_input_encoding(char const* const encoding)
