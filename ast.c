@@ -1765,9 +1765,10 @@ static bool is_builtin_const_call(const expression_t *expression)
 	case bk_gnu_builtin_nanf:
 	case bk_gnu_builtin_nanl:
 		return true;
+	default:
+		return false;
 	}
 
-	return false;
 }
 
 static bool is_constant_pointer(const expression_t *expression)

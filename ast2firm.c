@@ -1712,7 +1712,6 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return NULL;
 	}
 	case bk_ms_ReturnAddress: {
-		expression_t *const expression = call->arguments->expression;
 		ir_node *in[2];
 
 		in[0] = new_Const_long(mode_int, 0);
