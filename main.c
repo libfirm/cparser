@@ -1129,6 +1129,10 @@ int main(int argc, char **argv)
 	/* we do the lowering in ast2firm */
 	firm_opt.lower_bitfields = FALSE;
 
+	/* set the c_mode here, types depends on it */
+	c_mode |= features_on;
+	c_mode &= ~features_off;
+
 	gen_firm_init();
 	init_symbol_table();
 	init_types();
@@ -1313,6 +1317,7 @@ default_cxx_warn:
 do_parsing:
 			c_mode |= features_on;
 			c_mode &= ~features_off;
+
 			init_tokens();
 			translation_unit_t *const unit = do_parsing(in, filename);
 
