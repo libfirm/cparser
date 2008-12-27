@@ -9352,9 +9352,8 @@ static bool expression_has_effect(const expression_t *const expr)
 				return true;
 
 			switch (call->function->reference.entity->function.btk) {
-				case bk_gnu_builtin_prefetch:
-				case bk_gnu_builtin_va_end:   return true;
-				default:                      return false;
+				/* FIXME: which builtins have no effect? */
+				default:                      return true;
 			}
 		}
 
@@ -11503,10 +11502,25 @@ static void create_microsoft_intrinsics(void) {
 #define CONCAT(a,b)          a##b
 #define MS_BUILTIN(a, b)  create_builtin_function(CONCAT(bk_ms, a), STR(a), b)
 
+	/* intrinsics for all architectures */
+	MS_BUILTIN(_rotl,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
+	MS_BUILTIN(_rotr,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
+	MS_BUILTIN(_rotl64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
+	MS_BUILTIN(_rotr64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
+	MS_BUILTIN(_byteswap_ushort,       make_function_1_type(type_unsigned_short, type_unsigned_short));
+	MS_BUILTIN(_byteswap_ulong,        make_function_1_type(type_unsigned_long,  type_unsigned_long));
+	MS_BUILTIN(_byteswap_uint64,       make_function_1_type(type_unsigned_int64, type_unsigned_int64));
+
 	MS_BUILTIN(__debugbreak,    make_function_0_type(type_void));
 	MS_BUILTIN(_ReturnAddress,  make_function_0_type(type_void_ptr));
 	MS_BUILTIN(__popcount,      make_function_1_type(type_unsigned_int, type_unsigned_int));
-	MS_BUILTIN(__ud2,           make_function_0_type_noreturn(type_void));
+
+	/* x86/x64 only */
+	MS_BUILTIN(__ud2,                  make_function_0_type_noreturn(type_void));
+	MS_BUILTIN(_BitScanForward,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
+	MS_BUILTIN(_BitScanReverse,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
+	MS_BUILTIN(_InterlockedExchange,   make_function_2_type(type_long, type_long_ptr, type_long));
+	MS_BUILTIN(_InterlockedExchange64, make_function_2_type(type_int64, type_int64_ptr, type_int64));
 
 #undef MS_BUILTIN
 #undef CONCAT

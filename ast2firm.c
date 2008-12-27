@@ -1720,6 +1720,26 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
+	case bk_ms_rotl:
+	case bk_ms_rotl64: {
+		ir_node *val  = expression_to_firm(call->arguments->expression);
+		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
+		ir_mode *mode = get_irn_mode(val);
+		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
+	}
+	case bk_ms_rotr:
+	case bk_ms_rotr64: {
+		ir_node *val  = expression_to_firm(call->arguments->expression);
+		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
+		ir_mode *mode = get_irn_mode(val);
+		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
+		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
+		return new_d_Rotl(dbgi, val, sub, mode);
+	}
+	case bk_ms_byteswap_ushort:
+	case bk_ms_byteswap_ulong:
+	case bk_ms_byteswap_uint64:
+		return gen_unary_builtin(ir_bk_bswap, call->arguments->expression, function_type, dbgi);
 	default:
 		panic("unsupported builtin found");
 	}

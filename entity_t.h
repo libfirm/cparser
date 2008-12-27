@@ -257,10 +257,22 @@ typedef enum builtin_kind_t {
 	bk_gnu_builtin_prefetch,       /**< GNU __builtin_prefetch */
 	bk_gnu_builtin_trap,           /**< GNU __builtin_trap */
 
+	bk_ms_rotl,                    /**< MS _rotl */
+	bk_ms_rotr,                    /**< MS _rotr */
+	bk_ms_rotl64,                  /**< MS _rotl64 */
+	bk_ms_rotr64,                  /**< MS _rotr64 */
+	bk_ms_byteswap_ushort,         /**< MS _byteswap_ushort */
+	bk_ms_byteswap_ulong,          /**< MS _byteswap_ulong */
+	bk_ms_byteswap_uint64,         /**< MS _byteswap_uint64 */
+
 	bk_ms__debugbreak,             /**< MS __debugbreak */
 	bk_ms_ReturnAddress,           /**< MS _ReturnAddress */
 	bk_ms__popcount,               /**< MS __popcount */
 	bk_ms__ud2,                    /**< MS __ud2 */
+	bk_ms_BitScanForward,          /**< MS _BitScanForward */
+	bk_ms_BitScanReverse,          /**< MS _BitScanReverse */
+	bk_ms_InterlockedExchange,     /**< MS _InterlockedExchange */
+	bk_ms_InterlockedExchange64,   /**< MS _InterlockedExchange64 */
 } builtin_kind_t;
 
 struct function_t {

@@ -48,6 +48,7 @@ type_t *type_const_char_ptr;
 type_t *type_int_ptr;
 type_t *type_long_long_ptr;
 type_t *type_long_ptr;
+type_t *type_unsigned_long_ptr;
 type_t *type_short_ptr;
 type_t *type_signed_char_ptr;
 type_t *type_void_ptr;
@@ -90,6 +91,7 @@ type_t *type_unsigned_int8;
 type_t *type_unsigned_int16;
 type_t *type_unsigned_int32;
 type_t *type_unsigned_int64;
+type_t *type_int64_ptr;
 
 
 void init_basic_types(void)
@@ -133,6 +135,9 @@ void init_basic_types(void)
 		type_unsigned_int32      = make_atomic_type(unsigned_int32_type_kind, TYPE_QUALIFIER_NONE);
 		unsigned_int64_type_kind = find_unsigned_int_atomic_type_kind_for_size(8);
 		type_unsigned_int64      = make_atomic_type(unsigned_int64_type_kind, TYPE_QUALIFIER_NONE);
+
+		/* pointer types */
+		type_int64_ptr           = make_pointer_type(type_int64,              TYPE_QUALIFIER_NONE);
 	}
 
 	/* pointer types */
@@ -142,6 +147,7 @@ void init_basic_types(void)
 	type_short_ptr          = make_pointer_type(type_short,             TYPE_QUALIFIER_NONE);
 	type_int_ptr            = make_pointer_type(type_int,               TYPE_QUALIFIER_NONE);
 	type_long_ptr           = make_pointer_type(type_long,              TYPE_QUALIFIER_NONE);
+	type_unsigned_long_ptr  = make_pointer_type(type_unsigned_long,     TYPE_QUALIFIER_NONE);
 	type_long_long_ptr      = make_pointer_type(type_long_long,         TYPE_QUALIFIER_NONE);
 
 	type_char_ptr_ptr       = make_pointer_type(type_char_ptr,          TYPE_QUALIFIER_NONE);
