@@ -85,7 +85,6 @@ static void walk_expression(expression_t const *const expr,
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
-	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
 	case EXPR_LABEL_ADDRESS:

@@ -232,12 +232,44 @@ struct parameter_t {
 	} v;
 };
 
+/**
+ * GNU builtin or MS intrinsic functions.
+ */
+typedef enum builtin_kind_t {
+	bk_none = 0,                   /**< no builtin */
+	bk_gnu_builtin_alloca,         /**< GNU __builtin_alloca */
+	bk_gnu_builtin_huge_val,       /**< GNU __builtin_huge_val */
+	bk_gnu_builtin_inf,            /**< GNU __builtin_inf */
+	bk_gnu_builtin_inff,           /**< GNU __builtin_inff */
+	bk_gnu_builtin_infl,           /**< GNU __builtin_infl */
+	bk_gnu_builtin_nan,            /**< GNU __builtin_nan */
+	bk_gnu_builtin_nanf,           /**< GNU __builtin_nanf */
+	bk_gnu_builtin_nanl,           /**< GNU __builtin_nanl */
+	bk_gnu_builtin_va_end,         /**< GNU __builtin_va_end */
+	bk_gnu_builtin_expect,         /**< GNU __builtin_expect */
+	bk_gnu_builtin_return_address, /**< GNU __builtin_return_address */
+	bk_gnu_builtin_frame_address,  /**< GNU __builtin_frame_address */
+	bk_gnu_builtin_ffs,            /**< GNU __builtin_ffs */
+	bk_gnu_builtin_clz,            /**< GNU __builtin_clz */
+	bk_gnu_builtin_ctz,            /**< GNU __builtin_ctz */
+	bk_gnu_builtin_popcount,       /**< GNU __builtin_popcount */
+	bk_gnu_builtin_parity,         /**< GNU __builtin_parity */
+	bk_gnu_builtin_prefetch,       /**< GNU __builtin_prefetch */
+	bk_gnu_builtin_trap,           /**< GNU __builtin_trap */
+
+	bk_ms__debugbreak,             /**< MS __debugbreak */
+	bk_ms_ReturnAddress,           /**< MS _ReturnAddress */
+	bk_ms__popcount,               /**< MS __popcount */
+	bk_ms__ud2,                    /**< MS __ud2 */
+} builtin_kind_t;
+
 struct function_t {
 	declaration_t  base;
 	bool           is_inline     : 1;
 	bool           need_closure  : 1;  /**< Inner function needs closure. */
 	bool           goto_to_outer : 1;  /**< Inner function has goto to outer function. */
 
+	builtin_kind_t btk;
 	scope_t        parameters;
 	statement_t   *statement;
 

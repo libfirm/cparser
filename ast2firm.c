@@ -1444,6 +1444,21 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode_storage(type);
+
+		if (entity->function.btk != bk_none) {
+			/* for gcc compatibility we have to produce (dummy) addresses for some
+			 * builtins */
+			if (warning.other) {
+				warningf(&ref->base.source_position,
+					"taking address of builtin '%Y'", ref->entity->base.symbol);
+			}
+
+			/* simply create a NULL pointer */
+			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
+			ir_node  *res  = new_Const_long(mode, 0);
+
+			return res;
+		}
 		return create_symconst(dbgi, mode, entity->function.entity);
 	}
 	case DECLARATION_KIND_INNER_FUNCTION: {
@@ -1549,9 +1564,10 @@ static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t
 	in[0] = expression_to_firm(op);
 
 	ir_type *tp  = get_ir_type(function_type);
+	ir_type *res = get_method_res_type(tp, 0);
 	ir_node *irn = new_d_Builtin(db, get_irg_no_mem(current_ir_graph), kind, 1, in, tp);
 	set_irn_pinned(irn, op_pin_state_floats);
-	return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
+	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
 }
 
 /**
@@ -1561,17 +1577,16 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 {
 	dbg_info *dbgi = get_dbg_info(&call->base.source_position);
 
-	assert(call->function->kind == EXPR_BUILTIN_SYMBOL);
-	builtin_symbol_expression_t *builtin = &call->function->builtin_symbol;
+	assert(call->function->kind == EXPR_REFERENCE);
+	reference_expression_t *builtin = &call->function->reference;
 
 	type_t *type = skip_typeref(builtin->base.type);
 	assert(is_type_pointer(type));
 
 	type_t   *function_type = skip_typeref(type->pointer.points_to);
-	symbol_t *symbol        = builtin->symbol;
 
-	switch(symbol->ID) {
-	case T___builtin_alloca: {
+	switch (builtin->entity->function.btk) {
+	case bk_gnu_builtin_alloca: {
 		if (call->arguments == NULL || call->arguments->next != NULL) {
 			panic("invalid number of parameters on __builtin_alloca");
 		}
@@ -1588,19 +1603,19 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return res;
 	}
 
-	case T___builtin_huge_val:
-	case T___builtin_inf:
-	case T___builtin_inff:
-	case T___builtin_infl: {
+	case bk_gnu_builtin_huge_val:
+	case bk_gnu_builtin_inf:
+	case bk_gnu_builtin_inff:
+	case bk_gnu_builtin_infl: {
 		type_t  *type = function_type->function.return_type;
 		ir_mode *mode = get_ir_mode_arithmetic(type);
 		tarval  *tv   = get_mode_infinite(mode);
 		ir_node *res  = new_d_Const(dbgi, tv);
 		return   res;
 	}
-	case T___builtin_nan:
-	case T___builtin_nanf:
-	case T___builtin_nanl: {
+	case bk_gnu_builtin_nan:
+	case bk_gnu_builtin_nanf:
+	case bk_gnu_builtin_nanl: {
 		/* Ignore string for now... */
 		assert(is_type_function(function_type));
 		type_t  *type = function_type->function.return_type;
@@ -1609,15 +1624,15 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *res  = new_d_Const(dbgi, tv);
 		return res;
 	}
-	case T___builtin_expect: {
+	case bk_gnu_builtin_expect: {
 		expression_t *argument = call->arguments->expression;
 		return _expression_to_firm(argument);
 	}
-	case T___builtin_va_end:
+	case bk_gnu_builtin_va_end:
 		/* evaluate the argument of va_end for its side effects */
 		_expression_to_firm(call->arguments->expression);
 		return NULL;
-	case T___builtin_frame_address: {
+	case bk_gnu_builtin_frame_address: {
 		expression_t *const expression = call->arguments->expression;
 		long val = fold_constant(expression);
 		if (val == 0) {
@@ -1634,7 +1649,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 		}
 	}
-	case T___builtin_return_address: {
+	case bk_gnu_builtin_return_address: {
 		expression_t *const expression = call->arguments->expression;
 		ir_node *in[2];
 
@@ -1644,17 +1659,18 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
-	case T___builtin_ffs:
+	case bk_gnu_builtin_ffs:
 		 return gen_unary_builtin(ir_bk_ffs,      call->arguments->expression, function_type, dbgi);
-	case T___builtin_clz:
+	case bk_gnu_builtin_clz:
 		 return gen_unary_builtin(ir_bk_clz,      call->arguments->expression, function_type, dbgi);
-	case T___builtin_ctz:
+	case bk_gnu_builtin_ctz:
 		 return gen_unary_builtin(ir_bk_ctz,      call->arguments->expression, function_type, dbgi);
-	case T___builtin_popcount:
+	case bk_gnu_builtin_popcount:
+	case bk_ms__popcount:
 		 return gen_unary_builtin(ir_bk_popcount, call->arguments->expression, function_type, dbgi);
-	case T___builtin_parity:
+	case bk_gnu_builtin_parity:
 		 return gen_unary_builtin(ir_bk_parity,   call->arguments->expression, function_type, dbgi);
-	case T___builtin_prefetch: {
+	case bk_gnu_builtin_prefetch: {
 		call_argument_t *const args = call->arguments;
 		expression_t *const addr    = args->expression;
 		ir_node *in[3];
@@ -1681,11 +1697,29 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
-	case T___builtin_trap: {
+	case bk_gnu_builtin_trap:
+	case bk_ms__ud2:
+	{
 		ir_type *tp  = get_ir_type(function_type);
 		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_trap, 0, NULL, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
+	}
+	case bk_ms__debugbreak: {
+		ir_type *tp  = get_ir_type(function_type);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_debugbreak, 0, NULL, tp);
+		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
+		return NULL;
+	}
+	case bk_ms_ReturnAddress: {
+		expression_t *const expression = call->arguments->expression;
+		ir_node *in[2];
+
+		in[0] = new_Const_long(mode_int, 0);
+		in[1] = get_irg_frame(current_ir_graph);
+		ir_type *tp  = get_ir_type(function_type);
+		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
+		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
 	default:
 		panic("unsupported builtin found");
@@ -1705,12 +1739,14 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	assert(get_cur_block() != NULL);
 
 	expression_t *function = call->function;
-	if (function->kind == EXPR_BUILTIN_SYMBOL) {
-		return process_builtin_call(call);
-	}
 	if (function->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref    = &function->reference;
 		entity_t                     *entity = ref->entity;
+
+		if (ref->entity->kind == ENTITY_FUNCTION &&
+		    ref->entity->function.btk != bk_none) {
+			return process_builtin_call(call);
+		}
 
 		if (entity->kind == ENTITY_FUNCTION
 				&& entity->function.entity == rts_entities[rts_alloca]) {
@@ -3231,23 +3267,6 @@ static ir_node *label_address_to_firm(
 	return new_SymConst(mode_P_code, value, symconst_label);
 }
 
-static ir_node *builtin_symbol_to_firm(
-		const builtin_symbol_expression_t *expression)
-{
-	/* for gcc compatibility we have to produce (dummy) addresses for some
-	 * builtins */
-	if (warning.other) {
-		warningf(&expression->base.source_position,
-				 "taking address of builtin '%Y'", expression->symbol);
-	}
-
-	/* simply create a NULL pointer */
-	ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
-	ir_node  *res  = new_Const_long(mode, 0);
-
-	return res;
-}
-
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
@@ -3303,8 +3322,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return va_start_expression_to_firm(&expression->va_starte);
 	case EXPR_VA_ARG:
 		return va_arg_expression_to_firm(&expression->va_arge);
-	case EXPR_BUILTIN_SYMBOL:
-		return builtin_symbol_to_firm(&expression->builtin_symbol);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
@@ -3323,15 +3340,20 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	panic("invalid expression found");
 }
 
+/**
+ * Check if a given expression is a GNU __builtin_expect() call.
+ */
 static bool is_builtin_expect(const expression_t *expression)
 {
 	if (expression->kind != EXPR_CALL)
 		return false;
 
 	expression_t *function = expression->call.function;
-	if (function->kind != EXPR_BUILTIN_SYMBOL)
+	if (function->kind != EXPR_REFERENCE)
 		return false;
-	if (function->builtin_symbol.symbol->ID != T___builtin_expect)
+	reference_expression_t *ref = &function->reference;
+	if (ref->entity->kind == ENTITY_FUNCTION &&
+	    ref->entity->function.btk != bk_gnu_builtin_expect)
 		return false;
 
 	return true;
@@ -5633,6 +5655,10 @@ static void scope_to_firm(scope_t *scope)
 			continue;
 
 		if (entity->kind == ENTITY_FUNCTION) {
+			if (entity->function.btk != bk_none) {
+				/* builtins have no representation */
+				continue;
+			}
 			get_function_entity(entity);
 		} else if (entity->kind == ENTITY_VARIABLE) {
 			create_global_variable(entity);
@@ -5646,6 +5672,10 @@ static void scope_to_firm(scope_t *scope)
 			continue;
 
 		if (entity->kind == ENTITY_FUNCTION) {
+			if (entity->function.btk != bk_none) {
+				/* builtins have no representation */
+				continue;
+			}
 			create_function(entity);
 		} else if (entity->kind == ENTITY_VARIABLE) {
 			assert(entity->declaration.kind

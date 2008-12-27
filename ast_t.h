@@ -81,7 +81,6 @@ typedef enum expression_kind_t {
 	EXPR_ALIGNOF,
 
 	EXPR_FUNCNAME,
-	EXPR_BUILTIN_SYMBOL,
 	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_BUILTIN_TYPES_COMPATIBLE_P,
 	EXPR_OFFSETOF,
@@ -273,11 +272,6 @@ struct compound_literal_expression_t {
 	initializer_t     *initializer;
 };
 
-struct builtin_symbol_expression_t {
-	expression_base_t  base;
-	symbol_t          *symbol;
-};
-
 struct builtin_constant_expression_t {
 	expression_base_t  base;
 	expression_t      *value;
@@ -389,7 +383,6 @@ union expression_t {
 	string_literal_expression_t           string;
 	wide_string_literal_expression_t      wide_string;
 	compound_literal_expression_t         compound_literal;
-	builtin_symbol_expression_t           builtin_symbol;
 	builtin_constant_expression_t         builtin_constant;
 	builtin_types_compatible_expression_t builtin_types_compatible;
 	reference_expression_t                reference;

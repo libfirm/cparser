@@ -114,7 +114,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_ALIGNOF]                    = PREC_UNARY,
 
 		[EXPR_FUNCNAME]                   = PREC_PRIMARY,
-		[EXPR_BUILTIN_SYMBOL]             = PREC_PRIMARY,
 		[EXPR_BUILTIN_CONSTANT_P]         = PREC_PRIMARY,
 		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = PREC_PRIMARY,
 		[EXPR_OFFSETOF]                   = PREC_PRIMARY,
@@ -585,16 +584,6 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 }
 
 /**
- * Prints an builtin symbol.
- *
- * @param expression   the builtin symbol expression
- */
-static void print_builtin_symbol(const builtin_symbol_expression_t *expression)
-{
-	fputs(expression->symbol->string, out);
-}
-
-/**
  * Prints a builtin constant expression.
  *
  * @param expression   the builtin constant expression
@@ -811,9 +800,6 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_SIZEOF:
 	case EXPR_ALIGNOF:
 		print_typeprop_expression(&expression->typeprop);
-		break;
-	case EXPR_BUILTIN_SYMBOL:
-		print_builtin_symbol(&expression->builtin_symbol);
 		break;
 	case EXPR_BUILTIN_CONSTANT_P:
 		print_builtin_constant(&expression->builtin_constant);
@@ -1757,23 +1743,27 @@ bool is_address_constant(const expression_t *expression)
 	}
 }
 
+/**
+ * Check if the given expression is a call to a builtin function
+ * returning a constant result.
+ */
 static bool is_builtin_const_call(const expression_t *expression)
 {
 	expression_t *function = expression->call.function;
-	if (function->kind != EXPR_BUILTIN_SYMBOL) {
+	if (function->kind != EXPR_REFERENCE)
 		return false;
-	}
+	reference_expression_t *ref = &function->reference;
+	if (ref->entity->kind != ENTITY_FUNCTION)
+		return false;
 
-	symbol_t *symbol = function->builtin_symbol.symbol;
-
-	switch (symbol->ID) {
-	case T___builtin_huge_val:
-	case T___builtin_inf:
-	case T___builtin_inff:
-	case T___builtin_infl:
-	case T___builtin_nan:
-	case T___builtin_nanf:
-	case T___builtin_nanl:
+	switch (ref->entity->function.btk) {
+	case bk_gnu_builtin_huge_val:
+	case bk_gnu_builtin_inf:
+	case bk_gnu_builtin_inff:
+	case bk_gnu_builtin_infl:
+	case bk_gnu_builtin_nan:
+	case bk_gnu_builtin_nanf:
+	case bk_gnu_builtin_nanl:
 		return true;
 	}
 
@@ -1854,7 +1844,6 @@ bool is_constant_expression(const expression_t *expression)
 		return true;
 	}
 
-	case EXPR_BUILTIN_SYMBOL:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:

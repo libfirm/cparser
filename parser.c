@@ -206,6 +206,9 @@ static entity_t *record_entity(entity_t *entity, bool is_definition);
 
 static void semantic_comparison(binary_expression_t *expression);
 
+static void create_gnu_builtins(void);
+static void create_microsoft_intrinsics(void);
+
 #define STORAGE_CLASSES       \
 	STORAGE_CLASSES_NO_EXTERN \
 	case T_extern:
@@ -288,36 +291,17 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T___FUNCTION__:             \
 	case T___PRETTY_FUNCTION__:      \
 	case T___alignof__:              \
-	case T___builtin_alloca:         \
 	case T___builtin_classify_type:  \
 	case T___builtin_constant_p:     \
-	case T___builtin_expect:         \
-	case T___builtin_huge_val:       \
-	case T___builtin_inf:            \
-	case T___builtin_inff:           \
-	case T___builtin_infl:           \
 	case T___builtin_isgreater:      \
 	case T___builtin_isgreaterequal: \
 	case T___builtin_isless:         \
 	case T___builtin_islessequal:    \
 	case T___builtin_islessgreater:  \
 	case T___builtin_isunordered:    \
-	case T___builtin_nan:            \
-	case T___builtin_nanf:           \
-	case T___builtin_nanl:           \
 	case T___builtin_offsetof:       \
-	case T___builtin_prefetch:       \
 	case T___builtin_va_arg:         \
-	case T___builtin_va_end:         \
 	case T___builtin_va_start:       \
-	case T___builtin_return_address: \
-	case T___builtin_frame_address:  \
-	case T___builtin_ffs:            \
-	case T___builtin_clz:            \
-	case T___builtin_ctz:            \
-	case T___builtin_popcount:       \
-	case T___builtin_parity:         \
-	case T___builtin_trap:           \
 	case T___func__:                 \
 	case T___noop:                   \
 	case T__assume:                  \
@@ -436,7 +420,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_ALIGNOF]                    = sizeof(typeprop_expression_t),
 		[EXPR_CLASSIFY_TYPE]              = sizeof(classify_type_expression_t),
 		[EXPR_FUNCNAME]                   = sizeof(funcname_expression_t),
-		[EXPR_BUILTIN_SYMBOL]             = sizeof(builtin_symbol_expression_t),
 		[EXPR_BUILTIN_CONSTANT_P]         = sizeof(builtin_constant_expression_t),
 		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = sizeof(builtin_types_compatible_expression_t),
 		[EXPR_OFFSETOF]                   = sizeof(offsetof_expression_t),
@@ -2145,7 +2128,6 @@ unary:
 		case EXPR_CLASSIFY_TYPE:
 		case EXPR_ALIGNOF:
 		case EXPR_FUNCNAME:
-		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_OFFSETOF:
@@ -5762,7 +5744,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_SIZEOF: // TODO handle obscure VLA case
 		case EXPR_ALIGNOF:
 		case EXPR_FUNCNAME:
-		case EXPR_BUILTIN_SYMBOL:
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_OFFSETOF:
@@ -6943,52 +6924,20 @@ static type_t *make_function_0_type(type_t *return_type)
 }
 
 /**
- * Creates a function type for some function like builtins.
+ * Creates a NO_RETURN return_type (func)(void) function type if not
+ * already exists.
  *
- * @param symbol   the symbol describing the builtin
+ * @param return_type    the return type
  */
-static type_t *get_builtin_symbol_type(symbol_t *symbol)
+static type_t *make_function_0_type_noreturn(type_t *return_type)
 {
-	switch (symbol->ID) {
-	case T___builtin_alloca:
-		return make_function_1_type(type_void_ptr, type_size_t);
-	case T___builtin_huge_val:
-		return make_function_0_type(type_double);
-	case T___builtin_inf:
-		return make_function_0_type(type_double);
-	case T___builtin_inff:
-		return make_function_0_type(type_float);
-	case T___builtin_infl:
-		return make_function_0_type(type_long_double);
-	case T___builtin_nan:
-		return make_function_1_type(type_double, type_char_ptr);
-	case T___builtin_nanf:
-		return make_function_1_type(type_float, type_char_ptr);
-	case T___builtin_nanl:
-		return make_function_1_type(type_long_double, type_char_ptr);
-	case T___builtin_va_end:
-		return make_function_1_type(type_void, type_valist);
-	case T___builtin_expect:
-		return make_function_2_type(type_long, type_long, type_long);
-	case T___builtin_return_address:
-	case T___builtin_frame_address:
-		return make_function_1_type(type_void_ptr, type_unsigned_int);
-	case T___builtin_ffs:
-	case T___builtin_clz:
-	case T___builtin_ctz:
-	case T___builtin_popcount:
-	case T___builtin_parity:
-		return make_function_1_type(type_int, type_unsigned_int);
-	case T___builtin_prefetch:
-		return make_function_1_type_variadic(type_float, type_void_ptr);
-	case T___builtin_trap: {
-		type_t *type = make_function_0_type(type_void);
-		type->function.base.modifiers |= DM_NORETURN;
-		return type;
-	}
-	default:
-		internal_errorf(HERE, "not implemented builtin identifier found");
-	}
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = NULL;
+	type->function.base.modifiers |= DM_NORETURN;
+	return type;
+
+	return identify_new_type(type);
 }
 
 /**
@@ -7047,9 +6996,6 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 				return type_error_type;
 			return type->pointer.points_to;
 		}
-
-		case EXPR_BUILTIN_SYMBOL:
-			return get_builtin_symbol_type(expression->builtin_symbol.symbol);
 
 		case EXPR_ARRAY_ACCESS: {
 			const expression_t *array_ref = expression->array_access.array_ref;
@@ -7550,22 +7496,6 @@ end_error:
 	return create_invalid_expression();
 }
 
-static expression_t *parse_builtin_symbol(void)
-{
-	expression_t *expression = allocate_expression_zero(EXPR_BUILTIN_SYMBOL);
-
-	symbol_t *symbol = token.v.symbol;
-
-	expression->builtin_symbol.symbol = symbol;
-	next_token();
-
-	type_t *type = get_builtin_symbol_type(symbol);
-	type = automatic_type_conversion(type);
-
-	expression->base.type = type;
-	return expression;
-}
-
 /**
  * Parses a __builtin_constant_p() expression.
  */
@@ -7841,25 +7771,6 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_offsetof:           return parse_offsetof();
 		case T___builtin_va_start:           return parse_va_start();
 		case T___builtin_va_arg:             return parse_va_arg();
-		case T___builtin_expect:
-		case T___builtin_alloca:
-		case T___builtin_inf:
-		case T___builtin_inff:
-		case T___builtin_infl:
-		case T___builtin_nan:
-		case T___builtin_nanf:
-		case T___builtin_nanl:
-		case T___builtin_huge_val:
-		case T___builtin_va_end:
-		case T___builtin_return_address:
-		case T___builtin_frame_address:
-		case T___builtin_ffs:
-		case T___builtin_clz:
-		case T___builtin_ctz:
-		case T___builtin_popcount:
-		case T___builtin_parity:
-		case T___builtin_prefetch:
-		case T___builtin_trap:               return parse_builtin_symbol();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
@@ -8155,20 +8066,20 @@ static void check_call_argument(const function_parameter_t *parameter,
  * Handle the semantic restrictions of builtin calls
  */
 static void handle_builtin_argument_restrictions(call_expression_t *call) {
-	switch (call->function->builtin_symbol.symbol->ID) {
-		case T___builtin_return_address:
-		case T___builtin_frame_address: {
+	switch (call->function->reference.entity->function.btk) {
+		case bk_gnu_builtin_return_address:
+		case bk_gnu_builtin_frame_address: {
 			/* argument must be constant */
 			call_argument_t *argument = call->arguments;
 
 			if (! is_constant_expression(argument->expression)) {
 				errorf(&call->base.source_position,
 				       "argument of '%Y' must be a constant expression",
-				       call->function->builtin_symbol.symbol);
+				       call->function->reference.entity->base.symbol);
 			}
 			break;
 		}
-		case T___builtin_prefetch: {
+		case bk_gnu_builtin_prefetch: {
 			/* second and third argument must be constant if existent */
 			call_argument_t *rw = call->arguments->next;
 			call_argument_t *locality = NULL;
@@ -8177,7 +8088,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				if (! is_constant_expression(rw->expression)) {
 					errorf(&call->base.source_position,
 					       "second argument of '%Y' must be a constant expression",
-					       call->function->builtin_symbol.symbol);
+					       call->function->reference.entity->base.symbol);
 				}
 				locality = rw->next;
 			}
@@ -8185,7 +8096,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				if (! is_constant_expression(locality->expression)) {
 					errorf(&call->base.source_position,
 					       "third argument of '%Y' must be a constant expression",
-					       call->function->builtin_symbol.symbol);
+					       call->function->reference.entity->base.symbol);
 				}
 				locality = rw->next;
 			}
@@ -8288,8 +8199,11 @@ static expression_t *parse_call_expression(expression_t *expression)
 		         "function call has aggregate value");
 	}
 
-	if (call->function->kind == EXPR_BUILTIN_SYMBOL) {
-		handle_builtin_argument_restrictions(&result->call);
+	if (call->function->kind == EXPR_REFERENCE) {
+		reference_expression_t *reference = &call->function->reference;
+		if (reference->entity->kind == ENTITY_FUNCTION &&
+		    reference->entity->function.btk != bk_none)
+			handle_builtin_argument_restrictions(call);
 	}
 
 end_error:
@@ -9434,13 +9348,13 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;
-			if (call->function->kind != EXPR_BUILTIN_SYMBOL)
+			if (call->function->kind != EXPR_REFERENCE)
 				return true;
 
-			switch (call->function->builtin_symbol.symbol->ID) {
-				case T___builtin_prefetch:
-				case T___builtin_va_end:   return true;
-				default:                   return false;
+			switch (call->function->reference.entity->function.btk) {
+				case bk_gnu_builtin_prefetch:
+				case bk_gnu_builtin_va_end:   return true;
+				default:                      return false;
 			}
 		}
 
@@ -9461,7 +9375,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_ALIGNOF:                    return false;
 
 		case EXPR_FUNCNAME:                   return false;
-		case EXPR_BUILTIN_SYMBOL:             break; /* handled in EXPR_CALL */
 		case EXPR_BUILTIN_CONSTANT_P:         return false;
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return false;
 		case EXPR_OFFSETOF:                   return false;
@@ -11456,6 +11369,10 @@ void start_parsing(void)
 
 	assert(current_scope == NULL);
 	scope_push(&unit->scope);
+
+	create_gnu_builtins();
+	if (c_mode & _MS)
+		create_microsoft_intrinsics();
 }
 
 translation_unit_t *finish_parsing(void)
@@ -11517,6 +11434,84 @@ void parse(void)
 	complete_incomplete_arrays();
 	DEL_ARR_F(incomplete_arrays);
 	incomplete_arrays = NULL;
+}
+
+/**
+ * create a builtin function.
+ */
+static entity_t *create_builtin_function(builtin_kind_t kind, const char *name, type_t *function_type)
+{
+	symbol_t *symbol = symbol_table_insert(name);
+	entity_t *entity = allocate_entity_zero(ENTITY_FUNCTION);
+	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
+	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
+	entity->declaration.type                   = function_type;
+	entity->declaration.implicit               = true;
+	entity->base.symbol                        = symbol;
+	entity->base.source_position               = builtin_source_position;
+
+	entity->function.btk                       = kind;
+
+	record_entity(entity, /*is_definition=*/false);
+	return entity;
+}
+
+
+/**
+ * Create predefined gnu builtins.
+ */
+static void create_gnu_builtins(void) {
+#define _STR(a)              #a
+#define STR(a)               _STR(a)
+#define CONCAT(a,b)          a##b
+#define GNU_BUILTIN_NAME(a)  STR(CONCAT(__builtin_, a))
+#define GNU_BUILTIN(a, b)    create_builtin_function(CONCAT(bk_gnu_builtin_, a), GNU_BUILTIN_NAME(a), b)
+
+	GNU_BUILTIN(alloca,         make_function_1_type(type_void_ptr, type_size_t));
+	GNU_BUILTIN(huge_val,       make_function_0_type(type_double));
+	GNU_BUILTIN(inf,            make_function_0_type(type_double));
+	GNU_BUILTIN(inff,           make_function_0_type(type_float));
+	GNU_BUILTIN(infl,           make_function_0_type(type_long_double));
+	GNU_BUILTIN(nan,            make_function_1_type(type_double, type_char_ptr));
+	GNU_BUILTIN(nanf,           make_function_1_type(type_float, type_char_ptr));
+	GNU_BUILTIN(nanl,           make_function_1_type(type_long_double, type_char_ptr));
+	GNU_BUILTIN(va_end,         make_function_1_type(type_void, type_valist));
+	GNU_BUILTIN(expect,         make_function_2_type(type_long, type_long, type_long));
+	GNU_BUILTIN(return_address, make_function_1_type(type_void_ptr, type_unsigned_int));
+	GNU_BUILTIN(frame_address,  make_function_1_type(type_void_ptr, type_unsigned_int));
+	GNU_BUILTIN(ffs,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(clz,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(ctz,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(popcount,       make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(parity,         make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(prefetch,       make_function_1_type_variadic(type_float, type_void_ptr));
+	GNU_BUILTIN(trap,           make_function_0_type_noreturn(type_void));
+
+#undef GNU_BUILTIN
+#undef GNU_BUILTIN_NAME
+#undef CONCAT
+#undef STR
+#undef _STR
+}
+
+/**
+ * Create predefined MS intrinsics.
+ */
+static void create_microsoft_intrinsics(void) {
+#define _STR(a)              #a
+#define STR(a)               _STR(a)
+#define CONCAT(a,b)          a##b
+#define MS_BUILTIN(a, b)  create_builtin_function(CONCAT(bk_ms, a), STR(a), b)
+
+	MS_BUILTIN(__debugbreak,    make_function_0_type(type_void));
+	MS_BUILTIN(_ReturnAddress,  make_function_0_type(type_void_ptr));
+	MS_BUILTIN(__popcount,      make_function_1_type(type_unsigned_int, type_unsigned_int));
+	MS_BUILTIN(__ud2,           make_function_0_type_noreturn(type_void));
+
+#undef MS_BUILTIN
+#undef CONCAT
+#undef STR
+#undef _STR
 }
 
 /**
