@@ -268,11 +268,21 @@ typedef enum builtin_kind_t {
 	bk_ms__debugbreak,             /**< MS __debugbreak */
 	bk_ms_ReturnAddress,           /**< MS _ReturnAddress */
 	bk_ms__popcount,               /**< MS __popcount */
+	bk_ms_enable,                  /**< MS _enable */
+	bk_ms_disable,                 /**< MS _disable */
+	bk_ms__inbyte,                 /**< MS __inbyte */
+	bk_ms__inword,                 /**< MS __inword */
+	bk_ms__indword,                /**< MS __indword */
+	bk_ms__outbyte,                /**< MS __outbyte */
+	bk_ms__outword,                /**< MS __outword */
+	bk_ms__outdword,               /**< MS __outdword */
 	bk_ms__ud2,                    /**< MS __ud2 */
 	bk_ms_BitScanForward,          /**< MS _BitScanForward */
 	bk_ms_BitScanReverse,          /**< MS _BitScanReverse */
 	bk_ms_InterlockedExchange,     /**< MS _InterlockedExchange */
 	bk_ms_InterlockedExchange64,   /**< MS _InterlockedExchange64 */
+	bk_ms__readeflags,             /**< MS __readflags */
+	bk_ms__writeeflags,            /**< MS __writeflags */
 } builtin_kind_t;
 
 struct function_t {

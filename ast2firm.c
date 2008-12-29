@@ -1571,6 +1571,51 @@ static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t
 }
 
 /**
+ * Generate a pinned unary builtin.
+ *
+ * @param kind           the builtin kind to generate
+ * @param op             the operand
+ * @param function_type  the function type for the GNU builtin routine
+ * @param db             debug info
+ */
+static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op, type_t *function_type, dbg_info *db)
+{
+	ir_node *in[1];
+	in[0] = expression_to_firm(op);
+
+	ir_type *tp  = get_ir_type(function_type);
+	ir_type *res = get_method_res_type(tp, 0);
+	ir_node *mem = get_store();
+	ir_node *irn = new_d_Builtin(db, mem, kind, 1, in, tp);
+	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
+	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
+}
+
+
+/**
+ * Generate an binary-void-return builtin.
+ *
+ * @param kind           the builtin kind to generate
+ * @param op1            the first operand
+ * @param op2            the second operand
+ * @param function_type  the function type for the GNU builtin routine
+ * @param db             debug info
+ */
+static ir_node *gen_binary_builtin_mem(ir_builtin_kind kind, expression_t *op1, expression_t *op2,
+									   type_t *function_type, dbg_info *db)
+{
+	ir_node *in[2];
+	in[0] = expression_to_firm(op1);
+	in[1] = expression_to_firm(op2);
+
+	ir_type *tp  = get_ir_type(function_type);
+	ir_node *mem = get_store();
+	ir_node *irn = new_d_Builtin(db, mem, kind, 2, in, tp);
+	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
+	return NULL;
+}
+
+/**
  * Transform calls to builtin functions.
  */
 static ir_node *process_builtin_call(const call_expression_t *call)
@@ -1740,6 +1785,15 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case bk_ms_byteswap_ulong:
 	case bk_ms_byteswap_uint64:
 		return gen_unary_builtin(ir_bk_bswap, call->arguments->expression, function_type, dbgi);
+	case bk_ms__inbyte:
+	case bk_ms__inword:
+	case bk_ms__indword:
+		return gen_unary_builtin_pinned(ir_bk_inport, call->arguments->expression, function_type, dbgi);
+	case bk_ms__outbyte:
+	case bk_ms__outword:
+	case bk_ms__outdword:
+		return gen_binary_builtin_mem(ir_bk_outport, call->arguments->expression,
+			call->arguments->next->expression, function_type, dbgi);
 	default:
 		panic("unsupported builtin found");
 	}
