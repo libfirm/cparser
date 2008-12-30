@@ -397,8 +397,7 @@ static void print_assignment_expression(const expression_t *const expr)
  */
 static void print_call_expression(const call_expression_t *call)
 {
-	unsigned prec = get_expression_precedence(call->base.kind);
-	print_expression_prec(call->function, prec);
+	print_expression_prec(call->function, PREC_POSTFIX);
 	fputc('(', out);
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
@@ -546,14 +545,13 @@ static void print_label_address_expression(const label_address_expression_t *le)
  */
 static void print_array_expression(const array_access_expression_t *expression)
 {
-	unsigned prec = get_expression_precedence(expression->base.kind);
 	if (!expression->flipped) {
-		print_expression_prec(expression->array_ref, prec);
+		print_expression_prec(expression->array_ref, PREC_POSTFIX);
 		fputc('[', out);
 		print_expression(expression->index);
 		fputc(']', out);
 	} else {
-		print_expression_prec(expression->index, prec);
+		print_expression_prec(expression->index, PREC_POSTFIX);
 		fputc('[', out);
 		print_expression(expression->array_ref);
 		fputc(']', out);
@@ -664,8 +662,7 @@ static void print_va_arg(const va_arg_expression_t *expression)
  */
 static void print_select(const select_expression_t *expression)
 {
-	unsigned prec = get_expression_precedence(expression->base.kind);
-	print_expression_prec(expression->compound, prec);
+	print_expression_prec(expression->compound, PREC_POSTFIX);
 	if (is_type_pointer(skip_typeref(expression->compound->base.type))) {
 		fputs("->", out);
 	} else {
