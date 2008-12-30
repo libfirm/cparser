@@ -30,9 +30,7 @@ Missing Errors:
 
 Missing Warnings:
 - dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
-- catch the if(k = b) cases, maybe require all assignments to be in parentheses
-  (but some few exceptions like toplevel, nested assignments)
- - warn when folding shift constants with too large shift amounts
+- warn when folding shift constants with too large shift amounts
 
 main/driver:
 - delete output file if we had an error
