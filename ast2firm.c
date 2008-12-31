@@ -3425,7 +3425,7 @@ static bool is_builtin_expect(const expression_t *expression)
 	if (function->kind != EXPR_REFERENCE)
 		return false;
 	reference_expression_t *ref = &function->reference;
-	if (ref->entity->kind == ENTITY_FUNCTION &&
+	if (ref->entity->kind         != ENTITY_FUNCTION ||
 	    ref->entity->function.btk != bk_gnu_builtin_expect)
 		return false;
 
