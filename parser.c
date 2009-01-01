@@ -4635,7 +4635,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 	for (; iter != NULL; iter = iter->next) {
 		switch (iter->kind) {
 		case CONSTRUCT_INVALID:
-			internal_errorf(HERE, "invalid type construction found");
+			break;
 		case CONSTRUCT_FUNCTION: {
 			construct_function_type_t *construct_function_type
 				= (construct_function_type_t*) iter;
@@ -4657,8 +4657,10 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 				}
 			}
 
-			type = function_type;
-			break;
+			/* The function type was constructed earlier.  Freeing it here will
+			 * destroy other types. */
+			type = typehash_insert(function_type);
+			continue;
 		}
 
 		case CONSTRUCT_POINTER: {
@@ -4713,18 +4715,11 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 			} else if (is_type_function(skipped_type)) {
 				errorf(HERE, "array of functions is not allowed");
 			}
-			type = array_type;
-			break;
+			type = identify_new_type(array_type);
+			continue;
 		}
 		}
-
-		/* The function type was constructed earlier.  Freeing it here will
-		 * destroy other types. */
-		if (iter->kind == CONSTRUCT_FUNCTION) {
-			type = typehash_insert(type);
-		} else {
-			type = identify_new_type(type);
-		}
+		internal_errorf(HERE, "invalid type construction found");
 	}
 
 	return type;
