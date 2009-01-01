@@ -4419,9 +4419,9 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 {
 	/* construct a single linked list of construct_type_t's which describe
 	 * how to construct the final declarator type */
-	construct_type_t *first      = NULL;
-	construct_type_t *last       = NULL;
-	gnu_attribute_t  *attributes = NULL;
+	construct_type_t  *first      = NULL;
+	construct_type_t **anchor     = &first;
+	gnu_attribute_t   *attributes = NULL;
 
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
 
@@ -4463,13 +4463,8 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 				goto ptr_operator_end;
 		}
 
-		if (last == NULL) {
-			first = type;
-			last  = type;
-		} else {
-			last->base.next = type;
-			last            = type;
-		}
+		*anchor = type;
+		anchor  = &type->base.next;
 
 		/* TODO: find out if this is correct */
 		modifiers |= parse_attributes(&attributes);
@@ -4521,9 +4516,9 @@ ptr_operator_end:
 		return NULL;
 	}
 
-	construct_type_t *p = last;
+	construct_type_t **const p = anchor;
 
-	while (true) {
+	for (;;) {
 		construct_type_t *type;
 		switch (token.type) {
 		case '(': {
@@ -4541,28 +4536,17 @@ ptr_operator_end:
 			goto declarator_finished;
 		}
 
-		/* insert in the middle of the list (behind p) */
-		if (p != NULL) {
-			type->base.next = p->base.next;
-			p->base.next    = type;
-		} else {
-			type->base.next = first;
-			first           = type;
-		}
-		if (last == p) {
-			last = type;
-		}
+		/* insert in the middle of the list (at p) */
+		type->base.next = *p;
+		*p              = type;
+		if (anchor == p)
+			anchor = &type->base.next;
 	}
 
 declarator_finished:
-	/* append inner_types at the end of the list, we don't to set last anymore
+	/* append inner_types at the end of the list, we don't to set anchor anymore
 	 * as it's not needed anymore */
-	if (last == NULL) {
-		assert(first == NULL);
-		first = inner_types;
-	} else {
-		last->base.next = inner_types;
-	}
+	*anchor = inner_types;
 
 	return first;
 end_error:
