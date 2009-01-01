@@ -4159,8 +4159,8 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 	type_t *type = skip_typeref(entity->declaration.type);
 	if (is_type_incomplete(type)) {
 		errorf(&entity->base.source_position,
-		       "parameter '%Y' has incomplete type '%T'", entity->base.symbol,
-		       entity->declaration.type);
+				"parameter '%#T' has incomplete type",
+				entity->declaration.type, entity->base.symbol);
 	}
 }
 
