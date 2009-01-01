@@ -8093,18 +8093,13 @@ static expression_t *parse_call_expression(expression_t *expression)
 	add_anchor_token(',');
 
 	if (token.type != ')') {
-		call_argument_t *last_argument = NULL;
-
-		while (true) {
-			call_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
-
+		call_argument_t **anchor = &call->arguments;
+		for (;;) {
+			call_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 			argument->expression = parse_assignment_expression();
-			if (last_argument == NULL) {
-				call->arguments = argument;
-			} else {
-				last_argument->next = argument;
-			}
-			last_argument = argument;
+
+			*anchor = argument;
+			anchor  = &argument->next;
 
 			if (token.type != ',')
 				break;
