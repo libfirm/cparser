@@ -5492,8 +5492,8 @@ decl_list_end:
 	/* update function type */
 	type_t *new_type = duplicate_type(type);
 
-	function_parameter_t *parameters     = NULL;
-	function_parameter_t *last_parameter = NULL;
+	function_parameter_t  *parameters = NULL;
+	function_parameter_t **anchor     = &parameters;
 
 	parameter = entity->function.parameters.entities;
 	for (; parameter != NULL; parameter = parameter->base.next) {
@@ -5526,12 +5526,8 @@ decl_list_end:
 		function_parameter_t *const parameter =
 			allocate_parameter(parameter_type);
 
-		if (last_parameter != NULL) {
-			last_parameter->next = parameter;
-		} else {
-			parameters = parameter;
-		}
-		last_parameter = parameter;
+		*anchor = parameter;
+		anchor  = &parameter->next;
 	}
 
 	/* §6.9.1.7: A K&R style parameter list does NOT act as a function
