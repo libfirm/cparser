@@ -5353,7 +5353,8 @@ static void check_variable_type_complete(entity_t *ent)
 	/* §6.7:7  If an identifier for an object is declared with no linkage, the
 	 *         type for the object shall be complete [...] */
 	declaration_t *decl = &ent->declaration;
-	if (decl->storage_class != STORAGE_CLASS_NONE)
+	if (decl->storage_class == STORAGE_CLASS_EXTERN ||
+			decl->storage_class == STORAGE_CLASS_STATIC)
 		return;
 
 	type_t *const orig_type = decl->type;
