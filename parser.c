@@ -4164,6 +4164,24 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 	}
 }
 
+static bool has_parameters(void)
+{
+	/* func(void) is not a parameter */
+	if (token.type == T_IDENTIFIER) {
+		entity_t const *const entity = get_entity(token.v.symbol, NAMESPACE_NORMAL);
+		if (entity->kind != ENTITY_TYPEDEF)
+			return true;
+		if (skip_typeref(entity->typedefe.type) != type_void)
+			return true;
+	} else if (token.type != T_void) {
+		return true;
+	}
+	if (look_ahead(1)->type != ')')
+		return true;
+	next_token();
+	return false;
+}
+
 /**
  * Parses function type parameters (and optionally creates variable_t entities
  * for them in a scope)
@@ -4192,59 +4210,49 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		goto parameters_finished;
 	}
 
-	function_parameter_t *last_parameter = NULL;
+	if (has_parameters()) {
+		function_parameter_t **anchor = &type->parameters;
+		for (;;) {
+			switch (token.type) {
+			case T_DOTDOTDOT:
+				next_token();
+				type->variadic = true;
+				goto parameters_finished;
 
-	while (true) {
-		switch (token.type) {
-		case T_DOTDOTDOT:
-			next_token();
-			type->variadic = true;
-			goto parameters_finished;
+			case T_IDENTIFIER:
+			case T___extension__:
+			DECLARATION_START
+			{
+				entity_t *entity = parse_parameter();
+				if (entity->kind == ENTITY_TYPEDEF) {
+					errorf(&entity->base.source_position,
+							"typedef not allowed as function parameter");
+					break;
+				}
+				assert(is_declaration(entity));
 
-		case T_IDENTIFIER:
-		case T___extension__:
-		DECLARATION_START
-		{
-			entity_t *entity = parse_parameter();
-			if (entity->kind == ENTITY_TYPEDEF) {
-				errorf(&entity->base.source_position,
-				       "typedef not allowed as function parameter");
+				semantic_parameter_incomplete(entity);
+
+				function_parameter_t *const parameter =
+					allocate_parameter(entity->declaration.type);
+
+				if (scope != NULL) {
+					append_entity(scope, entity);
+				}
+
+				*anchor = parameter;
+				anchor  = &parameter->next;
 				break;
 			}
-			assert(is_declaration(entity));
 
-			/* func(void) is not a parameter */
-			if (last_parameter == NULL
-					&& token.type == ')'
-					&& entity->base.symbol == NULL
-					&& skip_typeref(entity->declaration.type) == type_void) {
+			default:
 				goto parameters_finished;
 			}
-			semantic_parameter_incomplete(entity);
-
-			function_parameter_t *const parameter =
-				allocate_parameter(entity->declaration.type);
-
-			if (scope != NULL) {
-				append_entity(scope, entity);
+			if (token.type != ',') {
+				goto parameters_finished;
 			}
-
-			if (last_parameter != NULL) {
-				last_parameter->next = parameter;
-			} else {
-				type->parameters = parameter;
-			}
-			last_parameter   = parameter;
-			break;
+			next_token();
 		}
-
-		default:
-			goto parameters_finished;
-		}
-		if (token.type != ',') {
-			goto parameters_finished;
-		}
-		next_token();
 	}
 
 
