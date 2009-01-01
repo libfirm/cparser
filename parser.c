@@ -4723,7 +4723,7 @@ static type_t *semantic_parameter(const source_position_t *pos,
 	type = automatic_type_conversion(type);
 
 	if (specifiers->is_inline && is_type_valid(type)) {
-		errorf(pos, "parameter '%Y' declared 'inline'", symbol);
+		errorf(pos, "parameter '%#T' declared 'inline'", type, symbol);
 	}
 
 	/* §6.9.1:6  The declarations in the declaration list shall contain
@@ -4733,7 +4733,7 @@ static type_t *semantic_parameter(const source_position_t *pos,
 			specifiers->storage_class != STORAGE_CLASS_NONE   &&
 			specifiers->storage_class != STORAGE_CLASS_REGISTER)
 	   ) {
-		errorf(pos, "invalid storage class for parameter '%Y'", symbol);
+		errorf(pos, "invalid storage class for parameter '%#T'", type, symbol);
 	}
 
 	/* delay test for incomplete type, because we might have (void)
