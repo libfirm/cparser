@@ -11459,12 +11459,9 @@ static entity_t *create_builtin_function(builtin_kind_t kind, const char *name, 
 /**
  * Create predefined gnu builtins.
  */
-static void create_gnu_builtins(void) {
-#define _STR(a)              #a
-#define STR(a)               _STR(a)
-#define CONCAT(a,b)          a##b
-#define GNU_BUILTIN_NAME(a)  STR(CONCAT(__builtin_, a))
-#define GNU_BUILTIN(a, b)    create_builtin_function(CONCAT(bk_gnu_builtin_, a), GNU_BUILTIN_NAME(a), b)
+static void create_gnu_builtins(void)
+{
+#define GNU_BUILTIN(a, b) create_builtin_function(bk_gnu_builtin_##a, "__builtin_" #a, b)
 
 	GNU_BUILTIN(alloca,         make_function_1_type(type_void_ptr, type_size_t));
 	GNU_BUILTIN(huge_val,       make_function_0_type(type_double));
@@ -11487,20 +11484,14 @@ static void create_gnu_builtins(void) {
 	GNU_BUILTIN(trap,           make_function_0_type_noreturn(type_void));
 
 #undef GNU_BUILTIN
-#undef GNU_BUILTIN_NAME
-#undef CONCAT
-#undef STR
-#undef _STR
 }
 
 /**
  * Create predefined MS intrinsics.
  */
-static void create_microsoft_intrinsics(void) {
-#define _STR(a)              #a
-#define STR(a)               _STR(a)
-#define CONCAT(a,b)          a##b
-#define MS_BUILTIN(a, b)  create_builtin_function(CONCAT(bk_ms, a), STR(a), b)
+static void create_microsoft_intrinsics(void)
+{
+#define MS_BUILTIN(a, b) create_builtin_function(bk_ms##a, #a, b)
 
 	/* intrinsics for all architectures */
 	MS_BUILTIN(_rotl,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
@@ -11539,9 +11530,6 @@ static void create_microsoft_intrinsics(void) {
 	}
 
 #undef MS_BUILTIN
-#undef CONCAT
-#undef STR
-#undef _STR
 }
 
 /**
