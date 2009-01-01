@@ -98,14 +98,6 @@ typedef struct parse_initializer_env_t {
 	bool        must_be_constant;
 } parse_initializer_env_t;
 
-/**
- * Capture a MS __base extension.
- */
-typedef struct based_spec_t {
-	source_position_t  source_position;
-	variable_t        *base_variable;
-} based_spec_t;
-
 typedef entity_t* (*parsed_declaration_func) (entity_t *declaration, bool is_definition);
 
 /** The current token. */
@@ -3442,29 +3434,23 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
-static void parse_microsoft_based(based_spec_t *based_spec)
+static variable_t *parse_microsoft_based(void)
 {
 	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing __based", T_IDENTIFIER, NULL);
-		return;
+		return NULL;
 	}
 	symbol_t *symbol = token.v.symbol;
 	entity_t *entity = get_entity(symbol, NAMESPACE_NORMAL);
 
+	variable_t *variable;
 	if (entity == NULL || entity->base.kind != ENTITY_VARIABLE) {
 		errorf(HERE, "'%Y' is not a variable name.", symbol);
-		entity = create_error_entity(symbol, ENTITY_VARIABLE);
+		variable = &create_error_entity(symbol, ENTITY_VARIABLE)->variable;
 	} else {
-		variable_t *variable = &entity->variable;
-
-		if (based_spec->base_variable != NULL) {
-			errorf(HERE, "__based type qualifier specified more than once");
-		}
-		based_spec->source_position = token.source_position;
-		based_spec->base_variable   = variable;
+		variable = &entity->variable;
 
 		type_t *const type = variable->base.type;
-
 		if (is_type_valid(type)) {
 			if (! is_type_pointer(skip_typeref(type))) {
 				errorf(HERE, "variable in __based modifier must have pointer type instead of '%T'", type);
@@ -3475,6 +3461,7 @@ static void parse_microsoft_based(based_spec_t *based_spec)
 		}
 	}
 	next_token();
+	return variable;
 }
 
 /**
@@ -4425,39 +4412,39 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 
 	decl_modifiers_t modifiers = parse_attributes(&attributes);
 
-	/* MS __based extension */
-	based_spec_t base_spec;
-	base_spec.base_variable = NULL;
-
 	for (;;) {
 		construct_type_t *type;
+		variable_t       *based = NULL; /* MS __based extension */
 		switch (token.type) {
 			case '&':
 				if (!(c_mode & _CXX))
 					errorf(HERE, "references are only available for C++");
-				if (base_spec.base_variable != NULL && warning.other) {
-					warningf(&base_spec.source_position,
-					         "__based does not precede a pointer operator, ignored");
-				}
 				type = parse_reference_declarator();
-				/* consumed */
-				base_spec.base_variable = NULL;
 				break;
 
-			case '*':
-				type = parse_pointer_declarator(base_spec.base_variable);
-				/* consumed */
-				base_spec.base_variable = NULL;
-				break;
-
-			case T__based:
+			case T__based: {
+				source_position_t const pos = *HERE;
 				next_token();
 				expect('(', end_error);
 				add_anchor_token(')');
-				parse_microsoft_based(&base_spec);
+				based = parse_microsoft_based();
 				rem_anchor_token(')');
 				expect(')', end_error);
-				continue;
+				if (token.type != '*') {
+					if (token.type == T__based) {
+						errorf(&pos, "__based type modifier specified more than once");
+					} else if (warning.other) {
+						warningf(&pos,
+								"__based does not precede a pointer declarator, ignored");
+					}
+					continue;
+				}
+				/* FALLTHROUGH */
+			}
+
+			case '*':
+				type = parse_pointer_declarator(based);
+				break;
 
 			default:
 				goto ptr_operator_end;
@@ -4470,10 +4457,6 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		modifiers |= parse_attributes(&attributes);
 	}
 ptr_operator_end:
-	if (base_spec.base_variable != NULL && warning.other) {
-		warningf(&base_spec.source_position,
-		         "__based does not precede a pointer operator, ignored");
-	}
 
 	if (env != NULL) {
 		modifiers      |= env->modifiers;
