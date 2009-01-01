@@ -129,7 +129,6 @@ struct compound_t {
 	scope_t           members;
 	decl_modifiers_t  modifiers;
 	bool              complete            : 1;
-	bool              has_flexible_member : 1;
 
 	/* ast2firm info */
 	ir_type          *irtype;

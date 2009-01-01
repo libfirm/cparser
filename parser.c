@@ -6600,11 +6600,9 @@ static void parse_compound_declarators(compound_t *compound,
 								entity->base.symbol, orig_type);
 					} else if (is_type_incomplete(type)) {
 						/* §6.7.2.1:16 flexible array member */
-						if (is_type_array(type) &&
-								token.type == ';'   &&
-								look_ahead(1)->type == '}') {
-							compound->has_flexible_member = true;
-						} else {
+						if (!is_type_array(type)       ||
+								token.type          != ';' ||
+								look_ahead(1)->type != '}') {
 							errorf(&entity->base.source_position,
 									"compound member '%Y' has incomplete type '%T'",
 									entity->base.symbol, orig_type);
