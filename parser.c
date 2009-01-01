@@ -4271,67 +4271,69 @@ typedef enum construct_type_kind_t {
 	CONSTRUCT_ARRAY
 } construct_type_kind_t;
 
-typedef struct construct_type_t construct_type_t;
-struct construct_type_t {
+typedef union construct_type_t construct_type_t;
+
+typedef struct construct_type_base_t {
 	construct_type_kind_t  kind;
 	construct_type_t      *next;
-};
+} construct_type_base_t;
 
-typedef struct parsed_pointer_t parsed_pointer_t;
-struct parsed_pointer_t {
-	construct_type_t  construct_type;
-	type_qualifiers_t type_qualifiers;
-	variable_t        *base_variable;  /**< MS __based extension. */
-};
+typedef struct parsed_pointer_t {
+	construct_type_base_t  base;
+	type_qualifiers_t      type_qualifiers;
+	variable_t             *base_variable;  /**< MS __based extension. */
+} parsed_pointer_t;
 
-typedef struct parsed_reference_t parsed_reference_t;
-struct parsed_reference_t {
-	construct_type_t construct_type;
-};
+typedef struct parsed_reference_t {
+	construct_type_base_t base;
+} parsed_reference_t;
 
-typedef struct construct_function_type_t construct_function_type_t;
-struct construct_function_type_t {
-	construct_type_t  construct_type;
-	type_t           *function_type;
-};
+typedef struct construct_function_type_t {
+	construct_type_base_t  base;
+	type_t                *function_type;
+} construct_function_type_t;
 
-typedef struct parsed_array_t parsed_array_t;
-struct parsed_array_t {
-	construct_type_t  construct_type;
-	type_qualifiers_t type_qualifiers;
-	bool              is_static;
-	bool              is_variable;
-	expression_t     *size;
-};
+typedef struct parsed_array_t {
+	construct_type_base_t  base;
+	type_qualifiers_t      type_qualifiers;
+	bool                   is_static;
+	bool                   is_variable;
+	expression_t          *size;
+} parsed_array_t;
 
-typedef struct construct_base_type_t construct_base_type_t;
-struct construct_base_type_t {
-	construct_type_t  construct_type;
-	type_t           *type;
+union construct_type_t {
+	construct_type_kind_t     kind;
+	construct_type_base_t     base;
+	parsed_pointer_t          pointer;
+	parsed_reference_t        reference;
+	construct_function_type_t function;
+	parsed_array_t            array;
 };
 
 static construct_type_t *parse_pointer_declarator(variable_t *base_variable)
 {
 	eat('*');
 
-	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
-	memset(pointer, 0, sizeof(pointer[0]));
-	pointer->construct_type.kind = CONSTRUCT_POINTER;
-	pointer->type_qualifiers     = parse_type_qualifiers();
-	pointer->base_variable       = base_variable;
+	construct_type_t *cons    = obstack_alloc(&temp_obst, sizeof(cons->pointer));
+	parsed_pointer_t *pointer = &cons->pointer;
+	memset(pointer, 0, sizeof(*pointer));
+	cons->kind               = CONSTRUCT_POINTER;
+	pointer->type_qualifiers = parse_type_qualifiers();
+	pointer->base_variable   = base_variable;
 
-	return &pointer->construct_type;
+	return cons;
 }
 
 static construct_type_t *parse_reference_declarator(void)
 {
 	eat('&');
 
-	parsed_reference_t *reference = obstack_alloc(&temp_obst, sizeof(reference[0]));
-	memset(reference, 0, sizeof(reference[0]));
-	reference->construct_type.kind = CONSTRUCT_REFERENCE;
+	construct_type_t   *cons      = obstack_alloc(&temp_obst, sizeof(cons->reference));
+	parsed_reference_t *reference = &cons->reference;
+	memset(reference, 0, sizeof(*reference));
+	cons->kind = CONSTRUCT_REFERENCE;
 
-	return (construct_type_t*)reference;
+	return cons;
 }
 
 static construct_type_t *parse_array_declarator(void)
@@ -4339,9 +4341,10 @@ static construct_type_t *parse_array_declarator(void)
 	eat('[');
 	add_anchor_token(']');
 
-	parsed_array_t *array = obstack_alloc(&temp_obst, sizeof(array[0]));
-	memset(array, 0, sizeof(array[0]));
-	array->construct_type.kind = CONSTRUCT_ARRAY;
+	construct_type_t *cons  = obstack_alloc(&temp_obst, sizeof(cons->array));
+	parsed_array_t   *array = &cons->array;
+	memset(array, 0, sizeof(*array));
+	cons->kind = CONSTRUCT_ARRAY;
 
 	if (token.type == T_static) {
 		array->is_static = true;
@@ -4370,7 +4373,7 @@ static construct_type_t *parse_array_declarator(void)
 	expect(']', end_error);
 
 end_error:
-	return &array->construct_type;
+	return cons;
 }
 
 static construct_type_t *parse_function_declarator(scope_t *scope,
@@ -4395,13 +4398,13 @@ static construct_type_t *parse_function_declarator(scope_t *scope,
 
 	parse_parameters(ftype, scope);
 
-	construct_function_type_t *construct_function_type =
-		obstack_alloc(&temp_obst, sizeof(construct_function_type[0]));
-	memset(construct_function_type, 0, sizeof(construct_function_type[0]));
-	construct_function_type->construct_type.kind = CONSTRUCT_FUNCTION;
-	construct_function_type->function_type       = type;
+	construct_type_t          *cons     = obstack_alloc(&temp_obst, sizeof(cons->function));
+	construct_function_type_t *function = &cons->function;
+	memset(function, 0, sizeof(*function));
+	cons->kind              = CONSTRUCT_FUNCTION;
+	function->function_type = type;
 
-	return &construct_function_type->construct_type;
+	return cons;
 }
 
 typedef struct parse_declarator_env_t {
@@ -4464,8 +4467,8 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 			first = type;
 			last  = type;
 		} else {
-			last->next = type;
-			last       = type;
+			last->base.next = type;
+			last            = type;
 		}
 
 		/* TODO: find out if this is correct */
@@ -4540,11 +4543,11 @@ ptr_operator_end:
 
 		/* insert in the middle of the list (behind p) */
 		if (p != NULL) {
-			type->next = p->next;
-			p->next    = type;
+			type->base.next = p->base.next;
+			p->base.next    = type;
 		} else {
-			type->next = first;
-			first      = type;
+			type->base.next = first;
+			first           = type;
 		}
 		if (last == p) {
 			last = type;
@@ -4558,7 +4561,7 @@ declarator_finished:
 		assert(first == NULL);
 		first = inner_types;
 	} else {
-		last->next = inner_types;
+		last->base.next = inner_types;
 	}
 
 	return first;
@@ -4632,15 +4635,13 @@ static void parse_declaration_attributes(entity_t *entity)
 static type_t *construct_declarator_type(construct_type_t *construct_list, type_t *type)
 {
 	construct_type_t *iter = construct_list;
-	for (; iter != NULL; iter = iter->next) {
+	for (; iter != NULL; iter = iter->base.next) {
 		switch (iter->kind) {
 		case CONSTRUCT_INVALID:
 			break;
 		case CONSTRUCT_FUNCTION: {
-			construct_function_type_t *construct_function_type
-				= (construct_function_type_t*) iter;
-
-			type_t *function_type = construct_function_type->function_type;
+			construct_function_type_t *function      = &iter->function;
+			type_t                    *function_type = function->function_type;
 
 			function_type->function.return_type = type;
 
@@ -4667,8 +4668,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 			if (is_type_reference(skip_typeref(type)))
 				errorf(HERE, "cannot declare a pointer to reference");
 
-			parsed_pointer_t *parsed_pointer = (parsed_pointer_t*) iter;
-			type = make_based_pointer_type(type, parsed_pointer->type_qualifiers, parsed_pointer->base_variable);
+			parsed_pointer_t *pointer = &iter->pointer;
+			type = make_based_pointer_type(type, pointer->type_qualifiers, pointer->base_variable);
 			continue;
 		}
 
@@ -4683,19 +4684,19 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 			if (is_type_reference(skip_typeref(type)))
 				errorf(HERE, "cannot declare an array of references");
 
-			parsed_array_t *parsed_array  = (parsed_array_t*) iter;
-			type_t         *array_type    = allocate_type_zero(TYPE_ARRAY);
+			parsed_array_t *array      = &iter->array;
+			type_t         *array_type = allocate_type_zero(TYPE_ARRAY);
 
-			expression_t *size_expression = parsed_array->size;
+			expression_t *size_expression = array->size;
 			if (size_expression != NULL) {
 				size_expression
 					= create_implicit_cast(size_expression, type_size_t);
 			}
 
-			array_type->base.qualifiers       = parsed_array->type_qualifiers;
+			array_type->base.qualifiers       = array->type_qualifiers;
 			array_type->array.element_type    = type;
-			array_type->array.is_static       = parsed_array->is_static;
-			array_type->array.is_variable     = parsed_array->is_variable;
+			array_type->array.is_static       = array->is_static;
+			array_type->array.is_variable     = array->is_variable;
 			array_type->array.size_expression = size_expression;
 
 			if (size_expression != NULL) {
