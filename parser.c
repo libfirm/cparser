@@ -531,6 +531,14 @@ static type_t *allocate_type_zero(type_kind_t kind)
 	return res;
 }
 
+static function_parameter_t *allocate_parameter(type_t *const type)
+{
+	function_parameter_t *const param = obstack_alloc(type_obst, sizeof(*param));
+	memset(param, 0, sizeof(*param));
+	param->type = type;
+	return param;
+}
+
 /**
  * Returns the size of an initializer node.
  *
@@ -4184,7 +4192,6 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		goto parameters_finished;
 	}
 
-	function_parameter_t *parameter;
 	function_parameter_t *last_parameter = NULL;
 
 	while (true) {
@@ -4215,9 +4222,8 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 			}
 			semantic_parameter_incomplete(entity);
 
-			parameter = obstack_alloc(type_obst, sizeof(parameter[0]));
-			memset(parameter, 0, sizeof(parameter[0]));
-			parameter->type = entity->declaration.type;
+			function_parameter_t *const parameter =
+				allocate_parameter(entity->declaration.type);
 
 			if (scope != NULL) {
 				append_entity(scope, entity);
@@ -5517,17 +5523,15 @@ decl_list_end:
 		 */
 		parameter_type = get_default_promoted_type(parameter_type);
 
-		function_parameter_t *function_parameter
-			= obstack_alloc(type_obst, sizeof(function_parameter[0]));
-		memset(function_parameter, 0, sizeof(function_parameter[0]));
+		function_parameter_t *const parameter =
+			allocate_parameter(parameter_type);
 
-		function_parameter->type = parameter_type;
 		if (last_parameter != NULL) {
-			last_parameter->next = function_parameter;
+			last_parameter->next = parameter;
 		} else {
-			parameters = function_parameter;
+			parameters = parameter;
 		}
-		last_parameter = function_parameter;
+		last_parameter = parameter;
 	}
 
 	/* §6.9.1.7: A K&R style parameter list does NOT act as a function
@@ -6824,15 +6828,8 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
                                     type_t *argument_type2)
 {
-	function_parameter_t *parameter2
-		= obstack_alloc(type_obst, sizeof(parameter2[0]));
-	memset(parameter2, 0, sizeof(parameter2[0]));
-	parameter2->type = argument_type2;
-
-	function_parameter_t *parameter1
-		= obstack_alloc(type_obst, sizeof(parameter1[0]));
-	memset(parameter1, 0, sizeof(parameter1[0]));
-	parameter1->type = argument_type1;
+	function_parameter_t *const parameter2 = allocate_parameter(argument_type2);
+	function_parameter_t *const parameter1 = allocate_parameter(argument_type1);
 	parameter1->next = parameter2;
 
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
@@ -6851,10 +6848,7 @@ static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
  */
 static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 {
-	function_parameter_t *parameter
-		= obstack_alloc(type_obst, sizeof(parameter[0]));
-	memset(parameter, 0, sizeof(parameter[0]));
-	parameter->type = argument_type;
+	function_parameter_t *const parameter = allocate_parameter(argument_type);
 
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
