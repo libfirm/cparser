@@ -58,6 +58,9 @@ static ir_type *ir_type_int;
 /* architecture specific floating point arithmetic mode (if any) */
 static ir_mode *mode_float_arithmetic;
 
+/* alignment of stack parameters */
+static unsigned stack_param_align;
+
 static int        next_value_number_function;
 static ir_node   *continue_label;
 static ir_node   *break_label;
@@ -251,6 +254,9 @@ static ir_node *get_vla_size(array_type_t *const type)
 	return size_node;
 }
 
+/**
+ * Return a node representing the size of a type.
+ */
 static ir_node *get_type_size(type_t *type)
 {
 	type = skip_typeref(type);
@@ -3224,7 +3230,12 @@ static ir_node *va_start_expression_to_firm(
 		new_d_simpleSel(dbgi, no_mem, arg_base, parm_ent);
 
 	ir_node   *const cnst        = get_type_size(expr->parameter->base.type);
-	ir_node   *const add         = new_d_Add(dbgi, arg_sel, cnst, mode_P_data);
+	ir_mode   *const mode        = get_irn_mode(cnst);
+	ir_node   *const c1          = new_Const_long(mode, stack_param_align - 1);
+	ir_node   *const c2          = new_d_Add(dbgi, cnst, c1, mode);
+	ir_node   *const c3          = new_Const_long(mode, -(long)stack_param_align);
+	ir_node   *const c4          = new_d_And(dbgi, c2, c3, mode);
+	ir_node   *const add         = new_d_Add(dbgi, arg_sel, c2, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
 	return NULL;
@@ -3240,7 +3251,12 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	ir_node      *const res     = deref_address(dbgi, type, ap);
 
 	ir_node      *const cnst    = get_type_size(expr->base.type);
-	ir_node      *const add     = new_d_Add(dbgi, ap, cnst, mode_P_data);
+	ir_mode      *const mode    = get_irn_mode(cnst);
+	ir_node      *const c1      = new_Const_long(mode, stack_param_align - 1);
+	ir_node      *const c2      = new_d_Add(dbgi, cnst, c1, mode);
+	ir_node      *const c3      = new_Const_long(mode, -(long)stack_param_align);
+	ir_node      *const c4      = new_d_And(dbgi, c2, c3, mode);
+	ir_node      *const add     = new_d_Add(dbgi, ap, c4, mode_P_data);
 
 	set_value_for_expression_addr(ap_expr, add, ap_addr);
 
@@ -5801,6 +5817,8 @@ static void init_ir_types(void)
 
 	const backend_params *be_params = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
+
+	stack_param_align       = be_params->stack_param_align;
 }
 
 void exit_ast2firm(void)
