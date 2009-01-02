@@ -1683,6 +1683,7 @@ static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
 				/* skip possible arguments */
 				if (token.type == '(') {
 					eat_until_matching_token(')');
+					next_token(); /* skip the ')' */
 				}
 			} else {
 				/* check for arguments */
