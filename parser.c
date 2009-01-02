@@ -4684,9 +4684,20 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 
 			if (size_expression != NULL) {
 				if (is_constant_expression(size_expression)) {
+					long const size                 = fold_constant(size_expression);
+					array_type->array.size          = size;
 					array_type->array.size_constant = true;
-					array_type->array.size
-						= fold_constant(size_expression);
+					/* §6.7.5.2:1  If the expression is a constant expression, it shall
+					 * have a value greater than zero. */
+					if (size <= 0) {
+						if (size < 0 || !GNU_MODE) {
+							errorf(&size_expression->base.source_position,
+									"size of array must be greater than zero");
+						} else if (warning.other) {
+							warningf(&size_expression->base.source_position,
+									"zero length arrays are a GCC extension");
+						}
+					}
 				} else {
 					array_type->array.is_vla = true;
 				}
