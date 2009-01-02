@@ -238,6 +238,9 @@ struct expression_base_t {
 #endif
 };
 
+/**
+ * A constant.
+ */
 struct const_expression_t {
 	expression_base_t  base;
 	union {
@@ -288,20 +291,25 @@ struct reference_expression_t {
 	entity_t          *entity;
 };
 
+/**
+ * An argument of a call.
+ */
 struct call_argument_t {
-	expression_t    *expression;
-	call_argument_t *next;
+	expression_t    *expression;  /**< The expression which value is transmitted. */
+	call_argument_t *next;        /**< Links to the next argument of this call. */
 };
+
 
 struct call_expression_t {
 	expression_base_t  base;
-	expression_t      *function;
-	call_argument_t   *arguments;
+	expression_t      *function;  /**< The address of the function to call. */
+	call_argument_t   *arguments; /**< List of arguments of this call. */
 };
+
 
 struct unary_expression_t {
 	expression_base_t  base;
-	expression_t      *value;
+	expression_t      *value;     /**< The unary operand. */
 };
 
 struct binary_expression_t {
@@ -318,9 +326,9 @@ struct select_expression_t {
 
 struct array_access_expression_t {
 	expression_base_t  base;
-	expression_t      *array_ref;
-	expression_t      *index;
-	bool               flipped; /**< index/ref was written in a 5[a] way */
+	expression_t      *array_ref; /**< the referenced array */
+	expression_t      *index;     /**< the index used */
+	bool               flipped;   /**< True if index/ref was written in a 5[a] way */
 };
 
 struct typeprop_expression_t {
@@ -331,8 +339,8 @@ struct typeprop_expression_t {
 
 struct designator_t {
 	source_position_t  source_position;
-	symbol_t          *symbol;
-	expression_t      *array_index;
+	symbol_t          *symbol;      /**< the symbol if any */
+	expression_t      *array_index; /**< the array index if any */
 	designator_t      *next;
 };
 
@@ -552,10 +560,10 @@ typedef enum statement_kind_t {
  */
 struct statement_base_t {
 	statement_kind_t   kind;
-	statement_t       *next;
+	statement_t       *next;         /**< Point to the next statement in a compound statement. */
 	source_position_t  source_position;
-	statement_t       *parent;
-	bool               reachable;
+	statement_t       *parent;       /**< The Parent statement that controls the execution. */
+	bool               reachable;    /**< True, if this statement is reachable. */
 #ifndef NDEBUG
 	bool               transformed;
 #endif
@@ -571,14 +579,14 @@ struct empty_statement_t {
 
 struct return_statement_t {
 	statement_base_t  base;
-	expression_t     *value;
+	expression_t     *value;    /**< The return value if any. */
 };
 
 struct compound_statement_t {
 	statement_base_t  base;
 	statement_t      *statements;
 	scope_t           scope;
-	bool              stmt_expr; /* The compound statement is a statement expression */
+	bool              stmt_expr; /**< True if this compound statement is a statement expression. */
 };
 
 struct declaration_statement_t {

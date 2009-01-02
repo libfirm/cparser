@@ -46,6 +46,9 @@ struct atomic_type_properties_t {
 	unsigned   flags;             /**< type flags from atomic_type_flag_t */
 };
 
+/**
+ * Properties of atomic types.
+ */
 static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	//ATOMIC_TYPE_INVALID = 0,
 	[ATOMIC_TYPE_VOID] = {

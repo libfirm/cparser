@@ -92,7 +92,7 @@ struct builtin_type_t {
 struct pointer_type_t {
 	type_base_t  base;
 	type_t      *points_to;
-	variable_t  *base_variable;  /**< Microsoft __based() extension */
+	variable_t  *base_variable;  /**< Microsoft __based() extension: base variable or NULL. */
 };
 
 struct reference_type_t {
