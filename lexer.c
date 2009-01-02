@@ -50,8 +50,7 @@
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 /* No strtold on windows and no replacement yet */
-#define strtold(s, e)     strtod(s, e)
-#define strcasecmp(a, b)  stricmp(a, b)
+#define strtold(s, e) strtod(s, e)
 #endif
 
 typedef unsigned int utf32;
