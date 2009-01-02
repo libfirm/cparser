@@ -1550,7 +1550,7 @@ static void check_no_argument(gnu_attribute_t *attribute, const char *name)
 	errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
 	eat_until_matching_token('(');
 	/* we have already consumed '(', so we stop before ')', eat it */
-	eat(')');
+	next_token();
 	attribute->invalid = true;
 }
 
