@@ -21,3 +21,4 @@
 #define __attribute__(x)
 #define snprintf _snprintf
 #define vsnprintf _vsnprintf
+#define stricmp(x, y) _stricmp(x, y)
