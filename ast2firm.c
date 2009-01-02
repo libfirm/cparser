@@ -3235,7 +3235,7 @@ static ir_node *va_start_expression_to_firm(
 	ir_node   *const c2          = new_d_Add(dbgi, cnst, c1, mode);
 	ir_node   *const c3          = new_Const_long(mode, -(long)stack_param_align);
 	ir_node   *const c4          = new_d_And(dbgi, c2, c3, mode);
-	ir_node   *const add         = new_d_Add(dbgi, arg_sel, c2, mode_P_data);
+	ir_node   *const add         = new_d_Add(dbgi, arg_sel, c4, mode_P_data);
 	set_value_for_expression(expr->ap, add);
 
 	return NULL;
