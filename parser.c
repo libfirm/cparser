@@ -343,6 +343,8 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 /**
  * Allocate an entity of given kind and initialize all
  * fields with zero.
+ *
+ * @param kind   the kind of the entity to allocate
  */
 static entity_t *allocate_entity_zero(entity_kind_t kind)
 {
@@ -450,6 +452,8 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 /**
  * Allocate an expression node of given kind and initialize all
  * fields with zero.
+ *
+ * @param kind  the kind of the expression to allocate
  */
 static expression_t *allocate_expression_zero(expression_kind_t kind)
 {
@@ -2976,6 +2980,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (token.type == T_IDENTIFIER) {
+		/* the compound has a name, check if we have seen it already */
 		symbol = token.v.symbol;
 		next_token();
 
@@ -11471,9 +11476,10 @@ static void create_microsoft_intrinsics(void)
 	MS_BUILTIN(_byteswap_ulong,        make_function_1_type(type_unsigned_long,  type_unsigned_long));
 	MS_BUILTIN(_byteswap_uint64,       make_function_1_type(type_unsigned_int64, type_unsigned_int64));
 
-	MS_BUILTIN(__debugbreak,    make_function_0_type(type_void));
-	MS_BUILTIN(_ReturnAddress,  make_function_0_type(type_void_ptr));
-	MS_BUILTIN(__popcount,      make_function_1_type(type_unsigned_int, type_unsigned_int));
+	MS_BUILTIN(__debugbreak,            make_function_0_type(type_void));
+	MS_BUILTIN(_ReturnAddress,          make_function_0_type(type_void_ptr));
+	MS_BUILTIN(_AddressOfReturnAddress, make_function_0_type(type_void_ptr));
+	MS_BUILTIN(__popcount,              make_function_1_type(type_unsigned_int, type_unsigned_int));
 
 	/* x86/x64 only */
 	MS_BUILTIN(_enable,                make_function_0_type(type_void));

@@ -266,6 +266,7 @@ typedef enum builtin_kind_t {
 
 	bk_ms__debugbreak,             /**< MS __debugbreak */
 	bk_ms_ReturnAddress,           /**< MS _ReturnAddress */
+	bk_ms_AddressOfReturnAddress,  /**< MS _AddressOfReturnAddress */
 	bk_ms__popcount,               /**< MS __popcount */
 	bk_ms_enable,                  /**< MS _enable */
 	bk_ms_disable,                 /**< MS _disable */
