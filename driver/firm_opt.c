@@ -489,7 +489,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_irp_memory_disambiguator_options(aa_opt);
 
   /* parameter passing code should set them directly sometime... */
-  set_opt_enabled("rts", firm_opt.freestanding);
+  set_opt_enabled("rts", !firm_opt.freestanding);
   set_opt_enabled("gc_irgs", firm_opt.remove_unused);
   set_opt_enabled("tailrec", firm_opt.tail_rec);
   set_opt_enabled("funccalls", firm_opt.func_calls);
