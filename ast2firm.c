@@ -3273,8 +3273,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
  */
 static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const expr)
 {
-	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
-	ir_node  *const src  = expression_to_firm(expr->src);
+	ir_node *const src = expression_to_firm(expr->src);
 	set_value_for_expression(expr->dst, src);
 	return NULL;
 }
