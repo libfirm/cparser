@@ -77,11 +77,15 @@ enum rts_names {
   rts_tanhl,       /**< the name of the tanhl() function */
 
   /* string functions */
-  rts_memcpy,      /**< the name of the memcpy() function */
-  rts_memset,      /**< the name of the memset() function */
   rts_strcmp,      /**< the name of the strcmp() function */
   rts_strncmp,     /**< the name of the strncmp() function */
+  rts_strcpy,      /**< the name of the strcpy() function */
   rts_strlen,      /**< the name of the strlen() function */
+  rts_memcpy,      /**< the name of the memcpy() function */
+  rts_mempcpy,     /**< the name of the mempcpy() function */
+  rts_memmove,     /**< the name of the memmove() function */
+  rts_memset,      /**< the name of the memset() function */
+  rts_memcmp,      /**< the name of the memcmp() function */
 
   rts_max
 };

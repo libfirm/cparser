@@ -973,10 +973,15 @@ static const struct {
 	{ rts_coshl,      1, "coshl",        1, _C99 },
 	{ rts_tanhl,      1, "tanhl",        1, _C99 },
 
-	{ rts_memcpy,     1, "memcpy",       3, _C89 },  /* HMM, man say its C99 */
-	{ rts_memset,     1, "memset",       3, _C89 },  /* HMM, man say its C99 */
 	{ rts_strcmp,     1, "strcmp",       2, _C89 },
-	{ rts_strncmp,    1, "strncmp",      3, _C89 }
+	{ rts_strncmp,    1, "strncmp",      3, _C89 },
+	{ rts_strcpy,     1, "strcpy",       2, _C89 },
+	{ rts_strlen,     1, "strlen",       1, _C89 },
+	{ rts_memcpy,     1, "memcpy",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_mempcpy,    1, "mempcpy",      3, _GNUC },
+	{ rts_memmove,    1, "memmove",      3, _C89 },  /* HMM, man say its C99 */
+	{ rts_memset,     1, "memset",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_memcmp,     1, "memcmp",       3, _C89 },  /* HMM, man say its C99 */
 };
 
 static ident *rts_idents[lengthof(rts_data)];

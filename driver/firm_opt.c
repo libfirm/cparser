@@ -212,11 +212,15 @@ static void rts_map(void) {
     { &rts_entities[rts_tanhl],   i_mapper_tanh },
 
     /* string */
-    { &rts_entities[rts_memcpy],  i_mapper_memcpy },
-    { &rts_entities[rts_memset],  i_mapper_memset },
     { &rts_entities[rts_strcmp],  i_mapper_strcmp },
     { &rts_entities[rts_strncmp], i_mapper_strncmp },
-    { &rts_entities[rts_strlen],  i_mapper_strlen }
+    { &rts_entities[rts_strcpy],  i_mapper_strcpy },
+    { &rts_entities[rts_strlen],  i_mapper_strlen },
+    { &rts_entities[rts_memcpy],  i_mapper_memcpy },
+	{ &rts_entities[rts_mempcpy], i_mapper_mempcpy },
+    { &rts_entities[rts_memmove], i_mapper_memmove },
+    { &rts_entities[rts_memset],  i_mapper_memset },
+    { &rts_entities[rts_memcmp],  i_mapper_memcmp }
   };
   i_record rec[sizeof(mapper)/sizeof(mapper[0])];
   unsigned i, n_map;
