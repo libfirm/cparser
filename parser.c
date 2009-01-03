@@ -171,8 +171,6 @@ static unsigned char token_anchor_set[T_LAST_TOKEN];
 /** true if we are in GCC mode. */
 #define GNU_MODE ((c_mode & _GNUC) || in_gcc_extension)
 
-static type_t *type_valist;
-
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
@@ -183,6 +181,9 @@ static void          parse_externals(void);
 static void          parse_external(void);
 
 static void parse_compound_type_entries(compound_t *compound_declaration);
+
+static void check_call_argument(type_t          *expected_type,
+								call_argument_t *argument, unsigned pos);
 
 typedef enum declarator_flags_t {
 	DECL_FLAGS_NONE             = 0,
@@ -294,6 +295,7 @@ static void create_microsoft_intrinsics(void);
 	case T___builtin_offsetof:       \
 	case T___builtin_va_arg:         \
 	case T___builtin_va_start:       \
+	case T___builtin_va_copy:        \
 	case T___func__:                 \
 	case T___noop:                   \
 	case T__assume:                  \
@@ -419,6 +421,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_OFFSETOF]                   = sizeof(offsetof_expression_t),
 		[EXPR_VA_START]                   = sizeof(va_start_expression_t),
 		[EXPR_VA_ARG]                     = sizeof(va_arg_expression_t),
+		[EXPR_VA_COPY]                    = sizeof(va_copy_expression_t),
 		[EXPR_STATEMENT]                  = sizeof(statement_expression_t),
 		[EXPR_LABEL_ADDRESS]              = sizeof(label_address_expression_t),
 	};
@@ -2035,6 +2038,10 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 
 		case EXPR_VA_ARG:
 			mark_vars_read(expr->va_arge.ap, lhs_ent);
+			return;
+
+		case EXPR_VA_COPY:
+			mark_vars_read(expr->va_copye.src, lhs_ent);
 			return;
 
 		case EXPR_UNARY_CAST:
@@ -5776,6 +5783,9 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_VA_ARG:
 			return expression_returns(expr->va_arge.ap);
 
+		case EXPR_VA_COPY:
+			return expression_returns(expr->va_copye.src);
+
 		EXPR_UNARY_CASES_MANDATORY
 			return expression_returns(expr->unary.value);
 
@@ -7456,7 +7466,7 @@ end_error:
 }
 
 /**
- * Parses a _builtin_va_arg() expression.
+ * Parses a __builtin_va_arg() expression.
  */
 static expression_t *parse_va_arg(void)
 {
@@ -7465,9 +7475,42 @@ static expression_t *parse_va_arg(void)
 	eat(T___builtin_va_arg);
 
 	expect('(', end_error);
-	expression->va_arge.ap = parse_assignment_expression();
+	call_argument_t ap;
+	ap.expression = parse_assignment_expression();
+	expression->va_arge.ap = ap.expression;
+	check_call_argument(type_valist, &ap, 1);
+
 	expect(',', end_error);
 	expression->base.type = parse_typename();
+	expect(')', end_error);
+
+	return expression;
+end_error:
+	return create_invalid_expression();
+}
+
+/**
+ * Parses a __builtin_va_copy() expression.
+ */
+static expression_t *parse_va_copy(void)
+{
+	expression_t *expression = allocate_expression_zero(EXPR_VA_COPY);
+
+	eat(T___builtin_va_copy);
+
+	expect('(', end_error);
+	expression_t *dst = parse_assignment_expression();
+	assign_error_t error = semantic_assign(type_valist, dst);
+	report_assign_error(error, type_valist, dst, "call argument 1",
+	                    &dst->base.source_position);
+	expression->va_copye.dst = dst;
+
+	expect(',', end_error);
+
+	call_argument_t src;
+	src.expression = parse_assignment_expression();
+	check_call_argument(type_valist, &src, 2);
+	expression->va_copye.src = src.expression;
 	expect(')', end_error);
 
 	return expression;
@@ -7750,6 +7793,7 @@ static expression_t *parse_primary_expression(void)
 		case T___builtin_offsetof:           return parse_offsetof();
 		case T___builtin_va_start:           return parse_va_start();
 		case T___builtin_va_arg:             return parse_va_arg();
+		case T___builtin_va_copy:            return parse_va_copy();
 		case T___builtin_isgreater:
 		case T___builtin_isgreaterequal:
 		case T___builtin_isless:
@@ -7982,10 +8026,9 @@ create_error_entry:
 	return select;
 }
 
-static void check_call_argument(const function_parameter_t *parameter,
+static void check_call_argument(type_t          *expected_type,
                                 call_argument_t *argument, unsigned pos)
 {
-	type_t         *expected_type      = parameter->type;
 	type_t         *expected_type_skip = skip_typeref(expected_type);
 	assign_error_t  error              = ASSIGN_ERROR_INCOMPATIBLE;
 	expression_t   *arg_expr           = argument->expression;
@@ -8019,8 +8062,7 @@ static void check_call_argument(const function_parameter_t *parameter,
 	}
 
 	error                = semantic_assign(expected_type, arg_expr);
-	argument->expression = create_implicit_cast(argument->expression,
-	                                            expected_type);
+	argument->expression = create_implicit_cast(arg_expr, expected_type);
 
 	if (error != ASSIGN_SUCCESS) {
 		/* report exact scope in error messages (like "in argument 3") */
@@ -8145,7 +8187,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	if (!function_type->unspecified_parameters) {
 		for (unsigned pos = 0; parameter != NULL && argument != NULL;
 				parameter = parameter->next, argument = argument->next) {
-			check_call_argument(parameter, argument, ++pos);
+			check_call_argument(parameter->type, argument, ++pos);
 		}
 
 		if (parameter != NULL) {
@@ -9353,6 +9395,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_OFFSETOF:                   return false;
 		case EXPR_VA_START:                   return true;
 		case EXPR_VA_ARG:                     return true;
+		case EXPR_VA_COPY:                    return true;
 		case EXPR_STATEMENT:                  return true; // TODO
 		case EXPR_COMPOUND_LITERAL:           return false;
 

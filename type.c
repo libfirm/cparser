@@ -23,6 +23,7 @@
 #include <assert.h>
 
 #include "type_t.h"
+#include "types.h"
 #include "entity_t.h"
 #include "symbol_t.h"
 #include "type_hash.h"
@@ -1074,6 +1075,14 @@ bool is_type_incomplete(const type_t *type)
 bool is_type_object(const type_t *type)
 {
 	return !is_type_function(type) && !is_type_incomplete(type);
+}
+
+bool is_builtin_va_list(type_t *type)
+{
+	type_t *tp = skip_typeref(type);
+
+	return tp->kind == type_valist->kind &&
+	       tp->builtin.symbol == type_valist->builtin.symbol;
 }
 
 /**

@@ -75,6 +75,19 @@ static void walk_expression(expression_t const *const expr,
 		return;
 	}
 
+	case EXPR_VA_START:
+		walk_expression(expr->va_starte.ap, callback, env);
+		return;
+
+	case EXPR_VA_ARG:
+		walk_expression(expr->va_arge.ap, callback, env);
+		return;
+
+	case EXPR_VA_COPY:
+		walk_expression(expr->va_copye.src, callback, env);
+		walk_expression(expr->va_copye.dst, callback, env);
+		return;
+
 	case EXPR_INVALID:
 	case EXPR_OFFSETOF:
 	case EXPR_REFERENCE:
@@ -85,8 +98,6 @@ static void walk_expression(expression_t const *const expr,
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
-	case EXPR_VA_START:
-	case EXPR_VA_ARG:
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		break;

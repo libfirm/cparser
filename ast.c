@@ -119,6 +119,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_OFFSETOF]                   = PREC_PRIMARY,
 		[EXPR_VA_START]                   = PREC_PRIMARY,
 		[EXPR_VA_ARG]                     = PREC_PRIMARY,
+		[EXPR_VA_COPY]                    = PREC_PRIMARY,
 		[EXPR_STATEMENT]                  = PREC_PRIMARY,
 		[EXPR_LABEL_ADDRESS]              = PREC_PRIMARY,
 
@@ -656,6 +657,20 @@ static void print_va_arg(const va_arg_expression_t *expression)
 }
 
 /**
+ * Prints a va_copy expression.
+ *
+ * @param expression   the va_copy expression
+ */
+static void print_va_copy(const va_copy_expression_t *expression)
+{
+	fputs("__builtin_va_copy(", out);
+	print_assignment_expression(expression->dst);
+	fputs(", ", out);
+	print_assignment_expression(expression->src);
+	fputc(')', out);
+}
+
+/**
  * Prints a select expression (. or ->).
  *
  * @param expression   the select expression
@@ -812,6 +827,9 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	case EXPR_VA_ARG:
 		print_va_arg(&expression->va_arge);
+		break;
+	case EXPR_VA_COPY:
+		print_va_copy(&expression->va_copye);
 		break;
 	case EXPR_SELECT:
 		print_select(&expression->select);
@@ -1845,6 +1863,7 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
+	case EXPR_VA_COPY:
 	case EXPR_STATEMENT:
 	case EXPR_REFERENCE:
 	case EXPR_UNARY_POSTFIX_INCREMENT:

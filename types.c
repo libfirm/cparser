@@ -71,6 +71,8 @@ type_t *type_ssize_t_ptr;
 type_t *type_wchar_t_ptr;
 type_t *type_const_wchar_t_ptr;
 
+type_t *type_valist;
+
 /* microsoft types */
 atomic_type_kind_t int8_type_kind            = ATOMIC_TYPE_INVALID;
 atomic_type_kind_t int16_type_kind           = ATOMIC_TYPE_INVALID;

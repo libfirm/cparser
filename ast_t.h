@@ -86,6 +86,7 @@ typedef enum expression_kind_t {
 	EXPR_OFFSETOF,
 	EXPR_VA_START,
 	EXPR_VA_ARG,
+	EXPR_VA_COPY,
 	EXPR_STATEMENT,
 	EXPR_LABEL_ADDRESS, /**< GCC extension &&label operator */
 
@@ -361,6 +362,12 @@ struct va_arg_expression_t {
 	expression_t      *ap;
 };
 
+struct va_copy_expression_t {
+	expression_base_t  base;
+	expression_t      *dst;    /**< destination argument */
+	expression_t      *src;    /**< source argument */
+};
+
 struct conditional_expression_t {
 	expression_base_t  base;
 	expression_t      *condition;
@@ -403,6 +410,7 @@ union expression_t {
 	offsetof_expression_t                 offsetofe;
 	va_start_expression_t                 va_starte;
 	va_arg_expression_t                   va_arge;
+	va_copy_expression_t                  va_copye;
 	conditional_expression_t              conditional;
 	statement_expression_t                statement;
 	classify_type_expression_t            classify_type;

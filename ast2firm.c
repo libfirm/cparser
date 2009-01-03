@@ -3263,6 +3263,17 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	return res;
 }
 
+/**
+ * Generate Firm for a va_copy expression.
+ */
+static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const expr)
+{
+	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
+	ir_node  *const src  = expression_to_firm(expr->src);
+	set_value_for_expression(expr->dst, src);
+	return NULL;
+}
+
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->base.kind == EXPR_UNARY_DEREFERENCE);
@@ -3411,6 +3422,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return va_start_expression_to_firm(&expression->va_starte);
 	case EXPR_VA_ARG:
 		return va_arg_expression_to_firm(&expression->va_arge);
+	case EXPR_VA_COPY:
+		return va_copy_expression_to_firm(&expression->va_copye);
 	case EXPR_BUILTIN_CONSTANT_P:
 		return builtin_constant_to_firm(&expression->builtin_constant);
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
