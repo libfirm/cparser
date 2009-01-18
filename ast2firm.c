@@ -1374,13 +1374,10 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 }
 
 static ir_node *get_global_var_address(dbg_info *const dbgi,
-                                       const entity_t *const entity)
+                                       const variable_t *const variable)
 {
-	assert(entity->kind == ENTITY_VARIABLE);
-	assert(entity->declaration.kind == DECLARATION_KIND_GLOBAL_VARIABLE);
-
-	ir_entity *const irentity = entity->variable.v.entity;
-	if (entity->variable.thread_local) {
+	ir_entity *const irentity = variable->v.entity;
+	if (variable->thread_local) {
 		ir_node *const no_mem = new_NoMem();
 		ir_node *const tls    = get_irg_tls(current_ir_graph);
 		return new_d_simpleSel(dbgi, no_mem, tls, irentity);
@@ -1484,8 +1481,9 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		}
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		ir_node *const addr = get_global_var_address(dbgi, entity);
-		return deref_address(dbgi, entity->declaration.type, addr);
+		const variable_t *variable = &entity->variable;
+		ir_node *const addr = get_global_var_address(dbgi, variable);
+		return deref_address(dbgi, variable->base.type, addr);
 	}
 
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
@@ -1526,7 +1524,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		 * as an indicator for no real address) */
 		return NULL;
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		ir_node *const addr = get_global_var_address(dbgi, entity);
+		ir_node *const addr = get_global_var_address(dbgi, &entity->variable);
 		return addr;
 	}
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
@@ -2399,6 +2397,14 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		ir_node *value_node = expression_to_firm(value);
 		type_t  *value_type = skip_typeref(value->base.type);
 		assert(is_type_pointer(value_type));
+
+		/* check for __based */
+		const variable_t *const base_var = value_type->pointer.base_variable;
+		if (base_var != NULL) {
+			ir_node *const addr = get_global_var_address(dbgi, base_var);
+			ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
+			value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(value_type));
+		}
 		type_t  *points_to  = value_type->pointer.points_to;
 		return deref_address(dbgi, points_to, value_node);
 	}
@@ -2410,7 +2416,25 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
 		if (is_type_scalar(type)) {
-			ir_mode *mode       = get_ir_mode_storage(type);
+			ir_mode *mode      = get_ir_mode_storage(type);
+			type_t  *from_type = value->base.type;
+			/* check for conversion from / to __based types */
+			if (is_type_pointer(type) && is_type_pointer(from_type)) {
+				const variable_t *from_var = from_type->pointer.base_variable;
+				const variable_t *to_var   = type->pointer.base_variable;
+				if (from_var != to_var) {
+					if (from_var != NULL) {
+						ir_node *const addr = get_global_var_address(dbgi, from_var);
+						ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
+						value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
+					}
+					if (to_var != NULL) {
+						ir_node *const addr = get_global_var_address(dbgi, to_var);
+						ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
+						value_node = new_d_Sub(dbgi, value_node, base, mode);
+					}
+				}
+			}
 			ir_node *node       = create_conv(dbgi, value_node, mode);
 			node                = do_strict_conv(dbgi, node);
 			ir_mode *mode_arith = get_ir_mode_arithmetic(type);
