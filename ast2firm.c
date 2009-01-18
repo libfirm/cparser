@@ -1326,6 +1326,13 @@ static ir_node *wide_string_literal_to_firm(
 	return create_symconst(dbgi, mode_P_data, entity);
 }
 
+/**
+ * Dereference an address.
+ *
+ * @param dbgi  debug info
+ * @param type  the type of the dereferenced result (the points_to type)
+ * @param addr  the address to dereference
+ */
 static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 		                      ir_node *const addr)
 {
@@ -1351,7 +1358,10 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 }
 
 /**
- * Creates a strict Conv if necessary.
+ * Creates a strict Conv (to the node's mode) if necessary.
+ *
+ * @param dbgi  debug info
+ * @param node  the node to strict conv
  */
 static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 {
@@ -1373,6 +1383,12 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 	return new_d_strictConv(dbgi, node, mode);
 }
 
+/**
+ * Returns the address of a global variable.
+ *
+ * @param dbgi      debug info
+ * @param variable  the variable
+ */
 static ir_node *get_global_var_address(dbg_info *const dbgi,
                                        const variable_t *const variable)
 {
@@ -1389,6 +1405,8 @@ static ir_node *get_global_var_address(dbg_info *const dbgi,
 /**
  * Returns the correct base address depending on whether it is a parameter or a
  * normal local variable.
+ *
+ * @param ent  an entity representing a variable
  */
 static ir_node *get_local_frame(ir_entity *const ent)
 {
