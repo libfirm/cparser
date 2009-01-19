@@ -297,6 +297,8 @@ struct function_t {
 
 	/* ast2firm info */
 	ir_entity     *entity;
+	ir_node       *static_link;        /**< if need_closure is set, the node representing
+										    the static link. */
 };
 
 union entity_t {
