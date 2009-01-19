@@ -90,6 +90,7 @@ static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
 static trampoline_region  *current_trampolines;
 static ir_type            *current_outer_frame;
+static ir_type            *current_outer_value_type;
 static ir_node            *current_static_link;
 
 static entitymap_t  entitymap;
@@ -1093,9 +1094,15 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	else
 		nested_function = true;
 
-	dbg_info *const dbgi     = get_dbg_info(&entity->base.source_position);
-	irentity                 = new_d_entity(owner_type, id, ir_type_method, dbgi);
-	set_entity_ld_ident(irentity, create_ld_ident(entity));
+	dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
+	irentity             = new_d_entity(owner_type, id, ir_type_method, dbgi);
+
+	ident *ld_id;
+	if (nested_function)
+		ld_id = id_unique("inner.%u");
+	else
+		ld_id = create_ld_ident(entity);
+	set_entity_ld_ident(irentity, ld_id);
 
 	handle_gnu_attributes_ent(irentity, entity);
 
@@ -1521,7 +1528,8 @@ static ir_node *get_local_frame(ir_entity *const ent)
 {
 	ir_graph      *const irg   = current_ir_graph;
 	const ir_type *const owner = get_entity_owner(ent);
-	if (owner == current_outer_frame) {
+	if (owner == current_outer_frame || owner == current_outer_value_type) {
+		assert(current_static_link != NULL);
 		return current_static_link;
 	} else {
 		return get_irg_frame(irg);
@@ -5832,6 +5840,7 @@ static void create_function(entity_t *entity)
 
 	next_value_number_function = 0;
 	initialize_function_parameters(entity);
+	current_static_link = entity->function.static_link;
 
 	statement_to_firm(entity->function.statement);
 
@@ -5932,17 +5941,17 @@ static void create_function(entity_t *entity)
 	/* create inner functions if any */
 	entity_t **inner = inner_functions;
 	if (inner != NULL) {
-		ir_type *rem_outer_frame = current_outer_frame;
-		current_outer_frame      = get_irg_frame_type(current_ir_graph);
-		ir_node *rem_static_link = current_static_link;
-		current_static_link      = entity->function.static_link;
+		ir_type *rem_outer_frame      = current_outer_frame;
+		current_outer_frame           = get_irg_frame_type(current_ir_graph);
+		ir_type *rem_outer_value_type = current_outer_value_type;
+		current_outer_value_type      = get_irg_value_param_type(current_ir_graph);
 		for (int i = ARR_LEN(inner) - 1; i >= 0; --i) {
 			create_function(inner[i]);
 		}
 		DEL_ARR_F(inner);
 
-		current_outer_frame = rem_outer_frame;
-		current_static_link = rem_static_link;
+		current_outer_value_type = rem_outer_value_type;
+		current_outer_frame      = rem_outer_frame;
 	}
 }
 
