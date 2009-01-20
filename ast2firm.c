@@ -2562,7 +2562,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		ir_node *value_node = expression_to_firm(value);
 		if (is_type_scalar(type)) {
 			ir_mode *mode      = get_ir_mode_storage(type);
-			type_t  *from_type = value->base.type;
+			type_t  *from_type = skip_typeref(value->base.type);
 			/* check for conversion from / to __based types */
 			if (is_type_pointer(type) && is_type_pointer(from_type)) {
 				const variable_t *from_var = from_type->pointer.base_variable;
