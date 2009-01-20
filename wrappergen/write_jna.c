@@ -96,6 +96,11 @@ static void write_pointer_type(const pointer_type_t *type)
 		fputs("String", out);
 		return;
 	}
+	if (is_type_pointer(points_to)) {
+		/* hack... */
+		fputs("Pointer[]", out);
+		return;
+	}
 	fputs("Pointer", out);
 }
 
@@ -459,8 +464,8 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 			if (buf[0] == 0)
 				continue;
 
-			char   *str = malloc(len);
-			memcpy(str, buf, len);
+			char *str = malloc(len+1);
+			memcpy(str, buf, len+1);
 			symbol_t *symbol = symbol_table_insert(str);
 			pset_new_insert(&avoid_symbols, symbol);
 		}
