@@ -725,8 +725,7 @@ static void print_designator(const designator_t *designator)
  */
 static void print_offsetof_expression(const offsetof_expression_t *expression)
 {
-	fputs("__builtin_offsetof", out);
-	fputc('(', out);
+	fputs("__builtin_offsetof(", out);
 	print_type(expression->type);
 	fputc(',', out);
 	print_designator(expression->designator);
