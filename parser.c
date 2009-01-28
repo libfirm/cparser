@@ -834,6 +834,21 @@ static entity_t *get_entity(const symbol_t *const symbol,
 	return NULL;
 }
 
+/* §6.2.3:1 24)  There is only one name space for tags even though three are
+ * possible. */
+static entity_t *get_tag(symbol_t const *const symbol,
+		entity_kind_tag_t const kind)
+{
+	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
+	if (entity != NULL && entity->kind != kind) {
+		errorf(HERE,
+				"'%Y' defined as wrong kind of tag (previous definition %P)",
+				symbol, &entity->base.source_position);
+		entity = NULL;
+	}
+	return entity;
+}
+
 /**
  * pushs an entity on the environment stack and links the corresponding symbol
  * it.
@@ -2986,16 +3001,14 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		modifiers |= parse_attributes(&attributes);
 	}
 
+	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
 	if (token.type == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
 		symbol = token.v.symbol;
 		next_token();
 
-		namespace_tag_t const namespc =
-			is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION;
-		entity_t *entity = get_entity(symbol, namespc);
+		entity_t *entity = get_tag(symbol, kind);
 		if (entity != NULL) {
-			assert(entity->kind == (is_struct ? ENTITY_STRUCT : ENTITY_UNION));
 			compound = &entity->compound;
 			if (compound->base.parent_scope != current_scope &&
 			    (token.type == '{' || token.type == ';')) {
@@ -3024,12 +3037,10 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (compound == NULL) {
-		entity_kind_t  kind   = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
-		entity_t      *entity = allocate_entity_zero(kind);
-		compound              = &entity->compound;
+		entity_t *entity = allocate_entity_zero(kind);
+		compound         = &entity->compound;
 
-		compound->base.namespc =
-			(is_struct ? NAMESPACE_STRUCT : NAMESPACE_UNION);
+		compound->base.namespc         = NAMESPACE_TAG;
 		compound->base.source_position = token.source_position;
 		compound->base.symbol          = symbol;
 		compound->base.parent_scope    = current_scope;
@@ -3114,9 +3125,8 @@ static type_t *parse_enum_specifier(void)
 		symbol = token.v.symbol;
 		next_token();
 
-		entity = get_entity(symbol, NAMESPACE_ENUM);
+		entity = get_tag(symbol, ENTITY_ENUM);
 		if (entity != NULL) {
-			assert(entity->kind == ENTITY_ENUM);
 			if (entity->base.parent_scope != current_scope &&
 					(token.type == '{' || token.type == ';')) {
 				/* we're in an inner scope and have a definition. Shadow
@@ -3138,7 +3148,7 @@ static type_t *parse_enum_specifier(void)
 
 	if (entity == NULL) {
 		entity                       = allocate_entity_zero(ENTITY_ENUM);
-		entity->base.namespc         = NAMESPACE_ENUM;
+		entity->base.namespc         = NAMESPACE_TAG;
 		entity->base.source_position = token.source_position;
 		entity->base.symbol          = symbol;
 		entity->base.parent_scope    = current_scope;
