@@ -4790,6 +4790,9 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 		if (is_declaration(entity)) {
 			initialize_local_declaration(entity);
 		} else if (entity->kind == ENTITY_TYPEDEF) {
+			/* §6.7.7:3  Any array size expressions associated with variable length
+			 * array declarators are evaluated each time the declaration of the
+			 * typedef name is reached in the order of execution. */
 			type_t *const type = skip_typeref(entity->typedefe.type);
 			if (is_type_array(type) && type->array.is_vla)
 				get_vla_size(&type->array);
