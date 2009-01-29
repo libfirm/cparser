@@ -4391,6 +4391,14 @@ static construct_type_t *parse_array_declarator(void)
 		next_token();
 	} else if (token.type != ']') {
 		expression_t *const size = parse_assignment_expression();
+
+		/* array size must have integer type §6.7.5.2 */
+		if (!is_type_integer(size->base.type)) {
+			errorf(&size->base.source_position,
+			       "array size '%E' must have integer type but has type '%T'",
+			       size, size->base.type);
+		}
+
 		array->size = size;
 		mark_vars_read(size, NULL);
 	}
