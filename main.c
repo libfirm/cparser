@@ -232,7 +232,7 @@ static void lextest(FILE *in, const char *fname)
 
 static void add_flag(struct obstack *obst, const char *format, ...)
 {
-	char buf[4096];
+	char buf[65536];
 	va_list ap;
 
 	va_start(ap, format);
@@ -318,7 +318,9 @@ static FILE *preprocess(const char *fname)
 		}
 	}
 	if (flags[0] != '\0') {
-		obstack_printf(&cppflags_obst, " %s", flags);
+		size_t len = strlen(flags);
+		obstack_1grow(&cppflags_obst, ' ');
+		obstack_grow(&cppflags_obst, flags, len);
 	}
 	add_flag(&cppflags_obst, fname);
 
@@ -339,7 +341,7 @@ static FILE *preprocess(const char *fname)
 
 static void assemble(const char *out, const char *in)
 {
-	char buf[4096];
+	char buf[65536];
 
 	snprintf(buf, sizeof(buf), "%s %s -o %s", ASSEMBLER, in, out);
 	if (verbose) {
