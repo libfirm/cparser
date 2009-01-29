@@ -1836,15 +1836,11 @@ bool is_constant_expression(const expression_t *expression)
 	case EXPR_CONST:
 	case EXPR_CHARACTER_CONSTANT:
 	case EXPR_WIDE_CHARACTER_CONSTANT:
-	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_CLASSIFY_TYPE:
-	case EXPR_FUNCNAME:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-	case EXPR_LABEL_ADDRESS:
 	case EXPR_REFERENCE_ENUM_VALUE:
 		return true;
 
@@ -1859,6 +1855,10 @@ bool is_constant_expression(const expression_t *expression)
 		return true;
 	}
 
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_FUNCNAME:
+	case EXPR_LABEL_ADDRESS:
 	case EXPR_SELECT:
 	case EXPR_VA_START:
 	case EXPR_VA_ARG:
