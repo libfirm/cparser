@@ -103,7 +103,7 @@ void *allocate_ast(size_t size);
 
 /**
  * Returns true if a given expression is a compile time
- * constant.
+ * constant. §6.6
  *
  * @param expression  the expression to check
  */

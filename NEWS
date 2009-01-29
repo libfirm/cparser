@@ -1,4 +1,4 @@
-===== cparser 0.9.8 (2008-12-11) =====
+===== cparser 0.9.8 (2009-01-28) =====
 * several bugfixes
 * add/correct semantic checks
 * improve error recovery
