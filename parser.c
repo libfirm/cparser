@@ -990,7 +990,7 @@ static int get_rank(const type_t *type)
 }
 
 /**
- * Do integer promotion for a given type.
+ * §6.3.1.1:2  Do integer promotion for a given type.
  *
  * @param type  the type to promote
  * @return the promoted type
@@ -4392,7 +4392,7 @@ static construct_type_t *parse_array_declarator(void)
 	} else if (token.type != ']') {
 		expression_t *const size = parse_assignment_expression();
 
-		/* array size must have integer type §6.7.5.2 */
+		/* §6.7.5.2:1  Array size must have integer type */
 		if (!is_type_integer(size->base.type)) {
 			errorf(&size->base.source_position,
 			       "array size '%E' must have integer type but has type '%T'",
@@ -5481,6 +5481,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration,
 	}
 }
 
+/* §6.5.2.2:6 */
 static type_t *get_default_promoted_type(type_t *orig_type)
 {
 	type_t *result = orig_type;
