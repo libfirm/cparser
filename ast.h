@@ -117,6 +117,10 @@ bool is_constant_initializer(const initializer_t *initializer);
  */
 bool is_constant_expression(const expression_t *expression);
 
+/**
+ * An object with a fixed but at compiletime unknown adress which will be known
+ * at link/load time.
+ */
 bool is_address_constant(const expression_t *expression);
 
 long fold_constant(const expression_t *expression);

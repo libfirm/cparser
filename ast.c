@@ -1686,6 +1686,12 @@ static bool is_object_with_linker_constant_address(const expression_t *expressio
 bool is_address_constant(const expression_t *expression)
 {
 	switch (expression->kind) {
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_FUNCNAME:
+	case EXPR_LABEL_ADDRESS:
+		return true;
+
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_linker_constant_address(expression->unary.value);
 
