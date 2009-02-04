@@ -10581,10 +10581,10 @@ static statement_t *parse_return(void)
 				/* Only warn in C mode, because GCC does the same */
 				if (strict_mode) {
 					errorf(pos,
-							"'return' with expression in function return 'void'");
+							"'return' with expression in function returning 'void'");
 				} else if (warning.other) {
 					warningf(pos,
-							"'return' with expression in function return 'void'");
+							"'return' with expression in function returning 'void'");
 				}
 			}
 		} else {
