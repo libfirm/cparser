@@ -7061,11 +7061,6 @@ static expression_t *parse_reference(void)
 		orig_type = entity->declaration.type;
 	} else if (entity->kind == ENTITY_ENUM_VALUE) {
 		orig_type = entity->enum_value.enum_type;
-	} else if (entity->kind == ENTITY_TYPEDEF) {
-		errorf(HERE, "encountered typedef name '%Y' while parsing expression",
-			symbol);
-		next_token();
-		return create_invalid_expression();
 	} else {
 		panic("expected declaration or enum value in reference");
 	}
@@ -7805,7 +7800,6 @@ static expression_t *parse_primary_expression(void)
 		case T_FLOATINGPOINT:                return parse_float_const();
 		case T_STRING_LITERAL:
 		case T_WIDE_STRING_LITERAL:          return parse_string_const();
-		case T_IDENTIFIER:                   return parse_reference();
 		case T___FUNCTION__:
 		case T___func__:                     return parse_function_keyword();
 		case T___PRETTY_FUNCTION__:          return parse_pretty_function_keyword();
@@ -7831,6 +7825,19 @@ static expression_t *parse_primary_expression(void)
 
 		case '(':                            return parse_parenthesized_expression();
 		case T___noop:                       return parse_noop_expression();
+
+		/* Gracefully handle type names while parsing expressions. */
+		case T_IDENTIFIER:
+			if (!is_typedef_symbol(token.v.symbol)) {
+				return parse_reference();
+			}
+			/* FALLTHROUGH */
+		TYPENAME_START {
+			source_position_t  const pos  = *HERE;
+			type_t const      *const type = parse_typename();
+			errorf(&pos, "encountered type '%T' while parsing expression", type);
+			return create_invalid_expression();
+		}
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
