@@ -4194,6 +4194,8 @@ static bool has_parameters(void)
 	/* func(void) is not a parameter */
 	if (token.type == T_IDENTIFIER) {
 		entity_t const *const entity = get_entity(token.v.symbol, NAMESPACE_NORMAL);
+		if (entity == NULL)
+			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
 			return true;
 		if (skip_typeref(entity->typedefe.type) != type_void)
