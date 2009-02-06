@@ -5572,7 +5572,6 @@ decl_list_end:
 		}
 
 		semantic_parameter_incomplete(parameter);
-		parameter_type = parameter->declaration.type;
 
 		/*
 		 * we need the default promoted types for the function type
