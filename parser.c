@@ -5560,14 +5560,15 @@ decl_list_end:
 			if (strict_mode) {
 				errorf(HERE, "no type specified for function parameter '%Y'",
 				       parameter->base.symbol);
+				parameter_type = type_error_type;
 			} else {
 				if (warning.implicit_int) {
 					warningf(HERE, "no type specified for function parameter '%Y', using 'int'",
 					         parameter->base.symbol);
 				}
-				parameter_type              = type_int;
-				parameter->declaration.type = parameter_type;
+				parameter_type = type_int;
 			}
+			parameter->declaration.type = parameter_type;
 		}
 
 		semantic_parameter_incomplete(parameter);
