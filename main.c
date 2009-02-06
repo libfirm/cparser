@@ -141,6 +141,7 @@ typedef enum filetype_t {
 	FILETYPE_ASSEMBLER,
 	FILETYPE_PREPROCESSED_ASSEMBLER,
 	FILETYPE_OBJECT,
+	FILETYPE_IR,
 	FILETYPE_UNKNOWN
 } filetype_t;
 
@@ -500,6 +501,7 @@ typedef enum compile_mode_t {
 	ParseOnly,
 	Compile,
 	CompileDump,
+	CompileExportIR,
 	CompileAssemble,
 	CompileAssembleLink,
 	LexTest,
@@ -1055,6 +1057,8 @@ int main(int argc, char **argv)
 					}
 					dumpfunction = argv[i];
 					mode         = CompileDump;
+				} else if (streq(option, "export-ir")) {
+					mode = CompileExportIR;
 				} else {
 					fprintf(stderr, "error: unknown argument '%s'\n", arg);
 					argument_errors = true;
@@ -1082,6 +1086,7 @@ int main(int argc, char **argv)
 							streq(suffix, "cpp") ? FILETYPE_CXX                    :
 							streq(suffix, "cxx") ? FILETYPE_CXX                    :
 							streq(suffix, "h")   ? FILETYPE_C                      :
+							streq(suffix, "ir")  ? FILETYPE_IR                     :
 							streq(suffix, "o")   ? FILETYPE_OBJECT                 :
 							streq(suffix, "s")   ? FILETYPE_PREPROCESSED_ASSEMBLER :
 							streq(suffix, "so")  ? FILETYPE_OBJECT                 :
@@ -1182,6 +1187,10 @@ int main(int argc, char **argv)
 		case CompileDump:
 			get_output_name(outnamebuf, sizeof(outnamebuf), dumpfunction,
 			                ".vcg");
+			outname = outnamebuf;
+			break;
+		case CompileExportIR:
+			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".ir");
 			outname = outnamebuf;
 			break;
 		case CompileAssembleLink:
@@ -1365,6 +1374,7 @@ do_parsing:
 
 			translation_unit_to_firm(unit);
 
+graph_built:
 			if (mode == ParseOnly) {
 				continue;
 			}
@@ -1394,11 +1404,21 @@ do_parsing:
 				exit(0);
 			}
 
+			if (mode == CompileExportIR) {
+				fclose(out);
+				ir_export(outname);
+				exit(0);
+			}
+
 			gen_firm_finish(asm_out, filename, /*c_mode=*/1,
 			                have_const_functions);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
+		} else if (filetype == FILETYPE_IR) {
+			fclose(in);
+			ir_import(filename);
+			goto graph_built;
 		} else if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
 			copy_file(asm_out, in);
 			if (in == preprocessed_in) {
