@@ -8963,7 +8963,7 @@ static void warn_addsub_in_shift(const expression_t *const expr)
 			"suggest parentheses around '%c' inside shift", op);
 }
 
-static void semantic_shift_op(binary_expression_t *expression)
+static bool semantic_shift(binary_expression_t *expression)
 {
 	expression_t *const left            = expression->left;
 	expression_t *const right           = expression->right;
@@ -8978,19 +8978,47 @@ static void semantic_shift_op(binary_expression_t *expression)
 			errorf(&expression->base.source_position,
 			       "operands of shift operation must have integer types");
 		}
-		return;
+		return false;
 	}
+
+	type_left = promote_integer(type_left);
+
+	if (is_constant_expression(right)) {
+		long count = fold_constant(right);
+		if (count < 0) {
+			warningf(&right->base.source_position,
+					"shift count must be non-negative");
+		} else if ((unsigned long)count >=
+				get_atomic_type_size(type_left->atomic.akind) * 8) {
+			warningf(&right->base.source_position,
+					"shift count must be less than type width");
+		}
+	}
+
+	type_right        = promote_integer(type_right);
+	expression->right = create_implicit_cast(right, type_right);
+
+	return true;
+}
+
+static void semantic_shift_op(binary_expression_t *expression)
+{
+	expression_t *const left  = expression->left;
+	expression_t *const right = expression->right;
+
+	if (!semantic_shift(expression))
+		return;
 
 	if (warning.parentheses) {
 		warn_addsub_in_shift(left);
 		warn_addsub_in_shift(right);
 	}
 
-	type_left  = promote_integer(type_left);
-	type_right = promote_integer(type_right);
+	type_t *const orig_type_left = left->base.type;
+	type_t *      type_left      = skip_typeref(orig_type_left);
 
+	type_left             = promote_integer(type_left);
 	expression->left      = create_implicit_cast(left, type_left);
-	expression->right     = create_implicit_cast(right, type_right);
 	expression->base.type = type_left;
 }
 
@@ -9318,6 +9346,50 @@ static void semantic_arithmetic_addsubb_assign(binary_expression_t *expression)
 	}
 }
 
+static void semantic_integer_assign(binary_expression_t *expression)
+{
+	expression_t *left            = expression->left;
+	expression_t *right           = expression->right;
+	type_t       *orig_type_left  = left->base.type;
+	type_t       *orig_type_right = right->base.type;
+
+	if (!is_valid_assignment_lhs(left))
+		return;
+
+	type_t *type_left  = skip_typeref(orig_type_left);
+	type_t *type_right = skip_typeref(orig_type_right);
+
+	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
+		/* TODO: improve error message */
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(&expression->base.source_position,
+			       "operation needs integer types");
+		}
+		return;
+	}
+
+	/* combined instructions are tricky. We can't create an implicit cast on
+	 * the left side, because we need the uncasted form for the store.
+	 * The ast2firm pass has to know that left_type must be right_type
+	 * for the arithmetic operation and create a cast by itself */
+	type_t *arithmetic_type = semantic_arithmetic(type_left, type_right);
+	expression->right       = create_implicit_cast(right, arithmetic_type);
+	expression->base.type   = type_left;
+}
+
+static void semantic_shift_assign(binary_expression_t *expression)
+{
+	expression_t *left           = expression->left;
+
+	if (!is_valid_assignment_lhs(left))
+		return;
+
+	if (!semantic_shift(expression))
+		return;
+
+	expression->base.type = skip_typeref(left->base.type);
+}
+
 static void warn_logical_and_within_or(const expression_t *const expr)
 {
 	if (expr->base.kind != EXPR_BINARY_LOGICAL_AND)
@@ -9554,11 +9626,11 @@ CREATE_BINEXPR_PARSER(T_MINUSEQUAL,           EXPR_BINARY_SUB_ASSIGN,         PR
 CREATE_BINEXPR_PARSER(T_ASTERISKEQUAL,        EXPR_BINARY_MUL_ASSIGN,         PREC_ASSIGNMENT,     semantic_arithmetic_assign)
 CREATE_BINEXPR_PARSER(T_SLASHEQUAL,           EXPR_BINARY_DIV_ASSIGN,         PREC_ASSIGNMENT,     semantic_divmod_assign)
 CREATE_BINEXPR_PARSER(T_PERCENTEQUAL,         EXPR_BINARY_MOD_ASSIGN,         PREC_ASSIGNMENT,     semantic_divmod_assign)
-CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL,        EXPR_BINARY_SHIFTLEFT_ASSIGN,   PREC_ASSIGNMENT,     semantic_arithmetic_assign)
-CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL,  EXPR_BINARY_SHIFTRIGHT_ASSIGN,  PREC_ASSIGNMENT,     semantic_arithmetic_assign)
-CREATE_BINEXPR_PARSER(T_ANDEQUAL,             EXPR_BINARY_BITWISE_AND_ASSIGN, PREC_ASSIGNMENT,     semantic_arithmetic_assign)
-CREATE_BINEXPR_PARSER(T_PIPEEQUAL,            EXPR_BINARY_BITWISE_OR_ASSIGN,  PREC_ASSIGNMENT,     semantic_arithmetic_assign)
-CREATE_BINEXPR_PARSER(T_CARETEQUAL,           EXPR_BINARY_BITWISE_XOR_ASSIGN, PREC_ASSIGNMENT,     semantic_arithmetic_assign)
+CREATE_BINEXPR_PARSER(T_LESSLESSEQUAL,        EXPR_BINARY_SHIFTLEFT_ASSIGN,   PREC_ASSIGNMENT,     semantic_shift_assign)
+CREATE_BINEXPR_PARSER(T_GREATERGREATEREQUAL,  EXPR_BINARY_SHIFTRIGHT_ASSIGN,  PREC_ASSIGNMENT,     semantic_shift_assign)
+CREATE_BINEXPR_PARSER(T_ANDEQUAL,             EXPR_BINARY_BITWISE_AND_ASSIGN, PREC_ASSIGNMENT,     semantic_integer_assign)
+CREATE_BINEXPR_PARSER(T_PIPEEQUAL,            EXPR_BINARY_BITWISE_OR_ASSIGN,  PREC_ASSIGNMENT,     semantic_integer_assign)
+CREATE_BINEXPR_PARSER(T_CARETEQUAL,           EXPR_BINARY_BITWISE_XOR_ASSIGN, PREC_ASSIGNMENT,     semantic_integer_assign)
 CREATE_BINEXPR_PARSER(',',                    EXPR_BINARY_COMMA,              PREC_ASSIGNMENT,     semantic_comma)
 
 
