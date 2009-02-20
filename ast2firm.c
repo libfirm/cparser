@@ -5127,7 +5127,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	}
 
 	if (def_nr == INT_MAX) {
-		/* Bad: an overflow will occurr, we cannot be sure that the
+		/* Bad: an overflow will occur, we cannot be sure that the
 		 * maximum + 1 is a free number. Scan the values a second
 		 * time to find a free number.
 		 */
@@ -5149,8 +5149,8 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 			}
 		}
 		/* We look at the first num_cases constants:
-		 * Either they are densed, so we took the last (num_cases)
-		 * one, or they are non densed, so we will find one free
+		 * Either they are dense, so we took the last (num_cases)
+		 * one, or they are not dense, so we will find one free
 		 * there...
 		 */
 		unsigned long i;
@@ -5214,7 +5214,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		do {
 			proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
 			add_immBlock_pred(block, proj);
-		} while(pn++ < end_pn);
+		} while (pn++ < end_pn);
 	} else {
 		saw_default_label = true;
 		proj = new_d_defaultProj(dbgi, current_switch_cond,
