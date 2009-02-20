@@ -10495,19 +10495,17 @@ static statement_t *parse_goto(void)
 		}
 
 		statement->gotos.expression = expression;
-	} else {
-		if (token.type != T_IDENTIFIER) {
-			if (GNU_MODE)
-				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
-			else
-				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
-			eat_until_anchor();
-			goto end_error;
-		}
+	} else if (token.type == T_IDENTIFIER) {
 		symbol_t *symbol = token.v.symbol;
 		next_token();
-
 		statement->gotos.label = get_label(symbol);
+	} else {
+		if (GNU_MODE)
+			parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
+		else
+			parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
+		eat_until_anchor();
+		goto end_error;
 	}
 
 	/* remember the goto's in a list for later checking */
