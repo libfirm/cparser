@@ -4395,10 +4395,12 @@ static construct_type_t *parse_array_declarator(void)
 		expression_t *const size = parse_assignment_expression();
 
 		/* §6.7.5.2:1  Array size must have integer type */
-		if (!is_type_integer(skip_typeref(size->base.type))) {
+		type_t *const orig_type = size->base.type;
+		type_t *const type      = skip_typeref(orig_type);
+		if (!is_type_integer(type) && is_type_valid(type)) {
 			errorf(&size->base.source_position,
 			       "array size '%E' must have integer type but has type '%T'",
-			       size, size->base.type);
+			       size, orig_type);
 		}
 
 		array->size = size;
