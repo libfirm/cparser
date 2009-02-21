@@ -927,7 +927,7 @@ static void generate_code_Proj_Cond(FILE *f, ir_node *n)
     fprintf(f, "mode_b, %s);\n", proj_nr ? "pn_Cond_true" : "pn_Cond_false");
   }
   else {
-    if (proj_nr == get_Cond_defaultProj(cond))
+    if (proj_nr == get_Cond_default_proj(cond))
       name(f, "  ", n, " = new_r_defaultProj(irg, ");
     else
       name(f, "  ", n, " = new_r_Proj(irg, ");
