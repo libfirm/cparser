@@ -4858,11 +4858,14 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			entity->function.parameters = env.parameters;
 
 			if (env.symbol != NULL) {
+				/* this needs fixes for C++ */
+				bool in_function_scope = current_function != NULL;
+
 				if (specifiers->thread_local || (
-							specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-							specifiers->storage_class != STORAGE_CLASS_NONE   &&
-							specifiers->storage_class != STORAGE_CLASS_STATIC
-						)) {
+				      specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+					  specifiers->storage_class != STORAGE_CLASS_NONE   &&
+				  	  (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
+			  	   )) {
 					errorf(&env.source_position,
 							"invalid storage class for function '%Y'", env.symbol);
 				}
@@ -8183,7 +8186,9 @@ static expression_t *parse_call_expression(expression_t *expression)
 	}
 
 	if (function_type == NULL && is_type_valid(type)) {
-		errorf(HERE, "called object '%E' (type '%T') is not a pointer to a function", expression, orig_type);
+		errorf(HERE,
+		       "called object '%E' (type '%T') is not a pointer to a function",
+		       expression, orig_type);
 	}
 
 	/* parse arguments */
@@ -8212,6 +8217,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	if (function_type == NULL)
 		return result;
 
+	/* check type and count of call arguments */
 	function_parameter_t *parameter = function_type->parameters;
 	call_argument_t      *argument  = call->arguments;
 	if (!function_type->unspecified_parameters) {
@@ -8227,7 +8233,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 		}
 	}
 
-	/* do default promotion */
+	/* do default promotion for other arguments */
 	for (; argument != NULL; argument = argument->next) {
 		type_t *type = argument->expression->base.type;
 
