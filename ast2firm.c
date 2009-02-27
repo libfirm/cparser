@@ -4753,6 +4753,11 @@ static void initialize_local_declaration(entity_t *entity)
 	if (entity->base.symbol == NULL)
 		return;
 
+	// no need to emit code in dead blocks
+	if (entity->declaration.storage_class != STORAGE_CLASS_STATIC
+			&& get_cur_block() == NULL)
+		return;
+
 	switch ((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_LOCAL_VARIABLE:
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
