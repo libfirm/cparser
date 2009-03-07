@@ -260,13 +260,13 @@ static ir_node *get_vla_size(array_type_t *const type)
 /**
  * Return a node representing the size of a type.
  */
-static ir_node *get_type_size(type_t *type)
+static ir_node *get_type_size_node(type_t *type)
 {
 	type = skip_typeref(type);
 
 	if (is_type_array(type) && type->array.is_vla) {
 		ir_node *size_node = get_vla_size(&type->array);
-		ir_node *elem_size = get_type_size(type->array.element_type);
+		ir_node *elem_size = get_type_size_node(type->array.element_type);
 		ir_mode *mode      = get_irn_mode(size_node);
 		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
 		return real_size;
@@ -290,28 +290,15 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
-static type_t *get_aligned_type(type_t *type, int alignment)
-{
-	if (alignment == 0)
-		return type;
-
-	type = skip_typeref(type);
-	if (alignment > type->base.alignment) {
-		type_t *copy         = duplicate_type(type);
-		copy->base.alignment = alignment;
-		type                 = identify_new_type(copy);
-	}
-	return type;
-}
-
 /**
  * Creates a Firm type for an atomic type
  */
-static ir_type *create_atomic_type(atomic_type_kind_t akind, int alignment)
+static ir_type *create_atomic_type(atomic_type_kind_t akind)
 {
-	ir_mode            *mode   = atomic_modes[akind];
-	ident              *id     = get_mode_ident(mode);
-	ir_type            *irtype = new_type_primitive(id, mode);
+	ir_mode        *mode      = atomic_modes[akind];
+	ident          *id        = get_mode_ident(mode);
+	ir_type        *irtype    = new_type_primitive(id, mode);
+	il_alignment_t  alignment = get_atomic_type_alignment(akind);
 
 	set_type_alignment_bytes(irtype, alignment);
 
@@ -342,8 +329,9 @@ static ir_type *create_imaginary_type(const imaginary_type_t *type)
 	ir_mode            *mode      = atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
 	ir_type            *irtype    = new_type_primitive(id, mode);
+	il_alignment_t      alignment = get_type_alignment((const type_t*) type);
 
-	set_type_alignment_bytes(irtype, type->base.alignment);
+	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
 }
@@ -352,10 +340,11 @@ static ir_type *create_imaginary_type(const imaginary_type_t *type)
  * return type of a parameter (and take transparent union gnu extension into
  * account)
  */
-static type_t *get_parameter_type(type_t *type)
+static type_t *get_parameter_type(type_t *orig_type)
 {
-	type = skip_typeref(type);
-	if (type->base.modifiers & TYPE_MODIFIER_TRANSPARENT_UNION) {
+	type_t *type = skip_typeref(orig_type);
+	if (is_type_union(type)
+			&& get_type_modifiers(orig_type) & DM_TRANSPARENT_UNION) {
 		compound_t *compound = type->compound.compound;
 		type                 = compound->members.entities->declaration.type;
 	}
@@ -635,8 +624,6 @@ static ir_type *create_compound_type(compound_type_t *type, ir_type *irtype,
 
 		symbol_t *symbol     = entry->base.symbol;
 		type_t   *entry_type = skip_typeref(entry->declaration.type);
-		entry_type
-			= get_aligned_type(entry_type, entry->compound_member.alignment);
 		dbg_info *dbgi       = get_dbg_info(&entry->base.source_position);
 
 		ident    *ident;
@@ -790,7 +777,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 	constant_folding = constant_folding_old;
 
-	return create_atomic_type(type->akind, type->base.alignment);
+	return create_atomic_type(type->akind);
 }
 
 static ir_type *get_ir_type_incomplete(type_t *type)
@@ -830,11 +817,10 @@ ir_type *get_ir_type(type_t *type)
 	switch (type->kind) {
 	case TYPE_ERROR:
 		/* Happens while constant folding, when there was an error */
-		return create_atomic_type(ATOMIC_TYPE_VOID, 0);
+		return create_atomic_type(ATOMIC_TYPE_VOID);
 
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(type->atomic.akind,
-		                               type->base.alignment);
+		firm_type = create_atomic_type(type->atomic.akind);
 		break;
 	case TYPE_COMPLEX:
 		firm_type = create_complex_type(&type->complex);
@@ -1005,7 +991,7 @@ static ident* (*create_ld_ident)(entity_t*) = create_name_linux_elf;
  * @param ent   the entity
  * @param decl  the routine declaration
  */
-static void handle_gnu_attributes_ent(ir_entity *irentity, entity_t *entity)
+static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 {
 	assert(is_declaration(entity));
 	decl_modifiers_t modifiers = entity->declaration.modifiers;
@@ -1104,7 +1090,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		ld_id = create_ld_ident(entity);
 	set_entity_ld_ident(irentity, ld_id);
 
-	handle_gnu_attributes_ent(irentity, entity);
+	handle_decl_modifiers(irentity, entity);
 
 	if (! nested_function) {
 		/* static inline             => local
@@ -2356,7 +2342,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 	ir_node *offset;
 	if (is_type_pointer(type)) {
 		pointer_type_t *pointer_type = &type->pointer;
-		offset                       = get_type_size(pointer_type->points_to);
+		offset = get_type_size_node(pointer_type->points_to);
 	} else {
 		assert(is_type_arithmetic(type));
 		offset = new_Const(get_mode_one(mode));
@@ -2654,7 +2640,7 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	assert(is_type_pointer(type));
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
-	ir_node        *      elem_size    = get_type_size(points_to);
+	ir_node        *      elem_size    = get_type_size_node(points_to);
 	elem_size                          = create_conv(dbgi, elem_size, mode);
 	value                              = create_conv(dbgi, value,     mode);
 	ir_node        *const mul          = new_d_Mul(dbgi, value, elem_size, mode);
@@ -2684,7 +2670,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 			const pointer_type_t *const ptr_type = &type_left->pointer;
 
 			mode = get_ir_mode_arithmetic(expression->base.type);
-			ir_node *const elem_size = get_type_size(ptr_type->points_to);
+			ir_node *const elem_size = get_type_size_node(ptr_type->points_to);
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
 			ir_node *const no_mem    = new_NoMem();
@@ -3045,7 +3031,7 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 		expression_to_firm(expression->tp_expression);
 	}
 
-	return get_type_size(type);
+	return get_type_size_node(type);
 }
 
 static entity_t *get_expression_entity(const expression_t *expression)
@@ -3056,54 +3042,46 @@ static entity_t *get_expression_entity(const expression_t *expression)
 	return expression->reference.entity;
 }
 
+static unsigned get_cparser_entity_alignment(const entity_t *entity)
+{
+	switch(entity->kind) {
+	DECLARATION_KIND_CASES
+		return entity->declaration.alignment;
+	case ENTITY_STRUCT:
+	case ENTITY_UNION:
+		return entity->compound.alignment;
+	case ENTITY_TYPEDEF:
+		return entity->typedefe.alignment;
+	default:
+		break;
+	}
+	return 0;
+}
+
 /**
  * Transform an alignof expression into Firm code.
  */
 static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
-	ir_entity *irentity = NULL;
+	unsigned alignment = 0;
 
 	const expression_t *tp_expression = expression->tp_expression;
 	if (tp_expression != NULL) {
 		entity_t *entity = get_expression_entity(tp_expression);
-		if (entity != NULL && is_declaration(entity)) {
-			switch (entity->declaration.kind) {
-			case DECLARATION_KIND_UNKNOWN:
-				panic("unknown entity reference found");
-			case DECLARATION_KIND_COMPOUND_MEMBER:
-				irentity = entity->compound_member.entity;
-				break;
-			case DECLARATION_KIND_GLOBAL_VARIABLE:
-			case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
-				irentity = entity->variable.v.entity;
-				break;
-			case DECLARATION_KIND_PARAMETER_ENTITY:
-				irentity = entity->parameter.v.entity;
-				break;
-			case DECLARATION_KIND_FUNCTION:
-			case DECLARATION_KIND_INNER_FUNCTION:
-				irentity = entity->function.entity;
-				break;
-			case DECLARATION_KIND_PARAMETER:
-			case DECLARATION_KIND_LOCAL_VARIABLE:
-			case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
-				break;
-			}
+		if (entity != NULL) {
+			alignment = get_cparser_entity_alignment(entity);
 		}
 	}
 
-	ir_type *irtype;
-	if (irentity != NULL) {
-		irtype = get_entity_type(irentity);
-	} else {
+	if (alignment == 0) {
 		type_t *type = expression->type;
-		irtype = get_ir_type(type);
+		alignment = get_type_alignment(type);
 	}
 
-	ir_mode *const mode = get_ir_mode_arithmetic(expression->base.type);
-	symconst_symbol sym;
-	sym.type_p = irtype;
-	return new_SymConst(mode, sym, symconst_type_align);
+	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	ir_mode  *mode = get_ir_mode_arithmetic(expression->base.type);
+	tarval   *tv   = new_tarval_from_long(alignment, mode);
+	return new_d_Const(dbgi, tv);
 }
 
 static void init_ir_types(void);
@@ -3403,7 +3381,8 @@ static ir_node *va_start_expression_to_firm(
 	ir_node   *const arg_sel     =
 		new_d_simpleSel(dbgi, no_mem, frame, parm_ent);
 
-	ir_node   *const cnst        = get_type_size(expr->parameter->base.type);
+	type_t    *const param_type  = expr->parameter->base.type;
+	ir_node   *const cnst        = get_type_size_node(param_type);
 	ir_mode   *const mode        = get_irn_mode(cnst);
 	ir_node   *const c1          = new_Const_long(mode, stack_param_align - 1);
 	ir_node   *const c2          = new_d_Add(dbgi, cnst, c1, mode);
@@ -3424,7 +3403,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	dbg_info     *const dbgi    = get_dbg_info(&expr->base.source_position);
 	ir_node      *const res     = deref_address(dbgi, type, ap);
 
-	ir_node      *const cnst    = get_type_size(expr->base.type);
+	ir_node      *const cnst    = get_type_size_node(expr->base.type);
 	ir_mode      *const mode    = get_irn_mode(cnst);
 	ir_node      *const c1      = new_Const_long(mode, stack_param_align - 1);
 	ir_node      *const c2      = new_d_Add(dbgi, cnst, c1, mode);
@@ -3764,22 +3743,22 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	return cond_expr;
 }
 
-
 static void create_variable_entity(entity_t *variable,
                                    declaration_kind_t declaration_kind,
                                    ir_type *parent_type)
 {
 	assert(variable->kind == ENTITY_VARIABLE);
 	type_t    *type = skip_typeref(variable->declaration.type);
-	type            = get_aligned_type(type, variable->variable.alignment);
 
-	ident     *const id       = new_id_from_str(variable->base.symbol->string);
-	ir_type   *const irtype   = get_ir_type(type);
-	dbg_info  *const dbgi     = get_dbg_info(&variable->base.source_position);
+	ident     *const id        = new_id_from_str(variable->base.symbol->string);
+	ir_type   *const irtype    = get_ir_type(type);
+	dbg_info  *const dbgi      = get_dbg_info(&variable->base.source_position);
+	ir_entity *const irentity  = new_d_entity(parent_type, id, irtype, dbgi);
+	unsigned         alignment = variable->declaration.alignment;
 
-	ir_entity *const irentity = new_d_entity(parent_type, id, irtype, dbgi);
+	set_entity_alignment(irentity, alignment);
 
-	handle_gnu_attributes_ent(irentity, variable);
+	handle_decl_modifiers(irentity, variable);
 
 	variable->declaration.kind  = (unsigned char) declaration_kind;
 	variable->variable.v.entity = irentity;
@@ -4421,7 +4400,6 @@ static void create_initializer_local_variable_entity(entity_t *entity)
 	ir_entity     *irentity    = entity->variable.v.entity;
 	type_t        *type        = entity->declaration.type;
 
-	type = get_aligned_type(type, entity->variable.alignment);
 	create_local_initializer(initializer, dbgi, irentity, type);
 }
 
@@ -4507,7 +4485,7 @@ static void allocate_variable_length_array(entity_t *entity)
 	ir_type  *el_type   = get_ir_type(type->array.element_type);
 
 	/* make sure size_node is calculated */
-	get_type_size(type);
+	get_type_size_node(type);
 	ir_node  *elems = type->array.size_node;
 	ir_node  *mem   = get_store();
 	ir_node  *alloc = new_d_Alloc(dbgi, mem, elems, el_type, stack_alloc);
@@ -4560,13 +4538,11 @@ static void create_local_static_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
-	type_t    *type = skip_typeref(entity->declaration.type);
-	type            = get_aligned_type(type, entity->variable.alignment);
-
-	ir_type   *const var_type = entity->variable.thread_local ?
+	type_t   *type           = skip_typeref(entity->declaration.type);
+	ir_type  *const var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
-	ir_type   *const irtype   = get_ir_type(type);
-	dbg_info  *const dbgi     = get_dbg_info(&entity->base.source_position);
+	ir_type  *const irtype   = get_ir_type(type);
+	dbg_info *const dbgi     = get_dbg_info(&entity->base.source_position);
 
 	size_t l = strlen(entity->base.symbol->string);
 	char   buf[l + sizeof(".%u")];
@@ -5734,7 +5710,8 @@ static void initialize_function_parameters(entity_t *entity)
  * @param irg            the IR-graph
  * @param dec_modifiers  additional modifiers
  */
-static void handle_decl_modifier_irg(ir_graph_ptr irg, decl_modifiers_t decl_modifiers)
+static void handle_decl_modifier_irg(ir_graph_ptr irg,
+                                     decl_modifiers_t decl_modifiers)
 {
 	if (decl_modifiers & DM_RETURNS_TWICE) {
 		/* TRUE if the declaration includes __attribute__((returns_twice)) */

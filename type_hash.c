@@ -101,6 +101,7 @@ static unsigned hash_function_type(const function_type_t *type)
 		result   ^= hash_ptr(parameter->type);
 		parameter = parameter->next;
 	}
+	result += type->modifiers;
 	result += type->linkage;
 	result += type->calling_convention;
 
@@ -216,6 +217,8 @@ static bool function_types_equal(const function_type_t *type1,
 		return false;
 	if (type1->linkage != type2->linkage)
 		return false;
+	if (type1->modifiers != type2->modifiers)
+		return false;
 	if (type1->calling_convention != type2->calling_convention)
 		return false;
 
@@ -319,8 +322,6 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	if (type1->kind != type2->kind)
 		return false;
 	if (type1->base.qualifiers != type2->base.qualifiers)
-		return false;
-	if (type1->base.modifiers != type2->base.modifiers)
 		return false;
 
 	switch (type1->kind) {

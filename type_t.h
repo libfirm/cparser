@@ -52,19 +52,11 @@ typedef enum type_kind_t {
 	TYPE_TYPEOF,
 } type_kind_t;
 
-typedef enum type_modifier_t {
-	TYPE_MODIFIER_NONE              = 0,
-	TYPE_MODIFIER_TRANSPARENT_UNION = 1 << 0,
-} type_modifier_t;
-typedef unsigned short type_modifiers_t;
-
 struct type_base_t {
 	type_kind_t       kind;
-	il_size_t         size;           /**< The size of this type. */
 	type_qualifiers_t qualifiers;
-	type_modifiers_t  modifiers;
-	il_alignment_t    alignment;      /**< The extra alignment of the type, 0 for default. */
 
+	/* cached ast2firm infos */
 	ir_type          *firm_type;
 };
 
@@ -148,6 +140,7 @@ struct function_type_t {
 	function_parameter_t *parameters;         /**< A list of the parameter types. */
 	linkage_kind_t        linkage;
 	cc_kind_t             calling_convention; /**< The specified calling convention. */
+	decl_modifiers_t      modifiers;
 	bool                  variadic : 1;
 	bool                  unspecified_parameters : 1;
 	bool                  kr_style_parameters : 1;

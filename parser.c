@@ -34,6 +34,7 @@
 #include "type_hash.h"
 #include "ast_t.h"
 #include "entity_t.h"
+#include "attribute_t.h"
 #include "lang_features.h"
 #include "walk_statements.h"
 #include "warning.h"
@@ -50,27 +51,6 @@ typedef struct {
 	entity_namespace_t  namespc;
 } stack_entry_t;
 
-typedef struct argument_list_t argument_list_t;
-struct argument_list_t {
-	long              argument;
-	argument_list_t  *next;
-};
-
-typedef struct gnu_attribute_t gnu_attribute_t;
-struct gnu_attribute_t {
-	gnu_attribute_kind_t kind;          /**< The kind of the GNU attribute. */
-	gnu_attribute_t     *next;
-	bool                 invalid;       /**< Set if this attribute had argument errors, */
-	bool                 has_arguments; /**< True, if this attribute has arguments. */
-	union {
-		size_t              value;
-		string_t            string;
-		symbol_t           *symbol;
-		long                argument;  /**< Single argument. */
-		argument_list_t    *arguments; /**< List of argument expressions. */
-	} u;
-};
-
 typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	source_position_t  source_position;
@@ -79,11 +59,7 @@ struct declaration_specifiers_t {
 	bool               is_inline    : 1;
 	bool               thread_local : 1;  /**< GCC __thread */
 	bool               deprecated   : 1;
-	decl_modifiers_t   modifiers;         /**< declaration modifiers */
-	gnu_attribute_t   *gnu_attributes;    /**< list of GNU attributes */
-	const char        *deprecated_string; /**< can be set if declaration was marked deprecated. */
-	symbol_t          *get_property_sym;  /**< the name of the get property if set. */
-	symbol_t          *put_property_sym;  /**< the name of the put property if set. */
+	attribute_t       *attributes;        /**< list of attributes */
 	type_t            *type;
 };
 
@@ -140,27 +116,6 @@ static declaration_t      **incomplete_arrays;
 
 /** special symbol used for anonymous entities. */
 static const symbol_t *sym_anonymous = NULL;
-
-/* symbols for Microsoft extended-decl-modifier */
-static const symbol_t *sym_align         = NULL;
-static const symbol_t *sym_allocate      = NULL;
-static const symbol_t *sym_dllimport     = NULL;
-static const symbol_t *sym_dllexport     = NULL;
-static const symbol_t *sym_naked         = NULL;
-static const symbol_t *sym_noinline      = NULL;
-static const symbol_t *sym_returns_twice = NULL;
-static const symbol_t *sym_noreturn      = NULL;
-static const symbol_t *sym_nothrow       = NULL;
-static const symbol_t *sym_novtable      = NULL;
-static const symbol_t *sym_property      = NULL;
-static const symbol_t *sym_get           = NULL;
-static const symbol_t *sym_put           = NULL;
-static const symbol_t *sym_selectany     = NULL;
-static const symbol_t *sym_thread        = NULL;
-static const symbol_t *sym_uuid          = NULL;
-static const symbol_t *sym_deprecated    = NULL;
-static const symbol_t *sym_restrict      = NULL;
-static const symbol_t *sym_noalias       = NULL;
 
 /** The token anchor set */
 static unsigned char token_anchor_set[T_LAST_TOKEN];
@@ -245,6 +200,11 @@ static void create_microsoft_intrinsics(void);
 	case T_unsigned:          \
 	case T_void:              \
 	case T_wchar_t:           \
+	case T__int8:             \
+	case T__int16:            \
+	case T__int32:            \
+	case T__int64:            \
+	case T__int128:           \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -1230,75 +1190,6 @@ static string_t parse_string_literals(void)
 	return result;
 }
 
-static const char *const gnu_attribute_names[GNU_AK_LAST] = {
-	[GNU_AK_CONST]                  = "const",
-	[GNU_AK_VOLATILE]               = "volatile",
-	[GNU_AK_CDECL]                  = "cdecl",
-	[GNU_AK_STDCALL]                = "stdcall",
-	[GNU_AK_FASTCALL]               = "fastcall",
-	[GNU_AK_DEPRECATED]             = "deprecated",
-	[GNU_AK_NOINLINE]               = "noinline",
-	[GNU_AK_RETURNS_TWICE]          = "returns_twice",
-	[GNU_AK_NORETURN]               = "noreturn",
-	[GNU_AK_NAKED]                  = "naked",
-	[GNU_AK_PURE]                   = "pure",
-	[GNU_AK_ALWAYS_INLINE]          = "always_inline",
-	[GNU_AK_MALLOC]                 = "malloc",
-	[GNU_AK_WEAK]                   = "weak",
-	[GNU_AK_CONSTRUCTOR]            = "constructor",
-	[GNU_AK_DESTRUCTOR]             = "destructor",
-	[GNU_AK_NOTHROW]                = "nothrow",
-	[GNU_AK_TRANSPARENT_UNION]      = "transparent_union",
-	[GNU_AK_COMMON]                 = "common",
-	[GNU_AK_NOCOMMON]               = "nocommon",
-	[GNU_AK_PACKED]                 = "packed",
-	[GNU_AK_SHARED]                 = "shared",
-	[GNU_AK_NOTSHARED]              = "notshared",
-	[GNU_AK_USED]                   = "used",
-	[GNU_AK_UNUSED]                 = "unused",
-	[GNU_AK_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
-	[GNU_AK_WARN_UNUSED_RESULT]     = "warn_unused_result",
-	[GNU_AK_LONGCALL]               = "longcall",
-	[GNU_AK_SHORTCALL]              = "shortcall",
-	[GNU_AK_LONG_CALL]              = "long_call",
-	[GNU_AK_SHORT_CALL]             = "short_call",
-	[GNU_AK_FUNCTION_VECTOR]        = "function_vector",
-	[GNU_AK_INTERRUPT]              = "interrupt",
-	[GNU_AK_INTERRUPT_HANDLER]      = "interrupt_handler",
-	[GNU_AK_NMI_HANDLER]            = "nmi_handler",
-	[GNU_AK_NESTING]                = "nesting",
-	[GNU_AK_NEAR]                   = "near",
-	[GNU_AK_FAR]                    = "far",
-	[GNU_AK_SIGNAL]                 = "signal",
-	[GNU_AK_EIGTHBIT_DATA]          = "eightbit_data",
-	[GNU_AK_TINY_DATA]              = "tiny_data",
-	[GNU_AK_SAVEALL]                = "saveall",
-	[GNU_AK_FLATTEN]                = "flatten",
-	[GNU_AK_SSEREGPARM]             = "sseregparm",
-	[GNU_AK_EXTERNALLY_VISIBLE]     = "externally_visible",
-	[GNU_AK_RETURN_TWICE]           = "return_twice",
-	[GNU_AK_MAY_ALIAS]              = "may_alias",
-	[GNU_AK_MS_STRUCT]              = "ms_struct",
-	[GNU_AK_GCC_STRUCT]             = "gcc_struct",
-	[GNU_AK_DLLIMPORT]              = "dllimport",
-	[GNU_AK_DLLEXPORT]              = "dllexport",
-	[GNU_AK_ALIGNED]                = "aligned",
-	[GNU_AK_ALIAS]                  = "alias",
-	[GNU_AK_SECTION]                = "section",
-	[GNU_AK_FORMAT]                 = "format",
-	[GNU_AK_FORMAT_ARG]             = "format_arg",
-	[GNU_AK_WEAKREF]                = "weakref",
-	[GNU_AK_NONNULL]                = "nonnull",
-	[GNU_AK_TLS_MODEL]              = "tls_model",
-	[GNU_AK_VISIBILITY]             = "visibility",
-	[GNU_AK_REGPARM]                = "regparm",
-	[GNU_AK_MODE]                   = "mode",
-	[GNU_AK_MODEL]                  = "model",
-	[GNU_AK_TRAP_EXIT]              = "trap_exit",
-	[GNU_AK_SP_SWITCH]              = "sp_switch",
-	[GNU_AK_SENTINEL]               = "sentinel"
-};
-
 /**
  * compare two string, ignoring double underscores on the second.
  */
@@ -1315,620 +1206,281 @@ static int strcmp_underscore(const char *s1, const char *s2)
 	return strcmp(s1, s2);
 }
 
-/**
- * Allocate a new gnu temporal attribute of given kind.
- */
-static gnu_attribute_t *allocate_gnu_attribute(gnu_attribute_kind_t kind)
+static attribute_t *allocate_attribute_zero(attribute_kind_t kind)
 {
-	gnu_attribute_t *attribute = obstack_alloc(&temp_obst, sizeof(*attribute));
-	attribute->kind            = kind;
-	attribute->next            = NULL;
-	attribute->invalid         = false;
-	attribute->has_arguments   = false;
-
+	attribute_t *attribute = allocate_ast_zero(sizeof(*attribute));
+	attribute->kind        = kind;
 	return attribute;
 }
 
 /**
- * Parse one constant expression argument of the given attribute.
+ * Parse (gcc) attribute argument. From gcc comments in gcc source:
+ *
+ *  attribute:
+ *    __attribute__ ( ( attribute-list ) )
+ *
+ *  attribute-list:
+ *    attrib
+ *    attribute_list , attrib
+ *
+ *  attrib:
+ *    empty
+ *    any-word
+ *    any-word ( identifier )
+ *    any-word ( identifier , nonempty-expr-list )
+ *    any-word ( expr-list )
+ *
+ *  where the "identifier" must not be declared as a type, and
+ *  "any-word" may be any identifier (including one declared as a
+ *  type), a reserved word storage class specifier, type specifier or
+ *  type qualifier.  ??? This still leaves out most reserved keywords
+ *  (following the old parser), shouldn't we include them, and why not
+ *  allow identifiers declared as types to start the arguments?
+ *
+ *  Matze: this all looks confusing and little systematic, so we're even less
+ *  strict and parse any list of things which are identifiers or
+ *  (assignment-)expressions.
  */
-static void parse_gnu_attribute_const_arg(gnu_attribute_t *attribute)
+static attribute_argument_t *parse_attribute_arguments(void)
 {
-	expression_t *expression;
-	add_anchor_token(')');
-	expression = parse_constant_expression();
-	rem_anchor_token(')');
-	expect(')', end_error);
-	attribute->u.argument = fold_constant(expression);
-	return;
-end_error:
-	attribute->invalid = true;
-}
+	if (token.type == ')')
+		return NULL;
 
-/**
- * Parse a list of constant expressions arguments of the given attribute.
- */
-static void parse_gnu_attribute_const_arg_list(gnu_attribute_t *attribute)
-{
-	argument_list_t **list = &attribute->u.arguments;
-	argument_list_t  *entry;
-	expression_t     *expression;
-	add_anchor_token(')');
-	add_anchor_token(',');
+	attribute_argument_t *first = NULL;
+	attribute_argument_t *last  = NULL;
 	while (true) {
-		expression = parse_constant_expression();
-		entry = obstack_alloc(&temp_obst, sizeof(entry));
-		entry->argument = fold_constant(expression);
-		entry->next     = NULL;
-		*list = entry;
-		list = &entry->next;
-		if (token.type != ',')
+		attribute_argument_t *argument = allocate_ast_zero(sizeof(*argument));
+
+		/* is it an identifier */
+		if (token.type == T_IDENTIFIER
+				&& (look_ahead(1)->type == ',' || look_ahead(1)->type == ')')) {
+			symbol_t *symbol   = token.v.symbol;
+			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
+			argument->v.symbol = symbol;
+			next_token();
+		} else {
+			/* must be an expression */
+			expression_t *expression = parse_assignment_expression();
+
+			argument->kind         = ATTRIBUTE_ARGUMENT_EXPRESSION;
+			argument->v.expression = expression;
+		}
+
+		/* append argument */
+		if (last == NULL) {
+			first = argument;
+		} else {
+			last->next = argument;
+		}
+		last = argument;
+
+		if (token.type == ',') {
+			next_token();
+			continue;
+		}
+		expect(')', end_error);
+		break;
+	}
+
+	return first;
+
+end_error:
+	/* TODO... */
+	return first;
+}
+
+static attribute_t *parse_attribute_asm(void)
+{
+	eat(T_asm);
+
+	attribute_t *attribute = allocate_attribute_zero(ATTRIBUTE_GNU_ASM);
+
+	expect('(', end_error);
+	attribute->a.arguments = parse_attribute_arguments();
+	return attribute;
+
+end_error:
+	return NULL;
+}
+
+static symbol_t *get_symbol_from_token(void)
+{
+	switch(token.type) {
+	case T_IDENTIFIER:
+	case T_auto:
+	case T_char:
+	case T_double:
+	case T_enum:
+	case T_extern:
+	case T_float:
+	case T_int:
+	case T_long:
+	case T_register:
+	case T_short:
+	case T_static:
+	case T_struct:
+	case T_union:
+	case T_unsigned:
+	case T_void:
+	case T_bool:
+	case T__Bool:
+	case T_class:
+	case T_explicit:
+	case T_export:
+	case T_wchar_t:
+	case T_const:
+	case T_signed:
+	case T___real__:
+	case T___imag__:
+	case T_restrict:
+	case T_volatile:
+	case T_inline:
+		/* maybe we need more tokens ... add them on demand */
+		return token.v.symbol;
+	default:
+		return NULL;
+	}
+}
+
+static attribute_t *parse_attribute_gnu_single(void)
+{
+	/* parse "any-word" */
+	symbol_t *symbol = get_symbol_from_token();
+	if (symbol == NULL) {
+		parse_error_expected("while parsing attribute((", T_IDENTIFIER, NULL);
+		goto end_error;
+	}
+
+	const char *name = symbol->string;
+	next_token();
+
+	attribute_kind_t kind;
+	for (kind = ATTRIBUTE_GNU_FIRST; kind <= ATTRIBUTE_GNU_LAST; ++kind) {
+		const char *attribute_name = get_attribute_name(kind);
+		if (attribute_name != NULL
+				&& strcmp_underscore(attribute_name, name) == 0)
 			break;
+	}
+
+	if (kind >= ATTRIBUTE_GNU_LAST) {
+		if (warning.attribute) {
+			warningf(HERE, "unknown attribute '%s' ignored", name);
+		}
+		/* TODO: we should still save the attribute in the list... */
+		kind = ATTRIBUTE_UNKNOWN;
+	}
+
+	attribute_t *attribute = allocate_attribute_zero(kind);
+
+	/* parse arguments */
+	if (token.type == '(') {
 		next_token();
+		attribute->a.arguments = parse_attribute_arguments();
 	}
-	rem_anchor_token(',');
-	rem_anchor_token(')');
-	expect(')', end_error);
-	return;
+
+	return attribute;
+
 end_error:
-	attribute->invalid = true;
+	return NULL;
 }
 
-/**
- * Parse one string literal argument of the given attribute.
- */
-static void parse_gnu_attribute_string_arg(gnu_attribute_t *attribute,
-                                           string_t *string)
+static attribute_t *parse_attribute_gnu(void)
 {
-	add_anchor_token('(');
-	if (token.type != T_STRING_LITERAL) {
-		parse_error_expected("while parsing attribute directive",
-		                     T_STRING_LITERAL, NULL);
-		goto end_error;
-	}
-	*string = parse_string_literals();
-	rem_anchor_token('(');
-	expect(')', end_error);
-	return;
-end_error:
-	attribute->invalid = true;
-}
-
-/**
- * Parse one tls model of the given attribute.
- */
-static void parse_gnu_attribute_tls_model_arg(gnu_attribute_t *attribute)
-{
-	static const char *const tls_models[] = {
-		"global-dynamic",
-		"local-dynamic",
-		"initial-exec",
-		"local-exec"
-	};
-	string_t string = { NULL, 0 };
-	parse_gnu_attribute_string_arg(attribute, &string);
-	if (string.begin != NULL) {
-		for (size_t i = 0; i < 4; ++i) {
-			if (strcmp(tls_models[i], string.begin) == 0) {
-				attribute->u.value = i;
-				return;
-			}
-		}
-		errorf(HERE, "'%s' is an unrecognized tls model", string.begin);
-	}
-	attribute->invalid = true;
-}
-
-/**
- * Parse one tls model of the given attribute.
- */
-static void parse_gnu_attribute_visibility_arg(gnu_attribute_t *attribute)
-{
-	static const char *const visibilities[] = {
-		"default",
-		"protected",
-		"hidden",
-		"internal"
-	};
-	string_t string = { NULL, 0 };
-	parse_gnu_attribute_string_arg(attribute, &string);
-	if (string.begin != NULL) {
-		for (size_t i = 0; i < 4; ++i) {
-			if (strcmp(visibilities[i], string.begin) == 0) {
-				attribute->u.value = i;
-				return;
-			}
-		}
-		errorf(HERE, "'%s' is an unrecognized visibility", string.begin);
-	}
-	attribute->invalid = true;
-}
-
-/**
- * Parse one (code) model of the given attribute.
- */
-static void parse_gnu_attribute_model_arg(gnu_attribute_t *attribute)
-{
-	static const char *const visibilities[] = {
-		"small",
-		"medium",
-		"large"
-	};
-	string_t string = { NULL, 0 };
-	parse_gnu_attribute_string_arg(attribute, &string);
-	if (string.begin != NULL) {
-		for (int i = 0; i < 3; ++i) {
-			if (strcmp(visibilities[i], string.begin) == 0) {
-				attribute->u.value = i;
-				return;
-			}
-		}
-		errorf(HERE, "'%s' is an unrecognized model", string.begin);
-	}
-	attribute->invalid = true;
-}
-
-/**
- * Parse one mode of the given attribute.
- */
-static void parse_gnu_attribute_mode_arg(gnu_attribute_t *attribute)
-{
-	add_anchor_token(')');
-
-	if (token.type != T_IDENTIFIER) {
-		expect(T_IDENTIFIER, end_error);
-	}
-
-	attribute->u.symbol = token.v.symbol;
-	next_token();
-
-	rem_anchor_token(')');
-	expect(')', end_error);
-	return;
-end_error:
-	attribute->invalid = true;
-}
-
-/**
- * Parse one interrupt argument of the given attribute.
- */
-static void parse_gnu_attribute_interrupt_arg(gnu_attribute_t *attribute)
-{
-	static const char *const interrupts[] = {
-		"IRQ",
-		"FIQ",
-		"SWI",
-		"ABORT",
-		"UNDEF"
-	};
-	string_t string = { NULL, 0 };
-	parse_gnu_attribute_string_arg(attribute, &string);
-	if (string.begin != NULL) {
-		for (size_t i = 0; i < 5; ++i) {
-			if (strcmp(interrupts[i], string.begin) == 0) {
-				attribute->u.value = i;
-				return;
-			}
-		}
-		errorf(HERE, "'%s' is not an interrupt", string.begin);
-	}
-	attribute->invalid = true;
-}
-
-/**
- * Parse ( identifier, const expression, const expression )
- */
-static void parse_gnu_attribute_format_args(gnu_attribute_t *attribute)
-{
-	static const char *const format_names[] = {
-		"printf",
-		"scanf",
-		"strftime",
-		"strfmon"
-	};
-	int i;
-
-	if (token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing format attribute directive", T_IDENTIFIER, NULL);
-		goto end_error;
-	}
-	const char *name = token.v.symbol->string;
-	for (i = 0; i < 4; ++i) {
-		if (strcmp_underscore(format_names[i], name) == 0)
-			break;
-	}
-	if (i >= 4) {
-		if (warning.attribute)
-			warningf(HERE, "'%s' is an unrecognized format function type", name);
-	}
-	next_token();
-
-	expect(',', end_error);
-	add_anchor_token(')');
-	add_anchor_token(',');
-	parse_constant_expression();
-	rem_anchor_token(',');
-	rem_anchor_token(')');
-
-	expect(',', end_error);
-	add_anchor_token(')');
-	parse_constant_expression();
-	rem_anchor_token(')');
-	expect(')', end_error);
-	return;
-end_error:
-	attribute->u.value = true;
-}
-
-/**
- * Check that a given GNU attribute has no arguments.
- */
-static void check_no_argument(gnu_attribute_t *attribute, const char *name)
-{
-	if (!attribute->has_arguments)
-		return;
-
-	/* should have no arguments */
-	errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-	eat_until_matching_token('(');
-	/* we have already consumed '(', so we stop before ')', eat it */
-	next_token();
-	attribute->invalid = true;
-}
-
-/**
- * Parse one GNU attribute.
- *
- * Note that attribute names can be specified WITH or WITHOUT
- * double underscores, ie const or __const__.
- *
- * The following attributes are parsed without arguments
- *  const
- *  volatile
- *  cdecl
- *  stdcall
- *  fastcall
- *  deprecated
- *  noinline
- *  noreturn
- *  naked
- *  pure
- *  always_inline
- *  malloc
- *  weak
- *  constructor
- *  destructor
- *  nothrow
- *  transparent_union
- *  common
- *  nocommon
- *  packed
- *  shared
- *  notshared
- *  used
- *  unused
- *  no_instrument_function
- *  warn_unused_result
- *  longcall
- *  shortcall
- *  long_call
- *  short_call
- *  function_vector
- *  interrupt_handler
- *  nmi_handler
- *  nesting
- *  near
- *  far
- *  signal
- *  eightbit_data
- *  tiny_data
- *  saveall
- *  flatten
- *  sseregparm
- *  externally_visible
- *  return_twice
- *  may_alias
- *  ms_struct
- *  gcc_struct
- *  dllimport
- *  dllexport
- *
- * The following attributes are parsed with arguments
- *  aligned( const expression )
- *  alias( string literal )
- *  section( string literal )
- *  format( identifier, const expression, const expression )
- *  format_arg( const expression )
- *  tls_model( string literal )
- *  visibility( string literal )
- *  regparm( const expression )
- *  model( string leteral )
- *  trap_exit( const expression )
- *  sp_switch( string literal )
- *
- * The following attributes might have arguments
- *  weak_ref( string literal )
- *  non_null( const expression // ',' )
- *  interrupt( string literal )
- *  sentinel( constant expression )
- */
-static decl_modifiers_t parse_gnu_attribute(gnu_attribute_t **attributes)
-{
-	gnu_attribute_t *head      = *attributes;
-	gnu_attribute_t *last      = *attributes;
-	decl_modifiers_t modifiers = 0;
-	gnu_attribute_t *attribute;
+	attribute_t *first = NULL;
+	attribute_t *last  = NULL;
 
 	eat(T___attribute__);
 	expect('(', end_error);
 	expect('(', end_error);
 
-	if (token.type != ')') {
-		/* find the end of the list */
+	if (token.type == ')') {
+		next_token();
+		expect(')', end_error);
+		return first;
+	}
+
+	while (true) {
+		attribute_t *attribute = parse_attribute_gnu_single();
+		if (attribute == NULL)
+			goto end_error;
+
+		if (last == NULL) {
+			first = attribute;
+		} else {
+			last->next = attribute;
+		}
+		last = attribute;
+
+		if (token.type == ')') {
+			next_token();
+			break;
+		}
+		expect(',', end_error);
+	}
+	expect(')', end_error);
+
+end_error:
+	return first;
+}
+
+/** Parse attributes. */
+static attribute_t *parse_attributes(attribute_t *first)
+{
+	attribute_t *last = first;
+	while (true) {
 		if (last != NULL) {
 			while (last->next != NULL)
 				last = last->next;
 		}
 
-		/* non-empty attribute list */
-		while (true) {
-			const char *name;
-			if (token.type == T_const) {
-				name = "const";
-			} else if (token.type == T_volatile) {
-				name = "volatile";
-			} else if (token.type == T_cdecl) {
-				/* __attribute__((cdecl)), WITH ms mode */
-				name = "cdecl";
-			} else if (token.type == T_IDENTIFIER) {
-				const symbol_t *sym = token.v.symbol;
-				name = sym->string;
-			} else {
-				parse_error_expected("while parsing GNU attribute", T_IDENTIFIER, NULL);
-				break;
-			}
-
-			next_token();
-
-			int i;
-			for (i = 0; i < GNU_AK_LAST; ++i) {
-				if (strcmp_underscore(gnu_attribute_names[i], name) == 0)
-					break;
-			}
-			gnu_attribute_kind_t kind = (gnu_attribute_kind_t)i;
-
-			attribute = NULL;
-			if (kind == GNU_AK_LAST) {
-				if (warning.attribute)
-					warningf(HERE, "'%s' attribute directive ignored", name);
-
-				/* skip possible arguments */
-				if (token.type == '(') {
-					eat_until_matching_token(')');
-					next_token(); /* skip the ')' */
-				}
-			} else {
-				/* check for arguments */
-				attribute = allocate_gnu_attribute(kind);
-				if (token.type == '(') {
-					next_token();
-					if (token.type == ')') {
-						/* empty args are allowed */
-						next_token();
-					} else
-						attribute->has_arguments = true;
-				}
-
-				switch (kind) {
-				case GNU_AK_VOLATILE:
-				case GNU_AK_NAKED:
-				case GNU_AK_MALLOC:
-				case GNU_AK_WEAK:
-				case GNU_AK_COMMON:
-				case GNU_AK_NOCOMMON:
-				case GNU_AK_SHARED:
-				case GNU_AK_NOTSHARED:
-				case GNU_AK_NO_INSTRUMENT_FUNCTION:
-				case GNU_AK_WARN_UNUSED_RESULT:
-				case GNU_AK_LONGCALL:
-				case GNU_AK_SHORTCALL:
-				case GNU_AK_LONG_CALL:
-				case GNU_AK_SHORT_CALL:
-				case GNU_AK_FUNCTION_VECTOR:
-				case GNU_AK_INTERRUPT_HANDLER:
-				case GNU_AK_NMI_HANDLER:
-				case GNU_AK_NESTING:
-			 	case GNU_AK_NEAR:
-				case GNU_AK_FAR:
-				case GNU_AK_SIGNAL:
-				case GNU_AK_EIGTHBIT_DATA:
-				case GNU_AK_TINY_DATA:
-				case GNU_AK_SAVEALL:
-				case GNU_AK_FLATTEN:
-				case GNU_AK_SSEREGPARM:
-				case GNU_AK_EXTERNALLY_VISIBLE:
-				case GNU_AK_RETURN_TWICE:
-				case GNU_AK_MAY_ALIAS:
-				case GNU_AK_MS_STRUCT:
-				case GNU_AK_GCC_STRUCT:
-					goto no_arg;
-
-				case GNU_AK_CDECL:             modifiers |= DM_CDECL;             goto no_arg;
-				case GNU_AK_FASTCALL:          modifiers |= DM_FASTCALL;          goto no_arg;
-				case GNU_AK_STDCALL:           modifiers |= DM_STDCALL;           goto no_arg;
-				case GNU_AK_UNUSED:            modifiers |= DM_UNUSED;            goto no_arg;
-				case GNU_AK_USED:              modifiers |= DM_USED;              goto no_arg;
-				case GNU_AK_PURE:              modifiers |= DM_PURE;              goto no_arg;
-				case GNU_AK_CONST:             modifiers |= DM_CONST;             goto no_arg;
-				case GNU_AK_ALWAYS_INLINE:     modifiers |= DM_FORCEINLINE;       goto no_arg;
-				case GNU_AK_DLLIMPORT:         modifiers |= DM_DLLIMPORT;         goto no_arg;
-				case GNU_AK_DLLEXPORT:         modifiers |= DM_DLLEXPORT;         goto no_arg;
-				case GNU_AK_PACKED:            modifiers |= DM_PACKED;            goto no_arg;
-				case GNU_AK_NOINLINE:          modifiers |= DM_NOINLINE;          goto no_arg;
-				case GNU_AK_RETURNS_TWICE:     modifiers |= DM_RETURNS_TWICE;     goto no_arg;
-				case GNU_AK_NORETURN:          modifiers |= DM_NORETURN;          goto no_arg;
-				case GNU_AK_NOTHROW:           modifiers |= DM_NOTHROW;           goto no_arg;
-				case GNU_AK_TRANSPARENT_UNION: modifiers |= DM_TRANSPARENT_UNION; goto no_arg;
-				case GNU_AK_CONSTRUCTOR:       modifiers |= DM_CONSTRUCTOR;       goto no_arg;
-				case GNU_AK_DESTRUCTOR:        modifiers |= DM_DESTRUCTOR;        goto no_arg;
-				case GNU_AK_DEPRECATED:        modifiers |= DM_DEPRECATED;        goto no_arg;
-
-				case GNU_AK_ALIGNED:
-					/* __align__ may be used without an argument */
-					if (attribute->has_arguments) {
-						parse_gnu_attribute_const_arg(attribute);
-					}
-					break;
-
-				case GNU_AK_FORMAT_ARG:
-				case GNU_AK_REGPARM:
-				case GNU_AK_TRAP_EXIT:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-						attribute->invalid = true;
-					} else
-						parse_gnu_attribute_const_arg(attribute);
-					break;
-				case GNU_AK_ALIAS:
-				case GNU_AK_SECTION:
-				case GNU_AK_SP_SWITCH:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-						attribute->invalid = true;
-					} else
-						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
-					break;
-				case GNU_AK_FORMAT:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-						attribute->invalid = true;
-					} else
-						parse_gnu_attribute_format_args(attribute);
-					break;
-				case GNU_AK_WEAKREF:
-					/* may have one string argument */
-					if (attribute->has_arguments)
-						parse_gnu_attribute_string_arg(attribute, &attribute->u.string);
-					break;
-				case GNU_AK_NONNULL:
-					if (attribute->has_arguments)
-						parse_gnu_attribute_const_arg_list(attribute);
-					break;
-				case GNU_AK_TLS_MODEL:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else
-						parse_gnu_attribute_tls_model_arg(attribute);
-					break;
-				case GNU_AK_VISIBILITY:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else
-						parse_gnu_attribute_visibility_arg(attribute);
-					break;
-				case GNU_AK_MODEL:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else {
-						parse_gnu_attribute_model_arg(attribute);
-					}
-					break;
-				case GNU_AK_MODE:
-					if (!attribute->has_arguments) {
-						/* should have arguments */
-						errorf(HERE, "wrong number of arguments specified for '%s' attribute", name);
-					} else {
-						parse_gnu_attribute_mode_arg(attribute);
-					}
-					break;
-				case GNU_AK_INTERRUPT:
-					/* may have one string argument */
-					if (attribute->has_arguments)
-						parse_gnu_attribute_interrupt_arg(attribute);
-					break;
-				case GNU_AK_SENTINEL:
-					/* may have one string argument */
-					if (attribute->has_arguments)
-						parse_gnu_attribute_const_arg(attribute);
-					break;
-				case GNU_AK_LAST:
-					/* already handled */
-					break;
-
-no_arg:
-					check_no_argument(attribute, name);
-				}
-			}
-			if (attribute != NULL) {
-				if (last != NULL) {
-					last->next = attribute;
-					last       = attribute;
-				} else {
-					head = last = attribute;
-				}
-			}
-
-			if (token.type != ',')
-				break;
-			next_token();
-		}
-	}
-	expect(')', end_error);
-	expect(')', end_error);
-end_error:
-	*attributes = head;
-
-	return modifiers;
-}
-
-/**
- * Parse GNU attributes.
- */
-static decl_modifiers_t parse_attributes(gnu_attribute_t **attributes)
-{
-	decl_modifiers_t modifiers = 0;
-
-	while (true) {
+		attribute_t *attribute;
 		switch (token.type) {
 		case T___attribute__:
-			modifiers |= parse_gnu_attribute(attributes);
-			continue;
+			attribute = parse_attribute_gnu();
+			break;
 
 		case T_asm:
-			next_token();
-			expect('(', end_error);
-			if (token.type != T_STRING_LITERAL) {
-				parse_error_expected("while parsing assembler attribute",
-				                     T_STRING_LITERAL, NULL);
-				eat_until_matching_token('(');
-				break;
-			} else {
-				parse_string_literals();
-			}
-			expect(')', end_error);
-			continue;
+			attribute = parse_attribute_asm();
+			break;
 
-		case T_cdecl:     modifiers |= DM_CDECL;    break;
-		case T__fastcall: modifiers |= DM_FASTCALL; break;
-		case T__stdcall:  modifiers |= DM_STDCALL;  break;
+		case T_cdecl:
+			next_token();
+			attribute = allocate_attribute_zero(ATTRIBUTE_MS_CDECL);
+			break;
+
+		case T__fastcall:
+			next_token();
+			attribute = allocate_attribute_zero(ATTRIBUTE_MS_FASTCALL);
+			break;
+
+		case T__forceinline:
+			next_token();
+			attribute = allocate_attribute_zero(ATTRIBUTE_MS_FORCEINLINE);
+			break;
+
+		case T__stdcall:
+			next_token();
+			attribute = allocate_attribute_zero(ATTRIBUTE_MS_STDCALL);
+			break;
 
 		case T___thiscall:
+			next_token();
 			/* TODO record modifier */
 			if (warning.other)
 				warningf(HERE, "Ignoring declaration modifier %K", &token);
+			attribute = allocate_attribute_zero(ATTRIBUTE_MS_THISCALL);
 			break;
 
-end_error:
-		default: return modifiers;
+		default:
+			return first;
 		}
 
-		next_token();
+		if (last == NULL) {
+			first = attribute;
+		} else {
+			last->next = attribute;
+		}
+		last = attribute;
 	}
 }
 
@@ -2642,18 +2194,6 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 }
 
 /**
- * skip until token is found.
- */
-static void skip_until(int type)
-{
-	while (token.type != type) {
-		if (token.type == T_EOF)
-			return;
-		next_token();
-	}
-}
-
-/**
  * skip any {...} blocks until a closing bracket is reached.
  */
 static void skip_initializers(void)
@@ -2986,8 +2526,6 @@ static void append_entity(scope_t *scope, entity_t *entity)
 
 static compound_t *parse_compound_type_specifier(bool is_struct)
 {
-	gnu_attribute_t  *attributes = NULL;
-	decl_modifiers_t  modifiers  = 0;
 	if (is_struct) {
 		eat(T_struct);
 	} else {
@@ -2998,7 +2536,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	compound_t *compound = NULL;
 
 	if (token.type == T___attribute__) {
-		modifiers |= parse_attributes(&attributes);
+		parse_attributes(NULL);
 	}
 
 	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
@@ -3052,7 +2590,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 
 	if (token.type == '{') {
 		parse_compound_type_entries(compound);
-		modifiers |= parse_attributes(&attributes);
+		parse_attributes(NULL);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
@@ -3061,7 +2599,6 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		}
 	}
 
-	compound->modifiers |= modifiers;
 	return compound;
 }
 
@@ -3116,7 +2653,6 @@ end_error:
 
 static type_t *parse_enum_specifier(void)
 {
-	gnu_attribute_t *attributes = NULL;
 	entity_t        *entity;
 	symbol_t        *symbol;
 
@@ -3166,7 +2702,7 @@ static type_t *parse_enum_specifier(void)
 		entity->enume.complete = true;
 
 		parse_enum_entries(type);
-		parse_attributes(&attributes);
+		parse_attributes(NULL);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
@@ -3287,167 +2823,142 @@ static type_t *get_typedef_type(symbol_t *symbol)
 	return type;
 }
 
-/**
- * check for the allowed MS alignment values.
- */
-static bool check_alignment_value(long long intvalue)
+static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 {
-	if (intvalue < 1 || intvalue > 8192) {
-		errorf(HERE, "illegal alignment value");
-		return false;
-	}
-	unsigned v = (unsigned)intvalue;
-	for (unsigned i = 1; i <= 8192; i += i) {
-		if (i == v)
-			return true;
-	}
-	errorf(HERE, "alignment must be power of two");
-	return false;
-}
+	expect('(', end_error);
 
-#define DET_MOD(name, tag) do { \
-	if (*modifiers & tag && warning.other) warningf(HERE, #name " used more than once"); \
-	*modifiers |= tag; \
-} while (0)
-
-static void parse_microsoft_extended_decl_modifier(declaration_specifiers_t *specifiers)
-{
-	decl_modifiers_t *modifiers = &specifiers->modifiers;
+	attribute_property_argument_t *property
+		= allocate_ast_zero(sizeof(*property));
 
 	while (true) {
-		if (token.type == T_restrict) {
-			next_token();
-			DET_MOD(restrict, DM_RESTRICT);
-			goto end_loop;
-		} else if (token.type != T_IDENTIFIER)
-			break;
+		if (token.type != T_IDENTIFIER) {
+			parse_error_expected("while parsing property declspec",
+			                     T_IDENTIFIER, NULL);
+			goto end_error;
+		}
+
+		bool is_put;
 		symbol_t *symbol = token.v.symbol;
-		if (symbol == sym_align) {
-			next_token();
-			expect('(', end_error);
-			if (token.type != T_INTEGER)
-				goto end_error;
-			if (check_alignment_value(token.v.intvalue)) {
-				if (specifiers->alignment != 0 && warning.other)
-					warningf(HERE, "align used more than once");
-				specifiers->alignment = (unsigned char)token.v.intvalue;
-			}
-			next_token();
-			expect(')', end_error);
-		} else if (symbol == sym_allocate) {
-			next_token();
-			expect('(', end_error);
-			if (token.type != T_IDENTIFIER)
-				goto end_error;
-			(void)token.v.symbol;
-			expect(')', end_error);
-		} else if (symbol == sym_dllimport) {
-			next_token();
-			DET_MOD(dllimport, DM_DLLIMPORT);
-		} else if (symbol == sym_dllexport) {
-			next_token();
-			DET_MOD(dllexport, DM_DLLEXPORT);
-		} else if (symbol == sym_thread) {
-			next_token();
-			DET_MOD(thread, DM_THREAD);
-		} else if (symbol == sym_naked) {
-			next_token();
-			DET_MOD(naked, DM_NAKED);
-		} else if (symbol == sym_noinline) {
-			next_token();
-			DET_MOD(noinline, DM_NOINLINE);
-		} else if (symbol == sym_returns_twice) {
-			next_token();
-			DET_MOD(returns_twice, DM_RETURNS_TWICE);
-		} else if (symbol == sym_noreturn) {
-			next_token();
-			DET_MOD(noreturn, DM_NORETURN);
-		} else if (symbol == sym_nothrow) {
-			next_token();
-			DET_MOD(nothrow, DM_NOTHROW);
-		} else if (symbol == sym_novtable) {
-			next_token();
-			DET_MOD(novtable, DM_NOVTABLE);
-		} else if (symbol == sym_property) {
-			next_token();
-			expect('(', end_error);
-			for (;;) {
-				bool is_get = false;
-				if (token.type != T_IDENTIFIER)
-					goto end_error;
-				if (token.v.symbol == sym_get) {
-					is_get = true;
-				} else if (token.v.symbol == sym_put) {
-				} else {
-					errorf(HERE, "Bad property name '%Y'", token.v.symbol);
-					goto end_error;
-				}
-				next_token();
-				expect('=', end_error);
-				if (token.type != T_IDENTIFIER)
-					goto end_error;
-				if (is_get) {
-					if (specifiers->get_property_sym != NULL) {
-						errorf(HERE, "get property name already specified");
-					} else {
-						specifiers->get_property_sym = token.v.symbol;
-					}
-				} else {
-					if (specifiers->put_property_sym != NULL) {
-						errorf(HERE, "put property name already specified");
-					} else {
-						specifiers->put_property_sym = token.v.symbol;
-					}
-				}
-				next_token();
-				if (token.type == ',') {
-					next_token();
-					continue;
-				}
+		next_token();
+		if (strcmp(symbol->string, "put") == 0) {
+			is_put = true;
+		} else if (strcmp(symbol->string, "get") == 0) {
+			is_put = false;
+		} else {
+			errorf(HERE, "expected put or get in property declspec");
+			goto end_error;
+		}
+		expect('=', end_error);
+		if (token.type != T_IDENTIFIER) {
+			parse_error_expected("while parsing property declspec",
+			                     T_IDENTIFIER, NULL);
+			goto end_error;
+		}
+		if (is_put) {
+			property->put_symbol = token.v.symbol;
+		} else {
+			property->get_symbol = token.v.symbol;
+		}
+		next_token();
+		if (token.type == ')')
+			break;
+		expect(',', end_error);
+	}
+
+	attribute->a.property = property;
+
+	expect(')', end_error);
+
+end_error:
+	return attribute;
+}
+
+static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
+{
+	attribute_kind_t kind = ATTRIBUTE_UNKNOWN;
+	if (token.type == T_restrict) {
+		kind = ATTRIBUTE_MS_RESTRICT;
+		next_token();
+	} else if (token.type == T_IDENTIFIER) {
+		const char *name = token.v.symbol->string;
+		next_token();
+		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
+		     ++k) {
+			const char *attribute_name = get_attribute_name(k);
+			if (attribute_name != NULL && strcmp(attribute_name, name) == 0) {
+				kind = k;
 				break;
 			}
-			expect(')', end_error);
-		} else if (symbol == sym_selectany) {
-			next_token();
-			DET_MOD(selectany, DM_SELECTANY);
-		} else if (symbol == sym_uuid) {
-			next_token();
-			expect('(', end_error);
-			if (token.type != T_STRING_LITERAL)
-				goto end_error;
-			next_token();
-			expect(')', end_error);
-		} else if (symbol == sym_deprecated) {
-			next_token();
-			if (specifiers->deprecated != 0 && warning.other)
-				warningf(HERE, "deprecated used more than once");
-			specifiers->deprecated = true;
-			if (token.type == '(') {
-				next_token();
-				if (token.type == T_STRING_LITERAL) {
-					specifiers->deprecated_string = token.v.string.begin;
-					next_token();
-				} else {
-					errorf(HERE, "string literal expected");
-				}
-				expect(')', end_error);
-			}
-		} else if (symbol == sym_noalias) {
-			next_token();
-			DET_MOD(noalias, DM_NOALIAS);
-		} else {
-			if (warning.other)
-				warningf(HERE, "Unknown modifier '%Y' ignored", token.v.symbol);
-			next_token();
-			if (token.type == '(')
-				skip_until(')');
 		}
-end_loop:
-		if (token.type == ',')
-			next_token();
+
+		if (kind == ATTRIBUTE_UNKNOWN && warning.attribute) {
+			warningf(HERE, "unknown __declspec '%s' ignored", name);
+		}
+	} else {
+		parse_error_expected("while parsing __declspec", T_IDENTIFIER, NULL);
+		return NULL;
 	}
+
+	attribute_t *attribute = allocate_attribute_zero(kind);
+
+	if (kind == ATTRIBUTE_MS_PROPERTY) {
+		return parse_attribute_ms_property(attribute);
+	}
+
+	/* parse arguments */
+	if (token.type == '(') {
+		next_token();
+		attribute->a.arguments = parse_attribute_arguments();
+	}
+
+	return attribute;
+}
+
+static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
+{
+	eat(T__declspec);
+
+	expect('(', end_error);
+
+	if (token.type == ')') {
+		next_token();
+		return NULL;
+	}
+
+	add_anchor_token(')');
+
+	attribute_t *last = first;
+	while (true) {
+		if (last != NULL) {
+			while (last->next != NULL)
+				last = last->next;
+		}
+
+		attribute_t *attribute
+			= parse_microsoft_extended_decl_modifier_single();
+		if (attribute == NULL)
+			goto end_error;
+
+		if (last == NULL) {
+			first = attribute;
+		} else {
+			last->next = attribute;
+		}
+		last = attribute;
+
+		if (token.type == ')') {
+			break;
+		}
+		expect(',', end_error);
+	}
+
+	rem_anchor_token(')');
+	expect(')', end_error);
+	return first;
+
 end_error:
-	return;
+	rem_anchor_token(')');
+	return first;
 }
 
 static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
@@ -3467,39 +2978,9 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
-static variable_t *parse_microsoft_based(void)
-{
-	if (token.type != T_IDENTIFIER) {
-		parse_error_expected("while parsing __based", T_IDENTIFIER, NULL);
-		return NULL;
-	}
-	symbol_t *symbol = token.v.symbol;
-	entity_t *entity = get_entity(symbol, NAMESPACE_NORMAL);
-
-	variable_t *variable;
-	if (entity == NULL || entity->base.kind != ENTITY_VARIABLE) {
-		errorf(HERE, "'%Y' is not a variable name.", symbol);
-		variable = &create_error_entity(symbol, ENTITY_VARIABLE)->variable;
-	} else {
-		variable = &entity->variable;
-
-		type_t *const type = variable->base.type;
-		if (is_type_valid(type)) {
-			if (! is_type_pointer(skip_typeref(type))) {
-				errorf(HERE, "variable in __based modifier must have pointer type instead of '%T'", type);
-			}
-			if (variable->base.base.parent_scope != file_scope) {
-				errorf(HERE, "a nonstatic local variable may not be used in a __based specification");
-			}
-		}
-	}
-	next_token();
-	return variable;
-}
-
 /**
- * Finish the construction of a struct type by calculating
- * its size, offsets, alignment.
+ * Finish the construction of a struct type by calculating its size, offsets,
+ * alignment.
  */
 static void finish_struct_type(compound_type_t *type)
 {
@@ -3509,22 +2990,22 @@ static void finish_struct_type(compound_type_t *type)
 	if (!compound->complete)
 		return;
 
-	il_size_t      size           = 0;
+	il_size_t      size = 0;
 	il_size_t      offset;
-	il_alignment_t alignment      = 1;
-	bool           need_pad       = false;
+	il_alignment_t alignment = compound->alignment;
+	bool           need_pad  = false;
 
 	entity_t *entry = compound->members.entities;
 	for (; entry != NULL; entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
-		type_t *m_type = skip_typeref(entry->declaration.type);
-		if (! is_type_valid(m_type)) {
+		type_t *m_type = entry->declaration.type;
+		if (! is_type_valid(skip_typeref(m_type))) {
 			/* simply ignore errors here */
 			continue;
 		}
-		il_alignment_t m_alignment = m_type->base.alignment;
+		il_alignment_t m_alignment = get_type_alignment(m_type);
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 
@@ -3533,10 +3014,7 @@ static void finish_struct_type(compound_type_t *type)
 		if (offset > size)
 			need_pad = true;
 		entry->compound_member.offset = offset;
-		size = offset + m_type->base.size;
-	}
-	if (type->base.alignment != 0) {
-		alignment = type->base.alignment;
+		size = offset + get_type_size(m_type);
 	}
 
 	offset = (size + alignment - 1) & -alignment;
@@ -3545,17 +3023,16 @@ static void finish_struct_type(compound_type_t *type)
 
 	if (need_pad) {
 		if (warning.padded) {
-			warningf(&compound->base.source_position, "'%T' needs padding", type);
+			warningf(&compound->base.source_position, "'%T' needs padding",
+			         type);
 		}
-	} else {
-		if (compound->modifiers & DM_PACKED && warning.packed) {
-			warningf(&compound->base.source_position,
-					"superfluous packed attribute on '%T'", type);
-		}
+	} else if (compound->packed && warning.packed) {
+		warningf(&compound->base.source_position,
+		         "superfluous packed attribute on '%T'", type);
 	}
 
-	type->base.size      = offset;
-	type->base.alignment = alignment;
+	compound->size      = offset;
+	compound->alignment = alignment;
 }
 
 /**
@@ -3571,108 +3048,35 @@ static void finish_union_type(compound_type_t *type)
 		return;
 
 	il_size_t      size      = 0;
-	il_alignment_t alignment = 1;
+	il_alignment_t alignment = compound->alignment;
 
 	entity_t *entry = compound->members.entities;
 	for (; entry != NULL; entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
-		type_t *m_type = skip_typeref(entry->declaration.type);
+		type_t *m_type = entry->declaration.type;
 		if (! is_type_valid(m_type))
 			continue;
 
 		entry->compound_member.offset = 0;
-		if (m_type->base.size > size)
-			size = m_type->base.size;
-		if (m_type->base.alignment > alignment)
-			alignment = m_type->base.alignment;
-	}
-	if (type->base.alignment != 0) {
-		alignment = type->base.alignment;
+		il_size_t m_size = get_type_size(m_type);
+		if (m_size > size)
+			size = m_size;
+		il_alignment_t m_alignment = get_type_alignment(m_type);
+		if (m_alignment > alignment)
+			alignment = m_alignment;
 	}
 	size = (size + alignment - 1) & -alignment;
-	type->base.size      = size;
-	type->base.alignment = alignment;
-}
 
-static type_t *handle_attribute_mode(const gnu_attribute_t *attribute,
-                                     type_t *orig_type)
-{
-	type_t *type = skip_typeref(orig_type);
-
-	/* at least: byte, word, pointer, list of machine modes
-	 * __XXX___ is interpreted as XXX */
-
-	/* This isn't really correct, the backend should provide a list of machine
-	 * specific modes (according to gcc philosophy that is...) */
-	const char         *symbol_str = attribute->u.symbol->string;
-	bool                sign       = is_type_signed(type);
-	atomic_type_kind_t  akind;
-	if (strcmp_underscore("QI",   symbol_str) == 0 ||
-	    strcmp_underscore("byte", symbol_str) == 0) {
-		akind = sign ? ATOMIC_TYPE_CHAR : ATOMIC_TYPE_UCHAR;
-	} else if (strcmp_underscore("HI", symbol_str) == 0) {
-		akind = sign ? ATOMIC_TYPE_SHORT : ATOMIC_TYPE_USHORT;
-	} else if (strcmp_underscore("SI",      symbol_str) == 0
-	        || strcmp_underscore("word",    symbol_str) == 0
-	        || strcmp_underscore("pointer", symbol_str) == 0) {
-		akind = sign ? ATOMIC_TYPE_INT : ATOMIC_TYPE_UINT;
-	} else if (strcmp_underscore("DI", symbol_str) == 0) {
-		akind = sign ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
-	} else {
-		if (warning.other)
-			warningf(HERE, "ignoring unknown mode '%s'", symbol_str);
-		return orig_type;
-	}
-
-	if (type->kind == TYPE_ATOMIC) {
-		type_t *copy       = duplicate_type(type);
-		copy->atomic.akind = akind;
-		return identify_new_type(copy);
-	} else if (type->kind == TYPE_ENUM) {
-		type_t *copy      = duplicate_type(type);
-		copy->enumt.akind = akind;
-		return identify_new_type(copy);
-	} else if (is_type_pointer(type)) {
-		warningf(HERE, "__attribute__((mode)) on pointers not implemented yet (ignored)");
-		return type;
-	}
-
-	errorf(HERE, "__attribute__((mode)) only allowed on integer, enum or pointer type");
-	return orig_type;
-}
-
-static type_t *handle_type_attributes(const gnu_attribute_t *attributes,
-                                      type_t *type)
-{
-	const gnu_attribute_t *attribute = attributes;
-	for ( ; attribute != NULL; attribute = attribute->next) {
-		if (attribute->invalid)
-			continue;
-
-		if (attribute->kind == GNU_AK_MODE) {
-			type = handle_attribute_mode(attribute, type);
-		} else if (attribute->kind == GNU_AK_ALIGNED) {
-			int alignment = 32; /* TODO: fill in maximum useful alignment for
-			                       target machine */
-			if (attribute->has_arguments)
-				alignment = attribute->u.argument;
-
-			type_t *copy         = duplicate_type(type);
-			copy->base.alignment = attribute->u.argument;
-			type                 = identify_new_type(copy);
-		}
-	}
-
-	return type;
+	compound->size      = size;
+	compound->alignment = alignment;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t            *type              = NULL;
 	type_qualifiers_t  qualifiers        = TYPE_QUALIFIER_NONE;
-	type_modifiers_t   modifiers         = TYPE_MODIFIER_NONE;
 	unsigned           type_specifiers   = 0;
 	bool               newtype           = false;
 	bool               saw_error         = false;
@@ -3681,8 +3085,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	specifiers->source_position = token.source_position;
 
 	while (true) {
-		specifiers->modifiers
-			|= parse_attributes(&specifiers->gnu_attributes);
+		specifiers->attributes = parse_attributes(specifiers->attributes);
 
 		switch (token.type) {
 		/* storage class */
@@ -3704,12 +3107,8 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 		MATCH_STORAGE_CLASS(T_register, STORAGE_CLASS_REGISTER)
 
 		case T__declspec:
-			next_token();
-			expect('(', end_error);
-			add_anchor_token(')');
-			parse_microsoft_extended_decl_modifier(specifiers);
-			rem_anchor_token(')');
-			expect(')', end_error);
+			specifiers->attributes
+				= parse_microsoft_extended_decl_modifier(specifiers->attributes);
 			break;
 
 		case T___thread:
@@ -3787,15 +3186,17 @@ wrong_thread_stoarge_class:
 		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
 		MATCH_SPECIFIER(T_wchar_t,    SPECIFIER_WCHAR_T,   "wchar_t");
 
-		case T__forceinline:
-			/* only in microsoft mode */
-			specifiers->modifiers |= DM_FORCEINLINE;
-			/* FALLTHROUGH */
-
 		case T_inline:
 			next_token();
 			specifiers->is_inline = true;
 			break;
+
+#if 0
+		case T__forceinline:
+			next_token();
+			specifiers->modifiers |= DM_FORCEINLINE;
+			break;
+#endif
 
 		case T_long:
 			if (type_specifiers & SPECIFIER_LONG_LONG) {
@@ -3808,28 +3209,33 @@ wrong_thread_stoarge_class:
 			next_token();
 			break;
 
-		case T_struct: {
+#define CHECK_DOUBLE_TYPE()        \
+			if ( type != NULL)     \
+				errorf(HERE, "multiple data types in declaration specifiers");
+
+		case T_struct:
+			CHECK_DOUBLE_TYPE();
 			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
 
 			type->compound.compound = parse_compound_type_specifier(true);
 			finish_struct_type(&type->compound);
 			break;
-		}
-		case T_union: {
+		case T_union:
+			CHECK_DOUBLE_TYPE();
 			type = allocate_type_zero(TYPE_COMPOUND_UNION);
 			type->compound.compound = parse_compound_type_specifier(false);
-			if (type->compound.compound->modifiers & DM_TRANSPARENT_UNION)
-				modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 			finish_union_type(&type->compound);
 			break;
-		}
 		case T_enum:
+			CHECK_DOUBLE_TYPE();
 			type = parse_enum_specifier();
 			break;
 		case T___typeof__:
+			CHECK_DOUBLE_TYPE();
 			type = parse_typeof();
 			break;
 		case T___builtin_va_list:
+			CHECK_DOUBLE_TYPE();
 			type = duplicate_type(type_valist);
 			next_token();
 			break;
@@ -3903,8 +3309,7 @@ wrong_thread_stoarge_class:
 	}
 
 finish_specifiers:
-	specifiers->modifiers
-		|= parse_attributes(&specifiers->gnu_attributes);
+	specifiers->attributes = parse_attributes(specifiers->attributes);
 
 	in_gcc_extension = old_gcc_extension;
 
@@ -4083,21 +3488,13 @@ warn_about_long_long:
 			type                 = allocate_type_zero(TYPE_ATOMIC);
 			type->atomic.akind   = atomic_type;
 		}
-		type->base.alignment = get_atomic_type_alignment(atomic_type);
-		unsigned const size  = get_atomic_type_size(atomic_type);
-		type->base.size      =
-			type_specifiers & SPECIFIER_COMPLEX ? size * 2 : size;
 		newtype = true;
 	} else if (type_specifiers != 0) {
 		errorf(HERE, "multiple datatypes in declaration");
 	}
 
 	/* FIXME: check type qualifiers here */
-
-	if (specifiers->modifiers & DM_TRANSPARENT_UNION)
-		modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
 	type->base.qualifiers = qualifiers;
-	type->base.modifiers  = modifiers;
 
 	if (newtype) {
 		type = identify_new_type(type);
@@ -4105,7 +3502,8 @@ warn_about_long_long:
 		type = typehash_insert(type);
 	}
 
-	type = handle_type_attributes(specifiers->gnu_attributes, type);
+	if (specifiers->attributes != NULL)
+		type = handle_type_attributes(specifiers->attributes, type);
 	specifiers->type = type;
 	return;
 
@@ -4309,7 +3707,7 @@ typedef struct construct_type_base_t {
 typedef struct parsed_pointer_t {
 	construct_type_base_t  base;
 	type_qualifiers_t      type_qualifiers;
-	variable_t             *base_variable;  /**< MS __based extension. */
+	variable_t            *base_variable;  /**< MS __based extension. */
 } parsed_pointer_t;
 
 typedef struct parsed_reference_t {
@@ -4338,18 +3736,17 @@ union construct_type_t {
 	parsed_array_t            array;
 };
 
-static construct_type_t *parse_pointer_declarator(variable_t *base_variable)
+static construct_type_t *parse_pointer_declarator(void)
 {
 	eat('*');
 
-	construct_type_t *cons    = obstack_alloc(&temp_obst, sizeof(cons->pointer));
-	parsed_pointer_t *pointer = &cons->pointer;
-	memset(pointer, 0, sizeof(*pointer));
-	cons->kind               = CONSTRUCT_POINTER;
+	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
+	memset(pointer, 0, sizeof(pointer[0]));
+	pointer->base.kind       = CONSTRUCT_POINTER;
 	pointer->type_qualifiers = parse_type_qualifiers();
-	pointer->base_variable   = base_variable;
+	//pointer->base_variable       = base_variable;
 
-	return cons;
+	return (construct_type_t*) pointer;
 }
 
 static construct_type_t *parse_reference_declarator(void)
@@ -4414,14 +3811,14 @@ end_error:
 	return cons;
 }
 
-static construct_type_t *parse_function_declarator(scope_t *scope,
-                                                   decl_modifiers_t modifiers)
+static construct_type_t *parse_function_declarator(scope_t *scope)
 {
 	type_t          *type  = allocate_type_zero(TYPE_FUNCTION);
 	function_type_t *ftype = &type->function;
 
 	ftype->linkage = current_linkage;
 
+#if 0
 	switch (modifiers & (DM_CDECL | DM_STDCALL | DM_FASTCALL | DM_THISCALL)) {
 		case DM_NONE:     break;
 		case DM_CDECL:    ftype->calling_convention = CC_CDECL;    break;
@@ -4433,6 +3830,7 @@ static construct_type_t *parse_function_declarator(scope_t *scope,
 			errorf(HERE, "multiple calling conventions in declaration");
 			break;
 	}
+#endif
 
 	parse_parameters(ftype, scope);
 
@@ -4446,26 +3844,27 @@ static construct_type_t *parse_function_declarator(scope_t *scope,
 }
 
 typedef struct parse_declarator_env_t {
+	bool               may_be_abstract : 1;
+	bool               must_be_abstract : 1;
 	decl_modifiers_t   modifiers;
 	symbol_t          *symbol;
 	source_position_t  source_position;
 	scope_t            parameters;
+	attribute_t       *attributes;
 } parse_declarator_env_t;
 
-static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
-		bool may_be_abstract)
+static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 {
 	/* construct a single linked list of construct_type_t's which describe
 	 * how to construct the final declarator type */
 	construct_type_t  *first      = NULL;
 	construct_type_t **anchor     = &first;
-	gnu_attribute_t   *attributes = NULL;
 
-	decl_modifiers_t modifiers = parse_attributes(&attributes);
+	env->attributes = parse_attributes(env->attributes);
 
 	for (;;) {
 		construct_type_t *type;
-		variable_t       *based = NULL; /* MS __based extension */
+		//variable_t       *based = NULL; /* MS __based extension */
 		switch (token.type) {
 			case '&':
 				if (!(c_mode & _CXX))
@@ -4474,6 +3873,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 				break;
 
 			case T__based: {
+#if 0
 				source_position_t const pos = *HERE;
 				next_token();
 				expect('(', end_error);
@@ -4490,11 +3890,14 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 					}
 					continue;
 				}
+#else
+				panic("based currently disabled");
+#endif
 				/* FALLTHROUGH */
 			}
 
 			case '*':
-				type = parse_pointer_declarator(based);
+				type = parse_pointer_declarator();
 				break;
 
 			default:
@@ -4505,20 +3908,20 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env,
 		anchor  = &type->base.next;
 
 		/* TODO: find out if this is correct */
-		modifiers |= parse_attributes(&attributes);
+		env->attributes = parse_attributes(env->attributes);
 	}
-ptr_operator_end:
 
-	if (env != NULL) {
-		modifiers      |= env->modifiers;
-		env->modifiers  = modifiers;
-	}
+ptr_operator_end: ;
+#if 0
+	modifiers      |= env->modifiers;
+	env->modifiers  = modifiers;
+#endif
 
 	construct_type_t *inner_types = NULL;
 
 	switch (token.type) {
 	case T_IDENTIFIER:
-		if (env == NULL) {
+		if (env->must_be_abstract) {
 			errorf(HERE, "no identifier expected in typename");
 		} else {
 			env->symbol          = token.v.symbol;
@@ -4533,17 +3936,17 @@ ptr_operator_end:
 		if (look_ahead(1)->type != ')') {
 			next_token();
 			add_anchor_token(')');
-			inner_types = parse_inner_declarator(env, may_be_abstract);
+			inner_types = parse_inner_declarator(env);
 			if (inner_types != NULL) {
 				/* All later declarators only modify the return type */
-				env = NULL;
+				env->must_be_abstract = true;
 			}
 			rem_anchor_token(')');
 			expect(')', end_error);
 		}
 		break;
 	default:
-		if (may_be_abstract)
+		if (env->may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
 		eat_until_anchor();
@@ -4557,10 +3960,11 @@ ptr_operator_end:
 		switch (token.type) {
 		case '(': {
 			scope_t *scope = NULL;
-			if (env != NULL)
+			if (!env->must_be_abstract) {
 				scope = &env->parameters;
+			}
 
-			type = parse_function_declarator(scope, modifiers);
+			type = parse_function_declarator(scope);
 			break;
 		}
 		case '[':
@@ -4585,69 +3989,6 @@ declarator_finished:
 	return first;
 end_error:
 	return NULL;
-}
-
-static void parse_declaration_attributes(entity_t *entity)
-{
-	gnu_attribute_t  *attributes = NULL;
-	decl_modifiers_t  modifiers  = parse_attributes(&attributes);
-
-	if (entity == NULL)
-		return;
-
-	type_t *type;
-	if (entity->kind == ENTITY_TYPEDEF) {
-		modifiers |= entity->typedefe.modifiers;
-		type       = entity->typedefe.type;
-	} else {
-		assert(is_declaration(entity));
-		modifiers |= entity->declaration.modifiers;
-		type       = entity->declaration.type;
-	}
-	if (type == NULL)
-		return;
-
-	gnu_attribute_t *attribute = attributes;
-	for ( ; attribute != NULL; attribute = attribute->next) {
-		if (attribute->invalid)
-			continue;
-
-		if (attribute->kind == GNU_AK_MODE) {
-			type = handle_attribute_mode(attribute, type);
-		} else if (attribute->kind == GNU_AK_ALIGNED) {
-			int alignment = 32; /* TODO: fill in maximum usefull alignment for target machine */
-			if (attribute->has_arguments)
-				alignment = attribute->u.argument;
-
-			if (entity->kind == ENTITY_TYPEDEF) {
-				type_t *copy         = duplicate_type(type);
-				copy->base.alignment = attribute->u.argument;
-				type                 = identify_new_type(copy);
-			} else if(entity->kind == ENTITY_VARIABLE) {
-				entity->variable.alignment = alignment;
-			} else if(entity->kind == ENTITY_COMPOUND_MEMBER) {
-				entity->compound_member.alignment = alignment;
-			}
-		}
-	}
-
-	type_modifiers_t type_modifiers = type->base.modifiers;
-	if (modifiers & DM_TRANSPARENT_UNION)
-		type_modifiers |= TYPE_MODIFIER_TRANSPARENT_UNION;
-
-	if (type->base.modifiers != type_modifiers) {
-		type_t *copy         = duplicate_type(type);
-		copy->base.modifiers = type_modifiers;
-		type                 = identify_new_type(copy);
-	}
-
-	if (entity->kind == ENTITY_TYPEDEF) {
-		entity->typedefe.type      = type;
-		entity->typedefe.modifiers = modifiers;
-	} else {
-		entity->declaration.type      = type;
-		entity->declaration.modifiers = modifiers;
-	}
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list, type_t *type)
@@ -4795,16 +4136,27 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 {
 	parse_declarator_env_t env;
 	memset(&env, 0, sizeof(env));
-	env.modifiers = specifiers->modifiers;
+	env.may_be_abstract = (flags & DECL_MAY_BE_ABSTRACT) != 0;
 
-	construct_type_t *construct_type =
-		parse_inner_declarator(&env, (flags & DECL_MAY_BE_ABSTRACT) != 0);
+	construct_type_t *construct_type = parse_inner_declarator(&env);
 	type_t           *orig_type      =
 		construct_declarator_type(construct_type, specifiers->type);
 	type_t           *type           = skip_typeref(orig_type);
 
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
+	}
+
+	attribute_t *attributes = parse_attributes(env.attributes);
+	/* append (shared) specifier attribute behind attributes of this
+	   declarator */
+	if (attributes != NULL) {
+		attribute_t *last = attributes;
+		while (last->next != NULL)
+			last = last->next;
+		last->next = specifiers->attributes;
+	} else {
+		attributes = specifiers->attributes;
 	}
 
 	entity_t *entity;
@@ -4873,9 +4225,6 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		} else {
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
 
-			entity->variable.get_property_sym = specifiers->get_property_sym;
-			entity->variable.put_property_sym = specifiers->put_property_sym;
-
 			entity->variable.thread_local = specifiers->thread_local;
 
 			if (env.symbol != NULL) {
@@ -4910,10 +4259,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		} else {
 			entity->base.source_position = specifiers->source_position;
 		}
-		entity->base.namespc                  = NAMESPACE_NORMAL;
-		entity->declaration.type              = orig_type;
-		entity->declaration.modifiers         = env.modifiers;
-		entity->declaration.deprecated_string = specifiers->deprecated_string;
+		entity->base.namespc           = NAMESPACE_NORMAL;
+		entity->declaration.type       = orig_type;
+		entity->declaration.alignment  = get_type_alignment(orig_type);
+		entity->declaration.modifiers  = env.modifiers;
+		entity->declaration.attributes = attributes;
 
 		storage_class_t storage_class = specifiers->storage_class;
 		entity->declaration.declared_storage_class = storage_class;
@@ -4923,19 +4273,27 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		entity->declaration.storage_class = storage_class;
 	}
 
-	parse_declaration_attributes(entity);
+	if (attributes != NULL) {
+		handle_entity_attributes(attributes, entity);
+	}
 
 	return entity;
 }
 
 static type_t *parse_abstract_declarator(type_t *base_type)
 {
-	construct_type_t *construct_type = parse_inner_declarator(NULL, 1);
+	parse_declarator_env_t env;
+	memset(&env, 0, sizeof(env));
+	env.may_be_abstract = true;
+	env.must_be_abstract = true;
+
+	construct_type_t *construct_type = parse_inner_declarator(&env);
 
 	type_t *result = construct_declarator_type(construct_type, base_type);
 	if (construct_type != NULL) {
 		obstack_free(&temp_obst, construct_type);
 	}
+	result = handle_type_attributes(env.attributes, result);
 
 	return result;
 }
@@ -5117,7 +4475,6 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 				prev_decl->storage_class          = decl->storage_class;
 				prev_decl->declared_storage_class = decl->declared_storage_class;
 				prev_decl->modifiers              = decl->modifiers;
-				prev_decl->deprecated_string      = decl->deprecated_string;
 				return previous_entity;
 			}
 
@@ -6521,7 +5878,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 			base_type);
 		bit_size = 0;
 	} else {
-		bit_size = skipped_type->base.size * 8;
+		bit_size = get_type_size(base_type) * 8;
 	}
 
 	if (is_constant_expression(size)) {
@@ -6586,7 +5943,6 @@ static void parse_compound_declarators(compound_t *compound,
 			entity->base.source_position               = source_position;
 			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
 			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
-			entity->declaration.modifiers              = specifiers->modifiers;
 			entity->declaration.type                   = type;
 			append_entity(&compound->members, entity);
 		} else {
@@ -6949,9 +6305,7 @@ static type_t *make_function_0_type_noreturn(type_t *return_type)
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = NULL;
-	type->function.base.modifiers |= DM_NORETURN;
-	return type;
-
+	type->function.modifiers  |= DM_NORETURN;
 	return identify_new_type(type);
 }
 
@@ -7088,7 +6442,7 @@ static expression_t *parse_reference(void)
 	}
 
 	if (entity->base.parent_scope != file_scope
-		&& entity->base.parent_scope->depth < current_function->parameters.depth
+		&& (current_function != NULL && entity->base.parent_scope->depth < current_function->parameters.depth)
 		&& is_type_valid(orig_type) && !is_type_function(orig_type)) {
 		if (entity->kind == ENTITY_VARIABLE) {
 			/* access of a variable from an outer function */
@@ -7103,15 +6457,15 @@ static expression_t *parse_reference(void)
 	if (warning.deprecated_declarations
 		&& is_declaration(entity)
 		&& entity->declaration.modifiers & DM_DEPRECATED) {
-		declaration_t *declaration = &entity->declaration;
 
 		char const *const prefix = entity->kind == ENTITY_FUNCTION ?
 			"function" : "variable";
-
-		if (declaration->deprecated_string != NULL) {
+		const char *deprecated_string
+			= get_deprecated_string(entity->declaration.attributes);
+		if (deprecated_string != NULL) {
 			warningf(HERE, "%s '%Y' is deprecated (declared %P): \"%s\"",
 			         prefix, entity->base.symbol, &entity->base.source_position,
-			         declaration->deprecated_string);
+			         deprecated_string);
 		} else {
 			warningf(HERE, "%s '%Y' is deprecated (declared %P)", prefix,
 			         entity->base.symbol, &entity->base.source_position);
@@ -8069,8 +7423,7 @@ static void check_call_argument(type_t          *expected_type,
 
 	/* handle transparent union gnu extension */
 	if (is_type_union(expected_type_skip)
-			&& (expected_type_skip->base.modifiers
-				& TYPE_MODIFIER_TRANSPARENT_UNION)) {
+			&& (get_type_modifiers(expected_type) & DM_TRANSPARENT_UNION)) {
 		compound_t *union_decl  = expected_type_skip->compound.compound;
 		type_t     *best_type   = NULL;
 		entity_t   *entry       = union_decl->members.entities;
@@ -11663,28 +11016,6 @@ void init_parser(void)
 {
 	sym_anonymous = symbol_table_insert("<anonymous>");
 
-	if (c_mode & _MS) {
-		/* add predefined symbols for extended-decl-modifier */
-		sym_align         = symbol_table_insert("align");
-		sym_allocate      = symbol_table_insert("allocate");
-		sym_dllimport     = symbol_table_insert("dllimport");
-		sym_dllexport     = symbol_table_insert("dllexport");
-		sym_naked         = symbol_table_insert("naked");
-		sym_noinline      = symbol_table_insert("noinline");
-		sym_returns_twice = symbol_table_insert("returns_twice");
-		sym_noreturn      = symbol_table_insert("noreturn");
-		sym_nothrow       = symbol_table_insert("nothrow");
-		sym_novtable      = symbol_table_insert("novtable");
-		sym_property      = symbol_table_insert("property");
-		sym_get           = symbol_table_insert("get");
-		sym_put           = symbol_table_insert("put");
-		sym_selectany     = symbol_table_insert("selectany");
-		sym_thread        = symbol_table_insert("thread");
-		sym_uuid          = symbol_table_insert("uuid");
-		sym_deprecated    = symbol_table_insert("deprecated");
-		sym_restrict      = symbol_table_insert("restrict");
-		sym_noalias       = symbol_table_insert("noalias");
-	}
 	memset(token_anchor_set, 0, sizeof(token_anchor_set));
 
 	init_expression_parsers();

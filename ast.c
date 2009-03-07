@@ -1349,6 +1349,7 @@ void print_initializer(const initializer_t *initializer)
 	panic("invalid initializer kind found");
 }
 
+#if 0
 /**
  * Print microsoft extended declaration modifiers.
  */
@@ -1440,6 +1441,7 @@ static void print_ms_modifiers(const declaration_t *declaration)
 	if (ds_shown)
 		fputs(") ", out);
 }
+#endif
 
 static void print_scope(const scope_t *scope)
 {
@@ -1490,7 +1492,7 @@ void print_declaration(const entity_t *entity)
 			}
 		}
 	}
-	print_ms_modifiers(declaration);
+	//print_ms_modifiers(declaration);
 	switch (entity->kind) {
 		case ENTITY_FUNCTION:
 			print_type_ext(entity->declaration.type, entity->base.symbol,

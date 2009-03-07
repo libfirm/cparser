@@ -36,4 +36,6 @@ typedef struct function_t                   function_t;
 typedef struct compound_member_t            compound_member_t;
 typedef union  entity_t                     entity_t;
 
+typedef unsigned                            decl_modifiers_t;
+
 #endif

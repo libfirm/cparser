@@ -261,12 +261,11 @@ ident *create_name_win32(entity_t *entity)
 
 	assert(is_declaration(entity));
 
-	if (entity->declaration.modifiers & DM_DLLIMPORT) {
-		/* add prefix for imported symbols */
-		obstack_printf(o, "__imp_");
-	}
-
 	if (entity->kind == ENTITY_FUNCTION) {
+		if (entity->declaration.modifiers & DM_DLLIMPORT)
+			/* add prefix for imported symbols */
+			obstack_printf(o, "__imp_");
+
 		cc_kind_t cc = entity->declaration.type->function.calling_convention;
 
 		/* calling convention prefix */

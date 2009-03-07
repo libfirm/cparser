@@ -192,6 +192,10 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
  */
 unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
 
+unsigned         get_type_alignment(const type_t *type);
+unsigned         get_type_size(const type_t *type);
+decl_modifiers_t get_type_modifiers(const type_t *type);
+
 /**
  * returns flags of an atomic type kind
  */

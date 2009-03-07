@@ -28,6 +28,8 @@ SOURCES := \
 	adt/obstack_printf.c \
 	adt/strset.c \
 	adt/xmalloc.c \
+	attribute.c \
+	parser.c \
 	ast.c \
 	ast2firm.c \
 	diagnostic.c \
@@ -42,7 +44,6 @@ SOURCES := \
 	lexer.c \
 	main.c \
 	mangle.c \
-	parser.c \
 	preprocessor.c \
 	symbol_table.c \
 	token.c \

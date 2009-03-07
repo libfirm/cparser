@@ -731,10 +731,6 @@ static void intern_print_type_post(const type_t *const type)
 	case TYPE_TYPEDEF:
 		break;
 	}
-
-	if (type->base.modifiers & DM_TRANSPARENT_UNION) {
-		fputs("__attribute__((__transparent_union__))", out);
-	}
 }
 
 /**
@@ -772,7 +768,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
  *
  * @param type  The type.
  */
-static size_t get_type_size(const type_t *type)
+static size_t get_type_struct_size(const type_t *type)
 {
 	switch(type->kind) {
 	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
@@ -805,7 +801,7 @@ static size_t get_type_size(const type_t *type)
  */
 type_t *duplicate_type(const type_t *type)
 {
-	size_t size = get_type_size(type);
+	size_t size = get_type_struct_size(type);
 
 	type_t *copy = obstack_alloc(type_obst, size);
 	memcpy(copy, type, size);
@@ -1194,7 +1190,11 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	}
 
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:
+	case TYPE_COMPOUND_UNION: {
+
+
+		break;
+	}
 	case TYPE_ENUM:
 	case TYPE_BUILTIN:
 		/* TODO: not implemented */
@@ -1225,19 +1225,13 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 type_t *skip_typeref(type_t *type)
 {
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
-	type_modifiers_t  modifiers  = TYPE_MODIFIER_NONE;
-	il_alignment_t    alignment  = 0;
 
 	while (true) {
-		if (alignment < type->base.alignment)
-			alignment = type->base.alignment;
-
 		switch (type->kind) {
 		case TYPE_ERROR:
 			return type;
 		case TYPE_TYPEDEF: {
 			qualifiers |= type->base.qualifiers;
-			modifiers  |= type->base.modifiers;
 
 			const typedef_type_t *typedef_type = &type->typedeft;
 			if (typedef_type->resolved_type != NULL) {
@@ -1249,7 +1243,6 @@ type_t *skip_typeref(type_t *type)
 		}
 		case TYPE_TYPEOF:
 			qualifiers |= type->base.qualifiers;
-			modifiers  |= type->base.modifiers;
 			type        = type->typeoft.typeof_type;
 			continue;
 		default:
@@ -1258,9 +1251,7 @@ type_t *skip_typeref(type_t *type)
 		break;
 	}
 
-	if (qualifiers != TYPE_QUALIFIER_NONE ||
-			modifiers  != TYPE_MODIFIER_NONE  ||
-			alignment  >  type->base.alignment) {
+	if (qualifiers != TYPE_QUALIFIER_NONE) {
 		type_t *const copy = duplicate_type(type);
 
 		/* for const with typedefed array type the element type has to be
@@ -1269,19 +1260,146 @@ type_t *skip_typeref(type_t *type)
 			type_t *element_type           = copy->array.element_type;
 			element_type                   = duplicate_type(element_type);
 			element_type->base.qualifiers |= qualifiers;
-			element_type->base.modifiers  |= modifiers;
-			element_type->base.alignment   = alignment;
 			copy->array.element_type       = element_type;
 		} else {
 			copy->base.qualifiers |= qualifiers;
-			copy->base.modifiers  |= modifiers;
-			copy->base.alignment   = alignment;
 		}
 
 		type = identify_new_type(copy);
 	}
 
 	return type;
+}
+
+unsigned get_type_size(const type_t *type)
+{
+	switch (type->kind) {
+	case TYPE_INVALID:
+		break;
+	case TYPE_ERROR:
+		return 0;
+	case TYPE_ATOMIC:
+		return get_atomic_type_size(type->atomic.akind);
+	case TYPE_COMPLEX:
+		return get_atomic_type_size(type->complex.akind) * 2;
+	case TYPE_IMAGINARY:
+		return get_atomic_type_size(type->imaginary.akind);
+	case TYPE_COMPOUND_UNION:
+	case TYPE_COMPOUND_STRUCT:
+		return type->compound.compound->size;
+	case TYPE_ENUM:
+		return get_atomic_type_size(type->enumt.akind);
+	case TYPE_FUNCTION:
+		return 0; /* non-const (but "address-const") */
+	case TYPE_REFERENCE:
+	case TYPE_POINTER:
+		/* TODO: make configurable by backend */
+		return 4;
+	case TYPE_ARRAY: {
+		/* TODO: correct if element_type is aligned? */
+		il_size_t element_size = get_type_size(type->array.element_type);
+		return type->array.size * element_size;
+	}
+	case TYPE_BITFIELD:
+		return 0;
+	case TYPE_BUILTIN:
+		return get_type_size(type->builtin.real_type);
+	case TYPE_TYPEDEF:
+		return get_type_size(type->typedeft.typedefe->type);
+	case TYPE_TYPEOF:
+		if (type->typeoft.typeof_type) {
+			return get_type_size(type->typeoft.typeof_type);
+		} else {
+			return get_type_size(type->typeoft.expression->base.type);
+		}
+	}
+	panic("invalid type in get_type_size");
+}
+
+unsigned get_type_alignment(const type_t *type)
+{
+	switch (type->kind) {
+	case TYPE_INVALID:
+		break;
+	case TYPE_ERROR:
+		return 0;
+	case TYPE_ATOMIC:
+		return get_atomic_type_alignment(type->atomic.akind);
+	case TYPE_COMPLEX:
+		return get_atomic_type_alignment(type->complex.akind);
+	case TYPE_IMAGINARY:
+		return get_atomic_type_alignment(type->imaginary.akind);
+	case TYPE_COMPOUND_UNION:
+	case TYPE_COMPOUND_STRUCT:
+		return type->compound.compound->alignment;
+	case TYPE_ENUM:
+		return get_atomic_type_alignment(type->enumt.akind);
+	case TYPE_FUNCTION:
+		/* what is correct here? */
+		return 4;
+	case TYPE_REFERENCE:
+	case TYPE_POINTER:
+		/* TODO: make configurable by backend */
+		return 4;
+	case TYPE_ARRAY:
+		return get_type_alignment(type->array.element_type);
+	case TYPE_BITFIELD:
+		return 0;
+	case TYPE_BUILTIN:
+		return get_type_alignment(type->builtin.real_type);
+	case TYPE_TYPEDEF: {
+		il_alignment_t alignment
+			= get_type_alignment(type->typedeft.typedefe->type);
+		if (type->typedeft.typedefe->alignment > alignment)
+			alignment = type->typedeft.typedefe->alignment;
+
+		return alignment;
+	}
+	case TYPE_TYPEOF:
+		if (type->typeoft.typeof_type) {
+			return get_type_alignment(type->typeoft.typeof_type);
+		} else {
+			return get_type_alignment(type->typeoft.expression->base.type);
+		}
+	}
+	panic("invalid type in get_type_alignment");
+}
+
+decl_modifiers_t get_type_modifiers(const type_t *type)
+{
+	switch(type->kind) {
+	case TYPE_INVALID:
+	case TYPE_ERROR:
+		break;
+	case TYPE_COMPOUND_STRUCT:
+	case TYPE_COMPOUND_UNION:
+		return type->compound.compound->modifiers;
+	case TYPE_FUNCTION:
+		return type->function.modifiers;
+	case TYPE_ENUM:
+	case TYPE_ATOMIC:
+	case TYPE_COMPLEX:
+	case TYPE_IMAGINARY:
+	case TYPE_REFERENCE:
+	case TYPE_POINTER:
+	case TYPE_BITFIELD:
+	case TYPE_ARRAY:
+		return 0;
+	case TYPE_BUILTIN:
+		return get_type_modifiers(type->builtin.real_type);
+	case TYPE_TYPEDEF: {
+		decl_modifiers_t modifiers = type->typedeft.typedefe->modifiers;
+		modifiers |= get_type_modifiers(type->typedeft.typedefe->type);
+		return modifiers;
+	}
+	case TYPE_TYPEOF:
+		if (type->typeoft.typeof_type) {
+			return get_type_modifiers(type->typeoft.typeof_type);
+		} else {
+			return get_type_modifiers(type->typeoft.expression->base.type);
+		}
+	}
+	panic("invalid type found in get_type_modifiers");
 }
 
 type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)
@@ -1436,8 +1554,6 @@ type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 	memset(type, 0, sizeof(atomic_type_t));
 
 	type->kind            = TYPE_ATOMIC;
-	type->base.size       = get_atomic_type_size(akind);
-	type->base.alignment  = get_atomic_type_alignment(akind);
 	type->base.qualifiers = qualifiers;
 	type->atomic.akind    = akind;
 
@@ -1457,7 +1573,6 @@ type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers
 
 	type->kind            = TYPE_COMPLEX;
 	type->base.qualifiers = qualifiers;
-	type->base.alignment  = get_atomic_type_alignment(akind);
 	type->complex.akind   = akind;
 
 	return identify_new_type(type);
@@ -1476,7 +1591,6 @@ type_t *make_imaginary_type(atomic_type_kind_t akind, type_qualifiers_t qualifie
 
 	type->kind            = TYPE_IMAGINARY;
 	type->base.qualifiers = qualifiers;
-	type->base.alignment  = get_atomic_type_alignment(akind);
 	type->imaginary.akind = akind;
 
 	return identify_new_type(type);
@@ -1495,7 +1609,6 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 
 	type->kind                  = TYPE_POINTER;
 	type->base.qualifiers       = qualifiers;
-	type->base.alignment        = 0;
 	type->pointer.points_to     = points_to;
 	type->pointer.base_variable = NULL;
 
@@ -1514,7 +1627,6 @@ type_t *make_reference_type(type_t *refers_to)
 
 	type->kind                = TYPE_REFERENCE;
 	type->base.qualifiers     = 0;
-	type->base.alignment      = 0;
 	type->reference.refers_to = refers_to;
 
 	return identify_new_type(type);
@@ -1535,7 +1647,6 @@ type_t *make_based_pointer_type(type_t *points_to,
 
 	type->kind                  = TYPE_POINTER;
 	type->base.qualifiers       = qualifiers;
-	type->base.alignment        = 0;
 	type->pointer.points_to     = points_to;
 	type->pointer.base_variable = variable;
 
@@ -1551,7 +1662,6 @@ type_t *make_array_type(type_t *element_type, size_t size,
 
 	type->kind                = TYPE_ARRAY;
 	type->base.qualifiers     = qualifiers;
-	type->base.alignment      = 0;
 	type->array.element_type  = element_type;
 	type->array.size          = size;
 	type->array.size_constant = true;

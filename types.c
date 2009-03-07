@@ -98,8 +98,7 @@ type_t *type_int64_ptr;
 
 void init_basic_types(void)
 {
-	static const type_base_t error = { TYPE_ERROR, 0, TYPE_QUALIFIER_NONE,
-	                                   TYPE_MODIFIER_NONE, 0, NULL };
+	static const type_base_t error = { TYPE_ERROR, TYPE_QUALIFIER_NONE, NULL };
 
 	type_error_type         = (type_t*)&error;
 	type_bool               = make_atomic_type(ATOMIC_TYPE_BOOL,        TYPE_QUALIFIER_NONE);

@@ -23,6 +23,7 @@
 #include "lexer.h"
 #include "symbol.h"
 #include "entity.h"
+#include "attribute.h"
 #include <libfirm/firm_types.h>
 
 typedef enum {
@@ -75,23 +76,21 @@ typedef enum decl_modifier_t {
 	DM_NOINLINE          = 1 << 10,
 	DM_RESTRICT          = 1 << 11,
 	DM_NOALIAS           = 1 << 12,
-	DM_PACKED            = 1 << 13,
-	DM_TRANSPARENT_UNION = 1 << 14,
-	DM_CONST             = 1 << 15,
-	DM_PURE              = 1 << 16,
-	DM_CONSTRUCTOR       = 1 << 17,
-	DM_DESTRUCTOR        = 1 << 18,
-	DM_UNUSED            = 1 << 19,
-	DM_USED              = 1 << 20,
-	DM_CDECL             = 1 << 21,
-	DM_FASTCALL          = 1 << 22,
-	DM_STDCALL           = 1 << 23,
-	DM_THISCALL          = 1 << 24,
-	DM_DEPRECATED        = 1 << 25,
-	DM_RETURNS_TWICE     = 1 << 26,
+	DM_TRANSPARENT_UNION = 1 << 13,
+	DM_CONST             = 1 << 14,
+	DM_PURE              = 1 << 15,
+	DM_CONSTRUCTOR       = 1 << 16,
+	DM_DESTRUCTOR        = 1 << 17,
+	DM_UNUSED            = 1 << 18,
+	DM_USED              = 1 << 19,
+	DM_CDECL             = 1 << 20,
+	DM_FASTCALL          = 1 << 21,
+	DM_STDCALL           = 1 << 22,
+	DM_THISCALL          = 1 << 23,
+	DM_DEPRECATED        = 1 << 24,
+	DM_RETURNS_TWICE     = 1 << 25,
+	DM_MALLOC            = 1 << 26,
 } decl_modifier_t;
-
-typedef unsigned decl_modifiers_t;
 
 /**
  * A scope containing entities.
@@ -127,6 +126,11 @@ struct compound_t {
 	scope_t           members;
 	decl_modifiers_t  modifiers;
 	bool              complete            : 1;
+	bool              transparent_union   : 1;
+	bool              packed              : 1;
+
+	il_alignment_t    alignment;
+	il_size_t         size;
 
 	/* ast2firm info */
 	ir_type          *irtype;
@@ -170,28 +174,29 @@ struct typedef_t {
 	entity_base_t     base;
 	decl_modifiers_t  modifiers;
 	type_t           *type;
+	il_alignment_t    alignment;
 	bool              builtin : 1;
 };
 
 struct declaration_t {
 	entity_base_t     base;
+	type_t           *type;
 	storage_class_t   declared_storage_class;
 	storage_class_t   storage_class;
 	decl_modifiers_t  modifiers;
-	const char       *deprecated_string;  /**< MS deprecated string if any. */
-	bool              used          : 1;  /**< Set if the declaration is used. */
-	bool              implicit      : 1;  /**< Set for implicit (not found in source code) declarations. */
-	type_t           *type;
+	il_alignment_t    alignment;
+	attribute_t      *attributes;
+	bool              used     : 1;  /**< Set if the declaration is used. */
+	bool              implicit : 1;  /**< Set for implicit (not found in source code) declarations. */
 
 	/* ast2firm info */
 	unsigned char     kind;
 };
 
 struct compound_member_t {
-	declaration_t  base;
-	unsigned char  alignment;
-	bool           read          : 1;
-	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
+	declaration_t    base;
+	bool             read          : 1;
+	bool             address_taken : 1;  /**< Set if the address of this declaration was taken. */
 
 	/* ast2firm info */
 	ir_entity *entity;
@@ -199,15 +204,16 @@ struct compound_member_t {
 };
 
 struct variable_t {
-	declaration_t  base;
-	bool           thread_local  : 1;  /**< GCC __thread */
-	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
-	bool           read          : 1;
-	unsigned char  alignment;
-	symbol_t      *get_property_sym;   /**< MS get property. */
-	symbol_t      *put_property_sym;   /**< MS put property. */
+	declaration_t     base;
+	bool              thread_local  : 1;  /**< GCC __thread */
+	bool              restricta     : 1;
+	bool              deprecated    : 1;
+	bool              noalias       : 1;
 
-	initializer_t *initializer;
+	bool              address_taken : 1;  /**< Set if the address of this declaration was taken. */
+	bool              read          : 1;
+
+	initializer_t    *initializer;
 
 	/* ast2firm info */
 	union {
@@ -286,6 +292,7 @@ typedef enum builtin_kind_t {
 struct function_t {
 	declaration_t  base;
 	bool           is_inline     : 1;
+
 	bool           need_closure  : 1;  /**< Inner function needs closure. */
 	bool           goto_to_outer : 1;  /**< Inner function has goto to outer function. */
 
@@ -317,13 +324,21 @@ union entity_t {
 	compound_member_t  compound_member;
 };
 
+#define DECLARATION_KIND_CASES        \
+	case ENTITY_FUNCTION:             \
+	case ENTITY_VARIABLE:             \
+	case ENTITY_PARAMETER:            \
+	case ENTITY_COMPOUND_MEMBER:
+
 static inline bool is_declaration(const entity_t *entity)
 {
-	return entity->kind == ENTITY_FUNCTION || entity->kind == ENTITY_VARIABLE
-		|| entity->kind == ENTITY_PARAMETER
-		|| entity->kind == ENTITY_COMPOUND_MEMBER;
+	switch(entity->kind) {
+	DECLARATION_KIND_CASES
+		return true;
+	default:
+		return false;
+	}
 }
-
 
 const char *get_entity_kind_name(entity_kind_t kind);
 
