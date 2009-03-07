@@ -3056,7 +3056,7 @@ static void finish_union_type(compound_type_t *type)
 			continue;
 
 		type_t *m_type = entry->declaration.type;
-		if (! is_type_valid(m_type))
+		if (! is_type_valid(skip_typeref(m_type)))
 			continue;
 
 		entry->compound_member.offset = 0;
