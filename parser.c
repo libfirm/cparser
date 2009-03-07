@@ -58,7 +58,6 @@ struct declaration_specifiers_t {
 	unsigned char      alignment;         /**< Alignment, 0 if not set. */
 	bool               is_inline    : 1;
 	bool               thread_local : 1;  /**< GCC __thread */
-	bool               deprecated   : 1;
 	attribute_t       *attributes;        /**< list of attributes */
 	type_t            *type;
 };
@@ -5938,12 +5937,27 @@ static void parse_compound_declarators(compound_t *compound,
 			type_t *type = make_bitfield_type(base_type, size,
 					&source_position, sym_anonymous);
 
+			attribute_t *attributes = parse_attributes(NULL);
+			if (attributes != NULL) {
+				attribute_t *last = attributes;
+				while (last->next != NULL)
+					last = last->next;
+				last->next = specifiers->attributes;
+			} else {
+				attributes = specifiers->attributes;
+			}
+
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
 			entity->base.namespc                       = NAMESPACE_NORMAL;
 			entity->base.source_position               = source_position;
 			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
 			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
 			entity->declaration.type                   = type;
+			entity->declaration.attributes             = attributes;
+
+			if (attributes != NULL) {
+				handle_entity_attributes(attributes, entity);
+			}
 			append_entity(&compound->members, entity);
 		} else {
 			entity = parse_declarator(specifiers,
@@ -5973,7 +5987,10 @@ static void parse_compound_declarators(compound_t *compound,
 					type_t *type          = entity->declaration.type;
 					type_t *bitfield_type = make_bitfield_type(type, size,
 							&source_position, entity->base.symbol);
+
+					attribute_t *attributes = parse_attributes(NULL);
 					entity->declaration.type = bitfield_type;
+					handle_entity_attributes(attributes, entity);
 				} else {
 					type_t *orig_type = entity->declaration.type;
 					type_t *type      = skip_typeref(orig_type);
@@ -6392,6 +6409,29 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 }
 
+static void check_deprecated(const source_position_t *source_position,
+                             const entity_t *entity)
+{
+	if (!warning.deprecated_declarations)
+		return;
+	if (!is_declaration(entity))
+		return;
+	if ((entity->declaration.modifiers & DM_DEPRECATED) == 0)
+		return;
+
+	char const *const prefix = get_entity_kind_name(entity->kind);
+	const char *deprecated_string
+			= get_deprecated_string(entity->declaration.attributes);
+	if (deprecated_string != NULL) {
+		warningf(source_position, "%s '%Y' is deprecated (declared %P): \"%s\"",
+				 prefix, entity->base.symbol, &entity->base.source_position,
+				 deprecated_string);
+	} else {
+		warningf(source_position, "%s '%Y' is deprecated (declared %P)", prefix,
+				 entity->base.symbol, &entity->base.source_position);
+	}
+}
+
 static expression_t *parse_reference(void)
 {
 	symbol_t *const symbol = token.v.symbol;
@@ -6453,24 +6493,7 @@ static expression_t *parse_reference(void)
 		current_function->need_closure = true;
 	}
 
-	/* check for deprecated functions */
-	if (warning.deprecated_declarations
-		&& is_declaration(entity)
-		&& entity->declaration.modifiers & DM_DEPRECATED) {
-
-		char const *const prefix = entity->kind == ENTITY_FUNCTION ?
-			"function" : "variable";
-		const char *deprecated_string
-			= get_deprecated_string(entity->declaration.attributes);
-		if (deprecated_string != NULL) {
-			warningf(HERE, "%s '%Y' is deprecated (declared %P): \"%s\"",
-			         prefix, entity->base.symbol, &entity->base.source_position,
-			         deprecated_string);
-		} else {
-			warningf(HERE, "%s '%Y' is deprecated (declared %P)", prefix,
-			         entity->base.symbol, &entity->base.source_position);
-		}
-	}
+	check_deprecated(HERE, entity);
 
 	if (warning.init_self && entity == current_init_decl && !in_type_prop
 	    && entity->kind == ENTITY_VARIABLE) {
@@ -7396,6 +7419,8 @@ create_error_entry:
 
 	assert(is_declaration(entry));
 	select->select.compound_entry = entry;
+
+	check_deprecated(HERE, entry);
 
 	type_t *entry_type = entry->declaration.type;
 	type_t *res_type

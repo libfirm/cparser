@@ -28,7 +28,7 @@ const char *get_entity_kind_name(entity_kind_t kind)
 	case ENTITY_FUNCTION:        return "function";
 	case ENTITY_VARIABLE:        return "variable";
 	case ENTITY_PARAMETER:       return "parameter";
-	case ENTITY_COMPOUND_MEMBER: return "compound type member";
+	case ENTITY_COMPOUND_MEMBER: return "compound member";
 	case ENTITY_STRUCT:          return "struct";
 	case ENTITY_UNION:           return "union";
 	case ENTITY_ENUM:            return "enum";
