@@ -9790,6 +9790,12 @@ static statement_t *parse_for(void)
 	size_t const  top       = environment_top();
 	scope_t      *old_scope = scope_push(&statement->fors.scope);
 
+	bool old_gcc_extension;
+	while (token.type == T___extension__) {
+		next_token();
+		in_gcc_extension = true;
+	}
+
 	if (token.type == ';') {
 		next_token();
 	} else if (is_declaration_specifier(&token, false)) {
@@ -9806,6 +9812,7 @@ static statement_t *parse_for(void)
 		rem_anchor_token(';');
 		expect(';', end_error2);
 	}
+	in_gcc_extension = old_gcc_extension;
 
 	if (token.type != ';') {
 		add_anchor_token(';');
