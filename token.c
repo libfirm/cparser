@@ -119,6 +119,11 @@ void print_token_type(FILE *f, token_type_t token_type)
 	}
 }
 
+symbol_t *get_token_symbol(const token_t *token)
+{
+	return token_symbols[token->type];
+}
+
 void print_token(FILE *f, const token_t *token)
 {
 	switch(token->type) {

@@ -1306,6 +1306,7 @@ static symbol_t *get_symbol_from_token(void)
 {
 	switch(token.type) {
 	case T_IDENTIFIER:
+		return token.v.symbol;
 	case T_auto:
 	case T_char:
 	case T_double:
@@ -1335,7 +1336,7 @@ static symbol_t *get_symbol_from_token(void)
 	case T_volatile:
 	case T_inline:
 		/* maybe we need more tokens ... add them on demand */
-		return token.v.symbol;
+		return get_token_symbol(&token);
 	default:
 		return NULL;
 	}
