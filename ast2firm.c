@@ -3088,6 +3088,9 @@ static void init_ir_types(void);
 
 long fold_constant(const expression_t *expression)
 {
+	if (expression->kind == EXPR_INVALID)
+		return 0;
+
 	assert(is_type_valid(skip_typeref(expression->base.type)));
 
 	bool constant_folding_old = constant_folding;
