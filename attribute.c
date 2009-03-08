@@ -341,15 +341,9 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 	}
 }
 
-static type_t *change_calling_convention(const source_position_t *pos,
-                                         type_t *type, cc_kind_t cconv)
+static type_t *change_calling_convention(type_t *type, cc_kind_t cconv)
 {
 	if (!is_type_function(type)) {
-		if (warning.other) {
-			warningf(pos,
-			         "Calling convention specified on non-function type '%T'",
-			         type);
-		}
 		return type;
 	}
 
@@ -368,22 +362,18 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 		switch(attribute->kind) {
 		case ATTRIBUTE_GNU_CDECL:
 		case ATTRIBUTE_MS_CDECL:
-			type = change_calling_convention(&attribute->source_position,
-			                                 type, CC_CDECL);
+			type = change_calling_convention(type, CC_CDECL);
 			break;
 		case ATTRIBUTE_MS_STDCALL:
 		case ATTRIBUTE_GNU_STDCALL:
-			type = change_calling_convention(&attribute->source_position,
-			                                 type, CC_STDCALL);
+			type = change_calling_convention(type, CC_STDCALL);
 			break;
 		case ATTRIBUTE_MS_FASTCALL:
 		case ATTRIBUTE_GNU_FASTCALL:
-			type = change_calling_convention(&attribute->source_position,
-			                                 type, CC_FASTCALL);
+			type = change_calling_convention(type, CC_FASTCALL);
 			break;
 		case ATTRIBUTE_MS_THISCALL:
-			type = change_calling_convention(&attribute->source_position,
-			                                 type, CC_THISCALL);
+			type = change_calling_convention(type, CC_THISCALL);
 			break;
 		case ATTRIBUTE_GNU_MODE:
 			type = handle_attribute_mode(attribute, type);
