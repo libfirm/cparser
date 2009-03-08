@@ -643,6 +643,10 @@ static int compute_type_size(ir_type *ty)
       ir_type *ent_ty = get_entity_type(ent);
       unsigned align, misalign;
 
+      /* inner functions do not expand the frame */
+      if (is_Method_type(ent_ty) && is_frame_type(ty))
+        continue;
+
       /* compute member types */
       if (! compute_type_size(ent_ty))
         return 0;
