@@ -2532,11 +2532,12 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		eat(T_union);
 	}
 
-	symbol_t   *symbol   = NULL;
-	compound_t *compound = NULL;
+	symbol_t    *symbol   = NULL;
+	compound_t  *compound = NULL;
+	attribute_t *attributes = NULL;
 
 	if (token.type == T___attribute__) {
-		parse_attributes(NULL);
+		attributes = parse_attributes(NULL);
 	}
 
 	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
@@ -2590,13 +2591,16 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 
 	if (token.type == '{') {
 		parse_compound_type_entries(compound);
-		parse_attributes(NULL);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
 			assert(anonymous_entity == NULL);
 			anonymous_entity = (entity_t*)compound;
 		}
+	}
+
+	if (attributes != NULL) {
+		handle_entity_attributes(attributes, (entity_t*) compound);
 	}
 
 	return compound;
@@ -2978,163 +2982,6 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
-static entity_t *pack_bitfield_members(il_size_t *size, type_t *type,
-                                       size_t offset, entity_t *first)
-{
-	/* TODO: packed handling */
-	type_t *base_type      = skip_typeref(type->bitfield.base_type);
-	size_t  remaining_bits = get_type_size(base_type) * BITS_PER_BYTE;
-	size_t  bit_offset     = 0;
-
-	entity_t *member;
-	for (member = first; member != NULL; member = member->base.next) {
-		/* TODO: make this an assert */
-		if (member->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		type_t *member_type = member->declaration.type;
-		if (member_type->kind != TYPE_BITFIELD)
-			break;
-		if (base_type != NULL
-		    && skip_typeref(member_type->bitfield.base_type) != base_type)
-			break;
-
-		size_t bit_size = member_type->bitfield.bit_size;
-		if (bit_size > remaining_bits)
-			break;
-
-		member->compound_member.offset     = offset;
-		member->compound_member.bit_offset = bit_offset;
-
-		bit_offset += bit_size;
-
-		/* 0-size members end current bucket. multiple 0-size buckets
-		 * seem to not start-end multiple buckets */
-		if (bit_size == 0) {
-			remaining_bits = 0;
-		} else {
-			remaining_bits -= bit_size;
-		}
-	}
-	assert(member != first);
-
-	*size += (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
-
-	return member;
-}
-
-/**
- * Finish the construction of a struct type by calculating its size, offsets,
- * alignment.
- */
-static void finish_struct_type(compound_type_t *type)
-{
-	assert(type->compound != NULL);
-
-	compound_t *compound = type->compound;
-	if (!compound->complete)
-		return;
-
-	il_size_t      offset;
-	il_size_t      size      = 0;
-	il_alignment_t alignment = compound->alignment;
-	bool           need_pad  = false;
-
-	entity_t *entry = compound->members.entities;
-	while (entry != NULL) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER) {
-			entry = entry->base.next;
-			continue;
-		}
-
-		type_t *m_type  = entry->declaration.type;
-		type_t *skipped = skip_typeref(m_type);
-		if (! is_type_valid(skipped)) {
-			entry = entry->base.next;
-			continue;
-		}
-
-		type_t *base_type = m_type;
-		if (skipped->kind == TYPE_BITFIELD) {
-			base_type = m_type->bitfield.base_type;
-		}
-
-		il_alignment_t m_alignment = get_type_alignment(base_type);
-		il_size_t      m_size      = get_type_size(base_type);
-		if (m_alignment > alignment)
-			alignment = m_alignment;
-
-		offset = (size + m_alignment - 1) & -m_alignment;
-
-		if (offset > size)
-			need_pad = true;
-
-		if (skipped->kind == TYPE_BITFIELD) {
-			entry = pack_bitfield_members(&size, m_type, offset, entry);
-		} else {
-			entry->compound_member.offset = offset;
-			size                          = offset + m_size;
-
-			entry = entry->base.next;
-		}
-	}
-
-	offset = (size + alignment - 1) & -alignment;
-	if (offset > size)
-		need_pad = true;
-
-	if (need_pad) {
-		if (warning.padded) {
-			warningf(&compound->base.source_position, "'%T' needs padding",
-			         type);
-		}
-	} else if (compound->packed && warning.packed) {
-		warningf(&compound->base.source_position,
-		         "superfluous packed attribute on '%T'", type);
-	}
-
-	compound->size      = offset;
-	compound->alignment = alignment;
-}
-
-/**
- * Finish the construction of an union type by calculating
- * its size and alignment.
- */
-static void finish_union_type(compound_type_t *type)
-{
-	assert(type->compound != NULL);
-
-	compound_t *compound = type->compound;
-	if (! compound->complete)
-		return;
-
-	il_size_t      size      = 0;
-	il_alignment_t alignment = compound->alignment;
-
-	entity_t *entry = compound->members.entities;
-	for (; entry != NULL; entry = entry->base.next) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		type_t *m_type = entry->declaration.type;
-		if (! is_type_valid(skip_typeref(m_type)))
-			continue;
-
-		entry->compound_member.offset = 0;
-		il_size_t m_size = get_type_size(m_type);
-		if (m_size > size)
-			size = m_size;
-		il_alignment_t m_alignment = get_type_alignment(m_type);
-		if (m_alignment > alignment)
-			alignment = m_alignment;
-	}
-	size = (size + alignment - 1) & -alignment;
-
-	compound->size      = size;
-	compound->alignment = alignment;
-}
-
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
 	type_t            *type              = NULL;
@@ -3280,13 +3127,11 @@ wrong_thread_stoarge_class:
 			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
 
 			type->compound.compound = parse_compound_type_specifier(true);
-			finish_struct_type(&type->compound);
 			break;
 		case T_union:
 			CHECK_DOUBLE_TYPE();
 			type = allocate_type_zero(TYPE_COMPOUND_UNION);
 			type->compound.compound = parse_compound_type_specifier(false);
-			finish_union_type(&type->compound);
 			break;
 		case T_enum:
 			CHECK_DOUBLE_TYPE();

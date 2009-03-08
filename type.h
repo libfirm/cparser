@@ -192,8 +192,8 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
  */
 unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
 
-unsigned         get_type_alignment(const type_t *type);
-unsigned         get_type_size(const type_t *type);
+unsigned         get_type_alignment(type_t *type);
+unsigned         get_type_size(type_t *type);
 decl_modifiers_t get_type_modifiers(const type_t *type);
 
 /**
@@ -215,5 +215,8 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size);
 atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 
 const char *get_atomic_kind_name(atomic_type_kind_t kind);
+
+void layout_struct_type(compound_type_t *type);
+void layout_union_type(compound_type_t *type);
 
 #endif

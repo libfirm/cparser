@@ -30,6 +30,8 @@
 #include "adt/error.h"
 #include "adt/util.h"
 #include "lang_features.h"
+#include "warning.h"
+#include "diagnostic.h"
 
 static struct obstack   _type_obst;
 static FILE            *out;
@@ -1274,7 +1276,7 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
-unsigned get_type_size(const type_t *type)
+unsigned get_type_size(type_t *type)
 {
 	switch (type->kind) {
 	case TYPE_INVALID:
@@ -1288,7 +1290,10 @@ unsigned get_type_size(const type_t *type)
 	case TYPE_IMAGINARY:
 		return get_atomic_type_size(type->imaginary.akind);
 	case TYPE_COMPOUND_UNION:
+		layout_union_type(&type->compound);
+		return type->compound.compound->size;
 	case TYPE_COMPOUND_STRUCT:
+		layout_struct_type(&type->compound);
 		return type->compound.compound->size;
 	case TYPE_ENUM:
 		return get_atomic_type_size(type->enumt.akind);
@@ -1319,7 +1324,7 @@ unsigned get_type_size(const type_t *type)
 	panic("invalid type in get_type_size");
 }
 
-unsigned get_type_alignment(const type_t *type)
+unsigned get_type_alignment(type_t *type)
 {
 	switch (type->kind) {
 	case TYPE_INVALID:
@@ -1333,7 +1338,10 @@ unsigned get_type_alignment(const type_t *type)
 	case TYPE_IMAGINARY:
 		return get_atomic_type_alignment(type->imaginary.akind);
 	case TYPE_COMPOUND_UNION:
+		layout_union_type(&type->compound);
+		return type->compound.compound->alignment;
 	case TYPE_COMPOUND_STRUCT:
+		layout_struct_type(&type->compound);
 		return type->compound.compound->alignment;
 	case TYPE_ENUM:
 		return get_atomic_type_alignment(type->enumt.akind);
@@ -1670,6 +1678,177 @@ type_t *make_array_type(type_t *element_type, size_t size,
 	type->array.size_constant = true;
 
 	return identify_new_type(type);
+}
+
+static entity_t *pack_bitfield_members(il_size_t *size, bool packed,
+                                       type_t *type, size_t offset,
+									   entity_t *first)
+{
+	/* TODO: packed handling */
+	type_t *base_type      = skip_typeref(type->bitfield.base_type);
+	size_t  remaining_bits = get_type_size(base_type) * BITS_PER_BYTE;
+	size_t  bit_offset     = 0;
+
+	entity_t *member;
+	for (member = first; member != NULL; member = member->base.next) {
+		/* TODO: make this an assert */
+		if (member->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		type_t *member_type = member->declaration.type;
+		if (member_type->kind != TYPE_BITFIELD)
+			break;
+		size_t bit_size = member_type->bitfield.bit_size;
+		if (!packed) {
+			if (base_type != NULL
+			    && skip_typeref(member_type->bitfield.base_type) != base_type)
+				break;
+			if (bit_size > remaining_bits)
+				break;
+		}
+
+		member->compound_member.offset     = offset;
+		member->compound_member.bit_offset = bit_offset;
+
+		bit_offset += bit_size;
+
+		/* 0-size members end current bucket. multiple 0-size buckets
+		 * seem to not start-end multiple buckets */
+		if (bit_size == 0) {
+			remaining_bits = 0;
+		} else {
+			remaining_bits -= bit_size;
+		}
+	}
+	assert(member != first);
+
+	*size += (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
+
+	return member;
+}
+
+/**
+ * Finish the construction of a struct type by calculating its size, offsets,
+ * alignment.
+ */
+void layout_struct_type(compound_type_t *type)
+{
+	assert(type->compound != NULL);
+
+	compound_t *compound = type->compound;
+	if (!compound->complete)
+		return;
+	if (type->compound->layouted)
+		return;
+
+	il_size_t      offset;
+	il_size_t      size      = 0;
+	il_alignment_t alignment = compound->alignment;
+	bool           need_pad  = false;
+
+	entity_t *entry = compound->members.entities;
+	while (entry != NULL) {
+		if (entry->kind != ENTITY_COMPOUND_MEMBER) {
+			entry = entry->base.next;
+			continue;
+		}
+
+		type_t *m_type  = entry->declaration.type;
+		type_t *skipped = skip_typeref(m_type);
+		if (! is_type_valid(skipped)) {
+			entry = entry->base.next;
+			continue;
+		}
+
+		type_t *base_type = m_type;
+		if (skipped->kind == TYPE_BITFIELD) {
+			base_type = m_type->bitfield.base_type;
+		}
+
+		il_alignment_t m_alignment = get_type_alignment(base_type);
+		il_size_t      m_size      = get_type_size(base_type);
+		if (m_alignment > alignment)
+			alignment = m_alignment;
+
+		if (compound->packed) {
+			offset = size;
+		} else {
+			offset = (size + m_alignment - 1) & -m_alignment;
+		}
+
+		if (offset > size)
+			need_pad = true;
+
+		if (skipped->kind == TYPE_BITFIELD) {
+			entry = pack_bitfield_members(&size, compound->packed,
+			                              m_type, offset, entry);
+		} else {
+			entry->compound_member.offset = offset;
+			size                          = offset + m_size;
+
+			entry = entry->base.next;
+		}
+	}
+
+	if (!compound->packed) {
+		offset = (size + alignment - 1) & -alignment;
+		if (offset > size)
+			need_pad = true;
+	} else {
+		offset = size;
+	}
+
+	if (need_pad) {
+		if (warning.padded) {
+			warningf(&compound->base.source_position, "'%T' needs padding",
+			         type);
+		}
+	} else if (compound->packed && warning.packed) {
+		warningf(&compound->base.source_position,
+		         "superfluous packed attribute on '%T'", type);
+	}
+
+	compound->size      = offset;
+	compound->alignment = alignment;
+	compound->layouted  = true;
+}
+
+/**
+ * Finish the construction of an union type by calculating
+ * its size and alignment.
+ */
+void layout_union_type(compound_type_t *type)
+{
+	assert(type->compound != NULL);
+
+	compound_t *compound = type->compound;
+	if (! compound->complete)
+		return;
+
+	il_size_t      size      = 0;
+	il_alignment_t alignment = compound->alignment;
+
+	entity_t *entry = compound->members.entities;
+	for (; entry != NULL; entry = entry->base.next) {
+		if (entry->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		type_t *m_type = entry->declaration.type;
+		if (! is_type_valid(skip_typeref(m_type)))
+			continue;
+
+		entry->compound_member.offset = 0;
+		il_size_t m_size = get_type_size(m_type);
+		if (m_size > size)
+			size = m_size;
+		il_alignment_t m_alignment = get_type_alignment(m_type);
+		if (m_alignment > alignment)
+			alignment = m_alignment;
+	}
+	size = (size + alignment - 1) & -alignment;
+
+	compound->size      = size;
+	compound->alignment = alignment;
 }
 
 /**

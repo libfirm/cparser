@@ -323,13 +323,13 @@ static ir_type *create_complex_type(const complex_type_t *type)
 /**
  * Creates a Firm type for an imaginary type
  */
-static ir_type *create_imaginary_type(const imaginary_type_t *type)
+static ir_type *create_imaginary_type(imaginary_type_t *type)
 {
 	atomic_type_kind_t  kind      = type->akind;
 	ir_mode            *mode      = atomic_modes[kind];
 	ident              *id        = get_mode_ident(mode);
 	ir_type            *irtype    = new_type_primitive(id, mode);
-	il_alignment_t      alignment = get_type_alignment((const type_t*) type);
+	il_alignment_t      alignment = get_type_alignment((type_t*) type);
 
 	set_type_alignment_bytes(irtype, alignment);
 
@@ -598,6 +598,12 @@ static ir_type *create_compound_type(compound_type_t *type,
 
 	if (incomplete)
 		return irtype;
+
+	if (is_union) {
+		layout_union_type(type);
+	} else {
+		layout_struct_type(type);
+	}
 
 	compound->irtype_complete = true;
 

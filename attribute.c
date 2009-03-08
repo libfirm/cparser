@@ -246,18 +246,32 @@ static void warn_arguments(const attribute_t *attribute)
 	}
 }
 
-static void handle_attribute_packed(const attribute_t *attribute,
-                                    entity_t *entity)
+static void handle_attribute_packed_e(const attribute_t *attribute,
+                                      entity_t *entity)
 {
-	warn_arguments(attribute);
-
-	if (entity->kind == ENTITY_STRUCT) {
-		entity->compound.packed = true;
-	} else if (warning.other) {
+#if 0
+	if (entity->kind != ENTITY_STRUCT) {
 		warningf(&attribute->source_position,
-		         "packed attribute on %s ignored",
-				 get_entity_kind_name(entity->kind));
+		         "packed attribute on %s '%s' ignored",
+				 get_entity_kind_name(entity->kind),
+				 entity->base.symbol->string);
+		return;
 	}
+#endif
+
+	warn_arguments(attribute);
+	entity->compound.packed = true;
+}
+
+static void handle_attribute_packed(const attribute_t *attribute, type_t *type)
+{
+	if (type->kind != TYPE_COMPOUND_STRUCT) {
+		warningf(&attribute->source_position,
+		         "packed attribute on type '%T' ignored", type);
+		return;
+	}
+
+	handle_attribute_packed_e(attribute, (entity_t*) type->compound.compound);
 }
 
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
@@ -310,8 +324,9 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_MS_NOALIAS:       modifiers |= DM_NOALIAS; break;
 
 		case ATTRIBUTE_GNU_PACKED:
-			handle_attribute_packed(attribute, entity);
-   			break;
+			handle_attribute_packed_e(attribute, entity);
+			break;
+
 		case ATTRIBUTE_MS_ALIGN:
 		case ATTRIBUTE_GNU_ALIGNED:
 			handle_attribute_aligned(attribute, entity);
@@ -360,6 +375,9 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 	const attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
 		switch(attribute->kind) {
+		case ATTRIBUTE_GNU_PACKED:
+			handle_attribute_packed(attribute, type);
+   			break;
 		case ATTRIBUTE_GNU_CDECL:
 		case ATTRIBUTE_MS_CDECL:
 			type = change_calling_convention(type, CC_CDECL);
