@@ -125,9 +125,9 @@ struct compound_t {
 	entity_t         *alias; /* used for name mangling of anonymous types */
 	scope_t           members;
 	decl_modifiers_t  modifiers;
-	bool              complete            : 1;
-	bool              transparent_union   : 1;
-	bool              packed              : 1;
+	bool              complete          : 1;
+	bool              transparent_union : 1;
+	bool              packed            : 1;
 
 	il_alignment_t    alignment;
 	il_size_t         size;
@@ -194,13 +194,14 @@ struct declaration_t {
 };
 
 struct compound_member_t {
-	declaration_t    base;
-	bool             read          : 1;
-	bool             address_taken : 1;  /**< Set if the address of this declaration was taken. */
+	declaration_t  base;
+	bool           read          : 1;
+	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
+	unsigned short offset;     /**< the offset of this member in the compound */
+	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
 
 	/* ast2firm info */
 	ir_entity *entity;
-	il_size_t  offset;  /**< The offset of this member inside a compound. */
 };
 
 struct variable_t {

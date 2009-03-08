@@ -233,9 +233,9 @@ struct expression_base_t {
 	expression_kind_t   kind;            /**< The expression kind. */
 	type_t             *type;            /**< The type of the expression. */
 	source_position_t   source_position; /**< The source position of this expression. */
-	bool                parenthesized;
+	bool                parenthesized : 1;
 #ifndef NDEBUG
-	bool                transformed;     /**< Set if this expression was transformed. */
+	bool                transformed : 1;     /**< Set if this expression was transformed. */
 #endif
 };
 
@@ -323,6 +323,8 @@ struct select_expression_t {
 	expression_base_t  base;
 	expression_t      *compound;
 	entity_t          *compound_entry;
+	bool               implicit : 1; /**< compiler generated select
+	                                      (for anonymous struct/union) */
 };
 
 struct array_access_expression_t {

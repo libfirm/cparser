@@ -2978,6 +2978,51 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 	return entity;
 }
 
+static entity_t *pack_bitfield_members(il_size_t *size, type_t *type,
+                                       size_t offset, entity_t *first)
+{
+	/* TODO: packed handling */
+	type_t *base_type      = skip_typeref(type->bitfield.base_type);
+	size_t  remaining_bits = get_type_size(base_type) * BITS_PER_BYTE;
+	size_t  bit_offset     = 0;
+
+	entity_t *member;
+	for (member = first; member != NULL; member = member->base.next) {
+		/* TODO: make this an assert */
+		if (member->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		type_t *member_type = member->declaration.type;
+		if (member_type->kind != TYPE_BITFIELD)
+			break;
+		if (base_type != NULL
+		    && skip_typeref(member_type->bitfield.base_type) != base_type)
+			break;
+
+		size_t bit_size = member_type->bitfield.bit_size;
+		if (bit_size > remaining_bits)
+			break;
+
+		member->compound_member.offset     = offset;
+		member->compound_member.bit_offset = bit_offset;
+
+		bit_offset += bit_size;
+
+		/* 0-size members end current bucket. multiple 0-size buckets
+		 * seem to not start-end multiple buckets */
+		if (bit_size == 0) {
+			remaining_bits = 0;
+		} else {
+			remaining_bits -= bit_size;
+		}
+	}
+	assert(member != first);
+
+	*size += (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
+
+	return member;
+}
+
 /**
  * Finish the construction of a struct type by calculating its size, offsets,
  * alignment.
@@ -2990,22 +3035,32 @@ static void finish_struct_type(compound_type_t *type)
 	if (!compound->complete)
 		return;
 
-	il_size_t      size = 0;
 	il_size_t      offset;
+	il_size_t      size      = 0;
 	il_alignment_t alignment = compound->alignment;
 	bool           need_pad  = false;
 
 	entity_t *entry = compound->members.entities;
-	for (; entry != NULL; entry = entry->base.next) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		type_t *m_type = entry->declaration.type;
-		if (! is_type_valid(skip_typeref(m_type))) {
-			/* simply ignore errors here */
+	while (entry != NULL) {
+		if (entry->kind != ENTITY_COMPOUND_MEMBER) {
+			entry = entry->base.next;
 			continue;
 		}
-		il_alignment_t m_alignment = get_type_alignment(m_type);
+
+		type_t *m_type  = entry->declaration.type;
+		type_t *skipped = skip_typeref(m_type);
+		if (! is_type_valid(skipped)) {
+			entry = entry->base.next;
+			continue;
+		}
+
+		type_t *base_type = m_type;
+		if (skipped->kind == TYPE_BITFIELD) {
+			base_type = m_type->bitfield.base_type;
+		}
+
+		il_alignment_t m_alignment = get_type_alignment(base_type);
+		il_size_t      m_size      = get_type_size(base_type);
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 
@@ -3013,8 +3068,15 @@ static void finish_struct_type(compound_type_t *type)
 
 		if (offset > size)
 			need_pad = true;
-		entry->compound_member.offset = offset;
-		size = offset + get_type_size(m_type);
+
+		if (skipped->kind == TYPE_BITFIELD) {
+			entry = pack_bitfield_members(&size, m_type, offset, entry);
+		} else {
+			entry->compound_member.offset = offset;
+			size                          = offset + m_size;
+
+			entry = entry->base.next;
+		}
 	}
 
 	offset = (size + alignment - 1) & -alignment;
@@ -5884,13 +5946,17 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 
 	if (is_constant_expression(size)) {
 		long v = fold_constant_to_int(size);
+		const symbol_t *user_symbol = symbol == NULL ? sym_anonymous : symbol;
 
 		if (v < 0) {
-			errorf(source_position, "negative width in bit-field '%Y'", symbol);
-		} else if (v == 0) {
-			errorf(source_position, "zero width for bit-field '%Y'", symbol);
+			errorf(source_position, "negative width in bit-field '%Y'",
+			       user_symbol);
+		} else if (v == 0 && symbol != NULL) {
+			errorf(source_position, "zero width for bit-field '%Y'",
+			       user_symbol);
 		} else if (bit_size > 0 && (il_size_t)v > bit_size) {
-			errorf(source_position, "width of '%Y' exceeds its type", symbol);
+			errorf(source_position, "width of '%Y' exceeds its type",
+			       user_symbol);
 		} else {
 			type->bitfield.bit_size = v;
 		}
@@ -5909,14 +5975,106 @@ static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
 		if (iter->base.symbol == symbol) {
 			return iter;
 		} else if (iter->base.symbol == NULL) {
+			/* search in anonymous structs and unions */
 			type_t *type = skip_typeref(iter->declaration.type);
 			if (is_type_compound(type)) {
-				entity_t *result
-					= find_compound_entry(type->compound.compound, symbol);
-				if (result != NULL)
-					return result;
+				if (find_compound_entry(type->compound.compound, symbol)
+						!= NULL)
+					return iter;
 			}
 			continue;
+		}
+	}
+
+	return NULL;
+}
+
+static void check_deprecated(const source_position_t *source_position,
+                             const entity_t *entity)
+{
+	if (!warning.deprecated_declarations)
+		return;
+	if (!is_declaration(entity))
+		return;
+	if ((entity->declaration.modifiers & DM_DEPRECATED) == 0)
+		return;
+
+	char const *const prefix = get_entity_kind_name(entity->kind);
+	const char *deprecated_string
+			= get_deprecated_string(entity->declaration.attributes);
+	if (deprecated_string != NULL) {
+		warningf(source_position, "%s '%Y' is deprecated (declared %P): \"%s\"",
+				 prefix, entity->base.symbol, &entity->base.source_position,
+				 deprecated_string);
+	} else {
+		warningf(source_position, "%s '%Y' is deprecated (declared %P)", prefix,
+				 entity->base.symbol, &entity->base.source_position);
+	}
+}
+
+
+static expression_t *create_select(const source_position_t *pos,
+                                   expression_t *addr,
+                                   type_qualifiers_t qualifiers,
+								   entity_t *entry)
+{
+	assert(entry->kind == ENTITY_COMPOUND_MEMBER);
+
+	check_deprecated(pos, entry);
+
+	expression_t *select          = allocate_expression_zero(EXPR_SELECT);
+	select->select.compound       = addr;
+	select->select.compound_entry = entry;
+
+	type_t *entry_type = entry->declaration.type;
+	type_t *res_type   = get_qualified_type(entry_type, qualifiers);
+
+	/* we always do the auto-type conversions; the & and sizeof parser contains
+	 * code to revert this! */
+	select->base.type = automatic_type_conversion(res_type);
+	if (res_type->kind == TYPE_BITFIELD) {
+		select->base.type = res_type->bitfield.base_type;
+	}
+
+	return select;
+}
+
+/**
+ * Find entry with symbol in compound. Search anonymous structs and unions and
+ * creates implicit select expressions for them.
+ * Returns the adress for the innermost compound.
+ */
+static expression_t *find_create_select(const source_position_t *pos,
+                                        expression_t *addr,
+                                        type_qualifiers_t qualifiers,
+                                        compound_t *compound, symbol_t *symbol)
+{
+	entity_t *iter = compound->members.entities;
+	for (; iter != NULL; iter = iter->base.next) {
+		if (iter->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		symbol_t *iter_symbol = iter->base.symbol;
+		if (iter_symbol == NULL) {
+			type_t *type = iter->declaration.type;
+			if (type->kind != TYPE_COMPOUND_STRUCT
+					&& type->kind != TYPE_COMPOUND_UNION)
+				continue;
+
+			compound_t *sub_compound = type->compound.compound;
+
+			if (find_compound_entry(sub_compound, symbol) == NULL)
+				continue;
+
+			expression_t *sub_addr = create_select(pos, addr, qualifiers, iter);
+			sub_addr->base.source_position = *pos;
+			sub_addr->select.implicit      = true;
+			return find_create_select(pos, sub_addr, qualifiers, sub_compound,
+			                          symbol);
+		}
+
+		if (iter_symbol == symbol) {
+			return create_select(pos, addr, qualifiers, iter);
 		}
 	}
 
@@ -5937,7 +6095,7 @@ static void parse_compound_declarators(compound_t *compound,
 			expression_t *size = parse_constant_expression();
 
 			type_t *type = make_bitfield_type(base_type, size,
-					&source_position, sym_anonymous);
+					&source_position, NULL);
 
 			attribute_t *attributes = parse_attributes(NULL);
 			if (attributes != NULL) {
@@ -6408,29 +6566,6 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 
 		default:
 			return expression->base.type;
-	}
-}
-
-static void check_deprecated(const source_position_t *source_position,
-                             const entity_t *entity)
-{
-	if (!warning.deprecated_declarations)
-		return;
-	if (!is_declaration(entity))
-		return;
-	if ((entity->declaration.modifiers & DM_DEPRECATED) == 0)
-		return;
-
-	char const *const prefix = get_entity_kind_name(entity->kind);
-	const char *deprecated_string
-			= get_deprecated_string(entity->declaration.attributes);
-	if (deprecated_string != NULL) {
-		warningf(source_position, "%s '%Y' is deprecated (declared %P): \"%s\"",
-				 prefix, entity->base.symbol, &entity->base.source_position,
-				 deprecated_string);
-	} else {
-		warningf(source_position, "%s '%Y' is deprecated (declared %P)", prefix,
-				 entity->base.symbol, &entity->base.source_position);
 	}
 }
 
@@ -7356,29 +7491,26 @@ static expression_t *parse_alignof(void)
 	return parse_typeprop(EXPR_ALIGNOF);
 }
 
-static expression_t *parse_select_expression(expression_t *compound)
+static expression_t *parse_select_expression(expression_t *addr)
 {
-	expression_t *select    = allocate_expression_zero(EXPR_SELECT);
-	select->select.compound = compound;
-
 	assert(token.type == '.' || token.type == T_MINUSGREATER);
-	bool is_pointer = (token.type == T_MINUSGREATER);
+	bool select_left_arrow = (token.type == T_MINUSGREATER);
 	next_token();
 
 	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
-		return select;
+		return create_invalid_expression();
 	}
 	symbol_t *symbol = token.v.symbol;
 	next_token();
 
-	type_t *const orig_type = compound->base.type;
+	type_t *const orig_type = addr->base.type;
 	type_t *const type      = skip_typeref(orig_type);
 
 	type_t *type_left;
 	bool    saw_error = false;
 	if (is_type_pointer(type)) {
-		if (!is_pointer) {
+		if (!select_left_arrow) {
 			errorf(HERE,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, orig_type);
@@ -7386,58 +7518,41 @@ static expression_t *parse_select_expression(expression_t *compound)
 		}
 		type_left = skip_typeref(type->pointer.points_to);
 	} else {
-		if (is_pointer && is_type_valid(type)) {
+		if (select_left_arrow && is_type_valid(type)) {
 			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
 			saw_error = true;
 		}
 		type_left = type;
 	}
 
-	entity_t *entry;
-	if (type_left->kind == TYPE_COMPOUND_STRUCT ||
-	    type_left->kind == TYPE_COMPOUND_UNION) {
-		compound_t *compound = type_left->compound.compound;
+	if (type_left->kind != TYPE_COMPOUND_STRUCT &&
+	    type_left->kind != TYPE_COMPOUND_UNION) {
 
-		if (!compound->complete) {
-			errorf(HERE, "request for member '%Y' of incomplete type '%T'",
-			       symbol, type_left);
-			goto create_error_entry;
-		}
-
-		entry = find_compound_entry(compound, symbol);
-		if (entry == NULL) {
-			errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
-			goto create_error_entry;
-		}
-	} else {
 		if (is_type_valid(type_left) && !saw_error) {
 			errorf(HERE,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, type_left);
 		}
-create_error_entry:
-		entry = create_error_entity(symbol, ENTITY_COMPOUND_MEMBER);
+		return create_invalid_expression();
 	}
 
-	assert(is_declaration(entry));
-	select->select.compound_entry = entry;
-
-	check_deprecated(HERE, entry);
-
-	type_t *entry_type = entry->declaration.type;
-	type_t *res_type
-		= get_qualified_type(entry_type, type_left->base.qualifiers);
-
-	/* we always do the auto-type conversions; the & and sizeof parser contains
-	 * code to revert this! */
-	select->base.type = automatic_type_conversion(res_type);
-
-	type_t *skipped = skip_typeref(res_type);
-	if (skipped->kind == TYPE_BITFIELD) {
-		select->base.type = skipped->bitfield.base_type;
+	compound_t *compound = type_left->compound.compound;
+	if (!compound->complete) {
+		errorf(HERE, "request for member '%Y' in incomplete type '%T'",
+		       symbol, type_left);
+		return create_invalid_expression();
 	}
 
-	return select;
+	type_qualifiers_t  qualifiers = type_left->base.qualifiers;
+	expression_t      *result
+		= find_create_select(HERE, addr, qualifiers, compound, symbol);
+
+	if (result == NULL) {
+		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
+		return create_invalid_expression();
+	}
+
+	return result;
 }
 
 static void check_call_argument(type_t          *expected_type,

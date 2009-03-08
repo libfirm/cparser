@@ -22,8 +22,6 @@ Parser:
 
 ast2firm:
 - output source file positions for panics.
-- handle bitfield members with 0 correctly (standard says they finish the
-  current unit)
 
 Missing Errors:
 - goto over VLA declarations

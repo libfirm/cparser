@@ -22,6 +22,8 @@
 
 #include "type.h"
 
+#define BITS_PER_BYTE    8
+
 typedef enum lang_features_t {
 	_C89  = 1U << 0,
 	_ANSI = 1U << 1,
