@@ -1943,7 +1943,7 @@ bool is_constant_expression(const expression_t *expression)
 		expression_t const *const left = expression->binary.left;
 		if (!is_constant_expression(left))
 			return false;
-		if (fold_constant(left) == 0)
+		if (fold_constant_to_bool(left) == false)
 			return true;
 		return is_constant_expression(expression->binary.right);
 	}
@@ -1952,7 +1952,7 @@ bool is_constant_expression(const expression_t *expression)
 		expression_t const *const left = expression->binary.left;
 		if (!is_constant_expression(left))
 			return false;
-		if (fold_constant(left) != 0)
+		if (fold_constant_to_bool(left) == true)
 			return true;
 		return is_constant_expression(expression->binary.right);
 	}
@@ -1965,8 +1965,7 @@ bool is_constant_expression(const expression_t *expression)
 		if (!is_constant_expression(condition))
 			return false;
 
-		long val = fold_constant(condition);
-		if (val != 0) {
+		if (fold_constant_to_bool(condition) == true) {
 			expression_t const *const t = expression->conditional.true_expression;
 			return t == NULL || is_constant_expression(t);
 		} else {

@@ -1818,8 +1818,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return NULL;
 	case bk_gnu_builtin_frame_address: {
 		expression_t *const expression = call->arguments->expression;
-		long val = fold_constant(expression);
-		if (val == 0) {
+		bool val = fold_constant_to_bool(expression);
+		if (!val) {
 			/* the nice case */
 			return get_irg_frame(current_ir_graph);
 		} else {
@@ -2771,22 +2771,22 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	ir_mode  *mode = get_ir_mode_arithmetic(type);
 
 	if (is_constant_expression(expression->left)) {
-		long val = fold_constant(expression->left);
+		bool val = fold_constant_to_bool(expression->left);
 		expression_kind_t ekind = expression->base.kind;
 		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
 		if (ekind == EXPR_BINARY_LOGICAL_AND) {
-			if (val == 0) {
+			if (!val) {
 				return new_Const(get_mode_null(mode));
 			}
 		} else {
-			if (val != 0) {
+			if (val) {
 				return new_Const(get_mode_one(mode));
 			}
 		}
 
 		if (is_constant_expression(expression->right)) {
-			long const valr = fold_constant(expression->right);
-			return valr != 0 ?
+			bool valr = fold_constant_to_bool(expression->right);
+			return valr ?
 				new_Const(get_mode_one(mode)) :
 				new_Const(get_mode_null(mode));
 		}
@@ -2960,7 +2960,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
-			long index         = fold_constant(array_index);
+			long index         = fold_constant_to_int(array_index);
 			ir_type *arr_type  = get_ir_type(type);
 			ir_type *elem_type = get_array_element_type(arr_type);
 			long     elem_size = get_type_size_bytes(elem_type);
@@ -3086,11 +3086,8 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 
 static void init_ir_types(void);
 
-long fold_constant(const expression_t *expression)
+static tarval *fold_constant_to_tarval(const expression_t *expression)
 {
-	if (expression->kind == EXPR_INVALID)
-		return 0;
-
 	assert(is_type_valid(skip_typeref(expression->base.type)));
 
 	bool constant_folding_old = constant_folding;
@@ -3110,14 +3107,31 @@ long fold_constant(const expression_t *expression)
 		panic("couldn't fold constant");
 	}
 
+	constant_folding = constant_folding_old;
+
 	tarval *tv = get_Const_tarval(cnst);
+	return tv;
+}
+
+long fold_constant_to_int(const expression_t *expression)
+{
+	if (expression->kind == EXPR_INVALID)
+		return 0;
+
+	tarval *tv = fold_constant_to_tarval(expression);
 	if (!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer");
 	}
 
-	constant_folding = constant_folding_old;
-
 	return get_tarval_long(tv);
+}
+
+bool fold_constant_to_bool(const expression_t *expression)
+{
+	if (expression->kind == EXPR_INVALID)
+		return false;
+	tarval *tv = fold_constant_to_tarval(expression);
+	return !tarval_is_null(tv);
 }
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
@@ -3126,7 +3140,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	/* first try to fold a constant condition */
 	if (is_constant_expression(expression->condition)) {
-		long val = fold_constant(expression->condition);
+		bool val = fold_constant_to_bool(expression->condition);
 		if (val) {
 			expression_t *true_expression = expression->true_expression;
 			if (true_expression == NULL)
@@ -3727,10 +3741,10 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	if (is_builtin_expect(expression) && is_Cond(cond)) {
 		call_argument_t *argument = expression->call.arguments->next;
 		if (is_constant_expression(argument->expression)) {
-			long               cnst = fold_constant(argument->expression);
+			bool             cnst = fold_constant_to_bool(argument->expression);
 			cond_jmp_predicate pred;
 
-			if (cnst == 0) {
+			if (cnst == false) {
 				pred = COND_JMP_PRED_FALSE;
 			} else {
 				pred = COND_JMP_PRED_TRUE;
@@ -3953,7 +3967,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
-			long index = fold_constant(array_index);
+			long index = fold_constant_to_int(array_index);
 			assert(index >= 0);
 #ifndef NDEBUG
 			if (type->array.size_constant) {
@@ -4883,7 +4897,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 
 	/* shortcut for while(true) */
 	if (is_constant_expression(statement->condition)
-			&& fold_constant(statement->condition) != 0) {
+			&& fold_constant_to_bool(statement->condition) != 0) {
 		set_cur_block(header_block);
 		ir_node *header_jmp = new_Jmp();
 		add_immBlock_pred(body_block, header_jmp);

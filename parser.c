@@ -1001,7 +1001,7 @@ static bool is_null_pointer_constant(const expression_t *expression)
 	return
 		is_type_integer(type)              &&
 		is_constant_expression(expression) &&
-		fold_constant(expression) == 0;
+		!fold_constant_to_bool(expression);
 }
 
 /**
@@ -2113,7 +2113,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				goto failed;
 			}
 
-			long index = fold_constant(array_index);
+			long index = fold_constant_to_int(array_index);
 			if (!used_in_offsetof) {
 				if (index < 0) {
 					errorf(&designator->source_position,
@@ -4060,7 +4060,8 @@ static type_t *construct_declarator_type(construct_type_t *construct_list, type_
 
 			if (size_expression != NULL) {
 				if (is_constant_expression(size_expression)) {
-					long const size                 = fold_constant(size_expression);
+					long const size
+						= fold_constant_to_int(size_expression);
 					array_type->array.size          = size;
 					array_type->array.size_constant = true;
 					/* §6.7.5.2:1  If the expression is a constant expression, it shall
@@ -5082,7 +5083,7 @@ static int determine_truth(expression_t const* const cond)
 {
 	return
 		!is_constant_expression(cond) ? 0 :
-		fold_constant(cond) != 0      ? 1 :
+		fold_constant_to_bool(cond)   ? 1 :
 		-1;
 }
 
@@ -5295,7 +5296,7 @@ static void check_reachable(statement_t *const stmt)
 				return;
 
 			if (is_constant_expression(expr)) {
-				long                    const val      = fold_constant(expr);
+				long                    const val      = fold_constant_to_int(expr);
 				case_label_statement_t *      defaults = NULL;
 				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
 					if (i->expression == NULL) {
@@ -5882,7 +5883,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 	}
 
 	if (is_constant_expression(size)) {
-		long v = fold_constant(size);
+		long v = fold_constant_to_int(size);
 
 		if (v < 0) {
 			errorf(source_position, "negative width in bit-field '%Y'", symbol);
@@ -8320,7 +8321,7 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 	/* The type of the right operand can be different for /= */
 	if (is_type_integer(right->base.type) &&
 	    is_constant_expression(right)     &&
-	    fold_constant(right) == 0) {
+	    !fold_constant_to_bool(right)) {
 		warningf(&expression->base.source_position, "division by zero");
 	}
 }
@@ -8371,7 +8372,7 @@ static bool semantic_shift(binary_expression_t *expression)
 	type_left = promote_integer(type_left);
 
 	if (is_constant_expression(right)) {
-		long count = fold_constant(right);
+		long count = fold_constant_to_int(right);
 		if (count < 0) {
 			warningf(&right->base.source_position,
 					"shift count must be non-negative");
@@ -8520,7 +8521,7 @@ static bool maybe_negative(expression_t const *const expr)
 {
 	return
 		!is_constant_expression(expr) ||
-		fold_constant(expr) < 0;
+		fold_constant_to_int(expr) < 0;
 }
 
 /**
@@ -9378,7 +9379,7 @@ static statement_t *parse_case_statement(void)
 		}
 		statement->case_label.is_bad = true;
 	} else {
-		long const val = fold_constant(expression);
+		long const val = fold_constant_to_int(expression);
 		statement->case_label.first_case = val;
 		statement->case_label.last_case  = val;
 	}
@@ -9397,7 +9398,7 @@ static statement_t *parse_case_statement(void)
 				}
 				statement->case_label.is_bad = true;
 			} else {
-				long const val = fold_constant(end_range);
+				long const val = fold_constant_to_int(end_range);
 				statement->case_label.last_case = val;
 
 				if (warning.other && val < statement->case_label.first_case) {
@@ -9625,7 +9626,7 @@ static void check_enum_cases(const switch_statement_t *statement)
 	for (; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
 		const expression_t *expression = entry->enum_value.value;
-		long                value      = expression != NULL ? fold_constant(expression) : last_value + 1;
+		long                value      = expression != NULL ? fold_constant_to_int(expression) : last_value + 1;
 		bool                found      = false;
 		for (const case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
 			if (l->expression == NULL)

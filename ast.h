@@ -123,6 +123,7 @@ bool is_constant_expression(const expression_t *expression);
  */
 bool is_address_constant(const expression_t *expression);
 
-long fold_constant(const expression_t *expression);
+long fold_constant_to_int(const expression_t *expression);
+bool fold_constant_to_bool(const expression_t *expression);
 
 #endif
