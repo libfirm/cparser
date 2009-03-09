@@ -934,8 +934,8 @@ static bool is_main(entity_t *entity)
 static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
-	if (entity->function.entity != NULL) {
-		return entity->function.entity;
+	if (entity->function.irentity != NULL) {
+		return entity->function.irentity;
 	}
 
 	if (is_main(entity)) {
@@ -1037,8 +1037,8 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	entitymap_insert(&entitymap, symbol, irentity);
 
 entity_created:
-	entity->declaration.kind = DECLARATION_KIND_FUNCTION;
-	entity->function.entity  = irentity;
+	entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
+	entity->function.irentity = irentity;
 
 	return irentity;
 }
@@ -1484,16 +1484,16 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 			return res;
 		}
-		return create_symconst(dbgi, mode, entity->function.entity);
+		return create_symconst(dbgi, mode, entity->function.irentity);
 	}
 	case DECLARATION_KIND_INNER_FUNCTION: {
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
 			/* inner function not using the closure */
-			return create_symconst(dbgi, mode, entity->function.entity);
+			return create_symconst(dbgi, mode, entity->function.irentity);
 		} else {
 			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity->function.entity);
+			return create_trampoline(dbgi, mode, entity->function.irentity);
 		}
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
@@ -1564,7 +1564,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	case DECLARATION_KIND_FUNCTION: {
 		type_t  *const type = skip_typeref(entity->declaration.type);
 		ir_mode *const mode = get_ir_mode_storage(type);
-		return create_symconst(dbgi, mode, entity->function.entity);
+		return create_symconst(dbgi, mode, entity->function.irentity);
 	}
 
 	case DECLARATION_KIND_INNER_FUNCTION: {
@@ -1572,10 +1572,10 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
 			/* inner function not using the closure */
-			return create_symconst(dbgi, mode, entity->function.entity);
+			return create_symconst(dbgi, mode, entity->function.irentity);
 		} else {
 			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity->function.entity);
+			return create_trampoline(dbgi, mode, entity->function.irentity);
 		}
 	}
 
@@ -1853,28 +1853,32 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		const reference_expression_t *ref    = &function->reference;
 		entity_t                     *entity = ref->entity;
 
-		if (ref->entity->kind == ENTITY_FUNCTION &&
-		    ref->entity->function.btk != bk_none) {
-			return process_builtin_call(call);
-		}
+		if (entity->kind == ENTITY_FUNCTION) {
+			if (entity->function.btk != bk_none) {
+				return process_builtin_call(call);
+			}
 
-		if (entity->kind == ENTITY_FUNCTION
-				&& entity->function.entity == rts_entities[rts_alloca]) {
-			/* handle alloca() call */
-			expression_t *argument = call->arguments->expression;
-			ir_node      *size     = expression_to_firm(argument);
-			ir_mode      *mode     = get_ir_mode_arithmetic(type_size_t);
+			ir_entity *irentity = entity->function.irentity;
+			if (irentity == NULL)
+				irentity = get_function_entity(entity, NULL);
 
-			size = create_conv(dbgi, size, mode);
+			if (irentity == rts_entities[rts_alloca]) {
+				/* handle alloca() call */
+				expression_t *argument = call->arguments->expression;
+				ir_node      *size     = expression_to_firm(argument);
+				ir_mode      *mode     = get_ir_mode_arithmetic(type_size_t);
 
-			ir_node  *store  = get_store();
-			ir_node  *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
-			                               stack_alloc);
-			ir_node  *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
-			set_store(proj_m);
-			ir_node  *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+				size = create_conv(dbgi, size, mode);
 
-			return res;
+				ir_node  *store  = get_store();
+				ir_node  *alloca = new_d_Alloc(dbgi, store, size,
+				                               firm_unknown_type, stack_alloc);
+				ir_node  *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+				set_store(proj_m);
+				ir_node  *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+
+				return res;
+			}
 		}
 	}
 	ir_node *callee = expression_to_firm(function);
@@ -5699,6 +5703,10 @@ static void create_function(entity_t *entity)
 
 	if (entity->function.statement == NULL)
 		return;
+
+	if (is_main(entity) && firm_opt.os_support == OS_SUPPORT_MINGW) {
+		prepare_main_collect2(entity);
+	}
 
 	inner_functions     = NULL;
 	current_trampolines = NULL;

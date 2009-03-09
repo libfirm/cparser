@@ -303,7 +303,7 @@ struct function_t {
 	statement_t   *statement;
 
 	/* ast2firm info */
-	ir_entity     *entity;
+	ir_entity     *irentity;
 	ir_node       *static_link;        /**< if need_closure is set, the node representing
 										    the static link. */
 };

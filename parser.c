@@ -4203,7 +4203,7 @@ static type_t *parse_abstract_declarator(type_t *base_type)
  * @param decl    the declaration to check
  * @param type    the function type of the declaration
  */
-static void check_type_of_main(const entity_t *entity)
+static void check_main(const entity_t *entity)
 {
 	const source_position_t *pos = &entity->base.source_position;
 	if (entity->kind != ENTITY_FUNCTION) {
@@ -4312,7 +4312,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		if (warning.main && current_scope == file_scope
 				&& is_sym_main(symbol)) {
-			check_type_of_main(entity);
+			check_main(entity);
 		}
 	}
 
@@ -6237,10 +6237,12 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	entity->base.symbol                        = symbol;
 	entity->base.source_position               = *source_position;
 
-	bool strict_prototypes_old = warning.strict_prototypes;
-	warning.strict_prototypes  = false;
-	record_entity(entity, false);
-	warning.strict_prototypes = strict_prototypes_old;
+	if (current_scope != NULL) {
+		bool strict_prototypes_old = warning.strict_prototypes;
+		warning.strict_prototypes  = false;
+		record_entity(entity, false);
+		warning.strict_prototypes = strict_prototypes_old;
+	}
 
 	return entity;
 }
@@ -10876,6 +10878,36 @@ static void complete_incomplete_arrays(void)
 
 		decl->type = result;
 	}
+}
+
+void prepare_main_collect2(entity_t *entity)
+{
+	// create call to __main
+	symbol_t *symbol         = symbol_table_insert("__main");
+	entity_t *subsubmain_ent
+		= create_implicit_function(symbol, &builtin_source_position);
+
+	expression_t *ref         = allocate_expression_zero(EXPR_REFERENCE);
+	type_t       *ftype       = subsubmain_ent->declaration.type;
+	ref->base.source_position = builtin_source_position;
+	ref->base.type            = make_pointer_type(ftype, TYPE_QUALIFIER_NONE);
+	ref->reference.entity     = subsubmain_ent;
+
+	expression_t *call = allocate_expression_zero(EXPR_CALL);
+	call->base.source_position = builtin_source_position;
+	call->base.type            = type_void;
+	call->call.function        = ref;
+
+	statement_t *expr_statement = allocate_statement_zero(STATEMENT_EXPRESSION);
+	expr_statement->base.source_position  = builtin_source_position;
+	expr_statement->expression.expression = call;
+
+	statement_t *statement = entity->function.statement;
+	assert(statement->kind == STATEMENT_COMPOUND);
+	compound_statement_t *compounds = &statement->compound;
+
+	expr_statement->base.next = compounds->statements;
+	compounds->statements     = expr_statement;
 }
 
 void parse(void)
