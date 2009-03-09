@@ -3,12 +3,10 @@ Refactoring:
 
 Lexer:
 - Add preprocessor code.
-- proper handling of different file encodings, parsing non-ascii strings
 - We could save some space by holding source positions in a separate (somehow
   compressed table) and only storing pointers to it on the AST.
 
 Parser:
-- disallow storage class specifiers in struct/union members
 - add constant folding code (optional, ast2firm already does it)
 - Refactor code, so code to handle number values (and strings?) is an own
   module and replacable
@@ -28,8 +26,6 @@ Missing Errors:
 
 Missing Warnings:
 - dead assignments (int x = 5; x = bla(); -> dead assignment at x = 5;)
-- warn when folding shift constants with too large shift amounts
 
 main/driver:
-- delete output file if we had an error
 - go through gcc manual and emulate all the gcc flags...
