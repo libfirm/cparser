@@ -3723,21 +3723,8 @@ static construct_type_t *parse_function_declarator(scope_t *scope)
 	type_t          *type  = allocate_type_zero(TYPE_FUNCTION);
 	function_type_t *ftype = &type->function;
 
-	ftype->linkage = current_linkage;
-
-#if 0
-	switch (modifiers & (DM_CDECL | DM_STDCALL | DM_FASTCALL | DM_THISCALL)) {
-		case DM_NONE:     break;
-		case DM_CDECL:    ftype->calling_convention = CC_CDECL;    break;
-		case DM_STDCALL:  ftype->calling_convention = CC_STDCALL;  break;
-		case DM_FASTCALL: ftype->calling_convention = CC_FASTCALL; break;
-		case DM_THISCALL: ftype->calling_convention = CC_THISCALL; break;
-
-		default:
-			errorf(HERE, "multiple calling conventions in declaration");
-			break;
-	}
-#endif
+	ftype->linkage            = current_linkage;
+	ftype->calling_convention = CC_CDECL;
 
 	parse_parameters(ftype, scope);
 

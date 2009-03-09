@@ -1097,11 +1097,8 @@ static bool function_types_compatible(const function_type_t *func1,
 	if (func1->linkage != func2->linkage)
 		return false;
 
-	/* this would make alot of sense, but gcc doesn't seem to do this */
-#if 0
 	if (func1->calling_convention != func2->calling_convention)
 		return false;
-#endif
 
 	/* can parameters be compared? */
 	if (func1->unspecified_parameters || func2->unspecified_parameters)
