@@ -32,11 +32,11 @@
 #include "lang_features.h"
 #include "warning.h"
 #include "diagnostic.h"
+#include "driver/firm_cmdline.h"
 
 static struct obstack   _type_obst;
 static FILE            *out;
 struct obstack         *type_obst                 = &_type_obst;
-static int              type_visited              = 0;
 static bool             print_implicit_array_size = false;
 
 static void intern_print_type_pre(const type_t *type);
@@ -186,6 +186,10 @@ void init_types(void)
 	props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
 	props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
 	props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
+	if (firm_opt.os_support == OS_SUPPORT_MACHO) {
+		props[ATOMIC_TYPE_LONG_DOUBLE].size      = 16;
+		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 16;
+	}
 
 	/* TODO: make this configurable for platforms which do not use byte sized
 	 * bools. */
@@ -202,11 +206,6 @@ void exit_types(void)
 void type_set_output(FILE *stream)
 {
 	out = stream;
-}
-
-void inc_type_visited(void)
-{
-	type_visited++;
 }
 
 void print_type_qualifiers(type_qualifiers_t qualifiers)
@@ -1681,14 +1680,12 @@ static entity_t *pack_bitfield_members(il_size_t *size, bool packed,
                                        type_t *type, size_t offset,
 									   entity_t *first)
 {
-	/* TODO: packed handling */
 	type_t *base_type      = skip_typeref(type->bitfield.base_type);
 	size_t  remaining_bits = get_type_size(base_type) * BITS_PER_BYTE;
 	size_t  bit_offset     = 0;
 
 	entity_t *member;
 	for (member = first; member != NULL; member = member->base.next) {
-		/* TODO: make this an assert */
 		if (member->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
@@ -1702,6 +1699,10 @@ static entity_t *pack_bitfield_members(il_size_t *size, bool packed,
 				break;
 			if (bit_size > remaining_bits)
 				break;
+		} else {
+			offset     += bit_offset / BITS_PER_BYTE;
+			*size      += bit_offset / BITS_PER_BYTE;
+			bit_offset  = bit_offset % BITS_PER_BYTE;
 		}
 
 		member->compound_member.offset     = offset;

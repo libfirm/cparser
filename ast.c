@@ -1600,8 +1600,6 @@ void print_entity(const entity_t *entity)
  */
 void print_ast(const translation_unit_t *unit)
 {
-	inc_type_visited();
-
 	entity_t *entity = unit->scope.entities;
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind == ENTITY_ENUM_VALUE)
