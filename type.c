@@ -1720,7 +1720,7 @@ static entity_t *pack_bitfield_members(il_size_t *size, bool packed,
 	}
 	assert(member != first);
 
-	*size += (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
+	*size = offset + (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
 
 	return member;
 }
