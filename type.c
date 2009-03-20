@@ -1678,8 +1678,7 @@ type_t *make_array_type(type_t *element_type, size_t size,
 
 static entity_t *pack_bitfield_members(il_size_t *struct_offset,
                                        il_alignment_t *struct_alignment,
-									   bool packed, type_t *type,
-									   entity_t *first)
+									   bool packed, entity_t *first)
 {
 	il_size_t      offset     = *struct_offset;
 	il_alignment_t alignment  = *struct_alignment;
@@ -1690,8 +1689,8 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 		if (member->kind != ENTITY_COMPOUND_MEMBER)
 			break;
 
-		type_t *member_type = member->declaration.type;
-		if (member_type->kind != TYPE_BITFIELD)
+		type_t *type = member->declaration.type;
+		if (type->kind != TYPE_BITFIELD)
 			break;
 
 		type_t *base_type = skip_typeref(type->bitfield.base_type);
@@ -1700,7 +1699,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 		if (base_alignment > alignment)
 			alignment = base_alignment;
 
-		size_t bit_size = member_type->bitfield.bit_size;
+		size_t bit_size = type->bitfield.bit_size;
 		if (!packed) {
 			bit_offset += (offset & alignment_mask) * BITS_PER_BYTE;
 			offset     &= ~alignment_mask;
@@ -1764,7 +1763,7 @@ void layout_struct_type(compound_type_t *type)
 
 		if (skipped->kind == TYPE_BITFIELD) {
 			entry = pack_bitfield_members(&offset, &alignment,
-			                              compound->packed, m_type, entry);
+			                              compound->packed, entry);
 			continue;
 		}
 
