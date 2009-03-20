@@ -1676,51 +1676,55 @@ type_t *make_array_type(type_t *element_type, size_t size,
 	return identify_new_type(type);
 }
 
-static entity_t *pack_bitfield_members(il_size_t *size, bool packed,
-                                       type_t *type, size_t offset,
+static entity_t *pack_bitfield_members(il_size_t *struct_offset,
+                                       il_alignment_t *struct_alignment,
+									   bool packed, type_t *type,
 									   entity_t *first)
 {
-	type_t *base_type      = skip_typeref(type->bitfield.base_type);
-	size_t  remaining_bits = get_type_size(base_type) * BITS_PER_BYTE;
-	size_t  bit_offset     = 0;
+	il_size_t      offset     = *struct_offset;
+	il_alignment_t alignment  = *struct_alignment;
+	size_t         bit_offset = 0;
 
 	entity_t *member;
 	for (member = first; member != NULL; member = member->base.next) {
 		if (member->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
+			break;
 
 		type_t *member_type = member->declaration.type;
 		if (member_type->kind != TYPE_BITFIELD)
 			break;
+
+		type_t *base_type = skip_typeref(type->bitfield.base_type);
+		il_alignment_t base_alignment = get_type_alignment(base_type);
+		il_alignment_t alignment_mask = base_alignment-1;
+		if (base_alignment > alignment)
+			alignment = base_alignment;
+
 		size_t bit_size = member_type->bitfield.bit_size;
 		if (!packed) {
-			if (base_type != NULL
-			    && skip_typeref(member_type->bitfield.base_type) != base_type)
-				break;
-			if (bit_size > remaining_bits)
-				break;
-		} else {
-			offset     += bit_offset / BITS_PER_BYTE;
-			*size      += bit_offset / BITS_PER_BYTE;
-			bit_offset  = bit_offset % BITS_PER_BYTE;
+			bit_offset += (offset & alignment_mask) * BITS_PER_BYTE;
+			size_t base_size = get_type_size(base_type) * BITS_PER_BYTE;
+
+			if (bit_offset + bit_size > base_size || bit_size == 0) {
+				offset    += (bit_offset+BITS_PER_BYTE-1) / BITS_PER_BYTE;
+				offset     = (offset + base_alignment-1) & ~alignment_mask;
+				bit_offset = 0;
+			}
 		}
 
 		member->compound_member.offset     = offset;
 		member->compound_member.bit_offset = bit_offset;
 
 		bit_offset += bit_size;
-
-		/* 0-size members end current bucket. multiple 0-size buckets
-		 * seem to not start-end multiple buckets */
-		if (bit_size == 0) {
-			remaining_bits = 0;
-		} else {
-			remaining_bits -= bit_size;
-		}
+		offset     += bit_offset / BITS_PER_BYTE;
+		bit_offset %= BITS_PER_BYTE;
 	}
-	assert(member != first);
 
-	*size = offset + (bit_offset + (BITS_PER_BYTE-1)) / BITS_PER_BYTE;
+	if (bit_offset > 0)
+		offset += 1;
+
+	*struct_offset    = offset;
+	*struct_alignment = alignment;
 
 	return member;
 }
@@ -1739,8 +1743,7 @@ void layout_struct_type(compound_type_t *type)
 	if (type->compound->layouted)
 		return;
 
-	il_size_t      offset;
-	il_size_t      size      = 0;
+	il_size_t      offset    = 0;
 	il_alignment_t alignment = compound->alignment;
 	bool           need_pad  = false;
 
@@ -1758,42 +1761,37 @@ void layout_struct_type(compound_type_t *type)
 			continue;
 		}
 
-		type_t *base_type = m_type;
 		if (skipped->kind == TYPE_BITFIELD) {
-			base_type = m_type->bitfield.base_type;
+			entry = pack_bitfield_members(&offset, &alignment,
+			                              compound->packed, m_type, entry);
+			continue;
 		}
 
-		il_alignment_t m_alignment = get_type_alignment(base_type);
-		il_size_t      m_size      = get_type_size(base_type);
+		il_alignment_t m_alignment = get_type_alignment(m_type);
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 
-		if (compound->packed) {
-			offset = size;
-		} else {
-			offset = (size + m_alignment - 1) & -m_alignment;
+		if (!compound->packed) {
+			il_size_t new_offset = (offset + m_alignment-1) & -m_alignment;
+
+			if (new_offset > offset) {
+				need_pad = true;
+				offset   = new_offset;
+			}
 		}
 
-		if (offset > size)
-			need_pad = true;
+		entry->compound_member.offset = offset;
+		offset += get_type_size(m_type);
 
-		if (skipped->kind == TYPE_BITFIELD) {
-			entry = pack_bitfield_members(&size, compound->packed,
-			                              m_type, offset, entry);
-		} else {
-			entry->compound_member.offset = offset;
-			size                          = offset + m_size;
-
-			entry = entry->base.next;
-		}
+		entry = entry->base.next;
 	}
 
 	if (!compound->packed) {
-		offset = (size + alignment - 1) & -alignment;
-		if (offset > size)
+		il_size_t new_offset = (offset + alignment-1) & -alignment;
+		if (new_offset > offset) {
 			need_pad = true;
-	} else {
-		offset = size;
+			offset   = new_offset;
+		}
 	}
 
 	if (need_pad) {
