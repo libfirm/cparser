@@ -1251,6 +1251,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_entity_ld_ident(entity, id);
 	set_entity_variability(entity, variability_constant);
 	set_entity_allocation(entity, allocation_static);
+	set_entity_visibility(entity, visibility_local);
 
 	ir_type *const elem_type = ir_type_const_char;
 	ir_mode *const mode      = get_type_mode(elem_type);
