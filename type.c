@@ -1703,6 +1703,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 		size_t bit_size = member_type->bitfield.bit_size;
 		if (!packed) {
 			bit_offset += (offset & alignment_mask) * BITS_PER_BYTE;
+			offset     &= ~alignment_mask;
 			size_t base_size = get_type_size(base_type) * BITS_PER_BYTE;
 
 			if (bit_offset + bit_size > base_size || bit_size == 0) {
