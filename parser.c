@@ -2579,6 +2579,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		entity_t *entity = allocate_entity_zero(kind);
 		compound         = &entity->compound;
 
+		compound->alignment            = 1;
 		compound->base.namespc         = NAMESPACE_TAG;
 		compound->base.source_position = token.source_position;
 		compound->base.symbol          = symbol;
