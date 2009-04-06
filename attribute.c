@@ -358,7 +358,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 
 static type_t *change_calling_convention(type_t *type, cc_kind_t cconv)
 {
-	if (!is_type_function(type)) {
+	if (is_typeref(type) || !is_type_function(type)) {
 		return type;
 	}
 
