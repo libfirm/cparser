@@ -1,7 +1,7 @@
 /**
  * @file firm_timing.c -- timing for the Firm compiler
  *
- * (C) 2006  Michael Beck   beck@ipd.info.uni-karlsruhe.de
+ * (C) 2006-2009  Michael Beck   beck@ipd.info.uni-karlsruhe.de
  *
  * $Id$
  */

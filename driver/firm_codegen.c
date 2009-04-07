@@ -3,7 +3,7 @@
  *
  * Compile when BACK_END_IS_CP_FIRM_BE is defined
  *
- * (C) 2005  Michael Beck  beck@ipd.info.uni-karlsruhe.de
+ * (C) 2005-2009  Michael Beck  beck@ipd.info.uni-karlsruhe.de
  *
  * $Id$
  */

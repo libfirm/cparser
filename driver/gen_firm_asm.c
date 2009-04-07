@@ -1,7 +1,7 @@
 /*
  * Generate Firm assembler from Firm graphs.
  *
- * (C) 2005-2006  Michael Beck   beck@ipd.info.uni-karlsruhe.de
+ * (C) 2005-2009  Michael Beck   beck@ipd.info.uni-karlsruhe.de
  */
 #include <stdio.h>
 #include <string.h>
