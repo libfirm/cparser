@@ -4390,6 +4390,7 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 						is_definition                     &&
 						!prev_decl->used                  &&
 						!(prev_decl->modifiers & DM_USED) &&
+						!type->function.kr_style_parameters &&
 						prev_decl->storage_class == STORAGE_CLASS_STATIC) {
 					warningf(&previous_entity->base.source_position,
 							"unnecessary static forward declaration for '%#T'",
