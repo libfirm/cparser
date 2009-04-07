@@ -1,6 +1,6 @@
 /*
  * This file is part of cparser.
- * Copyright (C) 2007-2008 Matthias Braun <matze@braunis.de>
+ * Copyright (C) 2007-2009 Matthias Braun <matze@braunis.de>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -533,7 +533,9 @@ static void print_cparser_version(void)
 		putchar(' ');
 		fputs(build, stdout);
 	}
-	puts(")\n");
+	puts(")");
+	puts("This is free software; see the source for copying conditions.  There is NO\n"
+	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 }
 
 static void set_be_option(const char *arg)
@@ -968,6 +970,8 @@ int main(int argc, char **argv)
 					set_be_option("omitleaffp=1");
 				} else if (streq(opt, "no-omit-leaf-frame-pointer")) {
 					set_be_option("omitleaffp=0");
+				} else if (streq(opt, "rtd")) {
+					default_calling_convention = CC_STDCALL;
 				} else {
 					char *endptr;
 					long int value = strtol(opt, &endptr, 10);
@@ -1288,7 +1292,7 @@ preprocess:
 			switch (standard) {
 				case STANDARD_ANSI:
 				case STANDARD_C89:   c_mode = _C89;                break;
-				/* TODO ^v determine difference between these two */
+				/* TODO determine difference between these two */
 				case STANDARD_C90:   c_mode = _C89;                break;
 				case STANDARD_C99:   c_mode = _C89 | _C99;         break;
 				case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;

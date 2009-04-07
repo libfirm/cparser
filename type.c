@@ -333,12 +333,20 @@ static void print_function_type_pre(const function_type_t *type)
 
 	intern_print_type_pre(type->return_type);
 
-	switch (type->calling_convention) {
+	cc_kind_t cc = type->calling_convention;
+restart:
+	switch (cc) {
 	case CC_CDECL:    fputs(" __cdecl",    out); break;
 	case CC_STDCALL:  fputs(" __stdcall",  out); break;
 	case CC_FASTCALL: fputs(" __fastcall", out); break;
 	case CC_THISCALL: fputs(" __thiscall", out); break;
-	case CC_DEFAULT:  break;
+	case CC_DEFAULT:
+		if (default_calling_convention != CC_CDECL) {
+			/* show the default calling convention if its not cdecl */
+			cc = default_calling_convention;
+			goto restart;
+		}
+		break;
 	}
 }
 
