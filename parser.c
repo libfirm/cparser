@@ -3725,7 +3725,7 @@ static construct_type_t *parse_function_declarator(scope_t *scope)
 	function_type_t *ftype = &type->function;
 
 	ftype->linkage            = current_linkage;
-	ftype->calling_convention = CC_CDECL;
+	ftype->calling_convention = CC_DEFAULT;
 
 	parse_parameters(ftype, scope);
 
