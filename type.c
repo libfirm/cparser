@@ -34,6 +34,9 @@
 #include "diagnostic.h"
 #include "driver/firm_cmdline.h"
 
+/** The default calling convention. */
+cc_kind_t default_calling_convention = CC_CDECL;
+
 static struct obstack   _type_obst;
 static FILE            *out;
 struct obstack         *type_obst                 = &_type_obst;
@@ -1096,7 +1099,14 @@ static bool function_types_compatible(const function_type_t *func1,
 	if (func1->linkage != func2->linkage)
 		return false;
 
-	if (func1->calling_convention != func2->calling_convention)
+	cc_kind_t cc1 = func1->calling_convention;
+	if (cc1 == CC_DEFAULT)
+		cc1 = default_calling_convention;
+	cc_kind_t cc2 = func2->calling_convention;
+	if (cc2 == CC_DEFAULT)
+		cc2 = default_calling_convention;
+
+	if (cc1 != cc2)
 		return false;
 
 	/* can parameters be compared? */

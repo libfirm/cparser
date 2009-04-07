@@ -202,6 +202,9 @@ union type_t {
 	typeof_type_t    typeoft;
 };
 
+/** The default calling convention for functions. */
+extern cc_kind_t default_calling_convention;
+
 type_t *make_atomic_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_complex_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
 type_t *make_imaginary_type(atomic_type_kind_t type, type_qualifiers_t qualifiers);
