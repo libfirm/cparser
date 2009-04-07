@@ -331,10 +331,10 @@ static void print_function_type_pre(const function_type_t *type)
 	intern_print_type_pre(type->return_type);
 
 	switch (type->calling_convention) {
-	case CC_CDECL:    fputs("__cdecl ",    out); break;
-	case CC_STDCALL:  fputs("__stdcall ",  out); break;
-	case CC_FASTCALL: fputs("__fastcall ", out); break;
-	case CC_THISCALL: fputs("__thiscall ", out); break;
+	case CC_CDECL:    fputs(" __cdecl",    out); break;
+	case CC_STDCALL:  fputs(" __stdcall",  out); break;
+	case CC_FASTCALL: fputs(" __fastcall", out); break;
+	case CC_THISCALL: fputs(" __thiscall", out); break;
 	case CC_DEFAULT:  break;
 	}
 }
