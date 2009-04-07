@@ -144,6 +144,7 @@ struct function_type_t {
 	bool                  variadic : 1;
 	bool                  unspecified_parameters : 1;
 	bool                  kr_style_parameters : 1;
+	bool                  prototyped : 1;
 };
 
 struct compound_type_t {

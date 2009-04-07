@@ -4386,11 +4386,21 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 						&previous_entity->base.source_position);
 			} else {
 				unsigned old_storage_class = prev_decl->storage_class;
+				bool     kr_prototype      = false;
+
+				if (is_type_function(type)) {
+					/* check if we have a prototype */
+					if (!prev_type->function.unspecified_parameters) {
+						type->function.prototyped = true;
+					       	if (type->function.kr_style_parameters)
+							kr_prototype = true;
+					}
+				}
 				if (warning.redundant_decls	          &&
 						is_definition                     &&
+						!kr_prototype                     &&
 						!prev_decl->used                  &&
 						!(prev_decl->modifiers & DM_USED) &&
-						!type->function.kr_style_parameters &&
 						prev_decl->storage_class == STORAGE_CLASS_STATIC) {
 					warningf(&previous_entity->base.source_position,
 							"unnecessary static forward declaration for '%#T'",
@@ -6285,11 +6295,23 @@ static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
 	return identify_new_type(type);
 }
 
+/**
+ * Creates a return_type (func)(argument_type, ...) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ * @param argument_type  the argument type
+ */
 static type_t *make_function_1_type_variadic(type_t *return_type, type_t *argument_type)
 {
-	type_t *res = make_function_1_type(return_type, argument_type);
-	res->function.variadic = 1;
-	return res;
+	function_parameter_t *const parameter = allocate_parameter(argument_type);
+
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = parameter;
+	type->function.variadic    = true;
+
+	return identify_new_type(type);
 }
 
 /**
