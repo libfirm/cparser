@@ -380,10 +380,11 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 		++n;
 	}
 
-	if (function_type->variadic ||
-	    (function_type->unspecified_parameters && !function_type->prototyped)) {
+	bool is_variadic = function_type->variadic ||
+	                   (function_type->unspecified_parameters && !function_type->prototyped);
+
+	if (is_variadic)
 		set_method_variadicity(irtype, variadicity_variadic);
-	}
 
 	unsigned cc = get_method_calling_convention(irtype);
 	switch (function_type->calling_convention) {
@@ -394,7 +395,7 @@ is_cdecl:
 		break;
 
 	case CC_STDCALL:
-		if (function_type->variadic || function_type->unspecified_parameters)
+		if (is_variadic)
 			goto is_cdecl;
 
 		/* only non-variadic function can use stdcall, else use cdecl */
@@ -402,7 +403,7 @@ is_cdecl:
 		break;
 
 	case CC_FASTCALL:
-		if (function_type->variadic || function_type->unspecified_parameters)
+		if (is_variadic)
 			goto is_cdecl;
 		/* only non-variadic function can use fastcall, else use cdecl */
 		set_method_calling_convention(irtype, SET_FASTCALL(cc));
