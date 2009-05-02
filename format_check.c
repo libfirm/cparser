@@ -161,40 +161,44 @@ static bool atend(vchar_t *self)
 /**
  * Check printf-style format.
  */
-static void check_printf_format(const call_argument_t *arg, const format_spec_t *spec)
+static ssize_t internal_check_printf_format(const expression_t *fmt_expr,
+    const call_argument_t *arg, const format_spec_t *spec)
 {
-	/* find format arg */
-	unsigned idx = 0;
-	for (; idx < spec->fmt_idx; ++idx) {
-		if (arg == NULL)
-			return;
-		arg = arg->next;
-	}
-
-	const expression_t *fmt_expr = arg->expression;
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 
 	vchar_t vchar;
-	if (fmt_expr->kind == EXPR_WIDE_STRING_LITERAL) {
-		vchar.string   = &fmt_expr->wide_string.value;
-		vchar.size     = fmt_expr->wide_string.value.size;
-		vchar.first    = wstring_first;
-		vchar.next     = wstring_next;
-		vchar.is_digit = wstring_isdigit;
-	} else if (fmt_expr->kind == EXPR_STRING_LITERAL) {
-		vchar.string   = &fmt_expr->string.value;
-		vchar.size     = fmt_expr->string.value.size;
-		vchar.first    = string_first;
-		vchar.next     = string_next;
-		vchar.is_digit = string_isdigit;
-	} else {
-		return;
+	switch (fmt_expr->kind) {
+		case EXPR_STRING_LITERAL:
+			vchar.string   = &fmt_expr->string.value;
+			vchar.size     = fmt_expr->string.value.size;
+			vchar.first    = string_first;
+			vchar.next     = string_next;
+			vchar.is_digit = string_isdigit;
+			break;
+
+		case EXPR_WIDE_STRING_LITERAL:
+			vchar.string   = &fmt_expr->wide_string.value;
+			vchar.size     = fmt_expr->wide_string.value.size;
+			vchar.first    = wstring_first;
+			vchar.next     = wstring_next;
+			vchar.is_digit = wstring_isdigit;
+			break;
+
+		case EXPR_CONDITIONAL: {
+			conditional_expression_t const *const c = &fmt_expr->conditional;
+			expression_t             const *      t = c->true_expression;
+			if (t == NULL)
+				t = c->condition;
+			ssize_t const nt = internal_check_printf_format(t,                   arg, spec);
+			ssize_t const nf = internal_check_printf_format(c->false_expression, arg, spec);
+			return nt > nf ? nt : nf;
+		}
+
+		default:
+			return -1;
 	}
-	/* find the real args */
-	for(; idx < spec->arg_idx && arg != NULL; ++idx)
-		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
 	unsigned fmt     = vchar.first(&vchar);
@@ -226,7 +230,7 @@ static void check_printf_format(const call_argument_t *arg, const format_spec_t 
 				/* ... argument selector */
 				fmt_flags = FMT_FLAG_NONE; /* reset possibly set 0-flag */
 				/* TODO implement */
-				return;
+				return -1;
 			}
 			/* ... minimum field width */
 		} else {
@@ -268,7 +272,7 @@ break_fmt_flags:
 				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
-					return;
+					return -1;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
@@ -289,7 +293,7 @@ break_fmt_flags:
 				fmt = vchar.next(&vchar);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
-					return;
+					return -1;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
@@ -528,7 +532,7 @@ eval_fmt_mod_unsigned:
 				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
 				if (arg == NULL) {
 					warningf(pos, "too few arguments for format string");
-					return;
+					return -1;
 				}
 				goto next_arg;
 		}
@@ -550,7 +554,7 @@ eval_fmt_mod_unsigned:
 
 		if (arg == NULL) {
 			warningf(pos, "too few arguments for format string");
-			return;
+			return -1;
 		}
 
 		{	/* create a scope here to prevent warning about the jump to next_arg */
@@ -590,15 +594,40 @@ next_arg:
 	if (!atend(&vchar)) {
 		warningf(pos, "format string contains '\\0'");
 	}
-	if (arg != NULL) {
-		unsigned num_args = num_fmt;
-		while (arg != NULL) {
-			++num_args;
-			arg = arg->next;
-		}
-		warningf(pos, "%u argument%s but only %u format specifier%s",
+	return num_fmt;
+}
+
+/**
+ * Check printf-style format.
+ */
+static void check_printf_format(call_argument_t const *arg, format_spec_t const *const spec)
+{
+	/* find format arg */
+	size_t idx = 0;
+	for (; idx < spec->fmt_idx; ++idx) {
+		if (arg == NULL)
+			return;
+		arg = arg->next;
+	}
+
+	expression_t const *const fmt_expr = arg->expression;
+
+	/* find the real args */
+	for (; idx < spec->arg_idx && arg != NULL; ++idx)
+		arg = arg->next;
+
+	ssize_t const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
+	if (num_fmt < 0)
+		return;
+
+	size_t num_args = 0;
+	for (; arg != NULL; arg = arg->next)
+		++num_args;
+	if (num_args > (size_t)num_fmt) {
+		warningf(&fmt_expr->base.source_position,
+			"%u argument%s but only %u format specifier%s",
 			num_args, num_args != 1 ? "s" : "",
-			num_fmt, num_fmt != 1 ? "s" : "");
+			num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
 
