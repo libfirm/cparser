@@ -1851,14 +1851,8 @@ bool is_constant_expression(const expression_t *expression)
 		return true;
 
 	case EXPR_SIZEOF: {
-		type_t *type = expression->typeprop.type;
-		if (type == NULL)
-			type = expression->typeprop.tp_expression->base.type;
-
-		type = skip_typeref(type);
-		if (is_type_array(type) && type->array.is_vla)
-			return false;
-		return true;
+		type_t *const type = skip_typeref(expression->typeprop.type);
+		return !is_type_array(type) || !type->array.is_vla;
 	}
 
 	case EXPR_STRING_LITERAL:
