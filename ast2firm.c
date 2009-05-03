@@ -2922,13 +2922,7 @@ static ir_node *compound_literal_to_firm(
  */
 static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 {
-	type_t *type = expression->type;
-	if (type == NULL) {
-		type = expression->tp_expression->base.type;
-		assert(type != NULL);
-	}
-
-	type = skip_typeref(type);
+	type_t *const type = skip_typeref(expression->type);
 	/* §6.5.3.4:2 if the type is a VLA, evaluate the expression. */
 	if (is_type_array(type) && type->array.is_vla
 			&& expression->tp_expression != NULL) {
