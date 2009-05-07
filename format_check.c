@@ -161,7 +161,7 @@ static bool atend(vchar_t *self)
 /**
  * Check printf-style format.
  */
-static ssize_t internal_check_printf_format(const expression_t *fmt_expr,
+static int internal_check_printf_format(const expression_t *fmt_expr,
     const call_argument_t *arg, const format_spec_t *spec)
 {
 	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
@@ -191,8 +191,8 @@ static ssize_t internal_check_printf_format(const expression_t *fmt_expr,
 			expression_t             const *      t = c->true_expression;
 			if (t == NULL)
 				t = c->condition;
-			ssize_t const nt = internal_check_printf_format(t,                   arg, spec);
-			ssize_t const nf = internal_check_printf_format(c->false_expression, arg, spec);
+			int const nt = internal_check_printf_format(t,                   arg, spec);
+			int const nf = internal_check_printf_format(c->false_expression, arg, spec);
 			return nt > nf ? nt : nf;
 		}
 
@@ -616,7 +616,7 @@ static void check_printf_format(call_argument_t const *arg, format_spec_t const 
 	for (; idx < spec->arg_idx && arg != NULL; ++idx)
 		arg = arg->next;
 
-	ssize_t const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
+	int const num_fmt = internal_check_printf_format(fmt_expr, arg, spec);
 	if (num_fmt < 0)
 		return;
 
