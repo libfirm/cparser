@@ -1227,7 +1227,7 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 	in[1] = create_symconst(dbgi, mode, entity);
 	in[2] = get_irg_frame(current_ir_graph);
 
-	ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_inner_trampoline, 3, in, get_unknown_type());
+	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 	return new_Proj(irn, mode, pn_Builtin_1_result);
 }
@@ -1604,7 +1604,7 @@ static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t
 
 	ir_type *tp  = get_ir_type(function_type);
 	ir_type *res = get_method_res_type(tp, 0);
-	ir_node *irn = new_d_Builtin(db, get_irg_no_mem(current_ir_graph), kind, 1, in, tp);
+	ir_node *irn = new_d_Builtin(db, get_irg_no_mem(current_ir_graph), 1, in, kind, tp);
 	set_irn_pinned(irn, op_pin_state_floats);
 	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
 }
@@ -1625,7 +1625,7 @@ static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op,
 	ir_type *tp  = get_ir_type(function_type);
 	ir_type *res = get_method_res_type(tp, 0);
 	ir_node *mem = get_store();
-	ir_node *irn = new_d_Builtin(db, mem, kind, 1, in, tp);
+	ir_node *irn = new_d_Builtin(db, mem, 1, in, kind, tp);
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
 }
@@ -1649,7 +1649,7 @@ static ir_node *gen_binary_builtin_mem(ir_builtin_kind kind, expression_t *op1, 
 
 	ir_type *tp  = get_ir_type(function_type);
 	ir_node *mem = get_store();
-	ir_node *irn = new_d_Builtin(db, mem, kind, 2, in, tp);
+	ir_node *irn = new_d_Builtin(db, mem, 2, in, kind, tp);
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 	return NULL;
 }
@@ -1729,7 +1729,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			in[0] = expression_to_firm(expression);
 			in[1] = get_irg_frame(current_ir_graph);
 			ir_type *tp  = get_ir_type(function_type);
-			ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_frame_addess, 2, in, tp);
+			ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_frame_address, tp);
 			return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 		}
 	}
@@ -1741,7 +1741,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		in[0] = expression_to_firm(expression);
 		in[1] = get_irg_frame(current_ir_graph);
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_return_address, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
 	case bk_gnu_builtin_ffs:
@@ -1778,7 +1778,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 			in[2] = new_Const_long(mode_int, 3);
 		}
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_prefetch, 3, in, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_prefetch, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
@@ -1786,13 +1786,13 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case bk_ms__ud2:
 	{
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_trap, 0, NULL, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), 0, NULL, ir_bk_trap, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
 	case bk_ms__debugbreak: {
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), ir_bk_debugbreak, 0, NULL, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_store(), 0, NULL, ir_bk_debugbreak, tp);
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
@@ -1802,7 +1802,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		in[0] = new_Const_long(mode_int, 0);
 		in[1] = get_irg_frame(current_ir_graph);
 		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), ir_bk_return_address, 2, in, tp);
+		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_return_address, tp);
 		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
 	}
 	case bk_ms_rotl:
