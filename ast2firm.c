@@ -380,8 +380,7 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 		++n;
 	}
 
-	bool is_variadic = function_type->variadic ||
-	                   (function_type->unspecified_parameters && !function_type->prototyped);
+	bool is_variadic = function_type->variadic || function_type->unspecified_parameters;
 
 	if (is_variadic)
 		set_method_variadicity(irtype, variadicity_variadic);
@@ -4606,7 +4605,11 @@ static void create_local_declaration(entity_t *entity)
 
 	switch ((storage_class_tag_t) entity->declaration.storage_class) {
 	case STORAGE_CLASS_STATIC:
-		create_local_static_variable(entity);
+		if (entity->kind == ENTITY_FUNCTION) {
+			(void)get_function_entity(entity, NULL);
+		} else {
+			create_local_static_variable(entity);
+		}
 		return;
 	case STORAGE_CLASS_EXTERN:
 		if (entity->kind == ENTITY_FUNCTION) {

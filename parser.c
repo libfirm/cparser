@@ -4386,19 +4386,9 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 						&previous_entity->base.source_position);
 			} else {
 				unsigned old_storage_class = prev_decl->storage_class;
-				bool     kr_prototype      = false;
 
-				if (is_type_function(type)) {
-					/* check if we have a prototype */
-					if (!prev_type->function.unspecified_parameters) {
-						type->function.prototyped = true;
-					       	if (type->function.kr_style_parameters)
-							kr_prototype = true;
-					}
-				}
 				if (warning.redundant_decls	          &&
 						is_definition                     &&
-						!kr_prototype                     &&
 						!prev_decl->used                  &&
 						!(prev_decl->modifiers & DM_USED) &&
 						prev_decl->storage_class == STORAGE_CLASS_STATIC) {
@@ -4777,6 +4767,9 @@ static void parse_kr_declaration_list(entity_t *entity)
 	if (!type->function.kr_style_parameters)
 		return;
 
+	entity_t *proto_type = get_entity(entity->base.symbol, NAMESPACE_NORMAL);
+	if (proto_type != NULL && proto_type->kind != ENTITY_FUNCTION)
+		proto_type = NULL;
 
 	add_anchor_token('{');
 
@@ -4845,7 +4838,8 @@ decl_list_end:
 		/*
 		 * we need the default promoted types for the function type
 		 */
-		parameter_type = get_default_promoted_type(parameter_type);
+		if (proto_type == NULL)
+			parameter_type = get_default_promoted_type(parameter_type);
 
 		function_parameter_t *const parameter =
 			allocate_parameter(parameter_type);
@@ -4854,10 +4848,15 @@ decl_list_end:
 		anchor  = &parameter->next;
 	}
 
-	/* §6.9.1.7: A K&R style parameter list does NOT act as a function
-	 * prototype */
-	new_type->function.parameters             = parameters;
-	new_type->function.unspecified_parameters = true;
+	new_type->function.parameters = parameters;
+	if (proto_type != NULL) {
+		/* compatibility with the prototype will be checked later ... */
+		new_type->function.prototyped = true;
+	} else {
+		/* §6.9.1.7: A K&R style parameter list does NOT act as a function
+		 * prototype */
+		new_type->function.unspecified_parameters = true;
+	}
 
 	new_type = identify_new_type(new_type);
 
