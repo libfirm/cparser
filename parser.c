@@ -3529,8 +3529,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 	    !is_typedef_symbol(token.v.symbol)) {
 		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ',' || la1_type == ')') {
-			type->kr_style_parameters    = true;
-			type->unspecified_parameters = true;
+			type->kr_style_parameters = true;
 			parse_identifier_list(scope);
 			goto parameters_finished;
 		}
