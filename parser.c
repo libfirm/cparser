@@ -4849,17 +4849,21 @@ decl_list_end:
 		semantic_parameter_incomplete(parameter);
 
 		/* we need the default promoted types for the function type */
-		type_t *promoted = get_default_promoted_type(parameter_type);
+		type_t *not_promoted = parameter_type;
+		parameter_type       = get_default_promoted_type(parameter_type);
 
 		/* gcc special: if the type of the prototype matches the unpromoted
 		 * type don't promote */
-		if (!strict_mode && proto_parameter != NULL
-				&& !types_compatible(proto_parameter->type, promoted)
-				&& types_compatible(proto_parameter->type, parameter_type)) {
-			/* don't promote */
-			need_incompatible_warning = true;
-		} else {
-			parameter_type = promoted;
+		if (!strict_mode && proto_parameter != NULL) {
+			type_t *proto_p_type = skip_typeref(proto_parameter->type);
+			type_t *promo_skip   = skip_typeref(parameter_type);
+			type_t *param_skip   = skip_typeref(not_promoted);
+			if (!types_compatible(proto_p_type, promo_skip)
+				&& types_compatible(proto_p_type, param_skip)) {
+				/* don't promote */
+				need_incompatible_warning = true;
+				parameter_type = not_promoted;
+			}
 		}
 		function_parameter_t *const parameter
 			= allocate_parameter(parameter_type);
