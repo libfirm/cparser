@@ -7012,31 +7012,6 @@ end_error:
 	return create_invalid_expression();
 }
 
-#if 0
-/**
- * Parses a __builtin_expect(, end_error) expression.
- */
-static expression_t *parse_builtin_expect(void, end_error)
-{
-	expression_t *expression
-		= allocate_expression_zero(EXPR_BINARY_BUILTIN_EXPECT);
-
-	eat(T___builtin_expect);
-
-	expect('(', end_error);
-	expression->binary.left = parse_assignment_expression();
-	expect(',', end_error);
-	expression->binary.right = parse_constant_expression();
-	expect(')', end_error);
-
-	expression->base.type = expression->binary.left->base.type;
-
-	return expression;
-end_error:
-	return create_invalid_expression();
-}
-#endif
-
 /**
  * Parses a MS assume() expression.
  */

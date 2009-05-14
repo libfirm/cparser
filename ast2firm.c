@@ -1455,6 +1455,21 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	/* make sure the type is constructed */
 	(void) get_ir_type(type);
 
+	/* for gcc compatibility we have to produce (dummy) addresses for some
+	 * builtins */
+	if (entity->kind == ENTITY_FUNCTION && entity->function.btk != bk_none) {
+		if (warning.other) {
+			warningf(&ref->base.source_position,
+					"taking address of builtin '%Y'", ref->entity->base.symbol);
+		}
+
+		/* simply create a NULL pointer */
+		ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
+		ir_node  *res  = new_Const_long(mode, 0);
+
+		return res;
+	}
+
 	switch ((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_UNKNOWN:
 		break;
@@ -1471,21 +1486,6 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_FUNCTION: {
 		ir_mode *const mode = get_ir_mode_storage(type);
-
-		if (entity->function.btk != bk_none) {
-			/* for gcc compatibility we have to produce (dummy) addresses for some
-			 * builtins */
-			if (warning.other) {
-				warningf(&ref->base.source_position,
-					"taking address of builtin '%Y'", ref->entity->base.symbol);
-			}
-
-			/* simply create a NULL pointer */
-			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
-			ir_node  *res  = new_Const_long(mode, 0);
-
-			return res;
-		}
 		return create_symconst(dbgi, mode, entity->function.irentity);
 	}
 	case DECLARATION_KIND_INNER_FUNCTION: {
