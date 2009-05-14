@@ -4766,10 +4766,6 @@ static void parse_kr_declaration_list(entity_t *entity)
 	if (!type->function.kr_style_parameters)
 		return;
 
-	entity_t *proto_type = get_entity(entity->base.symbol, NAMESPACE_NORMAL);
-	if (proto_type != NULL && proto_type->kind != ENTITY_FUNCTION)
-		proto_type = NULL;
-
 	add_anchor_token('{');
 
 	/* push function parameters */
@@ -4811,8 +4807,26 @@ decl_list_end:
 	function_parameter_t  *parameters = NULL;
 	function_parameter_t **anchor     = &parameters;
 
+	/* did we have an earlier prototype? */
+	entity_t *proto_type = get_entity(entity->base.symbol, NAMESPACE_NORMAL);
+	if (proto_type != NULL && proto_type->kind != ENTITY_FUNCTION)
+		proto_type = NULL;
+
+	function_parameter_t *proto_parameter = NULL;
+	if (proto_type != NULL) {
+		type_t *proto_type_type = proto_type->declaration.type;
+		proto_parameter         = proto_type_type->function.parameters;
+	} else {
+		/* §6.9.1.7: A K&R style parameter list does NOT act as a function
+		 * prototype */
+		new_type->function.unspecified_parameters = true;
+	}
+
+	bool need_incompatible_warning = false;
 	parameter = entity->function.parameters.entities;
-	for (; parameter != NULL; parameter = parameter->base.next) {
+	for (; parameter != NULL; parameter = parameter->base.next,
+			proto_parameter =
+				proto_parameter == NULL ? NULL : proto_parameter->next) {
 		if (parameter->kind != ENTITY_PARAMETER)
 			continue;
 
@@ -4834,30 +4848,37 @@ decl_list_end:
 
 		semantic_parameter_incomplete(parameter);
 
-		/*
-		 * we need the default promoted types for the function type
-		 */
-		if (proto_type == NULL)
-			parameter_type = get_default_promoted_type(parameter_type);
+		/* we need the default promoted types for the function type */
+		type_t *promoted = get_default_promoted_type(parameter_type);
 
-		function_parameter_t *const parameter =
-			allocate_parameter(parameter_type);
+		/* gcc special: if the type of the prototype matches the unpromoted
+		 * type don't promote */
+		if (!strict_mode && proto_parameter != NULL
+				&& !types_compatible(proto_parameter->type, promoted)
+				&& types_compatible(proto_parameter->type, parameter_type)) {
+			/* don't promote */
+			need_incompatible_warning = true;
+		} else {
+			parameter_type = promoted;
+		}
+		function_parameter_t *const parameter
+			= allocate_parameter(parameter_type);
 
 		*anchor = parameter;
 		anchor  = &parameter->next;
 	}
 
 	new_type->function.parameters = parameters;
-	if (proto_type != NULL) {
-		/* compatibility with the prototype will be checked later ... */
-		new_type->function.prototyped = true;
-	} else {
-		/* §6.9.1.7: A K&R style parameter list does NOT act as a function
-		 * prototype */
-		new_type->function.unspecified_parameters = true;
-	}
-
 	new_type = identify_new_type(new_type);
+
+	if (warning.other && need_incompatible_warning) {
+		type_t *proto_type_type = proto_type->declaration.type;
+		warningf(HERE,
+		         "declaration '%#T' is incompatible with '%#T' (declared %P)",
+		         proto_type_type, proto_type->base.symbol,
+		         new_type, entity->base.symbol,
+		         &proto_type->base.source_position);
+	}
 
 	entity->declaration.type = new_type;
 
@@ -5680,8 +5701,7 @@ static void parse_external_declaration(void)
 	/* §6.7.5.3:14 a function definition with () means no
 	 * parameters (and not unspecified parameters) */
 	if (type->function.unspecified_parameters &&
-			type->function.parameters == NULL     &&
-			!type->function.kr_style_parameters) {
+			type->function.parameters == NULL) {
 		type_t *copy                          = duplicate_type(type);
 		copy->function.unspecified_parameters = false;
 		type                                  = identify_new_type(copy);
