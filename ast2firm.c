@@ -380,7 +380,7 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 		++n;
 	}
 
-	bool is_variadic = function_type->variadic || function_type->unspecified_parameters;
+	bool is_variadic = function_type->variadic;
 
 	if (is_variadic)
 		set_method_variadicity(irtype, variadicity_variadic);
