@@ -3,7 +3,7 @@
  *
  * Compile when BACK_END_IS_CP_FIRM_BE is defined
  *
- * (C) 2005-2009  Michael Beck  beck@ipd.info.uni-karlsruhe.de
+ * (C) 2005  Michael Beck  beck@ipd.info.uni-karlsruhe.de
  *
  * $Id$
  */
@@ -45,6 +45,7 @@ struct a_firm_opt firm_opt = {
   /* mods            = */ TRUE,
   /* fragile_ops     = */ TRUE,
   /* load_store      = */ TRUE,
+  /* load_store_pre  = */ FALSE,
   /* modes           = */ FALSE,
   /* precise_exc     = */ FALSE,	/* never needed for C */
   /* use_DivMod      = */ FALSE,
@@ -69,9 +70,6 @@ struct a_firm_opt firm_opt = {
   /* honor_restrict  = */ TRUE,
   /* lower_bitfields = */ TRUE,
   /* pic             = */ FALSE,
-  /* ycomp_dbg       = */ FALSE,
-  /* ycomp_host      = */ FIRM_YCOMP_DEFAULT_HOST,
-  /* ycomp_port      = */ FIRM_YCOMP_DEFAULT_PORT,
   /* clone_threshold = */ DEFAULT_CLONE_THRESHOLD,
   /* inline_maxsize  = */ 750,
   /* inline_threshold= */ 0,
@@ -159,16 +157,18 @@ static const struct params {
   { X("no-scalar-replace"),      &firm_opt.scalar_replace,   0, "firm: disable scalar replacement" },
   { X("confirm"),                &firm_opt.confirm,          1, "firm: enable Confirm optimization" },
   { X("no-confirm"),             &firm_opt.confirm,          0, "firm: disable Confirm optimization" },
-  { X("opt-mul"),                &firm_opt.muls,             1, "firm: enable multiplication optimization" },
+  { X("opt-mul"),                &firm_opt.muls,             0, "firm: enable multiplication optimization" },
   { X("no-opt-mul"),             &firm_opt.muls,             0, "firm: disable multiplication optimization" },
-  { X("opt-div"),                &firm_opt.divs,             1, "firm: enable division optimization" },
+  { X("opt-div"),                &firm_opt.divs,             0, "firm: enable division optimization" },
   { X("no-opt-div"),             &firm_opt.divs,             0, "firm: disable division optimization" },
-  { X("opt-mod"),                &firm_opt.mods,             1, "firm: enable remainder optimization" },
+  { X("opt-mod"),                &firm_opt.mods,             0, "firm: enable remainder optimization" },
   { X("no-opt-mod"),             &firm_opt.mods,             0, "firm: disable remainder optimization" },
   { X("opt-fragile-ops"),        &firm_opt.fragile_ops,      1, "firm: enable fragile ops optimization" },
   { X("no-opt-fragile-ops"),     &firm_opt.fragile_ops,      0, "firm: disable fragile ops optimization" },
   { X("opt-load-store"),         &firm_opt.load_store,       1, "firm: enable load store optimization" },
   { X("no-opt-load-store"),      &firm_opt.load_store,       0, "firm: disable load store optimization" },
+  { X("opt-load-store-pre"),     &firm_opt.load_store_pre,   1, "firm: enable load store optimization and PRE" },
+  { X("no-opt-load-store-pre"),  &firm_opt.load_store_pre,   0, "firm: disable load store optimization and PRE" },
   { X("opt-modes"),              &firm_opt.modes,            1, "firm: optimize integer modes" },
   { X("no-opt-modes"),           &firm_opt.modes,            0, "firm: disable integer modes optimization" },
   { X("sync"),                   &firm_opt.auto_sync,        1, "firm: automatically create Sync nodes" },
@@ -191,8 +191,8 @@ static const struct params {
   { X("fp-precise"),             &firm_opt.fp_model,         fp_model_precise, "firm: precise fp model" },
   { X("fp-fast"),                &firm_opt.fp_model,         fp_model_fast,    "firm: fast fp model" },
   { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
-  { X("sync"),                   &firm_opt.sync,             1, "firm: use Syncs to remove unnecessary memory dependencies" },
-  { X("no-sync"),                &firm_opt.sync,             0, "firm: do not use Syncs to remove unnecessary memory dependencies" },
+  { X("sync"),                   &firm_opt.sync,             1, "firm: use Syncs to remove unnecesary memory dependencies" },
+  { X("no-sync"),                &firm_opt.sync,             0, "firm: do not use Syncs to remove unnecesary memory dependencies" },
   { X("deconv"),                 &firm_opt.deconv,           1, "firm: enable the conv node optimization" },
   { X("no-deconv"),              &firm_opt.deconv,           0, "firm: disable the conv node optimization" },
   { X("opt-cc"),                 &firm_opt.cc_opt,           1, "firm: enable calling conventions optimization" },
@@ -200,7 +200,7 @@ static const struct params {
   { X("bool"),                   &firm_opt.bool_opt,         1, "firm: enable bool simplification optimization" },
   { X("no-bool"),                &firm_opt.bool_opt,         0, "firm: disable bool simplification optimization" },
   { X("shape-blocks"),           &firm_opt.shape_blocks,     1, "firm: enable block shaping" },
-  { X("no-shape-blcoks"),        &firm_opt.shape_blocks,     0, "firm: disable block shaping" },
+  { X("no-shape-blocks"),        &firm_opt.shape_blocks,     0, "firm: disable block shaping" },
   { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
   { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
 
@@ -257,9 +257,6 @@ static const struct params {
   { X("win32"),                  &firm_opt.os_support,       OS_SUPPORT_MINGW, "misc: generate MinGW Win32 code" },
   { X("mac"),                    &firm_opt.os_support,       OS_SUPPORT_MACHO, "misc: generate MacOS code" },
   { X("linux"),                  &firm_opt.os_support,       OS_SUPPORT_LINUX, "misc: generate Linux-ELF code" },
-  { X("ycomp"),                  &firm_opt.ycomp_dbg,        1, "misc: enable yComp debugger extension" },
-  { X("ycomp-host=<hostname>"),  NULL,                       0, "misc: yComp host" },
-  { X("ycomp-port=<port>"),      NULL,                       0, "misc: yComp port" },
 
   /* string options */
   { X("dump-filter=<string>"),   NULL,                       0, "misc: set dumper filter" },
@@ -284,14 +281,6 @@ static void set_dump_filter(const char *filter)
 {
   firm_dump.filter = StrDup(filter);
 }  /* set_dump_filter */
-
-/**
- * Set ycomp host
- */
-static void set_ycomp_host(const char *host)
-{
-  firm_opt.ycomp_host = StrDup(host);
-}  /* set_ycomp_host */
 
 /** Disable all optimizations. */
 static void disable_opts(void) {
@@ -357,15 +346,6 @@ int firm_option(const char *opt)
     sscanf(&opt[17], "%u", &firm_opt.inline_threshold);
     return 1;
   }
-  else if (strncmp("ycomp-host=", opt, 11) == 0) {
-    opt = &opt[11];
-    set_ycomp_host(opt);
-    return 1;
-  }
-  else if (strncmp("ycomp-port=", opt, 11) == 0) {
-    sscanf(&opt[11], "%d", &firm_opt.ycomp_port);
-    return 1;
-  }
   else if (strcmp("no-opt", opt) == 0) {
     disable_opts();
     return 1;
@@ -414,7 +394,29 @@ int firm_be_option(const char *opt) {
 #ifdef FIRM_BACKEND
   return be_parse_arg(opt);
 #else
-  (void)opt;
   return 0;
 #endif /* FIRM_BACKEND */
 }  /* firm_be_option */
+
+/**
+ * prints the firm version number
+ */
+void print_firm_version(FILE *f) {
+  const char *revision = ir_get_version_revision();
+  const char *build    = ir_get_version_build();
+
+  fprintf(f, "Firm C-Compiler using libFirm (%u.%u",
+          ir_get_version_major(), ir_get_version_minor());
+  if (revision[0] != 0) {
+  	fputc(' ', f);
+    fputs(revision, f);
+  }
+   if(build[0] != 0) {
+  	fputc(' ', f);
+    fputs(build, f);
+  }
+  fprintf(f, "}\n"
+  		     "(C) 2005-2008 Michael Beck\n"
+             "(C) 1995-2008 University of Karlsruhe\n"
+             "Using ");
+}  /* print_firm_version */

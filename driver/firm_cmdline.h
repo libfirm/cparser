@@ -50,6 +50,7 @@ struct a_firm_opt {
   a_byte   mods;            /**< enable architecture dependent mod optimization */
   a_byte   fragile_ops;     /**< enable fragile ops optimization */
   a_byte   load_store;      /**< enable load store optimization */
+  a_byte   load_store_pre;  /**< enable new load store optimization */
   a_byte   modes;           /**< enable integer mode optimizations */
   a_byte   precise_exc;     /**< use precise exception context */
   a_byte   use_DivMod;      /**< use DivMod nodes */
@@ -63,7 +64,7 @@ struct a_firm_opt {
   a_byte   deconv;          /**< enable conv node optimization */
   a_byte   cc_opt;          /**< optimize calling conventions */
   a_byte   bool_opt;        /**< perform bool simplification */
-  a_byte   shape_blocks;    /**< block shaping */
+  a_byte   shape_blocks;    /**< end block melting */
   a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
   a_byte   lower_ll;        /**< lower double word access */
@@ -74,9 +75,6 @@ struct a_firm_opt {
   a_byte   honor_restrict;  /**< enable restrict keyword */
   a_byte   lower_bitfields; /**< lower bitfield access */
   a_byte   pic;             /**< generate position independent code */
-  a_byte   ycomp_dbg;       /**< yComp debugger extension */
-  char     *ycomp_host;     /**< The host, yComp is running on */
-  int      ycomp_port;      /**< The port, yComp is listening on */
   int      clone_threshold; /**< The threshold value for procedure cloning. */
   unsigned inline_maxsize;  /**< Maximum function size for inlining. */
   unsigned inline_threshold;/**< Inlining benefice threshold. */
@@ -137,6 +135,11 @@ extern struct a_firm_opt firm_opt;
 extern struct a_firm_dump firm_dump;
 extern struct a_firm_ext_grs firm_ext_grs;
 
+
+/**
+ * prints the firm version number
+ */
+void print_firm_version(FILE *f);
 
 /**
  * called by the generic command line parser
