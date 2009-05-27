@@ -2382,10 +2382,10 @@ finish_designator:
 error_excess:
 			if (warning.other) {
 				if (env->entity != NULL) {
-					warningf(HERE, "excess elements in struct initializer for '%Y'",
-				           env->entity->base.symbol);
+					warningf(HERE, "excess elements in initializer for '%Y'",
+					         env->entity->base.symbol);
 				} else {
-					warningf(HERE, "excess elements in struct initializer");
+					warningf(HERE, "excess elements in initializer");
 				}
 			}
 		}

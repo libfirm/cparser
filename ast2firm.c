@@ -3855,6 +3855,27 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			}
 			assert(iter != NULL);
 
+			/* revert previous initialisations of other union elements */
+			if (type->kind == TYPE_COMPOUND_UNION) {
+				ir_initializer_t *initializer = top->initializer;
+				if (initializer != NULL
+					&& get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
+					/* are we writing to a new element? */
+					ir_initializer_t *oldi
+						= get_initializer_compound_value(initializer, index);
+					if (get_initializer_kind(oldi) == IR_INITIALIZER_NULL) {
+						/* clear initializer */
+						size_t len
+							= get_initializer_compound_n_entries(initializer);
+						ir_initializer_t *nulli = get_initializer_null();
+						for (size_t i = 0; i < len; ++i) {
+							set_initializer_compound_value(initializer, i,
+							                               nulli);
+						}
+					}
+				}
+			}
+
 			top->type           = orig_type;
 			top->compound_entry = iter;
 			top->index          = index;
@@ -3898,6 +3919,7 @@ static void advance_current_object(type_path_t *path)
 
 	type_t *type = skip_typeref(top->type);
 	if (is_type_union(type)) {
+		/* only the first element is initialized in unions */
 		top->compound_entry = NULL;
 	} else if (is_type_struct(type)) {
 		entity_t *entry = top->compound_entry;
@@ -4103,58 +4125,12 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
-static void create_dynamic_null_initializer(ir_type *type, dbg_info *dbgi,
-		ir_node *base_addr)
-{
-	if (is_atomic_type(type)) {
-		ir_mode *mode = get_type_mode(type);
-		tarval  *zero = get_mode_null(mode);
-		ir_node *cnst = new_d_Const(dbgi, zero);
-
-		/* TODO: bitfields */
-		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, cons_none);
-		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
-		set_store(proj_m);
-	} else {
-		assert(is_compound_type(type));
-
-		int n_members;
-		if (is_Array_type(type)) {
-			assert(has_array_upper_bound(type, 0));
-			n_members = get_array_upper_bound_int(type, 0);
-		} else {
-			n_members = get_compound_n_members(type);
-		}
-
-		for (int i = 0; i < n_members; ++i) {
-			ir_node *addr;
-			ir_type *irtype;
-			if (is_Array_type(type)) {
-				ir_entity *entity   = get_array_element_entity(type);
-				tarval    *index_tv = new_tarval_from_long(i, mode_uint);
-				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
-				ir_node   *in[1]    = { cnst };
-				irtype = get_array_element_type(type);
-				addr   = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in, entity);
-			} else {
-				ir_entity *member = get_compound_member(type, i);
-
-				irtype = get_entity_type(member);
-				addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr, member);
-			}
-
-			create_dynamic_null_initializer(irtype, dbgi, addr);
-		}
-	}
-}
-
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {
 	switch(get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL: {
-		create_dynamic_null_initializer(type, dbgi, base_addr);
+		/* NULL is undefined for dynamic initializers */
 		return;
 	}
 	case IR_INITIALIZER_CONST: {
