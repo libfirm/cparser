@@ -79,6 +79,7 @@ static label_t  **all_labels;
 static entity_t **inner_functions;
 static ir_node   *ijmp_list;
 static bool       constant_folding;
+static bool       initializer_use_bitfield_basetype;
 
 extern bool       have_const_functions;
 
@@ -3963,8 +3964,18 @@ static ir_initializer_t *create_ir_initializer_value(
 	if (is_type_compound(initializer->value->base.type)) {
 		panic("initializer creation for compounds not implemented yet");
 	}
-	ir_node *value = expression_to_firm(initializer->value);
-	type_t  *type  = initializer->value->base.type;
+	type_t       *type = initializer->value->base.type;
+	expression_t *expr = initializer->value;
+	if (initializer_use_bitfield_basetype) {
+		type_t *skipped = skip_typeref(type);
+		if (skipped->kind == TYPE_BITFIELD) {
+			/* remove the bitfield cast... */
+			assert(expr->kind == EXPR_UNARY_CAST_IMPLICIT);
+			expr = expr->unary.value;
+			type = skipped->bitfield.base_type;
+		}
+	}
+	ir_node *value = expression_to_firm(expr);
 	ir_mode *mode  = get_ir_mode_storage(type);
 	value          = create_conv(NULL, value, mode);
 	return create_initializer_const(value);
@@ -4246,8 +4257,13 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	}
 
 	if (!is_constant_initializer(initializer)) {
+		bool old_initializer_use_bitfield_basetype
+			= initializer_use_bitfield_basetype;
+		initializer_use_bitfield_basetype = true;
 		ir_initializer_t *irinitializer
 			= create_ir_initializer(initializer, type);
+		initializer_use_bitfield_basetype
+			= old_initializer_use_bitfield_basetype;
 
 		create_dynamic_initializer(irinitializer, dbgi, entity);
 		return;
