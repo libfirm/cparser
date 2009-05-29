@@ -4987,10 +4987,13 @@ static ir_node *get_break_label(void)
 
 static void switch_statement_to_firm(switch_statement_t *statement)
 {
-	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-
-	ir_node *expression  = expression_to_firm(statement->expression);
-	ir_node *cond        = new_d_Cond(dbgi, expression);
+	ir_node  *first_block = get_cur_block();
+	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
+	ir_node  *cond        = NULL;
+	if (first_block != NULL) {
+		ir_node *expression = expression_to_firm(statement->expression);
+		cond                = new_d_Cond(dbgi, expression);
+	}
 
 	set_cur_block(NULL);
 
@@ -5065,8 +5068,8 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		add_immBlock_pred(get_break_label(), jmp);
 	}
 
-	if (!saw_default_label) {
-		set_cur_block(get_nodes_block(cond));
+	if (!saw_default_label && first_block != NULL) {
+		set_cur_block(first_block);
 		ir_node *const proj = new_d_defaultProj(dbgi, cond,
 		                                        statement->default_proj_nr);
 		add_immBlock_pred(get_break_label(), proj);
@@ -5094,24 +5097,26 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
 
 	ir_node *proj;
-	ir_node *block     = new_immBlock();
+	ir_node *block = new_immBlock();
 
-	set_cur_block(get_nodes_block(current_switch_cond));
-	if (statement->expression != NULL) {
-		long pn     = statement->first_case;
-		long end_pn = statement->last_case;
-		assert(pn <= end_pn);
-		/* create jumps for all cases in the given range */
-		do {
-			proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+	if (current_switch_cond != NULL) {
+		set_cur_block(get_nodes_block(current_switch_cond));
+		if (statement->expression != NULL) {
+			long pn     = statement->first_case;
+			long end_pn = statement->last_case;
+			assert(pn <= end_pn);
+			/* create jumps for all cases in the given range */
+			do {
+				proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+				add_immBlock_pred(block, proj);
+			} while (pn++ < end_pn);
+		} else {
+			saw_default_label = true;
+			proj = new_d_defaultProj(dbgi, current_switch_cond,
+									 current_switch->default_proj_nr);
+
 			add_immBlock_pred(block, proj);
-		} while (pn++ < end_pn);
-	} else {
-		saw_default_label = true;
-		proj = new_d_defaultProj(dbgi, current_switch_cond,
-		                         current_switch->default_proj_nr);
-
-		add_immBlock_pred(block, proj);
+		}
 	}
 
 	if (fallthrough != NULL) {
