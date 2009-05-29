@@ -2399,6 +2399,56 @@ static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression)
 	}
 }
 
+static ir_node *cast_to_firm(const unary_expression_t *expression)
+{
+	dbg_info           *dbgi = get_dbg_info(&expression->base.source_position);
+	type_t             *type = skip_typeref(expression->base.type);
+	const expression_t *value      = expression->value;
+	ir_node            *value_node = expression_to_firm(value);
+
+	if (!is_type_scalar(type)) {
+		/* make sure firm type is constructed */
+		(void) get_ir_type(type);
+		return value_node;
+	}
+
+	type_t  *from_type = skip_typeref(value->base.type);
+	ir_mode *mode      = get_ir_mode_storage(type);
+	/* check for conversion from / to __based types */
+	if (is_type_pointer(type) && is_type_pointer(from_type)) {
+		const variable_t *from_var = from_type->pointer.base_variable;
+		const variable_t *to_var   = type->pointer.base_variable;
+		if (from_var != to_var) {
+			if (from_var != NULL) {
+				ir_node *const addr = get_global_var_address(dbgi, from_var);
+				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
+				value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
+			}
+			if (to_var != NULL) {
+				ir_node *const addr = get_global_var_address(dbgi, to_var);
+				ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
+				value_node = new_d_Sub(dbgi, value_node, base, mode);
+			}
+		}
+	}
+
+	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
+	ir_node *node       = create_conv(dbgi, value_node, mode);
+	node                = do_strict_conv(dbgi, node);
+	node                = create_conv(dbgi, node, mode_arith);
+
+	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
+		/* bool adjustments (have to compare to get 0/1 value */
+		ir_node *zero = new_Const(get_mode_null(mode_arith));
+		ir_node *cmp  = new_d_Cmp(dbgi, node, zero);
+		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
+		ir_node *one  = new_Const_long(mode_arith, 1);
+		node          = new_d_Mux(dbgi, proj, zero, one, mode_arith);
+	}
+
+	return node;
+}
+
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
@@ -2448,51 +2498,9 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_PREFIX_INCREMENT:
 	case EXPR_UNARY_PREFIX_DECREMENT:
 		return create_incdec(expression);
-	case EXPR_UNARY_CAST: {
-		ir_node *value_node = expression_to_firm(value);
-		if (is_type_scalar(type)) {
-			ir_mode *mode      = get_ir_mode_storage(type);
-			type_t  *from_type = skip_typeref(value->base.type);
-			/* check for conversion from / to __based types */
-			if (is_type_pointer(type) && is_type_pointer(from_type)) {
-				const variable_t *from_var = from_type->pointer.base_variable;
-				const variable_t *to_var   = type->pointer.base_variable;
-				if (from_var != to_var) {
-					if (from_var != NULL) {
-						ir_node *const addr = get_global_var_address(dbgi, from_var);
-						ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
-						value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
-					}
-					if (to_var != NULL) {
-						ir_node *const addr = get_global_var_address(dbgi, to_var);
-						ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
-						value_node = new_d_Sub(dbgi, value_node, base, mode);
-					}
-				}
-			}
-			ir_node *node       = create_conv(dbgi, value_node, mode);
-			node                = do_strict_conv(dbgi, node);
-			ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-			node                = create_conv(dbgi, node, mode_arith);
-			return node;
-		} else {
-			/* make sure firm type is constructed */
-			(void) get_ir_type(type);
-			return value_node;
-		}
-	}
-	case EXPR_UNARY_CAST_IMPLICIT: {
-		ir_node *value_node = expression_to_firm(value);
-		if (is_type_scalar(type)) {
-			ir_mode *mode       = get_ir_mode_storage(type);
-			ir_node *res        = create_conv(dbgi, value_node, mode);
-			ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-			res                 = create_conv(dbgi, res, mode_arith);
-			return res;
-		} else {
-			return value_node;
-		}
-	}
+	case EXPR_UNARY_CAST_IMPLICIT:
+	case EXPR_UNARY_CAST:
+		return cast_to_firm(expression);
 	case EXPR_UNARY_ASSUME:
 		if (firm_opt.confirm)
 			return handle_assume(dbgi, value);
