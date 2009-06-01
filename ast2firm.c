@@ -3427,19 +3427,15 @@ static ir_node *get_label_block(label_t *label)
  * Pointer to a label.  This is used for the
  * GNU address-of-label extension.
  */
-static ir_node *label_address_to_firm(
-		const label_address_expression_t *label)
+static ir_node *label_address_to_firm(const label_address_expression_t *label)
 {
-	ir_node    *block = get_label_block(label->label);
-	ir_label_t  nr    = get_Block_label(block);
+	dbg_info  *dbgi   = get_dbg_info(&label->base.source_position);
+	ir_node   *block  = get_label_block(label->label);
+	ir_entity *entity = create_Block_entity(block);
 
-	if (nr == 0) {
-		nr = get_irp_next_label_nr();
-		set_Block_label(block, nr);
-	}
 	symconst_symbol value;
-	value.label = nr;
-	return new_SymConst(mode_P_code, value, symconst_label);
+	value.entity_p = entity;
+	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
 /**
