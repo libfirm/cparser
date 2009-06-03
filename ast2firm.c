@@ -2399,21 +2399,18 @@ static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression)
 	}
 }
 
-static ir_node *cast_to_firm(const unary_expression_t *expression)
+static ir_node *create_cast(dbg_info *dbgi,	ir_node *value_node,
+                            type_t *from_type, type_t *type)
 {
-	dbg_info           *dbgi = get_dbg_info(&expression->base.source_position);
-	type_t             *type = skip_typeref(expression->base.type);
-	const expression_t *value      = expression->value;
-	ir_node            *value_node = expression_to_firm(value);
-
+	type = skip_typeref(type);
 	if (!is_type_scalar(type)) {
 		/* make sure firm type is constructed */
 		(void) get_ir_type(type);
 		return value_node;
 	}
 
-	type_t  *from_type = skip_typeref(value->base.type);
-	ir_mode *mode      = get_ir_mode_storage(type);
+	from_type     = skip_typeref(from_type);
+	ir_mode *mode = get_ir_mode_storage(type);
 	/* check for conversion from / to __based types */
 	if (is_type_pointer(type) && is_type_pointer(from_type)) {
 		const variable_t *from_var = from_type->pointer.base_variable;
@@ -2432,19 +2429,16 @@ static ir_node *cast_to_firm(const unary_expression_t *expression)
 		}
 	}
 
+	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
+		/* bool adjustments (we save a mode_Bu, but have to temporarily
+		 * convert to mode_b so we only get a 0/1 value */
+		value_node = create_conv(dbgi, value_node, mode_b);
+	}
+
 	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
 	ir_node *node       = create_conv(dbgi, value_node, mode);
 	node                = do_strict_conv(dbgi, node);
 	node                = create_conv(dbgi, node, mode_arith);
-
-	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
-		/* bool adjustments (have to compare to get 0/1 value */
-		ir_node *zero = new_Const(get_mode_null(mode_arith));
-		ir_node *cmp  = new_d_Cmp(dbgi, node, zero);
-		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
-		ir_node *one  = new_Const_long(mode_arith, 1);
-		node          = new_d_Mux(dbgi, proj, zero, one, mode_arith);
-	}
 
 	return node;
 }
@@ -2499,8 +2493,11 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_PREFIX_DECREMENT:
 		return create_incdec(expression);
 	case EXPR_UNARY_CAST_IMPLICIT:
-	case EXPR_UNARY_CAST:
-		return cast_to_firm(expression);
+	case EXPR_UNARY_CAST: {
+		ir_node *value_node = expression_to_firm(value);
+		type_t  *from_type  = value->base.type;
+		return create_cast(dbgi, value_node, from_type, type);
+	}
 	case EXPR_UNARY_ASSUME:
 		if (firm_opt.confirm)
 			return handle_assume(dbgi, value);
