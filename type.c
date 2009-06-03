@@ -1117,13 +1117,13 @@ static bool function_types_compatible(const function_type_t *func1,
 	if (cc1 != cc2)
 		return false;
 
+	if (func1->variadic != func2->variadic)
+		return false;
+
 	/* can parameters be compared? */
 	if ((func1->unspecified_parameters && !func1->kr_style_parameters)
 			|| (func2->unspecified_parameters && !func2->kr_style_parameters))
 		return true;
-
-	if (func1->variadic != func2->variadic)
-		return false;
 
 	/* TODO: handling of unspecified parameters not correct yet */
 
