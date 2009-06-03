@@ -2715,13 +2715,12 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
 	const expression_t *left_expr = expression->left;
 	type_t             *type      = skip_typeref(left_expr->base.type);
-	ir_mode            *left_mode = get_ir_mode_storage(type);
 	ir_node            *right     = expression_to_firm(expression->right);
 	ir_node            *left_addr = expression_to_addr(left_expr);
 	ir_node            *left      = get_value_from_lvalue(left_expr, left_addr);
 	ir_node            *result    = create_op(dbgi, expression, left, right);
 
-	result = create_conv(dbgi, result, left_mode);
+	result = create_cast(dbgi, result, expression->right->base.type, type);
 	result = do_strict_conv(dbgi, result);
 
 	result = set_value_for_expression_addr(left_expr, result, left_addr);
