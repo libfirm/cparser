@@ -4811,6 +4811,10 @@ decl_list_end:
 	if (proto_type != NULL) {
 		type_t *proto_type_type = proto_type->declaration.type;
 		proto_parameter         = proto_type_type->function.parameters;
+		/* If a K&R function definition has a variadic prototype earlier, then
+		 * make the function definition variadic, too. This should conform to
+		 * §6.7.5.3:15 and §6.9.1:8. */
+		new_type->function.variadic = proto_type_type->function.variadic;
 	} else {
 		/* §6.9.1.7: A K&R style parameter list does NOT act as a function
 		 * prototype */
