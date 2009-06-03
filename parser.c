@@ -6863,9 +6863,12 @@ static expression_t *parse_va_start(void)
 	expression_t *const expr = parse_assignment_expression();
 	if (expr->kind == EXPR_REFERENCE) {
 		entity_t *const entity = expr->reference.entity;
-		if (entity->base.parent_scope != &current_function->parameters
-				|| entity->base.next != NULL
-				|| entity->kind != ENTITY_PARAMETER) {
+		if (!current_function->base.type->function.variadic) {
+			errorf(&expr->base.source_position,
+					"'va_start' used in non-variadic function");
+		} else if (entity->base.parent_scope != &current_function->parameters ||
+				entity->base.next != NULL ||
+				entity->kind != ENTITY_PARAMETER) {
 			errorf(&expr->base.source_position,
 			       "second argument of 'va_start' must be last parameter of the current function");
 		} else {
