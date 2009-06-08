@@ -81,9 +81,9 @@
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
-#define PREPROCESSOR "gcc -E -std=c99 -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "gcc -E -m32 -U__STRICT_ANSI__"
 #else
-#define PREPROCESSOR "cpp -std=c99 -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "cpp -m32 -U__STRICT_ANSI__"
 #endif
 #endif
 
@@ -129,6 +129,20 @@ static int             verbose;
 static struct obstack  cppflags_obst, ldflags_obst;
 static char            dep_target[1024];
 static const char     *outname;
+
+typedef enum lang_standard_t {
+	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
+	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
+	STANDARD_C89,     /* ISO C90 (sic) */
+	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
+	STANDARD_C99,     /* ISO C99 */
+	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
+	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
+	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
+	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
+} lang_standard_t;
+
+static lang_standard_t standard;
 
 typedef struct file_list_entry_t file_list_entry_t;
 
@@ -284,12 +298,17 @@ static const char *type_to_string(type_t *type)
 	return get_atomic_kind_name(type->atomic.akind);
 }
 
-static FILE *preprocess(const char *fname)
+static FILE *preprocess(const char *fname, filetype_t filetype)
 {
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
 
 	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
+	if (filetype == FILETYPE_C) {
+		add_flag(&cppflags_obst, "-std=c99");
+	} else {
+		add_flag(&cppflags_obst, "-std=c++98");
+	}
 
 	/* setup default defines */
 	add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
@@ -629,18 +648,6 @@ static void init_os_support(void)
 	}
 }
 
-typedef enum lang_standard_t {
-	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
-	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
-	STANDARD_C89,     /* ISO C90 (sic) */
-	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
-	STANDARD_C99,     /* ISO C99 */
-	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
-	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
-	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
-	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
-} lang_standard_t;
-
 int main(int argc, char **argv)
 {
 	initialize_firm();
@@ -734,7 +741,7 @@ int main(int argc, char **argv)
 	}
 
 	/* parse rest of options */
-	lang_standard_t standard        = STANDARD_DEFAULT;
+	standard                        = STANDARD_DEFAULT;
 	unsigned        features_on     = 0;
 	unsigned        features_off    = 0;
 	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
@@ -1240,15 +1247,16 @@ int main(int argc, char **argv)
 		}
 
 		FILE *preprocessed_in = NULL;
+		filetype_t next_filetype = filetype;
 		switch (filetype) {
 			case FILETYPE_C:
-				filetype = FILETYPE_PREPROCESSED_C;
+				next_filetype = FILETYPE_PREPROCESSED_C;
 				goto preprocess;
 			case FILETYPE_CXX:
-				filetype = FILETYPE_PREPROCESSED_CXX;
+				next_filetype = FILETYPE_PREPROCESSED_CXX;
 				goto preprocess;
 			case FILETYPE_ASSEMBLER:
-				filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
+				next_filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
 				add_flag(&cppflags_obst, "-x");
 				add_flag(&cppflags_obst, "assembler-with-cpp");
 				goto preprocess;
@@ -1257,7 +1265,7 @@ preprocess:
 				if (in != NULL)
 					panic("internal compiler error: in for preprocessor != NULL");
 
-				preprocessed_in = preprocess(filename);
+				preprocessed_in = preprocess(filename, filetype);
 				if (mode == PreprocessOnly) {
 					copy_file(out, preprocessed_in);
 					int result = pclose(preprocessed_in);
@@ -1270,6 +1278,7 @@ preprocess:
 				}
 
 				in = preprocessed_in;
+				filetype = next_filetype;
 				break;
 
 			default:

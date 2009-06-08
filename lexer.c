@@ -1766,6 +1766,16 @@ static void parse_preprocessor_directive(void)
 					lexer_token.type = set_type;           \
 					return;
 
+/* must use this as last thing */
+#define MAYBE_MODE(ch, set_type, mode)                     \
+				case ch:                                   \
+					if (c_mode & mode) {                   \
+						next_char();                       \
+						lexer_token.type = set_type;       \
+						return;                            \
+					}                                      \
+					/* fallthrough */
+
 #define ELSE_CODE(code)                                    \
 				default:                                   \
 					code                                   \
@@ -1921,6 +1931,7 @@ void lexer_next_preprocessing_token(void)
 		case ':':
 			MAYBE_PROLOG
 			MAYBE('>', ']')
+			MAYBE_MODE(':', T_COLONCOLON, _CXX)
 			ELSE(':')
 		case '=':
 			MAYBE_PROLOG

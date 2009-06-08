@@ -114,7 +114,7 @@ static declaration_t      **incomplete_arrays;
 #define POP_PARENT ((void)(current_parent = prev_parent))
 
 /** special symbol used for anonymous entities. */
-static const symbol_t *sym_anonymous = NULL;
+static symbol_t *sym_anonymous = NULL;
 
 /** The token anchor set */
 static unsigned char token_anchor_set[T_LAST_TOKEN];
@@ -796,7 +796,7 @@ static entity_t *get_entity(const symbol_t *const symbol,
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
  * possible. */
 static entity_t *get_tag(symbol_t const *const symbol,
-		entity_kind_tag_t const kind)
+                         entity_kind_tag_t const kind)
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
 	if (entity != NULL && entity->kind != kind) {
@@ -4158,7 +4158,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		storage_class_t storage_class = specifiers->storage_class;
 		entity->declaration.declared_storage_class = storage_class;
 
-		if (storage_class == STORAGE_CLASS_NONE	&& current_scope != file_scope)
+		if (storage_class == STORAGE_CLASS_NONE	&& current_function != NULL)
 			storage_class = STORAGE_CLASS_AUTO;
 		entity->declaration.storage_class = storage_class;
 	}
@@ -6448,14 +6448,73 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 }
 
-static expression_t *parse_reference(void)
+/**
+ * Find an entity matching a symbol in a scope.
+ * Uses current scope if scope is NULL
+ */
+static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
+                               namespace_tag_t namespc)
 {
-	symbol_t *const symbol = token.v.symbol;
+	if (scope == NULL) {
+		return get_entity(symbol, namespc);
+	}
 
-	entity_t *entity = get_entity(symbol, NAMESPACE_NORMAL);
+	/* we should optimize here, if scope grows above a certain size we should
+	   construct a hashmap here... */
+	entity_t *entity = scope->entities;
+	for ( ; entity != NULL; entity = entity->base.next) {
+		if (entity->base.symbol == symbol && entity->base.namespc == namespc)
+			break;
+	}
+
+	return entity;
+}
+
+static entity_t *parse_qualified_identifier(void)
+{
+	/* namespace containing the symbol */
+	symbol_t      *symbol;
+	const scope_t *lookup_scope = NULL;
+
+	if (token.type == T_COLONCOLON) {
+		next_token();
+		lookup_scope = &unit->scope;
+	}
+
+	entity_t *entity;
+	while (true) {
+		if (token.type != T_IDENTIFIER) {
+			parse_error_expected("while parsing identifier", T_IDENTIFIER, NULL);
+			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
+		}
+		symbol = token.v.symbol;
+		next_token();
+
+		/* lookup entity */
+		entity = lookup_entity(lookup_scope, symbol, NAMESPACE_NORMAL);
+
+		if (token.type != T_COLONCOLON)
+			break;
+		next_token();
+
+		switch (entity->kind) {
+		case ENTITY_NAMESPACE:
+			lookup_scope = &entity->namespacee.members;
+			break;
+		case ENTITY_STRUCT:
+		case ENTITY_UNION:
+		case ENTITY_CLASS:
+			lookup_scope = &entity->compound.members;
+			break;
+		default:
+			errorf(HERE, "'%Y' must be a namespace, class, struct or union (but is a %s)",
+			       symbol, get_entity_kind_name(entity->kind));
+			goto end_error;
+		}
+	}
 
 	if (entity == NULL) {
-		if (!strict_mode && look_ahead(1)->type == '(') {
+		if (!strict_mode && token.type == '(') {
 			/* an implicitly declared function */
 			if (warning.error_implicit_function_declaration) {
 				errorf(HERE, "implicit declaration of function '%Y'", symbol);
@@ -6470,8 +6529,25 @@ static expression_t *parse_reference(void)
 		}
 	}
 
-	type_t *orig_type;
+	return entity;
 
+end_error:
+	/* skip further qualifications */
+	while (token.type == T_IDENTIFIER) {
+		next_token();
+		if (token.type != T_COLONCOLON)
+			break;
+		next_token();
+	}
+
+	return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
+}
+
+static expression_t *parse_reference(void)
+{
+	entity_t *entity = parse_qualified_identifier();
+
+	type_t *orig_type;
 	if (is_declaration(entity)) {
 		orig_type = entity->declaration.type;
 	} else if (entity->kind == ENTITY_ENUM_VALUE) {
@@ -6518,7 +6594,6 @@ static expression_t *parse_reference(void)
 		         entity->declaration.type, entity->base.symbol);
 	}
 
-	next_token();
 	return expression;
 }
 
@@ -7203,6 +7278,8 @@ static expression_t *parse_primary_expression(void)
 		case T___noop:                       return parse_noop_expression();
 
 		/* Gracefully handle type names while parsing expressions. */
+		case T_COLONCOLON:
+			return parse_reference();
 		case T_IDENTIFIER:
 			if (!is_typedef_symbol(token.v.symbol)) {
 				return parse_reference();

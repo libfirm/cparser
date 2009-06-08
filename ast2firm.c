@@ -5875,6 +5875,8 @@ static void scope_to_firm(scope_t *scope)
 			(void)get_function_entity(entity, NULL);
 		} else if (entity->kind == ENTITY_VARIABLE) {
 			create_global_variable(entity);
+		} else if (entity->kind == ENTITY_NAMESPACE) {
+			scope_to_firm(&entity->namespacee.members);
 		}
 	}
 

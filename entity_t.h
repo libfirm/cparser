@@ -33,6 +33,7 @@ typedef enum {
 	ENTITY_PARAMETER,
 	ENTITY_FUNCTION,
 	ENTITY_TYPEDEF,
+	ENTITY_CLASS,
 	ENTITY_STRUCT,
 	ENTITY_UNION,
 	ENTITY_ENUM,
@@ -97,9 +98,9 @@ typedef enum decl_modifier_t {
  */
 struct scope_t {
 	entity_t *entities;
-	entity_t *last_entity;
-	unsigned  depth;        /**< while parsing, the depth of this scope in the
-	                             scope stack. */
+	entity_t *last_entity; /**< pointer to last entity (so appending is fast) */
+	unsigned  depth;       /**< while parsing, the depth of this scope in the
+	                            scope stack. */
 };
 
 /**

@@ -1553,6 +1553,12 @@ void print_entity(const entity_t *entity)
 	case ENTITY_TYPEDEF:
 		print_typedef(entity);
 		return;
+	case ENTITY_CLASS:
+		/* TODO */
+		fputs("class ", out);
+		fputs(entity->base.symbol->string, out);
+		fputs("; /* TODO */\n", out);
+		return;
 	case ENTITY_STRUCT:
 		fputs("struct ", out);
 		fputs(entity->base.symbol->string, out);
