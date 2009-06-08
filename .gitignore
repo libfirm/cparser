@@ -1,0 +1,16 @@
+/build
+/.depend
+/cparser
+/t
+/stuff
+/test
+/config.mak
+/revision.h
+/cparser.bootstrap
+/cparser.bootstrap2
+/cparser.bootstrape
+/config.h
+/builtins.h
+*.vcg
+a.out
+svn-commit.tmp
