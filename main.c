@@ -300,9 +300,42 @@ static const char *type_to_string(type_t *type)
 
 static FILE *preprocess(const char *fname, filetype_t filetype)
 {
-	obstack_1grow(&cppflags_obst, '\0');
-	const char *flags = obstack_finish(&cppflags_obst);
+	static const char *common_flags = NULL;
 
+	if (common_flags == NULL) {
+		obstack_1grow(&cppflags_obst, '\0');
+		const char *flags = obstack_finish(&cppflags_obst);
+
+		/* setup default defines */
+		add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
+		add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
+		add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
+		add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+
+		add_flag(&cppflags_obst, "-U__VERSION__");
+		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
+
+		/* TODO hack... */
+		add_flag(&cppflags_obst, "-D__builtin_abort=abort");
+		add_flag(&cppflags_obst, "-D__builtin_abs=abs");
+		add_flag(&cppflags_obst, "-D__builtin_exit=exit");
+		add_flag(&cppflags_obst, "-D__builtin_malloc=malloc");
+		add_flag(&cppflags_obst, "-D__builtin_memcmp=memcmp");
+		add_flag(&cppflags_obst, "-D__builtin_memcpy=memcpy");
+		add_flag(&cppflags_obst, "-D__builtin_memset=memset");
+		add_flag(&cppflags_obst, "-D__builtin_strlen=strlen");
+		add_flag(&cppflags_obst, "-D__builtin_strcmp=strcmp");
+		add_flag(&cppflags_obst, "-D__builtin_strcpy=strcpy");
+
+		if (flags[0] != '\0') {
+			size_t len = strlen(flags);
+			obstack_1grow(&cppflags_obst, ' ');
+			obstack_grow(&cppflags_obst, flags, len);
+		}
+		common_flags = obstack_finish(&cppflags_obst);
+	}
+
+	assert(obstack_object_size(&cppflags_obst) == 0);
 	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
 	if (filetype == FILETYPE_C) {
 		add_flag(&cppflags_obst, "-std=c99");
@@ -310,26 +343,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		add_flag(&cppflags_obst, "-std=c++98");
 	}
 
-	/* setup default defines */
-	add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
-	add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
-	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
-	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
-
-	add_flag(&cppflags_obst, "-U__VERSION__");
-	add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
-
-	/* TODO hack... */
-	add_flag(&cppflags_obst, "-D__builtin_abort=abort");
-	add_flag(&cppflags_obst, "-D__builtin_abs=abs");
-	add_flag(&cppflags_obst, "-D__builtin_exit=exit");
-	add_flag(&cppflags_obst, "-D__builtin_malloc=malloc");
-	add_flag(&cppflags_obst, "-D__builtin_memcmp=memcmp");
-	add_flag(&cppflags_obst, "-D__builtin_memcpy=memcpy");
-	add_flag(&cppflags_obst, "-D__builtin_memset=memset");
-	add_flag(&cppflags_obst, "-D__builtin_strlen=strlen");
-	add_flag(&cppflags_obst, "-D__builtin_strcmp=strcmp");
-	add_flag(&cppflags_obst, "-D__builtin_strcpy=strcpy");
+	obstack_printf(&cppflags_obst, "%s", common_flags);
 
 	/* handle dependency generation */
 	if (dep_target[0] != '\0') {
@@ -339,11 +353,6 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 				add_flag(&cppflags_obst, "-MQ");
 				add_flag(&cppflags_obst, outname);
 		}
-	}
-	if (flags[0] != '\0') {
-		size_t len = strlen(flags);
-		obstack_1grow(&cppflags_obst, ' ');
-		obstack_grow(&cppflags_obst, flags, len);
 	}
 	add_flag(&cppflags_obst, fname);
 
