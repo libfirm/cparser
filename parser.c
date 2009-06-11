@@ -6574,8 +6574,9 @@ static expression_t *parse_reference(void)
 	}
 
 	if (entity->base.parent_scope != file_scope
-		&& (current_function != NULL && entity->base.parent_scope->depth < current_function->parameters.depth)
-		&& is_type_valid(orig_type) && !is_type_function(orig_type)) {
+		&& (current_function != NULL
+			&& entity->base.parent_scope->depth < current_function->parameters.depth)
+		&& (entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER)) {
 		if (entity->kind == ENTITY_VARIABLE) {
 			/* access of a variable from an outer function */
 			entity->variable.address_taken = true;
