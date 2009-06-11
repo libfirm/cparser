@@ -316,6 +316,9 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
 	add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
 
+	add_flag(&cppflags_obst, "-U__VERSION__");
+	add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
+
 	/* TODO hack... */
 	add_flag(&cppflags_obst, "-D__builtin_abort=abort");
 	add_flag(&cppflags_obst, "-D__builtin_abs=abs");
