@@ -1877,7 +1877,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	mark_vars_read(expression, NULL);
 	if (must_be_constant && !is_initializer_constant(expression)) {
 		errorf(&expression->base.source_position,
-		       "Initialisation expression '%E' is not constant",
+		       "initialisation expression '%E' is not constant",
 		       expression);
 	}
 

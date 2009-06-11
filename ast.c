@@ -1764,6 +1764,19 @@ bool is_address_constant(const expression_t *expression)
 			is_address_constant(expression->array_access.array_ref);
 	}
 
+	case EXPR_CONDITIONAL: {
+		expression_t *const c = expression->conditional.condition;
+		if (!is_constant_expression(c))
+			return false;
+
+		if (fold_constant_to_bool(c)) {
+			expression_t const *const t = expression->conditional.true_expression;
+			return is_address_constant(t != NULL ? t : c);
+		} else {
+			return is_address_constant(expression->conditional.false_expression);
+		}
+	}
+
 	default:
 		return false;
 	}
