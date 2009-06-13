@@ -5255,7 +5255,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 				char     buf[64];
 				ir_node *value = get_value_from_lvalue(expr, addr);
 
-				snprintf(buf, sizeof(buf), "%u", pos);
+				snprintf(buf, sizeof(buf), "%u", out_size);
 
 				ir_asm_constraint constraint;
 				constraint.pos              = pos;
