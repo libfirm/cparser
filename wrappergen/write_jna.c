@@ -72,8 +72,8 @@ static const char *get_atomic_type_string(const atomic_type_kind_t type)
 	case ATOMIC_TYPE_USHORT:      return "short";
 	case ATOMIC_TYPE_INT:         return "int";
 	case ATOMIC_TYPE_UINT:        return "int";
-	case ATOMIC_TYPE_LONG:        return "NativeLong";
-	case ATOMIC_TYPE_ULONG:       return "NativeLong";
+	case ATOMIC_TYPE_LONG:        return "com.sun.jna.NativeLong";
+	case ATOMIC_TYPE_ULONG:       return "com.sun.jna.NativeLong";
 	case ATOMIC_TYPE_LONGLONG:    return "long";
 	case ATOMIC_TYPE_ULONGLONG:   return "long";
 	case ATOMIC_TYPE_FLOAT:       return "float";
@@ -443,10 +443,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	type_set_output(out);
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 	fputs("import com.sun.jna.Library;\n", out);
-	fputs("import com.sun.jna.Native;\n", out);
-	fputs("import com.sun.jna.Platform;\n", out);
 	fputs("import com.sun.jna.Pointer;\n", out);
-	fputs("import com.sun.jna.NativeLong;\n", out);
 	fputs("\n\n", out);
 
 	/* TODO: where to get the name from? */
