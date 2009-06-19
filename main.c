@@ -336,13 +336,21 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	}
 
 	assert(obstack_object_size(&cppflags_obst) == 0);
-	obstack_printf(&cppflags_obst, "%s", PREPROCESSOR);
-	if (filetype == FILETYPE_C) {
+	obstack_printf(&cppflags_obst, "%s ", PREPROCESSOR);
+	switch (filetype) {
+	case FILETYPE_C:
 		add_flag(&cppflags_obst, "-std=c99");
-	} else {
+		break;
+	case FILETYPE_CXX:
 		add_flag(&cppflags_obst, "-std=c++98");
+		break;
+	case FILETYPE_ASSEMBLER:
+		add_flag(&cppflags_obst, "-x");
+		add_flag(&cppflags_obst, "assembler-with-cpp");
+		break;
+	default:
+		break;
 	}
-
 	obstack_printf(&cppflags_obst, "%s", common_flags);
 
 	/* handle dependency generation */
@@ -357,7 +365,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	add_flag(&cppflags_obst, fname);
 
 	obstack_1grow(&cppflags_obst, '\0');
-	const char *buf = obstack_finish(&cppflags_obst);
+	char *buf = obstack_finish(&cppflags_obst);
 	if (verbose) {
 		puts(buf);
 	}
@@ -367,6 +375,9 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(1);
 	}
+
+	/* we don't really need that anymore */
+	obstack_free(&cppflags_obst, buf);
 
 	return f;
 }
@@ -1269,8 +1280,6 @@ int main(int argc, char **argv)
 				goto preprocess;
 			case FILETYPE_ASSEMBLER:
 				next_filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
-				add_flag(&cppflags_obst, "-x");
-				add_flag(&cppflags_obst, "assembler-with-cpp");
 				goto preprocess;
 preprocess:
 				/* no support for input on FILE* yet */
