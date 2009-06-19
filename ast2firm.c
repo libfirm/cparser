@@ -4987,12 +4987,14 @@ static ir_node *get_break_label(void)
 
 static void switch_statement_to_firm(switch_statement_t *statement)
 {
-	ir_node  *first_block = get_cur_block();
+	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
 	ir_node  *cond        = NULL;
-	if (first_block != NULL) {
+
+	if (get_cur_block() != NULL) {
 		ir_node *expression = expression_to_firm(statement->expression);
 		cond                = new_d_Cond(dbgi, expression);
+		first_block         = get_cur_block();
 	}
 
 	set_cur_block(NULL);
