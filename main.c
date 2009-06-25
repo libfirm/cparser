@@ -749,7 +749,6 @@ int main(int argc, char **argv)
 		break;
 	default:
 	case 4:
-		set_option("strict-aliasing");
 		/* use_builtins = true; */
 		/* fallthrough */
 	case 3:
@@ -757,6 +756,7 @@ int main(int argc, char **argv)
 		set_option("if-conv");
 		/* fallthrough */
 	case 2:
+		set_option("strict-aliasing");
 		set_option("inline");
 		set_option("deconv");
 		set_be_option("omitfp");
