@@ -5571,7 +5571,7 @@ static void initialize_function_parameters(entity_t *entity)
 
 	if (entity->function.need_closure) {
 		/* add an extra parameter for the static link */
-		entity->function.static_link = new_r_Proj(irg, start_block, args, mode_P_data, 0);
+		entity->function.static_link = new_r_Proj(start_block, args, mode_P_data, 0);
 		++first_param_nr;
 	}
 
@@ -5605,7 +5605,7 @@ static void initialize_function_parameters(entity_t *entity)
 		ir_mode *param_mode   = get_type_mode(param_irtype);
 
 		long     pn    = n + first_param_nr;
-		ir_node *value = new_r_Proj(irg, start_block, args, param_mode, pn);
+		ir_node *value = new_r_Proj(start_block, args, param_mode, pn);
 
 		ir_mode *mode = get_ir_mode_storage(type);
 		value = create_conv(NULL, value, mode);
