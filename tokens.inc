@@ -112,6 +112,9 @@ S(_MS, __FUNCDNAME__)
 #ifdef __w64
 #undef __w64
 #endif
+#ifdef __ptr32
+#undef __ptr32
+#endif
 #ifdef __ptr64
 #undef __ptr64
 #endif
