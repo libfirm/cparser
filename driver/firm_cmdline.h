@@ -36,7 +36,7 @@ struct a_firm_opt {
   a_byte   gcse;            /**< enable global common-subexpression elimination */
   a_byte   gvn_pre;         /**< enable global common-subexpression elimination
                                  and partial redundancy elimination */
-  a_byte   cond_eval;       /**< enable condition evaluation */
+  a_byte   jumpthreading;   /**< enable jumpthreading */
   a_byte   if_conversion;   /**< enable if-conversion */
   a_byte   func_calls;      /**< enable function call optimization */
   a_byte   do_inline;       /**< do automatic inlining */
