@@ -384,7 +384,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "sync",        (func_ptr_t) opt_sync,                true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "lower",       (func_ptr_t) do_lower_highlevel,      true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "deconv",      (func_ptr_t) conv_opt,                true, true,  true,  TV_DECONV },
-	{ OPT_TARGET_IRG, "condeval",    (func_ptr_t) opt_cond_eval,           true, true,  true,  TV_COND_EVAL },
+	{ OPT_TARGET_IRG, "jumpthreading", (func_ptr_t) opt_jumpthreading,     true, true,  true,  TV_JUMPTHREADING },
 	{ OPT_TARGET_IRG, "remove_confirms", (func_ptr_t) remove_confirms,     true, false, false, TV_CONFIRM_CREATE },
 	{ OPT_TARGET_IRG, "gvnpre",      (func_ptr_t) do_gvn_pre,              true, true,  true,  -1 },
 	{ OPT_TARGET_IRG, "ifconv",      (func_ptr_t) do_if_conv,              true, true,  true,  TV_IF_CONV },
@@ -979,6 +979,15 @@ void gen_firm_init(void)
 void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_firm_const_exists)
 {
   int i;
+
+#if 0
+  if (firm_opt.enable_statev) {
+	  char buf[1024];
+	  snprintf(buf, sizeof(buf), "%s.ev", input_filename);
+	  ir_stat_ev_begin(input_filename, firm_opt.statev_filter);
+	  ir_stat_ev_compilation_unit(input_filename);
+  }
+#endif
 
   firm_const_exists = new_firm_const_exists;
 

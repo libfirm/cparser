@@ -82,6 +82,8 @@ struct a_firm_opt {
   a_byte   grs_simd_opt;
   a_byte   grs_create_pattern;
   unsigned spare_size;      /**< allowed spare size for table switches in machine words. */
+  a_byte   enable_statev;   /**< enable statev output */
+  char     *statev_filter;  /**< statev filter */
 };
 
 /** statistic options */
