@@ -292,7 +292,7 @@ static void disable_opts(void) {
   /* firm_opt.control_flow */
   firm_opt.gcse            = FALSE;
   firm_opt.gvn_pre         = FALSE;
-  firm_opt.cond_eval       = FALSE;
+  firm_opt.jumpthreading   = FALSE;
   firm_opt.if_conversion   = FALSE;
   firm_opt.func_calls      = FALSE;
   firm_opt.do_inline       = FALSE;

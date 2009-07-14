@@ -752,7 +752,7 @@ int main(int argc, char **argv)
 		/* use_builtins = true; */
 		/* fallthrough */
 	case 3:
-		set_option("cond-eval");
+		set_option("jumpthreading");
 		set_option("if-conv");
 		/* fallthrough */
 	case 2:

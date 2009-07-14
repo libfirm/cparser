@@ -504,7 +504,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_opt_enabled("sync", firm_opt.sync);
   set_opt_enabled("ldst", firm_opt.load_store);
   set_opt_enabled("deconv", firm_opt.deconv);
-  set_opt_enabled("condeval", firm_opt.cond_eval);
+  set_opt_enabled("jumpthreading", firm_opt.jumpthreading);
   set_opt_enabled("gvnpre", firm_opt.gvn_pre);
   set_opt_enabled("ifconv", firm_opt.if_conversion);
   set_opt_enabled("bool", firm_opt.bool_opt);
