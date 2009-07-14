@@ -558,7 +558,7 @@ static void do_firm_optimizations(const char *input_filename)
     do_irg_opt(irg, "ldst");
     do_irg_opt(irg, "lower");
     do_irg_opt(irg, "deconv");
-    do_irg_opt(irg, "condeval");
+    do_irg_opt(irg, "jumpthreading");
     do_irg_opt(irg, "remove_confirms");
     do_irg_opt(irg, "gvnpre");
     do_irg_opt(irg, "place");
@@ -585,7 +585,7 @@ static void do_firm_optimizations(const char *input_filename)
     ir_graph *irg = get_irp_irg(i);
     do_irg_opt(irg, "local");
     do_irg_opt(irg, "controlflow");
-    do_irg_opt(irg, "condeval");
+    do_irg_opt(irg, "jumpthreading");
     do_irg_opt(irg, "local");
     do_irg_opt(irg, "controlflow");
   }
