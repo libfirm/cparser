@@ -366,35 +366,35 @@ typedef struct {
 } opt_config_t;
 
 static opt_config_t opts[] = {
-	{ OPT_TARGET_IRP, "rts",         (func_ptr_t) rts_map,                 true, true,  true,  -1 },
+	{ OPT_TARGET_IRP, "rts",         (func_ptr_t) rts_map,                 true, true,  true,  TV_RTS },
 	{ OPT_TARGET_IRG, "combo",       (func_ptr_t) combo,                   true, true,  true,  TV_COMBO },
 	{ OPT_TARGET_IRG, "controlflow", (func_ptr_t) optimize_cf,             true, true,  true,  TV_CF_OPT },
 	{ OPT_TARGET_IRG, "local",       (func_ptr_t) optimize_graph_df,       true, true,  true,  TV_LOCAL_OPT },
 	{ OPT_TARGET_IRP, "gc_irgs",     (func_ptr_t) remove_unused_functions, true, false, false, TV_CGANA },
 	{ OPT_TARGET_IRP, "tailrec",     (func_ptr_t) opt_tail_recursion,      true, true,  true,  TV_TAIL_REC },
 	{ OPT_TARGET_IRP, "funccalls",   (func_ptr_t) do_optimize_funccalls,   true, true,  true,  TV_REAL_FUNC_CALL },
-	{ OPT_TARGET_IRP, "lowerconst",  (func_ptr_t) lower_const_code,        true, false, false, -1 },
-	{ OPT_TARGET_IRG, "onereturn",   (func_ptr_t) normalize_one_return,    true, false, false, -1 },
+	{ OPT_TARGET_IRP, "lowerconst",  (func_ptr_t) lower_const_code,        true, false, false, TV_LOWER },
+	{ OPT_TARGET_IRG, "onereturn",   (func_ptr_t) normalize_one_return,    true, false, false, TV_ONERETURN },
 	{ OPT_TARGET_IRG, "scalar",      (func_ptr_t) scalar_replacement_opt,  true, true,  true,  TV_SCALAR_REPLACE },
 	{ OPT_TARGET_IRG, "reassoc",     (func_ptr_t) optimize_reassociation,  true, true,  true,  TV_REASSOCIATION },
 	{ OPT_TARGET_IRG, "gcse",        (func_ptr_t) do_gcse,                 true, true,  true,  TV_CODE_PLACE },
 	{ OPT_TARGET_IRG, "place",       (func_ptr_t) place_code,              true, true,  true,  TV_CODE_PLACE },
 	{ OPT_TARGET_IRG, "confirm",     (func_ptr_t) construct_confirms,      true, true,  true,  TV_CONFIRM_CREATE },
 	{ OPT_TARGET_IRG, "ldst",        (func_ptr_t) optimize_load_store,     true, true,  true,  TV_LOAD_STORE },
-	{ OPT_TARGET_IRG, "sync",        (func_ptr_t) opt_sync,                true, true,  true,  -1 },
-	{ OPT_TARGET_IRG, "lower",       (func_ptr_t) do_lower_highlevel,      true, true,  true,  -1 },
+	{ OPT_TARGET_IRG, "sync",        (func_ptr_t) opt_sync,                true, true,  true,  TV_SYNC },
+	{ OPT_TARGET_IRG, "lower",       (func_ptr_t) do_lower_highlevel,      true, true,  true,  TV_LOWER },
 	{ OPT_TARGET_IRG, "deconv",      (func_ptr_t) conv_opt,                true, true,  true,  TV_DECONV },
 	{ OPT_TARGET_IRG, "jumpthreading", (func_ptr_t) opt_jumpthreading,     true, true,  true,  TV_JUMPTHREADING },
 	{ OPT_TARGET_IRG, "remove_confirms", (func_ptr_t) remove_confirms,     true, false, false, TV_CONFIRM_CREATE },
-	{ OPT_TARGET_IRG, "gvnpre",      (func_ptr_t) do_gvn_pre,              true, true,  true,  -1 },
+	{ OPT_TARGET_IRG, "gvnpre",      (func_ptr_t) do_gvn_pre,              true, true,  true,  TV_GVNPRE },
 	{ OPT_TARGET_IRG, "ifconv",      (func_ptr_t) do_if_conv,              true, true,  true,  TV_IF_CONV },
-	{ OPT_TARGET_IRG, "bool",        (func_ptr_t) opt_bool,                true, true,  true,  -1 },
+	{ OPT_TARGET_IRG, "bool",        (func_ptr_t) opt_bool,                true, true,  true,  TV_BOOLOPT },
 	{ OPT_TARGET_IRG, "shape-blocks",(func_ptr_t) shape_blocks,            true, true,  true,  TV_END_MELT },
 	{ OPT_TARGET_IRG, "stred",       (func_ptr_t) do_stred,                true, true,  true,  TV_OSR },
 	{ OPT_TARGET_IRG, "dead",        (func_ptr_t) dead_node_elimination,   true, false, true,  TV_DEAD_NODE },
-	{ OPT_TARGET_IRP, "inline",      (func_ptr_t) do_inline,               true, true,  true,  -1 },
-	{ OPT_TARGET_IRP, "clone",       (func_ptr_t) do_cloning,              true, true,  true,  -1 },
-	{ OPT_TARGET_IRG, "lower_switch", (func_ptr_t) do_lower_switch,        true, true,  true,  -1 },
+	{ OPT_TARGET_IRP, "inline",      (func_ptr_t) do_inline,               true, true,  true,  TV_INLINE },
+	{ OPT_TARGET_IRP, "clone",       (func_ptr_t) do_cloning,              true, true,  true,  TV_CLONE },
+	{ OPT_TARGET_IRG, "lower_switch", (func_ptr_t) do_lower_switch,        true, true,  true,  TV_LOWER },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 
@@ -600,10 +600,7 @@ static void do_firm_optimizations(const char *input_filename)
 
   DUMP_ALL(firm_dump.ir_graph, "-opt");
   /* verify optimized graphs */
-  for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-    ir_graph *irg = get_irp_irg(i);
-    irg_verify(irg, VRFY_ENFORCE_SSA);
-  }
+  CHECK_ALL(firm_opt.check_all);
 
   if (firm_dump.statistic & STAT_AFTER_OPT)
     stat_dump_snapshot(input_filename, "opt");
@@ -827,10 +824,7 @@ static void do_firm_lowering(const char *input_filename)
     stat_dump_snapshot(input_filename, "low");
 
   /* verify lowered graphs */
-  timer_push(TV_VERIFY);
-  for (i = get_irp_n_irgs() - 1; i >= 0; --i)
-    irg_verify(get_irp_irg(i), VRFY_ENFORCE_SSA);
-  timer_pop();
+  CHECK_ALL(firm_opt.check_all);
 
   DUMP_ALL(firm_dump.ir_graph, "-low");
 
@@ -1012,6 +1006,7 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
   }
 
   /* finalize all graphs */
+  timer_push(TV_CONSTRUCT);
   for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
     ir_graph *irg = get_irp_irg(i);
 
@@ -1019,10 +1014,9 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
     DUMP_ONE(firm_dump.ir_graph, irg, "");
 
     /* verify the graph */
-    timer_push(TV_VERIFY);
-      irg_verify(irg, VRFY_ENFORCE_SSA);
-    timer_pop();
+    CHECK_ONE(firm_opt.check_all, irg);
   }
+  timer_pop();
 
   timer_push(TV_VERIFY);
     tr_vrfy();
@@ -1032,10 +1026,12 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
   set_irp_phase_state(phase_high);
 
   /* BEWARE: kill unreachable code before doing compound lowering */
+  timer_push(TV_CF_OPT);
   for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
     ir_graph *irg = get_irp_irg(i);
     optimize_cf(irg);
   }
+  timer_pop();
 
   /* lower all compound call return values */
   lower_compound_params();

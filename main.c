@@ -71,6 +71,7 @@
 #include "lang_features.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
+#include "driver/firm_timing.h"
 #include "adt/error.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_caml.h"
@@ -684,6 +685,7 @@ int main(int argc, char **argv)
 	file_list_entry_t *files                = NULL;
 	file_list_entry_t *last_file            = NULL;
 	bool               construct_dep_target = false;
+	bool               do_timing            = false;
 	struct obstack     file_obst;
 
 	atexit(free_temp_files);
@@ -1078,6 +1080,8 @@ int main(int argc, char **argv)
 					mode = PrintCaml;
 				} else if (streq(option, "print-jna")) {
 					mode = PrintJna;
+				} else if (streq(option, "time")) {
+					do_timing = true;
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					exit(EXIT_SUCCESS);
@@ -1184,6 +1188,9 @@ int main(int argc, char **argv)
 	init_parser();
 	init_ast2firm();
 	init_mangle();
+
+	if (do_timing)
+		timer_init();
 
 	if (construct_dep_target) {
 		if (outname != 0 && strlen(outname) >= 2) {
@@ -1363,8 +1370,10 @@ do_parsing:
 			c_mode |= features_on;
 			c_mode &= ~features_off;
 
+			timer_push(TV_PARSING);
 			init_tokens();
 			translation_unit_t *const unit = do_parsing(in, filename);
+			timer_pop();
 
 			/* prints the AST even if errors occurred */
 			if (mode == PrintAst) {
@@ -1406,7 +1415,9 @@ do_parsing:
 				continue;
 			}
 
+			timer_push(TV_CONSTRUCT);
 			translation_unit_to_firm(unit);
+			timer_pop();
 
 graph_built:
 			if (mode == ParseOnly) {
@@ -1538,6 +1549,9 @@ graph_built:
 			exit(1);
 		}
 	}
+
+	if (do_timing)
+		timer_term(stderr);
 
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
