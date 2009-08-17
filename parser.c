@@ -4275,6 +4275,47 @@ static bool is_error_entity(entity_t *const ent)
 	return false;
 }
 
+static bool contains_attribute(const attribute_t *list, const attribute_t *attr)
+{
+	for (const attribute_t *tattr = list; tattr != NULL; tattr = tattr->next) {
+		if (attributes_equal(tattr, attr))
+			return true;
+	}
+	return false;
+}
+
+/**
+ * test wether new_list contains any attributes not included in old_list
+ */
+static bool has_new_attributes(const attribute_t *old_list,
+                               const attribute_t *new_list)
+{
+	for (const attribute_t *attr = new_list; attr != NULL; attr = attr->next) {
+		if (!contains_attribute(old_list, attr))
+			return true;
+	}
+	return false;
+}
+
+/**
+ * Merge in attributes from an attribute list (probably from a previous
+ * declaration with the same name). Warning: destroys the old structure
+ * of the attribute list - don't reuse attributes after this call.
+ */
+static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
+{
+	attribute_t *next;
+	for (attribute_t *attr = attributes; attr != NULL; attr = next) {
+		next = attr->next;
+		if (contains_attribute(decl->attributes, attr))
+			continue;
+
+		/* move attribute to new declarations attributes list */
+		attr->next       = decl->attributes;
+		decl->attributes = attr;
+	}
+}
+
 /**
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
@@ -4429,8 +4470,14 @@ static entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 				if (old_storage_class == STORAGE_CLASS_EXTERN &&
 						new_storage_class == STORAGE_CLASS_EXTERN) {
-warn_redundant_declaration:
-					if (!is_definition           &&
+
+warn_redundant_declaration: ;
+					bool has_new_attrs
+						= has_new_attributes(prev_decl->attributes,
+						                     decl->attributes);
+					if (has_new_attrs) {
+						merge_in_attributes(decl, prev_decl->attributes);
+					} else if (!is_definition        &&
 							warning.redundant_decls  &&
 							is_type_valid(prev_type) &&
 							strcmp(previous_entity->base.source_position.input_name,

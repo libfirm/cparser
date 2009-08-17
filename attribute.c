@@ -24,6 +24,7 @@
 #include "warning.h"
 #include "attribute_t.h"
 #include "symbol_t.h"
+#include "adt/error.h"
 #include "type_t.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
@@ -421,4 +422,53 @@ const char *get_deprecated_string(const attribute_t *attribute)
 		return expression->string.value.begin;
 	}
 	return NULL;
+}
+
+static bool property_attribute_equal(const attribute_property_argument_t *prop1,
+                                     const attribute_property_argument_t *prop2)
+{
+	return prop1->put_symbol == prop2->put_symbol
+		&& prop1->get_symbol == prop2->get_symbol;
+}
+
+static bool attribute_argument_equal(const attribute_argument_t *arg1,
+                                     const attribute_argument_t *arg2)
+{
+	if (arg1->kind != arg2->kind)
+		return false;
+
+	switch (arg1->kind) {
+	case ATTRIBUTE_ARGUMENT_SYMBOL:
+		return arg1->v.symbol == arg2->v.symbol;
+	case ATTRIBUTE_ARGUMENT_EXPRESSION:
+		/* TODO */
+		return false;
+	}
+	panic("Unknown argument type found");
+}
+
+static bool attribute_arguments_equal(const attribute_argument_t *args1,
+                                      const attribute_argument_t *args2)
+{
+	for ( ; args1 != NULL && args2 != NULL;
+	     args1 = args1->next, args2 = args2->next) {
+		if (!attribute_argument_equal(args1, args2))
+			return false;
+	}
+	/* both should be NULL now */
+	return args1 == args2;
+}
+
+bool attributes_equal(const attribute_t *attr1, const attribute_t *attr2)
+{
+	if (attr1->kind != attr2->kind)
+		return false;
+
+	switch (attr1->kind) {
+	case ATTRIBUTE_MS_PROPERTY:
+		return property_attribute_equal(attr1->a.property, attr2->a.property);
+	default:
+		return attribute_arguments_equal(attr1->a.arguments,
+		                                 attr2->a.arguments);
+	}
 }

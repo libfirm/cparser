@@ -143,4 +143,6 @@ struct attribute_t {
 
 const char *get_attribute_name(attribute_kind_t kind);
 
+bool attributes_equal(const attribute_t *attr1, const attribute_t *attr2);
+
 #endif
