@@ -37,7 +37,7 @@
  *  <li><b>Hash(hashset,key)</b> calculates the hash value for a given key</li>
  * </ul>
  *
- * Note that by default it is assumed that the data values themselfes are used
+ * Note that by default it is assumed that the data values themselves are used
  * as keys. However you can change that with additional defines:
  *
  * <ul>
