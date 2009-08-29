@@ -333,6 +333,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 			obstack_1grow(&cppflags_obst, ' ');
 			obstack_grow(&cppflags_obst, flags, len);
 		}
+		obstack_1grow(&cppflags_obst, '\0');
 		common_flags = obstack_finish(&cppflags_obst);
 	}
 
