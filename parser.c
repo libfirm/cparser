@@ -2521,11 +2521,7 @@ static void append_entity(scope_t *scope, entity_t *entity)
 
 static compound_t *parse_compound_type_specifier(bool is_struct)
 {
-	if (is_struct) {
-		eat(T_struct);
-	} else {
-		eat(T_union);
-	}
+	eat(is_struct ? T_struct : T_union);
 
 	symbol_t    *symbol   = NULL;
 	compound_t  *compound = NULL;
