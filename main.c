@@ -957,9 +957,10 @@ int main(int argc, char **argv)
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = firm_be_option(arch_opt);
-					if (res == 0)
+					if (res == 0) {
+						fprintf(stderr, "Unknown architecture '%s'\n", arch_opt);
 						argument_errors = true;
-					else {
+					} else {
 						snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
 						int res = firm_be_option(arch_opt);
 						if (res == 0)
