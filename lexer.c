@@ -1806,12 +1806,10 @@ void lexer_next_preprocessing_token(void)
 		SYMBOL_CHARS
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
-			if(lexer_token.type == T_IDENTIFIER &&
-			    lexer_token.v.symbol == symbol_L) {
-			    if(c == '"') {
-					parse_wide_string_literal();
-				} else if(c == '\'') {
-					parse_wide_character_constant();
+			if (lexer_token.v.symbol == symbol_L) {
+				switch (c) {
+					case '"':  parse_wide_string_literal();     break;
+					case '\'': parse_wide_character_constant(); break;
 				}
 			}
 			return;
