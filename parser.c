@@ -2311,6 +2311,8 @@ finish_designator:
 
 			if (type == NULL) {
 				/* we are already outside, ... */
+				if (outer_type == NULL)
+					goto error_parse_next;
 				type_t *const outer_type_skip = skip_typeref(outer_type);
 				if (is_type_compound(outer_type_skip) &&
 				    !outer_type_skip->compound.compound->complete) {
