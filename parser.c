@@ -3408,7 +3408,6 @@ warn_about_long_long:
 
 end_error:
 	specifiers->type = type_error_type;
-	return;
 }
 
 static type_qualifiers_t parse_type_qualifiers(void)
