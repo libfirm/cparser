@@ -6517,8 +6517,9 @@ static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
 static entity_t *parse_qualified_identifier(void)
 {
 	/* namespace containing the symbol */
-	symbol_t      *symbol;
-	const scope_t *lookup_scope = NULL;
+	symbol_t          *symbol;
+	source_position_t  pos;
+	const scope_t     *lookup_scope = NULL;
 
 	if (token.type == T_COLONCOLON) {
 		next_token();
@@ -6532,6 +6533,7 @@ static entity_t *parse_qualified_identifier(void)
 			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 		}
 		symbol = token.v.symbol;
+		pos    = *HERE;
 		next_token();
 
 		/* lookup entity */
@@ -6551,7 +6553,7 @@ static entity_t *parse_qualified_identifier(void)
 			lookup_scope = &entity->compound.members;
 			break;
 		default:
-			errorf(HERE, "'%Y' must be a namespace, class, struct or union (but is a %s)",
+			errorf(&pos, "'%Y' must be a namespace, class, struct or union (but is a %s)",
 			       symbol, get_entity_kind_name(entity->kind));
 			goto end_error;
 		}
@@ -6561,14 +6563,14 @@ static entity_t *parse_qualified_identifier(void)
 		if (!strict_mode && token.type == '(') {
 			/* an implicitly declared function */
 			if (warning.error_implicit_function_declaration) {
-				errorf(HERE, "implicit declaration of function '%Y'", symbol);
+				errorf(&pos, "implicit declaration of function '%Y'", symbol);
 			} else if (warning.implicit_function_declaration) {
-				warningf(HERE, "implicit declaration of function '%Y'", symbol);
+				warningf(&pos, "implicit declaration of function '%Y'", symbol);
 			}
 
-			entity = create_implicit_function(symbol, HERE);
+			entity = create_implicit_function(symbol, &pos);
 		} else {
-			errorf(HERE, "unknown identifier '%Y' found.", symbol);
+			errorf(&pos, "unknown identifier '%Y' found.", symbol);
 			entity = create_error_entity(symbol, ENTITY_VARIABLE);
 		}
 	}
