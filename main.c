@@ -338,7 +338,12 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	}
 
 	assert(obstack_object_size(&cppflags_obst) == 0);
-	obstack_printf(&cppflags_obst, "%s ", PREPROCESSOR);
+
+	const char *preprocessor = getenv("CPARSER_PP");
+	if (preprocessor == NULL)
+		preprocessor = PREPROCESSOR;
+
+	obstack_printf(&cppflags_obst, "%s ", preprocessor);
 	switch (filetype) {
 	case FILETYPE_C:
 		add_flag(&cppflags_obst, "-std=c99");
@@ -388,7 +393,11 @@ static void assemble(const char *out, const char *in)
 {
 	char buf[65536];
 
-	snprintf(buf, sizeof(buf), "%s %s -o %s", ASSEMBLER, in, out);
+	const char *assembler = getenv("CPARSER_AS");
+	if (assembler == NULL)
+		assembler = ASSEMBLER;
+
+	snprintf(buf, sizeof(buf), "%s %s -o %s", assembler, in, out);
 	if (verbose) {
 		puts(buf);
 	}
@@ -408,7 +417,10 @@ static void print_file_name(const char *file)
 	const char *flags = obstack_finish(&ldflags_obst);
 
 	/* construct commandline */
-	obstack_printf(&ldflags_obst, "%s ", LINKER);
+	const char *linker = getenv("CPARSER_LINK");
+	if (linker == NULL)
+		linker = LINKER;
+	obstack_printf(&ldflags_obst, "%s ", linker);
 	obstack_printf(&ldflags_obst, "%s", flags);
 	obstack_1grow(&ldflags_obst, '\0');
 
@@ -1526,7 +1538,10 @@ graph_built:
 		const char *flags = obstack_finish(&ldflags_obst);
 
 		/* construct commandline */
-		obstack_printf(&file_obst, "%s", LINKER);
+		const char *linker = getenv("CPARSER_LINK");
+		if (linker == NULL)
+			linker = LINKER;
+		obstack_printf(&file_obst, "%s", linker);
 		for (file_list_entry_t *entry = files; entry != NULL;
 				entry = entry->next) {
 			if (entry->type != FILETYPE_OBJECT)
