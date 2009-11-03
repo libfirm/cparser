@@ -1156,11 +1156,11 @@ static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned align
 }
 
 /**
- * Return a node representing a trampoline reagion
- * for a given entity.
+ * Return a node representing a trampoline region
+ * for a given function entity.
  *
  * @param dbgi    debug info
- * @param entity  the entity
+ * @param entity  the function entity
  */
 static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
 {
@@ -1212,11 +1212,11 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
 }
 
 /**
- * Creates a SymConst for a given trampoline of an entity.
+ * Creates a trampoline for a function represented by an entity.
  *
  * @param dbgi    debug info
- * @param mode    the (reference) mode for the SymConst
- * @param entity  the entity
+ * @param mode    the (reference) mode for the function address
+ * @param entity  the function entity
  */
 static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
                                   ir_entity *entity)
