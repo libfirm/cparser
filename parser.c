@@ -1250,8 +1250,8 @@ static attribute_t *allocate_attribute_zero(attribute_kind_t kind)
  */
 static attribute_argument_t *parse_attribute_arguments(void)
 {
-	attribute_argument_t *first = NULL;
-	attribute_argument_t *last  = NULL;
+	attribute_argument_t  *first  = NULL;
+	attribute_argument_t **anchor = &first;
 	if (token.type != ')') do {
 		attribute_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 
@@ -1271,12 +1271,8 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		}
 
 		/* append argument */
-		if (last == NULL) {
-			first = argument;
-		} else {
-			last->next = argument;
-		}
-		last = argument;
+		*anchor = argument;
+		anchor  = &argument->next;
 	} while (next_if(','));
 	expect(')', end_error);
 
@@ -1383,8 +1379,8 @@ end_error:
 
 static attribute_t *parse_attribute_gnu(void)
 {
-	attribute_t *first = NULL;
-	attribute_t *last  = NULL;
+	attribute_t  *first  = NULL;
+	attribute_t **anchor = &first;
 
 	eat(T___attribute__);
 	expect('(', end_error);
@@ -1395,12 +1391,8 @@ static attribute_t *parse_attribute_gnu(void)
 		if (attribute == NULL)
 			goto end_error;
 
-		if (last == NULL) {
-			first = attribute;
-		} else {
-			last->next = attribute;
-		}
-		last = attribute;
+		*anchor = attribute;
+		anchor  = &attribute->next;
 	} while (next_if(','));
 	expect(')', end_error);
 	expect(')', end_error);
@@ -1412,12 +1404,10 @@ end_error:
 /** Parse attributes. */
 static attribute_t *parse_attributes(attribute_t *first)
 {
-	attribute_t *last = first;
-	while (true) {
-		if (last != NULL) {
-			while (last->next != NULL)
-				last = last->next;
-		}
+	attribute_t **anchor = &first;
+	for (;;) {
+		while (*anchor != NULL)
+			anchor = &(*anchor)->next;
 
 		attribute_t *attribute;
 		switch (token.type) {
@@ -1461,12 +1451,8 @@ static attribute_t *parse_attributes(attribute_t *first)
 			return first;
 		}
 
-		if (last == NULL) {
-			first = attribute;
-		} else {
-			last->next = attribute;
-		}
-		last = attribute;
+		*anchor = attribute;
+		anchor  = &attribute->next;
 	}
 }
 
@@ -1707,10 +1693,10 @@ unary:
 
 static designator_t *parse_designation(void)
 {
-	designator_t *result = NULL;
-	designator_t *last   = NULL;
+	designator_t  *result = NULL;
+	designator_t **anchor = &result;
 
-	while (true) {
+	for (;;) {
 		designator_t *designator;
 		switch (token.type) {
 		case '[':
@@ -1740,12 +1726,8 @@ static designator_t *parse_designation(void)
 		}
 
 		assert(designator != NULL);
-		if (last != NULL) {
-			last->next = designator;
-		} else {
-			result = designator;
-		}
-		last = designator;
+		*anchor = designator;
+		anchor  = &designator->next;
 	}
 end_error:
 	return NULL;
@@ -2896,24 +2878,18 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 
 	add_anchor_token(')');
 
-	attribute_t *last = first;
+	attribute_t **anchor = &first;
 	do {
-		if (last != NULL) {
-			while (last->next != NULL)
-				last = last->next;
-		}
+		while (*anchor != NULL)
+			anchor = &(*anchor)->next;
 
 		attribute_t *attribute
 			= parse_microsoft_extended_decl_modifier_single();
 		if (attribute == NULL)
 			goto end_error;
 
-		if (last == NULL) {
-			first = attribute;
-		} else {
-			last->next = attribute;
-		}
-		last = attribute;
+		*anchor = attribute;
+		anchor  = &attribute->next;
 	} while (next_if(','));
 
 	rem_anchor_token(')');
@@ -3987,15 +3963,11 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 	attribute_t *attributes = parse_attributes(env.attributes);
 	/* append (shared) specifier attribute behind attributes of this
-	   declarator */
-	if (attributes != NULL) {
-		attribute_t *last = attributes;
-		while (last->next != NULL)
-			last = last->next;
-		last->next = specifiers->attributes;
-	} else {
-		attributes = specifiers->attributes;
-	}
+	 * declarator */
+	attribute_t **anchor = &attributes;
+	while (*anchor != NULL)
+		anchor = &(*anchor)->next;
+	*anchor = specifiers->attributes;
 
 	entity_t *entity;
 	if (specifiers->storage_class == STORAGE_CLASS_TYPEDEF) {
@@ -5952,15 +5924,11 @@ static void parse_compound_declarators(compound_t *compound,
 			type_t *type = make_bitfield_type(base_type, size,
 					&source_position, NULL);
 
-			attribute_t *attributes = parse_attributes(NULL);
-			if (attributes != NULL) {
-				attribute_t *last = attributes;
-				while (last->next != NULL)
-					last = last->next;
-				last->next = specifiers->attributes;
-			} else {
-				attributes = specifiers->attributes;
-			}
+			attribute_t  *attributes = parse_attributes(NULL);
+			attribute_t **anchor     = &attributes;
+			while (*anchor != NULL)
+				anchor = &(*anchor)->next;
+			*anchor = specifiers->attributes;
 
 			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER);
 			entity->base.namespc                       = NAMESPACE_NORMAL;
@@ -9293,19 +9261,15 @@ end_error:
  */
 static asm_clobber_t *parse_asm_clobbers(void)
 {
-	asm_clobber_t *result = NULL;
-	asm_clobber_t *last   = NULL;
+	asm_clobber_t *result  = NULL;
+	asm_clobber_t **anchor = &result;
 
 	while (token.type == T_STRING_LITERAL) {
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 		clobber->clobber       = parse_string_literals();
 
-		if (last != NULL) {
-			last->next = clobber;
-		} else {
-			result = clobber;
-		}
-		last = clobber;
+		*anchor = clobber;
+		anchor  = &clobber->next;
 
 		if (!next_if(','))
 			break;
