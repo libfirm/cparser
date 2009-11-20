@@ -8109,14 +8109,14 @@ static bool is_lvalue(const expression_t *expression)
 		return true;
 
 	default: {
-	  type_t *type = skip_typeref(expression->base.type);
-	  return
-		/* ISO/IEC 14882:1998(E) §3.10:3 */
-		is_type_reference(type) ||
-		/* Claim it is an lvalue, if the type is invalid.  There was a parse
-		 * error before, which maybe prevented properly recognizing it as
-		 * lvalue. */
-		!is_type_valid(type);
+		type_t *type = skip_typeref(expression->base.type);
+		return
+			/* ISO/IEC 14882:1998(E) §3.10:3 */
+			is_type_reference(type) ||
+			/* Claim it is an lvalue, if the type is invalid.  There was a parse
+			 * error before, which maybe prevented properly recognizing it as
+			 * lvalue. */
+			!is_type_valid(type);
 	}
 	}
 }
