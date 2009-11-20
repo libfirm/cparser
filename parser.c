@@ -569,6 +569,16 @@ static inline void next_token(void)
 #endif
 }
 
+static inline bool next_if(int const type)
+{
+	if (token.type == type) {
+		next_token();
+		return true;
+	} else {
+		return false;
+	}
+}
+
 /**
  * Return the next token with a given lookahead.
  */
@@ -702,8 +712,7 @@ static void eat_until_anchor(void)
 static void eat_block(void)
 {
 	eat_until_matching_token('{');
-	if (token.type == '}')
-		next_token();
+	next_if('}');
 }
 
 #define eat(token_type) (assert(token.type == (token_type)), next_token())
@@ -747,8 +756,7 @@ static void type_error_incompatible(const char *msg,
 			parse_error_expected(NULL, (expected), NULL); \
 			add_anchor_token(expected);                   \
 			eat_until_anchor();                           \
-			if (token.type == expected)                   \
-				next_token();                             \
+			next_if((expected));                          \
 			rem_anchor_token(expected);                   \
 			goto error_label;                             \
 		}                                                 \
@@ -1242,12 +1250,9 @@ static attribute_t *allocate_attribute_zero(attribute_kind_t kind)
  */
 static attribute_argument_t *parse_attribute_arguments(void)
 {
-	if (token.type == ')')
-		return NULL;
-
 	attribute_argument_t *first = NULL;
 	attribute_argument_t *last  = NULL;
-	while (true) {
+	if (token.type != ')') do {
 		attribute_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 
 		/* is it an identifier */
@@ -1272,14 +1277,8 @@ static attribute_argument_t *parse_attribute_arguments(void)
 			last->next = argument;
 		}
 		last = argument;
-
-		if (token.type == ',') {
-			next_token();
-			continue;
-		}
-		expect(')', end_error);
-		break;
-	}
+	} while (next_if(','));
+	expect(')', end_error);
 
 	return first;
 
@@ -1373,10 +1372,8 @@ static attribute_t *parse_attribute_gnu_single(void)
 	attribute_t *attribute = allocate_attribute_zero(kind);
 
 	/* parse arguments */
-	if (token.type == '(') {
-		next_token();
+	if (next_if('('))
 		attribute->a.arguments = parse_attribute_arguments();
-	}
 
 	return attribute;
 
@@ -1393,13 +1390,7 @@ static attribute_t *parse_attribute_gnu(void)
 	expect('(', end_error);
 	expect('(', end_error);
 
-	if (token.type == ')') {
-		next_token();
-		expect(')', end_error);
-		return first;
-	}
-
-	while (true) {
+	if (token.type != ')') do {
 		attribute_t *attribute = parse_attribute_gnu_single();
 		if (attribute == NULL)
 			goto end_error;
@@ -1410,13 +1401,8 @@ static attribute_t *parse_attribute_gnu(void)
 			last->next = attribute;
 		}
 		last = attribute;
-
-		if (token.type == ')') {
-			next_token();
-			break;
-		}
-		expect(',', end_error);
-	}
+	} while (next_if(','));
+	expect(')', end_error);
 	expect(')', end_error);
 
 end_error:
@@ -1864,13 +1850,12 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 {
 	/* there might be extra {} hierarchies */
 	int braces = 0;
-	if (token.type == '{') {
+	if (next_if('{')) {
 		if (warning.other)
 			warningf(HERE, "extra curly braces around scalar initializer");
 		do {
 			++braces;
-			next_token();
-		} while (token.type == '{');
+		} while (next_if('{'));
 	}
 
 	expression_t *expression = parse_assignment_expression();
@@ -1893,9 +1878,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	bool additional_warning_displayed = false;
 	while (braces > 0) {
-		if (token.type == ',') {
-			next_token();
-		}
+		next_if(',');
 		if (token.type != '}') {
 			if (!additional_warning_displayed && warning.other) {
 				warningf(HERE, "additional elements in scalar initializer");
@@ -2193,8 +2176,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
  */
 static void skip_initializers(void)
 {
-	if (token.type == '{')
-		next_token();
+	next_if('{');
 
 	while (token.type != '}') {
 		if (token.type == T_EOF)
@@ -2327,9 +2309,7 @@ finish_designator:
 					&& outer_type != NULL) {
 				sub = initializer_from_expression(outer_type, expression);
 				if (sub != NULL) {
-					if (token.type == ',') {
-						next_token();
-					}
+					next_if(',');
 					if (token.type != '}' && warning.other) {
 						warningf(HERE, "excessive elements in initializer for type '%T'",
 								 orig_type);
@@ -2625,8 +2605,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		entity->base.source_position = token.source_position;
 		next_token();
 
-		if (token.type == '=') {
-			next_token();
+		if (next_if('=')) {
 			expression_t *value = parse_constant_expression();
 
 			value = create_implicit_cast(value, enum_type);
@@ -2636,11 +2615,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		}
 
 		record_entity(entity, false);
-
-		if (token.type != ',')
-			break;
-		next_token();
-	} while (token.type != '}');
+	} while (next_if(',') && token.type != '}');
 	rem_anchor_token('}');
 
 	expect('}', end_error);
@@ -2739,9 +2714,8 @@ static type_t *parse_typeof(void)
 	bool old_gcc_extension = in_gcc_extension;
 	in_type_prop           = true;
 
-	while (token.type == T___extension__) {
+	while (next_if(T___extension__)) {
 		/* This can be a prefix to a typename or an expression. */
-		next_token();
 		in_gcc_extension = true;
 	}
 	switch (token.type) {
@@ -2828,7 +2802,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 	attribute_property_argument_t *property
 		= allocate_ast_zero(sizeof(*property));
 
-	while (true) {
+	do {
 		if (token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing property declspec",
 			                     T_IDENTIFIER, NULL);
@@ -2858,10 +2832,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			property->get_symbol = token.v.symbol;
 		}
 		next_token();
-		if (token.type == ')')
-			break;
-		expect(',', end_error);
-	}
+	} while (next_if(','));
 
 	attribute->a.property = property;
 
@@ -2874,9 +2845,8 @@ end_error:
 static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 {
 	attribute_kind_t kind = ATTRIBUTE_UNKNOWN;
-	if (token.type == T_restrict) {
+	if (next_if(T_restrict)) {
 		kind = ATTRIBUTE_MS_RESTRICT;
-		next_token();
 	} else if (token.type == T_IDENTIFIER) {
 		const char *name = token.v.symbol->string;
 		next_token();
@@ -2904,10 +2874,8 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	}
 
 	/* parse arguments */
-	if (token.type == '(') {
-		next_token();
+	if (next_if('('))
 		attribute->a.arguments = parse_attribute_arguments();
-	}
 
 	return attribute;
 }
@@ -2918,15 +2886,13 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 
 	expect('(', end_error);
 
-	if (token.type == ')') {
-		next_token();
+	if (next_if(')'))
 		return NULL;
-	}
 
 	add_anchor_token(')');
 
 	attribute_t *last = first;
-	while (true) {
+	do {
 		if (last != NULL) {
 			while (last->next != NULL)
 				last = last->next;
@@ -2943,12 +2909,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 			last->next = attribute;
 		}
 		last = attribute;
-
-		if (token.type == ')') {
-			break;
-		}
-		expect(',', end_error);
-	}
+	} while (next_if(','));
 
 	rem_anchor_token(')');
 	expect(')', end_error);
@@ -3450,12 +3411,7 @@ static void parse_identifier_list(scope_t *scope)
 
 		if (scope != NULL)
 			append_entity(scope, entity);
-
-		if (token.type != ',') {
-			break;
-		}
-		next_token();
-	} while (token.type == T_IDENTIFIER);
+	} while (next_if(',') && token.type == T_IDENTIFIER);
 }
 
 static entity_t *parse_parameter(void)
@@ -3536,7 +3492,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 
 	if (has_parameters()) {
 		function_parameter_t **anchor = &type->parameters;
-		for (;;) {
+		do {
 			switch (token.type) {
 			case T_DOTDOTDOT:
 				next_token();
@@ -3572,11 +3528,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 			default:
 				goto parameters_finished;
 			}
-			if (token.type != ',') {
-				goto parameters_finished;
-			}
-			next_token();
-		}
+		} while (next_if(','));
 	}
 
 
@@ -3670,18 +3622,12 @@ static construct_type_t *parse_array_declarator(void)
 	memset(array, 0, sizeof(*array));
 	cons->kind = CONSTRUCT_ARRAY;
 
-	if (token.type == T_static) {
+	if (next_if(T_static))
 		array->is_static = true;
-		next_token();
-	}
 
 	type_qualifiers_t type_qualifiers = parse_type_qualifiers();
-	if (type_qualifiers != 0) {
-		if (token.type == T_static) {
+	if (type_qualifiers != 0 && next_if(T_static))
 			array->is_static = true;
-			next_token();
-		}
-	}
 	array->type_qualifiers = type_qualifiers;
 
 	if (token.type == '*' && look_ahead(1)->type == ']') {
@@ -4722,9 +4668,8 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 
 		check_variable_type_complete(entity);
 
-		if (token.type != ',')
+		if (!next_if(','))
 			break;
-		eat(',');
 
 		add_anchor_token('=');
 		ndeclaration = parse_declarator(specifiers, flags);
@@ -5989,7 +5934,7 @@ static expression_t *find_create_select(const source_position_t *pos,
 static void parse_compound_declarators(compound_t *compound,
 		const declaration_specifiers_t *specifiers)
 {
-	while (true) {
+	do {
 		entity_t *entity;
 
 		if (token.type == ':') {
@@ -6078,11 +6023,7 @@ static void parse_compound_declarators(compound_t *compound,
 				append_entity(&compound->members, entity);
 			}
 		}
-
-		if (token.type != ',')
-			break;
-		next_token();
-	}
+	} while (next_if(','));
 	expect(';', end_error);
 
 end_error:
@@ -6517,10 +6458,8 @@ static entity_t *parse_qualified_identifier(void)
 	source_position_t  pos;
 	const scope_t     *lookup_scope = NULL;
 
-	if (token.type == T_COLONCOLON) {
-		next_token();
+	if (next_if(T_COLONCOLON))
 		lookup_scope = &unit->scope;
-	}
 
 	entity_t *entity;
 	while (true) {
@@ -6535,9 +6474,8 @@ static entity_t *parse_qualified_identifier(void)
 		/* lookup entity */
 		entity = lookup_entity(lookup_scope, symbol, NAMESPACE_NORMAL);
 
-		if (token.type != T_COLONCOLON)
+		if (!next_if(T_COLONCOLON))
 			break;
-		next_token();
 
 		switch (entity->kind) {
 		case ENTITY_NAMESPACE:
@@ -6575,12 +6513,7 @@ static entity_t *parse_qualified_identifier(void)
 
 end_error:
 	/* skip further qualifications */
-	while (token.type == T_IDENTIFIER) {
-		next_token();
-		if (token.type != T_COLONCOLON)
-			break;
-		next_token();
-	}
+	while (next_if(T_IDENTIFIER) && next_if(T_COLONCOLON)) {}
 
 	return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 }
@@ -6883,8 +6816,7 @@ static designator_t *parse_designator(void)
 
 	designator_t *last_designator = result;
 	while (true) {
-		if (token.type == '.') {
-			next_token();
+		if (next_if('.')) {
 			if (token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
 				                     T_IDENTIFIER, NULL);
@@ -6899,8 +6831,7 @@ static designator_t *parse_designator(void)
 			last_designator       = designator;
 			continue;
 		}
-		if (token.type == '[') {
-			next_token();
+		if (next_if('[')) {
 			add_anchor_token(']');
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = *HERE;
@@ -7263,14 +7194,9 @@ static expression_t *parse_noop_expression(void)
 		add_anchor_token(')');
 		add_anchor_token(',');
 
-		if (token.type != ')') {
-			while (true) {
-				(void)parse_assignment_expression();
-				if (token.type != ',')
-					break;
-				next_token();
-			}
-		}
+		if (token.type != ')') do {
+			(void)parse_assignment_expression();
+		} while (next_if(','));
 	}
 	rem_anchor_token(',');
 	rem_anchor_token(')');
@@ -7670,17 +7596,13 @@ static expression_t *parse_call_expression(expression_t *expression)
 
 	if (token.type != ')') {
 		call_argument_t **anchor = &call->arguments;
-		for (;;) {
+		do {
 			call_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 			argument->expression = parse_assignment_expression();
 
 			*anchor = argument;
 			anchor  = &argument->next;
-
-			if (token.type != ',')
-				break;
-			next_token();
-		}
+		} while (next_if(','));
 	}
 	rem_anchor_token(',');
 	rem_anchor_token(')');
@@ -7996,8 +7918,7 @@ static expression_t *parse_delete(void)
 
 	eat(T_delete);
 
-	if (token.type == '[') {
-		next_token();
+	if (next_if('[')) {
 		result->kind = EXPR_UNARY_DELETE_ARRAY;
 		expect(']', end_error);
 end_error:;
@@ -9274,8 +9195,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 		memset(argument, 0, sizeof(argument[0]));
 
-		if (token.type == '[') {
-			eat('[');
+		if (next_if('[')) {
 			if (token.type != T_IDENTIFIER) {
 				parse_error_expected("while parsing asm argument",
 				                     T_IDENTIFIER, NULL);
@@ -9354,9 +9274,8 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		*anchor = argument;
 		anchor  = &argument->next;
 
-		if (token.type != ',')
+		if (!next_if(','))
 			break;
-		eat(',');
 	}
 
 	return result;
@@ -9383,9 +9302,8 @@ static asm_clobber_t *parse_asm_clobbers(void)
 		}
 		last = clobber;
 
-		if (token.type != ',')
+		if (!next_if(','))
 			break;
-		eat(',');
 	}
 
 	return result;
@@ -9401,36 +9319,31 @@ static statement_t *parse_asm_statement(void)
 
 	eat(T_asm);
 
-	if (token.type == T_volatile) {
-		next_token();
+	if (next_if(T_volatile))
 		asm_statement->is_volatile = true;
-	}
 
 	expect('(', end_error);
 	add_anchor_token(')');
 	add_anchor_token(':');
 	asm_statement->asm_text = parse_string_literals();
 
-	if (token.type != ':') {
+	if (!next_if(':')) {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
-	eat(':');
 
 	asm_statement->outputs = parse_asm_arguments(true);
-	if (token.type != ':') {
+	if (!next_if(':')) {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
-	eat(':');
 
 	asm_statement->inputs = parse_asm_arguments(false);
-	if (token.type != ':') {
+	if (!next_if(':')) {
 		rem_anchor_token(':');
 		goto end_of_asm;
 	}
 	rem_anchor_token(':');
-	eat(':');
 
 	asm_statement->clobbers = parse_asm_clobbers();
 
@@ -9477,8 +9390,7 @@ static statement_t *parse_case_statement(void)
 	}
 
 	if (GNU_MODE) {
-		if (token.type == T_DOTDOTDOT) {
-			next_token();
+		if (next_if(T_DOTDOTDOT)) {
 			expression_t *const end_range   = parse_expression();
 			statement->case_label.end_range = end_range;
 			if (!is_constant_expression(end_range)) {
@@ -9681,8 +9593,7 @@ end_error:
 	statement->ifs.true_statement = true_stmt;
 	rem_anchor_token(T_else);
 
-	if (token.type == T_else) {
-		next_token();
+	if (next_if(T_else)) {
 		statement->ifs.false_statement = parse_statement();
 	} else if (warning.parentheses &&
 			true_stmt->kind == STATEMENT_IF &&
@@ -9885,13 +9796,11 @@ static statement_t *parse_for(void)
 	scope_t      *old_scope = scope_push(&statement->fors.scope);
 
 	bool old_gcc_extension = in_gcc_extension;
-	while (token.type == T___extension__) {
-		next_token();
+	while (next_if(T___extension__)) {
 		in_gcc_extension = true;
 	}
 
-	if (token.type == ';') {
-		next_token();
+	if (next_if(';')) {
 	} else if (is_declaration_specifier(&token, false)) {
 		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	} else {
@@ -9959,8 +9868,7 @@ static statement_t *parse_goto(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_GOTO);
 	eat(T_goto);
 
-	if (GNU_MODE && token.type == '*') {
-		next_token();
+	if (GNU_MODE && next_if('*')) {
 		expression_t *expression = parse_expression();
 		mark_vars_read(expression, NULL);
 
@@ -10243,8 +10151,7 @@ static statement_t *parse_ms_try_statment(void)
 
 	POP_PARENT;
 
-	if (token.type == T___except) {
-		eat(T___except);
+	if (next_if(T___except)) {
 		expect('(', end_error);
 		add_anchor_token(')');
 		expression_t *const expr = parse_expression();
@@ -10261,8 +10168,7 @@ static statement_t *parse_ms_try_statment(void)
 		rem_anchor_token(')');
 		expect(')', end_error);
 		statement->ms_try.final_statement = parse_compound_statement(false);
-	} else if (token.type == T__finally) {
-		eat(T___finally);
+	} else if (next_if(T__finally)) {
 		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
 		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
@@ -10291,7 +10197,7 @@ static statement_t *parse_local_label_declaration(void)
 
 	entity_t *begin = NULL, *end = NULL;
 
-	while (true) {
+	do {
 		if (token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing local label declaration",
 				T_IDENTIFIER, NULL);
@@ -10319,11 +10225,7 @@ static statement_t *parse_local_label_declaration(void)
 			environment_push(entity);
 		}
 		next_token();
-
-		if (token.type != ',')
-			break;
-		next_token();
-	}
+	} while (next_if(','));
 	eat(';');
 end_error:
 	statement->declaration.declarations_begin = begin;
@@ -10430,9 +10332,7 @@ expression_statment:
 	case T___extension__:
 		/* This can be a prefix to a declaration or an expression statement.
 		 * We simply eat it now and parse the rest with tail recursion. */
-		do {
-			next_token();
-		} while (token.type == T___extension__);
+		while (next_if(T___extension__)) {}
 		bool old_gcc_extension = in_gcc_extension;
 		in_gcc_extension       = true;
 		statement = intern_parse_statement();
@@ -10829,8 +10729,7 @@ static void parse_linkage_specification(void)
 	}
 	current_linkage = new_linkage;
 
-	if (token.type == '{') {
-		next_token();
+	if (next_if('{')) {
 		parse_externals();
 		expect('}', end_error);
 	} else {
