@@ -2626,33 +2626,38 @@ end_error:
 
 static type_t *parse_enum_specifier(void)
 {
-	entity_t        *entity;
-	symbol_t        *symbol;
+	entity_t *entity;
+	symbol_t *symbol;
 
 	eat(T_enum);
-	if (token.type == T_IDENTIFIER) {
-		symbol = token.v.symbol;
-		next_token();
+	switch (token.type) {
+		case T_IDENTIFIER:
+			symbol = token.v.symbol;
+			next_token();
 
-		entity = get_tag(symbol, ENTITY_ENUM);
-		if (entity != NULL) {
-			if (entity->base.parent_scope != current_scope &&
-					(token.type == '{' || token.type == ';')) {
-				/* we're in an inner scope and have a definition. Shadow
-				 * existing definition in outer scope */
-				entity = NULL;
-			} else if (entity->enume.complete && token.type == '{') {
-				errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
-						symbol, &entity->base.source_position);
+			entity = get_tag(symbol, ENTITY_ENUM);
+			if (entity != NULL) {
+				if (entity->base.parent_scope != current_scope &&
+						(token.type == '{' || token.type == ';')) {
+					/* we're in an inner scope and have a definition. Shadow
+					 * existing definition in outer scope */
+					entity = NULL;
+				} else if (entity->enume.complete && token.type == '{') {
+					errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
+							symbol, &entity->base.source_position);
+				}
 			}
-		}
-	} else if (token.type != '{') {
-		parse_error_expected("while parsing enum type specifier",
-		                     T_IDENTIFIER, '{', NULL);
-		return NULL;
-	} else {
-		entity  = NULL;
-		symbol  = NULL;
+			break;
+
+		case '{':
+			entity = NULL;
+			symbol = NULL;
+			break;
+
+		default:
+			parse_error_expected("while parsing enum type specifier",
+					T_IDENTIFIER, '{', NULL);
+			return NULL;
 	}
 
 	if (entity == NULL) {
