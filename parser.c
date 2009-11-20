@@ -5313,9 +5313,8 @@ static void check_reachable(statement_t *const stmt)
 			break;
 		}
 
-		case STATEMENT_CONTINUE: {
-			statement_t *parent = stmt;
-			for (;;) {
+		case STATEMENT_CONTINUE:
+			for (statement_t *parent = stmt;;) {
 				parent = parent->base.parent;
 				if (parent == NULL) /* continue not within loop */
 					return;
@@ -5329,11 +5328,9 @@ static void check_reachable(statement_t *const stmt)
 					default: break;
 				}
 			}
-		}
 
-		case STATEMENT_BREAK: {
-			statement_t *parent = stmt;
-			for (;;) {
+		case STATEMENT_BREAK:
+			for (statement_t *parent = stmt;;) {
 				parent = parent->base.parent;
 				if (parent == NULL) /* break not within loop/switch */
 					return;
@@ -5352,7 +5349,6 @@ static void check_reachable(statement_t *const stmt)
 			}
 found_break_parent:
 			break;
-		}
 
 		case STATEMENT_GOTO:
 			if (stmt->gotos.expression) {
