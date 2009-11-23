@@ -346,6 +346,11 @@ static void do_lower_switch(ir_graph *irg)
 	lower_switch(irg, firm_opt.spare_size);
 }
 
+static void do_loop(ir_graph *irg)
+{
+	loop_optimization(irg);
+}
+
 typedef enum opt_target {
 	OPT_TARGET_IRG,
 	OPT_TARGET_IRP
@@ -395,6 +400,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRP, "inline",      (func_ptr_t) do_inline,               true, true,  true,  TV_INLINE },
 	{ OPT_TARGET_IRP, "clone",       (func_ptr_t) do_cloning,              true, true,  true,  TV_CLONE },
 	{ OPT_TARGET_IRG, "lower_switch", (func_ptr_t) do_lower_switch,        true, true,  true,  TV_LOWER },
+	{ OPT_TARGET_IRG, "loop", 		 (func_ptr_t) do_loop,        		   true, true,  true,  TV_LOOP },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 
@@ -512,6 +518,7 @@ static void do_firm_optimizations(const char *input_filename)
   set_opt_enabled("inline", firm_opt.do_inline);
   set_opt_enabled("clone", firm_opt.cloning);
   set_opt_enabled("combo", firm_opt.combo);
+  set_opt_enabled("loop", firm_opt.loop);
 
   timer_start(TV_ALL_OPT);
 
@@ -556,6 +563,7 @@ static void do_firm_optimizations(const char *input_filename)
 
     do_irg_opt(irg, "controlflow");
     do_irg_opt(irg, "ldst");
+    do_irg_opt(irg, "loop");
     do_irg_opt(irg, "lower");
     do_irg_opt(irg, "deconv");
     do_irg_opt(irg, "jumpthreading");

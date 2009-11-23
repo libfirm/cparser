@@ -909,7 +909,6 @@ int main(int argc, char **argv)
 						char_is_signed = !truth_value;
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
-					           streq(opt, "unroll-loops")            ||
 					           streq(opt, "expensive-optimizations") ||
 					           streq(opt, "common")                  ||
 					           streq(opt, "PIC")                     ||

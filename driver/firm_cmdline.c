@@ -78,7 +78,8 @@ struct a_firm_opt firm_opt = {
   /* grs_create_pattern = */ 0,
   /* spare_size      = */ 128,
   /* enable_statev   = */ FALSE,
-  /* statev_filter   = */ ""
+  /* statev_filter   = */ "",
+  /* loop 			 = */ FALSE
 };
 
 /* dumping options */
@@ -205,6 +206,8 @@ static const struct params {
   { X("no-shape-blocks"),        &firm_opt.shape_blocks,     0, "firm: disable block shaping" },
   { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
   { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
+  { X("loop"),        			 &firm_opt.loop,    		 1, "firm: enable loop peeling and unrolling" },
+  { X("no-loop"),        	     &firm_opt.loop,    		 0, "firm: disable loop peeling and unrolling" },
 
   /* other firm regarding options */
   { X("restrict"),               &firm_opt.honor_restrict,   1, "firm: honor restrict keyword" },
@@ -319,6 +322,7 @@ static void disable_opts(void) {
   firm_opt.bool_opt        = FALSE;
   firm_opt.shape_blocks    = FALSE;
   firm_opt.freestanding    = TRUE;
+  firm_opt.loop			   = FALSE;
 }  /* disable_opts */
 
 /**
