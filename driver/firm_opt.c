@@ -348,7 +348,12 @@ static void do_lower_switch(ir_graph *irg)
 
 static void do_loop(ir_graph *irg)
 {
+#if 0 // FIXME undeclared
 	loop_optimization(irg);
+#else
+	(void)irg;
+	abort();
+#endif
 }
 
 typedef enum opt_target {
