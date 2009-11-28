@@ -405,7 +405,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRP, "inline",      (func_ptr_t) do_inline,               true, true,  true,  TV_INLINE },
 	{ OPT_TARGET_IRP, "clone",       (func_ptr_t) do_cloning,              true, true,  true,  TV_CLONE },
 	{ OPT_TARGET_IRG, "lower_switch", (func_ptr_t) do_lower_switch,        true, true,  true,  TV_LOWER },
-	{ OPT_TARGET_IRG, "loop", 		 (func_ptr_t) do_loop,        		   true, true,  true,  TV_LOOP },
+	{ OPT_TARGET_IRG, "loop",        (func_ptr_t) do_loop,                 true, true,  true,  TV_LOOP },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 

@@ -84,7 +84,7 @@ struct a_firm_opt {
   unsigned spare_size;      /**< allowed spare size for table switches in machine words. */
   a_byte   enable_statev;   /**< enable statev output */
   char     *statev_filter;  /**< statev filter */
-  a_byte   loop;			/**< loop peeling and unrolling */
+  a_byte   loop;            /**< loop peeling and unrolling */
 };
 
 /** statistic options */

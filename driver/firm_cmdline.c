@@ -79,7 +79,7 @@ struct a_firm_opt firm_opt = {
   /* spare_size      = */ 128,
   /* enable_statev   = */ FALSE,
   /* statev_filter   = */ "",
-  /* loop 			 = */ FALSE
+  /* loop            = */ FALSE
 };
 
 /* dumping options */
@@ -206,8 +206,8 @@ static const struct params {
   { X("no-shape-blocks"),        &firm_opt.shape_blocks,     0, "firm: disable block shaping" },
   { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
   { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
-  { X("loop"),        			 &firm_opt.loop,    		 1, "firm: enable loop peeling and unrolling" },
-  { X("no-loop"),        	     &firm_opt.loop,    		 0, "firm: disable loop peeling and unrolling" },
+  { X("loop"),                   &firm_opt.loop,             1, "firm: enable loop peeling and unrolling" },
+  { X("no-loop"),                &firm_opt.loop,             0, "firm: disable loop peeling and unrolling" },
 
   /* other firm regarding options */
   { X("restrict"),               &firm_opt.honor_restrict,   1, "firm: honor restrict keyword" },
@@ -237,10 +237,10 @@ static const struct params {
   { X("no-codegen"),             &firm_be_opt.selection,     BE_NONE, "cg: disable code generator" },
 
 #ifdef FIRM_EXT_GRS
-  { X("grs-simd-opt"),           &firm_ext_grs.simd_opt,		1, "firm: do simd optimization" },
-  { X("grs-create-pattern"),     &firm_ext_grs.create_pattern,	1, "firm: create patterns for simd optimization" },
-  { X("no-grs-simd-opt"),        &firm_ext_grs.simd_opt,		0, "firm: do simd optimization" },
-  { X("no-grs-create-pattern"),  &firm_ext_grs.create_pattern,	0, "firm: create patterns for simd optimization" },
+  { X("grs-simd-opt"),           &firm_ext_grs.simd_opt,       1, "firm: do simd optimization" },
+  { X("grs-create-pattern"),     &firm_ext_grs.create_pattern, 1, "firm: create patterns for simd optimization" },
+  { X("no-grs-simd-opt"),        &firm_ext_grs.simd_opt,       0, "firm: do simd optimization" },
+  { X("no-grs-create-pattern"),  &firm_ext_grs.create_pattern, 0, "firm: create patterns for simd optimization" },
 #endif
 
 #ifdef FIRM_BACKEND
@@ -322,7 +322,7 @@ static void disable_opts(void) {
   firm_opt.bool_opt        = FALSE;
   firm_opt.shape_blocks    = FALSE;
   firm_opt.freestanding    = TRUE;
-  firm_opt.loop			   = FALSE;
+  firm_opt.loop            = FALSE;
 }  /* disable_opts */
 
 /**
