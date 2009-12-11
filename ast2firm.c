@@ -1951,7 +1951,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	ir_node  *store = get_store();
 	ir_node  *node  = new_d_Call(dbgi, store, callee, n_parameters, in,
 	                             ir_method_type);
-	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M_regular);
+	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M);
 	set_store(mem);
 
 	type_t  *return_type = skip_typeref(function_type->return_type);
@@ -2011,7 +2011,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	} else {
 		ir_type *irtype    = get_ir_type(type);
 		ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, value, irtype);
-		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
 		set_store(copyb_mem);
 	}
 }
@@ -4294,7 +4294,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	ir_node *const src_addr = create_symconst(dbgi, mode_P_data, init_entity);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
-	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M_regular);
+	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
 	set_store(copyb_mem);
 }
 
