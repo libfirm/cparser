@@ -768,7 +768,7 @@ int main(int argc, char **argv)
 		/* fallthrough */
 	case 3:
 		set_option("thread-jumps");
-		set_option("if-conv");
+		set_option("if-conversion");
 		/* fallthrough */
 	case 2:
 		set_option("strict-aliasing");

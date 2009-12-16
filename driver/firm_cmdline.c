@@ -9,6 +9,7 @@
  */
 #include <string.h>
 #include "firm_cmdline.h"
+#include "firm_opt.h"
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
@@ -25,41 +26,17 @@ struct a_firm_opt firm_opt = {
   /* enabled         = */ TRUE,
   /* debug_mode      = */ DBG_MODE_NONE,
   /* const_folding   = */ TRUE,
-  /* reassoc         = */ TRUE,
   /* cse             = */ TRUE,
   /* control_flow    = */ TRUE,
-  /* combo           = */ TRUE,
   /* gcse            = */ TRUE,
-  /* gvn_pre         = */ FALSE,
-  /* jumpthreading   = */ FALSE,
-  /* if_conversion   = */ FALSE,
-  /* func_calls      = */ TRUE,
-  /* do_inline       = */ FALSE,
-  /* auto_inline     = */ TRUE,
-  /* tail_rec        = */ TRUE,
-  /* strength_red    = */ TRUE,
-  /* scalar_replace  = */ TRUE,
   /* confirm         = */ TRUE,
   /* muls            = */ TRUE,
   /* divs            = */ TRUE,
   /* mods            = */ TRUE,
-  /* fragile_ops     = */ TRUE,
-  /* load_store      = */ TRUE,
-  /* load_store_pre  = */ FALSE,
-  /* modes           = */ FALSE,
-  /* precise_exc     = */ FALSE,	/* never needed for C */
-  /* use_DivMod      = */ FALSE,
-  /* remove_unused   = */ TRUE,
-  /* cloning         = */ FALSE,
-  /* auto_sync       = */ FALSE,
   /* alias_analysis  = */ TRUE,
   /* strict_alias    = */ FALSE,
   /* no_alias        = */ FALSE,
-  /* sync            = */ TRUE,
-  /* deconv          = */ FALSE,
   /* cc_opt          = */ TRUE,
-  /* bool_opt        = */ FALSE,
-  /* shape_blocks    = */ FALSE,
   /* freestanding;   = */ FALSE,
   /* fp_model        = */ fp_model_precise,
   /* lower_ll        = */ FALSE,
@@ -79,7 +56,6 @@ struct a_firm_opt firm_opt = {
   /* spare_size      = */ 128,
   /* enable_statev   = */ FALSE,
   /* statev_filter   = */ "",
-  /* loop            = */ FALSE
 };
 
 /* dumping options */
@@ -134,30 +110,10 @@ static const struct params {
   { X("no-const-fold"),          &firm_opt.const_folding,    0, "firm: disable constant folding" },
   { X("control_flow"),           &firm_opt.control_flow,     1, "firm: enable control flow optimization" },
   { X("no-control-flow"),        &firm_opt.control_flow,     0, "firm: disable control flow optimization" },
-  { X("combo"),                  &firm_opt.combo,            1, "firm: enable combined CCE, UCE and GVN" },
-  { X("no-combo"),               &firm_opt.combo,            0, "firm: disable combined CCE, UCE and GVN" },
   { X("gcse"),                   &firm_opt.gcse,             1, "firm: enable global common subexpression elimination" },
   { X("no-gcse"),                &firm_opt.gcse,             0, "firm: disable global common subexpression elimination" },
-  { X("gvn-pre"),                &firm_opt.gvn_pre,          1, "firm: enable GVN partial redundancy elimination" },
-  { X("no-gvn-pre"),             &firm_opt.gvn_pre,          0, "firm: disable GVN partial redundancy elimination" },
-  { X("thread-jumps"),           &firm_opt.jumpthreading,    1, "firm: enable path-sensitive jumpthreading optimization" },
-  { X("no-thread-jumps"),        &firm_opt.jumpthreading,    0, "firm: disable path-sensitive jumpthreading optimization" },
-  { X("if-conv"),                &firm_opt.if_conversion,    1, "firm: enable if-conversion optimization" },
-  { X("no-if-conv"),             &firm_opt.if_conversion,    0, "firm: disable if-conversion optimization" },
-  { X("opt-func-call"),          &firm_opt.func_calls,       1, "firm: enable function call optimization" },
-  { X("no-opt-func-call"),       &firm_opt.func_calls,       0, "firm: disable function call optimization" },
-  { X("reassociation"),          &firm_opt.reassoc,          1, "firm: enable reassociation" },
-  { X("no-reassociation"),       &firm_opt.reassoc,          0, "firm: disable reassociation" },
-  { X("inline"),                 &firm_opt.do_inline,        1, "firm: enable FIRM inlining" },
-  { X("no-inline"),              &firm_opt.do_inline,        0, "firm: disable FIRM inlining" },
   { X("inline-max-size=<size>"), NULL,                       0, "firm: set maximum size for function inlining" },
   { X("inline-threshold=<size>"),NULL,                       0, "firm: set benefice threshold for function inlining" },
-  { X("tail-rec"),               &firm_opt.tail_rec,         1, "firm: enable tail-recursion optimization" },
-  { X("no-tail-rec"),            &firm_opt.tail_rec,         0, "firm: disable tail-recursion optimization" },
-  { X("strength-red"),           &firm_opt.strength_red,     1, "firm: enable strength reduction for loops" },
-  { X("no-strength-red"),        &firm_opt.strength_red,     0, "firm: disable strength reduction for loops" },
-  { X("scalar-replace"),         &firm_opt.scalar_replace,   1, "firm: enable scalar replacement" },
-  { X("no-scalar-replace"),      &firm_opt.scalar_replace,   0, "firm: disable scalar replacement" },
   { X("confirm"),                &firm_opt.confirm,          1, "firm: enable Confirm optimization" },
   { X("no-confirm"),             &firm_opt.confirm,          0, "firm: disable Confirm optimization" },
   { X("opt-mul"),                &firm_opt.muls,             0, "firm: enable multiplication optimization" },
@@ -166,48 +122,20 @@ static const struct params {
   { X("no-opt-div"),             &firm_opt.divs,             0, "firm: disable division optimization" },
   { X("opt-mod"),                &firm_opt.mods,             0, "firm: enable remainder optimization" },
   { X("no-opt-mod"),             &firm_opt.mods,             0, "firm: disable remainder optimization" },
-  { X("opt-fragile-ops"),        &firm_opt.fragile_ops,      1, "firm: enable fragile ops optimization" },
-  { X("no-opt-fragile-ops"),     &firm_opt.fragile_ops,      0, "firm: disable fragile ops optimization" },
-  { X("opt-load-store"),         &firm_opt.load_store,       1, "firm: enable load store optimization" },
-  { X("no-opt-load-store"),      &firm_opt.load_store,       0, "firm: disable load store optimization" },
-  { X("opt-load-store-pre"),     &firm_opt.load_store_pre,   1, "firm: enable load store optimization and PRE" },
-  { X("no-opt-load-store-pre"),  &firm_opt.load_store_pre,   0, "firm: disable load store optimization and PRE" },
-  { X("opt-modes"),              &firm_opt.modes,            1, "firm: optimize integer modes" },
-  { X("no-opt-modes"),           &firm_opt.modes,            0, "firm: disable integer modes optimization" },
-  { X("sync"),                   &firm_opt.auto_sync,        1, "firm: automatically create Sync nodes" },
-  { X("no-sync"),                &firm_opt.auto_sync,        0, "firm: do not create Sync nodes" },
   { X("opt-alias"),              &firm_opt.alias_analysis,   1, "firm: enable alias analysis" },
   { X("no-opt-alias"),           &firm_opt.alias_analysis,   0, "firm: disable alias analysis" },
   { X("alias"),                  &firm_opt.no_alias,         0, "firm: aliasing occurs" },
   { X("no-alias"),               &firm_opt.no_alias,         1, "firm: no aliasing occurs" },
   { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "firm: strict alias rules" },
   { X("no-strict-aliasing"),     &firm_opt.strict_alias,     0, "firm: strict alias rules" },
-  { X("opt-proc-clone"),         &firm_opt.cloning,          1, "firm: enable procedure cloning" },
-  { X("no-opt-proc-clone"),      &firm_opt.cloning,          0, "firm: disable procedure cloning" },
   { X("clone-threshold=<value>"),NULL,                       0, "firm: set clone threshold to <value>" },
-  { X("DivMod"),                 &firm_opt.use_DivMod,       1, "firm: use DivMod nodes" },
-  { X("no-DivMod"),              &firm_opt.use_DivMod,       0, "firm: don't use DivMod nodes" },
-  { X("precise-except"),         &firm_opt.precise_exc,      1, "firm: precise exception context" },
-  { X("no-precise-except"),      &firm_opt.precise_exc,      0, "firm: no precise exception context" },
-  { X("remove-unused"),          &firm_opt.remove_unused,    1, "firm: remove unused functions" },
-  { X("no-remove-unused"),       &firm_opt.remove_unused,    0, "firm: dont't remove unused functions" },
   { X("fp-precise"),             &firm_opt.fp_model,         fp_model_precise, "firm: precise fp model" },
   { X("fp-fast"),                &firm_opt.fp_model,         fp_model_fast,    "firm: fast fp model" },
   { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
-  { X("sync"),                   &firm_opt.sync,             1, "firm: use Syncs to remove unnecesary memory dependencies" },
-  { X("no-sync"),                &firm_opt.sync,             0, "firm: do not use Syncs to remove unnecesary memory dependencies" },
-  { X("deconv"),                 &firm_opt.deconv,           1, "firm: enable the conv node optimization" },
-  { X("no-deconv"),              &firm_opt.deconv,           0, "firm: disable the conv node optimization" },
   { X("opt-cc"),                 &firm_opt.cc_opt,           1, "firm: enable calling conventions optimization" },
   { X("no-opt-cc"),              &firm_opt.cc_opt,           0, "firm: disable calling conventions optimization" },
-  { X("bool"),                   &firm_opt.bool_opt,         1, "firm: enable bool simplification optimization" },
-  { X("no-bool"),                &firm_opt.bool_opt,         0, "firm: disable bool simplification optimization" },
-  { X("shape-blocks"),           &firm_opt.shape_blocks,     1, "firm: enable block shaping" },
-  { X("no-shape-blocks"),        &firm_opt.shape_blocks,     0, "firm: disable block shaping" },
   { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
   { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
-  { X("loop"),                   &firm_opt.loop,             1, "firm: enable loop peeling and unrolling" },
-  { X("no-loop"),                &firm_opt.loop,             0, "firm: disable loop peeling and unrolling" },
 
   /* other firm regarding options */
   { X("restrict"),               &firm_opt.honor_restrict,   1, "firm: honor restrict keyword" },
@@ -289,41 +217,23 @@ static void set_dump_filter(const char *filter)
 
 /** Disable all optimizations. */
 static void disable_opts(void) {
-  /* firm_opt.const_folding */
-  firm_opt.reassoc         = FALSE;
   firm_opt.cse             = FALSE;
-  /* firm_opt.control_flow */
   firm_opt.gcse            = FALSE;
-  firm_opt.gvn_pre         = FALSE;
-  firm_opt.jumpthreading   = FALSE;
-  firm_opt.if_conversion   = FALSE;
-  firm_opt.func_calls      = FALSE;
-  firm_opt.do_inline       = FALSE;
-  firm_opt.auto_inline     = FALSE;
-  firm_opt.tail_rec        = FALSE;
-  firm_opt.strength_red    = FALSE;
-  firm_opt.scalar_replace  = FALSE;
   firm_opt.confirm         = FALSE;
   firm_opt.muls            = FALSE;
   firm_opt.divs            = FALSE;
   firm_opt.mods            = FALSE;
-  firm_opt.fragile_ops     = FALSE;
-  firm_opt.load_store      = FALSE;
-  firm_opt.remove_unused   = FALSE;
-  /* firm_opt.jmp_tbls */
-  firm_opt.cloning         = FALSE;
-  /* firm_opt.auto_sync */
   firm_opt.alias_analysis  = FALSE;
   firm_opt.strict_alias    = FALSE;
   firm_opt.no_alias        = FALSE;
-  firm_opt.sync            = FALSE;
-  firm_opt.deconv          = FALSE;
   firm_opt.cc_opt          = FALSE;
-  firm_opt.bool_opt        = FALSE;
-  firm_opt.shape_blocks    = FALSE;
   firm_opt.freestanding    = TRUE;
-  firm_opt.loop            = FALSE;
 }  /* disable_opts */
+
+void print_option_help(const char *name, const char *description)
+{
+	printf("-f %-20s %s\n", name, description);
+}
 
 /**
  * Handles a firm option.
@@ -341,7 +251,6 @@ int firm_option(const char *opt)
   }
   else if (strncmp("clone-threshold=", opt, 16) == 0) {
     sscanf(&opt[16], "%d", &firm_opt.clone_threshold);
-    firm_opt.cloning = TRUE;
     return 1;
   }
   else if (strncmp("inline-max-size=", opt, 16) == 0) {
@@ -361,9 +270,10 @@ int firm_option(const char *opt)
     if (len == firm_options[i].opt_len && strncmp(p, firm_options[i].option, len) == 0) {
       if (!firm_options[i].flag) {
         /* help option */
-        for (i = 0; i < (int) (sizeof(firm_options)/sizeof(firm_options[0])); ++i) {
-          printf("-f %-20s %s\n", firm_options[i].option,
-                 firm_options[i].description);
+        print_option_help(firm_options[0].option, firm_options[0].description);
+        firm_opt_option_help();
+        for (i = 1; i < (int) (sizeof(firm_options)/sizeof(firm_options[0])); ++i) {
+          print_option_help(firm_options[i].option, firm_options[i].description);
         }
         return -1;
       }
@@ -385,9 +295,14 @@ int firm_option(const char *opt)
     }
   }
 
-  if (i < 0)
-    return 0;
-  return 1;
+  if (i >= 0)
+    return 1;
+
+  /* maybe this enables/disables an optimisations */
+  if (firm_opt_option(p))
+    return 1;
+
+  return 0;
 }  /* firm_option */
 
 /**

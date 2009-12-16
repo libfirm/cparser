@@ -92,30 +92,39 @@ enum rts_names {
 
 extern ir_entity_ptr rts_entities[rts_max];
 
-/* This function is called, whenever a local variable is used before definition. */
+/**
+ * This function is called, whenever a local variable is used before
+ * definition.
+ */
 extern ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos);
 
-/* Debug printf implementation. */
+/** Debug printf implementation. */
 extern void dbg_printf(const char *fmt, ...);
 
-/* Convert the debug info into human readable form. */
+/** Convert the debug info into human readable form. */
 extern unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg);
 
-/* Convert the debug info back. */
+/** Convert the debug info back. */
 extern const char *dbg_retrieve(const dbg_info *dbg, unsigned *line);
 
-/* Do the necessary lowering for compound parameters. */
+/** Do the necessary lowering for compound parameters. */
 extern void lower_compound_params(void);
 
-/* Initialize for the Firm-generating back end. */
+/** Initialize for the Firm-generating back end. */
 void gen_firm_init(void);
 
-/* called, after the Firm generation is completed. */
+/** called, after the Firm generation is completed. */
 void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int firm_const_exists);
 
 void gen_Firm_assembler(const char *input_filename);
 
-/* early initialization. */
+/** early initialization. */
 void firm_early_init(void);
+
+/** process optimisation commandline option */
+int firm_opt_option(const char *opt);
+
+/** print help about optimisations options */
+void firm_opt_option_help(void);
 
 #endif /* FIRM_OPT_H */

@@ -29,42 +29,17 @@ struct a_firm_opt {
   a_byte   enabled;         /**< enable all optimizations */
   a_byte   debug_mode;      /**< debug mode: store all local variables */
   a_byte   const_folding;   /**< enable constant folding */
-  a_byte   reassoc;         /**< enable reassociation */
   a_byte   cse;             /**< enable common-subexpression elimination */
   a_byte   control_flow;    /**< enable control flow optimizations */
-  a_byte   combo;           /**< enable combined CCE, UCE and GVN */
   a_byte   gcse;            /**< enable global common-subexpression elimination */
-  a_byte   gvn_pre;         /**< enable global common-subexpression elimination
-                                 and partial redundancy elimination */
-  a_byte   jumpthreading;   /**< enable jumpthreading */
-  a_byte   if_conversion;   /**< enable if-conversion */
-  a_byte   func_calls;      /**< enable function call optimization */
-  a_byte   do_inline;       /**< do automatic inlining */
-  a_byte   auto_inline;     /**< current automatic inlining state */
-  a_byte   tail_rec;        /**< tail recursion optimization */
-  a_byte   strength_red;    /**< enable strength reduction */
-  a_byte   scalar_replace;  /**< enable scalar replacement */
   a_byte   confirm;         /**< enable Confirm optimization */
   a_byte   muls;            /**< enable architecture dependent mul optimization */
   a_byte   divs;            /**< enable architecture dependent div optimization */
   a_byte   mods;            /**< enable architecture dependent mod optimization */
-  a_byte   fragile_ops;     /**< enable fragile ops optimization */
-  a_byte   load_store;      /**< enable load store optimization */
-  a_byte   load_store_pre;  /**< enable new load store optimization */
-  a_byte   modes;           /**< enable integer mode optimizations */
-  a_byte   precise_exc;     /**< use precise exception context */
-  a_byte   use_DivMod;      /**< use DivMod nodes */
-  a_byte   remove_unused;   /**< remove unused functions */
-  a_byte   cloning;         /**< enable procedure cloning */
-  a_byte   auto_sync;       /**< automatically create Sync nodes */
   a_byte   alias_analysis;  /**< enable Alias Analysis */
   a_byte   strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
   a_byte   no_alias;        /**< no aliasing possible. */
-  a_byte   sync;            /**< use Syncs to remove unnecessary memory dependencies */
-  a_byte   deconv;          /**< enable conv node optimization */
   a_byte   cc_opt;          /**< optimize calling conventions */
-  a_byte   bool_opt;        /**< perform bool simplification */
-  a_byte   shape_blocks;    /**< end block melting */
   a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
   a_byte   lower_ll;        /**< lower double word access */
@@ -84,7 +59,6 @@ struct a_firm_opt {
   unsigned spare_size;      /**< allowed spare size for table switches in machine words. */
   a_byte   enable_statev;   /**< enable statev output */
   char     *statev_filter;  /**< statev filter */
-  a_byte   loop;            /**< loop peeling and unrolling */
 };
 
 /** statistic options */
@@ -138,6 +112,7 @@ extern struct a_firm_opt firm_opt;
 extern struct a_firm_dump firm_dump;
 extern struct a_firm_ext_grs firm_ext_grs;
 
+void print_option_help(const char *name, const char *description);
 
 /**
  * prints the firm version number
