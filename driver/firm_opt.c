@@ -192,11 +192,11 @@ static void dump_graph_count(ir_graph *const irg, const char *const suffix)
 
 	timer_push(t_vcg_dump);
 	if (firm_dump.no_blocks)
-		dump_ir_graph(irg, suffix);
+		dump_ir_graph(irg, name);
 	else if (firm_dump.extbb)
-		dump_ir_extblock_graph(irg, suffix);
+		dump_ir_extblock_graph(irg, name);
 	else
-		dump_ir_block_graph(irg, suffix);
+		dump_ir_block_graph(irg, name);
 	timer_pop(t_vcg_dump);
 }
 
@@ -405,7 +405,7 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	timer_pop(timers[n]);
 
 	if (firm_dump.all_phases && firm_dump.ir_graph) {
-		dump_graph_count(irg, config->name);
+		dump_graph_count(irg, name);
 	}
 
 	if (firm_opt.check_all) {
@@ -437,7 +437,7 @@ static void do_irp_opt(const char *name)
 		int i;
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 			ir_graph *irg = get_irp_irg(i);
-			dump_graph_count(irg, config->name);
+			dump_graph_count(irg, name);
 		}
 	}
 
@@ -485,9 +485,6 @@ static void do_firm_optimizations(const char *input_filename)
 {
 	int      i;
 	unsigned aa_opt;
-
-	/* FIXME: cloning might ADD new graphs. */
-	irg_dump_no = calloc(get_irp_last_idx(), sizeof(*irg_dump_no));
 
 	set_opt_alias_analysis(firm_opt.alias_analysis);
 
@@ -972,6 +969,9 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 	if (!firm_dump.edge_labels)
 		turn_off_edge_labels();
 
+	/* FIXME: cloning might ADD new graphs. */
+	irg_dump_no = calloc(get_irp_last_idx(), sizeof(*irg_dump_no));
+
 	if (firm_dump.all_types) {
 		dump_all_types("");
 		if (! c_mode) {
@@ -983,12 +983,9 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 	/* finalize all graphs */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
-
 		irg_finalize_cons(irg);
-		if (firm_dump.ir_graph) {
-			dump_graph_count(irg, "");
-		}
 	}
+	dump_all("");
 
 	timer_push(t_verify);
 	tr_vrfy();
