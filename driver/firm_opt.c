@@ -15,8 +15,6 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <libfirm/firm.h>
-#include <libfirm/be.h>
-
 
 #include "firm_opt.h"
 #include "firm_codegen.h"
@@ -30,20 +28,23 @@
 #define DBG(x) ((void)0)
 #endif /* _DEBUG || FIRM_DEBUG */
 
+static ir_timer_t *t_vcg_dump;
+static ir_timer_t *t_verify;
+static ir_timer_t *t_all_opt;
 static bool do_irg_opt(ir_graph *irg, const char *name);
 
 /** dump all the graphs depending on cond */
 #define DUMP_ALL(cond, suffix)                             \
   do {                                                     \
     if (cond) {                                            \
-      timer_push(TV_VCG_DUMP);                             \
+      timer_push(t_vcg_dump);                              \
       if (firm_dump.no_blocks)                             \
         dump_all_ir_graphs(dump_ir_graph, suffix);         \
       else if (firm_dump.extbb)                            \
         dump_all_ir_graphs(dump_ir_extblock_graph, suffix);\
       else                                                 \
         dump_all_ir_graphs(dump_ir_block_graph, suffix);   \
-      timer_pop();                                         \
+      timer_pop(t_vcg_dump);                               \
     }                                                      \
   } while (0)
 
@@ -51,38 +52,24 @@ static bool do_irg_opt(ir_graph *irg, const char *name);
 #define DUMP_ALL_CFG(cond, suffix)                      \
   do {                                                  \
     if (cond) {                                         \
-      timer_push(TV_VCG_DUMP);                          \
+      timer_push(t_vcg_dump);                           \
         dump_all_ir_graphs(dump_cfg, suffix);           \
-      timer_pop();                                      \
+      timer_pop(t_vcg_dump);                            \
     }                                                   \
   } while (0)
-
-/** check all graphs depending on cond */
-#define CHECK_ALL(cond)                                 \
-  do {                                                  \
-    if (cond) {                                         \
-      int ii;                                           \
-      timer_push(TV_VERIFY);                            \
-      for (ii = get_irp_n_irgs() - 1; ii >= 0; --ii)    \
-        irg_verify(get_irp_irg(ii), VRFY_ENFORCE_SSA);  \
-      timer_pop();                                      \
-    }                                                   \
-  } while (0)
-
-
 
 /** dump graphs irg depending on cond */
 #define DUMP_ONE(cond, irg, suffix)                     \
   do {                                                  \
     if (cond) {                                         \
-      timer_push(TV_VCG_DUMP);                          \
+      timer_push(t_vcg_dump);                           \
       if (firm_dump.no_blocks)                          \
         dump_ir_graph(irg, suffix);                     \
       else if (firm_dump.extbb)                         \
         dump_ir_extblock_graph(irg, suffix);            \
       else                                              \
         dump_ir_block_graph(irg, suffix);               \
-      timer_pop();                                      \
+      timer_pop(t_vcg_dump);                            \
     }                                                   \
   } while (0)
 
@@ -90,28 +77,17 @@ static bool do_irg_opt(ir_graph *irg, const char *name);
 #define DUMP_ONE_CFG(cond, irg, suffix)                 \
   do {                                                  \
     if (cond) {                                         \
-      timer_push(TV_VCG_DUMP);                          \
+      timer_push(t_vcg_dump);                           \
       dump_cfg(irg, suffix);                            \
-      timer_pop();                                      \
+      timer_pop(t_vcg_dump);                            \
     }                                                   \
   } while (0)
-
-/** check a graph irg depending on cond */
-#define CHECK_ONE(cond, irg)                            \
-  do {                                                  \
-    if (cond) {                                         \
-      timer_push(TV_VERIFY);                            \
-        irg_verify(irg, VRFY_ENFORCE_SSA);              \
-      timer_pop();                                      \
-    }                                                   \
-  } while (0)
-
 
 /* set by the backend parameters */
-static const ir_settings_arch_dep_t *ad_param = NULL;
-static create_intrinsic_fkt *arch_create_intrinsic = NULL;
-static void *create_intrinsic_ctx = NULL;
-static const ir_settings_if_conv_t *if_conv_info = NULL;
+static const ir_settings_arch_dep_t *ad_param              = NULL;
+static create_intrinsic_fkt         *arch_create_intrinsic = NULL;
+static void                         *create_intrinsic_ctx  = NULL;
+static const ir_settings_if_conv_t  *if_conv_info          = NULL;
 
 /* entities of runtime functions */
 ir_entity_ptr rts_entities[rts_max];
@@ -340,6 +316,26 @@ static void do_lower_switch(ir_graph *irg)
 	lower_switch(irg, firm_opt.spare_size);
 }
 
+static void do_lower_dw_ops(void)
+{
+	lwrdw_param_t init = {
+		1,
+		1,
+		get_atomic_mode(ATOMIC_TYPE_LONGLONG),
+		get_atomic_mode(ATOMIC_TYPE_ULONGLONG),
+		get_atomic_mode(ATOMIC_TYPE_INT),
+		get_atomic_mode(ATOMIC_TYPE_UINT),
+		def_create_intrinsic_fkt,
+		NULL
+	};
+
+	if (arch_create_intrinsic) {
+		init.create_intrinsic = arch_create_intrinsic;
+		init.ctx              = create_intrinsic_ctx;
+	}
+	lower_dw_ops(&init);
+}
+
 typedef enum opt_target {
 	OPT_TARGET_IRG, /**< optimization function works on a single graph */
 	OPT_TARGET_IRP  /**< optimization function works on the complete program */
@@ -362,46 +358,47 @@ typedef struct {
 	opt_target_t  target;
 	const char   *name;
 	func_ptr_t    func;
-	int           timer;
 	const char   *description;
 	opt_flags_t   flags;
 } opt_config_t;
 
 static opt_config_t opts[] = {
-	{ OPT_TARGET_IRP, "rts",             (func_ptr_t) rts_map,                 TV_RTS,            "optimization of known library functions", OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "combo",           (func_ptr_t) combo,                   TV_COMBO,          "combined CCE, UCE and GVN",               OPT_FLAG_NONE},
-	{ OPT_TARGET_IRG, "control-flow",    (func_ptr_t) optimize_cf,             TV_CF_OPT,         "optimization of control-flow",            OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "local",           (func_ptr_t) optimize_graph_df,       TV_LOCAL_OPT,      "local graph optimizations",               OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) remove_unused_functions, TV_CGANA,          "removal of unused functions",             OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRP, "opt-tail-rec",    (func_ptr_t) opt_tail_recursion,      TV_TAIL_REC,       "tail-recursion eliminiation",             OPT_FLAG_NONE },
-	{ OPT_TARGET_IRP, "opt-func-call",   (func_ptr_t) do_optimize_funccalls,   TV_REAL_FUNC_CALL, "function call optimization",              OPT_FLAG_NONE },
-	{ OPT_TARGET_IRP, "lower-const",     (func_ptr_t) lower_const_code,        TV_LOWER,          "lowering of constant code",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRG, "one-return",      (func_ptr_t) normalize_one_return,    TV_ONERETURN,      "normalisation to 1 return",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRG, "scalar-replace",  (func_ptr_t) scalar_replacement_opt,  TV_SCALAR_REPLACE, "scalar replacement",                      OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "reassociation",   (func_ptr_t) optimize_reassociation,  TV_REASSOCIATION,  "reassociation",                           OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "gcse",            (func_ptr_t) do_gcse,                 TV_CODE_PLACE,     "global common subexpression elimination", OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "place",           (func_ptr_t) place_code,              TV_CODE_PLACE,     "code placement",                          OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "confirm",         (func_ptr_t) construct_confirms,      TV_CONFIRM_CREATE, "confirm optimisation",                    OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "opt-load-store",  (func_ptr_t) optimize_load_store,     TV_LOAD_STORE,     "load store optimization",                 OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "sync",            (func_ptr_t) opt_sync,                TV_SYNC,           "automatic sync-node creation",            OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      TV_LOWER,          "lowering",                                OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "deconv",          (func_ptr_t) conv_opt,                TV_DECONV,         "conv node elimination",                   OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "thread-jumps",    (func_ptr_t) opt_jumpthreading,       TV_JUMPTHREADING,  "path-sensitive jumpthreading",            OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "remove-confirms", (func_ptr_t) remove_confirms,         TV_CONFIRM_CREATE, "confirm removal",                         OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRG, "gvn-pre",         (func_ptr_t) do_gvn_pre,              TV_GVNPRE,         "global value numbering partial redundancy elimination", OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "if-conversion",   (func_ptr_t) do_if_conv,              TV_IF_CONV,        "if-conversion",                           OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "bool",            (func_ptr_t) opt_bool,                TV_BOOLOPT,        "bool simplification",                     OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "shape-blocks",    (func_ptr_t) shape_blocks,            TV_END_MELT,       "block shaping",                           OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "ivopts",          (func_ptr_t) do_stred,                TV_OSR,            "induction variable strength reduction",   OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "remove-phi-cycles", (func_ptr_t) remove_phi_cycles,     TV_OSR,            "removal of phi cycles",                   OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "dead",            (func_ptr_t) dead_node_elimination,   TV_DEAD_NODE,      "dead node elimination",                   OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRP, "inline",          (func_ptr_t) do_inline,               TV_INLINE,         "inlining",                                OPT_FLAG_NONE },
-	{ OPT_TARGET_IRP, "opt-proc-clone",  (func_ptr_t) do_cloning,              TV_CLONE,          "procedure cloning",                       OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "lower-switch",    (func_ptr_t) do_lower_switch,         TV_LOWER,          "switch lowering",                         OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "invert-loops",    (func_ptr_t) do_loop_inversion,       TV_LOOP_INVERSION, "loop inversion",                          OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "peel-loops",      (func_ptr_t) do_loop_peeling,         TV_LOOP_PEELING,   "loop peeling",                            OPT_FLAG_NONE },
+	{ OPT_TARGET_IRP, "rts",             (func_ptr_t) rts_map,                 "optimization of known library functions", OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "combo",           (func_ptr_t) combo,                   "combined CCE, UCE and GVN",               OPT_FLAG_NONE},
+	{ OPT_TARGET_IRG, "control-flow",    (func_ptr_t) optimize_cf,             "optimization of control-flow",            OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "local",           (func_ptr_t) optimize_graph_df,       "local graph optimizations",               OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) remove_unused_functions, "removal of unused functions",             OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRP, "opt-tail-rec",    (func_ptr_t) opt_tail_recursion,      "tail-recursion eliminiation",             OPT_FLAG_NONE },
+	{ OPT_TARGET_IRP, "opt-func-call",   (func_ptr_t) do_optimize_funccalls,   "function call optimization",              OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      "lowering",                                OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRP, "lower-const",     (func_ptr_t) lower_const_code,        "lowering of constant code",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRP, "lower-dw",        (func_ptr_t) do_lower_dw_ops,         "lowering of doubleword operations",       OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "lower-switch",    (func_ptr_t) do_lower_switch,         "switch lowering",                         OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "one-return",      (func_ptr_t) normalize_one_return,    "normalisation to 1 return",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRG, "scalar-replace",  (func_ptr_t) scalar_replacement_opt,  "scalar replacement",                      OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "reassociation",   (func_ptr_t) optimize_reassociation,  "reassociation",                           OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "gcse",            (func_ptr_t) do_gcse,                 "global common subexpression elimination", OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "place",           (func_ptr_t) place_code,              "code placement",                          OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "confirm",         (func_ptr_t) construct_confirms,      "confirm optimisation",                    OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "opt-load-store",  (func_ptr_t) optimize_load_store,     "load store optimization",                 OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "parallelize-mem", (func_ptr_t) opt_parallelize_mem,     "parallelize memory",                      OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "deconv",          (func_ptr_t) conv_opt,                "conv node elimination",                   OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "thread-jumps",    (func_ptr_t) opt_jumpthreading,       "path-sensitive jumpthreading",            OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "remove-confirms", (func_ptr_t) remove_confirms,         "confirm removal",                         OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRG, "gvn-pre",         (func_ptr_t) do_gvn_pre,              "global value numbering partial redundancy elimination", OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "if-conversion",   (func_ptr_t) do_if_conv,              "if-conversion",                           OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "bool",            (func_ptr_t) opt_bool,                "bool simplification",                     OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "shape-blocks",    (func_ptr_t) shape_blocks,            "block shaping",                           OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "ivopts",          (func_ptr_t) do_stred,                "induction variable strength reduction",   OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "remove-phi-cycles", (func_ptr_t) remove_phi_cycles,     "removal of phi cycles",                   OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "dead",            (func_ptr_t) dead_node_elimination,   "dead node elimination",                   OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRP, "inline",          (func_ptr_t) do_inline,               "inlining",                                OPT_FLAG_NONE },
+	{ OPT_TARGET_IRP, "opt-proc-clone",  (func_ptr_t) do_cloning,              "procedure cloning",                       OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "invert-loops",    (func_ptr_t) do_loop_inversion,       "loop inversion",                          OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "peel-loops",      (func_ptr_t) do_loop_peeling,         "loop peeling",                            OPT_FLAG_NONE },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
+ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
 
 static opt_config_t *get_opt(const char *name)
 {
@@ -438,24 +435,29 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	transform_irg_func  func;
 	ir_graph           *old_irg;
 	opt_config_t       *config = get_opt(name);
+	size_t              n      = config - opts;
+	assert(config != NULL);
 	assert(config->target == OPT_TARGET_IRG);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return false;
 
-	if (config->timer != -1)
-		timer_push(config->timer);
 
 	old_irg          = current_ir_graph;
 	current_ir_graph = irg;
 
 	func = (transform_irg_func) config->func;
-	func(irg);
 
-	if (config->timer != -1)
-		timer_pop();
+	timer_push(timers[n]);
+	func(irg);
+	timer_pop(timers[n]);
 
 	DUMP_ONE_C(firm_dump.ir_graph && firm_dump.all_phases, irg, config->name);
-	CHECK_ONE(firm_opt.check_all, irg);
+
+	if (firm_opt.check_all) {
+		timer_push(t_verify);
+		irg_verify(irg, VRFY_ENFORCE_SSA);
+		timer_pop(t_verify);
+	}
 
 	current_ir_graph = old_irg;
 	return true;
@@ -465,21 +467,27 @@ static void do_irp_opt(const char *name)
 {
 	transform_irp_func  func;
 	opt_config_t       *config = get_opt(name);
+	size_t              n      = config - opts;
 	assert(config->target == OPT_TARGET_IRP);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return;
 
-	if (config->timer != -1)
-		timer_push(config->timer);
-
 	func = (transform_irp_func) config->func;
+
+	timer_push(timers[n]);
 	func();
+	timer_pop(timers[n]);
 
 	DUMP_ALL_C(firm_dump.ir_graph && firm_dump.all_phases, config->name);
-	CHECK_ALL(firm_opt.check_all);
 
-	if (config->timer != -1)
-		timer_pop();
+	if (firm_opt.check_all) {
+		int i;
+		timer_push(t_verify);
+		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+			irg_verify(get_irp_irg(i), VRFY_ENFORCE_SSA);
+		}
+		timer_pop(t_verify);
+	}
 }
 
 /**
@@ -541,7 +549,7 @@ static void do_firm_optimizations(const char *input_filename)
   if (get_opt_enabled("ivopts"))
   	  set_opt_enabled("remove-phi-cycles", false);
 
-  timer_start(TV_ALL_OPT);
+  timer_start(t_all_opt);
 
   do_irp_opt("rts");
 
@@ -621,14 +629,12 @@ static void do_firm_optimizations(const char *input_filename)
   do_irp_opt("remove-unused");
 
   DUMP_ALL(firm_dump.ir_graph, "-opt");
-  /* verify optimized graphs */
-  CHECK_ALL(firm_opt.check_all);
 
   if (firm_dump.statistic & STAT_AFTER_OPT)
     stat_dump_snapshot(input_filename, "opt");
 
-  timer_stop(TV_ALL_OPT);
-}  /* do_firm_optimizations */
+  timer_stop(t_all_opt);
+}
 
 /**
  * compute the size of a type (do implicit lowering)
@@ -820,38 +826,15 @@ static void do_firm_lowering(const char *input_filename)
 {
   int i;
 
-  if (firm_opt.lower_ll) {
-    lwrdw_param_t init = {
-      1,
-      1,
-      get_atomic_mode(ATOMIC_TYPE_LONGLONG),
-      get_atomic_mode(ATOMIC_TYPE_ULONGLONG),
-      get_atomic_mode(ATOMIC_TYPE_INT),
-      get_atomic_mode(ATOMIC_TYPE_UINT),
-      def_create_intrinsic_fkt,
-      NULL
-    };
-
-
-    if (arch_create_intrinsic) {
-      init.create_intrinsic = arch_create_intrinsic;
-      init.ctx              = create_intrinsic_ctx;
-    }
-    timer_push(TV_DW_LOWER);
-      lower_dw_ops(&init);
-    timer_pop();
-  }
+  do_irp_opt("lower-dw");
 
   if (firm_dump.statistic & STAT_AFTER_LOWER)
     stat_dump_snapshot(input_filename, "low");
 
-  /* verify lowered graphs */
-  CHECK_ALL(firm_opt.check_all);
-
   DUMP_ALL(firm_dump.ir_graph, "-low");
 
   if (firm_opt.enabled) {
-    timer_start(TV_ALL_OPT);
+    timer_start(t_all_opt);
 
     /* run reassociation first on all graphs BEFORE the architecture dependent optimizations
        are enabled */
@@ -882,9 +865,9 @@ static void do_firm_lowering(const char *input_filename)
         do_irg_opt(irg, "control-flow");
       }
 
-      do_irg_opt(current_ir_graph, "sync");
+      do_irg_opt(irg, "parallelize-mem");
     }
-    timer_stop(TV_ALL_OPT);
+    timer_stop(t_all_opt);
 
     DUMP_ALL(firm_dump.ir_graph, "-low-opt");
   }
@@ -902,7 +885,7 @@ static void do_firm_lowering(const char *input_filename)
   if (firm_dump.statistic & STAT_FINAL) {
     stat_dump_snapshot(input_filename, "final");
   }
-}  /* do_firm_lowering */
+}
 
 /**
  * Initialize for the Firm-generating back end.
@@ -911,6 +894,18 @@ void gen_firm_init(void)
 {
   firm_parameter_t params;
   unsigned         pattern = 0;
+  int              i;
+
+  for (i = 0; i < n_opts; ++i) {
+    timers[i] = ir_timer_new();
+    timer_register(timers[i], opts[i].description);
+  }
+  t_verify = ir_timer_new();
+  timer_register(t_verify, "Firm: verify pass");
+  t_vcg_dump = ir_timer_new();
+  timer_register(t_vcg_dump, "Firm: vcg dumping");
+  t_all_opt = ir_timer_new();
+  timer_register(t_all_opt, "Firm: all optimizations");
 
   if (firm_dump.stat_pattern)
     pattern |= FIRMSTAT_PATTERN_ENABLED;
@@ -931,7 +926,8 @@ void gen_firm_init(void)
   if (firm_be_opt.selection == BE_FIRM_BE) {
     const backend_params *be_params = be_get_backend_param();
 
-    firm_opt.lower_ll       = (a_byte) be_params->do_dw_lowering;
+	if (be_params->do_dw_lowering)
+		set_opt_enabled("lower-dw", true);
 
     arch_create_intrinsic   = be_params->arch_create_intrinsic_fkt;
     create_intrinsic_ctx    = be_params->create_intrinsic_ctx;
@@ -974,7 +970,7 @@ void gen_firm_init(void)
 
   /* do not dump entity ld names */
   dump_ld_names(0);
-}  /* gen_firm_init */
+}
 
 /**
  * Called, after the Firm generation is completed,
@@ -1021,32 +1017,25 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
   }
 
   /* finalize all graphs */
-  timer_push(TV_CONSTRUCT);
   for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
     ir_graph *irg = get_irp_irg(i);
 
     irg_finalize_cons(irg);
     DUMP_ONE(firm_dump.ir_graph, irg, "");
-
-    /* verify the graph */
-    CHECK_ONE(firm_opt.check_all, irg);
   }
-  timer_pop();
 
-  timer_push(TV_VERIFY);
-    tr_vrfy();
-  timer_pop();
+  timer_push(t_verify);
+  tr_vrfy();
+  timer_pop(t_verify);
 
   /* all graphs are finalized, set the irp phase to high */
   set_irp_phase_state(phase_high);
 
   /* BEWARE: kill unreachable code before doing compound lowering */
-  timer_push(TV_CF_OPT);
   for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
     ir_graph *irg = get_irp_irg(i);
-    optimize_cf(irg);
+	do_irg_opt(irg, "control-flow");
   }
-  timer_pop();
 
   /* lower all compound call return values */
   lower_compound_params();
@@ -1068,9 +1057,11 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode, int new_
     do_firm_optimizations(input_filename);
 
   if (firm_dump.gen_firm_asm) {
-    timer_push(TV_FIRM_ASM);
-      gen_Firm_assembler(input_filename);
-    timer_pop();
+  	ir_timer_t *timer = ir_timer_new();
+  	timer_register(timer, "Firm: Firm assembler");
+  	timer_push(timer);
+    gen_Firm_assembler(input_filename);
+    timer_pop(timer);
     return;
   }
 

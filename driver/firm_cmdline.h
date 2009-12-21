@@ -42,7 +42,6 @@ struct a_firm_opt {
   a_byte   cc_opt;          /**< optimize calling conventions */
   a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
-  a_byte   lower_ll;        /**< lower double word access */
   a_byte   vrfy;            /**< Firm verifier setting */
   a_byte   check_all;       /**< enable checking all Firm phases */
   a_byte   lower;           /**< enable Firm lowering */

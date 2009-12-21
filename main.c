@@ -1383,10 +1383,13 @@ do_parsing:
 			c_mode |= features_on;
 			c_mode &= ~features_off;
 
-			timer_push(TV_PARSING);
+			/* do the actual parsing */
+			ir_timer_t *t_parsing = ir_timer_new();
+			timer_register(t_parsing, "Frontend: Parsing");
+			timer_push(t_parsing);
 			init_tokens();
 			translation_unit_t *const unit = do_parsing(in, filename);
-			timer_pop();
+			timer_pop(t_parsing);
 
 			/* prints the AST even if errors occurred */
 			if (mode == PrintAst) {
@@ -1428,9 +1431,12 @@ do_parsing:
 				continue;
 			}
 
-			timer_push(TV_CONSTRUCT);
+			/* build the firm graph */
+			ir_timer_t *t_construct = ir_timer_new();
+			timer_register(t_construct, "Frontend: Graph construction");
+			timer_push(t_construct);
 			translation_unit_to_firm(unit);
-			timer_pop();
+			timer_pop(t_construct);
 
 graph_built:
 			if (mode == ParseOnly) {

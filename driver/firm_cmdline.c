@@ -39,7 +39,6 @@ struct a_firm_opt firm_opt = {
   /* cc_opt          = */ TRUE,
   /* freestanding;   = */ FALSE,
   /* fp_model        = */ fp_model_precise,
-  /* lower_ll        = */ FALSE,
   /* vrfy            = */ FIRM_VERIFICATION_ON,
   /* check_all       = */ FALSE,
   /* lower           = */ TRUE,

@@ -41,11 +41,9 @@ static char *generate_asm_file_name(const char *file_name) {
     break;
 #endif
 
-#ifdef FIRM_BACKEND
   case BE_FIRM_BE:
     strncat(asm_file_name, ".s", 4);
     break;
-#endif
   }
 
   return asm_file_name;
@@ -70,22 +68,26 @@ void do_codegen(FILE *out, const char *file_name) {
 
   switch (firm_be_opt.selection) {
 #ifdef FIRM2C_BACKEND
-  case BE_FIRM2C:
-    timer_start(TV_FIRM2C_BE);
-      cbackend_set_debug_retrieve(dbg_retrieve);
-      generate_code_file(out);
-    timer_stop(TV_FIRM2C_BE);
+  case BE_FIRM2C: {
+  	ir_timer_t *timer = ir_timer_new();
+  	timer_register(timer, "Firm: C-generating backend");
+  	timer_start(timer);
+    cbackend_set_debug_retrieve(dbg_retrieve);
+    generate_code_file(out);
+    timer_stop(timer);
     break;
+  }
 #endif
 
-#ifdef FIRM_BACKEND
-  case BE_FIRM_BE:
-    timer_start(TV_FIRM_BE);
-      ir_set_debug_retrieve(dbg_retrieve);
-      be_main(out, file_name);
-    timer_stop(TV_FIRM_BE);
+  case BE_FIRM_BE: {
+    ir_timer_t *timer = ir_timer_new();
+    timer_register(timer, "Firm: backend");
+    timer_start(timer);
+    ir_set_debug_retrieve(dbg_retrieve);
+    be_main(out, file_name);
+    timer_stop(timer);
     break;
-#endif
+  }
 
   default:
     fprintf(stderr, "Fatal: Unknown backend %d\n", firm_be_opt.selection);
@@ -93,4 +95,4 @@ void do_codegen(FILE *out, const char *file_name) {
 
   if (close_out)
     fclose(close_out);
-} /* do_codegen() */
+}

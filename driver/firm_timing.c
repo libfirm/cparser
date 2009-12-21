@@ -5,63 +5,84 @@
  *
  * $Id$
  */
-#include <libfirm/timing.h>
 #include "firm_timing.h"
 
-static const char *tv_names[] = {
-#define DEFTIMEVAR(x, y, z)	y,
-#include "firm_timing.def"
-	NULL
-#undef DEFTIMEVAR
-};
+#include <libfirm/adt/xmalloc.h>
 
-static const char *tv_desc[] = {
-#define DEFTIMEVAR(x, y, z)	z,
-#include "firm_timing.def"
-	NULL
-#undef DEFTIMEVAR
-};
-
-static ir_timer_t *timers[TV_LAST];
 static int timers_inited;
 
-void timer_init(void) {
-	int i;
+typedef struct timer_info_t {
+	struct timer_info_t *next;
+	char                *description;
+	ir_timer_t          *timer;
+} timer_info_t;
 
-	for (i = 0; i < TV_LAST; ++i) {
-		timers[i] = ir_timer_register(tv_names[i], tv_desc[i]);
+timer_info_t *infos;
+timer_info_t *last_info;
+
+void timer_register(ir_timer_t *timer, const char *description)
+{
+	timer_info_t *info = XMALLOCZ(timer_info_t);
+
+	info->description = xstrdup(description);
+	info->timer       = timer;
+
+	if (last_info != NULL) {
+		last_info->next = info;
+	} else {
+		infos = info;
 	}
+	last_info = info;
+}
 
+void timer_init(void)
+{
 	timers_inited = 1;
 }
 
-void timer_term(FILE *f) {
-	int i;
+void timer_term(FILE *f)
+{
+	timer_info_t *info;
+	timer_info_t *next;
 
-	for (i = 0; i < TV_LAST; ++i) {
-		double val = (double)ir_timer_elapsed_usec(timers[i]) / 1000.0;
-		fprintf(f, "%-30s %8.3f msec\n", tv_desc[i], val);
+	for (info = infos; info != NULL; info = next) {
+		ir_timer_t *timer = info->timer;
+		double      val         = (double)ir_timer_elapsed_usec(timer) / 1000.0;
+		const char *description = info->description;
+		fprintf(f, "%-45s %8.3f msec\n", description, val);
+
+		ir_timer_free(timer);
+		xfree(info->description);
+		next = info->next;
+		xfree(info);
 	}
+	infos = NULL;
+	last_info = NULL;
 
 	timers_inited = 0;
 }
 
-void timer_push(int timer) {
+void timer_push(ir_timer_t *timer)
+{
 	if (timers_inited)
-		ir_timer_push(timers[timer]);
+		ir_timer_push(timer);
 }
 
-void timer_pop(void) {
+void timer_pop(ir_timer_t *timer)
+{
+	(void) timer;
 	if (timers_inited)
 		ir_timer_pop();
 }
 
-void timer_start(int timer) {
+void timer_start(ir_timer_t *timer)
+{
 	if (timers_inited)
-		ir_timer_start(timers[timer]);
+		ir_timer_start(timer);
 }
 
-void timer_stop(int timer) {
+void timer_stop(ir_timer_t *timer)
+{
 	if (timers_inited)
-		ir_timer_stop(timers[timer]);
+		ir_timer_stop(timer);
 }

@@ -1,5 +1,3 @@
-#ifndef __FIRM_TIMING_H__
-#define __FIRM_TIMING_H__
 /**
  * @file firm_timing.h -- timing for the Firm compiler
  *
@@ -7,21 +5,18 @@
  *
  * $Id$
  */
+#ifndef __FIRM_TIMING_H__
+#define __FIRM_TIMING_H__
 
 #include <stdio.h>
-
-enum timings {
-#define DEFTIMEVAR(x, y, z)	x,
-#include "firm_timing.def"
-	TV_LAST
-#undef DEFTIMEVAR
-};
+#include <libfirm/timing.h>
 
 void timer_init(void);
+void timer_register(ir_timer_t *timer, const char *description);
 void timer_term(FILE *f);
-void timer_push(int timer);
-void timer_pop(void);
-void timer_start(int timer);
-void timer_stop(int timer);
+void timer_push(ir_timer_t *timer);
+void timer_pop(ir_timer_t *timer);
+void timer_start(ir_timer_t *timer);
+void timer_stop(ir_timer_t *timer);
 
-#endif /* __FIRM_TIMING_H__ */
+#endif
