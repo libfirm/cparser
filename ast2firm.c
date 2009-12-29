@@ -1316,7 +1316,7 @@ static ir_node *wide_string_literal_to_firm(
 
 	set_array_lower_bound_int(type, 0, 0);
 	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen);
+	set_type_size_bytes(type, slen * get_mode_size_bytes(mode));
 	set_type_state(type, layout_fixed);
 
 	ir_initializer_t *initializer = create_initializer_compound(slen);
