@@ -1266,13 +1266,13 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_type_size_bytes(type, slen);
 	set_type_state(type, layout_fixed);
 
-	tarval **const tvs = xmalloc(slen * sizeof(tvs[0]));
+	ir_initializer_t *initializer = create_initializer_compound(slen);
 	for (size_t i = 0; i < slen; ++i) {
-		tvs[i] = new_tarval_from_long(string[i], mode);
+		tarval           *tv  = new_tarval_from_long(string[i], mode);
+		ir_initializer_t *val = create_initializer_tarval(tv);
+		set_initializer_compound_value(initializer, i, val);
 	}
-
-	set_array_entity_values(entity, tvs, slen);
-	free(tvs);
+	set_entity_initializer(entity, initializer);
 
 	return create_symconst(dbgi, mode_P_data, entity);
 }
@@ -1319,13 +1319,13 @@ static ir_node *wide_string_literal_to_firm(
 	set_type_size_bytes(type, slen);
 	set_type_state(type, layout_fixed);
 
-	tarval **const tvs = xmalloc(slen * sizeof(tvs[0]));
+	ir_initializer_t *initializer = create_initializer_compound(slen);
 	for (size_t i = 0; i < slen; ++i) {
-		tvs[i] = new_tarval_from_long(string[i], mode);
+		tarval           *tv  = new_tarval_from_long(string[i], mode);
+		ir_initializer_t *val = create_initializer_tarval(tv);
+		set_initializer_compound_value(initializer, i, val);
 	}
-
-	set_array_entity_values(entity, tvs, slen);
-	free(tvs);
+	set_entity_initializer(entity, initializer);
 
 	return create_symconst(dbgi, mode_P_data, entity);
 }
