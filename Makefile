@@ -37,7 +37,6 @@ SOURCES := \
 	driver/firm_codegen.c \
 	driver/firm_opt.c \
 	driver/firm_timing.c \
-	driver/gen_firm_asm.c \
 	entity.c \
 	entitymap.c \
 	format_check.c \
