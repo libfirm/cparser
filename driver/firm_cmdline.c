@@ -69,7 +69,6 @@ struct a_firm_dump firm_dump = {
   /* statistic    = */ STAT_NONE,
   /* stat_pattern = */ 0,
   /* stat_dag     = */ 0,
-  /* gen_firm_asm = */ FALSE,
   /* filter       = */ NULL
 };
 
@@ -185,7 +184,6 @@ static const struct params {
   { X("stat-final"),             &firm_dump.statistic,       STAT_FINAL,       "misc: Firm statistic after code generation" },
   { X("stat-pattern"),           &firm_dump.stat_pattern,    1, "misc: Firm statistic calculates most used pattern" },
   { X("stat-dag"),               &firm_dump.stat_dag,        1, "misc: Firm calculates DAG statistics" },
-  { X("firm-asm"),               &firm_dump.gen_firm_asm,    1, "misc: output Firm assembler" },
   { X("win32"),                  &firm_opt.os_support,       OS_SUPPORT_MINGW, "misc: generate MinGW Win32 code" },
   { X("mac"),                    &firm_opt.os_support,       OS_SUPPORT_MACHO, "misc: generate MacOS code" },
   { X("linux"),                  &firm_opt.os_support,       OS_SUPPORT_LINUX, "misc: generate Linux-ELF code" },

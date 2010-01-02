@@ -1018,15 +1018,6 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 	if (firm_opt.enabled)
 		do_firm_optimizations(input_filename);
 
-	if (firm_dump.gen_firm_asm) {
-		ir_timer_t *timer = ir_timer_new();
-		timer_register(timer, "Firm: Firm assembler");
-		timer_push(timer);
-		gen_Firm_assembler(input_filename);
-		timer_pop(timer);
-		return;
-	}
-
 	if (firm_opt.lower)
 		do_firm_lowering(input_filename);
 

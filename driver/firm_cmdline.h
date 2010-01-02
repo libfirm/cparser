@@ -89,7 +89,6 @@ struct a_firm_dump {
   a_byte statistic;     /**< Firm statistic setting */
   a_byte stat_pattern;  /**< enable Firm statistic pattern */
   a_byte stat_dag;      /**< enable Firm DAG statistic */
-  a_byte gen_firm_asm;  /**< generate Firm assembler and exit */
   char   *filter;       /**< the dump filter */
 };
 
