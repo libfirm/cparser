@@ -896,7 +896,6 @@ void gen_firm_init(void)
 		if_conv_info            = be_params->if_conv_info;
 	}
 
-	dbg_init(NULL, NULL, dbg_snprint);
 	edges_init_dbg(firm_opt.vrfy_edges);
 
 	/* Sel node cannot produce NULL pointers */

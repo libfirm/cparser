@@ -101,9 +101,6 @@ extern ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos);
 /** Debug printf implementation. */
 extern void dbg_printf(const char *fmt, ...);
 
-/** Convert the debug info into human readable form. */
-extern unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg);
-
 /** Convert the debug info back. */
 extern const char *dbg_retrieve(const dbg_info *dbg, unsigned *line);
 

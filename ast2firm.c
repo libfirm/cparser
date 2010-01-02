@@ -141,15 +141,6 @@ ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	return new_r_Unknown(irg, mode);
 }
 
-unsigned dbg_snprint(char *buf, unsigned len, const dbg_info *dbg)
-{
-	const source_position_t *pos = (const source_position_t*) dbg;
-	if (pos == NULL)
-		return 0;
-	return (unsigned) snprintf(buf, len, "%s:%u", pos->input_name,
-	                           pos->linenr);
-}
-
 const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 {
 	const source_position_t *pos = (const source_position_t*) dbg;
