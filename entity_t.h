@@ -114,6 +114,7 @@ struct entity_base_t {
 	source_position_t   source_position;
 	scope_t            *parent_scope;    /**< The scope where this entity
 										      is contained in */
+	entity_t           *parent_entity;
 
 	/** next declaration in a scope */
 	entity_t           *next;
@@ -305,8 +306,8 @@ struct function_t {
 
 	/* ast2firm info */
 	ir_entity     *irentity;
-	ir_node       *static_link;        /**< if need_closure is set, the node representing
-										    the static link. */
+	ir_node       *static_link;        /**< if need_closure is set, the node
+	                                        representing the static link. */
 };
 
 union entity_t {

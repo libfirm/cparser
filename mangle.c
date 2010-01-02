@@ -226,12 +226,28 @@ static void mangle_type(type_t *orig_type)
 	panic("invalid type encountered while mangling");
 }
 
+static void mangle_namespace(entity_t *entity)
+{
+	for (entity_t *e = entity->base.parent_entity; e != NULL;
+	     e = e->base.parent_entity) {
+	    /* TODO: we need something similar (or the same?) for classes */
+		if (e->kind == ENTITY_NAMESPACE) {
+			mangle_namespace(e);
+			print_name(e->base.symbol->string);
+			return;
+		}
+	}
+}
+
 static void mangle_entity(entity_t *entity)
 {
 	obstack_1grow(&obst, '_');
 	obstack_1grow(&obst, 'Z');
 
-	/* TODO: mangle scope */
+	if (entity->base.parent_entity != NULL) {
+		obstack_1grow(&obst, 'N');
+		mangle_namespace(entity);
+	}
 
 	print_name(entity->base.symbol->string);
 

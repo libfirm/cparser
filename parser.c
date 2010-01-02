@@ -87,6 +87,7 @@ static scope_t             *file_scope        = NULL;
 static scope_t             *current_scope     = NULL;
 /** Point to the current function declaration if inside a function. */
 static function_t          *current_function  = NULL;
+static entity_t            *current_entity    = NULL;
 static entity_t            *current_init_decl = NULL;
 static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
@@ -99,9 +100,9 @@ static label_statement_t   *label_first       = NULL;
 static label_statement_t  **label_anchor      = NULL;
 /** current translation unit. */
 static translation_unit_t  *unit              = NULL;
-/** true if we are in a type property context (evaluation only for type. */
+/** true if we are in a type property context (evaluation only for type) */
 static bool                 in_type_prop      = false;
-/** true in we are in a __extension__ context. */
+/** true if we are in an __extension__ context. */
 static bool                 in_gcc_extension  = false;
 static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
@@ -2479,7 +2480,8 @@ static void append_entity(scope_t *scope, entity_t *entity)
 	} else {
 		scope->entities = entity;
 	}
-	scope->last_entity = entity;
+	entity->base.parent_entity = current_entity;
+	scope->last_entity         = entity;
 }
 
 
@@ -3686,26 +3688,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 				break;
 
 			case T__based: {
-#if 0
-				source_position_t const pos = *HERE;
-				next_token();
-				expect('(', end_error);
-				add_anchor_token(')');
-				based = parse_microsoft_based();
-				rem_anchor_token(')');
-				expect(')', end_error);
-				if (token.type != '*') {
-					if (token.type == T__based) {
-						errorf(&pos, "__based type modifier specified more than once");
-					} else if (warning.other) {
-						warningf(&pos,
-								"__based does not precede a pointer declarator, ignored");
-					}
-					continue;
-				}
-#else
-				panic("based currently disabled");
-#endif
+				panic("based not supported anymore");
 				/* FALLTHROUGH */
 			}
 
@@ -3725,11 +3708,6 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 	}
 
 ptr_operator_end: ;
-#if 0
-	modifiers      |= env->modifiers;
-	env->modifiers  = modifiers;
-#endif
-
 	construct_type_t *inner_types = NULL;
 
 	switch (token.type) {
@@ -3804,7 +3782,8 @@ end_error:
 	return NULL;
 }
 
-static type_t *construct_declarator_type(construct_type_t *construct_list, type_t *type)
+static type_t *construct_declarator_type(construct_type_t *construct_list,
+                                         type_t *type)
 {
 	construct_type_t *iter = construct_list;
 	for (; iter != NULL; iter = iter->base.next) {
@@ -4403,15 +4382,15 @@ warn_redundant_declaration: ;
 							strcmp(previous_entity->base.source_position.input_name,
 								"<builtin>") != 0) {
 						warningf(pos,
-								"redundant declaration for '%Y' (declared %P)",
-								symbol, &previous_entity->base.source_position);
+						         "redundant declaration for '%Y' (declared %P)",
+						         symbol, &previous_entity->base.source_position);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC &&
 							new_storage_class == STORAGE_CLASS_STATIC) {
 						errorf(pos,
-								"static declaration of '%Y' follows non-static declaration (declared %P)",
-								symbol, &previous_entity->base.source_position);
+						       "static declaration of '%Y' follows non-static declaration (declared %P)",
+						       symbol, &previous_entity->base.source_position);
 					} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						prev_decl->storage_class          = STORAGE_CLASS_NONE;
 						prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
@@ -5711,7 +5690,9 @@ static void parse_external_declaration(void)
 		/* parse function body */
 		int         label_stack_top      = label_top();
 		function_t *old_current_function = current_function;
+		entity_t   *old_current_entity   = current_entity;
 		current_function                 = function;
+		current_entity                   = (entity_t*) function;
 		current_parent                   = NULL;
 
 		goto_first   = NULL;
@@ -5743,6 +5724,8 @@ static void parse_external_declaration(void)
 
 		assert(current_parent   == NULL);
 		assert(current_function == function);
+		assert(current_entity   == (entity_t*) function);
+		current_entity   = old_current_entity;
 		current_function = old_current_function;
 		label_pop_to(label_stack_top);
 	}
@@ -5765,7 +5748,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 	type_t *skipped_type = skip_typeref(base_type);
 	if (!is_type_integer(skipped_type)) {
 		errorf(HERE, "bitfield base type '%T' is not an integer type",
-			base_type);
+		       base_type);
 		bit_size = 0;
 	} else {
 		bit_size = get_type_size(base_type) * 8;
@@ -5979,7 +5962,7 @@ static void parse_compound_declarators(compound_t *compound,
 					type_t *type      = skip_typeref(orig_type);
 					if (is_type_function(type)) {
 						errorf(&entity->base.source_position,
-								"compound member '%Y' must not have function type '%T'",
+						       "compound member '%Y' must not have function type '%T'",
 								entity->base.symbol, orig_type);
 					} else if (is_type_incomplete(type)) {
 						/* §6.7.2.1:16 flexible array member */
@@ -5987,7 +5970,7 @@ static void parse_compound_declarators(compound_t *compound,
 								token.type          != ';' ||
 								look_ahead(1)->type != '}') {
 							errorf(&entity->base.source_position,
-									"compound member '%Y' has incomplete type '%T'",
+							       "compound member '%Y' has incomplete type '%T'",
 									entity->base.symbol, orig_type);
 						}
 					}
@@ -6031,8 +6014,8 @@ static type_t *parse_typename(void)
 	declaration_specifiers_t specifiers;
 	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
-	if (specifiers.storage_class != STORAGE_CLASS_NONE ||
-			specifiers.thread_local) {
+	if (specifiers.storage_class != STORAGE_CLASS_NONE
+			|| specifiers.thread_local) {
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
@@ -10214,9 +10197,9 @@ static void parse_namespace_definition(void)
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
-		if (entity       != NULL             &&
-				entity->kind != ENTITY_NAMESPACE &&
-				entity->base.parent_scope == current_scope) {
+		if (entity != NULL
+				&& entity->kind != ENTITY_NAMESPACE
+				&& entity->base.parent_scope == current_scope) {
 			if (!is_error_entity(entity)) {
 				error_redefined_as_different_kind(&token.source_position,
 						entity, ENTITY_NAMESPACE);
@@ -10244,12 +10227,17 @@ static void parse_namespace_definition(void)
 	size_t const  top       = environment_top();
 	scope_t      *old_scope = scope_push(&entity->namespacee.members);
 
+	entity_t     *old_current_entity = current_entity;
+	current_entity = entity;
+
 	expect('{', end_error);
 	parse_externals();
 	expect('}', end_error);
 
 end_error:
 	assert(current_scope == &entity->namespacee.members);
+	assert(current_entity == entity);
+	current_entity = old_current_entity;
 	scope_pop(old_scope);
 	environment_pop_to(top);
 }

@@ -66,9 +66,9 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 
 static symbol_table_t  symbol_table;
 
-symbol_t *symbol_table_insert(const char *symbol)
+symbol_t *symbol_table_insert(const char *string)
 {
-	return _symbol_table_insert(&symbol_table, symbol);
+	return _symbol_table_insert(&symbol_table, string);
 }
 
 void init_symbol_table(void)
