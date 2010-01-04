@@ -5899,7 +5899,7 @@ void init_ast2firm(void)
 	obstack_init(&asm_obst);
 	init_atomic_modes();
 
-	ir_set_dbg_retrieve(dbg_retrieve);
+	ir_set_debug_retrieve(dbg_retrieve);
 
 	/* OS option must be set to the backend */
 	switch (firm_opt.os_support) {
