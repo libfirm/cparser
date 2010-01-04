@@ -29,6 +29,7 @@
 #include "entity_t.h"
 #include "type.h"
 #include "adt/error.h"
+#include "printer.h"
 
 static const scope_t *global_scope;
 static FILE          *out;
@@ -228,7 +229,7 @@ void write_caml_decls(FILE *output, const translation_unit_t *unit)
 	out          = output;
 	global_scope = &unit->scope;
 
-	ast_set_output(out);
+	print_to_file(out);
 	fprintf(out, "(* WARNING: Automatically generated file - chaning is useless *)\n");
 
 	/* write functions */

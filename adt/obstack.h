@@ -504,6 +504,9 @@ __extension__								\
 
 int obstack_printf(struct obstack *obst, const char *fmt, ...);
 
+#include <stdarg.h>
+int obstack_vprintf(struct obstack *obst, const char *fmt, va_list ap);
+
 #ifdef __cplusplus
 }	/* C++ */
 #endif

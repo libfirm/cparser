@@ -38,6 +38,7 @@
 #include "lang_features.h"
 #include "walk_statements.h"
 #include "warning.h"
+#include "printer.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
 #include "adt/array.h"
@@ -10815,8 +10816,7 @@ void start_parsing(void)
 	error_count       = 0;
 	warning_count     = 0;
 
-	type_set_output(stderr);
-	ast_set_output(stderr);
+	print_to_file(stderr);
 
 	assert(unit == NULL);
 	unit = allocate_ast_zero(sizeof(unit[0]));

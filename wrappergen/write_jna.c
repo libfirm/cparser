@@ -28,6 +28,7 @@
 #include "type_t.h"
 #include "entity_t.h"
 #include "type.h"
+#include "printer.h"
 #include "adt/error.h"
 #include <libfirm/adt/pset_new.h>
 
@@ -439,8 +440,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 
 	pset_new_init(&avoid_symbols);
 
-	ast_set_output(out);
-	type_set_output(out);
+	print_to_file(out);
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 	fputs("import com.sun.jna.Library;\n", out);
 	fputs("import com.sun.jna.Pointer;\n", out);

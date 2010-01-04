@@ -25,6 +25,7 @@
 #include "parser.h"
 #include "lang_features.h"
 #include "entity_t.h"
+#include "printer.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -44,8 +45,7 @@
 
 struct obstack ast_obstack;
 
-static FILE *out;
-static int   indent;
+static int indent;
 
 /** If set, implicit casts are printed. */
 bool print_implicit_casts = false;
@@ -65,7 +65,7 @@ void change_indent(int delta)
 void print_indent(void)
 {
 	for (int i = 0; i < indent; ++i)
-		fputc('\t', out);
+		print_string("\t");
 }
 
 /**
@@ -77,13 +77,13 @@ void print_indent(void)
 static int right_to_left(unsigned precedence)
 {
 	switch (precedence) {
-		case PREC_ASSIGNMENT:
-		case PREC_CONDITIONAL:
-		case PREC_UNARY:
-			return 1;
+	case PREC_ASSIGNMENT:
+	case PREC_CONDITIONAL:
+	case PREC_UNARY:
+		return 1;
 
-		default:
-			return 0;
+	default:
+		return 0;
 	}
 }
 
@@ -198,19 +198,19 @@ static void print_const(const const_expression_t *cnst)
 	const type_t *const type = skip_typeref(cnst->base.type);
 
 	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
-		fputs(cnst->v.int_value ? "true" : "false", out);
+		print_string(cnst->v.int_value ? "true" : "false");
 	} else if (is_type_integer(type)) {
-		fprintf(out, "%lld", cnst->v.int_value);
+		print_format("%lld", cnst->v.int_value);
 	} else if (is_type_float(type)) {
 		long double const val = cnst->v.float_value;
 #ifdef _WIN32
 		/* ARG, no way to print long double */
-		fprintf(out, "%.20g", (double)val);
+		print_format("%.20g", (double)val);
 #else
-		fprintf(out, "%.20Lg", val);
+		print_format("%.20Lg", val);
 #endif
 		if (isfinite(val) && truncl(val) == val)
-			fputs(".0", out);
+			print_string(".0");
 	} else {
 		panic("unknown constant");
 	}
@@ -227,7 +227,7 @@ static void print_const(const const_expression_t *cnst)
 
 		default: return;
 	}
-	fputs(suffix, out);
+	print_string(suffix);
 }
 
 /**
@@ -239,38 +239,38 @@ static void print_const(const const_expression_t *cnst)
  */
 static void print_quoted_string(const string_t *const string, char border, int skip)
 {
-	fputc(border, out);
+	print_char(border);
 	const char *end = string->begin + string->size - skip;
 	for (const char *c = string->begin; c != end; ++c) {
 		unsigned char const tc = *c;
 		if (tc == border) {
-			fputc('\\', out);
+			print_string("\\");
 		}
 		switch (tc) {
-		case '\\':  fputs("\\\\", out); break;
-		case '\a':  fputs("\\a", out); break;
-		case '\b':  fputs("\\b", out); break;
-		case '\f':  fputs("\\f", out); break;
-		case '\n':  fputs("\\n", out); break;
-		case '\r':  fputs("\\r", out); break;
-		case '\t':  fputs("\\t", out); break;
-		case '\v':  fputs("\\v", out); break;
-		case '\?':  fputs("\\?", out); break;
+		case '\\':  print_string("\\\\"); break;
+		case '\a':  print_string("\\a"); break;
+		case '\b':  print_string("\\b"); break;
+		case '\f':  print_string("\\f"); break;
+		case '\n':  print_string("\\n"); break;
+		case '\r':  print_string("\\r"); break;
+		case '\t':  print_string("\\t"); break;
+		case '\v':  print_string("\\v"); break;
+		case '\?':  print_string("\\?"); break;
 		case 27:
 			if (c_mode & _GNUC) {
-				fputs("\\e", out); break;
+				print_string("\\e"); break;
 			}
 			/* FALLTHROUGH */
 		default:
 			if (tc < 0x80 && !isprint(tc)) {
-				fprintf(out, "\\%03o", (unsigned)tc);
+				print_format("\\%03o", (unsigned)tc);
 			} else {
-				fputc(tc, out);
+				print_char(tc);
 			}
 			break;
 		}
 	}
-	fputc(border, out);
+	print_char(border);
 }
 
 /**
@@ -283,51 +283,41 @@ static void print_quoted_string(const string_t *const string, char border, int s
 static void print_quoted_wide_string(const wide_string_t *const wstr,
                                      char border, int skip)
 {
-	fputc('L', out);
-	fputc(border, out);
+	print_string("L");
+	print_char(border);
 	const wchar_rep_t *end = wstr->begin + wstr->size - skip;
 	for (const wchar_rep_t *c = wstr->begin; c != end; ++c) {
 		switch (*c) {
-			case L'\"':  fputs("\\\"", out); break;
-			case L'\\':  fputs("\\\\", out); break;
-			case L'\a':  fputs("\\a",  out); break;
-			case L'\b':  fputs("\\b",  out); break;
-			case L'\f':  fputs("\\f",  out); break;
-			case L'\n':  fputs("\\n",  out); break;
-			case L'\r':  fputs("\\r",  out); break;
-			case L'\t':  fputs("\\t",  out); break;
-			case L'\v':  fputs("\\v",  out); break;
-			case L'\?':  fputs("\\?",  out); break;
+			case L'\"':  print_string("\\\""); break;
+			case L'\\':  print_string("\\\\"); break;
+			case L'\a':  print_string("\\a");  break;
+			case L'\b':  print_string("\\b");  break;
+			case L'\f':  print_string("\\f");  break;
+			case L'\n':  print_string("\\n");  break;
+			case L'\r':  print_string("\\r");  break;
+			case L'\t':  print_string("\\t");  break;
+			case L'\v':  print_string("\\v");  break;
+			case L'\?':  print_string("\\?");  break;
 			case 27:
 				if (c_mode & _GNUC) {
-					fputs("\\e", out); break;
+					print_string("\\e"); break;
 				}
 				/* FALLTHROUGH */
 			default: {
 				const unsigned tc = *c;
 				if (tc < 0x80U) {
 					if (isprint(*c)) {
-						fputc(*c, out);
+						print_char(*c);
 					} else {
-						fprintf(out, "\\%03o", tc);
+						print_format("\\%03o", tc);
 					}
-				} else if (tc < 0x800) {
-					fputc(0xC0 | (tc >> 6),   out);
-					fputc(0x80 | (tc & 0x3F), out);
-				} else if (tc < 0x10000) {
-					fputc(0xE0 | ( tc >> 12),         out);
-					fputc(0x80 | ((tc >>  6) & 0x3F), out);
-					fputc(0x80 | ( tc        & 0x3F), out);
 				} else {
-					fputc(0xF0 | ( tc >> 18),         out);
-					fputc(0x80 | ((tc >> 12) & 0x3F), out);
-					fputc(0x80 | ((tc >>  6) & 0x3F), out);
-					fputc(0x80 | ( tc        & 0x3F), out);
+					print_char(tc);
 				}
 			}
 		}
 	}
-	fputc(border, out);
+	print_char(border);
 }
 
 /**
@@ -368,7 +358,7 @@ static void print_funcname(const funcname_expression_t *funcname)
 	case FUNCNAME_FUNCSIG:         s = "__FUNCSIG__"; break;
 	case FUNCNAME_FUNCDNAME:       s = "__FUNCDNAME__"; break;
 	}
-	fputs(s, out);
+	print_string(s);
 }
 
 static void print_wide_string_literal(
@@ -380,9 +370,9 @@ static void print_wide_string_literal(
 static void print_compound_literal(
 		const compound_literal_expression_t *expression)
 {
-	fputc('(', out);
+	print_string("(");
 	print_type(expression->type);
-	fputc(')', out);
+	print_string(")");
 	print_initializer(expression->initializer);
 }
 
@@ -399,12 +389,12 @@ static void print_assignment_expression(const expression_t *const expr)
 static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
-	fputc('(', out);
+	print_string("(");
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
 	while (argument != NULL) {
 		if (!first) {
-			fputs(", ", out);
+			print_string(", ");
 		} else {
 			first = 0;
 		}
@@ -412,7 +402,7 @@ static void print_call_expression(const call_expression_t *call)
 
 		argument = argument->next;
 	}
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -461,7 +451,7 @@ static void print_binary_expression(const binary_expression_t *binexpr)
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  op = " >>= "; break;
 	default: panic("invalid binexpression found");
 	}
-	fputs(op, out);
+	print_string(op);
 	print_expression_prec(binexpr->right, prec + 1 - r2l);
 }
 
@@ -474,43 +464,43 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch (unexpr->base.kind) {
-	case EXPR_UNARY_NEGATE:           fputc('-',          out); break;
-	case EXPR_UNARY_PLUS:             fputc('+',          out); break;
-	case EXPR_UNARY_NOT:              fputc('!',          out); break;
-	case EXPR_UNARY_BITWISE_NEGATE:   fputc('~',          out); break;
-	case EXPR_UNARY_PREFIX_INCREMENT: fputs("++",         out); break;
-	case EXPR_UNARY_PREFIX_DECREMENT: fputs("--",         out); break;
-	case EXPR_UNARY_DEREFERENCE:      fputc('*',          out); break;
-	case EXPR_UNARY_TAKE_ADDRESS:     fputc('&',          out); break;
-	case EXPR_UNARY_DELETE:           fputs("delete ",    out); break;
-	case EXPR_UNARY_DELETE_ARRAY:     fputs("delete [] ", out); break;
+	case EXPR_UNARY_NEGATE:           print_string("-"); break;
+	case EXPR_UNARY_PLUS:             print_string("+"); break;
+	case EXPR_UNARY_NOT:              print_string("!"); break;
+	case EXPR_UNARY_BITWISE_NEGATE:   print_string("~"); break;
+	case EXPR_UNARY_PREFIX_INCREMENT: print_string("++"); break;
+	case EXPR_UNARY_PREFIX_DECREMENT: print_string("--"); break;
+	case EXPR_UNARY_DEREFERENCE:      print_string("*"); break;
+	case EXPR_UNARY_TAKE_ADDRESS:     print_string("&"); break;
+	case EXPR_UNARY_DELETE:           print_string("delete "); break;
+	case EXPR_UNARY_DELETE_ARRAY:     print_string("delete [] "); break;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 		print_expression_prec(unexpr->value, prec);
-		fputs("++", out);
+		print_string("++");
 		return;
 	case EXPR_UNARY_POSTFIX_DECREMENT:
 		print_expression_prec(unexpr->value, prec);
-		fputs("--", out);
+		print_string("--");
 		return;
 	case EXPR_UNARY_CAST_IMPLICIT:
 	case EXPR_UNARY_CAST:
-		fputc('(', out);
+		print_string("(");
 		print_type(unexpr->base.type);
-		fputc(')', out);
+		print_string(")");
 		break;
 	case EXPR_UNARY_ASSUME:
-		fputs("__assume(", out);
+		print_string("__assume(");
 		print_assignment_expression(unexpr->value);
-		fputc(')', out);
+		print_string(")");
 		return;
 
 	case EXPR_UNARY_THROW:
 		if (unexpr->value == NULL) {
-			fputs("throw", out);
+			print_string("throw");
 			return;
 		}
-		fputs("throw ", out);
+		print_string("throw ");
 		break;
 
 	default:
@@ -526,7 +516,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
  */
 static void print_reference_expression(const reference_expression_t *ref)
 {
-	fputs(ref->entity->base.symbol->string, out);
+	print_string(ref->entity->base.symbol->string);
 }
 
 /**
@@ -536,7 +526,7 @@ static void print_reference_expression(const reference_expression_t *ref)
  */
 static void print_label_address_expression(const label_address_expression_t *le)
 {
-	fprintf(out, "&&%s", le->label->base.symbol->string);
+	print_format("&&%s", le->label->base.symbol->string);
 }
 
 /**
@@ -548,14 +538,14 @@ static void print_array_expression(const array_access_expression_t *expression)
 {
 	if (!expression->flipped) {
 		print_expression_prec(expression->array_ref, PREC_POSTFIX);
-		fputc('[', out);
+		print_string("[");
 		print_expression(expression->index);
-		fputc(']', out);
+		print_string("]");
 	} else {
 		print_expression_prec(expression->index, PREC_POSTFIX);
-		fputc('[', out);
+		print_string("[");
 		print_expression(expression->array_ref);
-		fputc(']', out);
+		print_string("]");
 	}
 }
 
@@ -567,18 +557,18 @@ static void print_array_expression(const array_access_expression_t *expression)
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
 	if (expression->base.kind == EXPR_SIZEOF) {
-		fputs("sizeof", out);
+		print_string("sizeof");
 	} else {
 		assert(expression->base.kind == EXPR_ALIGNOF);
-		fputs("__alignof__", out);
+		print_string("__alignof__");
 	}
 	if (expression->tp_expression != NULL) {
 		/* PREC_TOP: always print the '()' here, sizeof x is right but unusual */
 		print_expression_prec(expression->tp_expression, PREC_TOP);
 	} else {
-		fputc('(', out);
+		print_string("(");
 		print_type(expression->type);
-		fputc(')', out);
+		print_string(")");
 	}
 }
 
@@ -589,9 +579,9 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
  */
 static void print_builtin_constant(const builtin_constant_expression_t *expression)
 {
-	fputs("__builtin_constant_p(", out);
+	print_string("__builtin_constant_p(");
 	print_assignment_expression(expression->value);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -602,11 +592,11 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 static void print_builtin_types_compatible(
 		const builtin_types_compatible_expression_t *expression)
 {
-	fputs("__builtin_types_compatible_p(", out);
+	print_string("__builtin_types_compatible_p(");
 	print_type(expression->left);
-	fputs(", ", out);
+	print_string(", ");
 	print_type(expression->right);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -618,11 +608,11 @@ static void print_conditional(const conditional_expression_t *expression)
 {
 	print_expression_prec(expression->condition, PREC_LOGICAL_OR);
 	if (expression->true_expression != NULL) {
-		fputs(" ? ", out);
+		print_string(" ? ");
 		print_expression_prec(expression->true_expression, PREC_EXPRESSION);
-		fputs(" : ", out);
+		print_string(" : ");
 	} else {
-		fputs(" ?: ", out);
+		print_string(" ?: ");
 	}
 	precedence_t prec = c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL;
 	print_expression_prec(expression->false_expression, prec);
@@ -635,11 +625,11 @@ static void print_conditional(const conditional_expression_t *expression)
  */
 static void print_va_start(const va_start_expression_t *const expression)
 {
-	fputs("__builtin_va_start(", out);
+	print_string("__builtin_va_start(");
 	print_assignment_expression(expression->ap);
-	fputs(", ", out);
-	fputs(expression->parameter->base.base.symbol->string, out);
-	fputc(')', out);
+	print_string(", ");
+	print_string(expression->parameter->base.base.symbol->string);
+	print_string(")");
 }
 
 /**
@@ -649,11 +639,11 @@ static void print_va_start(const va_start_expression_t *const expression)
  */
 static void print_va_arg(const va_arg_expression_t *expression)
 {
-	fputs("__builtin_va_arg(", out);
+	print_string("__builtin_va_arg(");
 	print_assignment_expression(expression->ap);
-	fputs(", ", out);
+	print_string(", ");
 	print_type(expression->base.type);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -663,11 +653,11 @@ static void print_va_arg(const va_arg_expression_t *expression)
  */
 static void print_va_copy(const va_copy_expression_t *expression)
 {
-	fputs("__builtin_va_copy(", out);
+	print_string("__builtin_va_copy(");
 	print_assignment_expression(expression->dst);
-	fputs(", ", out);
+	print_string(", ");
 	print_assignment_expression(expression->src);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -679,11 +669,11 @@ static void print_select(const select_expression_t *expression)
 {
 	print_expression_prec(expression->compound, PREC_POSTFIX);
 	if (is_type_pointer(skip_typeref(expression->compound->base.type))) {
-		fputs("->", out);
+		print_string("->");
 	} else {
-		fputc('.', out);
+		print_string(".");
 	}
-	fputs(expression->compound_entry->base.symbol->string, out);
+	print_string(expression->compound_entry->base.symbol->string);
 }
 
 /**
@@ -694,9 +684,9 @@ static void print_select(const select_expression_t *expression)
 static void print_classify_type_expression(
 	const classify_type_expression_t *const expr)
 {
-	fputs("__builtin_classify_type(", out);
+	print_string("__builtin_classify_type(");
 	print_assignment_expression(expr->type_expression);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -708,12 +698,12 @@ static void print_designator(const designator_t *designator)
 {
 	for ( ; designator != NULL; designator = designator->next) {
 		if (designator->symbol == NULL) {
-			fputc('[', out);
+			print_string("[");
 			print_expression(designator->array_index);
-			fputc(']', out);
+			print_string("]");
 		} else {
-			fputc('.', out);
-			fputs(designator->symbol->string, out);
+			print_string(".");
+			print_string(designator->symbol->string);
 		}
 	}
 }
@@ -725,11 +715,11 @@ static void print_designator(const designator_t *designator)
  */
 static void print_offsetof_expression(const offsetof_expression_t *expression)
 {
-	fputs("__builtin_offsetof(", out);
+	print_string("__builtin_offsetof(");
 	print_type(expression->type);
-	fputc(',', out);
+	print_string(",");
 	print_designator(expression->designator);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -739,9 +729,9 @@ static void print_offsetof_expression(const offsetof_expression_t *expression)
  */
 static void print_statement_expression(const statement_expression_t *expression)
 {
-	fputc('(', out);
+	print_string("(");
 	print_statement(expression->statement);
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -762,11 +752,11 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		top_prec > get_expression_precedence(expression->base.kind);
 
 	if (parenthesized)
-		fputc('(', out);
+		print_string("(");
 	switch (expression->kind) {
 	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
-		fputs("$invalid expression$", out);
+		print_string("$invalid expression$");
 		break;
 	case EXPR_CHARACTER_CONSTANT:
 		print_character_constant(&expression->conste);
@@ -845,11 +835,11 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 
 	default:
 		/* TODO */
-		fprintf(out, "some expression of type %d", (int)expression->kind);
+		print_format("some expression of type %d", (int)expression->kind);
 		break;
 	}
 	if (parenthesized)
-		fputc(')', out);
+		print_string(")");
 }
 
 /**
@@ -859,7 +849,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
  */
 static void print_compound_statement(const compound_statement_t *block)
 {
-	fputs("{\n", out);
+	print_string("{\n");
 	++indent;
 
 	statement_t *statement = block->statements;
@@ -874,7 +864,7 @@ static void print_compound_statement(const compound_statement_t *block)
 	}
 	--indent;
 	print_indent();
-	fputs(block->stmt_expr ? "}" : "}\n", out);
+	print_string(block->stmt_expr ? "}" : "}\n");
 }
 
 /**
@@ -886,11 +876,11 @@ static void print_return_statement(const return_statement_t *statement)
 {
 	expression_t const *const val = statement->value;
 	if (val != NULL) {
-		fputs("return ", out);
+		print_string("return ");
 		print_expression(val);
-		fputs(";\n", out);
+		print_string(";\n");
 	} else {
-		fputs("return;\n", out);
+		print_string("return;\n");
 	}
 }
 
@@ -902,7 +892,7 @@ static void print_return_statement(const return_statement_t *statement)
 static void print_expression_statement(const expression_statement_t *statement)
 {
 	print_expression(statement->expression);
-	fputs(";\n", out);
+	print_string(";\n");
 }
 
 /**
@@ -912,14 +902,14 @@ static void print_expression_statement(const expression_statement_t *statement)
  */
 static void print_goto_statement(const goto_statement_t *statement)
 {
-	fputs("goto ", out);
+	print_string("goto ");
 	if (statement->expression != NULL) {
-		fputc('*', out);
+		print_string("*");
 		print_expression(statement->expression);
 	} else {
-		fputs(statement->label->base.symbol->string, out);
+		print_string(statement->label->base.symbol->string);
 	}
-	fputs(";\n", out);
+	print_string(";\n");
 }
 
 /**
@@ -929,7 +919,7 @@ static void print_goto_statement(const goto_statement_t *statement)
  */
 static void print_label_statement(const label_statement_t *statement)
 {
-	fprintf(out, "%s:\n", statement->label->base.symbol->string);
+	print_format("%s:\n", statement->label->base.symbol->string);
 	print_indent();
 	print_statement(statement->statement);
 }
@@ -941,14 +931,14 @@ static void print_label_statement(const label_statement_t *statement)
  */
 static void print_if_statement(const if_statement_t *statement)
 {
-	fputs("if (", out);
+	print_string("if (");
 	print_expression(statement->condition);
-	fputs(") ", out);
+	print_string(") ");
 	print_statement(statement->true_statement);
 
 	if (statement->false_statement != NULL) {
 		print_indent();
-		fputs("else ", out);
+		print_string("else ");
 		print_statement(statement->false_statement);
 	}
 }
@@ -960,9 +950,9 @@ static void print_if_statement(const if_statement_t *statement)
  */
 static void print_switch_statement(const switch_statement_t *statement)
 {
-	fputs("switch (", out);
+	print_string("switch (");
 	print_expression(statement->expression);
-	fputs(") ", out);
+	print_string(") ");
 	print_statement(statement->body);
 }
 
@@ -974,15 +964,15 @@ static void print_switch_statement(const switch_statement_t *statement)
 static void print_case_label(const case_label_statement_t *statement)
 {
 	if (statement->expression == NULL) {
-		fputs("default:\n", out);
+		print_string("default:\n");
 	} else {
-		fputs("case ", out);
+		print_string("case ");
 		print_expression(statement->expression);
 		if (statement->end_range != NULL) {
-			fputs(" ... ", out);
+			print_string(" ... ");
 			print_expression(statement->end_range);
 		}
-		fputs(":\n", out);
+		print_string(":\n");
 	}
 	++indent;
 	if (statement->statement != NULL) {
@@ -996,9 +986,9 @@ static void print_case_label(const case_label_statement_t *statement)
 
 static void print_typedef(const entity_t *entity)
 {
-	fputs("typedef ", out);
+	print_string("typedef ");
 	print_type_ext(entity->typedefe.type, entity->base.symbol, NULL);
-	fputc(';', out);
+	print_string(";");
 }
 
 /**
@@ -1027,7 +1017,7 @@ static void print_declaration_statement(
 	bool first = true;
 	entity_t *entity = statement->declarations_begin;
 	if (entity == NULL) {
-		fputs("/* empty declaration statement */\n", out);
+		print_string("/* empty declaration statement */\n");
 		return;
 	}
 
@@ -1045,7 +1035,7 @@ static void print_declaration_statement(
 		}
 
 		print_entity(entity);
-		fputc('\n', out);
+		print_string("\n");
 	}
 }
 
@@ -1056,9 +1046,9 @@ static void print_declaration_statement(
  */
 static void print_while_statement(const while_statement_t *statement)
 {
-	fputs("while (", out);
+	print_string("while (");
 	print_expression(statement->condition);
-	fputs(") ", out);
+	print_string(") ");
 	print_statement(statement->body);
 }
 
@@ -1069,12 +1059,12 @@ static void print_while_statement(const while_statement_t *statement)
  */
 static void print_do_while_statement(const do_while_statement_t *statement)
 {
-	fputs("do ", out);
+	print_string("do ");
 	print_statement(statement->body);
 	print_indent();
-	fputs("while (", out);
+	print_string("while (");
 	print_expression(statement->condition);
-	fputs(");\n", out);
+	print_string(");\n");
 }
 
 /**
@@ -1084,10 +1074,10 @@ static void print_do_while_statement(const do_while_statement_t *statement)
  */
 static void print_for_statement(const for_statement_t *statement)
 {
-	fputs("for (", out);
+	print_string("for (");
 	if (statement->initialisation != NULL) {
 		print_expression(statement->initialisation);
-		fputc(';', out);
+		print_string(";");
 	} else {
 		entity_t const *entity = statement->scope.entities;
 		for (; entity != NULL; entity = entity->base.next) {
@@ -1098,15 +1088,15 @@ static void print_for_statement(const for_statement_t *statement)
 		}
 	}
 	if (statement->condition != NULL) {
-		fputc(' ', out);
+		print_string(" ");
 		print_expression(statement->condition);
 	}
-	fputc(';', out);
+	print_string(";");
 	if (statement->step != NULL) {
-		fputc(' ', out);
+		print_string(" ");
 		print_expression(statement->step);
 	}
-	fputs(") ", out);
+	print_string(") ");
 	print_statement(statement->body);
 }
 
@@ -1120,15 +1110,15 @@ static void print_asm_arguments(asm_argument_t *arguments)
 	asm_argument_t *argument = arguments;
 	for (; argument != NULL; argument = argument->next) {
 		if (argument != arguments)
-			fputs(", ", out);
+			print_string(", ");
 
 		if (argument->symbol) {
-			fprintf(out, "[%s] ", argument->symbol->string);
+			print_format("[%s] ", argument->symbol->string);
 		}
 		print_quoted_string(&argument->constraints, '"', 1);
-		fputs(" (", out);
+		print_string(" (");
 		print_expression(argument->expression);
-		fputc(')', out);
+		print_string(")");
 	}
 }
 
@@ -1142,7 +1132,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 	asm_clobber_t *clobber = clobbers;
 	for (; clobber != NULL; clobber = clobber->next) {
 		if (clobber != clobbers)
-			fputs(", ", out);
+			print_string(", ");
 
 		print_quoted_string(&clobber->clobber, '"', 1);
 	}
@@ -1155,32 +1145,32 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
  */
 static void print_asm_statement(const asm_statement_t *statement)
 {
-	fputs("asm ", out);
+	print_string("asm ");
 	if (statement->is_volatile) {
-		fputs("volatile ", out);
+		print_string("volatile ");
 	}
-	fputc('(', out);
+	print_string("(");
 	print_quoted_string(&statement->asm_text, '"', 1);
 	if (statement->outputs  == NULL &&
 	    statement->inputs   == NULL &&
 	    statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
-	fputs(" : ", out);
+	print_string(" : ");
 	print_asm_arguments(statement->outputs);
 	if (statement->inputs == NULL && statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
-	fputs(" : ", out);
+	print_string(" : ");
 	print_asm_arguments(statement->inputs);
 	if (statement->clobbers == NULL)
 		goto end_of_print_asm_statement;
 
-	fputs(" : ", out);
+	print_string(" : ");
 	print_asm_clobbers(statement->clobbers);
 
 end_of_print_asm_statement:
-	fputs(");\n", out);
+	print_string(");\n");
 }
 
 /**
@@ -1190,15 +1180,15 @@ end_of_print_asm_statement:
  */
 static void print_ms_try_statement(const ms_try_statement_t *statement)
 {
-	fputs("__try ", out);
+	print_string("__try ");
 	print_statement(statement->try_statement);
 	print_indent();
 	if (statement->except_expression != NULL) {
-		fputs("__except(", out);
+		print_string("__except(");
 		print_expression(statement->except_expression);
-		fputs(") ", out);
+		print_string(") ");
 	} else {
-		fputs("__finally ", out);
+		print_string("__finally ");
 	}
 	print_statement(statement->final_statement);
 }
@@ -1211,7 +1201,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 static void print_leave_statement(const leave_statement_t *statement)
 {
 	(void)statement;
-	fputs("__leave;\n", out);
+	print_string("__leave;\n");
 }
 
 /**
@@ -1223,7 +1213,7 @@ void print_statement(const statement_t *statement)
 {
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
-		fputs(";\n", out);
+		print_string(";\n");
 		break;
 	case STATEMENT_COMPOUND:
 		print_compound_statement(&statement->compound);
@@ -1241,10 +1231,10 @@ void print_statement(const statement_t *statement)
 		print_goto_statement(&statement->gotos);
 		break;
 	case STATEMENT_CONTINUE:
-		fputs("continue;\n", out);
+		print_string("continue;\n");
 		break;
 	case STATEMENT_BREAK:
-		fputs("break;\n", out);
+		print_string("break;\n");
 		break;
 	case STATEMENT_IF:
 		print_if_statement(&statement->ifs);
@@ -1277,7 +1267,7 @@ void print_statement(const statement_t *statement)
 		print_leave_statement(&statement->leave);
 		break;
 	case STATEMENT_INVALID:
-		fputs("$invalid statement$\n", out);
+		print_string("$invalid statement$\n");
 		break;
 	}
 }
@@ -1291,11 +1281,11 @@ static void print_storage_class(storage_class_tag_t storage_class)
 {
 	switch (storage_class) {
 	case STORAGE_CLASS_NONE:     return;
-	case STORAGE_CLASS_TYPEDEF:  fputs("typedef ",  out); return;
-	case STORAGE_CLASS_EXTERN:   fputs("extern ",   out); return;
-	case STORAGE_CLASS_STATIC:   fputs("static ",   out); return;
-	case STORAGE_CLASS_AUTO:     fputs("auto ",     out); return;
-	case STORAGE_CLASS_REGISTER: fputs("register ", out); return;
+	case STORAGE_CLASS_TYPEDEF:  print_string("typedef ");  return;
+	case STORAGE_CLASS_EXTERN:   print_string("extern ");   return;
+	case STORAGE_CLASS_STATIC:   print_string("static ");   return;
+	case STORAGE_CLASS_AUTO:     print_string("auto ");     return;
+	case STORAGE_CLASS_REGISTER: print_string("register "); return;
 	}
 	panic("invalid storage class");
 }
@@ -1308,7 +1298,7 @@ static void print_storage_class(storage_class_tag_t storage_class)
 void print_initializer(const initializer_t *initializer)
 {
 	if (initializer == NULL) {
-		fputs("{}", out);
+		print_string("{}");
 		return;
 	}
 
@@ -1320,7 +1310,7 @@ void print_initializer(const initializer_t *initializer)
 	}
 	case INITIALIZER_LIST: {
 		assert(initializer->kind == INITIALIZER_LIST);
-		fputs("{ ", out);
+		print_string("{ ");
 		const initializer_list_t *list = &initializer->list;
 
 		for (size_t i = 0 ; i < list->len; ++i) {
@@ -1328,10 +1318,10 @@ void print_initializer(const initializer_t *initializer)
 			print_initializer(list->initializers[i]);
 			if (i < list->len-1) {
 				if (sub_init == NULL || sub_init->kind != INITIALIZER_DESIGNATOR)
-					fputs(", ", out);
+					print_string(", ");
 			}
 		}
-		fputs(" }", out);
+		print_string(" }");
 		return;
 	}
 	case INITIALIZER_STRING:
@@ -1342,7 +1332,7 @@ void print_initializer(const initializer_t *initializer)
 		return;
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
-		fputs(" = ", out);
+		print_string(" = ");
 		return;
 	}
 
@@ -1369,24 +1359,24 @@ static void print_ms_modifiers(const declaration_t *declaration)
 				|| variable->get_property_sym != NULL
 				|| variable->put_property_sym != NULL) {
 			if (!ds_shown) {
-				fputs("__declspec", out);
+				print_string("__declspec");
 				ds_shown = true;
 			}
 
 			if (variable->alignment != 0) {
-				fputs(next, out); next = ", "; fprintf(out, "align(%u)", variable->alignment);
+				print_string(next); next = ", "; print_format("align(%u)", variable->alignment);
 			}
 			if (variable->get_property_sym != NULL
 					|| variable->put_property_sym != NULL) {
 				char *comma = "";
-				fputs(next, out); next = ", "; fputs("property(", out);
+				print_string(next); next = ", "; print_string("property(");
 				if (variable->get_property_sym != NULL) {
-					fprintf(out, "get=%s", variable->get_property_sym->string);
+					print_format("get=%s", variable->get_property_sym->string);
 					comma = ", ";
 				}
 				if (variable->put_property_sym != NULL)
-					fprintf(out, "%sput=%s", comma, variable->put_property_sym->string);
-				fputc(')', out);
+					print_format("%sput=%s", comma, variable->put_property_sym->string);
+				print_string(")");
 			}
 		}
 	}
@@ -1394,52 +1384,52 @@ static void print_ms_modifiers(const declaration_t *declaration)
 	/* DM_FORCEINLINE handled outside. */
 	if ((modifiers & ~DM_FORCEINLINE) != 0) {
 		if (!ds_shown) {
-			fputs("__declspec", out);
+			print_string("__declspec");
 			ds_shown = true;
 		}
 		if (modifiers & DM_DLLIMPORT) {
-			fputs(next, out); next = ", "; fputs("dllimport", out);
+			print_string(next); next = ", "; print_string("dllimport");
 		}
 		if (modifiers & DM_DLLEXPORT) {
-			fputs(next, out); next = ", "; fputs("dllexport", out);
+			print_string(next); next = ", "; print_string("dllexport");
 		}
 		if (modifiers & DM_THREAD) {
-			fputs(next, out); next = ", "; fputs("thread", out);
+			print_string(next); next = ", "; print_string("thread");
 		}
 		if (modifiers & DM_NAKED) {
-			fputs(next, out); next = ", "; fputs("naked", out);
+			print_string(next); next = ", "; print_string("naked");
 		}
 		if (modifiers & DM_THREAD) {
-			fputs(next, out); next = ", "; fputs("thread", out);
+			print_string(next); next = ", "; print_string("thread");
 		}
 		if (modifiers & DM_SELECTANY) {
-			fputs(next, out); next = ", "; fputs("selectany", out);
+			print_string(next); next = ", "; print_string("selectany");
 		}
 		if (modifiers & DM_NOTHROW) {
-			fputs(next, out); next = ", "; fputs("nothrow", out);
+			print_string(next); next = ", "; print_string("nothrow");
 		}
 		if (modifiers & DM_NORETURN) {
-			fputs(next, out); next = ", "; fputs("noreturn", out);
+			print_string(next); next = ", "; print_string("noreturn");
 		}
 		if (modifiers & DM_NOINLINE) {
-			fputs(next, out); next = ", "; fputs("noinline", out);
+			print_string(next); next = ", "; print_string("noinline");
 		}
 		if (modifiers & DM_DEPRECATED) {
-			fputs(next, out); next = ", "; fputs("deprecated", out);
+			print_string(next); next = ", "; print_string("deprecated");
 			if (declaration->deprecated_string != NULL)
-				fprintf(out, "(\"%s\")",
+				print_format("(\"%s\")",
 				        declaration->deprecated_string);
 		}
 		if (modifiers & DM_RESTRICT) {
-			fputs(next, out); next = ", "; fputs("restrict", out);
+			print_string(next); next = ", "; print_string("restrict");
 		}
 		if (modifiers & DM_NOALIAS) {
-			fputs(next, out); next = ", "; fputs("noalias", out);
+			print_string(next); next = ", "; print_string("noalias");
 		}
 	}
 
 	if (ds_shown)
-		fputs(") ", out);
+		print_string(") ");
 }
 #endif
 
@@ -1449,26 +1439,26 @@ static void print_scope(const scope_t *scope)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		print_indent();
 		print_entity(entity);
-		fputs("\n", out);
+		print_string("\n");
 	}
 }
 
 static void print_namespace(const namespace_t *namespace)
 {
-	fputs("namespace ", out);
+	print_string("namespace ");
 	if (namespace->base.symbol != NULL) {
-		fputs(namespace->base.symbol->string, out);
-		fputc(' ', out);
+		print_string(namespace->base.symbol->string);
+		print_string(" ");
 	}
 
-	fputs("{\n", out);
+	print_string("{\n");
 	++indent;
 
 	print_scope(&namespace->members);
 
 	--indent;
 	print_indent();
-	fputs("}\n", out);
+	print_string("}\n");
 }
 
 /**
@@ -1484,11 +1474,11 @@ void print_declaration(const entity_t *entity)
 		function_t *function = (function_t*)declaration;
 		if (function->is_inline) {
 			if (declaration->modifiers & DM_FORCEINLINE) {
-				fputs("__forceinline ", out);
+				print_string("__forceinline ");
 			} else if (declaration->modifiers & DM_MICROSOFT_INLINE) {
-				fputs("__inline ", out);
+				print_string("__inline ");
 			} else {
-				fputs("inline ", out);
+				print_string("inline ");
 			}
 		}
 	}
@@ -1499,7 +1489,7 @@ void print_declaration(const entity_t *entity)
 					&entity->function.parameters);
 
 			if (entity->function.statement != NULL) {
-				fputc('\n', out);
+				print_string("\n");
 				print_indent();
 				print_statement(entity->function.statement);
 				return;
@@ -1508,10 +1498,10 @@ void print_declaration(const entity_t *entity)
 
 		case ENTITY_VARIABLE:
 			if (entity->variable.thread_local)
-				fputs("__thread ", out);
+				print_string("__thread ");
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			if (entity->variable.initializer != NULL) {
-				fputs(" = ", out);
+				print_string(" = ");
 				print_initializer(entity->variable.initializer);
 			}
 			break;
@@ -1520,7 +1510,7 @@ void print_declaration(const entity_t *entity)
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			break;
 	}
-	fputc(';', out);
+	print_string(";");
 }
 
 /**
@@ -1555,40 +1545,42 @@ void print_entity(const entity_t *entity)
 		return;
 	case ENTITY_CLASS:
 		/* TODO */
-		fputs("class ", out);
-		fputs(entity->base.symbol->string, out);
-		fputs("; /* TODO */\n", out);
+		print_string("class ");
+		print_string(entity->base.symbol->string);
+		print_string("; /* TODO */\n");
 		return;
 	case ENTITY_STRUCT:
-		fputs("struct ", out);
-		fputs(entity->base.symbol->string, out);
+		print_string("struct ");
+		print_string(entity->base.symbol->string);
 		if (entity->structe.complete) {
-			fputc(' ', out);
+			print_string(" ");
 			print_compound_definition(&entity->structe);
 		}
-		fputc(';', out);
+		print_string(";");
 		return;
 	case ENTITY_UNION:
-		fputs("union ", out);
-		fputs(entity->base.symbol->string, out);
+		print_string("union ");
+		print_string(entity->base.symbol->string);
 		if (entity->unione.complete) {
-			fputc(' ', out);
+			print_string(" ");
 			print_compound_definition(&entity->unione);
 		}
-		fputc(';', out);
+		print_string(";");
 		return;
 	case ENTITY_ENUM:
-		fputs("enum ", out);
-		fputs(entity->base.symbol->string, out);
-		fputc(' ', out);
+		print_string("enum ");
+		print_string(entity->base.symbol->string);
+		print_string(" ");
 		print_enum_definition(&entity->enume);
-		fputc(';', out);
+		print_string(";");
 		return;
 	case ENTITY_NAMESPACE:
 		print_namespace(&entity->namespacee);
 		return;
 	case ENTITY_LOCAL_LABEL:
-		fprintf(out, "__label__ %s;", entity->base.symbol->string);
+		print_string("__label__ ");
+		print_string(entity->base.symbol->string);
+		print_string(";");
 		return;
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:
@@ -1618,7 +1610,7 @@ void print_ast(const translation_unit_t *unit)
 
 		print_indent();
 		print_entity(entity);
-		fputc('\n', out);
+		print_string("\n");
 	}
 }
 
@@ -2007,17 +1999,6 @@ void init_ast(void)
 void exit_ast(void)
 {
 	obstack_free(&ast_obstack, NULL);
-}
-
-/**
- * Set the output stream for the AST printer.
- *
- * @param stream  the output stream
- */
-void ast_set_output(FILE *stream)
-{
-	out = stream;
-	type_set_output(stream);
 }
 
 /**

@@ -111,11 +111,6 @@ void print_type_qualifiers(type_qualifiers_t qualifiers);
 void print_enum_definition(const enum_t *enume);
 void print_compound_definition(const compound_t *compound);
 
-/**
- * set output stream for the type printer
- */
-void type_set_output(FILE *out);
-
 void inc_type_visited(void);
 
 /**

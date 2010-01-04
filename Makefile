@@ -44,6 +44,7 @@ SOURCES := \
 	main.c \
 	mangle.c \
 	preprocessor.c \
+	printer.c \
 	symbol_table.c \
 	token.c \
 	type.c \

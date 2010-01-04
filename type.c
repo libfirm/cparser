@@ -32,13 +32,13 @@
 #include "lang_features.h"
 #include "warning.h"
 #include "diagnostic.h"
+#include "printer.h"
 #include "driver/firm_cmdline.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;
 
 static struct obstack   _type_obst;
-static FILE            *out;
 struct obstack         *type_obst                 = &_type_obst;
 static bool             print_implicit_array_size = false;
 
@@ -206,25 +206,16 @@ void exit_types(void)
 	obstack_free(type_obst, NULL);
 }
 
-void type_set_output(FILE *stream)
-{
-	out = stream;
-}
-
 void print_type_qualifiers(type_qualifiers_t qualifiers)
 {
-	int first = 1;
 	if (qualifiers & TYPE_QUALIFIER_CONST) {
-		fputs(" const" + first,    out);
-		first = 0;
+		print_string("const ");
 	}
 	if (qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		fputs(" volatile" + first, out);
-		first = 0;
+		print_string("volatile ");
 	}
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT) {
-		fputs(" restrict" + first, out);
-		first = 0;
+		print_string("restrict ");
 	}
 }
 
@@ -261,7 +252,7 @@ const char *get_atomic_kind_name(atomic_type_kind_t kind)
 static void print_atomic_kinds(atomic_type_kind_t kind)
 {
 	const char *s = get_atomic_kind_name(kind);
-	fputs(s, out);
+	print_string(s);
 }
 
 /**
@@ -272,8 +263,6 @@ static void print_atomic_kinds(atomic_type_kind_t kind)
 static void print_atomic_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers);
-	if (type->base.qualifiers != 0)
-		fputc(' ', out);
 	print_atomic_kinds(type->akind);
 }
 
@@ -282,12 +271,10 @@ static void print_atomic_type(const atomic_type_t *type)
  *
  * @param type  The type.
  */
-static
-void print_complex_type(const complex_type_t *type)
+static void print_complex_type(const complex_type_t *type)
 {
-	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs(" _Complex " + empty, out);
+	print_string("_Complex");
 	print_atomic_kinds(type->akind);
 }
 
@@ -296,12 +283,10 @@ void print_complex_type(const complex_type_t *type)
  *
  * @param type  The type.
  */
-static
-void print_imaginary_type(const imaginary_type_t *type)
+static void print_imaginary_type(const imaginary_type_t *type)
 {
-	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs(" _Imaginary " + empty, out);
+	print_string("_Imaginary ");
 	print_atomic_kinds(type->akind);
 }
 
@@ -318,28 +303,26 @@ static void print_function_type_pre(const function_type_t *type)
 
 		case LINKAGE_C:
 			if (c_mode & _CXX)
-				fputs("extern \"C\" ",   out);
+				print_string("extern \"C\" ");
 			break;
 
 		case LINKAGE_CXX:
 			if (!(c_mode & _CXX))
-				fputs("extern \"C++\" ", out);
+				print_string("extern \"C++\" ");
 			break;
 	}
 
 	print_type_qualifiers(type->base.qualifiers);
-	if (type->base.qualifiers != 0)
-		fputc(' ', out);
 
 	intern_print_type_pre(type->return_type);
 
 	cc_kind_t cc = type->calling_convention;
 restart:
 	switch (cc) {
-	case CC_CDECL:    fputs(" __cdecl",    out); break;
-	case CC_STDCALL:  fputs(" __stdcall",  out); break;
-	case CC_FASTCALL: fputs(" __fastcall", out); break;
-	case CC_THISCALL: fputs(" __thiscall", out); break;
+	case CC_CDECL:    print_string(" __cdecl");    break;
+	case CC_STDCALL:  print_string(" __stdcall");  break;
+	case CC_FASTCALL: print_string(" __fastcall"); break;
+	case CC_THISCALL: print_string(" __thiscall"); break;
 	case CC_DEFAULT:
 		if (default_calling_convention != CC_CDECL) {
 			/* show the default calling convention if its not cdecl */
@@ -358,7 +341,7 @@ restart:
 static void print_function_type_post(const function_type_t *type,
                                      const scope_t *parameters)
 {
-	fputc('(', out);
+	print_string("(");
 	bool first = true;
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
@@ -366,7 +349,7 @@ static void print_function_type_post(const function_type_t *type,
 			if (first) {
 				first = false;
 			} else {
-				fputs(", ", out);
+				print_string(", ");
 			}
 			print_type(parameter->type);
 		}
@@ -379,11 +362,11 @@ static void print_function_type_post(const function_type_t *type,
 			if (first) {
 				first = false;
 			} else {
-				fputs(", ", out);
+				print_string(", ");
 			}
 			const type_t *const type = parameter->declaration.type;
 			if (type == NULL) {
-				fputs(parameter->base.symbol->string, out);
+				print_string(parameter->base.symbol->string);
 			} else {
 				print_type_ext(type, parameter->base.symbol, NULL);
 			}
@@ -393,14 +376,14 @@ static void print_function_type_post(const function_type_t *type,
 		if (first) {
 			first = false;
 		} else {
-			fputs(", ", out);
+			print_string(", ");
 		}
-		fputs("...", out);
+		print_string("...");
 	}
 	if (first && !type->unspecified_parameters) {
-		fputs("void", out);
+		print_string("void");
 	}
-	fputc(')', out);
+	print_string(")");
 
 	intern_print_type_post(type->return_type);
 }
@@ -415,17 +398,17 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 	type_t const *const points_to = type->points_to;
 	intern_print_type_pre(points_to);
 	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
-		fputs(" (", out);
+		print_string(" (");
 	variable_t *const variable = type->base_variable;
 	if (variable != NULL) {
-		fputs(" __based(", out);
-		fputs(variable->base.base.symbol->string, out);
-		fputs(") ", out);
+		print_string(" __based(");
+		print_string(variable->base.base.symbol->string);
+		print_string(") ");
 	}
-	fputc('*', out);
+	print_string("*");
 	type_qualifiers_t const qual = type->base.qualifiers;
 	if (qual != 0)
-		fputc(' ', out);
+		print_string(" ");
 	print_type_qualifiers(qual);
 }
 
@@ -438,7 +421,7 @@ static void print_pointer_type_post(const pointer_type_t *type)
 {
 	type_t const *const points_to = type->points_to;
 	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
-		fputc(')', out);
+		print_string(")");
 	intern_print_type_post(points_to);
 }
 
@@ -452,8 +435,8 @@ static void print_reference_type_pre(const reference_type_t *type)
 	type_t const *const refers_to = type->refers_to;
 	intern_print_type_pre(refers_to);
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
-		fputs(" (", out);
-	fputc('&', out);
+		print_string(" (");
+	print_string("&");
 }
 
 /**
@@ -465,7 +448,7 @@ static void print_reference_type_post(const reference_type_t *type)
 {
 	type_t const *const refers_to = type->refers_to;
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
-		fputc(')', out);
+		print_string(")");
 	intern_print_type_post(refers_to);
 }
 
@@ -486,18 +469,16 @@ static void print_array_type_pre(const array_type_t *type)
  */
 static void print_array_type_post(const array_type_t *type)
 {
-	fputc('[', out);
+	print_string("[");
 	if (type->is_static) {
-		fputs("static ", out);
+		print_string("static ");
 	}
 	print_type_qualifiers(type->base.qualifiers);
-	if (type->base.qualifiers != 0)
-		fputc(' ', out);
 	if (type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
 	}
-	fputc(']', out);
+	print_string("]");
 	intern_print_type_post(type->element_type);
 }
 
@@ -508,7 +489,7 @@ static void print_array_type_post(const array_type_t *type)
  */
 static void print_bitfield_type_post(const bitfield_type_t *type)
 {
-	fputs(" : ", out);
+	print_string(" : ");
 	print_expression(type->size_expression);
 	intern_print_type_post(type->base_type);
 }
@@ -520,7 +501,7 @@ static void print_bitfield_type_post(const bitfield_type_t *type)
  */
 void print_enum_definition(const enum_t *enume)
 {
-	fputs("{\n", out);
+	print_string("{\n");
 
 	change_indent(1);
 
@@ -529,9 +510,9 @@ void print_enum_definition(const enum_t *enume)
 	       entry = entry->base.next) {
 
 		print_indent();
-		fputs(entry->base.symbol->string, out);
+		print_string(entry->base.symbol->string);
 		if (entry->enum_value.value != NULL) {
-			fputs(" = ", out);
+			print_string(" = ");
 
 			/* skip the implicit cast */
 			expression_t *expression = entry->enum_value.value;
@@ -540,12 +521,12 @@ void print_enum_definition(const enum_t *enume)
 			}
 			print_expression(expression);
 		}
-		fputs(",\n", out);
+		print_string(",\n");
 	}
 
 	change_indent(-1);
 	print_indent();
-	fputc('}', out);
+	print_string("}");
 }
 
 /**
@@ -555,14 +536,13 @@ void print_enum_definition(const enum_t *enume)
  */
 static void print_type_enum(const enum_type_t *type)
 {
-	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
-	fputs(" enum " + empty, out);
+	print_string("enum ");
 
 	enum_t   *enume  = type->enume;
 	symbol_t *symbol = enume->base.symbol;
 	if (symbol != NULL) {
-		fputs(symbol->string, out);
+		print_string(symbol->string);
 	} else {
 		print_enum_definition(enume);
 	}
@@ -573,7 +553,7 @@ static void print_type_enum(const enum_type_t *type)
  */
 void print_compound_definition(const compound_t *compound)
 {
-	fputs("{\n", out);
+	print_string("{\n");
 	change_indent(1);
 
 	entity_t *entity = compound->members.entities;
@@ -583,14 +563,14 @@ void print_compound_definition(const compound_t *compound)
 
 		print_indent();
 		print_entity(entity);
-		fputc('\n', out);
+		print_string("\n");
 	}
 
 	change_indent(-1);
 	print_indent();
-	fputc('}', out);
+	print_string("}");
 	if (compound->modifiers & DM_TRANSPARENT_UNION) {
-		fputs("__attribute__((__transparent_union__))", out);
+		print_string("__attribute__((__transparent_union__))");
 	}
 }
 
@@ -601,20 +581,19 @@ void print_compound_definition(const compound_t *compound)
  */
 static void print_compound_type(const compound_type_t *type)
 {
-	int empty = type->base.qualifiers == 0;
 	print_type_qualifiers(type->base.qualifiers);
 
 	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
-		fputs(" struct " + empty, out);
+		print_string("struct ");
 	} else {
 		assert(type->base.kind == TYPE_COMPOUND_UNION);
-		fputs(" union " + empty, out);
+		print_string("union ");
 	}
 
 	compound_t *compound = type->compound;
 	symbol_t   *symbol   = compound->base.symbol;
 	if (symbol != NULL) {
-		fputs(symbol->string, out);
+		print_string(symbol->string);
 	} else {
 		print_compound_definition(compound);
 	}
@@ -628,9 +607,7 @@ static void print_compound_type(const compound_type_t *type)
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
 	print_type_qualifiers(type->base.qualifiers);
-	if (type->base.qualifiers != 0)
-		fputc(' ', out);
-	fputs(type->typedefe->base.symbol->string, out);
+	print_string(type->typedefe->base.symbol->string);
 }
 
 /**
@@ -640,13 +617,13 @@ static void print_typedef_type_pre(const typedef_type_t *const type)
  */
 static void print_typeof_type_pre(const typeof_type_t *const type)
 {
-	fputs("typeof(", out);
+	print_string("typeof(");
 	if (type->expression != NULL) {
 		print_expression(type->expression);
 	} else {
 		print_type(type->typeof_type);
 	}
-	fputc(')', out);
+	print_string(")");
 }
 
 /**
@@ -658,10 +635,10 @@ static void intern_print_type_pre(const type_t *const type)
 {
 	switch(type->kind) {
 	case TYPE_ERROR:
-		fputs("<error>", out);
+		print_string("<error>");
 		return;
 	case TYPE_INVALID:
-		fputs("<invalid>", out);
+		print_string("<invalid>");
 		return;
 	case TYPE_ENUM:
 		print_type_enum(&type->enumt);
@@ -680,7 +657,7 @@ static void intern_print_type_pre(const type_t *const type)
 		print_compound_type(&type->compound);
 		return;
 	case TYPE_BUILTIN:
-		fputs(type->builtin.symbol->string, out);
+		print_string(type->builtin.symbol->string);
 		return;
 	case TYPE_FUNCTION:
 		print_function_type_pre(&type->function);
@@ -704,7 +681,7 @@ static void intern_print_type_pre(const type_t *const type)
 		print_typeof_type_pre(&type->typeoft);
 		return;
 	}
-	fputs("unknown", out);
+	print_string("unknown");
 }
 
 /**
@@ -759,14 +736,14 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
                     const scope_t *parameters)
 {
 	if (type == NULL) {
-		fputs("nil type", out);
+		print_string("nil type");
 		return;
 	}
 
 	intern_print_type_pre(type);
 	if (symbol != NULL) {
-		fputc(' ', out);
-		fputs(symbol->string, out);
+		print_string(" ");
+		print_string(symbol->string);
 	}
 	if (type->kind == TYPE_FUNCTION) {
 		print_function_type_post(&type->function, parameters);
@@ -1872,10 +1849,8 @@ void layout_union_type(compound_type_t *type)
 static __attribute__((unused))
 void dbg_type(const type_t *type)
 {
-	FILE *old_out = out;
-	out = stderr;
+	print_to_file(stderr);
 	print_type(type);
-	puts("\n");
+	print_string("\n");
 	fflush(stderr);
-	out = old_out;
 }

@@ -79,6 +79,7 @@
 #include "revision.h"
 #include "warning.h"
 #include "mangle.h"
+#include "printer.h"
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
@@ -1393,8 +1394,7 @@ do_parsing:
 
 			/* prints the AST even if errors occurred */
 			if (mode == PrintAst) {
-				type_set_output(out);
-				ast_set_output(out);
+				print_to_file(out);
 				print_ast(unit);
 			}
 
