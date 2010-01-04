@@ -72,7 +72,6 @@ void do_codegen(FILE *out, const char *file_name) {
   	ir_timer_t *timer = ir_timer_new();
   	timer_register(timer, "Firm: C-generating backend");
   	timer_start(timer);
-    cbackend_set_debug_retrieve(dbg_retrieve);
     generate_code_file(out);
     timer_stop(timer);
     break;
@@ -83,7 +82,6 @@ void do_codegen(FILE *out, const char *file_name) {
     ir_timer_t *timer = ir_timer_new();
     timer_register(timer, "Firm: backend");
     timer_start(timer);
-    ir_set_debug_retrieve(dbg_retrieve);
     be_main(out, file_name);
     timer_stop(timer);
     break;

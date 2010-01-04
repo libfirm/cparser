@@ -101,9 +101,6 @@ extern ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos);
 /** Debug printf implementation. */
 extern void dbg_printf(const char *fmt, ...);
 
-/** Convert the debug info back. */
-extern const char *dbg_retrieve(const dbg_info *dbg, unsigned *line);
-
 /** Do the necessary lowering for compound parameters. */
 extern void lower_compound_params(void);
 

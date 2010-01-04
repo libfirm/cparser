@@ -141,7 +141,7 @@ ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	return new_r_Unknown(irg, mode);
 }
 
-const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
+static const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 {
 	const source_position_t *pos = (const source_position_t*) dbg;
 	if (pos == NULL)
@@ -5898,6 +5898,8 @@ void init_ast2firm(void)
 {
 	obstack_init(&asm_obst);
 	init_atomic_modes();
+
+	ir_set_dbg_retrieve(dbg_retrieve);
 
 	/* OS option must be set to the backend */
 	switch (firm_opt.os_support) {

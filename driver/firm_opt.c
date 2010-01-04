@@ -897,7 +897,6 @@ void gen_firm_init(void)
 	}
 
 	edges_init_dbg(firm_opt.vrfy_edges);
-	ir_set_debug_retrieve(dbg_retrieve);
 
 	/* Sel node cannot produce NULL pointers */
 	set_opt_sel_based_null_check_elim(1);
