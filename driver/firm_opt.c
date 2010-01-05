@@ -879,7 +879,6 @@ void gen_firm_init(void)
 		| pattern;
 	params.initialize_local_func = uninitialized_local_var;
 	params.cc_mask               = 0; /* no regparam, cdecl */
-	params.builtin_dbg           = NULL;
 
 	ir_init(&params);
 

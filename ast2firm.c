@@ -46,6 +46,7 @@
 #include "mangle.h"
 #include "walk_statements.h"
 #include "warning.h"
+#include "printer.h"
 #include "entitymap_t.h"
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
@@ -154,6 +155,21 @@ static const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 static dbg_info *get_dbg_info(const source_position_t *pos)
 {
 	return (dbg_info*) pos;
+}
+
+static void dbg_print_type_dbg_info(char *buffer, size_t buffer_size,
+                                    const type_dbg_info *dbg)
+{
+	assert(dbg != NULL);
+	print_to_buffer(buffer, buffer_size);
+	const type_t *type = (const type_t*) dbg;
+	print_type(type);
+	finish_print_to_buffer();
+}
+
+static type_dbg_info *get_type_dbg_info_(const type_t *type)
+{
+	return (type_dbg_info*) type;
 }
 
 static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
@@ -285,11 +301,11 @@ static unsigned count_parameters(const function_type_t *function_type)
 /**
  * Creates a Firm type for an atomic type
  */
-static ir_type *create_atomic_type(atomic_type_kind_t akind)
+static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
 {
 	ir_mode        *mode      = atomic_modes[akind];
-	ident          *id        = get_mode_ident(mode);
-	ir_type        *irtype    = new_type_primitive(id, mode);
+	type_dbg_info  *dbgi      = get_type_dbg_info_(type);
+	ir_type        *irtype    = new_d_type_primitive(mode, dbgi);
 	il_alignment_t  alignment = get_atomic_type_alignment(akind);
 
 	set_type_alignment_bytes(irtype, alignment);
@@ -317,15 +333,7 @@ static ir_type *create_complex_type(const complex_type_t *type)
  */
 static ir_type *create_imaginary_type(imaginary_type_t *type)
 {
-	atomic_type_kind_t  kind      = type->akind;
-	ir_mode            *mode      = atomic_modes[kind];
-	ident              *id        = get_mode_ident(mode);
-	ir_type            *irtype    = new_type_primitive(id, mode);
-	il_alignment_t      alignment = get_type_alignment((type_t*) type);
-
-	set_type_alignment_bytes(irtype, alignment);
-
-	return irtype;
+	return create_atomic_type(type->akind, (const type_t*) type);
 }
 
 /**
@@ -346,12 +354,13 @@ static type_t *get_parameter_type(type_t *orig_type)
 
 static ir_type *create_method_type(const function_type_t *function_type, bool for_closure)
 {
-	type_t  *return_type  = skip_typeref(function_type->return_type);
+	type_t        *return_type  = skip_typeref(function_type->return_type);
 
-	ident   *id           = id_unique("functiontype.%u");
-	int      n_parameters = count_parameters(function_type) + (for_closure ? 1 : 0);
-	int      n_results    = return_type == type_void ? 0 : 1;
-	ir_type *irtype       = new_type_method(id, n_parameters, n_results);
+	int            n_parameters = count_parameters(function_type)
+	                               + (for_closure ? 1 : 0);
+	int            n_results    = return_type == type_void ? 0 : 1;
+	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
+	ir_type       *irtype       = new_d_type_method(n_parameters, n_results, dbgi);
 
 	if (return_type != type_void) {
 		ir_type *restype = get_ir_type(return_type);
@@ -413,31 +422,30 @@ is_cdecl:
 
 static ir_type *create_pointer_type(pointer_type_t *type)
 {
-	type_t   *points_to    = type->points_to;
-	ir_type  *ir_points_to = get_ir_type_incomplete(points_to);
-	ir_type  *ir_type      = new_type_pointer(id_unique("pointer.%u"),
-	                                          ir_points_to, mode_P_data);
+	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
+	type_t        *points_to    = type->points_to;
+	ir_type       *ir_points_to = get_ir_type_incomplete(points_to);
+	ir_type       *ir_type      = new_d_type_pointer(ir_points_to, dbgi);
 
 	return ir_type;
 }
 
 static ir_type *create_reference_type(reference_type_t *type)
 {
-	type_t  *refers_to    = type->refers_to;
-	ir_type *ir_refers_to = get_ir_type_incomplete(refers_to);
-	ir_type *ir_type      = new_type_pointer(id_unique("reference.%u"),
-	                                         ir_refers_to, mode_P_data);
+	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
+	type_t        *refers_to    = type->refers_to;
+	ir_type       *ir_refers_to = get_ir_type_incomplete(refers_to);
+	ir_type       *ir_type      = new_d_type_pointer(ir_refers_to, dbgi);
 
 	return ir_type;
 }
 
 static ir_type *create_array_type(array_type_t *type)
 {
-	type_t  *element_type    = type->element_type;
-	ir_type *ir_element_type = get_ir_type(element_type);
-
-	ident    *id      = id_unique("array.%u");
-	ir_type  *ir_type = new_type_array(id, 1, ir_element_type);
+	type_dbg_info *dbgi            = get_type_dbg_info_((const type_t*) type);
+	type_t        *element_type    = type->element_type;
+	ir_type       *ir_element_type = get_ir_type(element_type);
+	ir_type       *ir_type         = new_d_type_array(1, ir_element_type, dbgi);
 
 	const int align = get_type_alignment_bytes(ir_element_type);
 	set_type_alignment_bytes(ir_type, align);
@@ -466,7 +474,8 @@ static ir_type *create_array_type(array_type_t *type)
  * @param size   the size
  */
 static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
-                                                 unsigned size)
+                                                 unsigned size,
+												 const type_t *type)
 {
 	static ir_mode *s_modes[64 + 1] = {NULL, };
 	ir_type *res;
@@ -485,11 +494,8 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 		s_modes[size] = mode;
 	}
 
-	char name[32];
-	snprintf(name, sizeof(name), "I%u", size);
-	ident *id = new_id_from_str(name);
-	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
-	res = new_d_type_primitive(id_mangle_u(get_type_ident(base_tp), id), mode, dbgi);
+	type_dbg_info *dbgi = get_type_dbg_info_(type);
+	res                 = new_d_type_primitive(mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -501,7 +507,8 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
  * @param size   the size
  */
 static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
-                                                   unsigned size)
+                                                   unsigned size,
+												   const type_t *type)
 {
 	static ir_mode *u_modes[64 + 1] = {NULL, };
 	ir_type *res;
@@ -520,12 +527,8 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 		u_modes[size] = mode;
 	}
 
-	char name[32];
-
-	snprintf(name, sizeof(name), "U%u", size);
-	ident *id = new_id_from_str(name);
-	dbg_info *dbgi = get_dbg_info(&builtin_source_position);
-	res = new_d_type_primitive(id_mangle_u(get_type_ident(base_tp), id), mode, dbgi);
+	type_dbg_info *dbgi = get_type_dbg_info_(type);
+	res = new_d_type_primitive(mode, dbgi);
 	set_primitive_base_type(res, base_tp);
 
 	return res;
@@ -541,9 +544,11 @@ static ir_type *create_bitfield_type(bitfield_type_t *const type)
 
 	assert(!is_type_float(base));
 	if (is_type_signed(base)) {
-		return get_signed_int_type_for_bit_size(irbase, size);
+		return get_signed_int_type_for_bit_size(irbase, size,
+		                                        (const type_t*) type);
 	} else {
-		return get_unsigned_int_type_for_bit_size(irbase, size);
+		return get_unsigned_int_type_for_bit_size(irbase, size,
+		                                          (const type_t*) type);
 	}
 }
 
@@ -577,13 +582,12 @@ static ir_type *create_compound_type(compound_type_t *type,
 			id = id_unique("__anonymous_struct.%u");
 		}
 	}
-	dbg_info *dbgi = get_dbg_info(&compound->base.source_position);
 
 	ir_type *irtype;
 	if (is_union) {
-		irtype = new_d_type_union(id, dbgi);
+		irtype = new_type_union(id);
 	} else {
-		irtype = new_d_type_struct(id, dbgi);
+		irtype = new_type_struct(id);
 	}
 
 	compound->irtype_complete = false;
@@ -671,7 +675,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 	constant_folding = constant_folding_old;
 
-	return create_atomic_type(type->akind);
+	return create_atomic_type(type->akind, (const type_t*) type);
 }
 
 static ir_type *get_ir_type_incomplete(type_t *type)
@@ -709,10 +713,10 @@ ir_type *get_ir_type(type_t *type)
 	switch (type->kind) {
 	case TYPE_ERROR:
 		/* Happens while constant folding, when there was an error */
-		return create_atomic_type(ATOMIC_TYPE_VOID);
+		return create_atomic_type(ATOMIC_TYPE_VOID, NULL);
 
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(type->atomic.akind);
+		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
 	case TYPE_COMPLEX:
 		firm_type = create_complex_type(&type->complex);
@@ -1128,17 +1132,17 @@ static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
  * Allocate an area of size bytes aligned at alignment
  * at a frame type.
  */
-static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned alignment) {
+static ir_entity *alloc_trampoline(ir_type *frame_type, int size, unsigned alignment)
+{
 	static unsigned area_cnt = 0;
 	char buf[32];
 
-	snprintf(buf, sizeof(buf), "trampolin%u", area_cnt++);
-	ident *name = new_id_from_str(buf);
-
-	ir_type *tp = new_type_array(id_mangle_u(get_type_ident(frame_type), name), 1, ir_type_char);
+	ir_type *tp = new_type_array(1, ir_type_char);
 	set_array_bounds_int(tp, 0, 0, size);
 	set_type_alignment_bytes(tp, alignment);
 
+	snprintf(buf, sizeof(buf), "trampolin%u", area_cnt++);
+	ident *name = new_id_from_str(buf);
 	ir_entity *area = new_entity(frame_type, name, tp);
 
 	/* mark this entity as compiler generated */
@@ -1236,8 +1240,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 {
 	ir_type  *const global_type = get_glob_type();
 	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const type        = new_d_type_array(id_unique("strtype.%u"), 1,
-	                                               ir_type_const_char, dbgi);
+	ir_type  *const type        = new_type_array(1, ir_type_const_char);
 
 	ident     *const id     = id_unique(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
@@ -1291,8 +1294,7 @@ static ir_node *wide_string_literal_to_firm(
 	ir_type *const global_type = get_glob_type();
 	ir_type *const elem_type   = ir_type_wchar_t;
 	dbg_info *const dbgi       = get_dbg_info(&literal->base.source_position);
-	ir_type *const type        = new_d_type_array(id_unique("strtype.%u"), 1,
-	                                            elem_type, dbgi);
+	ir_type *const type        = new_type_array(1, elem_type);
 
 	ident     *const id     = id_unique("Lstr.%u");
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
@@ -1895,9 +1897,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 
 		/* we need to construct a new method type matching the call
 		 * arguments... */
+		type_dbg_info *tdbgi = get_type_dbg_info_((const type_t*) function_type);
 		int n_res       = get_method_n_ress(ir_method_type);
-		new_method_type = new_d_type_method(id_unique("calltype.%u"),
-		                                    n_parameters, n_res, dbgi);
+		new_method_type = new_d_type_method(n_parameters, n_res, tdbgi);
 		set_method_calling_convention(new_method_type,
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
@@ -5656,8 +5658,7 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
                                  const char *unique_template)
 {
 	ir_type   *method_type  = get_entity_type(method);
-	ident     *id           = id_unique(unique_template);
-	ir_type   *ptr_type     = new_type_pointer(id, method_type, mode_P_code);
+	ir_type   *ptr_type     = new_type_pointer(method_type);
 
 	ident     *ide          = id_unique(unique_template);
 	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
@@ -5900,6 +5901,7 @@ void init_ast2firm(void)
 	init_atomic_modes();
 
 	ir_set_debug_retrieve(dbg_retrieve);
+	ir_set_type_debug_retrieve(dbg_print_type_dbg_info);
 
 	/* OS option must be set to the backend */
 	switch (firm_opt.os_support) {
