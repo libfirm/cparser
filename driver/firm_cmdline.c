@@ -225,6 +225,7 @@ static void disable_opts(void) {
   firm_opt.no_alias        = FALSE;
   firm_opt.cc_opt          = FALSE;
   firm_opt.freestanding    = TRUE;
+  disable_all_opts();
 }  /* disable_opts */
 
 void print_option_help(const char *name, const char *description)
