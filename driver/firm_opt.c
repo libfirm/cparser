@@ -62,18 +62,18 @@ ir_entity_ptr rts_entities[rts_max];
  */
 static const ir_settings_arch_dep_t *arch_factory(void)
 {
-  static const ir_settings_arch_dep_t param = {
-      1,   /* also use subs */
-      4,   /* maximum shifts */
-     31,   /* maximum shift amount */
-     NULL, /* use default evaluator */
+	static const ir_settings_arch_dep_t param = {
+		1,   /* also use subs */
+		4,   /* maximum shifts */
+		31,   /* maximum shift amount */
+		NULL, /* use default evaluator */
 
-      1, /* allow Mulhs */
-      1, /* allow Mulus */
-     32  /* Mulh allowed up to 32 bit */
-  };
+		1, /* allow Mulhs */
+		1, /* allow Mulus */
+		32  /* Mulh allowed up to 32 bit */
+	};
 
-  return ad_param ? ad_param : &param;
+	return ad_param ? ad_param : &param;
 }
 
 /**
@@ -269,6 +269,11 @@ static void do_lower_switch(ir_graph *irg)
 	lower_switch(irg, firm_opt.spare_size);
 }
 
+static void do_lower_mux(ir_graph *irg)
+{
+	lower_mux(irg, NULL);
+}
+
 static void do_lower_dw_ops(void)
 {
 	lwrdw_param_t init = {
@@ -301,6 +306,8 @@ typedef enum opt_flags {
 	OPT_FLAG_NO_VERIFY    = 1 << 2, /**< don't verify after transformation */
 	OPT_FLAG_HIDE_OPTIONS = 1 << 3, /**< do not automatically process
 	                                     -foptions for this transformation */
+	OPT_FLAG_ESSENTIAL    = 1 << 4, /**< output won't work without this pass
+	                                     so we need it even with -O0 */
 } opt_flags_t;
 
 typedef void (*transform_irg_func)(ir_graph *irg);
@@ -323,10 +330,10 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) remove_unused_functions, "removal of unused functions",             OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
 	{ OPT_TARGET_IRP, "opt-tail-rec",    (func_ptr_t) opt_tail_recursion,      "tail-recursion eliminiation",             OPT_FLAG_NONE },
 	{ OPT_TARGET_IRP, "opt-func-call",   (func_ptr_t) do_optimize_funccalls,   "function call optimization",              OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      "lowering",                                OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRP, "lower-const",     (func_ptr_t) lower_const_code,        "lowering of constant code",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRP, "lower-dw",        (func_ptr_t) do_lower_dw_ops,         "lowering of doubleword operations",       OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRG, "lower-switch",    (func_ptr_t) do_lower_switch,         "switch lowering",                         OPT_FLAG_HIDE_OPTIONS },
+	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      "lowering",                                OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL },
+	{ OPT_TARGET_IRP, "lower-const",     (func_ptr_t) lower_const_code,        "lowering of constant code",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL },
+	{ OPT_TARGET_IRP, "lower-dw",        (func_ptr_t) do_lower_dw_ops,         "lowering of doubleword operations",       OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL },
+	{ OPT_TARGET_IRG, "lower-switch",    (func_ptr_t) do_lower_switch,         "switch lowering",                         OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL },
 	{ OPT_TARGET_IRG, "one-return",      (func_ptr_t) normalize_one_return,    "normalisation to 1 return",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
 	{ OPT_TARGET_IRG, "scalar-replace",  (func_ptr_t) scalar_replacement_opt,  "scalar replacement",                      OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "reassociation",   (func_ptr_t) optimize_reassociation,  "reassociation",                           OPT_FLAG_NONE },
@@ -349,6 +356,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRP, "opt-proc-clone",  (func_ptr_t) do_cloning,              "procedure cloning",                       OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "invert-loops",    (func_ptr_t) do_loop_inversion,       "loop inversion",                          OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "peel-loops",      (func_ptr_t) do_loop_peeling,         "loop peeling",                            OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "lower-mux",       (func_ptr_t) do_lower_mux,            "mux lowering",                            OPT_FLAG_NONE },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
@@ -558,6 +566,8 @@ static void do_firm_optimizations(const char *input_filename)
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "control-flow");
 		}
+		/* this doesn't make too much sense but tests the mux destruction... */
+		do_irg_opt(irg, "lower-mux");
 
 		do_irg_opt(irg, "bool");
 		do_irg_opt(irg, "shape-blocks");
@@ -1036,6 +1046,18 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 
 	if (firm_dump.statistic & STAT_FINAL)
 		stat_dump_snapshot(input_filename, "final");
+}
+
+void disable_all_opts(void)
+{
+	for (int i = 0; i < n_opts; ++i) {
+		opt_config_t *config = &opts[i];
+		if (config->flags & OPT_FLAG_ESSENTIAL) {
+			config->flags |= OPT_FLAG_ENABLED;
+		} else {
+			config->flags &= ~OPT_FLAG_ENABLED;
+		}
+	}
 }
 
 int firm_opt_option(const char *opt)
