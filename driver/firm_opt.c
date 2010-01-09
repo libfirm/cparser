@@ -2,7 +2,7 @@
  *
  * @file firm_opt.c -- Firm-generating back end optimizations.
  *
- * (C) 2005-2009  Michael Beck   beck@ipd.info.uni-karlsruhe.de
+ * (C) 2005-2010  Michael Beck   beck@ipd.info.uni-karlsruhe.de
  *
  * $Id$
  */
@@ -627,7 +627,7 @@ static int compute_type_size(ir_type *ty)
 		return 1;
 	}
 
-	DBG(("compute type size visiting: %s\n", get_type_name(ty)));
+	DBG(("compute type size visiting: %+F\n", ty));
 
 	switch (get_type_tpop_code(ty)) {
 	case tpo_class:
@@ -654,7 +654,7 @@ static int compute_type_size(ir_type *ty)
 			size += get_type_size_bytes(ent_ty);
 
 			DBG(("  member %s %s -> (size: %u, align: %u)\n",
-						get_type_name(ent_ty), get_entity_name(ent),
+						get_compound_name(ent_ty), get_entity_name(ent),
 						get_type_size_bytes(ent_ty), get_type_alignment_bytes(ent_ty)));
 		}
 		if (align_all > 0 && size % align_all) {
@@ -723,8 +723,8 @@ static int compute_type_size(ir_type *ty)
 		}
 		restore_optimization_state(&state);
 
-		DBG(("array %s -> (elements: %d, element type size: %d)\n",
-					get_type_name(ty),
+		DBG(("array %+F -> (elements: %d, element type size: %d)\n",
+					ty,
 					size, get_type_size_bytes(get_array_element_type(ty))));
 		size *= get_type_size_bytes(get_array_element_type(ty));
 		set = 1;
