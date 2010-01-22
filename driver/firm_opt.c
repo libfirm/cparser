@@ -606,187 +606,6 @@ static void do_firm_optimizations(const char *input_filename)
 }
 
 /**
- * compute the size of a type (do implicit lowering)
- *
- * @param ty   a Firm type
- */
-static int compute_type_size(ir_type *ty)
-{
-	optimization_state_t state;
-	unsigned             align_all = 1;
-	int                  n, size = 0, set = 0;
-	int                  i, dims, s;
-
-	if (get_type_state(ty) == layout_fixed) {
-		/* do not layout already layouted types again */
-		return 1;
-	}
-
-	if (is_Method_type(ty) || ty == get_glob_type()) {
-		/* no need for size calculation for method types or the global type */
-		return 1;
-	}
-
-	DBG(("compute type size visiting: %+F\n", ty));
-
-	switch (get_type_tpop_code(ty)) {
-	case tpo_class:
-	case tpo_struct:
-		for (i = 0, n = get_compound_n_members(ty); i < n; ++i) {
-			ir_entity *ent  = get_compound_member(ty, i);
-			ir_type *ent_ty = get_entity_type(ent);
-			unsigned align, misalign;
-
-			/* inner functions do not expand the frame */
-			if (is_Method_type(ent_ty) && is_frame_type(ty))
-				continue;
-
-			/* compute member types */
-			if (! compute_type_size(ent_ty))
-				return 0;
-
-			align     = get_type_alignment_bytes(ent_ty);
-			align_all = align > align_all ? align : align_all;
-			misalign  = (align ? size % align : 0);
-			size     += (misalign ? align - misalign : 0);
-
-			set_entity_offset(ent, size);
-			size += get_type_size_bytes(ent_ty);
-
-			DBG(("  member %s %s -> (size: %u, align: %u)\n",
-						get_compound_name(ent_ty), get_entity_name(ent),
-						get_type_size_bytes(ent_ty), get_type_alignment_bytes(ent_ty)));
-		}
-		if (align_all > 0 && size % align_all) {
-			DBG(("align of the struct member: %u, type size: %d\n", align_all, size));
-			size += align_all - (size % align_all);
-			DBG(("correcting type-size to %d\n", size));
-		}
-		set_type_alignment_bytes(ty, align_all);
-		set = 1;
-		break;
-
-	case tpo_union:
-		for (i = 0, n = get_union_n_members(ty); i < n; ++i) {
-			ir_entity *ent = get_union_member(ty, i);
-
-			if (! compute_type_size(get_entity_type(ent)))
-				return 0;
-			s = get_type_size_bytes(get_entity_type(ent));
-
-			set_entity_offset(ent, 0);
-			size = (s > size ? s : size);
-		}
-		set = 1;
-		break;
-
-	case tpo_array:
-		dims = get_array_n_dimensions(ty);
-
-		if (! compute_type_size(get_array_element_type(ty)))
-			return 0;
-
-		size = 1;
-
-		save_optimization_state(&state);
-		set_optimize(1);
-		set_opt_constant_folding(1);
-		set_opt_algebraic_simplification(1);
-
-		for (i = 0; i < dims; ++i) {
-			ir_node *lower   = get_array_lower_bound(ty, i);
-			ir_node *upper   = get_array_upper_bound(ty, i);
-			ir_graph *rem    = current_ir_graph;
-			tarval  *tv_lower, *tv_upper;
-			long     val_lower, val_upper;
-
-			current_ir_graph = get_const_code_irg();
-			local_optimize_node(lower);
-			local_optimize_node(upper);
-			current_ir_graph = rem;
-
-			tv_lower = computed_value(lower);
-			tv_upper = computed_value(upper);
-
-			if (tv_lower == tarval_bad || tv_upper == tarval_bad) {
-				/*
-				 * we cannot calculate the size of this array yet, it
-				 * even might be unknown until the end, like argv[]
-				 */
-				restore_optimization_state(&state);
-				return 0;
-			}
-
-			val_upper = get_tarval_long(tv_upper);
-			val_lower = get_tarval_long(tv_lower);
-			size     *= val_upper - val_lower;
-		}
-		restore_optimization_state(&state);
-
-		DBG(("array %+F -> (elements: %d, element type size: %d)\n",
-					ty,
-					size, get_type_size_bytes(get_array_element_type(ty))));
-		size *= get_type_size_bytes(get_array_element_type(ty));
-		set = 1;
-		break;
-
-	default:
-		break;
-	}
-
-	if (set) {
-		set_type_size_bytes(ty, size);
-		set_type_state(ty, layout_fixed);
-	}
-
-	DBG(("size: %d\n", get_type_size_bytes(ty)));
-
-	return set;
-}
-
-/**
- * layout all non-frame types of the Firm graph
- */
-static void compute_type_sizes(void)
-{
-	int i;
-	ir_type *tp;
-
-	/* all non-frame other types */
-	for (i = get_irp_n_types() - 1; i >= 0; --i) {
-		tp = get_irp_type(i);
-		compute_type_size(tp);
-
-		if (is_Method_type(tp)) {
-			tp = get_method_value_res_type(tp);
-
-			if (tp) {
-				/* we have a value result type for this method, lower */
-				compute_type_size(tp);
-			}
-		}
-	}
-}
-
-/**
- * layout all frame-types of the Firm graph
- */
-static void compute_frame_type_sizes(void)
-{
-	int i;
-	ir_graph *irg;
-
-	/* all frame types */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-		irg = get_irp_irg(i);
-		/* do not optimize away variables in debug mode */
-		if (firm_opt.debug_mode == DBG_MODE_NONE)
-			opt_frame_irg(irg);
-		compute_type_size(get_irg_frame_type(irg));
-	}
-}
-
-/**
  * do Firm lowering
  *
  * @param input_filename  the name of the (main) source file
@@ -1011,9 +830,6 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 	/* lower all compound call return values */
 	lower_compound_params();
 
-	/* computes the sizes of all types that are still not computed */
-	compute_type_sizes();
-
 	/* lower copyb nodes */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
@@ -1029,9 +845,6 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 
 	if (firm_opt.lower)
 		do_firm_lowering(input_filename);
-
-	/* computes the sizes of all frame types */
-	compute_frame_type_sizes();
 
 	/* set the phase to low */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i)
