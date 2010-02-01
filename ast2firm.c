@@ -889,18 +889,17 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 {
 	assert(is_declaration(entity));
 	decl_modifiers_t modifiers = entity->declaration.modifiers;
-	if (modifiers & DM_PURE) {
-		/* TRUE if the declaration includes the GNU
-		   __attribute__((pure)) specifier. */
-		set_entity_additional_property(irentity, mtp_property_pure);
-	}
-	if (modifiers & DM_CONST) {
-		set_entity_additional_property(irentity, mtp_property_const);
-		have_const_functions = true;
+
+	if (is_method_entity(irentity)) {
+		if (modifiers & DM_PURE) {
+			set_entity_additional_property(irentity, mtp_property_pure);
+		}
+		if (modifiers & DM_CONST) {
+			set_entity_additional_property(irentity, mtp_property_const);
+			have_const_functions = true;
+		}
 	}
 	if (modifiers & DM_USED) {
-		/* TRUE if the declaration includes the GNU
-		   __attribute__((used)) specifier. */
 		set_entity_stickyness(irentity, stickyness_sticky);
 	}
 }
