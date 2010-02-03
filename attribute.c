@@ -310,6 +310,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_UNUSED:        modifiers |= DM_UNUSED; break;
 		case ATTRIBUTE_GNU_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_GNU_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
+		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
 
 		case ATTRIBUTE_MS_ALLOCATE:      modifiers |= DM_MALLOC; break;
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;

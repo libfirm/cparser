@@ -902,6 +902,9 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	if (modifiers & DM_USED) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
 	}
+	if (modifiers & DM_WEAK) {
+		add_entity_linkage(irentity, IR_LINKAGE_WEAK);
+	}
 }
 
 static bool is_main(entity_t *entity)

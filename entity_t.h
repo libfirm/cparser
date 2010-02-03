@@ -91,6 +91,7 @@ typedef enum decl_modifier_t {
 	DM_DEPRECATED        = 1 << 24,
 	DM_RETURNS_TWICE     = 1 << 25,
 	DM_MALLOC            = 1 << 26,
+	DM_WEAK              = 1 << 27,
 } decl_modifier_t;
 
 /**
