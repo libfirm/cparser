@@ -4540,18 +4540,20 @@ static void create_global_variable(entity_t *entity)
 	switch ((storage_class_tag_t)entity->declaration.storage_class) {
 	case STORAGE_CLASS_STATIC: linkage |= IR_LINKAGE_LOCAL; break;
 	case STORAGE_CLASS_EXTERN: linkage |= IR_LINKAGE_EXTERN; break;
+	case STORAGE_CLASS_NONE:
+		/* uninitialized globals get merged in C */
+		if (entity->variable.initializer == NULL)
+			linkage |= IR_LINKAGE_MERGE;
+		break;
 	case STORAGE_CLASS_TYPEDEF:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
-	case STORAGE_CLASS_NONE:   break;
+		break;
 	}
 
 	ir_type *var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
-	/* uninitialized globals get merged in C */
- 	if (entity->variable.initializer == NULL)
-		linkage |= IR_LINKAGE_MERGE;
 	add_entity_linkage(entity->variable.v.entity, linkage);
 }
 
