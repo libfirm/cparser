@@ -4549,6 +4549,9 @@ static void create_global_variable(entity_t *entity)
 	ir_type *var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
+	/* uninitialized globals get merged in C */
+ 	if (entity->variable.initializer == NULL)
+		linkage |= IR_LINKAGE_MERGE;
 	add_entity_linkage(entity->variable.v.entity, linkage);
 }
 
