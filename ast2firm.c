@@ -957,8 +957,9 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
 	bool const has_body = entity->function.statement != NULL;
 	if (irentity != NULL) {
-		if ((get_entity_linkage(irentity) & IR_LINKAGE_EXTERN) && has_body) {
-			remove_entity_linkage(irentity, IR_LINKAGE_EXTERN);
+		if (get_entity_visibility(irentity) == ir_visibility_external
+				&& has_body) {
+			set_entity_visibility(irentity, ir_visibility_default);
 		}
 		goto entity_created;
 	}
@@ -997,16 +998,18 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		bool                const is_inline     = entity->function.is_inline;
 
 		if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
+		    set_entity_visibility(irentity, ir_visibility_default);
 		} else if (storage_class == STORAGE_CLASS_STATIC ||
 		           (is_inline && has_body)) {
-			add_entity_linkage(irentity, IR_LINKAGE_LOCAL);
+		    set_entity_visibility(irentity, ir_visibility_local);
 		} else if (has_body) {
+		    set_entity_visibility(irentity, ir_visibility_default);
 		} else {
-			add_entity_linkage(irentity, IR_LINKAGE_EXTERN);
+		    set_entity_visibility(irentity, ir_visibility_external);
 		}
 	} else {
 		/* nested functions are always local */
-		add_entity_linkage(irentity, IR_LINKAGE_LOCAL);
+	   	set_entity_visibility(irentity, ir_visibility_local);
 	}
 
 	/* We should check for file scope here, but as long as we compile C only
@@ -1239,7 +1242,8 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	ident     *const id     = id_unique(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT | IR_LINKAGE_LOCAL);
+	set_entity_visibility(entity, ir_visibility_local);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 
 	ir_type *const elem_type = ir_type_const_char;
 	ir_mode *const mode      = get_type_mode(elem_type);
@@ -1291,7 +1295,8 @@ static ir_node *wide_string_literal_to_firm(
 	ident     *const id     = id_unique("Lstr.%u");
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT | IR_LINKAGE_LOCAL);
+	set_entity_visibility(entity, ir_visibility_local);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 
 	ir_mode *const mode      = get_type_mode(elem_type);
 
@@ -4261,7 +4266,8 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(init_entity, id);
 
-	add_entity_linkage(init_entity, IR_LINKAGE_LOCAL|IR_LINKAGE_CONSTANT);
+	set_entity_visibility(init_entity, ir_visibility_local);
+	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
 
 	set_entity_initializer(init_entity, irinitializer);
 
@@ -4435,7 +4441,7 @@ static void create_local_static_variable(entity_t *entity)
 	entity->variable.v.entity = irentity;
 
 	set_entity_ld_ident(irentity, id);
-	add_entity_linkage(irentity, IR_LINKAGE_LOCAL);
+	set_entity_visibility(irentity, ir_visibility_local);
 
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
@@ -4534,13 +4540,16 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_global_variable(entity_t *entity)
 {
-	ir_linkage linkage = 0;
+	ir_linkage    linkage    = 0;
+	ir_visibility visibility = ir_visibility_default;
+	ir_entity    *irentity;
 	assert(entity->kind == ENTITY_VARIABLE);
 
 	switch ((storage_class_tag_t)entity->declaration.storage_class) {
-	case STORAGE_CLASS_STATIC: linkage |= IR_LINKAGE_LOCAL; break;
-	case STORAGE_CLASS_EXTERN: linkage |= IR_LINKAGE_EXTERN; break;
+	case STORAGE_CLASS_STATIC: visibility = ir_visibility_local; break;
+	case STORAGE_CLASS_EXTERN: visibility = ir_visibility_external; break;
 	case STORAGE_CLASS_NONE:
+		visibility = ir_visibility_default;
 		/* uninitialized globals get merged in C */
 		if (entity->variable.initializer == NULL)
 			linkage |= IR_LINKAGE_MERGE;
@@ -4548,13 +4557,15 @@ static void create_global_variable(entity_t *entity)
 	case STORAGE_CLASS_TYPEDEF:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
-		break;
+		panic("invalid storage class for global var");
 	}
 
 	ir_type *var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
-	add_entity_linkage(entity->variable.v.entity, linkage);
+	irentity = entity->variable.v.entity;
+	add_entity_linkage(irentity, linkage);
+	set_entity_visibility(irentity, visibility);
 }
 
 static void create_local_declaration(entity_t *entity)
@@ -5646,7 +5657,8 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	                                                   method, NULL);
 
 	set_entity_compiler_generated(ptr, 1);
-	add_entity_linkage(ptr, IR_LINKAGE_LOCAL | IR_LINKAGE_CONSTANT);
+	set_entity_visibility(ptr, ir_visibility_local);
+	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT);
 	set_atomic_ent_value(ptr, val);
 }
 
