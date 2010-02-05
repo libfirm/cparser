@@ -247,6 +247,8 @@ typedef enum builtin_kind_t {
 	bk_none = 0,                   /**< no builtin */
 	bk_gnu_builtin_alloca,         /**< GNU __builtin_alloca */
 	bk_gnu_builtin_huge_val,       /**< GNU __builtin_huge_val */
+	bk_gnu_builtin_huge_valf,      /**< GNU __builtin_huge_valf */
+	bk_gnu_builtin_huge_vall,      /**< GNU __builtin_huge_vall */
 	bk_gnu_builtin_inf,            /**< GNU __builtin_inf */
 	bk_gnu_builtin_inff,           /**< GNU __builtin_inff */
 	bk_gnu_builtin_infl,           /**< GNU __builtin_infl */

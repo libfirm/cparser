@@ -10953,6 +10953,8 @@ static void create_gnu_builtins(void)
 
 	GNU_BUILTIN(alloca,         make_function_1_type(type_void_ptr, type_size_t));
 	GNU_BUILTIN(huge_val,       make_function_0_type(type_double));
+	GNU_BUILTIN(huge_valf,      make_function_0_type(type_float));
+	GNU_BUILTIN(huge_vall,      make_function_0_type(type_long_double));
 	GNU_BUILTIN(inf,            make_function_0_type(type_double));
 	GNU_BUILTIN(inff,           make_function_0_type(type_float));
 	GNU_BUILTIN(infl,           make_function_0_type(type_long_double));

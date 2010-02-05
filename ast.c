@@ -1789,6 +1789,8 @@ static bool is_builtin_const_call(const expression_t *expression)
 
 	switch (ref->entity->function.btk) {
 	case bk_gnu_builtin_huge_val:
+	case bk_gnu_builtin_huge_valf:
+	case bk_gnu_builtin_huge_vall:
 	case bk_gnu_builtin_inf:
 	case bk_gnu_builtin_inff:
 	case bk_gnu_builtin_infl:

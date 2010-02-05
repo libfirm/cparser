@@ -1677,6 +1677,8 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 
 	case bk_gnu_builtin_huge_val:
+	case bk_gnu_builtin_huge_valf:
+	case bk_gnu_builtin_huge_vall:
 	case bk_gnu_builtin_inf:
 	case bk_gnu_builtin_inff:
 	case bk_gnu_builtin_infl: {
