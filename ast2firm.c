@@ -5652,12 +5652,17 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ir_type   *method_type  = get_entity_type(method);
 	ir_type   *ptr_type     = new_type_pointer(method_type);
 
+	/* these entities don't really have a name but firm only allows
+	 * "" in ld_ident.
+	 * Note that we mustn't give these entities a name since for example
+	 * Mach-O doesn't allow them. */
 	ident     *ide          = id_unique(unique_template);
 	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
 	ir_graph  *irg          = get_const_code_irg();
 	ir_node   *val          = new_rd_SymConst_addr_ent(NULL, irg, mode_P_code,
 	                                                   method, NULL);
 
+	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
 	set_entity_compiler_generated(ptr, 1);
 	set_entity_visibility(ptr, ir_visibility_local);
 	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
