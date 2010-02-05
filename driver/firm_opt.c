@@ -200,21 +200,6 @@ static void dump_graph_count(ir_graph *const irg, const char *const suffix)
 	timer_pop(t_vcg_dump);
 }
 
-static void remove_unused_functions(void)
-{
-	ir_entity **keep_methods;
-	int         arr_len;
-
-	/* Analysis that finds the free methods,
-	   i.e. methods that are dereferenced.
-	   Optimizes polymorphic calls :-). */
-	cgana(&arr_len, &keep_methods);
-
-	/* Remove methods that are never called. */
-	gc_irgs(arr_len, keep_methods);
-	free(keep_methods);
-}
-
 static int firm_const_exists;
 
 static void do_optimize_funccalls(void)
@@ -327,7 +312,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "combo",           (func_ptr_t) combo,                   "combined CCE, UCE and GVN",               OPT_FLAG_NONE},
 	{ OPT_TARGET_IRG, "control-flow",    (func_ptr_t) optimize_cf,             "optimization of control-flow",            OPT_FLAG_HIDE_OPTIONS },
 	{ OPT_TARGET_IRG, "local",           (func_ptr_t) optimize_graph_df,       "local graph optimizations",               OPT_FLAG_HIDE_OPTIONS },
-	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) remove_unused_functions, "removal of unused functions",             OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
+	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) garbage_collect_entities,"removal of unused functions/variables",   OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
 	{ OPT_TARGET_IRP, "opt-tail-rec",    (func_ptr_t) opt_tail_recursion,      "tail-recursion eliminiation",             OPT_FLAG_NONE },
 	{ OPT_TARGET_IRP, "opt-func-call",   (func_ptr_t) do_optimize_funccalls,   "function call optimization",              OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      "lowering",                                OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL },
