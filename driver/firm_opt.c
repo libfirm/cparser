@@ -340,7 +340,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRP, "inline",          (func_ptr_t) do_inline,               "inlining",                                OPT_FLAG_NONE },
 	{ OPT_TARGET_IRP, "opt-proc-clone",  (func_ptr_t) do_cloning,              "procedure cloning",                       OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "invert-loops",    (func_ptr_t) do_loop_inversion,       "loop inversion",                          OPT_FLAG_NONE },
-	{ OPT_TARGET_IRG, "peel-loops",      (func_ptr_t) do_loop_peeling,         "loop peeling",                            OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "unroll-loops",    (func_ptr_t) do_loop_unrolling,       "loop unrolling",                          OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "lower-mux",       (func_ptr_t) do_lower_mux,            "mux lowering",                            OPT_FLAG_NONE },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
@@ -522,6 +522,7 @@ static void do_firm_optimizations(const char *input_filename)
 
 		do_irg_opt(irg, "scalar-replace");
 		do_irg_opt(irg, "invert-loops");
+		do_irg_opt(irg, "unroll-loops");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "reassociation");
 		do_irg_opt(irg, "local");
