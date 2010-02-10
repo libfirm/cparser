@@ -4562,8 +4562,12 @@ static void create_global_variable(entity_t *entity)
 		panic("invalid storage class for global var");
 	}
 
-	ir_type *var_type = entity->variable.thread_local ?
-		get_tls_type() : get_glob_type();
+	ir_type *var_type = get_glob_type();
+	if (entity->variable.thread_local) {
+		var_type = get_tls_type();
+		/* LINKAGE_MERGE not supported by current linkers */
+		linkage &= ~IR_LINKAGE_MERGE;
+	}
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
 	irentity = entity->variable.v.entity;
 	add_entity_linkage(irentity, linkage);
