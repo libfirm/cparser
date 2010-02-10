@@ -4548,8 +4548,13 @@ static void create_global_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 
 	switch ((storage_class_tag_t)entity->declaration.storage_class) {
-	case STORAGE_CLASS_STATIC: visibility = ir_visibility_local; break;
 	case STORAGE_CLASS_EXTERN: visibility = ir_visibility_external; break;
+	case STORAGE_CLASS_STATIC:
+		visibility = ir_visibility_local;
+		/* uninitialized globals get merged in C */
+		if (entity->variable.initializer == NULL)
+			linkage |= IR_LINKAGE_MERGE;
+		break;
 	case STORAGE_CLASS_NONE:
 		visibility = ir_visibility_default;
 		/* uninitialized globals get merged in C */
