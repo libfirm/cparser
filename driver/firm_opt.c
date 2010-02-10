@@ -279,6 +279,11 @@ static void do_lower_dw_ops(void)
 	lower_dw_ops(&init);
 }
 
+static void do_vrp(ir_graph *irg)
+{
+	set_vrp_data(irg);
+}
+
 typedef enum opt_target {
 	OPT_TARGET_IRG, /**< optimization function works on a single graph */
 	OPT_TARGET_IRP  /**< optimization function works on the complete program */
@@ -342,6 +347,8 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "invert-loops",    (func_ptr_t) do_loop_inversion,       "loop inversion",                          OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "unroll-loops",    (func_ptr_t) do_loop_unrolling,       "loop unrolling",                          OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "lower-mux",       (func_ptr_t) do_lower_mux,            "mux lowering",                            OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "vrp", 			 (func_ptr_t) do_vrp,				   "value range propagation", 				  OPT_FLAG_NONE },
+
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
@@ -535,6 +542,7 @@ static void do_firm_optimizations(const char *input_filename)
 			 */
 			do_irg_opt(irg, "control-flow");
 			do_irg_opt(irg, "confirm");
+			do_irg_opt(irg, "vrp");
 			do_irg_opt(irg, "local");
 		}
 
@@ -573,6 +581,13 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "thread-jumps");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "control-flow");
+
+		if( do_irg_opt(irg, "vrp") ) { // if vrp is enabled
+			do_irg_opt(irg, "local");
+			do_irg_opt(irg, "vrp");
+			do_irg_opt(irg, "local");
+			do_irg_opt(irg, "vrp");
+		}
 	}
 
 	if (firm_dump.ir_graph) {
@@ -633,6 +648,14 @@ static void do_firm_lowering(const char *input_filename)
 			do_irg_opt(irg, "opt-load-store");
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "control-flow");
+
+			if (do_irg_opt(irg, "vrp")) {
+				do_irg_opt(irg, "local");
+				do_irg_opt(irg, "control-flow");
+				do_irg_opt(irg, "vrp");
+				do_irg_opt(irg, "local");
+				do_irg_opt(irg, "control-flow");
+			}
 
 			if (do_irg_opt(irg, "if-conversion")) {
 				do_irg_opt(irg, "local");
