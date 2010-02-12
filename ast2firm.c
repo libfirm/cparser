@@ -4326,7 +4326,8 @@ static void create_variable_initializer(entity_t *entity)
 
 			ir_entity *irentity = entity->variable.v.entity;
 
-			if (tq & TYPE_QUALIFIER_CONST) {
+			if (tq & TYPE_QUALIFIER_CONST
+					&& get_entity_owner(irentity) != get_tls_type()) {
 				add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 			}
 			set_atomic_ent_value(irentity, value);
@@ -4431,8 +4432,7 @@ static void create_local_static_variable(entity_t *entity)
 	size_t l = strlen(entity->base.symbol->string);
 	char   buf[l + sizeof(".%u")];
 	snprintf(buf, sizeof(buf), "%s.%%u", entity->base.symbol->string);
-	ident     *const id = id_unique(buf);
-
+	ident     *const id       = id_unique(buf);
 	ir_entity *const irentity = new_d_entity(var_type, id, irtype, dbgi);
 
 	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
