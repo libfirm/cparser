@@ -95,7 +95,7 @@
 
 #ifndef ASSEMBLER
 #ifdef __APPLE__
-#define ASSEMBLER "gcc -c -xassembler"
+#define ASSEMBLER "gcc -m32 -c -xassembler"
 #else
 #define ASSEMBLER "as --32"
 #endif
