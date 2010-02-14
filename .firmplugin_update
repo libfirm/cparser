@@ -1,0 +1,2 @@
+#!/bin/sh
+./make_revision.sh "$PLUGINDIR/revision.h" "$PLUGINDIR" cparser_REVISION
