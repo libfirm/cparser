@@ -32,6 +32,7 @@ SOURCES := \
 	parser.c \
 	ast.c \
 	ast2firm.c \
+	builtins.c \
 	diagnostic.c \
 	driver/firm_cmdline.c \
 	driver/firm_codegen.c \
@@ -122,11 +123,11 @@ $(DIRS):
 	@echo "===> MKDIR $@"
 	$(Q)mkdir -p $@
 
-builtins.h: builtins/builtins.c create_builtins_h.sh
+gen_builtins.h: builtins/builtins.c create_builtins_h.sh
 	@echo '===> CREATE_BUILTINS $<'
-	$(Q)./create_builtins_h.sh > $@
+	$(Q)./create_builtins_h.sh "$<" > $@
 
-main.c: builtins.h
+main.c: gen_builtins.h
 
 build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'

@@ -3,6 +3,30 @@ SOURCES = ;
 for d in $(DIRS) {
 	SOURCES += [ Wildcard $(d) : *.c *.h ] ;
 }
+
+actions RunGenerator bind GENERATOR {
+	$(GENERATOR) $(>) > $(<)
+}
+
+rule BuiltinGenerator {
+	local target = [ LocateTarget $(<) : $(SUBDIR) ] ;
+	local source = [ SearchSource $(>) ] ;
+	local generator = [ SearchSource $(3) ] ;
+	local header = $(target) ;
+	Depends $(<) : $(target) ;
+	Depends $(target) : $(generator) ;
+	Depends $(target) : $(source) ;
+	RunGenerator $(target) : $(source) ;
+	GENERATOR on $(target) = $(generator) ;
+
+	Includes $(header:G=) : $(header) ;
+
+	Clean clean : $(target) ;
+
+	return $(target) ;
+}
+BuiltinGenerator gen_builtins.h : builtins/builtins.c : create_builtins_h.sh ;
+
 Application cparser : $(SOURCES) ;
 CppFlags cparser : -DFIRM_BACKEND -I$(top_srcdir)/libfirm/include ;
 IncludeDir cparser : . ;
