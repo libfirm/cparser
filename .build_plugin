@@ -4,7 +4,7 @@ for d in $(DIRS) {
 	SOURCES += [ Wildcard $(d) : *.c *.h ] ;
 }
 
-actions RunGenerator bind GENERATOR {
+actions RunBuiltinGenerator bind GENERATOR {
 	$(GENERATOR) $(>) > $(<)
 }
 
@@ -16,7 +16,7 @@ rule BuiltinGenerator {
 	Depends $(<) : $(target) ;
 	Depends $(target) : $(generator) ;
 	Depends $(target) : $(source) ;
-	RunGenerator $(target) : $(source) ;
+	RunBuiltinGenerator $(target) : $(source) ;
 	GENERATOR on $(target) = $(generator) ;
 
 	Includes $(header:G=) : $(header) ;
