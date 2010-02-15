@@ -19,8 +19,12 @@
  */
 #include <config.h>
 
+#include <assert.h>
+
 #include "entity_t.h"
+#include "ast_t.h"
 #include "adt/error.h"
+#include "adt/util.h"
 
 const char *get_entity_kind_name(entity_kind_t kind)
 {
@@ -42,4 +46,44 @@ const char *get_entity_kind_name(entity_kind_t kind)
 	}
 
 	panic("Invalid entity kind encountered in get_entity_kind_name");
+}
+
+/**
+ * Returns the size of an entity node.
+ *
+ * @param kind  the entity kind
+ */
+static size_t get_entity_struct_size(entity_kind_t kind)
+{
+	static const size_t sizes[] = {
+		[ENTITY_VARIABLE]        = sizeof(variable_t),
+		[ENTITY_PARAMETER]       = sizeof(parameter_t),
+		[ENTITY_COMPOUND_MEMBER] = sizeof(compound_member_t),
+		[ENTITY_FUNCTION]        = sizeof(function_t),
+		[ENTITY_TYPEDEF]         = sizeof(typedef_t),
+		[ENTITY_STRUCT]          = sizeof(compound_t),
+		[ENTITY_UNION]           = sizeof(compound_t),
+		[ENTITY_ENUM]            = sizeof(enum_t),
+		[ENTITY_ENUM_VALUE]      = sizeof(enum_value_t),
+		[ENTITY_LABEL]           = sizeof(label_t),
+		[ENTITY_LOCAL_LABEL]     = sizeof(label_t),
+		[ENTITY_NAMESPACE]       = sizeof(namespace_t)
+	};
+	assert(kind < lengthof(sizes));
+	assert(sizes[kind] != 0);
+	return sizes[kind];
+}
+
+/**
+ * Allocate an entity of given kind and initialize all
+ * fields with zero.
+ *
+ * @param kind   the kind of the entity to allocate
+ */
+entity_t *allocate_entity_zero(entity_kind_t kind)
+{
+	size_t    size   = get_entity_struct_size(kind);
+	entity_t *entity = allocate_ast_zero(size);
+	entity->kind     = kind;
+	return entity;
 }

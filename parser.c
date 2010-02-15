@@ -151,12 +151,7 @@ typedef enum declarator_flags_t {
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
                                   declarator_flags_t flags);
 
-static entity_t *record_entity(entity_t *entity, bool is_definition);
-
 static void semantic_comparison(binary_expression_t *expression);
-
-static void create_gnu_builtins(void);
-static void create_microsoft_intrinsics(void);
 
 #define STORAGE_CLASSES       \
 	STORAGE_CLASSES_NO_EXTERN \
@@ -265,57 +260,6 @@ static void create_microsoft_intrinsics(void);
 	case T_sizeof:                   \
 	case T_throw:                    \
 	case T_true:
-
-/**
- * Allocate an AST node with given size and
- * initialize all fields with zero.
- */
-static void *allocate_ast_zero(size_t size)
-{
-	void *res = allocate_ast(size);
-	memset(res, 0, size);
-	return res;
-}
-
-/**
- * Returns the size of an entity node.
- *
- * @param kind  the entity kind
- */
-static size_t get_entity_struct_size(entity_kind_t kind)
-{
-	static const size_t sizes[] = {
-		[ENTITY_VARIABLE]        = sizeof(variable_t),
-		[ENTITY_PARAMETER]       = sizeof(parameter_t),
-		[ENTITY_COMPOUND_MEMBER] = sizeof(compound_member_t),
-		[ENTITY_FUNCTION]        = sizeof(function_t),
-		[ENTITY_TYPEDEF]         = sizeof(typedef_t),
-		[ENTITY_STRUCT]          = sizeof(compound_t),
-		[ENTITY_UNION]           = sizeof(compound_t),
-		[ENTITY_ENUM]            = sizeof(enum_t),
-		[ENTITY_ENUM_VALUE]      = sizeof(enum_value_t),
-		[ENTITY_LABEL]           = sizeof(label_t),
-		[ENTITY_LOCAL_LABEL]     = sizeof(label_t),
-		[ENTITY_NAMESPACE]       = sizeof(namespace_t)
-	};
-	assert(kind < lengthof(sizes));
-	assert(sizes[kind] != 0);
-	return sizes[kind];
-}
-
-/**
- * Allocate an entity of given kind and initialize all
- * fields with zero.
- *
- * @param kind   the kind of the entity to allocate
- */
-static entity_t *allocate_entity_zero(entity_kind_t kind)
-{
-	size_t    size   = get_entity_struct_size(kind);
-	entity_t *entity = allocate_ast_zero(size);
-	entity->kind     = kind;
-	return entity;
-}
 
 /**
  * Returns the size of a statement node.
@@ -455,53 +399,10 @@ static statement_t *create_empty_statement(void)
 	return allocate_statement_zero(STATEMENT_EMPTY);
 }
 
-/**
- * Returns the size of a type node.
- *
- * @param kind  the type kind
- */
-static size_t get_type_struct_size(type_kind_t kind)
-{
-	static const size_t sizes[] = {
-		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
-		[TYPE_COMPLEX]         = sizeof(complex_type_t),
-		[TYPE_IMAGINARY]       = sizeof(imaginary_type_t),
-		[TYPE_BITFIELD]        = sizeof(bitfield_type_t),
-		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
-		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
-		[TYPE_ENUM]            = sizeof(enum_type_t),
-		[TYPE_FUNCTION]        = sizeof(function_type_t),
-		[TYPE_POINTER]         = sizeof(pointer_type_t),
-		[TYPE_ARRAY]           = sizeof(array_type_t),
-		[TYPE_BUILTIN]         = sizeof(builtin_type_t),
-		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
-		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
-	};
-	assert(lengthof(sizes) == (int)TYPE_TYPEOF + 1);
-	assert(kind <= TYPE_TYPEOF);
-	assert(sizes[kind] != 0);
-	return sizes[kind];
-}
-
-/**
- * Allocate a type node of given kind and initialize all
- * fields with zero.
- *
- * @param kind             type kind to allocate
- */
-static type_t *allocate_type_zero(type_kind_t kind)
-{
-	size_t  size = get_type_struct_size(kind);
-	type_t *res  = obstack_alloc(type_obst, size);
-	memset(res, 0, size);
-	res->base.kind = kind;
-
-	return res;
-}
-
 static function_parameter_t *allocate_parameter(type_t *const type)
 {
-	function_parameter_t *const param = obstack_alloc(type_obst, sizeof(*param));
+	function_parameter_t *const param
+		= obstack_alloc(type_obst, sizeof(*param));
 	memset(param, 0, sizeof(*param));
 	param->type = type;
 	return param;
@@ -4220,7 +4121,7 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
  */
-static entity_t *record_entity(entity_t *entity, const bool is_definition)
+entity_t *record_entity(entity_t *entity, const bool is_definition)
 {
 	const symbol_t *const    symbol  = entity->base.symbol;
 	const namespace_tag_t    namespc = (namespace_tag_t)entity->base.namespc;
@@ -6216,91 +6117,6 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	}
 
 	return entity;
-}
-
-/**
- * Creates a return_type (func)(argument_type) function type if not
- * already exists.
- */
-static type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
-                                    type_t *argument_type2)
-{
-	function_parameter_t *const parameter2 = allocate_parameter(argument_type2);
-	function_parameter_t *const parameter1 = allocate_parameter(argument_type1);
-	parameter1->next = parameter2;
-
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.return_type = return_type;
-	type->function.parameters  = parameter1;
-
-	return identify_new_type(type);
-}
-
-/**
- * Creates a return_type (func)(argument_type) function type if not
- * already exists.
- *
- * @param return_type    the return type
- * @param argument_type  the argument type
- */
-static type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
-{
-	function_parameter_t *const parameter = allocate_parameter(argument_type);
-
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.return_type = return_type;
-	type->function.parameters  = parameter;
-
-	return identify_new_type(type);
-}
-
-/**
- * Creates a return_type (func)(argument_type, ...) function type if not
- * already exists.
- *
- * @param return_type    the return type
- * @param argument_type  the argument type
- */
-static type_t *make_function_1_type_variadic(type_t *return_type, type_t *argument_type)
-{
-	function_parameter_t *const parameter = allocate_parameter(argument_type);
-
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.return_type = return_type;
-	type->function.parameters  = parameter;
-	type->function.variadic    = true;
-
-	return identify_new_type(type);
-}
-
-/**
- * Creates a return_type (func)(void) function type if not
- * already exists.
- *
- * @param return_type    the return type
- */
-static type_t *make_function_0_type(type_t *return_type)
-{
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.return_type = return_type;
-	type->function.parameters  = NULL;
-
-	return identify_new_type(type);
-}
-
-/**
- * Creates a NO_RETURN return_type (func)(void) function type if not
- * already exists.
- *
- * @param return_type    the return type
- */
-static type_t *make_function_0_type_noreturn(type_t *return_type)
-{
-	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
-	type->function.return_type = return_type;
-	type->function.parameters  = NULL;
-	type->function.modifiers  |= DM_NORETURN;
-	return identify_new_type(type);
 }
 
 /**
@@ -10921,106 +10737,6 @@ void parse(void)
 	complete_incomplete_arrays();
 	DEL_ARR_F(incomplete_arrays);
 	incomplete_arrays = NULL;
-}
-
-/**
- * create a builtin function.
- */
-static entity_t *create_builtin_function(builtin_kind_t kind, const char *name, type_t *function_type)
-{
-	symbol_t *symbol = symbol_table_insert(name);
-	entity_t *entity = allocate_entity_zero(ENTITY_FUNCTION);
-	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
-	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
-	entity->declaration.type                   = function_type;
-	entity->declaration.implicit               = true;
-	entity->base.symbol                        = symbol;
-	entity->base.source_position               = builtin_source_position;
-
-	entity->function.btk                       = kind;
-
-	record_entity(entity, /*is_definition=*/false);
-	return entity;
-}
-
-
-/**
- * Create predefined gnu builtins.
- */
-static void create_gnu_builtins(void)
-{
-#define GNU_BUILTIN(a, b) create_builtin_function(bk_gnu_builtin_##a, "__builtin_" #a, b)
-
-	GNU_BUILTIN(alloca,         make_function_1_type(type_void_ptr, type_size_t));
-	GNU_BUILTIN(huge_val,       make_function_0_type(type_double));
-	GNU_BUILTIN(huge_valf,      make_function_0_type(type_float));
-	GNU_BUILTIN(huge_vall,      make_function_0_type(type_long_double));
-	GNU_BUILTIN(inf,            make_function_0_type(type_double));
-	GNU_BUILTIN(inff,           make_function_0_type(type_float));
-	GNU_BUILTIN(infl,           make_function_0_type(type_long_double));
-	GNU_BUILTIN(nan,            make_function_1_type(type_double, type_char_ptr));
-	GNU_BUILTIN(nanf,           make_function_1_type(type_float, type_char_ptr));
-	GNU_BUILTIN(nanl,           make_function_1_type(type_long_double, type_char_ptr));
-	GNU_BUILTIN(va_end,         make_function_1_type(type_void, type_valist));
-	GNU_BUILTIN(expect,         make_function_2_type(type_long, type_long, type_long));
-	GNU_BUILTIN(return_address, make_function_1_type(type_void_ptr, type_unsigned_int));
-	GNU_BUILTIN(frame_address,  make_function_1_type(type_void_ptr, type_unsigned_int));
-	GNU_BUILTIN(ffs,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(clz,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(ctz,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(popcount,       make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(parity,         make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(prefetch,       make_function_1_type_variadic(type_float, type_void_ptr));
-	GNU_BUILTIN(trap,           make_function_0_type_noreturn(type_void));
-
-#undef GNU_BUILTIN
-}
-
-/**
- * Create predefined MS intrinsics.
- */
-static void create_microsoft_intrinsics(void)
-{
-#define MS_BUILTIN(a, b) create_builtin_function(bk_ms##a, #a, b)
-
-	/* intrinsics for all architectures */
-	MS_BUILTIN(_rotl,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
-	MS_BUILTIN(_rotr,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
-	MS_BUILTIN(_rotl64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
-	MS_BUILTIN(_rotr64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
-	MS_BUILTIN(_byteswap_ushort,       make_function_1_type(type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(_byteswap_ulong,        make_function_1_type(type_unsigned_long,  type_unsigned_long));
-	MS_BUILTIN(_byteswap_uint64,       make_function_1_type(type_unsigned_int64, type_unsigned_int64));
-
-	MS_BUILTIN(__debugbreak,            make_function_0_type(type_void));
-	MS_BUILTIN(_ReturnAddress,          make_function_0_type(type_void_ptr));
-	MS_BUILTIN(_AddressOfReturnAddress, make_function_0_type(type_void_ptr));
-	MS_BUILTIN(__popcount,              make_function_1_type(type_unsigned_int, type_unsigned_int));
-
-	/* x86/x64 only */
-	MS_BUILTIN(_enable,                make_function_0_type(type_void));
-	MS_BUILTIN(_disable,               make_function_0_type(type_void));
-	MS_BUILTIN(__inbyte,               make_function_1_type(type_unsigned_char, type_unsigned_short));
-	MS_BUILTIN(__inword,               make_function_1_type(type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(__indword,              make_function_1_type(type_unsigned_long, type_unsigned_short));
-	MS_BUILTIN(__outbyte,              make_function_2_type(type_void, type_unsigned_short, type_unsigned_char));
-	MS_BUILTIN(__outword,              make_function_2_type(type_void, type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(__outdword,             make_function_2_type(type_void, type_unsigned_short, type_unsigned_long));
-	MS_BUILTIN(__ud2,                  make_function_0_type_noreturn(type_void));
-	MS_BUILTIN(_BitScanForward,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
-	MS_BUILTIN(_BitScanReverse,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
-	MS_BUILTIN(_InterlockedExchange,   make_function_2_type(type_long, type_long_ptr, type_long));
-	MS_BUILTIN(_InterlockedExchange64, make_function_2_type(type_int64, type_int64_ptr, type_int64));
-
-	if (machine_size <= 32) {
-		MS_BUILTIN(__readeflags,           make_function_0_type(type_unsigned_int));
-		MS_BUILTIN(__writeeflags,          make_function_1_type(type_void, type_unsigned_int));
-	} else {
-		MS_BUILTIN(__readeflags,           make_function_0_type(type_unsigned_int64));
-		MS_BUILTIN(__writeeflags,          make_function_1_type(type_void, type_unsigned_int64));
-	}
-
-#undef MS_BUILTIN
 }
 
 /**

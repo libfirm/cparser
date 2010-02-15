@@ -288,4 +288,53 @@ static inline bool is_type_valid(const type_t *type)
 	return type->kind != TYPE_ERROR;
 }
 
+/**
+ * Allocate a type node of given kind and initialize all
+ * fields with zero.
+ *
+ * @param kind             type kind to allocate
+ */
+type_t *allocate_type_zero(type_kind_t kind);
+
+/**
+ * Creates a return_type (func)(void) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ */
+type_t *make_function_0_type(type_t *return_type);
+
+/**
+ * Creates a return_type (func)(argument_type) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ * @param argument_type  the argument type
+ */
+type_t *make_function_1_type(type_t *return_type, type_t *argument_type1);
+
+
+/**
+ * Creates a return_type (func)(argument_type1,argument_type2) function type
+ * if not already exists.
+ */
+type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
+                             type_t *argument_type2);
+
+/**
+ * Creates a return_type (func)(argument_type, ...) function type if not
+ * already exists.
+ *
+ * @param return_type    the return type
+ * @param argument_type  the argument type
+ */
+type_t *make_function_1_type_variadic(type_t *return_type, type_t *argument_type);
+
+/**
+ * Create a function type with n parameters
+ */
+type_t *make_function_type(type_t *return_type, int n_types,
+                           type_t *const *argument_types,
+						   decl_modifiers_t modifiers);
+
 #endif

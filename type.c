@@ -53,6 +53,44 @@ struct atomic_type_properties_t {
 };
 
 /**
+ * Returns the size of a type node.
+ *
+ * @param kind  the type kind
+ */
+static size_t get_type_struct_size(type_kind_t kind)
+{
+	static const size_t sizes[] = {
+		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
+		[TYPE_COMPLEX]         = sizeof(complex_type_t),
+		[TYPE_IMAGINARY]       = sizeof(imaginary_type_t),
+		[TYPE_BITFIELD]        = sizeof(bitfield_type_t),
+		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
+		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
+		[TYPE_ENUM]            = sizeof(enum_type_t),
+		[TYPE_FUNCTION]        = sizeof(function_type_t),
+		[TYPE_POINTER]         = sizeof(pointer_type_t),
+		[TYPE_ARRAY]           = sizeof(array_type_t),
+		[TYPE_BUILTIN]         = sizeof(builtin_type_t),
+		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
+		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
+	};
+	assert(lengthof(sizes) == (int)TYPE_TYPEOF + 1);
+	assert(kind <= TYPE_TYPEOF);
+	assert(sizes[kind] != 0);
+	return sizes[kind];
+}
+
+type_t *allocate_type_zero(type_kind_t kind)
+{
+	size_t  size = get_type_struct_size(kind);
+	type_t *res  = obstack_alloc(type_obst, size);
+	memset(res, 0, size);
+	res->base.kind = kind;
+
+	return res;
+}
+
+/**
  * Properties of atomic types.
  */
 static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
@@ -753,34 +791,6 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 }
 
 /**
- * Return the size of a type AST node.
- *
- * @param type  The type.
- */
-static size_t get_type_struct_size(const type_t *type)
-{
-	switch(type->kind) {
-	case TYPE_ATOMIC:          return sizeof(atomic_type_t);
-	case TYPE_COMPLEX:         return sizeof(complex_type_t);
-	case TYPE_IMAGINARY:       return sizeof(imaginary_type_t);
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  return sizeof(compound_type_t);
-	case TYPE_ENUM:            return sizeof(enum_type_t);
-	case TYPE_FUNCTION:        return sizeof(function_type_t);
-	case TYPE_POINTER:         return sizeof(pointer_type_t);
-	case TYPE_REFERENCE:       return sizeof(reference_type_t);
-	case TYPE_ARRAY:           return sizeof(array_type_t);
-	case TYPE_BUILTIN:         return sizeof(builtin_type_t);
-	case TYPE_TYPEDEF:         return sizeof(typedef_type_t);
-	case TYPE_TYPEOF:          return sizeof(typeof_type_t);
-	case TYPE_BITFIELD:        return sizeof(bitfield_type_t);
-	case TYPE_ERROR:           panic("error type found");
-	case TYPE_INVALID:         panic("invalid type found");
-	}
-	panic("unknown type found");
-}
-
-/**
  * Duplicates a type.
  *
  * @param type  The type to copy.
@@ -790,7 +800,7 @@ static size_t get_type_struct_size(const type_t *type)
  */
 type_t *duplicate_type(const type_t *type)
 {
-	size_t size = get_type_struct_size(type);
+	size_t size = get_type_struct_size(type->kind);
 
 	type_t *copy = obstack_alloc(type_obst, size);
 	memcpy(copy, type, size);
@@ -1725,10 +1735,6 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 	return member;
 }
 
-/**
- * Finish the construction of a struct type by calculating its size, offsets,
- * alignment.
- */
 void layout_struct_type(compound_type_t *type)
 {
 	assert(type->compound != NULL);
@@ -1805,10 +1811,6 @@ void layout_struct_type(compound_type_t *type)
 	compound->layouted  = true;
 }
 
-/**
- * Finish the construction of an union type by calculating
- * its size and alignment.
- */
 void layout_union_type(compound_type_t *type)
 {
 	assert(type->compound != NULL);
@@ -1841,6 +1843,89 @@ void layout_union_type(compound_type_t *type)
 
 	compound->size      = size;
 	compound->alignment = alignment;
+}
+
+static function_parameter_t *allocate_parameter(type_t *const type)
+{
+	function_parameter_t *const param
+		= obstack_alloc(type_obst, sizeof(*param));
+	memset(param, 0, sizeof(*param));
+	param->type = type;
+	return param;
+}
+
+type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
+                             type_t *argument_type2)
+{
+	function_parameter_t *const parameter2 = allocate_parameter(argument_type2);
+	function_parameter_t *const parameter1 = allocate_parameter(argument_type1);
+	parameter1->next = parameter2;
+
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = parameter1;
+	type->function.linkage     = LINKAGE_C;
+
+	return identify_new_type(type);
+}
+
+type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
+{
+	function_parameter_t *const parameter = allocate_parameter(argument_type);
+
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = parameter;
+	type->function.linkage     = LINKAGE_C;
+
+	return identify_new_type(type);
+}
+
+type_t *make_function_1_type_variadic(type_t *return_type,
+                                      type_t *argument_type)
+{
+	function_parameter_t *const parameter = allocate_parameter(argument_type);
+
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = parameter;
+	type->function.variadic    = true;
+	type->function.linkage     = LINKAGE_C;
+
+	return identify_new_type(type);
+}
+
+type_t *make_function_0_type(type_t *return_type)
+{
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.parameters  = NULL;
+	type->function.linkage     = LINKAGE_C;
+
+	return identify_new_type(type);
+}
+
+type_t *make_function_type(type_t *return_type, int n_types,
+                           type_t *const *argument_types,
+						   decl_modifiers_t modifiers)
+{
+	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
+	type->function.return_type = return_type;
+	type->function.modifiers  |= modifiers;
+	type->function.linkage     = LINKAGE_C;
+
+	function_parameter_t *last  = NULL;
+	for (int i = 0; i < n_types; ++i) {
+		function_parameter_t *parameter = allocate_parameter(argument_types[i]);
+		if (last == NULL) {
+			type->function.parameters = parameter;
+		} else {
+			last->next = parameter;
+		}
+		last = parameter;
+	}
+
+	return identify_new_type(type);
 }
 
 /**

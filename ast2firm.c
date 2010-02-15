@@ -926,7 +926,7 @@ static bool is_main(entity_t *entity)
 /**
  * Creates an entity representing a function.
  *
- * @param declaration  the function declaration
+ * @param entity       the function declaration/definition
  * @param owner_type   the owner type of this function, NULL
  *                     for global functions
  */
@@ -935,6 +935,13 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	assert(entity->kind == ENTITY_FUNCTION);
 	if (entity->function.irentity != NULL) {
 		return entity->function.irentity;
+	}
+
+	entity_t *original_entity = entity;
+	if (entity->function.btk != bk_none) {
+		entity = get_builtin_replacement(entity);
+		if (entity == NULL)
+			return NULL;
 	}
 
 	if (is_main(entity)) {
@@ -951,7 +958,6 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 	symbol_t *symbol = entity->base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
-
 
 	/* already an entity defined? */
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
@@ -1031,8 +1037,8 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	entitymap_insert(&entitymap, symbol, irentity);
 
 entity_created:
-	entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
-	entity->function.irentity = irentity;
+	original_entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
+	original_entity->function.irentity = irentity;
 
 	return irentity;
 }
@@ -1445,19 +1451,23 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	/* make sure the type is constructed */
 	(void) get_ir_type(type);
 
-	/* for gcc compatibility we have to produce (dummy) addresses for some
-	 * builtins */
 	if (entity->kind == ENTITY_FUNCTION && entity->function.btk != bk_none) {
-		if (warning.other) {
-			warningf(&ref->base.source_position,
-					"taking address of builtin '%Y'", ref->entity->base.symbol);
+		ir_entity *irentity = get_function_entity(entity, NULL);
+		/* for gcc compatibility we have to produce (dummy) addresses for some
+		 * builtins which don't have entities */
+		if (irentity == NULL) {
+			if (warning.other) {
+				warningf(&ref->base.source_position,
+						"taking address of builtin '%Y'",
+						ref->entity->base.symbol);
+			}
+
+			/* simply create a NULL pointer */
+			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
+			ir_node  *res  = new_Const_long(mode, 0);
+
+			return res;
 		}
-
-		/* simply create a NULL pointer */
-		ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
-		ir_node  *res  = new_Const_long(mode, 0);
-
-		return res;
 	}
 
 	switch ((declaration_kind_t) entity->declaration.kind) {
@@ -1606,7 +1616,8 @@ static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t
  * @param function_type  the function type for the GNU builtin routine
  * @param db             debug info
  */
-static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op, type_t *function_type, dbg_info *db)
+static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op,
+                                         type_t *function_type, dbg_info *db)
 {
 	ir_node *in[1];
 	in[0] = expression_to_firm(op);
@@ -1619,7 +1630,6 @@ static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op,
 	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
 }
 
-
 /**
  * Generate an binary-void-return builtin.
  *
@@ -1629,8 +1639,9 @@ static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op,
  * @param function_type  the function type for the GNU builtin routine
  * @param db             debug info
  */
-static ir_node *gen_binary_builtin_mem(ir_builtin_kind kind, expression_t *op1, expression_t *op2,
-									   type_t *function_type, dbg_info *db)
+static ir_node *gen_binary_builtin_mem(ir_builtin_kind kind, expression_t *op1,
+                                       expression_t *op2, type_t *function_type,
+									   dbg_info *db)
 {
 	ir_node *in[2];
 	in[0] = expression_to_firm(op1);
@@ -1848,13 +1859,13 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		entity_t                     *entity = ref->entity;
 
 		if (entity->kind == ENTITY_FUNCTION) {
-			if (entity->function.btk != bk_none) {
-				return process_builtin_call(call);
-			}
-
 			ir_entity *irentity = entity->function.irentity;
 			if (irentity == NULL)
 				irentity = get_function_entity(entity, NULL);
+
+			if (irentity == NULL && entity->function.btk != bk_none) {
+				return process_builtin_call(call);
+			}
 
 			if (irentity == rts_entities[rts_alloca]) {
 				/* handle alloca() call */

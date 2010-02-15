@@ -25,6 +25,7 @@
 #include "entity.h"
 #include "attribute.h"
 #include <libfirm/firm_types.h>
+#include "builtins.h"
 
 typedef enum {
 	ENTITY_INVALID,
@@ -240,62 +241,6 @@ struct parameter_t {
 	} v;
 };
 
-/**
- * GNU builtin or MS intrinsic functions.
- */
-typedef enum builtin_kind_t {
-	bk_none = 0,                   /**< no builtin */
-	bk_gnu_builtin_alloca,         /**< GNU __builtin_alloca */
-	bk_gnu_builtin_huge_val,       /**< GNU __builtin_huge_val */
-	bk_gnu_builtin_huge_valf,      /**< GNU __builtin_huge_valf */
-	bk_gnu_builtin_huge_vall,      /**< GNU __builtin_huge_vall */
-	bk_gnu_builtin_inf,            /**< GNU __builtin_inf */
-	bk_gnu_builtin_inff,           /**< GNU __builtin_inff */
-	bk_gnu_builtin_infl,           /**< GNU __builtin_infl */
-	bk_gnu_builtin_nan,            /**< GNU __builtin_nan */
-	bk_gnu_builtin_nanf,           /**< GNU __builtin_nanf */
-	bk_gnu_builtin_nanl,           /**< GNU __builtin_nanl */
-	bk_gnu_builtin_va_end,         /**< GNU __builtin_va_end */
-	bk_gnu_builtin_expect,         /**< GNU __builtin_expect */
-	bk_gnu_builtin_return_address, /**< GNU __builtin_return_address */
-	bk_gnu_builtin_frame_address,  /**< GNU __builtin_frame_address */
-	bk_gnu_builtin_ffs,            /**< GNU __builtin_ffs */
-	bk_gnu_builtin_clz,            /**< GNU __builtin_clz */
-	bk_gnu_builtin_ctz,            /**< GNU __builtin_ctz */
-	bk_gnu_builtin_popcount,       /**< GNU __builtin_popcount */
-	bk_gnu_builtin_parity,         /**< GNU __builtin_parity */
-	bk_gnu_builtin_prefetch,       /**< GNU __builtin_prefetch */
-	bk_gnu_builtin_trap,           /**< GNU __builtin_trap */
-
-	bk_ms_rotl,                    /**< MS _rotl */
-	bk_ms_rotr,                    /**< MS _rotr */
-	bk_ms_rotl64,                  /**< MS _rotl64 */
-	bk_ms_rotr64,                  /**< MS _rotr64 */
-	bk_ms_byteswap_ushort,         /**< MS _byteswap_ushort */
-	bk_ms_byteswap_ulong,          /**< MS _byteswap_ulong */
-	bk_ms_byteswap_uint64,         /**< MS _byteswap_uint64 */
-
-	bk_ms__debugbreak,             /**< MS __debugbreak */
-	bk_ms_ReturnAddress,           /**< MS _ReturnAddress */
-	bk_ms_AddressOfReturnAddress,  /**< MS _AddressOfReturnAddress */
-	bk_ms__popcount,               /**< MS __popcount */
-	bk_ms_enable,                  /**< MS _enable */
-	bk_ms_disable,                 /**< MS _disable */
-	bk_ms__inbyte,                 /**< MS __inbyte */
-	bk_ms__inword,                 /**< MS __inword */
-	bk_ms__indword,                /**< MS __indword */
-	bk_ms__outbyte,                /**< MS __outbyte */
-	bk_ms__outword,                /**< MS __outword */
-	bk_ms__outdword,               /**< MS __outdword */
-	bk_ms__ud2,                    /**< MS __ud2 */
-	bk_ms_BitScanForward,          /**< MS _BitScanForward */
-	bk_ms_BitScanReverse,          /**< MS _BitScanReverse */
-	bk_ms_InterlockedExchange,     /**< MS _InterlockedExchange */
-	bk_ms_InterlockedExchange64,   /**< MS _InterlockedExchange64 */
-	bk_ms__readeflags,             /**< MS __readflags */
-	bk_ms__writeeflags,            /**< MS __writeflags */
-} builtin_kind_t;
-
 struct function_t {
 	declaration_t  base;
 	bool           is_inline     : 1;
@@ -348,5 +293,7 @@ static inline bool is_declaration(const entity_t *entity)
 }
 
 const char *get_entity_kind_name(entity_kind_t kind);
+
+entity_t *allocate_entity_zero(entity_kind_t kind);
 
 #endif

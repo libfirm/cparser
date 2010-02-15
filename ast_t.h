@@ -676,4 +676,15 @@ static inline bool is_invalid_statement(statement_t *statement)
 
 #define allocate_ast(size)                 _allocate_ast(size)
 
+/**
+ * Allocate an AST node with given size and
+ * initialize all fields with zero.
+ */
+static inline void *allocate_ast_zero(size_t size)
+{
+	void *res = allocate_ast(size);
+	memset(res, 0, size);
+	return res;
+}
+
 #endif

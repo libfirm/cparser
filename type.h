@@ -211,7 +211,16 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 
 const char *get_atomic_kind_name(atomic_type_kind_t kind);
 
+/**
+ * Finish the construction of a struct type by calculating its size, offsets,
+ * alignment.
+ */
 void layout_struct_type(compound_type_t *type);
+
+/**
+ * Finish the construction of an union type by calculating
+ * its size and alignment.
+ */
 void layout_union_type(compound_type_t *type);
 
 #endif

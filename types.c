@@ -44,7 +44,9 @@ type_t *type_unsigned_long;
 type_t *type_void;
 
 type_t *type_char_ptr;
+type_t *type_char_ptr_restrict;
 type_t *type_const_char_ptr;
+type_t *type_const_char_ptr_restrict;
 type_t *type_int_ptr;
 type_t *type_long_long_ptr;
 type_t *type_long_ptr;
@@ -52,6 +54,8 @@ type_t *type_unsigned_long_ptr;
 type_t *type_short_ptr;
 type_t *type_signed_char_ptr;
 type_t *type_void_ptr;
+type_t *type_const_void_ptr;
+type_t *type_void_ptr_restrict;
 
 type_t *type_char_ptr_ptr;
 
@@ -143,7 +147,10 @@ void init_basic_types(void)
 
 	/* pointer types */
 	type_void_ptr           = make_pointer_type(type_void,              TYPE_QUALIFIER_NONE);
+	type_const_void_ptr     = make_pointer_type(type_void,              TYPE_QUALIFIER_CONST);
+	type_void_ptr_restrict  = make_pointer_type(type_void,              TYPE_QUALIFIER_RESTRICT);
 	type_char_ptr           = make_pointer_type(type_char,              TYPE_QUALIFIER_NONE);
+	type_char_ptr_restrict  = make_pointer_type(type_char,              TYPE_QUALIFIER_RESTRICT);
 	type_signed_char_ptr    = make_pointer_type(type_signed_char,       TYPE_QUALIFIER_NONE);
 	type_short_ptr          = make_pointer_type(type_short,             TYPE_QUALIFIER_NONE);
 	type_int_ptr            = make_pointer_type(type_int,               TYPE_QUALIFIER_NONE);
@@ -156,6 +163,7 @@ void init_basic_types(void)
 	/* const character types */
 	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);
 	type_const_char_ptr     = make_pointer_type(type_const_char,        TYPE_QUALIFIER_NONE);
+	type_const_char_ptr_restrict = make_pointer_type(type_const_char,        TYPE_QUALIFIER_RESTRICT);
 
 	/* other types */
 	type_intmax_t    = type_long_long;
