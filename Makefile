@@ -161,4 +161,4 @@ build/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf builtins.h build/* $(GOAL) .depend
+	$(Q)rm -rf gen_builtins.h build/* $(GOAL) .depend
