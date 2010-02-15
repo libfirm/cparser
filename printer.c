@@ -112,28 +112,25 @@ void print_to_obstack(struct obstack *new_obst)
 static char *buffer_pos;
 static char *buffer_end;
 
-static void print_string_buffer(const char *str)
-{
-	for (const char *c = str; *c != '\0'; ++c) {
-		if (buffer_pos == buffer_end) {
-			return;
-		}
-		*buffer_pos++ = *c;
-	}
-}
-
-static void print_vformat_buffer(const char *format, va_list ap)
-{
-	size_t size    = buffer_end - buffer_pos + 1;
-	int    written = vsnprintf(buffer_pos, size, format, ap);
-	buffer_pos    += written;
-}
-
 static inline void buffer_add_char(int c)
 {
 	if (buffer_pos == buffer_end)
 		return;
 	*buffer_pos++ = c;
+}
+
+static void print_string_buffer(const char *str)
+{
+	for (const char *c = str; *c != '\0'; ++c) {
+		buffer_add_char(*c);
+	}
+}
+
+static void print_vformat_buffer(const char *format, va_list ap)
+{
+	size_t size    = buffer_end - buffer_pos;
+	size_t written = (size_t) vsnprintf(buffer_pos, size, format, ap);
+	buffer_pos    += written < size ? written : size;
 }
 
 static void print_char_buffer(wchar_rep_t c)
@@ -159,7 +156,7 @@ static void print_char_buffer(wchar_rep_t c)
 void print_to_buffer(char *buffer, size_t buffer_size)
 {
 	buffer_pos = buffer;
-	buffer_end = buffer + buffer_size - 1;
+	buffer_end = buffer + buffer_size - 2;
 
 	print_string  = print_string_buffer;
 	print_vformat = print_vformat_buffer;
