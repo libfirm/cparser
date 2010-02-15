@@ -218,7 +218,7 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 		panic("filename too long");
 }
 
-#include "builtins.h"
+#include "gen_builtins.h"
 
 static translation_unit_t *do_parsing(FILE *const in, const char *const input_name)
 {
