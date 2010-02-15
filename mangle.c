@@ -278,53 +278,56 @@ ident *create_name_win32(entity_t *entity)
 	assert(is_declaration(entity));
 
 	if (entity->kind == ENTITY_FUNCTION) {
+		type_t *type = skip_typeref(entity->declaration.type);
+		assert(is_type_function(type));
+
 		if (entity->declaration.modifiers & DM_DLLIMPORT)
 			/* add prefix for imported symbols */
 			obstack_printf(o, "__imp_");
 
-		cc_kind_t cc = entity->declaration.type->function.calling_convention;
+		cc_kind_t cc = type->function.calling_convention;
 
 		/* calling convention prefix */
 		switch (cc) {
-			case CC_DEFAULT:
-			case CC_CDECL:
-			case CC_STDCALL:  obstack_1grow(o, '_'); break;
-			case CC_FASTCALL: obstack_1grow(o, '@'); break;
-			default:          panic("unhandled calling convention");
+		case CC_DEFAULT:
+		case CC_CDECL:
+		case CC_STDCALL:  obstack_1grow(o, '_'); break;
+		case CC_FASTCALL: obstack_1grow(o, '@'); break;
+		default:          panic("unhandled calling convention");
 		}
 
-		switch (entity->declaration.type->function.linkage) {
-			case LINKAGE_INVALID:
-				panic("linkage type of function is invalid");
+		switch (type->function.linkage) {
+		case LINKAGE_INVALID:
+			panic("linkage type of function is invalid");
 
-			case LINKAGE_C:
-				obstack_printf(o, "%s", entity->base.symbol->string);
-				break;
+		case LINKAGE_C:
+			obstack_printf(o, "%s", entity->base.symbol->string);
+			break;
 
-			case LINKAGE_CXX:
-				mangle_entity(entity);
-				break;
+		case LINKAGE_CXX:
+			mangle_entity(entity);
+			break;
 		}
 
 		/* calling convention suffix */
 		switch (cc) {
-			case CC_DEFAULT:
-			case CC_CDECL:
-				break;
+		case CC_DEFAULT:
+		case CC_CDECL:
+			break;
 
-			case CC_STDCALL:
-			case CC_FASTCALL: {
-				ir_type  *irtype = get_ir_type(entity->declaration.type);
-				unsigned size    = 0;
-				for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
-					size += get_type_size_bytes(get_method_param_type(irtype, i));
-				}
-				obstack_printf(o, "@%u", size);
-				break;
+		case CC_STDCALL:
+		case CC_FASTCALL: {
+			ir_type  *irtype = get_ir_type(entity->declaration.type);
+			unsigned size    = 0;
+			for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
+				size += get_type_size_bytes(get_method_param_type(irtype, i));
 			}
+			obstack_printf(o, "@%u", size);
+			break;
+		}
 
-			default:
-				panic("unhandled calling convention");
+		default:
+			panic("unhandled calling convention");
 		}
 	} else {
 		obstack_printf(o, "_%s", entity->base.symbol->string);
@@ -344,12 +347,14 @@ ident *create_name_linux_elf(entity_t *entity)
 	bool needs_mangling = false;
 
 	if (entity->kind == ENTITY_FUNCTION) {
-		switch (entity->declaration.type->function.linkage) {
+		type_t *type = skip_typeref(entity->declaration.type);
+		assert(is_type_function(type));
+		switch (type->function.linkage) {
 			case LINKAGE_INVALID:
 				panic("linkage type of function is invalid");
 
-			case LINKAGE_C:       break;
-			case LINKAGE_CXX:     needs_mangling = true; break;
+			case LINKAGE_C:   break;
+			case LINKAGE_CXX: needs_mangling = true; break;
 		}
 	}
 
@@ -369,8 +374,12 @@ ident *create_name_linux_elf(entity_t *entity)
  */
 ident *create_name_macho(entity_t *entity)
 {
-	if (entity->kind == ENTITY_FUNCTION && entity->declaration.type->function.linkage == LINKAGE_INVALID)
-		panic("linkage type of function is invalid");
+	if (entity->kind == ENTITY_FUNCTION) {
+		type_t *type = skip_typeref(entity->declaration.type);
+		assert(is_type_function(type));
+		if (type->function.linkage == LINKAGE_INVALID)
+			panic("linkage type of function is invalid");
+	}
 
 	obstack_printf(&obst, "_%s", entity->base.symbol->string);
 	return make_id_from_obst();

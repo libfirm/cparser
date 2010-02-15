@@ -862,11 +862,7 @@ int main(int argc, char **argv)
 				char const *orig_opt;
 				GET_ARG_AFTER(orig_opt, "-f");
 
-				if (strstart(orig_opt, "align-loops=") ||
-				    strstart(orig_opt, "align-jumps=") ||
-				    strstart(orig_opt, "align-functions=")) {
-					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
-				} else if (strstart(orig_opt, "input-charset=")) {
+				if (strstart(orig_opt, "input-charset=")) {
 					char const* const encoding = strchr(orig_opt, '=') + 1;
 					select_input_encoding(encoding);
 				} else if (streq(orig_opt, "verbose-asm")) {
@@ -896,11 +892,19 @@ int main(int argc, char **argv)
 						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "unsigned-char")) {
 						char_is_signed = !truth_value;
+					} else if (truth_value == false &&
+					           streq(opt, "asynchronous-unwind-tables")) {
+					    /* nothing todo, a gcc feature which we don't support
+					     * anyway was deactivated */
+					} else if (strstart(orig_opt, "align-loops=") ||
+							strstart(orig_opt, "align-jumps=") ||
+							strstart(orig_opt, "align-functions=")) {
+						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
 					           streq(opt, "expensive-optimizations") ||
 					           streq(opt, "common")                  ||
-					           streq(opt, "PIC")                     ||
+					           streq(opt, "optimize-sibling-calls")  ||
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
 					           streq(opt, "align-functions")) {
@@ -1006,6 +1010,12 @@ int main(int argc, char **argv)
 					set_be_option("omitleaffp=0");
 				} else if (streq(opt, "rtd")) {
 					default_calling_convention = CC_STDCALL;
+				} else if (strstart(opt, "regparm=")) {
+					fprintf(stderr, "error: regparm convention not supported yet\n");
+					argument_errors = true;
+				} else if (streq(opt, "soft-float")) {
+					fprintf(stderr, "error: software floatingpoint not supported yet\n");
+					argument_errors = true;
 				} else {
 					char *endptr;
 					long int value = strtol(opt, &endptr, 10);
