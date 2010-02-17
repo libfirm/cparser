@@ -1248,7 +1248,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	ident     *const id     = id_unique(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_local);
+	set_entity_visibility(entity, ir_visibility_private);
 	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 
 	ir_type *const elem_type = ir_type_const_char;
@@ -1281,7 +1281,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 static ir_node *string_literal_to_firm(
 		const string_literal_expression_t* literal)
 {
-	return string_to_firm(&literal->base.source_position, "Lstr.%u",
+	return string_to_firm(&literal->base.source_position, "str.%u",
 	                      &literal->value);
 }
 
@@ -1298,10 +1298,10 @@ static ir_node *wide_string_literal_to_firm(
 	dbg_info *const dbgi       = get_dbg_info(&literal->base.source_position);
 	ir_type *const type        = new_type_array(1, elem_type);
 
-	ident     *const id     = id_unique("Lstr.%u");
+	ident     *const id     = id_unique("str.%u");
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
 	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_local);
+	set_entity_visibility(entity, ir_visibility_private);
 	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 
 	ir_mode *const mode      = get_type_mode(elem_type);
@@ -4279,7 +4279,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
 	set_entity_ld_ident(init_entity, id);
 
-	set_entity_visibility(init_entity, ir_visibility_local);
+	set_entity_visibility(init_entity, ir_visibility_private);
 	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
 
 	set_entity_initializer(init_entity, irinitializer);
