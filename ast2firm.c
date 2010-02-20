@@ -4140,7 +4140,6 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	}
 	case IR_INITIALIZER_CONST: {
 		ir_node *node     = get_initializer_const_value(initializer);
-		ir_mode *mode     = get_irn_mode(node);
 		ir_type *ent_type = get_entity_type(entity);
 
 		/* is it a bitfield type? */
@@ -4150,7 +4149,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			return;
 		}
 
-		assert(get_type_mode(type) == mode);
+		assert(get_type_mode(type) == get_irn_mode(node));
 		ir_node *mem    = get_store();
 		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
@@ -4159,7 +4158,6 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	}
 	case IR_INITIALIZER_TARVAL: {
 		tarval  *tv       = get_initializer_tarval_value(initializer);
-		ir_mode *mode     = get_tarval_mode(tv);
 		ir_node *cnst     = new_d_Const(dbgi, tv);
 		ir_type *ent_type = get_entity_type(entity);
 
@@ -4170,7 +4168,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			return;
 		}
 
-		assert(get_type_mode(type) == mode);
+		assert(get_type_mode(type) == get_tarval_mode(tv));
 		ir_node *mem    = get_store();
 		ir_node *store  = new_d_Store(dbgi, mem, base_addr, cnst, cons_none);
 		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
