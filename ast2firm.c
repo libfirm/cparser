@@ -650,7 +650,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 	ir_mode *const mode    = mode_int;
 	tarval  *const one     = get_mode_one(mode);
-	tarval  *      tv_next = get_tarval_null(mode);
+	tarval  *      tv_next = get_mode_null(mode);
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
