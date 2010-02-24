@@ -29,7 +29,6 @@
 #include "type.h"
 #include "entity_t.h"
 #include "adt/obst.h"
-#include "target_value.h"
 
 /** The AST obstack contains all data that must stay in the AST. */
 extern struct obstack ast_obstack;
