@@ -218,47 +218,50 @@ static void semantic_comparison(binary_expression_t *expression);
 	TYPE_QUALIFIERS         \
 	TYPE_SPECIFIERS
 
-#define EXPRESSION_START           \
-	case '!':                        \
-	case '&':                        \
-	case '(':                        \
-	case '*':                        \
-	case '+':                        \
-	case '-':                        \
-	case '~':                        \
-	case T_ANDAND:                   \
-	case T_CHARACTER_CONSTANT:       \
-	case T_FLOATINGPOINT:            \
-	case T_INTEGER:                  \
-	case T_MINUSMINUS:               \
-	case T_PLUSPLUS:                 \
-	case T_STRING_LITERAL:           \
-	case T_WIDE_CHARACTER_CONSTANT:  \
-	case T_WIDE_STRING_LITERAL:      \
-	case T___FUNCDNAME__:            \
-	case T___FUNCSIG__:              \
-	case T___FUNCTION__:             \
-	case T___PRETTY_FUNCTION__:      \
-	case T___alignof__:              \
-	case T___builtin_classify_type:  \
-	case T___builtin_constant_p:     \
-	case T___builtin_isgreater:      \
-	case T___builtin_isgreaterequal: \
-	case T___builtin_isless:         \
-	case T___builtin_islessequal:    \
-	case T___builtin_islessgreater:  \
-	case T___builtin_isunordered:    \
-	case T___builtin_offsetof:       \
-	case T___builtin_va_arg:         \
-	case T___builtin_va_start:       \
-	case T___builtin_va_copy:        \
-	case T___func__:                 \
-	case T___noop:                   \
-	case T__assume:                  \
-	case T_delete:                   \
-	case T_false:                    \
-	case T_sizeof:                   \
-	case T_throw:                    \
+#define EXPRESSION_START              \
+	case '!':                         \
+	case '&':                         \
+	case '(':                         \
+	case '*':                         \
+	case '+':                         \
+	case '-':                         \
+	case '~':                         \
+	case T_ANDAND:                    \
+	case T_CHARACTER_CONSTANT:        \
+	case T_INTEGER:                   \
+	case T_INTEGER_OCTAL:             \
+	case T_INTEGER_HEXADECIMAL:       \
+	case T_FLOATINGPOINT:             \
+	case T_FLOATINGPOINT_HEXADECIMAL: \
+	case T_MINUSMINUS:                \
+	case T_PLUSPLUS:                  \
+	case T_STRING_LITERAL:            \
+	case T_WIDE_CHARACTER_CONSTANT:   \
+	case T_WIDE_STRING_LITERAL:       \
+	case T___FUNCDNAME__:             \
+	case T___FUNCSIG__:               \
+	case T___FUNCTION__:              \
+	case T___PRETTY_FUNCTION__:       \
+	case T___alignof__:               \
+	case T___builtin_classify_type:   \
+	case T___builtin_constant_p:      \
+	case T___builtin_isgreater:       \
+	case T___builtin_isgreaterequal:  \
+	case T___builtin_isless:          \
+	case T___builtin_islessequal:     \
+	case T___builtin_islessgreater:   \
+	case T___builtin_isunordered:     \
+	case T___builtin_offsetof:        \
+	case T___builtin_va_arg:          \
+	case T___builtin_va_start:        \
+	case T___builtin_va_copy:         \
+	case T___func__:                  \
+	case T___noop:                    \
+	case T__assume:                   \
+	case T_delete:                    \
+	case T_false:                     \
+	case T_sizeof:                    \
+	case T_throw:                     \
 	case T_true:
 
 /**
