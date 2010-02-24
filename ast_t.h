@@ -29,6 +29,7 @@
 #include "type.h"
 #include "entity_t.h"
 #include "adt/obst.h"
+#include "target_value.h"
 
 /** The AST obstack contains all data that must stay in the AST. */
 extern struct obstack ast_obstack;
@@ -66,9 +67,15 @@ typedef enum expression_kind_t {
 	EXPR_INVALID,
 	EXPR_REFERENCE,
 	EXPR_REFERENCE_ENUM_VALUE,
-	EXPR_CONST,
-	EXPR_CHARACTER_CONSTANT,
-	EXPR_WIDE_CHARACTER_CONSTANT,
+	EXPR_LITERAL_BOOLEAN,
+	EXPR_LITERAL_INTEGER,
+	EXPR_LITERAL_INTEGER_OCTAL,
+	EXPR_LITERAL_INTEGER_HEXADECIMAL,
+	EXPR_LITERAL_FLOATINGPOINT,
+	EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL,
+	EXPR_LITERAL_CHARACTER,
+	EXPR_LITERAL_WIDE_CHARACTER,
+	EXPR_LITERAL_MS_NOOP, /**< MS __noop extension */
 	EXPR_STRING_LITERAL,
 	EXPR_WIDE_STRING_LITERAL,
 	EXPR_COMPOUND_LITERAL,
@@ -226,6 +233,17 @@ typedef enum funcname_kind_t {
 	EXPR_UNARY_CASES_MANDATORY \
 	EXPR_UNARY_CASES_OPTIONAL
 
+#define EXPR_LITERAL_CASES                        \
+	case EXPR_LITERAL_BOOLEAN:                    \
+	case EXPR_LITERAL_INTEGER:                    \
+	case EXPR_LITERAL_INTEGER_OCTAL:              \
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:        \
+	case EXPR_LITERAL_FLOATINGPOINT:              \
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:  \
+	case EXPR_LITERAL_CHARACTER:                  \
+	case EXPR_LITERAL_WIDE_CHARACTER:             \
+	case EXPR_LITERAL_MS_NOOP:
+
 /**
  * The base class of every expression.
  */
@@ -240,18 +258,15 @@ struct expression_base_t {
 };
 
 /**
- * A constant.
+ * integer/float constants, character and string literals
  */
-struct const_expression_t {
+struct literal_expression_t {
 	expression_base_t  base;
-	union {
-		long long      int_value;
-		long double    float_value;
-		string_t       character;
-		wide_string_t  wide_character;
-	} v;
-	bool               is_ms_noop;  /**< True, if this constant is the result
-	                                     of an microsoft __noop operator */
+	string_t           value;
+	symbol_t          *suffix;
+
+	/* ast2firm data */
+	tarval            *target_value;
 };
 
 struct string_literal_expression_t {
@@ -263,11 +278,6 @@ struct funcname_expression_t {
 	expression_base_t  base;
 	funcname_kind_t    kind;
 	string_t           value;     /**< the value once assigned. */
-};
-
-struct wide_string_literal_expression_t {
-	expression_base_t  base;
-	wide_string_t      value;
 };
 
 struct compound_literal_expression_t {
@@ -395,10 +405,9 @@ struct label_address_expression_t {
 union expression_t {
 	expression_kind_t                     kind;
 	expression_base_t                     base;
-	const_expression_t                    conste;
+	literal_expression_t                  literal;
+	string_literal_expression_t           string_literal;
 	funcname_expression_t                 funcname;
-	string_literal_expression_t           string;
-	wide_string_literal_expression_t      wide_string;
 	compound_literal_expression_t         compound_literal;
 	builtin_constant_expression_t         builtin_constant;
 	builtin_types_compatible_expression_t builtin_types_compatible;
@@ -449,7 +458,7 @@ struct initializer_string_t {
 
 struct initializer_wide_string_t {
 	initializer_base_t  base;
-	wide_string_t       string;
+	string_t            string;
 };
 
 struct initializer_designator_t {

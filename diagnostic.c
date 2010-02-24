@@ -67,12 +67,6 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					fputc(*f, stderr);
 					break;
 
-				case 'C': {
-					const wint_t val = va_arg(ap, wint_t);
-					fprintf(stderr, "%lc", val);
-					break;
-				}
-
 				case 'c': {
 					const unsigned char val = (unsigned char) va_arg(ap, int);
 					fputc(val, stderr);
@@ -88,6 +82,14 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 				case 's': {
 					const char* const str = va_arg(ap, const char*);
 					fputs(str, stderr);
+					break;
+				}
+
+				case 'S': {
+					const string_t *str = va_arg(ap, const string_t*);
+					for (size_t i = 0; i < str->size; ++i) {
+						fputc(str->begin[i], stderr);
+					}
 					break;
 				}
 

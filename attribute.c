@@ -420,7 +420,7 @@ const char *get_deprecated_string(const attribute_t *attribute)
 		expression_t *expression = argument->v.expression;
 		if (expression->kind != EXPR_STRING_LITERAL)
 			return NULL;
-		return expression->string.value.begin;
+		return expression->literal.value.begin;
 	}
 	return NULL;
 }

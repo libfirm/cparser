@@ -17,8 +17,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
+#include <config.h>
+
 #include <ctype.h>
-#include <wctype.h>
 
 #include "adt/util.h"
 #include "format_check.h"
@@ -93,7 +94,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 
 static void warn_invalid_length_modifier(const source_position_t *pos,
                                          const format_length_modifier_t mod,
-                                         const wchar_rep_t conversion)
+                                         const utf32 conversion)
 {
 	warningf(pos,
 		"invalid length modifier '%s' for conversion specifier '%%%c'",
@@ -101,113 +102,51 @@ static void warn_invalid_length_modifier(const source_position_t *pos,
 	);
 }
 
-typedef struct vchar_t vchar_t;
-struct vchar_t {
-	const void *string;   /**< the string */
-	size_t     position;  /**< current position */
-	size_t     size;      /**< size of the string */
-
-	/** return the first character of the string and setthe position to 0. */
-	unsigned (*first)(vchar_t *self);
-	/** return the next character of the string */
-	unsigned (*next)(vchar_t *self);
-	/** return non_zero if the given character is a digit */
-	int (*is_digit)(unsigned vchar);
-};
-
-static unsigned string_first(vchar_t *self)
-{
-	self->position = 0;
-	const string_t *string = self->string;
-	return string->begin[0];
-}
-
-static unsigned string_next(vchar_t *self)
-{
-	++self->position;
-	const string_t *string = self->string;
-	return string->begin[self->position];
-}
-
-static int string_isdigit(unsigned vchar)
-{
-	return isdigit(vchar);
-}
-
-static unsigned wstring_first(vchar_t *self)
-{
-	self->position = 0;
-	const wide_string_t *wstring = self->string;
-	return wstring->begin[0];
-}
-
-static unsigned wstring_next(vchar_t *self)
-{
-	++self->position;
-	const wide_string_t *wstring = self->string;
-	return wstring->begin[self->position];
-}
-
-static int wstring_isdigit(unsigned vchar)
-{
-	return iswdigit(vchar);
-}
-
-static bool atend(vchar_t *self)
-{
-	return self->position + 1 == self->size;
-}
-
 /**
  * Check printf-style format.
  */
 static int internal_check_printf_format(const expression_t *fmt_expr,
-    const call_argument_t *arg, const format_spec_t *spec)
+                                        const call_argument_t *arg,
+                                        const format_spec_t *spec)
 {
-	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
+	while (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 
-	vchar_t vchar;
-	switch (fmt_expr->kind) {
-		case EXPR_STRING_LITERAL:
-			vchar.string   = &fmt_expr->string.value;
-			vchar.size     = fmt_expr->string.value.size;
-			vchar.first    = string_first;
-			vchar.next     = string_next;
-			vchar.is_digit = string_isdigit;
-			break;
-
-		case EXPR_WIDE_STRING_LITERAL:
-			vchar.string   = &fmt_expr->wide_string.value;
-			vchar.size     = fmt_expr->wide_string.value.size;
-			vchar.first    = wstring_first;
-			vchar.next     = wstring_next;
-			vchar.is_digit = wstring_isdigit;
-			break;
-
-		case EXPR_CONDITIONAL: {
-			conditional_expression_t const *const c = &fmt_expr->conditional;
-			expression_t             const *      t = c->true_expression;
-			if (t == NULL)
-				t = c->condition;
-			int const nt = internal_check_printf_format(t,                   arg, spec);
-			int const nf = internal_check_printf_format(c->false_expression, arg, spec);
-			return nt > nf ? nt : nf;
-		}
-
-		default:
-			return -1;
+	/*
+	 * gettext results in expressions like (X ? "format_string" : Y)
+	 * we assume the left part is the format string
+	 */
+	if (fmt_expr->kind == EXPR_CONDITIONAL) {
+		conditional_expression_t const *const c = &fmt_expr->conditional;
+		expression_t             const *      t = c->true_expression;
+		if (t == NULL)
+			t = c->condition;
+		int const nt = internal_check_printf_format(t,                   arg, spec);
+		int const nf = internal_check_printf_format(c->false_expression, arg, spec);
+		return nt > nf ? nt : nf;
 	}
 
+	if (fmt_expr->kind != EXPR_STRING_LITERAL
+			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
+		return -1;
+
+	const char *string = fmt_expr->literal.value.begin;
+	size_t      size   = fmt_expr->literal.value.size;
+	const char *c      = string;
+
 	const source_position_t *pos = &fmt_expr->base.source_position;
-	unsigned fmt     = vchar.first(&vchar);
 	unsigned num_fmt = 0;
-	for (; fmt != '\0'; fmt = vchar.next(&vchar)) {
+	char     fmt;
+	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
 		if (fmt != '%')
 			continue;
-		fmt = vchar.next(&vchar);
+		fmt = *(++c);
 
+		if (fmt == '\0') {
+			warningf(pos, "dangling %% in format string");
+			break;
+		}
 		if (fmt == '%')
 			continue;
 
@@ -215,15 +154,15 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
 		if (fmt == '0') {
-			fmt = vchar.next(&vchar);
+			fmt = *(++c);
 			fmt_flags |= FMT_FLAG_ZERO;
 		}
 
 		/* argument selector or minimum field width */
-		if (vchar.is_digit(fmt)) {
+		if (isdigit(fmt)) {
 			do {
-				fmt = vchar.next(&vchar);
-			} while (vchar.is_digit(fmt));
+				fmt = *(++c);
+			} while (isdigit(fmt));
 
 			/* digit string was ... */
 			if (fmt == '$') {
@@ -263,13 +202,13 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 					warningf(pos, "repeated flag '%c' in conversion specification %u", (char)fmt, num_fmt);
 				}
 				fmt_flags |= flag;
-				fmt = vchar.next(&vchar);
+				fmt = *(++c);
 			}
 break_fmt_flags:
 
 			/* minimum field width */
 			if (fmt == '*') {
-				fmt = vchar.next(&vchar);
+				fmt = *(++c);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
 					return -1;
@@ -280,17 +219,17 @@ break_fmt_flags:
 				}
 				arg = arg->next;
 			} else {
-				while (vchar.is_digit(fmt)) {
-					fmt = vchar.next(&vchar);
+				while (isdigit(fmt)) {
+					fmt = *(++c);
 				}
 			}
 		}
 
 		/* precision */
 		if (fmt == '.') {
-			fmt = vchar.next(&vchar);
+			fmt = *(++c);
 			if (fmt == '*') {
-				fmt = vchar.next(&vchar);
+				fmt = *(++c);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
 					return -1;
@@ -302,8 +241,8 @@ break_fmt_flags:
 				arg = arg->next;
 			} else {
 				/* digit string may be omitted */
-				while (vchar.is_digit(fmt)) {
-					fmt = vchar.next(&vchar);
+				while (isdigit(fmt)) {
+					fmt = *(++c);
 				}
 			}
 		}
@@ -312,9 +251,9 @@ break_fmt_flags:
 		format_length_modifier_t fmt_mod;
 		switch (fmt) {
 			case 'h':
-				fmt = vchar.next(&vchar);
+				fmt = *(++c);
 				if (fmt == 'h') {
-					fmt = vchar.next(&vchar);
+					fmt = *(++c);
 					fmt_mod = FMT_MOD_hh;
 				} else {
 					fmt_mod = FMT_MOD_h;
@@ -322,48 +261,48 @@ break_fmt_flags:
 				break;
 
 			case 'l':
-				fmt = vchar.next(&vchar);
+				fmt = *(++c);
 				if (fmt == 'l') {
-					fmt = vchar.next(&vchar);
+					fmt = *(++c);
 					fmt_mod = FMT_MOD_ll;
 				} else {
 					fmt_mod = FMT_MOD_l;
 				}
 				break;
 
-			case 'L': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_L;    break;
-			case 'j': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_j;    break;
-			case 't': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_t;    break;
-			case 'z': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_z;    break;
-			case 'q': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_q;    break;
+			case 'L': fmt = *(++c); fmt_mod = FMT_MOD_L;    break;
+			case 'j': fmt = *(++c); fmt_mod = FMT_MOD_j;    break;
+			case 't': fmt = *(++c); fmt_mod = FMT_MOD_t;    break;
+			case 'z': fmt = *(++c); fmt_mod = FMT_MOD_z;    break;
+			case 'q': fmt = *(++c); fmt_mod = FMT_MOD_q;    break;
 			/* microsoft mode */
 			case 'w':
 				if (c_mode & _MS) {
-					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_w;
+					fmt = *(++c); fmt_mod = FMT_MOD_w;
 				} else {
 					fmt_mod = FMT_MOD_NONE;
 				}
 				break;
 			case 'I':
 				if (c_mode & _MS) {
-					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_I;
+					fmt = *(++c); fmt_mod = FMT_MOD_I;
 					if (fmt == '3') {
-						fmt = vchar.next(&vchar);
+						fmt = *(++c);
 						if (fmt == '2') {
-							fmt = vchar.next(&vchar);
+							fmt = *(++c);
 							fmt_mod = FMT_MOD_I32;
 						} else {
 							/* rewind */
-							--vchar.position;
+							fmt = *(--c);
 						}
 					} else if (fmt == '6') {
-						fmt = vchar.next(&vchar);
+						fmt = *(++c);
 						if (fmt == '4') {
-							fmt = vchar.next(&vchar);
+							fmt = *(++c);
 							fmt_mod = FMT_MOD_I64;
 						} else {
 							/* rewind */
-							--vchar.position;
+							fmt = *(--c);
 						}
 					}
 				} else {
@@ -375,10 +314,6 @@ break_fmt_flags:
 				break;
 		}
 
-		if (fmt == '\0') {
-			warningf(pos, "dangling %% in format string");
-			break;
-		}
 
 		type_t            *expected_type;
 		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
@@ -529,7 +464,7 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
+				warningf(pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
 				if (arg == NULL) {
 					warningf(pos, "too few arguments for format string");
 					return -1;
@@ -577,10 +512,8 @@ eval_fmt_mod_unsigned:
 						goto next_arg;
 					}
 				}
-			} else {
-				if (get_unqualified_type(arg_skip) == expected_type_skip) {
-					goto next_arg;
-				}
+			} else if (get_unqualified_type(arg_skip) == expected_type_skip) {
+				goto next_arg;
 			}
 			if (is_type_valid(arg_skip)) {
 				warningf(pos,
@@ -591,7 +524,8 @@ eval_fmt_mod_unsigned:
 next_arg:
 		arg = arg->next;
 	}
-	if (!atend(&vchar)) {
+	assert(fmt == '\0');
+	if (c+1 < string + size) {
 		warningf(pos, "format string contains '\\0'");
 	}
 	return num_fmt;
@@ -600,7 +534,8 @@ next_arg:
 /**
  * Check printf-style format.
  */
-static void check_printf_format(call_argument_t const *arg, format_spec_t const *const spec)
+static void check_printf_format(call_argument_t const *arg,
+                                format_spec_t const *const spec)
 {
 	/* find format arg */
 	size_t idx = 0;
@@ -625,16 +560,17 @@ static void check_printf_format(call_argument_t const *arg, format_spec_t const 
 		++num_args;
 	if (num_args > (size_t)num_fmt) {
 		warningf(&fmt_expr->base.source_position,
-			"%u argument%s but only %u format specifier%s",
-			num_args, num_args != 1 ? "s" : "",
-			num_fmt,  num_fmt  != 1 ? "s" : "");
+		         "%u argument%s but only %u format specifier%s",
+		         num_args, num_args != 1 ? "s" : "",
+		         num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
 
 /**
  * Check scanf-style format.
  */
-static void check_scanf_format(const call_argument_t *arg, const format_spec_t *spec)
+static void check_scanf_format(const call_argument_t *arg,
+                               const format_spec_t *spec)
 {
 	/* find format arg */
 	unsigned idx = 0;
@@ -649,252 +585,240 @@ static void check_scanf_format(const call_argument_t *arg, const format_spec_t *
 		fmt_expr = fmt_expr->unary.value;
 	}
 
-	vchar_t vchar;
-	if (fmt_expr->kind == EXPR_WIDE_STRING_LITERAL) {
-		vchar.string   = &fmt_expr->wide_string.value;
-		vchar.size     = fmt_expr->wide_string.value.size;
-		vchar.first    = wstring_first;
-		vchar.next     = wstring_next;
-		vchar.is_digit = wstring_isdigit;
-	} else if (fmt_expr->kind == EXPR_STRING_LITERAL) {
-		vchar.string   = &fmt_expr->string.value;
-		vchar.size     = fmt_expr->string.value.size;
-		vchar.first    = string_first;
-		vchar.next     = string_next;
-		vchar.is_digit = string_isdigit;
-	} else {
+	if (fmt_expr->kind != EXPR_STRING_LITERAL
+			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
 		return;
-	}
+
+	const char *string = fmt_expr->literal.value.begin;
+	size_t      size   = fmt_expr->literal.value.size;
+	const char *c      = string;
+
 	/* find the real args */
 	for (; idx < spec->arg_idx && arg != NULL; ++idx)
 		arg = arg->next;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
-	unsigned fmt     = vchar.first(&vchar);
 	unsigned num_fmt = 0;
-	for (; fmt != '\0'; fmt = vchar.next(&vchar)) {
+	char     fmt;
+	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
 		if (fmt != '%')
 			continue;
-		fmt = vchar.next(&vchar);
-
+		fmt = *(++c);
+		if (fmt == '\0') {
+			warningf(pos, "dangling '%%' in format string");
+			break;
+		}
 		if (fmt == '%')
 			continue;
 
 		++num_fmt;
 
-		/* length modifier */
-		format_length_modifier_t fmt_mod;
+		/* look for length modifiers */
+		format_length_modifier_t fmt_mod = FMT_MOD_NONE;
 		switch (fmt) {
-			case 'h':
-				fmt = vchar.next(&vchar);
-				if (fmt == 'h') {
-					fmt = vchar.next(&vchar);
-					fmt_mod = FMT_MOD_hh;
-				} else {
-					fmt_mod = FMT_MOD_h;
-				}
-				break;
+		case 'h':
+			fmt = *(++c);
+			if (fmt == 'h') {
+				fmt = *(++c);
+				fmt_mod = FMT_MOD_hh;
+			} else {
+				fmt_mod = FMT_MOD_h;
+			}
+			break;
 
-			case 'l':
-				fmt = vchar.next(&vchar);
-				if (fmt == 'l') {
-					fmt = vchar.next(&vchar);
-					fmt_mod = FMT_MOD_ll;
-				} else {
-					fmt_mod = FMT_MOD_l;
-				}
-				break;
+		case 'l':
+			fmt = *(++c);
+			if (fmt == 'l') {
+				fmt = *(++c);
+				fmt_mod = FMT_MOD_ll;
+			} else {
+				fmt_mod = FMT_MOD_l;
+			}
+			break;
 
-			case 'L': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_L;    break;
-			case 'j': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_j;    break;
-			case 't': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_t;    break;
-			case 'z': fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_z;    break;
-			/* microsoft mode */
-			case 'w':
-				if (c_mode & _MS) {
-					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_w;
-				} else {
-					fmt_mod = FMT_MOD_NONE;
-				}
-				break;
-			case 'I':
-				if (c_mode & _MS) {
-					fmt = vchar.next(&vchar); fmt_mod = FMT_MOD_I;
-					if (fmt == '3') {
-						fmt = vchar.next(&vchar);
-						if (fmt == '2') {
-							fmt = vchar.next(&vchar);
-							fmt_mod = FMT_MOD_I32;
-						} else {
-							/* rewind */
-							--vchar.position;
-						}
-					} else if (fmt == '6') {
-						fmt = vchar.next(&vchar);
-						if (fmt == '4') {
-							fmt = vchar.next(&vchar);
-							fmt_mod = FMT_MOD_I64;
-						} else {
-							/* rewind */
-							--vchar.position;
-						}
+		case 'L': fmt = *(++c); fmt_mod = FMT_MOD_L; break;
+		case 'j': fmt = *(++c); fmt_mod = FMT_MOD_j; break;
+		case 't': fmt = *(++c); fmt_mod = FMT_MOD_t; break;
+		case 'z': fmt = *(++c); fmt_mod = FMT_MOD_z; break;
+		/* microsoft mode */
+		case 'w':
+			if (c_mode & _MS) {
+				fmt = *(++c);
+				fmt_mod = FMT_MOD_w;
+			}
+			break;
+		case 'I':
+			if (c_mode & _MS) {
+				fmt = *(++c);
+				fmt_mod = FMT_MOD_I;
+				if (fmt == '3') {
+					fmt = *(++c);
+					if (fmt == '2') {
+						fmt = *(++c);
+						fmt_mod = FMT_MOD_I32;
+					} else {
+						/* rewind */
+						fmt = *(--c);
 					}
-				} else {
-					fmt_mod = FMT_MOD_NONE;
+				} else if (fmt == '6') {
+					fmt = *(++c);
+					if (fmt == '4') {
+						fmt = *(++c);
+						fmt_mod = FMT_MOD_I64;
+					} else {
+						/* rewind */
+						fmt = *(--c);
+					}
 				}
-				break;
-			default:
-				fmt_mod = FMT_MOD_NONE;
-				break;
-		}
-
-		if (fmt == '\0') {
-			warningf(pos, "dangling %% in format string");
+			}
 			break;
 		}
 
-		type_t            *expected_type;
+		if (fmt == '\0') {
+			warningf(pos, "dangling % with conversion specififer in format string");
+			break;
+		}
+
+		type_t *expected_type;
 		switch (fmt) {
-			case 'd':
-			case 'i':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;         break;
-					case FMT_MOD_hh:   expected_type = type_signed_char; break;
-					case FMT_MOD_h:    expected_type = type_short;       break;
-					case FMT_MOD_l:    expected_type = type_long;        break;
-					case FMT_MOD_ll:   expected_type = type_long_long;   break;
-					case FMT_MOD_j:    expected_type = type_intmax_t;    break;
-					case FMT_MOD_z:    expected_type = type_ssize_t;     break;
-					case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
-					case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
-					case FMT_MOD_I32:  expected_type = type_int32;       break;
-					case FMT_MOD_I64:  expected_type = type_int64;       break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
-
-			case 'o':
-			case 'X':
-			case 'x':
-				goto eval_fmt_mod_unsigned;
-
-			case 'u':
-eval_fmt_mod_unsigned:
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_unsigned_int;       break;
-					case FMT_MOD_hh:   expected_type = type_unsigned_char;      break;
-					case FMT_MOD_h:    expected_type = type_unsigned_short;     break;
-					case FMT_MOD_l:    expected_type = type_unsigned_long;      break;
-					case FMT_MOD_ll:   expected_type = type_unsigned_long_long; break;
-					case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
-					case FMT_MOD_z:    expected_type = type_size_t;             break;
-					case FMT_MOD_t:    expected_type = type_uptrdiff_t;         break;
-					case FMT_MOD_I:    expected_type = type_size_t;             break;
-					case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
-					case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
-
-			case 'A':
-			case 'a':
-			case 'E':
-			case 'e':
-			case 'F':
-			case 'f':
-			case 'G':
-			case 'g':
-				switch (fmt_mod) {
-					case FMT_MOD_l:    /* l modifier is ignored */
-					case FMT_MOD_NONE: expected_type = type_double;      break;
-					case FMT_MOD_L:    expected_type = type_long_double; break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
-
-			case 'C':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_wchar_t;
-				break;
-
-			case 'c':
-				expected_type = type_int;
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;     break; /* TODO promoted char */
-					case FMT_MOD_l:    expected_type = type_wint_t;  break;
-					case FMT_MOD_w:    expected_type = type_wchar_t; break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
-
-			case 'S':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_wchar_t;
-				break;
-
-			case 's':
-			case '[':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_char;    break;
-					case FMT_MOD_l:    expected_type = type_wchar_t; break;
-					case FMT_MOD_w:    expected_type = type_wchar_t; break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
-
-			case 'p':
-				if (fmt_mod != FMT_MOD_NONE) {
-					warn_invalid_length_modifier(pos, fmt_mod, fmt);
-					goto next_arg;
-				}
-				expected_type = type_void_ptr;
-				break;
-
-			case 'n':
-				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;         break;
-					case FMT_MOD_hh:   expected_type = type_signed_char; break;
-					case FMT_MOD_h:    expected_type = type_short;       break;
-					case FMT_MOD_l:    expected_type = type_long;        break;
-					case FMT_MOD_ll:   expected_type = type_long_long;   break;
-					case FMT_MOD_j:    expected_type = type_intmax_t;    break;
-					case FMT_MOD_z:    expected_type = type_ssize_t;     break;
-					case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
-
-					default:
-						warn_invalid_length_modifier(pos, fmt_mod, fmt);
-						goto next_arg;
-				}
-				break;
+		case 'd':
+		case 'i':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int;         break;
+			case FMT_MOD_hh:   expected_type = type_signed_char; break;
+			case FMT_MOD_h:    expected_type = type_short;       break;
+			case FMT_MOD_l:    expected_type = type_long;        break;
+			case FMT_MOD_ll:   expected_type = type_long_long;   break;
+			case FMT_MOD_j:    expected_type = type_intmax_t;    break;
+			case FMT_MOD_z:    expected_type = type_ssize_t;     break;
+			case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
+			case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
+			case FMT_MOD_I32:  expected_type = type_int32;       break;
+			case FMT_MOD_I64:  expected_type = type_int64;       break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%C' at position %u", (wint_t)fmt, num_fmt);
-				if (arg == NULL) {
-					warningf(pos, "too few arguments for format string");
-					return;
-				}
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
+			}
+			break;
+
+		case 'o':
+		case 'X':
+		case 'x':
+		case 'u':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_unsigned_int;       break;
+			case FMT_MOD_hh:   expected_type = type_unsigned_char;      break;
+			case FMT_MOD_h:    expected_type = type_unsigned_short;     break;
+			case FMT_MOD_l:    expected_type = type_unsigned_long;      break;
+			case FMT_MOD_ll:   expected_type = type_unsigned_long_long; break;
+			case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
+			case FMT_MOD_z:    expected_type = type_size_t;             break;
+			case FMT_MOD_t:    expected_type = type_uptrdiff_t;         break;
+			case FMT_MOD_I:    expected_type = type_size_t;             break;
+			case FMT_MOD_I32:  expected_type = type_unsigned_int32;     break;
+			case FMT_MOD_I64:  expected_type = type_unsigned_int64;     break;
+
+			default:
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			break;
+
+		case 'A':
+		case 'a':
+		case 'E':
+		case 'e':
+		case 'F':
+		case 'f':
+		case 'G':
+		case 'g':
+			switch (fmt_mod) {
+			case FMT_MOD_l:    expected_type = type_double;      break;
+			case FMT_MOD_NONE: expected_type = type_float;       break;
+			case FMT_MOD_L:    expected_type = type_long_double; break;
+
+			default:
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			break;
+
+		case 'C':
+			if (fmt_mod != FMT_MOD_NONE) {
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			expected_type = type_wchar_t;
+			break;
+
+		case 'c':
+			expected_type = type_int;
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int;     break; /* TODO promoted char */
+			case FMT_MOD_l:    expected_type = type_wint_t;  break;
+			case FMT_MOD_w:    expected_type = type_wchar_t; break;
+
+			default:
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			break;
+
+		case 'S':
+			if (fmt_mod != FMT_MOD_NONE) {
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			expected_type = type_wchar_t;
+			break;
+
+		case 's':
+		case '[':
+			switch (fmt_mod) {
+				case FMT_MOD_NONE: expected_type = type_char;    break;
+				case FMT_MOD_l:    expected_type = type_wchar_t; break;
+				case FMT_MOD_w:    expected_type = type_wchar_t; break;
+
+				default:
+					warn_invalid_length_modifier(pos, fmt_mod, fmt);
+					goto next_arg;
+			}
+			break;
+
+		case 'p':
+			if (fmt_mod != FMT_MOD_NONE) {
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			expected_type = type_void_ptr;
+			break;
+
+		case 'n':
+			switch (fmt_mod) {
+			case FMT_MOD_NONE: expected_type = type_int;         break;
+			case FMT_MOD_hh:   expected_type = type_signed_char; break;
+			case FMT_MOD_h:    expected_type = type_short;       break;
+			case FMT_MOD_l:    expected_type = type_long;        break;
+			case FMT_MOD_ll:   expected_type = type_long_long;   break;
+			case FMT_MOD_j:    expected_type = type_intmax_t;    break;
+			case FMT_MOD_z:    expected_type = type_ssize_t;     break;
+			case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
+
+			default:
+				warn_invalid_length_modifier(pos, fmt_mod, fmt);
+				goto next_arg;
+			}
+			break;
+
+		default:
+			warningf(pos, "encountered unknown conversion specifier '%%%c' at format %u",
+			         fmt, num_fmt);
+			if (arg == NULL) {
+				warningf(pos, "too few arguments for format string");
+				return;
+			}
+			goto next_arg;
 		}
 
 		if (arg == NULL) {
@@ -938,7 +862,8 @@ error_arg_type:
 next_arg:
 		arg = arg->next;
 	}
-	if (!atend(&vchar)) {
+	assert(fmt == '\0');
+	if (c+1 < string + size) {
 		warningf(pos, "format string contains '\\0'");
 	}
 	if (arg != NULL) {
@@ -948,8 +873,8 @@ next_arg:
 			arg = arg->next;
 		}
 		warningf(pos, "%u argument%s but only %u format specifier%s",
-			num_args, num_args != 1 ? "s" : "",
-			num_fmt, num_fmt != 1 ? "s" : "");
+		         num_args, num_args != 1 ? "s" : "",
+		         num_fmt, num_fmt != 1 ? "s" : "");
 	}
 }
 
@@ -1018,8 +943,9 @@ void check_format(const call_expression_t *const call)
 		/* the declaration has a GNU format attribute, check it */
 	} else {
 		/*
-		 * For some functions we always check the format, even if it was not specified.
-		 * This allows to check format even in MS mode or without header included.
+		 * For some functions we always check the format, even if it was not
+		 * specified. This allows to check format even in MS mode or without
+		 * header included.
 		 */
 		const char *const name = entity->base.symbol->string;
 		for (size_t i = 0; i < lengthof(builtin_table); ++i) {

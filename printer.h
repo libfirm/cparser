@@ -35,8 +35,7 @@
 /** print a string into current output */
 extern void (*print_string)(const char *str);
 extern void (*print_vformat)(const char *format, va_list ap);
-/** print a single unicode character to current output (encoded as UTF-8) */
-extern void (*print_char)(wchar_rep_t c);
+extern void (*print_char)(const char c);
 
 /** print a printf style format string to current output */
 static inline void __attribute__((format(printf,1,2))) print_format(const char *format, ...)

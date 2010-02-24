@@ -60,15 +60,9 @@ struct source_position_t {
 extern const source_position_t builtin_source_position;
 
 typedef struct {
-	int type;
-	union {
-		symbol_t      *symbol;
-		long long      intvalue;
-		long double    floatvalue;
-		string_t       string;
-		wide_string_t  wide_string;
-	} v;
-	type_t            *datatype;
+	int                type;
+	symbol_t          *symbol;  /**< contains identifier. Contains number suffix for numbers */
+	string_t           literal; /**< string value/literal value */
 	source_position_t  source_position;
 } token_t;
 

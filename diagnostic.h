@@ -51,7 +51,7 @@
  *  %K  const token_t*
  *  %k  token_kind_t
  *  %P  const source_position_t *
- *
+ *  %S  const string_t *
  */
 void diagnosticf(const char *fmt, ...);
 void errorf(const source_position_t *pos, const char *fmt, ...);

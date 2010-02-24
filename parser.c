@@ -305,11 +305,15 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_INVALID]                    = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
 		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
-		[EXPR_CONST]                      = sizeof(const_expression_t),
-		[EXPR_CHARACTER_CONSTANT]         = sizeof(const_expression_t),
-		[EXPR_WIDE_CHARACTER_CONSTANT]    = sizeof(const_expression_t),
+		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
+		[EXPR_LITERAL_INTEGER_OCTAL]      = sizeof(literal_expression_t),
+		[EXPR_LITERAL_INTEGER_HEXADECIMAL]= sizeof(literal_expression_t),
+		[EXPR_LITERAL_FLOATINGPOINT]      = sizeof(literal_expression_t),
+		[EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL] = sizeof(literal_expression_t),
+		[EXPR_LITERAL_CHARACTER]          = sizeof(literal_expression_t),
+		[EXPR_LITERAL_WIDE_CHARACTER]     = sizeof(literal_expression_t),
 		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
-		[EXPR_WIDE_STRING_LITERAL]        = sizeof(wide_string_literal_expression_t),
+		[EXPR_WIDE_STRING_LITERAL]        = sizeof(string_literal_expression_t),
 		[EXPR_COMPOUND_LITERAL]           = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                       = sizeof(call_expression_t),
 		[EXPR_UNARY_FIRST]                = sizeof(unary_expression_t),
@@ -1085,15 +1089,23 @@ static expression_t *parse_assignment_expression(void)
 	return parse_sub_expression(PREC_ASSIGNMENT);
 }
 
+static void warn_string_concat(const source_position_t *pos)
+{
+	if (warning.traditional) {
+		warningf(pos, "traditional C rejects string constant concatenation");
+	}
+}
+
 static string_t parse_string_literals(void)
 {
 	assert(token.type == T_STRING_LITERAL);
-	string_t result = token.v.string;
+	string_t result = token.literal;
 
 	next_token();
 
 	while (token.type == T_STRING_LITERAL) {
-		result = concat_strings(&result, &token.v.string);
+		warn_string_concat(&token.source_position);
+		result = concat_strings(&result, &token.literal);
 		next_token();
 	}
 
@@ -1161,7 +1173,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		/* is it an identifier */
 		if (token.type == T_IDENTIFIER
 				&& (look_ahead(1)->type == ',' || look_ahead(1)->type == ')')) {
-			symbol_t *symbol   = token.v.symbol;
+			symbol_t *symbol   = token.symbol;
 			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
 			argument->v.symbol = symbol;
 			next_token();
@@ -1204,7 +1216,7 @@ static symbol_t *get_symbol_from_token(void)
 {
 	switch(token.type) {
 	case T_IDENTIFIER:
-		return token.v.symbol;
+		return token.symbol;
 	case T_auto:
 	case T_char:
 	case T_double:
@@ -1570,11 +1582,9 @@ unary:
 			determine_lhs_ent(expr->va_starte.ap, lhs_ent);
 			return;
 
+		EXPR_LITERAL_CASES
 		case EXPR_UNKNOWN:
 		case EXPR_INVALID:
-		case EXPR_CONST:
-		case EXPR_CHARACTER_CONSTANT:
-		case EXPR_WIDE_CHARACTER_CONSTANT:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO init?
@@ -1620,7 +1630,7 @@ static designator_t *parse_designation(void)
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
-			designator->symbol = token.v.symbol;
+			designator->symbol = token.symbol;
 			next_token();
 			break;
 		default:
@@ -1636,7 +1646,7 @@ end_error:
 	return NULL;
 }
 
-static initializer_t *initializer_from_string(array_type_t *type,
+static initializer_t *initializer_from_string(array_type_t *const type,
                                               const string_t *const string)
 {
 	/* TODO: check len vs. size of array type */
@@ -1649,7 +1659,7 @@ static initializer_t *initializer_from_string(array_type_t *type,
 }
 
 static initializer_t *initializer_from_wide_string(array_type_t *const type,
-                                                   wide_string_t *const string)
+                                                   const string_t *const string)
 {
 	/* TODO: check len vs. size of array type */
 	(void) type;
@@ -1673,6 +1683,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	type_t *type           = skip_typeref(orig_type);
 	type_t *expr_type_orig = expression->base.type;
 	type_t *expr_type      = skip_typeref(expr_type_orig);
+
 	if (is_type_array(type) && expr_type->kind == TYPE_POINTER) {
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
@@ -1680,26 +1691,26 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		if (element_type->kind == TYPE_ATOMIC) {
 			atomic_type_kind_t akind = element_type->atomic.akind;
 			switch (expression->kind) {
-				case EXPR_STRING_LITERAL:
-					if (akind == ATOMIC_TYPE_CHAR
-							|| akind == ATOMIC_TYPE_SCHAR
-							|| akind == ATOMIC_TYPE_UCHAR) {
-						return initializer_from_string(array_type,
-							&expression->string.value);
-					}
-					break;
-
-				case EXPR_WIDE_STRING_LITERAL: {
-					type_t *bare_wchar_type = skip_typeref(type_wchar_t);
-					if (get_unqualified_type(element_type) == bare_wchar_type) {
-						return initializer_from_wide_string(array_type,
-							&expression->wide_string.value);
-					}
-					break;
+			case EXPR_STRING_LITERAL:
+				if (akind == ATOMIC_TYPE_CHAR
+						|| akind == ATOMIC_TYPE_SCHAR
+						|| akind == ATOMIC_TYPE_UCHAR) {
+					return initializer_from_string(array_type,
+							&expression->string_literal.value);
 				}
+				break;
 
-				default:
-					break;
+			case EXPR_WIDE_STRING_LITERAL: {
+				type_t *bare_wchar_type = skip_typeref(type_wchar_t);
+				if (get_unqualified_type(element_type) == bare_wchar_type) {
+					return initializer_from_wide_string(array_type,
+							&expression->string_literal.value);
+				}
+				break;
+			}
+
+			default:
+				break;
 			}
 		}
 	}
@@ -2113,7 +2124,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			/* GNU-style designator ("identifier: value") */
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = token.source_position;
-			designator->symbol          = token.v.symbol;
+			designator->symbol          = token.symbol;
 			eat(T_IDENTIFIER);
 			eat(':');
 
@@ -2292,6 +2303,18 @@ end_error:
 	return NULL;
 }
 
+static expression_t *make_size_literal(size_t value)
+{
+	expression_t *literal = allocate_ast_zero(EXPR_LITERAL_INTEGER);
+	literal->base.type    = type_size_t;
+
+	char buf[128];
+	snprintf(buf, sizeof(buf), "%u", (unsigned) value);
+	literal->literal.value = make_string(buf);
+
+	return literal;
+}
+
 /**
  * Parses an initializer. Parsers either a compound literal
  * (env->declaration == NULL) or an initializer of a declaration.
@@ -2357,13 +2380,9 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			internal_errorf(HERE, "invalid initializer type");
 		}
 
-		expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
-		cnst->base.type          = type_size_t;
-		cnst->conste.v.int_value = size;
-
 		type_t *new_type = duplicate_type(type);
 
-		new_type->array.size_expression   = cnst;
+		new_type->array.size_expression   = make_size_literal(size);
 		new_type->array.size_constant     = true;
 		new_type->array.has_implicit_size = true;
 		new_type->array.size              = size;
@@ -2402,7 +2421,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
 	if (token.type == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
-		symbol = token.v.symbol;
+		symbol = token.symbol;
 		next_token();
 
 		entity_t *entity = get_tag(symbol, kind);
@@ -2487,7 +2506,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 		entity_t *entity             = allocate_entity_zero(ENTITY_ENUM_VALUE);
 		entity->enum_value.enum_type = enum_type;
-		entity->base.symbol          = token.v.symbol;
+		entity->base.symbol          = token.symbol;
 		entity->base.source_position = token.source_position;
 		next_token();
 
@@ -2518,7 +2537,7 @@ static type_t *parse_enum_specifier(void)
 	eat(T_enum);
 	switch (token.type) {
 		case T_IDENTIFIER:
-			symbol = token.v.symbol;
+			symbol = token.symbol;
 			next_token();
 
 			entity = get_tag(symbol, ENTITY_ENUM);
@@ -2611,7 +2630,7 @@ static type_t *parse_typeof(void)
 	}
 	switch (token.type) {
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.v.symbol)) {
+		if (is_typedef_symbol(token.symbol)) {
 			type = parse_typename();
 		} else {
 			expression = parse_expression();
@@ -2701,7 +2720,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		}
 
 		bool is_put;
-		symbol_t *symbol = token.v.symbol;
+		symbol_t *symbol = token.symbol;
 		next_token();
 		if (strcmp(symbol->string, "put") == 0) {
 			is_put = true;
@@ -2718,9 +2737,9 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			goto end_error;
 		}
 		if (is_put) {
-			property->put_symbol = token.v.symbol;
+			property->put_symbol = token.symbol;
 		} else {
-			property->get_symbol = token.v.symbol;
+			property->get_symbol = token.symbol;
 		}
 		next_token();
 	} while (next_if(','));
@@ -2739,7 +2758,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	if (next_if(T_restrict)) {
 		kind = ATTRIBUTE_MS_RESTRICT;
 	} else if (token.type == T_IDENTIFIER) {
-		const char *name = token.v.symbol->string;
+		const char *name = token.symbol->string;
 		next_token();
 		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
 		     ++k) {
@@ -3013,7 +3032,7 @@ wrong_thread_stoarge_class:
 				}
 			}
 
-			type_t *const typedef_type = get_typedef_type(token.v.symbol);
+			type_t *const typedef_type = get_typedef_type(token.symbol);
 			if (typedef_type == NULL) {
 				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
@@ -3027,7 +3046,7 @@ wrong_thread_stoarge_class:
 						errorf(HERE, "%K does not name a type", &token);
 
 						entity_t *entity =
-							create_error_entity(token.v.symbol, ENTITY_TYPEDEF);
+							create_error_entity(token.symbol, ENTITY_TYPEDEF);
 
 						type = allocate_type_zero(TYPE_TYPEDEF);
 						type->typedeft.typedefe = &entity->typedefe;
@@ -3290,7 +3309,7 @@ static void parse_identifier_list(scope_t *scope)
 		entity_t *entity = allocate_entity_zero(ENTITY_PARAMETER);
 		entity->base.source_position = token.source_position;
 		entity->base.namespc         = NAMESPACE_NORMAL;
-		entity->base.symbol          = token.v.symbol;
+		entity->base.symbol          = token.symbol;
 		/* a K&R parameter has no type, yet */
 		next_token();
 
@@ -3332,7 +3351,7 @@ static bool has_parameters(void)
 {
 	/* func(void) is not a parameter */
 	if (token.type == T_IDENTIFIER) {
-		entity_t const *const entity = get_entity(token.v.symbol, NAMESPACE_NORMAL);
+		entity_t const *const entity = get_entity(token.symbol, NAMESPACE_NORMAL);
 		if (entity == NULL)
 			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
@@ -3359,7 +3378,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 	int saved_comma_state = save_and_reset_anchor_state(',');
 
 	if (token.type == T_IDENTIFIER &&
-	    !is_typedef_symbol(token.v.symbol)) {
+	    !is_typedef_symbol(token.symbol)) {
 		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ',' || la1_type == ')') {
 			type->kr_style_parameters = true;
@@ -3617,7 +3636,7 @@ ptr_operator_end: ;
 		if (env->must_be_abstract) {
 			errorf(HERE, "no identifier expected in typename");
 		} else {
-			env->symbol          = token.v.symbol;
+			env->symbol          = token.symbol;
 			env->source_position = token.source_position;
 		}
 		next_token();
@@ -4378,7 +4397,7 @@ static bool is_declaration_specifier(const token_t *token,
 		TYPE_QUALIFIERS
 			return true;
 		case T_IDENTIFIER:
-			return is_typedef_symbol(token->v.symbol);
+			return is_typedef_symbol(token->symbol);
 
 		case T___extension__:
 		STORAGE_CLASSES
@@ -4890,9 +4909,7 @@ static bool expression_returns(expression_t const *const expr)
 
 		case EXPR_REFERENCE:
 		case EXPR_REFERENCE_ENUM_VALUE:
-		case EXPR_CONST:
-		case EXPR_CHARACTER_CONSTANT:
-		case EXPR_WIDE_CHARACTER_CONSTANT:
+		EXPR_LITERAL_CASES
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO descend into initialisers
@@ -5958,82 +5975,181 @@ static expression_t *expected_expression_error(void)
 	return create_invalid_expression();
 }
 
+static type_t *get_string_type(void)
+{
+	return warning.write_strings ? type_const_char_ptr : type_char_ptr;
+}
+
+static type_t *get_wide_string_type(void)
+{
+	return warning.write_strings ? type_const_wchar_t_ptr : type_wchar_t_ptr;
+}
+
 /**
  * Parse a string constant.
  */
-static expression_t *parse_string_const(void)
+static expression_t *parse_string_literal(void)
 {
-	wide_string_t wres;
-	if (token.type == T_STRING_LITERAL) {
-		string_t res = token.v.string;
-		next_token();
-		while (token.type == T_STRING_LITERAL) {
-			res = concat_strings(&res, &token.v.string);
-			next_token();
-		}
-		if (token.type != T_WIDE_STRING_LITERAL) {
-			expression_t *const cnst = allocate_expression_zero(EXPR_STRING_LITERAL);
-			/* note: that we use type_char_ptr here, which is already the
-			 * automatic converted type. revert_automatic_type_conversion
-			 * will construct the array type */
-			cnst->base.type    = warning.write_strings ? type_const_char_ptr : type_char_ptr;
-			cnst->string.value = res;
-			return cnst;
-		}
+	source_position_t begin   = token.source_position;
+	string_t          res     = token.literal;
+	bool              is_wide = (token.type == T_WIDE_STRING_LITERAL);
 
-		wres = concat_string_wide_string(&res, &token.v.wide_string);
-	} else {
-		wres = token.v.wide_string;
-	}
 	next_token();
-
-	for (;;) {
-		switch (token.type) {
-			case T_WIDE_STRING_LITERAL:
-				wres = concat_wide_strings(&wres, &token.v.wide_string);
-				break;
-
-			case T_STRING_LITERAL:
-				wres = concat_wide_string_string(&wres, &token.v.string);
-				break;
-
-			default: {
-				expression_t *const cnst = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
-				cnst->base.type         = warning.write_strings ? type_const_wchar_t_ptr : type_wchar_t_ptr;
-				cnst->wide_string.value = wres;
-				return cnst;
-			}
-		}
+	while (token.type == T_STRING_LITERAL
+			|| token.type == T_WIDE_STRING_LITERAL) {
+		warn_string_concat(&token.source_position);
+		res = concat_strings(&res, &token.literal);
 		next_token();
+		is_wide |= token.type == T_WIDE_STRING_LITERAL;
 	}
+
+	expression_t *literal;
+	if (is_wide) {
+		literal = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
+		literal->base.type = get_wide_string_type();
+	} else {
+		literal = allocate_expression_zero(EXPR_STRING_LITERAL);
+		literal->base.type = get_string_type();
+	}
+	literal->base.source_position = begin;
+	literal->literal.value        = res;
+
+	return literal;
 }
 
 /**
  * Parse a boolean constant.
  */
-static expression_t *parse_bool_const(bool value)
+static expression_t *parse_boolean_literal(bool value)
 {
-	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
-	cnst->base.type          = type_bool;
-	cnst->conste.v.int_value = value;
+	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_BOOLEAN);
+	literal->base.source_position = token.source_position;
+	literal->base.type            = type_bool;
+	literal->literal.value.begin  = value ? "true" : "false";
+	literal->literal.value.size   = value ? 4 : 5;
 
 	next_token();
+	return literal;
+}
 
-	return cnst;
+static void warn_traditional_suffix(void)
+{
+	if (!warning.traditional)
+		return;
+	warningf(&token.source_position, "traditional C rejects the '%Y' suffix",
+	         token.symbol);
+}
+
+static void check_integer_suffix(void)
+{
+	symbol_t *suffix = token.symbol;
+	if (suffix == NULL)
+		return;
+
+	bool not_traditional = false;
+	const char *c = suffix->string;
+	if (*c == 'l' || *c == 'L') {
+		++c;
+		if (*c == *(c-1)) {
+			not_traditional = true;
+			++c;
+			if (*c == 'u' || *c == 'U') {
+				++c;
+			}
+		} else if (*c == 'u' || *c == 'U') {
+			not_traditional = true;
+			++c;
+		}
+	} else if (*c == 'u' || *c == 'U') {
+		not_traditional = true;
+		++c;
+		if (*c == 'l' || *c == 'L') {
+			++c;
+			if (*c == *(c-1)) {
+				++c;
+			}
+		}
+	}
+	if (*c != '\0') {
+		errorf(&token.source_position,
+		       "invalid suffix '%s' on integer constant", suffix->string);
+	} else if (not_traditional) {
+		warn_traditional_suffix();
+	}
+}
+
+static type_t *check_floatingpoint_suffix(void)
+{
+	symbol_t *suffix = token.symbol;
+	type_t   *type   = type_double;
+	if (suffix == NULL)
+		return type;
+
+	bool not_traditional = false;
+	const char *c = suffix->string;
+	if (*c == 'f' || *c == 'F') {
+		++c;
+		type = type_float;
+	} else if (*c == 'l' || *c == 'L') {
+		++c;
+		type = type_long_double;
+	}
+	if (*c != '\0') {
+		errorf(&token.source_position,
+		       "invalid suffix '%s' on floatingpoint constant", suffix->string);
+	} else if (not_traditional) {
+		warn_traditional_suffix();
+	}
+
+	return type;
 }
 
 /**
  * Parse an integer constant.
  */
-static expression_t *parse_int_const(void)
+static expression_t *parse_number_literal(void)
 {
-	expression_t *cnst       = allocate_expression_zero(EXPR_CONST);
-	cnst->base.type          = token.datatype;
-	cnst->conste.v.int_value = token.v.intvalue;
+	expression_kind_t  kind;
+	type_t            *type;
 
+	switch (token.type) {
+	case T_INTEGER:
+		kind = EXPR_LITERAL_INTEGER;
+		check_integer_suffix();
+		break;
+	case T_INTEGER_OCTAL:
+		kind = EXPR_LITERAL_INTEGER_OCTAL;
+		check_integer_suffix();
+		break;
+	case T_INTEGER_HEXADECIMAL:
+		kind = EXPR_LITERAL_INTEGER_HEXADECIMAL;
+		check_integer_suffix();
+		break;
+	case T_FLOATINGPOINT:
+		kind = EXPR_LITERAL_FLOATINGPOINT;
+		type = check_floatingpoint_suffix();
+		break;
+	case T_FLOATINGPOINT_HEXADECIMAL:
+		kind = EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL;
+		type = check_floatingpoint_suffix();
+		break;
+	default:
+		panic("unexpected token type in parse_number_literal");
+	}
+
+	expression_t *literal = allocate_expression_zero(kind);
+	literal->base.source_position = token.source_position;
+	literal->base.type            = type;
+	literal->literal.value        = token.literal;
+	literal->literal.suffix       = token.symbol;
 	next_token();
 
-	return cnst;
+	/* integer type depends on the size of the number and the size
+	 * representable by the types. The backend/codegeneration has to determine
+	 * that
+	 */
+	determine_literal_type(&literal->literal);
+	return literal;
 }
 
 /**
@@ -6041,20 +6157,23 @@ static expression_t *parse_int_const(void)
  */
 static expression_t *parse_character_constant(void)
 {
-	expression_t *cnst = allocate_expression_zero(EXPR_CHARACTER_CONSTANT);
-	cnst->base.type          = token.datatype;
-	cnst->conste.v.character = token.v.string;
+	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
+	literal->base.source_position = token.source_position;
+	literal->base.type            = c_mode & _CXX ? type_char : type_int;
+	literal->literal.value        = token.literal;
 
-	if (cnst->conste.v.character.size != 1) {
-		if (!GNU_MODE) {
+	size_t len = literal->literal.value.size;
+	if (len != 1) {
+		if (!GNU_MODE && !(c_mode & _C99)) {
 			errorf(HERE, "more than 1 character in character constant");
 		} else if (warning.multichar) {
+			literal->base.type = type_int;
 			warningf(HERE, "multi-character character constant");
 		}
 	}
-	next_token();
 
-	return cnst;
+	next_token();
+	return literal;
 }
 
 /**
@@ -6062,34 +6181,18 @@ static expression_t *parse_character_constant(void)
  */
 static expression_t *parse_wide_character_constant(void)
 {
-	expression_t *cnst = allocate_expression_zero(EXPR_WIDE_CHARACTER_CONSTANT);
-	cnst->base.type               = token.datatype;
-	cnst->conste.v.wide_character = token.v.wide_string;
+	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
+	literal->base.source_position = token.source_position;
+	literal->base.type            = type_int;
+	literal->literal.value        = token.literal;
 
-	if (cnst->conste.v.wide_character.size != 1) {
-		if (!GNU_MODE) {
-			errorf(HERE, "more than 1 character in character constant");
-		} else if (warning.multichar) {
-			warningf(HERE, "multi-character character constant");
-		}
+	size_t len = wstrlen(&literal->literal.value);
+	if (len != 1) {
+		warningf(HERE, "multi-character character constant");
 	}
-	next_token();
-
-	return cnst;
-}
-
-/**
- * Parse a float constant.
- */
-static expression_t *parse_float_const(void)
-{
-	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
-	cnst->base.type            = token.datatype;
-	cnst->conste.v.float_value = token.v.floatvalue;
 
 	next_token();
-
-	return cnst;
+	return literal;
 }
 
 static entity_t *create_implicit_function(symbol_t *symbol,
@@ -6149,57 +6252,58 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
 	switch (expression->kind) {
-		case EXPR_REFERENCE: {
-			entity_t *entity = expression->reference.entity;
-			if (is_declaration(entity)) {
-				return entity->declaration.type;
-			} else if (entity->kind == ENTITY_ENUM_VALUE) {
-				return entity->enum_value.enum_type;
-			} else {
-				panic("no declaration or enum in reference");
-			}
+	case EXPR_REFERENCE: {
+		entity_t *entity = expression->reference.entity;
+		if (is_declaration(entity)) {
+			return entity->declaration.type;
+		} else if (entity->kind == ENTITY_ENUM_VALUE) {
+			return entity->enum_value.enum_type;
+		} else {
+			panic("no declaration or enum in reference");
 		}
-
-		case EXPR_SELECT: {
-			entity_t *entity = expression->select.compound_entry;
-			assert(is_declaration(entity));
-			type_t   *type   = entity->declaration.type;
-			return get_qualified_type(type,
-					expression->base.type->base.qualifiers);
-		}
-
-		case EXPR_UNARY_DEREFERENCE: {
-			const expression_t *const value = expression->unary.value;
-			type_t             *const type  = skip_typeref(value->base.type);
-			if (!is_type_pointer(type))
-				return type_error_type;
-			return type->pointer.points_to;
-		}
-
-		case EXPR_ARRAY_ACCESS: {
-			const expression_t *array_ref = expression->array_access.array_ref;
-			type_t             *type_left = skip_typeref(array_ref->base.type);
-			if (!is_type_pointer(type_left))
-				return type_error_type;
-			return type_left->pointer.points_to;
-		}
-
-		case EXPR_STRING_LITERAL: {
-			size_t size = expression->string.value.size;
-			return make_array_type(type_char, size, TYPE_QUALIFIER_NONE);
-		}
-
-		case EXPR_WIDE_STRING_LITERAL: {
-			size_t size = expression->wide_string.value.size;
-			return make_array_type(type_wchar_t, size, TYPE_QUALIFIER_NONE);
-		}
-
-		case EXPR_COMPOUND_LITERAL:
-			return expression->compound_literal.type;
-
-		default:
-			return expression->base.type;
 	}
+
+	case EXPR_SELECT: {
+		entity_t *entity = expression->select.compound_entry;
+		assert(is_declaration(entity));
+		type_t   *type   = entity->declaration.type;
+		return get_qualified_type(type,
+				expression->base.type->base.qualifiers);
+	}
+
+	case EXPR_UNARY_DEREFERENCE: {
+		const expression_t *const value = expression->unary.value;
+		type_t             *const type  = skip_typeref(value->base.type);
+		if (!is_type_pointer(type))
+			return type_error_type;
+		return type->pointer.points_to;
+	}
+
+	case EXPR_ARRAY_ACCESS: {
+		const expression_t *array_ref = expression->array_access.array_ref;
+		type_t             *type_left = skip_typeref(array_ref->base.type);
+		if (!is_type_pointer(type_left))
+			return type_error_type;
+		return type_left->pointer.points_to;
+	}
+
+	case EXPR_STRING_LITERAL: {
+		size_t size = expression->string_literal.value.size;
+		return make_array_type(type_char, size, TYPE_QUALIFIER_NONE);
+	}
+
+	case EXPR_WIDE_STRING_LITERAL: {
+		size_t size = wstrlen(&expression->string_literal.value);
+		return make_array_type(type_wchar_t, size, TYPE_QUALIFIER_NONE);
+	}
+
+	case EXPR_COMPOUND_LITERAL:
+		return expression->compound_literal.type;
+
+	default:
+		break;
+	}
+	return expression->base.type;
 }
 
 /**
@@ -6240,7 +6344,7 @@ static entity_t *parse_qualified_identifier(void)
 			parse_error_expected("while parsing identifier", T_IDENTIFIER, NULL);
 			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 		}
-		symbol = token.v.symbol;
+		symbol = token.symbol;
 		pos    = *HERE;
 		next_token();
 
@@ -6497,7 +6601,7 @@ static expression_t *parse_parenthesized_expression(void)
 	TYPE_SPECIFIERS
 		return parse_cast();
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.v.symbol)) {
+		if (is_typedef_symbol(token.symbol)) {
 			return parse_cast();
 		}
 	}
@@ -6584,7 +6688,7 @@ static designator_t *parse_designator(void)
 		                     T_IDENTIFIER, NULL);
 		return NULL;
 	}
-	result->symbol = token.v.symbol;
+	result->symbol = token.symbol;
 	next_token();
 
 	designator_t *last_designator = result;
@@ -6597,7 +6701,7 @@ static designator_t *parse_designator(void)
 			}
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = *HERE;
-			designator->symbol          = token.v.symbol;
+			designator->symbol          = token.symbol;
 			next_token();
 
 			last_designator->next = designator;
@@ -6930,7 +7034,7 @@ static expression_t *parse_label_address(void)
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
 		goto end_error;
 	}
-	symbol_t *symbol = token.v.symbol;
+	symbol_t *symbol = token.symbol;
 	next_token();
 
 	label_t *label       = get_label(symbol);
@@ -6954,10 +7058,11 @@ end_error:
 static expression_t *parse_noop_expression(void)
 {
 	/* the result is a (int)0 */
-	expression_t *cnst         = allocate_expression_zero(EXPR_CONST);
-	cnst->base.type            = type_int;
-	cnst->conste.v.int_value   = 0;
-	cnst->conste.is_ms_noop    = true;
+	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_MS_NOOP);
+	literal->base.type            = type_int;
+	literal->base.source_position = token.source_position;
+	literal->literal.value.begin  = "__noop";
+	literal->literal.value.size   = 6;
 
 	eat(T___noop);
 
@@ -6976,7 +7081,7 @@ static expression_t *parse_noop_expression(void)
 	expect(')', end_error);
 
 end_error:
-	return cnst;
+	return literal;
 }
 
 /**
@@ -6985,54 +7090,57 @@ end_error:
 static expression_t *parse_primary_expression(void)
 {
 	switch (token.type) {
-		case T_false:                        return parse_bool_const(false);
-		case T_true:                         return parse_bool_const(true);
-		case T_INTEGER:                      return parse_int_const();
-		case T_CHARACTER_CONSTANT:           return parse_character_constant();
-		case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
-		case T_FLOATINGPOINT:                return parse_float_const();
-		case T_STRING_LITERAL:
-		case T_WIDE_STRING_LITERAL:          return parse_string_const();
-		case T___FUNCTION__:
-		case T___func__:                     return parse_function_keyword();
-		case T___PRETTY_FUNCTION__:          return parse_pretty_function_keyword();
-		case T___FUNCSIG__:                  return parse_funcsig_keyword();
-		case T___FUNCDNAME__:                return parse_funcdname_keyword();
-		case T___builtin_offsetof:           return parse_offsetof();
-		case T___builtin_va_start:           return parse_va_start();
-		case T___builtin_va_arg:             return parse_va_arg();
-		case T___builtin_va_copy:            return parse_va_copy();
-		case T___builtin_isgreater:
-		case T___builtin_isgreaterequal:
-		case T___builtin_isless:
-		case T___builtin_islessequal:
-		case T___builtin_islessgreater:
-		case T___builtin_isunordered:        return parse_compare_builtin();
-		case T___builtin_constant_p:         return parse_builtin_constant();
-		case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
-		case T__assume:                      return parse_assume();
-		case T_ANDAND:
-			if (GNU_MODE)
-				return parse_label_address();
-			break;
+	case T_false:                        return parse_boolean_literal(false);
+	case T_true:                         return parse_boolean_literal(true);
+	case T_INTEGER:
+	case T_INTEGER_OCTAL:
+	case T_INTEGER_HEXADECIMAL:
+	case T_FLOATINGPOINT:
+	case T_FLOATINGPOINT_HEXADECIMAL:    return parse_number_literal();
+	case T_CHARACTER_CONSTANT:           return parse_character_constant();
+	case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
+	case T_STRING_LITERAL:
+	case T_WIDE_STRING_LITERAL:          return parse_string_literal();
+	case T___FUNCTION__:
+	case T___func__:                     return parse_function_keyword();
+	case T___PRETTY_FUNCTION__:          return parse_pretty_function_keyword();
+	case T___FUNCSIG__:                  return parse_funcsig_keyword();
+	case T___FUNCDNAME__:                return parse_funcdname_keyword();
+	case T___builtin_offsetof:           return parse_offsetof();
+	case T___builtin_va_start:           return parse_va_start();
+	case T___builtin_va_arg:             return parse_va_arg();
+	case T___builtin_va_copy:            return parse_va_copy();
+	case T___builtin_isgreater:
+	case T___builtin_isgreaterequal:
+	case T___builtin_isless:
+	case T___builtin_islessequal:
+	case T___builtin_islessgreater:
+	case T___builtin_isunordered:        return parse_compare_builtin();
+	case T___builtin_constant_p:         return parse_builtin_constant();
+	case T___builtin_types_compatible_p: return parse_builtin_types_compatible();
+	case T__assume:                      return parse_assume();
+	case T_ANDAND:
+		if (GNU_MODE)
+			return parse_label_address();
+		break;
 
-		case '(':                            return parse_parenthesized_expression();
-		case T___noop:                       return parse_noop_expression();
+	case '(':                            return parse_parenthesized_expression();
+	case T___noop:                       return parse_noop_expression();
 
-		/* Gracefully handle type names while parsing expressions. */
-		case T_COLONCOLON:
+	/* Gracefully handle type names while parsing expressions. */
+	case T_COLONCOLON:
+		return parse_reference();
+	case T_IDENTIFIER:
+		if (!is_typedef_symbol(token.symbol)) {
 			return parse_reference();
-		case T_IDENTIFIER:
-			if (!is_typedef_symbol(token.v.symbol)) {
-				return parse_reference();
-			}
-			/* FALLTHROUGH */
-		TYPENAME_START {
-			source_position_t  const pos  = *HERE;
-			type_t const      *const type = parse_typename();
-			errorf(&pos, "encountered type '%T' while parsing expression", type);
-			return create_invalid_expression();
 		}
+		/* FALLTHROUGH */
+	TYPENAME_START {
+		source_position_t  const pos  = *HERE;
+		type_t const      *const type = parse_typename();
+		errorf(&pos, "encountered type '%T' while parsing expression", type);
+		return create_invalid_expression();
+	}
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
@@ -7177,7 +7285,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
 		return create_invalid_expression();
 	}
-	symbol_t *symbol = token.v.symbol;
+	symbol_t *symbol = token.symbol;
 	next_token();
 
 	type_t *const orig_type = addr->base.type;
@@ -8277,8 +8385,8 @@ static void warn_string_literal_address(expression_t const* expr)
 		expr = expr->unary.value;
 	}
 
-	if (expr->kind == EXPR_STRING_LITERAL ||
-	    expr->kind == EXPR_WIDE_STRING_LITERAL) {
+	if (expr->kind == EXPR_STRING_LITERAL
+			|| expr->kind == EXPR_WIDE_STRING_LITERAL) {
 		warningf(&expr->base.source_position,
 			"comparison with string literal results in unspecified behaviour");
 	}
@@ -8628,13 +8736,20 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_INVALID:                    return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
 		case EXPR_REFERENCE_ENUM_VALUE:       return false;
+		case EXPR_LABEL_ADDRESS:              return false;
+
 		/* suppress the warning for microsoft __noop operations */
-		case EXPR_CONST:                      return expr->conste.is_ms_noop;
-		case EXPR_CHARACTER_CONSTANT:         return false;
-		case EXPR_WIDE_CHARACTER_CONSTANT:    return false;
+		case EXPR_LITERAL_MS_NOOP:            return true;
+		case EXPR_LITERAL_BOOLEAN:
+		case EXPR_LITERAL_CHARACTER:
+		case EXPR_LITERAL_WIDE_CHARACTER:
+		case EXPR_LITERAL_INTEGER:
+		case EXPR_LITERAL_INTEGER_OCTAL:
+		case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+		case EXPR_LITERAL_FLOATINGPOINT:
+		case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: return false;
 		case EXPR_STRING_LITERAL:             return false;
 		case EXPR_WIDE_STRING_LITERAL:        return false;
-		case EXPR_LABEL_ADDRESS:              return false;
 
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;
@@ -8974,7 +9089,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
-			argument->symbol = token.v.symbol;
+			argument->symbol = token.symbol;
 
 			expect(']', end_error);
 		}
@@ -9276,7 +9391,7 @@ end_error:
 static statement_t *parse_label_statement(void)
 {
 	assert(token.type == T_IDENTIFIER);
-	symbol_t *symbol = token.v.symbol;
+	symbol_t *symbol = token.symbol;
 	label_t  *label  = get_label(symbol);
 
 	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
@@ -9658,7 +9773,7 @@ static statement_t *parse_goto(void)
 
 		statement->gotos.expression = expression;
 	} else if (token.type == T_IDENTIFIER) {
-		symbol_t *symbol = token.v.symbol;
+		symbol_t *symbol = token.symbol;
 		next_token();
 		statement->gotos.label = get_label(symbol);
 	} else {
@@ -9972,7 +10087,7 @@ static statement_t *parse_local_label_declaration(void)
 				T_IDENTIFIER, NULL);
 			goto end_error;
 		}
-		symbol_t *symbol = token.v.symbol;
+		symbol_t *symbol = token.symbol;
 		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 		if (entity != NULL && entity->base.parent_scope == current_scope) {
 			errorf(HERE, "multiple definitions of '__label__ %Y' (previous definition %P)",
@@ -10010,7 +10125,7 @@ static void parse_namespace_definition(void)
 	symbol_t *symbol = NULL;
 
 	if (token.type == T_IDENTIFIER) {
-		symbol = token.v.symbol;
+		symbol = token.symbol;
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
@@ -10075,7 +10190,7 @@ static statement_t *intern_parse_statement(void)
 		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
 		if (la1_type == ':') {
 			statement = parse_label_statement();
-		} else if (is_typedef_symbol(token.v.symbol)) {
+		} else if (is_typedef_symbol(token.symbol)) {
 			statement = parse_declaration_statement();
 		} else {
 			/* it's an identifier, the grammar says this must be an
@@ -10085,7 +10200,7 @@ static statement_t *intern_parse_statement(void)
 			switch (la1_type) {
 			case '&':
 			case '*':
-				if (get_entity(token.v.symbol, NAMESPACE_NORMAL) != NULL)
+				if (get_entity(token.symbol, NAMESPACE_NORMAL) != NULL)
 					goto expression_statment;
 				/* FALLTHROUGH */
 

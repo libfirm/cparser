@@ -2,13 +2,16 @@
 #define TS(x,str,val)
 #endif
 
-TS(IDENTIFIER,              "identifier", = 256)
-TS(INTEGER,                 "integer number",)
-TS(CHARACTER_CONSTANT,      "character constant",)
-TS(WIDE_CHARACTER_CONSTANT, "wide character constant",)
-TS(FLOATINGPOINT,           "floatingpoint number",)
-TS(STRING_LITERAL,          "string literal",)
-TS(WIDE_STRING_LITERAL,     "wide string literal",)
+TS(IDENTIFIER,                "identifier", = 256)
+TS(INTEGER,                   "integer number",)
+TS(INTEGER_OCTAL,             "octal integer number",)
+TS(INTEGER_HEXADECIMAL,       "hexadecimal integer number",)
+TS(FLOATINGPOINT,             "floatingpoint number",)
+TS(FLOATINGPOINT_HEXADECIMAL, "hexadecimal floatingpoint number",)
+TS(CHARACTER_CONSTANT,        "character constant",)
+TS(WIDE_CHARACTER_CONSTANT,   "wide character constant",)
+TS(STRING_LITERAL,            "string literal",)
+TS(WIDE_STRING_LITERAL,       "wide string literal",)
 
 #define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
 #define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)

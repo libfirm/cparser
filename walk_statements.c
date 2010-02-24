@@ -107,13 +107,11 @@ static void walk_expression(expression_t const *const expr,
 		walk_expression(expr->va_copye.dst, callback, env);
 		return;
 
+	EXPR_LITERAL_CASES
 	case EXPR_INVALID:
 	case EXPR_OFFSETOF:
 	case EXPR_REFERENCE:
 	case EXPR_REFERENCE_ENUM_VALUE:
-	case EXPR_CONST:
-	case EXPR_CHARACTER_CONSTANT:
-	case EXPR_WIDE_CHARACTER_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:

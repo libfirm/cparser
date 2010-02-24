@@ -1043,6 +1043,22 @@ entity_created:
 	return irentity;
 }
 
+/**
+ * Creates a SymConst for a given entity.
+ *
+ * @param dbgi    debug info
+ * @param mode    the (reference) mode for the SymConst
+ * @param entity  the entity
+ */
+static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
+                                ir_entity *entity)
+{
+	assert(entity != NULL);
+	union symconst_symbol sym;
+	sym.entity_p = entity;
+	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
+}
+
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 {
 	ir_mode *value_mode = get_irn_mode(value);
@@ -1061,74 +1077,251 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 }
 
 /**
+ * Creates a SymConst node representing a wide string literal.
+ *
+ * @param literal   the wide string literal
+ */
+static ir_node *wide_string_literal_to_firm(
+		const string_literal_expression_t *literal)
+{
+	ir_type  *const global_type = get_glob_type();
+	ir_type  *const elem_type   = ir_type_wchar_t;
+	dbg_info *const dbgi        = get_dbg_info(&literal->base.source_position);
+	ir_type  *const type        = new_type_array(1, elem_type);
+
+	ident     *const id     = id_unique("str.%u");
+	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
+	set_entity_ld_ident(entity, id);
+	set_entity_visibility(entity, ir_visibility_private);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
+
+	ir_mode      *const mode = get_type_mode(elem_type);
+	const size_t        slen = wstrlen(&literal->value);
+
+	set_array_lower_bound_int(type, 0, 0);
+	set_array_upper_bound_int(type, 0, slen);
+	set_type_size_bytes(type, slen * get_mode_size_bytes(mode));
+	set_type_state(type, layout_fixed);
+
+	ir_initializer_t *initializer = create_initializer_compound(slen);
+	const char              *p    = literal->value.begin;
+	for (size_t i = 0; i < slen; ++i) {
+		assert(p < literal->value.begin + literal->value.size);
+		utf32              v  = read_utf8_char(&p);
+		tarval           *tv  = new_tarval_from_long(v, mode);
+		ir_initializer_t *val = create_initializer_tarval(tv);
+		set_initializer_compound_value(initializer, i, val);
+	}
+	set_entity_initializer(entity, initializer);
+
+	return create_symconst(dbgi, mode_P_data, entity);
+}
+
+/**
+ * Creates a SymConst node representing a string constant.
+ *
+ * @param src_pos    the source position of the string constant
+ * @param id_prefix  a prefix for the name of the generated string constant
+ * @param value      the value of the string constant
+ */
+static ir_node *string_to_firm(const source_position_t *const src_pos,
+                               const char *const id_prefix,
+                               const string_t *const value)
+{
+	ir_type  *const global_type = get_glob_type();
+	dbg_info *const dbgi        = get_dbg_info(src_pos);
+	ir_type  *const type        = new_type_array(1, ir_type_const_char);
+
+	ident     *const id     = id_unique(id_prefix);
+	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
+	set_entity_ld_ident(entity, id);
+	set_entity_visibility(entity, ir_visibility_private);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
+
+	ir_type *const elem_type = ir_type_const_char;
+	ir_mode *const mode      = get_type_mode(elem_type);
+
+	const char* const string = value->begin;
+	const size_t      slen   = value->size;
+
+	set_array_lower_bound_int(type, 0, 0);
+	set_array_upper_bound_int(type, 0, slen);
+	set_type_size_bytes(type, slen);
+	set_type_state(type, layout_fixed);
+
+	ir_initializer_t *initializer = create_initializer_compound(slen);
+	for (size_t i = 0; i < slen; ++i) {
+		tarval           *tv  = new_tarval_from_long(string[i], mode);
+		ir_initializer_t *val = create_initializer_tarval(tv);
+		set_initializer_compound_value(initializer, i, val);
+	}
+	set_entity_initializer(entity, initializer);
+
+	return create_symconst(dbgi, mode_P_data, entity);
+}
+
+static bool try_create_integer(literal_expression_t *literal,
+                               type_t *type, unsigned char base)
+{
+	const char *string = literal->value.begin;
+	size_t      size   = literal->value.size;
+
+	assert(type->kind == TYPE_ATOMIC);
+	atomic_type_kind_t akind = type->atomic.akind;
+
+	ir_mode *mode = atomic_modes[akind];
+	tarval  *tv   = new_integer_tarval_from_str(string, size, 1, base, mode);
+	if (tv == tarval_bad)
+		return false;
+
+	literal->base.type    = type;
+	literal->target_value = tv;
+	return true;
+}
+
+static void create_integer_tarval(literal_expression_t *literal)
+{
+	unsigned  us     = 0;
+	unsigned  ls     = 0;
+	symbol_t *suffix = literal->suffix;
+	/* parse suffix */
+	if (suffix != NULL) {
+		for (const char *c = suffix->string; *c != '\0'; ++c) {
+			if (*c == 'u' || *c == 'U') { ++us; }
+			if (*c == 'l' || *c == 'L') { ++ls; }
+		}
+	}
+
+	unsigned char base = 10;
+	if (literal->base.kind == EXPR_LITERAL_INTEGER_OCTAL) {
+		base = 8;
+	} else if (literal->base.kind == EXPR_LITERAL_INTEGER_HEXADECIMAL) {
+		base = 16;
+	} else {
+		assert(literal->base.kind == EXPR_LITERAL_INTEGER);
+	}
+
+	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
+
+	/* now try if the constant is small enough for some types */
+	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
+	if (ls < 1) {
+		if (us == 0 && try_create_integer(literal, type_int, base))
+			goto finished;
+		if ((us == 1 || base != 10)
+				&& try_create_integer(literal, type_unsigned_int, base))
+			goto finished;
+	}
+	if (ls < 2) {
+		if (us == 0 && try_create_integer(literal, type_long, base))
+			goto finished;
+		if ((us == 1 || base != 10)
+				&& try_create_integer(literal, type_unsigned_long, base))
+			goto finished;
+	}
+	/* last try? then we should not report tarval_bad */
+	if (us != 1 && base == 10)
+		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+	if (us == 0 && try_create_integer(literal, type_long_long, base))
+		goto finished;
+
+	/* last try */
+	assert(us == 1 || base != 10);
+	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+	bool res = try_create_integer(literal, type_unsigned_long_long, base);
+	if (res == false)
+		panic("internal error when parsing number literal");
+
+finished:
+	tarval_set_integer_overflow_mode(old_mode);
+}
+
+void determine_literal_type(literal_expression_t *literal)
+{
+	switch (literal->base.kind) {
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_INTEGER_OCTAL:
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+		create_integer_tarval(literal);
+		return;
+	default:
+		break;
+	}
+}
+
+/**
  * Creates a Const node representing a constant.
  */
-static ir_node *const_to_firm(const const_expression_t *cnst)
+static ir_node *literal_to_firm(const literal_expression_t *literal)
 {
-	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
-	type_t   *type = skip_typeref(cnst->base.type);
-	ir_mode  *mode = get_ir_mode_storage(type);
+	type_t     *type   = skip_typeref(literal->base.type);
+	ir_mode    *mode   = get_ir_mode_storage(type);
+	const char *string = literal->value.begin;
+	size_t      size   = literal->value.size;
+	tarval     *tv;
 
-	char    buf[128];
-	tarval *tv;
-	size_t  len;
-	if (mode_is_float(mode)) {
-		tv = new_tarval_from_double(cnst->v.float_value, mode);
-	} else {
-		if (mode_is_signed(mode)) {
-			len = snprintf(buf, sizeof(buf), "%lld", cnst->v.int_value);
-		} else {
-			len = snprintf(buf, sizeof(buf), "%llu",
-			               (unsigned long long) cnst->v.int_value);
-		}
+	switch (literal->base.kind) {
+	case EXPR_LITERAL_WIDE_CHARACTER: {
+		utf32  v = read_utf8_char(&string);
+		char   buf[128];
+		size_t len = snprintf(buf, sizeof(buf), UTF32_PRINTF_FORMAT, v);
+
 		tv = new_tarval_from_str(buf, len, mode);
+		goto make_const;
 	}
-
-	ir_node *res        = new_d_Const(dbgi, tv);
-	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-	return create_conv(dbgi, res, mode_arith);
-}
-
-/**
- * Creates a Const node representing a character constant.
- */
-static ir_node *character_constant_to_firm(const const_expression_t *cnst)
-{
-	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
-	ir_mode  *mode = get_ir_mode_arithmetic(cnst->base.type);
-
-	long long int v;
-	size_t const  size = cnst->v.character.size;
-	if (size == 1 && char_is_signed) {
-		v = (signed char)cnst->v.character.begin[0];
-	} else {
-		v = 0;
-		for (size_t i = 0; i < size; ++i) {
-			v = (v << 8) | ((unsigned char)cnst->v.character.begin[i]);
+	case EXPR_LITERAL_CHARACTER: {
+		long long int v;
+		if (size == 1 && char_is_signed) {
+			v = (signed char)string[0];
+		} else {
+			v = 0;
+			for (size_t i = 0; i < size; ++i) {
+				v = (v << 8) | ((unsigned char)string[i]);
+			}
 		}
+		char   buf[128];
+		size_t len = snprintf(buf, sizeof(buf), "%lld", v);
+
+		tv = new_tarval_from_str(buf, len, mode);
+		goto make_const;
 	}
-	char    buf[128];
-	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
-	tarval *tv = new_tarval_from_str(buf, len, mode);
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_INTEGER_OCTAL:
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+		assert(literal->target_value != NULL);
+		tv = literal->target_value;
+		goto make_const;
+	case EXPR_LITERAL_FLOATINGPOINT:
+		tv = new_tarval_from_str(string, size, mode);
+		goto make_const;
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: {
+		char *buffer = alloca(size + 2);
+		memcpy(buffer, "0x", 2);
+		memcpy(buffer+2, string, size);
+		tv = new_tarval_from_str(buffer, size+2, mode);
+		goto make_const;
+	}
+	case EXPR_LITERAL_BOOLEAN:
+		if (string[0] == 't') {
+			tv = get_mode_one(mode);
+		} else {
+			assert(string[0] == 'f');
+			tv = get_mode_null(mode);
+		}
+		goto make_const;
+	case EXPR_LITERAL_MS_NOOP:
+		tv = get_mode_null(mode);
+		goto make_const;
+	default:
+		break;
+	}
+	panic("Invalid literal kind found");
 
-	return new_d_Const(dbgi, tv);
-}
-
-/**
- * Creates a Const node representing a wide character constant.
- */
-static ir_node *wide_character_constant_to_firm(const const_expression_t *cnst)
-{
-	dbg_info *dbgi = get_dbg_info(&cnst->base.source_position);
-	ir_mode  *mode = get_ir_mode_arithmetic(cnst->base.type);
-
-	long long int v = cnst->v.wide_character.begin[0];
-
-	char    buf[128];
-	size_t  len = snprintf(buf, sizeof(buf), "%lld", v);
-	tarval *tv = new_tarval_from_str(buf, len, mode);
-
-	return new_d_Const(dbgi, tv);
+make_const: ;
+	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
+	ir_node  *res        = new_d_Const(dbgi, tv);
+	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
+	return create_conv(dbgi, res, mode_arith);
 }
 
 /*
@@ -1192,23 +1385,6 @@ static ir_node *get_trampoline_region(dbg_info *dbgi, ir_entity *entity)
 	                       region);
 }
 
-
-/**
- * Creates a SymConst for a given entity.
- *
- * @param dbgi    debug info
- * @param mode    the (reference) mode for the SymConst
- * @param entity  the entity
- */
-static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
-                                ir_entity *entity)
-{
-	assert(entity != NULL);
-	union symconst_symbol sym;
-	sym.entity_p = entity;
-	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
-}
-
 /**
  * Creates a trampoline for a function represented by an entity.
  *
@@ -1228,101 +1404,6 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 	return new_Proj(irn, mode, pn_Builtin_1_result);
-}
-
-/**
- * Creates a SymConst node representing a string constant.
- *
- * @param src_pos    the source position of the string constant
- * @param id_prefix  a prefix for the name of the generated string constant
- * @param value      the value of the string constant
- */
-static ir_node *string_to_firm(const source_position_t *const src_pos,
-                               const char *const id_prefix,
-                               const string_t *const value)
-{
-	ir_type  *const global_type = get_glob_type();
-	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const type        = new_type_array(1, ir_type_const_char);
-
-	ident     *const id     = id_unique(id_prefix);
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_type *const elem_type = ir_type_const_char;
-	ir_mode *const mode      = get_type_mode(elem_type);
-
-	const char* const string = value->begin;
-	const size_t      slen   = value->size;
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen);
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	for (size_t i = 0; i < slen; ++i) {
-		tarval           *tv  = new_tarval_from_long(string[i], mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
-	}
-	set_entity_initializer(entity, initializer);
-
-	return create_symconst(dbgi, mode_P_data, entity);
-}
-
-/**
- * Creates a SymConst node representing a string literal.
- *
- * @param literal   the string literal
- */
-static ir_node *string_literal_to_firm(
-		const string_literal_expression_t* literal)
-{
-	return string_to_firm(&literal->base.source_position, "str.%u",
-	                      &literal->value);
-}
-
-/**
- * Creates a SymConst node representing a wide string literal.
- *
- * @param literal   the wide string literal
- */
-static ir_node *wide_string_literal_to_firm(
-	const wide_string_literal_expression_t* const literal)
-{
-	ir_type *const global_type = get_glob_type();
-	ir_type *const elem_type   = ir_type_wchar_t;
-	dbg_info *const dbgi       = get_dbg_info(&literal->base.source_position);
-	ir_type *const type        = new_type_array(1, elem_type);
-
-	ident     *const id     = id_unique("str.%u");
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_mode *const mode      = get_type_mode(elem_type);
-
-	const wchar_rep_t *const string = literal->value.begin;
-	const size_t             slen   = literal->value.size;
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen * get_mode_size_bytes(mode));
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	for (size_t i = 0; i < slen; ++i) {
-		tarval           *tv  = new_tarval_from_long(string[i], mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
-	}
-	set_entity_initializer(entity, initializer);
-
-	return create_symconst(dbgi, mode_P_data, entity);
 }
 
 /**
@@ -3449,16 +3530,13 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 #endif
 
 	switch (expression->kind) {
-	case EXPR_CHARACTER_CONSTANT:
-		return character_constant_to_firm(&expression->conste);
-	case EXPR_WIDE_CHARACTER_CONSTANT:
-		return wide_character_constant_to_firm(&expression->conste);
-	case EXPR_CONST:
-		return const_to_firm(&expression->conste);
+	EXPR_LITERAL_CASES
+		return literal_to_firm(&expression->literal);
 	case EXPR_STRING_LITERAL:
-		return string_literal_to_firm(&expression->string);
+		return string_to_firm(&expression->base.source_position, "str.%u",
+		                      &expression->literal.value);
 	case EXPR_WIDE_STRING_LITERAL:
-		return wide_string_literal_to_firm(&expression->wide_string);
+		return wide_string_literal_to_firm(&expression->string_literal);
 	case EXPR_REFERENCE:
 		return reference_expression_to_firm(&expression->reference);
 	case EXPR_REFERENCE_ENUM_VALUE:
@@ -4084,19 +4162,19 @@ static ir_initializer_t *create_ir_initializer_string(
 static ir_initializer_t *create_ir_initializer_wide_string(
 		const initializer_wide_string_t *initializer, type_t *type)
 {
-	size_t            string_len    = initializer->string.size;
 	assert(type->kind == TYPE_ARRAY);
 	assert(type->array.size_constant);
 	size_t            len           = type->array.size;
+	size_t            string_len    = wstrlen(&initializer->string);
 	ir_initializer_t *irinitializer = create_initializer_compound(len);
 
-	const wchar_rep_t *string = initializer->string.begin;
-	ir_mode           *mode   = get_type_mode(ir_type_wchar_t);
+	const char *p    = initializer->string.begin;
+	ir_mode    *mode = get_type_mode(ir_type_wchar_t);
 
 	for (size_t i = 0; i < len; ++i) {
-		wchar_rep_t c = 0;
+		utf32 c = 0;
 		if (i < string_len) {
-			c = string[i];
+			c = read_utf8_char(&p);
 		}
 		tarval *tv = new_tarval_from_long(c, mode);
 		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
@@ -5981,6 +6059,9 @@ static void global_asm_to_firm(statement_t *s)
 
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	/* initialize firm arithmetic */
+	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+
 	/* just to be sure */
 	continue_label           = NULL;
 	break_label              = NULL;

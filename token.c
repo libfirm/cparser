@@ -124,20 +124,42 @@ symbol_t *get_token_symbol(const token_t *token)
 	return token_symbols[token->type];
 }
 
+static void print_stringrep(const string_t *string, FILE *f)
+{
+	for (size_t i = 0; i < string->size; ++i) {
+		fputc(string->begin[i], f);
+	}
+}
+
 void print_token(FILE *f, const token_t *token)
 {
 	switch(token->type) {
 	case T_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->v.symbol->string);
+		fprintf(f, "identifier '%s'", token->symbol->string);
 		break;
 	case T_INTEGER:
-		fprintf(f, "integer number '%lld'", token->v.intvalue);
-		break;
+	case T_INTEGER_OCTAL:
+	case T_INTEGER_HEXADECIMAL:
 	case T_FLOATINGPOINT:
-		fprintf(f, "floating-point number '%LF'", token->v.floatvalue);
+	case T_FLOATINGPOINT_HEXADECIMAL:
+		print_token_type(f, (token_type_t)token->type);
+		fputs(" '", f);
+		print_stringrep(&token->literal, f);
+		if (token->symbol != NULL)
+			fputs(token->symbol->string, f);
+		fputc('\'', f);
 		break;
+	case T_WIDE_STRING_LITERAL:
 	case T_STRING_LITERAL:
-		fprintf(f, "string \"%s\"", token->v.string.begin);
+		print_token_type(f, (token_type_t)token->type);
+		fprintf(f, " \"%s\"", token->literal.begin);
+		break;
+	case T_CHARACTER_CONSTANT:
+	case T_WIDE_CHARACTER_CONSTANT:
+		print_token_type(f, (token_type_t)token->type);
+		fputs(" \'", f);
+		print_stringrep(&token->literal, f);
+		fputs("'", f);
 		break;
 	default:
 		fputc('\'', f);
@@ -180,13 +202,13 @@ void print_pp_token(FILE *f, const token_t *token)
 {
 	switch((preprocessor_token_type_t) token->type) {
 	case TP_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->v.symbol->string);
+		fprintf(f, "identifier '%s'", token->symbol->string);
 		break;
 	case TP_NUMBER:
-		fprintf(f, "number '%s'", token->v.string.begin);
+		fprintf(f, "number '%s'", token->literal.begin);
 		break;
 	case TP_STRING_LITERAL:
-		fprintf(f, "string \"%s\"", token->v.string.begin);
+		fprintf(f, "string \"%s\"", token->literal.begin);
 		break;
 	default:
 		print_pp_token_type(f, (preprocessor_token_type_t) token->type);

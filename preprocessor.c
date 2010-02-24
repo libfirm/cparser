@@ -484,9 +484,9 @@ end_of_string:
 	const char *const result = string;
 #endif
 
-	pp_token.type           = TP_STRING_LITERAL;
-	pp_token.v.string.begin = result;
-	pp_token.v.string.size  = size;
+	pp_token.type          = TP_STRING_LITERAL;
+	pp_token.literal.begin = result;
+	pp_token.literal.size  = size;
 }
 
 static void parse_wide_character_constant(void)
@@ -530,67 +530,6 @@ static void parse_wide_character_constant(void)
 end_of_wide_char_constant:
 	pp_token.type       = TP_WIDE_CHARACTER_CONSTANT;
 	/* TODO... */
-}
-
-static void parse_wide_string_literal(void)
-{
-	const unsigned start_linenr = input.position.linenr;
-
-	assert(CC == '"');
-	next_char();
-
-	while(1) {
-		switch(CC) {
-		case '\\': {
-			wchar_rep_t tc = parse_escape_sequence();
-			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
-			break;
-		}
-
-		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = pp_token.source_position.input_name;
-			source_position.linenr     = start_linenr;
-			errorf(&source_position, "string has no end");
-			pp_token.type = TP_ERROR;
-			return;
-		}
-
-		case '"':
-			next_char();
-			goto end_of_string;
-
-		default: {
-			wchar_rep_t tc = CC;
-			obstack_grow(&symbol_obstack, &tc, sizeof(tc));
-			next_char();
-			break;
-		}
-		}
-	}
-
-end_of_string:;
-	/* add finishing 0 to the string */
-	static const wchar_rep_t nul = L'\0';
-	obstack_grow(&symbol_obstack, &nul, sizeof(nul));
-
-	const size_t size
-		= (size_t)obstack_object_size(&symbol_obstack) / sizeof(wchar_rep_t);
-	const wchar_rep_t *const string = obstack_finish(&symbol_obstack);
-
-#if 0 /* TODO hash */
-	/* check if there is already a copy of the string */
-	const wchar_rep_t *const result = strset_insert(&stringset, string);
-	if(result != string) {
-		obstack_free(&symbol_obstack, string);
-	}
-#else
-	const wchar_rep_t *const result = string;
-#endif
-
-	pp_token.type                = TP_WIDE_STRING_LITERAL;
-	pp_token.v.wide_string.begin = result;
-	pp_token.v.wide_string.size  = size;
 }
 
 static void parse_character_constant(void)
@@ -637,9 +576,9 @@ end_of_char_constant:;
 	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
 	const char *const string = obstack_finish(&symbol_obstack);
 
-	pp_token.type           = TP_CHARACTER_CONSTANT;
-	pp_token.v.string.begin = string;
-	pp_token.v.string.size  = size;
+	pp_token.type          = TP_CHARACTER_CONSTANT;
+	pp_token.literal.begin = string;
+	pp_token.literal.size  = size;
 }
 
 #define SYMBOL_CHARS_WITHOUT_E_P \
@@ -747,7 +686,7 @@ restart:
 		return;
 
 	/* if it was an identifier then we might need to expand again */
-	pp_definition_t *symbol_definition = pp_token.v.symbol->pp_definition;
+	pp_definition_t *symbol_definition = pp_token.symbol->pp_definition;
 	if(symbol_definition != NULL && !symbol_definition->is_expanding) {
 		symbol_definition->parent_expansion = definition;
 		symbol_definition->expand_pos       = 0;
@@ -912,7 +851,7 @@ end_symbol:
 	/* might be a wide string or character constant ( L"string"/L'c' ) */
 	if (CC == '"' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
-		parse_wide_string_literal();
+		/* TODO */
 		return;
 	} else if (CC == '\'' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
@@ -922,8 +861,8 @@ end_symbol:
 
 	symbol_t *symbol = symbol_table_insert(string);
 
-	pp_token.type     = symbol->pp_ID;
-	pp_token.v.symbol = symbol;
+	pp_token.type   = symbol->pp_ID;
+	pp_token.symbol = symbol;
 
 	/* we can free the memory from symbol obstack if we already had an entry in
 	 * the symbol table */
@@ -993,11 +932,10 @@ end_number:
 	size_t  size   = obstack_object_size(&symbol_obstack);
 	char   *string = obstack_finish(&symbol_obstack);
 
-	pp_token.type           = TP_NUMBER;
-	pp_token.v.string.begin = string;
-	pp_token.v.string.size  = size;
+	pp_token.type          = TP_NUMBER;
+	pp_token.literal.begin = string;
+	pp_token.literal.size  = size;
 }
-
 
 
 #define MAYBE_PROLOG                                       \
@@ -1292,14 +1230,14 @@ static void emit_pp_token(void)
 
 	switch(pp_token.type) {
 	case TP_IDENTIFIER:
-		fputs(pp_token.v.symbol->string, out);
+		fputs(pp_token.symbol->string, out);
 		break;
 	case TP_NUMBER:
-		fputs(pp_token.v.string.begin, out);
+		fputs(pp_token.literal.begin, out);
 		break;
 	case TP_STRING_LITERAL:
 		fputc('"', out);
-		fputs(pp_token.v.string.begin, out);
+		fputs(pp_token.literal.begin, out);
 		fputc('"', out);
 		break;
 	case '\n':
@@ -1332,22 +1270,6 @@ static bool strings_equal(const string_t *string1, const string_t *string2)
 	return true;
 }
 
-static bool wide_strings_equal(const wide_string_t *string1,
-                               const wide_string_t *string2)
-{
-	size_t size = string1->size;
-	if(size != string2->size)
-		return false;
-
-	const wchar_rep_t *c1 = string1->begin;
-	const wchar_rep_t *c2 = string2->begin;
-	for(size_t i = 0; i < size; ++i, ++c1, ++c2) {
-		if(*c1 != *c2)
-			return false;
-	}
-	return true;
-}
-
 static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 {
 	if(token1->type != token2->type)
@@ -1358,16 +1280,12 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 		/* TODO */
 		return false;
 	case TP_IDENTIFIER:
-		return token1->v.symbol == token2->v.symbol;
+		return token1->symbol == token2->symbol;
 	case TP_NUMBER:
 	case TP_CHARACTER_CONSTANT:
 	case TP_STRING_LITERAL:
-		return strings_equal(&token1->v.string, &token2->v.string);
+		return strings_equal(&token1->literal, &token2->literal);
 
-	case TP_WIDE_CHARACTER_CONSTANT:
-	case TP_WIDE_STRING_LITERAL:
-		return wide_strings_equal(&token1->v.wide_string,
-		                          &token2->v.wide_string);
 	default:
 		return true;
 	}
@@ -1399,7 +1317,7 @@ static void parse_define_directive(void)
 		       "expected identifier after #define, got '%t'", &pp_token);
 		goto error_out;
 	}
-	symbol_t *symbol = pp_token.v.symbol;
+	symbol_t *symbol = pp_token.symbol;
 
 	pp_definition_t *new_definition
 		= obstack_alloc(&pp_obstack, sizeof(new_definition[0]));
@@ -1427,7 +1345,7 @@ static void parse_define_directive(void)
 				}
 				break;
 			case TP_IDENTIFIER:
-				obstack_ptr_grow(&pp_obstack, pp_token.v.symbol);
+				obstack_ptr_grow(&pp_obstack, pp_token.symbol);
 				next_preprocessing_token();
 
 				if (pp_token.type == ',') {
@@ -1508,7 +1426,7 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	symbol_t *symbol = pp_token.v.symbol;
+	symbol_t *symbol = pp_token.symbol;
 	symbol->pp_definition = NULL;
 	next_preprocessing_token();
 
@@ -1696,7 +1614,7 @@ static void parse_ifdef_ifndef_directive(void)
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
-		symbol_t        *symbol        = pp_token.v.symbol;
+		symbol_t        *symbol        = pp_token.symbol;
 		pp_definition_t *pp_definition = symbol->pp_definition;
 		next_preprocessing_token();
 

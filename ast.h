@@ -25,10 +25,9 @@
 #include "entity.h"
 
 typedef struct expression_base_t                     expression_base_t;
-typedef struct const_expression_t                    const_expression_t;
+typedef struct literal_expression_t                  literal_expression_t;
 typedef struct string_literal_expression_t           string_literal_expression_t;
 typedef struct funcname_expression_t                 funcname_expression_t;
-typedef struct wide_string_literal_expression_t      wide_string_literal_expression_t;
 typedef struct compound_literal_expression_t         compound_literal_expression_t;
 typedef struct reference_expression_t                reference_expression_t;
 typedef struct cast_expression_t                     cast_expression_t;
@@ -124,5 +123,12 @@ bool is_address_constant(const expression_t *expression);
 
 long fold_constant_to_int(const expression_t *expression);
 bool fold_constant_to_bool(const expression_t *expression);
+
+/**
+ * the type of a literal is usually the biggest type that can hold the value.
+ * Since this is backend dependent the parses needs this call exposed.
+ * Works for EXPR_LITERAL_* expressions.
+ */
+void determine_literal_type(literal_expression_t *literal);
 
 #endif

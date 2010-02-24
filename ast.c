@@ -26,6 +26,7 @@
 #include "lang_features.h"
 #include "entity_t.h"
 #include "printer.h"
+#include "types.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -68,6 +69,18 @@ void print_indent(void)
 		print_string("\t");
 }
 
+static void print_symbol(const symbol_t *symbol)
+{
+	print_string(symbol->string);
+}
+
+static void print_stringrep(const string_t *string)
+{
+	for (size_t i = 0; i < string->size; ++i) {
+		print_char(string->begin[i]);
+	}
+}
+
 /**
  * Returns 1 if a given precedence level has right-to-left
  * associativity, else 0.
@@ -95,88 +108,93 @@ static int right_to_left(unsigned precedence)
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
 	static const unsigned prec[] = {
-		[EXPR_UNKNOWN]                    = PREC_PRIMARY,
-		[EXPR_INVALID]                    = PREC_PRIMARY,
-		[EXPR_REFERENCE]                  = PREC_PRIMARY,
-		[EXPR_REFERENCE_ENUM_VALUE]       = PREC_PRIMARY,
-		[EXPR_CHARACTER_CONSTANT]         = PREC_PRIMARY,
-		[EXPR_WIDE_CHARACTER_CONSTANT]    = PREC_PRIMARY,
-		[EXPR_CONST]                      = PREC_PRIMARY,
-		[EXPR_STRING_LITERAL]             = PREC_PRIMARY,
-		[EXPR_WIDE_STRING_LITERAL]        = PREC_PRIMARY,
-		[EXPR_COMPOUND_LITERAL]           = PREC_UNARY,
-		[EXPR_CALL]                       = PREC_POSTFIX,
-		[EXPR_CONDITIONAL]                = PREC_CONDITIONAL,
-		[EXPR_SELECT]                     = PREC_POSTFIX,
-		[EXPR_ARRAY_ACCESS]               = PREC_POSTFIX,
-		[EXPR_SIZEOF]                     = PREC_UNARY,
-		[EXPR_CLASSIFY_TYPE]              = PREC_UNARY,
-		[EXPR_ALIGNOF]                    = PREC_UNARY,
+		[EXPR_UNKNOWN]                           = PREC_PRIMARY,
+		[EXPR_INVALID]                           = PREC_PRIMARY,
+		[EXPR_REFERENCE]                         = PREC_PRIMARY,
+		[EXPR_REFERENCE_ENUM_VALUE]              = PREC_PRIMARY,
+		[EXPR_LITERAL_INTEGER]                   = PREC_PRIMARY,
+		[EXPR_LITERAL_INTEGER_OCTAL]             = PREC_PRIMARY,
+		[EXPR_LITERAL_INTEGER_HEXADECIMAL]       = PREC_PRIMARY,
+		[EXPR_LITERAL_FLOATINGPOINT]             = PREC_PRIMARY,
+		[EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL] = PREC_PRIMARY,
+		[EXPR_LITERAL_CHARACTER]                 = PREC_PRIMARY,
+		[EXPR_LITERAL_WIDE_CHARACTER]            = PREC_PRIMARY,
+		[EXPR_LITERAL_MS_NOOP]                   = PREC_PRIMARY,
+		[EXPR_STRING_LITERAL]                    = PREC_PRIMARY,
+		[EXPR_WIDE_STRING_LITERAL]               = PREC_PRIMARY,
+		[EXPR_COMPOUND_LITERAL]                  = PREC_UNARY,
+		[EXPR_CALL]                              = PREC_POSTFIX,
+		[EXPR_CONDITIONAL]                       = PREC_CONDITIONAL,
+		[EXPR_SELECT]                            = PREC_POSTFIX,
+		[EXPR_ARRAY_ACCESS]                      = PREC_POSTFIX,
+		[EXPR_SIZEOF]                            = PREC_UNARY,
+		[EXPR_CLASSIFY_TYPE]                     = PREC_UNARY,
+		[EXPR_ALIGNOF]                           = PREC_UNARY,
 
-		[EXPR_FUNCNAME]                   = PREC_PRIMARY,
-		[EXPR_BUILTIN_CONSTANT_P]         = PREC_PRIMARY,
-		[EXPR_BUILTIN_TYPES_COMPATIBLE_P] = PREC_PRIMARY,
-		[EXPR_OFFSETOF]                   = PREC_PRIMARY,
-		[EXPR_VA_START]                   = PREC_PRIMARY,
-		[EXPR_VA_ARG]                     = PREC_PRIMARY,
-		[EXPR_VA_COPY]                    = PREC_PRIMARY,
-		[EXPR_STATEMENT]                  = PREC_PRIMARY,
-		[EXPR_LABEL_ADDRESS]              = PREC_PRIMARY,
+		[EXPR_FUNCNAME]                          = PREC_PRIMARY,
+		[EXPR_BUILTIN_CONSTANT_P]                = PREC_PRIMARY,
+		[EXPR_BUILTIN_TYPES_COMPATIBLE_P]        = PREC_PRIMARY,
+		[EXPR_OFFSETOF]                          = PREC_PRIMARY,
+		[EXPR_VA_START]                          = PREC_PRIMARY,
+		[EXPR_VA_ARG]                            = PREC_PRIMARY,
+		[EXPR_VA_COPY]                           = PREC_PRIMARY,
+		[EXPR_STATEMENT]                         = PREC_PRIMARY,
+		[EXPR_LABEL_ADDRESS]                     = PREC_PRIMARY,
 
-		[EXPR_UNARY_NEGATE]               = PREC_UNARY,
-		[EXPR_UNARY_PLUS]                 = PREC_UNARY,
-		[EXPR_UNARY_BITWISE_NEGATE]       = PREC_UNARY,
-		[EXPR_UNARY_NOT]                  = PREC_UNARY,
-		[EXPR_UNARY_DEREFERENCE]          = PREC_UNARY,
-		[EXPR_UNARY_TAKE_ADDRESS]         = PREC_UNARY,
-		[EXPR_UNARY_POSTFIX_INCREMENT]    = PREC_POSTFIX,
-		[EXPR_UNARY_POSTFIX_DECREMENT]    = PREC_POSTFIX,
-		[EXPR_UNARY_PREFIX_INCREMENT]     = PREC_UNARY,
-		[EXPR_UNARY_PREFIX_DECREMENT]     = PREC_UNARY,
-		[EXPR_UNARY_CAST]                 = PREC_UNARY,
-		[EXPR_UNARY_CAST_IMPLICIT]        = PREC_UNARY,
-		[EXPR_UNARY_ASSUME]               = PREC_PRIMARY,
-		[EXPR_UNARY_DELETE]               = PREC_UNARY,
-		[EXPR_UNARY_DELETE_ARRAY]         = PREC_UNARY,
-		[EXPR_UNARY_THROW]                = PREC_ASSIGNMENT,
+		[EXPR_UNARY_NEGATE]                      = PREC_UNARY,
+		[EXPR_UNARY_PLUS]                        = PREC_UNARY,
+		[EXPR_UNARY_BITWISE_NEGATE]              = PREC_UNARY,
+		[EXPR_UNARY_NOT]                         = PREC_UNARY,
+		[EXPR_UNARY_DEREFERENCE]                 = PREC_UNARY,
+		[EXPR_UNARY_TAKE_ADDRESS]                = PREC_UNARY,
+		[EXPR_UNARY_POSTFIX_INCREMENT]           = PREC_POSTFIX,
+		[EXPR_UNARY_POSTFIX_DECREMENT]           = PREC_POSTFIX,
+		[EXPR_UNARY_PREFIX_INCREMENT]            = PREC_UNARY,
+		[EXPR_UNARY_PREFIX_DECREMENT]            = PREC_UNARY,
+		[EXPR_UNARY_CAST]                        = PREC_UNARY,
+		[EXPR_UNARY_CAST_IMPLICIT]               = PREC_UNARY,
+		[EXPR_UNARY_ASSUME]                      = PREC_PRIMARY,
+		[EXPR_UNARY_DELETE]                      = PREC_UNARY,
+		[EXPR_UNARY_DELETE_ARRAY]                = PREC_UNARY,
+		[EXPR_UNARY_THROW]                       = PREC_ASSIGNMENT,
 
-		[EXPR_BINARY_ADD]                 = PREC_ADDITIVE,
-		[EXPR_BINARY_SUB]                 = PREC_ADDITIVE,
-		[EXPR_BINARY_MUL]                 = PREC_MULTIPLICATIVE,
-		[EXPR_BINARY_DIV]                 = PREC_MULTIPLICATIVE,
-		[EXPR_BINARY_MOD]                 = PREC_MULTIPLICATIVE,
-		[EXPR_BINARY_EQUAL]               = PREC_EQUALITY,
-		[EXPR_BINARY_NOTEQUAL]            = PREC_EQUALITY,
-		[EXPR_BINARY_LESS]                = PREC_RELATIONAL,
-		[EXPR_BINARY_LESSEQUAL]           = PREC_RELATIONAL,
-		[EXPR_BINARY_GREATER]             = PREC_RELATIONAL,
-		[EXPR_BINARY_GREATEREQUAL]        = PREC_RELATIONAL,
-		[EXPR_BINARY_BITWISE_AND]         = PREC_AND,
-		[EXPR_BINARY_BITWISE_OR]          = PREC_OR,
-		[EXPR_BINARY_BITWISE_XOR]         = PREC_XOR,
-		[EXPR_BINARY_LOGICAL_AND]         = PREC_LOGICAL_AND,
-		[EXPR_BINARY_LOGICAL_OR]          = PREC_LOGICAL_OR,
-		[EXPR_BINARY_SHIFTLEFT]           = PREC_SHIFT,
-		[EXPR_BINARY_SHIFTRIGHT]          = PREC_SHIFT,
-		[EXPR_BINARY_ASSIGN]              = PREC_ASSIGNMENT,
-		[EXPR_BINARY_MUL_ASSIGN]          = PREC_ASSIGNMENT,
-		[EXPR_BINARY_DIV_ASSIGN]          = PREC_ASSIGNMENT,
-		[EXPR_BINARY_MOD_ASSIGN]          = PREC_ASSIGNMENT,
-		[EXPR_BINARY_ADD_ASSIGN]          = PREC_ASSIGNMENT,
-		[EXPR_BINARY_SUB_ASSIGN]          = PREC_ASSIGNMENT,
-		[EXPR_BINARY_SHIFTLEFT_ASSIGN]    = PREC_ASSIGNMENT,
-		[EXPR_BINARY_SHIFTRIGHT_ASSIGN]   = PREC_ASSIGNMENT,
-		[EXPR_BINARY_BITWISE_AND_ASSIGN]  = PREC_ASSIGNMENT,
-		[EXPR_BINARY_BITWISE_XOR_ASSIGN]  = PREC_ASSIGNMENT,
-		[EXPR_BINARY_BITWISE_OR_ASSIGN]   = PREC_ASSIGNMENT,
-		[EXPR_BINARY_COMMA]               = PREC_EXPRESSION,
+		[EXPR_BINARY_ADD]                        = PREC_ADDITIVE,
+		[EXPR_BINARY_SUB]                        = PREC_ADDITIVE,
+		[EXPR_BINARY_MUL]                        = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_DIV]                        = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_MOD]                        = PREC_MULTIPLICATIVE,
+		[EXPR_BINARY_EQUAL]                      = PREC_EQUALITY,
+		[EXPR_BINARY_NOTEQUAL]                   = PREC_EQUALITY,
+		[EXPR_BINARY_LESS]                       = PREC_RELATIONAL,
+		[EXPR_BINARY_LESSEQUAL]                  = PREC_RELATIONAL,
+		[EXPR_BINARY_GREATER]                    = PREC_RELATIONAL,
+		[EXPR_BINARY_GREATEREQUAL]               = PREC_RELATIONAL,
+		[EXPR_BINARY_BITWISE_AND]                = PREC_AND,
+		[EXPR_BINARY_BITWISE_OR]                 = PREC_OR,
+		[EXPR_BINARY_BITWISE_XOR]                = PREC_XOR,
+		[EXPR_BINARY_LOGICAL_AND]                = PREC_LOGICAL_AND,
+		[EXPR_BINARY_LOGICAL_OR]                 = PREC_LOGICAL_OR,
+		[EXPR_BINARY_SHIFTLEFT]                  = PREC_SHIFT,
+		[EXPR_BINARY_SHIFTRIGHT]                 = PREC_SHIFT,
+		[EXPR_BINARY_ASSIGN]                     = PREC_ASSIGNMENT,
+		[EXPR_BINARY_MUL_ASSIGN]                 = PREC_ASSIGNMENT,
+		[EXPR_BINARY_DIV_ASSIGN]                 = PREC_ASSIGNMENT,
+		[EXPR_BINARY_MOD_ASSIGN]                 = PREC_ASSIGNMENT,
+		[EXPR_BINARY_ADD_ASSIGN]                 = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SUB_ASSIGN]                 = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SHIFTLEFT_ASSIGN]           = PREC_ASSIGNMENT,
+		[EXPR_BINARY_SHIFTRIGHT_ASSIGN]          = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_AND_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_XOR_ASSIGN]         = PREC_ASSIGNMENT,
+		[EXPR_BINARY_BITWISE_OR_ASSIGN]          = PREC_ASSIGNMENT,
+		[EXPR_BINARY_COMMA]                      = PREC_EXPRESSION,
 
-		[EXPR_BINARY_ISGREATER]           = PREC_PRIMARY,
-		[EXPR_BINARY_ISGREATEREQUAL]      = PREC_PRIMARY,
-		[EXPR_BINARY_ISLESS]              = PREC_PRIMARY,
-		[EXPR_BINARY_ISLESSEQUAL]         = PREC_PRIMARY,
-		[EXPR_BINARY_ISLESSGREATER]       = PREC_PRIMARY,
-		[EXPR_BINARY_ISUNORDERED]         = PREC_PRIMARY
+		[EXPR_BINARY_ISGREATER]                  = PREC_PRIMARY,
+		[EXPR_BINARY_ISGREATEREQUAL]             = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESS]                     = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESSEQUAL]                = PREC_PRIMARY,
+		[EXPR_BINARY_ISLESSGREATER]              = PREC_PRIMARY,
+		[EXPR_BINARY_ISUNORDERED]                = PREC_PRIMARY
 	};
 	assert((size_t)kind < lengthof(prec));
 	unsigned res = prec[kind];
@@ -186,58 +204,14 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 }
 
 /**
- * Print a constant expression.
- *
- * @param cnst  the constant expression
- */
-static void print_const(const const_expression_t *cnst)
-{
-	if (cnst->base.type == NULL)
-		return;
-
-	const type_t *const type = skip_typeref(cnst->base.type);
-
-	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
-		print_string(cnst->v.int_value ? "true" : "false");
-	} else if (is_type_integer(type)) {
-		print_format("%lld", cnst->v.int_value);
-	} else if (is_type_float(type)) {
-		long double const val = cnst->v.float_value;
-#ifdef _WIN32
-		/* ARG, no way to print long double */
-		print_format("%.20g", (double)val);
-#else
-		print_format("%.20Lg", val);
-#endif
-		if (isfinite(val) && truncl(val) == val)
-			print_string(".0");
-	} else {
-		panic("unknown constant");
-	}
-
-	char const* suffix;
-	switch (type->atomic.akind) {
-		case ATOMIC_TYPE_UINT:        suffix = "U";   break;
-		case ATOMIC_TYPE_LONG:        suffix = "L";   break;
-		case ATOMIC_TYPE_ULONG:       suffix = "UL";  break;
-		case ATOMIC_TYPE_LONGLONG:    suffix = "LL";  break;
-		case ATOMIC_TYPE_ULONGLONG:   suffix = "ULL"; break;
-		case ATOMIC_TYPE_FLOAT:       suffix = "F";   break;
-		case ATOMIC_TYPE_LONG_DOUBLE: suffix = "L";   break;
-
-		default: return;
-	}
-	print_string(suffix);
-}
-
-/**
  * Print a quoted string constant.
  *
  * @param string  the string constant
  * @param border  the border char
  * @param skip    number of chars to skip at the end
  */
-static void print_quoted_string(const string_t *const string, char border, int skip)
+static void print_quoted_string(const string_t *const string, char border,
+                                int skip)
 {
 	print_char(border);
 	const char *end = string->begin + string->size - skip;
@@ -247,15 +221,15 @@ static void print_quoted_string(const string_t *const string, char border, int s
 			print_string("\\");
 		}
 		switch (tc) {
-		case '\\':  print_string("\\\\"); break;
-		case '\a':  print_string("\\a"); break;
-		case '\b':  print_string("\\b"); break;
-		case '\f':  print_string("\\f"); break;
-		case '\n':  print_string("\\n"); break;
-		case '\r':  print_string("\\r"); break;
-		case '\t':  print_string("\\t"); break;
-		case '\v':  print_string("\\v"); break;
-		case '\?':  print_string("\\?"); break;
+		case '\\': print_string("\\\\"); break;
+		case '\a': print_string("\\a"); break;
+		case '\b': print_string("\\b"); break;
+		case '\f': print_string("\\f"); break;
+		case '\n': print_string("\\n"); break;
+		case '\r': print_string("\\r"); break;
+		case '\t': print_string("\\t"); break;
+		case '\v': print_string("\\v"); break;
+		case '\?': print_string("\\?"); break;
 		case 27:
 			if (c_mode & _GNUC) {
 				print_string("\\e"); break;
@@ -273,77 +247,42 @@ static void print_quoted_string(const string_t *const string, char border, int s
 	print_char(border);
 }
 
-/**
- * Prints a wide string literal expression.
- *
- * @param wstr    the wide string literal expression
- * @param border  the border char
- * @param skip    number of chars to skip at the end
- */
-static void print_quoted_wide_string(const wide_string_t *const wstr,
-                                     char border, int skip)
+static void print_string_literal(const string_literal_expression_t *literal)
 {
-	print_string("L");
-	print_char(border);
-	const wchar_rep_t *end = wstr->begin + wstr->size - skip;
-	for (const wchar_rep_t *c = wstr->begin; c != end; ++c) {
-		switch (*c) {
-			case L'\"':  print_string("\\\""); break;
-			case L'\\':  print_string("\\\\"); break;
-			case L'\a':  print_string("\\a");  break;
-			case L'\b':  print_string("\\b");  break;
-			case L'\f':  print_string("\\f");  break;
-			case L'\n':  print_string("\\n");  break;
-			case L'\r':  print_string("\\r");  break;
-			case L'\t':  print_string("\\t");  break;
-			case L'\v':  print_string("\\v");  break;
-			case L'\?':  print_string("\\?");  break;
-			case 27:
-				if (c_mode & _GNUC) {
-					print_string("\\e"); break;
-				}
-				/* FALLTHROUGH */
-			default: {
-				const unsigned tc = *c;
-				if (tc < 0x80U) {
-					if (isprint(*c)) {
-						print_char(*c);
-					} else {
-						print_format("\\%03o", tc);
-					}
-				} else {
-					print_char(tc);
-				}
-			}
-		}
+	if (literal->base.kind == EXPR_WIDE_STRING_LITERAL) {
+		print_char('L');
 	}
-	print_char(border);
+	print_quoted_string(&literal->value, '"', 1);
 }
 
-/**
- * Print a constant character expression.
- *
- * @param cnst  the constant character expression
- */
-static void print_character_constant(const const_expression_t *cnst)
+static void print_literal(const literal_expression_t *literal)
 {
-	print_quoted_string(&cnst->v.character, '\'', 0);
-}
-
-static void print_wide_character_constant(const const_expression_t *cnst)
-{
-	print_quoted_wide_string(&cnst->v.wide_character, '\'', 0);
-}
-
-/**
- * Prints a string literal expression.
- *
- * @param string_literal  the string literal expression
- */
-static void print_string_literal(
-		const string_literal_expression_t *string_literal)
-{
-	print_quoted_string(&string_literal->value, '"', 1);
+	switch (literal->base.kind) {
+	case EXPR_LITERAL_MS_NOOP:
+		print_string("__noop");
+		return;
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
+		print_string("0x");
+		/* FALLTHROUGH */
+	case EXPR_LITERAL_BOOLEAN:
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_INTEGER_OCTAL:
+	case EXPR_LITERAL_FLOATINGPOINT:
+		print_stringrep(&literal->value);
+		if (literal->suffix != NULL)
+			print_symbol(literal->suffix);
+		return;
+	case EXPR_LITERAL_WIDE_CHARACTER:
+		print_char('L');
+		/* FALLTHROUGH */
+	case EXPR_LITERAL_CHARACTER:
+		print_quoted_string(&literal->value, '\'', 0);
+		return;
+	default:
+		break;
+	}
+	print_string("INVALID LITERAL KIND");
 }
 
 /**
@@ -359,12 +298,6 @@ static void print_funcname(const funcname_expression_t *funcname)
 	case FUNCNAME_FUNCDNAME:       s = "__FUNCDNAME__"; break;
 	}
 	print_string(s);
-}
-
-static void print_wide_string_literal(
-	const wide_string_literal_expression_t *const wstr)
-{
-	print_quoted_wide_string(&wstr->value, '"', 1);
 }
 
 static void print_compound_literal(
@@ -758,23 +691,15 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_INVALID:
 		print_string("$invalid expression$");
 		break;
-	case EXPR_CHARACTER_CONSTANT:
-		print_character_constant(&expression->conste);
+	case EXPR_WIDE_STRING_LITERAL:
+	case EXPR_STRING_LITERAL:
+		print_string_literal(&expression->string_literal);
 		break;
-	case EXPR_WIDE_CHARACTER_CONSTANT:
-		print_wide_character_constant(&expression->conste);
-		break;
-	case EXPR_CONST:
-		print_const(&expression->conste);
+	EXPR_LITERAL_CASES
+		print_literal(&expression->literal);
 		break;
 	case EXPR_FUNCNAME:
 		print_funcname(&expression->funcname);
-		break;
-	case EXPR_STRING_LITERAL:
-		print_string_literal(&expression->string);
-		break;
-	case EXPR_WIDE_STRING_LITERAL:
-		print_wide_string_literal(&expression->wide_string);
 		break;
 	case EXPR_COMPOUND_LITERAL:
 		print_compound_literal(&expression->compound_literal);
@@ -833,10 +758,12 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		print_statement_expression(&expression->statement);
 		break;
 
+#if 0
 	default:
 		/* TODO */
 		print_format("some expression of type %d", (int)expression->kind);
 		break;
+#endif
 	}
 	if (parenthesized)
 		print_string(")");
@@ -1328,7 +1255,7 @@ void print_initializer(const initializer_t *initializer)
 		print_quoted_string(&initializer->string.string, '"', 1);
 		return;
 	case INITIALIZER_WIDE_STRING:
-		print_quoted_wide_string(&initializer->wide_string.string, '"', 1);
+		print_quoted_string(&initializer->string.string, '"', 1);
 		return;
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
@@ -1851,10 +1778,7 @@ static bool is_object_with_constant_address(const expression_t *expression)
 bool is_constant_expression(const expression_t *expression)
 {
 	switch (expression->kind) {
-
-	case EXPR_CONST:
-	case EXPR_CHARACTER_CONSTANT:
-	case EXPR_WIDE_CHARACTER_CONSTANT:
+	EXPR_LITERAL_CASES
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
