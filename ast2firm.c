@@ -1295,7 +1295,7 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		tv = new_tarval_from_str(string, size, mode);
 		goto make_const;
 	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: {
-		char *buffer = alloca(size + 2);
+		char buffer[size + 2];
 		memcpy(buffer, "0x", 2);
 		memcpy(buffer+2, string, size);
 		tv = new_tarval_from_str(buffer, size+2, mode);
