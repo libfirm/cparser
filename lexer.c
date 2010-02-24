@@ -649,8 +649,9 @@ static void parse_number_hex(void)
 		errorf(&lexer_token.source_position,
 		       "hexadecimal floatingpoint constant requires an exponent");
 	}
+	obstack_1grow(&symbol_obstack, '\0');
 
-	size_t  size   = obstack_object_size(&symbol_obstack);
+	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
 	lexer_token.literal = identify_string(string, size);
 
@@ -743,7 +744,8 @@ static void parse_number(void)
 		}
 	}
 
-	size_t  size   = obstack_object_size(&symbol_obstack);
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
 	lexer_token.literal = identify_string(string, size);
 
@@ -1032,7 +1034,8 @@ static void parse_wide_character_constant(void)
 	}
 
 end_of_wide_char_constant:;
-	size_t  size   = (size_t) obstack_object_size(&symbol_obstack);
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t  size   = (size_t) obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
 
 	lexer_token.type     = T_WIDE_CHARACTER_CONSTANT;
@@ -1097,7 +1100,8 @@ static void parse_character_constant(void)
 	}
 
 end_of_char_constant:;
-	const size_t        size   = (size_t)obstack_object_size(&symbol_obstack);
+	obstack_1grow(&symbol_obstack, '\0');
+	const size_t        size   = (size_t)obstack_object_size(&symbol_obstack)-1;
 	char         *const string = obstack_finish(&symbol_obstack);
 
 	lexer_token.type    = T_CHARACTER_CONSTANT;

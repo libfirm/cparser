@@ -2308,7 +2308,7 @@ end_error:
 
 static expression_t *make_size_literal(size_t value)
 {
-	expression_t *literal = allocate_ast_zero(EXPR_LITERAL_INTEGER);
+	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_INTEGER);
 	literal->base.type    = type_size_t;
 
 	char buf[128];
@@ -2325,7 +2325,7 @@ static expression_t *make_size_literal(size_t value)
 static initializer_t *parse_initializer(parse_initializer_env_t *env)
 {
 	type_t        *type      = skip_typeref(env->type);
-	size_t         max_index = 0xdeadbeaf;   // TODO: Resolve this uninitialized variable problem
+	size_t         max_index = 0;
 	initializer_t *result;
 
 	if (is_type_scalar(type)) {
