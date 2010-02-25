@@ -1192,13 +1192,12 @@ static void create_integer_tarval(literal_expression_t *literal)
 		}
 	}
 
-	unsigned char base = 10;
-	if (literal->base.kind == EXPR_LITERAL_INTEGER_OCTAL) {
-		base = 8;
-	} else if (literal->base.kind == EXPR_LITERAL_INTEGER_HEXADECIMAL) {
-		base = 16;
-	} else {
-		assert(literal->base.kind == EXPR_LITERAL_INTEGER);
+	unsigned base;
+	switch (literal->base.kind) {
+		case EXPR_LITERAL_INTEGER_OCTAL:       base =  8; break;
+		case EXPR_LITERAL_INTEGER:             base = 10; break;
+		case EXPR_LITERAL_INTEGER_HEXADECIMAL: base = 16; break;
+		default: panic("invalid literal kind");
 	}
 
 	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
@@ -1229,7 +1228,7 @@ static void create_integer_tarval(literal_expression_t *literal)
 	assert(us == 1 || base != 10);
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
 	bool res = try_create_integer(literal, type_unsigned_long_long, base);
-	if (res == false)
+	if (!res)
 		panic("internal error when parsing number literal");
 
 finished:
