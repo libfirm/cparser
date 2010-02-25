@@ -228,11 +228,11 @@ static void semantic_comparison(binary_expression_t *expression);
 	case '~':                         \
 	case T_ANDAND:                    \
 	case T_CHARACTER_CONSTANT:        \
-	case T_INTEGER:                   \
-	case T_INTEGER_OCTAL:             \
-	case T_INTEGER_HEXADECIMAL:       \
 	case T_FLOATINGPOINT:             \
 	case T_FLOATINGPOINT_HEXADECIMAL: \
+	case T_INTEGER:                   \
+	case T_INTEGER_HEXADECIMAL:       \
+	case T_INTEGER_OCTAL:             \
 	case T_MINUSMINUS:                \
 	case T_PLUSPLUS:                  \
 	case T_STRING_LITERAL:            \
@@ -253,8 +253,8 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T___builtin_isunordered:     \
 	case T___builtin_offsetof:        \
 	case T___builtin_va_arg:          \
-	case T___builtin_va_start:        \
 	case T___builtin_va_copy:         \
+	case T___builtin_va_start:        \
 	case T___func__:                  \
 	case T___noop:                    \
 	case T__assume:                   \
