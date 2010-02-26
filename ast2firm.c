@@ -2059,7 +2059,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		 * nodes into a new and unreachable block. */
 		keep_alive(node);
 		keep_alive(get_cur_block());
-		new_Block(0, NULL);
+		ir_node *block = new_Block(0, NULL);
+		set_cur_block(block);
 	}
 
 	return result;
@@ -2616,7 +2617,8 @@ static ir_node *produce_condition_result(const expression_t *expression,
 	mature_immBlock(zero_block);
 
 	ir_node *in_cf[2] = { jmp_one, jmp_zero };
-	new_Block(2, in_cf);
+	ir_node *block = new_Block(2, in_cf);
+	set_cur_block(block);
 
 	ir_node *in[2] = { one, zero };
 	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
@@ -3167,7 +3169,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	/* create the common block */
 	ir_node *in_cf[2] = { true_jmp, false_jmp };
-	new_Block(2, in_cf);
+	ir_node *block = new_Block(2, in_cf);
+	set_cur_block(block);
 
 	/* TODO improve static semantics, so either both or no values are NULL */
 	if (true_val == NULL || false_val == NULL)
