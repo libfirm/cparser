@@ -5643,7 +5643,6 @@ static void initialize_function_parameters(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	ir_graph *irg             = current_ir_graph;
 	ir_node  *args            = get_irg_args(irg);
-	ir_node  *start_block     = get_irg_start_block(irg);
 	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
 	int      first_param_nr   = 0;
 
