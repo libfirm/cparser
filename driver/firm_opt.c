@@ -596,8 +596,6 @@ static void do_firm_optimizations(const char *input_filename)
 			construct_cf_backedges(get_irp_irg(i));
 	}
 
-	do_irp_opt("remove-unused");
-
 	dump_all("-opt");
 
 	if (firm_dump.statistic & STAT_AFTER_OPT)
@@ -665,6 +663,8 @@ static void do_firm_lowering(const char *input_filename)
 			do_irg_opt(irg, "parallelize-mem");
 		}
 		timer_stop(t_all_opt);
+
+		do_irp_opt("remove-unused");
 
 		dump_all("-low-opt");
 	}
