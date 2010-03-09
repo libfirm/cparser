@@ -935,7 +935,9 @@ int main(int argc, char **argv)
 					strncpy(cpu_arch, opt, sizeof(cpu_arch));
 				}
 			} else if (option[0] == 'W') {
-				if (strstart(option + 1, "p,")) {
+				if (option[1] == '\0') {
+					/* ignore -W, out defaults are already quiet verbose */
+				} else if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wp,");
