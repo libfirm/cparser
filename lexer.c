@@ -1242,7 +1242,8 @@ static void parse_line_directive(void)
 	if (pp_token.type != T_INTEGER) {
 		parse_error("expected integer");
 	} else {
-		lexer_token.source_position.linenr = atoi(pp_token.literal.begin);
+		/* use offset -1 as this is about the next line */
+		lexer_token.source_position.linenr = atoi(pp_token.literal.begin) - 1;
 		next_pp_token();
 	}
 	if (pp_token.type == T_STRING_LITERAL) {
