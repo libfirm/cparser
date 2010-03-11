@@ -9152,7 +9152,9 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 				       "asm output argument is not an lvalue");
 			}
 
-			if (argument->constraints.begin[0] == '+')
+			if (argument->constraints.begin[0] == '=')
+				determine_lhs_ent(expression, NULL);
+			else
 				mark_vars_read(expression, NULL);
 		} else {
 			mark_vars_read(expression, NULL);
