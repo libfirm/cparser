@@ -9420,14 +9420,8 @@ static statement_t *parse_label_statement(void)
 	eat(':');
 
 	if (token.type == '}') {
-		/* TODO only warn? */
-		if (warning.other && false) {
-			warningf(HERE, "label at end of compound statement");
-			statement->label.statement = create_empty_statement();
-		} else {
-			errorf(HERE, "label at end of compound statement");
-			statement->label.statement = create_invalid_statement();
-		}
+		errorf(HERE, "label at end of compound statement");
+		statement->label.statement = create_invalid_statement();
 	} else if (token.type == ';') {
 		/* Eat an empty statement here, to avoid the warning about an empty
 		 * statement after a label.  label:; is commonly used to have a label

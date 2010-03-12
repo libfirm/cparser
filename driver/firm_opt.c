@@ -394,7 +394,6 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return false;
 
-
 	old_irg          = current_ir_graph;
 	current_ir_graph = irg;
 
@@ -638,8 +637,6 @@ static void do_firm_lowering(const char *input_filename)
 
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 			ir_graph *irg = get_irp_irg(i);
-
-			current_ir_graph = irg;
 
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "gcse");

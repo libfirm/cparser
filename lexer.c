@@ -1657,15 +1657,15 @@ void lexer_open_buffer(const char *buffer, size_t len, const char *input_name)
 #if 0 // TODO
 	bufpos = buffer;
 	bufend = buffer + len;
+
+	/* place a virtual \n at the beginning so the lexer knows that we're
+	 * at the beginning of a line */
+	c = '\n';
 #else
 	(void)buffer;
 	(void)len;
 	panic("builtin lexing not done yet");
 #endif
-
-	/* place a virtual \n at the beginning so the lexer knows that we're
-	 * at the beginning of a line */
-	c = '\n';
 }
 
 void exit_lexer(void)
