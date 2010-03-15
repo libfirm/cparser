@@ -103,7 +103,7 @@ static void warn_invalid_length_modifier(const source_position_t *pos,
 }
 
 /**
- * Check printf-style format.
+ * Check printf-style format. Returns number of expected arguments.
  */
 static int internal_check_printf_format(const expression_t *fmt_expr,
                                         const call_argument_t *arg,
@@ -136,7 +136,8 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 	const char *c      = string;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
-	unsigned num_fmt = 0;
+	unsigned num_fmt  = 0;
+	unsigned num_args = 0;
 	char     fmt;
 	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
 		if (fmt != '%')
@@ -151,6 +152,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 			continue;
 
 		++num_fmt;
+		++num_args;
 
 		format_flags_t fmt_flags = FMT_FLAG_NONE;
 		if (fmt == '0') {
@@ -208,6 +210,7 @@ break_fmt_flags:
 
 			/* minimum field width */
 			if (fmt == '*') {
+				++num_args;
 				fmt = *(++c);
 				if (arg == NULL) {
 					warningf(pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
@@ -227,6 +230,7 @@ break_fmt_flags:
 
 		/* precision */
 		if (fmt == '.') {
+			++num_args;
 			fmt = *(++c);
 			if (fmt == '*') {
 				fmt = *(++c);
@@ -528,7 +532,7 @@ next_arg:
 	if (c+1 < string + size) {
 		warningf(pos, "format string contains '\\0'");
 	}
-	return num_fmt;
+	return num_args;
 }
 
 /**
