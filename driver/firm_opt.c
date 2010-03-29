@@ -318,7 +318,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "control-flow",    (func_ptr_t) optimize_cf,             "optimization of control-flow",            OPT_FLAG_HIDE_OPTIONS },
 	{ OPT_TARGET_IRG, "local",           (func_ptr_t) optimize_graph_df,       "local graph optimizations",               OPT_FLAG_HIDE_OPTIONS },
 	{ OPT_TARGET_IRP, "remove-unused",   (func_ptr_t) garbage_collect_entities,"removal of unused functions/variables",   OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY },
-	{ OPT_TARGET_IRP, "opt-tail-rec",    (func_ptr_t) opt_tail_recursion,      "tail-recursion eliminiation",             OPT_FLAG_NONE },
+	{ OPT_TARGET_IRG, "opt-tail-rec",    (func_ptr_t) opt_tail_rec_irg,        "tail-recursion eliminiation",             OPT_FLAG_NONE },
 	{ OPT_TARGET_IRP, "opt-func-call",   (func_ptr_t) do_optimize_funccalls,   "function call optimization",              OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "lower",           (func_ptr_t) do_lower_highlevel,      "lowering",                                OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL },
 	{ OPT_TARGET_IRP, "lower-const",     (func_ptr_t) lower_const_code,        "lowering of constant code",               OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL },
@@ -348,7 +348,7 @@ static opt_config_t opts[] = {
 	{ OPT_TARGET_IRG, "unroll-loops",    (func_ptr_t) do_loop_unrolling,       "loop unrolling",                          OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "lower-mux",       (func_ptr_t) do_lower_mux,            "mux lowering",                            OPT_FLAG_NONE },
 	{ OPT_TARGET_IRG, "vrp", 			 (func_ptr_t) do_vrp,				   "value range propagation", 				  OPT_FLAG_NONE },
-
+	{ OPT_TARGET_IRG, "frame",           (func_ptr_t) opt_frame_irg,           "remove unused frame entities",            OPT_FLAG_NONE },
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
 ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
@@ -473,6 +473,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("dead", true);
 	set_opt_enabled("lower-switch", true);
 	set_opt_enabled("remove-phi-cycles", true);
+	set_opt_enabled("frame", true);
 }
 
 /**
@@ -519,7 +520,10 @@ static void do_firm_optimizations(const char *input_filename)
 	}
 
 	do_irp_opt("remove-unused");
-	do_irp_opt("opt-tail-rec");
+	for (i = 0; i < get_irp_n_irgs(); ++i) {
+		ir_graph *irg = get_irp_irg(i);
+		do_irg_opt(irg, "opt-tail-rec");
+	}
 	do_irp_opt("opt-func-call");
 	do_irp_opt("lower-const");
 
@@ -568,6 +572,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "ivopts");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "dead");
+		do_irg_opt(irg, "frame");
 	}
 
 	do_irp_opt("inline");
