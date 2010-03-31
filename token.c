@@ -34,55 +34,65 @@ static symbol_t *pp_token_symbols[TP_LAST_TOKEN];
 
 const source_position_t builtin_source_position = { "<built-in>", 0 };
 
+static int last_id;
+
+static symbol_t *intern_register_token(token_type_t id, const char *string)
+{
+	assert(0 <= id && id < T_LAST_TOKEN);
+	symbol_t *symbol = symbol_table_insert(string);
+	if (token_symbols[id] == NULL)
+		token_symbols[id] = symbol;
+	return symbol;
+}
+
+static symbol_t *intern_register_pp_token(token_type_t id, const char *string)
+{
+	assert(0 <= id && id < TP_LAST_TOKEN);
+	symbol_t *symbol = symbol_table_insert(string);
+	if (pp_token_symbols[id] == NULL)
+		pp_token_symbols[id] = symbol;
+	return symbol;
+}
+
+static void register_token(unsigned mode, token_type_t id, const char *string)
+{
+	if (id > 255) {
+		assert(id >= last_id);
+		last_id = id;
+	}
+	if (c_mode & mode) {
+		symbol_t *symbol = intern_register_token(id, string);
+		symbol->ID = id;
+	}
+}
+
+static void register_pp_token(unsigned mode, token_type_t id,
+                              const char *string)
+{
+	if (! (c_mode & mode))
+		return;
+
+	symbol_t *symbol = intern_register_token(id, string);
+	symbol->pp_ID = id;
+}
+
 void init_tokens(void)
 {
-	symbol_t *symbol;
-	int       last_id = -2;
-
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 	memset(pp_token_symbols, 0, TP_LAST_TOKEN * sizeof(pp_token_symbols[0]));
 
-#define T(mode,x,str,val)                                          \
-	if (T_##x > 255) {                                             \
-		assert(T_##x >= last_id);                                  \
-		last_id = T_##x;                                           \
-	}                                                              \
-	if (c_mode & (mode)) {                                         \
-		assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                \
-		symbol               = symbol_table_insert(str);           \
-		symbol->ID           = T_##x;                              \
-		if (token_symbols[T_##x] == NULL)                          \
-			token_symbols[T_##x] = symbol;                         \
-	}
+	last_id = -2;
 
-#define TS(x,str,val)                                              \
-	assert(T_##x >= 0 && T_##x < T_LAST_TOKEN);                    \
-	symbol               = symbol_table_insert(str);               \
-	if (token_symbols[T_##x] == NULL)                              \
-		token_symbols[T_##x] = symbol;                             \
-
+#define T(mode,x,str,val)  register_token(mode, T_##x, str);
+#define TS(x,str,val)      intern_register_token(T_##x, str);
 #include "tokens.inc"
-
 #undef TS
 #undef T
 
-#define T(mode,x,str,val)                                          \
-	if (c_mode & (mode)) {                                         \
-		assert(TP_##x >= 0 && TP_##x < TP_LAST_TOKEN);             \
-		symbol                   = symbol_table_insert(str);       \
-		symbol->pp_ID            = TP_##x;                         \
-		if (pp_token_symbols[TP_##x] == NULL)                      \
-			pp_token_symbols[TP_##x] = symbol;                     \
-	}
-
-#define TS(x,str,val)                                              \
-	assert(TP_##x >= 0 && TP_##x < T_LAST_TOKEN);                  \
-	symbol                   = symbol_table_insert(str);           \
-	if (pp_token_symbols[TP_##x] == NULL)                          \
-		pp_token_symbols[TP_##x] = symbol;
-
+#define T(mode,x,str,val)  register_pp_token(mode, TP_##x, str);
+#define TS(x,str,val)      intern_register_pp_token(TP_##x, str);
 #include "tokens_preprocessor.inc"
-
+#undef TS
 #undef T
 }
 
