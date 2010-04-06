@@ -1273,6 +1273,7 @@ int main(int argc, char **argv)
 	}
 
 	file_list_entry_t *file;
+	bool               already_constructed_firm = false;
 	for (file = files; file != NULL; file = file->next) {
 		char        asm_tempfile[1024];
 		const char *filename = file->name;
@@ -1435,7 +1436,11 @@ do_parsing:
 			ir_timer_t *t_construct = ir_timer_new();
 			timer_register(t_construct, "Frontend: Graph construction");
 			timer_push(t_construct);
+			if (already_constructed_firm) {
+				panic("compiling multiple files/translation units not possible");
+			}
 			translation_unit_to_firm(unit);
+			already_constructed_firm = true;
 			timer_pop(t_construct);
 
 graph_built:
