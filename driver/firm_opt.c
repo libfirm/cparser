@@ -474,6 +474,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("lower-switch", true);
 	set_opt_enabled("remove-phi-cycles", true);
 	set_opt_enabled("frame", true);
+	set_opt_enabled("combo", true);
 }
 
 /**
