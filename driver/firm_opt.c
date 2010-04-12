@@ -323,6 +323,7 @@ static opt_config_t opts[] = {
 	IRG("control-flow",      optimize_cf,              "optimization of control-flow",                          OPT_FLAG_HIDE_OPTIONS),
 	IRG("dead",              dead_node_elimination,    "dead node elimination",                                 OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRG("deconv",            conv_opt,                 "conv node elimination",                                 OPT_FLAG_NONE),
+	IRG("fp-vrp",            fixpoint_vrp,             "fixpoint value range propagation",                      OPT_FLAG_NONE),
 	IRG("frame",             opt_frame_irg,            "remove unused frame entities",                          OPT_FLAG_NONE),
 	IRG("gcse",              do_gcse,                  "global common subexpression elimination",               OPT_FLAG_NONE),
 	IRG("gvn-pre",           do_gvn_pre,               "global value numbering partial redundancy elimination", OPT_FLAG_NONE),
@@ -552,6 +553,7 @@ static void do_firm_optimizations(const char *input_filename)
 
 		do_irg_opt(irg, "control-flow");
 		do_irg_opt(irg, "opt-load-store");
+		do_irg_opt(irg, "fp-vrp");
 		do_irg_opt(irg, "lower");
 		do_irg_opt(irg, "deconv");
 		do_irg_opt(irg, "thread-jumps");
