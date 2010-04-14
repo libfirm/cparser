@@ -202,7 +202,7 @@ struct compound_member_t {
 	declaration_t  base;
 	bool           read          : 1;
 	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
-	unsigned short offset;     /**< the offset of this member in the compound */
+	il_size_t      offset;     /**< the offset of this member in the compound */
 	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
 
 	/* ast2firm info */
