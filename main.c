@@ -907,7 +907,8 @@ int main(int argc, char **argv)
 					           streq(opt, "optimize-sibling-calls")  ||
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
-					           streq(opt, "align-functions")) {
+					           streq(opt, "align-functions")         ||
+					           streq(opt, "PIC")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else {
 						int res = firm_option(orig_opt);
