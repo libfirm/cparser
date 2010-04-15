@@ -35,7 +35,8 @@ static bool do_irg_opt(ir_graph *irg, const char *name);
 
 /** dump all the graphs depending on cond */
 
-static void dump_all(const char *suffix) {
+static void dump_all(const char *suffix)
+{
 	if (firm_dump.ir_graph) {
 		timer_push(t_vcg_dump);
 		if (firm_dump.no_blocks)
@@ -79,7 +80,8 @@ static const ir_settings_arch_dep_t *arch_factory(void)
 /**
  * Map runtime functions.
  */
-static void rts_map(void) {
+static void rts_map(void)
+{
 	static const struct {
 		ir_entity_ptr *ent; /**< address of the rts entity */
 		i_mapper_func func; /**< mapper function. */
@@ -476,6 +478,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("remove-phi-cycles", true);
 	set_opt_enabled("frame", true);
 	set_opt_enabled("combo", true);
+	set_opt_enabled("invert-loops", true);
 }
 
 /**
