@@ -11,11 +11,11 @@ CPPFLAGS  = -DHAVE_CONFIG_H -DFIRM_BACKEND
 CPPFLAGS += -I.
 CPPFLAGS += $(FIRM_CFLAGS)
 
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Werror -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
 CFLAGS += -O0 -g3
 #CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 #CFLAGS += -pg -O3 -fno-inline
-ICC_CFLAGS = -O0 -g3 -std=c99 -Wall -Werror
+ICC_CFLAGS = -O0 -g3 -std=c99 -Wall
 #LFLAGS += -pg
 ICC    ?= true
 GCCO1  ?= true

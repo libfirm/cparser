@@ -200,10 +200,11 @@ struct declaration_t {
 
 struct compound_member_t {
 	declaration_t  base;
-	bool           read          : 1;
-	bool           address_taken : 1;  /**< Set if the address of this declaration was taken. */
 	il_size_t      offset;     /**< the offset of this member in the compound */
 	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
+	bool           read          : 1;
+	bool           address_taken : 1;  /**< Set if the address of this
+	                                        declaration was taken. */
 
 	/* ast2firm info */
 	ir_entity *entity;
