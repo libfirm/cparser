@@ -333,10 +333,20 @@ static named_decoder_t const decoders[] = {
 	{ NULL,              NULL                }
 };
 
+/** strcasecmp is not part of C99 so we need our own implementation here */
+static int my_strcasecmp(const char *s1, const char *s2)
+{
+	for ( ; *s1 != 0; ++s1, ++s2) {
+		if (tolower(*s1) != tolower(*s2))
+			break;
+	}
+	return (unsigned char)*s1 - (unsigned char)*s2;
+}
+
 void select_input_encoding(char const* const encoding)
 {
 	for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
-		if (strcasecmp(encoding, i->name) != 0)
+		if (my_strcasecmp(encoding, i->name) != 0)
 			continue;
 		decoder = i->decoder;
 		return;
