@@ -6119,14 +6119,17 @@ static expression_t *parse_number_literal(void)
 	case T_INTEGER:
 		kind = EXPR_LITERAL_INTEGER;
 		check_integer_suffix();
+		type = type_int;
 		break;
 	case T_INTEGER_OCTAL:
 		kind = EXPR_LITERAL_INTEGER_OCTAL;
 		check_integer_suffix();
+		type = type_int;
 		break;
 	case T_INTEGER_HEXADECIMAL:
 		kind = EXPR_LITERAL_INTEGER_HEXADECIMAL;
 		check_integer_suffix();
+		type = type_int;
 		break;
 	case T_FLOATINGPOINT:
 		kind = EXPR_LITERAL_FLOATINGPOINT;
