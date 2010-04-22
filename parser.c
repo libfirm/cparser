@@ -2634,16 +2634,13 @@ static type_t *parse_typeof(void)
 	switch (token.type) {
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(token.symbol)) {
+	TYPENAME_START
 			type = parse_typename();
 		} else {
 	default:
 			expression = parse_expression();
 			type       = revert_automatic_type_conversion(expression);
 		}
-		break;
-
-	TYPENAME_START
-		type = parse_typename();
 		break;
 	}
 	in_type_prop     = old_type_prop;
