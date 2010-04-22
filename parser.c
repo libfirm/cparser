@@ -2636,6 +2636,7 @@ static type_t *parse_typeof(void)
 		if (is_typedef_symbol(token.symbol)) {
 			type = parse_typename();
 		} else {
+	default:
 			expression = parse_expression();
 			type       = revert_automatic_type_conversion(expression);
 		}
@@ -2643,11 +2644,6 @@ static type_t *parse_typeof(void)
 
 	TYPENAME_START
 		type = parse_typename();
-		break;
-
-	default:
-		expression = parse_expression();
-		type       = expression->base.type;
 		break;
 	}
 	in_type_prop     = old_type_prop;
