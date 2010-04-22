@@ -3538,11 +3538,12 @@ static construct_type_t *parse_array_declarator(void)
 	array->type_qualifiers = type_qualifiers;
 	array->is_static       = is_static;
 
+	expression_t *size = NULL;
 	if (token.type == '*' && look_ahead(1)->type == ']') {
 		array->is_variable = true;
 		next_token();
 	} else if (token.type != ']') {
-		expression_t *const size = parse_assignment_expression();
+		size = parse_assignment_expression();
 
 		/* §6.7.5.2:1  Array size must have integer type */
 		type_t *const orig_type = size->base.type;
@@ -3556,6 +3557,9 @@ static construct_type_t *parse_array_declarator(void)
 		array->size = size;
 		mark_vars_read(size, NULL);
 	}
+
+	if (is_static && size == NULL)
+		errorf(HERE, "static array parameters require a size");
 
 	rem_anchor_token(']');
 	expect(']', end_error);
