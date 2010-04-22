@@ -3487,6 +3487,7 @@ union construct_type_t {
 	parsed_array_t            array;
 };
 
+/* §6.7.5.1 */
 static construct_type_t *parse_pointer_declarator(void)
 {
 	eat('*');
@@ -3500,6 +3501,7 @@ static construct_type_t *parse_pointer_declarator(void)
 	return (construct_type_t*) pointer;
 }
 
+/* ISO/IEC 14882:1998(E) §8.3.2 */
 static construct_type_t *parse_reference_declarator(void)
 {
 	eat('&');
@@ -3512,6 +3514,7 @@ static construct_type_t *parse_reference_declarator(void)
 	return cons;
 }
 
+/* §6.7.5.2 */
 static construct_type_t *parse_array_declarator(void)
 {
 	eat('[');
@@ -3556,6 +3559,7 @@ end_error:
 	return cons;
 }
 
+/* §6.7.5.3 */
 static construct_type_t *parse_function_declarator(scope_t *scope)
 {
 	type_t          *type  = allocate_type_zero(TYPE_FUNCTION);
@@ -3585,6 +3589,7 @@ typedef struct parse_declarator_env_t {
 	attribute_t       *attributes;
 } parse_declarator_env_t;
 
+/* §6.7.5 */
 static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 {
 	/* construct a single linked list of construct_type_t's which describe
