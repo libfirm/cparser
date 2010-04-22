@@ -768,7 +768,7 @@ static void parse_number(void)
 		/* check for invalid octal digits */
 		for (size_t i= 0; i < size; ++i) {
 			char t = string[i];
-			if (t == '8' || t == '9')
+			if (t >= '8')
 				errorf(&lexer_token.source_position,
 				       "invalid digit '%c' in octal number", t);
 		}
