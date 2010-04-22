@@ -3528,13 +3528,15 @@ static construct_type_t *parse_array_declarator(void)
 	memset(array, 0, sizeof(*array));
 	cons->kind = CONSTRUCT_ARRAY;
 
-	if (next_if(T_static))
-		array->is_static = true;
+	bool is_static = next_if(T_static);
 
 	type_qualifiers_t type_qualifiers = parse_type_qualifiers();
-	if (type_qualifiers != 0 && next_if(T_static))
-			array->is_static = true;
+
+	if (!is_static)
+		is_static = next_if(T_static);
+
 	array->type_qualifiers = type_qualifiers;
+	array->is_static       = is_static;
 
 	if (token.type == '*' && look_ahead(1)->type == ']') {
 		array->is_variable = true;
