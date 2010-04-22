@@ -3506,6 +3506,9 @@ static construct_type_t *parse_reference_declarator(void)
 {
 	eat('&');
 
+	if (!(c_mode & _CXX))
+		errorf(HERE, "references are only available for C++");
+
 	construct_type_t   *cons      = obstack_alloc(&temp_obst, sizeof(cons->reference));
 	parsed_reference_t *reference = &cons->reference;
 	memset(reference, 0, sizeof(*reference));
@@ -3604,8 +3607,6 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 		//variable_t       *based = NULL; /* MS __based extension */
 		switch (token.type) {
 			case '&':
-				if (!(c_mode & _CXX))
-					errorf(HERE, "references are only available for C++");
 				type = parse_reference_declarator();
 				break;
 
