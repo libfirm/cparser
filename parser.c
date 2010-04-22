@@ -1967,7 +1967,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					type_t *real_type = skip_typeref(iter->declaration.type);
 					if (real_type->kind == TYPE_BITFIELD) {
 						errorf(&designator->source_position,
-						       "offsetof designator '%Y' may not specify bitfield",
+						       "offsetof designator '%Y' must not specify bitfield",
 						       symbol);
 						goto failed;
 					}
@@ -5941,7 +5941,7 @@ static type_t *parse_typename(void)
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
-		errorf(HERE, "typename may not have a storage class");
+		errorf(HERE, "typename must not have a storage class");
 	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
