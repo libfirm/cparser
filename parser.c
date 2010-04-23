@@ -3487,18 +3487,24 @@ union construct_type_t {
 	parsed_array_t            array;
 };
 
+static construct_type_t *allocate_declarator_zero(construct_type_kind_t const kind, size_t const size)
+{
+	construct_type_t *const cons = obstack_alloc(&temp_obst, size);
+	memset(cons, 0, size);
+	cons->kind = kind;
+	return cons;
+}
+
 /* §6.7.5.1 */
 static construct_type_t *parse_pointer_declarator(void)
 {
 	eat('*');
 
-	parsed_pointer_t *pointer = obstack_alloc(&temp_obst, sizeof(pointer[0]));
-	memset(pointer, 0, sizeof(pointer[0]));
-	pointer->base.kind       = CONSTRUCT_POINTER;
-	pointer->type_qualifiers = parse_type_qualifiers();
-	//pointer->base_variable       = base_variable;
+	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_POINTER, sizeof(parsed_pointer_t));
+	cons->pointer.type_qualifiers = parse_type_qualifiers();
+	//cons->pointer.base_variable   = base_variable;
 
-	return (construct_type_t*) pointer;
+	return cons;
 }
 
 /* ISO/IEC 14882:1998(E) §8.3.2 */
@@ -3509,10 +3515,7 @@ static construct_type_t *parse_reference_declarator(void)
 	if (!(c_mode & _CXX))
 		errorf(HERE, "references are only available for C++");
 
-	construct_type_t   *cons      = obstack_alloc(&temp_obst, sizeof(cons->reference));
-	parsed_reference_t *reference = &cons->reference;
-	memset(reference, 0, sizeof(*reference));
-	cons->kind = CONSTRUCT_REFERENCE;
+	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_REFERENCE, sizeof(parsed_reference_t));
 
 	return cons;
 }
@@ -3523,10 +3526,8 @@ static construct_type_t *parse_array_declarator(void)
 	eat('[');
 	add_anchor_token(']');
 
-	construct_type_t *cons  = obstack_alloc(&temp_obst, sizeof(cons->array));
-	parsed_array_t   *array = &cons->array;
-	memset(array, 0, sizeof(*array));
-	cons->kind = CONSTRUCT_ARRAY;
+	construct_type_t *const cons  = allocate_declarator_zero(CONSTRUCT_ARRAY, sizeof(parsed_array_t));
+	parsed_array_t   *const array = &cons->array;
 
 	bool is_static = next_if(T_static);
 
@@ -3579,11 +3580,8 @@ static construct_type_t *parse_function_declarator(scope_t *scope)
 
 	parse_parameters(ftype, scope);
 
-	construct_type_t          *cons     = obstack_alloc(&temp_obst, sizeof(cons->function));
-	construct_function_type_t *function = &cons->function;
-	memset(function, 0, sizeof(*function));
-	cons->kind              = CONSTRUCT_FUNCTION;
-	function->function_type = type;
+	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_FUNCTION, sizeof(construct_function_type_t));
+	cons->function.function_type = type;
 
 	return cons;
 }
