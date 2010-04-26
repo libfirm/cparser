@@ -5475,7 +5475,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create output projs & connect them */
 	if (needs_memory) {
-		ir_node *projm = new_Proj(node, mode_M, out_size+1);
+		ir_node *projm = new_Proj(node, mode_M, out_size);
 		set_store(projm);
 	}
 
