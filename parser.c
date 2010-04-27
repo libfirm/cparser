@@ -130,7 +130,7 @@ static unsigned char token_anchor_set[T_LAST_TOKEN];
 static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
-static expression_t *parse_sub_expression(precedence_t);
+static expression_t *parse_subexpression(precedence_t);
 static expression_t *parse_expression(void);
 static type_t       *parse_typename(void);
 static void          parse_externals(void);
@@ -1077,7 +1077,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 
 static expression_t *parse_constant_expression(void)
 {
-	expression_t *result = parse_sub_expression(PREC_CONDITIONAL);
+	expression_t *result = parse_subexpression(PREC_CONDITIONAL);
 
 	if (!is_constant_expression(result)) {
 		errorf(&result->base.source_position,
@@ -1089,7 +1089,7 @@ static expression_t *parse_constant_expression(void)
 
 static expression_t *parse_assignment_expression(void)
 {
-	return parse_sub_expression(PREC_ASSIGNMENT);
+	return parse_subexpression(PREC_ASSIGNMENT);
 }
 
 static void warn_string_concat(const source_position_t *pos)
@@ -6546,7 +6546,7 @@ static expression_t *parse_cast(void)
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
 	cast->base.source_position = source_position;
 
-	expression_t *value = parse_sub_expression(PREC_CAST);
+	expression_t *value = parse_subexpression(PREC_CAST);
 	cast->base.type   = type;
 	cast->unary.value = value;
 
@@ -7245,7 +7245,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 			goto typeprop_expression;
 		}
 	} else {
-		expression = parse_sub_expression(PREC_UNARY);
+		expression = parse_subexpression(PREC_UNARY);
 
 typeprop_expression:
 		tp_expression->typeprop.tp_expression = expression;
@@ -7652,7 +7652,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 	expect(':', end_error);
 end_error:;
 	expression_t *false_expression =
-		parse_sub_expression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
+		parse_subexpression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
 
 	type_t *const orig_true_type  = true_expression->base.type;
 	type_t *const orig_false_type = false_expression->base.type;
@@ -7770,7 +7770,7 @@ static expression_t *parse_extension(void)
 
 	bool old_gcc_extension   = in_gcc_extension;
 	in_gcc_extension         = true;
-	expression_t *expression = parse_sub_expression(PREC_UNARY);
+	expression_t *expression = parse_subexpression(PREC_UNARY);
 	in_gcc_extension         = old_gcc_extension;
 	return expression;
 }
@@ -7814,7 +7814,7 @@ static expression_t *parse_delete(void)
 end_error:;
 	}
 
-	expression_t *const value = parse_sub_expression(PREC_CAST);
+	expression_t *const value = parse_subexpression(PREC_CAST);
 	result->unary.value = value;
 
 	type_t *const type = skip_typeref(value->base.type);
@@ -8078,7 +8078,7 @@ static expression_t *parse_##unexpression_type(void)                         \
 	expression_t *unary_expression                                           \
 		= allocate_expression_zero(unexpression_type);                       \
 	eat(token_type);                                                         \
-	unary_expression->unary.value = parse_sub_expression(PREC_UNARY);        \
+	unary_expression->unary.value = parse_subexpression(PREC_UNARY);         \
 	                                                                         \
 	sfunc(&unary_expression->unary);                                         \
 	                                                                         \
@@ -8892,7 +8892,7 @@ static expression_t *parse_##binexpression_type(expression_t *left)          \
 	binexpr->binary.left  = left;                                            \
 	eat(token_type);                                                         \
                                                                              \
-	expression_t *right = parse_sub_expression(prec_r);                      \
+	expression_t *right = parse_subexpression(prec_r);                       \
                                                                              \
 	binexpr->binary.right = right;                                           \
 	sfunc(&binexpr->binary);                                                 \
@@ -8932,7 +8932,7 @@ CREATE_BINEXPR_PARSER(T_CARETEQUAL,           EXPR_BINARY_BITWISE_XOR_ASSIGN, PR
 CREATE_BINEXPR_PARSER(',',                    EXPR_BINARY_COMMA,              PREC_ASSIGNMENT,     semantic_comma)
 
 
-static expression_t *parse_sub_expression(precedence_t precedence)
+static expression_t *parse_subexpression(precedence_t precedence)
 {
 	if (token.type < 0) {
 		return expected_expression_error();
@@ -8977,7 +8977,7 @@ static expression_t *parse_sub_expression(precedence_t precedence)
  */
 static expression_t *parse_expression(void)
 {
-	return parse_sub_expression(PREC_EXPRESSION);
+	return parse_subexpression(PREC_EXPRESSION);
 }
 
 /**
@@ -9219,9 +9219,13 @@ static statement_t *parse_asm_statement(void)
 
 	expect('(', end_error);
 	add_anchor_token(')');
-	add_anchor_token(':');
+	if (token.type != T_STRING_LITERAL) {
+		parse_error_expected("after asm(", T_STRING_LITERAL, NULL);
+		goto end_of_asm;
+	}
 	asm_statement->asm_text = parse_string_literals();
 
+	add_anchor_token(':');
 	if (!next_if(':')) {
 		rem_anchor_token(':');
 		goto end_of_asm;
