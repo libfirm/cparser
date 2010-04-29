@@ -301,7 +301,11 @@ static void write_expression(const expression_t *expression)
 	/* TODO */
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_INTEGER_OCTAL:
 		fprintf(out, "%s", expression->literal.value.begin);
+		break;
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+		fprintf(out, "0x%s", expression->literal.value.begin);
 		break;
 	case EXPR_REFERENCE_ENUM_VALUE: {
 		/* UHOH... hacking */
@@ -448,12 +452,15 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	if (avoid != NULL) {
 		while (!feof(avoid)) {
 			char buf[1024];
-			fgets(buf, sizeof(buf), avoid);
+			char *res = fgets(buf, sizeof(buf), avoid);
+			if (res == NULL)
+				break;
+			if (buf[0] == 0)
+				continue;
+
 			size_t len = strlen(buf);
 			if (buf[len-1] == '\n')
 				buf[len-1] = 0;
-			if (buf[0] == 0)
-				continue;
 
 			char *str = malloc(len+1);
 			memcpy(str, buf, len+1);
