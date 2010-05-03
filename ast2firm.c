@@ -868,11 +868,11 @@ static const struct {
 	{ rts_strncmp,    1, "strncmp",      3, _C89 },
 	{ rts_strcpy,     1, "strcpy",       2, _C89 },
 	{ rts_strlen,     1, "strlen",       1, _C89 },
-	{ rts_memcpy,     1, "memcpy",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_memcpy,     1, "memcpy",       3, _C89 },
 	{ rts_mempcpy,    1, "mempcpy",      3, _GNUC },
-	{ rts_memmove,    1, "memmove",      3, _C89 },  /* HMM, man say its C99 */
-	{ rts_memset,     1, "memset",       3, _C89 },  /* HMM, man say its C99 */
-	{ rts_memcmp,     1, "memcmp",       3, _C89 },  /* HMM, man say its C99 */
+	{ rts_memmove,    1, "memmove",      3, _C89 },
+	{ rts_memset,     1, "memset",       3, _C89 },
+	{ rts_memcmp,     1, "memcmp",       3, _C89 },
 };
 
 static ident *rts_idents[lengthof(rts_data)];
@@ -1024,6 +1024,22 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		/* check for a known runtime function */
 		for (size_t i = 0; i < lengthof(rts_data); ++i) {
 			if (id != rts_idents[i])
+				continue;
+
+			function_type_t *function_type
+				= &entity->declaration.type->function;
+			/* rts_entities code can't handle a "wrong" number of parameters */
+			if (function_type->unspecified_parameters)
+				continue;
+
+			/* check number of parameters */
+			int n_params = count_parameters(function_type);
+			if (n_params != rts_data[i].n_params)
+				continue;
+
+			type_t *return_type = skip_typeref(function_type->return_type);
+			int     n_res       = return_type != type_void ? 1 : 0;
+			if (n_res != rts_data[i].n_res)
 				continue;
 
 			/* ignore those rts functions not necessary needed for current mode */
