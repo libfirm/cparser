@@ -17,8 +17,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
-#include "obstack.h"
 #include "xmalloc.h"
+#include <libfirm/adt/obstack.h>
 
 #define obstack_chunk_alloc xmalloc
 #define obstack_chunk_free  free
