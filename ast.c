@@ -1840,7 +1840,7 @@ bool is_constant_expression(const expression_t *expression)
 
 	case EXPR_UNARY_CAST:
 	case EXPR_UNARY_CAST_IMPLICIT:
-		return is_type_arithmetic(skip_typeref(expression->base.type))
+		return is_type_scalar(skip_typeref(expression->base.type))
 			&& is_constant_expression(expression->unary.value);
 
 	case EXPR_BINARY_ADD:

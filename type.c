@@ -1009,9 +1009,9 @@ bool is_type_scalar(const type_t *type)
 	assert(!is_typeref(type));
 
 	switch (type->kind) {
-		case TYPE_POINTER: return true;
-		case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
-		default:           break;
+	case TYPE_POINTER: return true;
+	case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
+	default:           break;
 	}
 
 	return is_type_arithmetic(type);
