@@ -1,3 +1,11 @@
+===== cparser 0.9.11 (2009-05-16) =====
+* add missing NEWS entries
+* fix crash when known C library functions had the wrong number of arguments
+
+===== cparser 0.9.10 (2009-04-15) =====
+* bugfixes
+* adapt to libfirm-1.18.0
+
 ===== cparser 0.9.9 (2009-05-15) =====
 * bugfixes
 * extend and improve support for attributes
