@@ -4272,7 +4272,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		return;
 	}
 	case IR_INITIALIZER_COMPOUND: {
-		assert(is_compound_type(type));
+		assert(is_compound_type(type) || is_Array_type(type));
 		int n_members;
 		if (is_Array_type(type)) {
 			assert(has_array_upper_bound(type, 0));
