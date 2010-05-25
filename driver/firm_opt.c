@@ -697,9 +697,8 @@ static void do_firm_lowering(const char *input_filename)
  */
 void gen_firm_init(void)
 {
-	firm_parameter_t params;
-	unsigned         pattern = 0;
-	int              i;
+	unsigned pattern = 0;
+	int      i;
 
 	for (i = 0; i < n_opts; ++i) {
 		timers[i] = ir_timer_new();
@@ -718,15 +717,10 @@ void gen_firm_init(void)
 	if (firm_dump.stat_dag)
 		pattern |= FIRMSTAT_COUNT_DAG;
 
-	memset(&params, 0, sizeof(params));
-	params.size                  = sizeof(params);
-	params.enable_statistics     = firm_dump.statistic == STAT_NONE ? 0 :
-		FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP | FIRMSTAT_COUNT_CONSTS
-		| pattern;
-	params.initialize_local_func = uninitialized_local_var;
-	params.cc_mask               = 0; /* no regparam, cdecl */
-
-	ir_init(&params);
+	ir_init(NULL);
+	firm_init_stat(firm_dump.statistic == STAT_NONE ?
+			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
+			| FIRMSTAT_COUNT_CONSTS | pattern);
 
 	if (firm_be_opt.selection == BE_FIRM_BE) {
 		const backend_params *be_params = be_get_backend_param();

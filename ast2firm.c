@@ -129,7 +129,7 @@ static void enqueue_inner_function(entity_t *entity)
 	ARR_APP1(entity_t*, inner_functions, entity);
 }
 
-ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
+static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 
@@ -6078,6 +6078,7 @@ void translation_unit_to_firm(translation_unit_t *unit)
 {
 	/* initialize firm arithmetic */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
+	ir_set_uninitialized_local_variable_func(uninitialized_local_var);
 
 	/* just to be sure */
 	continue_label           = NULL;

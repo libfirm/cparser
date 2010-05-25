@@ -92,12 +92,6 @@ enum rts_names {
 
 extern ir_entity_ptr rts_entities[rts_max];
 
-/**
- * This function is called, whenever a local variable is used before
- * definition.
- */
-extern ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos);
-
 /** Debug printf implementation. */
 extern void dbg_printf(const char *fmt, ...);
 
