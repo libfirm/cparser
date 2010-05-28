@@ -7,8 +7,7 @@ BUILDDIR ?= build
 FIRM_CFLAGS ?= `pkg-config --cflags libfirm`
 FIRM_LIBS   ?= `pkg-config --libs libfirm`
 
-CPPFLAGS  = -DHAVE_CONFIG_H -DFIRM_BACKEND
-CPPFLAGS += -I.
+CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic

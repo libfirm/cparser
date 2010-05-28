@@ -28,7 +28,7 @@ rule BuiltinGenerator {
 BuiltinGenerator gen_builtins.h : builtins/builtins.c : create_builtins_h.sh ;
 
 Application cparser : $(SOURCES) ;
-CppFlags cparser : -DFIRM_BACKEND -I$(top_srcdir)/libfirm/include ;
+CppFlags cparser : -I$(top_srcdir)/libfirm/include ;
 IncludeDir cparser : . ;
 CFlags cparser : -std=c99 ;
 LinkWith cparser : firm ;

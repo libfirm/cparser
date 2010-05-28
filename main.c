@@ -585,7 +585,7 @@ static void print_cparser_version(void)
 
 static void set_be_option(const char *arg)
 {
-	int res = firm_be_option(arg);
+	int res = be_parse_arg(arg);
 	(void) res;
 	assert(res);
 }
@@ -925,7 +925,7 @@ int main(int argc, char **argv)
 			} else if (option[0] == 'b') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-b");
-				int res = firm_be_option(opt);
+				int res = be_parse_arg(opt);
 				if (res == 0) {
 					fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
 					        opt);
@@ -963,26 +963,26 @@ int main(int argc, char **argv)
 				if (strstart(opt, "arch=")) {
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
-					int res = firm_be_option(arch_opt);
+					int res = be_parse_arg(arch_opt);
 					if (res == 0) {
 						fprintf(stderr, "Unknown architecture '%s'\n", arch_opt);
 						argument_errors = true;
 					} else {
 						snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-						int res = firm_be_option(arch_opt);
+						int res = be_parse_arg(arch_opt);
 						if (res == 0)
 							argument_errors = true;
 					}
 				} else if (strstart(opt, "tune=")) {
 					GET_ARG_AFTER(opt, "-mtune=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-					int res = firm_be_option(arch_opt);
+					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
 				} else if (strstart(opt, "cpu=")) {
 					GET_ARG_AFTER(opt, "-mcpu=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
-					int res = firm_be_option(arch_opt);
+					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
 				} else if (strstart(opt, "fpmath=")) {
@@ -997,14 +997,14 @@ int main(int argc, char **argv)
 					}
 					if (!argument_errors) {
 						snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
-						int res = firm_be_option(arch_opt);
+						int res = be_parse_arg(arch_opt);
 						if (res == 0)
 							argument_errors = true;
 					}
 				} else if (strstart(opt, "preferred-stack-boundary=")) {
 					GET_ARG_AFTER(opt, "-mpreferred-stack-boundary=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-stackalign=%s", cpu_arch, opt);
-					int res = firm_be_option(arch_opt);
+					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
 				} else if (streq(opt, "omit-leaf-frame-pointer")) {

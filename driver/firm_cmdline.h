@@ -123,10 +123,4 @@ void print_firm_version(FILE *f);
  */
 int firm_option(const char *opt);
 
-/**
- * called by the generic command line parser
- * to handle the --backend= or -b options
- */
-int firm_be_option(const char *opt);
-
-#endif /* FIRM_CMDLINE_H */
+#endif

@@ -169,9 +169,7 @@ static const struct params {
   { X("no-grs-create-pattern"),  &firm_ext_grs.create_pattern, 0, "firm: create patterns for simd optimization" },
 #endif
 
-#ifdef FIRM_BACKEND
   { X("be-firm"),                &firm_be_opt.selection,     BE_FIRM_BE, "backend: firm backend facility" },
-#endif /* FIRM_BACKEND */
 #ifdef FIRM2C_BACKEND
   { X("be-firm2c"),              &firm_be_opt.selection,     BE_FIRM2C, "backend: firm2C" },
 #endif /* FIRM2C_BACKEND */
@@ -285,8 +283,8 @@ int firm_option(const char *opt)
         if (firm_opt.debug_mode == DBG_MODE_FULL)
           disable_opts();
         res = 1;
-        res &= firm_be_option("omitfp=0");
-        res &= firm_be_option("stabs");
+        res &= be_parse_arg("omitfp=0");
+        res &= be_parse_arg("stabs");
         return res;
       }
       break;
@@ -302,20 +300,6 @@ int firm_option(const char *opt)
 
   return 0;
 }  /* firm_option */
-
-/**
- * Handles a firm backend option.
- *
- * The options are here only checked for validity and later transmitted
- * to the firm backend (in the hope they do not fail ...)
- */
-int firm_be_option(const char *opt) {
-#ifdef FIRM_BACKEND
-  return be_parse_arg(opt);
-#else
-  return 0;
-#endif /* FIRM_BACKEND */
-}  /* firm_be_option */
 
 /**
  * prints the firm version number
