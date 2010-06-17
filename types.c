@@ -56,6 +56,7 @@ type_t *type_signed_char_ptr;
 type_t *type_void_ptr;
 type_t *type_const_void_ptr;
 type_t *type_void_ptr_restrict;
+type_t *type_const_void_ptr_restrict;
 
 type_t *type_char_ptr_ptr;
 
@@ -149,6 +150,8 @@ void init_basic_types(void)
 	type_void_ptr           = make_pointer_type(type_void,              TYPE_QUALIFIER_NONE);
 	type_const_void_ptr     = make_pointer_type(type_void,              TYPE_QUALIFIER_CONST);
 	type_void_ptr_restrict  = make_pointer_type(type_void,              TYPE_QUALIFIER_RESTRICT);
+	type_const_void_ptr_restrict
+	                        = make_pointer_type(type_void,              TYPE_QUALIFIER_CONST | TYPE_QUALIFIER_RESTRICT);
 	type_char_ptr           = make_pointer_type(type_char,              TYPE_QUALIFIER_NONE);
 	type_char_ptr_restrict  = make_pointer_type(type_char,              TYPE_QUALIFIER_RESTRICT);
 	type_signed_char_ptr    = make_pointer_type(type_signed_char,       TYPE_QUALIFIER_NONE);

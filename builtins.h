@@ -20,6 +20,8 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
+#include <stdbool.h>
+
 /**
  * GNU builtin or MS intrinsic functions.
  */
@@ -56,10 +58,14 @@ typedef enum builtin_kind_t {
 	bk_gnu_builtin_memcmp,
 	bk_gnu_builtin_memcpy,
 	bk_gnu_builtin___memcpy_chk,
+	bk_gnu_builtin_memmove,
 	bk_gnu_builtin_memset,
 	bk_gnu_builtin_strlen,
 	bk_gnu_builtin_strcmp,
 	bk_gnu_builtin_strcpy,
+	bk_gnu_builtin_strncpy,
+	bk_gnu_builtin_strcat,
+	bk_gnu_builtin_strncat,
 
 	bk_ms_rotl,
 	bk_ms_rotr,
@@ -106,5 +112,7 @@ void create_microsoft_intrinsics(void);
  * replace the builtins with these during code generation
  */
 entity_t *get_builtin_replacement(const entity_t *builtin_entity);
+
+int get_builtin_chk_arg_pos(builtin_kind_t kind);
 
 #endif

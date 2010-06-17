@@ -1763,7 +1763,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	type_t *type = skip_typeref(builtin->base.type);
 	assert(is_type_pointer(type));
 
-	type_t   *function_type = skip_typeref(type->pointer.points_to);
+	type_t *function_type = skip_typeref(type->pointer.points_to);
 
 	switch (builtin->entity->function.btk) {
 	case bk_gnu_builtin_alloca: {
@@ -1832,7 +1832,6 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		}
 	}
 	case bk_gnu_builtin_return_address: {
-
 		expression_t *const expression = call->arguments->expression;
 		ir_node *in[2];
 
@@ -1963,6 +1962,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 				return process_builtin_call(call);
 			}
 
+#if 0
 			if (irentity == rts_entities[rts_alloca]) {
 				/* handle alloca() call */
 				expression_t *argument = call->arguments->expression;
@@ -1980,6 +1980,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 
 				return res;
 			}
+#endif
 		}
 	}
 	ir_node *callee = expression_to_firm(function);

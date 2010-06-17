@@ -75,15 +75,19 @@ void create_gnu_builtins(void)
 	GNU_BUILTIN(abs,            make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
 	GNU_BUILTIN(labs,           make_function_type(type_long, 1, (type_t *[]) { type_long }, DM_CONST));
 	GNU_BUILTIN(llabs,          make_function_type(type_long_long, 1, (type_t *[]) { type_long_long }, DM_CONST));
-	GNU_BUILTIN(memcpy,         make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_void_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__memcpy_chk,   make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_void_ptr_restrict, type_size_t, type_size_t}, DM_NONE));
-	GNU_BUILTIN(exit,           make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
-	GNU_BUILTIN(malloc,         make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
+	GNU_BUILTIN(memcpy,         make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(__memcpy_chk,   make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t}, DM_NONE));
 	GNU_BUILTIN(memcmp,         make_function_type(type_int, 3, (type_t *[]) { type_const_void_ptr, type_const_void_ptr, type_size_t }, DM_PURE));
 	GNU_BUILTIN(memset,         make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
+	GNU_BUILTIN(memmove,        make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(strcat,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	GNU_BUILTIN(strcat,         make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
 	GNU_BUILTIN(strlen,         make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
 	GNU_BUILTIN(strcmp,         make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
 	GNU_BUILTIN(strcpy,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	GNU_BUILTIN(strncpy,        make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_char_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(exit,           make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
+	GNU_BUILTIN(malloc,         make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
 
 	/* TODO: gcc has a LONG list of builtin functions (nearly everything from
 	 * C89-C99 and others. Complete this */
@@ -94,23 +98,37 @@ void create_gnu_builtins(void)
 static const char *get_builtin_replacement_name(builtin_kind_t kind)
 {
 	switch (kind) {
-	case bk_gnu_builtin_abort:  return "abort";
-	case bk_gnu_builtin_abs:    return "abs";
-	case bk_gnu_builtin_labs:   return "labs";
-	case bk_gnu_builtin_llabs:  return "llabs";
-	case bk_gnu_builtin_exit:   return "exit";
-	case bk_gnu_builtin_malloc: return "malloc";
-	case bk_gnu_builtin_memcmp: return "memcmp";
-	case bk_gnu_builtin_memcpy: return "memcpy";
-	case bk_gnu_builtin_memset: return "memset";
-	case bk_gnu_builtin_strlen: return "strlen";
-	case bk_gnu_builtin_strcmp: return "strcmp";
-	case bk_gnu_builtin_strcpy: return "strcpy";
+	case bk_gnu_builtin_abort:        return "abort";
+	case bk_gnu_builtin_abs:          return "abs";
+	case bk_gnu_builtin_labs:         return "labs";
+	case bk_gnu_builtin_llabs:        return "llabs";
+	case bk_gnu_builtin_exit:         return "exit";
+	case bk_gnu_builtin_malloc:       return "malloc";
+	case bk_gnu_builtin_memcmp:       return "memcmp";
+	case bk_gnu_builtin_memcpy:       return "memcpy";
+	case bk_gnu_builtin___memcpy_chk: return "memcpy";
+	case bk_gnu_builtin_memset:       return "memset";
+	case bk_gnu_builtin_memmove:      return "memmove";
+	case bk_gnu_builtin_strlen:       return "strlen";
+	case bk_gnu_builtin_strcmp:       return "strcmp";
+	case bk_gnu_builtin_strcpy:       return "strcpy";
+	case bk_gnu_builtin_strcat:       return "strcat";
+	case bk_gnu_builtin_strncat:      return "strncat";
 
 	default:
 		break;
 	}
 	return NULL;
+}
+
+int get_builtin_chk_arg_pos(builtin_kind_t kind)
+{
+	switch (kind) {
+	case bk_gnu_builtin___memcpy_chk: return 3;
+	default:
+		break;
+	}
+	return -1;
 }
 
 entity_t *get_builtin_replacement(const entity_t *builtin_entity)
