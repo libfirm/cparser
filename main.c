@@ -169,24 +169,6 @@ struct file_list_entry_t {
 
 static file_list_entry_t *temp_files;
 
-#if defined(_DEBUG) || defined(FIRM_DEBUG)
-/**
- * Debug printf implementation.
- *
- * @param fmt  printf style format parameter
- */
-void dbg_printf(const char *fmt, ...)
-{
-	va_list list;
-
-	if (firm_dump.debug_print) {
-		va_start(list, fmt);
-		vprintf(fmt, list);
-		va_end(list);
-	}  /* if */
-}
-#endif /* defined(_DEBUG) || defined(FIRM_DEBUG) */
-
 static void initialize_firm(void)
 {
 	firm_early_init();

@@ -22,12 +22,6 @@
 #include "firm_timing.h"
 #include "ast2firm.h"
 
-#if defined(_DEBUG) || defined(FIRM_DEBUG)
-#define DBG(x)  dbg_printf x
-#else
-#define DBG(x) ((void)0)
-#endif /* _DEBUG || FIRM_DEBUG */
-
 static ir_timer_t *t_vcg_dump;
 static ir_timer_t *t_verify;
 static ir_timer_t *t_all_opt;
