@@ -540,7 +540,7 @@ typedef enum compile_mode_t {
 
 static void usage(const char *argv0)
 {
-	fprintf(stderr, "Usage %s input [-o output] [-c]\n", argv0);
+	fprintf(stderr, "Usage %s [options] input [-o output]\n", argv0);
 }
 
 static void print_cparser_version(void)
@@ -563,6 +563,15 @@ static void print_cparser_version(void)
 	puts(")");
 	puts("This is free software; see the source for copying conditions.  There is NO\n"
 	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
+}
+
+static void print_help(const char *argv0)
+{
+	usage(argv0);
+	puts("");
+	puts("\t-fhelp     Display help about firm optimisation options");
+	puts("\t-bhelp     Display help about firm backend options");
+	puts("A big number of gcc flags is also supported");
 }
 
 static void set_be_option(const char *arg)
@@ -1082,6 +1091,9 @@ int main(int argc, char **argv)
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					exit(EXIT_SUCCESS);
+				} else if (streq(option, "help")) {
+					print_help(argv[0]);
+					help_displayed = true;
 				} else if (streq(option, "dump-function")) {
 					++i;
 					if (i >= argc) {
@@ -1150,19 +1162,19 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (help_displayed) {
+		return !argument_errors;
+	}
+
 	if (print_file_name_file != NULL) {
 		print_file_name(print_file_name_file);
 		return 0;
 	}
-
 	if (files == NULL) {
 		fprintf(stderr, "error: no input files specified\n");
 		argument_errors = true;
 	}
 
-	if (help_displayed) {
-		return !argument_errors;
-	}
 	if (argument_errors) {
 		usage(argv[0]);
 		return 1;
