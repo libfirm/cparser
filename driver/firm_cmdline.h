@@ -85,7 +85,6 @@ struct a_firm_dump {
   a_byte extbb;         /**< dumps extended basic blocks */
   a_byte ir_graph;      /**< dump all graphs */
   a_byte all_phases;    /**< dump the IR graph after all phases */
-  a_byte edge_labels;   /**< use edge labels when dumping IR graphs */
   a_byte statistic;     /**< Firm statistic setting */
   a_byte stat_pattern;  /**< enable Firm statistic pattern */
   a_byte stat_dag;      /**< enable Firm DAG statistic */

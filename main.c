@@ -172,9 +172,6 @@ static file_list_entry_t *temp_files;
 static void initialize_firm(void)
 {
 	firm_early_init();
-
-	dump_consts_local(1);
-	dump_keepalive_edges(1);
 }
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
@@ -1463,7 +1460,7 @@ graph_built:
 					exit(1);
 				}
 
-				dump_ir_block_graph_file(irg, out);
+				dump_ir_graph_file(out, irg);
 				fclose(out);
 				exit(0);
 			}
@@ -1474,8 +1471,7 @@ graph_built:
 				exit(0);
 			}
 
-			gen_firm_finish(asm_out, filename, /*c_mode=*/1,
-			                have_const_functions);
+			gen_firm_finish(asm_out, filename, have_const_functions);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}

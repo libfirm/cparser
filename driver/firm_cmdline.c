@@ -65,7 +65,6 @@ struct a_firm_dump firm_dump = {
   /* extbb        = */ FALSE,
   /* ir_graph     = */ FALSE,
   /* all_phases   = */ FALSE,
-  /* edge_labels  = */ FALSE,
   /* statistic    = */ STAT_NONE,
   /* stat_pattern = */ 0,
   /* stat_dag     = */ 0,
@@ -157,7 +156,6 @@ static const struct params {
   { X("dump-no-blocks"),         &firm_dump.no_blocks,       1, "firm: dump non-blocked graph" },
   { X("dump-extbb"),             &firm_dump.extbb,           1, "firm: dump extended basic blocks" },
   { X("dump-all-phases"),        &firm_dump.all_phases,      1, "firm: dump graphs for all optimization phases" },
-  { X("dump-edge-labels"),       &firm_dump.edge_labels,     1, "firm: dump edge labels" },
 
   /* code generation */
   { X("no-codegen"),             &firm_be_opt.selection,     BE_NONE, "cg: disable code generator" },

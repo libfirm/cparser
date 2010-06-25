@@ -31,16 +31,12 @@ static bool do_irg_opt(ir_graph *irg, const char *name);
 
 static void dump_all(const char *suffix)
 {
-	if (firm_dump.ir_graph) {
-		timer_push(t_vcg_dump);
-		if (firm_dump.no_blocks)
-			dump_all_ir_graphs(dump_ir_graph, suffix);
-		else if (firm_dump.extbb)
-			dump_all_ir_graphs(dump_ir_extblock_graph, suffix);
-		else
-			dump_all_ir_graphs(dump_ir_block_graph, suffix);
-		timer_pop(t_vcg_dump);
-	}
+	if (!firm_dump.ir_graph)
+		return;
+
+	timer_push(t_vcg_dump);
+	dump_all_ir_graphs(suffix);
+	timer_pop(t_vcg_dump);
 }
 
 /* set by the backend parameters */
@@ -179,23 +175,6 @@ static void rts_map(void)
 }
 
 static int *irg_dump_no;
-
-static void dump_graph_count(ir_graph *const irg, const char *const suffix)
-{
-	char name[64];
-	snprintf(name, sizeof(name), "-%02d_%s", irg_dump_no[get_irg_idx(irg)]++,
-	         suffix);
-
-	timer_push(t_vcg_dump);
-	if (firm_dump.no_blocks)
-		dump_ir_graph(irg, name);
-	else if (firm_dump.extbb)
-		dump_ir_extblock_graph(irg, name);
-	else
-		dump_ir_block_graph(irg, name);
-	timer_pop(t_vcg_dump);
-}
-
 static int firm_const_exists;
 
 static void do_optimize_funccalls(void)
@@ -404,7 +383,7 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	timer_pop(timers[n]);
 
 	if (firm_dump.all_phases && firm_dump.ir_graph) {
-		dump_graph_count(irg, name);
+		dump_ir_graph(irg, name);
 	}
 
 	if (firm_opt.check_all) {
@@ -433,7 +412,7 @@ static void do_irp_opt(const char *name)
 		int i;
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 			ir_graph *irg = get_irp_irg(i);
-			dump_graph_count(irg, name);
+			dump_ir_graph(irg, name);
 		}
 	}
 
@@ -600,7 +579,7 @@ static void do_firm_optimizations(const char *input_filename)
 			construct_cf_backedges(get_irp_irg(i));
 	}
 
-	dump_all("-opt");
+	dump_all("opt");
 
 	if (firm_dump.statistic & STAT_AFTER_OPT)
 		stat_dump_snapshot(input_filename, "opt");
@@ -622,7 +601,7 @@ static void do_firm_lowering(const char *input_filename)
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
 
-	dump_all("-low");
+	dump_all("low");
 
 	if (firm_opt.enabled) {
 		timer_start(t_all_opt);
@@ -668,17 +647,17 @@ static void do_firm_lowering(const char *input_filename)
 
 		do_irp_opt("remove-unused");
 
-		dump_all("-low-opt");
+		dump_all("low-opt");
 	}
 
 	if (firm_opt.cc_opt)
 		mark_private_methods();
 
 	/* set the phase to low */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i)
-		set_irg_phase_low(get_irp_irg(i));
-
-	/* all graphs are lowered, set the irp phase to low */
+	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		ir_graph *irg = get_irp_irg(i);
+		set_irg_phase_state(irg, phase_low);
+	}
 	set_irp_phase_state(phase_low);
 
 	if (firm_dump.statistic & STAT_FINAL) {
@@ -743,8 +722,12 @@ void gen_firm_init(void)
 	arch_dep_set_opts(arch_dep_none);
 
 	do_node_verification((firm_verification_t) firm_opt.vrfy);
-	if (firm_dump.filter)
-		only_dump_method_with_name(new_id_from_str(firm_dump.filter));
+	if (firm_dump.filter != NULL)
+		ir_set_dump_filter(firm_dump.filter);
+	if (firm_dump.extbb)
+		ir_add_dump_flags(ir_dump_flag_group_extbb);
+	if (firm_dump.no_blocks)
+		ir_remove_dump_flags(ir_dump_flag_blocks_as_subgraphs);
 
 	if (firm_opt.enabled) {
 		set_optimize(1);
@@ -759,9 +742,6 @@ void gen_firm_init(void)
 	} else {
 		set_optimize(0);
 	}
-
-	/* do not dump entity ld names */
-	dump_ld_names(0);
 }
 
 /**
@@ -773,7 +753,7 @@ void gen_firm_init(void)
  * @param c_mode             non-zero if "C" was compiled
  * @param new_firm_const_exists  non-zero, if the const attribute was used on functions
  */
-void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
+void gen_firm_finish(FILE *out, const char *input_filename,
                      int new_firm_const_exists)
 {
 	int i;
@@ -793,23 +773,15 @@ void gen_firm_finish(FILE *out, const char *input_filename, int c_mode,
 	firm_dump.ir_graph
 		= (a_byte) (firm_dump.ir_graph | firm_dump.all_phases | firm_dump.extbb);
 
-	dump_keepalive_edges(1);
-	dump_consts_local(1);
-	dump_dominator_information(1);
-	dump_loop_information(0);
-
-	if (!firm_dump.edge_labels)
-		turn_off_edge_labels();
+	ir_add_dump_flags(ir_dump_flag_keepalive_edges
+			| ir_dump_flag_consts_local | ir_dump_flag_dominance);
+	ir_remove_dump_flags(ir_dump_flag_loops | ir_dump_flag_ld_names);
 
 	/* FIXME: cloning might ADD new graphs. */
 	irg_dump_no = calloc(get_irp_last_idx(), sizeof(*irg_dump_no));
 
 	if (firm_dump.all_types) {
-		dump_all_types("");
-		if (! c_mode) {
-			dump_class_hierarchy(0, "");
-			dump_class_hierarchy(1, "-with-entities");
-		}
+		dump_ir_prog_ext(dump_typegraph, "types.vcg");
 	}
 
 	/* finalize all graphs */
