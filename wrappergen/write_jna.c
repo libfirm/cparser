@@ -40,7 +40,11 @@ static void write_type(type_t *type);
 
 static bool is_system_header(const char *fname)
 {
-	return strncmp(fname, "/usr/include", 12) == 0;
+	if (strncmp(fname, "/usr/include", 12) == 0)
+		return true;
+	if (fname == builtin_source_position.input_name)
+		return true;
+	return false;
 }
 
 static const char *fix_builtin_names(const char *name)
