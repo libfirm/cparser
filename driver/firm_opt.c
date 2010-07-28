@@ -825,7 +825,7 @@ void gen_firm_finish(FILE *out, const char *input_filename,
 
 	/* set the phase to low */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i)
-		set_irg_phase_low(get_irp_irg(i));
+		set_irg_phase_state(get_irp_irg(i), phase_low);
 
 	if (firm_dump.statistic & STAT_FINAL_IR)
 		stat_dump_snapshot(input_filename, "final-ir");
