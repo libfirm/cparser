@@ -5935,7 +5935,7 @@ static void create_function(entity_t *entity)
 	set_type_size_bytes(frame_type, offset);
 	set_type_alignment_bytes(frame_type, align_all);
 
-	irg_vrfy(irg);
+	irg_verify(irg, VERIFY_ENFORCE_SSA);
 	current_function = old_current_function;
 
 	if (current_trampolines != NULL) {

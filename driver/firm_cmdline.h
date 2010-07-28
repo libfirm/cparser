@@ -42,7 +42,7 @@ struct a_firm_opt {
   a_byte   cc_opt;          /**< optimize calling conventions */
   a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
-  a_byte   vrfy;            /**< Firm verifier setting */
+  a_byte   verify;          /**< Firm verifier setting */
   a_byte   check_all;       /**< enable checking all Firm phases */
   a_byte   lower;           /**< enable Firm lowering */
   a_byte   os_support;      /**< current os support */
@@ -52,7 +52,7 @@ struct a_firm_opt {
   int      clone_threshold; /**< The threshold value for procedure cloning. */
   unsigned inline_maxsize;  /**< Maximum function size for inlining. */
   unsigned inline_threshold;/**< Inlining benefice threshold. */
-  a_byte   vrfy_edges;      /**< verify edges */
+  a_byte   verify_edges;    /**< verify edges */
   a_byte   grs_simd_opt;
   a_byte   grs_create_pattern;
   unsigned spare_size;      /**< allowed spare size for table switches in machine words. */

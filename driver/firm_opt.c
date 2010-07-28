@@ -388,7 +388,7 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 
 	if (firm_opt.check_all) {
 		timer_push(t_verify);
-		irg_verify(irg, VRFY_ENFORCE_SSA);
+		irg_verify(irg, VERIFY_ENFORCE_SSA);
 		timer_pop(t_verify);
 	}
 
@@ -420,7 +420,7 @@ static void do_irp_opt(const char *name)
 		int i;
 		timer_push(t_verify);
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-			irg_verify(get_irp_irg(i), VRFY_ENFORCE_SSA);
+			irg_verify(get_irp_irg(i), VERIFY_ENFORCE_SSA);
 		}
 		timer_pop(t_verify);
 	}
@@ -708,7 +708,7 @@ void gen_firm_init(void)
 		if_conv_info            = be_params->if_conv_info;
 	}
 
-	edges_init_dbg(firm_opt.vrfy_edges);
+	edges_init_dbg(firm_opt.verify_edges);
 
 	/* Sel node cannot produce NULL pointers */
 	set_opt_sel_based_null_check_elim(1);
@@ -721,7 +721,7 @@ void gen_firm_init(void)
 	/* do not run architecture dependent optimizations in building phase */
 	arch_dep_set_opts(arch_dep_none);
 
-	do_node_verification((firm_verification_t) firm_opt.vrfy);
+	do_node_verification((firm_verification_t) firm_opt.verify);
 	if (firm_dump.filter != NULL)
 		ir_set_dump_filter(firm_dump.filter);
 	if (firm_dump.extbb)
@@ -792,7 +792,7 @@ void gen_firm_finish(FILE *out, const char *input_filename,
 	dump_all("");
 
 	timer_push(t_verify);
-	tr_vrfy();
+	tr_verify();
 	timer_pop(t_verify);
 
 	/* all graphs are finalized, set the irp phase to high */
