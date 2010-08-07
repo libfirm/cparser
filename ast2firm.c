@@ -4648,7 +4648,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_global_variable(entity_t *entity)
 {
-	ir_linkage    linkage    = 0;
+	ir_linkage    linkage    = IR_LINKAGE_DEFAULT;
 	ir_visibility visibility = ir_visibility_default;
 	ir_entity    *irentity;
 	assert(entity->kind == ENTITY_VARIABLE);
