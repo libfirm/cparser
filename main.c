@@ -1136,13 +1136,8 @@ int main(int argc, char **argv)
 							streq(suffix, "o")   ? FILETYPE_OBJECT                 :
 							streq(suffix, "s")   ? FILETYPE_PREPROCESSED_ASSEMBLER :
 							streq(suffix, "so")  ? FILETYPE_OBJECT                 :
-							FILETYPE_AUTODETECT;
+							FILETYPE_OBJECT; /* gcc behavior: unknown file extension means object file */
 					}
-				}
-
-				if (type == FILETYPE_AUTODETECT) {
-					fprintf(stderr, "'%s': file format not recognized\n", arg);
-					continue;
 				}
 			}
 
