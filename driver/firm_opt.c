@@ -39,33 +39,8 @@ static void dump_all(const char *suffix)
 	timer_pop(t_vcg_dump);
 }
 
-/* set by the backend parameters */
-static const ir_settings_arch_dep_t *ad_param              = NULL;
-static create_intrinsic_fkt         *arch_create_intrinsic = NULL;
-static void                         *create_intrinsic_ctx  = NULL;
-static const ir_settings_if_conv_t  *if_conv_info          = NULL;
-
 /* entities of runtime functions */
 ir_entity_ptr rts_entities[rts_max];
-
-/**
- * factory for setting architecture dependent parameters
- */
-static const ir_settings_arch_dep_t *arch_factory(void)
-{
-	static const ir_settings_arch_dep_t param = {
-		1,   /* also use subs */
-		4,   /* maximum shifts */
-		31,   /* maximum shift amount */
-		NULL, /* use default evaluator */
-
-		1, /* allow Mulhs */
-		1, /* allow Mulus */
-		32  /* Mulh allowed up to 32 bit */
-	};
-
-	return ad_param ? ad_param : &param;
-}
 
 /**
  * Map runtime functions.
@@ -195,11 +170,6 @@ static void do_lower_highlevel(ir_graph *irg)
 	lower_highlevel_graph(irg, firm_opt.lower_bitfields);
 }
 
-static void do_if_conv(ir_graph *irg)
-{
-	opt_if_conv(irg, if_conv_info);
-}
-
 static void do_stred(ir_graph *irg)
 {
 	opt_osr(irg, osr_flag_default | osr_flag_keep_reg_pressure | osr_flag_ignore_x86_shift);
@@ -234,24 +204,10 @@ static void do_lower_mux(ir_graph *irg)
 	lower_mux(irg, NULL);
 }
 
-static void do_lower_dw_ops(void)
+static void do_lower_for_target(void)
 {
-	lwrdw_param_t init = {
-		1,
-		1,
-		get_atomic_mode(ATOMIC_TYPE_LONGLONG),
-		get_atomic_mode(ATOMIC_TYPE_ULONGLONG),
-		get_atomic_mode(ATOMIC_TYPE_INT),
-		get_atomic_mode(ATOMIC_TYPE_UINT),
-		def_create_intrinsic_fkt,
-		NULL
-	};
-
-	if (arch_create_intrinsic) {
-		init.create_intrinsic = arch_create_intrinsic;
-		init.ctx              = create_intrinsic_ctx;
-	}
-	lower_dw_ops(&init);
+	const backend_params *be_params = be_get_backend_param();
+	be_params->lower_for_target();
 }
 
 static void do_vrp(ir_graph *irg)
@@ -302,7 +258,7 @@ static opt_config_t opts[] = {
 	IRG("frame",             opt_frame_irg,            "remove unused frame entities",                          OPT_FLAG_NONE),
 	IRG("gcse",              do_gcse,                  "global common subexpression elimination",               OPT_FLAG_NONE),
 	IRG("gvn-pre",           do_gvn_pre,               "global value numbering partial redundancy elimination", OPT_FLAG_NONE),
-	IRG("if-conversion",     do_if_conv,               "if-conversion",                                         OPT_FLAG_NONE),
+	IRG("if-conversion",     opt_if_conv,              "if-conversion",                                         OPT_FLAG_NONE),
 	IRG("invert-loops",      do_loop_inversion,        "loop inversion",                                        OPT_FLAG_NONE),
 	IRG("ivopts",            do_stred,                 "induction variable strength reduction",                 OPT_FLAG_NONE),
 	IRG("local",             optimize_graph_df,        "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
@@ -324,7 +280,7 @@ static opt_config_t opts[] = {
 	IRG("vrp",               do_vrp,                   "value range propagation",                               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
-	IRP("lower-dw",          do_lower_dw_ops,          "lowering of doubleword operations",                     OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
+	IRP("target-lowering",   do_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRP("opt-func-call",     do_optimize_funccalls,    "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
@@ -452,6 +408,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("frame", true);
 	set_opt_enabled("combo", true);
 	set_opt_enabled("invert-loops", true);
+	set_opt_enabled("target-lowering", true);
 }
 
 /**
@@ -596,7 +553,7 @@ static void do_firm_lowering(const char *input_filename)
 {
 	int i;
 
-	do_irp_opt("lower-dw");
+	do_irp_opt("target-lowering");
 
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
@@ -624,6 +581,7 @@ static void do_firm_lowering(const char *input_filename)
 
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "gcse");
+			do_irg_opt(irg, "control-flow");
 			do_irg_opt(irg, "opt-load-store");
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "control-flow");
@@ -695,19 +653,6 @@ void gen_firm_init(void)
 			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
 			| FIRMSTAT_COUNT_CONSTS | pattern);
 
-	if (firm_be_opt.selection == BE_FIRM_BE) {
-		const backend_params *be_params = be_get_backend_param();
-
-		if (be_params->do_dw_lowering)
-			set_opt_enabled("lower-dw", true);
-
-		arch_create_intrinsic   = be_params->arch_create_intrinsic_fkt;
-		create_intrinsic_ctx    = be_params->create_intrinsic_ctx;
-
-		ad_param                = be_params->dep_param;
-		if_conv_info            = be_params->if_conv_info;
-	}
-
 	edges_init_dbg(firm_opt.verify_edges);
 
 	/* Sel node cannot produce NULL pointers */
@@ -715,8 +660,6 @@ void gen_firm_init(void)
 
 	/* dynamic dispatch works currently only if whole world scenarios */
 	set_opt_dyn_meth_dispatch(0);
-
-	arch_dep_init(arch_factory);
 
 	/* do not run architecture dependent optimizations in building phase */
 	arch_dep_set_opts(arch_dep_none);
