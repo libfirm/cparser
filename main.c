@@ -888,6 +888,8 @@ int main(int argc, char **argv)
 							strstart(orig_opt, "align-jumps=") ||
 							strstart(orig_opt, "align-functions=")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+					} else if (strstart(orig_opt, "message-length=")) {
+							/* ignore: would only affect error message format */
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
 					           streq(opt, "expensive-optimizations") ||
