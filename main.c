@@ -101,25 +101,14 @@
 #endif
 #endif
 
-/** The current c mode/dialect. */
-unsigned int c_mode = _C89 | _ANSI | _C99 | _GNUC;
-
-/** The 'machine size', 16, 32 or 64 bit, 32bit is the default. */
-unsigned int machine_size = 32;
-
-/** true if the char type is signed. */
-bool char_is_signed = true;
-
-/** true for strict language checking. */
-bool strict_mode = false;
-
-/** use builtins for some libc functions */
-bool use_builtins = false;
-
-/** we have extern function with const attribute. */
-bool have_const_functions = false;
-
-atomic_type_kind_t wchar_atomic_kind = ATOMIC_TYPE_INT;
+unsigned int       c_mode                = _C89 | _ANSI | _C99 | _GNUC;
+unsigned int       machine_size          = 32;
+bool               byte_order_big_endian = false;
+bool               char_is_signed        = true;
+bool               strict_mode           = false;
+bool               use_builtins          = false;
+bool               have_const_functions  = false;
+atomic_type_kind_t wchar_atomic_kind     = ATOMIC_TYPE_INT;
 
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
@@ -1182,6 +1171,7 @@ int main(int argc, char **argv)
 	c_mode &= ~features_off;
 
 	gen_firm_init();
+	byte_order_big_endian = be_get_backend_param()->byte_order_big_endian;
 	init_symbol_table();
 	init_types();
 	init_typehash();

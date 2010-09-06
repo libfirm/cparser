@@ -34,19 +34,22 @@ typedef enum lang_features_t {
 	_ALL  = 0xFF
 } lang_features_t;
 
-/* the current C mode/dialect */
+/** the current C mode/dialect */
 extern unsigned int c_mode;
 
-/* the 'machine size', 16, 32 or 64 bit */
+/** the 'machine size', 16, 32 or 64 bit */
 extern unsigned int machine_size;
 
-/* true if the char type is signed */
+/** byte-order: true = big-endian, false = little-endian */
+extern bool byte_order_big_endian;
+
+/** true if the char type is signed */
 extern bool char_is_signed;
 
-/* true for strict language checking. */
+/** true for strict language checking. */
 extern bool strict_mode;
 
-/* atomic type of wchar_t */
+/** atomic type of wchar_t */
 extern atomic_type_kind_t wchar_atomic_kind;
 
 #endif

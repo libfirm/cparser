@@ -1682,6 +1682,57 @@ type_t *make_array_type(type_t *element_type, size_t size,
 	return identify_new_type(type);
 }
 
+static entity_t *pack_bitfield_members_big_endian(il_size_t *struct_offset,
+		il_alignment_t *struct_alignment, bool packed, entity_t *first)
+{
+	type_t        *current_base_type = NULL;
+	il_size_t      offset            = *struct_offset;
+	il_alignment_t alignment         = *struct_alignment;
+	size_t         bit_offset        = 0;
+
+	if (packed)
+		panic("packed bitfields on big-endian arch not supported yet");
+
+	entity_t *member;
+	for (member = first; member != NULL; member = member->base.next) {
+		if (member->kind != ENTITY_COMPOUND_MEMBER)
+			continue;
+
+		type_t *type = member->declaration.type;
+		if (type->kind != TYPE_BITFIELD)
+			break;
+
+		size_t  bit_size  = type->bitfield.bit_size;
+		type_t *base_type = skip_typeref(type->bitfield.base_type);
+
+		/* see if we need to start a new "bucket" */
+		if (base_type != current_base_type || bit_size > bit_offset) {
+			if (current_base_type != NULL)
+				offset += get_type_size(current_base_type);
+
+			current_base_type = base_type;
+			il_alignment_t base_alignment = get_type_alignment(base_type);
+			il_alignment_t alignment_mask = base_alignment-1;
+			if (base_alignment > alignment)
+				alignment = base_alignment;
+			offset     = (offset + base_alignment-1) & ~alignment_mask;
+			bit_offset = get_type_size(base_type) * BITS_PER_BYTE;
+			assert(bit_offset >= bit_size);
+		}
+
+		bit_offset -= bit_size;
+		member->compound_member.offset     = offset;
+		member->compound_member.bit_offset = bit_offset;
+	}
+
+	if (current_base_type != NULL)
+		offset += get_type_size(current_base_type);
+
+	*struct_offset    = offset;
+	*struct_alignment = alignment;
+	return member;
+}
+
 static entity_t *pack_bitfield_members(il_size_t *struct_offset,
                                        il_alignment_t *struct_alignment,
 									   bool packed, entity_t *first)
@@ -1693,7 +1744,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 	entity_t *member;
 	for (member = first; member != NULL; member = member->base.next) {
 		if (member->kind != ENTITY_COMPOUND_MEMBER)
-			break;
+			continue;
 
 		type_t *type = member->declaration.type;
 		if (type->kind != TYPE_BITFIELD)
@@ -1731,7 +1782,6 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 
 	*struct_offset    = offset;
 	*struct_alignment = alignment;
-
 	return member;
 }
 
@@ -1764,8 +1814,14 @@ void layout_struct_type(compound_type_t *type)
 		}
 
 		if (skipped->kind == TYPE_BITFIELD) {
-			entry = pack_bitfield_members(&offset, &alignment,
-			                              compound->packed, entry);
+			if (byte_order_big_endian) {
+				entry = pack_bitfield_members_big_endian(&offset, &alignment,
+				                                         compound->packed,
+				                                         entry);
+			} else {
+				entry = pack_bitfield_members(&offset, &alignment,
+				                              compound->packed, entry);
+			}
 			continue;
 		}
 
