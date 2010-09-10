@@ -52,7 +52,6 @@ struct a_firm_opt firm_opt = {
   /* verify_edges    = */ FALSE,
   /* grs_simd_opt    = */ 0,
   /* grs_create_pattern = */ 0,
-  /* spare_size      = */ 128,
   /* enable_statev   = */ FALSE,
   /* statev_filter   = */ "",
 };

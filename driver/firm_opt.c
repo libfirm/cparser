@@ -194,11 +194,6 @@ static void do_cloning(void)
 	proc_cloning((float) firm_opt.clone_threshold);
 }
 
-static void do_lower_switch(ir_graph *irg)
-{
-	lower_switch(irg, firm_opt.spare_size);
-}
-
 static void do_lower_mux(ir_graph *irg)
 {
 	lower_mux(irg, NULL);
@@ -264,8 +259,6 @@ static opt_config_t opts[] = {
 	IRG("local",             optimize_graph_df,        "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
 	IRG("lower",             do_lower_highlevel,       "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRG("lower-mux",         do_lower_mux,             "mux lowering",                                          OPT_FLAG_NONE),
-	IRG("lower-switch",      do_lower_switch,          "switch lowering",                                       OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
-	IRG("one-return",        normalize_one_return,     "normalisation to 1 return",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
 	IRG("opt-tail-rec",      opt_tail_rec_irg,         "tail-recursion eliminiation",                           OPT_FLAG_NONE),
 	IRG("parallelize-mem",   opt_parallelize_mem,      "parallelize memory",                                    OPT_FLAG_NONE),
@@ -403,7 +396,6 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("remove-confirms", true);
 	set_opt_enabled("ivopts", true);
 	set_opt_enabled("dead", true);
-	set_opt_enabled("lower-switch", true);
 	set_opt_enabled("remove-phi-cycles", true);
 	set_opt_enabled("frame", true);
 	set_opt_enabled("combo", true);
@@ -504,7 +496,6 @@ static void do_firm_optimizations(const char *input_filename)
 
 		do_irg_opt(irg, "bool");
 		do_irg_opt(irg, "shape-blocks");
-		do_irg_opt(irg, "lower-switch");
 		do_irg_opt(irg, "ivopts");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "dead");
