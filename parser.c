@@ -7520,6 +7520,10 @@ static expression_t *parse_call_expression(expression_t *expression)
 	/* do default promotion for other arguments */
 	for (; argument != NULL; argument = argument->next) {
 		type_t *type = argument->expression->base.type;
+		if (!is_type_object(skip_typeref(type))) {
+			errorf(&argument->expression->base.source_position,
+			       "call argument '%E' must not be void", argument->expression);
+		}
 
 		type = get_default_promoted_type(type);
 
