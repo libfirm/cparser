@@ -30,7 +30,6 @@ struct a_firm_opt {
   a_byte   debug_mode;      /**< debug mode: store all local variables */
   a_byte   const_folding;   /**< enable constant folding */
   a_byte   cse;             /**< enable common-subexpression elimination */
-  a_byte   control_flow;    /**< enable control flow optimizations */
   a_byte   gcse;            /**< enable global common-subexpression elimination */
   a_byte   confirm;         /**< enable Confirm optimization */
   a_byte   muls;            /**< enable architecture dependent mul optimization */

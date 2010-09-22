@@ -669,9 +669,6 @@ void gen_firm_init(void)
 		set_opt_cse(firm_opt.cse);
 		set_opt_global_cse(0);
 		set_opt_unreachable_code(1);
-		set_opt_control_flow(firm_opt.control_flow);
-		set_opt_control_flow_weak_simplification(1);
-		set_opt_control_flow_strong_simplification(1);
 	} else {
 		set_optimize(0);
 	}
