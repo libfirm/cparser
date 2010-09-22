@@ -201,8 +201,16 @@ static void do_lower_mux(ir_graph *irg)
 
 static void do_lower_for_target(void)
 {
+	int i;
 	const backend_params *be_params = be_get_backend_param();
 	be_params->lower_for_target();
+
+	/* set the phase to low */
+	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		ir_graph *irg = get_irp_irg(i);
+		set_irg_phase_state(irg, phase_low);
+	}
+	set_irp_phase_state(phase_low);
 }
 
 static void do_vrp(ir_graph *irg)
@@ -549,8 +557,6 @@ static void do_firm_lowering(const char *input_filename)
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
 
-	dump_all("low");
-
 	if (firm_opt.enabled) {
 		timer_start(t_all_opt);
 
@@ -601,13 +607,6 @@ static void do_firm_lowering(const char *input_filename)
 
 	if (firm_opt.cc_opt)
 		mark_private_methods();
-
-	/* set the phase to low */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-		ir_graph *irg = get_irp_irg(i);
-		set_irg_phase_state(irg, phase_low);
-	}
-	set_irp_phase_state(phase_low);
 
 	if (firm_dump.statistic & STAT_FINAL) {
 		stat_dump_snapshot(input_filename, "final");
