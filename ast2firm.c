@@ -5771,7 +5771,7 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 	ir_entity *ptr          = new_entity(segment, ide, ptr_type);
 	ir_graph  *irg          = get_const_code_irg();
 	ir_node   *val          = new_rd_SymConst_addr_ent(NULL, irg, mode_P_code,
-	                                                   method, NULL);
+	                                                   method);
 
 	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
 	set_entity_compiler_generated(ptr, 1);
@@ -5830,13 +5830,15 @@ static void create_function(entity_t *entity)
 
 	int       n_local_vars = get_function_n_local_vars(entity);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
+	current_ir_graph = irg;
 
 	ir_graph *old_current_function = current_function;
 	current_function = irg;
 
 	set_irg_fp_model(irg, firm_opt.fp_model);
 	tarval_enable_fp_ops(1);
-	set_irn_dbg_info(get_irg_start_block(irg), get_entity_dbg_info(function_entity));
+	set_irn_dbg_info(get_irg_start_block(irg),
+	                 get_entity_dbg_info(function_entity));
 
 	ir_node *first_block = get_cur_block();
 
