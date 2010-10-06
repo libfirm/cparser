@@ -12,12 +12,6 @@
 
 #include "fe_common.h"
 
-enum an_os_support {
-  OS_SUPPORT_LINUX,         /**< create code for Linux OS */
-  OS_SUPPORT_MINGW,         /**< create code for MinGW WIN32 */
-  OS_SUPPORT_MACHO          /**< create code for MacOS Mach-O */
-} an_os_support;
-
 enum a_debug_mode {
   DBG_MODE_NONE      = 0,   /**< no special debug support */
   DBG_MODE_BACKSTORE = 1,   /**< backstores are created */
@@ -39,12 +33,10 @@ struct a_firm_opt {
   a_byte   strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
   a_byte   no_alias;        /**< no aliasing possible. */
   a_byte   cc_opt;          /**< optimize calling conventions */
-  a_byte   freestanding;    /**< if set, freestanding mode is enabled */
   a_byte   fp_model;        /**< fp model */
   a_byte   verify;          /**< Firm verifier setting */
   a_byte   check_all;       /**< enable checking all Firm phases */
   a_byte   lower;           /**< enable Firm lowering */
-  a_byte   os_support;      /**< current os support */
   a_byte   honor_restrict;  /**< enable restrict keyword */
   a_byte   lower_bitfields; /**< lower bitfield access */
   a_byte   pic;             /**< generate position independent code */

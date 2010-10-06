@@ -13,14 +13,6 @@
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
-#if defined(_WIN32) || defined(__CYGWIN__)
-#define DEFAULT_OS OS_SUPPORT_MINGW
-#elif defined(__APPLE__)
-#define DEFAULT_OS OS_SUPPORT_MACHO
-#else
-#define DEFAULT_OS OS_SUPPORT_LINUX
-#endif
-
 /* optimization settings */
 struct a_firm_opt firm_opt = {
   /* enabled         = */ TRUE,
@@ -36,12 +28,10 @@ struct a_firm_opt firm_opt = {
   /* strict_alias    = */ FALSE,
   /* no_alias        = */ FALSE,
   /* cc_opt          = */ TRUE,
-  /* freestanding;   = */ FALSE,
   /* fp_model        = */ fp_model_precise,
   /* verify          = */ FIRM_VERIFICATION_ON,
   /* check_all       = */ FALSE,
   /* lower           = */ TRUE,
-  /* os_support      = */ DEFAULT_OS,
   /* honor_restrict  = */ TRUE,
   /* lower_bitfields = */ TRUE,
   /* pic             = */ FALSE,
@@ -127,8 +117,6 @@ static const struct params {
   { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
   { X("opt-cc"),                 &firm_opt.cc_opt,           1, "firm: enable calling conventions optimization" },
   { X("no-opt-cc"),              &firm_opt.cc_opt,           0, "firm: disable calling conventions optimization" },
-  { X("freestanding"),           &firm_opt.freestanding,     1, "firm: freestanding environment" },
-  { X("hosted"),                 &firm_opt.freestanding,     0, "firm: hosted environment" },
 
   /* other firm regarding options */
   { X("restrict"),               &firm_opt.honor_restrict,   1, "firm: honor restrict keyword" },
@@ -176,9 +164,6 @@ static const struct params {
   { X("stat-final"),             &firm_dump.statistic,       STAT_FINAL,       "misc: Firm statistic after code generation" },
   { X("stat-pattern"),           &firm_dump.stat_pattern,    1, "misc: Firm statistic calculates most used pattern" },
   { X("stat-dag"),               &firm_dump.stat_dag,        1, "misc: Firm calculates DAG statistics" },
-  { X("win32"),                  &firm_opt.os_support,       OS_SUPPORT_MINGW, "misc: generate MinGW Win32 code" },
-  { X("mac"),                    &firm_opt.os_support,       OS_SUPPORT_MACHO, "misc: generate MacOS code" },
-  { X("linux"),                  &firm_opt.os_support,       OS_SUPPORT_LINUX, "misc: generate Linux-ELF code" },
 
   /* string options */
   { X("dump-filter=<string>"),   NULL,                       0, "misc: set dumper filter" },
@@ -216,7 +201,6 @@ static void disable_opts(void) {
   firm_opt.strict_alias    = FALSE;
   firm_opt.no_alias        = FALSE;
   firm_opt.cc_opt          = FALSE;
-  firm_opt.freestanding    = TRUE;
   disable_all_opts();
 }  /* disable_opts */
 

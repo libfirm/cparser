@@ -227,9 +227,9 @@ void init_types(void)
 	props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
 	props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
 	props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
-	if (firm_opt.os_support == OS_SUPPORT_MACHO) {
-		props[ATOMIC_TYPE_LONG_DOUBLE].size      = 16;
-		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 16;
+	if (force_long_double_size > 0) {
+		props[ATOMIC_TYPE_LONG_DOUBLE].size      = force_long_double_size;
+		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = force_long_double_size;
 	}
 
 	/* TODO: make this configurable for platforms which do not use byte sized

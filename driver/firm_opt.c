@@ -409,6 +409,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("combo", true);
 	set_opt_enabled("invert-loops", true);
 	set_opt_enabled("target-lowering", true);
+	set_opt_enabled("rts", true);
 }
 
 /**
@@ -432,7 +433,6 @@ static void do_firm_optimizations(const char *input_filename)
 	set_irp_memory_disambiguator_options(aa_opt);
 
 	/* parameter passing code should set them directly sometime... */
-	set_opt_enabled("rts", !firm_opt.freestanding);
 	set_opt_enabled("gcse", firm_opt.gcse);
 	set_opt_enabled("place", !firm_opt.gcse);
 	set_opt_enabled("confirm", firm_opt.confirm);

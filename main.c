@@ -101,14 +101,17 @@
 #endif
 #endif
 
-unsigned int       c_mode                = _C89 | _ANSI | _C99 | _GNUC;
-unsigned int       machine_size          = 32;
-bool               byte_order_big_endian = false;
-bool               char_is_signed        = true;
-bool               strict_mode           = false;
-bool               use_builtins          = false;
-bool               have_const_functions  = false;
-atomic_type_kind_t wchar_atomic_kind     = ATOMIC_TYPE_INT;
+unsigned int       c_mode                    = _C89 | _ANSI | _C99 | _GNUC;
+unsigned int       machine_size              = 32;
+bool               byte_order_big_endian     = false;
+bool               char_is_signed            = true;
+bool               strict_mode               = false;
+bool               use_builtins              = false;
+bool               have_const_functions      = false;
+atomic_type_kind_t wchar_atomic_kind         = ATOMIC_TYPE_INT;
+unsigned           force_long_double_size    = 0;
+bool               enable_main_collect2_hack = false;
+bool               freestanding              = false;
 
 /* to switch on printing of implicit casts */
 extern bool print_implicit_casts;
@@ -116,6 +119,7 @@ extern bool print_implicit_casts;
 /* to switch on printing of parenthesis to indicate operator precedence */
 extern bool print_parenthesis;
 
+static const char     *target_triple;
 static int             verbose;
 static struct obstack  cppflags_obst, ldflags_obst;
 static char            dep_target[1024];
@@ -297,10 +301,14 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	assert(obstack_object_size(&cppflags_obst) == 0);
 
 	const char *preprocessor = getenv("CPARSER_PP");
-	if (preprocessor == NULL)
-		preprocessor = PREPROCESSOR;
+	if (preprocessor != NULL) {
+		obstack_printf(&cppflags_obst, "%s ", preprocessor);
+	} else {
+		if (target_triple != NULL)
+			obstack_printf(&cppflags_obst, "%s-", target_triple);
+		obstack_printf(&cppflags_obst, PREPROCESSOR);
+	}
 
-	obstack_printf(&cppflags_obst, "%s ", preprocessor);
 	switch (filetype) {
 	case FILETYPE_C:
 		add_flag(&cppflags_obst, "-std=c99");
@@ -348,13 +356,24 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 
 static void assemble(const char *out, const char *in)
 {
-	char buf[65536];
+	struct obstack asflags_obst;
+	char *buf;
+
+	obstack_init(&asflags_obst);
 
 	const char *assembler = getenv("CPARSER_AS");
-	if (assembler == NULL)
-		assembler = ASSEMBLER;
+	if (assembler != NULL) {
+		obstack_printf(&asflags_obst, "%s ", assembler);
+	} else {
+		if (target_triple != NULL)
+			obstack_printf(&asflags_obst, "%s-", target_triple);
+		obstack_printf(&asflags_obst, "%s ", ASSEMBLER);
+	}
 
-	snprintf(buf, sizeof(buf), "%s %s -o %s", assembler, in, out);
+	obstack_printf(&asflags_obst, "%s -o %s", in, out);
+	obstack_1grow(&asflags_obst, '\0');
+	buf = obstack_finish(&asflags_obst);
+
 	if (verbose) {
 		puts(buf);
 	}
@@ -364,6 +383,8 @@ static void assemble(const char *out, const char *in)
 		fprintf(stderr, "assembler reported an error\n");
 		exit(1);
 	}
+
+	obstack_free(&asflags_obst, NULL);
 }
 
 static void print_file_name(const char *file)
@@ -375,8 +396,13 @@ static void print_file_name(const char *file)
 
 	/* construct commandline */
 	const char *linker = getenv("CPARSER_LINK");
-	if (linker == NULL)
-		linker = LINKER;
+	if (linker != NULL) {
+		obstack_printf(&ldflags_obst, "%s ", linker);
+	} else {
+		if (target_triple != NULL)
+			obstack_printf(&ldflags_obst, "%s-", target_triple);
+		obstack_printf(&ldflags_obst, "%s ", LINKER);
+	}
 	obstack_printf(&ldflags_obst, "%s ", linker);
 	obstack_printf(&ldflags_obst, "%s", flags);
 	obstack_1grow(&ldflags_obst, '\0');
@@ -632,23 +658,99 @@ static filetype_t get_filetype_from_string(const char *string)
 	return FILETYPE_UNKNOWN;
 }
 
-static void init_os_support(void)
+/**
+ * Initialize firm codegeneration for a specific operating system.
+ * The argument is the operating system part of a target-triple */
+static bool set_os_support(const char *os)
 {
-	/* OS option must be set to the backend */
-	switch (firm_opt.os_support) {
-	case OS_SUPPORT_MINGW:
-		set_be_option("ia32-gasmode=mingw");
-		wchar_atomic_kind = ATOMIC_TYPE_USHORT;
-		break;
-	case OS_SUPPORT_LINUX:
+	wchar_atomic_kind         = ATOMIC_TYPE_INT;
+	force_long_double_size    = 0;
+	enable_main_collect2_hack = false;
+
+	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
+			|| streq(os, "solaris")) {
 		set_be_option("ia32-gasmode=elf");
-		break;
-	case OS_SUPPORT_MACHO:
-		set_be_option("ia32-gasmode=macho");
+		set_create_ld_ident(create_name_linux_elf);
+	} else if (streq(os, "darwin")) {
+		force_long_double_size = 16;
+		set_be_option("ia32-gasmode=darwin");
 		set_be_option("ia32-stackalign=4");
-		set_be_option("pic");
-		break;
+		set_be_option("pic=true");
+		set_create_ld_ident(create_name_macho);
+	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
+		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
+		enable_main_collect2_hack = true;
+		set_be_option("ia32-gasmode=mingw");
+		set_create_ld_ident(create_name_win32);
+	} else {
+		return false;
 	}
+
+	return true;
+}
+
+static bool parse_target_triple(const char *arg)
+{
+	const char *manufacturer = strchr(arg, '-');
+	if (manufacturer == NULL) {
+		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
+		return false;
+	}
+	manufacturer += 1;
+
+	const char *os = strchr(manufacturer, '-');
+	if (os == NULL) {
+		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
+		return false;
+	}
+	os += 1;
+
+	/* Note: Triples are more or less defined by what the config.guess and
+	 * config.sub scripts from GNU autoconf emit. We have to lookup there what
+	 * triples are possible */
+
+	/* process cpu type */
+	if (strstart(arg, "i386-")) {
+		be_parse_arg("isa=ia32");
+		be_parse_arg("ia32-arch=i386");
+	} else if (strstart(arg, "i486-")) {
+		be_parse_arg("isa=ia32");
+		be_parse_arg("ia32-arch=i486");
+	} else if (strstart(arg, "i586-")) {
+		be_parse_arg("isa=ia32");
+		be_parse_arg("ia32-arch=i586");
+	} else if (strstart(arg, "i686-")) {
+		be_parse_arg("isa=ia32");
+		be_parse_arg("ia32-arch=i686");
+	} else if (strstart(arg, "i786-")) {
+		be_parse_arg("isa=ia32");
+		be_parse_arg("ia32-arch=pentium4");
+	} else if (strstart(arg, "x86_64")) {
+		be_parse_arg("isa=amd64");
+	} else if (strstart(arg, "sparc-")) {
+		be_parse_arg("isa=sparc");
+	} else if (strstart(arg, "arm-")) {
+		be_parse_arg("isa=arm");
+	} else {
+		fprintf(stderr, "Unknown cpu in triple '%s'\n", arg);
+		return false;
+	}
+
+	/* process manufacturer, alot of people incorrectly leave out the
+	 * manufacturer instead of using unknown- */
+	if (strstart(manufacturer, "linux")) {
+		os = manufacturer;
+		manufacturer = "unknown-";
+	}
+
+	/* process operating system */
+	if (!set_os_support(os)) {
+		fprintf(stderr, "Unknown operating system '%s' in triple '%s'\n", os, arg);
+		return false;
+	}
+
+	target_triple = arg;
+	return true;
 }
 
 int main(int argc, char **argv)
@@ -708,17 +810,16 @@ int main(int argc, char **argv)
 		if (option[0] == 'O') {
 			sscanf(&option[1], "%d", &opt_level);
 		}
-		if (strcmp(arg, "-fwin32") == 0) {
-			firm_opt.os_support = OS_SUPPORT_MINGW;
-		} else if (strcmp(arg, "-fmac") == 0) {
-			firm_opt.os_support = OS_SUPPORT_MACHO;
-		} else if (strcmp(arg, "-flinux") == 0) {
-			firm_opt.os_support = OS_SUPPORT_LINUX;
-		}
 	}
 
-	/* set target/os specific stuff */
-	init_os_support();
+	/* Guess host OS */
+#if defined(_WIN32) || defined(__CYGWIN__)
+	set_os_support("win32");
+#elif defined(__APPLE__)
+	set_os_support("darwin");
+#else
+	set_os_support("linux");
+#endif
 
 	/* apply optimisation level */
 	switch(opt_level) {
@@ -744,13 +845,17 @@ int main(int argc, char **argv)
 		break;
 	}
 
+	const char *target = getenv("TARGET");
+	if (target != NULL)
+		parse_target_triple(target);
+
 	/* parse rest of options */
-	standard                        = STANDARD_DEFAULT;
-	unsigned        features_on     = 0;
-	unsigned        features_off    = 0;
-	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
-	bool            help_displayed  = false;
-	bool            argument_errors = false;
+	standard                   = STANDARD_DEFAULT;
+	unsigned   features_on     = 0;
+	unsigned   features_off    = 0;
+	filetype_t forced_filetype = FILETYPE_AUTODETECT;
+	bool       help_displayed  = false;
+	bool       argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
@@ -869,6 +974,10 @@ int main(int argc, char **argv)
 						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "unsigned-char")) {
 						char_is_signed = !truth_value;
+					} else if (streq(opt, "freestanding")) {
+						freestanding = true;
+					} else if (streq(opt, "hosted")) {
+						freestanding = false;
 					} else if (truth_value == false &&
 					           streq(opt, "asynchronous-unwind-tables")) {
 					    /* nothing todo, a gcc feature which we don't support
@@ -939,7 +1048,15 @@ int main(int argc, char **argv)
 				char arch_opt[64];
 
 				GET_ARG_AFTER(opt, "-m");
-				if (strstart(opt, "arch=")) {
+				if (strstart(opt, "target=")) {
+					GET_ARG_AFTER(opt, "-mtarget=");
+					if (!parse_target_triple(opt))
+						argument_errors = true;
+				} else if (strstart(opt, "triple=")) {
+					GET_ARG_AFTER(opt, "-mtriple=");
+					if (!parse_target_triple(opt))
+						argument_errors = true;
+				} else if (strstart(opt, "arch=")) {
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = be_parse_arg(arch_opt);
@@ -1527,9 +1644,14 @@ graph_built:
 
 		/* construct commandline */
 		const char *linker = getenv("CPARSER_LINK");
-		if (linker == NULL)
-			linker = LINKER;
-		obstack_printf(&file_obst, "%s", linker);
+		if (linker != NULL) {
+			obstack_printf(&file_obst, "%s ", linker);
+		} else {
+			if (target_triple != NULL)
+				obstack_printf(&file_obst, "%s-", target_triple);
+			obstack_printf(&file_obst, "%s ", LINKER);
+		}
+
 		for (file_list_entry_t *entry = files; entry != NULL;
 				entry = entry->next) {
 			if (entry->type != FILETYPE_OBJECT)

@@ -877,7 +877,12 @@ static const struct {
 
 static ident *rts_idents[lengthof(rts_data)];
 
-static ident* (*create_ld_ident)(entity_t*) = create_name_linux_elf;
+static create_ld_ident_func create_ld_ident = create_name_linux_elf;
+
+void set_create_ld_ident(ident *(*func)(entity_t*))
+{
+	create_ld_ident = func;
+}
 
 /**
  * Handle GNU attributes for entities
@@ -1015,12 +1020,12 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		}
 	} else {
 		/* nested functions are always local */
-	   	set_entity_visibility(irentity, ir_visibility_local);
+		set_entity_visibility(irentity, ir_visibility_local);
 	}
 
 	/* We should check for file scope here, but as long as we compile C only
 	   this is not needed. */
-	if (! firm_opt.freestanding && !has_body) {
+	if (!freestanding && !has_body) {
 		/* check for a known runtime function */
 		for (size_t i = 0; i < lengthof(rts_data); ++i) {
 			if (id != rts_idents[i])
@@ -2439,7 +2444,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 	cmp_val = get_pnc(expression->base.kind, op1->base.type);
 
 	if (is_local_variable(op1) && is_local_variable(op2)) {
-    	var  = op1->reference.entity;
+		var  = op1->reference.entity;
 	    var2 = op2->reference.entity;
 
 		type_t  *const type = skip_typeref(var->declaration.type);
@@ -2599,10 +2604,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		return create_cast(dbgi, value_node, from_type, type);
 	}
 	case EXPR_UNARY_ASSUME:
-		if (firm_opt.confirm)
-			return handle_assume(dbgi, value);
-		else
-			return NULL;
+		return handle_assume(dbgi, value);
 
 	default:
 		break;
@@ -5802,7 +5804,7 @@ static void create_function(entity_t *entity)
 	if (entity->function.statement == NULL)
 		return;
 
-	if (is_main(entity) && firm_opt.os_support == OS_SUPPORT_MINGW) {
+	if (is_main(entity) && enable_main_collect2_hack) {
 		prepare_main_collect2(entity);
 	}
 
@@ -6009,21 +6011,6 @@ void init_ast2firm(void)
 
 	ir_set_debug_retrieve(dbg_retrieve);
 	ir_set_type_debug_retrieve(dbg_print_type_dbg_info);
-
-	/* OS option must be set to the backend */
-	switch (firm_opt.os_support) {
-	case OS_SUPPORT_MINGW:
-		create_ld_ident = create_name_win32;
-		break;
-	case OS_SUPPORT_LINUX:
-		create_ld_ident = create_name_linux_elf;
-		break;
-	case OS_SUPPORT_MACHO:
-		create_ld_ident = create_name_macho;
-		break;
-	default:
-		panic("unexpected OS support mode");
-	}
 
 	/* create idents for all known runtime functions */
 	for (size_t i = 0; i < lengthof(rts_data); ++i) {

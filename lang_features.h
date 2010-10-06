@@ -52,4 +52,14 @@ extern bool strict_mode;
 /** atomic type of wchar_t */
 extern atomic_type_kind_t wchar_atomic_kind;
 
+/** size of long double (this is 16 on some x86 architectures even if only the
+ * lowest 80bits are used */
+extern unsigned force_long_double_size;
+
+/** a hack that adds a call to __main into the main function, necessary on
+ * mingw */
+extern bool enable_main_collect2_hack;
+
+extern bool freestanding;
+
 #endif

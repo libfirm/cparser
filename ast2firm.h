@@ -32,4 +32,8 @@ void exit_ast2firm(void);
 ir_mode *get_atomic_mode(atomic_type_kind_t kind);
 ir_type *get_ir_type(type_t *type);
 
+typedef ident* (*create_ld_ident_func)(entity_t *entity);
+
+void set_create_ld_ident(create_ld_ident_func func);
+
 #endif
