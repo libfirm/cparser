@@ -265,7 +265,7 @@ struct literal_expression_t {
 	symbol_t          *suffix;
 
 	/* ast2firm data */
-	tarval            *target_value;
+	ir_tarval         *target_value;
 };
 
 struct string_literal_expression_t {

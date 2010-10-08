@@ -157,7 +157,7 @@ struct enum_value_t {
 	type_t        *enum_type;
 
 	/* ast2firm info */
-	tarval        *tv;
+	ir_tarval     *tv;
 };
 
 struct label_t {
