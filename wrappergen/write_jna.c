@@ -401,7 +401,7 @@ static void write_function(const entity_t *entity)
 	const function_type_t *function_type
 		= (const function_type_t*) entity->declaration.type;
 
-	fputc('\t', out);
+	fprintf(out, "\tpublic static native ");
 	type_t *return_type = skip_typeref(function_type->return_type);
 	write_type(return_type);
 	fprintf(out, " %s(", entity->base.symbol->string);
@@ -444,12 +444,13 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 
 	print_to_file(out);
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
-	fputs("import com.sun.jna.Library;\n", out);
+	fputs("import com.sun.jna.Native;\n", out);
 	fputs("import com.sun.jna.Pointer;\n", out);
 	fputs("\n\n", out);
 
 	/* TODO: where to get the name from? */
-	fputs("public interface binding extends Library {\n", out);
+	fputs("public class binding {\n", out);
+	fputs("\tstatic { Native.register(\"firm\"); }\n", out);
 
 	/* read the avoid list */
 	FILE *avoid = fopen("avoid.config", "r");
