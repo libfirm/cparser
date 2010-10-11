@@ -552,6 +552,17 @@ static void do_firm_lowering(const char *input_filename)
 {
 	int i;
 
+	/* enable architecture dependent optimizations */
+	arch_dep_set_opts((arch_dep_opts_t)
+			((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
+			 (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
+			 (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
+	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		ir_graph *irg = get_irp_irg(i);
+		do_irg_opt(irg, "reassociation");
+		do_irg_opt(irg, "local");
+	}
+
 	do_irp_opt("target-lowering");
 
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
@@ -559,19 +570,6 @@ static void do_firm_lowering(const char *input_filename)
 
 	if (firm_opt.enabled) {
 		timer_start(t_all_opt);
-
-		/* run reassociation first on all graphs BEFORE the architecture
-		   dependent optimizations are enabled */
-		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-			ir_graph *irg = get_irp_irg(i);
-			do_irg_opt(irg, "reassociation");
-		}
-
-		/* enable architecture dependent optimizations */
-		arch_dep_set_opts((arch_dep_opts_t)
-				((firm_opt.muls ? arch_dep_mul_to_shift : arch_dep_none) |
-				 (firm_opt.divs ? arch_dep_div_by_const : arch_dep_none) |
-				 (firm_opt.mods ? arch_dep_mod_by_const : arch_dep_none) ));
 
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 			ir_graph *irg = get_irp_irg(i);
