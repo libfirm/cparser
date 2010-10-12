@@ -1884,6 +1884,22 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
 		return NULL;
 	}
+	case bk_gnu_builtin_object_size: {
+		/* determine value of "type" */
+		expression_t *type_expression = call->arguments->next->expression;
+		long          type_val        = fold_constant_to_int(type_expression);
+		type_t       *type            = function_type->function.return_type;
+		ir_mode      *mode            = get_ir_mode_arithmetic(type);
+		ir_tarval    *result;
+
+		/* just produce a "I don't know" result */
+		if (type_val & 2)
+			result = new_tarval_from_long(0, mode);
+		else
+			result = new_tarval_from_long(-1, mode);
+
+		return new_d_Const(dbgi, result);
+	}
 	case bk_gnu_builtin_trap:
 	case bk_ms__ud2:
 	{

@@ -7421,8 +7421,21 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 			}
 			break;
 		}
-		case bk_gnu_builtin_prefetch: {
+		case bk_gnu_builtin_object_size:
+			if (call->arguments == NULL)
+				break;
+
+			call_argument_t *arg = call->arguments->next;
+			if (arg != NULL && ! is_constant_expression(arg->expression)) {
+				errorf(&call->base.source_position,
+					   "second argument of '%Y' must be a constant expression",
+					   call->function->reference.entity->base.symbol);
+			}
+			break;
+		case bk_gnu_builtin_prefetch:
 			/* second and third argument must be constant if existent */
+			if (call->arguments == NULL)
+				break;
 			call_argument_t *rw = call->arguments->next;
 			call_argument_t *locality = NULL;
 
@@ -7443,7 +7456,6 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				locality = rw->next;
 			}
 			break;
-		}
 		default:
 			break;
 	}
