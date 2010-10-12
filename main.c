@@ -673,7 +673,7 @@ static bool set_os_support(const char *os)
 		set_create_ld_ident(create_name_linux_elf);
 	} else if (streq(os, "darwin")) {
 		force_long_double_size = 16;
-		set_be_option("ia32-gasmode=darwin");
+		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
 		set_create_ld_ident(create_name_macho);
