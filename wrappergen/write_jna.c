@@ -103,7 +103,7 @@ static void write_pointer_type(const pointer_type_t *type)
 	}
 	if (is_type_pointer(points_to)) {
 		/* hack... */
-		fputs("Buffer", out);
+		fputs("java.nio.Buffer", out);
 		return;
 	}
 	fputs("Pointer", out);
@@ -446,7 +446,6 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 	fputs("import com.sun.jna.Native;\n", out);
 	fputs("import com.sun.jna.Pointer;\n", out);
-	fputs("import java.nio.Buffer;\n", out);
 	fputs("\n\n", out);
 
 	/* TODO: where to get the name from? */
