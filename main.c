@@ -1268,7 +1268,7 @@ int main(int argc, char **argv)
 
 	if (print_file_name_file != NULL) {
 		print_file_name(print_file_name_file);
-		return 0;
+		return EXIT_SUCCESS;
 	}
 	if (files == NULL) {
 		fprintf(stderr, "error: no input files specified\n");
@@ -1277,7 +1277,7 @@ int main(int argc, char **argv)
 
 	if (argument_errors) {
 		usage(argv[0]);
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	/* we do the lowering in ast2firm */
@@ -1364,7 +1364,7 @@ int main(int argc, char **argv)
 		if (out == NULL) {
 			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
 					strerror(errno));
-			return 1;
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -1566,13 +1566,13 @@ graph_built:
 
 				dump_ir_graph_file(out, irg);
 				fclose(out);
-				exit(0);
+				exit(EXIT_SUCCESS);
 			}
 
 			if (mode == CompileExportIR) {
 				fclose(out);
 				ir_export(outname);
-				exit(0);
+				exit(EXIT_SUCCESS);
 			}
 
 			gen_firm_finish(asm_out, filename, have_const_functions);
@@ -1673,7 +1673,7 @@ graph_built:
 		int err = system(commandline);
 		if (err != EXIT_SUCCESS) {
 			fprintf(stderr, "linker reported an error\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -1693,5 +1693,5 @@ graph_built:
 	exit_types();
 	exit_tokens();
 	exit_symbol_table();
-	return 0;
+	return EXIT_SUCCESS;
 }
