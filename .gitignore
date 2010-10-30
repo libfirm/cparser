@@ -14,3 +14,9 @@
 *.vcg
 a.out
 svn-commit.tmp
+*/Debug
+*/Release
+*/VTune
+*.vcproj.*.*.user
+*.suo
+*.ncb
