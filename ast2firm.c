@@ -897,10 +897,10 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 
 	if (is_method_entity(irentity)) {
 		if (modifiers & DM_PURE) {
-			set_entity_additional_property(irentity, mtp_property_pure);
+			set_entity_additional_properties(irentity, mtp_property_pure);
 		}
 		if (modifiers & DM_CONST) {
-			set_entity_additional_property(irentity, mtp_property_const);
+			add_entity_additional_properties(irentity, mtp_property_const);
 			have_const_functions = true;
 		}
 	}
@@ -5743,22 +5743,22 @@ static void handle_decl_modifier_irg(ir_graph_ptr irg,
 {
 	if (decl_modifiers & DM_RETURNS_TWICE) {
 		/* TRUE if the declaration includes __attribute__((returns_twice)) */
-		set_irg_additional_property(irg, mtp_property_returns_twice);
+		add_irg_additional_properties(irg, mtp_property_returns_twice);
 	}
 	if (decl_modifiers & DM_NORETURN) {
 		/* TRUE if the declaration includes the Microsoft
 		   __declspec(noreturn) specifier. */
-		set_irg_additional_property(irg, mtp_property_noreturn);
+		add_irg_additional_properties(irg, mtp_property_noreturn);
 	}
 	if (decl_modifiers & DM_NOTHROW) {
 		/* TRUE if the declaration includes the Microsoft
 		   __declspec(nothrow) specifier. */
-		set_irg_additional_property(irg, mtp_property_nothrow);
+		add_irg_additional_properties(irg, mtp_property_nothrow);
 	}
 	if (decl_modifiers & DM_NAKED) {
 		/* TRUE if the declaration includes the Microsoft
 		   __declspec(naked) specifier. */
-		set_irg_additional_property(irg, mtp_property_naked);
+		add_irg_additional_properties(irg, mtp_property_naked);
 	}
 	if (decl_modifiers & DM_FORCEINLINE) {
 		/* TRUE if the declaration includes the
