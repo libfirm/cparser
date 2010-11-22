@@ -283,6 +283,7 @@ static void write_binary_expression(const binary_expression_t *expression)
 {
 	fputs("(", out);
 	write_expression(expression->left);
+	fputc(' ', out);
 	switch(expression->base.kind) {
 	case EXPR_BINARY_BITWISE_OR:  fputs("|", out); break;
 	case EXPR_BINARY_BITWISE_AND: fputs("&", out); break;
@@ -296,6 +297,7 @@ static void write_binary_expression(const binary_expression_t *expression)
 	default:
 		panic("unimplemented binexpr");
 	}
+	fputc(' ', out);
 	write_expression(expression->right);
 	fputs(")", out);
 }
@@ -361,23 +363,29 @@ static void write_enum(const symbol_t *symbol, const enum_t *entity)
 		}
 	}
 	fprintf(out, "\t\tpublic final int val;\n");
-	fprintf(out, "\t\tprivate static class C { static int next_val; }\n\n");
+	fprintf(out, "\n");
+	fprintf(out, "\t\tprivate static class C {\n");
+	fprintf(out, "\t\t\tstatic int next_val;\n");
+	fprintf(out, "\t\t}\n");
+	fprintf(out, "\n");
 	fprintf(out, "\t\t%s(int val) {\n", name);
 	fprintf(out, "\t\t\tthis.val = val;\n");
 	fprintf(out, "\t\t\tC.next_val = val + 1;\n");
 	fprintf(out, "\t\t}\n");
+	fprintf(out, "\n");
 	fprintf(out, "\t\t%s() {\n", name);
 	fprintf(out, "\t\t\tthis.val = C.next_val++;\n");
 	fprintf(out, "\t\t}\n");
-	fprintf(out, "\t\t\n");
+	fprintf(out, "\n");
 	fprintf(out, "\t\tpublic static %s getEnum(int val) {\n", name);
-	fprintf(out, "\t\t\tfor(%s entry : values()) {\n", name);
+	fprintf(out, "\t\t\tfor (%s entry : values()) {\n", name);
 	fprintf(out, "\t\t\t\tif (val == entry.val)\n");
 	fprintf(out, "\t\t\t\t\treturn entry;\n");
 	fprintf(out, "\t\t\t}\n");
 	fprintf(out, "\t\t\treturn null;\n");
 	fprintf(out, "\t\t}\n");
 	fprintf(out, "\t}\n");
+	fprintf(out, "\n");
 }
 
 #if 0
@@ -401,6 +409,7 @@ static void write_function(const entity_t *entity)
 	const function_type_t *function_type
 		= (const function_type_t*) entity->declaration.type;
 
+	fputc('\n', out);
 	fprintf(out, "\tpublic static native ");
 	type_t *return_type = skip_typeref(function_type->return_type);
 	write_type(return_type);
@@ -409,7 +418,7 @@ static void write_function(const entity_t *entity)
 	entity_t *parameter = entity->function.parameters.entities;
 	int       first     = 1;
 	int       n         = 0;
-	for( ; parameter != NULL; parameter = parameter->base.next) {
+	for ( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->kind == ENTITY_PARAMETER);
 		if(!first) {
 			fprintf(out, ", ");
@@ -446,11 +455,14 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	fprintf(out, "/* WARNING: Automatically generated file */\n");
 	fputs("import com.sun.jna.Native;\n", out);
 	fputs("import com.sun.jna.Pointer;\n", out);
-	fputs("\n\n", out);
+	fputs("\n", out);
 
 	/* TODO: where to get the name from? */
 	fputs("public class binding {\n", out);
-	fputs("\tstatic { Native.register(\"firm\"); }\n", out);
+	fputs("\tstatic {\n", out);
+	fputs("\t\tNative.register(\"firm\");\n", out);
+	fputs("\t}\n", out);
+	fputs("\n", out);
 
 	/* read the avoid list */
 	FILE *avoid = fopen("avoid.config", "r");
@@ -477,7 +489,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 
 	/* write structs,unions + enums */
 	entity_t *entity = unit->scope.entities;
-	for( ; entity != NULL; entity = entity->base.next) {
+	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind == ENTITY_ENUM) {
 			if (find_enum_typedef(&entity->enume) != NULL)
 				continue;
@@ -499,7 +511,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 
 	/* write functions */
 	entity = unit->scope.entities;
-	for( ; entity != NULL; entity = entity->base.next) {
+	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;
 		if (is_system_header(entity->base.source_position.input_name))
