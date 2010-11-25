@@ -4249,7 +4249,25 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 {
 	switch(get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL: {
-		/* NULL is undefined for dynamic initializers */
+		/* ANSI C §6.7.8:21: If there are fewer initializers [..] than there
+		are elements [...] the remainder of the aggregate shall be initialized
+		implicitly the same as objects that have static storage duration. */
+		ir_type *ent_type = get_entity_type(entity);
+		ir_mode *value_mode = get_type_mode(ent_type);
+		ir_node *node = new_Const_long(value_mode, 0);
+
+		/* is it a bitfield type? */
+		if (is_Primitive_type(ent_type) &&
+				get_primitive_base_type(ent_type) != NULL) {
+			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+			return;
+		}
+
+		assert(get_type_mode(type) == get_irn_mode(node));
+		ir_node *mem    = get_store();
+		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
+		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+		set_store(proj_m);
 		return;
 	}
 	case IR_INITIALIZER_CONST: {
