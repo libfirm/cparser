@@ -5139,8 +5139,8 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	current_switch                       = statement;
 
 	/* determine a free number for the default label */
-	unsigned long num_cases = 0;
-	long def_nr = 0;
+	unsigned long num_cases       = 0;
+	long          default_proj_nr = 0;
 	for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
 		if (l->expression == NULL) {
 			/* default case */
@@ -5148,18 +5148,18 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		}
 		if (l->last_case >= l->first_case)
 			num_cases += l->last_case - l->first_case + 1;
-		if (l->last_case > def_nr)
-			def_nr = l->last_case;
+		if (l->last_case > default_proj_nr)
+			default_proj_nr = l->last_case;
 	}
 
-	if (def_nr == INT_MAX) {
+	if (default_proj_nr == INT_MAX) {
 		/* Bad: an overflow will occur, we cannot be sure that the
 		 * maximum + 1 is a free number. Scan the values a second
 		 * time to find a free number.
 		 */
 		unsigned char *bits = xmalloc((num_cases + 7) >> 3);
 
- 		memset(bits, 0, (num_cases + 7) >> 3);
+		memset(bits, 0, (num_cases + 7) >> 3);
 		for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
 			if (l->expression == NULL) {
 				/* default case */
@@ -5185,11 +5185,15 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 				break;
 
 		free(bits);
-		def_nr = i;
+		default_proj_nr = i;
 	} else {
-		++def_nr;
+		++default_proj_nr;
 	}
-	statement->default_proj_nr = def_nr;
+	statement->default_proj_nr = default_proj_nr;
+	/* safety check: cond might already be folded to a Bad */
+	if (is_Cond(cond)) {
+		set_Cond_default_proj(cond, default_proj_nr);
+	}
 
 	if (statement->body != NULL) {
 		statement_to_firm(statement->body);
@@ -5202,8 +5206,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 	if (!saw_default_label && first_block != NULL) {
 		set_cur_block(first_block);
-		ir_node *const proj = new_d_defaultProj(dbgi, cond,
-		                                        statement->default_proj_nr);
+		ir_node *const proj = new_d_Proj(dbgi, cond, mode_X, default_proj_nr);
 		add_immBlock_pred(get_break_label(), proj);
 	}
 
@@ -5244,8 +5247,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 			} while (pn++ < end_pn);
 		} else {
 			saw_default_label = true;
-			proj = new_d_defaultProj(dbgi, current_switch_cond,
-									 current_switch->default_proj_nr);
+			proj = new_d_Proj(dbgi, current_switch_cond, mode_X,
+			                  current_switch->default_proj_nr);
 
 			add_immBlock_pred(block, proj);
 		}
