@@ -83,7 +83,6 @@ static const char *get_atomic_type_string(const atomic_type_kind_t type)
 	case ATOMIC_TYPE_ULONGLONG:   return "long";
 	case ATOMIC_TYPE_FLOAT:       return "float";
 	case ATOMIC_TYPE_DOUBLE:      return "double";
-	case ATOMIC_TYPE_LONG_DOUBLE: return "double";
 	case ATOMIC_TYPE_BOOL:        return "boolean";
 	default:                      panic("unsupported atomic type");
 	}
