@@ -5191,7 +5191,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	}
 	statement->default_proj_nr = default_proj_nr;
 	/* safety check: cond might already be folded to a Bad */
-	if (is_Cond(cond)) {
+	if (cond != NULL && is_Cond(cond)) {
 		set_Cond_default_proj(cond, default_proj_nr);
 	}
 
