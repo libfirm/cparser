@@ -4244,32 +4244,48 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
+static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
+		ir_node *base_addr)
+{
+	/* ANSI C §6.7.8:21: If there are fewer initializers [..] than there
+	are elements [...] the remainder of the aggregate shall be initialized
+	implicitly the same as objects that have static storage duration. */
+	ir_type *ent_type = get_entity_type(entity);
+	/* create sub-initializers for a compound type */
+	if (is_compound_type(ent_type)) {
+		unsigned n_members = get_compound_n_members(ent_type);
+		for (unsigned n = 0; n < n_members; ++n) {
+			ir_entity *member = get_compound_member(ent_type, n);
+			ir_node   *addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr,
+				                                member);
+			create_dynamic_null_initializer(member, dbgi, addr);
+		}
+		return;
+	}
+
+	ir_mode *value_mode = get_type_mode(ent_type);
+	ir_node *node = new_Const_long(value_mode, 0);
+
+	/* is it a bitfield type? */
+	if (is_Primitive_type(ent_type) &&
+			get_primitive_base_type(ent_type) != NULL) {
+		bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+		return;
+	}
+
+	ir_node *mem    = get_store();
+	ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
+	ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
+	set_store(proj_m);
+}
+
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {
 	switch(get_initializer_kind(initializer)) {
-	case IR_INITIALIZER_NULL: {
-		/* ANSI C §6.7.8:21: If there are fewer initializers [..] than there
-		are elements [...] the remainder of the aggregate shall be initialized
-		implicitly the same as objects that have static storage duration. */
-		ir_type *ent_type = get_entity_type(entity);
-		ir_mode *value_mode = get_type_mode(ent_type);
-		ir_node *node = new_Const_long(value_mode, 0);
-
-		/* is it a bitfield type? */
-		if (is_Primitive_type(ent_type) &&
-				get_primitive_base_type(ent_type) != NULL) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
-			return;
-		}
-
-		assert(get_type_mode(type) == get_irn_mode(node));
-		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
-		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
-		set_store(proj_m);
+	case IR_INITIALIZER_NULL:
+		create_dynamic_null_initializer(entity, dbgi, base_addr);
 		return;
-	}
 	case IR_INITIALIZER_CONST: {
 		ir_node *node     = get_initializer_const_value(initializer);
 		ir_type *ent_type = get_entity_type(entity);
