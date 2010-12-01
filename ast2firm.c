@@ -4244,12 +4244,18 @@ static ir_initializer_t *create_ir_initializer(
 	panic("unknown initializer");
 }
 
+/** ANSI C §6.7.8:21: If there are fewer initializers [..] than there
+ *  are elements [...] the remainder of the aggregate shall be initialized
+ *  implicitly the same as objects that have static storage duration. */
 static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 		ir_node *base_addr)
 {
-	/* ANSI C §6.7.8:21: If there are fewer initializers [..] than there
-	are elements [...] the remainder of the aggregate shall be initialized
-	implicitly the same as objects that have static storage duration. */
+	/* for unions we must NOT do anything for null initializers */
+	ir_type *owner = get_entity_owner(entity);
+	if (is_Union_type(owner)) {
+		return;
+	}
+
 	ir_type *ent_type = get_entity_type(entity);
 	/* create sub-initializers for a compound type */
 	if (is_compound_type(ent_type)) {
@@ -4259,6 +4265,20 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 			ir_node   *addr   = new_d_simpleSel(dbgi, new_NoMem(), base_addr,
 				                                member);
 			create_dynamic_null_initializer(member, dbgi, addr);
+		}
+		return;
+	}
+	if (is_Array_type(ent_type)) {
+		assert(has_array_upper_bound(ent_type, 0));
+		long n = get_array_upper_bound_int(ent_type, 0);
+		for (long i = 0; i < n; ++i) {
+			ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
+			ir_node   *cnst     = new_d_Const(dbgi, index_tv);
+			ir_node   *in[1]    = { cnst };
+			ir_entity *arrent   = get_array_element_entity(ent_type);
+			ir_node   *addr     = new_d_Sel(dbgi, new_NoMem(), base_addr, 1, in,
+			                                arrent);
+			create_dynamic_null_initializer(arrent, dbgi, addr);
 		}
 		return;
 	}
