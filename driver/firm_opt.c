@@ -199,20 +199,6 @@ static void do_lower_mux(ir_graph *irg)
 	lower_mux(irg, NULL);
 }
 
-static void do_lower_for_target(void)
-{
-	int i;
-	const backend_params *be_params = be_get_backend_param();
-	be_params->lower_for_target();
-
-	/* set the phase to low */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-		ir_graph *irg = get_irp_irg(i);
-		set_irg_phase_state(irg, phase_low);
-	}
-	set_irp_phase_state(phase_low);
-}
-
 static void do_vrp(ir_graph *irg)
 {
 	set_vrp_data(irg);
@@ -281,7 +267,7 @@ static opt_config_t opts[] = {
 	IRG("vrp",               do_vrp,                   "value range propagation",                               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
-	IRP("target-lowering",   do_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
+	IRP("target-lowering",   be_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRP("opt-func-call",     do_optimize_funccalls,    "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
