@@ -1191,6 +1191,24 @@ int main(int argc, char **argv)
 					mode = PrintCaml;
 				} else if (streq(option, "print-jna")) {
 					mode = PrintJna;
+				} else if (streq(option, "jna-limit")) {
+					++i;
+					if (i >= argc) {
+						fprintf(stderr, "error: "
+						        "expected argument after '--jna-limit'\n");
+						argument_errors = true;
+						break;
+					}
+					jna_limit_output(argv[i]);
+				} else if (streq(option, "jna-libname")) {
+					++i;
+					if (i >= argc) {
+						fprintf(stderr, "error: "
+						        "expected argument after '--jna-libname'\n");
+						argument_errors = true;
+						break;
+					}
+					jna_set_libname(argv[i]);
 				} else if (streq(option, "time")) {
 					do_timing = true;
 				} else if (streq(option, "version")) {

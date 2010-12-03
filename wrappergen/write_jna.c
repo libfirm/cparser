@@ -30,11 +30,19 @@
 #include "type.h"
 #include "printer.h"
 #include "adt/error.h"
+#include "adt/xmalloc.h"
 #include <libfirm/adt/pset_new.h>
+
+typedef struct output_limit {
+	const char          *filename;
+	struct output_limit *next;
+} output_limit;
 
 static const scope_t *global_scope;
 static FILE          *out;
 static pset_new_t     avoid_symbols;
+static output_limit  *output_limits;
+static const char    *libname;
 
 static void write_type(type_t *type);
 
@@ -442,6 +450,19 @@ static void write_function(const entity_t *entity)
 	fprintf(out, ");\n");
 }
 
+void jna_limit_output(const char *filename)
+{
+	output_limit *limit = xmalloc(sizeof(limit[0]));
+	limit->filename = filename;
+
+	limit->next   = output_limits;
+	output_limits = limit;
+}
+
+void jna_set_libname(const char *new_libname)
+{
+	libname = new_libname;
+}
 
 void write_jna_decls(FILE *output, const translation_unit_t *unit)
 {
@@ -456,10 +477,14 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	fputs("import com.sun.jna.Pointer;\n", out);
 	fputs("\n", out);
 
+	const char *register_libname = libname;
+	if (register_libname == NULL)
+		register_libname = "library";
+
 	/* TODO: where to get the name from? */
 	fputs("public class binding {\n", out);
 	fputs("\tstatic {\n", out);
-	fputs("\t\tNative.register(\"firm\");\n", out);
+	fprintf(out, "\t\tNative.register(\"%s\");\n", register_libname);
 	fputs("\t}\n", out);
 	fputs("\n", out);
 
@@ -513,8 +538,21 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;
-		if (is_system_header(entity->base.source_position.input_name))
+		const char *input_name = entity->base.source_position.input_name;
+		if (is_system_header(input_name))
 			continue;
+		if (output_limits != NULL) {
+			bool in_limits = false;
+			for (output_limit *limit = output_limits; limit != NULL;
+			     limit = limit->next) {
+			    if (strcmp(limit->filename, input_name) == 0) {
+					in_limits = true;
+					break;
+				}
+			}
+			if (!in_limits)
+				continue;
+		}
 
 		if (pset_new_contains(&avoid_symbols, entity->base.symbol))
 			continue;
