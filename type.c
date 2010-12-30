@@ -204,7 +204,8 @@ void init_types(void)
 	}
 
 	unsigned int_size   = machine_size < 32 ? 2 : 4;
-	unsigned long_size  = machine_size < 64 ? 4 : 8;
+	/* long is always 32bit on windows */
+	unsigned long_size  = c_mode & _MS ? 4 : (machine_size < 64 ? 4 : 8);
 	unsigned llong_size = machine_size < 32 ? 4 : 8;
 
 	props[ATOMIC_TYPE_INT].size            = int_size;
@@ -222,11 +223,19 @@ void init_types(void)
 
 	/* TODO: backend specific, need a way to query the backend for this.
 	 * The following are good settings for x86 */
-	props[ATOMIC_TYPE_FLOAT].alignment       = 4;
-	props[ATOMIC_TYPE_DOUBLE].alignment      = 4;
-	props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
-	props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
-	props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
+	if (machine_size <= 32) {
+		props[ATOMIC_TYPE_FLOAT].alignment       = 4;
+		props[ATOMIC_TYPE_DOUBLE].alignment      = 4;
+		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
+		props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
+		props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
+	} else {
+		props[ATOMIC_TYPE_FLOAT].alignment       = 4;
+		props[ATOMIC_TYPE_DOUBLE].alignment      = 8;
+		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 8;
+		props[ATOMIC_TYPE_LONGLONG].alignment    = 8;
+		props[ATOMIC_TYPE_ULONGLONG].alignment   = 8;
+	}
 	if (force_long_double_size > 0) {
 		props[ATOMIC_TYPE_LONG_DOUBLE].size      = force_long_double_size;
 		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = force_long_double_size;
