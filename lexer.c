@@ -87,7 +87,9 @@ static size_t read_block(unsigned char *const read_buf, size_t const n)
 {
 	size_t const s = fread(read_buf, 1, n, input);
 	if (s == 0) {
-		if (ferror(input))
+		/* on OS/X ferror appears to return true on eof as well when running
+		 * the application in gdb... */
+		if (!feof(input) && ferror(input))
 			parse_error("read from input failed");
 		buf[MAX_PUTBACK] = EOF;
 		bufpos           = buf + MAX_PUTBACK;
