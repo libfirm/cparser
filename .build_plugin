@@ -1,7 +1,7 @@
-DIRS = . adt driver wrappergen ;
+DIRS = "" adt driver wrappergen ;
 SOURCES = ;
 for d in $(DIRS) {
-	SOURCES += [ Wildcard $(d) : *.c *.h ] ;
+	SOURCES += [ Wildcard $(PLUGIN_DIR)/$(d) : *.c *.h ] ;
 }
 
 actions RunBuiltinGenerator bind GENERATOR {
@@ -9,27 +9,27 @@ actions RunBuiltinGenerator bind GENERATOR {
 }
 
 rule BuiltinGenerator {
-	local target = [ LocateTarget $(<) : $(SUBDIR) ] ;
+	local target = $(<) ;
 	local source = [ SearchSource $(>) ] ;
 	local generator = [ SearchSource $(3) ] ;
 	local header = $(target) ;
-	Depends $(<) : $(target) ;
 	Depends $(target) : $(generator) ;
 	Depends $(target) : $(source) ;
 	RunBuiltinGenerator $(target) : $(source) ;
 	GENERATOR on $(target) = $(generator) ;
 
-	Includes $(header:G=) : $(header) ;
+	NP = $(header:D=) ;
+	Includes $(NP:G=) : $(header) ;
 
 	Clean clean : $(target) ;
 
 	return $(target) ;
 }
-BuiltinGenerator gen_builtins.h : builtins/builtins.c : create_builtins_h.sh ;
+BuiltinGenerator $(PLUGIN_DIR)/gen_builtins.h : $(PLUGIN_DIR)/builtins/builtins.c : $(PLUGIN_DIR)/create_builtins_h.sh ;
 
 Application cparser : $(SOURCES) ;
-CppFlags cparser : -I$(top_srcdir)/libfirm/include ;
-IncludeDir cparser : . ;
+IncludeDir cparser : libfirm/include libfirm/include/libfirm ;
+IncludeDir cparser : $(PLUGIN_DIR) ;
 CFlags cparser : -std=c99 ;
 LinkWith cparser : firm ;
 LFlags cparser : -lm ;
