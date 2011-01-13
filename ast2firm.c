@@ -5847,7 +5847,7 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 
 	set_entity_ld_ident(ptr, new_id_from_chars("", 0));
 	set_entity_compiler_generated(ptr, 1);
-	set_entity_visibility(ptr, ir_visibility_local);
+	set_entity_visibility(ptr, ir_visibility_private);
 	add_entity_linkage(ptr, IR_LINKAGE_CONSTANT|IR_LINKAGE_HIDDEN_USER);
 	set_atomic_ent_value(ptr, val);
 }
