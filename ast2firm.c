@@ -4923,14 +4923,10 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 static void while_statement_to_firm(while_statement_t *statement)
 {
-	ir_node *jmp = NULL;
-	if (get_cur_block() != NULL) {
-		jmp = new_Jmp();
-	}
-
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
-	if (jmp != NULL) {
+	if (get_cur_block() != NULL) {
+		ir_node *const jmp = new_Jmp();
 		add_immBlock_pred(header_block, jmp);
 	}
 
@@ -4950,7 +4946,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	break_label    = old_break_label;
 
 	if (get_cur_block() != NULL) {
-		jmp = new_Jmp();
+		ir_node *const jmp = new_Jmp();
 		add_immBlock_pred(header_block, jmp);
 	}
 
