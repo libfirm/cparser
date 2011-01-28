@@ -7697,13 +7697,6 @@ end_error:;
 	} else if (is_type_arithmetic(true_type)
 	           && is_type_arithmetic(false_type)) {
 		result_type = semantic_arithmetic(true_type, false_type);
-
-		true_expression  = create_implicit_cast(true_expression, result_type);
-		false_expression = create_implicit_cast(false_expression, result_type);
-
-		conditional->true_expression  = true_expression;
-		conditional->false_expression = false_expression;
-		conditional->base.type        = result_type;
 	} else if (same_compound_type(true_type, false_type)) {
 		/* just take 1 of the 2 types */
 		result_type = true_type;
