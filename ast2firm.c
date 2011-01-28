@@ -2524,6 +2524,11 @@ static ir_node *create_cast(dbg_info *dbgi,	ir_node *value_node,
                             type_t *from_type, type_t *type)
 {
 	type = skip_typeref(type);
+	if (type == type_void) {
+		/* make sure firm type is constructed */
+		(void) get_ir_type(type);
+		return NULL;
+	}
 	if (!is_type_scalar(type)) {
 		/* make sure firm type is constructed */
 		(void) get_ir_type(type);
