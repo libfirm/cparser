@@ -658,7 +658,7 @@ static void type_error_incompatible(const char *msg,
 /**
  * Expect the current token is the expected token.
  * If not, generate an error, eat the current statement,
- * and goto the end_error label.
+ * and goto the error_label label.
  */
 #define expect(expected, error_label)                     \
 	do {                                                  \
