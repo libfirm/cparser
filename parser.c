@@ -823,7 +823,7 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 		}
 	}
 
-	ARR_SHRINKLEN(*stack_ptr, (int) new_top);
+	ARR_SHRINKLEN(*stack_ptr, new_top);
 }
 
 /**
