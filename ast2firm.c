@@ -5080,28 +5080,23 @@ static void for_statement_to_firm(for_statement_t *statement)
 	ir_node *const false_block = new_immBlock();
 
 	/* the loop body */
-	ir_node *body_block;
-	if (statement->body != NULL) {
-		ir_node *const old_continue_label = continue_label;
-		ir_node *const old_break_label    = break_label;
-		continue_label = step_block;
-		break_label    = false_block;
+	ir_node *const old_continue_label = continue_label;
+	ir_node *const old_break_label    = break_label;
+	continue_label = step_block;
+	break_label    = false_block;
 
-		body_block = new_immBlock();
-		set_cur_block(body_block);
-		statement_to_firm(statement->body);
+	ir_node *const body_block = new_immBlock();
+	set_cur_block(body_block);
+	statement_to_firm(statement->body);
 
-		assert(continue_label == step_block);
-		assert(break_label    == false_block);
-		continue_label = old_continue_label;
-		break_label    = old_break_label;
+	assert(continue_label == step_block);
+	assert(break_label    == false_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
 
-		if (get_cur_block() != NULL) {
-			jmp = new_Jmp();
-			add_immBlock_pred(step_block, jmp);
-		}
-	} else {
-		body_block = step_block;
+	if (get_cur_block() != NULL) {
+		jmp = new_Jmp();
+		add_immBlock_pred(step_block, jmp);
 	}
 
 	/* create the condition */
