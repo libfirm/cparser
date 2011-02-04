@@ -4871,17 +4871,14 @@ static void if_statement_to_firm(if_statement_t *statement)
 	ir_node *fallthrough_block = NULL;
 
 	/* the true (blocks) */
-	ir_node *true_block = NULL;
-	if (statement->true_statement != NULL) {
-		true_block = new_immBlock();
-		set_cur_block(true_block);
-		statement_to_firm(statement->true_statement);
-		if (get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
-			if (fallthrough_block == NULL)
-				fallthrough_block = new_immBlock();
-			add_immBlock_pred(fallthrough_block, jmp);
-		}
+	ir_node *const true_block = new_immBlock();
+	set_cur_block(true_block);
+	statement_to_firm(statement->true_statement);
+	if (get_cur_block() != NULL) {
+		ir_node *jmp = new_Jmp();
+		if (fallthrough_block == NULL)
+			fallthrough_block = new_immBlock();
+		add_immBlock_pred(fallthrough_block, jmp);
 	}
 
 	/* the false (blocks) */
@@ -4901,13 +4898,10 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 	/* create the condition */
 	if (cur_block != NULL) {
-		if (true_block == NULL || false_block == NULL) {
+		if (false_block == NULL) {
 			if (fallthrough_block == NULL)
 				fallthrough_block = new_immBlock();
-			if (true_block == NULL)
-				true_block = fallthrough_block;
-			if (false_block == NULL)
-				false_block = fallthrough_block;
+			false_block = fallthrough_block;
 		}
 
 		set_cur_block(cur_block);
