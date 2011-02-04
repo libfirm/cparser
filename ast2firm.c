@@ -5221,9 +5221,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		set_Cond_default_proj(cond, default_proj_nr);
 	}
 
-	if (statement->body != NULL) {
-		statement_to_firm(statement->body);
-	}
+	statement_to_firm(statement->body);
 
 	if (get_cur_block() != NULL) {
 		ir_node *jmp = new_Jmp();
