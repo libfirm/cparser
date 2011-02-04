@@ -9375,6 +9375,8 @@ static statement_t *parse_default_statement(void)
 	PUSH_PARENT(statement);
 
 	expect(':', end_error);
+end_error:
+
 	if (current_switch != NULL) {
 		const case_label_statement_t *def_label = current_switch->default_label;
 		if (def_label != NULL) {
@@ -9404,9 +9406,6 @@ static statement_t *parse_default_statement(void)
 
 	POP_PARENT;
 	return statement;
-end_error:
-	POP_PARENT;
-	return create_invalid_statement();
 }
 
 /**
