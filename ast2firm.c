@@ -5284,9 +5284,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	mature_immBlock(block);
 	set_cur_block(block);
 
-	if (statement->statement != NULL) {
-		statement_to_firm(statement->statement);
-	}
+	statement_to_firm(statement->statement);
 }
 
 static void label_to_firm(const label_statement_t *statement)
