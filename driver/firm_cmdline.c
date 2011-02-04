@@ -282,22 +282,23 @@ int firm_option(const char *opt)
 /**
  * prints the firm version number
  */
-void print_firm_version(FILE *f) {
-  const char *revision = ir_get_version_revision();
-  const char *build    = ir_get_version_build();
+void print_firm_version(FILE *f)
+{
+	const char *revision = ir_get_version_revision();
+	const char *build    = ir_get_version_build();
 
-  fprintf(f, "Firm C-Compiler using libFirm (%u.%u",
-          ir_get_version_major(), ir_get_version_minor());
-  if (revision[0] != 0) {
-  	fputc(' ', f);
-    fputs(revision, f);
-  }
-   if(build[0] != 0) {
-  	fputc(' ', f);
-    fputs(build, f);
-  }
-  fprintf(f, "}\n"
-  		     "(C) 2005-2008 Michael Beck\n"
-             "(C) 1995-2008 University of Karlsruhe\n"
-             "Using ");
+	fprintf(f, "Firm C-Compiler using libFirm (%u.%u",
+			ir_get_version_major(), ir_get_version_minor());
+	if (revision[0] != 0) {
+		fputc(' ', f);
+		fputs(revision, f);
+	}
+	if (build[0] != 0) {
+		fputc(' ', f);
+		fputs(build, f);
+	}
+	fprintf(f, "}\n"
+			"(C) 2005-2008 Michael Beck\n"
+			"(C) 1995-2008 University of Karlsruhe\n"
+			"Using ");
 }  /* print_firm_version */

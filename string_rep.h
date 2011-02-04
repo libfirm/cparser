@@ -47,7 +47,7 @@ static inline utf32 read_utf8_char(const char **p)
 
 	if ((*c & 0x80) == 0) {
 		/* 1 character encoding: 0b0??????? */
- 		result = *c++;
+		result = *c++;
 	} else if ((*c & 0xE0) == 0xC0) {
 		/* 2 character encoding: 0b110?????, 0b10?????? */
 		result = *c++ & 0x1F;

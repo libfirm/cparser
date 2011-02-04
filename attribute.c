@@ -379,7 +379,7 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 		switch(attribute->kind) {
 		case ATTRIBUTE_GNU_PACKED:
 			handle_attribute_packed(attribute, type);
-   			break;
+			break;
 		case ATTRIBUTE_GNU_CDECL:
 		case ATTRIBUTE_MS_CDECL:
 			type = change_calling_convention(type, CC_CDECL);

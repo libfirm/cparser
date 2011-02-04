@@ -100,7 +100,7 @@ unsigned nlz(unsigned x) {
 			: "r" (x));
 	return 31 - res;
 #else
-   	x |= x >> 1;
+	x |= x >> 1;
 	x |= x >> 2;
 	x |= x >> 4;
 	x |= x >> 8;

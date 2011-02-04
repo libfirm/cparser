@@ -1055,8 +1055,8 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			return ASSIGN_WARNING_POINTER_FROM_INT;
 		}
 	} else if ((is_type_arithmetic(type_left) && is_type_arithmetic(type_right)) ||
-	    (is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
-	     	&& is_type_pointer(type_right))) {
+			(is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
+				&& is_type_pointer(type_right))) {
 		return ASSIGN_SUCCESS;
 	} else if ((is_type_compound(type_left)  && is_type_compound(type_right))
 			|| (is_type_builtin(type_left) && is_type_builtin(type_right))) {
@@ -1999,8 +1999,8 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					long array_size = type->array.size;
 					if (index >= array_size) {
 						errorf(&designator->source_position,
-		 				       "designator [%E] (%d) exceeds array size %d",
-			 			       array_index, index, array_size);
+						       "designator [%E] (%d) exceeds array size %d",
+						       array_index, index, array_size);
 					}
 				}
 			}
@@ -3930,10 +3930,10 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				bool in_function_scope = current_function != NULL;
 
 				if (specifiers->thread_local || (
-				      specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-					  specifiers->storage_class != STORAGE_CLASS_NONE   &&
-				  	  (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
-			  	   )) {
+							specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+							specifiers->storage_class != STORAGE_CLASS_NONE   &&
+							(in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
+						)) {
 					errorf(&env.source_position,
 							"invalid storage class for function '%Y'", env.symbol);
 				}
@@ -7748,7 +7748,7 @@ end_error:;
 			result_type = pointer_type;
 		} else {
 			if (is_type_valid(other_type)) {
-			 	type_error_incompatible("while parsing conditional",
+				type_error_incompatible("while parsing conditional",
 						&expression->base.source_position, true_type, false_type);
 			}
 			result_type = type_error_type;

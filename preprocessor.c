@@ -770,9 +770,9 @@ static void skip_spaces(bool skip_newline)
 		switch (CC) {
 		case ' ':
 		case '\t':
-	 		if(do_print_spaces)
+			if (do_print_spaces)
 				counted_spaces++;
-	 		next_char();
+			next_char();
 			continue;
 		case '/':
 			next_char();
@@ -975,9 +975,9 @@ restart:
 	switch(CC) {
 	case ' ':
 	case '\t':
- 		if(do_print_spaces)
+		if (do_print_spaces)
 			counted_spaces++;
- 		next_char();
+		next_char();
 		goto restart;
 
 	MATCH_NEWLINE(
@@ -1396,7 +1396,7 @@ static void parse_define_directive(void)
 	if (old_definition != NULL) {
 		if (!pp_definitions_equal(old_definition, new_definition)) {
 			warningf(&input.position, "multiple definition of macro '%Y' (first defined %P)",
-	   		         symbol, &old_definition->source_position);
+			         symbol, &old_definition->source_position);
 		} else {
 			/* reuse the old definition */
 			obstack_free(&pp_obstack, new_definition);

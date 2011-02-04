@@ -53,44 +53,45 @@ static char *generate_asm_file_name(const char *file_name) {
  * Calls the specified backend.
  * Code is written to file <file_name> ('.c' is substituted for '.asm')
  */
-void do_codegen(FILE *out, const char *file_name) {
-  FILE *close_out = NULL;
-  if (out == NULL) {
-    char *asm_file_name = generate_asm_file_name(file_name);
+void do_codegen(FILE *out, const char *file_name)
+{
+	FILE *close_out = NULL;
+	if (out == NULL) {
+		char *asm_file_name = generate_asm_file_name(file_name);
 
-    if ((out = fopen(asm_file_name, "w")) == NULL) {
-      fprintf(stderr, "Could not open output file %s\n", asm_file_name);
-      exit(1);
-    }
-    free(asm_file_name);
-    close_out = out;
-  }
+		if ((out = fopen(asm_file_name, "w")) == NULL) {
+			fprintf(stderr, "Could not open output file %s\n", asm_file_name);
+			exit(1);
+		}
+		free(asm_file_name);
+		close_out = out;
+	}
 
-  switch (firm_be_opt.selection) {
+	switch (firm_be_opt.selection) {
 #ifdef FIRM2C_BACKEND
-  case BE_FIRM2C: {
-  	ir_timer_t *timer = ir_timer_new();
-  	timer_register(timer, "Firm: C-generating backend");
-  	timer_start(timer);
-    generate_code_file(out);
-    timer_stop(timer);
-    break;
-  }
+		case BE_FIRM2C: {
+			ir_timer_t *timer = ir_timer_new();
+			timer_register(timer, "Firm: C-generating backend");
+			timer_start(timer);
+			generate_code_file(out);
+			timer_stop(timer);
+			break;
+		}
 #endif
 
-  case BE_FIRM_BE: {
-    ir_timer_t *timer = ir_timer_new();
-    timer_register(timer, "Firm: backend");
-    timer_start(timer);
-    be_main(out, file_name);
-    timer_stop(timer);
-    break;
-  }
+		case BE_FIRM_BE: {
+			ir_timer_t *timer = ir_timer_new();
+			timer_register(timer, "Firm: backend");
+			timer_start(timer);
+			be_main(out, file_name);
+			timer_stop(timer);
+			break;
+		}
 
-  default:
-    fprintf(stderr, "Fatal: Unknown backend %d\n", firm_be_opt.selection);
-  } /* switch (firm_be_opt.selection) */
+		default:
+			fprintf(stderr, "Fatal: Unknown backend %d\n", firm_be_opt.selection);
+	} /* switch (firm_be_opt.selection) */
 
-  if (close_out)
-    fclose(close_out);
+	if (close_out)
+		fclose(close_out);
 }

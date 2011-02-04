@@ -4057,7 +4057,7 @@ static void advance_current_object(type_path_t *path)
 
 	/* we're past the last member of the current sub-aggregate, try if we
 	 * can ascend in the type hierarchy and continue with another subobject */
-  	size_t len = ARR_LEN(path->path);
+	size_t len = ARR_LEN(path->path);
 
 	if (len > 1) {
 		ascend_from_subtype(path);
