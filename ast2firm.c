@@ -5300,9 +5300,7 @@ static void label_to_firm(const label_statement_t *statement)
 	keep_alive(block);
 	keep_all_memory(block);
 
-	if (statement->statement != NULL) {
-		statement_to_firm(statement->statement);
-	}
+	statement_to_firm(statement->statement);
 }
 
 static void goto_to_firm(const goto_statement_t *statement)
