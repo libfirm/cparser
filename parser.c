@@ -10099,8 +10099,9 @@ static statement_t *parse_local_label_declaration(void)
 
 	eat(T___label__);
 
-	entity_t *begin = NULL, *end = NULL;
-
+	entity_t *begin   = NULL;
+	entity_t *end     = NULL;
+	entity_t **anchor = &begin;
 	do {
 		if (token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing local label declaration",
@@ -10120,11 +10121,9 @@ static statement_t *parse_local_label_declaration(void)
 			entity->base.source_position = token.source_position;
 			entity->base.symbol          = symbol;
 
-			if (end != NULL)
-				end->base.next = entity;
-			end = entity;
-			if (begin == NULL)
-				begin = entity;
+			*anchor = entity;
+			anchor  = &entity->base.next;
+			end     = entity;
 
 			environment_push(entity);
 		}
