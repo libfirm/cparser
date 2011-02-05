@@ -2885,10 +2885,10 @@ check_thread_storage_class:
 						break;
 
 						char const* wrong;
-					case STORAGE_CLASS_AUTO:     wrong = "auto";     goto wrong_thread_stoarge_class;
-					case STORAGE_CLASS_REGISTER: wrong = "register"; goto wrong_thread_stoarge_class;
-					case STORAGE_CLASS_TYPEDEF:  wrong = "typedef";  goto wrong_thread_stoarge_class;
-wrong_thread_stoarge_class:
+					case STORAGE_CLASS_AUTO:     wrong = "auto";     goto wrong_thread_storage_class;
+					case STORAGE_CLASS_REGISTER: wrong = "register"; goto wrong_thread_storage_class;
+					case STORAGE_CLASS_TYPEDEF:  wrong = "typedef";  goto wrong_thread_storage_class;
+wrong_thread_storage_class:
 						errorf(HERE, "'__thread' used with '%s'", wrong);
 						break;
 				}
