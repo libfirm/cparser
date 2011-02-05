@@ -1261,7 +1261,7 @@ static attribute_t *parse_attribute_gnu_single(void)
 	symbol_t *symbol = get_symbol_from_token();
 	if (symbol == NULL) {
 		parse_error_expected("while parsing attribute((", T_IDENTIFIER, NULL);
-		goto end_error;
+		return NULL;
 	}
 
 	const char *name = symbol->string;
@@ -1290,9 +1290,6 @@ static attribute_t *parse_attribute_gnu_single(void)
 		attribute->a.arguments = parse_attribute_arguments();
 
 	return attribute;
-
-end_error:
-	return NULL;
 }
 
 static attribute_t *parse_attribute_gnu(void)
@@ -10224,18 +10221,14 @@ static statement_t *intern_parse_statement(void)
 			switch (la1_type) {
 			case '&':
 			case '*':
-				if (get_entity(token.symbol, NAMESPACE_NORMAL) != NULL)
-					goto expression_statment;
-				/* FALLTHROUGH */
-
+				if (get_entity(token.symbol, NAMESPACE_NORMAL) != NULL) {
+			default:
+					statement = parse_expression_statement();
+				} else {
 			DECLARATION_START
 			case T_IDENTIFIER:
-				statement = parse_declaration_statement();
-				break;
-
-			default:
-expression_statment:
-				statement = parse_expression_statement();
+					statement = parse_declaration_statement();
+				}
 				break;
 			}
 		}
