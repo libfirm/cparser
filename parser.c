@@ -9803,7 +9803,7 @@ static statement_t *parse_goto(void)
 		else
 			parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_until_anchor();
-		goto end_error;
+		return create_invalid_statement();
 	}
 
 	/* remember the goto's in a list for later checking */
@@ -9812,9 +9812,8 @@ static statement_t *parse_goto(void)
 
 	expect(';', end_error);
 
-	return statement;
 end_error:
-	return create_invalid_statement();
+	return statement;
 }
 
 /**
