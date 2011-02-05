@@ -5027,8 +5027,6 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 
 static void for_statement_to_firm(for_statement_t *statement)
 {
-	ir_node *jmp = NULL;
-
 	/* create declarations */
 	entity_t *entity = statement->scope.entities;
 	for ( ; entity != NULL; entity = entity->base.next) {
@@ -5038,6 +5036,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		create_local_declaration(entity);
 	}
 
+	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
 		entity = statement->scope.entities;
 		for ( ; entity != NULL; entity = entity->base.next) {
@@ -5090,8 +5089,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	break_label    = old_break_label;
 
 	if (get_cur_block() != NULL) {
-		jmp = new_Jmp();
-		add_immBlock_pred(step_block, jmp);
+		add_immBlock_pred(step_block, new_Jmp());
 	}
 
 	/* create the condition */
@@ -5102,8 +5100,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 	} else {
 		keep_alive(header_block);
 		keep_all_memory(header_block);
-		jmp = new_Jmp();
-		add_immBlock_pred(body_block, jmp);
+		add_immBlock_pred(body_block, new_Jmp());
 	}
 
 	mature_immBlock(body_block);
@@ -5246,9 +5243,6 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	if (statement->is_empty_range)
 		return;
 
-	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-
-	ir_node *proj;
 	ir_node *block = new_immBlock();
 
 	if (get_cur_block() != NULL) {
@@ -5258,20 +5252,20 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 	if (current_switch_cond != NULL) {
 		set_cur_block(get_nodes_block(current_switch_cond));
+		dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
 		if (statement->expression != NULL) {
 			long pn     = statement->first_case;
 			long end_pn = statement->last_case;
 			assert(pn <= end_pn);
 			/* create jumps for all cases in the given range */
 			do {
-				proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
+				ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
 				add_immBlock_pred(block, proj);
 			} while (pn++ < end_pn);
 		} else {
 			saw_default_label = true;
-			proj = new_d_Proj(dbgi, current_switch_cond, mode_X,
-			                  current_switch->default_proj_nr);
-
+			ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X,
+			                                 current_switch->default_proj_nr);
 			add_immBlock_pred(block, proj);
 		}
 	}
