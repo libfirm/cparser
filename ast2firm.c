@@ -5248,10 +5248,13 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 
-	ir_node *const fallthrough = (get_cur_block() == NULL ? NULL : new_Jmp());
-
 	ir_node *proj;
 	ir_node *block = new_immBlock();
+
+	if (get_cur_block() != NULL) {
+		/* Fallthrough from previous case */
+		add_immBlock_pred(block, new_Jmp());
+	}
 
 	if (current_switch_cond != NULL) {
 		set_cur_block(get_nodes_block(current_switch_cond));
@@ -5273,9 +5276,6 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		}
 	}
 
-	if (fallthrough != NULL) {
-		add_immBlock_pred(block, fallthrough);
-	}
 	mature_immBlock(block);
 	set_cur_block(block);
 
