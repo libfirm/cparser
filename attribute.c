@@ -242,7 +242,7 @@ static void warn_arguments(const attribute_t *attribute)
 
 	if (warning.other) {
 		warningf(&attribute->source_position,
-				 "attribute '%s' needs no attributes",
+				 "attribute '%s' needs no arguments",
 				 get_attribute_name(attribute->kind));
 	}
 }
