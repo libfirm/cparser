@@ -4982,18 +4982,13 @@ static void while_statement_to_firm(while_statement_t *statement)
 
 static void do_while_statement_to_firm(do_while_statement_t *statement)
 {
-	ir_node *jmp = NULL;
-	if (get_cur_block() != NULL) {
-		jmp = new_Jmp();
-	}
-
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
 
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	if (jmp != NULL) {
-		add_immBlock_pred(body_block, jmp);
+	if (get_cur_block() != NULL) {
+		add_immBlock_pred(body_block, new_Jmp());
 	}
 
 	ir_node *old_continue_label = continue_label;
