@@ -10130,7 +10130,7 @@ static statement_t *parse_local_label_declaration(void)
 		}
 		next_token();
 	} while (next_if(','));
-	eat(';');
+	expect(';', end_error);
 end_error:
 	statement->declaration.declarations_begin = begin;
 	statement->declaration.declarations_end   = end;
