@@ -3658,12 +3658,16 @@ ptr_operator_end: ;
 			}
 			rem_anchor_token(')');
 			expect(')', end_error);
+		} else if (!env->may_be_abstract) {
+			errorf(HERE, "declarator must have a name");
+			goto error_out;
 		}
 		break;
 	default:
 		if (env->may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
+error_out:
 		eat_until_anchor();
 		return NULL;
 	}
