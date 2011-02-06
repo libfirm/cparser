@@ -1570,7 +1570,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 
 			/* simply create a NULL pointer */
 			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
-			ir_node  *res  = new_Const_long(mode, 0);
+			ir_node  *res  = new_Const(get_mode_null(mode));
 
 			return res;
 		}
@@ -1922,7 +1922,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case bk_ms_ReturnAddress: {
 		ir_node *in[2];
 
-		in[0] = new_Const_long(mode_int, 0);
+		in[0] = new_Const(get_mode_null(mode_int));
 		in[1] = get_irg_frame(current_ir_graph);
 		ir_type *tp  = get_ir_type(function_type);
 		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_return_address, tp);
@@ -4266,7 +4266,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 	}
 
 	ir_mode *value_mode = get_type_mode(ent_type);
-	ir_node *node = new_Const_long(value_mode, 0);
+	ir_node *node       = new_Const(get_mode_null(value_mode));
 
 	/* is it a bitfield type? */
 	if (is_Primitive_type(ent_type) &&
