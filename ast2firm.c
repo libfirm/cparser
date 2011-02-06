@@ -3669,7 +3669,10 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	}
 
 	if (is_constant_expression(expression) == EXPR_CLASS_CONSTANT) {
+		bool const constant_folding_old = constant_folding;
+		constant_folding = true;
 		ir_node *res  = _expression_to_firm(expression);
+		constant_folding = constant_folding_old;
 		ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
 		assert(is_Const(res));
 		return create_Const_from_bool(mode, !is_Const_null(res));
