@@ -3167,51 +3167,42 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		}
 	}
 
-	ir_node *cur_block   = get_cur_block();
-
-	/* create the true block */
-	ir_node *true_block  = new_immBlock();
-	set_cur_block(true_block);
-
-	ir_node *true_val = expression->true_expression != NULL ?
-		expression_to_firm(expression->true_expression) : NULL;
-	ir_node *true_jmp = new_Jmp();
-
-	/* create the false block */
-	ir_node *false_block = new_immBlock();
-	set_cur_block(false_block);
-
-	ir_node *false_val = expression_to_firm(expression->false_expression);
-	ir_node *false_jmp = new_Jmp();
-
-	/* create the condition evaluation */
-	set_cur_block(cur_block);
-	ir_node *const cond_expr = create_condition_evaluation(expression->condition, true_block, false_block);
-	if (expression->true_expression == NULL) {
-		if (cond_expr != NULL && get_irn_mode(cond_expr) != mode_b) {
-			true_val = cond_expr;
-		} else {
-			/* Condition ended with a short circuit (&&, ||, !) operation or a
-			 * comparison.  Generate a "1" as value for the true branch. */
-			true_val = new_Const(get_mode_one(mode_Is));
-		}
-	}
+	ir_node *const true_block  = new_immBlock();
+	ir_node *const false_block = new_immBlock();
+	ir_node *const cond_expr   = create_condition_evaluation(expression->condition, true_block, false_block);
 	mature_immBlock(true_block);
 	mature_immBlock(false_block);
 
+	set_cur_block(true_block);
+	ir_node *true_val;
+	if (expression->true_expression != NULL) {
+		true_val = expression_to_firm(expression->true_expression);
+	} else if (cond_expr != NULL && get_irn_mode(cond_expr) != mode_b) {
+		true_val = cond_expr;
+	} else {
+		/* Condition ended with a short circuit (&&, ||, !) operation or a
+		 * comparison.  Generate a "1" as value for the true branch. */
+		true_val = new_Const(get_mode_one(mode_Is));
+	}
+	ir_node *const true_jmp = new_d_Jmp(dbgi);
+
+	set_cur_block(false_block);
+	ir_node *const false_val = expression_to_firm(expression->false_expression);
+	ir_node *const false_jmp = new_d_Jmp(dbgi);
+
 	/* create the common block */
-	ir_node *in_cf[2] = { true_jmp, false_jmp };
-	ir_node *block = new_Block(2, in_cf);
+	ir_node *const in_cf[2] = { true_jmp, false_jmp };
+	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
 	set_cur_block(block);
 
 	/* TODO improve static semantics, so either both or no values are NULL */
 	if (true_val == NULL || false_val == NULL)
 		return NULL;
 
-	ir_node *in[2] = { true_val, false_val };
-	ir_mode *mode  = get_irn_mode(true_val);
+	ir_node *const in[2] = { true_val, false_val };
+	ir_mode *const mode  = get_irn_mode(true_val);
 	assert(get_irn_mode(false_val) == mode);
-	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
+	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
 }
