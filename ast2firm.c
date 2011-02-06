@@ -5019,7 +5019,6 @@ static void for_statement_to_firm(for_statement_t *statement)
 		create_local_declaration(entity);
 	}
 
-	ir_node *jmp = NULL;
 	if (get_cur_block() != NULL) {
 		entity = statement->scope.entities;
 		for ( ; entity != NULL; entity = entity->base.next) {
@@ -5032,67 +5031,73 @@ static void for_statement_to_firm(for_statement_t *statement)
 		if (statement->initialisation != NULL) {
 			expression_to_firm(statement->initialisation);
 		}
-
-		jmp = new_Jmp();
 	}
 
-
-	/* create the step block */
-	ir_node *const step_block = new_immBlock();
-	set_cur_block(step_block);
-	if (statement->step != NULL) {
-		expression_to_firm(statement->step);
-	}
-	ir_node *const step_jmp = new_Jmp();
-
-	/* create the header block */
+	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	set_cur_block(header_block);
-	if (jmp != NULL) {
-		add_immBlock_pred(header_block, jmp);
+	if (get_cur_block() != NULL) {
+		add_immBlock_pred(header_block, new_Jmp());
 	}
-	add_immBlock_pred(header_block, step_jmp);
 
-	/* the false block */
-	ir_node *const false_block = new_immBlock();
+	/* Create the condition. */
+	ir_node *body_block;
+	ir_node *false_block;
+	if (statement->condition != NULL) {
+		body_block  = new_immBlock();
+		false_block = new_immBlock();
 
-	/* the loop body */
+		set_cur_block(header_block);
+		create_condition_evaluation(statement->condition, body_block, false_block);
+		mature_immBlock(body_block);
+	} else {
+		/* for-ever. */
+		body_block  = header_block;
+		false_block = NULL;
+
+		keep_alive(header_block);
+		keep_all_memory(header_block);
+	}
+
+	/* Create the step block, if necessary. */
+	ir_node      *      step_block = header_block;
+	expression_t *const step       = statement->step;
+	if (step != NULL) {
+		step_block = new_immBlock();
+	}
+
 	ir_node *const old_continue_label = continue_label;
 	ir_node *const old_break_label    = break_label;
 	continue_label = step_block;
 	break_label    = false_block;
 
-	ir_node *const body_block = new_immBlock();
+	/* Create the loop body. */
 	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-
-	assert(continue_label == step_block);
-	assert(break_label    == false_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
-
 	if (get_cur_block() != NULL) {
 		add_immBlock_pred(step_block, new_Jmp());
 	}
 
-	/* create the condition */
-	set_cur_block(header_block);
-	if (statement->condition != NULL) {
-		create_condition_evaluation(statement->condition, body_block,
-		                            false_block);
-	} else {
-		keep_alive(header_block);
-		keep_all_memory(header_block);
-		add_immBlock_pred(body_block, new_Jmp());
+	/* Create the step code. */
+	if (step != NULL) {
+		mature_immBlock(step_block);
+		set_cur_block(step_block);
+		expression_to_firm(step);
+		if (get_cur_block() != NULL) {
+			add_immBlock_pred(header_block, new_Jmp());
+		}
 	}
 
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-	mature_immBlock(step_block);
 	mature_immBlock(header_block);
-	mature_immBlock(false_block);
-
+	assert(false_block == NULL || false_block == break_label);
+	false_block = break_label;
+	if (false_block != NULL) {
+		mature_immBlock(false_block);
+	}
 	set_cur_block(false_block);
+
+	assert(continue_label == step_block);
+	continue_label = old_continue_label;
+	break_label    = old_break_label;
 }
 
 static void create_jump_statement(const statement_t *statement,
