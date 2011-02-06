@@ -7154,6 +7154,7 @@ static expression_t *parse_primary_expression(void)
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
+	eat_until_anchor();
 	return create_invalid_expression();
 }
 
