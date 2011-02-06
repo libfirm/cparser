@@ -4866,57 +4866,48 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 
 static void if_statement_to_firm(if_statement_t *statement)
 {
-	ir_node *cur_block = get_cur_block();
+	/* Create the condition. */
+	ir_node *true_block  = NULL;
+	ir_node *false_block = NULL;
+	if (get_cur_block() != NULL) {
+		true_block  = new_immBlock();
+		false_block = new_immBlock();
+		create_condition_evaluation(statement->condition, true_block, false_block);
+		mature_immBlock(true_block);
+	}
 
+	/* Create the false statement.
+	 * Hadle false before true, so if no false statement is present, then the
+	 * empty false block is reused as fallthrough block. */
 	ir_node *fallthrough_block = NULL;
+	if (statement->false_statement != NULL) {
+		if (false_block != NULL) {
+			mature_immBlock(false_block);
+		}
+		set_cur_block(false_block);
+		statement_to_firm(statement->false_statement);
+		if (get_cur_block() != NULL) {
+			fallthrough_block = new_immBlock();
+			add_immBlock_pred(fallthrough_block, new_Jmp());
+		}
+	} else {
+		fallthrough_block = false_block;
+	}
 
-	/* the true (blocks) */
-	ir_node *const true_block = new_immBlock();
+	/* Create the true statement. */
 	set_cur_block(true_block);
 	statement_to_firm(statement->true_statement);
 	if (get_cur_block() != NULL) {
-		ir_node *jmp = new_Jmp();
-		if (fallthrough_block == NULL)
+		if (fallthrough_block == NULL) {
 			fallthrough_block = new_immBlock();
-		add_immBlock_pred(fallthrough_block, jmp);
-	}
-
-	/* the false (blocks) */
-	ir_node *false_block = NULL;
-	if (statement->false_statement != NULL) {
-		false_block = new_immBlock();
-		set_cur_block(false_block);
-
-		statement_to_firm(statement->false_statement);
-		if (get_cur_block() != NULL) {
-			ir_node *jmp = new_Jmp();
-			if (fallthrough_block == NULL)
-				fallthrough_block = new_immBlock();
-			add_immBlock_pred(fallthrough_block, jmp);
 		}
+		add_immBlock_pred(fallthrough_block, new_Jmp());
 	}
 
-	/* create the condition */
-	if (cur_block != NULL) {
-		if (false_block == NULL) {
-			if (fallthrough_block == NULL)
-				fallthrough_block = new_immBlock();
-			false_block = fallthrough_block;
-		}
-
-		set_cur_block(cur_block);
-		create_condition_evaluation(statement->condition, true_block,
-		                            false_block);
-	}
-
-	mature_immBlock(true_block);
-	if (false_block != fallthrough_block && false_block != NULL) {
-		mature_immBlock(false_block);
-	}
+	/* Handle the block after the if-statement. */
 	if (fallthrough_block != NULL) {
 		mature_immBlock(fallthrough_block);
 	}
-
 	set_cur_block(fallthrough_block);
 }
 
