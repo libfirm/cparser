@@ -4911,13 +4911,20 @@ static void if_statement_to_firm(if_statement_t *statement)
 	set_cur_block(fallthrough_block);
 }
 
+/* Create a jump node which jumps into target_block, if the current block is
+ * reachable. */
+static void jump_if_reachable(ir_node *const target_block)
+{
+	if (get_cur_block() != NULL) {
+		add_immBlock_pred(target_block, new_Jmp());
+	}
+}
+
 static void while_statement_to_firm(while_statement_t *statement)
 {
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	if (get_cur_block() != NULL) {
-		add_immBlock_pred(header_block, new_Jmp());
-	}
+	jump_if_reachable(header_block);
 
 	/* Create the condition. */
 	ir_node      *      body_block;
@@ -4947,9 +4954,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	/* Create the loop body. */
 	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-	if (get_cur_block() != NULL) {
-		add_immBlock_pred(header_block, new_Jmp());
-	}
+	jump_if_reachable(header_block);
 
 	mature_immBlock(header_block);
 	assert(false_block == NULL || false_block == break_label);
@@ -4971,9 +4976,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	if (get_cur_block() != NULL) {
-		add_immBlock_pred(body_block, new_Jmp());
-	}
+	jump_if_reachable(body_block);
 
 	ir_node *old_continue_label = continue_label;
 	ir_node *old_break_label    = break_label;
@@ -4988,10 +4991,7 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
 
-	if (get_cur_block() != NULL) {
-		ir_node *body_jmp = new_Jmp();
-		add_immBlock_pred(header_block, body_jmp);
-	}
+	jump_if_reachable(header_block);
 
 	if (false_block == NULL) {
 		false_block = new_immBlock();
@@ -5035,9 +5035,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	if (get_cur_block() != NULL) {
-		add_immBlock_pred(header_block, new_Jmp());
-	}
+	jump_if_reachable(header_block);
 
 	/* Create the condition. */
 	ir_node *body_block;
@@ -5073,18 +5071,14 @@ static void for_statement_to_firm(for_statement_t *statement)
 	/* Create the loop body. */
 	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-	if (get_cur_block() != NULL) {
-		add_immBlock_pred(step_block, new_Jmp());
-	}
+	jump_if_reachable(step_block);
 
 	/* Create the step code. */
 	if (step != NULL) {
 		mature_immBlock(step_block);
 		set_cur_block(step_block);
 		expression_to_firm(step);
-		if (get_cur_block() != NULL) {
-			add_immBlock_pred(header_block, new_Jmp());
-		}
+		jump_if_reachable(header_block);
 	}
 
 	mature_immBlock(header_block);
@@ -5203,10 +5197,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 	statement_to_firm(statement->body);
 
-	if (get_cur_block() != NULL) {
-		ir_node *jmp = new_Jmp();
-		add_immBlock_pred(get_break_label(), jmp);
-	}
+	jump_if_reachable(get_break_label());
 
 	if (!saw_default_label && first_block != NULL) {
 		set_cur_block(first_block);
@@ -5232,11 +5223,8 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		return;
 
 	ir_node *block = new_immBlock();
-
-	if (get_cur_block() != NULL) {
-		/* Fallthrough from previous case */
-		add_immBlock_pred(block, new_Jmp());
-	}
+	/* Fallthrough from previous case */
+	jump_if_reachable(block);
 
 	if (current_switch_cond != NULL) {
 		set_cur_block(get_nodes_block(current_switch_cond));
@@ -5267,11 +5255,7 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 static void label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
-
-	if (get_cur_block() != NULL) {
-		ir_node *jmp = new_Jmp();
-		add_immBlock_pred(block, jmp);
-	}
+	jump_if_reachable(block);
 
 	set_cur_block(block);
 	keep_alive(block);
