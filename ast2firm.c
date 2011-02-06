@@ -2639,29 +2639,22 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 static ir_node *produce_condition_result(const expression_t *expression,
                                          ir_mode *mode, dbg_info *dbgi)
 {
-	ir_node *cur_block = get_cur_block();
-
-	ir_node *one_block = new_immBlock();
-	set_cur_block(one_block);
-	ir_node *one       = new_Const(get_mode_one(mode));
-	ir_node *jmp_one   = new_d_Jmp(dbgi);
-
-	ir_node *zero_block = new_immBlock();
-	set_cur_block(zero_block);
-	ir_node *zero       = new_Const(get_mode_null(mode));
-	ir_node *jmp_zero   = new_d_Jmp(dbgi);
-
-	set_cur_block(cur_block);
+	ir_node *const one_block  = new_immBlock();
+	ir_node *const zero_block = new_immBlock();
 	create_condition_evaluation(expression, one_block, zero_block);
 	mature_immBlock(one_block);
 	mature_immBlock(zero_block);
 
-	ir_node *in_cf[2] = { jmp_one, jmp_zero };
-	ir_node *block = new_Block(2, in_cf);
+	ir_node *const jmp_one  = new_rd_Jmp(dbgi, one_block);
+	ir_node *const jmp_zero = new_rd_Jmp(dbgi, zero_block);
+	ir_node *const in_cf[2] = { jmp_one, jmp_zero };
+	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
 	set_cur_block(block);
 
-	ir_node *in[2] = { one, zero };
-	ir_node *val   = new_d_Phi(dbgi, 2, in, mode);
+	ir_node *const one   = new_Const(get_mode_one(mode));
+	ir_node *const zero  = new_Const(get_mode_null(mode));
+	ir_node *const in[2] = { one, zero };
+	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
 }
