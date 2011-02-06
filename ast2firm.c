@@ -4953,6 +4953,14 @@ static void while_statement_to_firm(while_statement_t *statement)
 	break_label    = old_break_label;
 }
 
+static ir_node *get_break_label(void)
+{
+	if (break_label == NULL) {
+		break_label = new_immBlock();
+	}
+	return break_label;
+}
+
 static void do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	/* create the header block */
@@ -4969,17 +4977,13 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 
 	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-	ir_node *false_block = break_label;
+	ir_node *const false_block = get_break_label();
 
 	assert(continue_label == header_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
 
 	jump_if_reachable(header_block);
-
-	if (false_block == NULL) {
-		false_block = new_immBlock();
-	}
 
 	/* create the condition */
 	mature_immBlock(header_block);
@@ -5089,14 +5093,6 @@ static void create_jump_statement(const statement_t *statement,
 	add_immBlock_pred(target_block, jump);
 
 	set_cur_block(NULL);
-}
-
-static ir_node *get_break_label(void)
-{
-	if (break_label == NULL) {
-		break_label = new_immBlock();
-	}
-	return break_label;
 }
 
 static void switch_statement_to_firm(switch_statement_t *statement)
