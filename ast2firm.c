@@ -4991,7 +4991,6 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	if (get_cur_block() != NULL) {
 		ir_node *body_jmp = new_Jmp();
 		add_immBlock_pred(header_block, body_jmp);
-		mature_immBlock(header_block);
 	}
 
 	if (false_block == NULL) {
@@ -4999,11 +4998,11 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	}
 
 	/* create the condition */
+	mature_immBlock(header_block);
 	set_cur_block(header_block);
 
 	create_condition_evaluation(statement->condition, body_block, false_block);
 	mature_immBlock(body_block);
-	mature_immBlock(header_block);
 	mature_immBlock(false_block);
 
 	set_cur_block(false_block);
