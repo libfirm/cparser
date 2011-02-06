@@ -916,10 +916,13 @@ static bool is_null_pointer_constant(const expression_t *expression)
 	}
 
 	type_t *const type = skip_typeref(expression->base.type);
-	return
-		is_type_integer(type)              &&
-		is_constant_expression(expression) &&
-		!fold_constant_to_bool(expression);
+	if (!is_type_integer(type))
+		return false;
+	switch (is_constant_expression(expression)) {
+		case EXPR_CLASS_ERROR:    return true;
+		case EXPR_CLASS_CONSTANT: return !fold_constant_to_bool(expression);
+		default:                  return false;
+	}
 }
 
 /**
@@ -1079,7 +1082,7 @@ static expression_t *parse_constant_expression(void)
 {
 	expression_t *result = parse_subexpression(PREC_CONDITIONAL);
 
-	if (!is_constant_expression(result)) {
+	if (is_constant_expression(result) == EXPR_CLASS_VARIABLE) {
 		errorf(&result->base.source_position,
 		       "expression '%E' is not constant", result);
 	}
@@ -1732,8 +1735,9 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
  */
 static bool is_initializer_constant(const expression_t *expression)
 {
-	return is_constant_expression(expression)
-		|| is_address_constant(expression);
+	return
+		is_constant_expression(expression) != EXPR_CLASS_VARIABLE ||
+		is_address_constant(expression)    != EXPR_CLASS_VARIABLE;
 }
 
 /**
@@ -3779,24 +3783,31 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			array_type->array.size_expression = size_expression;
 
 			if (size_expression != NULL) {
-				if (is_constant_expression(size_expression)) {
-					long const size
-						= fold_constant_to_int(size_expression);
-					array_type->array.size          = size;
-					array_type->array.size_constant = true;
-					/* §6.7.5.2:1  If the expression is a constant expression, it shall
-					 * have a value greater than zero. */
-					if (size <= 0) {
-						if (size < 0 || !GNU_MODE) {
-							errorf(&size_expression->base.source_position,
-									"size of array must be greater than zero");
-						} else if (warning.other) {
-							warningf(&size_expression->base.source_position,
-									"zero length arrays are a GCC extension");
+				switch (is_constant_expression(size_expression)) {
+					case EXPR_CLASS_CONSTANT: {
+						long const size = fold_constant_to_int(size_expression);
+						array_type->array.size          = size;
+						array_type->array.size_constant = true;
+						/* §6.7.5.2:1  If the expression is a constant expression, it shall
+						 * have a value greater than zero. */
+						if (size <= 0) {
+							if (size < 0 || !GNU_MODE) {
+								errorf(&size_expression->base.source_position,
+										"size of array must be greater than zero");
+							} else if (warning.other) {
+								warningf(&size_expression->base.source_position,
+										"zero length arrays are a GCC extension");
+							}
 						}
+						break;
 					}
-				} else {
-					array_type->array.is_vla = true;
+
+					case EXPR_CLASS_VARIABLE:
+						array_type->array.is_vla = true;
+						break;
+
+					case EXPR_CLASS_ERROR:
+						break;
 				}
 			}
 
@@ -4883,8 +4894,8 @@ static void check_declarations(void)
 static int determine_truth(expression_t const* const cond)
 {
 	return
-		!is_constant_expression(cond) ? 0 :
-		fold_constant_to_bool(cond)   ? 1 :
+		is_constant_expression(cond) != EXPR_CLASS_CONSTANT ? 0 :
+		fold_constant_to_bool(cond)                         ? 1 :
 		-1;
 }
 
@@ -5094,7 +5105,7 @@ static void check_reachable(statement_t *const stmt)
 			if (!expression_returns(expr))
 				return;
 
-			if (is_constant_expression(expr)) {
+			if (is_constant_expression(expr) == EXPR_CLASS_CONSTANT) {
 				long                    const val      = fold_constant_to_int(expr);
 				case_label_statement_t *      defaults = NULL;
 				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
@@ -5680,7 +5691,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 		bit_size = get_type_size(base_type) * 8;
 	}
 
-	if (is_constant_expression(size)) {
+	if (is_constant_expression(size) == EXPR_CLASS_CONSTANT) {
 		long v = fold_constant_to_int(size);
 		const symbol_t *user_symbol = symbol == NULL ? sym_anonymous : symbol;
 
@@ -7416,7 +7427,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 			/* argument must be constant */
 			call_argument_t *argument = call->arguments;
 
-			if (! is_constant_expression(argument->expression)) {
+			if (is_constant_expression(argument->expression) == EXPR_CLASS_VARIABLE) {
 				errorf(&call->base.source_position,
 				       "argument of '%Y' must be a constant expression",
 				       call->function->reference.entity->base.symbol);
@@ -7428,7 +7439,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				break;
 
 			call_argument_t *arg = call->arguments->next;
-			if (arg != NULL && ! is_constant_expression(arg->expression)) {
+			if (arg != NULL && is_constant_expression(arg->expression) == EXPR_CLASS_VARIABLE) {
 				errorf(&call->base.source_position,
 					   "second argument of '%Y' must be a constant expression",
 					   call->function->reference.entity->base.symbol);
@@ -7442,7 +7453,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 			call_argument_t *locality = NULL;
 
 			if (rw != NULL) {
-				if (! is_constant_expression(rw->expression)) {
+				if (is_constant_expression(rw->expression) == EXPR_CLASS_VARIABLE) {
 					errorf(&call->base.source_position,
 					       "second argument of '%Y' must be a constant expression",
 					       call->function->reference.entity->base.symbol);
@@ -7450,7 +7461,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 				locality = rw->next;
 			}
 			if (locality != NULL) {
-				if (! is_constant_expression(locality->expression)) {
+				if (is_constant_expression(locality->expression) == EXPR_CLASS_VARIABLE) {
 					errorf(&call->base.source_position,
 					       "third argument of '%Y' must be a constant expression",
 					       call->function->reference.entity->base.symbol);
@@ -8233,8 +8244,8 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 
 	expression_t const *const right = expression->right;
 	/* The type of the right operand can be different for /= */
-	if (is_type_integer(right->base.type) &&
-	    is_constant_expression(right)     &&
+	if (is_type_integer(right->base.type)                    &&
+	    is_constant_expression(right) == EXPR_CLASS_CONSTANT &&
 	    !fold_constant_to_bool(right)) {
 		warningf(&expression->base.source_position, "division by zero");
 	}
@@ -8285,7 +8296,7 @@ static bool semantic_shift(binary_expression_t *expression)
 
 	type_left = promote_integer(type_left);
 
-	if (is_constant_expression(right)) {
+	if (is_constant_expression(right) == EXPR_CLASS_CONSTANT) {
 		long count = fold_constant_to_int(right);
 		if (count < 0) {
 			warningf(&right->base.source_position,
@@ -8433,9 +8444,11 @@ static void warn_comparison_in_comparison(const expression_t *const expr)
 
 static bool maybe_negative(expression_t const *const expr)
 {
-	return
-		!is_constant_expression(expr) ||
-		fold_constant_to_int(expr) < 0;
+	switch (is_constant_expression(expr)) {
+		case EXPR_CLASS_ERROR:    return false;
+		case EXPR_CLASS_CONSTANT: return fold_constant_to_int(expr) < 0;
+		default:                  return true;
+	}
 }
 
 /**
@@ -9315,11 +9328,9 @@ static statement_t *parse_case_statement(void)
 
 	expression_t *const expression   = parse_expression();
 	statement->case_label.expression = expression;
-	if (!is_constant_expression(expression)) {
-		/* This check does not prevent the error message in all cases of an
-		 * prior error while parsing the expression.  At least it catches the
-		 * common case of a mistyped enum entry. */
-		if (is_type_valid(skip_typeref(expression->base.type))) {
+	expression_classification_t const expr_class = is_constant_expression(expression);
+	if (expr_class != EXPR_CLASS_CONSTANT) {
+		if (expr_class != EXPR_CLASS_ERROR) {
 			errorf(pos, "case label does not reduce to an integer constant");
 		}
 		statement->case_label.is_bad = true;
@@ -9333,11 +9344,9 @@ static statement_t *parse_case_statement(void)
 		if (next_if(T_DOTDOTDOT)) {
 			expression_t *const end_range   = parse_expression();
 			statement->case_label.end_range = end_range;
-			if (!is_constant_expression(end_range)) {
-				/* This check does not prevent the error message in all cases of an
-				 * prior error while parsing the expression.  At least it catches the
-				 * common case of a mistyped enum entry. */
-				if (is_type_valid(skip_typeref(end_range->base.type))) {
+			expression_classification_t const end_class = is_constant_expression(end_range);
+			if (end_class != EXPR_CLASS_CONSTANT) {
+				if (end_class != EXPR_CLASS_ERROR) {
 					errorf(pos, "case range does not reduce to an integer constant");
 				}
 				statement->case_label.is_bad = true;

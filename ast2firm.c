@@ -2479,10 +2479,10 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 	}
 
 	expression_t *con;
-	if (is_local_variable(op1) && is_constant_expression(op2)) {
+	if (is_local_variable(op1) && is_constant_expression(op2) == EXPR_CLASS_CONSTANT) {
 		var = op1->reference.entity;
 		con = op2;
-	} else if (is_constant_expression(op1) && is_local_variable(op2)) {
+	} else if (is_constant_expression(op1) == EXPR_CLASS_CONSTANT && is_local_variable(op2)) {
 		cmp_val = get_inversed_pnc(cmp_val);
 		var = op2->reference.entity;
 		con = op1;
@@ -2796,7 +2796,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	type_t   *type = skip_typeref(expression->base.type);
 	ir_mode  *mode = get_ir_mode_arithmetic(type);
 
-	if (is_constant_expression(expression->left)) {
+	if (is_constant_expression(expression->left) == EXPR_CLASS_CONSTANT) {
 		bool val = fold_constant_to_bool(expression->left);
 		expression_kind_t ekind = expression->base.kind;
 		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
@@ -2810,7 +2810,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 			}
 		}
 
-		if (is_constant_expression(expression->right)) {
+		if (is_constant_expression(expression->right) == EXPR_CLASS_CONSTANT) {
 			bool valr = fold_constant_to_bool(expression->right);
 			return valr ?
 				new_Const(get_mode_one(mode)) :
@@ -3112,7 +3112,7 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	init_ir_types();
 
-	assert(is_constant_expression(expression));
+	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
@@ -3155,7 +3155,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
 
 	/* first try to fold a constant condition */
-	if (is_constant_expression(expression->condition)) {
+	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
 		bool val = fold_constant_to_bool(expression->condition);
 		if (val) {
 			expression_t *true_expression = expression->true_expression;
@@ -3487,7 +3487,7 @@ static ir_node *builtin_constant_to_firm(
 	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
 	long     v;
 
-	if (is_constant_expression(expression->value)) {
+	if (is_constant_expression(expression->value) == EXPR_CLASS_CONSTANT) {
 		v = 1;
 	} else {
 		v = 0;
@@ -3671,7 +3671,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 		return res;
 	}
 
-	if (is_constant_expression(expression)) {
+	if (is_constant_expression(expression) == EXPR_CLASS_CONSTANT) {
 		ir_node *res  = _expression_to_firm(expression);
 		ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
 		assert(is_Const(res));
@@ -3741,7 +3741,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	/* set branch prediction info based on __builtin_expect */
 	if (is_builtin_expect(expression) && is_Cond(cond)) {
 		call_argument_t *argument = expression->call.arguments->next;
-		if (is_constant_expression(argument->expression)) {
+		if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
 			bool             cnst = fold_constant_to_bool(argument->expression);
 			cond_jmp_predicate pred;
 
@@ -4405,7 +4405,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 		return;
 	}
 
-	if (!is_constant_initializer(initializer)) {
+	if (is_constant_initializer(initializer) == EXPR_CLASS_VARIABLE) {
 		bool old_initializer_use_bitfield_basetype
 			= initializer_use_bitfield_basetype;
 		initializer_use_bitfield_basetype = true;
@@ -4914,7 +4914,8 @@ static void while_statement_to_firm(while_statement_t *statement)
 	ir_node      *      body_block;
 	ir_node      *      false_block;
 	expression_t *const cond = statement->condition;
-	if (is_constant_expression(cond) && fold_constant_to_bool(cond)) {
+	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT &&
+			fold_constant_to_bool(cond)) {
 		/* Shortcut for while (true). */
 		body_block  = header_block;
 		false_block = NULL;

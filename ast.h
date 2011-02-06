@@ -99,13 +99,19 @@ void  print_entity(const entity_t *entity);
 void  change_indent(int delta);
 void *allocate_ast(size_t size);
 
+typedef enum expression_classification_t {
+	EXPR_CLASS_VARIABLE,
+	EXPR_CLASS_ERROR,
+	EXPR_CLASS_CONSTANT
+} expression_classification_t;
+
 /**
  * Returns true if a given expression is a compile time
  * constant. §6.6
  *
  * @param expression  the expression to check
  */
-bool is_constant_initializer(const initializer_t *initializer);
+expression_classification_t is_constant_initializer(const initializer_t *initializer);
 
 /**
  * Returns true if a given expression is a compile time
@@ -113,13 +119,13 @@ bool is_constant_initializer(const initializer_t *initializer);
  *
  * @param expression  the expression to check
  */
-bool is_constant_expression(const expression_t *expression);
+expression_classification_t is_constant_expression(const expression_t *expression);
 
 /**
  * An object with a fixed but at compiletime unknown adress which will be known
  * at link/load time.
  */
-bool is_address_constant(const expression_t *expression);
+expression_classification_t is_address_constant(const expression_t *expression);
 
 long fold_constant_to_int(const expression_t *expression);
 bool fold_constant_to_bool(const expression_t *expression);
