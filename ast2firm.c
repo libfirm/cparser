@@ -1097,6 +1097,11 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	return new_d_Conv(dbgi, value, dest_mode);
 }
 
+static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
+{
+	return new_Const((v ? get_mode_one : get_mode_null)(mode));
+}
+
 /**
  * Creates a SymConst node representing a wide string literal.
  *
@@ -2812,9 +2817,7 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 
 		if (is_constant_expression(expression->right) == EXPR_CLASS_CONSTANT) {
 			bool valr = fold_constant_to_bool(expression->right);
-			return valr ?
-				new_Const(get_mode_one(mode)) :
-				new_Const(get_mode_null(mode));
+			return create_Const_from_bool(mode, valr);
 		}
 
 		return produce_condition_result(expression->right, mode, dbgi);
@@ -3484,15 +3487,9 @@ static ir_node *expression_to_addr(const expression_t *expression)
 static ir_node *builtin_constant_to_firm(
 		const builtin_constant_expression_t *expression)
 {
-	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
-	long     v;
-
-	if (is_constant_expression(expression->value) == EXPR_CLASS_CONSTANT) {
-		v = 1;
-	} else {
-		v = 0;
-	}
-	return new_Const_long(mode, v);
+	ir_mode *const mode = get_ir_mode_arithmetic(expression->base.type);
+	bool     const v    = is_constant_expression(expression->value) == EXPR_CLASS_CONSTANT;
+	return create_Const_from_bool(mode, v);
 }
 
 static ir_node *builtin_types_compatible_to_firm(
@@ -3500,9 +3497,9 @@ static ir_node *builtin_types_compatible_to_firm(
 {
 	type_t  *const left  = get_unqualified_type(skip_typeref(expression->left));
 	type_t  *const right = get_unqualified_type(skip_typeref(expression->right));
-	long     const value = types_compatible(left, right) ? 1 : 0;
+	bool     const value = types_compatible(left, right);
 	ir_mode *const mode  = get_ir_mode_arithmetic(expression->base.type);
-	return new_Const_long(mode, value);
+	return create_Const_from_bool(mode, value);
 }
 
 static ir_node *get_label_block(label_t *label)
@@ -3675,11 +3672,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 		ir_node *res  = _expression_to_firm(expression);
 		ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
 		assert(is_Const(res));
-		if (is_Const_null(res)) {
-			return new_Const_long(mode, 0);
-		} else {
-			return new_Const_long(mode, 1);
-		}
+		return create_Const_from_bool(mode, !is_Const_null(res));
 	}
 
 	/* we have to produce a 0/1 from the mode_b expression */
