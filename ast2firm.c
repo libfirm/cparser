@@ -4913,62 +4913,55 @@ static void if_statement_to_firm(if_statement_t *statement)
 
 static void while_statement_to_firm(while_statement_t *statement)
 {
-	/* create the header block */
-	ir_node *header_block = new_immBlock();
+	/* Create the header block */
+	ir_node *const header_block = new_immBlock();
 	if (get_cur_block() != NULL) {
-		ir_node *const jmp = new_Jmp();
-		add_immBlock_pred(header_block, jmp);
+		add_immBlock_pred(header_block, new_Jmp());
 	}
 
-	/* the loop body */
-	ir_node *old_continue_label = continue_label;
-	ir_node *old_break_label    = break_label;
-	continue_label              = header_block;
-	break_label                 = NULL;
+	/* Create the condition. */
+	ir_node      *      body_block;
+	ir_node      *      false_block;
+	expression_t *const cond = statement->condition;
+	if (is_constant_expression(cond) && fold_constant_to_bool(cond)) {
+		/* Shortcut for while (true). */
+		body_block  = header_block;
+		false_block = NULL;
 
-	ir_node *body_block = new_immBlock();
+		keep_alive(header_block);
+		keep_all_memory(header_block);
+	} else {
+		body_block  = new_immBlock();
+		false_block = new_immBlock();
+
+		set_cur_block(header_block);
+		create_condition_evaluation(cond, body_block, false_block);
+		mature_immBlock(body_block);
+	}
+
+	ir_node *const old_continue_label = continue_label;
+	ir_node *const old_break_label    = break_label;
+	continue_label = header_block;
+	break_label    = false_block;
+
+	/* Create the loop body. */
 	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-	ir_node *false_block = break_label;
+	if (get_cur_block() != NULL) {
+		add_immBlock_pred(header_block, new_Jmp());
+	}
+
+	mature_immBlock(header_block);
+	assert(false_block == NULL || false_block == break_label);
+	false_block = break_label;
+	if (false_block != NULL) {
+		mature_immBlock(false_block);
+	}
+	set_cur_block(false_block);
 
 	assert(continue_label == header_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
-
-	if (get_cur_block() != NULL) {
-		ir_node *const jmp = new_Jmp();
-		add_immBlock_pred(header_block, jmp);
-	}
-
-	/* shortcut for while(true) */
-	if (is_constant_expression(statement->condition)
-			&& fold_constant_to_bool(statement->condition) != 0) {
-		set_cur_block(header_block);
-		ir_node *header_jmp = new_Jmp();
-		add_immBlock_pred(body_block, header_jmp);
-
-		keep_alive(body_block);
-		keep_all_memory(body_block);
-		set_cur_block(body_block);
-	} else {
-		if (false_block == NULL) {
-			false_block = new_immBlock();
-		}
-
-		/* create the condition */
-		set_cur_block(header_block);
-
-		create_condition_evaluation(statement->condition, body_block,
-		                            false_block);
-	}
-
-	mature_immBlock(body_block);
-	mature_immBlock(header_block);
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
-
-	set_cur_block(false_block);
 }
 
 static void do_while_statement_to_firm(do_while_statement_t *statement)
