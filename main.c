@@ -345,7 +345,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	FILE *f = popen(buf, "r");
 	if (f == NULL) {
 		fprintf(stderr, "invoking preprocessor failed\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* we don't really need that anymore */
@@ -381,7 +381,7 @@ static void assemble(const char *out, const char *in)
 	int err = system(buf);
 	if (err != 0) {
 		fprintf(stderr, "assembler reported an error\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	obstack_free(&asflags_obst, NULL);
@@ -415,7 +415,7 @@ static void print_file_name(const char *file)
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
 		fprintf(stderr, "linker reported an error\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -483,12 +483,12 @@ static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
 	if (fd == -1) {
 		fprintf(stderr, "couldn't create temporary file: %s\n",
 		        strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
 		fprintf(stderr, "couldn't create temporary file FILE*\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	file_list_entry_t *entry = xmalloc(sizeof(*entry));
@@ -636,7 +636,7 @@ static FILE *open_file(const char *filename)
 	if (in == NULL) {
 		fprintf(stderr, "Couldn't open '%s': %s\n", filename,
 				strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	return in;
@@ -1213,7 +1213,7 @@ int main(int argc, char **argv)
 					do_timing = true;
 				} else if (streq(option, "version")) {
 					print_cparser_version();
-					exit(EXIT_SUCCESS);
+					return EXIT_SUCCESS;
 				} else if (streq(option, "help")) {
 					print_help(argv[0]);
 					help_displayed = true;
@@ -1402,7 +1402,7 @@ int main(int argc, char **argv)
 				in = open_file(filename);
 			lextest(in, filename);
 			fclose(in);
-			exit(EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 		}
 
 		FILE *preprocessed_in = NULL;
@@ -1529,7 +1529,7 @@ do_parsing:
 					/* remove output file */
 					if (out != stdout)
 						unlink(outname);
-					exit(EXIT_FAILURE);
+					return EXIT_FAILURE;
 				}
 			}
 
@@ -1579,18 +1579,18 @@ graph_built:
 				if (irg == NULL) {
 					fprintf(stderr, "No graph for function '%s' found\n",
 					        dumpfunction);
-					exit(1);
+					return EXIT_FAILURE;
 				}
 
 				dump_ir_graph_file(out, irg);
 				fclose(out);
-				exit(EXIT_SUCCESS);
+				return EXIT_SUCCESS;
 			}
 
 			if (mode == CompileExportIR) {
 				fclose(out);
 				ir_export(outname);
-				exit(EXIT_SUCCESS);
+				return EXIT_SUCCESS;
 			}
 
 			gen_firm_finish(asm_out, filename, have_const_functions);
@@ -1691,7 +1691,7 @@ graph_built:
 		int err = system(commandline);
 		if (err != EXIT_SUCCESS) {
 			fprintf(stderr, "linker reported an error\n");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 	}
 
