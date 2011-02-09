@@ -405,7 +405,7 @@ static void enable_safe_defaults(void)
  */
 static void do_firm_optimizations(const char *input_filename)
 {
-	int      i;
+	size_t   i;
 	unsigned aa_opt;
 
 	set_opt_alias_analysis(firm_opt.alias_analysis);
