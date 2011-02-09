@@ -2770,15 +2770,9 @@ normal_node:
 	case EXPR_BINARY_DIV:
 	case EXPR_BINARY_DIV_ASSIGN: {
 		ir_node *pin = new_Pin(new_NoMem());
-		ir_node *op;
-		ir_node *res;
-		if (mode_is_float(mode)) {
-			op  = new_d_Quot(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Quot_res);
-		} else {
-			op  = new_d_Div(dbgi, pin, left, right, mode, op_pin_state_floats);
-			res = new_d_Proj(dbgi, op, mode, pn_Div_res);
-		}
+		ir_node *op  = new_d_Div(dbgi, pin, left, right, mode,
+		                         op_pin_state_floats);
+		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Div_res);
 		return res;
 	}
 	case EXPR_BINARY_MOD:
