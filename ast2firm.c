@@ -3198,7 +3198,12 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	ir_node *const in[2] = { true_val, false_val };
 	type_t  *const type  = skip_typeref(expression->base.type);
-	ir_mode *const mode  = get_ir_mode_arithmetic(type);
+	ir_mode *mode;
+	if (is_type_compound(type)) {
+		mode = mode_P;
+	} else {
+		mode = get_ir_mode_arithmetic(type);
+	}
 	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
