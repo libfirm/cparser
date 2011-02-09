@@ -3197,8 +3197,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		return NULL;
 
 	ir_node *const in[2] = { true_val, false_val };
-	ir_mode *const mode  = get_irn_mode(true_val);
-	assert(get_irn_mode(false_val) == mode);
+	type_t  *const type  = skip_typeref(expression->base.type);
+	ir_mode *const mode  = get_ir_mode_arithmetic(type);
 	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
