@@ -1833,7 +1833,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	case EXPR_VA_ARG:
 	case EXPR_VA_COPY:
 	case EXPR_STATEMENT:
-	case EXPR_REFERENCE:
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 	case EXPR_UNARY_POSTFIX_DECREMENT:
 	case EXPR_UNARY_PREFIX_INCREMENT:
@@ -1857,6 +1856,11 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	case EXPR_BINARY_COMMA:
 	case EXPR_ARRAY_ACCESS:
 		return EXPR_CLASS_VARIABLE;
+
+	case EXPR_REFERENCE: {
+		type_t *const type = skip_typeref(expression->base.type);
+		return is_type_valid(type) ? EXPR_CLASS_VARIABLE : EXPR_CLASS_ERROR;
+	}
 
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_constant_address(expression->unary.value);
