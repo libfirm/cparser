@@ -7306,6 +7306,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 {
 	assert(token.type == '.' || token.type == T_MINUSGREATER);
 	bool select_left_arrow = (token.type == T_MINUSGREATER);
+	source_position_t const pos = *HERE;
 	next_token();
 
 	if (token.type != T_IDENTIFIER) {
@@ -7322,7 +7323,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 	bool    saw_error = false;
 	if (is_type_pointer(type)) {
 		if (!select_left_arrow) {
-			errorf(HERE,
+			errorf(&pos,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, orig_type);
 			saw_error = true;
@@ -7330,7 +7331,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 		type_left = skip_typeref(type->pointer.points_to);
 	} else {
 		if (select_left_arrow && is_type_valid(type)) {
-			errorf(HERE, "left hand side of '->' is not a pointer, but '%T'", orig_type);
+			errorf(&pos, "left hand side of '->' is not a pointer, but '%T'", orig_type);
 			saw_error = true;
 		}
 		type_left = type;
@@ -7340,7 +7341,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 	    type_left->kind != TYPE_COMPOUND_UNION) {
 
 		if (is_type_valid(type_left) && !saw_error) {
-			errorf(HERE,
+			errorf(&pos,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, type_left);
 		}
@@ -7349,17 +7350,17 @@ static expression_t *parse_select_expression(expression_t *addr)
 
 	compound_t *compound = type_left->compound.compound;
 	if (!compound->complete) {
-		errorf(HERE, "request for member '%Y' in incomplete type '%T'",
+		errorf(&pos, "request for member '%Y' in incomplete type '%T'",
 		       symbol, type_left);
 		return create_invalid_expression();
 	}
 
 	type_qualifiers_t  qualifiers = type_left->base.qualifiers;
-	expression_t      *result
-		= find_create_select(HERE, addr, qualifiers, compound, symbol);
+	expression_t      *result     =
+		find_create_select(&pos, addr, qualifiers, compound, symbol);
 
 	if (result == NULL) {
-		errorf(HERE, "'%T' has no member named '%Y'", orig_type, symbol);
+		errorf(&pos, "'%T' has no member named '%Y'", orig_type, symbol);
 		return create_invalid_expression();
 	}
 
