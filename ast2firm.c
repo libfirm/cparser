@@ -1895,13 +1895,9 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		long          type_val        = fold_constant_to_int(type_expression);
 		type_t       *type            = function_type->function.return_type;
 		ir_mode      *mode            = get_ir_mode_arithmetic(type);
-		ir_tarval    *result;
-
 		/* just produce a "I don't know" result */
-		if (type_val & 2)
-			result = new_tarval_from_long(0, mode);
-		else
-			result = new_tarval_from_long(-1, mode);
+		ir_tarval    *result          = type_val & 2 ? get_mode_null(mode) :
+		                                get_mode_minus_one(mode);
 
 		return new_d_Const(dbgi, result);
 	}
