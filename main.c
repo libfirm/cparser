@@ -934,6 +934,13 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-isystem");
 				add_flag(&cppflags_obst, "-isystem");
 				add_flag(&cppflags_obst, "%s", opt);
+#if defined(linux) || defined(__linux) || defined(__linux__) || defined(__CYGWIN__)
+			} else if (streq(option, "pthread")) {
+				/* set flags for the preprocessor */
+				add_flag(&cppflags_obst, "-D_REENTRANT");
+				/* set flags for the linker */
+				add_flag(&ldflags_obst, "-lpthread");
+#endif
 			} else if (streq(option, "nostdinc")
 					|| streq(option, "trigraphs")) {
 				/* pass these through to the preprocessor */
