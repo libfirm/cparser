@@ -4110,9 +4110,9 @@ static void error_redefined_as_different_kind(const source_position_t *pos,
 static bool is_error_entity(entity_t *const ent)
 {
 	if (is_declaration(ent)) {
-		return is_type_valid(skip_typeref(ent->declaration.type));
+		return !is_type_valid(skip_typeref(ent->declaration.type));
 	} else if (ent->kind == ENTITY_TYPEDEF) {
-		return is_type_valid(skip_typeref(ent->typedefe.type));
+		return !is_type_valid(skip_typeref(ent->typedefe.type));
 	}
 	return false;
 }
