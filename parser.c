@@ -702,6 +702,7 @@ static void scope_pop(scope_t *old_scope)
 static entity_t *get_entity(const symbol_t *const symbol,
                             namespace_tag_t namespc)
 {
+	assert(namespc != NAMESPACE_INVALID);
 	entity_t *entity = symbol->entity;
 	for (; entity != NULL; entity = entity->base.symbol_next) {
 		if (entity->base.namespc == namespc)
@@ -2510,6 +2511,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 		entity_t *entity             = allocate_entity_zero(ENTITY_ENUM_VALUE);
 		entity->enum_value.enum_type = enum_type;
+		entity->base.namespc         = NAMESPACE_NORMAL;
 		entity->base.symbol          = token.symbol;
 		entity->base.source_position = token.source_position;
 		next_token();
@@ -2824,6 +2826,7 @@ end_error:
 static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 {
 	entity_t *entity             = allocate_entity_zero(kind);
+	entity->base.namespc         = NAMESPACE_NORMAL;
 	entity->base.source_position = *HERE;
 	entity->base.symbol          = symbol;
 	if (is_declaration(entity)) {
@@ -3890,6 +3893,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 	entity_t *entity;
 	if (specifiers->storage_class == STORAGE_CLASS_TYPEDEF) {
 		entity                       = allocate_entity_zero(ENTITY_TYPEDEF);
+		entity->base.namespc         = NAMESPACE_NORMAL;
 		entity->base.symbol          = env.symbol;
 		entity->base.source_position = env.source_position;
 		entity->typedefe.type        = orig_type;
@@ -6230,6 +6234,7 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
 	entity->declaration.type                   = type;
 	entity->declaration.implicit               = true;
+	entity->base.namespc                       = NAMESPACE_NORMAL;
 	entity->base.symbol                        = symbol;
 	entity->base.source_position               = *source_position;
 

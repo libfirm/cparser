@@ -36,6 +36,7 @@ static entity_t *create_builtin_function(builtin_kind_t kind, const char *name,
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
 	entity->declaration.type                   = function_type;
 	entity->declaration.implicit               = true;
+	entity->base.namespc                       = NAMESPACE_NORMAL;
 	entity->base.symbol                        = symbol;
 	entity->base.source_position               = builtin_source_position;
 
