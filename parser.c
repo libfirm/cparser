@@ -4107,14 +4107,14 @@ static void error_redefined_as_different_kind(const source_position_t *pos,
 	       get_entity_kind_name(new_kind), &old->base.source_position);
 }
 
-static bool is_error_entity(entity_t *const ent)
+static bool is_entity_valid(entity_t *const ent)
 {
 	if (is_declaration(ent)) {
-		return !is_type_valid(skip_typeref(ent->declaration.type));
+		return is_type_valid(skip_typeref(ent->declaration.type));
 	} else if (ent->kind == ENTITY_TYPEDEF) {
-		return !is_type_valid(skip_typeref(ent->typedefe.type));
+		return is_type_valid(skip_typeref(ent->typedefe.type));
 	}
-	return false;
+	return true;
 }
 
 static bool contains_attribute(const attribute_t *list, const attribute_t *attr)
@@ -4216,7 +4216,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		if (previous_entity->base.parent_scope == current_scope) {
 			if (previous_entity->kind != entity->kind) {
-				if (!is_error_entity(previous_entity) && !is_error_entity(entity)) {
+				if (is_entity_valid(previous_entity) && is_entity_valid(entity)) {
 					error_redefined_as_different_kind(pos, previous_entity,
 							entity->kind);
 				}
@@ -10187,7 +10187,7 @@ static void parse_namespace_definition(void)
 		if (entity != NULL
 				&& entity->kind != ENTITY_NAMESPACE
 				&& entity->base.parent_scope == current_scope) {
-			if (!is_error_entity(entity)) {
+			if (is_entity_valid(entity)) {
 				error_redefined_as_different_kind(&token.source_position,
 						entity, ENTITY_NAMESPACE);
 			}
