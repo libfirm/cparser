@@ -4852,7 +4852,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	}
 
 	/* Create the false statement.
-	 * Hadle false before true, so if no false statement is present, then the
+	 * Handle false before true, so if no false statement is present, then the
 	 * empty false block is reused as fallthrough block. */
 	ir_node *fallthrough_block = NULL;
 	if (statement->false_statement != NULL) {
