@@ -7274,12 +7274,28 @@ typeprop_expression:
 
 	tp_expression->typeprop.type   = orig_type;
 	type_t const* const type       = skip_typeref(orig_type);
-	char   const* const wrong_type =
-		GNU_MODE && is_type_atomic(type, ATOMIC_TYPE_VOID) ? NULL                  :
-		is_type_incomplete(type)                           ? "incomplete"          :
-		type->kind == TYPE_FUNCTION                        ? "function designator" :
-		type->kind == TYPE_BITFIELD                        ? "bitfield"            :
-		NULL;
+	char   const*       wrong_type = NULL;
+	if (is_type_incomplete(type)) {
+		if (!is_type_atomic(type, ATOMIC_TYPE_VOID) || !GNU_MODE)
+			wrong_type = "incomplete";
+	} else if (type->kind == TYPE_FUNCTION) {
+		if (GNU_MODE) {
+			/* function types are allowed (and return 1) */
+			if (warning.other) {
+				char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
+				warningf(&tp_expression->base.source_position,
+				         "%s expression with function argument returns invalid result", what);
+			}
+		} else {
+			wrong_type = "function";
+		}
+	} else {
+		if (is_type_incomplete(type))
+			wrong_type = "incomplete";
+	}
+	if (type->kind == TYPE_BITFIELD)
+		wrong_type = "bitfield";
+
 	if (wrong_type != NULL) {
 		char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
 		errorf(&tp_expression->base.source_position,

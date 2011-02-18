@@ -3040,6 +3040,11 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 			&& expression->tp_expression != NULL) {
 		expression_to_firm(expression->tp_expression);
 	}
+	/* strange gnu extensions: sizeof(function) == 1 */
+	if (is_type_function(type)) {
+		ir_mode *mode = get_ir_mode_storage(type_size_t);
+		return new_Const(get_mode_one(mode));
+	}
 
 	return get_type_size_node(type);
 }
@@ -3079,7 +3084,12 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	if (tp_expression != NULL) {
 		entity_t *entity = get_expression_entity(tp_expression);
 		if (entity != NULL) {
-			alignment = get_cparser_entity_alignment(entity);
+			if (entity->kind == ENTITY_FUNCTION) {
+				/* a gnu-extension */
+				alignment = 1;
+			} else {
+				alignment = get_cparser_entity_alignment(entity);
+			}
 		}
 	}
 
