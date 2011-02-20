@@ -10735,6 +10735,7 @@ static void parse_externals(void)
 	add_anchor_token(T_EOF);
 
 #ifndef NDEBUG
+	/* make a copy of the anchor set, so we can check if it is restored after parsing */
 	unsigned char token_anchor_copy[T_LAST_TOKEN];
 	memcpy(token_anchor_copy, token_anchor_set, sizeof(token_anchor_copy));
 #endif
@@ -10742,14 +10743,16 @@ static void parse_externals(void)
 	while (token.type != T_EOF && token.type != '}') {
 #ifndef NDEBUG
 		bool anchor_leak = false;
-		for (int i = 0; i != T_LAST_TOKEN; ++i) {
+		for (int i = 0; i < T_LAST_TOKEN; ++i) {
 			unsigned char count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
+				/* the anchor set and its copy differs */
 				errorf(HERE, "Leaked anchor token %k %d times", i, count);
 				anchor_leak = true;
 			}
 		}
 		if (in_gcc_extension) {
+			/* an gcc extension scope was not closed */
 			errorf(HERE, "Leaked __extension__");
 			anchor_leak = true;
 		}
