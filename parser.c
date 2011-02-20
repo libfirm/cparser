@@ -4432,19 +4432,26 @@ static bool is_declaration_specifier(const token_t *token,
 
 static void parse_init_declarator_rest(entity_t *entity)
 {
-	assert(is_declaration(entity));
-	declaration_t *const declaration = &entity->declaration;
+	type_t *orig_type = type_error_type;
 
+	if (entity->base.kind == ENTITY_TYPEDEF) {
+		errorf(&entity->base.source_position,
+		       "typedef '%Y' is initialized (use __typeof__ instead)",
+		       entity->base.symbol);
+	} else {
+		assert(is_declaration(entity));
+		orig_type = entity->declaration.type;
+	}
 	eat('=');
 
-	type_t *orig_type = declaration->type;
-	type_t *type      = skip_typeref(orig_type);
+	type_t *type = skip_typeref(orig_type);
 
 	if (entity->kind == ENTITY_VARIABLE
 			&& entity->variable.initializer != NULL) {
 		parser_error_multiple_definition(entity, HERE);
 	}
 
+	declaration_t *const declaration = &entity->declaration;
 	bool must_be_constant = false;
 	if (declaration->storage_class == STORAGE_CLASS_STATIC ||
 	    entity->base.parent_scope  == file_scope) {
