@@ -9315,17 +9315,17 @@ end_error:
 	return create_invalid_statement();
 }
 
-static statement_t *parse_label_inner_statement(char const *const label, bool const eat_empty_stmt)
+static statement_t *parse_label_inner_statement(statement_t const *const label, char const *const label_kind)
 {
 	statement_t *inner_stmt;
 	switch (token.type) {
 		case '}':
-			errorf(HERE, "%s at end of compound statement", label);
+			errorf(&label->base.source_position, "%s at end of compound statement", label_kind);
 			inner_stmt = create_invalid_statement();
 			break;
 
 		case ';':
-			if (eat_empty_stmt) {
+			if (label->kind == STATEMENT_LABEL) {
 				/* Eat an empty statement here, to avoid the warning about an empty
 				 * statement after a label.  label:; is commonly used to have a label
 				 * before a closing brace. */
@@ -9338,7 +9338,7 @@ static statement_t *parse_label_inner_statement(char const *const label, bool co
 		default:
 			inner_stmt = parse_statement();
 			if (inner_stmt->kind == STATEMENT_DECLARATION) {
-				errorf(&inner_stmt->base.source_position, "declaration after %s", label);
+				errorf(&inner_stmt->base.source_position, "declaration after %s", label_kind);
 			}
 			break;
 	}
@@ -9423,7 +9423,7 @@ end_error:
 		errorf(pos, "case label not within a switch statement");
 	}
 
-	statement->case_label.statement = parse_label_inner_statement("case label", false);
+	statement->case_label.statement = parse_label_inner_statement(statement, "case label");
 
 	POP_PARENT;
 	return statement;
@@ -9464,7 +9464,7 @@ end_error:
 			"'default' label not within a switch statement");
 	}
 
-	statement->case_label.statement = parse_label_inner_statement("default label", false);
+	statement->case_label.statement = parse_label_inner_statement(statement, "default label");
 
 	POP_PARENT;
 	return statement;
@@ -9499,7 +9499,7 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
-	statement->label.statement = parse_label_inner_statement("label", true);
+	statement->label.statement = parse_label_inner_statement(statement, "label");
 
 	/* remember the labels in a list for later checking */
 	*label_anchor = &statement->label;
