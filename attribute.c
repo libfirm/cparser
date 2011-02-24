@@ -275,6 +275,22 @@ static void handle_attribute_packed(const attribute_t *attribute, type_t *type)
 	handle_attribute_packed_e(attribute, (entity_t*) type->compound.compound);
 }
 
+static void handle_attribute_asm(const attribute_t *attribute,
+                                      entity_t *entity)
+{
+	attribute_argument_t *argument = attribute->a.arguments;
+	assert (argument->kind == ATTRIBUTE_ARGUMENT_EXPRESSION);
+	expression_t *expression = argument->v.expression;
+	if (expression->kind != EXPR_STRING_LITERAL)
+		errorf(&attribute->source_position,
+		       "Invalid asm attribute expression");
+	string_literal_expression_t *strexpr = (string_literal_expression_t*)expression;
+	symbol_t *sym = symbol_table_insert(strexpr->value.begin);
+	entity->function.actual_name = sym;
+	assert (argument->next == NULL);
+	return;
+}
+
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 {
 	if (entity->kind == ENTITY_TYPEDEF) {
@@ -327,6 +343,10 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 
 		case ATTRIBUTE_GNU_PACKED:
 			handle_attribute_packed_e(attribute, entity);
+			break;
+
+		case ATTRIBUTE_GNU_ASM:
+			handle_attribute_asm(attribute, entity);
 			break;
 
 		case ATTRIBUTE_MS_ALIGN:

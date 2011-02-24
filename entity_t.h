@@ -252,6 +252,7 @@ struct function_t {
 	builtin_kind_t btk;
 	scope_t        parameters;
 	statement_t   *statement;
+	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
 
 	/* ast2firm info */
 	ir_entity     *irentity;

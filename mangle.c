@@ -344,7 +344,7 @@ ident *create_name_win32(entity_t *entity)
  */
 ident *create_name_linux_elf(entity_t *entity)
 {
-	bool needs_mangling = false;
+	const char *name = entity->base.symbol->string;
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		type_t *type = skip_typeref(entity->declaration.type);
@@ -352,18 +352,18 @@ ident *create_name_linux_elf(entity_t *entity)
 		switch (type->function.linkage) {
 			case LINKAGE_INVALID:
 				panic("linkage type of function is invalid");
-
-			case LINKAGE_C:   break;
-			case LINKAGE_CXX: needs_mangling = true; break;
+			case LINKAGE_C:
+				if (entity->function.actual_name != NULL)
+					name = entity->function.actual_name->string;
+				break;
+			case LINKAGE_CXX:
+				// TODO What about __REDIRECT/actual_name with mangling?
+				mangle_entity(entity);
+				return make_id_from_obst();
 		}
 	}
 
-	if (needs_mangling) {
-		mangle_entity(entity);
-		return make_id_from_obst();
-	}
-
-	return new_id_from_str(entity->base.symbol->string);
+	return new_id_from_str(name);
 }
 
 /**
