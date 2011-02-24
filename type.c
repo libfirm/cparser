@@ -782,11 +782,6 @@ void print_type(const type_t *const type)
 void print_type_ext(const type_t *const type, const symbol_t *symbol,
                     const scope_t *parameters)
 {
-	if (type == NULL) {
-		print_string("nil type");
-		return;
-	}
-
 	intern_print_type_pre(type);
 	if (symbol != NULL) {
 		print_string(" ");
