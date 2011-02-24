@@ -112,57 +112,26 @@ S(_MS, __FUNCDNAME__)
 #undef S
 
 /* needed on Windows */
-#ifdef __w64
 #undef __w64
-#endif
-#ifdef __ptr32
 #undef __ptr32
-#endif
-#ifdef __ptr64
 #undef __ptr64
-#endif
 
 /* needed on MinGW */
-#ifdef __MINGW32__
-#ifdef __int8
 #undef __int8
-#endif
-#ifdef __int16
 #undef __int16
-#endif
-#ifdef __int32
 #undef __int32
-#endif
-#ifdef __int64
 #undef __int64
-#endif
-#endif
 
-#if defined(__MINGW32__) || defined(__CYGWIN__)
-#ifdef __cdecl
+/* needed on MinGW and Cygwin */
 #undef __cdecl
-#endif
-#ifdef __stdcall
 #undef __stdcall
-#endif
-#ifdef __fastcall
 #undef __fastcall
-#endif
-#endif
 
-/* needed on darwin... */
-#ifdef __signed
+/* needed on Darwin... */
 #undef __signed
-#endif
-#ifdef __volatile
 #undef __volatile
-#endif
-#ifdef __const
 #undef __const
-#endif
-#ifdef __restrict
 #undef __restrict
-#endif
 
 #define S(mode, x, val) T(mode, x, #x, val)
 S(_ANSI|_C99|_CXX,   signed,               )
