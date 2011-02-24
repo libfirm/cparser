@@ -10661,7 +10661,6 @@ end_error:;
 static void parse_linkage_specification(void)
 {
 	eat(T_extern);
-	assert(token.type == T_STRING_LITERAL);
 
 	const char *linkage = parse_string_literals().begin;
 
