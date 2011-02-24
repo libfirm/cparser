@@ -9337,7 +9337,8 @@ static statement_t *parse_label_inner_statement(statement_t const *const label, 
 
 		default:
 			inner_stmt = parse_statement();
-			if (inner_stmt->kind == STATEMENT_DECLARATION) {
+			/* ISO/IEC 14882:1998(E) §6:1/§6.7  Declarations are statements */
+			if (inner_stmt->kind == STATEMENT_DECLARATION && !(c_mode & _CXX)) {
 				errorf(&inner_stmt->base.source_position, "declaration after %s", label_kind);
 			}
 			break;
