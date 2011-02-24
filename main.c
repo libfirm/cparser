@@ -1032,7 +1032,7 @@ int main(int argc, char **argv)
 				}
 			} else if (option[0] == 'W') {
 				if (option[1] == '\0') {
-					/* ignore -W, out defaults are already quiet verbose */
+					/* ignore -W, out defaults are already quite verbose */
 				} else if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
