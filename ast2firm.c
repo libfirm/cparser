@@ -1089,9 +1089,8 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 
 	if (dest_mode == mode_b) {
 		ir_node *zero = new_Const(get_mode_null(value_mode));
-		ir_node *cmp  = new_d_Cmp(dbgi, value, zero);
-		ir_node *proj = new_d_Proj(dbgi, cmp, mode_b, pn_Cmp_Lg);
-		return proj;
+		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_less_greater);
+		return cmp;
 	}
 
 	return new_d_Conv(dbgi, value, dest_mode);
@@ -2414,22 +2413,21 @@ static bool is_local_variable(expression_t *expression)
 	return entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE;
 }
 
-static pn_Cmp get_pnc(const expression_kind_t kind, type_t *const type)
+static ir_relation get_relation(const expression_kind_t kind)
 {
 	switch(kind) {
-	case EXPR_BINARY_EQUAL:         return pn_Cmp_Eq;
-	case EXPR_BINARY_ISLESSGREATER: return pn_Cmp_Lg;
-	case EXPR_BINARY_NOTEQUAL:
-		return is_type_float(skip_typeref(type)) ? pn_Cmp_Ne : pn_Cmp_Lg;
+	case EXPR_BINARY_EQUAL:         return ir_relation_equal;
+	case EXPR_BINARY_ISLESSGREATER: return ir_relation_less_greater;
+	case EXPR_BINARY_NOTEQUAL:      return ir_relation_unordered_less_greater;
 	case EXPR_BINARY_ISLESS:
-	case EXPR_BINARY_LESS:          return pn_Cmp_Lt;
+	case EXPR_BINARY_LESS:          return ir_relation_less;
 	case EXPR_BINARY_ISLESSEQUAL:
-	case EXPR_BINARY_LESSEQUAL:     return pn_Cmp_Le;
+	case EXPR_BINARY_LESSEQUAL:     return ir_relation_less_equal;
 	case EXPR_BINARY_ISGREATER:
-	case EXPR_BINARY_GREATER:       return pn_Cmp_Gt;
+	case EXPR_BINARY_GREATER:       return ir_relation_greater;
 	case EXPR_BINARY_ISGREATEREQUAL:
-	case EXPR_BINARY_GREATEREQUAL:  return pn_Cmp_Ge;
-	case EXPR_BINARY_ISUNORDERED:   return pn_Cmp_Uo;
+	case EXPR_BINARY_GREATEREQUAL:  return ir_relation_greater_equal;
+	case EXPR_BINARY_ISUNORDERED:   return ir_relation_unordered;
 
 	default:
 		break;
@@ -2455,10 +2453,8 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 	expression_t *op1 = expression->left;
 	expression_t *op2 = expression->right;
 	entity_t     *var2, *var = NULL;
-	ir_node      *res = NULL;
-	pn_Cmp        cmp_val;
-
-	cmp_val = get_pnc(expression->base.kind, op1->base.type);
+	ir_node      *res      = NULL;
+	ir_relation   relation = get_relation(expression->base.kind);
 
 	if (is_local_variable(op1) && is_local_variable(op2)) {
 		var  = op1->reference.entity;
@@ -2470,10 +2466,10 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 		ir_node *const irn1 = get_value(var->variable.v.value_number, mode);
 		ir_node *const irn2 = get_value(var2->variable.v.value_number, mode);
 
-		res = new_d_Confirm(dbi, irn2, irn1, get_inversed_pnc(cmp_val));
+		res = new_d_Confirm(dbi, irn2, irn1, get_inversed_relation(relation));
 		set_value(var2->variable.v.value_number, res);
 
-		res = new_d_Confirm(dbi, irn1, irn2, cmp_val);
+		res = new_d_Confirm(dbi, irn1, irn2, relation);
 		set_value(var->variable.v.value_number, res);
 
 		return res;
@@ -2484,7 +2480,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 		var = op1->reference.entity;
 		con = op2;
 	} else if (is_constant_expression(op1) == EXPR_CLASS_CONSTANT && is_local_variable(op2)) {
-		cmp_val = get_inversed_pnc(cmp_val);
+		relation = get_inversed_relation(relation);
 		var = op2->reference.entity;
 		con = op1;
 	}
@@ -2494,7 +2490,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 		ir_mode *const mode = get_ir_mode_storage(type);
 
 		res = get_value(var->variable.v.value_number, mode);
-		res = new_d_Confirm(dbi, res, expression_to_firm(con), cmp_val);
+		res = new_d_Confirm(dbi, res, expression_to_firm(con), relation);
 		set_value(var->variable.v.value_number, res);
 	}
 	return res;
@@ -2859,13 +2855,12 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_ISLESSEQUAL:
 	case EXPR_BINARY_ISLESSGREATER:
 	case EXPR_BINARY_ISUNORDERED: {
-		dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
-		ir_node *left  = expression_to_firm(expression->left);
-		ir_node *right = expression_to_firm(expression->right);
-		ir_node *cmp   = new_d_Cmp(dbgi, left, right);
-		long     pnc   = get_pnc(kind, expression->left->base.type);
-		ir_node *proj  = new_d_Proj(dbgi, cmp, mode_b, pnc);
-		return proj;
+		dbg_info   *dbgi     = get_dbg_info(&expression->base.source_position);
+		ir_node    *left     = expression_to_firm(expression->left);
+		ir_node    *right    = expression_to_firm(expression->right);
+		ir_relation relation = get_relation(kind);
+		ir_node    *cmp      = new_d_Cmp(dbgi, left, right, relation);
+		return cmp;
 	}
 	case EXPR_BINARY_ASSIGN: {
 		ir_node *addr  = expression_to_addr(expression->left);
