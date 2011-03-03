@@ -133,7 +133,7 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 
-	if (entity != NULL) {
+	if (entity != NULL && warning.uninitialized) {
 		warningf(&entity->base.source_position,
 		         "%s '%#T' might be used uninitialized",
 		         get_entity_kind_name(entity->kind),

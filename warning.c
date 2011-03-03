@@ -64,6 +64,7 @@ warning_t warning = {
 	.switch_default                      = false,
 	.switch_enum                         = false,
 	.traditional                         = false,
+	.uninitialized                       = true,
 	.unknown_pragmas                     = true,
 	.unreachable_code                    = false,
 	.unused_function                     = false,
@@ -113,6 +114,7 @@ void set_warning_opt(const char *const opt)
 		SET(sign_compare);
 		SET(strict_prototypes);
 		SET(switch_enum);
+		SET(uninitialized);
 		SET(unknown_pragmas);
 		SET(unreachable_code);
 		SET(unused_function);
@@ -178,6 +180,7 @@ void set_warning_opt(const char *const opt)
 	OPT("switch-default",                      switch_default);
 	OPT("switch-enum",                         switch_enum);
 	OPT("traditional",                         traditional);
+	OPT("uninitialized",                       uninitialized);
 	OPT("unknown-pragmas",                     unknown_pragmas);
 	OPT("unreachable-code",                    unreachable_code);
 	OPTX("unused") {
