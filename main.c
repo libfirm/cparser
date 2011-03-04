@@ -519,21 +519,6 @@ static void free_temp_files(void)
 	temp_files = NULL;
 }
 
-/**
- * Do the necessary lowering for compound parameters.
- */
-void lower_compound_params(void)
-{
-	lower_params_t params;
-
-	params.def_ptr_alignment    = 4;
-	params.flags                = LF_COMPOUND_RETURN | LF_RETURN_HIDDEN;
-	params.hidden_params        = ADD_HIDDEN_ALWAYS_IN_FRONT;
-	params.find_pointer_type    = NULL;
-	params.ret_compound_in_regs = NULL;
-	lower_calls_with_compounds(&params);
-}
-
 typedef enum compile_mode_t {
 	BenchmarkParser,
 	PreprocessOnly,

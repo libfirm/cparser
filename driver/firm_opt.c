@@ -718,9 +718,6 @@ void gen_firm_finish(FILE *out, const char *input_filename,
 		do_irg_opt(irg, "control-flow");
 	}
 
-	/* lower all compound call return values */
-	lower_compound_params();
-
 	/* lower copyb nodes */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);

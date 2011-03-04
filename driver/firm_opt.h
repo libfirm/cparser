@@ -95,9 +95,6 @@ extern ir_entity_ptr rts_entities[rts_max];
 /** Debug printf implementation. */
 extern void dbg_printf(const char *fmt, ...);
 
-/** Do the necessary lowering for compound parameters. */
-extern void lower_compound_params(void);
-
 /** Initialize for the Firm-generating back end. */
 void gen_firm_init(void);
 
