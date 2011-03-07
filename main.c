@@ -1108,13 +1108,11 @@ int main(int argc, char **argv)
 					fprintf(stderr, "error: software floatingpoint not supported yet\n");
 					argument_errors = true;
 				} else {
-					char *endptr;
-					long int value = strtol(opt, &endptr, 10);
-					if (*endptr != '\0') {
+					long int value = strtol(opt, NULL, 10);
+					if (value == 0) {
 						fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
 						argument_errors = true;
-					}
-					if (value != 16 && value != 32 && value != 64) {
+					} else if (value != 16 && value != 32 && value != 64) {
 						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
 						argument_errors = true;
 					} else {
