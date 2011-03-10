@@ -6,6 +6,8 @@ FIRM_HOME   = libfirm
 FIRM_CPPFLAGS = -I$(FIRM_HOME)/include
 FIRM_LIBS   = -lm
 LIBFIRM_FILE = build/debug/libfirm.a
+FIRM_VERSION = 1.19.1
+FIRM_URL = http://downloads.sourceforge.net/project/libfirm/libfirm/$(FIRM_VERSION)/libfirm-$(FIRM_VERSION).tar.bz2?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flibfirm%2Ffiles%2Flibfirm%2F&ts=1299786346&use_mirror=ignum
 
 CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CPPFLAGS)
@@ -65,7 +67,7 @@ Q = @
 
 all: $(GOAL)
 
-.PHONY: all clean bootstrap bootstrap2
+.PHONY: all clean bootstrap bootstrap2 $(FIRM_HOME)/$(LIBFIRM_FILE)
 
 ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
@@ -97,6 +99,12 @@ DIRS = build build/adt build/driver build/wrappergen build/cpb build/cpb/adt bui
 UNUSED := $(shell mkdir -p $(DIRS))
 
 $(FIRM_HOME)/$(LIBFIRM_FILE):
+ifeq "$(wildcard $(FIRM_HOME) )" ""
+	@echo 'Download and extract libfirm tarball ...'
+	$(Q)curl -s -L "${FIRM_URL}" -o "libfirm-$(FIRM_VERSION).tar.bz2"
+	$(Q)tar xf "libfirm-$(FIRM_VERSION).tar.bz2"
+	$(Q)mv "libfirm-$(FIRM_VERSION)" libfirm
+endif
 	cd libfirm && $(MAKE) $(LIBFIRM_FILE)
 
 $(GOAL): $(FIRM_HOME)/$(LIBFIRM_FILE) $(OBJECTS)
