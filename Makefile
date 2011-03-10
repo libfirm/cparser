@@ -1,14 +1,14 @@
--include config.mak
-
 GOAL = $(BUILDDIR)/cparser
 
 BUILDDIR ?= build
 
-FIRM_CFLAGS ?= `pkg-config --cflags libfirm`
-FIRM_LIBS   ?= `pkg-config --libs libfirm`
+FIRM_HOME   = libfirm
+FIRM_CPPFLAGS = -I$(FIRM_HOME)/include
+FIRM_LIBS   = -lm
+LIBFIRM_FILE = build/debug/libfirm.a
 
 CPPFLAGS  = -I.
-CPPFLAGS += $(FIRM_CFLAGS)
+CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
 CFLAGS += -O2 -g
@@ -36,6 +36,7 @@ SOURCES := \
 	entity.c \
 	entitymap.c \
 	format_check.c \
+	input.c \
 	lexer.c \
 	main.c \
 	mangle.c \
@@ -46,8 +47,9 @@ SOURCES := \
 	type.c \
 	type_hash.c \
 	types.c \
-	walk_statements.c \
+	help.c \
 	warning.c \
+	walk.c \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c
 
@@ -94,9 +96,12 @@ revision.h:
 DIRS = build build/adt build/driver build/wrappergen build/cpb build/cpb/adt build/cpb/driver build/cpb/wrappergen build/cpb2 build/cpb2/adt build/cpb2/driver build/cpb2/wrappergen build/cpbe build/cpbe/adt build/cpbe/driver build/cpbe2/wrappergen
 UNUSED := $(shell mkdir -p $(DIRS))
 
-$(GOAL): $(OBJECTS) $(LIBFIRM_FILE)
+$(FIRM_HOME)/$(LIBFIRM_FILE):
+	cd libfirm && $(MAKE) $(LIBFIRM_FILE)
+
+$(GOAL): $(FIRM_HOME)/$(LIBFIRM_FILE) $(OBJECTS)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(OBJECTS) $(LFLAGS) -o $(GOAL)
+	$(Q)$(CC) $(OBJECTS) $(LFLAGS) $(FIRM_HOME)/$(LIBFIRM_FILE) -o $(GOAL)
 
 splint: $(SPLINTS)
 

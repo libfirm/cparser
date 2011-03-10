@@ -1,0 +1,3 @@
+[submodule "libfirm"]
+	path = libfirm
+	url = http://pp.info.uni-karlsruhe.de/cgi-bin/cgit.cgi/libFirm/
