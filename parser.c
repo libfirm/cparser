@@ -8265,6 +8265,30 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	expression->base.type = arithmetic_type;
 }
 
+static void semantic_binexpr_integer(binary_expression_t *const expression)
+{
+	expression_t *const left            = expression->left;
+	expression_t *const right           = expression->right;
+	type_t       *const orig_type_left  = left->base.type;
+	type_t       *const orig_type_right = right->base.type;
+	type_t       *const type_left       = skip_typeref(orig_type_left);
+	type_t       *const type_right      = skip_typeref(orig_type_right);
+
+	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
+		/* TODO: improve error message */
+		if (is_type_valid(type_left) && is_type_valid(type_right)) {
+			errorf(&expression->base.source_position,
+			       "operation needs integer types");
+		}
+		return;
+	}
+
+	type_t *const result_type = semantic_arithmetic(type_left, type_right);
+	expression->left      = create_implicit_cast(left, result_type);
+	expression->right     = create_implicit_cast(right, result_type);
+	expression->base.type = result_type;
+}
+
 static void warn_div_by_zero(binary_expression_t const *const expression)
 {
 	if (!warning.div_by_zero ||
@@ -8966,9 +8990,9 @@ CREATE_BINEXPR_PARSER(T_LESSEQUAL,            EXPR_BINARY_LESSEQUAL,          PR
 CREATE_BINEXPR_PARSER(T_GREATEREQUAL,         EXPR_BINARY_GREATEREQUAL,       PREC_SHIFT,          semantic_comparison)
 CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, EXPR_BINARY_NOTEQUAL,           PREC_RELATIONAL,     semantic_comparison)
 CREATE_BINEXPR_PARSER(T_EQUALEQUAL,           EXPR_BINARY_EQUAL,              PREC_RELATIONAL,     semantic_comparison)
-CREATE_BINEXPR_PARSER('&',                    EXPR_BINARY_BITWISE_AND,        PREC_EQUALITY,       semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('^',                    EXPR_BINARY_BITWISE_XOR,        PREC_AND,            semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('|',                    EXPR_BINARY_BITWISE_OR,         PREC_XOR,            semantic_binexpr_arithmetic)
+CREATE_BINEXPR_PARSER('&',                    EXPR_BINARY_BITWISE_AND,        PREC_EQUALITY,       semantic_binexpr_integer)
+CREATE_BINEXPR_PARSER('^',                    EXPR_BINARY_BITWISE_XOR,        PREC_AND,            semantic_binexpr_integer)
+CREATE_BINEXPR_PARSER('|',                    EXPR_BINARY_BITWISE_OR,         PREC_XOR,            semantic_binexpr_integer)
 CREATE_BINEXPR_PARSER(T_ANDAND,               EXPR_BINARY_LOGICAL_AND,        PREC_OR,             semantic_logical_op)
 CREATE_BINEXPR_PARSER(T_PIPEPIPE,             EXPR_BINARY_LOGICAL_OR,         PREC_LOGICAL_AND,    semantic_logical_op)
 CREATE_BINEXPR_PARSER('=',                    EXPR_BINARY_ASSIGN,             PREC_ASSIGNMENT,     semantic_binexpr_assign)
