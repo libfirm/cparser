@@ -932,6 +932,10 @@ int main(int argc, char **argv)
 				add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pipe")) {
 				/* here for gcc compatibility */
+			} else if (streq(option, "static")) {
+				add_flag(&ldflags_obst, "-static");
+			} else if (streq(option, "shared")) {
+				add_flag(&ldflags_obst, "-shared");
 			} else if (option[0] == 'f') {
 				char const *orig_opt;
 				GET_ARG_AFTER(orig_opt, "-f");
