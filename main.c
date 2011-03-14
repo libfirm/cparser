@@ -83,21 +83,21 @@
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
-#define PREPROCESSOR "gcc -E -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__"
 #else
-#define PREPROCESSOR "cpp -m32 -U__STRICT_ANSI__"
+#define PREPROCESSOR "cpp -U__STRICT_ANSI__"
 #endif
 #endif
 
 #ifndef LINKER
-#define LINKER    "gcc -m32"
+#define LINKER    "gcc"
 #endif
 
 #ifndef ASSEMBLER
 #ifdef __APPLE__
-#define ASSEMBLER "gcc -m32 -c -xassembler"
+#define ASSEMBLER "gcc -c -xassembler"
 #else
-#define ASSEMBLER "as --32"
+#define ASSEMBLER "as"
 #endif
 #endif
 
@@ -121,7 +121,9 @@ extern bool print_parenthesis;
 
 static const char     *target_triple;
 static int             verbose;
-static struct obstack  cppflags_obst, ldflags_obst;
+static struct obstack  cppflags_obst;
+static struct obstack  ldflags_obst;
+static struct obstack  asflags_obst;
 static char            dep_target[1024];
 static const char     *outname;
 
@@ -335,56 +337,52 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		}
 	}
 	add_flag(&cppflags_obst, fname);
-
 	obstack_1grow(&cppflags_obst, '\0');
-	char *buf = obstack_finish(&cppflags_obst);
-	if (verbose) {
-		puts(buf);
-	}
 
-	FILE *f = popen(buf, "r");
+	char *commandline = obstack_finish(&cppflags_obst);
+	if (verbose) {
+		puts(commandline);
+	}
+	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(EXIT_FAILURE);
 	}
-
 	/* we don't really need that anymore */
-	obstack_free(&cppflags_obst, buf);
+	obstack_free(&cppflags_obst, commandline);
 
 	return f;
 }
 
 static void assemble(const char *out, const char *in)
 {
-	struct obstack asflags_obst;
-	char *buf;
-
-	obstack_init(&asflags_obst);
+	obstack_1grow(&asflags_obst, '\0');
+	const char *flags = obstack_finish(&asflags_obst);
 
 	const char *assembler = getenv("CPARSER_AS");
 	if (assembler != NULL) {
-		obstack_printf(&asflags_obst, "%s ", assembler);
+		obstack_printf(&asflags_obst, "%s", assembler);
 	} else {
 		if (target_triple != NULL)
 			obstack_printf(&asflags_obst, "%s-", target_triple);
-		obstack_printf(&asflags_obst, "%s ", ASSEMBLER);
+		obstack_printf(&asflags_obst, "%s", ASSEMBLER);
 	}
+	if (flags[0] != '\0')
+		obstack_printf(&asflags_obst, " %s", flags);
 
-	obstack_printf(&asflags_obst, "%s -o %s", in, out);
+	obstack_printf(&asflags_obst, " %s -o %s", in, out);
 	obstack_1grow(&asflags_obst, '\0');
-	buf = obstack_finish(&asflags_obst);
 
+	char *commandline = obstack_finish(&asflags_obst);
 	if (verbose) {
-		puts(buf);
+		puts(commandline);
 	}
-
-	int err = system(buf);
-	if (err != 0) {
+	int err = system(commandline);
+	if (err != EXIT_SUCCESS) {
 		fprintf(stderr, "assembler reported an error\n");
 		exit(EXIT_FAILURE);
 	}
-
-	obstack_free(&asflags_obst, NULL);
+	obstack_free(&asflags_obst, commandline);
 }
 
 static void print_file_name(const char *file)
@@ -408,7 +406,6 @@ static void print_file_name(const char *file)
 	obstack_1grow(&ldflags_obst, '\0');
 
 	char *commandline = obstack_finish(&ldflags_obst);
-
 	if (verbose) {
 		puts(commandline);
 	}
@@ -417,6 +414,7 @@ static void print_file_name(const char *file)
 		fprintf(stderr, "linker reported an error\n");
 		exit(EXIT_FAILURE);
 	}
+	obstack_free(&ldflags_obst, commandline);
 }
 
 static const char *try_dir(const char *dir)
@@ -764,6 +762,7 @@ int main(int argc, char **argv)
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
+	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
 
 #define GET_ARG_AFTER(def, args)                                             \
@@ -1121,6 +1120,8 @@ int main(int argc, char **argv)
 						argument_errors = true;
 					} else {
 						machine_size = (unsigned int)value;
+						add_flag(&asflags_obst, "--%u", machine_size);
+						add_flag(&ldflags_obst, "-m%u", machine_size);
 					}
 				}
 			} else if (streq(option, "pg")) {
@@ -1699,6 +1700,7 @@ graph_built:
 
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
+	obstack_free(&asflags_obst, NULL);
 	obstack_free(&file_obst, NULL);
 
 	exit_mangle();
