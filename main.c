@@ -74,7 +74,6 @@
 #include "driver/firm_timing.h"
 #include "adt/error.h"
 #include "wrappergen/write_fluffy.h"
-#include "wrappergen/write_caml.h"
 #include "wrappergen/write_jna.h"
 #include "revision.h"
 #include "warning.h"
@@ -529,7 +528,6 @@ typedef enum compile_mode_t {
 	LexTest,
 	PrintAst,
 	PrintFluffy,
-	PrintCaml,
 	PrintJna
 } compile_mode_t;
 
@@ -1182,8 +1180,6 @@ int main(int argc, char **argv)
 					print_parenthesis = true;
 				} else if (streq(option, "print-fluffy")) {
 					mode = PrintFluffy;
-				} else if (streq(option, "print-caml")) {
-					mode = PrintCaml;
 				} else if (streq(option, "print-jna")) {
 					mode = PrintJna;
 				} else if (streq(option, "jna-limit")) {
@@ -1338,7 +1334,6 @@ int main(int argc, char **argv)
 		case BenchmarkParser:
 		case PrintAst:
 		case PrintFluffy:
-		case PrintCaml:
 		case PrintJna:
 		case LexTest:
 		case PreprocessOnly:
@@ -1537,9 +1532,6 @@ do_parsing:
 				return result;
 			} else if (mode == PrintFluffy) {
 				write_fluffy_decls(out, unit);
-				continue;
-			} else if (mode == PrintCaml) {
-				write_caml_decls(out, unit);
 				continue;
 			} else if (mode == PrintJna) {
 				write_jna_decls(out, unit);
