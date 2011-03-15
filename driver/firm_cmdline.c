@@ -71,7 +71,7 @@ struct a_firm_be_opt firm_be_opt = {
   /* node_stat = */ 0,
 };
 
-#define X(a)	a, sizeof(a)-1
+#define X(a)  a, sizeof(a)-1
 
 /** Parameter description structure */
 static const struct params {

@@ -2517,7 +2517,7 @@ static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression)
 	}
 }
 
-static ir_node *create_cast(dbg_info *dbgi,	ir_node *value_node,
+static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
                             type_t *from_type, type_t *type)
 {
 	type = skip_typeref(type);
@@ -5504,13 +5504,13 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 	}
 }
 
-static void	ms_try_statement_to_firm(ms_try_statement_t *statement)
+static void ms_try_statement_to_firm(ms_try_statement_t *statement)
 {
 	statement_to_firm(statement->try_statement);
 	warningf(&statement->base.source_position, "structured exception handling ignored");
 }
 
-static void	leave_statement_to_firm(leave_statement_t *statement)
+static void leave_statement_to_firm(leave_statement_t *statement)
 {
 	errorf(&statement->base.source_position, "__leave not supported yet");
 }

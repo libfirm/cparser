@@ -43,7 +43,7 @@ static const char *get_atomic_type_string(const atomic_type_kind_t type)
 	case ATOMIC_TYPE_CHAR:        return "byte";
 	case ATOMIC_TYPE_SCHAR:       return "byte";
 	case ATOMIC_TYPE_UCHAR:       return "unsigned byte";
-	case ATOMIC_TYPE_SHORT:	      return "short";
+	case ATOMIC_TYPE_SHORT:       return "short";
 	case ATOMIC_TYPE_USHORT:      return "unsigned short";
 	case ATOMIC_TYPE_INT:         return "int";
 	case ATOMIC_TYPE_UINT:        return "unsigned int";

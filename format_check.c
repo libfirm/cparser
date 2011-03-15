@@ -496,7 +496,7 @@ eval_fmt_mod_unsigned:
 			return -1;
 		}
 
-		{	/* create a scope here to prevent warning about the jump to next_arg */
+		{ /* create a scope here to prevent warning about the jump to next_arg */
 			type_t *const arg_type           = arg->expression->base.type;
 			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);
@@ -830,7 +830,7 @@ static void check_scanf_format(const call_argument_t *arg,
 			return;
 		}
 
-		{	/* create a scope here to prevent warning about the jump to next_arg */
+		{ /* create a scope here to prevent warning about the jump to next_arg */
 			type_t *const arg_type           = arg->expression->base.type;
 			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);

@@ -34,9 +34,9 @@
  *
  * @note This uses the fact, that double case labels are not allowed.
  */
-#define COMPILETIME_ASSERT(x, name)	\
+#define COMPILETIME_ASSERT(x, name) \
 	static __attribute__((unused)) void compiletime_assert_##name (int h) { \
-		switch(h) { case 0:	case (x): {} } \
+		switch(h) { case 0: case (x): {} } \
 	}
 
 /**

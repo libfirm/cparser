@@ -4000,7 +4000,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		storage_class_t storage_class = specifiers->storage_class;
 		entity->declaration.declared_storage_class = storage_class;
 
-		if (storage_class == STORAGE_CLASS_NONE	&& current_function != NULL)
+		if (storage_class == STORAGE_CLASS_NONE && current_function != NULL)
 			storage_class = STORAGE_CLASS_AUTO;
 		entity->declaration.storage_class = storage_class;
 	}
@@ -4264,7 +4264,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			} else {
 				unsigned old_storage_class = prev_decl->storage_class;
 
-				if (warning.redundant_decls	          &&
+				if (warning.redundant_decls               &&
 						is_definition                     &&
 						!prev_decl->used                  &&
 						!(prev_decl->modifiers & DM_USED) &&
@@ -7431,8 +7431,8 @@ static void check_call_argument(type_t          *expected_type,
 		/* report exact scope in error messages (like "in argument 3") */
 		char buf[64];
 		snprintf(buf, sizeof(buf), "call argument %u", pos);
-		report_assign_error(error, expected_type, arg_expr,	buf,
-							&arg_expr->base.source_position);
+		report_assign_error(error, expected_type, arg_expr, buf,
+		                    &arg_expr->base.source_position);
 	} else if (warning.traditional || warning.conversion) {
 		type_t *const promoted_type = get_default_promoted_type(arg_type);
 		if (!types_compatible(expected_type_skip, promoted_type) &&
@@ -8083,8 +8083,8 @@ static void set_address_taken(expression_t *expression, bool may_be_register)
 	if (entity->declaration.storage_class == STORAGE_CLASS_REGISTER
 			&& !may_be_register) {
 		errorf(&expression->base.source_position,
-				"address of register %s '%Y' requested",
-				get_entity_kind_name(entity->kind),	entity->base.symbol);
+		       "address of register %s '%Y' requested",
+		       get_entity_kind_name(entity->kind), entity->base.symbol);
 	}
 
 	if (entity->kind == ENTITY_VARIABLE) {
@@ -9083,7 +9083,7 @@ static void register_expression_parser(parse_expression_function parser,
  * @param precedence  the precedence of the operator
  */
 static void register_infix_parser(parse_expression_infix_function parser,
-		int token_type,	precedence_t precedence)
+                                  int token_type, precedence_t precedence)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_type];
 
@@ -10035,13 +10035,13 @@ static statement_t *parse_return(void)
 			}
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
-			report_assign_error(error, return_type,	return_value, "'return'",
-					pos);
+			report_assign_error(error, return_type, return_value, "'return'",
+			                    pos);
 		}
 		return_value = create_implicit_cast(return_value, return_type);
 		/* check for returning address of a local var */
 		if (warning.other && return_value != NULL
-				&& return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
+		    && return_value->base.kind == EXPR_UNARY_TAKE_ADDRESS) {
 			const expression_t *expression = return_value->unary.value;
 			if (expression_is_local_variable(expression)) {
 				warningf(pos, "function returns address of local variable");
@@ -10051,10 +10051,10 @@ static statement_t *parse_return(void)
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
 		if (c_mode & _CXX || strict_mode) {
 			errorf(pos,
-					"'return' without value, in function returning non-void");
+			       "'return' without value, in function returning non-void");
 		} else {
 			warningf(pos,
-					"'return' without value, in function returning non-void");
+			         "'return' without value, in function returning non-void");
 		}
 	}
 	statement->returns.value = return_value;
