@@ -396,6 +396,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("invert-loops", true);
 	set_opt_enabled("target-lowering", true);
 	set_opt_enabled("rts", true);
+	set_opt_enabled("parallelize-mem", true);
 }
 
 /**
