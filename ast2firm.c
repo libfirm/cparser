@@ -91,7 +91,6 @@ static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
 static trampoline_region  *current_trampolines;
 static ir_type            *current_outer_frame;
-static ir_type            *current_outer_value_type;
 static ir_node            *current_static_link;
 
 static entitymap_t  entitymap;
@@ -1497,7 +1496,7 @@ static ir_node *get_local_frame(ir_entity *const ent)
 {
 	ir_graph      *const irg   = current_ir_graph;
 	const ir_type *const owner = get_entity_owner(ent);
-	if (owner == current_outer_frame || owner == current_outer_value_type) {
+	if (owner == current_outer_frame) {
 		assert(current_static_link != NULL);
 		return current_static_link;
 	} else {
@@ -3375,15 +3374,19 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 static ir_node *va_start_expression_to_firm(
 	const va_start_expression_t *const expr)
 {
+	ir_graph  *const irg         = current_ir_graph;
 	type_t    *const type        = current_function_entity->declaration.type;
 	ir_type   *const method_type = get_ir_type(type);
-	int        const n           = get_method_n_params(method_type) - 1;
-	ir_entity *const parm_ent    = get_method_value_param_ent(method_type, n);
-	ir_node   *const frame       = get_irg_frame(current_ir_graph);
+	size_t     const n           = get_method_n_params(method_type) - 1;
+	ir_type   *frame_type        = get_irg_frame_type(irg);
+	ir_type   *param_irtype      = get_method_param_type(method_type, n);
+	ir_entity *const param_ent   =
+		new_parameter_entity(frame_type, n, param_irtype);
+	ir_node   *const frame       = get_irg_frame(irg);
 	dbg_info  *const dbgi        = get_dbg_info(&expr->base.source_position);
 	ir_node   *const no_mem      = new_NoMem();
 	ir_node   *const arg_sel     =
-		new_d_simpleSel(dbgi, no_mem, frame, parm_ent);
+		new_d_simpleSel(dbgi, no_mem, frame, param_ent);
 
 	type_t    *const param_type  = expr->parameter->base.type;
 	ir_node   *const cnst        = get_type_size_node(param_type);
@@ -5624,16 +5627,23 @@ static void initialize_function_parameters(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	ir_graph *irg             = current_ir_graph;
 	ir_node  *args            = get_irg_args(irg);
-	ir_type  *function_irtype = get_ir_type(entity->declaration.type);
-	int      first_param_nr   = 0;
+	int       n               = 0;
+	ir_type  *function_irtype;
 
 	if (entity->function.need_closure) {
 		/* add an extra parameter for the static link */
 		entity->function.static_link = new_r_Proj(args, mode_P_data, 0);
-		++first_param_nr;
+		++n;
+
+		/* Matze: IMO this is wrong, nested functions should have an own
+		 * type and not rely on strange parameters... */
+		function_irtype = create_method_type(&entity->declaration.type->function, true);
+	} else {
+		function_irtype = get_ir_type(entity->declaration.type);
 	}
 
-	int       n         = 0;
+
+
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
 		if (parameter->kind != ENTITY_PARAMETER)
@@ -5648,22 +5658,20 @@ static void initialize_function_parameters(entity_t *entity)
 			needs_entity = true;
 		}
 
+		ir_type *param_irtype = get_method_param_type(function_irtype, n);
 		if (needs_entity) {
-			ir_entity *param = get_method_value_param_ent(function_irtype, n);
-			ident     *id    = new_id_from_str(parameter->base.symbol->string);
-			set_entity_ident(param, id);
-
+			ir_type   *frame_type = get_irg_frame_type(irg);
+			ir_entity *param
+				= new_parameter_entity(frame_type, n, param_irtype);
 			parameter->declaration.kind
 				= DECLARATION_KIND_PARAMETER_ENTITY;
 			parameter->parameter.v.entity = param;
 			continue;
 		}
 
-		ir_type *param_irtype = get_method_param_type(function_irtype, n);
-		ir_mode *param_mode   = get_type_mode(param_irtype);
-
-		long     pn    = n + first_param_nr;
-		ir_node *value = new_r_Proj(args, param_mode, pn);
+		ir_mode *param_mode = get_type_mode(param_irtype);
+		long     pn         = n;
+		ir_node *value      = new_r_Proj(args, param_mode, pn);
 
 		ir_mode *mode = get_ir_mode_storage(type);
 		value = create_conv(NULL, value, mode);
@@ -5913,14 +5921,11 @@ static void create_function(entity_t *entity)
 	if (inner != NULL) {
 		ir_type *rem_outer_frame      = current_outer_frame;
 		current_outer_frame           = get_irg_frame_type(current_ir_graph);
-		ir_type *rem_outer_value_type = current_outer_value_type;
-		current_outer_value_type      = get_irg_value_param_type(current_ir_graph);
 		for (int i = ARR_LEN(inner) - 1; i >= 0; --i) {
 			create_function(inner[i]);
 		}
 		DEL_ARR_F(inner);
 
-		current_outer_value_type = rem_outer_value_type;
 		current_outer_frame      = rem_outer_frame;
 	}
 }
