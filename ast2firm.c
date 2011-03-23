@@ -1068,16 +1068,14 @@ entity_created:
  * Creates a SymConst for a given entity.
  *
  * @param dbgi    debug info
- * @param mode    the (reference) mode for the SymConst
  * @param entity  the entity
  */
-static ir_node *create_symconst(dbg_info *dbgi, ir_mode *mode,
-                                ir_entity *entity)
+static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 {
 	assert(entity != NULL);
 	union symconst_symbol sym;
 	sym.entity_p = entity;
-	return new_d_SymConst(dbgi, mode, sym, symconst_addr_ent);
+	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -1139,7 +1137,7 @@ static ir_node *wide_string_literal_to_firm(
 	}
 	set_entity_initializer(entity, initializer);
 
-	return create_symconst(dbgi, mode_P_data, entity);
+	return create_symconst(dbgi, entity);
 }
 
 /**
@@ -1182,7 +1180,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	}
 	set_entity_initializer(entity, initializer);
 
-	return create_symconst(dbgi, mode_P_data, entity);
+	return create_symconst(dbgi, entity);
 }
 
 static bool try_create_integer(literal_expression_t *literal,
@@ -1422,7 +1420,7 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 	assert(entity != NULL);
 	ir_node *in[3];
 	in[0] = get_trampoline_region(dbgi, entity);
-	in[1] = create_symconst(dbgi, mode, entity);
+	in[1] = create_symconst(dbgi, entity);
 	in[2] = get_irg_frame(current_ir_graph);
 
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
@@ -1485,25 +1483,6 @@ static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
 
 	/* otherwise create a new one */
 	return new_d_strictConv(dbgi, node, mode);
-}
-
-/**
- * Returns the address of a global variable.
- *
- * @param dbgi      debug info
- * @param variable  the variable
- */
-static ir_node *get_global_var_address(dbg_info *const dbgi,
-                                       const variable_t *const variable)
-{
-	ir_entity *const irentity = variable->v.entity;
-	if (variable->thread_local) {
-		ir_node *const no_mem = new_NoMem();
-		ir_node *const tls    = get_irg_tls(current_ir_graph);
-		return new_d_simpleSel(dbgi, no_mem, tls, irentity);
-	} else {
-		return create_symconst(dbgi, mode_P_data, irentity);
-	}
 }
 
 /**
@@ -1590,14 +1569,13 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
 	}
 	case DECLARATION_KIND_FUNCTION: {
-		ir_mode *const mode = get_ir_mode_storage(type);
-		return create_symconst(dbgi, mode, entity->function.irentity);
+		return create_symconst(dbgi, entity->function.irentity);
 	}
 	case DECLARATION_KIND_INNER_FUNCTION: {
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
 			/* inner function not using the closure */
-			return create_symconst(dbgi, mode, entity->function.irentity);
+			return create_symconst(dbgi, entity->function.irentity);
 		} else {
 			/* need trampoline here */
 			return create_trampoline(dbgi, mode, entity->function.irentity);
@@ -1605,7 +1583,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
 		const variable_t *variable = &entity->variable;
-		ir_node *const addr = get_global_var_address(dbgi, variable);
+		ir_node *const addr = create_symconst(dbgi, variable->v.entity);
 		return deref_address(dbgi, variable->base.type, addr);
 	}
 
@@ -1647,7 +1625,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		 * as an indicator for no real address) */
 		return NULL;
 	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		ir_node *const addr = get_global_var_address(dbgi, &entity->variable);
+		ir_node *const addr = create_symconst(dbgi, entity->variable.v.entity);
 		return addr;
 	}
 	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
@@ -1669,9 +1647,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		return entity->variable.v.vla_base;
 
 	case DECLARATION_KIND_FUNCTION: {
-		type_t  *const type = skip_typeref(entity->declaration.type);
-		ir_mode *const mode = get_ir_mode_storage(type);
-		return create_symconst(dbgi, mode, entity->function.irentity);
+		return create_symconst(dbgi, entity->function.irentity);
 	}
 
 	case DECLARATION_KIND_INNER_FUNCTION: {
@@ -1679,7 +1655,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
 			/* inner function not using the closure */
-			return create_symconst(dbgi, mode, entity->function.irentity);
+			return create_symconst(dbgi, entity->function.irentity);
 		} else {
 			/* need trampoline here */
 			return create_trampoline(dbgi, mode, entity->function.irentity);
@@ -2540,12 +2516,12 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 		const variable_t *to_var   = type->pointer.base_variable;
 		if (from_var != to_var) {
 			if (from_var != NULL) {
-				ir_node *const addr = get_global_var_address(dbgi, from_var);
+				ir_node *const addr = create_symconst(dbgi, from_var->v.entity);
 				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
 				value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
 			}
 			if (to_var != NULL) {
-				ir_node *const addr = get_global_var_address(dbgi, to_var);
+				ir_node *const addr = create_symconst(dbgi, to_var->v.entity);
 				ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
 				value_node = new_d_Sub(dbgi, value_node, base, mode);
 			}
@@ -2603,7 +2579,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		/* check for __based */
 		const variable_t *const base_var = value_type->pointer.base_variable;
 		if (base_var != NULL) {
-			ir_node *const addr = get_global_var_address(dbgi, base_var);
+			ir_node *const addr = create_symconst(dbgi, base_var->v.entity);
 			ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
 			value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(value_type));
 		}
@@ -4435,7 +4411,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 
 	set_entity_initializer(init_entity, irinitializer);
 
-	ir_node *const src_addr = create_symconst(dbgi, mode_P_data, init_entity);
+	ir_node *const src_addr = create_symconst(dbgi, init_entity);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
