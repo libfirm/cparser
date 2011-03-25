@@ -157,14 +157,6 @@ static void do_optimize_funccalls(void)
 	optimize_funccalls(firm_const_exists, NULL);
 }
 
-static void do_gcse(ir_graph *irg)
-{
-	set_opt_global_cse(1);
-	optimize_graph_df(irg);
-	place_code(irg);
-	set_opt_global_cse(0);
-}
-
 static void do_lower_highlevel(ir_graph *irg)
 {
 	lower_highlevel_graph(irg, firm_opt.lower_bitfields);
@@ -245,7 +237,6 @@ static opt_config_t opts[] = {
 	IRG("deconv",            conv_opt,                 "conv node elimination",                                 OPT_FLAG_NONE),
 	IRG("fp-vrp",            fixpoint_vrp,             "fixpoint value range propagation",                      OPT_FLAG_NONE),
 	IRG("frame",             opt_frame_irg,            "remove unused frame entities",                          OPT_FLAG_NONE),
-	IRG("gcse",              do_gcse,                  "global common subexpression elimination",               OPT_FLAG_NONE),
 	IRG("gvn-pre",           do_gvn_pre,               "global value numbering partial redundancy elimination", OPT_FLAG_NONE),
 	IRG("if-conversion",     opt_if_conv,              "if-conversion",                                         OPT_FLAG_NONE),
 	IRG("invert-loops",      do_loop_inversion,        "loop inversion",                                        OPT_FLAG_NONE),
@@ -420,8 +411,6 @@ static void do_firm_optimizations(const char *input_filename)
 	set_irp_memory_disambiguator_options(aa_opt);
 
 	/* parameter passing code should set them directly sometime... */
-	set_opt_enabled("gcse", firm_opt.gcse);
-	set_opt_enabled("place", !firm_opt.gcse);
 	set_opt_enabled("confirm", firm_opt.confirm);
 	set_opt_enabled("remove-confirms", firm_opt.confirm);
 
@@ -458,7 +447,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "reassociation");
 		do_irg_opt(irg, "local");
-		do_irg_opt(irg, "gcse");
+		do_irg_opt(irg, "place");
 
 		if (firm_opt.confirm) {
 			/* Confirm construction currently can only handle blocks with only
@@ -562,7 +551,7 @@ static void do_firm_lowering(const char *input_filename)
 			ir_graph *irg = get_irp_irg(i);
 
 			do_irg_opt(irg, "local");
-			do_irg_opt(irg, "gcse");
+			do_irg_opt(irg, "place");
 			do_irg_opt(irg, "control-flow");
 			do_irg_opt(irg, "opt-load-store");
 			do_irg_opt(irg, "local");

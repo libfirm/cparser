@@ -19,7 +19,6 @@ struct a_firm_opt firm_opt = {
   /* debug_mode      = */ DBG_MODE_NONE,
   /* const_folding   = */ TRUE,
   /* cse             = */ TRUE,
-  /* gcse            = */ TRUE,
   /* confirm         = */ TRUE,
   /* muls            = */ TRUE,
   /* divs            = */ TRUE,
@@ -93,8 +92,6 @@ static const struct params {
   { X("no-cse"),                 &firm_opt.cse,              0, "firm: disable common subexpression elimination" },
   { X("const-fold"),             &firm_opt.const_folding,    1, "firm: enable constant folding" },
   { X("no-const-fold"),          &firm_opt.const_folding,    0, "firm: disable constant folding" },
-  { X("gcse"),                   &firm_opt.gcse,             1, "firm: enable global common subexpression elimination" },
-  { X("no-gcse"),                &firm_opt.gcse,             0, "firm: disable global common subexpression elimination" },
   { X("inline-max-size=<size>"), NULL,                       0, "firm: set maximum size for function inlining" },
   { X("inline-threshold=<size>"),NULL,                       0, "firm: set benefice threshold for function inlining" },
   { X("confirm"),                &firm_opt.confirm,          1, "firm: enable Confirm optimization" },
@@ -192,7 +189,6 @@ static void set_dump_filter(const char *filter)
 /** Disable all optimizations. */
 static void disable_opts(void) {
   firm_opt.cse             = FALSE;
-  firm_opt.gcse            = FALSE;
   firm_opt.confirm         = FALSE;
   firm_opt.muls            = FALSE;
   firm_opt.divs            = FALSE;
