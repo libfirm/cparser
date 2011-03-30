@@ -185,9 +185,11 @@ static void do_lower_mux(ir_graph *irg)
 	lower_mux(irg, NULL);
 }
 
-static void do_vrp(ir_graph *irg)
+static void do_gcse(ir_graph *irg)
 {
-	set_vrp_data(irg);
+	set_opt_global_cse(1);
+	optimize_graph_df(irg);
+	set_opt_global_cse(0);
 }
 
 typedef enum opt_target {
@@ -241,6 +243,7 @@ static opt_config_t opts[] = {
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
 	IRG("opt-tail-rec",      opt_tail_rec_irg,         "tail-recursion eliminiation",                           OPT_FLAG_NONE),
 	IRG("parallelize-mem",   opt_parallelize_mem,      "parallelize memory",                                    OPT_FLAG_NONE),
+	IRG("gcse",              do_gcse,                  "global common subexpression eliminiation",              OPT_FLAG_NONE),
 	IRG("place",             place_code,               "code placement",                                        OPT_FLAG_NONE),
 	IRG("reassociation",     optimize_reassociation,   "reassociation",                                         OPT_FLAG_NONE),
 	IRG("remove-confirms",   remove_confirms,          "confirm removal",                                       OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
@@ -249,7 +252,7 @@ static opt_config_t opts[] = {
 	IRG("shape-blocks",      shape_blocks,             "block shaping",                                         OPT_FLAG_NONE),
 	IRG("thread-jumps",      opt_jumpthreading,        "path-sensitive jumpthreading",                          OPT_FLAG_NONE),
 	IRG("unroll-loops",      do_loop_unrolling,        "loop unrolling",                                        OPT_FLAG_NONE),
-	IRG("vrp",               do_vrp,                   "value range propagation",                               OPT_FLAG_NONE),
+	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("target-lowering",   be_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
@@ -369,6 +372,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("lower-const", true);
 	set_opt_enabled("scalar-replace", true);
 	set_opt_enabled("place", true);
+	set_opt_enabled("gcse", true);
 	set_opt_enabled("confirm", true);
 	set_opt_enabled("opt-load-store", true);
 	set_opt_enabled("lower", true);
@@ -443,6 +447,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "reassociation");
 		do_irg_opt(irg, "local");
+		do_irg_opt(irg, "gcse");
 		do_irg_opt(irg, "place");
 
 		if (firm_opt.confirm) {
@@ -464,6 +469,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "thread-jumps");
 		do_irg_opt(irg, "remove-confirms");
 		do_irg_opt(irg, "gvn-pre");
+		do_irg_opt(irg, "gcse");
 		do_irg_opt(irg, "place");
 		do_irg_opt(irg, "control-flow");
 
@@ -546,6 +552,7 @@ static void do_firm_lowering(const char *input_filename)
 		ir_graph *irg = get_irp_irg(i);
 
 		do_irg_opt(irg, "local");
+		do_irg_opt(irg, "gcse");
 		do_irg_opt(irg, "place");
 		do_irg_opt(irg, "control-flow");
 		do_irg_opt(irg, "opt-load-store");
