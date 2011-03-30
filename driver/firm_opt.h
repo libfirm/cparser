@@ -1,6 +1,7 @@
 #ifndef FIRM_OPT_H
 #define FIRM_OPT_H
 
+#include <stdio.h>
 #include <libfirm/firm_types.h>
 #include <libfirm/dbginfo.h>
 

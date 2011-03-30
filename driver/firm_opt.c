@@ -648,7 +648,7 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 
 	/* the general for dumping option must be set, or the others will not work*/
 	firm_dump.ir_graph
-		= (a_byte) (firm_dump.ir_graph | firm_dump.all_phases | firm_dump.extbb);
+		= (bool) (firm_dump.ir_graph | firm_dump.all_phases | firm_dump.extbb);
 
 	ir_add_dump_flags(ir_dump_flag_keepalive_edges
 			| ir_dump_flag_consts_local | ir_dump_flag_dominance);
@@ -702,8 +702,11 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 		stat_dump_snapshot(input_filename, "final-ir");
 
 	/* run the code generator */
-	if (firm_be_opt.selection != BE_NONE)
-		do_codegen(out, input_filename);
+	ir_timer_t *timer = ir_timer_new();
+	timer_register(timer, "Firm: backend");
+	timer_start(timer);
+	be_main(out, input_filename);
+	timer_stop(timer);
 
 	if (firm_dump.statistic & STAT_FINAL)
 		stat_dump_snapshot(input_filename, "final");

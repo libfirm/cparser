@@ -15,48 +15,36 @@
 
 /* optimization settings */
 struct a_firm_opt firm_opt = {
-  /* const_folding   = */ TRUE,
-  /* cse             = */ TRUE,
-  /* confirm         = */ TRUE,
-  /* muls            = */ TRUE,
-  /* divs            = */ TRUE,
-  /* mods            = */ TRUE,
-  /* alias_analysis  = */ TRUE,
-  /* strict_alias    = */ FALSE,
-  /* no_alias        = */ FALSE,
+  /* const_folding   = */ true,
+  /* cse             = */ true,
+  /* confirm         = */ true,
+  /* muls            = */ true,
+  /* divs            = */ true,
+  /* mods            = */ true,
+  /* alias_analysis  = */ true,
+  /* strict_alias    = */ false,
+  /* no_alias        = */ false,
   /* fp_model        = */ fp_model_precise,
   /* verify          = */ FIRM_VERIFICATION_ON,
-  /* check_all       = */ FALSE,
+  /* check_all       = */ false,
   /* clone_threshold = */ DEFAULT_CLONE_THRESHOLD,
   /* inline_maxsize  = */ 750,
   /* inline_threshold= */ 0,
-  /* verify_edges    = */ FALSE,
+  /* verify_edges    = */ false,
 };
 
 /* dumping options */
 struct a_firm_dump firm_dump = {
-  /* debug_print  = */ FALSE,
-  /* all_types    = */ FALSE,
-  /* no_blocks    = */ FALSE,
-  /* extbb        = */ FALSE,
-  /* ir_graph     = */ FALSE,
-  /* all_phases   = */ FALSE,
+  /* debug_print  = */ false,
+  /* all_types    = */ false,
+  /* no_blocks    = */ false,
+  /* extbb        = */ false,
+  /* ir_graph     = */ false,
+  /* all_phases   = */ false,
   /* statistic    = */ STAT_NONE,
   /* stat_pattern = */ 0,
   /* stat_dag     = */ 0,
   /* filter       = */ NULL
-};
-
-#ifdef FIRM_EXT_GRS
-struct a_firm_ext_grs firm_ext_grs = {
-  /* simd_opt       = */ FALSE,
-  /* create_pattern = */ FALSE
-};
-#endif
-
-struct a_firm_be_opt firm_be_opt = {
-  /* selection = */ BE_FIRM_BE,
-  /* node_stat = */ 0,
 };
 
 #define X(a)  a, sizeof(a)-1
@@ -65,8 +53,8 @@ struct a_firm_be_opt firm_be_opt = {
 static const struct params {
   const char *option;      /**< name of the option */
   int        opt_len;      /**< length of the option string */
-  a_byte     *flag;        /**< address of variable to set/reset */
-  a_byte     set;          /**< iff true, variable will be set, else reset */
+  bool       *flag;        /**< address of variable to set/reset */
+  bool       set;          /**< iff true, variable will be set, else reset */
   const char *description; /**< description of this option */
 } firm_options[] = {
   /* this must be first */
@@ -109,30 +97,11 @@ static const struct params {
   { X("verify-edges-off"),       &firm_opt.verify_edges,     0, "firm: disable out edge verification" },
 
   /* dumping */
-#if defined(_DEBUG) || defined(FIRM_DEBUG)
-  { X("debug"),                  &firm_dump.debug_print,     1, "firm: enable debug output" },
-#endif
-
   { X("dump-ir"),                &firm_dump.ir_graph,        1, "firm: dump IR graph" },
   { X("dump-all-types"),         &firm_dump.all_types,       1, "firm: dump graph of all types" },
   { X("dump-no-blocks"),         &firm_dump.no_blocks,       1, "firm: dump non-blocked graph" },
   { X("dump-extbb"),             &firm_dump.extbb,           1, "firm: dump extended basic blocks" },
   { X("dump-all-phases"),        &firm_dump.all_phases,      1, "firm: dump graphs for all optimization phases" },
-
-  /* code generation */
-  { X("no-codegen"),             &firm_be_opt.selection,     BE_NONE, "cg: disable code generator" },
-
-#ifdef FIRM_EXT_GRS
-  { X("grs-simd-opt"),           &firm_ext_grs.simd_opt,       1, "firm: do simd optimization" },
-  { X("grs-create-pattern"),     &firm_ext_grs.create_pattern, 1, "firm: create patterns for simd optimization" },
-  { X("no-grs-simd-opt"),        &firm_ext_grs.simd_opt,       0, "firm: do simd optimization" },
-  { X("no-grs-create-pattern"),  &firm_ext_grs.create_pattern, 0, "firm: create patterns for simd optimization" },
-#endif
-
-  { X("be-firm"),                &firm_be_opt.selection,     BE_FIRM_BE, "backend: firm backend facility" },
-#ifdef FIRM2C_BACKEND
-  { X("be-firm2c"),              &firm_be_opt.selection,     BE_FIRM2C, "backend: firm2C" },
-#endif /* FIRM2C_BACKEND */
 
   /* misc */
   { X("stat-before-opt"),        &firm_dump.statistic,       STAT_BEFORE_OPT,  "misc: Firm statistic output before optimizations" },
@@ -169,14 +138,14 @@ static void set_dump_filter(const char *filter)
 
 /** Disable all optimizations. */
 static void disable_opts(void) {
-  firm_opt.cse             = FALSE;
-  firm_opt.confirm         = FALSE;
-  firm_opt.muls            = FALSE;
-  firm_opt.divs            = FALSE;
-  firm_opt.mods            = FALSE;
-  firm_opt.alias_analysis  = FALSE;
-  firm_opt.strict_alias    = FALSE;
-  firm_opt.no_alias        = FALSE;
+  firm_opt.cse             = false;
+  firm_opt.confirm         = false;
+  firm_opt.muls            = false;
+  firm_opt.divs            = false;
+  firm_opt.mods            = false;
+  firm_opt.alias_analysis  = false;
+  firm_opt.strict_alias    = false;
+  firm_opt.no_alias        = false;
   disable_all_opts();
 }  /* disable_opts */
 
@@ -228,7 +197,7 @@ int firm_option(const char *opt)
       }
       /* statistic options do accumulate */
       if (firm_options[i].flag == &firm_dump.statistic)
-        *firm_options[i].flag = (a_byte) (*firm_options[i].flag | firm_options[i].set);
+        *firm_options[i].flag = (bool) (*firm_options[i].flag | firm_options[i].set);
       else
         *firm_options[i].flag = firm_options[i].set;
 
@@ -244,28 +213,4 @@ int firm_option(const char *opt)
     return 1;
 
   return 0;
-}  /* firm_option */
-
-/**
- * prints the firm version number
- */
-void print_firm_version(FILE *f)
-{
-	const char *revision = ir_get_version_revision();
-	const char *build    = ir_get_version_build();
-
-	fprintf(f, "Firm C-Compiler using libFirm (%u.%u",
-			ir_get_version_major(), ir_get_version_minor());
-	if (revision[0] != 0) {
-		fputc(' ', f);
-		fputs(revision, f);
-	}
-	if (build[0] != 0) {
-		fputc(' ', f);
-		fputs(build, f);
-	}
-	fprintf(f, "}\n"
-			"(C) 2005-2008 Michael Beck\n"
-			"(C) 1995-2008 University of Karlsruhe\n"
-			"Using ");
-}  /* print_firm_version */
+}
