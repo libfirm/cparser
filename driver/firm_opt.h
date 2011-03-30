@@ -101,7 +101,7 @@ void gen_firm_init(void);
 void disable_all_opts(void);
 
 /** called, after the Firm generation is completed. */
-void gen_firm_finish(FILE *out, const char *input_filename, int firm_const_exists);
+void gen_firm_finish(FILE *out, const char *input_filename);
 
 void gen_Firm_assembler(const char *input_filename);
 

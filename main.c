@@ -106,7 +106,6 @@ bool               byte_order_big_endian     = false;
 bool               char_is_signed            = true;
 bool               strict_mode               = false;
 bool               use_builtins              = false;
-bool               have_const_functions      = false;
 atomic_type_kind_t wchar_atomic_kind         = ATOMIC_TYPE_INT;
 unsigned           force_long_double_size    = 0;
 bool               enable_main_collect2_hack = false;
@@ -1582,7 +1581,7 @@ graph_built:
 				return EXIT_SUCCESS;
 			}
 
-			gen_firm_finish(asm_out, filename, have_const_functions);
+			gen_firm_finish(asm_out, filename);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}

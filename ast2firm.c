@@ -82,8 +82,6 @@ static ir_node   *ijmp_list;
 static bool       constant_folding;
 static bool       initializer_use_bitfield_basetype;
 
-extern bool       have_const_functions;
-
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
@@ -901,7 +899,6 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 		}
 		if (modifiers & DM_CONST) {
 			add_entity_additional_properties(irentity, mtp_property_const);
-			have_const_functions = true;
 		}
 	}
 	if (modifiers & DM_USED) {

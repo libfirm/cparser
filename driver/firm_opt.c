@@ -150,12 +150,6 @@ static void rts_map(void)
 }
 
 static int *irg_dump_no;
-static int firm_const_exists;
-
-static void do_optimize_funccalls(void)
-{
-	optimize_funccalls(firm_const_exists, NULL);
-}
 
 static void do_lower_highlevel(ir_graph *irg)
 {
@@ -259,7 +253,7 @@ static opt_config_t opts[] = {
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("target-lowering",   be_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
-	IRP("opt-func-call",     do_optimize_funccalls,    "function call optimization",                            OPT_FLAG_NONE),
+	IRP("opt-func-call",     optimize_funccalls,       "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRP("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_HIDE_OPTIONS),
@@ -647,14 +641,10 @@ void gen_firm_init(void)
  * @param out                a file handle for the output, may be NULL
  * @param input_filename     the name of the (main) source file
  * @param c_mode             non-zero if "C" was compiled
- * @param new_firm_const_exists  non-zero, if the const attribute was used on functions
  */
-void gen_firm_finish(FILE *out, const char *input_filename,
-                     int new_firm_const_exists)
+void gen_firm_finish(FILE *out, const char *input_filename)
 {
 	int i;
-
-	firm_const_exists = new_firm_const_exists;
 
 	/* the general for dumping option must be set, or the others will not work*/
 	firm_dump.ir_graph
