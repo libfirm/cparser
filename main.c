@@ -1294,9 +1294,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	/* we do the lowering in ast2firm */
-	firm_opt.lower_bitfields = FALSE;
-
 	/* set the c_mode here, types depends on it */
 	c_mode |= features_on;
 	c_mode &= ~features_off;

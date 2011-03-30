@@ -15,8 +15,6 @@
 
 /* optimization settings */
 struct a_firm_opt firm_opt = {
-  /* enabled         = */ TRUE,
-  /* debug_mode      = */ DBG_MODE_NONE,
   /* const_folding   = */ TRUE,
   /* cse             = */ TRUE,
   /* confirm         = */ TRUE,
@@ -26,22 +24,13 @@ struct a_firm_opt firm_opt = {
   /* alias_analysis  = */ TRUE,
   /* strict_alias    = */ FALSE,
   /* no_alias        = */ FALSE,
-  /* cc_opt          = */ TRUE,
   /* fp_model        = */ fp_model_precise,
   /* verify          = */ FIRM_VERIFICATION_ON,
   /* check_all       = */ FALSE,
-  /* lower           = */ TRUE,
-  /* honor_restrict  = */ TRUE,
-  /* lower_bitfields = */ TRUE,
-  /* pic             = */ FALSE,
   /* clone_threshold = */ DEFAULT_CLONE_THRESHOLD,
   /* inline_maxsize  = */ 750,
   /* inline_threshold= */ 0,
   /* verify_edges    = */ FALSE,
-  /* grs_simd_opt    = */ 0,
-  /* grs_create_pattern = */ 0,
-  /* enable_statev   = */ FALSE,
-  /* statev_filter   = */ "",
 };
 
 /* dumping options */
@@ -84,9 +73,6 @@ static const struct params {
   { X("help"),                   NULL,                       0, "print FCC related help options" },
 
   /* firm optimization options */
-  { X("pic"),                    &firm_opt.pic,              1, "firm: generate position independent code" },
-  { X("g0"),                     &firm_opt.debug_mode,       DBG_MODE_BACKSTORE, "firm: Debug Mode: use back stores" },
-  { X("g1"),                     &firm_opt.debug_mode,       DBG_MODE_FULL,      "firm: Debug Mode: no register variables" },
   { X("no-opt"),                 NULL,                       0, "firm: disable all FIRM optimizations" },
   { X("cse"),                    &firm_opt.cse,              1, "firm: enable common subexpression elimination" },
   { X("no-cse"),                 &firm_opt.cse,              0, "firm: disable common subexpression elimination" },
@@ -112,13 +98,8 @@ static const struct params {
   { X("fp-precise"),             &firm_opt.fp_model,         fp_model_precise, "firm: precise fp model" },
   { X("fp-fast"),                &firm_opt.fp_model,         fp_model_fast,    "firm: fast fp model" },
   { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
-  { X("opt-cc"),                 &firm_opt.cc_opt,           1, "firm: enable calling conventions optimization" },
-  { X("no-opt-cc"),              &firm_opt.cc_opt,           0, "firm: disable calling conventions optimization" },
 
   /* other firm regarding options */
-  { X("restrict"),               &firm_opt.honor_restrict,   1, "firm: honor restrict keyword" },
-  { X("no-restrict"),            &firm_opt.honor_restrict,   1, "firm: restrict keyword is meaningless" },
-  { X("no-lower"),               &firm_opt.lower,            0, "firm: disable lowering" },
   { X("verify-off"),             &firm_opt.verify,           FIRM_VERIFICATION_OFF, "firm: disable node verification" },
   { X("verify-on"),              &firm_opt.verify,           FIRM_VERIFICATION_ON, "firm: enable node verification" },
   { X("verify-report"),          &firm_opt.verify,           FIRM_VERIFICATION_REPORT, "firm: node verification, report only" },
@@ -196,7 +177,6 @@ static void disable_opts(void) {
   firm_opt.alias_analysis  = FALSE;
   firm_opt.strict_alias    = FALSE;
   firm_opt.no_alias        = FALSE;
-  firm_opt.cc_opt          = FALSE;
   disable_all_opts();
 }  /* disable_opts */
 
@@ -212,7 +192,6 @@ int firm_option(const char *opt)
 {
   int i, len    = strlen(opt);
   const char *p = opt;
-  int res;
 
   if (strncmp("dump-filter=", opt, 12) == 0) {
     opt = &opt[12];
@@ -253,14 +232,6 @@ int firm_option(const char *opt)
       else
         *firm_options[i].flag = firm_options[i].set;
 
-      if (firm_options[i].flag == &firm_opt.debug_mode && firm_opt.debug_mode > DBG_MODE_NONE) {
-        if (firm_opt.debug_mode == DBG_MODE_FULL)
-          disable_opts();
-        res = 1;
-        res &= be_parse_arg("omitfp=0");
-        res &= be_parse_arg("stabs");
-        return res;
-      }
       break;
     }
   }

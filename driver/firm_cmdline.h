@@ -12,16 +12,8 @@
 
 #include "fe_common.h"
 
-enum a_debug_mode {
-  DBG_MODE_NONE      = 0,   /**< no special debug support */
-  DBG_MODE_BACKSTORE = 1,   /**< backstores are created */
-  DBG_MODE_FULL      = 2,   /**< no register valiables */
-};
-
 /* optimization settings */
 struct a_firm_opt {
-  a_byte      enabled;         /**< enable all optimizations */
-  a_byte      debug_mode;      /**< debug mode: store all local variables */
   a_byte      const_folding;   /**< enable constant folding */
   a_byte      cse;             /**< enable common-subexpression elimination */
   a_byte      confirm;         /**< enable Confirm optimization */
@@ -31,22 +23,13 @@ struct a_firm_opt {
   a_byte      alias_analysis;  /**< enable Alias Analysis */
   a_byte      strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
   a_byte      no_alias;        /**< no aliasing possible. */
-  a_byte      cc_opt;          /**< optimize calling conventions */
   a_byte      fp_model;        /**< fp model */
   a_byte      verify;          /**< Firm verifier setting */
   a_byte      check_all;       /**< enable checking all Firm phases */
-  a_byte      lower;           /**< enable Firm lowering */
-  a_byte      honor_restrict;  /**< enable restrict keyword */
-  a_byte      lower_bitfields; /**< lower bitfield access */
-  a_byte      pic;             /**< generate position independent code */
   int         clone_threshold; /**< The threshold value for procedure cloning. */
   unsigned    inline_maxsize;  /**< Maximum function size for inlining. */
   unsigned    inline_threshold;/**< Inlining benefice threshold. */
   a_byte      verify_edges;    /**< verify edges */
-  a_byte      grs_simd_opt;
-  a_byte      grs_create_pattern;
-  a_byte      enable_statev;   /**< enable statev output */
-  const char *statev_filter;  /**< statev filter */
 };
 
 /** statistic options */

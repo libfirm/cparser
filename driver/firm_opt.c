@@ -159,7 +159,7 @@ static void do_optimize_funccalls(void)
 
 static void do_lower_highlevel(ir_graph *irg)
 {
-	lower_highlevel_graph(irg, firm_opt.lower_bitfields);
+	lower_highlevel_graph(irg, false);
 }
 
 static void do_stred(ir_graph *irg)
@@ -263,6 +263,7 @@ static opt_config_t opts[] = {
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRP("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_HIDE_OPTIONS),
+	IRP("opt-cc",            mark_private_methods,     "calling conventions optimization",                      OPT_FLAG_NONE),
 #undef IRP
 #undef IRG
 };
@@ -388,6 +389,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("target-lowering", true);
 	set_opt_enabled("rts", true);
 	set_opt_enabled("parallelize-mem", true);
+	set_opt_enabled("opt-cc", true);
 }
 
 /**
@@ -544,43 +546,37 @@ static void do_firm_lowering(const char *input_filename)
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
 
-	if (firm_opt.enabled) {
-		timer_start(t_all_opt);
+	timer_start(t_all_opt);
 
-		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-			ir_graph *irg = get_irp_irg(i);
+	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
+		ir_graph *irg = get_irp_irg(i);
 
+		do_irg_opt(irg, "local");
+		do_irg_opt(irg, "place");
+		do_irg_opt(irg, "control-flow");
+		do_irg_opt(irg, "opt-load-store");
+		do_irg_opt(irg, "local");
+		do_irg_opt(irg, "control-flow");
+
+		if (do_irg_opt(irg, "vrp")) {
 			do_irg_opt(irg, "local");
-			do_irg_opt(irg, "place");
 			do_irg_opt(irg, "control-flow");
-			do_irg_opt(irg, "opt-load-store");
+			do_irg_opt(irg, "vrp");
 			do_irg_opt(irg, "local");
 			do_irg_opt(irg, "control-flow");
-
-			if (do_irg_opt(irg, "vrp")) {
-				do_irg_opt(irg, "local");
-				do_irg_opt(irg, "control-flow");
-				do_irg_opt(irg, "vrp");
-				do_irg_opt(irg, "local");
-				do_irg_opt(irg, "control-flow");
-			}
-
-			if (do_irg_opt(irg, "if-conversion")) {
-				do_irg_opt(irg, "local");
-				do_irg_opt(irg, "control-flow");
-			}
-
-			do_irg_opt(irg, "parallelize-mem");
 		}
-		timer_stop(t_all_opt);
 
-		do_irp_opt("remove-unused");
+		if (do_irg_opt(irg, "if-conversion")) {
+			do_irg_opt(irg, "local");
+			do_irg_opt(irg, "control-flow");
+		}
 
-		dump_all("low-opt");
+		do_irg_opt(irg, "parallelize-mem");
 	}
-
-	if (firm_opt.cc_opt)
-		mark_private_methods();
+	do_irp_opt("remove-unused");
+	do_irp_opt("opt-cc");
+	timer_stop(t_all_opt);
+	dump_all("low-opt");
 
 	if (firm_dump.statistic & STAT_FINAL) {
 		stat_dump_snapshot(input_filename, "final");
@@ -636,16 +632,12 @@ void gen_firm_init(void)
 	if (firm_dump.no_blocks)
 		ir_remove_dump_flags(ir_dump_flag_blocks_as_subgraphs);
 
-	if (firm_opt.enabled) {
-		set_optimize(1);
-		set_opt_constant_folding(firm_opt.const_folding);
-		set_opt_algebraic_simplification(firm_opt.const_folding);
-		set_opt_cse(firm_opt.cse);
-		set_opt_global_cse(0);
-		set_opt_unreachable_code(1);
-	} else {
-		set_optimize(0);
-	}
+	set_optimize(1);
+	set_opt_constant_folding(firm_opt.const_folding);
+	set_opt_algebraic_simplification(firm_opt.const_folding);
+	set_opt_cse(firm_opt.cse);
+	set_opt_global_cse(0);
+	set_opt_unreachable_code(1);
 }
 
 /**
@@ -661,15 +653,6 @@ void gen_firm_finish(FILE *out, const char *input_filename,
                      int new_firm_const_exists)
 {
 	int i;
-
-#if 0
-	if (firm_opt.enable_statev) {
-		char buf[1024];
-		snprintf(buf, sizeof(buf), "%s.ev", input_filename);
-		ir_stat_ev_begin(input_filename, firm_opt.statev_filter);
-		ir_stat_ev_compilation_unit(input_filename);
-	}
-#endif
 
 	firm_const_exists = new_firm_const_exists;
 
@@ -718,11 +701,8 @@ void gen_firm_finish(FILE *out, const char *input_filename,
 		stat_dump_snapshot(input_filename, "noopt");
 	}
 
-	if (firm_opt.enabled)
-		do_firm_optimizations(input_filename);
-
-	if (firm_opt.lower)
-		do_firm_lowering(input_filename);
+	do_firm_optimizations(input_filename);
+	do_firm_lowering(input_filename);
 
 	/* set the phase to low */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i)
