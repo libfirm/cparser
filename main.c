@@ -821,6 +821,7 @@ int main(int argc, char **argv)
 	case 2:
 		set_option("strict-aliasing");
 		set_option("inline");
+		set_option("fp-vrp");
 		set_option("deconv");
 		set_be_option("omitfp");
 		break;
