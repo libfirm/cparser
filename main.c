@@ -73,6 +73,7 @@
 #include "driver/firm_cmdline.h"
 #include "driver/firm_timing.h"
 #include "adt/error.h"
+#include "adt/strutil.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 #include "revision.h"
@@ -590,20 +591,6 @@ static void copy_file(FILE *dest, FILE *input)
 			perror("couldn't write output");
 		}
 	}
-}
-
-static inline bool streq(char const* a, char const* b)
-{
-	return strcmp(a, b) == 0;
-}
-
-static inline bool strstart(char const* str, char const* start)
-{
-	do {
-		if (*start == '\0')
-			return true;
-	} while (*str++ == *start++);
-	return false;
 }
 
 static FILE *open_file(const char *filename)

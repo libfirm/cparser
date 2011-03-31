@@ -8,6 +8,8 @@
  * $Id$
  */
 #include <string.h>
+#include "../adt/strutil.h"
+#include "../adt/util.h"
 #include "firm_cmdline.h"
 #include "firm_opt.h"
 #include <libfirm/firm.h>
@@ -52,7 +54,7 @@ struct a_firm_dump firm_dump = {
 /** Parameter description structure */
 static const struct params {
   const char *option;      /**< name of the option */
-  int        opt_len;      /**< length of the option string */
+  size_t     opt_len;      /**< length of the option string */
   bool       *flag;        /**< address of variable to set/reset */
   bool       set;          /**< iff true, variable will be set, else reset */
   const char *description; /**< description of this option */
@@ -157,59 +159,52 @@ void print_option_help(const char *name, const char *description)
 /**
  * Handles a firm option.
  */
-int firm_option(const char *opt)
+int firm_option(char const *const opt)
 {
-  int i, len    = strlen(opt);
-  const char *p = opt;
-
-  if (strncmp("dump-filter=", opt, 12) == 0) {
-    opt = &opt[12];
-    set_dump_filter(opt);
+	char const* val;
+  if ((val = strstart(opt, "dump-filter="))) {
+    set_dump_filter(val);
     return 1;
-  }
-  else if (strncmp("clone-threshold=", opt, 16) == 0) {
-    sscanf(&opt[16], "%d", &firm_opt.clone_threshold);
+  } else if ((val = strstart(opt, "clone-threshold="))) {
+    sscanf(val, "%d", &firm_opt.clone_threshold);
     return 1;
-  }
-  else if (strncmp("inline-max-size=", opt, 16) == 0) {
-    sscanf(&opt[16], "%u", &firm_opt.inline_maxsize);
+  } else if ((val = strstart(opt, "inline-max-size="))) {
+    sscanf(val, "%u", &firm_opt.inline_maxsize);
     return 1;
-  }
-  else if (strncmp("inline-threshold=", opt, 17) == 0) {
-    sscanf(&opt[17], "%u", &firm_opt.inline_threshold);
+  } else if ((val = strstart(opt, "inline-threshold="))) {
+    sscanf(val, "%u", &firm_opt.inline_threshold);
     return 1;
-  }
-  else if (strcmp("no-opt", opt) == 0) {
+  } else if (streq(opt, "no-opt")) {
     disable_opts();
     return 1;
   }
 
-  for (i = sizeof(firm_options) / sizeof(firm_options[0]) - 1; i >= 0; --i) {
-    if (len == firm_options[i].opt_len && strncmp(p, firm_options[i].option, len) == 0) {
-      if (!firm_options[i].flag) {
+  size_t const len = strlen(opt);
+  for (size_t i = lengthof(firm_options); i != 0;) {
+    struct params const* const o = &firm_options[--i];
+    if (len == o->opt_len && strncmp(opt, o->option, len) == 0) {
+      if (!o->flag) {
         /* help option */
         print_option_help(firm_options[0].option, firm_options[0].description);
         firm_opt_option_help();
-        for (i = 1; i < (int) (sizeof(firm_options)/sizeof(firm_options[0])); ++i) {
-          print_option_help(firm_options[i].option, firm_options[i].description);
+        for (size_t k = 1; k != lengthof(firm_options); ++k) {
+          print_option_help(firm_options[k].option, firm_options[k].description);
         }
         return -1;
       }
-      /* statistic options do accumulate */
-      if (firm_options[i].flag == &firm_dump.statistic)
-        *firm_options[i].flag = (bool) (*firm_options[i].flag | firm_options[i].set);
-      else
-        *firm_options[i].flag = firm_options[i].set;
 
-      break;
+      /* statistic options do accumulate */
+      if (o->flag == &firm_dump.statistic)
+        *o->flag = (bool) (*o->flag | o->set);
+      else
+        *o->flag = o->set;
+
+      return 1;
     }
   }
 
-  if (i >= 0)
-    return 1;
-
-  /* maybe this enables/disables an optimisations */
-  if (firm_opt_option(p))
+  /* maybe this enables/disables optimisations */
+  if (firm_opt_option(opt))
     return 1;
 
   return 0;
