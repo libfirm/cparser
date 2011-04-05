@@ -94,11 +94,7 @@
 #endif
 
 #ifndef ASSEMBLER
-#ifdef __APPLE__
 #define ASSEMBLER "gcc -c -xassembler"
-#else
-#define ASSEMBLER "as"
-#endif
 #endif
 
 unsigned int       c_mode                    = _C89 | _ANSI | _C99 | _GNUC;
@@ -1105,7 +1101,7 @@ int main(int argc, char **argv)
 						argument_errors = true;
 					} else {
 						machine_size = (unsigned int)value;
-						add_flag(&asflags_obst, "--%u", machine_size);
+						add_flag(&asflags_obst, "-m%u", machine_size);
 						add_flag(&ldflags_obst, "-m%u", machine_size);
 					}
 				}
