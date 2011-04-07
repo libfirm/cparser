@@ -72,6 +72,7 @@
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 #include "driver/firm_timing.h"
+#include "driver/firm_os.h"
 #include "adt/error.h"
 #include "adt/strutil.h"
 #include "wrappergen/write_fluffy.h"
@@ -114,13 +115,14 @@ extern bool print_implicit_casts;
 /* to switch on printing of parenthesis to indicate operator precedence */
 extern bool print_parenthesis;
 
-static const char     *target_triple;
-static int             verbose;
-static struct obstack  cppflags_obst;
-static struct obstack  ldflags_obst;
-static struct obstack  asflags_obst;
-static char            dep_target[1024];
-static const char     *outname;
+static machine_triple_t *target_machine;
+static const char       *target_triple;
+static int               verbose;
+static struct obstack    cppflags_obst;
+static struct obstack    ldflags_obst;
+static struct obstack    asflags_obst;
+static char              dep_target[1024];
+static const char       *outname;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -570,13 +572,6 @@ static void set_be_option(const char *arg)
 	assert(res);
 }
 
-static void set_option(const char *arg)
-{
-	int res = firm_option(arg);
-	(void) res;
-	assert(res);
-}
-
 static void copy_file(FILE *dest, FILE *input)
 {
 	char buf[16384];
@@ -621,29 +616,22 @@ static filetype_t get_filetype_from_string(const char *string)
 	return FILETYPE_UNKNOWN;
 }
 
-/**
- * Initialize firm codegeneration for a specific operating system.
- * The argument is the operating system part of a target-triple */
-static bool set_os_support(const char *os)
+static bool init_os_support(void)
 {
+	const char *os = target_machine->operating_system;
 	wchar_atomic_kind         = ATOMIC_TYPE_INT;
 	force_long_double_size    = 0;
 	enable_main_collect2_hack = false;
 
 	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
 			|| streq(os, "solaris")) {
-		set_be_option("ia32-gasmode=elf");
 		set_create_ld_ident(create_name_linux_elf);
 	} else if (streq(os, "darwin")) {
 		force_long_double_size = 16;
-		set_be_option("ia32-gasmode=macho");
-		set_be_option("ia32-stackalign=4");
-		set_be_option("pic=true");
 		set_create_ld_ident(create_name_macho);
 	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
 		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
-		set_be_option("ia32-gasmode=mingw");
 		set_create_ld_ident(create_name_win32);
 	} else {
 		return false;
@@ -654,65 +642,11 @@ static bool set_os_support(const char *os)
 
 static bool parse_target_triple(const char *arg)
 {
-	const char *manufacturer = strchr(arg, '-');
-	if (manufacturer == NULL) {
+	machine_triple_t *triple = firm_parse_machine_triple(arg);
+	if (triple == NULL) {
 		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
 		return false;
 	}
-	manufacturer += 1;
-
-	const char *os = strchr(manufacturer, '-');
-	if (os == NULL) {
-		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
-		return false;
-	}
-	os += 1;
-
-	/* Note: Triples are more or less defined by what the config.guess and
-	 * config.sub scripts from GNU autoconf emit. We have to lookup there what
-	 * triples are possible */
-
-	/* process cpu type */
-	if (strstart(arg, "i386-")) {
-		be_parse_arg("isa=ia32");
-		be_parse_arg("ia32-arch=i386");
-	} else if (strstart(arg, "i486-")) {
-		be_parse_arg("isa=ia32");
-		be_parse_arg("ia32-arch=i486");
-	} else if (strstart(arg, "i586-")) {
-		be_parse_arg("isa=ia32");
-		be_parse_arg("ia32-arch=i586");
-	} else if (strstart(arg, "i686-")) {
-		be_parse_arg("isa=ia32");
-		be_parse_arg("ia32-arch=i686");
-	} else if (strstart(arg, "i786-")) {
-		be_parse_arg("isa=ia32");
-		be_parse_arg("ia32-arch=pentium4");
-	} else if (strstart(arg, "x86_64")) {
-		be_parse_arg("isa=amd64");
-	} else if (strstart(arg, "sparc-")) {
-		be_parse_arg("isa=sparc");
-	} else if (strstart(arg, "arm-")) {
-		be_parse_arg("isa=arm");
-	} else {
-		fprintf(stderr, "Unknown cpu in triple '%s'\n", arg);
-		return false;
-	}
-
-	/* process manufacturer, alot of people incorrectly leave out the
-	 * manufacturer instead of using unknown- */
-	if (strstart(manufacturer, "linux")) {
-		os = manufacturer;
-		manufacturer = "unknown-";
-	}
-
-	/* process operating system */
-	if (!set_os_support(os)) {
-		fprintf(stderr, "Unknown operating system '%s' in triple '%s'\n", os, arg);
-		return false;
-	}
-
-	target_triple = arg;
 	return true;
 }
 
@@ -776,43 +710,15 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* Guess host OS */
-#if defined(_WIN32) || defined(__CYGWIN__)
-	set_os_support("win32");
-#elif defined(__APPLE__)
-	set_os_support("darwin");
-#else
-	set_os_support("linux");
-#endif
-
-	/* apply optimisation level */
-	switch(opt_level) {
-	case 0:
-		set_option("no-opt");
-		break;
-	case 1:
-		set_option("no-inline");
-		break;
-	default:
-	case 4:
-		/* use_builtins = true; */
-		/* fallthrough */
-	case 3:
-		set_option("thread-jumps");
-		set_option("if-conversion");
-		/* fallthrough */
-	case 2:
-		set_option("strict-aliasing");
-		set_option("inline");
-		set_option("fp-vrp");
-		set_option("deconv");
-		set_be_option("omitfp");
-		break;
-	}
-
 	const char *target = getenv("TARGET");
 	if (target != NULL)
 		parse_target_triple(target);
+	if (target_machine == NULL) {
+		target_machine = firm_get_host_machine();
+	}
+	choose_optimization_pack(opt_level);
+	setup_firm_for_machine(target_machine);
+	init_os_support();
 
 	/* parse rest of options */
 	standard                   = STANDARD_DEFAULT;
@@ -1026,12 +932,20 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-m");
 				if (strstart(opt, "target=")) {
 					GET_ARG_AFTER(opt, "-mtarget=");
-					if (!parse_target_triple(opt))
+					if (!parse_target_triple(opt)) {
 						argument_errors = true;
+					} else {
+						setup_firm_for_machine(target_machine);
+						target_triple = opt;
+					}
 				} else if (strstart(opt, "triple=")) {
 					GET_ARG_AFTER(opt, "-mtriple=");
-					if (!parse_target_triple(opt))
+					if (!parse_target_triple(opt)) {
 						argument_errors = true;
+					} else {
+						setup_firm_for_machine(target_machine);
+						target_triple = opt;
+					}
 				} else if (strstart(opt, "arch=")) {
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);

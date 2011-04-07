@@ -768,6 +768,48 @@ void firm_opt_option_help(void)
 	}
 }
 
+static void set_be_option(const char *arg)
+{
+	int res = be_parse_arg(arg);
+	(void) res;
+	assert(res);
+}
+
+static void set_option(const char *arg)
+{
+	int res = firm_option(arg);
+	(void) res;
+	assert(res);
+}
+
+void choose_optimization_pack(int level)
+{
+	/* apply optimisation level */
+	switch(level) {
+	case 0:
+		set_option("no-opt");
+		break;
+	case 1:
+		set_option("no-inline");
+		break;
+	default:
+	case 4:
+		/* use_builtins = true; */
+		/* fallthrough */
+	case 3:
+		set_option("thread-jumps");
+		set_option("if-conversion");
+		/* fallthrough */
+	case 2:
+		set_option("strict-aliasing");
+		set_option("inline");
+		set_option("fp-vrp");
+		set_option("deconv");
+		set_be_option("omitfp");
+		break;
+	}
+}
+
 /**
  * Do very early initializations
  */

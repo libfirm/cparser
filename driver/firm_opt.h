@@ -115,4 +115,14 @@ int firm_opt_option(const char *opt);
 /** print help about optimisations options */
 void firm_opt_option_help(void);
 
-#endif /* FIRM_OPT_H */
+/** Choose an optimization level. (Typically used to interpret the -O compiler
+ * switches) */
+void choose_optimization_pack(int level);
+
+/**
+ * Setup firm to generate code for a specific os.
+ * The parameter should be the OS-part of a machine triple
+ */
+void firm_init_os(const char *os);
+
+#endif

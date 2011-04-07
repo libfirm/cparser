@@ -4,4 +4,4 @@
 /* Calls the specified backend. */
 void do_codegen(FILE *out, const char *asm_file_name);
 
-#endif /* FIRM_CODEGEN_H */
+#endif
