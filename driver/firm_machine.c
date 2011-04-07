@@ -2,7 +2,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#include "firm_os.h"
+#include "firm_machine.h"
 #include "adt/strutil.h"
 #include "adt/xmalloc.h"
 #include <libfirm/firm.h>

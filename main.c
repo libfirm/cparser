@@ -72,7 +72,7 @@
 #include "driver/firm_opt.h"
 #include "driver/firm_cmdline.h"
 #include "driver/firm_timing.h"
-#include "driver/firm_os.h"
+#include "driver/firm_machine.h"
 #include "adt/error.h"
 #include "adt/strutil.h"
 #include "wrappergen/write_fluffy.h"
