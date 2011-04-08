@@ -161,11 +161,6 @@ struct file_list_entry_t {
 
 static file_list_entry_t *temp_files;
 
-static void initialize_firm(void)
-{
-	firm_early_init();
-}
-
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
                             const char *newext)
 {
@@ -652,7 +647,7 @@ static bool parse_target_triple(const char *arg)
 
 int main(int argc, char **argv)
 {
-	initialize_firm();
+	firm_early_init();
 
 	const char        *dumpfunction         = NULL;
 	const char        *print_file_name_file = NULL;
