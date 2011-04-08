@@ -64,9 +64,9 @@ CPARSEROS2 = $(SOURCES:%.c=build/cpb2/%.o)
 
 Q = @
 
-all: $(DIRS) $(GOAL)
+all: $(GOAL)
 
-.PHONY: all clean dirs bootstrap bootstrap2
+.PHONY: all clean bootstrap bootstrap2
 
 ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
 -include .depend
@@ -115,10 +115,6 @@ bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bo
 %.c.cparser: %.c
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
-
-$(DIRS):
-	@echo "===> MKDIR $@"
-	$(Q)mkdir -p $@
 
 gen_builtins.h: builtins/builtins.c create_builtins_h.sh
 	@echo '===> CREATE_BUILTINS $<'
