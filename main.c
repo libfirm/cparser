@@ -642,7 +642,15 @@ static bool parse_target_triple(const char *arg)
 		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
 		return false;
 	}
+	target_machine = triple;
 	return true;
+}
+
+static void setup_target_machine(void)
+{
+	if (!setup_firm_for_machine(target_machine))
+		exit(1);
+	init_os_support();
 }
 
 int main(int argc, char **argv)
@@ -712,8 +720,7 @@ int main(int argc, char **argv)
 		target_machine = firm_get_host_machine();
 	}
 	choose_optimization_pack(opt_level);
-	setup_firm_for_machine(target_machine);
-	init_os_support();
+	setup_target_machine();
 
 	/* parse rest of options */
 	standard                   = STANDARD_DEFAULT;
@@ -930,7 +937,7 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_firm_for_machine(target_machine);
+						setup_target_machine();
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "triple=")) {
@@ -938,7 +945,7 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_firm_for_machine(target_machine);
+						setup_target_machine();
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "arch=")) {

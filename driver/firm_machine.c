@@ -119,7 +119,7 @@ machine_triple_t *firm_parse_machine_triple(const char *triple_string)
 
 	machine_triple_t *triple = XMALLOCZ(machine_triple_t);
 
-	size_t cpu_type_len = manufacturer-cpu+1;
+	size_t cpu_type_len = manufacturer-cpu;
 	triple->cpu_type = XMALLOCN(char, cpu_type_len);
 	memcpy(triple->cpu_type, cpu, cpu_type_len-1);
 	triple->cpu_type[cpu_type_len-1] = '\0';
@@ -130,7 +130,7 @@ machine_triple_t *firm_parse_machine_triple(const char *triple_string)
 		triple->manufacturer = xstrdup("unknown");
 		os = manufacturer;
 	} else {
-		size_t manufacturer_len = os-manufacturer+1;
+		size_t manufacturer_len = os-manufacturer;
 		triple->manufacturer = XMALLOCN(char, manufacturer_len);
 		memcpy(triple->manufacturer, manufacturer, manufacturer_len-1);
 		triple->manufacturer[manufacturer_len-1] = '\0';
