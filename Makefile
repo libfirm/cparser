@@ -1,11 +1,12 @@
 GOAL = $(BUILDDIR)/cparser
 
 BUILDDIR ?= build
+variant  ?= debug# Different libfirm variants (debug, optimize, profile)
 
 FIRM_HOME   = libfirm
 FIRM_CPPFLAGS = -I$(FIRM_HOME)/include
 FIRM_LIBS   = -lm
-LIBFIRM_FILE = build/debug/libfirm.a
+LIBFIRM_FILE = build/$(variant)/libfirm.a
 FIRM_VERSION = 1.19.1
 FIRM_URL = http://downloads.sourceforge.net/project/libfirm/libfirm/$(FIRM_VERSION)/libfirm-$(FIRM_VERSION).tar.bz2?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flibfirm%2Ffiles%2Flibfirm%2F&ts=1299786346&use_mirror=ignum
 
