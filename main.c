@@ -1135,6 +1135,7 @@ int main(int argc, char **argv)
 							streq(suffix, "S")   ? FILETYPE_ASSEMBLER              :
 							streq(suffix, "a")   ? FILETYPE_OBJECT                 :
 							streq(suffix, "c")   ? FILETYPE_C                      :
+							streq(suffix, "i")   ? FILETYPE_PREPROCESSED_C         :
 							streq(suffix, "C")   ? FILETYPE_CXX                    :
 							streq(suffix, "cc")  ? FILETYPE_CXX                    :
 							streq(suffix, "cp")  ? FILETYPE_CXX                    :
@@ -1142,7 +1143,7 @@ int main(int argc, char **argv)
 							streq(suffix, "CPP") ? FILETYPE_CXX                    :
 							streq(suffix, "cxx") ? FILETYPE_CXX                    :
 							streq(suffix, "c++") ? FILETYPE_CXX                    :
-							streq(suffix, "ii")  ? FILETYPE_CXX                    :
+							streq(suffix, "ii")  ? FILETYPE_PREPROCESSED_CXX       :
 							streq(suffix, "h")   ? FILETYPE_C                      :
 							streq(suffix, "ir")  ? FILETYPE_IR                     :
 							streq(suffix, "o")   ? FILETYPE_OBJECT                 :
