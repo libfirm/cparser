@@ -1,3 +1,10 @@
+===== cparser 0.9.12 (2009-05-15) =====
+* Adapt to libfirm-1.19.0
+* Introduce -mtarget (and -mtriple for llvm compatibility) for conventient
+  cross-compilation
+* Fix big-endian struct layouting
+* Bugfixes
+
 ===== cparser 0.9.11 (2009-05-16) =====
 * add missing NEWS entries
 * fix crash when known C library functions had the wrong number of arguments
