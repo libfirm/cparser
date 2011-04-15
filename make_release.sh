@@ -2,7 +2,7 @@
 
 #set -x
 WORKDIR="release"
-VERSION="0.9.11"
+VERSION="0.9.12"
 RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
@@ -25,6 +25,7 @@ for dir in $SOURCEDIRS; do
 done
 cp $ADDFILES "$FULLRELEASEDIR"
 rm -f "$FULLRELEASEDIR/revision.h"
+rm -f "$FULLRELEASEDIR/config.h"
 echo "REVISION = \"$VERSION\"" > "$FULLRELEASEDIR/Makefile"
 cat Makefile >> "$FULLRELEASEDIR/Makefile"
 
