@@ -11,7 +11,7 @@ CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
-CFLAGS += -O0 -g3
+CFLAGS += -O2 -g
 #CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
 #CFLAGS += -pg -O3 -fno-inline
 ICC_CFLAGS = -O0 -g3 -std=c99 -Wall
@@ -24,7 +24,6 @@ LFLAGS += $(FIRM_LIBS)
 SOURCES := \
 	adt/hashset.c \
 	adt/strset.c \
-	adt/xmalloc.c \
 	attribute.c \
 	parser.c \
 	ast.c \
@@ -32,7 +31,7 @@ SOURCES := \
 	builtins.c \
 	diagnostic.c \
 	driver/firm_cmdline.c \
-	driver/firm_codegen.c \
+	driver/firm_machine.c \
 	driver/firm_opt.c \
 	driver/firm_timing.c \
 	entity.c \
@@ -50,7 +49,6 @@ SOURCES := \
 	types.c \
 	walk_statements.c \
 	warning.c \
-	wrappergen/write_caml.c \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c
 
@@ -80,7 +78,8 @@ config.h:
 
 REVISION ?= $(shell svnversion -n .)
 
-.depend: config.h $(SOURCES)
+revision.h:
+	@echo "===> GEN $@"
 	@echo "#define cparser_REVISION \"$(REVISION)\"" > .revision.h
 	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
 	      rm .revision.h;                                    \
@@ -88,6 +87,8 @@ REVISION ?= $(shell svnversion -n .)
 	      echo "===> UPDATING revision.h";                   \
 	      mv .revision.h revision.h;                         \
 	    fi
+
+.depend: config.h revision.h $(SOURCES)
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
