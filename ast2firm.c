@@ -2657,7 +2657,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 	case EXPR_BINARY_SHIFTRIGHT:
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-		mode  = get_irn_mode(left);
+		mode  = get_ir_mode_arithmetic(expression->base.type);
 		right = create_conv(dbgi, right, mode_uint);
 		break;
 
