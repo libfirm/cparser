@@ -667,6 +667,8 @@ int main(int argc, char **argv)
 	file_list_entry_t *last_file            = NULL;
 	bool               construct_dep_target = false;
 	bool               do_timing            = false;
+	bool               profile_generate     = false;
+	bool               profile_use          = false;
 	struct obstack     file_obst;
 
 	atexit(free_temp_files);
@@ -867,6 +869,10 @@ int main(int argc, char **argv)
 						freestanding = truth_value;
 					} else if (streq(opt, "hosted")) {
 						freestanding = !truth_value;
+					} else if (streq(opt, "profile-generate")) {
+						profile_generate = truth_value;
+					} else if (streq(opt, "profile-use")) {
+						profile_use = truth_value;
 					} else if (truth_value == false &&
 					           streq(opt, "asynchronous-unwind-tables")) {
 					    /* nothing todo, a gcc feature which we don't support
@@ -1195,9 +1201,16 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	/* set the c_mode here, types depends on it */
+	/* apply some effects from switches */
 	c_mode |= features_on;
 	c_mode &= ~features_off;
+	if (profile_generate) {
+		add_flag(&ldflags_obst, "-lfirmprof");
+		set_be_option("profilegenerate");
+	}
+	if (profile_use) {
+		set_be_option("profileuse");
+	}
 
 	gen_firm_init();
 	byte_order_big_endian = be_get_backend_param()->byte_order_big_endian;
