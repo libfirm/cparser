@@ -831,9 +831,14 @@ int main(int argc, char **argv)
 				if (strstart(orig_opt, "input-charset=")) {
 					char const* const encoding = strchr(orig_opt, '=') + 1;
 					select_input_encoding(encoding);
-				} else if (streq(orig_opt, "verbose-asm")) {
-					/* ignore: we always print verbose assembler */
+				} else if (strstart(orig_opt, "align-loops=") ||
+				           strstart(orig_opt, "align-jumps=") ||
+				           strstart(orig_opt, "align-functions=")) {
+					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+				} else if (strstart(orig_opt, "message-length=")) {
+					/* ignore: would only affect error message format */
 				} else {
+					/* -f options which have an -fno- variant */
 					char const *opt         = orig_opt;
 					bool        truth_value = true;
 					if (opt[0] == 'n' && opt[1] == 'o' && opt[2] == '-') {
@@ -859,19 +864,15 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "unsigned-char")) {
 						char_is_signed = !truth_value;
 					} else if (streq(opt, "freestanding")) {
-						freestanding = true;
+						freestanding = truth_value;
 					} else if (streq(opt, "hosted")) {
-						freestanding = false;
+						freestanding = !truth_value;
 					} else if (truth_value == false &&
 					           streq(opt, "asynchronous-unwind-tables")) {
 					    /* nothing todo, a gcc feature which we don't support
 					     * anyway was deactivated */
-					} else if (strstart(orig_opt, "align-loops=") ||
-							strstart(orig_opt, "align-jumps=") ||
-							strstart(orig_opt, "align-functions=")) {
-						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
-					} else if (strstart(orig_opt, "message-length=")) {
-							/* ignore: would only affect error message format */
+					} else if (streq(orig_opt, "verbose-asm")) {
+						/* ignore: we always print verbose assembler */
 					} else if (streq(opt, "fast-math")               ||
 					           streq(opt, "jump-tables")             ||
 					           streq(opt, "expensive-optimizations") ||
