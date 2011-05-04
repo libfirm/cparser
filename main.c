@@ -123,6 +123,7 @@ static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
 static char              dep_target[1024];
 static const char       *outname;
+static bool              define_intmax_types;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -282,6 +283,13 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 
 		add_flag(&cppflags_obst, "-U__VERSION__");
 		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
+
+		if (define_intmax_types) {
+			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
+			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
+			add_flag(&cppflags_obst, "-U__UINTMAX_TYPE__");
+			add_flag(&cppflags_obst, "-D__UINTMAX_TYPE__=%s", type_to_string(type_uintmax_t));
+		}
 
 		if (flags[0] != '\0') {
 			size_t len = strlen(flags);
@@ -617,6 +625,7 @@ static bool init_os_support(void)
 	wchar_atomic_kind         = ATOMIC_TYPE_INT;
 	force_long_double_size    = 0;
 	enable_main_collect2_hack = false;
+	define_intmax_types       = false;
 
 	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
 			|| streq(os, "solaris")) {
@@ -624,6 +633,7 @@ static bool init_os_support(void)
 	} else if (streq(os, "darwin")) {
 		force_long_double_size = 16;
 		set_create_ld_ident(create_name_macho);
+		define_intmax_types = true;
 	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
 		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
