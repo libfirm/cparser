@@ -883,7 +883,7 @@ int main(int argc, char **argv)
 						profile_generate = truth_value;
 					} else if (streq(opt, "profile-use")) {
 						profile_use = truth_value;
-					} else if (truth_value == false &&
+					} else if (!truth_value &&
 					           streq(opt, "asynchronous-unwind-tables")) {
 					    /* nothing todo, a gcc feature which we don't support
 					     * anyway was deactivated */

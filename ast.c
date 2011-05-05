@@ -1916,7 +1916,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		expression_classification_t const lclass = is_constant_expression(left);
 		if (lclass != EXPR_CLASS_CONSTANT)
 			return lclass;
-		if (fold_constant_to_bool(left) == false)
+		if (!fold_constant_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
 		return is_constant_expression(expression->binary.right);
 	}
@@ -1926,7 +1926,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		expression_classification_t const lclass = is_constant_expression(left);
 		if (lclass != EXPR_CLASS_CONSTANT)
 			return lclass;
-		if (fold_constant_to_bool(left) == true)
+		if (fold_constant_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
 		return is_constant_expression(expression->binary.right);
 	}
@@ -1940,7 +1940,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		if (cclass != EXPR_CLASS_CONSTANT)
 			return cclass;
 
-		if (fold_constant_to_bool(condition) == true) {
+		if (fold_constant_to_bool(condition)) {
 			expression_t const *const t = expression->conditional.true_expression;
 			return t == NULL ? EXPR_CLASS_CONSTANT : is_constant_expression(t);
 		} else {

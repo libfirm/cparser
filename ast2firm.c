@@ -3711,14 +3711,8 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	if (is_builtin_expect(expression) && is_Cond(cond)) {
 		call_argument_t *argument = expression->call.arguments->next;
 		if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
-			bool             cnst = fold_constant_to_bool(argument->expression);
-			cond_jmp_predicate pred;
-
-			if (cnst == false) {
-				pred = COND_JMP_PRED_FALSE;
-			} else {
-				pred = COND_JMP_PRED_TRUE;
-			}
+			bool               const cnst = fold_constant_to_bool(argument->expression);
+			cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
 			set_Cond_jmp_pred(cond, pred);
 		}
 	}
