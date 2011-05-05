@@ -265,7 +265,7 @@ static opt_config_t opts[] = {
 	IRP("opt-func-call",     optimize_funccalls,       "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
-	IRP("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_HIDE_OPTIONS),
+	IRP("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
 	IRP("opt-cc",            mark_private_methods,     "calling conventions optimization",                      OPT_FLAG_NONE),
 #undef IRP
 #undef IRG
