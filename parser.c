@@ -3456,6 +3456,7 @@ typedef union construct_type_t construct_type_t;
 
 typedef struct construct_type_base_t {
 	construct_type_kind_t  kind;
+	source_position_t      pos;
 	construct_type_t      *next;
 } construct_type_base_t;
 
@@ -3495,16 +3496,16 @@ static construct_type_t *allocate_declarator_zero(construct_type_kind_t const ki
 {
 	construct_type_t *const cons = obstack_alloc(&temp_obst, size);
 	memset(cons, 0, size);
-	cons->kind = kind;
+	cons->kind     = kind;
+	cons->base.pos = *HERE;
 	return cons;
 }
 
 /* §6.7.5.1 */
 static construct_type_t *parse_pointer_declarator(void)
 {
-	eat('*');
-
 	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_POINTER, sizeof(parsed_pointer_t));
+	eat('*');
 	cons->pointer.type_qualifiers = parse_type_qualifiers();
 	//cons->pointer.base_variable   = base_variable;
 
@@ -3514,12 +3515,11 @@ static construct_type_t *parse_pointer_declarator(void)
 /* ISO/IEC 14882:1998(E) §8.3.2 */
 static construct_type_t *parse_reference_declarator(void)
 {
-	eat('&');
-
 	if (!(c_mode & _CXX))
 		errorf(HERE, "references are only available for C++");
 
 	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_REFERENCE, sizeof(parsed_reference_t));
+	eat('&');
 
 	return cons;
 }
@@ -3527,11 +3527,11 @@ static construct_type_t *parse_reference_declarator(void)
 /* §6.7.5.2 */
 static construct_type_t *parse_array_declarator(void)
 {
-	eat('[');
-	add_anchor_token(']');
-
 	construct_type_t *const cons  = allocate_declarator_zero(CONSTRUCT_ARRAY, sizeof(parsed_array_t));
 	parsed_array_t   *const array = &cons->array;
+
+	eat('[');
+	add_anchor_token(']');
 
 	bool is_static = next_if(T_static);
 
@@ -3576,6 +3576,8 @@ end_error:
 /* §6.7.5.3 */
 static construct_type_t *parse_function_declarator(scope_t *scope)
 {
+	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_FUNCTION, sizeof(construct_function_type_t));
+
 	type_t          *type  = allocate_type_zero(TYPE_FUNCTION);
 	function_type_t *ftype = &type->function;
 
@@ -3584,7 +3586,6 @@ static construct_type_t *parse_function_declarator(scope_t *scope)
 
 	parse_parameters(ftype, scope);
 
-	construct_type_t *const cons = allocate_declarator_zero(CONSTRUCT_FUNCTION, sizeof(construct_function_type_t));
 	cons->function.function_type = type;
 
 	return cons;
@@ -3722,6 +3723,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 {
 	construct_type_t *iter = construct_list;
 	for (; iter != NULL; iter = iter->base.next) {
+		source_position_t const* const pos = &iter->base.pos;
 		switch (iter->kind) {
 		case CONSTRUCT_INVALID:
 			break;
@@ -3734,13 +3736,12 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			type_t *skipped_return_type = skip_typeref(type);
 			/* §6.7.5.3:1 */
 			if (is_type_function(skipped_return_type)) {
-				errorf(HERE, "function returning function is not allowed");
+				errorf(pos, "function returning function is not allowed");
 			} else if (is_type_array(skipped_return_type)) {
-				errorf(HERE, "function returning array is not allowed");
+				errorf(pos, "function returning array is not allowed");
 			} else {
 				if (skipped_return_type->base.qualifiers != 0 && warning.other) {
-					warningf(HERE,
-						"type qualifiers in return type of function type are meaningless");
+					warningf(pos, "type qualifiers in return type of function type are meaningless");
 				}
 			}
 
@@ -3752,7 +3753,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_POINTER: {
 			if (is_type_reference(skip_typeref(type)))
-				errorf(HERE, "cannot declare a pointer to reference");
+				errorf(pos, "cannot declare a pointer to reference");
 
 			parsed_pointer_t *pointer = &iter->pointer;
 			type = make_based_pointer_type(type, pointer->type_qualifiers, pointer->base_variable);
@@ -3761,14 +3762,14 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 		case CONSTRUCT_REFERENCE:
 			if (is_type_reference(skip_typeref(type)))
-				errorf(HERE, "cannot declare a reference to reference");
+				errorf(pos, "cannot declare a reference to reference");
 
 			type = make_reference_type(type);
 			continue;
 
 		case CONSTRUCT_ARRAY: {
 			if (is_type_reference(skip_typeref(type)))
-				errorf(HERE, "cannot declare an array of references");
+				errorf(pos, "cannot declare an array of references");
 
 			parsed_array_t *array      = &iter->array;
 			type_t         *array_type = allocate_type_zero(TYPE_ARRAY);
@@ -3817,15 +3818,15 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			type_t *skipped_type = skip_typeref(type);
 			/* §6.7.5.2:1 */
 			if (is_type_incomplete(skipped_type)) {
-				errorf(HERE, "array of incomplete type '%T' is not allowed", type);
+				errorf(pos, "array of incomplete type '%T' is not allowed", type);
 			} else if (is_type_function(skipped_type)) {
-				errorf(HERE, "array of functions is not allowed");
+				errorf(pos, "array of functions is not allowed");
 			}
 			type = identify_new_type(array_type);
 			continue;
 		}
 		}
-		internal_errorf(HERE, "invalid type construction found");
+		internal_errorf(pos, "invalid type construction found");
 	}
 
 	return type;
