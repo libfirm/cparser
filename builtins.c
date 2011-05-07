@@ -90,9 +90,11 @@ void create_gnu_builtins(void)
 	GNU_BUILTIN(strlen,         make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
 	GNU_BUILTIN(strcmp,         make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
 	GNU_BUILTIN(strcpy,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	GNU_BUILTIN(__strcpy_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	GNU_BUILTIN(strncpy,        make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__strncpy_chk,  make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
+	GNU_BUILTIN(__strcpy_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(stpcpy,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	GNU_BUILTIN(__stpcpy_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(strncpy,        make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	GNU_BUILTIN(__strncpy_chk,  make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
 	GNU_BUILTIN(exit,           make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
 	GNU_BUILTIN(malloc,         make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
 
@@ -110,6 +112,7 @@ static const char *get_builtin_replacement_name(builtin_kind_t kind)
 	case bk_gnu_builtin___memset_chk:    return "memset";
 	case bk_gnu_builtin___snprintf_chk:  return "snprintf";
 	case bk_gnu_builtin___sprintf_chk:   return "sprintf";
+	case bk_gnu_builtin___stpcpy_chk:    return "stpcpy";
 	case bk_gnu_builtin___strcat_chk:    return "strcat";
 	case bk_gnu_builtin___strcpy_chk:    return "strcpy";
 	case bk_gnu_builtin___strncat_chk:   return "strncat";
@@ -128,6 +131,7 @@ static const char *get_builtin_replacement_name(builtin_kind_t kind)
 	case bk_gnu_builtin_memset:          return "memset";
 	case bk_gnu_builtin_snprintf:        return "snprintf";
 	case bk_gnu_builtin_sprintf:         return "sprintf";
+	case bk_gnu_builtin_stpcpy:          return "stpcpy";
 	case bk_gnu_builtin_strcat:          return "strcat";
 	case bk_gnu_builtin_strcmp:          return "strcmp";
 	case bk_gnu_builtin_strcpy:          return "strcpy";
