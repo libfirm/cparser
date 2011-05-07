@@ -54,6 +54,7 @@ type_t *type_unsigned_long_ptr;
 type_t *type_short_ptr;
 type_t *type_signed_char_ptr;
 type_t *type_void_ptr;
+type_t *type_const_void;
 type_t *type_const_void_ptr;
 type_t *type_void_ptr_restrict;
 type_t *type_const_void_ptr_restrict;
@@ -122,6 +123,7 @@ void init_basic_types(void)
 	type_float              = make_atomic_type(ATOMIC_TYPE_FLOAT,       TYPE_QUALIFIER_NONE);
 	type_char               = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_NONE);
 	type_void               = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_NONE);
+	type_const_void         = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_CONST);
 
 	/* microsoft types */
 	if (c_mode & _MS) {
@@ -148,10 +150,10 @@ void init_basic_types(void)
 
 	/* pointer types */
 	type_void_ptr           = make_pointer_type(type_void,              TYPE_QUALIFIER_NONE);
-	type_const_void_ptr     = make_pointer_type(type_void,              TYPE_QUALIFIER_CONST);
+	type_const_void_ptr     = make_pointer_type(type_const_void,        TYPE_QUALIFIER_NONE);
 	type_void_ptr_restrict  = make_pointer_type(type_void,              TYPE_QUALIFIER_RESTRICT);
 	type_const_void_ptr_restrict
-	                        = make_pointer_type(type_void,              TYPE_QUALIFIER_CONST | TYPE_QUALIFIER_RESTRICT);
+	                        = make_pointer_type(type_const_void,        TYPE_QUALIFIER_RESTRICT);
 	type_char_ptr           = make_pointer_type(type_char,              TYPE_QUALIFIER_NONE);
 	type_char_ptr_restrict  = make_pointer_type(type_char,              TYPE_QUALIFIER_RESTRICT);
 	type_signed_char_ptr    = make_pointer_type(type_signed_char,       TYPE_QUALIFIER_NONE);
