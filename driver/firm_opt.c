@@ -476,7 +476,6 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "thread-jumps");
 		do_irg_opt(irg, "remove-confirms");
 		do_irg_opt(irg, "gvn-pre");
-		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "gcse");
 		do_irg_opt(irg, "place");
 		do_irg_opt(irg, "control-flow");
