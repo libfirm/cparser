@@ -116,7 +116,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 
 				case 'Q': {
 					const unsigned qualifiers = va_arg(ap, unsigned);
-					print_type_qualifiers(qualifiers);
+					print_type_qualifiers(qualifiers, QUAL_SEP_NONE);
 					break;
 				}
 

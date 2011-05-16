@@ -253,17 +253,23 @@ void exit_types(void)
 	obstack_free(type_obst, NULL);
 }
 
-void print_type_qualifiers(type_qualifiers_t qualifiers)
+void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparators const q)
 {
+	size_t sep = q & QUAL_SEP_START ? 0 : 1;
 	if (qualifiers & TYPE_QUALIFIER_CONST) {
-		print_string("const ");
+		print_string(" const" + sep);
+		sep = 0;
 	}
 	if (qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		print_string("volatile ");
+		print_string(" volatile" + sep);
+		sep = 0;
 	}
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT) {
-		print_string("restrict ");
+		print_string(" restrict" + sep);
+		sep = 0;
 	}
+	if (sep == 0 && q & QUAL_SEP_END)
+		print_char(' ');
 }
 
 const char *get_atomic_kind_name(atomic_type_kind_t kind)
@@ -309,7 +315,7 @@ static void print_atomic_kinds(atomic_type_kind_t kind)
  */
 static void print_atomic_type(const atomic_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_atomic_kinds(type->akind);
 }
 
@@ -320,7 +326,7 @@ static void print_atomic_type(const atomic_type_t *type)
  */
 static void print_complex_type(const complex_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string("_Complex");
 	print_atomic_kinds(type->akind);
 }
@@ -332,7 +338,7 @@ static void print_complex_type(const complex_type_t *type)
  */
 static void print_imaginary_type(const imaginary_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string("_Imaginary ");
 	print_atomic_kinds(type->akind);
 }
@@ -359,7 +365,7 @@ static void print_function_type_pre(const function_type_t *type)
 			break;
 	}
 
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 
 	intern_print_type_pre(type->return_type);
 
@@ -453,10 +459,7 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 		print_string(") ");
 	}
 	print_string("*");
-	type_qualifiers_t const qual = type->base.qualifiers;
-	if (qual != 0)
-		print_string(" ");
-	print_type_qualifiers(qual);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_START);
 }
 
 /**
@@ -520,7 +523,7 @@ static void print_array_type_post(const array_type_t *type)
 	if (type->is_static) {
 		print_string("static ");
 	}
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	if (type->size_expression != NULL
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
@@ -583,7 +586,7 @@ void print_enum_definition(const enum_t *enume)
  */
 static void print_type_enum(const enum_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string("enum ");
 
 	enum_t   *enume  = type->enume;
@@ -628,7 +631,7 @@ void print_compound_definition(const compound_t *compound)
  */
 static void print_compound_type(const compound_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 
 	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
 		print_string("struct ");
@@ -653,7 +656,7 @@ static void print_compound_type(const compound_type_t *type)
  */
 static void print_typedef_type_pre(const typedef_type_t *const type)
 {
-	print_type_qualifiers(type->base.qualifiers);
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string(type->typedefe->base.symbol->string);
 }
 

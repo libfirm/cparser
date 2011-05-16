@@ -106,7 +106,13 @@ void print_type(const type_t *type);
 void print_type_ext(const type_t *type, const symbol_t *symbol,
                     const scope_t *parameters);
 
-void print_type_qualifiers(type_qualifiers_t qualifiers);
+typedef enum QualifierSeparators {
+	QUAL_SEP_NONE  = 0,
+	QUAL_SEP_START = 1U << 0,
+	QUAL_SEP_END   = 1U << 1
+} QualifierSeparators;
+
+void print_type_qualifiers(type_qualifiers_t qualifiers, QualifierSeparators);
 
 void print_enum_definition(const enum_t *enume);
 void print_compound_definition(const compound_t *compound);
