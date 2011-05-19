@@ -2415,8 +2415,8 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 {
 	eat(is_struct ? T_struct : T_union);
 
-	symbol_t    *symbol   = NULL;
-	compound_t  *compound = NULL;
+	symbol_t    *symbol     = NULL;
+	entity_t    *entity     = NULL;
 	attribute_t *attributes = NULL;
 
 	if (token.type == T___attribute__) {
@@ -2429,21 +2429,20 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		symbol = token.symbol;
 		next_token();
 
-		entity_t *entity = get_tag(symbol, kind);
+		entity = get_tag(symbol, kind);
 		if (entity != NULL) {
-			compound = &entity->compound;
-			if (compound->base.parent_scope != current_scope &&
+			if (entity->base.parent_scope != current_scope &&
 			    (token.type == '{' || token.type == ';')) {
 				/* we're in an inner scope and have a definition. Shadow
 				 * existing definition in outer scope */
-				compound = NULL;
-			} else if (compound->complete && token.type == '{') {
+				entity = NULL;
+			} else if (entity->compound.complete && token.type == '{') {
 				assert(symbol != NULL);
 				errorf(HERE, "multiple definitions of '%s %Y' (previous definition %P)",
 				       is_struct ? "struct" : "union", symbol,
-				       &compound->base.source_position);
+				       &entity->base.source_position);
 				/* clear members in the hope to avoid further errors */
-				compound->members.entities = NULL;
+				entity->compound.members.entities = NULL;
 			}
 		}
 	} else if (token.type != '{') {
@@ -2458,15 +2457,14 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		return NULL;
 	}
 
-	if (compound == NULL) {
-		entity_t *entity = allocate_entity_zero(kind);
-		compound         = &entity->compound;
+	if (entity == NULL) {
+		entity = allocate_entity_zero(kind);
 
-		compound->alignment            = 1;
-		compound->base.namespc         = NAMESPACE_TAG;
-		compound->base.source_position = token.source_position;
-		compound->base.symbol          = symbol;
-		compound->base.parent_scope    = current_scope;
+		entity->compound.alignment   = 1;
+		entity->base.namespc         = NAMESPACE_TAG;
+		entity->base.source_position = token.source_position;
+		entity->base.symbol          = symbol;
+		entity->base.parent_scope    = current_scope;
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
@@ -2474,20 +2472,20 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (token.type == '{') {
-		parse_compound_type_entries(compound);
+		parse_compound_type_entries(&entity->compound);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
 			assert(anonymous_entity == NULL);
-			anonymous_entity = (entity_t*)compound;
+			anonymous_entity = entity;
 		}
 	}
 
 	if (attributes != NULL) {
-		handle_entity_attributes(attributes, (entity_t*) compound);
+		handle_entity_attributes(attributes, entity);
 	}
 
-	return compound;
+	return &entity->compound;
 }
 
 static void parse_enum_entries(type_t *const enum_type)
@@ -5606,7 +5604,7 @@ static void parse_external_declaration(void)
 	assert(entity->kind == ENTITY_FUNCTION);
 	assert(ndeclaration->kind == ENTITY_FUNCTION);
 
-	function_t *function = &entity->function;
+	function_t *const function = &entity->function;
 	if (ndeclaration != entity) {
 		function->parameters = ndeclaration->function.parameters;
 	}
@@ -5641,7 +5639,7 @@ static void parse_external_declaration(void)
 		function_t *old_current_function = current_function;
 		entity_t   *old_current_entity   = current_entity;
 		current_function                 = function;
-		current_entity                   = (entity_t*) function;
+		current_entity                   = entity;
 		current_parent                   = NULL;
 
 		goto_first   = NULL;
@@ -5673,7 +5671,7 @@ static void parse_external_declaration(void)
 
 		assert(current_parent   == NULL);
 		assert(current_function == function);
-		assert(current_entity   == (entity_t*) function);
+		assert(current_entity   == entity);
 		current_entity   = old_current_entity;
 		current_function = old_current_function;
 		label_pop_to(label_stack_top);
