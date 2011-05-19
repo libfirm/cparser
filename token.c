@@ -45,7 +45,7 @@ static symbol_t *intern_register_token(token_type_t id, const char *string)
 	return symbol;
 }
 
-static symbol_t *intern_register_pp_token(token_type_t id, const char *string)
+static symbol_t *intern_register_pp_token(preprocessor_token_type_t id, const char *string)
 {
 	assert(0 <= id && id < TP_LAST_TOKEN);
 	symbol_t *symbol = symbol_table_insert(string);
