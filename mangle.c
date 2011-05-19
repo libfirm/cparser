@@ -377,8 +377,16 @@ ident *create_name_macho(entity_t *entity)
 	if (entity->kind == ENTITY_FUNCTION) {
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
-		if (type->function.linkage == LINKAGE_INVALID)
-			panic("linkage type of function is invalid");
+
+		switch (type->function.linkage) {
+			case LINKAGE_INVALID:
+				panic("linkage type of function is invalid");
+
+			default:
+				if (entity->function.actual_name != NULL)
+					return new_id_from_str(entity->function.actual_name->string);
+				break;
+		}
 	}
 
 	obstack_printf(&obst, "_%s", entity->base.symbol->string);
