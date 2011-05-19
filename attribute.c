@@ -286,7 +286,7 @@ static void handle_attribute_asm(const attribute_t *attribute,
 		       "Invalid asm attribute expression");
 	symbol_t *sym = symbol_table_insert(expression->string_literal.value.begin);
 	entity->function.actual_name = sym;
-	assert (argument->next == NULL);
+	assert(argument->next == NULL);
 	return;
 }
 
