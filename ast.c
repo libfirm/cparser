@@ -1478,19 +1478,14 @@ void print_entity(const entity_t *entity)
 		return;
 	case ENTITY_STRUCT:
 		print_string("struct ");
-		print_string(entity->base.symbol->string);
-		if (entity->structe.complete) {
-			print_string(" ");
-			print_compound_definition(&entity->structe);
-		}
-		print_string(";");
-		return;
+		goto print_compound;
 	case ENTITY_UNION:
 		print_string("union ");
+print_compound:
 		print_string(entity->base.symbol->string);
-		if (entity->unione.complete) {
+		if (entity->compound.complete) {
 			print_string(" ");
-			print_compound_definition(&entity->unione);
+			print_compound_definition(&entity->compound);
 		}
 		print_string(";");
 		return;

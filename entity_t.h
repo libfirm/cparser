@@ -263,8 +263,6 @@ struct function_t {
 union entity_t {
 	entity_kind_t      kind;
 	entity_base_t      base;
-	compound_t         structe;
-	compound_t         unione;
 	compound_t         compound;
 	enum_t             enume;
 	enum_value_t       enum_value;
