@@ -284,8 +284,7 @@ static void handle_attribute_asm(const attribute_t *attribute,
 	if (expression->kind != EXPR_STRING_LITERAL)
 		errorf(&attribute->source_position,
 		       "Invalid asm attribute expression");
-	string_literal_expression_t *strexpr = (string_literal_expression_t*)expression;
-	symbol_t *sym = symbol_table_insert(strexpr->value.begin);
+	symbol_t *sym = symbol_table_insert(expression->string_literal.value.begin);
 	entity->function.actual_name = sym;
 	assert (argument->next == NULL);
 	return;
