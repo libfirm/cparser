@@ -70,7 +70,6 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_FUNCTION]        = sizeof(function_type_t),
 		[TYPE_POINTER]         = sizeof(pointer_type_t),
 		[TYPE_ARRAY]           = sizeof(array_type_t),
-		[TYPE_BUILTIN]         = sizeof(builtin_type_t),
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
 	};
@@ -706,9 +705,6 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_COMPOUND_UNION:
 		print_compound_type(&type->compound);
 		return;
-	case TYPE_BUILTIN:
-		print_string(type->builtin.symbol->string);
-		return;
 	case TYPE_FUNCTION:
 		print_function_type_pre(&type->function);
 		return;
@@ -765,7 +761,6 @@ static void intern_print_type_post(const type_t *const type)
 	case TYPE_ENUM:
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
-	case TYPE_BUILTIN:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		break;
@@ -1015,11 +1010,8 @@ bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch (type->kind) {
-	case TYPE_POINTER: return true;
-	case TYPE_BUILTIN: return is_type_scalar(type->builtin.real_type);
-	default:           break;
-	}
+	if (type->kind == TYPE_POINTER)
+		return true;
 
 	return is_type_arithmetic(type);
 }
@@ -1060,7 +1052,6 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
 	case TYPE_REFERENCE:
-	case TYPE_BUILTIN:
 	case TYPE_ERROR:
 		return false;
 
@@ -1077,14 +1068,6 @@ bool is_type_incomplete(const type_t *type)
 bool is_type_object(const type_t *type)
 {
 	return !is_type_function(type) && !is_type_incomplete(type);
-}
-
-bool is_builtin_va_list(type_t *type)
-{
-	type_t *tp = skip_typeref(type);
-
-	return tp->kind == type_valist->kind &&
-	       tp->builtin.symbol == type_valist->builtin.symbol;
 }
 
 /**
@@ -1210,7 +1193,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		break;
 	}
 	case TYPE_ENUM:
-	case TYPE_BUILTIN:
 		/* TODO: not implemented */
 		break;
 
@@ -1319,8 +1301,6 @@ unsigned get_type_size(type_t *type)
 	}
 	case TYPE_BITFIELD:
 		return 0;
-	case TYPE_BUILTIN:
-		return get_type_size(type->builtin.real_type);
 	case TYPE_TYPEDEF:
 		return get_type_size(type->typedeft.typedefe->type);
 	case TYPE_TYPEOF:
@@ -1365,8 +1345,6 @@ unsigned get_type_alignment(type_t *type)
 		return get_type_alignment(type->array.element_type);
 	case TYPE_BITFIELD:
 		return 0;
-	case TYPE_BUILTIN:
-		return get_type_alignment(type->builtin.real_type);
 	case TYPE_TYPEDEF: {
 		il_alignment_t alignment
 			= get_type_alignment(type->typedeft.typedefe->type);
@@ -1405,8 +1383,6 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 	case TYPE_BITFIELD:
 	case TYPE_ARRAY:
 		return 0;
-	case TYPE_BUILTIN:
-		return get_type_modifiers(type->builtin.real_type);
 	case TYPE_TYPEDEF: {
 		decl_modifiers_t modifiers = type->typedeft.typedefe->modifiers;
 		modifiers |= get_type_modifiers(type->typedeft.typedefe->type);

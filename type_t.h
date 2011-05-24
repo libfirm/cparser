@@ -47,7 +47,6 @@ typedef enum type_kind_t {
 	TYPE_REFERENCE,
 	TYPE_ARRAY,
 	TYPE_BITFIELD,
-	TYPE_BUILTIN,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
 } type_kind_t;
@@ -73,12 +72,6 @@ struct complex_type_t {
 struct imaginary_type_t {
 	type_base_t         base;
 	atomic_type_kind_t  akind;
-};
-
-struct builtin_type_t {
-	type_base_t  base;
-	symbol_t    *symbol;
-	type_t      *real_type;
 };
 
 struct pointer_type_t {
@@ -189,7 +182,6 @@ union type_t {
 	atomic_type_t    atomic;
 	complex_type_t   complex;
 	imaginary_type_t imaginary;
-	builtin_type_t   builtin;
 	pointer_type_t   pointer;
 	reference_type_t reference;
 	array_type_t     array;
@@ -267,12 +259,6 @@ static inline bool is_type_struct(const type_t *type)
 {
 	assert(!is_typeref(type));
 	return type->kind == TYPE_COMPOUND_STRUCT;
-}
-
-static inline bool is_type_builtin(const type_t *type)
-{
-	assert(!is_typeref(type));
-	return type->kind == TYPE_BUILTIN;
 }
 
 static inline bool is_type_compound(const type_t *type)

@@ -162,6 +162,7 @@ void init_basic_types(void)
 	type_long_long_ptr      = make_pointer_type(type_long_long,         TYPE_QUALIFIER_NONE);
 
 	type_char_ptr_ptr       = make_pointer_type(type_char_ptr,          TYPE_QUALIFIER_NONE);
+	type_valist             = type_void_ptr;
 
 	/* const character types */
 	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);

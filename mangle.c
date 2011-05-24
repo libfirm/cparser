@@ -215,7 +215,6 @@ static void mangle_type(type_t *orig_type)
 		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
 		panic("error type encountered while mangling");
-	case TYPE_BUILTIN:
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("typeref not resolved while manging?!?");

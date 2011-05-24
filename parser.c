@@ -1062,8 +1062,7 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			(is_type_atomic(type_left, ATOMIC_TYPE_BOOL)
 				&& is_type_pointer(type_right))) {
 		return ASSIGN_SUCCESS;
-	} else if ((is_type_compound(type_left)  && is_type_compound(type_right))
-			|| (is_type_builtin(type_left) && is_type_builtin(type_right))) {
+	} else if (is_type_compound(type_left) && is_type_compound(type_right)) {
 		type_t *const unqual_type_left  = get_unqualified_type(type_left);
 		type_t *const unqual_type_right = get_unqualified_type(type_right);
 		if (types_compatible(unqual_type_left, unqual_type_right)) {
@@ -2680,15 +2679,6 @@ typedef enum specifiers_t {
 	SPECIFIER_COMPLEX   = 1 << 17,
 	SPECIFIER_IMAGINARY = 1 << 18,
 } specifiers_t;
-
-static type_t *create_builtin_type(symbol_t *const symbol,
-                                   type_t *const real_type)
-{
-	type_t *type            = allocate_type_zero(TYPE_BUILTIN);
-	type->builtin.symbol    = symbol;
-	type->builtin.real_type = real_type;
-	return identify_new_type(type);
-}
 
 static type_t *get_typedef_type(symbol_t *symbol)
 {
@@ -10949,9 +10939,6 @@ void init_parser(void)
 
 	init_expression_parsers();
 	obstack_init(&temp_obst);
-
-	symbol_t *const va_list_sym = symbol_table_insert("__builtin_va_list");
-	type_valist = create_builtin_type(va_list_sym, type_void_ptr);
 }
 
 /**

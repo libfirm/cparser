@@ -743,9 +743,6 @@ ir_type *get_ir_type(type_t *type)
 	case TYPE_ENUM:
 		firm_type = create_enum_type(&type->enumt);
 		break;
-	case TYPE_BUILTIN:
-		firm_type = get_ir_type(type->builtin.real_type);
-		break;
 	case TYPE_BITFIELD:
 		firm_type = create_bitfield_type(&type->bitfield);
 		break;
@@ -3317,7 +3314,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			/* gcc classifies the referenced type */
 			case TYPE_REFERENCE: type = type->reference.refers_to; continue;
 
-			case TYPE_BUILTIN:
 			/* typedef/typeof should be skipped already */
 			case TYPE_TYPEDEF:
 			case TYPE_TYPEOF:

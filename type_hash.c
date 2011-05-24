@@ -166,9 +166,6 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_ARRAY:
 		hash = hash_array_type(&type->array);
 		break;
-	case TYPE_BUILTIN:
-		hash = hash_ptr(type->builtin.symbol);
-		break;
 	case TYPE_TYPEDEF:
 		hash = hash_ptr(type->typedeft.typedefe);
 		break;
@@ -271,12 +268,6 @@ static bool array_types_equal(const array_type_t *type1,
 	return false;
 }
 
-static bool builtin_types_equal(const builtin_type_t *type1,
-                                const builtin_type_t *type2)
-{
-	return type1->symbol == type2->symbol;
-}
-
 static bool compound_types_equal(const compound_type_t *type1,
                                  const compound_type_t *type2)
 {
@@ -349,8 +340,6 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 		return reference_types_equal(&type1->reference, &type2->reference);
 	case TYPE_ARRAY:
 		return array_types_equal(&type1->array, &type2->array);
-	case TYPE_BUILTIN:
-		return builtin_types_equal(&type1->builtin, &type2->builtin);
 	case TYPE_TYPEOF:
 		return typeof_types_equal(&type1->typeoft, &type2->typeoft);
 	case TYPE_TYPEDEF:

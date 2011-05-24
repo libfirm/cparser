@@ -166,11 +166,6 @@ bool is_type_incomplete(const type_t *type);
 
 bool is_type_object(const type_t *type);
 
-/**
- * returns true if teh type is the builtin va_list type.
- */
-bool is_builtin_va_list(type_t *type);
-
 bool types_compatible(const type_t *type1, const type_t *type2);
 
 type_t *get_unqualified_type(type_t *type);

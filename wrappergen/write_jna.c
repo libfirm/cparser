@@ -224,9 +224,6 @@ static void write_type(type_t *type)
 	case TYPE_ENUM:
 		write_enum_type(&type->enumt);
 		return;
-	case TYPE_BUILTIN:
-		write_type(type->builtin.real_type);
-		return;
 	case TYPE_ERROR:
 	case TYPE_INVALID:
 	case TYPE_TYPEOF:
