@@ -4051,23 +4051,30 @@ static void check_main(const entity_t *entity)
 	}
 	const function_parameter_t *parm = func_type->parameters;
 	if (parm != NULL) {
-		type_t *const first_type = parm->type;
-		if (!types_compatible(skip_typeref(first_type), type_int)) {
+		type_t *const first_type        = skip_typeref(parm->type);
+		type_t *const first_type_unqual = get_unqualified_type(first_type);
+		if (!types_compatible(first_type_unqual, type_int)) {
 			warningf(pos,
 			         "first argument of 'main' should be 'int', but is '%T'",
-			         first_type);
+			         parm->type);
 		}
 		parm = parm->next;
 		if (parm != NULL) {
-			type_t *const second_type = parm->type;
-			if (!types_compatible(skip_typeref(second_type), type_char_ptr_ptr)) {
-				warningf(pos, "second argument of 'main' should be 'char**', but is '%T'", second_type);
+			type_t *const second_type = skip_typeref(parm->type);
+			type_t *const second_type_unqual
+				= get_unqualified_type(second_type);
+			if (!types_compatible(second_type_unqual, type_char_ptr_ptr)) {
+				warningf(pos, "second argument of 'main' should be 'char**', but is '%T'",
+				         parm->type);
 			}
 			parm = parm->next;
 			if (parm != NULL) {
-				type_t *const third_type = parm->type;
-				if (!types_compatible(skip_typeref(third_type), type_char_ptr_ptr)) {
-					warningf(pos, "third argument of 'main' should be 'char**', but is '%T'", third_type);
+				type_t *const third_type = skip_typeref(parm->type);
+				type_t *const third_type_unqual
+					= get_unqualified_type(third_type);
+				if (!types_compatible(third_type_unqual, type_char_ptr_ptr)) {
+					warningf(pos, "third argument of 'main' should be 'char**', but is '%T'",
+					         parm->type);
 				}
 				parm = parm->next;
 				if (parm != NULL)
