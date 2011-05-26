@@ -559,11 +559,11 @@ static void do_firm_lowering(const char *input_filename)
 		ir_graph *irg = get_irp_irg(i);
 
 		do_irg_opt(irg, "local");
-		do_irg_opt(irg, "gcse");
-		do_irg_opt(irg, "place");
+		do_irg_opt(irg, "deconv");
 		do_irg_opt(irg, "control-flow");
 		do_irg_opt(irg, "opt-load-store");
-		do_irg_opt(irg, "local");
+		do_irg_opt(irg, "gcse");
+		do_irg_opt(irg, "place");
 		do_irg_opt(irg, "control-flow");
 
 		if (do_irg_opt(irg, "vrp")) {
