@@ -492,7 +492,6 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "ivopts");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "dead");
-		do_irg_opt(irg, "frame");
 	}
 
 	do_irp_opt("inline");
@@ -580,6 +579,7 @@ static void do_firm_lowering(const char *input_filename)
 		}
 
 		do_irg_opt(irg, "parallelize-mem");
+		do_irg_opt(irg, "frame");
 	}
 	do_irp_opt("remove-unused");
 	do_irp_opt("opt-cc");
