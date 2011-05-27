@@ -1012,10 +1012,6 @@ int main(int argc, char **argv)
 					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
-				} else if (streq(opt, "omit-leaf-frame-pointer")) {
-					set_be_option("omitleaffp=1");
-				} else if (streq(opt, "no-omit-leaf-frame-pointer")) {
-					set_be_option("omitleaffp=0");
 				} else if (streq(opt, "rtd")) {
 					default_calling_convention = CC_STDCALL;
 				} else if (strstart(opt, "regparm=")) {
