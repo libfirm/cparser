@@ -1331,6 +1331,8 @@ static attribute_t *parse_attributes(attribute_t *first)
 		switch (token.type) {
 		case T___attribute__:
 			attribute = parse_attribute_gnu();
+			if (attribute == NULL)
+				continue;
 			break;
 
 		case T_asm:
