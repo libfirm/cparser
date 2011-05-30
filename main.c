@@ -79,6 +79,7 @@
 #include "wrappergen/write_jna.h"
 #include "revision.h"
 #include "warning.h"
+#include "help.h"
 #include "mangle.h"
 #include "printer.h"
 
@@ -559,13 +560,198 @@ static void print_cparser_version(void)
 	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 }
 
-static void print_help(const char *argv0)
+static void print_help_basic(const char *argv0)
 {
 	usage(argv0);
 	puts("");
-	puts("\t-fhelp     Display help about firm optimisation options");
-	puts("\t-bhelp     Display help about firm backend options");
-	puts("A big number of gcc flags is also supported");
+	put_help("--help",                   "Display this information");
+	put_help("--version",                "Display compiler version");
+	put_help("--help-parser",            "Display information about parser options");
+	put_help("--help-warnings",          "Display information about warning options");
+	put_help("--help-codegen",           "Display information about code-generation options");
+	put_help("--help-linker",            "Display information about linker options");
+	put_help("--help-language-tools",    "Display information about language tools options");
+	put_help("--help-debug",             "Display information about compiler debugging options");
+	put_help("--help-firm",              "Display information about direct firm options");
+	put_help("--help-all",               "Display information about all options");
+	put_help("-c",                       "Compile and assemble but do not link");
+	put_help("-E",                       "Preprocess only");
+	put_help("-S",                       "Compile but do not assembler or link");
+	put_help("-o",                       "Specify output file");
+	put_help("-v",                       "Verbose output (show invocation of sub-processes)");
+	put_help("-x",                       "Force input language:");
+	put_choice("c",                      "C");
+	put_choice("c++",                    "C++");
+	put_choice("assembler",              "Assembler (no preprocessing)");
+	put_choice("assembler-with-cpp",     "Assembler with preprocessing");
+	put_choice("none",                   "Autodetection");
+	put_help("-pipe",                    "ignored (gcc compatibility)");
+}
+
+static void print_help_preprocessor(void)
+{
+	put_help("-nostdinc",                "Do not search standard system include directories");
+	put_help("-trigraphs",               "Support ISO C trigraphs");
+	put_help("-isystem",                 "");
+	put_help("-include",                 "");
+	put_help("-I PATH",                  "");
+	put_help("-D SYMBOL[=value]",        "");
+	put_help("-U SYMBOL",                "");
+	put_help("-Wp,OPTION",               "pass option directly to preprocessor");
+	put_help("-M",                       "");
+	put_help("-MD",                      "");
+	put_help("-MMD",                     "");
+	put_help("-MM",                      "");
+	put_help("-MP",                      "");
+	put_help("-MT",                      "");
+	put_help("-MQ",                      "");
+	put_help("-MF",                      "");
+}
+
+static void print_help_parser(void)
+{
+	put_help("-finput-charset=CHARSET",  "Select encoding of input files");
+	put_help("-fmessage-length=LEN",     "ignored (gcc compatibility)");
+	put_help("-fshort-wchar",            "wchar_t is unsigned short instead of int");
+	put_help("-funsigned-char",          "char is an unsigned type");
+	put_help("--ms",                     "Enable msvc extensions");
+	put_help("--no-ms",                  "Disable msvc extensions");
+	put_help("--gcc",                    "Enable gcc extensions");
+	put_help("--no-gcc",                 "Disable gcc extensions");
+	put_help("-std=STANDARD",            "Specify language standard:");
+	put_choice("c99",                    "ISO C99 standard");
+	put_choice("c89",                    "ISO C89 standard");
+	put_choice("c9x",                    "deprecated");
+	put_choice("c++",                    "ISO C++ 98");
+	put_choice("c++98",                  "ISO C++ 98");
+	put_choice("gnu99",                  "ISO C99 + GNU extensions (default)");
+	put_choice("gnu89",                  "ISO C89 + GNU extensions");
+	put_choice("gnu9x",                  "deprecated");
+	put_choice("iso9899:1990",           "ISO C89");
+	put_choice("iso9899:199409",         "ISO C90");
+	put_choice("iso9899:1999",           "ISO C99");
+	put_choice("iso9899:199x",           "deprecated");
+	put_help("-pedantic",                "ignored (gcc compatibility)");
+	put_help("-ansi",                    "ignored (gcc compatibility)");
+	put_help("--strict",                 "Enable strict conformance checking");
+}
+
+static void print_help_warnings(void)
+{
+	put_help("-w",                       "disable all warnings");
+	put_help("-W",                       "ignored (gcc compatibility)");
+	put_help("-Wno-trigraphs",           "warn if input contains trigraphs");
+	put_help("-Wundef",                  "Warn if an undefined macro is used in an #if");
+	print_warning_opt_help();
+}
+
+static void print_help_optimisation(void)
+{
+	put_help("-O LEVEL",                 "select optimisation level (0-4)");
+	put_help("-fexpensive-optimizations","ignored (gcc compatibility)");
+}
+
+static void print_help_codegeneration(void)
+{
+	put_help("-g",                       "Generate debug information");
+	put_help("-pg",                      "Instrument code for gnu gprof");
+	put_help("-fomit-frame-pointer",     "Produce code without frame pointer where possible");
+	put_help("-ffreestanding",           "compile in freestanding mode (see ISO C standard)");
+	put_help("-fhosted",                 "compile in hosted (not freestanding) mode");
+	put_help("-fprofile-generate",       "Generate instrumented code to collect profile information");
+	put_help("-fprofile-use",            "Use profile information generated by instrumented binaries");
+	put_help("-pthread",                 "Use pthread threading library");
+	put_help("-fverbose-asm",            "ignored (gcc compatibility)");
+	put_help("-ffast-math",              "ignored (gcc compatibility)");
+	put_help("-fjump-tables",            "ignored (gcc compatibility)");
+	put_help("-fcommon",                 "ignored (gcc compatibility)");
+	put_help("-foptimize-sibling-calls", "ignored (gcc compatibility)");
+	put_help("-falign-loops",            "ignored (gcc compatibility)");
+	put_help("-falign-jumps",            "ignored (gcc compatibility)");
+	put_help("-falign-functions",        "ignored (gcc compatibility)");
+	put_help("-fPIC",                    "ignored (gcc compatibility)");
+	put_help("-mtarget=TARGET",          "Specify target architecture as CPU-manufacturer-OS triple");
+	put_help("-mtriple=TARGET",          "alias for -mtarget (clang compatibility)");
+	put_help("-march=ARCH",              "");
+	put_help("-mtune=ARCH",              "");
+	put_help("-mcpu=CPU",                "");
+	put_help("-mfpmath=",                "");
+	put_help("-mpreferred-stack-boundary=", "");
+	put_help("-mrtd",                    "");
+	put_help("-mregparm=",               "not supported yet");
+	put_help("-msoft-float",             "not supported yet");
+	put_help("-m32",                     "generate 32bit code");
+	put_help("-m64",                     "generate 64bit code");
+	puts("");
+	puts("\tMost of these options can be used with a no- prefix to disable them");
+	puts("\ti.e. -fno-signed-char");
+}
+
+static void print_help_linker(void)
+{
+	put_help("-l LIBRARY",               "");
+	put_help("-L PATH",                  "");
+	put_help("-shared",                  "Produce a shared library");
+	put_help("-static",                  "Produce statically linked binary");
+	put_help("-Wl,OPTION",               "pass option directly to linker");
+}
+
+static void print_help_debug(void)
+{
+	put_help("--lextest",                "Preprocess and tokenize only");
+	put_help("--print-ast",              "Preprocess, parse and print AST");
+	put_help("--print-implicit-cast",    "");
+	put_help("--print-parenthesis",      "");
+	put_help("--benchmark",              "Preprocess and parse, produces no output");
+	put_help("--time",                   "Measure time of compiler passes");
+	put_help("--dump-function func",     "Preprocess, parse and output vcg graph of func");
+	put_help("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
+}
+
+static void print_help_language_tools(void)
+{
+	put_help("--print-fluffy",           "Preprocess, parse and generate declarations for the fluffy language");
+	put_help("--print-jna",              "Preprocess, parse and generate declarations for JNA");
+	put_help("--jna-limit filename",     "");
+	put_help("--jna-libname name",       "");
+}
+
+static void print_help_firm(void)
+{
+	put_help("-bOPTION",                 "directly pass option to libFirm backend");
+	int res = be_parse_arg("help");
+	(void) res;
+	assert(res);
+}
+
+typedef enum {
+	HELP_NONE          = 0,
+	HELP_BASIC         = 1u << 0,
+	HELP_PREPROCESSOR  = 1u << 1,
+	HELP_PARSER        = 1u << 2,
+	HELP_WARNINGS      = 1u << 3,
+	HELP_OPTIMISATION  = 1u << 4,
+	HELP_CODEGEN       = 1u << 5,
+	HELP_LINKER        = 1u << 6,
+	HELP_LANGUAGETOOLS = 1u << 7,
+	HELP_DEBUG         = 1u << 8,
+	HELP_FIRM          = 1u << 9,
+
+	HELP_ALL           = (unsigned)-1
+} help_sections_t;
+
+static void print_help(const char *argv0, help_sections_t sections)
+{
+	if (sections & HELP_BASIC)         print_help_basic(argv0);
+	if (sections & HELP_PREPROCESSOR)  print_help_preprocessor();
+	if (sections & HELP_PARSER)        print_help_parser();
+	if (sections & HELP_WARNINGS)      print_help_warnings();
+	if (sections & HELP_OPTIMISATION)  print_help_optimisation();
+	if (sections & HELP_CODEGEN)       print_help_codegeneration();
+	if (sections & HELP_LINKER)        print_help_linker();
+	if (sections & HELP_LANGUAGETOOLS) print_help_language_tools();
+	if (sections & HELP_DEBUG)         print_help_debug();
+	if (sections & HELP_FIRM)          print_help_firm();
 }
 
 static void set_be_option(const char *arg)
@@ -735,12 +921,12 @@ int main(int argc, char **argv)
 	setup_target_machine();
 
 	/* parse rest of options */
-	standard                   = STANDARD_DEFAULT;
-	unsigned   features_on     = 0;
-	unsigned   features_off    = 0;
-	filetype_t forced_filetype = FILETYPE_AUTODETECT;
-	bool       help_displayed  = false;
-	bool       argument_errors = false;
+	                standard        = STANDARD_DEFAULT;
+	unsigned        features_on     = 0;
+	unsigned        features_off    = 0;
+	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
+	help_sections_t help            = HELP_NONE;
+	bool            argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
@@ -899,6 +1085,9 @@ int main(int argc, char **argv)
 					           streq(opt, "align-functions")         ||
 					           streq(opt, "PIC")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+					} else if (streq(opt, "help")) {
+						fprintf(stderr, "warning: -fhelp is deprecated\n");
+						help |= HELP_FIRM;
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
@@ -906,23 +1095,25 @@ int main(int argc, char **argv)
 							        orig_opt);
 							argument_errors = true;
 							continue;
-						} else if (res == -1) {
-							help_displayed = true;
 						}
 					}
 				}
 			} else if (option[0] == 'b') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-b");
-				int res = be_parse_arg(opt);
-				if (res == 0) {
-					fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
-					        opt);
-					argument_errors = true;
-				} else if (res == -1) {
-					help_displayed = true;
-				} else if (strstart(opt, "isa=")) {
-					strncpy(cpu_arch, opt, sizeof(cpu_arch));
+
+				if (streq(opt, "help")) {
+					fprintf(stderr, "warning: -bhelp is deprecated (use --help-firm)\n");
+					help |= HELP_FIRM;
+				} else {
+					int res = be_parse_arg(opt);
+					if (res == 0) {
+						fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
+								opt);
+						argument_errors = true;
+					} else if (strstart(opt, "isa=")) {
+						strncpy(cpu_arch, opt, sizeof(cpu_arch));
+					}
 				}
 			} else if (option[0] == 'W') {
 				if (option[1] == '\0') {
@@ -1116,8 +1307,23 @@ int main(int argc, char **argv)
 					print_cparser_version();
 					return EXIT_SUCCESS;
 				} else if (streq(option, "help")) {
-					print_help(argv[0]);
-					help_displayed = true;
+					help |= HELP_BASIC;
+				} else if (streq(option, "help-parser")) {
+					help |= HELP_PARSER;
+				} else if (streq(option, "help-warnings")) {
+					help |= HELP_WARNINGS;
+				} else if (streq(option, "help-codegen")) {
+					help |= HELP_CODEGEN;
+				} else if (streq(option, "help-linker")) {
+					help |= HELP_LINKER;
+				} else if (streq(option, "help-language-tools")) {
+					help |= HELP_LANGUAGETOOLS;
+				} else if (streq(option, "help-debug")) {
+					help |= HELP_DEBUG;
+				} else if (streq(option, "help-firm")) {
+					help |= HELP_FIRM;
+				} else if (streq(option, "help-all")) {
+					help |= HELP_ALL;
 				} else if (streq(option, "dump-function")) {
 					++i;
 					if (i >= argc) {
@@ -1187,7 +1393,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (help_displayed) {
+	if (help != HELP_NONE) {
+		print_help(argv[0], help);
 		return !argument_errors;
 	}
 

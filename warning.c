@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "warning.h"
+#include "help.h"
 
 warning_t warning = {
 	.other                               = true,
@@ -74,6 +75,65 @@ warning_t warning = {
 	.unused_variable                     = false,
 	.write_strings                       = false
 };
+
+void print_warning_opt_help(void)
+{
+	/* TODO: write explanations */
+	put_help("-Waddress",                       "");
+	put_help("-Wall",                           "");
+	put_help("-Waggregate-return",              "");
+	put_help("-Wattribute",                     "");
+	put_help("-Wcast-qual",                     "");
+	put_help("-Wchar-subscripts",               "");
+	put_help("-Wcomment",                       "");
+	put_help("-Wconversion",                    "");
+	put_help("-Wdeclaration-after-statement",   "");
+	put_help("-Wdeprecated-declarations",       "");
+	put_help("-Wdiv-by-zero",                   "");
+	put_help("-Wempty-statement",               "");
+	put_help("-Werror",                         "warnings are errors");
+	put_help("-Werror-implicit-function-declaration", "");
+	put_help("-Wextra",                         "");
+	put_help("-Wfatal-errors",                  "");
+	put_help("-Wfloat-equal",                   "");
+	put_help("-Wformat",                        "");
+	put_help("-Wimplicit",                      "");
+	put_help("-Wimplicit-function-declaration", "");
+	put_help("-Wimplicit-int",                  "");
+	put_help("-Winit-self",                     "");
+	put_help("-Wlong-long",                     "");
+	put_help("-Wmain",                          "");
+	put_help("-Wmissing-declarations",          "");
+	put_help("-Wmissing-noreturn",              "");
+	put_help("-Wmissing-prototypes",            "");
+	put_help("-Wmultichar",                     "");
+	put_help("-Wnested-externs",                "");
+	put_help("-Wnonnull",                       "");
+	put_help("-Wold-style-definition",          "");
+	put_help("-Wparentheses",                   "");
+	put_help("-Wpacked",                        "");
+	put_help("-Wpadded",                        "");
+	put_help("-Wparentheses",                   "");
+	put_help("-Wpointer-arith",                 "");
+	put_help("-Wredundant-decls",               "");
+	put_help("-Wreturn-type",                   "");
+	put_help("-Wshadow",                        "");
+	put_help("-Wsign-compare",                  "");
+	put_help("-Wstrict-prototypes",             "");
+	put_help("-Wswitch-default",                "");
+	put_help("-Wswitch-enum",                   "");
+	put_help("-Wtraditional",                   "");
+	put_help("-Wuninitialized",                 "");
+	put_help("-Wunknown-pragmas",               "");
+	put_help("-Wunreachable-code",              "");
+	put_help("-Wunused",                        "");
+	put_help("-Wunused-function",               "");
+	put_help("-Wunused-label",                  "");
+	put_help("-Wunused-parameter",              "");
+	put_help("-Wunused-value",                  "");
+	put_help("-Wunused-variable",               "");
+	put_help("-Wwrite-strings",                 "");
+}
 
 void set_warning_opt(const char *const opt)
 {

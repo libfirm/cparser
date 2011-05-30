@@ -24,6 +24,8 @@
 
 void set_warning_opt(const char *opt);
 
+void print_warning_opt_help(void);
+
 typedef struct warning_t {
 	bool other:1;                               /**< Warnings not covered by any option below */
 
