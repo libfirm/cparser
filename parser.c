@@ -3642,25 +3642,44 @@ ptr_operator_end: ;
 		}
 		next_token();
 		break;
-	case '(':
-		/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
-		 * interpreted as ``function with no parameter specification'', rather
-		 * than redundant parentheses around the omitted identifier. */
-		if (look_ahead(1)->type != ')') {
-			next_token();
-			add_anchor_token(')');
-			inner_types = parse_inner_declarator(env);
-			if (inner_types != NULL) {
-				/* All later declarators only modify the return type */
-				env->must_be_abstract = true;
-			}
-			rem_anchor_token(')');
-			expect(')', end_error);
-		} else if (!env->may_be_abstract) {
-			errorf(HERE, "declarator must have a name");
-			goto error_out;
+
+	case '(': {
+		/* Parenthesized declarator or function declarator? */
+		token_t const *const la1 = look_ahead(1);
+		switch (la1->type) {
+			case T_IDENTIFIER:
+				if (is_typedef_symbol(la1->symbol)) {
+			case ')':
+					/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
+					 * interpreted as ``function with no parameter specification'', rather
+					 * than redundant parentheses around the omitted identifier. */
+			default:
+					/* Function declarator. */
+					if (!env->may_be_abstract) {
+						errorf(HERE, "function declarator must have a name");
+						goto error_out;
+					}
+				} else {
+			case '(':
+			case '*':
+			case '[':
+			case T___attribute__: /* FIXME __attribute__ might also introduce a parameter of a function declarator. */
+					/* Paranthesized declarator. */
+					next_token();
+					add_anchor_token(')');
+					inner_types = parse_inner_declarator(env);
+					if (inner_types != NULL) {
+						/* All later declarators only modify the return type */
+						env->must_be_abstract = true;
+					}
+					rem_anchor_token(')');
+					expect(')', end_error);
+				}
+				break;
 		}
 		break;
+	}
+
 	default:
 		if (env->may_be_abstract)
 			break;
