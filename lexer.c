@@ -1052,6 +1052,10 @@ end_of_wide_char_constant:;
 
 	lexer_token.type     = T_WIDE_CHARACTER_CONSTANT;
 	lexer_token.literal  = identify_string(string, size);
+
+	if (size == 0) {
+		parse_error("empty character constant");
+	}
 }
 
 /**
@@ -1118,6 +1122,10 @@ end_of_char_constant:;
 
 	lexer_token.type    = T_CHARACTER_CONSTANT;
 	lexer_token.literal = identify_string(string, size);
+
+	if (size == 0) {
+		parse_error("empty character constant");
+	}
 }
 
 /**

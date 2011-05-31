@@ -6212,7 +6212,7 @@ static expression_t *parse_character_constant(void)
 	literal->literal.value        = token.literal;
 
 	size_t len = literal->literal.value.size;
-	if (len != 1) {
+	if (len > 1) {
 		if (!GNU_MODE && !(c_mode & _C99)) {
 			errorf(HERE, "more than 1 character in character constant");
 		} else if (warning.multichar) {
@@ -6236,7 +6236,7 @@ static expression_t *parse_wide_character_constant(void)
 	literal->literal.value        = token.literal;
 
 	size_t len = wstrlen(&literal->literal.value);
-	if (len != 1) {
+	if (len > 1) {
 		warningf(HERE, "multi-character character constant");
 	}
 
