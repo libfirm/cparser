@@ -1031,6 +1031,7 @@ int main(int argc, char **argv)
 					select_input_encoding(encoding);
 				} else if (strstart(orig_opt, "align-loops=") ||
 				           strstart(orig_opt, "align-jumps=") ||
+				           strstart(orig_opt, "visibility=")  ||
 				           strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 				} else if (strstart(orig_opt, "message-length=")) {
