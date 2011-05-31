@@ -170,6 +170,22 @@ static type_dbg_info *get_type_dbg_info_(const type_t *type)
 	return (type_dbg_info*) type;
 }
 
+/* is the current block a reachable one? */
+static bool currently_reachable()
+{
+	ir_node *block = get_cur_block();
+	if (block == NULL || is_Bad(block))
+		return false;
+	else
+		return true;
+}
+
+static void set_unreachable_now()
+{
+	ir_node *bad = new_Bad(mode_BB);
+	set_cur_block(bad);
+}
+
 static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_mode *mode_int, *mode_uint;
@@ -1937,7 +1953,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 static ir_node *call_expression_to_firm(const call_expression_t *const call)
 {
 	dbg_info *const dbgi = get_dbg_info(&call->base.source_position);
-	assert(get_cur_block() != NULL);
+	assert(currently_reachable());
 
 	expression_t *function = call->function;
 	if (function->kind == EXPR_REFERENCE) {
@@ -3716,7 +3732,7 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 	add_immBlock_pred(true_block, true_proj);
 	add_immBlock_pred(false_block, false_proj);
 
-	set_cur_block(NULL);
+	set_unreachable_now();
 	return cond_expr;
 }
 
@@ -4488,7 +4504,7 @@ static void allocate_variable_length_array(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->variable.initializer == NULL);
-	assert(get_cur_block() != NULL);
+	assert(currently_reachable());
 
 	dbg_info *dbgi      = get_dbg_info(&entity->base.source_position);
 	type_t   *type      = entity->declaration.type;
@@ -4583,7 +4599,7 @@ static void create_local_static_variable(entity_t *entity)
 
 static void return_statement_to_firm(return_statement_t *statement)
 {
-	if (get_cur_block() == NULL)
+	if (!currently_reachable())
 		return;
 
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
@@ -4629,12 +4645,12 @@ static void return_statement_to_firm(return_statement_t *statement)
 	ir_node *end_block = get_irg_end_block(current_ir_graph);
 	add_immBlock_pred(end_block, ret);
 
-	set_cur_block(NULL);
+	set_unreachable_now();
 }
 
 static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 {
-	if (get_cur_block() == NULL)
+	if (!currently_reachable())
 		return NULL;
 
 	return expression_to_firm(statement->expression);
@@ -4755,7 +4771,7 @@ static void initialize_local_declaration(entity_t *entity)
 
 	// no need to emit code in dead blocks
 	if (entity->declaration.storage_class != STORAGE_CLASS_STATIC
-			&& get_cur_block() == NULL)
+			&& !currently_reachable())
 		return;
 
 	switch ((declaration_kind_t) entity->declaration.kind) {
@@ -4812,7 +4828,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	/* Create the condition. */
 	ir_node *true_block  = NULL;
 	ir_node *false_block = NULL;
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		true_block  = new_immBlock();
 		false_block = new_immBlock();
 		create_condition_evaluation(statement->condition, true_block, false_block);
@@ -4829,7 +4845,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 		}
 		set_cur_block(false_block);
 		statement_to_firm(statement->false_statement);
-		if (get_cur_block() != NULL) {
+		if (currently_reachable()) {
 			fallthrough_block = new_immBlock();
 			add_immBlock_pred(fallthrough_block, new_Jmp());
 		}
@@ -4840,7 +4856,7 @@ static void if_statement_to_firm(if_statement_t *statement)
 	/* Create the true statement. */
 	set_cur_block(true_block);
 	statement_to_firm(statement->true_statement);
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		if (fallthrough_block == NULL) {
 			fallthrough_block = new_immBlock();
 		}
@@ -4858,7 +4874,7 @@ static void if_statement_to_firm(if_statement_t *statement)
  * reachable. */
 static void jump_if_reachable(ir_node *const target_block)
 {
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		add_immBlock_pred(target_block, new_Jmp());
 	}
 }
@@ -4967,7 +4983,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 		create_local_declaration(entity);
 	}
 
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		entity = statement->scope.entities;
 		for ( ; entity != NULL; entity = entity->base.next) {
 			if (!is_declaration(entity))
@@ -5045,14 +5061,14 @@ static void for_statement_to_firm(for_statement_t *statement)
 static void create_jump_statement(const statement_t *statement,
                                   ir_node *target_block)
 {
-	if (get_cur_block() == NULL)
+	if (!currently_reachable())
 		return;
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 	ir_node  *jump = new_d_Jmp(dbgi);
 	add_immBlock_pred(target_block, jump);
 
-	set_cur_block(NULL);
+	set_unreachable_now();
 }
 
 static void switch_statement_to_firm(switch_statement_t *statement)
@@ -5061,13 +5077,13 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
 	ir_node  *cond        = NULL;
 
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		ir_node *expression = expression_to_firm(statement->expression);
 		cond                = new_d_Cond(dbgi, expression);
 		first_block         = get_cur_block();
 	}
 
-	set_cur_block(NULL);
+	set_unreachable_now();
 
 	ir_node *const old_switch_cond       = current_switch_cond;
 	ir_node *const old_break_label       = break_label;
@@ -5206,7 +5222,7 @@ static void label_to_firm(const label_statement_t *statement)
 
 static void goto_to_firm(const goto_statement_t *statement)
 {
-	if (get_cur_block() == NULL)
+	if (!currently_reachable())
 		return;
 
 	if (statement->expression) {
@@ -5221,7 +5237,7 @@ static void goto_to_firm(const goto_statement_t *statement)
 		ir_node *jmp   = new_Jmp();
 		add_immBlock_pred(block, jmp);
 	}
-	set_cur_block(NULL);
+	set_unreachable_now();
 }
 
 static void asm_statement_to_firm(const asm_statement_t *statement)
@@ -5813,7 +5829,7 @@ static void create_function(entity_t *entity)
 	ir_node *end_block = get_irg_end_block(irg);
 
 	/* do we have a return statement yet? */
-	if (get_cur_block() != NULL) {
+	if (currently_reachable()) {
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
 		const function_type_t *func_type   = &type->function;
