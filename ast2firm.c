@@ -4876,6 +4876,8 @@ static void jump_if_reachable(ir_node *const target_block)
 {
 	if (currently_reachable()) {
 		add_immBlock_pred(target_block, new_Jmp());
+	} else {
+		add_immBlock_pred(target_block, new_Bad(mode_X));
 	}
 }
 
