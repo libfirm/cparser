@@ -3651,6 +3651,7 @@ ptr_operator_end: ;
 						goto error_out;
 					}
 				} else {
+			case '&':
 			case '(':
 			case '*':
 			case '[':
