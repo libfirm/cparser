@@ -1963,7 +1963,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				if (iter == NULL) {
 					errorf(&designator->source_position,
 					       "'%T' has no member named '%Y'", orig_type, symbol);
-					goto failed;
+					return false;
 				}
 				assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 				if (used_in_offsetof) {
@@ -1972,7 +1972,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 						errorf(&designator->source_position,
 						       "offsetof designator '%Y' must not specify bitfield",
 						       symbol);
-						goto failed;
+						return false;
 					}
 				}
 
@@ -1990,7 +1990,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					       "[%E] designator used for non-array type '%T'",
 					       array_index, orig_type);
 				}
-				goto failed;
+				return false;
 			}
 
 			long index = fold_constant_to_int(array_index);
@@ -2019,9 +2019,6 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 		}
 	}
 	return true;
-
-failed:
-	return false;
 }
 
 static void advance_current_object(type_path_t *path, size_t top_path_level)
@@ -3043,8 +3040,6 @@ wrong_thread_storage_class:
 
 						next_token();
 						saw_error = true;
-						if (la1_type == '&' || la1_type == '*')
-							goto finish_specifiers;
 						continue;
 					}
 
@@ -3381,10 +3376,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		/* ISO/IEC 14882:1998(E) §C.1.6:1 */
 		if (!(c_mode & _CXX))
 			type->unspecified_parameters = true;
-		goto parameters_finished;
-	}
-
-	if (has_parameters()) {
+	} else if (has_parameters()) {
 		function_parameter_t **anchor = &type->parameters;
 		do {
 			switch (token.type) {
@@ -3424,7 +3416,6 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 			}
 		} while (next_if(','));
 	}
-
 
 parameters_finished:
 	rem_anchor_token(')');
