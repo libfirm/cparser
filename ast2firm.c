@@ -182,8 +182,7 @@ static bool currently_reachable()
 
 static void set_unreachable_now()
 {
-	ir_node *bad = new_Bad(mode_BB);
-	set_cur_block(bad);
+	set_cur_block(NULL);
 }
 
 static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
