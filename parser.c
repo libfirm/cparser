@@ -2958,7 +2958,7 @@ wrong_thread_storage_class:
 
 		case T_long:
 			if (type_specifiers & SPECIFIER_LONG_LONG) {
-				errorf(HERE, "multiple type specifiers given");
+				errorf(HERE, "too many long type specifiers given");
 			} else if (type_specifiers & SPECIFIER_LONG) {
 				type_specifiers |= SPECIFIER_LONG_LONG;
 			} else {
