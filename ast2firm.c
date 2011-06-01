@@ -171,16 +171,13 @@ static type_dbg_info *get_type_dbg_info_(const type_t *type)
 }
 
 /* is the current block a reachable one? */
-static bool currently_reachable()
+static bool currently_reachable(void)
 {
-	ir_node *block = get_cur_block();
-	if (block == NULL || is_Bad(block))
-		return false;
-	else
-		return true;
+	ir_node *const block = get_cur_block();
+	return block != NULL && !is_Bad(block);
 }
 
-static void set_unreachable_now()
+static void set_unreachable_now(void)
 {
 	set_cur_block(NULL);
 }
@@ -4873,11 +4870,8 @@ static void if_statement_to_firm(if_statement_t *statement)
  * reachable. */
 static void jump_if_reachable(ir_node *const target_block)
 {
-	if (currently_reachable()) {
-		add_immBlock_pred(target_block, new_Jmp());
-	} else {
-		add_immBlock_pred(target_block, new_Bad(mode_X));
-	}
+	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
+	add_immBlock_pred(target_block, pred);
 }
 
 static void while_statement_to_firm(while_statement_t *statement)
