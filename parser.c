@@ -7190,29 +7190,15 @@ static expression_t *parse_primary_expression(void)
 	return create_invalid_expression();
 }
 
-/**
- * Check if the expression has the character type and issue a warning then.
- */
-static void check_for_char_index_type(const expression_t *expression)
-{
-	type_t       *const type      = expression->base.type;
-	const type_t *const base_type = skip_typeref(type);
-
-	if (is_type_atomic(base_type, ATOMIC_TYPE_CHAR) &&
-			warning.char_subscripts) {
-		warningf(&expression->base.source_position,
-		         "array subscript has type '%T'", type);
-	}
-}
-
 static expression_t *parse_array_expression(expression_t *left)
 {
-	expression_t *expression = allocate_expression_zero(EXPR_ARRAY_ACCESS);
+	expression_t              *const expr = allocate_expression_zero(EXPR_ARRAY_ACCESS);
+	array_access_expression_t *const arr  = &expr->array_access;
 
 	eat('[');
 	add_anchor_token(']');
 
-	expression_t *inside = parse_expression();
+	expression_t *const inside = parse_expression();
 
 	type_t *const orig_type_left   = left->base.type;
 	type_t *const orig_type_inside = inside->base.type;
@@ -7220,36 +7206,46 @@ static expression_t *parse_array_expression(expression_t *left)
 	type_t *const type_left   = skip_typeref(orig_type_left);
 	type_t *const type_inside = skip_typeref(orig_type_inside);
 
-	type_t                    *return_type;
-	array_access_expression_t *array_access = &expression->array_access;
+	expression_t *ref;
+	expression_t *idx;
+	type_t       *idx_type;
+	type_t       *res_type;
 	if (is_type_pointer(type_left)) {
-		return_type             = type_left->pointer.points_to;
-		array_access->array_ref = left;
-		array_access->index     = inside;
-		check_for_char_index_type(inside);
+		ref      = left;
+		idx      = inside;
+		idx_type = type_inside;
+		res_type = type_left->pointer.points_to;
+		goto check_idx;
 	} else if (is_type_pointer(type_inside)) {
-		return_type             = type_inside->pointer.points_to;
-		array_access->array_ref = inside;
-		array_access->index     = left;
-		array_access->flipped   = true;
-		check_for_char_index_type(left);
+		arr->flipped = true;
+		ref      = inside;
+		idx      = left;
+		idx_type = type_left;
+		res_type = type_inside->pointer.points_to;
+check_idx:
+		res_type = automatic_type_conversion(res_type);
+		if (is_type_atomic(idx_type, ATOMIC_TYPE_CHAR) && warning.char_subscripts) {
+			warningf(&idx->base.source_position, "array subscript has char type");
+		}
 	} else {
 		if (is_type_valid(type_left) && is_type_valid(type_inside)) {
 			errorf(HERE,
 				"array access on object with non-pointer types '%T', '%T'",
 				orig_type_left, orig_type_inside);
 		}
-		return_type             = type_error_type;
-		array_access->array_ref = left;
-		array_access->index     = inside;
+		res_type = type_error_type;
+		ref      = left;
+		idx      = inside;
 	}
 
-	expression->base.type = automatic_type_conversion(return_type);
+	arr->array_ref = ref;
+	arr->index     = idx;
+	arr->base.type = res_type;
 
 	rem_anchor_token(']');
 	expect(']', end_error);
 end_error:
-	return expression;
+	return expr;
 }
 
 static expression_t *parse_typeprop(expression_kind_t const kind)
