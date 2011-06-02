@@ -7224,7 +7224,9 @@ static expression_t *parse_array_expression(expression_t *left)
 		res_type = type_inside->pointer.points_to;
 check_idx:
 		res_type = automatic_type_conversion(res_type);
-		if (is_type_atomic(idx_type, ATOMIC_TYPE_CHAR) && warning.char_subscripts) {
+		if (!is_type_integer(idx_type)) {
+			errorf(&idx->base.source_position, "array subscript must have integer type");
+		} else if (is_type_atomic(idx_type, ATOMIC_TYPE_CHAR) && warning.char_subscripts) {
 			warningf(&idx->base.source_position, "array subscript has char type");
 		}
 	} else {
