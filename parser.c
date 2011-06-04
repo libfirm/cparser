@@ -2446,13 +2446,10 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 			}
 		}
 	} else if (token.type != '{') {
-		if (is_struct) {
-			parse_error_expected("while parsing struct type specifier",
-			                     T_IDENTIFIER, '{', NULL);
-		} else {
-			parse_error_expected("while parsing union type specifier",
-			                     T_IDENTIFIER, '{', NULL);
-		}
+		char const *const msg =
+			is_struct ? "while parsing struct type specifier" :
+			            "while parsing union type specifier";
+		parse_error_expected(msg, T_IDENTIFIER, '{', NULL);
 
 		return NULL;
 	}
