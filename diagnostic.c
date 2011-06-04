@@ -190,15 +190,20 @@ void diagnosticf(const char *const fmt, ...)
 	va_end(ap);
 }
 
+static void diagnosticposvf(source_position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
+{
+	FILE *const out = stderr;
+	fprintf(out, "%s:%u: %s: ", pos->input_name, pos->linenr, kind);
+	curr_pos = pos;
+	diagnosticvf(fmt, ap);
+	fputc('\n', out);
+}
+
 static void errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: error: ", pos->input_name, pos->linenr);
 	++error_count;
-	curr_pos = pos;
-	diagnosticvf(fmt, ap);
-	fputc('\n', stderr);
-
+	diagnosticposvf(pos, "error", fmt, ap);
 	if (warning.fatal_errors)
 		exit(EXIT_FAILURE);
 }
@@ -215,11 +220,8 @@ void errorf(const source_position_t *pos, const char *const fmt, ...)
 static void warningvf(const source_position_t *pos,
                       const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: warning: ", pos->input_name, pos->linenr);
 	++warning_count;
-	curr_pos = pos;
-	diagnosticvf(fmt, ap);
-	fputc('\n', stderr);
+	diagnosticposvf(pos, "warning", fmt, ap);
 }
 
 void warningf(const source_position_t *pos, const char *const fmt, ...)
@@ -238,10 +240,7 @@ void warningf(const source_position_t *pos, const char *const fmt, ...)
 static void internal_errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	fprintf(stderr, "%s:%u: internal error: ", pos->input_name, pos->linenr);
-	curr_pos = pos;
-	diagnosticvf(fmt, ap);
-	fputc('\n', stderr);
+	diagnosticposvf(pos, "internal error", fmt, ap);
 }
 
 void internal_errorf(const source_position_t *pos, const char *const fmt, ...)
