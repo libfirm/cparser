@@ -7595,16 +7595,16 @@ static expression_t *parse_call_expression(expression_t *expression)
 			= create_implicit_cast(argument->expression, type);
 	}
 
-	check_format(&result->call);
+	check_format(call);
 
 	if (warning.aggregate_return &&
 	    is_type_compound(skip_typeref(function_type->return_type))) {
-		warningf(&result->base.source_position,
+		warningf(&expression->base.source_position,
 		         "function call has aggregate value");
 	}
 
-	if (call->function->kind == EXPR_REFERENCE) {
-		reference_expression_t *reference = &call->function->reference;
+	if (expression->kind == EXPR_REFERENCE) {
+		reference_expression_t *reference = &expression->reference;
 		if (reference->entity->kind == ENTITY_FUNCTION &&
 		    reference->entity->function.btk != bk_none)
 			handle_builtin_argument_restrictions(call);
