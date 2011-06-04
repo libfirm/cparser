@@ -613,6 +613,7 @@ static void print_help_parser(void)
 	put_help("-finput-charset=CHARSET",  "Select encoding of input files");
 	put_help("-fmessage-length=LEN",     "ignored (gcc compatibility)");
 	put_help("-fshort-wchar",            "wchar_t is unsigned short instead of int");
+	put_help("-fshow-column",            "show the column number in diagnostic messages");
 	put_help("-funsigned-char",          "char is an unsigned type");
 	put_help("--ms",                     "Enable msvc extensions");
 	put_help("--no-ms",                  "Disable msvc extensions");
@@ -1054,6 +1055,8 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "short-wchar")) {
 						wchar_atomic_kind = truth_value ? ATOMIC_TYPE_USHORT
 							: ATOMIC_TYPE_INT;
+					} else if (streq(opt, "show-column")) {
+						show_column = truth_value;
 					} else if (streq(opt, "signed-char")) {
 						char_is_signed = truth_value;
 					} else if (streq(opt, "strength-reduce")) {

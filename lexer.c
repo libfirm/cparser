@@ -53,15 +53,16 @@
 #define strtold(s, e) strtod(s, e)
 #endif
 
-static utf32        c;
-token_t             lexer_token;
-symbol_t           *symbol_L;
-static FILE        *input;
-static utf32        buf[BUF_SIZE + MAX_PUTBACK];
-static const utf32 *bufend;
-static const utf32 *bufpos;
-static strset_t     stringset;
-bool                allow_dollar_in_symbol = true;
+static utf32             c;
+static source_position_t lexer_pos;
+token_t                  lexer_token;
+symbol_t                *symbol_L;
+static FILE             *input;
+static utf32             buf[BUF_SIZE + MAX_PUTBACK];
+static const utf32      *bufend;
+static const utf32      *bufpos;
+static strset_t          stringset;
+bool                     allow_dollar_in_symbol = true;
 
 /**
  * Prints a parse error message at the current token.
@@ -70,7 +71,7 @@ bool                allow_dollar_in_symbol = true;
  */
 static void parse_error(const char *msg)
 {
-	errorf(&lexer_token.source_position, "%s", msg);
+	errorf(&lexer_pos, "%s", msg);
 }
 
 /**
@@ -80,7 +81,7 @@ static void parse_error(const char *msg)
  */
 static NORETURN internal_error(const char *msg)
 {
-	internal_errorf(&lexer_token.source_position, "%s", msg);
+	internal_errorf(&lexer_pos, "%s", msg);
 }
 
 static size_t read_block(unsigned char *const read_buf, size_t const n)
@@ -367,6 +368,7 @@ static inline void next_real_char(void)
 		decoder();
 	}
 	c = *bufpos++;
+	++lexer_pos.colno;
 }
 
 /**
@@ -378,6 +380,7 @@ static inline void put_back(utf32 const pc)
 {
 	assert(bufpos > buf);
 	*(--bufpos - buf + buf) = pc;
+	--lexer_pos.colno;
 
 #ifdef DEBUG_CHARS
 	printf("putback '%lc'\n", pc);
@@ -386,17 +389,15 @@ static inline void put_back(utf32 const pc)
 
 static inline void next_char(void);
 
-#define MATCH_NEWLINE(code)                   \
-	case '\r':                                \
-		next_char();                          \
-		if (c == '\n') {                      \
-			next_char();                      \
-		}                                     \
-		lexer_token.source_position.lineno++; \
-		code                                  \
-	case '\n':                                \
-		next_char();                          \
-		lexer_token.source_position.lineno++; \
+#define MATCH_NEWLINE(code)  \
+	case '\r':               \
+		next_char();         \
+		if (c == '\n') {     \
+	case '\n':               \
+			next_char();     \
+		}                    \
+		lexer_pos.lineno++;  \
+		lexer_pos.colno = 1; \
 		code
 
 #define eat(c_type)  do { assert(c == c_type); next_char(); } while (0)
@@ -955,8 +956,6 @@ static void grow_symbol(utf32 const tc)
  */
 static void parse_string_literal(void)
 {
-	const unsigned start_linenr = lexer_token.source_position.lineno;
-
 	eat('"');
 
 	while (true) {
@@ -964,18 +963,14 @@ static void parse_string_literal(void)
 		case '\\': {
 			utf32 const tc = parse_escape_sequence();
 			if (tc >= 0x100) {
-				warningf(&lexer_token.source_position,
-						"escape sequence out of range");
+				warningf(&lexer_pos, "escape sequence out of range");
 			}
 			obstack_1grow(&symbol_obstack, tc);
 			break;
 		}
 
 		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = lexer_token.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "string has no end");
+			errorf(&lexer_token.source_position, "string has no end");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -1009,8 +1004,6 @@ end_of_string:
  */
 static void parse_wide_character_constant(void)
 {
-	const unsigned start_linenr = lexer_token.source_position.lineno;
-
 	eat('\'');
 
 	while (true) {
@@ -1031,9 +1024,7 @@ static void parse_wide_character_constant(void)
 			goto end_of_wide_char_constant;
 
 		case EOF: {
-			source_position_t source_position = lexer_token.source_position;
-			source_position.lineno = start_linenr;
-			errorf(&source_position, "EOF while parsing character constant");
+			errorf(&lexer_token.source_position, "EOF while parsing character constant");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -1073,8 +1064,6 @@ static void parse_wide_string_literal(void)
  */
 static void parse_character_constant(void)
 {
-	const unsigned start_linenr = lexer_token.source_position.lineno;
-
 	eat('\'');
 
 	while (true) {
@@ -1082,8 +1071,7 @@ static void parse_character_constant(void)
 		case '\\': {
 			utf32 const tc = parse_escape_sequence();
 			if (tc >= 0x100) {
-				warningf(&lexer_token.source_position,
-						"escape sequence out of range");
+				warningf(&lexer_pos, "escape sequence out of range");
 			}
 			obstack_1grow(&symbol_obstack, tc);
 			break;
@@ -1099,10 +1087,7 @@ static void parse_character_constant(void)
 			goto end_of_char_constant;
 
 		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = lexer_token.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "EOF while parsing character constant");
+			errorf(&lexer_token.source_position, "EOF while parsing character constant");
 			lexer_token.type = T_ERROR;
 			return;
 		}
@@ -1133,8 +1118,6 @@ end_of_char_constant:;
  */
 static void skip_multiline_comment(void)
 {
-	unsigned start_linenr = lexer_token.source_position.lineno;
-
 	while (true) {
 		switch (c) {
 		case '/':
@@ -1142,7 +1125,7 @@ static void skip_multiline_comment(void)
 			if (c == '*') {
 				/* nested comment, warn here */
 				if (warning.comment) {
-					warningf(&lexer_token.source_position, "'/*' within comment");
+					warningf(&lexer_pos, "'/*' within comment");
 				}
 			}
 			break;
@@ -1157,10 +1140,7 @@ static void skip_multiline_comment(void)
 		MATCH_NEWLINE(break;)
 
 		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = lexer_token.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "at end of file while looking for comment end");
+			errorf(&lexer_token.source_position, "at end of file while looking for comment end");
 			return;
 		}
 
@@ -1189,7 +1169,7 @@ static void skip_line_comment(void)
 			next_char();
 			if (c == '\n' || c == '\r') {
 				if (warning.comment)
-					warningf(&lexer_token.source_position, "multi-line comment");
+					warningf(&lexer_pos, "multi-line comment");
 				return;
 			}
 			break;
@@ -1263,11 +1243,11 @@ static void parse_line_directive(void)
 		parse_error("expected integer");
 	} else {
 		/* use offset -1 as this is about the next line */
-		lexer_token.source_position.lineno = atoi(pp_token.literal.begin) - 1;
+		lexer_pos.lineno = atoi(pp_token.literal.begin) - 1;
 		next_pp_token();
 	}
 	if (pp_token.type == T_STRING_LITERAL) {
-		lexer_token.source_position.input_name = pp_token.literal.begin;
+		lexer_pos.input_name = pp_token.literal.begin;
 		next_pp_token();
 	}
 
@@ -1456,6 +1436,8 @@ static void parse_preprocessor_directive(void)
 void lexer_next_preprocessing_token(void)
 {
 	while (true) {
+		lexer_token.source_position = lexer_pos;
+
 		switch (c) {
 		case ' ':
 		case '\t':
@@ -1625,7 +1607,7 @@ void lexer_next_preprocessing_token(void)
 
 		default:
 dollar_sign:
-			errorf(&lexer_token.source_position, "unknown character '%c' found", c);
+			errorf(&lexer_pos, "unknown character '%c' found", c);
 			next_char();
 			lexer_token.type = T_ERROR;
 			return;
@@ -1656,9 +1638,10 @@ void init_lexer(void)
 
 void lexer_open_stream(FILE *stream, const char *input_name)
 {
-	input                                  = stream;
-	lexer_token.source_position.lineno     = 0;
-	lexer_token.source_position.input_name = input_name;
+	input                = stream;
+	lexer_pos.lineno     = 0;
+	lexer_pos.colno      = 0;
+	lexer_pos.input_name = input_name;
 
 	bufpos = NULL;
 	bufend = NULL;
@@ -1670,9 +1653,10 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 
 void lexer_open_buffer(const char *buffer, size_t len, const char *input_name)
 {
-	input                                  = NULL;
-	lexer_token.source_position.lineno     = 0;
-	lexer_token.source_position.input_name = input_name;
+	input                = NULL;
+	lexer_pos.lineno     = 0;
+	lexer_pos.colno      = 0;
+	lexer_pos.input_name = input_name;
 
 #if 0 // TODO
 	bufpos = buffer;
@@ -1696,7 +1680,7 @@ void exit_lexer(void)
 static __attribute__((unused))
 void dbg_pos(const source_position_t source_position)
 {
-	fprintf(stdout, "%s:%u\n", source_position.input_name,
-	        source_position.lineno);
+	fprintf(stdout, "%s:%u:%u\n", source_position.input_name,
+	        source_position.lineno, source_position.colno);
 	fflush(stdout);
 }

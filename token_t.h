@@ -54,6 +54,7 @@ typedef struct source_position_t source_position_t;
 struct source_position_t {
 	const char *input_name;
 	unsigned    lineno;
+	unsigned    colno;
 };
 
 /* position used for "builtin" declarations/types */
