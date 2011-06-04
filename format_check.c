@@ -520,7 +520,7 @@ eval_fmt_mod_unsigned:
 				goto next_arg;
 			}
 			if (is_type_valid(arg_skip)) {
-				warningf(pos,
+				warningf(&arg->expression->base.source_position,
 					"argument type '%T' does not match conversion specifier '%%%s%c' at position %u",
 					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
 			}
@@ -858,7 +858,7 @@ static void check_scanf_format(const call_argument_t *arg,
 			}
 error_arg_type:
 			if (is_type_valid(arg_skip)) {
-				warningf(pos,
+				warningf(&arg->expression->base.source_position,
 					"argument type '%T' does not match conversion specifier '%%%s%c' at position %u",
 					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
 			}

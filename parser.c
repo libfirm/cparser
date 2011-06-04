@@ -2154,7 +2154,6 @@ finish_designator:
 			if (type != NULL && is_type_scalar(type)) {
 				sub = parse_scalar_initializer(type, env->must_be_constant);
 			} else {
-				eat('{');
 				if (type == NULL) {
 					if (env->entity != NULL) {
 						errorf(HERE,
@@ -2163,8 +2162,11 @@ finish_designator:
 					} else {
 						errorf(HERE, "extra brace group at end of initializer");
 					}
-				} else
+					eat('{');
+				} else {
+					eat('{');
 					descend_into_subtype(path);
+				}
 
 				add_anchor_token('}');
 				sub = parse_sub_initializer(path, orig_type, top_path_level+1,
@@ -2411,6 +2413,7 @@ static void append_entity(scope_t *scope, entity_t *entity)
 
 static compound_t *parse_compound_type_specifier(bool is_struct)
 {
+	source_position_t const pos = *HERE;
 	eat(is_struct ? T_struct : T_union);
 
 	symbol_t    *symbol     = NULL;
@@ -2425,9 +2428,9 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	if (token.type == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
 		symbol = token.symbol;
+		entity = get_tag(symbol, kind);
 		next_token();
 
-		entity = get_tag(symbol, kind);
 		if (entity != NULL) {
 			if (entity->base.parent_scope != current_scope &&
 			    (token.type == '{' || token.type == ';')) {
@@ -2435,8 +2438,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 				 * existing definition in outer scope */
 				entity = NULL;
 			} else if (entity->compound.complete && token.type == '{') {
-				assert(symbol != NULL);
-				errorf(HERE, "multiple definitions of '%s %Y' (previous definition %P)",
+				errorf(&pos, "multiple definitions of '%s %Y' (previous definition %P)",
 				       is_struct ? "struct" : "union", symbol,
 				       &entity->base.source_position);
 				/* clear members in the hope to avoid further errors */
@@ -2460,7 +2462,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 
 		entity->compound.alignment   = 1;
 		entity->base.namespc         = NAMESPACE_TAG;
-		entity->base.source_position = token.source_position;
+		entity->base.source_position = pos;
 		entity->base.symbol          = symbol;
 		entity->base.parent_scope    = current_scope;
 		if (symbol != NULL) {
@@ -2533,16 +2535,17 @@ end_error:
 
 static type_t *parse_enum_specifier(void)
 {
-	entity_t *entity;
-	symbol_t *symbol;
+	source_position_t const pos = *HERE;
+	entity_t               *entity;
+	symbol_t               *symbol;
 
 	eat(T_enum);
 	switch (token.type) {
 		case T_IDENTIFIER:
 			symbol = token.symbol;
+			entity = get_tag(symbol, ENTITY_ENUM);
 			next_token();
 
-			entity = get_tag(symbol, ENTITY_ENUM);
 			if (entity != NULL) {
 				if (entity->base.parent_scope != current_scope &&
 						(token.type == '{' || token.type == ';')) {
@@ -2550,7 +2553,7 @@ static type_t *parse_enum_specifier(void)
 					 * existing definition in outer scope */
 					entity = NULL;
 				} else if (entity->enume.complete && token.type == '{') {
-					errorf(HERE, "multiple definitions of 'enum %Y' (previous definition %P)",
+					errorf(&pos, "multiple definitions of 'enum %Y' (previous definition %P)",
 							symbol, &entity->base.source_position);
 				}
 			}
@@ -2570,7 +2573,7 @@ static type_t *parse_enum_specifier(void)
 	if (entity == NULL) {
 		entity                       = allocate_entity_zero(ENTITY_ENUM);
 		entity->base.namespc         = NAMESPACE_TAG;
-		entity->base.source_position = token.source_position;
+		entity->base.source_position = pos;
 		entity->base.symbol          = symbol;
 		entity->base.parent_scope    = current_scope;
 	}
@@ -3545,7 +3548,7 @@ static construct_type_t *parse_array_declarator(void)
 	}
 
 	if (is_static && size == NULL)
-		errorf(HERE, "static array parameters require a size");
+		errorf(&array->base.pos, "static array parameters require a size");
 
 	rem_anchor_token(']');
 	expect(']', end_error);
@@ -4610,7 +4613,7 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	entity_t *previous_entity = get_entity(symbol, NAMESPACE_NORMAL);
 	if (previous_entity == NULL
 			|| previous_entity->base.parent_scope != current_scope) {
-		errorf(HERE, "expected declaration of a function parameter, found '%Y'",
+		errorf(&entity->base.source_position, "expected declaration of a function parameter, found '%Y'",
 		       symbol);
 		return entity;
 	}
@@ -5587,15 +5590,15 @@ static void parse_external_declaration(void)
 
 	if (warning.aggregate_return &&
 	    is_type_compound(skip_typeref(type->function.return_type))) {
-		warningf(HERE, "function '%Y' returns an aggregate",
+		warningf(&ndeclaration->base.source_position, "function '%Y' returns an aggregate",
 		         ndeclaration->base.symbol);
 	}
 	if (warning.traditional && !type->function.unspecified_parameters) {
-		warningf(HERE, "traditional C rejects ISO C style function definition of function '%Y'",
+		warningf(&ndeclaration->base.source_position, "traditional C rejects ISO C style function definition of function '%Y'",
 			ndeclaration->base.symbol);
 	}
 	if (warning.old_style_definition && type->function.unspecified_parameters) {
-		warningf(HERE, "old-style function definition '%Y'",
+		warningf(&ndeclaration->base.source_position, "old-style function definition '%Y'",
 			ndeclaration->base.symbol);
 	}
 
@@ -6439,7 +6442,8 @@ end_error:
 
 static expression_t *parse_reference(void)
 {
-	entity_t *entity = parse_qualified_identifier();
+	source_position_t const pos    = token.source_position;
+	entity_t         *const entity = parse_qualified_identifier();
 
 	type_t *orig_type;
 	if (is_declaration(entity)) {
@@ -6458,9 +6462,10 @@ static expression_t *parse_reference(void)
 	if (entity->kind == ENTITY_ENUM_VALUE)
 		kind = EXPR_REFERENCE_ENUM_VALUE;
 
-	expression_t *expression     = allocate_expression_zero(kind);
-	expression->reference.entity = entity;
-	expression->base.type        = type;
+	expression_t *expression         = allocate_expression_zero(kind);
+	expression->base.source_position = pos;
+	expression->base.type            = type;
+	expression->reference.entity     = entity;
 
 	/* this declaration is used */
 	if (is_declaration(entity)) {
@@ -6485,7 +6490,7 @@ static expression_t *parse_reference(void)
 	if (warning.init_self && entity == current_init_decl && !in_type_prop
 	    && entity->kind == ENTITY_VARIABLE) {
 		current_init_decl = NULL;
-		warningf(HERE, "variable '%#T' is initialized by itself",
+		warningf(&pos, "variable '%#T' is initialized by itself",
 		         entity->declaration.type, entity->base.symbol);
 	}
 
@@ -6563,9 +6568,10 @@ static expression_t *parse_compound_literal(type_t *type)
  */
 static expression_t *parse_cast(void)
 {
-	add_anchor_token(')');
-
 	source_position_t source_position = token.source_position;
+
+	eat('(');
+	add_anchor_token(')');
 
 	type_t *type = parse_typename();
 
@@ -6597,9 +6603,10 @@ end_error:
  */
 static expression_t *parse_statement_expression(void)
 {
-	add_anchor_token(')');
-
 	expression_t *expression = allocate_expression_zero(EXPR_STATEMENT);
+
+	eat('(');
+	add_anchor_token(')');
 
 	statement_t *statement          = parse_compound_statement(true);
 	statement->compound.stmt_expr   = true;
@@ -6632,22 +6639,21 @@ end_error:
  */
 static expression_t *parse_parenthesized_expression(void)
 {
-	eat('(');
-
-	switch (token.type) {
+	token_t const* const la1 = look_ahead(1);
+	switch (la1->type) {
 	case '{':
 		/* gcc extension: a statement expression */
 		return parse_statement_expression();
 
+	case T_IDENTIFIER:
+		if (is_typedef_symbol(la1->symbol)) {
 	TYPE_QUALIFIERS
 	TYPE_SPECIFIERS
-		return parse_cast();
-	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.symbol)) {
 			return parse_cast();
 		}
 	}
 
+	eat('(');
 	add_anchor_token(')');
 	expression_t *result = parse_expression();
 	result->base.parenthesized = true;
@@ -7572,9 +7578,9 @@ static expression_t *parse_call_expression(expression_t *expression)
 		}
 
 		if (parameter != NULL) {
-			errorf(HERE, "too few arguments to function '%E'", expression);
+			errorf(&expression->base.source_position, "too few arguments to function '%E'", expression);
 		} else if (argument != NULL && !function_type->variadic) {
-			errorf(HERE, "too many arguments to function '%E'", expression);
+			errorf(&argument->expression->base.source_position, "too many arguments to function '%E'", expression);
 		}
 	}
 
@@ -8619,33 +8625,33 @@ static bool is_valid_assignment_lhs(expression_t const* const left)
 	type_t *const type_left      = skip_typeref(orig_type_left);
 
 	if (!is_lvalue(left)) {
-		errorf(HERE, "left hand side '%E' of assignment is not an lvalue",
+		errorf(&left->base.source_position, "left hand side '%E' of assignment is not an lvalue",
 		       left);
 		return false;
 	}
 
 	if (left->kind == EXPR_REFERENCE
 			&& left->reference.entity->kind == ENTITY_FUNCTION) {
-		errorf(HERE, "cannot assign to function '%E'", left);
+		errorf(&left->base.source_position, "cannot assign to function '%E'", left);
 		return false;
 	}
 
 	if (is_type_array(type_left)) {
-		errorf(HERE, "cannot assign to array '%E'", left);
+		errorf(&left->base.source_position, "cannot assign to array '%E'", left);
 		return false;
 	}
 	if (type_left->base.qualifiers & TYPE_QUALIFIER_CONST) {
-		errorf(HERE, "assignment to readonly location '%E' (type '%T')", left,
+		errorf(&left->base.source_position, "assignment to read-only location '%E' (type '%T')", left,
 		       orig_type_left);
 		return false;
 	}
 	if (is_type_incomplete(type_left)) {
-		errorf(HERE, "left-hand side '%E' of assignment has incomplete type '%T'",
+		errorf(&left->base.source_position, "left-hand side '%E' of assignment has incomplete type '%T'",
 		       left, orig_type_left);
 		return false;
 	}
 	if (is_type_compound(type_left) && has_const_fields(&type_left->compound)) {
-		errorf(HERE, "cannot assign to '%E' because compound type '%T' has readonly fields",
+		errorf(&left->base.source_position, "cannot assign to '%E' because compound type '%T' has read-only fields",
 		       left, orig_type_left);
 		return false;
 	}
