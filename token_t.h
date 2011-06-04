@@ -53,7 +53,7 @@ typedef enum preprocessor_token_type_t {
 typedef struct source_position_t source_position_t;
 struct source_position_t {
 	const char *input_name;
-	unsigned    linenr;
+	unsigned    lineno;
 };
 
 /* position used for "builtin" declarations/types */

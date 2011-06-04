@@ -146,7 +146,7 @@ static const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
 	if (pos == NULL)
 		return NULL;
 	if (line != NULL)
-		*line = pos->linenr;
+		*line = pos->lineno;
 	return pos->input_name;
 }
 

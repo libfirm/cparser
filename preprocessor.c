@@ -97,7 +97,7 @@ static bool open_input(const char *filename)
 	input.bufpos              = NULL;
 	input.had_non_space       = false;
 	input.position.input_name = filename;
-	input.position.linenr     = 1;
+	input.position.lineno     = 1;
 
 	/* indicate that we're at a new input */
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
@@ -214,11 +214,11 @@ static inline void put_back(int pc)
 		if(CC == '\n') {                      \
 			next_char();                      \
 		}                                     \
-		++input.position.linenr;              \
+		++input.position.lineno;              \
 		code                                  \
 	case '\n':                                \
 		next_char();                          \
-		++input.position.linenr;              \
+		++input.position.lineno;              \
 		code
 
 #define eat(c_type)  do { assert(CC == c_type); next_char(); } while(0)
@@ -429,7 +429,7 @@ static int parse_escape_sequence(void)
 
 static void parse_string_literal(void)
 {
-	const unsigned start_linenr = input.position.linenr;
+	const unsigned start_linenr = input.position.lineno;
 
 	eat('"');
 
@@ -451,7 +451,7 @@ static void parse_string_literal(void)
 		case EOF: {
 			source_position_t source_position;
 			source_position.input_name = pp_token.source_position.input_name;
-			source_position.linenr     = start_linenr;
+			source_position.lineno     = start_linenr;
 			errorf(&source_position, "string has no end");
 			pp_token.type = TP_ERROR;
 			return;
@@ -534,7 +534,7 @@ end_of_wide_char_constant:
 
 static void parse_character_constant(void)
 {
-	const unsigned start_linenr = input.position.linenr;
+	const unsigned start_linenr = input.position.lineno;
 
 	eat('\'');
 
@@ -554,7 +554,7 @@ static void parse_character_constant(void)
 		case EOF: {
 			source_position_t source_position;
 			source_position.input_name = pp_token.source_position.input_name;
-			source_position.linenr     = start_linenr;
+			source_position.lineno     = start_linenr;
 			errorf(&source_position, "EOF while parsing character constant");
 			pp_token.type = TP_ERROR;
 			return;
@@ -723,7 +723,7 @@ static void skip_multiline_comment(void)
 	if(do_print_spaces)
 		counted_spaces++;
 
-	unsigned start_linenr = input.position.linenr;
+	unsigned start_linenr = input.position.lineno;
 	while(1) {
 		switch(CC) {
 		case '/':
@@ -751,7 +751,7 @@ static void skip_multiline_comment(void)
 		case EOF: {
 			source_position_t source_position;
 			source_position.input_name = pp_token.source_position.input_name;
-			source_position.linenr     = start_linenr;
+			source_position.lineno     = start_linenr;
 			errorf(&source_position, "at end of file while looking for comment end");
 			return;
 		}
@@ -798,7 +798,7 @@ static void skip_spaces(bool skip_newline)
 			if(CC == '\n') {
 				next_char();
 			}
-			++input.position.linenr;
+			++input.position.lineno;
 			if (do_print_spaces)
 				++counted_newlines;
 			continue;
@@ -808,7 +808,7 @@ static void skip_spaces(bool skip_newline)
 				return;
 
 			next_char();
-			++input.position.linenr;
+			++input.position.lineno;
 			if (do_print_spaces)
 				++counted_newlines;
 			continue;
@@ -1189,7 +1189,7 @@ static void print_quoted_string(const char *const string)
 
 static void print_line_directive(const source_position_t *pos, const char *add)
 {
-	fprintf(out, "# %u ", pos->linenr);
+	fprintf(out, "# %u ", pos->lineno);
 	print_quoted_string(pos->input_name);
 	if (add != NULL) {
 		fputc(' ', out);

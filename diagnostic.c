@@ -42,7 +42,7 @@ static const source_position_t *curr_pos = NULL;
  */
 static void print_source_position(FILE *out, const source_position_t *pos)
 {
-	fprintf(out, "at line %u", pos->linenr);
+	fprintf(out, "at line %u", pos->lineno);
 	if (curr_pos == NULL || curr_pos->input_name != pos->input_name)
 		fprintf(out, " of \"%s\"", pos->input_name);
 }
@@ -193,7 +193,7 @@ void diagnosticf(const char *const fmt, ...)
 static void diagnosticposvf(source_position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
 {
 	FILE *const out = stderr;
-	fprintf(out, "%s:%u: %s: ", pos->input_name, pos->linenr, kind);
+	fprintf(out, "%s:%u: %s: ", pos->input_name, pos->lineno, kind);
 	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 	fputc('\n', out);
