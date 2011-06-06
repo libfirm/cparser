@@ -75,7 +75,7 @@ config.h:
 %.h:
 	@true
 
-REVISION ?= $(shell svnversion -n .)
+REVISION ?= $(shell git describe --always --dirty --match '')
 
 revision.h:
 	@echo "===> GEN $@"
