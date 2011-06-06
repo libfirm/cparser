@@ -10788,13 +10788,13 @@ static void parse_externals(void)
 			unsigned char count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
 				/* the anchor set and its copy differs */
-				errorf(HERE, "Leaked anchor token %k %d times", i, count);
+				internal_errorf(HERE, "Leaked anchor token %k %d times", i, count);
 				anchor_leak = true;
 			}
 		}
 		if (in_gcc_extension) {
 			/* an gcc extension scope was not closed */
-			errorf(HERE, "Leaked __extension__");
+			internal_errorf(HERE, "Leaked __extension__");
 			anchor_leak = true;
 		}
 
