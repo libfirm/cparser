@@ -5103,7 +5103,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 			default_proj_nr = l->last_case;
 	}
 
-	if (default_proj_nr == INT_MAX) {
+	if (default_proj_nr == LONG_MAX) {
 		/* Bad: an overflow will occur, we cannot be sure that the
 		 * maximum + 1 is a free number. Scan the values a second
 		 * time to find a free number.
