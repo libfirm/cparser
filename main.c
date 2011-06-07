@@ -1225,6 +1225,7 @@ int main(int argc, char **argv)
 						argument_errors = true;
 					} else {
 						machine_size = (unsigned int)value;
+						add_flag(&cppflags_obst, "-m%u", machine_size);
 						add_flag(&asflags_obst, "-m%u", machine_size);
 						add_flag(&ldflags_obst, "-m%u", machine_size);
 					}
