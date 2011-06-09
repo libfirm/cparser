@@ -144,9 +144,15 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 
 	/* This isn't really correct, the backend should provide a list of machine
 	 * specific modes (according to gcc philosophy that is...) */
-	attribute_argument_t *arg        = attribute->a.arguments;
-	const char           *symbol_str = arg->v.symbol->string;
-	bool                  sign       = is_type_signed(type);
+	attribute_argument_t *arg = attribute->a.arguments;
+	if (arg == NULL) {
+		errorf(&attribute->source_position,
+		       "__attribute__((mode(X))) misses argument");
+		return orig_type;
+	}
+
+	const char         *symbol_str = arg->v.symbol->string;
+	bool                sign       = is_type_signed(type);
 	atomic_type_kind_t  akind;
 	if (strcmp_underscore("QI",   symbol_str) == 0 ||
 	    strcmp_underscore("byte", symbol_str) == 0) {
