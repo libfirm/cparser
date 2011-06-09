@@ -667,7 +667,7 @@ struct translation_unit_t {
 	statement_t *global_asm;
 };
 
-static inline void *_allocate_ast(size_t size)
+static inline void *allocate_ast(size_t size)
 {
 	return obstack_alloc(&ast_obstack, size);
 }
@@ -682,8 +682,6 @@ static inline bool is_invalid_statement(statement_t *statement)
 	return statement->base.kind == STATEMENT_INVALID;
 }
 
-#define allocate_ast(size)                 _allocate_ast(size)
-
 /**
  * Allocate an AST node with given size and
  * initialize all fields with zero.
@@ -694,5 +692,10 @@ static inline void *allocate_ast_zero(size_t size)
 	memset(res, 0, size);
 	return res;
 }
+
+/** If set, implicit casts are printed. */
+extern bool print_implicit_casts;
+/** If set parenthesis are printed to indicate operator precedence. */
+extern bool print_parenthesis;
 
 #endif

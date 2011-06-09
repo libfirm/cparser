@@ -87,17 +87,23 @@ typedef union  statement_t                           statement_t;
 
 typedef struct translation_unit_t                    translation_unit_t;
 
-void  init_ast(void);
-void  exit_ast(void);
+/**
+ * Initialize the AST construction.
+ */
+void init_ast(void);
 
-void  print_expression(const expression_t *expression);
-void  print_initializer(const initializer_t *initializer);
-void  print_ast(const translation_unit_t *unit);
-void  print_indent(void);
-void  print_declaration(const entity_t *entity);
-void  print_entity(const entity_t *entity);
-void  change_indent(int delta);
-void *allocate_ast(size_t size);
+/**
+ * Free the AST.
+ */
+void exit_ast(void);
+
+void print_expression(const expression_t *expression);
+void print_initializer(const initializer_t *initializer);
+void print_ast(const translation_unit_t *unit);
+void print_indent(void);
+void print_declaration(const entity_t *entity);
+void print_entity(const entity_t *entity);
+void change_indent(int delta);
 
 typedef enum expression_classification_t {
 	EXPR_CLASS_VARIABLE,

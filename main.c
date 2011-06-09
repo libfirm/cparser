@@ -110,12 +110,6 @@ unsigned           force_long_double_size    = 0;
 bool               enable_main_collect2_hack = false;
 bool               freestanding              = false;
 
-/* to switch on printing of implicit casts */
-extern bool print_implicit_casts;
-
-/* to switch on printing of parenthesis to indicate operator precedence */
-extern bool print_parenthesis;
-
 static machine_triple_t *target_machine;
 static const char       *target_triple;
 static int               verbose;

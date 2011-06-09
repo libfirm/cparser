@@ -48,10 +48,7 @@ struct obstack ast_obstack;
 
 static int indent;
 
-/** If set, implicit casts are printed. */
 bool print_implicit_casts = false;
-
-/** If set parenthesis are printed to indicate operator precedence. */
 bool print_parenthesis = false;
 
 static void print_statement(const statement_t *statement);
@@ -1952,30 +1949,12 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	panic("invalid expression found (is constant expression)");
 }
 
-/**
- * Initialize the AST construction.
- */
 void init_ast(void)
 {
 	obstack_init(&ast_obstack);
 }
 
-/**
- * Free the AST.
- */
 void exit_ast(void)
 {
 	obstack_free(&ast_obstack, NULL);
-}
-
-/**
- * Allocate an AST object of the given size.
- *
- * @param size  the size of the object to allocate
- *
- * @return  A new allocated object in the AST memeory space.
- */
-void *(allocate_ast)(size_t size)
-{
-	return _allocate_ast(size);
 }
