@@ -538,6 +538,8 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 		const char *input_name = entity->base.source_position.input_name;
 		if (is_system_header(input_name))
 			continue;
+		if (entity->function.elf_visibility != ELF_VISIBILITY_DEFAULT)
+			continue;
 		if (output_limits != NULL) {
 			bool in_limits = false;
 			for (output_limit *limit = output_limits; limit != NULL;

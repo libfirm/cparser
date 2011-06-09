@@ -233,9 +233,64 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 		break;
 	default:
 		if (warning.other) {
+			const char *what = get_entity_kind_name(entity->kind);
 			warningf(&attribute->source_position,
-					 "alignment attribute specification on '%S' ignored",
-					 entity->base.symbol);
+					 "alignment attribute specification on %s '%S' ignored",
+					 what, entity->base.symbol);
+		}
+		break;
+	}
+}
+
+static const char *get_argument_string(const attribute_argument_t *argument)
+{
+	if (argument == NULL)
+		return NULL;
+	if (argument->kind != ATTRIBUTE_ARGUMENT_EXPRESSION)
+		return NULL;
+	expression_t *expression = argument->v.expression;
+	if (expression->kind != EXPR_STRING_LITERAL)
+		return NULL;
+	return expression->literal.value.begin;
+}
+
+static void handle_attribute_visibility(const attribute_t *attribute,
+                                        entity_t *entity)
+{
+	/* This isn't really correct, the backend should provide a list of machine
+	 * specific modes (according to gcc philosophy that is...) */
+	attribute_argument_t *arg = attribute->a.arguments;
+	if (arg == NULL) {
+		errorf(&attribute->source_position,
+		       "__attribute__((visibility(X))) misses argument");
+		return;
+	}
+	const char *string = get_argument_string(arg);
+	if (string == NULL) {
+		errorf(&attribute->source_position,
+		       "__attribute__((visibility(X))) argument is not a string");
+		return;
+	}
+	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string);
+	if (visibility == ELF_VISIBILITY_ERROR) {
+		errorf(&attribute->source_position,
+		       "unknown visibility type '%s'", string);
+		return;
+	}
+
+	switch (entity->kind) {
+	case ENTITY_VARIABLE:
+		entity->variable.elf_visibility = visibility;
+		break;
+	case ENTITY_FUNCTION:
+		entity->function.elf_visibility = visibility;
+		break;
+	default:
+		if (warning.other) {
+			const char *what = get_entity_kind_name(entity->kind);
+			warningf(&attribute->source_position,
+					 "visibility attribute specification on %s '%S' ignored",
+					 what, entity->base.symbol);
 		}
 		break;
 	}
@@ -354,6 +409,10 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 			handle_attribute_asm(attribute, entity);
 			break;
 
+		case ATTRIBUTE_GNU_VISIBILITY:
+			handle_attribute_visibility(attribute, entity);
+			break;
+
 		case ATTRIBUTE_MS_ALIGN:
 		case ATTRIBUTE_GNU_ALIGNED:
 			handle_attribute_aligned(attribute, entity);
@@ -438,14 +497,7 @@ const char *get_deprecated_string(const attribute_t *attribute)
 			continue;
 
 		attribute_argument_t *argument = attribute->a.arguments;
-		if (argument == NULL)
-			return NULL;
-		if (argument->kind != ATTRIBUTE_ARGUMENT_EXPRESSION)
-			return NULL;
-		expression_t *expression = argument->v.expression;
-		if (expression->kind != EXPR_STRING_LITERAL)
-			return NULL;
-		return expression->literal.value.begin;
+		return get_argument_string(argument);
 	}
 	return NULL;
 }

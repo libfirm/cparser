@@ -25,6 +25,7 @@
 #include "ast_t.h"
 #include "adt/error.h"
 #include "adt/util.h"
+#include "adt/strutil.h"
 
 const char *get_entity_kind_name(entity_kind_t kind)
 {
@@ -86,4 +87,19 @@ entity_t *allocate_entity_zero(entity_kind_t kind)
 	entity_t *entity = allocate_ast_zero(size);
 	entity->kind     = kind;
 	return entity;
+}
+
+elf_visibility_tag_t get_elf_visibility_from_string(const char *string)
+{
+	if (streq(string, "default")) {
+		return ELF_VISIBILITY_DEFAULT;
+	} else if (streq(string, "hidden")) {
+		return ELF_VISIBILITY_HIDDEN;
+	} else if (streq(string, "internal")) {
+		return ELF_VISIBILITY_INTERNAL;
+	} else if (streq(string, "protected")) {
+		return ELF_VISIBILITY_PROTECTED;
+	} else {
+		return ELF_VISIBILITY_ERROR;
+	}
 }

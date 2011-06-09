@@ -21,6 +21,7 @@
 #define PARSER_H
 
 #include "ast.h"
+#include "entity_t.h"
 #include "type.h"
 
 typedef struct environment_entry_t environment_entry_t;
@@ -56,5 +57,8 @@ entity_t *expression_is_variable(const expression_t *expression);
 void prepare_main_collect2(entity_t *entity);
 
 entity_t *record_entity(entity_t *entity, bool is_definition);
+
+/** set default elf visbility */
+void set_default_visibility(elf_visibility_tag_t visibility);
 
 #endif

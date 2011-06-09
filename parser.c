@@ -108,6 +108,7 @@ static bool                 in_gcc_extension  = false;
 static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
+static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 
 
 #define PUSH_PARENT(stmt)                          \
@@ -3940,8 +3941,9 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		} else if (is_type_function(type)) {
 			entity = allocate_entity_zero(ENTITY_FUNCTION);
 
-			entity->function.is_inline  = specifiers->is_inline;
-			entity->function.parameters = env.parameters;
+			entity->function.is_inline      = specifiers->is_inline;
+			entity->function.elf_visibility = default_visibility;
+			entity->function.parameters     = env.parameters;
 
 			if (env.symbol != NULL) {
 				/* this needs fixes for C++ */
@@ -3959,7 +3961,8 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		} else {
 			entity = allocate_entity_zero(ENTITY_VARIABLE);
 
-			entity->variable.thread_local = specifiers->thread_local;
+			entity->variable.elf_visibility = default_visibility;
+			entity->variable.thread_local   = specifiers->thread_local;
 
 			if (env.symbol != NULL) {
 				if (specifiers->is_inline && is_type_valid(type)) {
@@ -10827,6 +10830,11 @@ static void parse_translation_unit(void)
 			eat_until_matching_token(token.type);
 		next_token();
 	}
+}
+
+void set_default_visibility(elf_visibility_tag_t visibility)
+{
+	default_visibility = visibility;
 }
 
 /**

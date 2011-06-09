@@ -95,6 +95,14 @@ typedef enum decl_modifier_t {
 	DM_WEAK              = 1 << 27,
 } decl_modifier_t;
 
+typedef enum elf_visibility_tag_t {
+	ELF_VISIBILITY_DEFAULT,
+	ELF_VISIBILITY_HIDDEN,
+	ELF_VISIBILITY_INTERNAL,
+	ELF_VISIBILITY_PROTECTED,
+	ELF_VISIBILITY_ERROR
+} elf_visibility_tag_t;
+
 /**
  * A scope containing entities.
  */
@@ -212,13 +220,14 @@ struct compound_member_t {
 
 struct variable_t {
 	declaration_t     base;
-	bool              thread_local  : 1;  /**< GCC __thread */
-	bool              restricta     : 1;
-	bool              deprecated    : 1;
-	bool              noalias       : 1;
+	bool              thread_local   : 1;  /**< GCC __thread */
+	bool              restricta      : 1;
+	bool              deprecated     : 1;
+	bool              noalias        : 1;
 
-	bool              address_taken : 1;  /**< Set if the address of this declaration was taken. */
-	bool              read          : 1;
+	bool              address_taken  : 1;  /**< Set if the address of this declaration was taken. */
+	bool              read           : 1;
+	unsigned          elf_visibility : 2;
 
 	initializer_t    *initializer;
 
@@ -244,10 +253,11 @@ struct parameter_t {
 
 struct function_t {
 	declaration_t  base;
-	bool           is_inline     : 1;
+	bool           is_inline      : 1;
 
-	bool           need_closure  : 1;  /**< Inner function needs closure. */
-	bool           goto_to_outer : 1;  /**< Inner function has goto to outer function. */
+	bool           need_closure   : 1;  /**< Inner function needs closure. */
+	bool           goto_to_outer  : 1;  /**< Inner function has goto to outer function. */
+	unsigned       elf_visibility : 2;
 
 	builtin_kind_t btk;
 	scope_t        parameters;
@@ -295,5 +305,7 @@ static inline bool is_declaration(const entity_t *entity)
 const char *get_entity_kind_name(entity_kind_t kind);
 
 entity_t *allocate_entity_zero(entity_kind_t kind);
+
+elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
 
 #endif

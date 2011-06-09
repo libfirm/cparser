@@ -1026,9 +1026,19 @@ int main(int argc, char **argv)
 					select_input_encoding(encoding);
 				} else if (strstart(orig_opt, "align-loops=") ||
 				           strstart(orig_opt, "align-jumps=") ||
-				           strstart(orig_opt, "visibility=")  ||
 				           strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
+				} else if (strstart(orig_opt, "visibility=")) {
+					const char *arg = strchr(orig_opt, '=')+1;
+					elf_visibility_tag_t visibility
+						= get_elf_visibility_from_string(arg);
+					if (visibility == ELF_VISIBILITY_ERROR) {
+						fprintf(stderr, "invalid visibility '%s' specified\n",
+						        arg);
+						argument_errors = true;
+					} else {
+						set_default_visibility(visibility);
+					}
 				} else if (strstart(orig_opt, "message-length=")) {
 					/* ignore: would only affect error message format */
 				} else {
