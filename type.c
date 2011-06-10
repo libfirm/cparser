@@ -33,7 +33,6 @@
 #include "warning.h"
 #include "diagnostic.h"
 #include "printer.h"
-#include "driver/firm_cmdline.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;

@@ -19,7 +19,6 @@ struct a_firm_opt {
   bool     alias_analysis;  /**< enable Alias Analysis */
   bool     strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
   bool     no_alias;        /**< no aliasing possible. */
-  bool     fp_model;        /**< fp model */
   bool     verify;          /**< Firm verifier setting */
   bool     check_all;       /**< enable checking all Firm phases */
   int      clone_threshold; /**< The threshold value for procedure cloning. */

@@ -49,13 +49,14 @@
 #include "printer.h"
 #include "entitymap_t.h"
 #include "driver/firm_opt.h"
-#include "driver/firm_cmdline.h"
 
 typedef struct trampoline_region trampoline_region;
 struct trampoline_region {
 	ir_entity        *function;    /**< The function that is called by this trampoline */
 	ir_entity        *region;      /**< created region for the trampoline */
 };
+
+fp_model_t firm_fp_model = fp_model_precise;
 
 static const backend_params *be_params;
 
@@ -5803,7 +5804,7 @@ static void create_function(entity_t *entity)
 	ir_graph *old_current_function = current_function;
 	current_function = irg;
 
-	set_irg_fp_model(irg, firm_opt.fp_model);
+	set_irg_fp_model(irg, firm_fp_model);
 	tarval_enable_fp_ops(1);
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));

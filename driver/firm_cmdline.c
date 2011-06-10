@@ -26,7 +26,6 @@ struct a_firm_opt firm_opt = {
   /* alias_analysis  = */ true,
   /* strict_alias    = */ false,
   /* no_alias        = */ false,
-  /* fp_model        = */ fp_model_precise,
   /* verify          = */ FIRM_VERIFICATION_ON,
   /* check_all       = */ true,
   /* clone_threshold = */ DEFAULT_CLONE_THRESHOLD,
@@ -85,9 +84,6 @@ static const struct params {
   { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "firm: strict alias rules" },
   { X("no-strict-aliasing"),     &firm_opt.strict_alias,     0, "firm: strict alias rules" },
   { X("clone-threshold=<value>"),NULL,                       0, "firm: set clone threshold to <value>" },
-  { X("fp-precise"),             &firm_opt.fp_model,         fp_model_precise, "firm: precise fp model" },
-  { X("fp-fast"),                &firm_opt.fp_model,         fp_model_fast,    "firm: fast fp model" },
-  { X("fp-strict"),              &firm_opt.fp_model,         fp_model_strict,  "firm: strict fp model" },
 
   /* other firm regarding options */
   { X("verify-off"),             &firm_opt.verify,           FIRM_VERIFICATION_OFF, "firm: disable node verification" },

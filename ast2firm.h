@@ -20,7 +20,7 @@
 #ifndef AST2FIRM_H
 #define AST2FIRM_H
 
-#include <libfirm/firm_types.h>
+#include <libfirm/firm.h>
 #include "ast.h"
 #include "type.h"
 
@@ -35,5 +35,7 @@ ir_type *get_ir_type(type_t *type);
 typedef ident* (*create_ld_ident_func)(entity_t *entity);
 
 void set_create_ld_ident(create_ld_ident_func func);
+
+extern fp_model_t firm_fp_model;
 
 #endif
