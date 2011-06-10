@@ -1068,7 +1068,8 @@ int main(int argc, char **argv)
 					} else if (streq(opt, "signed-char")) {
 						char_is_signed = truth_value;
 					} else if (streq(opt, "strength-reduce")) {
-						firm_option(truth_value ? "strength-red" : "no-strength-red");
+						/* does nothing, for gcc compatibility (even gcc does
+						 * nothing for this switch anymore) */
 					} else if (streq(opt, "syntax-only")) {
 						mode = truth_value ? ParseOnly : CompileAssembleLink;
 					} else if (streq(opt, "unsigned-char")) {
