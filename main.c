@@ -1106,7 +1106,7 @@ int main(int argc, char **argv)
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else if (streq(opt, "help")) {
 						fprintf(stderr, "warning: -fhelp is deprecated\n");
-						help |= HELP_OPTIMISATION;
+						help |= HELP_OPTIMIZATION;
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
