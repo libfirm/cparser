@@ -373,7 +373,7 @@ static opt_config_t opts[] = {
 #define IRP(a, b, c, d) { OPT_TARGET_IRP, a, .u.transform_irp = b,                     c, d }
 	IRG("bool",              opt_bool,                 "bool simplification",                                   OPT_FLAG_NONE),
 	IRG("combo",             combo,                    "combined CCE, UCE and GVN",                             OPT_FLAG_NONE),
-	IRG("confirm",           construct_confirms,       "confirm optimisation",                                  OPT_FLAG_HIDE_OPTIONS),
+	IRG("confirm",           construct_confirms,       "confirm optimization",                                  OPT_FLAG_HIDE_OPTIONS),
 	IRG("control-flow",      optimize_cf,              "optimization of control-flow",                          OPT_FLAG_HIDE_OPTIONS),
 	IRG("dead",              dead_node_elimination,    "dead node elimination",                                 OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRG("deconv",            conv_opt,                 "conv node elimination",                                 OPT_FLAG_NONE),
@@ -440,7 +440,7 @@ static bool get_opt_enabled(const char *name)
 }
 
 /**
- * perform an optimisation on a single graph
+ * perform an optimization on a single graph
  *
  * @return  true if something changed, false otherwise
  */
@@ -966,7 +966,7 @@ int firm_option(const char *const opt)
 		}
 	}
 
-	/* maybe this enables/disables optimisations */
+	/* maybe this enables/disables optimizations */
 	if (firm_opt_option(opt))
 		return 1;
 
@@ -989,7 +989,7 @@ static void set_option(const char *arg)
 
 void choose_optimization_pack(int level)
 {
-	/* apply optimisation level */
+	/* apply optimization level */
 	switch(level) {
 	case 0:
 		set_option("no-opt");

@@ -6,4 +6,4 @@ and general support by:
 Christoph Mallon   (he understands the standard :), bugfixes,
                     diagnostic infrastructure and printf format checker,
                     warnings)
-Michael Beck       (bugfixes, firm optimisation driver, warnings, comments)
+Michael Beck       (bugfixes, firm optimization driver, warnings, comments)
