@@ -70,7 +70,6 @@
 #include "diagnostic.h"
 #include "lang_features.h"
 #include "driver/firm_opt.h"
-#include "driver/firm_cmdline.h"
 #include "driver/firm_timing.h"
 #include "driver/firm_machine.h"
 #include "adt/error.h"
@@ -563,6 +562,7 @@ static void print_help_basic(const char *argv0)
 	put_help("--help-parser",            "Display information about parser options");
 	put_help("--help-warnings",          "Display information about warning options");
 	put_help("--help-codegen",           "Display information about code-generation options");
+	put_help("--help-optimization",      "Display information about optimization options");
 	put_help("--help-linker",            "Display information about linker options");
 	put_help("--help-language-tools",    "Display information about language tools options");
 	put_help("--help-debug",             "Display information about compiler debugging options");
@@ -640,9 +640,10 @@ static void print_help_warnings(void)
 	print_warning_opt_help();
 }
 
-static void print_help_optimisation(void)
+static void print_help_optimization(void)
 {
-	put_help("-O LEVEL",                 "select optimisation level (0-4)");
+	put_help("-O LEVEL",                 "select optimization level (0-4)");
+	firm_option_help(put_help);
 	put_help("-fexpensive-optimizations","ignored (gcc compatibility)");
 }
 
@@ -729,7 +730,7 @@ typedef enum {
 	HELP_PREPROCESSOR  = 1u << 1,
 	HELP_PARSER        = 1u << 2,
 	HELP_WARNINGS      = 1u << 3,
-	HELP_OPTIMISATION  = 1u << 4,
+	HELP_OPTIMIZATION  = 1u << 4,
 	HELP_CODEGEN       = 1u << 5,
 	HELP_LINKER        = 1u << 6,
 	HELP_LANGUAGETOOLS = 1u << 7,
@@ -745,7 +746,7 @@ static void print_help(const char *argv0, help_sections_t sections)
 	if (sections & HELP_PREPROCESSOR)  print_help_preprocessor();
 	if (sections & HELP_PARSER)        print_help_parser();
 	if (sections & HELP_WARNINGS)      print_help_warnings();
-	if (sections & HELP_OPTIMISATION)  print_help_optimisation();
+	if (sections & HELP_OPTIMIZATION)  print_help_optimization();
 	if (sections & HELP_CODEGEN)       print_help_codegeneration();
 	if (sections & HELP_LINKER)        print_help_linker();
 	if (sections & HELP_LANGUAGETOOLS) print_help_language_tools();
@@ -898,7 +899,7 @@ int main(int argc, char **argv)
 
 #define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
 
-	/* early options parsing (find out optimisation level and OS) */
+	/* early options parsing (find out optimization level and OS) */
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] != '-')
@@ -1105,7 +1106,7 @@ int main(int argc, char **argv)
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else if (streq(opt, "help")) {
 						fprintf(stderr, "warning: -fhelp is deprecated\n");
-						help |= HELP_FIRM;
+						help |= HELP_OPTIMISATION;
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
@@ -1335,6 +1336,8 @@ int main(int argc, char **argv)
 					help |= HELP_CODEGEN;
 				} else if (streq(option, "help-linker")) {
 					help |= HELP_LINKER;
+				} else if (streq(option, "help-optimization")) {
+					help |= HELP_OPTIMIZATION;
 				} else if (streq(option, "help-language-tools")) {
 					help |= HELP_LANGUAGETOOLS;
 				} else if (streq(option, "help-debug")) {

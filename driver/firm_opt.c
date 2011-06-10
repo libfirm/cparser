@@ -17,10 +17,151 @@
 #include <libfirm/firm.h>
 
 #include "firm_opt.h"
-#include "firm_codegen.h"
-#include "firm_cmdline.h"
 #include "firm_timing.h"
 #include "ast2firm.h"
+#include "adt/strutil.h"
+
+/* optimization settings */
+struct a_firm_opt {
+	bool     const_folding;   /**< enable constant folding */
+	bool     cse;             /**< enable common-subexpression elimination */
+	bool     confirm;         /**< enable Confirm optimization */
+	bool     muls;            /**< enable architecture dependent mul optimization */
+	bool     divs;            /**< enable architecture dependent div optimization */
+	bool     mods;            /**< enable architecture dependent mod optimization */
+	bool     alias_analysis;  /**< enable Alias Analysis */
+	bool     strict_alias;    /**< enable strict Alias Analysis (using type based AA) */
+	bool     no_alias;        /**< no aliasing possible. */
+	bool     verify;          /**< Firm verifier setting */
+	bool     check_all;       /**< enable checking all Firm phases */
+	int      clone_threshold; /**< The threshold value for procedure cloning. */
+	unsigned inline_maxsize;  /**< Maximum function size for inlining. */
+	unsigned inline_threshold;/**< Inlining benefice threshold. */
+	bool     verify_edges;    /**< verify edges */
+};
+
+/** statistic options */
+typedef enum a_firmstat_selection_tag {
+	STAT_NONE        = 0x00000000,
+	STAT_BEFORE_OPT  = 0x00000001,
+	STAT_AFTER_OPT   = 0x00000002,
+	STAT_AFTER_LOWER = 0x00000004,
+	STAT_FINAL_IR    = 0x00000008,
+	STAT_FINAL       = 0x00000010,
+} a_firmstat_selection;
+
+/* dumping options */
+struct a_firm_dump {
+	bool debug_print;   /**< enable debug print */
+	bool all_types;     /**< dump the All_types graph */
+	bool no_blocks;     /**< dump non-blocked graph */
+	bool extbb;         /**< dumps extended basic blocks */
+	bool ir_graph;      /**< dump all graphs */
+	bool all_phases;    /**< dump the IR graph after all phases */
+	bool statistic;     /**< Firm statistic setting */
+	bool stat_pattern;  /**< enable Firm statistic pattern */
+	bool stat_dag;      /**< enable Firm DAG statistic */
+};
+
+struct a_firm_be_opt {
+	bool selection;
+	bool node_stat;
+};
+
+/* optimization settings */
+struct a_firm_opt firm_opt = {
+	.const_folding    =  true,
+	.cse              =  true,
+	.confirm          =  true,
+	.muls             =  true,
+	.divs             =  true,
+	.mods             =  true,
+	.alias_analysis   =  true,
+	.strict_alias     =  false,
+	.no_alias         =  false,
+	.verify           =  FIRM_VERIFICATION_ON,
+	.check_all        =  true,
+	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
+	.inline_maxsize   =  750,
+	.inline_threshold =  0,
+	.verify_edges     =  false,
+};
+
+/* dumping options */
+struct a_firm_dump firm_dump = {
+	.debug_print  = false,
+	.all_types    = false,
+	.no_blocks    = false,
+	.extbb        = false,
+	.ir_graph     = false,
+	.all_phases   = false,
+	.statistic    = STAT_NONE,
+	.stat_pattern = 0,
+	.stat_dag     = 0,
+};
+
+#define X(a)  a, sizeof(a)-1
+
+/** Parameter description structure */
+static const struct params {
+  const char *option;      /**< name of the option */
+  size_t     opt_len;      /**< length of the option string */
+  bool       *flag;        /**< address of variable to set/reset */
+  bool       set;          /**< iff true, variable will be set, else reset */
+  const char *description; /**< description of this option */
+} firm_options[] = {
+  /* firm optimization options */
+  { X("no-opt"),                 NULL,                       0, "disable all FIRM optimizations" },
+  { X("cse"),                    &firm_opt.cse,              1, "enable common subexpression elimination" },
+  { X("no-cse"),                 &firm_opt.cse,              0, "disable common subexpression elimination" },
+  { X("const-fold"),             &firm_opt.const_folding,    1, "enable constant folding" },
+  { X("no-const-fold"),          &firm_opt.const_folding,    0, "disable constant folding" },
+  { X("inline-max-size=<size>"), NULL,                       0, "set maximum size for function inlining" },
+  { X("inline-threshold=<size>"),NULL,                       0, "set benefice threshold for function inlining" },
+  { X("confirm"),                &firm_opt.confirm,          1, "enable Confirm optimization" },
+  { X("no-confirm"),             &firm_opt.confirm,          0, "disable Confirm optimization" },
+  { X("opt-mul"),                &firm_opt.muls,             0, "enable multiplication optimization" },
+  { X("no-opt-mul"),             &firm_opt.muls,             0, "disable multiplication optimization" },
+  { X("opt-div"),                &firm_opt.divs,             0, "enable division optimization" },
+  { X("no-opt-div"),             &firm_opt.divs,             0, "disable division optimization" },
+  { X("opt-mod"),                &firm_opt.mods,             0, "enable remainder optimization" },
+  { X("no-opt-mod"),             &firm_opt.mods,             0, "disable remainder optimization" },
+  { X("opt-alias"),              &firm_opt.alias_analysis,   1, "enable alias analysis" },
+  { X("no-opt-alias"),           &firm_opt.alias_analysis,   0, "disable alias analysis" },
+  { X("alias"),                  &firm_opt.no_alias,         0, "aliasing occurs" },
+  { X("no-alias"),               &firm_opt.no_alias,         1, "no aliasing occurs" },
+  { X("strict-aliasing"),        &firm_opt.strict_alias,     1, "strict alias rules" },
+  { X("no-strict-aliasing"),     &firm_opt.strict_alias,     0, "strict alias rules" },
+  { X("clone-threshold=<value>"),NULL,                       0, "set clone threshold to <value>" },
+
+  /* other firm regarding options */
+  { X("verify-off"),             &firm_opt.verify,           FIRM_VERIFICATION_OFF,    "disable node verification" },
+  { X("verify-on"),              &firm_opt.verify,           FIRM_VERIFICATION_ON,     "enable node verification" },
+  { X("verify-report"),          &firm_opt.verify,           FIRM_VERIFICATION_REPORT, "node verification, report only" },
+  { X("check-all"),              &firm_opt.check_all,        1, "enable checking all Firm phases" },
+  { X("no-check-all"),           &firm_opt.check_all,        0, "disable checking all Firm phases" },
+  { X("verify-edges-on"),        &firm_opt.verify_edges,     1, "enable out edge verification" },
+  { X("verify-edges-off"),       &firm_opt.verify_edges,     0, "disable out edge verification" },
+
+  /* dumping */
+  { X("dump-ir"),                &firm_dump.ir_graph,        1, "dump IR graph" },
+  { X("dump-all-types"),         &firm_dump.all_types,       1, "dump graph of all types" },
+  { X("dump-no-blocks"),         &firm_dump.no_blocks,       1, "dump non-blocked graph" },
+  { X("dump-extbb"),             &firm_dump.extbb,           1, "dump extended basic blocks" },
+  { X("dump-all-phases"),        &firm_dump.all_phases,      1, "dump graphs for all optimization phases" },
+  { X("dump-filter=<string>"),   NULL,                       0, "set dumper filter" },
+
+  /* misc */
+  { X("stat-before-opt"),        &firm_dump.statistic,       STAT_BEFORE_OPT,  "Firm statistic output before optimizations" },
+  { X("stat-after-opt"),         &firm_dump.statistic,       STAT_AFTER_OPT,   "Firm statistic output after optimizations" },
+  { X("stat-after-lower"),       &firm_dump.statistic,       STAT_AFTER_LOWER, "Firm statistic output after lowering" },
+  { X("stat-final-ir"),          &firm_dump.statistic,       STAT_FINAL_IR,    "Firm statistic after final optimization" },
+  { X("stat-final"),             &firm_dump.statistic,       STAT_FINAL,       "Firm statistic after code generation" },
+  { X("stat-pattern"),           &firm_dump.stat_pattern,    1, "Firm statistic calculates most used pattern" },
+  { X("stat-dag"),               &firm_dump.stat_dag,        1, "Firm calculates DAG statistics" },
+};
+
+#undef X
 
 static ir_timer_t *t_vcg_dump;
 static ir_timer_t *t_verify;
@@ -636,8 +777,6 @@ void gen_firm_init(void)
 	arch_dep_set_opts(arch_dep_none);
 
 	do_node_verification((firm_verification_t) firm_opt.verify);
-	if (firm_dump.filter != NULL)
-		ir_set_dump_filter(firm_dump.filter);
 	if (firm_dump.extbb)
 		ir_add_dump_flags(ir_dump_flag_group_extbb);
 	if (firm_dump.no_blocks)
@@ -724,8 +863,17 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 		stat_dump_snapshot(input_filename, "final");
 }
 
-void disable_all_opts(void)
+static void disable_all_opts(void)
 {
+	firm_opt.cse             = false;
+	firm_opt.confirm         = false;
+	firm_opt.muls            = false;
+	firm_opt.divs            = false;
+	firm_opt.mods            = false;
+	firm_opt.alias_analysis  = false;
+	firm_opt.strict_alias    = false;
+	firm_opt.no_alias        = false;
+
 	for (int i = 0; i < n_opts; ++i) {
 		opt_config_t *config = &opts[i];
 		if (config->flags & OPT_FLAG_ESSENTIAL) {
@@ -736,7 +884,7 @@ void disable_all_opts(void)
 	}
 }
 
-int firm_opt_option(const char *opt)
+static bool firm_opt_option(const char *opt)
 {
 	bool enable = true;
 	if (strncmp(opt, "no-", 3) == 0) {
@@ -746,18 +894,18 @@ int firm_opt_option(const char *opt)
 
 	opt_config_t *config = get_opt(opt);
 	if (config == NULL || (config->flags & OPT_FLAG_HIDE_OPTIONS))
-		return 0;
+		return false;
 
 	config->flags &= ~OPT_FLAG_ENABLED;
 	config->flags |= enable ? OPT_FLAG_ENABLED : 0;
-	return 1;
+	return true;
 }
 
-void firm_opt_option_help(void)
+void firm_option_help(print_option_help_func print_option_help)
 {
-	int i;
+	print_option_help(firm_options[0].option, firm_options[0].description);
 
-	for (i = 0; i < n_opts; ++i) {
+	for (int i = 0; i < n_opts; ++i) {
 		char buf[1024];
 		char buf2[1024];
 
@@ -765,12 +913,64 @@ void firm_opt_option_help(void)
 		if (config->flags & OPT_FLAG_HIDE_OPTIONS)
 			continue;
 
-		snprintf(buf2, sizeof(buf2), "firm: enable %s", config->description);
-		print_option_help(config->name, buf2);
-		snprintf(buf, sizeof(buf), "no-%s", config->name);
-		snprintf(buf2, sizeof(buf2), "firm: disable %s", config->description);
+		snprintf(buf, sizeof(buf), "-f%s", config->name);
+		snprintf(buf2, sizeof(buf2), "enable %s", config->description);
+		print_option_help(buf, buf2);
+		snprintf(buf, sizeof(buf), "-fno-%s", config->name);
+		snprintf(buf2, sizeof(buf2), "disable %s", config->description);
 		print_option_help(buf, buf2);
 	}
+
+	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
+	for (size_t k = 0; k < n_options; ++k) {
+		char buf[1024];
+		char buf2[1024];
+		snprintf(buf, sizeof(buf), "-f%s", firm_options[k].option);
+		snprintf(buf2, sizeof(buf2), "%s", firm_options[k].description);
+		print_option_help(buf, buf2);
+	}
+}
+
+int firm_option(const char *const opt)
+{
+	char const* val;
+	if ((val = strstart(opt, "dump-filter="))) {
+		ir_set_dump_filter(val);
+		return 1;
+	} else if ((val = strstart(opt, "clone-threshold="))) {
+		sscanf(val, "%d", &firm_opt.clone_threshold);
+		return 1;
+	} else if ((val = strstart(opt, "inline-max-size="))) {
+		sscanf(val, "%u", &firm_opt.inline_maxsize);
+		return 1;
+	} else if ((val = strstart(opt, "inline-threshold="))) {
+		sscanf(val, "%u", &firm_opt.inline_threshold);
+		return 1;
+	} else if (streq(opt, "no-opt")) {
+		disable_all_opts();
+		return 1;
+	}
+
+	size_t const len = strlen(opt);
+	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
+	for (size_t i = n_options; i != 0;) {
+		struct params const* const o = &firm_options[--i];
+		if (len == o->opt_len && strncmp(opt, o->option, len) == 0) {
+			/* statistic options do accumulate */
+			if (o->flag == &firm_dump.statistic)
+				*o->flag = (bool) (*o->flag | o->set);
+			else
+				*o->flag = o->set;
+
+			return 1;
+		}
+	}
+
+	/* maybe this enables/disables optimisations */
+	if (firm_opt_option(opt))
+		return 1;
+
+	return 0;
 }
 
 static void set_be_option(const char *arg)

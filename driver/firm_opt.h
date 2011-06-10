@@ -93,36 +93,24 @@ enum rts_names {
 
 extern ir_entity_ptr rts_entities[rts_max];
 
-/** Debug printf implementation. */
-extern void dbg_printf(const char *fmt, ...);
-
 /** Initialize for the Firm-generating back end. */
 void gen_firm_init(void);
-
-void disable_all_opts(void);
 
 /** called, after the Firm generation is completed. */
 void gen_firm_finish(FILE *out, const char *input_filename);
 
-void gen_Firm_assembler(const char *input_filename);
-
 /** early initialization. */
 void firm_early_init(void);
 
-/** process optimisation commandline option */
-int firm_opt_option(const char *opt);
+/** process optimization commandline option */
+int firm_option(const char *opt);
 
-/** print help about optimisations options */
-void firm_opt_option_help(void);
+typedef void (*print_option_help_func)(const char *name, const char *description);
+
+void firm_option_help(print_option_help_func func);
 
 /** Choose an optimization level. (Typically used to interpret the -O compiler
  * switches) */
 void choose_optimization_pack(int level);
-
-/**
- * Setup firm to generate code for a specific os.
- * The parameter should be the OS-part of a machine triple
- */
-void firm_init_os(const char *os);
 
 #endif
