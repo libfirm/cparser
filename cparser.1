@@ -119,7 +119,7 @@ In particular these are
 .Fl Wpointer-arith ,
 .Fl Wredundant-decls ,
 .Fl Wreturn-type ,
-.Fl Wshadow ,
+.Fl Wshadow-local ,
 .Fl Wsign-compare ,
 .Fl Wstrict-prototypes ,
 .Fl Wswitch-enum ,
@@ -152,6 +152,7 @@ Generate an error, when calling a function without a prior declaration.
 Activate some more warnings.
 In particular these are
 .Fl Wempty-statement ,
+.Fl Wshadow ,
 .Fl Wunused-parameter ,
 .Fl Wunused-value .
 .It Fl Wfatal-errors
@@ -207,6 +208,10 @@ Warn if + or - is used as operand of << or >>, e.g. x\ +\ y\ <<\ z.
 Warn about redundant declarations, i.e. multiple declarations of the same object or static forward declarations which have no use before their definition.
 .It Fl Wshadow
 Warn when a new declaration shadows another declaration with the same name in an outer scope.
+.It Fl Wshadow-local
+Like
+.Fl Wshadow ,
+but only warn if the shadowed declaration is not global, e.g. a local variable shadows a parameter or another local variable.
 .It Fl Wunreachable-code
 Warn when the compiler determines that a statement (or in some cases a part thereof) will never be executed.
 .It Fl Wunused

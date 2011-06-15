@@ -4376,7 +4376,8 @@ error_redeclaration:
 			return previous_entity;
 		}
 
-		if (warning.shadow) {
+		if (warning.shadow ||
+				(warning.shadow_local && previous_entity->base.parent_scope != file_scope)) {
 			warningf(pos, "%s '%Y' shadows %s (declared %P)",
 					get_entity_kind_name(entity->kind), symbol,
 					get_entity_kind_name(previous_entity->kind),

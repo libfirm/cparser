@@ -60,6 +60,7 @@ warning_t warning = {
 	.return_type                         = true,
 	.s_are_errors                        = false,
 	.shadow                              = false,
+	.shadow_local                        = false,
 	.sign_compare                        = false,
 	.strict_prototypes                   = true,
 	.switch_default                      = false,
@@ -118,6 +119,7 @@ void print_warning_opt_help(void)
 	put_help("-Wredundant-decls",               "");
 	put_help("-Wreturn-type",                   "");
 	put_help("-Wshadow",                        "");
+	put_help("-Wshadow-local",                  "");
 	put_help("-Wsign-compare",                  "");
 	put_help("-Wstrict-prototypes",             "");
 	put_help("-Wswitch-default",                "");
@@ -172,7 +174,7 @@ void set_warning_opt(const char *const opt)
 		SET(pointer_arith);
 		SET(redundant_decls);
 		SET(return_type);
-		SET(shadow);
+		SET(shadow_local);
 		SET(sign_compare);
 		SET(strict_prototypes);
 		SET(switch_enum);
@@ -206,6 +208,7 @@ extra:
 		// TODO SET(incomplete_aggregate_init);
 		// TODO SET(missing_field_initializers);
 		// TODO SET(pointless_comparison);
+		SET(shadow);
 		SET(unused_parameter);
 		SET(unused_value);
 	}
@@ -238,6 +241,7 @@ extra:
 	OPT("redundant-decls",                     redundant_decls);
 	OPT("return-type",                         return_type);
 	OPT("shadow",                              shadow);
+	OPT("shadow-local",                        shadow_local);
 	OPT("sign-compare",                        sign_compare);
 	OPT("strict-prototypes",                   strict_prototypes);
 	OPT("switch-default",                      switch_default);
