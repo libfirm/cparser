@@ -309,6 +309,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_INVALID]                    = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
 		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
+		[EXPR_LITERAL_BOOLEAN]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER_OCTAL]      = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER_HEXADECIMAL]= sizeof(literal_expression_t),
