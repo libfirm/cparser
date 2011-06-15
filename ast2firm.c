@@ -436,9 +436,9 @@ static ir_type *create_pointer_type(pointer_type_t *type)
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
 	type_t        *points_to    = type->points_to;
 	ir_type       *ir_points_to = get_ir_type_incomplete(points_to);
-	ir_type       *ir_type      = new_d_type_pointer(ir_points_to, dbgi);
+	ir_type       *irtype       = new_d_type_pointer(ir_points_to, dbgi);
 
-	return ir_type;
+	return irtype;
 }
 
 static ir_type *create_reference_type(reference_type_t *type)
@@ -446,9 +446,9 @@ static ir_type *create_reference_type(reference_type_t *type)
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
 	type_t        *refers_to    = type->refers_to;
 	ir_type       *ir_refers_to = get_ir_type_incomplete(refers_to);
-	ir_type       *ir_type      = new_d_type_pointer(ir_refers_to, dbgi);
+	ir_type       *irtype       = new_d_type_pointer(ir_refers_to, dbgi);
 
-	return ir_type;
+	return irtype;
 }
 
 static ir_type *create_array_type(array_type_t *type)
@@ -456,27 +456,27 @@ static ir_type *create_array_type(array_type_t *type)
 	type_dbg_info *dbgi            = get_type_dbg_info_((const type_t*) type);
 	type_t        *element_type    = type->element_type;
 	ir_type       *ir_element_type = get_ir_type(element_type);
-	ir_type       *ir_type         = new_d_type_array(1, ir_element_type, dbgi);
+	ir_type       *irtype          = new_d_type_array(1, ir_element_type, dbgi);
 
 	const int align = get_type_alignment_bytes(ir_element_type);
-	set_type_alignment_bytes(ir_type, align);
+	set_type_alignment_bytes(irtype, align);
 
 	if (type->size_constant) {
 		int n_elements = type->size;
 
-		set_array_bounds_int(ir_type, 0, 0, n_elements);
+		set_array_bounds_int(irtype, 0, 0, n_elements);
 
 		size_t elemsize = get_type_size_bytes(ir_element_type);
 		if (elemsize % align > 0) {
 			elemsize += align - (elemsize % align);
 		}
-		set_type_size_bytes(ir_type, n_elements * elemsize);
+		set_type_size_bytes(irtype, n_elements * elemsize);
 	} else {
-		set_array_lower_bound_int(ir_type, 0, 0);
+		set_array_lower_bound_int(irtype, 0, 0);
 	}
-	set_type_state(ir_type, layout_fixed);
+	set_type_state(irtype, layout_fixed);
 
-	return ir_type;
+	return irtype;
 }
 
 /**
