@@ -183,7 +183,7 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_LONG_DOUBLE] = {
-		.size       = 12,
+		.size       = (unsigned) -1, /* will be filled in later */
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
@@ -234,9 +234,12 @@ void init_types(void)
 		props[ATOMIC_TYPE_LONGLONG].alignment    = 8;
 		props[ATOMIC_TYPE_ULONGLONG].alignment   = 8;
 	}
-	if (force_long_double_size > 0) {
-		props[ATOMIC_TYPE_LONG_DOUBLE].size      = force_long_double_size;
-		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = force_long_double_size;
+
+	if (long_double_size > 0) {
+		props[ATOMIC_TYPE_LONG_DOUBLE].size      = long_double_size;
+		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = long_double_size;
+	} else {
+		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	}
 
 	/* TODO: make this configurable for platforms which do not use byte sized

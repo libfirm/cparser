@@ -105,7 +105,7 @@ bool               char_is_signed            = true;
 bool               strict_mode               = false;
 bool               use_builtins              = false;
 atomic_type_kind_t wchar_atomic_kind         = ATOMIC_TYPE_INT;
-unsigned           force_long_double_size    = 0;
+unsigned           long_double_size          = 0;
 bool               enable_main_collect2_hack = false;
 bool               freestanding              = false;
 
@@ -808,7 +808,6 @@ static bool init_os_support(void)
 {
 	const char *os = target_machine->operating_system;
 	wchar_atomic_kind         = ATOMIC_TYPE_INT;
-	force_long_double_size    = 0;
 	enable_main_collect2_hack = false;
 	define_intmax_types       = false;
 
@@ -816,7 +815,7 @@ static bool init_os_support(void)
 			|| streq(os, "solaris")) {
 		set_create_ld_ident(create_name_linux_elf);
 	} else if (streq(os, "darwin")) {
-		force_long_double_size = 16;
+		long_double_size = 16;
 		set_create_ld_ident(create_name_macho);
 		define_intmax_types = true;
 	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
@@ -845,6 +844,17 @@ static void setup_target_machine(void)
 {
 	if (!setup_firm_for_machine(target_machine))
 		exit(1);
+
+	const backend_params *be_params = be_get_backend_param();
+	if (be_params->long_double_size % 8 != 0) {
+		fprintf(stderr, "firm-target long double size is not a multiple of 8, can't handle this\n");
+		exit(1);
+	}
+
+	byte_order_big_endian = be_params->byte_order_big_endian;
+	machine_size          = be_params->machine_size;
+	long_double_size      = be_params->long_double_size / 8;
+
 	init_os_support();
 }
 
@@ -1236,10 +1246,10 @@ int main(int argc, char **argv)
 						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
 						argument_errors = true;
 					} else {
-						machine_size = (unsigned int)value;
 						add_flag(&cppflags_obst, "-m%u", machine_size);
 						add_flag(&asflags_obst, "-m%u", machine_size);
 						add_flag(&ldflags_obst, "-m%u", machine_size);
+						/* TODO: choose/change backend based on this */
 					}
 				}
 			} else if (streq(option, "pg")) {
@@ -1443,7 +1453,6 @@ int main(int argc, char **argv)
 	}
 
 	gen_firm_init();
-	byte_order_big_endian = be_get_backend_param()->byte_order_big_endian;
 	init_symbol_table();
 	init_types();
 	init_typehash();
