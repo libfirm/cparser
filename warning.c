@@ -169,6 +169,7 @@ void set_warning_opt(const char *const opt)
 		SET(implicit_int);
 		SET(init_self);
 		SET(main);
+		SET(missing_declarations);
 		SET(nonnull);
 		SET(parentheses);
 		SET(pointer_arith);
