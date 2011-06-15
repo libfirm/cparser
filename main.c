@@ -634,7 +634,6 @@ static void print_help_parser(void)
 static void print_help_warnings(void)
 {
 	put_help("-w",                       "disable all warnings");
-	put_help("-W",                       "ignored (gcc compatibility)");
 	put_help("-Wno-trigraphs",           "warn if input contains trigraphs");
 	put_help("-Wundef",                  "Warn if an undefined macro is used in an #if");
 	print_warning_opt_help();
@@ -1135,9 +1134,7 @@ int main(int argc, char **argv)
 					}
 				}
 			} else if (option[0] == 'W') {
-				if (option[1] == '\0') {
-					/* ignore -W, our defaults are already quite verbose */
-				} else if (strstart(option + 1, "p,")) {
+				if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wp,");

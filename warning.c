@@ -147,7 +147,9 @@ void set_warning_opt(const char *const opt)
 		state = false;
 	}
 
-	if (0) {}
+	if (s[0] == '\0') { // -W is an alias for -Wextra
+		goto extra;
+	}
 #define OPTX(x)   else if (strcmp(s, x) == 0)
 #define SET(y)    (void)(warning.y = state)
 #define OPT(x, y) OPTX(x) SET(y)
@@ -197,6 +199,7 @@ void set_warning_opt(const char *const opt)
 	OPT("error",                               s_are_errors);
 	OPT("error-implicit-function-declaration", error_implicit_function_declaration);
 	OPTX("extra") {
+extra:
 		/* TODO */
 		// TODO SET(function_end_without_return);
 		SET(empty_statement);
