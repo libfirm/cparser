@@ -213,7 +213,7 @@ static void print_quoted_string(const string_t *const string, char border,
 	print_char(border);
 	const char *end = string->begin + string->size - skip;
 	for (const char *c = string->begin; c != end; ++c) {
-		unsigned char const tc = *c;
+		const char tc = *c;
 		if (tc == border) {
 			print_string("\\");
 		}
@@ -233,7 +233,7 @@ static void print_quoted_string(const string_t *const string, char border,
 			}
 			/* FALLTHROUGH */
 		default:
-			if (tc < 0x80 && !isprint(tc)) {
+			if ((unsigned)tc < 0x80 && !isprint(tc)) {
 				print_format("\\%03o", (unsigned)tc);
 			} else {
 				print_char(tc);

@@ -289,7 +289,7 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t),
 		[STATEMENT_LEAVE]       = sizeof(leave_statement_t)
 	};
-	assert(kind < lengthof(sizes));
+	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -341,7 +341,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 	if (kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
-	assert(kind < lengthof(sizes));
+	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -427,7 +427,7 @@ static size_t get_initializer_size(initializer_kind_t kind)
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
 		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
-	assert(kind < lengthof(sizes));
+	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -703,7 +703,7 @@ static entity_t *get_entity(const symbol_t *const symbol,
 	assert(namespc != NAMESPACE_INVALID);
 	entity_t *entity = symbol->entity;
 	for (; entity != NULL; entity = entity->base.symbol_next) {
-		if (entity->base.namespc == namespc)
+		if ((namespace_tag_t)entity->base.namespc == namespc)
 			return entity;
 	}
 
@@ -716,7 +716,7 @@ static entity_t *get_tag(symbol_t const *const symbol,
                          entity_kind_tag_t const kind)
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
-	if (entity != NULL && entity->kind != kind) {
+	if (entity != NULL && (entity_kind_tag_t)entity->kind != kind) {
 		errorf(HERE,
 				"'%Y' defined as wrong kind of tag (previous definition %P)",
 				symbol, &entity->base.source_position);
@@ -2949,8 +2949,10 @@ wrong_thread_storage_class:
 			break;
 
 #define CHECK_DOUBLE_TYPE()        \
+			do { \
 			if ( type != NULL)     \
-				errorf(HERE, "multiple data types in declaration specifiers");
+				errorf(HERE, "multiple data types in declaration specifiers"); \
+			} while(0)
 
 		case T_struct:
 			CHECK_DOUBLE_TYPE();
@@ -5946,7 +5948,7 @@ struct expression_parser_function_t {
 	parse_expression_infix_function  infix_parser;
 };
 
-expression_parser_function_t expression_parsers[T_LAST_TOKEN];
+static expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
 /**
  * Prints an error message if an expression was expected but not read
@@ -6310,7 +6312,8 @@ static entity_t *lookup_entity(const scope_t *scope, symbol_t *symbol,
 	   construct a hashmap here... */
 	entity_t *entity = scope->entities;
 	for ( ; entity != NULL; entity = entity->base.next) {
-		if (entity->base.symbol == symbol && entity->base.namespc == namespc)
+		if (entity->base.symbol == symbol
+		    && (namespace_tag_t)entity->base.namespc == namespc)
 			break;
 	}
 
@@ -10702,23 +10705,17 @@ static void parse_externals(void)
 
 	while (token.type != T_EOF && token.type != '}') {
 #ifndef NDEBUG
-		bool anchor_leak = false;
 		for (int i = 0; i < T_LAST_TOKEN; ++i) {
 			unsigned char count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
 				/* the anchor set and its copy differs */
 				internal_errorf(HERE, "Leaked anchor token %k %d times", i, count);
-				anchor_leak = true;
 			}
 		}
 		if (in_gcc_extension) {
 			/* an gcc extension scope was not closed */
 			internal_errorf(HERE, "Leaked __extension__");
-			anchor_leak = true;
 		}
-
-		if (anchor_leak)
-			abort();
 #endif
 
 		parse_external();

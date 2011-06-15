@@ -69,7 +69,7 @@ struct a_firm_be_opt {
 };
 
 /* optimization settings */
-struct a_firm_opt firm_opt = {
+static struct a_firm_opt firm_opt = {
 	.const_folding    =  true,
 	.cse              =  true,
 	.confirm          =  true,
@@ -88,7 +88,7 @@ struct a_firm_opt firm_opt = {
 };
 
 /* dumping options */
-struct a_firm_dump firm_dump = {
+static struct a_firm_dump firm_dump = {
 	.debug_print  = false,
 	.all_types    = false,
 	.no_blocks    = false,
@@ -412,7 +412,7 @@ static opt_config_t opts[] = {
 #undef IRG
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
-ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
+static ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
 
 static opt_config_t *get_opt(const char *name)
 {

@@ -848,7 +848,7 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 		copy                     = duplicate_type(type);
 		copy->array.element_type = qual_element_type;
 	} else if (is_type_valid(type)) {
-		if ((type->base.qualifiers & qual) == qual)
+		if ((type->base.qualifiers & qual) == (int)qual)
 			return orig_type;
 
 		copy                   = duplicate_type(type);

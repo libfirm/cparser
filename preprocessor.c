@@ -61,7 +61,7 @@ struct pp_input_t {
 	pp_input_t        *parent;
 };
 
-pp_input_t input;
+static pp_input_t input;
 #define CC input.c
 
 static pp_input_t     *input_stack;
@@ -70,7 +70,7 @@ static struct obstack  input_obstack;
 
 static pp_conditional_t *conditional_stack;
 
-token_t                   pp_token;
+static token_t            pp_token;
 static bool               resolve_escape_sequences = false;
 static bool               do_print_spaces          = true;
 static bool               do_expansions;
@@ -951,15 +951,14 @@ end_number:
 
 #define ELSE_CODE(code)                                    \
 				default:                                   \
-					code;                                  \
+					code                                   \
+					return;                                \
 				}                                          \
 			} /* end of while(1) */                        \
-			break;
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
 			pp_token.type = set_type;                      \
-			return;                                        \
 		)
 
 static void next_preprocessing_token(void)
@@ -1027,7 +1026,6 @@ restart:
 					put_back(CC);
 					CC = '.';
 					pp_token.type = '.';
-					return;
 				)
 		ELSE('.')
 	case '&':
@@ -1079,7 +1077,6 @@ restart:
 							put_back(CC);
 							CC = '%';
 							pp_token.type = '#';
-							return;
 						)
 				ELSE('#')
 		ELSE('%')
@@ -1177,7 +1174,7 @@ static void print_quoted_string(const char *const string)
 		case '\?':  fputs("\\?", out); break;
 		default:
 			if(!isprint(*c)) {
-				fprintf(out, "\\%03o", *c);
+				fprintf(out, "\\%03o", (unsigned)*c);
 				break;
 			}
 			fputc(*c, out);

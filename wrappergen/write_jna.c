@@ -44,8 +44,6 @@ static pset_new_t     avoid_symbols;
 static output_limit  *output_limits;
 static const char    *libname;
 
-static void write_type(type_t *type);
-
 static bool is_system_header(const char *fname)
 {
 	if (strncmp(fname, "/usr/include", 12) == 0)

@@ -56,7 +56,7 @@
 static utf32             c;
 static source_position_t lexer_pos;
 token_t                  lexer_token;
-symbol_t                *symbol_L;
+static symbol_t         *symbol_L;
 static FILE             *input;
 static utf32             buf[BUF_SIZE + MAX_PUTBACK];
 static const utf32      *bufend;
@@ -1423,14 +1423,13 @@ static void parse_preprocessor_directive(void)
 #define ELSE_CODE(code)                                    \
 				default:                                   \
 					code                                   \
+					return;                                \
 				}                                          \
 			} /* end of while (true) */                    \
-			break;
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
 			lexer_token.type = set_type;                   \
-			return;                                        \
 		)
 
 void lexer_next_preprocessing_token(void)
@@ -1487,7 +1486,6 @@ void lexer_next_preprocessing_token(void)
 						put_back(c);
 						c = '.';
 						lexer_token.type = '.';
-						return;
 					)
 			ELSE('.')
 		case '&':
@@ -1541,7 +1539,6 @@ void lexer_next_preprocessing_token(void)
 								put_back(c);
 								c = '%';
 								lexer_token.type = '#';
-								return;
 							)
 					ELSE('#')
 			ELSE('%')

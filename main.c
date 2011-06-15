@@ -103,7 +103,6 @@ unsigned int       machine_size              = 32;
 bool               byte_order_big_endian     = false;
 bool               char_is_signed            = true;
 bool               strict_mode               = false;
-bool               use_builtins              = false;
 atomic_type_kind_t wchar_atomic_kind         = ATOMIC_TYPE_INT;
 unsigned           long_double_size          = 0;
 bool               enable_main_collect2_hack = false;
@@ -112,6 +111,7 @@ bool               freestanding              = false;
 static machine_triple_t *target_machine;
 static const char       *target_triple;
 static int               verbose;
+static bool              use_builtins;
 static struct obstack    cppflags_obst;
 static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
@@ -890,21 +890,23 @@ int main(int argc, char **argv)
 	obstack_init(&file_obst);
 
 #define GET_ARG_AFTER(def, args)                                             \
+	do {                                                                     \
 	def = &arg[sizeof(args)-1];                                              \
-	if (def[0] == '\0') {                                                     \
+	if (def[0] == '\0') {                                                    \
 		++i;                                                                 \
-		if (i >= argc) {                                                      \
+		if (i >= argc) {                                                     \
 			fprintf(stderr, "error: expected argument after '" args "'\n");  \
 			argument_errors = true;                                          \
 			break;                                                           \
 		}                                                                    \
 		def = argv[i];                                                       \
-		if (def[0] == '-' && def[1] != '\0') {                                \
+		if (def[0] == '-' && def[1] != '\0') {                               \
 			fprintf(stderr, "error: expected argument after '" args "'\n");  \
 			argument_errors = true;                                          \
 			continue;                                                        \
 		}                                                                    \
-	}
+	}                                                                        \
+	} while (0)
 
 #define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
 

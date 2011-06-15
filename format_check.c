@@ -88,7 +88,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 		[FMT_MOD_I32]  = "I32",
 		[FMT_MOD_I64]  = "I64"
 	};
-	assert(mod < lengthof(names));
+	assert((size_t)mod < lengthof(names));
 	return names[mod];
 }
 
@@ -943,31 +943,27 @@ void check_format(const call_expression_t *const call)
 	const entity_t        *const entity = func_expr->reference.entity;
 	const call_argument_t *      arg    = call->arguments;
 
-	if (false) {
-		/* the declaration has a GNU format attribute, check it */
-	} else {
-		/*
-		 * For some functions we always check the format, even if it was not
-		 * specified. This allows to check format even in MS mode or without
-		 * header included.
-		 */
-		const char *const name = entity->base.symbol->string;
-		for (size_t i = 0; i < lengthof(builtin_table); ++i) {
-			if (strcmp(name, builtin_table[i].name) == 0) {
-				switch (builtin_table[i].fmt_kind) {
-				case FORMAT_PRINTF:
-					check_printf_format(arg, &builtin_table[i]);
-					break;
-				case FORMAT_SCANF:
-					check_scanf_format(arg, &builtin_table[i]);
-					break;
-				case FORMAT_STRFTIME:
-				case FORMAT_STRFMON:
-					/* TODO: implement other cases */
-					break;
-				}
+	/*
+	 * For some functions we always check the format, even if it was not
+	 * specified. This allows to check format even in MS mode or without
+	 * header included.
+	 */
+	const char *const name = entity->base.symbol->string;
+	for (size_t i = 0; i < lengthof(builtin_table); ++i) {
+		if (strcmp(name, builtin_table[i].name) == 0) {
+			switch (builtin_table[i].fmt_kind) {
+			case FORMAT_PRINTF:
+				check_printf_format(arg, &builtin_table[i]);
+				break;
+			case FORMAT_SCANF:
+				check_scanf_format(arg, &builtin_table[i]);
+				break;
+			case FORMAT_STRFTIME:
+			case FORMAT_STRFMON:
+				/* TODO: implement other cases */
 				break;
 			}
+			break;
 		}
 	}
 }

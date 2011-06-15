@@ -53,6 +53,7 @@ extern type_t *type_unsigned_long_ptr;
 extern type_t *type_short_ptr;
 extern type_t *type_signed_char_ptr;
 extern type_t *type_void_ptr;
+extern type_t *type_const_void;
 extern type_t *type_const_void_ptr;
 extern type_t *type_void_ptr_restrict;
 extern type_t *type_const_void_ptr_restrict;

@@ -112,12 +112,6 @@ typedef enum declaration_kind_t {
 } declaration_kind_t;
 
 static ir_mode *get_ir_mode_storage(type_t *type);
-/*
- * get arithmetic mode for a type. This is different from get_ir_mode_storage,
- * int that it returns bigger modes for floating point on some platforms
- * (x87 internally does arithemtic with 80bits)
- */
-static ir_mode *get_ir_mode_arithmetic(type_t *type);
 
 static ir_type *get_ir_type_incomplete(type_t *type);
 
@@ -786,6 +780,11 @@ static ir_mode *get_ir_mode_storage(type_t *type)
 	return mode;
 }
 
+/*
+ * get arithmetic mode for a type. This is different from get_ir_mode_storage,
+ * int that it returns bigger modes for floating point on some platforms
+ * (x87 internally does arithemtic with 80bits)
+ */
 static ir_mode *get_ir_mode_arithmetic(type_t *type)
 {
 	ir_mode *mode = get_ir_mode_storage(type);
@@ -2458,7 +2457,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 		return res;
 	}
 
-	expression_t *con;
+	expression_t *con = NULL;
 	if (is_local_variable(op1) && is_constant_expression(op2) == EXPR_CLASS_CONSTANT) {
 		var = op1->reference.entity;
 		con = op2;

@@ -17,8 +17,8 @@ typedef struct timer_info_t {
 	ir_timer_t          *timer;
 } timer_info_t;
 
-timer_info_t *infos;
-timer_info_t *last_info;
+static timer_info_t *infos;
+static timer_info_t *last_info;
 
 void timer_register(ir_timer_t *timer, const char *description)
 {
