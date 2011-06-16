@@ -1273,19 +1273,20 @@ static attribute_t *parse_attribute_gnu_single(void)
 	next_token();
 
 	attribute_kind_t kind;
-	for (kind = ATTRIBUTE_GNU_FIRST; kind <= ATTRIBUTE_GNU_LAST; ++kind) {
+	for (kind = ATTRIBUTE_GNU_FIRST;; ++kind) {
+		if (kind > ATTRIBUTE_GNU_LAST) {
+			if (warning.attribute) {
+				warningf(HERE, "unknown attribute '%s' ignored", name);
+			}
+			/* TODO: we should still save the attribute in the list... */
+			kind = ATTRIBUTE_UNKNOWN;
+			break;
+		}
+
 		const char *attribute_name = get_attribute_name(kind);
 		if (attribute_name != NULL
 				&& strcmp_underscore(attribute_name, name) == 0)
 			break;
-	}
-
-	if (kind >= ATTRIBUTE_GNU_LAST) {
-		if (warning.attribute) {
-			warningf(HERE, "unknown attribute '%s' ignored", name);
-		}
-		/* TODO: we should still save the attribute in the list... */
-		kind = ATTRIBUTE_UNKNOWN;
 	}
 
 	attribute_t *attribute = allocate_attribute_zero(kind);
