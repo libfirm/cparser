@@ -30,13 +30,12 @@
 static entity_t *create_builtin_function(builtin_kind_t kind, const char *name,
                                          type_t *function_type)
 {
-	symbol_t *symbol = symbol_table_insert(name);
-	entity_t *entity = allocate_entity_zero(ENTITY_FUNCTION);
+	symbol_t *const symbol = symbol_table_insert(name);
+	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL);
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
 	entity->declaration.type                   = function_type;
 	entity->declaration.implicit               = true;
-	entity->base.namespc                       = NAMESPACE_NORMAL;
 	entity->base.symbol                        = symbol;
 	entity->base.source_position               = builtin_source_position;
 
@@ -176,9 +175,8 @@ entity_t *get_builtin_replacement(const entity_t *builtin_entity)
 	if (replacement == NULL)
 		return NULL;
 
-	entity_t *entity = allocate_entity_zero(ENTITY_FUNCTION);
+	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL);
 	entity->base.symbol           = symbol_table_insert(replacement);
-	entity->base.namespc          = NAMESPACE_NORMAL;
 	entity->base.source_position  = builtin_source_position;
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
