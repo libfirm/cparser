@@ -2353,6 +2353,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		DEL_ARR_F(path.path);
 
 		expect('}', end_error);
+end_error:;
 	} else {
 		/* parse_scalar_initializer() also works in this case: we simply
 		 * have an expression without {} around it */
@@ -2398,8 +2399,6 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	}
 
 	return result;
-end_error:
-	return NULL;
 }
 
 static void append_entity(scope_t *scope, entity_t *entity)
@@ -3209,18 +3208,17 @@ warn_about_long_long:
 		default:
 			/* invalid specifier combination, give an error message */
 			if (type_specifiers == 0) {
-				if (saw_error)
-					goto end_error;
-
-				/* ISO/IEC 14882:1998(E) §C.1.5:4 */
-				if (!(c_mode & _CXX) && !strict_mode) {
-					if (warning.implicit_int) {
-						warningf(HERE, "no type specifiers in declaration, using 'int'");
+				if (!saw_error) {
+					/* ISO/IEC 14882:1998(E) §C.1.5:4 */
+					if (!(c_mode & _CXX) && !strict_mode) {
+						if (warning.implicit_int) {
+							warningf(HERE, "no type specifiers in declaration, using 'int'");
+						}
+						atomic_type = ATOMIC_TYPE_INT;
+						break;
+					} else {
+						errorf(HERE, "no type specifiers given in declaration");
 					}
-					atomic_type = ATOMIC_TYPE_INT;
-					break;
-				} else {
-					errorf(HERE, "no type specifiers given in declaration");
 				}
 			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
@@ -3650,7 +3648,6 @@ ptr_operator_end: ;
 					/* Function declarator. */
 					if (!env->may_be_abstract) {
 						errorf(HERE, "function declarator must have a name");
-						goto error_out;
 					}
 				} else {
 			case '&':
@@ -3678,7 +3675,6 @@ ptr_operator_end: ;
 		if (env->may_be_abstract)
 			break;
 		parse_error_expected("while parsing declarator", T_IDENTIFIER, '(', NULL);
-error_out:
 		eat_until_anchor();
 		return NULL;
 	}
