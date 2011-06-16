@@ -2202,10 +2202,18 @@ finish_designator:
 					goto error_parse_next;
 				type_t *const outer_type_skip = skip_typeref(outer_type);
 				if (is_type_compound(outer_type_skip) &&
-				    !outer_type_skip->compound.compound->complete) {
+						!outer_type_skip->compound.compound->complete) {
 					goto error_parse_next;
 				}
-				goto error_excess;
+
+				if (warning.other) {
+					if (env->entity != NULL) {
+						warningf(HERE, "excess elements in initializer for '%Y'", env->entity->base.symbol);
+					} else {
+						warningf(HERE, "excess elements in initializer");
+					}
+				}
+				goto error_parse_next;
 			}
 
 			/* handle { "string" } special case */
@@ -2257,20 +2265,8 @@ finish_designator:
 				path->max_index = index;
 		}
 
-		if (type != NULL) {
-			/* append to initializers list */
-			ARR_APP1(initializer_t*, initializers, sub);
-		} else {
-error_excess:
-			if (warning.other) {
-				if (env->entity != NULL) {
-					warningf(HERE, "excess elements in initializer for '%Y'",
-					         env->entity->base.symbol);
-				} else {
-					warningf(HERE, "excess elements in initializer");
-				}
-			}
-		}
+		/* append to initializers list */
+		ARR_APP1(initializer_t*, initializers, sub);
 
 error_parse_next:
 		if (token.type == '}') {
