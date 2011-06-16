@@ -2703,16 +2703,16 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			goto end_error;
 		}
 
-		bool is_put;
-		symbol_t *symbol = token.symbol;
+		symbol_t **prop;
+		symbol_t  *symbol = token.symbol;
 		next_token();
 		if (strcmp(symbol->string, "put") == 0) {
-			is_put = true;
+			prop = &property->put_symbol;
 		} else if (strcmp(symbol->string, "get") == 0) {
-			is_put = false;
+			prop = &property->get_symbol;
 		} else {
 			errorf(HERE, "expected put or get in property declspec");
-			goto end_error;
+			prop = NULL;
 		}
 		expect('=', end_error);
 		if (token.type != T_IDENTIFIER) {
@@ -2720,11 +2720,8 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			                     T_IDENTIFIER, NULL);
 			goto end_error;
 		}
-		if (is_put) {
-			property->put_symbol = token.symbol;
-		} else {
-			property->get_symbol = token.symbol;
-		}
+		if (prop != NULL)
+			*prop = token.symbol;
 		next_token();
 	} while (next_if(','));
 
