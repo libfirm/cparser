@@ -2594,8 +2594,7 @@ static type_t *parse_enum_specifier(void)
 			anonymous_entity = entity;
 		}
 	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
-		errorf(HERE, "'enum %Y' used before definition (incomplete enums are a GNU extension)",
-		       symbol);
+		errorf(HERE, "'%T' used before definition (incomplete enums are a GNU extension)", type);
 	}
 
 	return type;
