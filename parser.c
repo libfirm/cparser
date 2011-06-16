@@ -6997,31 +6997,20 @@ end_error:
  */
 static label_t *get_label(symbol_t *symbol)
 {
-	entity_t *label;
 	assert(current_function != NULL);
 
-	label = get_entity(symbol, NAMESPACE_LABEL);
-	/* if we found a local label, we already created the declaration */
+	entity_t *label = get_entity(symbol, NAMESPACE_LABEL);
+	/* If we find a local label, we already created the declaration. */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != current_scope) {
 			assert(label->base.parent_scope->depth < current_scope->depth);
 			current_function->goto_to_outer = true;
 		}
-		return &label->label;
+	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
+		/* There is no matching label in the same function, so create a new one. */
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, symbol);
+		label_push(label);
 	}
-
-	label = get_entity(symbol, NAMESPACE_LABEL);
-	/* if we found a label in the same function, then we already created the
-	 * declaration */
-	if (label != NULL
-			&& label->base.parent_scope == &current_function->parameters) {
-		return &label->label;
-	}
-
-	/* otherwise we need to create a new one */
-	label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, symbol);
-
-	label_push(label);
 
 	return &label->label;
 }
