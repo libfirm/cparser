@@ -1269,10 +1269,8 @@ static attribute_t *parse_attribute_gnu_single(void)
 		return NULL;
 	}
 
-	const char *name = symbol->string;
-	next_token();
-
-	attribute_kind_t kind;
+	attribute_kind_t  kind;
+	char const *const name = symbol->string;
 	for (kind = ATTRIBUTE_GNU_FIRST;; ++kind) {
 		if (kind > ATTRIBUTE_GNU_LAST) {
 			if (warning.attribute) {
@@ -1288,6 +1286,8 @@ static attribute_t *parse_attribute_gnu_single(void)
 				&& strcmp_underscore(attribute_name, name) == 0)
 			break;
 	}
+
+	next_token();
 
 	attribute_t *attribute = allocate_attribute_zero(kind);
 
@@ -1363,10 +1363,10 @@ static attribute_t *parse_attributes(attribute_t *first)
 			break;
 
 		case T___thiscall:
-			next_token();
 			/* TODO record modifier */
 			if (warning.other)
 				warningf(HERE, "Ignoring declaration modifier %K", &token);
+			eat(T___thiscall);
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_THISCALL);
 			break;
 
@@ -2207,10 +2207,11 @@ finish_designator:
 				}
 
 				if (warning.other) {
+					source_position_t const* const pos = &expression->base.source_position;
 					if (env->entity != NULL) {
-						warningf(HERE, "excess elements in initializer for '%Y'", env->entity->base.symbol);
+						warningf(pos, "excess elements in initializer for '%Y'", env->entity->base.symbol);
 					} else {
-						warningf(HERE, "excess elements in initializer");
+						warningf(pos, "excess elements in initializer");
 					}
 				}
 				goto error_parse_next;
@@ -2698,7 +2699,6 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 
 		symbol_t **prop;
 		symbol_t  *symbol = token.symbol;
-		next_token();
 		if (strcmp(symbol->string, "put") == 0) {
 			prop = &property->put_symbol;
 		} else if (strcmp(symbol->string, "get") == 0) {
@@ -2707,6 +2707,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 			errorf(HERE, "expected put or get in property declspec");
 			prop = NULL;
 		}
+		eat(T_IDENTIFIER);
 		expect('=', end_error);
 		if (token.type != T_IDENTIFIER) {
 			parse_error_expected("while parsing property declspec",
@@ -2733,7 +2734,6 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 		kind = ATTRIBUTE_MS_RESTRICT;
 	} else if (token.type == T_IDENTIFIER) {
 		const char *name = token.symbol->string;
-		next_token();
 		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
 		     ++k) {
 			const char *attribute_name = get_attribute_name(k);
@@ -2746,6 +2746,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 		if (kind == ATTRIBUTE_UNKNOWN && warning.attribute) {
 			warningf(HERE, "unknown __declspec '%s' ignored", name);
 		}
+		eat(T_IDENTIFIER);
 	} else {
 		parse_error_expected("while parsing __declspec", T_IDENTIFIER, NULL);
 		return NULL;
@@ -3189,30 +3190,32 @@ warn_about_long_long:
 		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
 			atomic_type = ATOMIC_TYPE_LONG_DOUBLE;
 			break;
-		default:
+		default: {
 			/* invalid specifier combination, give an error message */
+			source_position_t const* const pos = &specifiers->source_position;
 			if (type_specifiers == 0) {
 				if (!saw_error) {
 					/* ISO/IEC 14882:1998(E) §C.1.5:4 */
 					if (!(c_mode & _CXX) && !strict_mode) {
 						if (warning.implicit_int) {
-							warningf(HERE, "no type specifiers in declaration, using 'int'");
+							warningf(pos, "no type specifiers in declaration, using 'int'");
 						}
 						atomic_type = ATOMIC_TYPE_INT;
 						break;
 					} else {
-						errorf(HERE, "no type specifiers given in declaration");
+						errorf(pos, "no type specifiers given in declaration");
 					}
 				}
 			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
-				errorf(HERE, "signed and unsigned specifiers given");
+				errorf(pos, "signed and unsigned specifiers given");
 			} else if (type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
-				errorf(HERE, "only integer types can be signed or unsigned");
+				errorf(pos, "only integer types can be signed or unsigned");
 			} else {
-				errorf(HERE, "multiple datatypes in declaration");
+				errorf(pos, "multiple datatypes in declaration");
 			}
 			goto end_error;
+		}
 		}
 
 		if (type_specifiers & SPECIFIER_COMPLEX) {
@@ -3227,7 +3230,7 @@ warn_about_long_long:
 		}
 		newtype = true;
 	} else if (type_specifiers != 0) {
-		errorf(HERE, "multiple datatypes in declaration");
+		errorf(&specifiers->source_position, "multiple datatypes in declaration");
 	}
 
 	/* FIXME: check type qualifiers here */
@@ -4423,7 +4426,6 @@ static void parse_init_declarator_rest(entity_t *entity)
 		assert(is_declaration(entity));
 		orig_type = entity->declaration.type;
 	}
-	eat('=');
 
 	type_t *type = skip_typeref(orig_type);
 
@@ -4431,6 +4433,7 @@ static void parse_init_declarator_rest(entity_t *entity)
 			&& entity->variable.initializer != NULL) {
 		parser_error_multiple_definition(entity, HERE);
 	}
+	eat('=');
 
 	declaration_t *const declaration = &entity->declaration;
 	bool must_be_constant = false;
@@ -4703,14 +4706,13 @@ decl_list_end:
 
 		type_t *parameter_type = parameter->declaration.type;
 		if (parameter_type == NULL) {
+			source_position_t const* const pos = &parameter->base.source_position;
 			if (strict_mode) {
-				errorf(HERE, "no type specified for function parameter '%Y'",
-				       parameter->base.symbol);
+				errorf(pos, "no type specified for function parameter '%Y'", parameter->base.symbol);
 				parameter_type = type_error_type;
 			} else {
 				if (warning.implicit_int) {
-					warningf(HERE, "no type specified for function parameter '%Y', using 'int'",
-					         parameter->base.symbol);
+					warningf(pos, "no type specified for function parameter '%Y', using 'int'", parameter->base.symbol);
 				}
 				parameter_type = type_int;
 			}
@@ -4748,7 +4750,7 @@ decl_list_end:
 
 	if (warning.other && need_incompatible_warning) {
 		type_t *proto_type_type = proto_type->declaration.type;
-		warningf(HERE,
+		warningf(&entity->base.source_position,
 		         "declaration '%#T' is incompatible with '%#T' (declared %P)",
 		         proto_type_type, proto_type->base.symbol,
 		         new_type, entity->base.symbol,
@@ -5668,8 +5670,7 @@ static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
 	il_size_t bit_size;
 	type_t *skipped_type = skip_typeref(base_type);
 	if (!is_type_integer(skipped_type)) {
-		errorf(HERE, "bitfield base type '%T' is not an integer type",
-		       base_type);
+		errorf(source_position, "bitfield base type '%T' is not an integer type", base_type);
 		bit_size = 0;
 	} else {
 		bit_size = get_type_size(base_type) * 8;
@@ -5936,7 +5937,7 @@ static type_t *parse_typename(void)
 		/* TODO: improve error message, user does probably not know what a
 		 * storage class is...
 		 */
-		errorf(HERE, "typename must not have a storage class");
+		errorf(&specifiers.source_position, "typename must not have a storage class");
 	}
 
 	type_t *result = parse_abstract_declarator(specifiers.type);
@@ -6440,7 +6441,7 @@ static expression_t *parse_reference(void)
 		current_function->need_closure = true;
 	}
 
-	check_deprecated(HERE, entity);
+	check_deprecated(&pos, entity);
 
 	if (warning.init_self && entity == current_init_decl && !in_type_prop
 	    && entity->kind == ENTITY_VARIABLE) {
@@ -7175,7 +7176,7 @@ check_idx:
 		}
 	} else {
 		if (is_type_valid(type_left) && is_type_valid(type_inside)) {
-			errorf(HERE,
+			errorf(&expr->base.source_position,
 				"array access on object with non-pointer types '%T', '%T'",
 				orig_type_left, orig_type_inside);
 		}
@@ -9422,8 +9423,7 @@ end_error:
 	if (current_switch != NULL) {
 		const case_label_statement_t *def_label = current_switch->default_label;
 		if (def_label != NULL) {
-			errorf(HERE, "multiple default labels in one switch (previous declared %P)",
-			       &def_label->base.source_position);
+			errorf(&statement->base.source_position, "multiple default labels in one switch (previous declared %P)", &def_label->base.source_position);
 		} else {
 			current_switch->default_label = &statement->case_label;
 
@@ -9460,10 +9460,11 @@ static statement_t *parse_label_statement(void)
 	/* if statement is already set then the label is defined twice,
 	 * otherwise it was just mentioned in a goto/local label declaration so far
 	 */
+	source_position_t const* const pos = &statement->base.source_position;
 	if (label->statement != NULL) {
-		errorf(HERE, "duplicate label '%Y' (declared %P)", label->base.symbol, &label->base.source_position);
+		errorf(pos, "duplicate label '%Y' (declared %P)", label->base.symbol, &label->base.source_position);
 	} else {
-		label->base.source_position = token.source_position;
+		label->base.source_position = *pos;
 		label->statement            = statement;
 	}
 
@@ -10626,7 +10627,8 @@ static void parse_linkage_specification(void)
 {
 	eat(T_extern);
 
-	const char *linkage = parse_string_literals().begin;
+	source_position_t const pos     = *HERE;
+	char const       *const linkage = parse_string_literals().begin;
 
 	linkage_kind_t old_linkage = current_linkage;
 	linkage_kind_t new_linkage;
@@ -10635,7 +10637,7 @@ static void parse_linkage_specification(void)
 	} else if (strcmp(linkage, "C++") == 0) {
 		new_linkage = LINKAGE_CXX;
 	} else {
-		errorf(HERE, "linkage string \"%s\" not recognized", linkage);
+		errorf(&pos, "linkage string \"%s\" not recognized", linkage);
 		new_linkage = LINKAGE_INVALID;
 	}
 	current_linkage = new_linkage;
