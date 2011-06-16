@@ -4598,10 +4598,8 @@ end_error:
 static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 {
 	symbol_t *symbol = entity->base.symbol;
-	if (symbol == NULL) {
-		errorf(HERE, "anonymous declaration not valid as function parameter");
+	if (symbol == NULL)
 		return entity;
-	}
 
 	assert(entity->base.namespc == NAMESPACE_NORMAL);
 	entity_t *previous_entity = get_entity(symbol, NAMESPACE_NORMAL);
