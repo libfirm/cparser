@@ -6991,15 +6991,14 @@ end_error:
 }
 
 /**
- * Return the declaration for a given label symbol or create a new one.
- *
- * @param symbol  the symbol of the label
+ * Return the label for the current symbol or create a new one.
  */
-static label_t *get_label(symbol_t *symbol)
+static label_t *get_label(void)
 {
+	assert(token.type == T_IDENTIFIER);
 	assert(current_function != NULL);
 
-	entity_t *label = get_entity(symbol, NAMESPACE_LABEL);
+	entity_t *label = get_entity(token.symbol, NAMESPACE_LABEL);
 	/* If we find a local label, we already created the declaration. */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != current_scope) {
@@ -7008,10 +7007,11 @@ static label_t *get_label(symbol_t *symbol)
 		}
 	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, symbol);
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.symbol);
 		label_push(label);
 	}
 
+	eat(T_IDENTIFIER);
 	return &label->label;
 }
 
@@ -7026,10 +7026,8 @@ static expression_t *parse_label_address(void)
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
 		goto end_error;
 	}
-	symbol_t *symbol = token.symbol;
-	next_token();
 
-	label_t *label       = get_label(symbol);
+	label_t *const label = get_label();
 	label->used          = true;
 	label->address_taken = true;
 
@@ -9457,14 +9455,9 @@ end_error:
  */
 static statement_t *parse_label_statement(void)
 {
-	assert(token.type == T_IDENTIFIER);
-	symbol_t *symbol = token.symbol;
-	label_t  *label  = get_label(symbol);
-
 	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
-	statement->label.label       = label;
-
-	next_token();
+	label_t     *const label     = get_label();
+	statement->label.label = label;
 
 	PUSH_PARENT(statement);
 
@@ -9472,8 +9465,7 @@ static statement_t *parse_label_statement(void)
 	 * otherwise it was just mentioned in a goto/local label declaration so far
 	 */
 	if (label->statement != NULL) {
-		errorf(HERE, "duplicate label '%Y' (declared %P)",
-		       symbol, &label->base.source_position);
+		errorf(HERE, "duplicate label '%Y' (declared %P)", label->base.symbol, &label->base.source_position);
 	} else {
 		label->base.source_position = token.source_position;
 		label->statement            = statement;
@@ -9819,9 +9811,7 @@ static statement_t *parse_goto(void)
 
 		statement->gotos.expression = expression;
 	} else if (token.type == T_IDENTIFIER) {
-		symbol_t *symbol = token.symbol;
-		next_token();
-		statement->gotos.label = get_label(symbol);
+		statement->gotos.label = get_label();
 	} else {
 		if (GNU_MODE)
 			parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
