@@ -2839,6 +2839,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	bool               saw_error         = false;
 	bool               old_gcc_extension = in_gcc_extension;
 
+	memset(specifiers, 0, sizeof(*specifiers));
 	specifiers->source_position = token.source_position;
 
 	while (true) {
@@ -3308,8 +3309,6 @@ static void parse_identifier_list(scope_t *scope)
 static entity_t *parse_parameter(void)
 {
 	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-
 	parse_declaration_specifiers(&specifiers);
 
 	entity_t *entity = parse_declarator(&specifiers,
@@ -4630,10 +4629,8 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 static void parse_declaration(parsed_declaration_func finished_declaration,
                               declarator_flags_t      flags)
 {
-	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-
 	add_anchor_token(';');
+	declaration_specifiers_t specifiers;
 	parse_declaration_specifiers(&specifiers);
 	rem_anchor_token(';');
 
@@ -5527,10 +5524,8 @@ static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
 	 * specifiers */
-	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
-
 	add_anchor_token(';');
+	declaration_specifiers_t specifiers;
 	parse_declaration_specifiers(&specifiers);
 	rem_anchor_token(';');
 
@@ -5959,9 +5954,7 @@ static void parse_compound_type_entries(compound_t *compound)
 			break;
 		}
 		declaration_specifiers_t specifiers;
-		memset(&specifiers, 0, sizeof(specifiers));
 		parse_declaration_specifiers(&specifiers);
-
 		parse_compound_declarators(compound, &specifiers);
 	}
 	rem_anchor_token('}');
@@ -5974,7 +5967,6 @@ static void parse_compound_type_entries(compound_t *compound)
 static type_t *parse_typename(void)
 {
 	declaration_specifiers_t specifiers;
-	memset(&specifiers, 0, sizeof(specifiers));
 	parse_declaration_specifiers(&specifiers);
 	if (specifiers.storage_class != STORAGE_CLASS_NONE
 			|| specifiers.thread_local) {
