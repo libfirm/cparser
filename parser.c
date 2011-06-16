@@ -1754,12 +1754,13 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 {
 	/* there might be extra {} hierarchies */
 	int braces = 0;
-	if (next_if('{')) {
+	if (token.type == '{') {
 		if (warning.other)
 			warningf(HERE, "extra curly braces around scalar initializer");
 		do {
+			eat('{');
 			++braces;
-		} while (next_if('{'));
+		} while (token.type == '{');
 	}
 
 	expression_t *expression = parse_assignment_expression();
