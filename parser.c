@@ -7176,9 +7176,7 @@ check_idx:
 		}
 	} else {
 		if (is_type_valid(type_left) && is_type_valid(type_inside)) {
-			errorf(&expr->base.source_position,
-				"array access on object with non-pointer types '%T', '%T'",
-				orig_type_left, orig_type_inside);
+			errorf(&expr->base.source_position, "invalid types '%T[%T]' for array access", orig_type_left, orig_type_inside);
 		}
 		res_type = type_error_type;
 		ref      = left;
