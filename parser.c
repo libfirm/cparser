@@ -7022,7 +7022,7 @@ static expression_t *parse_label_address(void)
 	eat(T_ANDAND);
 	if (token.type != T_IDENTIFIER) {
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
-		goto end_error;
+		return create_invalid_expression();
 	}
 
 	label_t *const label = get_label();
@@ -7036,8 +7036,6 @@ static expression_t *parse_label_address(void)
 	expression->base.type           = type_void_ptr;
 	expression->label_address.label = label;
 	return expression;
-end_error:
-	return create_invalid_expression();
 }
 
 /**
