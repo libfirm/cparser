@@ -4790,8 +4790,6 @@ static void check_labels(void)
 			continue;
 
 		label_t *label = goto_statement->label;
-
-		label->used = true;
 		if (label->base.source_position.input_name == NULL) {
 			print_in_function();
 			errorf(&goto_statement->base.source_position,
@@ -9811,7 +9809,9 @@ static statement_t *parse_goto(void)
 
 		statement->gotos.expression = expression;
 	} else if (token.type == T_IDENTIFIER) {
-		statement->gotos.label = get_label();
+		label_t *const label = get_label();
+		label->used            = true;
+		statement->gotos.label = label;
 	} else {
 		if (GNU_MODE)
 			parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
