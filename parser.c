@@ -6357,7 +6357,11 @@ static entity_t *parse_qualified_identifier(void)
 		default:
 			errorf(&pos, "'%Y' must be a namespace, class, struct or union (but is a %s)",
 			       symbol, get_entity_kind_name(entity->kind));
-			goto end_error;
+
+			/* skip further qualifications */
+			while (next_if(T_IDENTIFIER) && next_if(T_COLONCOLON)) {}
+
+			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 		}
 	}
 
@@ -6378,12 +6382,6 @@ static entity_t *parse_qualified_identifier(void)
 	}
 
 	return entity;
-
-end_error:
-	/* skip further qualifications */
-	while (next_if(T_IDENTIFIER) && next_if(T_COLONCOLON)) {}
-
-	return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 }
 
 static expression_t *parse_reference(void)
