@@ -215,10 +215,6 @@ static void semantic_comparison(binary_expression_t *expression);
 	TYPE_QUALIFIERS                 \
 	TYPE_SPECIFIERS
 
-#define TYPENAME_START      \
-	TYPE_QUALIFIERS         \
-	TYPE_SPECIFIERS
-
 #define EXPRESSION_START              \
 	case '!':                         \
 	case '&':                         \
@@ -2625,7 +2621,7 @@ static type_t *parse_typeof(void)
 	switch (token.type) {
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(token.symbol)) {
-	TYPENAME_START
+	DECLARATION_START
 			type = parse_typename();
 		} else {
 	default:
@@ -4395,19 +4391,13 @@ static void parser_error_multiple_definition(entity_t *entity,
 	       entity->base.symbol, &entity->base.source_position);
 }
 
-static bool is_declaration_specifier(const token_t *token,
-                                     bool only_specifiers_qualifiers)
+static bool is_declaration_specifier(const token_t *token)
 {
 	switch (token->type) {
-		TYPE_SPECIFIERS
-		TYPE_QUALIFIERS
+		DECLARATION_START
 			return true;
 		case T_IDENTIFIER:
 			return is_typedef_symbol(token->symbol);
-
-		case T___extension__:
-		STORAGE_CLASSES
-			return !only_specifiers_qualifiers;
 
 		default:
 			return false;
@@ -6603,8 +6593,7 @@ static expression_t *parse_parenthesized_expression(void)
 
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(la1->symbol)) {
-	TYPE_QUALIFIERS
-	TYPE_SPECIFIERS
+	DECLARATION_START
 			return parse_cast();
 		}
 	}
@@ -7122,9 +7111,11 @@ static expression_t *parse_primary_expression(void)
 			return parse_reference();
 		}
 		/* FALLTHROUGH */
-	TYPENAME_START {
-		source_position_t  const pos  = *HERE;
-		type_t const      *const type = parse_typename();
+	DECLARATION_START {
+		source_position_t const  pos = *HERE;
+		declaration_specifiers_t specifiers;
+		parse_declaration_specifiers(&specifiers);
+		type_t const *const type = parse_abstract_declarator(specifiers.type);
 		errorf(&pos, "encountered type '%T' while parsing expression", type);
 		return create_invalid_expression();
 	}
@@ -7206,7 +7197,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 
 	type_t       *orig_type;
 	expression_t *expression;
-	if (token.type == '(' && is_declaration_specifier(look_ahead(1), true)) {
+	if (token.type == '(' && is_declaration_specifier(look_ahead(1))) {
 		next_token();
 		add_anchor_token(')');
 		orig_type = parse_typename();
@@ -9718,7 +9709,7 @@ static statement_t *parse_for(void)
 	}
 
 	if (next_if(';')) {
-	} else if (is_declaration_specifier(&token, false)) {
+	} else if (is_declaration_specifier(&token)) {
 		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	} else {
 		add_anchor_token(';');
