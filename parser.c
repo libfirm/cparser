@@ -7032,7 +7032,7 @@ static expression_t *parse_label_address(void)
 	expression_t *expression = allocate_expression_zero(EXPR_LABEL_ADDRESS);
 	expression->base.source_position = source_position;
 
-	/* label address is threaten as a void pointer */
+	/* label address is treated as a void pointer */
 	expression->base.type           = type_void_ptr;
 	expression->label_address.label = label;
 	return expression;
