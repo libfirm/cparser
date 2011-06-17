@@ -1045,12 +1045,12 @@ int main(int argc, char **argv)
 				           strstart(orig_opt, "align-functions=")) {
 					fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 				} else if (strstart(orig_opt, "visibility=")) {
-					const char *arg = strchr(orig_opt, '=')+1;
+					const char *val = strchr(orig_opt, '=')+1;
 					elf_visibility_tag_t visibility
-						= get_elf_visibility_from_string(arg);
+						= get_elf_visibility_from_string(val);
 					if (visibility == ELF_VISIBILITY_ERROR) {
 						fprintf(stderr, "invalid visibility '%s' specified\n",
-						        arg);
+						        val);
 						argument_errors = true;
 					} else {
 						set_default_visibility(visibility);
@@ -1188,14 +1188,12 @@ int main(int argc, char **argv)
 					GET_ARG_AFTER(opt, "-march=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
 					int res = be_parse_arg(arch_opt);
+					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
+					res &= be_parse_arg(arch_opt);
+
 					if (res == 0) {
 						fprintf(stderr, "Unknown architecture '%s'\n", arch_opt);
 						argument_errors = true;
-					} else {
-						snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-						int res = be_parse_arg(arch_opt);
-						if (res == 0)
-							argument_errors = true;
 					}
 				} else if (strstart(opt, "tune=")) {
 					GET_ARG_AFTER(opt, "-mtune=");
@@ -1572,13 +1570,13 @@ preprocess:
 				preprocessed_in = preprocess(filename, filetype);
 				if (mode == PreprocessOnly) {
 					copy_file(out, preprocessed_in);
-					int result = pclose(preprocessed_in);
+					int pp_result = pclose(preprocessed_in);
 					fclose(out);
 					/* remove output file in case of error */
-					if (out != stdout && result != EXIT_SUCCESS) {
+					if (out != stdout && pp_result != EXIT_SUCCESS) {
 						unlink(outname);
 					}
-					return result;
+					return pp_result;
 				}
 
 				in = preprocessed_in;

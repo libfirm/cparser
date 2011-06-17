@@ -191,6 +191,11 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	/* complex and imaginary types are set in init_types */
 };
 
+static inline bool is_po2(unsigned x)
+{
+	return (x & (x-1)) == 0;
+}
+
 void init_types(void)
 {
 	obstack_init(type_obst);
@@ -237,7 +242,9 @@ void init_types(void)
 
 	if (long_double_size > 0) {
 		props[ATOMIC_TYPE_LONG_DOUBLE].size      = long_double_size;
-		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = long_double_size;
+		if (is_po2(long_double_size)) {
+			props[ATOMIC_TYPE_LONG_DOUBLE].alignment = long_double_size;
+		}
 	} else {
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	}
@@ -418,11 +425,11 @@ static void print_function_type_post(const function_type_t *type,
 			} else {
 				print_string(", ");
 			}
-			const type_t *const type = parameter->declaration.type;
-			if (type == NULL) {
+			const type_t *const param_type = parameter->declaration.type;
+			if (param_type == NULL) {
 				print_string(parameter->base.symbol->string);
 			} else {
-				print_type_ext(type, parameter->base.symbol, NULL);
+				print_type_ext(param_type, parameter->base.symbol, NULL);
 			}
 		}
 	}

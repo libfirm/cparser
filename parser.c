@@ -4728,11 +4728,11 @@ decl_list_end:
 				parameter_type = not_promoted;
 			}
 		}
-		function_parameter_t *const parameter
+		function_parameter_t *const function_parameter
 			= allocate_parameter(parameter_type);
 
-		*anchor = parameter;
-		anchor  = &parameter->next;
+		*anchor = function_parameter;
+		anchor  = &function_parameter->next;
 	}
 
 	new_type->function.parameters = parameters;
@@ -5023,15 +5023,15 @@ static void check_reachable(statement_t *const stmt)
 		case STATEMENT_DECLARATION: {
 			declaration_statement_t const *const decl = &stmt->declaration;
 			entity_t                const *      ent  = decl->declarations_begin;
-			entity_t                const *const last = decl->declarations_end;
+			entity_t                const *const last_decl = decl->declarations_end;
 			if (ent != NULL) {
 				for (;; ent = ent->base.next) {
 					if (ent->kind                 == ENTITY_VARIABLE &&
-							ent->variable.initializer != NULL            &&
-							!initializer_returns(ent->variable.initializer)) {
+					    ent->variable.initializer != NULL            &&
+					    !initializer_returns(ent->variable.initializer)) {
 						return;
 					}
-					if (ent == last)
+					if (ent == last_decl)
 						break;
 				}
 			}
@@ -7515,16 +7515,16 @@ static expression_t *parse_call_expression(expression_t *expression)
 
 	/* do default promotion for other arguments */
 	for (; argument != NULL; argument = argument->next) {
-		type_t *type = argument->expression->base.type;
-		if (!is_type_object(skip_typeref(type))) {
+		type_t *argument_type = argument->expression->base.type;
+		if (!is_type_object(skip_typeref(argument_type))) {
 			errorf(&argument->expression->base.source_position,
 			       "call argument '%E' must not be void", argument->expression);
 		}
 
-		type = get_default_promoted_type(type);
+		argument_type = get_default_promoted_type(argument_type);
 
 		argument->expression
-			= create_implicit_cast(argument->expression, type);
+			= create_implicit_cast(argument->expression, argument_type);
 	}
 
 	check_format(call);

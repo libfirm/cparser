@@ -576,10 +576,10 @@ static ir_type *create_compound_type(compound_type_t *type,
 		return compound->irtype;
 	}
 
-	symbol_t *symbol = compound->base.symbol;
+	symbol_t *type_symbol = compound->base.symbol;
 	ident    *id;
-	if (symbol != NULL) {
-		id = new_id_from_str(symbol->string);
+	if (type_symbol != NULL) {
+		id = new_id_from_str(type_symbol->string);
 	} else {
 		if (is_union) {
 			id = id_unique("__anonymous_union.%u");
@@ -1751,10 +1751,10 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	assert(call->function->kind == EXPR_REFERENCE);
 	reference_expression_t *builtin = &call->function->reference;
 
-	type_t *type = skip_typeref(builtin->base.type);
-	assert(is_type_pointer(type));
+	type_t *expr_type = skip_typeref(builtin->base.type);
+	assert(is_type_pointer(expr_type));
 
-	type_t *function_type = skip_typeref(type->pointer.points_to);
+	type_t *function_type = skip_typeref(expr_type->pointer.points_to);
 
 	switch (builtin->entity->function.btk) {
 	case bk_gnu_builtin_alloca: {
@@ -2038,8 +2038,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		expression_t *expression = argument->expression;
 		ir_node      *arg_node   = expression_to_firm(expression);
 
-		type_t  *type = skip_typeref(expression->base.type);
-		if (!is_type_compound(type)) {
+		type_t *arg_type = skip_typeref(expression->base.type);
+		if (!is_type_compound(arg_type)) {
 			ir_mode *mode = get_ir_mode_storage(expression->base.type);
 			arg_node      = create_conv(dbgi, arg_node, mode);
 			arg_node      = do_strict_conv(dbgi, arg_node);
@@ -4451,8 +4451,8 @@ static void create_variable_initializer(entity_t *entity)
 
 		ir_node *value = expression_to_firm(initializer_value->value);
 
-		type_t  *type = initializer_value->value->base.type;
-		ir_mode *mode = get_ir_mode_storage(type);
+		type_t  *init_type = initializer_value->value->base.type;
+		ir_mode *mode      = get_ir_mode_storage(init_type);
 		value = create_conv(dbgi, value, mode);
 		value = do_strict_conv(dbgi, value);
 
@@ -4602,7 +4602,6 @@ static void return_statement_to_firm(return_statement_t *statement)
 	type_t   *type        = current_function_entity->declaration.type;
 	ir_type  *func_irtype = get_ir_type(type);
 
-
 	ir_node *in[1];
 	int      in_len;
 	if (get_method_n_ress(func_irtype) > 0) {
@@ -4611,10 +4610,10 @@ static void return_statement_to_firm(return_statement_t *statement)
 		if (statement->value != NULL) {
 			ir_node *node = expression_to_firm(statement->value);
 			if (!is_compound_type(res_type)) {
-				type_t  *type = statement->value->base.type;
-				ir_mode *mode = get_ir_mode_storage(type);
-				node          = create_conv(dbgi, node, mode);
-				node          = do_strict_conv(dbgi, node);
+				type_t  *ret_value_type = statement->value->base.type;
+				ir_mode *mode           = get_ir_mode_storage(ret_value_type);
+				node                    = create_conv(dbgi, node, mode);
+				node                    = do_strict_conv(dbgi, node);
 			}
 			in[0] = node;
 		} else {
@@ -5655,13 +5654,13 @@ static void initialize_function_parameters(entity_t *entity)
 		}
 
 		if (needs_entity) {
-			ir_entity *entity = get_method_value_param_ent(function_irtype, n);
-			ident     *id     = new_id_from_str(parameter->base.symbol->string);
-			set_entity_ident(entity, id);
+			ir_entity *param = get_method_value_param_ent(function_irtype, n);
+			ident     *id    = new_id_from_str(parameter->base.symbol->string);
+			set_entity_ident(param, id);
 
 			parameter->declaration.kind
 				= DECLARATION_KIND_PARAMETER_ENTITY;
-			parameter->parameter.v.entity = entity;
+			parameter->parameter.v.entity = param;
 			continue;
 		}
 
@@ -5887,8 +5886,8 @@ static void create_function(entity_t *entity)
 	int      align_all  = 4;
 	int      offset     = 0;
 	for (int i = 0; i < n; ++i) {
-		ir_entity *entity      = get_compound_member(frame_type, i);
-		ir_type   *entity_type = get_entity_type(entity);
+		ir_entity *member      = get_compound_member(frame_type, i);
+		ir_type   *entity_type = get_entity_type(member);
 
 		int align = get_type_alignment_bytes(entity_type);
 		if (align > align_all)
@@ -5901,7 +5900,7 @@ static void create_function(entity_t *entity)
 			}
 		}
 
-		set_entity_offset(entity, offset);
+		set_entity_offset(member, offset);
 		offset += get_type_size_bytes(entity_type);
 	}
 	set_type_size_bytes(frame_type, offset);
