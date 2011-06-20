@@ -1583,21 +1583,22 @@ static expression_classification_t is_object_with_linker_constant_address(const 
 
 	case EXPR_REFERENCE: {
 		entity_t *entity = expression->reference.entity;
-		if (is_declaration(entity)) {
-			switch ((storage_class_tag_t)entity->declaration.storage_class) {
-			case STORAGE_CLASS_NONE:
-			case STORAGE_CLASS_EXTERN:
-			case STORAGE_CLASS_STATIC:
-				return
-					entity->kind != ENTITY_VARIABLE ||
-					!entity->variable.thread_local ? EXPR_CLASS_CONSTANT :
-					EXPR_CLASS_VARIABLE;
+		if (!is_declaration(entity))
+			return EXPR_CLASS_VARIABLE;
 
-			case STORAGE_CLASS_REGISTER:
-			case STORAGE_CLASS_TYPEDEF:
-			case STORAGE_CLASS_AUTO:
-				break;
-			}
+		switch ((storage_class_tag_t)entity->declaration.storage_class) {
+		case STORAGE_CLASS_NONE:
+		case STORAGE_CLASS_EXTERN:
+		case STORAGE_CLASS_STATIC:
+			return
+				entity->kind != ENTITY_VARIABLE ||
+				!entity->variable.thread_local ? EXPR_CLASS_CONSTANT :
+				EXPR_CLASS_VARIABLE;
+
+		case STORAGE_CLASS_REGISTER:
+		case STORAGE_CLASS_TYPEDEF:
+		case STORAGE_CLASS_AUTO:
+			break;
 		}
 		return EXPR_CLASS_VARIABLE;
 	}
@@ -1706,6 +1707,19 @@ expression_classification_t is_address_constant(const expression_t *expression)
 			return is_address_constant(t != NULL ? t : c);
 		} else {
 			return is_address_constant(expression->conditional.false_expression);
+		}
+	}
+
+	case EXPR_SELECT: {
+		entity_t *entity = expression->select.compound_entry;
+		if (!is_declaration(entity))
+			return EXPR_CLASS_VARIABLE;
+		expression_t *compound = expression->select.compound;
+		type_t       *type     = skip_typeref(entity->declaration.type);
+		if (is_type_array(type)) {
+			return is_object_with_linker_constant_address(compound);
+		} else {
+			return is_address_constant(compound);
 		}
 	}
 

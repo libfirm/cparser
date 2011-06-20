@@ -1732,7 +1732,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 }
 
 /**
- * Checks if a given expression can be used as an constant initializer.
+ * Checks if a given expression can be used as a constant initializer.
  */
 static bool is_initializer_constant(const expression_t *expression)
 {
