@@ -1714,13 +1714,19 @@ expression_classification_t is_address_constant(const expression_t *expression)
 		entity_t *entity = expression->select.compound_entry;
 		if (!is_declaration(entity))
 			return EXPR_CLASS_VARIABLE;
-		expression_t *compound = expression->select.compound;
-		type_t       *type     = skip_typeref(entity->declaration.type);
+		type_t *type = skip_typeref(entity->declaration.type);
 		if (is_type_array(type)) {
-			return is_object_with_linker_constant_address(compound);
-		} else {
-			return is_address_constant(compound);
+			/* arrays automatically convert to their address */
+			expression_t *compound  = expression->select.compound;
+			type_t       *base_type = skip_typeref(compound->base.type);
+			if (is_type_pointer(base_type)) {
+				/* it's a -> */
+				return is_address_constant(compound);
+			} else {
+				return is_object_with_linker_constant_address(compound);
+			}
 		}
+		return EXPR_CLASS_VARIABLE;
 	}
 
 	case EXPR_INVALID:
