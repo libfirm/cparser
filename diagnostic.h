@@ -44,14 +44,16 @@
 /**
  * Issue a diagnostic message.
  * Format types:
- *  %Y  const symbol_t *
- *  %E  const expression_t *
- *  %Q  unsigned  (qualifier)
- *  %T  const type_t*
- *  %K  const token_t*
- *  %k  token_kind_t
- *  %P  const source_position_t *
- *  %S  const string_t *
+ *  %E   expression_t const*
+ *  %K   token_t const*
+ *  %k   token_kind_t
+ *  %#k  va_list*, char const*
+ *  %P   source_position_t const*
+ *  %Q   unsigned (qualifier)
+ *  %S   string_t const*
+ *  %T   type_t const*
+ *  %#T  type_t const*, symbol_t const*
+ *  %Y   symbol_t const*
  */
 void diagnosticf(const char *fmt, ...);
 void errorf(const source_position_t *pos, const char *fmt, ...);
