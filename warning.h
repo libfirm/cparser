@@ -114,14 +114,15 @@ typedef enum warning_t {
 	WARN_WRITE_STRINGS,                 /**< Give string constants the type 'const char[LENGTH]' so that copying the address of one into a 'char *' pointer will get a warning */
 } warning_t;
 
-typedef enum warn_level_t {
-	WARN_LEVEL_OFF,
-	WARN_LEVEL_ON,
-	WARN_LEVEL_ERROR
-} warn_level_t;
+typedef enum warn_state_t {
+	WARN_STATE_NONE     = 0,
+	WARN_STATE_ON       = 1U << 0,
+	WARN_STATE_ERROR    = 1U << 1,
+	WARN_STATE_NO_ERROR = 1U << 2
+} warn_state_t;
 
 typedef struct warning_switch_t {
-	warn_level_t      level;
+	warn_state_t      state;
 	char const* const name;
 } warning_switch_t;
 
@@ -129,7 +130,7 @@ warning_switch_t const *get_warn_switch(warning_t);
 
 static inline bool is_warn_on(warning_t const warn)
 {
-	return get_warn_switch(warn)->level != WARN_LEVEL_OFF;
+	return get_warn_switch(warn)->state & WARN_STATE_ON;
 }
 
 #endif

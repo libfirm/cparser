@@ -26,56 +26,56 @@
 #include "help.h"
 
 static warning_switch_t warning[] = {
-	[WARN_ADDRESS]                       = { WARN_LEVEL_ON,  "address"                       },
-	[WARN_AGGREGATE_RETURN]              = { WARN_LEVEL_OFF, "aggregate-return"              },
-	[WARN_ATTRIBUTE]                     = { WARN_LEVEL_ON,  "attribute"                     },
-	[WARN_CAST_QUAL]                     = { WARN_LEVEL_OFF, "cast-qual",                    },
-	[WARN_CHAR_SUBSCRIPTS]               = { WARN_LEVEL_ON,  "char-subscripts",              },
-	[WARN_COMMENT]                       = { WARN_LEVEL_OFF, "comment",                      },
-	[WARN_CONVERSION]                    = { WARN_LEVEL_OFF, "conversion",                   },
-	[WARN_DECLARATION_AFTER_STATEMENT]   = { WARN_LEVEL_OFF, "declaration-after-statement",  },
-	[WARN_DEPRECATED_DECLARATIONS]       = { WARN_LEVEL_ON,  "deprecated-declarations",      },
-	[WARN_DIV_BY_ZERO]                   = { WARN_LEVEL_ON,  "div-by-zero",                  },
-	[WARN_EMPTY_STATEMENT]               = { WARN_LEVEL_OFF, "empty-statement",              },
-	[WARN_ERROR]                         = { WARN_LEVEL_OFF, "error"                         },
-	[WARN_FATAL_ERRORS]                  = { WARN_LEVEL_OFF, "fatal-errors"                  },
-	[WARN_FLOAT_EQUAL]                   = { WARN_LEVEL_OFF, "float-equal",                  },
-	[WARN_FORMAT]                        = { WARN_LEVEL_ON,  "format"                        },
-	[WARN_IMPLICIT_FUNCTION_DECLARATION] = { WARN_LEVEL_ON,  "implicit-function-declaration" },
-	[WARN_IMPLICIT_INT]                  = { WARN_LEVEL_ON,  "implicit-int"                  },
-	[WARN_INIT_SELF]                     = { WARN_LEVEL_ON,  "init-self",                    },
-	[WARN_LONG_LONG]                     = { WARN_LEVEL_OFF, "long-long"                     },
-	[WARN_MAIN]                          = { WARN_LEVEL_ON,  "main",                         },
-	[WARN_MISSING_DECLARATIONS]          = { WARN_LEVEL_OFF, "missing-declarations",         },
-	[WARN_MISSING_NORETURN]              = { WARN_LEVEL_OFF, "missing-noreturn",             },
-	[WARN_MISSING_PROTOTYPES]            = { WARN_LEVEL_OFF, "missing-prototypes",           },
-	[WARN_MULTICHAR]                     = { WARN_LEVEL_ON,  "multichar",                    },
-	[WARN_NESTED_EXTERNS]                = { WARN_LEVEL_OFF, "nested-externs"                },
-	[WARN_NONNULL]                       = { WARN_LEVEL_ON,  "nonnull",                      },
-	[WARN_OLD_STYLE_DEFINITION]          = { WARN_LEVEL_OFF, "old-style-definition",         },
-	[WARN_OTHER]                         = { WARN_LEVEL_ON,  "other"                         },
-	[WARN_PACKED]                        = { WARN_LEVEL_OFF, "packed",                       },
-	[WARN_PADDED]                        = { WARN_LEVEL_OFF, "padded",                       },
-	[WARN_PARENTHESES]                   = { WARN_LEVEL_OFF, "parentheses",                  },
-	[WARN_POINTER_ARITH]                 = { WARN_LEVEL_ON,  "pointer-arith",                },
-	[WARN_REDUNDANT_DECLS]               = { WARN_LEVEL_ON,  "redundant-decls",              },
-	[WARN_RETURN_TYPE]                   = { WARN_LEVEL_ON,  "return-type",                  },
-	[WARN_SHADOW]                        = { WARN_LEVEL_OFF, "shadow",                       },
-	[WARN_SHADOW_LOCAL]                  = { WARN_LEVEL_OFF, "shadow-local",                 },
-	[WARN_SIGN_COMPARE]                  = { WARN_LEVEL_OFF, "sign-compare",                 },
-	[WARN_STRICT_PROTOTYPES]             = { WARN_LEVEL_ON,  "strict-prototypes"             },
-	[WARN_SWITCH_DEFAULT]                = { WARN_LEVEL_OFF, "switch-default",               },
-	[WARN_SWITCH_ENUM]                   = { WARN_LEVEL_OFF, "switch-enum",                  },
-	[WARN_TRADITIONAL]                   = { WARN_LEVEL_OFF, "traditional"                   },
-	[WARN_UNINITIALIZED]                 = { WARN_LEVEL_ON,  "uninitialized",                },
-	[WARN_UNKNOWN_PRAGMAS]               = { WARN_LEVEL_ON,  "unknown-pragmas",              },
-	[WARN_UNREACHABLE_CODE]              = { WARN_LEVEL_OFF, "unreachable-code"              },
-	[WARN_UNUSED_FUNCTION]               = { WARN_LEVEL_OFF, "unused-function",              },
-	[WARN_UNUSED_LABEL]                  = { WARN_LEVEL_OFF, "unused-label",                 },
-	[WARN_UNUSED_PARAMETER]              = { WARN_LEVEL_OFF, "unused-parameter",             },
-	[WARN_UNUSED_VALUE]                  = { WARN_LEVEL_ON,  "unused-value",                 },
-	[WARN_UNUSED_VARIABLE]               = { WARN_LEVEL_OFF, "unused-variable",              },
-	[WARN_WRITE_STRINGS]                 = { WARN_LEVEL_OFF, "write-strings",                },
+	[WARN_ADDRESS]                       = { WARN_STATE_ON,   "address"                       },
+	[WARN_AGGREGATE_RETURN]              = { WARN_STATE_NONE, "aggregate-return"              },
+	[WARN_ATTRIBUTE]                     = { WARN_STATE_ON,   "attribute"                     },
+	[WARN_CAST_QUAL]                     = { WARN_STATE_NONE, "cast-qual",                    },
+	[WARN_CHAR_SUBSCRIPTS]               = { WARN_STATE_ON,   "char-subscripts",              },
+	[WARN_COMMENT]                       = { WARN_STATE_NONE, "comment",                      },
+	[WARN_CONVERSION]                    = { WARN_STATE_NONE, "conversion",                   },
+	[WARN_DECLARATION_AFTER_STATEMENT]   = { WARN_STATE_NONE, "declaration-after-statement",  },
+	[WARN_DEPRECATED_DECLARATIONS]       = { WARN_STATE_ON,   "deprecated-declarations",      },
+	[WARN_DIV_BY_ZERO]                   = { WARN_STATE_ON,   "div-by-zero",                  },
+	[WARN_EMPTY_STATEMENT]               = { WARN_STATE_NONE, "empty-statement",              },
+	[WARN_ERROR]                         = { WARN_STATE_NONE, "error"                         },
+	[WARN_FATAL_ERRORS]                  = { WARN_STATE_NONE, "fatal-errors"                  },
+	[WARN_FLOAT_EQUAL]                   = { WARN_STATE_NONE, "float-equal",                  },
+	[WARN_FORMAT]                        = { WARN_STATE_ON,   "format"                        },
+	[WARN_IMPLICIT_FUNCTION_DECLARATION] = { WARN_STATE_ON,   "implicit-function-declaration" },
+	[WARN_IMPLICIT_INT]                  = { WARN_STATE_ON,   "implicit-int"                  },
+	[WARN_INIT_SELF]                     = { WARN_STATE_ON,   "init-self",                    },
+	[WARN_LONG_LONG]                     = { WARN_STATE_NONE, "long-long"                     },
+	[WARN_MAIN]                          = { WARN_STATE_ON,   "main",                         },
+	[WARN_MISSING_DECLARATIONS]          = { WARN_STATE_NONE, "missing-declarations",         },
+	[WARN_MISSING_NORETURN]              = { WARN_STATE_NONE, "missing-noreturn",             },
+	[WARN_MISSING_PROTOTYPES]            = { WARN_STATE_NONE, "missing-prototypes",           },
+	[WARN_MULTICHAR]                     = { WARN_STATE_ON,   "multichar",                    },
+	[WARN_NESTED_EXTERNS]                = { WARN_STATE_NONE, "nested-externs"                },
+	[WARN_NONNULL]                       = { WARN_STATE_ON,   "nonnull",                      },
+	[WARN_OLD_STYLE_DEFINITION]          = { WARN_STATE_NONE, "old-style-definition",         },
+	[WARN_OTHER]                         = { WARN_STATE_ON,   "other"                         },
+	[WARN_PACKED]                        = { WARN_STATE_NONE, "packed",                       },
+	[WARN_PADDED]                        = { WARN_STATE_NONE, "padded",                       },
+	[WARN_PARENTHESES]                   = { WARN_STATE_NONE, "parentheses",                  },
+	[WARN_POINTER_ARITH]                 = { WARN_STATE_ON,   "pointer-arith",                },
+	[WARN_REDUNDANT_DECLS]               = { WARN_STATE_ON,   "redundant-decls",              },
+	[WARN_RETURN_TYPE]                   = { WARN_STATE_ON,   "return-type",                  },
+	[WARN_SHADOW]                        = { WARN_STATE_NONE, "shadow",                       },
+	[WARN_SHADOW_LOCAL]                  = { WARN_STATE_NONE, "shadow-local",                 },
+	[WARN_SIGN_COMPARE]                  = { WARN_STATE_NONE, "sign-compare",                 },
+	[WARN_STRICT_PROTOTYPES]             = { WARN_STATE_ON,   "strict-prototypes"             },
+	[WARN_SWITCH_DEFAULT]                = { WARN_STATE_NONE, "switch-default",               },
+	[WARN_SWITCH_ENUM]                   = { WARN_STATE_NONE, "switch-enum",                  },
+	[WARN_TRADITIONAL]                   = { WARN_STATE_NONE, "traditional"                   },
+	[WARN_UNINITIALIZED]                 = { WARN_STATE_ON,   "uninitialized",                },
+	[WARN_UNKNOWN_PRAGMAS]               = { WARN_STATE_ON,   "unknown-pragmas",              },
+	[WARN_UNREACHABLE_CODE]              = { WARN_STATE_NONE, "unreachable-code"              },
+	[WARN_UNUSED_FUNCTION]               = { WARN_STATE_NONE, "unused-function",              },
+	[WARN_UNUSED_LABEL]                  = { WARN_STATE_NONE, "unused-label",                 },
+	[WARN_UNUSED_PARAMETER]              = { WARN_STATE_NONE, "unused-parameter",             },
+	[WARN_UNUSED_VALUE]                  = { WARN_STATE_ON,   "unused-value",                 },
+	[WARN_UNUSED_VARIABLE]               = { WARN_STATE_NONE, "unused-variable",              },
+	[WARN_WRITE_STRINGS]                 = { WARN_STATE_NONE, "write-strings",                },
 };
 
 warning_switch_t const *get_warn_switch(warning_t const w)
@@ -95,16 +95,28 @@ void print_warning_opt_help(void)
 
 void set_warning_opt(const char *const opt)
 {
-	const char* s = opt;
+	/* Process prefixes: -W[no-][error=] */
+	char const *s     = opt;
+	bool const  no    = strncmp(s, "no-",    3) == 0 ? s += 3, true : false;
+	bool const  error = strncmp(s, "error=", 6) == 0 ? s += 6, true : false;
 
-	warn_level_t const level =
-		strncmp(s, "no-",    3) == 0 ? s += 3, WARN_LEVEL_OFF   : /* "no-" prefix */
-		strncmp(s, "error-", 6) == 0 ? s += 6, WARN_LEVEL_ERROR : /* "error-" prefix */
-		WARN_LEVEL_ON;
+	warn_state_t on  = WARN_STATE_NONE;
+	warn_state_t off = WARN_STATE_NONE;
+	if (!no || !error)
+		on |= WARN_STATE_ON;
+	if (error) {
+		on  |= WARN_STATE_ERROR;
+		off |= WARN_STATE_NO_ERROR;
+	}
+	if (no) {
+		warn_state_t const tmp = on;
+		on  = off;
+		off = tmp;
+	}
 
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
 		if (strcmp(i->name, s) == 0) {
-			i->level = level;
+			i->state = (i->state & ~off) | on;
 			return;
 		}
 	}
@@ -113,7 +125,7 @@ void set_warning_opt(const char *const opt)
 		goto extra;
 	}
 #define OPTX(x)   else if (strcmp(s, x) == 0)
-#define SET(y)    (void)(warning[y].level = level)
+#define SET(y)    (void)(warning[y].state = (warning[y].state & ~off) | on)
 	OPTX("all") {
 		/* Note: this switched on a lot more warnings than gcc's -Wall */
 		SET(WARN_ADDRESS);
@@ -171,6 +183,11 @@ extra:
 	}
 #undef SET
 #undef OPT_X
+	else if (strcmp(opt /* sic */, "error-implicit-function-declaration") == 0) {
+		/* GCC legacy: This way it only can be activated. */
+		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
+		return;
+	}
 	else {
 		fprintf(stderr, "warning: ignoring unknown option -W%s\n", opt);
 	}
@@ -181,7 +198,7 @@ void disable_all_warnings(void)
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
 		if (i != &warning[WARN_ERROR] &&
 		    i != &warning[WARN_FATAL_ERRORS]) {
-			i->level = WARN_LEVEL_OFF;
+			i->state &= ~WARN_STATE_ON;
 		}
 	}
 }

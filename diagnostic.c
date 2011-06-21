@@ -245,17 +245,15 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 	va_list ap;
 	va_start(ap, fmt);
 	warning_switch_t const *const s = get_warn_switch(warn);
-	switch (s->level) {
-		case WARN_LEVEL_OFF:
-			break;
-
+	switch (s->state) {
 			char const* kind;
-		case WARN_LEVEL_ON:
+		case WARN_STATE_ON:
 			if (is_warn_on(WARN_ERROR)) {
-		case WARN_LEVEL_ERROR:
+		case WARN_STATE_ON | WARN_STATE_ERROR:
 				++error_count;
 				kind = "error";
 			} else {
+		case WARN_STATE_ON | WARN_STATE_NO_ERROR:
 				++warning_count;
 				kind = "warning";
 			}
@@ -264,7 +262,7 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 			break;
 
 		default:
-			panic("invalid warning level");
+			break;
 	}
 	va_end(ap);
 }

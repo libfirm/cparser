@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd December 21, 2008
+.Dd June 21, 2011
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -14,7 +14,7 @@
 .Op Fl - Ns Oo Cm no- Oc Ns Cm ms
 .Op Fl g
 .Op Fl O Ns Ar level
-.Op Fl W Ns Oo Cm no- Ns | Ns Cm error- Oc Ns Ar warn
+.Op Fl W Ns Oo Cm no- Oc Ns Oo Cm error= Oc Ns Ar warning
 .Op Fl w
 .Op Fl I Ar dir
 .Op Fl L Ar dir
@@ -91,14 +91,17 @@ format.
 .\" TODO expand
 Select the optimization level.
 Sensible values are between 0 and 4, inclusive.
-.It Fl W Ns Oo Cm no- Ns | Ns Cm error- Oc Ns Ar warn
 .\" TODO expand
-Disable/enable a specific warning.
-Every warning option has a corresponding
-.Cm no-
-switch to deactivate it and an
-.Cm error-
-switch to turn it into an error.
+.It Fl W Ns Ar warning
+Enable the specified warning.
+.It Fl Wno- Ns Ar warning
+Disable the specified warning.
+.It Fl Werror= Ns Ar warning
+Enable the specified warning and turn it into an error.
+.It Fl Wno-error= Ns Ar warning
+Force the specified warning to only be a warning, even in the presence of
+.Fl Werror .
+This neither enables nor disables the warning itself.
 .It Fl Waddress
 Warn about suspicious use of addresses, like using the address of a function or variable as boolean condition or comparing with the address of a string literal.
 .It Fl Waggregate-return
