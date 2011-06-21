@@ -22,6 +22,7 @@
 
 #include "diagnostic.h"
 #include "adt/error.h"
+#include "entity_t.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "ast.h"
@@ -164,6 +165,22 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 					} else {
 						const token_type_t token = va_arg(ap, token_type_t);
 						print_token_type(stderr, token);
+					}
+					break;
+				}
+
+				case 'N': {
+					entity_t const *const ent = va_arg(ap, entity_t const*);
+					if (extended && is_declaration(ent)) {
+						print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
+					} else {
+						char     const *const kind = get_entity_kind_name(ent->kind);
+						symbol_t const *const sym  = ent->base.symbol;
+						if (sym) {
+							fprintf(stderr, "%s %s", kind, sym->string);
+						} else {
+							fprintf(stderr, "anonymous %s", kind);
+						}
 					}
 					break;
 				}

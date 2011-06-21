@@ -48,6 +48,8 @@
  *  %K   token_t const*
  *  %k   token_kind_t
  *  %#k  va_list*, char const*
+ *  %N   entity_t const*
+ *  %#N  entity_t const*
  *  %P   source_position_t const*
  *  %Q   unsigned (qualifier)
  *  %S   string_t const*

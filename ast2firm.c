@@ -127,10 +127,8 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 
 	if (entity != NULL && warning.uninitialized) {
-		warningf(&entity->base.source_position,
-		         "%s '%#T' might be used uninitialized",
-		         get_entity_kind_name(entity->kind),
-		         entity->declaration.type, entity->base.symbol);
+		source_position_t const *const pos = &entity->base.source_position;
+		warningf(pos, "'%N' might be used uninitialized", entity);
 	}
 	return new_r_Unknown(irg, mode);
 }
@@ -5865,9 +5863,8 @@ static void create_function(entity_t *entity)
 	if (has_computed_gotos) {
 		/* if we have computed goto's in the function, we cannot inline it */
 		if (get_irg_inline_property(irg) >= irg_inline_recomended) {
-			warningf(&entity->base.source_position,
-			         "function '%Y' can never be inlined because it contains a computed goto",
-			         entity->base.symbol);
+			source_position_t const *const pos = &entity->base.source_position;
+			warningf(pos, "'%N' can never be inlined because it contains a computed goto", entity);
 		}
 		set_irg_inline_property(irg, irg_inline_forbidden);
 	}
