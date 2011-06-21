@@ -128,10 +128,13 @@ expression_classification_t is_constant_initializer(const initializer_t *initial
 expression_classification_t is_constant_expression(const expression_t *expression);
 
 /**
- * An object with a fixed but at compiletime unknown adress which will be known
- * at link/load time.
+ * Checks if an expression is a constant/known value to the linker. Examples:
+ *  - all constant expression casted to a pointer type
+ *  - "&x", with x being a global variable.
+ *  - "array" or "a.array" in case array is an array and array and a,
+ *  respectively is an object with link time constant address
  */
-expression_classification_t is_address_constant(const expression_t *expression);
+expression_classification_t is_linker_constant(const expression_t *expression);
 
 long fold_constant_to_int(const expression_t *expression);
 bool fold_constant_to_bool(const expression_t *expression);

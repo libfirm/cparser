@@ -1736,9 +1736,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
  */
 static bool is_initializer_constant(const expression_t *expression)
 {
-	return
-		is_constant_expression(expression) != EXPR_CLASS_VARIABLE ||
-		is_address_constant(expression)    != EXPR_CLASS_VARIABLE;
+	return is_constant_expression(expression) != EXPR_CLASS_VARIABLE ||
+	       is_linker_constant(expression)     != EXPR_CLASS_VARIABLE;
 }
 
 /**

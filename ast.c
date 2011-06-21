@@ -1559,24 +1559,32 @@ expression_classification_t is_constant_initializer(const initializer_t *initial
 	panic("invalid initializer kind found");
 }
 
-static expression_classification_t is_object_with_linker_constant_address(const expression_t *expression)
+/**
+ * Checks if an expression references an object with a constant/known location
+ * to the linker. Example:
+ *  - "x", "*&x" with x being a global variable. The value of x need not be
+ *         constant but the address of x is.
+ *  - "a.b.c" when a has a constant/known location to the linker
+ */
+static expression_classification_t is_object_with_linker_constant_address(
+	const expression_t *expression)
 {
 	switch (expression->kind) {
 	case EXPR_UNARY_DEREFERENCE:
-		return is_address_constant(expression->unary.value);
+		return is_linker_constant(expression->unary.value);
 
 	case EXPR_SELECT: {
 		type_t *base_type = skip_typeref(expression->select.compound->base.type);
 		if (is_type_pointer(base_type)) {
 			/* it's a -> */
-			return is_address_constant(expression->select.compound);
+			return is_linker_constant(expression->select.compound);
 		} else {
 			return is_object_with_linker_constant_address(expression->select.compound);
 		}
 	}
 
 	case EXPR_ARRAY_ACCESS: {
-		expression_classification_t const ref = is_address_constant(expression->array_access.array_ref);
+		expression_classification_t const ref = is_linker_constant(expression->array_access.array_ref);
 		expression_classification_t const idx = is_constant_expression(expression->array_access.index);
 		return ref < idx ? ref : idx;
 	}
@@ -1611,7 +1619,7 @@ static expression_classification_t is_object_with_linker_constant_address(const 
 	}
 }
 
-expression_classification_t is_address_constant(const expression_t *expression)
+expression_classification_t is_linker_constant(const expression_t *expression)
 {
 	switch (expression->kind) {
 	case EXPR_STRING_LITERAL:
@@ -1628,7 +1636,7 @@ expression_classification_t is_address_constant(const expression_t *expression)
 			= revert_automatic_type_conversion(expression->unary.value);
 		/* dereferencing a function is a NOP */
 		if (is_type_function(real_type)) {
-			return is_address_constant(expression->unary.value);
+			return is_linker_constant(expression->unary.value);
 		}
 		/* FALLTHROUGH */
 	}
@@ -1643,7 +1651,7 @@ expression_classification_t is_address_constant(const expression_t *expression)
 			return EXPR_CLASS_VARIABLE;
 
 		expression_classification_t const expr = is_constant_expression(expression->unary.value);
-		expression_classification_t const addr = is_address_constant(expression->unary.value);
+		expression_classification_t const addr = is_linker_constant(expression->unary.value);
 		return expr > addr ? expr : addr;
 	}
 
@@ -1655,12 +1663,12 @@ expression_classification_t is_address_constant(const expression_t *expression)
 		type_t       *const rtype = skip_typeref(right->base.type);
 
 		if (is_type_pointer(ltype)) {
-			expression_classification_t const l = is_address_constant(left);
+			expression_classification_t const l = is_linker_constant(left);
 			expression_classification_t const r = is_constant_expression(right);
 			return l < r ? l : r;
 		} else if (is_type_pointer(rtype)) {
 			expression_classification_t const l = is_constant_expression(left);
-			expression_classification_t const r = is_address_constant(right);
+			expression_classification_t const r = is_linker_constant(right);
 			return l < r ? l : r;
 		} else if (!is_type_valid(ltype) || !is_type_valid(rtype)) {
 			return EXPR_CLASS_ERROR;
@@ -1691,7 +1699,7 @@ expression_classification_t is_address_constant(const expression_t *expression)
 			skip_typeref(revert_automatic_type_conversion(expression));
 		if (!is_type_array(type))
 			return EXPR_CLASS_VARIABLE;
-		expression_classification_t const ref = is_address_constant(expression->array_access.array_ref);
+		expression_classification_t const ref = is_linker_constant(expression->array_access.array_ref);
 		expression_classification_t const idx = is_constant_expression(expression->array_access.index);
 		return ref < idx ? ref : idx;
 	}
@@ -1704,9 +1712,9 @@ expression_classification_t is_address_constant(const expression_t *expression)
 
 		if (fold_constant_to_bool(c)) {
 			expression_t const *const t = expression->conditional.true_expression;
-			return is_address_constant(t != NULL ? t : c);
+			return is_linker_constant(t != NULL ? t : c);
 		} else {
-			return is_address_constant(expression->conditional.false_expression);
+			return is_linker_constant(expression->conditional.false_expression);
 		}
 	}
 
@@ -1721,7 +1729,7 @@ expression_classification_t is_address_constant(const expression_t *expression)
 			type_t       *base_type = skip_typeref(compound->base.type);
 			if (is_type_pointer(base_type)) {
 				/* it's a -> */
-				return is_address_constant(compound);
+				return is_linker_constant(compound);
 			} else {
 				return is_object_with_linker_constant_address(compound);
 			}
