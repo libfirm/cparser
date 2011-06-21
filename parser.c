@@ -4153,8 +4153,9 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		assert(is_type_function(type));
 		if (type->function.unspecified_parameters &&
-				warning.strict_prototypes &&
-				previous_entity == NULL) {
+				warning.strict_prototypes             &&
+		    previous_entity == NULL               &&
+		    !entity->declaration.implicit) {
 			warningf(pos, "function declaration '%#N' is not a prototype", entity);
 		}
 
@@ -4164,10 +4165,11 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 		}
 	}
 
-	if (is_declaration(entity) &&
-			warning.nested_externs &&
-			entity->declaration.storage_class == STORAGE_CLASS_EXTERN &&
-			current_scope != file_scope) {
+	if (is_declaration(entity)                                    &&
+	    warning.nested_externs                                    &&
+	    entity->declaration.storage_class == STORAGE_CLASS_EXTERN &&
+	    current_scope != file_scope                               &&
+	    !entity->declaration.implicit) {
 		warningf(pos, "nested extern declaration of '%#N'", entity);
 	}
 
@@ -6140,12 +6142,8 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	entity->declaration.implicit               = true;
 	entity->base.source_position               = *source_position;
 
-	if (current_scope != NULL) {
-		bool strict_prototypes_old = warning.strict_prototypes;
-		warning.strict_prototypes  = false;
+	if (current_scope != NULL)
 		record_entity(entity, false);
-		warning.strict_prototypes = strict_prototypes_old;
-	}
 
 	return entity;
 }
