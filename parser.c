@@ -10386,7 +10386,7 @@ static void check_unused_globals(void)
 			s   = "defined";
 		}
 
-		warningf(why, &declaration->base.source_position, "'%#N' %s but not used", entity);
+		warningf(why, &declaration->base.source_position, "'%#N' %s but not used", entity, s);
 	}
 }
 
