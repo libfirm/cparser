@@ -7665,13 +7665,10 @@ end_error:;
 			}
 			result_type = pointer_type;
 		} else {
-			if (is_type_valid(other_type)) {
-				type_error_incompatible("while parsing conditional",
-						&expression->base.source_position, true_type, false_type);
-			}
-			result_type = type_error_type;
+			goto types_incompatible;
 		}
 	} else {
+types_incompatible:
 		if (is_type_valid(true_type) && is_type_valid(false_type)) {
 			type_error_incompatible("while parsing conditional",
 			                        &conditional->base.source_position, true_type,
