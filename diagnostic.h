@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 #include "token_t.h"
+#include "warning.h"
 
 /* define a NORETURN attribute */
 #ifndef NORETURN
@@ -59,7 +60,7 @@
  */
 void diagnosticf(const char *fmt, ...);
 void errorf(const source_position_t *pos, const char *fmt, ...);
-void warningf(const source_position_t *pos, const char *fmt, ...);
+void warningf(warning_t, const source_position_t *pos, const char *fmt, ...);
 NORETURN internal_errorf(const source_position_t *pos, const char *fmt, ...);
 
 extern unsigned diagnostic_count;

@@ -126,9 +126,9 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 
-	if (entity != NULL && warning.uninitialized) {
+	if (entity != NULL) {
 		source_position_t const *const pos = &entity->base.source_position;
-		warningf(pos, "'%N' might be used uninitialized", entity);
+		warningf(WARN_UNINITIALIZED, pos, "'%N' might be used uninitialized", entity);
 	}
 	return new_r_Unknown(irg, mode);
 }
@@ -1544,11 +1544,9 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		/* for gcc compatibility we have to produce (dummy) addresses for some
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
-			if (warning.other) {
-				warningf(&ref->base.source_position,
-						"taking address of builtin '%Y'",
-						ref->entity->base.symbol);
-			}
+			source_position_t const *const pos = &ref->base.source_position;
+			symbol_t          const *const sym = ref->entity->base.symbol;
+			warningf(WARN_OTHER, pos, "taking address of builtin '%Y'", sym);
 
 			/* simply create a NULL pointer */
 			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
@@ -5292,20 +5290,19 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 		asm_constraint_flags_t asm_flags
 			= be_parse_asm_constraints(constraints);
 
-		if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-			warningf(&statement->base.source_position,
-			       "some constraints in '%s' are not supported", constraints);
-		}
-		if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-			errorf(&statement->base.source_position,
-			       "some constraints in '%s' are invalid", constraints);
-			continue;
-		}
-		if (! (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE)) {
-			errorf(&statement->base.source_position,
-			       "no write flag specified for output constraints '%s'",
-			       constraints);
-			continue;
+		{
+			source_position_t const *const pos = &statement->base.source_position;
+			if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
+				warningf(WARN_OTHER, pos, "some constraints in '%s' are not supported", constraints);
+			}
+			if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
+				errorf(pos, "some constraints in '%s' are invalid", constraints);
+				continue;
+			}
+			if (! (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE)) {
+				errorf(pos, "no write flag specified for output constraints '%s'", constraints);
+				continue;
+			}
 		}
 
 		unsigned pos = next_pos++;
@@ -5478,7 +5475,8 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 static void ms_try_statement_to_firm(ms_try_statement_t *statement)
 {
 	statement_to_firm(statement->try_statement);
-	warningf(&statement->base.source_position, "structured exception handling ignored");
+	source_position_t const *const pos = &statement->base.source_position;
+	warningf(WARN_OTHER, pos, "structured exception handling ignored");
 }
 
 static void leave_statement_to_firm(leave_statement_t *statement)
@@ -5864,7 +5862,7 @@ static void create_function(entity_t *entity)
 		/* if we have computed goto's in the function, we cannot inline it */
 		if (get_irg_inline_property(irg) >= irg_inline_recomended) {
 			source_position_t const *const pos = &entity->base.source_position;
-			warningf(pos, "'%N' can never be inlined because it contains a computed goto", entity);
+			warningf(WARN_OTHER, pos, "'%N' can never be inlined because it contains a computed goto", entity);
 		}
 		set_irg_inline_property(irg, irg_inline_forbidden);
 	}

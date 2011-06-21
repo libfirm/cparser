@@ -30,12 +30,12 @@
 #include "warning.h"
 
 /** Number of occurred diagnostics. */
-unsigned diagnostic_count = 0;
+unsigned diagnostic_count    = 0;
 /** Number of occurred errors. */
-unsigned error_count      = 0;
+unsigned error_count         = 0;
 /** Number of occurred warnings. */
-unsigned warning_count    = 0;
-bool     show_column      = true;
+unsigned warning_count       = 0;
+bool     show_column         = true;
 
 static const source_position_t *curr_pos = NULL;
 
@@ -219,15 +219,16 @@ static void diagnosticposvf(source_position_t const *const pos, char const *cons
 	fprintf(out, " %s: ", kind);
 	curr_pos = pos;
 	diagnosticvf(fmt, ap);
-	fputc('\n', out);
 }
 
 static void errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
+	curr_pos = pos;
 	++error_count;
 	diagnosticposvf(pos, "error", fmt, ap);
-	if (warning.fatal_errors)
+	fputc('\n', stderr);
+	if (is_warn_on(WARN_FATAL_ERRORS))
 		exit(EXIT_FAILURE);
 }
 
@@ -235,27 +236,35 @@ void errorf(const source_position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = pos;
 	errorvf(pos, fmt, ap);
 	va_end(ap);
 }
 
-static void warningvf(const source_position_t *pos,
-                      const char *const fmt, va_list ap)
-{
-	++warning_count;
-	diagnosticposvf(pos, "warning", fmt, ap);
-}
-
-void warningf(const source_position_t *pos, const char *const fmt, ...)
+void warningf(warning_t const warn, source_position_t const* pos, char const *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = pos;
-	if (warning.s_are_errors) {
-		errorvf(pos, fmt, ap);
-	} else {
-		warningvf(pos, fmt, ap);
+	warning_switch_t const *const s = get_warn_switch(warn);
+	switch (s->level) {
+		case WARN_LEVEL_OFF:
+			break;
+
+			char const* kind;
+		case WARN_LEVEL_ON:
+			if (is_warn_on(WARN_ERROR)) {
+		case WARN_LEVEL_ERROR:
+				++error_count;
+				kind = "error";
+			} else {
+				++warning_count;
+				kind = "warning";
+			}
+			diagnosticposvf(pos, kind, fmt, ap);
+			fprintf(stderr, " [-W%s]\n", s->name);
+			break;
+
+		default:
+			panic("invalid warning level");
 	}
 	va_end(ap);
 }
@@ -264,6 +273,7 @@ static void internal_errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
 	diagnosticposvf(pos, "internal error", fmt, ap);
+	fputc('\n', stderr);
 }
 
 void internal_errorf(const source_position_t *pos, const char *const fmt, ...)

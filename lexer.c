@@ -963,7 +963,7 @@ static void parse_string_literal(void)
 		case '\\': {
 			utf32 const tc = parse_escape_sequence();
 			if (tc >= 0x100) {
-				warningf(&lexer_pos, "escape sequence out of range");
+				warningf(WARN_OTHER, &lexer_pos, "escape sequence out of range");
 			}
 			obstack_1grow(&symbol_obstack, tc);
 			break;
@@ -1071,7 +1071,7 @@ static void parse_character_constant(void)
 		case '\\': {
 			utf32 const tc = parse_escape_sequence();
 			if (tc >= 0x100) {
-				warningf(&lexer_pos, "escape sequence out of range");
+				warningf(WARN_OTHER, &lexer_pos, "escape sequence out of range");
 			}
 			obstack_1grow(&symbol_obstack, tc);
 			break;
@@ -1124,9 +1124,7 @@ static void skip_multiline_comment(void)
 			next_char();
 			if (c == '*') {
 				/* nested comment, warn here */
-				if (warning.comment) {
-					warningf(&lexer_pos, "'/*' within comment");
-				}
+				warningf(WARN_COMMENT, &lexer_pos, "'/*' within comment");
 			}
 			break;
 		case '*':
@@ -1168,8 +1166,7 @@ static void skip_line_comment(void)
 		case '\\':
 			next_char();
 			if (c == '\n' || c == '\r') {
-				if (warning.comment)
-					warningf(&lexer_pos, "multi-line comment");
+				warningf(WARN_COMMENT, &lexer_pos, "multi-line comment");
 				return;
 			}
 			break;
@@ -1328,8 +1325,8 @@ static void parse_pragma(void)
 		unknown_pragma = true;
 	}
 	eat_until_newline();
-	if (unknown_pragma && warning.unknown_pragmas) {
-		warningf(&pp_token.source_position, "encountered unknown #pragma");
+	if (unknown_pragma) {
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.source_position, "encountered unknown #pragma");
 	}
 }
 

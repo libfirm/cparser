@@ -96,10 +96,8 @@ static void warn_invalid_length_modifier(const source_position_t *pos,
                                          const format_length_modifier_t mod,
                                          const utf32 conversion)
 {
-	warningf(pos,
-		"invalid length modifier '%s' for conversion specifier '%%%c'",
-		get_length_modifier_name(mod), conversion
-	);
+	char const *const lmod = get_length_modifier_name(mod);
+	warningf(WARN_FORMAT, pos, "invalid length modifier '%s' for conversion specifier '%%%c'", lmod, conversion);
 }
 
 /**
@@ -145,7 +143,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 		fmt = *(++c);
 
 		if (fmt == '\0') {
-			warningf(pos, "dangling %% in format string");
+			warningf(WARN_FORMAT, pos, "dangling %% in format string");
 			break;
 		}
 		if (fmt == '%')
@@ -186,14 +184,14 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 
 					case ' ':
 						if (fmt_flags & FMT_FLAG_PLUS) {
-							warningf(pos, "' ' is overridden by prior '+' in conversion specification %u", num_fmt);
+							warningf(WARN_FORMAT, pos, "' ' is overridden by prior '+' in conversion specification %u", num_fmt);
 						}
 						flag = FMT_FLAG_SPACE;
 						break;
 
 					case '+':
 						if (fmt_flags & FMT_FLAG_SPACE) {
-							warningf(pos, "'+' overrides prior ' ' in conversion specification %u", num_fmt);
+							warningf(WARN_FORMAT, pos, "'+' overrides prior ' ' in conversion specification %u", num_fmt);
 						}
 						flag = FMT_FLAG_PLUS;
 						break;
@@ -201,7 +199,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 					default: goto break_fmt_flags;
 				}
 				if (fmt_flags & flag) {
-					warningf(pos, "repeated flag '%c' in conversion specification %u", (char)fmt, num_fmt);
+					warningf(WARN_FORMAT, pos, "repeated flag '%c' in conversion specification %u", (char)fmt, num_fmt);
 				}
 				fmt_flags |= flag;
 				fmt = *(++c);
@@ -213,12 +211,12 @@ break_fmt_flags:
 				++num_args;
 				fmt = *(++c);
 				if (arg == NULL) {
-					warningf(pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
+					warningf(WARN_FORMAT, pos, "missing argument for '*' field width in conversion specification %u", num_fmt);
 					return -1;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
-					warningf(pos, "argument for '*' field width in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
+					warningf(WARN_FORMAT, pos, "argument for '*' field width in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -235,12 +233,12 @@ break_fmt_flags:
 			if (fmt == '*') {
 				fmt = *(++c);
 				if (arg == NULL) {
-					warningf(pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
+					warningf(WARN_FORMAT, pos, "missing argument for '*' precision in conversion specification %u", num_fmt);
 					return -1;
 				}
 				const type_t *const arg_type = arg->expression->base.type;
 				if (arg_type != type_int) {
-					warningf(pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
+					warningf(WARN_FORMAT, pos, "argument for '*' precision in conversion specification %u is not an 'int', but an '%T'", num_fmt, arg_type);
 				}
 				arg = arg->next;
 			} else {
@@ -468,9 +466,9 @@ eval_fmt_mod_unsigned:
 				break;
 
 			default:
-				warningf(pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
+				warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
 				if (arg == NULL) {
-					warningf(pos, "too few arguments for format string");
+					warningf(WARN_FORMAT, pos, "too few arguments for format string");
 					return -1;
 				}
 				goto next_arg;
@@ -488,11 +486,11 @@ eval_fmt_mod_unsigned:
 			if (wrong_flags & FMT_FLAG_TICK)  *p++ = '\'';
 			*p = '\0';
 
-			warningf(pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, num_fmt);
+			warningf(WARN_FORMAT, pos, "invalid format flags \"%s\" in conversion specification %%%c at position %u", wrong, fmt, num_fmt);
 		}
 
 		if (arg == NULL) {
-			warningf(pos, "too few arguments for format string");
+			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return -1;
 		}
 
@@ -520,9 +518,9 @@ eval_fmt_mod_unsigned:
 				goto next_arg;
 			}
 			if (is_type_valid(arg_skip)) {
-				warningf(&arg->expression->base.source_position,
-					"argument type '%T' does not match conversion specifier '%%%s%c' at position %u",
-					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
+				source_position_t const *const apos = &arg->expression->base.source_position;
+				char              const *const mod  = get_length_modifier_name(fmt_mod);
+				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
 			}
 		}
 next_arg:
@@ -530,7 +528,7 @@ next_arg:
 	}
 	assert(fmt == '\0');
 	if (c+1 < string + size) {
-		warningf(pos, "format string contains '\\0'");
+		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
 	}
 	return num_args;
 }
@@ -563,10 +561,8 @@ static void check_printf_format(call_argument_t const *arg,
 	for (; arg != NULL; arg = arg->next)
 		++num_args;
 	if (num_args > (size_t)num_fmt) {
-		warningf(&fmt_expr->base.source_position,
-		         "%u argument%s but only %u format specifier%s",
-		         num_args, num_args != 1 ? "s" : "",
-		         num_fmt,  num_fmt  != 1 ? "s" : "");
+		source_position_t const *const pos = &fmt_expr->base.source_position;
+		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
 
@@ -609,7 +605,7 @@ static void check_scanf_format(const call_argument_t *arg,
 			continue;
 		fmt = *(++c);
 		if (fmt == '\0') {
-			warningf(pos, "dangling '%%' in format string");
+			warningf(WARN_FORMAT, pos, "dangling '%%' in format string");
 			break;
 		}
 		if (fmt == '%')
@@ -679,7 +675,7 @@ static void check_scanf_format(const call_argument_t *arg,
 		}
 
 		if (fmt == '\0') {
-			warningf(pos, "dangling % with conversion specififer in format string");
+			warningf(WARN_FORMAT, pos, "dangling %% with conversion specififer in format string");
 			break;
 		}
 
@@ -816,17 +812,16 @@ static void check_scanf_format(const call_argument_t *arg,
 			break;
 
 		default:
-			warningf(pos, "encountered unknown conversion specifier '%%%c' at format %u",
-			         fmt, num_fmt);
+			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at format %u", fmt, num_fmt);
 			if (arg == NULL) {
-				warningf(pos, "too few arguments for format string");
+				warningf(WARN_FORMAT, pos, "too few arguments for format string");
 				return;
 			}
 			goto next_arg;
 		}
 
 		if (arg == NULL) {
-			warningf(pos, "too few arguments for format string");
+			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return;
 		}
 
@@ -858,9 +853,9 @@ static void check_scanf_format(const call_argument_t *arg,
 			}
 error_arg_type:
 			if (is_type_valid(arg_skip)) {
-				warningf(&arg->expression->base.source_position,
-					"argument type '%T' does not match conversion specifier '%%%s%c' at position %u",
-					arg_type, get_length_modifier_name(fmt_mod), (char)fmt, num_fmt);
+				source_position_t const *const apos = &arg->expression->base.source_position;
+				char              const *const mod  = get_length_modifier_name(fmt_mod);
+				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
 			}
 		}
 next_arg:
@@ -868,7 +863,7 @@ next_arg:
 	}
 	assert(fmt == '\0');
 	if (c+1 < string + size) {
-		warningf(pos, "format string contains '\\0'");
+		warningf(WARN_FORMAT, pos, "format string contains '\\0'");
 	}
 	if (arg != NULL) {
 		unsigned num_args = num_fmt;
@@ -876,9 +871,7 @@ next_arg:
 			++num_args;
 			arg = arg->next;
 		}
-		warningf(pos, "%u argument%s but only %u format specifier%s",
-		         num_args, num_args != 1 ? "s" : "",
-		         num_fmt, num_fmt != 1 ? "s" : "");
+		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt, num_fmt != 1 ? "s" : "");
 	}
 }
 
@@ -933,7 +926,7 @@ static const format_spec_t builtin_table[] = {
 
 void check_format(const call_expression_t *const call)
 {
-	if (!warning.format)
+	if (!is_warn_on(WARN_FORMAT))
 		return;
 
 	const expression_t *const func_expr = call->function;

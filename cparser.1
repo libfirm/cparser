@@ -14,7 +14,7 @@
 .Op Fl - Ns Oo Cm no- Oc Ns Cm ms
 .Op Fl g
 .Op Fl O Ns Ar level
-.Op Fl W Ns Oo Cm no- Oc Ns Ar warn
+.Op Fl W Ns Oo Cm no- Ns | Ns Cm error- Oc Ns Ar warn
 .Op Fl w
 .Op Fl I Ar dir
 .Op Fl L Ar dir
@@ -91,12 +91,14 @@ format.
 .\" TODO expand
 Select the optimization level.
 Sensible values are between 0 and 4, inclusive.
-.It Fl W Ns Oo Cm no- Oc Ns Ar warn
+.It Fl W Ns Oo Cm no- Ns | Ns Cm error- Oc Ns Ar warn
 .\" TODO expand
 Disable/enable a specific warning.
 Every warning option has a corresponding
 .Cm no-
-switch to deactivate it.
+switch to deactivate it and an
+.Cm error-
+switch to turn it into an error.
 .It Fl Waddress
 Warn about suspicious use of addresses, like using the address of a function or variable as boolean condition or comparing with the address of a string literal.
 .It Fl Waggregate-return
@@ -144,8 +146,6 @@ Warn about empty statements, i.e. statements which only consist of a single
 Use {} as replacement to avoid this warning.
 .It Fl Werror
 Treat warnings as errors, i.e. do not continue after parsing when a warning is encountered.
-.It Fl Werror-implicit-function-declaration
-Generate an error, when calling a function without a prior declaration.
 .It Fl Wextra
 (Alias
 .Fl W Ns )

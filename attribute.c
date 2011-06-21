@@ -166,9 +166,8 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 	} else if (strcmp_underscore("DI", symbol_str) == 0) {
 		akind = sign ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
 	} else {
-		if (warning.other)
-			warningf(&attribute->source_position, "ignoring unknown mode '%s'",
-			         symbol_str);
+		source_position_t const *const pos = &attribute->source_position;
+		warningf(WARN_OTHER, pos, "ignoring unknown mode '%s'", symbol_str);
 		return orig_type;
 	}
 
@@ -181,8 +180,8 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 		copy->enumt.akind = akind;
 		return identify_new_type(copy);
 	} else if (is_type_pointer(type)) {
-		warningf(&attribute->source_position,
-		         "__attribute__((mode)) on pointers not implemented yet (ignored)");
+		source_position_t const *const pos = &attribute->source_position;
+		warningf(WARN_OTHER, pos, "__attribute__((mode)) on pointers not implemented yet (ignored)");
 		return type;
 	}
 
@@ -231,14 +230,13 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 			entity->compound.alignment = alignment;
 		}
 		break;
-	default:
-		if (warning.other) {
-			const char *what = get_entity_kind_name(entity->kind);
-			warningf(&attribute->source_position,
-					 "alignment attribute specification on %s '%S' ignored",
-					 what, entity->base.symbol);
-		}
+	default: {
+		source_position_t const *const pos  = &attribute->source_position;
+		char              const *const what = get_entity_kind_name(entity->kind);
+		symbol_t          const *const sym  = entity->base.symbol;
+		warningf(WARN_OTHER, pos, "alignment attribute specification on %s '%S' ignored", what, sym);
 		break;
+	}
 	}
 }
 
@@ -285,14 +283,13 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 	case ENTITY_FUNCTION:
 		entity->function.elf_visibility = visibility;
 		break;
-	default:
-		if (warning.other) {
-			const char *what = get_entity_kind_name(entity->kind);
-			warningf(&attribute->source_position,
-					 "visibility attribute specification on %s '%S' ignored",
-					 what, entity->base.symbol);
-		}
+	default: {
+		source_position_t const *const pos  = &attribute->source_position;
+		char              const *const what = get_entity_kind_name(entity->kind);
+		symbol_t          const *const sym  = entity->base.symbol;
+		warningf(WARN_OTHER, pos, "visibility attribute specification on %s '%S' ignored", what, sym);
 		break;
+	}
 	}
 }
 
@@ -301,11 +298,9 @@ static void warn_arguments(const attribute_t *attribute)
 	if (attribute->a.arguments == NULL)
 		return;
 
-	if (warning.other) {
-		warningf(&attribute->source_position,
-				 "attribute '%s' needs no arguments",
-				 get_attribute_name(attribute->kind));
-	}
+	source_position_t const *const pos  = &attribute->source_position;
+	char              const *const what = get_attribute_name(attribute->kind);
+	warningf(WARN_OTHER, pos, "attribute '%s' needs no arguments", what);
 }
 
 static void handle_attribute_packed_e(const attribute_t *attribute,
@@ -313,10 +308,10 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 {
 #if 0
 	if (entity->kind != ENTITY_STRUCT) {
-		warningf(&attribute->source_position,
-		         "packed attribute on %s '%s' ignored",
-				 get_entity_kind_name(entity->kind),
-				 entity->base.symbol->string);
+		source_position_t const *const pos  = &attribute->source_position;
+		char              const *const what = get_entity_kind_name(entity->kind);
+		symbol_t          const *const sym  = entity->base.symbol;
+		warningf(WARN_OTHER, pos, "packed attribute on %s '%S' ignored", what, sym);
 		return;
 	}
 #endif
@@ -328,8 +323,8 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 static void handle_attribute_packed(const attribute_t *attribute, type_t *type)
 {
 	if (type->kind != TYPE_COMPOUND_STRUCT) {
-		warningf(&attribute->source_position,
-		         "packed attribute on type '%T' ignored", type);
+		source_position_t const *const pos  = &attribute->source_position;
+		warningf(WARN_OTHER, pos, "packed attribute on type '%T' ignored", type);
 		return;
 	}
 

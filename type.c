@@ -1793,14 +1793,11 @@ void layout_struct_type(compound_type_t *type)
 		}
 	}
 
+	source_position_t const *const pos = &compound->base.source_position;
 	if (need_pad) {
-		if (warning.padded) {
-			warningf(&compound->base.source_position, "'%T' needs padding",
-			         type);
-		}
-	} else if (compound->packed && warning.packed) {
-		warningf(&compound->base.source_position,
-		         "superfluous packed attribute on '%T'", type);
+		warningf(WARN_PADDED, pos, "'%T' needs padding", type);
+	} else if (compound->packed) {
+		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%T'", type);
 	}
 
 	compound->size      = offset;

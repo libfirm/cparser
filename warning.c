@@ -17,257 +17,171 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
  */
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "adt/util.h"
 #include "warning.h"
 #include "help.h"
 
-warning_t warning = {
-	.other                               = true,
-
-	.address                             = true,
-	.aggregate_return                    = false,
-	.attribute                           = true,
-	.cast_qual                           = false,
-	.char_subscripts                     = true,
-	.comment                             = false,
-	.conversion                          = false,
-	.declaration_after_statement         = false,
-	.deprecated_declarations             = true,
-	.div_by_zero                         = true,
-	.empty_statement                     = false,
-	.error_implicit_function_declaration = false,
-	.fatal_errors                        = false,
-	.float_equal                         = false,
-	.format                              = true,
-	.implicit_function_declaration       = true,
-	.implicit_int                        = true,
-	.init_self                           = true,
-	.long_long                           = false,
-	.main                                = true,
-	.missing_declarations                = false,
-	.missing_noreturn                    = false,
-	.missing_prototypes                  = false,
-	.multichar                           = true,
-	.nested_externs                      = false,
-	.nonnull                             = true,
-	.old_style_definition                = false,
-	.packed                              = false,
-	.padded                              = false,
-	.parentheses                         = false,
-	.pointer_arith                       = true,
-	.redundant_decls                     = true,
-	.return_type                         = true,
-	.s_are_errors                        = false,
-	.shadow                              = false,
-	.shadow_local                        = false,
-	.sign_compare                        = false,
-	.strict_prototypes                   = true,
-	.switch_default                      = false,
-	.switch_enum                         = false,
-	.traditional                         = false,
-	.uninitialized                       = true,
-	.unknown_pragmas                     = true,
-	.unreachable_code                    = false,
-	.unused_function                     = false,
-	.unused_label                        = false,
-	.unused_parameter                    = false,
-	.unused_value                        = true,
-	.unused_variable                     = false,
-	.write_strings                       = false
+static warning_switch_t warning[] = {
+	[WARN_ADDRESS]                       = { WARN_LEVEL_ON,  "address"                       },
+	[WARN_AGGREGATE_RETURN]              = { WARN_LEVEL_OFF, "aggregate-return"              },
+	[WARN_ATTRIBUTE]                     = { WARN_LEVEL_ON,  "attribute"                     },
+	[WARN_CAST_QUAL]                     = { WARN_LEVEL_OFF, "cast-qual",                    },
+	[WARN_CHAR_SUBSCRIPTS]               = { WARN_LEVEL_ON,  "char-subscripts",              },
+	[WARN_COMMENT]                       = { WARN_LEVEL_OFF, "comment",                      },
+	[WARN_CONVERSION]                    = { WARN_LEVEL_OFF, "conversion",                   },
+	[WARN_DECLARATION_AFTER_STATEMENT]   = { WARN_LEVEL_OFF, "declaration-after-statement",  },
+	[WARN_DEPRECATED_DECLARATIONS]       = { WARN_LEVEL_ON,  "deprecated-declarations",      },
+	[WARN_DIV_BY_ZERO]                   = { WARN_LEVEL_ON,  "div-by-zero",                  },
+	[WARN_EMPTY_STATEMENT]               = { WARN_LEVEL_OFF, "empty-statement",              },
+	[WARN_ERROR]                         = { WARN_LEVEL_OFF, "error"                         },
+	[WARN_FATAL_ERRORS]                  = { WARN_LEVEL_OFF, "fatal-errors"                  },
+	[WARN_FLOAT_EQUAL]                   = { WARN_LEVEL_OFF, "float-equal",                  },
+	[WARN_FORMAT]                        = { WARN_LEVEL_ON,  "format"                        },
+	[WARN_IMPLICIT_FUNCTION_DECLARATION] = { WARN_LEVEL_ON,  "implicit-function-declaration" },
+	[WARN_IMPLICIT_INT]                  = { WARN_LEVEL_ON,  "implicit-int"                  },
+	[WARN_INIT_SELF]                     = { WARN_LEVEL_ON,  "init-self",                    },
+	[WARN_LONG_LONG]                     = { WARN_LEVEL_OFF, "long-long"                     },
+	[WARN_MAIN]                          = { WARN_LEVEL_ON,  "main",                         },
+	[WARN_MISSING_DECLARATIONS]          = { WARN_LEVEL_OFF, "missing-declarations",         },
+	[WARN_MISSING_NORETURN]              = { WARN_LEVEL_OFF, "missing-noreturn",             },
+	[WARN_MISSING_PROTOTYPES]            = { WARN_LEVEL_OFF, "missing-prototypes",           },
+	[WARN_MULTICHAR]                     = { WARN_LEVEL_ON,  "multichar",                    },
+	[WARN_NESTED_EXTERNS]                = { WARN_LEVEL_OFF, "nested-externs"                },
+	[WARN_NONNULL]                       = { WARN_LEVEL_ON,  "nonnull",                      },
+	[WARN_OLD_STYLE_DEFINITION]          = { WARN_LEVEL_OFF, "old-style-definition",         },
+	[WARN_OTHER]                         = { WARN_LEVEL_ON,  "other"                         },
+	[WARN_PACKED]                        = { WARN_LEVEL_OFF, "packed",                       },
+	[WARN_PADDED]                        = { WARN_LEVEL_OFF, "padded",                       },
+	[WARN_PARENTHESES]                   = { WARN_LEVEL_OFF, "parentheses",                  },
+	[WARN_POINTER_ARITH]                 = { WARN_LEVEL_ON,  "pointer-arith",                },
+	[WARN_REDUNDANT_DECLS]               = { WARN_LEVEL_ON,  "redundant-decls",              },
+	[WARN_RETURN_TYPE]                   = { WARN_LEVEL_ON,  "return-type",                  },
+	[WARN_SHADOW]                        = { WARN_LEVEL_OFF, "shadow",                       },
+	[WARN_SHADOW_LOCAL]                  = { WARN_LEVEL_OFF, "shadow-local",                 },
+	[WARN_SIGN_COMPARE]                  = { WARN_LEVEL_OFF, "sign-compare",                 },
+	[WARN_STRICT_PROTOTYPES]             = { WARN_LEVEL_ON,  "strict-prototypes"             },
+	[WARN_SWITCH_DEFAULT]                = { WARN_LEVEL_OFF, "switch-default",               },
+	[WARN_SWITCH_ENUM]                   = { WARN_LEVEL_OFF, "switch-enum",                  },
+	[WARN_TRADITIONAL]                   = { WARN_LEVEL_OFF, "traditional"                   },
+	[WARN_UNINITIALIZED]                 = { WARN_LEVEL_ON,  "uninitialized",                },
+	[WARN_UNKNOWN_PRAGMAS]               = { WARN_LEVEL_ON,  "unknown-pragmas",              },
+	[WARN_UNREACHABLE_CODE]              = { WARN_LEVEL_OFF, "unreachable-code"              },
+	[WARN_UNUSED_FUNCTION]               = { WARN_LEVEL_OFF, "unused-function",              },
+	[WARN_UNUSED_LABEL]                  = { WARN_LEVEL_OFF, "unused-label",                 },
+	[WARN_UNUSED_PARAMETER]              = { WARN_LEVEL_OFF, "unused-parameter",             },
+	[WARN_UNUSED_VALUE]                  = { WARN_LEVEL_ON,  "unused-value",                 },
+	[WARN_UNUSED_VARIABLE]               = { WARN_LEVEL_OFF, "unused-variable",              },
+	[WARN_WRITE_STRINGS]                 = { WARN_LEVEL_OFF, "write-strings",                },
 };
+
+warning_switch_t const *get_warn_switch(warning_t const w)
+{
+	assert((size_t)w < lengthof(warning));
+	assert(warning[w].name);
+	return &warning[w];
+}
 
 void print_warning_opt_help(void)
 {
 	/* TODO: write explanations */
-	put_help("-Waddress",                       "");
-	put_help("-Wall",                           "");
-	put_help("-Waggregate-return",              "");
-	put_help("-Wattribute",                     "");
-	put_help("-Wcast-qual",                     "");
-	put_help("-Wchar-subscripts",               "");
-	put_help("-Wcomment",                       "");
-	put_help("-Wconversion",                    "");
-	put_help("-Wdeclaration-after-statement",   "");
-	put_help("-Wdeprecated-declarations",       "");
-	put_help("-Wdiv-by-zero",                   "");
-	put_help("-Wempty-statement",               "");
-	put_help("-Werror",                         "warnings are errors");
-	put_help("-Werror-implicit-function-declaration", "");
-	put_help("-Wextra",                         "");
-	put_help("-Wfatal-errors",                  "");
-	put_help("-Wfloat-equal",                   "");
-	put_help("-Wformat",                        "");
-	put_help("-Wimplicit",                      "");
-	put_help("-Wimplicit-function-declaration", "");
-	put_help("-Wimplicit-int",                  "");
-	put_help("-Winit-self",                     "");
-	put_help("-Wlong-long",                     "");
-	put_help("-Wmain",                          "");
-	put_help("-Wmissing-declarations",          "");
-	put_help("-Wmissing-noreturn",              "");
-	put_help("-Wmissing-prototypes",            "");
-	put_help("-Wmultichar",                     "");
-	put_help("-Wnested-externs",                "");
-	put_help("-Wnonnull",                       "");
-	put_help("-Wold-style-definition",          "");
-	put_help("-Wparentheses",                   "");
-	put_help("-Wpacked",                        "");
-	put_help("-Wpadded",                        "");
-	put_help("-Wparentheses",                   "");
-	put_help("-Wpointer-arith",                 "");
-	put_help("-Wredundant-decls",               "");
-	put_help("-Wreturn-type",                   "");
-	put_help("-Wshadow",                        "");
-	put_help("-Wshadow-local",                  "");
-	put_help("-Wsign-compare",                  "");
-	put_help("-Wstrict-prototypes",             "");
-	put_help("-Wswitch-default",                "");
-	put_help("-Wswitch-enum",                   "");
-	put_help("-Wtraditional",                   "");
-	put_help("-Wuninitialized",                 "");
-	put_help("-Wunknown-pragmas",               "");
-	put_help("-Wunreachable-code",              "");
-	put_help("-Wunused",                        "");
-	put_help("-Wunused-function",               "");
-	put_help("-Wunused-label",                  "");
-	put_help("-Wunused-parameter",              "");
-	put_help("-Wunused-value",                  "");
-	put_help("-Wunused-variable",               "");
-	put_help("-Wwrite-strings",                 "");
+	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
+		put_help(i->name, "");
+	}
 }
 
 void set_warning_opt(const char *const opt)
 {
 	const char* s = opt;
 
-	bool state = true;
+	warn_level_t const level =
+		strncmp(s, "no-",    3) == 0 ? s += 3, WARN_LEVEL_OFF   : /* "no-" prefix */
+		strncmp(s, "error-", 6) == 0 ? s += 6, WARN_LEVEL_ERROR : /* "error-" prefix */
+		WARN_LEVEL_ON;
 
-	/* "no-" prefix */
-	if (s[0] == 'n' && s[1] == 'o' && s[2] == '-') {
-		s += 3;
-		state = false;
+	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
+		if (strcmp(i->name, s) == 0) {
+			i->level = level;
+			return;
+		}
 	}
 
 	if (s[0] == '\0') { // -W is an alias for -Wextra
 		goto extra;
 	}
 #define OPTX(x)   else if (strcmp(s, x) == 0)
-#define SET(y)    (void)(warning.y = state)
-#define OPT(x, y) OPTX(x) SET(y)
+#define SET(y)    (void)(warning[y].level = level)
 	OPTX("all") {
 		/* Note: this switched on a lot more warnings than gcc's -Wall */
-		SET(other);
-
-		SET(address);
-		SET(attribute);
-		SET(char_subscripts);
-		SET(comment);
-		SET(empty_statement);
-		SET(format);
-		SET(implicit_function_declaration);
-		SET(implicit_int);
-		SET(init_self);
-		SET(main);
-		SET(missing_declarations);
-		SET(nonnull);
-		SET(parentheses);
-		SET(pointer_arith);
-		SET(redundant_decls);
-		SET(return_type);
-		SET(shadow_local);
-		SET(sign_compare);
-		SET(strict_prototypes);
-		SET(switch_enum);
-		SET(uninitialized);
-		SET(unknown_pragmas);
-		SET(unreachable_code);
-		SET(unused_function);
-		SET(unused_label);
-		SET(unused_parameter);
-		SET(unused_value);
-		SET(unused_variable);
+		SET(WARN_ADDRESS);
+		SET(WARN_ATTRIBUTE);
+		SET(WARN_CHAR_SUBSCRIPTS);
+		SET(WARN_COMMENT);
+		SET(WARN_EMPTY_STATEMENT);
+		SET(WARN_FORMAT);
+		SET(WARN_IMPLICIT_FUNCTION_DECLARATION);
+		SET(WARN_IMPLICIT_INT);
+		SET(WARN_INIT_SELF);
+		SET(WARN_MAIN);
+		SET(WARN_MISSING_DECLARATIONS);
+		SET(WARN_NONNULL);
+		SET(WARN_OTHER);
+		SET(WARN_PARENTHESES);
+		SET(WARN_POINTER_ARITH);
+		SET(WARN_REDUNDANT_DECLS);
+		SET(WARN_RETURN_TYPE);
+		SET(WARN_SHADOW_LOCAL);
+		SET(WARN_SIGN_COMPARE);
+		SET(WARN_STRICT_PROTOTYPES);
+		SET(WARN_SWITCH_ENUM);
+		SET(WARN_UNINITIALIZED);
+		SET(WARN_UNKNOWN_PRAGMAS);
+		SET(WARN_UNREACHABLE_CODE);
+		SET(WARN_UNUSED_FUNCTION);
+		SET(WARN_UNUSED_LABEL);
+		SET(WARN_UNUSED_PARAMETER);
+		SET(WARN_UNUSED_VALUE);
+		SET(WARN_UNUSED_VARIABLE);
 	}
-	OPT("address",                             address);
-	OPT("aggregate-return",                    aggregate_return);
-	OPT("attribute",                           attribute);
-	OPT("cast-qual",                           cast_qual);
-	OPT("char-subscripts",                     char_subscripts);
-	OPT("comment",                             comment);
-	OPT("conversion",                          conversion);
-	OPT("declaration-after-statement",         declaration_after_statement);
-	OPT("deprecated-declarations",             deprecated_declarations);
-	OPT("div-by-zero",                         div_by_zero);
-	OPT("empty-statement",                     empty_statement);
-	OPT("error",                               s_are_errors);
-	OPT("error-implicit-function-declaration", error_implicit_function_declaration);
 	OPTX("extra") {
 extra:
 		/* TODO */
 		// TODO SET(function_end_without_return);
-		SET(empty_statement);
+		SET(WARN_EMPTY_STATEMENT);
 		// TODO SET(incomplete_aggregate_init);
 		// TODO SET(missing_field_initializers);
 		// TODO SET(pointless_comparison);
-		SET(shadow);
-		SET(unused_parameter);
-		SET(unused_value);
-	}
-	OPT("fatal-errors",                        fatal_errors);
-	OPT("float-equal",                         float_equal);
-	OPTX("format") {
-		SET(format);
-		SET(nonnull);
+		SET(WARN_SHADOW);
+		SET(WARN_UNUSED_PARAMETER);
+		SET(WARN_UNUSED_VALUE);
 	}
 	OPTX("implicit") {
-		SET(implicit_function_declaration);
-		SET(implicit_int);
+		SET(WARN_IMPLICIT_FUNCTION_DECLARATION);
+		SET(WARN_IMPLICIT_INT);
 	}
-	OPT("implicit-function-declaration",       implicit_function_declaration);
-	OPT("implicit-int",                        implicit_int);
-	OPT("init-self",                           init_self);
-	OPT("long-long",                           long_long);
-	OPT("main",                                main);
-	OPT("missing-declarations",                missing_declarations);
-	OPT("missing-noreturn",                    missing_noreturn);
-	OPT("missing-prototypes",                  missing_prototypes);
-	OPT("multichar",                           multichar);
-	OPT("nested-externs",                      nested_externs);
-	OPT("nonnull",                             nonnull);
-	OPT("old-style-definition",                old_style_definition);
-	OPT("packed",                              packed);
-	OPT("padded",                              padded);
-	OPT("parentheses",                         parentheses);
-	OPT("pointer-arith",                       pointer_arith);
-	OPT("redundant-decls",                     redundant_decls);
-	OPT("return-type",                         return_type);
-	OPT("shadow",                              shadow);
-	OPT("shadow-local",                        shadow_local);
-	OPT("sign-compare",                        sign_compare);
-	OPT("strict-prototypes",                   strict_prototypes);
-	OPT("switch-default",                      switch_default);
-	OPT("switch-enum",                         switch_enum);
-	OPT("traditional",                         traditional);
-	OPT("uninitialized",                       uninitialized);
-	OPT("unknown-pragmas",                     unknown_pragmas);
-	OPT("unreachable-code",                    unreachable_code);
 	OPTX("unused") {
-		SET(unused_function);
-		SET(unused_label);
-		SET(unused_parameter);
-		SET(unused_value);
-		SET(unused_variable);
+		SET(WARN_UNUSED_FUNCTION);
+		SET(WARN_UNUSED_LABEL);
+		SET(WARN_UNUSED_PARAMETER);
+		SET(WARN_UNUSED_VALUE);
+		SET(WARN_UNUSED_VARIABLE);
 	}
-	OPT("unused-function",                     unused_function);
-	OPT("unused-label",                        unused_label);
-	OPT("unused-parameter",                    unused_parameter);
-	OPT("unused-value",                        unused_value);
-	OPT("unused-variable",                     unused_variable);
-	OPT("write-strings",                       write_strings);
-#undef OPT
 #undef SET
 #undef OPT_X
 	else {
 		fprintf(stderr, "warning: ignoring unknown option -W%s\n", opt);
+	}
+}
+
+void disable_all_warnings(void)
+{
+	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
+		if (i != &warning[WARN_ERROR] &&
+		    i != &warning[WARN_FATAL_ERRORS]) {
+			i->level = WARN_LEVEL_OFF;
+		}
 	}
 }

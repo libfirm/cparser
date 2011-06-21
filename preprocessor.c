@@ -1392,8 +1392,7 @@ static void parse_define_directive(void)
 	pp_definition_t *old_definition = symbol->pp_definition;
 	if (old_definition != NULL) {
 		if (!pp_definitions_equal(old_definition, new_definition)) {
-			warningf(&input.position, "multiple definition of macro '%Y' (first defined %P)",
-			         symbol, &old_definition->source_position);
+			warningf(WARN_OTHER, &input.position, "multiple definition of macro '%Y' (first defined %P)", symbol, &old_definition->source_position);
 		} else {
 			/* reuse the old definition */
 			obstack_free(&pp_obstack, new_definition);
@@ -1428,7 +1427,7 @@ static void parse_undef_directive(void)
 	next_preprocessing_token();
 
 	if(pp_token.type != '\n') {
-		warningf(&input.position, "extra tokens at end of #undef directive");
+		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
 	}
 	/* eat until '\n' */
 	eat_pp_directive();
@@ -1524,8 +1523,7 @@ static bool parse_include_directive(void)
 	}
 
 	if (pp_token.type != '\n' && pp_token.type != TP_EOF) {
-		warningf(&pp_token.source_position,
-		         "extra tokens at end of #include directive");
+		warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #include directive");
 		eat_pp_directive();
 	}
 
@@ -1641,7 +1639,7 @@ static void parse_else_directive(void)
 
 	if (pp_token.type != '\n') {
 		if (!skip_mode) {
-			warningf(&pp_token.source_position, "extra tokens at end of #else");
+			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #else");
 		}
 		eat_pp_directive();
 	}
@@ -1673,8 +1671,7 @@ static void parse_endif_directive(void)
 
 	if (pp_token.type != '\n') {
 		if (!skip_mode) {
-			warningf(&pp_token.source_position,
-			         "extra tokens at end of #endif");
+			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #endif");
 		}
 		eat_pp_directive();
 	}
