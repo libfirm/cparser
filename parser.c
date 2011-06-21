@@ -8415,31 +8415,40 @@ static void warn_string_literal_address(expression_t const* expr)
 	}
 }
 
-static void warn_comparison_in_comparison(const expression_t *const expr)
-{
-	if (expr->base.parenthesized)
-		return;
-	switch (expr->base.kind) {
-		case EXPR_BINARY_LESS:
-		case EXPR_BINARY_GREATER:
-		case EXPR_BINARY_LESSEQUAL:
-		case EXPR_BINARY_GREATEREQUAL:
-		case EXPR_BINARY_NOTEQUAL:
-		case EXPR_BINARY_EQUAL:
-			warningf(&expr->base.source_position,
-					"comparisons like 'x <= y < z' do not have their mathematical meaning");
-			break;
-		default:
-			break;
-	}
-}
-
 static bool maybe_negative(expression_t const *const expr)
 {
 	switch (is_constant_expression(expr)) {
 		case EXPR_CLASS_ERROR:    return false;
 		case EXPR_CLASS_CONSTANT: return fold_constant_to_int(expr) < 0;
 		default:                  return true;
+	}
+}
+
+static void warn_comparison(source_position_t const *const pos, expression_t const *const expr, expression_t const *const other)
+{
+	if (warning.address) {
+		warn_string_literal_address(expr);
+
+		expression_t const* const ref = get_reference_address(expr);
+		if (ref != NULL && is_null_pointer_constant(other)) {
+			symbol_t const *const sym = ref->reference.entity->base.symbol;
+			warningf(pos, "the address of '%Y' will never be NULL", sym);
+		}
+	}
+
+	if (warning.parentheses && !expr->base.parenthesized) {
+		switch (expr->base.kind) {
+			case EXPR_BINARY_LESS:
+			case EXPR_BINARY_GREATER:
+			case EXPR_BINARY_LESSEQUAL:
+			case EXPR_BINARY_GREATEREQUAL:
+			case EXPR_BINARY_NOTEQUAL:
+			case EXPR_BINARY_EQUAL:
+				warningf(pos, "comparisons like 'x <= y < z' do not have their mathematical meaning");
+				break;
+			default:
+				break;
+		}
 	}
 }
 
@@ -8450,32 +8459,12 @@ static bool maybe_negative(expression_t const *const expr)
  */
 static void semantic_comparison(binary_expression_t *expression)
 {
-	expression_t *left  = expression->left;
-	expression_t *right = expression->right;
+	source_position_t const *const pos   = &expression->base.source_position;
+	expression_t            *const left  = expression->left;
+	expression_t            *const right = expression->right;
 
-	if (warning.address) {
-		warn_string_literal_address(left);
-		warn_string_literal_address(right);
-
-		expression_t const* const func_left = get_reference_address(left);
-		if (func_left != NULL && is_null_pointer_constant(right)) {
-			warningf(&expression->base.source_position,
-			         "the address of '%Y' will never be NULL",
-			         func_left->reference.entity->base.symbol);
-		}
-
-		expression_t const* const func_right = get_reference_address(right);
-		if (func_right != NULL && is_null_pointer_constant(right)) {
-			warningf(&expression->base.source_position,
-			         "the address of '%Y' will never be NULL",
-			         func_right->reference.entity->base.symbol);
-		}
-	}
-
-	if (warning.parentheses) {
-		warn_comparison_in_comparison(left);
-		warn_comparison_in_comparison(right);
-	}
+	warn_comparison(pos, left, right);
+	warn_comparison(pos, right, left);
 
 	type_t *orig_type_left  = left->base.type;
 	type_t *orig_type_right = right->base.type;
@@ -8495,8 +8484,7 @@ static void semantic_comparison(binary_expression_t *expression)
 				/* TODO check whether constant value can be represented by other type */
 				if ((signed_left  && maybe_negative(left)) ||
 						(signed_right && maybe_negative(right))) {
-					warningf(&expression->base.source_position,
-							"comparison between signed and unsigned");
+					warningf(pos, "comparison between signed and unsigned");
 				}
 			}
 		}
@@ -8508,8 +8496,7 @@ static void semantic_comparison(binary_expression_t *expression)
 		    (expression->base.kind == EXPR_BINARY_EQUAL ||
 		     expression->base.kind == EXPR_BINARY_NOTEQUAL) &&
 		    is_type_float(arithmetic_type)) {
-			warningf(&expression->base.source_position,
-			         "comparing floating point with == or != is unsafe");
+			warningf(pos, "comparing floating point with == or != is unsafe");
 		}
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		/* TODO check compatibility */
@@ -8518,9 +8505,7 @@ static void semantic_comparison(binary_expression_t *expression)
 	} else if (is_type_pointer(type_right)) {
 		expression->left = create_implicit_cast(left, type_right);
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
-		type_error_incompatible("invalid operands in comparison",
-		                        &expression->base.source_position,
-		                        type_left, type_right);
+		type_error_incompatible("invalid operands in comparison", pos, type_left, type_right);
 	}
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
