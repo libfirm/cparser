@@ -683,7 +683,7 @@ static void print_help_codegeneration(void)
 	put_help("-ffast-math",              "same as fp-fast (gcc compatibility)");
 	puts("");
 	puts("\tMost of these options can be used with a no- prefix to disable them");
-	puts("\ti.e. -fno-signed-char");
+	puts("\te.g. -fno-signed-char");
 }
 
 static void print_help_linker(void)
