@@ -30,12 +30,13 @@
 #include "warning.h"
 
 /** Number of occurred diagnostics. */
-unsigned diagnostic_count    = 0;
+unsigned diagnostic_count        = 0;
 /** Number of occurred errors. */
-unsigned error_count         = 0;
+unsigned error_count             = 0;
 /** Number of occurred warnings. */
-unsigned warning_count       = 0;
-bool     show_column         = true;
+unsigned warning_count           = 0;
+bool     show_column             = true;
+bool     diagnostics_show_option = true;
 
 static const source_position_t *curr_pos = NULL;
 
@@ -258,7 +259,8 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 				kind = "warning";
 			}
 			diagnosticposvf(pos, kind, fmt, ap);
-			fprintf(stderr, " [-W%s]\n", s->name);
+			if (diagnostics_show_option)
+				fprintf(stderr, " [-W%s]\n", s->name);
 			break;
 
 		default:

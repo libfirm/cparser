@@ -66,6 +66,7 @@ NORETURN internal_errorf(const source_position_t *pos, const char *fmt, ...);
 extern unsigned diagnostic_count;
 extern unsigned error_count;
 extern unsigned warning_count;
-extern bool     show_column;      /**< Show column in diagnostic messages */
+extern bool     show_column;             /**< Show column in diagnostic messages */
+extern bool     diagnostics_show_option; /**< Show the switch, which controls a warning. */
 
 #endif

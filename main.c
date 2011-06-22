@@ -633,9 +633,10 @@ static void print_help_parser(void)
 
 static void print_help_warnings(void)
 {
-	put_help("-w",                       "disable all warnings");
-	put_help("-Wno-trigraphs",           "warn if input contains trigraphs");
-	put_help("-Wundef",                  "Warn if an undefined macro is used in an #if");
+	put_help("-f[no-]diagnostics-show-option", "Show the switch, which controls a warning, after each warning");
+	put_help("-w",                             "disable all warnings");
+	put_help("-Wno-trigraphs",                 "warn if input contains trigraphs");
+	put_help("-Wundef",                        "Warn if an undefined macro is used in an #if");
 	print_warning_opt_help();
 }
 
@@ -1068,6 +1069,8 @@ int main(int argc, char **argv)
 
 					if (streq(opt, "builtins")) {
 						use_builtins = truth_value;
+					} else if (streq(opt, "diagnostics-show-option")) {
+						diagnostics_show_option = truth_value;
 					} else if (streq(opt, "dollars-in-identifiers")) {
 						allow_dollar_in_symbol = truth_value;
 					} else if (streq(opt, "omit-frame-pointer")) {
