@@ -2915,11 +2915,8 @@ wrong_thread_storage_class:
 			next_token();
 			break;
 
-#define CHECK_DOUBLE_TYPE()        \
-			do { \
-			if ( type != NULL)     \
-				errorf(HERE, "multiple data types in declaration specifiers"); \
-			} while(0)
+#define CHECK_DOUBLE_TYPE() \
+	(type != NULL ? errorf(HERE, "multiple types in declaration specifiers") : (void)0)
 
 		case T_struct:
 			CHECK_DOUBLE_TYPE();

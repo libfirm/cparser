@@ -221,7 +221,7 @@ static inline void put_back(int pc)
 		++input.position.lineno;              \
 		code
 
-#define eat(c_type)  do { assert(CC == c_type); next_char(); } while(0)
+#define eat(c_type) (assert(CC == c_type), next_char())
 
 static void maybe_concat_lines(void)
 {

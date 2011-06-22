@@ -400,7 +400,7 @@ static inline void next_char(void);
 		lexer_pos.colno = 1; \
 		code
 
-#define eat(c_type)  do { assert(c == c_type); next_char(); } while (0)
+#define eat(c_type) (assert(c == c_type), next_char())
 
 static void maybe_concat_lines(void)
 {
