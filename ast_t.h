@@ -667,11 +667,6 @@ struct translation_unit_t {
 	statement_t *global_asm;
 };
 
-static inline void *allocate_ast(size_t size)
-{
-	return obstack_alloc(&ast_obstack, size);
-}
-
 static inline bool is_invalid_expression(expression_t *expression)
 {
 	return expression->base.kind == EXPR_INVALID;
@@ -688,9 +683,7 @@ static inline bool is_invalid_statement(statement_t *statement)
  */
 static inline void *allocate_ast_zero(size_t size)
 {
-	void *res = allocate_ast(size);
-	memset(res, 0, size);
-	return res;
+	return memset(obstack_alloc(&ast_obstack, size), 0, size);
 }
 
 /** If set, implicit casts are printed. */
