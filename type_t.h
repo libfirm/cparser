@@ -205,6 +205,7 @@ type_t *make_based_pointer_type(type_t *points_to,
 								type_qualifiers_t qualifiers, variable_t *variable);
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);
+function_parameter_t *allocate_parameter(type_t*);
 
 type_t *duplicate_type(const type_t *type);
 type_t *identify_new_type(type_t *type);

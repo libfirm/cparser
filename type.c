@@ -1818,7 +1818,7 @@ void layout_union_type(compound_type_t *type)
 	compound->alignment = alignment;
 }
 
-static function_parameter_t *allocate_parameter(type_t *const type)
+function_parameter_t *allocate_parameter(type_t *const type)
 {
 	function_parameter_t *const param
 		= obstack_alloc(type_obst, sizeof(*param));

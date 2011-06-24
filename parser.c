@@ -404,15 +404,6 @@ static statement_t *create_empty_statement(void)
 	return allocate_statement_zero(STATEMENT_EMPTY);
 }
 
-static function_parameter_t *allocate_parameter(type_t *const type)
-{
-	function_parameter_t *const param
-		= obstack_alloc(type_obst, sizeof(*param));
-	memset(param, 0, sizeof(*param));
-	param->type = type;
-	return param;
-}
-
 /**
  * Returns the size of an initializer node.
  *
