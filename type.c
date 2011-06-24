@@ -37,9 +37,8 @@
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;
 
-static struct obstack   _type_obst;
-struct obstack         *type_obst                 = &_type_obst;
-static bool             print_implicit_array_size = false;
+static struct obstack type_obst;
+static bool           print_implicit_array_size = false;
 
 static void intern_print_type_pre(const type_t *type);
 static void intern_print_type_post(const type_t *type);
@@ -80,8 +79,8 @@ static size_t get_type_struct_size(type_kind_t kind)
 
 type_t *allocate_type_zero(type_kind_t kind)
 {
-	size_t  size = get_type_struct_size(kind);
-	type_t *res  = obstack_alloc(type_obst, size);
+	size_t  const size = get_type_struct_size(kind);
+	type_t *const res  = obstack_alloc(&type_obst, size);
 	memset(res, 0, size);
 	res->base.kind = kind;
 
@@ -198,7 +197,7 @@ static inline bool is_po2(unsigned x)
 
 void init_types(void)
 {
-	obstack_init(type_obst);
+	obstack_init(&type_obst);
 
 	atomic_type_properties_t *props = atomic_type_properties;
 
@@ -258,7 +257,7 @@ void init_types(void)
 
 void exit_types(void)
 {
-	obstack_free(type_obst, NULL);
+	obstack_free(&type_obst, NULL);
 }
 
 void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparators const q)
@@ -813,7 +812,7 @@ type_t *duplicate_type(const type_t *type)
 {
 	size_t size = get_type_struct_size(type->kind);
 
-	type_t *copy = obstack_alloc(type_obst, size);
+	type_t *const copy = obstack_alloc(&type_obst, size);
 	memcpy(copy, type, size);
 	copy->base.firm_type = NULL;
 
@@ -1542,7 +1541,7 @@ type_t *identify_new_type(type_t *type)
 {
 	type_t *result = typehash_insert(type);
 	if (result != type) {
-		obstack_free(type_obst, type);
+		obstack_free(&type_obst, type);
 	}
 	return result;
 }
@@ -1820,8 +1819,7 @@ void layout_union_type(compound_type_t *type)
 
 function_parameter_t *allocate_parameter(type_t *const type)
 {
-	function_parameter_t *const param
-		= obstack_alloc(type_obst, sizeof(*param));
+	function_parameter_t *const param = obstack_alloc(&type_obst, sizeof(*param));
 	memset(param, 0, sizeof(*param));
 	param->type = type;
 	return param;

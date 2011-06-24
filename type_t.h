@@ -31,8 +31,6 @@
 #include "ast_t.h"
 #include "adt/obst.h"
 
-extern struct obstack *type_obst;
-
 typedef enum type_kind_t {
 	TYPE_INVALID,
 	TYPE_ERROR,
