@@ -1555,10 +1555,7 @@ type_t *identify_new_type(type_t *type)
  */
 type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(atomic_type_t));
-	memset(type, 0, sizeof(atomic_type_t));
-
-	type->kind            = TYPE_ATOMIC;
+	type_t *const type = allocate_type_zero(TYPE_ATOMIC);
 	type->base.qualifiers = qualifiers;
 	type->atomic.akind    = akind;
 
@@ -1573,10 +1570,7 @@ type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
  */
 type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(complex_type_t));
-	memset(type, 0, sizeof(complex_type_t));
-
-	type->kind            = TYPE_COMPLEX;
+	type_t *const type = allocate_type_zero(TYPE_COMPLEX);
 	type->base.qualifiers = qualifiers;
 	type->complex.akind   = akind;
 
@@ -1591,10 +1585,7 @@ type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers
  */
 type_t *make_imaginary_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(imaginary_type_t));
-	memset(type, 0, sizeof(imaginary_type_t));
-
-	type->kind            = TYPE_IMAGINARY;
+	type_t *const type = allocate_type_zero(TYPE_IMAGINARY);
 	type->base.qualifiers = qualifiers;
 	type->imaginary.akind = akind;
 
@@ -1609,10 +1600,7 @@ type_t *make_imaginary_type(atomic_type_kind_t akind, type_qualifiers_t qualifie
  */
 type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
-	memset(type, 0, sizeof(pointer_type_t));
-
-	type->kind                  = TYPE_POINTER;
+	type_t *const type = allocate_type_zero(TYPE_POINTER);
 	type->base.qualifiers       = qualifiers;
 	type->pointer.points_to     = points_to;
 	type->pointer.base_variable = NULL;
@@ -1627,11 +1615,8 @@ type_t *make_pointer_type(type_t *points_to, type_qualifiers_t qualifiers)
  */
 type_t *make_reference_type(type_t *refers_to)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(reference_type_t));
-	memset(type, 0, sizeof(reference_type_t));
-
-	type->kind                = TYPE_REFERENCE;
-	type->base.qualifiers     = 0;
+	type_t *const type = allocate_type_zero(TYPE_REFERENCE);
+	type->base.qualifiers     = TYPE_QUALIFIER_NONE;
 	type->reference.refers_to = refers_to;
 
 	return identify_new_type(type);
@@ -1647,10 +1632,7 @@ type_t *make_reference_type(type_t *refers_to)
 type_t *make_based_pointer_type(type_t *points_to,
 								type_qualifiers_t qualifiers, variable_t *variable)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(pointer_type_t));
-	memset(type, 0, sizeof(pointer_type_t));
-
-	type->kind                  = TYPE_POINTER;
+	type_t *const type = allocate_type_zero(TYPE_POINTER);
 	type->base.qualifiers       = qualifiers;
 	type->pointer.points_to     = points_to;
 	type->pointer.base_variable = variable;
@@ -1662,10 +1644,7 @@ type_t *make_based_pointer_type(type_t *points_to,
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers)
 {
-	type_t *type = obstack_alloc(type_obst, sizeof(array_type_t));
-	memset(type, 0, sizeof(array_type_t));
-
-	type->kind                = TYPE_ARRAY;
+	type_t *const type = allocate_type_zero(TYPE_ARRAY);
 	type->base.qualifiers     = qualifiers;
 	type->array.element_type  = element_type;
 	type->array.size          = size;
