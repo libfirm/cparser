@@ -1885,15 +1885,11 @@ type_t *make_function_type(type_t *return_type, int n_types,
 	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
-	function_parameter_t *last  = NULL;
+	function_parameter_t **anchor = &type->function.parameters;
 	for (int i = 0; i < n_types; ++i) {
 		function_parameter_t *parameter = allocate_parameter(argument_types[i]);
-		if (last == NULL) {
-			type->function.parameters = parameter;
-		} else {
-			last->next = parameter;
-		}
-		last = parameter;
+		*anchor = parameter;
+		anchor  = &parameter->next;
 	}
 
 	return identify_new_type(type);
