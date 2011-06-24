@@ -30,7 +30,6 @@ SOURCES := \
 	ast2firm.c \
 	builtins.c \
 	diagnostic.c \
-	driver/firm_cmdline.c \
 	driver/firm_machine.c \
 	driver/firm_opt.c \
 	driver/firm_timing.c \
