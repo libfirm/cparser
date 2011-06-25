@@ -8759,7 +8759,6 @@ static expression_t *parse_subexpression(precedence_t precedence)
 
 	expression_parser_function_t *parser
 		= &expression_parsers[token.type];
-	source_position_t             source_position = token.source_position;
 	expression_t                 *left;
 
 	if (parser->parser != NULL) {
@@ -8768,7 +8767,6 @@ static expression_t *parse_subexpression(precedence_t precedence)
 		left = parse_primary_expression();
 	}
 	assert(left != NULL);
-	left->base.source_position = source_position;
 
 	while (true) {
 		if (token.type < 0) {
@@ -8785,7 +8783,6 @@ static expression_t *parse_subexpression(precedence_t precedence)
 
 		assert(left != NULL);
 		assert(left->kind != EXPR_UNKNOWN);
-		left->base.source_position = source_position;
 	}
 
 	return left;
