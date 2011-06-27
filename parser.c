@@ -5773,20 +5773,25 @@ static void parse_compound_type_entries(compound_t *compound)
 	eat('{');
 	add_anchor_token('}');
 
-	while (token.type != '}') {
-		if (token.type == T_EOF) {
-			errorf(HERE, "EOF while parsing struct");
-			break;
-		}
-		declaration_specifiers_t specifiers;
-		parse_declaration_specifiers(&specifiers);
-		parse_compound_declarators(compound, &specifiers);
-	}
-	rem_anchor_token('}');
-	next_token();
+	for (;;) {
+		switch (token.type) {
+			DECLARATION_START
+			case T_IDENTIFIER: {
+				declaration_specifiers_t specifiers;
+				parse_declaration_specifiers(&specifiers);
+				parse_compound_declarators(compound, &specifiers);
+				break;
+			}
 
-	/* §6.7.2.1:7 */
-	compound->complete = true;
+			default:
+				rem_anchor_token('}');
+				expect('}', end_error);
+end_error:
+				/* §6.7.2.1:7 */
+				compound->complete = true;
+				return;
+		}
+	}
 }
 
 static type_t *parse_typename(void)
