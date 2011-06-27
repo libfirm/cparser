@@ -6344,9 +6344,10 @@ static bool semantic_cast(expression_t *cast)
 	return true;
 }
 
-static expression_t *parse_compound_literal(type_t *type)
+static expression_t *parse_compound_literal(source_position_t const *const pos, type_t *type)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
+	expression->base.source_position = *pos;
 
 	parse_initializer_env_t env;
 	env.type             = type;
@@ -6367,7 +6368,7 @@ static expression_t *parse_compound_literal(type_t *type)
  */
 static expression_t *parse_cast(void)
 {
-	source_position_t source_position = token.source_position;
+	source_position_t const pos = *HERE;
 
 	eat('(');
 	add_anchor_token(')');
@@ -6378,11 +6379,11 @@ static expression_t *parse_cast(void)
 	expect(')', end_error);
 
 	if (token.type == '{') {
-		return parse_compound_literal(type);
+		return parse_compound_literal(&pos, type);
 	}
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
-	cast->base.source_position = source_position;
+	cast->base.source_position = pos;
 
 	expression_t *value = parse_subexpression(PREC_CAST);
 	cast->base.type   = type;
@@ -7052,6 +7053,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 	type_t       *orig_type;
 	expression_t *expression;
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1))) {
+		source_position_t const pos = *HERE;
 		next_token();
 		add_anchor_token(')');
 		orig_type = parse_typename();
@@ -7061,7 +7063,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 		if (token.type == '{') {
 			/* It was not sizeof(type) after all.  It is sizeof of an expression
 			 * starting with a compound literal */
-			expression = parse_compound_literal(orig_type);
+			expression = parse_compound_literal(&pos, orig_type);
 			goto typeprop_expression;
 		}
 	} else {
