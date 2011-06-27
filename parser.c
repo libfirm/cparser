@@ -1172,9 +1172,8 @@ end_error:
 
 static attribute_t *parse_attribute_asm(void)
 {
-	eat(T_asm);
-
 	attribute_t *attribute = allocate_attribute_zero(ATTRIBUTE_GNU_ASM);
+	eat(T_asm);
 
 	expect('(', end_error);
 	attribute->a.arguments = parse_attribute_arguments();
@@ -1249,9 +1248,8 @@ static attribute_t *parse_attribute_gnu_single(void)
 			break;
 	}
 
-	next_token();
-
 	attribute_t *attribute = allocate_attribute_zero(kind);
+	next_token();
 
 	/* parse arguments */
 	if (next_if('('))
@@ -1305,30 +1303,30 @@ static attribute_t *parse_attributes(attribute_t *first)
 			break;
 
 		case T_cdecl:
-			next_token();
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_CDECL);
+			eat(T_cdecl);
 			break;
 
 		case T__fastcall:
-			next_token();
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_FASTCALL);
+			eat(T__fastcall);
 			break;
 
 		case T__forceinline:
-			next_token();
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_FORCEINLINE);
+			eat(T__forceinline);
 			break;
 
 		case T__stdcall:
-			next_token();
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_STDCALL);
+			eat(T__stdcall);
 			break;
 
 		case T___thiscall:
 			/* TODO record modifier */
 			warningf(WARN_OTHER, HERE, "Ignoring declaration modifier %K", &token);
-			eat(T___thiscall);
 			attribute = allocate_attribute_zero(ATTRIBUTE_MS_THISCALL);
+			eat(T___thiscall);
 			break;
 
 		default:
@@ -2701,13 +2699,13 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 		if (kind == ATTRIBUTE_UNKNOWN) {
 			warningf(WARN_ATTRIBUTE, HERE, "unknown __declspec '%s' ignored", name);
 		}
-		eat(T_IDENTIFIER);
 	} else {
 		parse_error_expected("while parsing __declspec", T_IDENTIFIER, NULL);
 		return NULL;
 	}
 
 	attribute_t *attribute = allocate_attribute_zero(kind);
+	eat(T_IDENTIFIER);
 
 	if (kind == ATTRIBUTE_MS_PROPERTY) {
 		return parse_attribute_ms_property(attribute);
