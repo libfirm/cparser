@@ -1102,7 +1102,8 @@ static int strcmp_underscore(const char *s1, const char *s2)
 static attribute_t *allocate_attribute_zero(attribute_kind_t kind)
 {
 	attribute_t *attribute = allocate_ast_zero(sizeof(*attribute));
-	attribute->kind        = kind;
+	attribute->kind            = kind;
+	attribute->source_position = *HERE;
 	return attribute;
 }
 
