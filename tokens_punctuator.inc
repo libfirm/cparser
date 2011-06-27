@@ -36,7 +36,8 @@ PUNCTUATOR(EQUAL,           "=", = '=')
 PUNCTUATOR(COMMA,           ",", = ',')
 PUNCTUATOR(HASH,            "#", = '#')
 
-PUNCTUATOR(MINUSGREATER,             "->", = 265)
+/* Start after extended ASCII. */
+PUNCTUATOR(MINUSGREATER,             "->", = 256)
 PUNCTUATOR(PLUSPLUS,                 "++",)
 PUNCTUATOR(MINUSMINUS,               "--",)
 PUNCTUATOR(LESSLESS,                 "<<",)

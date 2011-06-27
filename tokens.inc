@@ -2,7 +2,14 @@
 #define TS(x,str,val)
 #endif
 
-TS(IDENTIFIER,                "identifier", = 256)
+/* These must go first. Some set explicit values. */
+#define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
+#define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
+#include "tokens_punctuator.inc"
+#undef PUNCTUATOR
+#undef ALTERNATE
+
+TS(IDENTIFIER,                "identifier",)
 TS(INTEGER,                   "integer number",)
 TS(INTEGER_OCTAL,             "octal integer number",)
 TS(INTEGER_HEXADECIMAL,       "hexadecimal integer number",)
@@ -12,12 +19,6 @@ TS(CHARACTER_CONSTANT,        "character constant",)
 TS(WIDE_CHARACTER_CONSTANT,   "wide character constant",)
 TS(STRING_LITERAL,            "string literal",)
 TS(WIDE_STRING_LITERAL,       "wide string literal",)
-
-#define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
-#define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
-#include "tokens_punctuator.inc"
-#undef PUNCTUATOR
-#undef ALTERNATE
 
 #define S(mode,x)   T(mode,x,#x,)
 S(_ALL, auto)
