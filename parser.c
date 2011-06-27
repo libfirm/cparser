@@ -5888,10 +5888,9 @@ static expression_t *parse_string_literal(void)
 static expression_t *parse_boolean_literal(bool value)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_BOOLEAN);
-	literal->base.source_position = token.source_position;
-	literal->base.type            = type_bool;
-	literal->literal.value.begin  = value ? "true" : "false";
-	literal->literal.value.size   = value ? 4 : 5;
+	literal->base.type           = type_bool;
+	literal->literal.value.begin = value ? "true" : "false";
+	literal->literal.value.size  = value ? 4 : 5;
 
 	next_token();
 	return literal;
@@ -6003,10 +6002,9 @@ static expression_t *parse_number_literal(void)
 	}
 
 	expression_t *literal = allocate_expression_zero(kind);
-	literal->base.source_position = token.source_position;
-	literal->base.type            = type;
-	literal->literal.value        = token.literal;
-	literal->literal.suffix       = token.symbol;
+	literal->base.type      = type;
+	literal->literal.value  = token.literal;
+	literal->literal.suffix = token.symbol;
 	next_token();
 
 	/* integer type depends on the size of the number and the size
@@ -6023,9 +6021,8 @@ static expression_t *parse_number_literal(void)
 static expression_t *parse_character_constant(void)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
-	literal->base.source_position = token.source_position;
-	literal->base.type            = c_mode & _CXX ? type_char : type_int;
-	literal->literal.value        = token.literal;
+	literal->base.type     = c_mode & _CXX ? type_char : type_int;
+	literal->literal.value = token.literal;
 
 	size_t len = literal->literal.value.size;
 	if (len > 1) {
@@ -6047,9 +6044,8 @@ static expression_t *parse_character_constant(void)
 static expression_t *parse_wide_character_constant(void)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
-	literal->base.source_position = token.source_position;
-	literal->base.type            = type_int;
-	literal->literal.value        = token.literal;
+	literal->base.type     = type_int;
+	literal->literal.value = token.literal;
 
 	size_t len = wstrlen(&literal->literal.value);
 	if (len > 1) {
@@ -6893,10 +6889,9 @@ static expression_t *parse_noop_expression(void)
 {
 	/* the result is a (int)0 */
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_MS_NOOP);
-	literal->base.type            = type_int;
-	literal->base.source_position = token.source_position;
-	literal->literal.value.begin  = "__noop";
-	literal->literal.value.size   = 6;
+	literal->base.type           = type_int;
+	literal->literal.value.begin = "__noop";
+	literal->literal.value.size  = 6;
 
 	eat(T___noop);
 
