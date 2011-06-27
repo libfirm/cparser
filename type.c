@@ -67,6 +67,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_ENUM]            = sizeof(enum_type_t),
 		[TYPE_FUNCTION]        = sizeof(function_type_t),
 		[TYPE_POINTER]         = sizeof(pointer_type_t),
+		[TYPE_REFERENCE]       = sizeof(reference_type_t),
 		[TYPE_ARRAY]           = sizeof(array_type_t),
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
