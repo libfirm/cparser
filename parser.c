@@ -9718,9 +9718,8 @@ entity_t *expression_is_variable(const expression_t *expression)
  */
 static statement_t *parse_return(void)
 {
-	eat(T_return);
-
 	statement_t *statement = allocate_statement_zero(STATEMENT_RETURN);
+	eat(T_return);
 
 	expression_t *return_value = NULL;
 	if (token.type != ';') {
