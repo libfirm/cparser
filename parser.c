@@ -655,9 +655,9 @@ static void type_error_incompatible(const char *msg,
 			parse_error_expected(NULL, (expected), NULL); \
 			add_anchor_token(expected);                   \
 			eat_until_anchor();                           \
-			next_if((expected));                          \
 			rem_anchor_token(expected);                   \
-			goto error_label;                             \
+			if (token.type != (expected))                 \
+			  goto error_label;                           \
 		}                                                 \
 		next_token();                                     \
 	} while (0)
