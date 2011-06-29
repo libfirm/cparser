@@ -111,10 +111,11 @@ static declaration_t      **incomplete_arrays;
 static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 
 
-#define PUSH_PARENT(stmt)                          \
-	statement_t *const prev_parent = current_parent; \
-	((void)(current_parent = (stmt)))
-#define POP_PARENT() ((void)(current_parent = prev_parent))
+#define PUSH_PARENT(stmt) \
+	statement_t *const new_parent = (stmt); \
+	statement_t *const old_parent = current_parent; \
+	((void)(current_parent = new_parent))
+#define POP_PARENT() (assert(current_parent == new_parent), (void)(current_parent = old_parent))
 
 /** special symbol used for anonymous entities. */
 static symbol_t *sym_anonymous = NULL;
