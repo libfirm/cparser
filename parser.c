@@ -114,7 +114,7 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 #define PUSH_PARENT(stmt)                          \
 	statement_t *const prev_parent = current_parent; \
 	((void)(current_parent = (stmt)))
-#define POP_PARENT ((void)(current_parent = prev_parent))
+#define POP_PARENT() ((void)(current_parent = prev_parent))
 
 /** special symbol used for anonymous entities. */
 static symbol_t *sym_anonymous = NULL;
@@ -9190,7 +9190,7 @@ end_error:
 
 	statement->case_label.statement = parse_label_inner_statement(statement, "case label");
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 }
 
@@ -9230,7 +9230,7 @@ end_error:
 
 	statement->case_label.statement = parse_label_inner_statement(statement, "default label");
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 }
 
@@ -9264,7 +9264,7 @@ static statement_t *parse_label_statement(void)
 	*label_anchor = &statement->label;
 	label_anchor  = &statement->label.next;
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 }
 
@@ -9308,7 +9308,7 @@ end_error:
 		warningf(WARN_PARENTHESES, pos, "suggest explicit braces to avoid ambiguous 'else'");
 	}
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 }
 
@@ -9395,10 +9395,10 @@ static statement_t *parse_switch(void)
 	}
 	check_enum_cases(&statement->switchs);
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 end_error:
-	POP_PARENT;
+	POP_PARENT();
 	return create_invalid_statement();
 }
 
@@ -9437,10 +9437,10 @@ static statement_t *parse_while(void)
 
 	statement->whiles.body = parse_loop_body(statement);
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 end_error:
-	POP_PARENT;
+	POP_PARENT();
 	return create_invalid_statement();
 }
 
@@ -9472,10 +9472,10 @@ static statement_t *parse_do(void)
 	expect(')', end_error);
 	expect(';', end_error);
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 end_error:
-	POP_PARENT;
+	POP_PARENT();
 	return create_invalid_statement();
 }
 
@@ -9544,11 +9544,11 @@ static statement_t *parse_for(void)
 	scope_pop(old_scope);
 	environment_pop_to(top);
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 
 end_error2:
-	POP_PARENT;
+	POP_PARENT();
 	rem_anchor_token(')');
 	assert(current_scope == &statement->fors.scope);
 	scope_pop(old_scope);
@@ -9841,7 +9841,7 @@ static statement_t *parse_ms_try_statment(void)
 	statement->ms_try.try_statement = parse_compound_statement(false);
 	current_try = rem;
 
-	POP_PARENT;
+	POP_PARENT();
 
 	if (next_if(T___except)) {
 		expect('(', end_error);
@@ -10333,7 +10333,7 @@ end_error:
 	scope_pop(old_scope);
 	environment_pop_to(top);
 
-	POP_PARENT;
+	POP_PARENT();
 	return statement;
 }
 
