@@ -5491,7 +5491,7 @@ static void parse_external_declaration(void)
 		entity_t   *old_current_entity   = current_entity;
 		current_function                 = function;
 		current_entity                   = entity;
-		current_parent                   = NULL;
+		PUSH_PARENT(NULL);
 
 		goto_first   = NULL;
 		goto_anchor  = &goto_first;
@@ -5517,7 +5517,7 @@ static void parse_external_declaration(void)
 			}
 		}
 
-		assert(current_parent   == NULL);
+		POP_PARENT();
 		assert(current_function == function);
 		assert(current_entity   == entity);
 		current_entity   = old_current_entity;
