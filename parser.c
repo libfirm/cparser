@@ -117,6 +117,12 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 	((void)(current_parent = new_parent))
 #define POP_PARENT() (assert(current_parent == new_parent), (void)(current_parent = old_parent))
 
+#define PUSH_SCOPE(scope) \
+	size_t   const top       = environment_top(); \
+	scope_t *const new_scope = (scope); \
+	scope_t *const old_scope = scope_push(new_scope)
+#define POP_SCOPE() (assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top))
+
 /** special symbol used for anonymous entities. */
 static symbol_t *sym_anonymous = NULL;
 
@@ -4529,9 +4535,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 
 	add_anchor_token('{');
 
-	/* push function parameters */
-	size_t const  top       = environment_top();
-	scope_t      *old_scope = scope_push(&entity->function.parameters);
+	PUSH_SCOPE(&entity->function.parameters);
 
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
@@ -4557,10 +4561,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 	}
 decl_list_end:
 
-	/* pop function parameters */
-	assert(current_scope == &entity->function.parameters);
-	scope_pop(old_scope);
-	environment_pop_to(top);
+	POP_SCOPE();
 
 	/* update function type */
 	type_t *new_type = duplicate_type(type);
@@ -5463,9 +5464,7 @@ static void parse_external_declaration(void)
 	assert(is_declaration(entity));
 	type = skip_typeref(entity->declaration.type);
 
-	/* push function parameters and switch scope */
-	size_t const  top       = environment_top();
-	scope_t      *old_scope = scope_push(&function->parameters);
+	PUSH_SCOPE(&function->parameters);
 
 	entity_t *parameter = function->parameters.entities;
 	for (; parameter != NULL; parameter = parameter->base.next) {
@@ -5526,9 +5525,7 @@ static void parse_external_declaration(void)
 		label_pop_to(label_stack_top);
 	}
 
-	assert(current_scope == &function->parameters);
-	scope_pop(old_scope);
-	environment_pop_to(top);
+	POP_SCOPE();
 }
 
 static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
@@ -9493,9 +9490,7 @@ static statement_t *parse_for(void)
 	add_anchor_token(')');
 
 	PUSH_PARENT(statement);
-
-	size_t const  top       = environment_top();
-	scope_t      *old_scope = scope_push(&statement->fors.scope);
+	PUSH_SCOPE(&statement->fors.scope);
 
 	bool old_gcc_extension = in_gcc_extension;
 	while (next_if(T___extension__)) {
@@ -9541,19 +9536,14 @@ static statement_t *parse_for(void)
 	rem_anchor_token(')');
 	statement->fors.body = parse_loop_body(statement);
 
-	assert(current_scope == &statement->fors.scope);
-	scope_pop(old_scope);
-	environment_pop_to(top);
-
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 
 end_error2:
 	POP_PARENT();
 	rem_anchor_token(')');
-	assert(current_scope == &statement->fors.scope);
-	scope_pop(old_scope);
-	environment_pop_to(top);
+	POP_SCOPE();
 	/* fallthrough */
 
 end_error1:
@@ -9957,8 +9947,7 @@ static void parse_namespace_definition(void)
 	environment_push(entity);
 	append_entity(current_scope, entity);
 
-	size_t const  top       = environment_top();
-	scope_t      *old_scope = scope_push(&entity->namespacee.members);
+	PUSH_SCOPE(&entity->namespacee.members);
 
 	entity_t     *old_current_entity = current_entity;
 	current_entity = entity;
@@ -9968,11 +9957,9 @@ static void parse_namespace_definition(void)
 	expect('}', end_error);
 
 end_error:
-	assert(current_scope == &entity->namespacee.members);
 	assert(current_entity == entity);
 	current_entity = old_current_entity;
-	scope_pop(old_scope);
-	environment_pop_to(top);
+	POP_SCOPE();
 }
 
 /**
@@ -10097,6 +10084,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	statement_t *statement = allocate_statement_zero(STATEMENT_COMPOUND);
 
 	PUSH_PARENT(statement);
+	PUSH_SCOPE(&statement->compound.scope);
 
 	eat('{');
 	add_anchor_token('}');
@@ -10188,9 +10176,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_volatile);
 	add_anchor_token(T_wchar_t);
 	add_anchor_token(T_while);
-
-	size_t const  top       = environment_top();
-	scope_t      *old_scope = scope_push(&statement->compound.scope);
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
@@ -10330,10 +10315,8 @@ end_error:
 	rem_anchor_token('&');
 	rem_anchor_token('!');
 	rem_anchor_token('}');
-	assert(current_scope == &statement->compound.scope);
-	scope_pop(old_scope);
-	environment_pop_to(top);
 
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 }
