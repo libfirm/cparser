@@ -9099,7 +9099,8 @@ static statement_t *parse_label_inner_statement(statement_t const *const label, 
 
 		default:
 			inner_stmt = parse_statement();
-			/* ISO/IEC 14882:1998(E) §6:1/§6.7  Declarations are statements */
+			/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
+			/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
 			if (inner_stmt->kind == STATEMENT_DECLARATION && !(c_mode & _CXX)) {
 				errorf(&inner_stmt->base.source_position, "declaration after %s", label_kind);
 			}
@@ -9266,6 +9267,17 @@ static statement_t *parse_label_statement(void)
 	return statement;
 }
 
+static statement_t *parse_inner_statement(void)
+{
+	statement_t *const stmt = parse_statement();
+	/* ISO/IEC  9899:1999(E) §6.8:1/6.8.2:1  Declarations are no statements */
+	/* ISO/IEC 14882:1998(E) §6:1/§6.7       Declarations are statements */
+	if (stmt->kind == STATEMENT_DECLARATION && !(c_mode & _CXX)) {
+		errorf(&stmt->base.source_position, "declaration as inner statement, use {}");
+	}
+	return stmt;
+}
+
 /**
  * Parse an if statement.
  */
@@ -9294,12 +9306,12 @@ end_error:
 	rem_anchor_token('{');
 
 	add_anchor_token(T_else);
-	statement_t *const true_stmt = parse_statement();
+	statement_t *const true_stmt = parse_inner_statement();
 	statement->ifs.true_statement = true_stmt;
 	rem_anchor_token(T_else);
 
 	if (next_if(T_else)) {
-		statement->ifs.false_statement = parse_statement();
+		statement->ifs.false_statement = parse_inner_statement();
 	} else if (true_stmt->kind == STATEMENT_IF &&
 			true_stmt->ifs.false_statement != NULL) {
 		source_position_t const *const pos = &true_stmt->base.source_position;
@@ -9385,7 +9397,7 @@ static statement_t *parse_switch(void)
 
 	switch_statement_t *rem = current_switch;
 	current_switch          = &statement->switchs;
-	statement->switchs.body = parse_statement();
+	statement->switchs.body = parse_inner_statement();
 	current_switch          = rem;
 
 	if (statement->switchs.default_label == NULL) {
@@ -9405,7 +9417,7 @@ static statement_t *parse_loop_body(statement_t *const loop)
 	statement_t *const rem = current_loop;
 	current_loop = loop;
 
-	statement_t *const body = parse_statement();
+	statement_t *const body = parse_inner_statement();
 
 	current_loop = rem;
 	return body;
