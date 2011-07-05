@@ -10425,22 +10425,21 @@ end_error:
 static void parse_external(void)
 {
 	switch (token.type) {
-		DECLARATION_START_NO_EXTERN
-		case T_IDENTIFIER:
-		case T___extension__:
-		/* tokens below are for implicit int */
-		case '&': /* & x; -> int& x; (and error later, because C++ has no
-		             implicit int) */
-		case '*': /* * x; -> int* x; */
-		case '(': /* (x); -> int (x); */
-			parse_external_declaration();
-			return;
-
 		case T_extern:
 			if (look_ahead(1)->type == T_STRING_LITERAL) {
 				parse_linkage_specification();
 			} else {
+		DECLARATION_START_NO_EXTERN
+		case T_IDENTIFIER:
+		case T___extension__:
+		/* tokens below are for implicit int */
+		case '&':  /* & x; -> int& x; (and error later, because C++ has no
+		              implicit int) */
+		case '*':  /* * x; -> int* x; */
+		case '(':; /* (x); -> int (x); */
+				PUSH_EXTENSION();
 				parse_external_declaration();
+				POP_EXTENSION();
 			}
 			return;
 
