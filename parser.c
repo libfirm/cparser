@@ -5783,10 +5783,13 @@ static void parse_compound_type_entries(compound_t *compound)
 	for (;;) {
 		switch (token.type) {
 			DECLARATION_START
+			case T___extension__:
 			case T_IDENTIFIER: {
+				PUSH_EXTENSION();
 				declaration_specifiers_t specifiers;
 				parse_declaration_specifiers(&specifiers);
 				parse_compound_declarators(compound, &specifiers);
+				POP_EXTENSION();
 				break;
 			}
 
