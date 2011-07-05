@@ -123,6 +123,15 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 	scope_t *const old_scope = scope_push(new_scope)
 #define POP_SCOPE() (assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top))
 
+#define PUSH_EXTENSION() \
+	bool const old_gcc_extension = in_gcc_extension; \
+	while (next_if(T___extension__)) { \
+		in_gcc_extension = true; \
+	} \
+	do {} while (0)
+#define POP_EXTENSION() \
+	((void)(in_gcc_extension = old_gcc_extension))
+
 /** special symbol used for anonymous entities. */
 static symbol_t *sym_anonymous = NULL;
 
@@ -7589,12 +7598,9 @@ types_incompatible:
  */
 static expression_t *parse_extension(void)
 {
-	eat(T___extension__);
-
-	bool old_gcc_extension   = in_gcc_extension;
-	in_gcc_extension         = true;
+	PUSH_EXTENSION();
 	expression_t *expression = parse_subexpression(PREC_UNARY);
-	in_gcc_extension         = old_gcc_extension;
+	POP_EXTENSION();
 	return expression;
 }
 
@@ -9504,10 +9510,7 @@ static statement_t *parse_for(void)
 	PUSH_PARENT(statement);
 	PUSH_SCOPE(&statement->fors.scope);
 
-	bool old_gcc_extension = in_gcc_extension;
-	while (next_if(T___extension__)) {
-		in_gcc_extension = true;
-	}
+	PUSH_EXTENSION();
 
 	if (next_if(';')) {
 	} else if (is_declaration_specifier(&token)) {
@@ -9523,7 +9526,8 @@ static statement_t *parse_for(void)
 		rem_anchor_token(';');
 		expect(';', end_error2);
 	}
-	in_gcc_extension = old_gcc_extension;
+
+	POP_EXTENSION();
 
 	if (token.type != ';') {
 		add_anchor_token(';');
@@ -10014,15 +10018,14 @@ static statement_t *intern_parse_statement(void)
 		break;
 	}
 
-	case T___extension__:
+	case T___extension__: {
 		/* This can be a prefix to a declaration or an expression statement.
 		 * We simply eat it now and parse the rest with tail recursion. */
-		while (next_if(T___extension__)) {}
-		bool old_gcc_extension = in_gcc_extension;
-		in_gcc_extension       = true;
+		PUSH_EXTENSION();
 		statement = intern_parse_statement();
-		in_gcc_extension = old_gcc_extension;
+		POP_EXTENSION();
 		break;
+	}
 
 	DECLARATION_START
 		statement = parse_declaration_statement();
