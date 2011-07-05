@@ -2780,12 +2780,11 @@ static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 {
-	type_t            *type              = NULL;
-	type_qualifiers_t  qualifiers        = TYPE_QUALIFIER_NONE;
-	unsigned           type_specifiers   = 0;
-	bool               newtype           = false;
-	bool               saw_error         = false;
-	bool               old_gcc_extension = in_gcc_extension;
+	type_t            *type            = NULL;
+	type_qualifiers_t  qualifiers      = TYPE_QUALIFIER_NONE;
+	unsigned           type_specifiers = 0;
+	bool               newtype         = false;
+	bool               saw_error       = false;
 
 	memset(specifiers, 0, sizeof(*specifiers));
 	specifiers->source_position = token.source_position;
@@ -2856,11 +2855,6 @@ wrong_thread_storage_class:
 		MATCH_TYPE_QUALIFIER(T___ptr64,  TYPE_QUALIFIER_PTR64);
 		MATCH_TYPE_QUALIFIER(T___uptr,   TYPE_QUALIFIER_UPTR);
 		MATCH_TYPE_QUALIFIER(T___sptr,   TYPE_QUALIFIER_SPTR);
-
-		case T___extension__:
-			next_token();
-			in_gcc_extension = true;
-			break;
 
 		/* type specifiers */
 #define MATCH_SPECIFIER(token, specifier, name)                         \
@@ -3011,8 +3005,6 @@ wrong_thread_storage_class:
 
 finish_specifiers:
 	specifiers->attributes = parse_attributes(specifiers->attributes);
-
-	in_gcc_extension = old_gcc_extension;
 
 	if (type == NULL || (saw_error && type_specifiers != 0)) {
 		atomic_type_kind_t atomic_type;
