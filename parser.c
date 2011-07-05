@@ -3326,7 +3326,6 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 				goto parameters_finished;
 
 			case T_IDENTIFIER:
-			case T___extension__:
 			DECLARATION_START
 			{
 				entity_t *entity = parse_parameter();
@@ -4551,7 +4550,6 @@ static void parse_kr_declaration_list(entity_t *entity)
 	for (;;) {
 		switch (token.type) {
 			DECLARATION_START
-			case T___extension__:
 			/* This covers symbols, which are no type, too, and results in
 			 * better error messages.  The typical cases are misspelled type
 			 * names and missing includes. */
