@@ -2583,14 +2583,9 @@ static type_t *parse_typeof(void)
 
 	expression_t *expression  = NULL;
 
-	bool old_type_prop     = in_type_prop;
-	bool old_gcc_extension = in_gcc_extension;
-	in_type_prop           = true;
+	bool old_type_prop = in_type_prop;
+	in_type_prop       = true;
 
-	while (next_if(T___extension__)) {
-		/* This can be a prefix to a typename or an expression. */
-		in_gcc_extension = true;
-	}
 	switch (token.type) {
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(token.symbol)) {
@@ -2603,8 +2598,7 @@ static type_t *parse_typeof(void)
 		}
 		break;
 	}
-	in_type_prop     = old_type_prop;
-	in_gcc_extension = old_gcc_extension;
+	in_type_prop = old_type_prop;
 
 	rem_anchor_token(')');
 	expect(')', end_error);
