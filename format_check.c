@@ -228,6 +228,10 @@ break_fmt_flags:
 
 		/* precision */
 		if (fmt == '.') {
+			if (fmt_flags & FMT_FLAG_ZERO) {
+				warningf(WARN_FORMAT, pos, "'0' flag ignored with precision in conversion specification %u", num_fmt);
+			}
+
 			++num_args;
 			fmt = *(++c);
 			if (fmt == '*') {
