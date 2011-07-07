@@ -328,17 +328,17 @@ break_fmt_flags:
 			case 'd':
 			case 'i':
 				switch (fmt_mod) {
-					case FMT_MOD_NONE: expected_type = type_int;       break;
-					case FMT_MOD_hh:   expected_type = type_int;       break; /* TODO promoted signed char */
-					case FMT_MOD_h:    expected_type = type_int;       break; /* TODO promoted short */
-					case FMT_MOD_l:    expected_type = type_long;      break;
-					case FMT_MOD_ll:   expected_type = type_long_long; break;
-					case FMT_MOD_j:    expected_type = type_intmax_t;  break;
-					case FMT_MOD_z:    expected_type = type_ssize_t;   break;
-					case FMT_MOD_t:    expected_type = type_ptrdiff_t; break;
-					case FMT_MOD_I:    expected_type = type_ptrdiff_t; break;
-					case FMT_MOD_I32:  expected_type = type_int32;     break;
-					case FMT_MOD_I64:  expected_type = type_int64;     break;
+					case FMT_MOD_NONE: expected_type = type_int;         break;
+					case FMT_MOD_hh:   expected_type = type_signed_char; break;
+					case FMT_MOD_h:    expected_type = type_short;       break;
+					case FMT_MOD_l:    expected_type = type_long;        break;
+					case FMT_MOD_ll:   expected_type = type_long_long;   break;
+					case FMT_MOD_j:    expected_type = type_intmax_t;    break;
+					case FMT_MOD_z:    expected_type = type_ssize_t;     break;
+					case FMT_MOD_t:    expected_type = type_ptrdiff_t;   break;
+					case FMT_MOD_I:    expected_type = type_ptrdiff_t;   break;
+					case FMT_MOD_I32:  expected_type = type_int32;       break;
+					case FMT_MOD_I64:  expected_type = type_int64;       break;
 
 					default:
 						warn_invalid_length_modifier(pos, fmt_mod, fmt);
@@ -358,8 +358,8 @@ break_fmt_flags:
 eval_fmt_mod_unsigned:
 				switch (fmt_mod) {
 					case FMT_MOD_NONE: expected_type = type_unsigned_int;       break;
-					case FMT_MOD_hh:   expected_type = type_int;                break; /* TODO promoted unsigned char */
-					case FMT_MOD_h:    expected_type = type_int;                break; /* TODO promoted unsigned short */
+					case FMT_MOD_hh:   expected_type = type_unsigned_char;      break;
+					case FMT_MOD_h:    expected_type = type_unsigned_short;     break;
 					case FMT_MOD_l:    expected_type = type_unsigned_long;      break;
 					case FMT_MOD_ll:   expected_type = type_unsigned_long_long; break;
 					case FMT_MOD_j:    expected_type = type_uintmax_t;          break;
@@ -520,6 +520,15 @@ eval_fmt_mod_unsigned:
 				}
 			} else if (get_unqualified_type(arg_skip) == expected_type_skip) {
 				goto next_arg;
+			} else if (arg->expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+				expression_t const *const expr        = arg->expression->unary.value;
+				type_t             *const unprom_type = skip_typeref(expr->base.type);
+				if (get_unqualified_type(unprom_type) == expected_type_skip) {
+					goto next_arg;
+				}
+				if (expected_type_skip == type_unsigned_int && !is_type_signed(unprom_type)) {
+					goto next_arg;
+				}
 			}
 			if (is_type_valid(arg_skip)) {
 				source_position_t const *const apos = &arg->expression->base.source_position;
