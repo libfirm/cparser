@@ -659,7 +659,6 @@ static void print_help_codegeneration(void)
 	put_help("-ffp-precise",             "precise floating point model");
 	put_help("-ffp-fast",                "imprecise floating point model");
 	put_help("-ffp-strict",              "strict floating point model");
-	put_help("-ffp-precise",             "precise floating point model");
 	put_help("-pthread",                 "Use pthread threading library");
 	put_help("-mtarget=TARGET",          "Specify target architecture as CPU-manufacturer-OS triple");
 	put_help("-mtriple=TARGET",          "alias for -mtarget (clang compatibility)");
