@@ -1217,7 +1217,7 @@ int main(int argc, char **argv)
 					else if (streq(opt, "sse"))
 						opt = "sse2";
 					else {
-						fprintf(stderr, "error: option -mfpumath supports only 387 or sse\n");
+						fprintf(stderr, "error: option -mfpmath supports only 387 or sse\n");
 						argument_errors = true;
 					}
 					if (!argument_errors) {
