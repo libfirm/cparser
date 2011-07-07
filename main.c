@@ -680,7 +680,7 @@ static void print_help_codegeneration(void)
 	put_help("-falign-jumps",            "ignored (gcc compatibility)");
 	put_help("-falign-functions",        "ignored (gcc compatibility)");
 	put_help("-fPIC",                    "ignored (gcc compatibility)");
-	put_help("-ffast-math",              "same as fp-fast (gcc compatibility)");
+	put_help("-ffast-math",              "same as -ffp-fast (gcc compatibility)");
 	puts("");
 	puts("\tMost of these options can be used with a no- prefix to disable them");
 	puts("\te.g. -fno-signed-char");
