@@ -1058,6 +1058,16 @@ int main(int argc, char **argv)
 					}
 				} else if (strstart(orig_opt, "message-length=")) {
 					/* ignore: would only affect error message format */
+				} else if (strstart(orig_opt, "fast-math") ||
+				           strstart(orig_opt, "fp-fast")) {
+					firm_fp_model = fp_model_fast;
+				} else if (strstart(orig_opt, "fp-precise")) {
+					firm_fp_model = fp_model_precise;
+				} else if (strstart(orig_opt, "fp-strict")) {
+					firm_fp_model = fp_model_strict;
+				} else if (streq(opt, "help")) {
+					fprintf(stderr, "warning: -fhelp is deprecated\n");
+					help |= HELP_OPTIMIZATION;
 				} else {
 					/* -f options which have an -fno- variant */
 					char const *opt         = orig_opt;
@@ -1103,12 +1113,6 @@ int main(int argc, char **argv)
 					     * anyway was deactivated */
 					} else if (streq(opt, "verbose-asm")) {
 						/* ignore: we always print verbose assembler */
-					} else if (streq(opt, "fast-math") || streq(opt, "fp-fast")) {
-						firm_fp_model = fp_model_fast;
-					} else if (streq(opt, "fp-precise")) {
-						firm_fp_model = fp_model_precise;
-					} else if (streq(opt, "fp-strict")) {
-						firm_fp_model = fp_model_strict;
 					} else if (streq(opt, "jump-tables")             ||
 					           streq(opt, "expensive-optimizations") ||
 					           streq(opt, "common")                  ||
@@ -1118,9 +1122,6 @@ int main(int argc, char **argv)
 					           streq(opt, "align-functions")         ||
 					           streq(opt, "PIC")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
-					} else if (streq(opt, "help")) {
-						fprintf(stderr, "warning: -fhelp is deprecated\n");
-						help |= HELP_OPTIMIZATION;
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
