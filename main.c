@@ -342,7 +342,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		fprintf(stderr, "invoking preprocessor failed\n");
 		exit(EXIT_FAILURE);
 	}
-	/* we don't really need that anymore */
+	/* we do not really need that anymore */
 	obstack_free(&cppflags_obst, commandline);
 
 	return f;
@@ -473,13 +473,13 @@ static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
 
 	int fd = mkstemp(buffer);
 	if (fd == -1) {
-		fprintf(stderr, "couldn't create temporary file: %s\n",
+		fprintf(stderr, "could not create temporary file: %s\n",
 		        strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
-		fprintf(stderr, "couldn't create temporary file FILE*\n");
+		fprintf(stderr, "could not create temporary file FILE*\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -767,7 +767,7 @@ static void copy_file(FILE *dest, FILE *input)
 	while (!feof(input) && !ferror(dest)) {
 		size_t read = fread(buf, 1, sizeof(buf), input);
 		if (fwrite(buf, 1, read, dest) != read) {
-			perror("couldn't write output");
+			perror("could not write output");
 		}
 	}
 }
@@ -780,7 +780,7 @@ static FILE *open_file(const char *filename)
 
 	FILE *in = fopen(filename, "r");
 	if (in == NULL) {
-		fprintf(stderr, "Couldn't open '%s': %s\n", filename,
+		fprintf(stderr, "Could not open '%s': %s\n", filename,
 				strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -847,7 +847,7 @@ static void setup_target_machine(void)
 
 	const backend_params *be_params = be_get_backend_param();
 	if (be_params->long_double_size % 8 != 0) {
-		fprintf(stderr, "firm-target long double size is not a multiple of 8, can't handle this\n");
+		fprintf(stderr, "firm-target long double size is not a multiple of 8, cannot handle this\n");
 		exit(1);
 	}
 
@@ -1098,7 +1098,7 @@ int main(int argc, char **argv)
 						profile_use = truth_value;
 					} else if (!truth_value &&
 					           streq(opt, "asynchronous-unwind-tables")) {
-					    /* nothing todo, a gcc feature which we don't support
+					    /* nothing todo, a gcc feature which we do not support
 					     * anyway was deactivated */
 					} else if (streq(opt, "verbose-asm")) {
 						/* ignore: we always print verbose assembler */
@@ -1527,7 +1527,7 @@ int main(int argc, char **argv)
 	} else {
 		out = fopen(outname, "w");
 		if (out == NULL) {
-			fprintf(stderr, "Couldn't open '%s' for writing: %s\n", outname,
+			fprintf(stderr, "Could not open '%s' for writing: %s\n", outname,
 					strerror(errno));
 			return EXIT_FAILURE;
 		}
