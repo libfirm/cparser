@@ -617,10 +617,6 @@ static void check_scanf_format(const call_argument_t *arg,
 		if (fmt != '%')
 			continue;
 		fmt = *(++c);
-		if (fmt == '\0') {
-			warningf(WARN_FORMAT, pos, "dangling '%%' in format string");
-			break;
-		}
 		if (fmt == '%')
 			continue;
 
