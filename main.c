@@ -608,6 +608,7 @@ static void print_help_parser(void)
 	put_help("-fmessage-length=LEN",     "Ignored (gcc compatibility)");
 	put_help("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
 	put_help("-fshow-column",            "Show the column number in diagnostic messages");
+	put_help("-fsigned-char",            "Type \"char\" is a signed type");
 	put_help("-funsigned-char",          "Type \"char\" is an unsigned type");
 	put_help("--ms",                     "Enable msvc extensions");
 	put_help("--no-ms",                  "Disable msvc extensions");
