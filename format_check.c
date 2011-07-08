@@ -768,7 +768,6 @@ static void check_scanf_format(const call_argument_t *arg,
 			break;
 
 		case 'c':
-			expected_type = type_int;
 			switch (fmt_mod) {
 			case FMT_MOD_NONE: expected_type = type_char;    break;
 			case FMT_MOD_l:    expected_type = type_wchar_t; break;
