@@ -684,7 +684,7 @@ static void print_help_codegeneration(void)
 	put_help("-ffast-math",              "Same as -ffp-fast (gcc compatibility)");
 	puts("");
 	puts("\tMost of these options can be used with a no- prefix to disable them");
-	puts("\te.g. -fno-signed-char");
+	puts("\te.g. -fno-omit-frame-pointer");
 }
 
 static void print_help_linker(void)
