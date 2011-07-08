@@ -1065,7 +1065,7 @@ int main(int argc, char **argv)
 					firm_fp_model = fp_model_precise;
 				} else if (strstart(orig_opt, "fp-strict")) {
 					firm_fp_model = fp_model_strict;
-				} else if (streq(opt, "help")) {
+				} else if (strstart(orig_opt, "help")) {
 					fprintf(stderr, "warning: -fhelp is deprecated\n");
 					help |= HELP_OPTIMIZATION;
 				} else {
