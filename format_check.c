@@ -472,8 +472,7 @@ eval_fmt_mod_unsigned:
 			default:
 				warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at position %u", fmt, num_fmt);
 				if (arg == NULL) {
-					warningf(WARN_FORMAT, pos, "too few arguments for format string");
-					return -1;
+					goto too_few_args;
 				}
 				goto next_arg;
 		}
@@ -494,6 +493,7 @@ eval_fmt_mod_unsigned:
 		}
 
 		if (arg == NULL) {
+too_few_args:
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return -1;
 		}
@@ -826,14 +826,13 @@ static void check_scanf_format(const call_argument_t *arg,
 
 		default:
 			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at format %u", fmt, num_fmt);
-			if (arg == NULL) {
-				warningf(WARN_FORMAT, pos, "too few arguments for format string");
-				return;
-			}
+			if (arg == NULL)
+				goto too_few_args;
 			goto next_arg;
 		}
 
 		if (arg == NULL) {
+too_few_args:
 			warningf(WARN_FORMAT, pos, "too few arguments for format string");
 			return;
 		}
