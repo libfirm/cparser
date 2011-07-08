@@ -27,6 +27,7 @@
 #include "ast_t.h"
 #include "entity_t.h"
 #include "diagnostic.h"
+#include "parser.h"
 #include "types.h"
 #include "type_t.h"
 #include "warning.h"
@@ -628,6 +629,17 @@ static void check_scanf_format(const call_argument_t *arg,
 			suppress_assignment = true;
 		}
 
+		size_t width = 0;
+		if ('0' <= fmt && fmt <= '9') {
+			do {
+				width = width * 10 + (fmt - '0');
+				fmt   = *++c;
+			} while ('0' <= fmt && fmt <= '9');
+			if (width == 0) {
+				warningf(WARN_FORMAT, pos, "field width is zero at format %u", num_fmt);
+			}
+		}
+
 		/* look for length modifiers */
 		format_length_modifier_t fmt_mod = FMT_MOD_NONE;
 		switch (fmt) {
@@ -765,9 +777,9 @@ static void check_scanf_format(const call_argument_t *arg,
 				goto next_arg;
 			}
 			expected_type = type_wchar_t;
-			break;
+			goto check_c_width;
 
-		case 'c':
+		case 'c': {
 			switch (fmt_mod) {
 			case FMT_MOD_NONE: expected_type = type_char;    break;
 			case FMT_MOD_l:    expected_type = type_wchar_t; break;
@@ -777,7 +789,20 @@ static void check_scanf_format(const call_argument_t *arg,
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
 			}
+
+check_c_width:
+			if (width == 0)
+				width = 1;
+			if (!suppress_assignment && arg != NULL) {
+				type_t *const type = skip_typeref(revert_automatic_type_conversion(arg->expression));
+				if (is_type_array(type)       &&
+				    type->array.size_constant &&
+				    width > type->array.size) {
+					warningf(WARN_FORMAT, pos, "target buffer '%T' is too small for %u characters at format %u", type, width, num_fmt);
+				}
+			}
 			break;
+		}
 
 		case 'S':
 			if (fmt_mod != FMT_MOD_NONE) {
@@ -788,7 +813,7 @@ static void check_scanf_format(const call_argument_t *arg,
 			break;
 
 		case 's':
-		case '[':
+		case '[': {
 			switch (fmt_mod) {
 				case FMT_MOD_NONE: expected_type = type_char;    break;
 				case FMT_MOD_l:    expected_type = type_wchar_t; break;
@@ -798,7 +823,19 @@ static void check_scanf_format(const call_argument_t *arg,
 					warn_invalid_length_modifier(pos, fmt_mod, fmt);
 					goto next_arg;
 			}
+
+			if (!suppress_assignment &&
+			    width != 0           &&
+			    arg   != NULL) {
+				type_t *const type = skip_typeref(revert_automatic_type_conversion(arg->expression));
+				if (is_type_array(type)       &&
+				    type->array.size_constant &&
+				    width >= type->array.size) {
+					warningf(WARN_FORMAT, pos, "target buffer '%T' is too small for %u characters and \\0 at format %u", type, width, num_fmt);
+				}
+			}
 			break;
+		}
 
 		case 'p':
 			if (fmt_mod != FMT_MOD_NONE) {
