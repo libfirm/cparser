@@ -1058,14 +1058,14 @@ int main(int argc, char **argv)
 					}
 				} else if (strstart(orig_opt, "message-length=")) {
 					/* ignore: would only affect error message format */
-				} else if (strstart(orig_opt, "fast-math") ||
-				           strstart(orig_opt, "fp-fast")) {
+				} else if (streq(orig_opt, "fast-math") ||
+				           streq(orig_opt, "fp-fast")) {
 					firm_fp_model = fp_model_fast;
-				} else if (strstart(orig_opt, "fp-precise")) {
+				} else if (streq(orig_opt, "fp-precise")) {
 					firm_fp_model = fp_model_precise;
-				} else if (strstart(orig_opt, "fp-strict")) {
+				} else if (streq(orig_opt, "fp-strict")) {
 					firm_fp_model = fp_model_strict;
-				} else if (strstart(orig_opt, "help")) {
+				} else if (streq(orig_opt, "help")) {
 					fprintf(stderr, "warning: -fhelp is deprecated\n");
 					help |= HELP_OPTIMIZATION;
 				} else {
