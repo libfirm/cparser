@@ -622,6 +622,12 @@ static void check_scanf_format(const call_argument_t *arg,
 
 		++num_fmt;
 
+		bool suppress_assignment = false;
+		if (fmt == '*') {
+			fmt = *++c;
+			suppress_assignment = true;
+		}
+
 		/* look for length modifiers */
 		format_length_modifier_t fmt_mod = FMT_MOD_NONE;
 		switch (fmt) {
@@ -803,7 +809,11 @@ static void check_scanf_format(const call_argument_t *arg,
 			expected_type = type_void_ptr;
 			break;
 
-		case 'n':
+		case 'n': {
+			if (suppress_assignment) {
+				warningf(WARN_FORMAT, pos, "conversion '%n' cannot be suppressed with '*' at format %u", num_fmt);
+			}
+
 			switch (fmt_mod) {
 			case FMT_MOD_NONE: expected_type = type_int;         break;
 			case FMT_MOD_hh:   expected_type = type_signed_char; break;
@@ -819,13 +829,19 @@ static void check_scanf_format(const call_argument_t *arg,
 				goto next_arg;
 			}
 			break;
+		}
 
 		default:
 			warningf(WARN_FORMAT, pos, "encountered unknown conversion specifier '%%%c' at format %u", fmt, num_fmt);
+			if (suppress_assignment)
+				continue;
 			if (arg == NULL)
 				goto too_few_args;
 			goto next_arg;
 		}
+
+		if (suppress_assignment)
+			continue;
 
 		if (arg == NULL) {
 too_few_args:
