@@ -1390,8 +1390,10 @@ int main(int argc, char **argv)
 					fprintf(stderr, "error: regparm convention not supported yet\n");
 					argument_errors = true;
 				} else if (streq(opt, "soft-float")) {
-					fprintf(stderr, "error: software floatingpoint not supported yet\n");
-					argument_errors = true;
+					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=softfloat", cpu_arch);
+					int res = be_parse_arg(arch_opt);
+					if (res == 0)
+						argument_errors = true;
 				} else {
 					long int value = strtol(opt, NULL, 10);
 					if (value == 0) {
