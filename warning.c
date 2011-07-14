@@ -43,7 +43,6 @@ static warning_switch_t warning[] = {
 	[WARN_FORMAT]                        = { WARN_STATE_ON,   "format"                        },
 	[WARN_IMPLICIT_FUNCTION_DECLARATION] = { WARN_STATE_ON,   "implicit-function-declaration" },
 	[WARN_IMPLICIT_INT]                  = { WARN_STATE_ON,   "implicit-int"                  },
-	[WARN_INIT_SELF]                     = { WARN_STATE_ON,   "init-self",                    },
 	[WARN_LONG_LONG]                     = { WARN_STATE_NONE, "long-long"                     },
 	[WARN_MAIN]                          = { WARN_STATE_ON,   "main",                         },
 	[WARN_MISSING_DECLARATIONS]          = { WARN_STATE_NONE, "missing-declarations",         },
@@ -136,7 +135,6 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_FORMAT);
 		SET(WARN_IMPLICIT_FUNCTION_DECLARATION);
 		SET(WARN_IMPLICIT_INT);
-		SET(WARN_INIT_SELF);
 		SET(WARN_MAIN);
 		SET(WARN_MISSING_DECLARATIONS);
 		SET(WARN_NONNULL);

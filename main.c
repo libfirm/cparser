@@ -638,6 +638,7 @@ static void print_help_warnings(void)
 	put_help("-w",                             "Disable all warnings");
 	put_help("-Wno-trigraphs",                 "Warn if input contains trigraphs");
 	put_help("-Wundef",                        "Warn if an undefined macro is used in an #if");
+	put_help("-Winit-self",                    "Ignored (gcc compatibility)");
 	print_warning_opt_help();
 }
 
@@ -1163,6 +1164,8 @@ int main(int argc, char **argv)
 				} else if (streq(option + 1, "no-trigraphs")
 							|| streq(option + 1, "undef")) {
 					add_flag(&cppflags_obst, "%s", arg);
+				} else if (streq(option+1, "init-self")) {
+					/* ignored (gcc compatibility) */
 				} else {
 					set_warning_opt(&option[1]);
 				}

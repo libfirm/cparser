@@ -89,7 +89,6 @@ static scope_t             *current_scope     = NULL;
 /** Point to the current function declaration if inside a function. */
 static function_t          *current_function  = NULL;
 static entity_t            *current_entity    = NULL;
-static entity_t            *current_init_decl = NULL;
 static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
@@ -101,8 +100,6 @@ static label_statement_t   *label_first       = NULL;
 static label_statement_t  **label_anchor      = NULL;
 /** current translation unit. */
 static translation_unit_t  *unit              = NULL;
-/** true if we are in a type property context (evaluation only for type) */
-static bool                 in_type_prop      = false;
 /** true if we are in an __extension__ context. */
 static bool                 in_gcc_extension  = false;
 static struct obstack       temp_obst;
@@ -2583,9 +2580,6 @@ static type_t *parse_typeof(void)
 
 	expression_t *expression  = NULL;
 
-	bool old_type_prop = in_type_prop;
-	in_type_prop       = true;
-
 	switch (token.type) {
 	case T_IDENTIFIER:
 		if (is_typedef_symbol(token.symbol)) {
@@ -2598,7 +2592,6 @@ static type_t *parse_typeof(void)
 		}
 		break;
 	}
-	in_type_prop = old_type_prop;
 
 	rem_anchor_token(')');
 	expect(')', end_error);
@@ -4350,10 +4343,8 @@ static void parse_init_declarator_rest(entity_t *entity)
 	env.type             = orig_type;
 	env.must_be_constant = must_be_constant;
 	env.entity           = entity;
-	current_init_decl    = entity;
 
 	initializer_t *initializer = parse_initializer(&env);
-	current_init_decl = NULL;
 
 	if (entity->kind == ENTITY_VARIABLE) {
 		/* §6.7.5:22  array initializers for arrays with unknown size
@@ -6286,11 +6277,6 @@ static expression_t *parse_reference(void)
 
 	check_deprecated(&pos, entity);
 
-	if (entity == current_init_decl && !in_type_prop && entity->kind == ENTITY_VARIABLE) {
-		current_init_decl = NULL;
-		warningf(WARN_INIT_SELF, &pos, "variable '%#N' is initialized by itself", entity);
-	}
-
 	return expression;
 }
 
@@ -7040,10 +7026,6 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 
 	eat(kind == EXPR_SIZEOF ? T_sizeof : T___alignof__);
 
-	/* we only refer to a type property, mark this case */
-	bool old     = in_type_prop;
-	in_type_prop = true;
-
 	type_t       *orig_type;
 	expression_t *expression;
 	if (token.type == '(' && is_declaration_specifier(look_ahead(1))) {
@@ -7100,7 +7082,6 @@ typeprop_expression:
 	}
 
 end_error:
-	in_type_prop = old;
 	return tp_expression;
 }
 

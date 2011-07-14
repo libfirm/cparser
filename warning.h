@@ -56,7 +56,6 @@ typedef enum warning_t {
 	WARN_FORMAT,                        /**< Check printf-style format strings */
 	WARN_IMPLICIT_FUNCTION_DECLARATION, /**< Warn whenever a function is used before being declared */
 	WARN_IMPLICIT_INT,                  /**< Warn when a declaration does not specify a type */
-	WARN_INIT_SELF,                     /**< Warn about uninitialized variables which are initialized with themselves. */
 #if 0 // TODO
 	WARN_INLINE,                        /**< Warn if a function can not be inlined and it was declared as inline */
 	WARN_INT_TO_POINTER_CAST,           /**< Warn if cast from integer to pointer of different size. */
