@@ -121,6 +121,7 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 #define POP_SCOPE() (assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top))
 
 #define PUSH_EXTENSION() \
+	(void)0; \
 	bool const old_gcc_extension = in_gcc_extension; \
 	while (next_if(T___extension__)) { \
 		in_gcc_extension = true; \
@@ -10404,7 +10405,7 @@ static void parse_external(void)
 		case '&':  /* & x; -> int& x; (and error later, because C++ has no
 		              implicit int) */
 		case '*':  /* * x; -> int* x; */
-		case '(':; /* (x); -> int (x); */
+		case '(':  /* (x); -> int (x); */
 				PUSH_EXTENSION();
 				parse_external_declaration();
 				POP_EXTENSION();

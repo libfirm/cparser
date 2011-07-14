@@ -246,7 +246,7 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 	va_list ap;
 	va_start(ap, fmt);
 	warning_switch_t const *const s = get_warn_switch(warn);
-	switch (s->state) {
+	switch ((unsigned) s->state) {
 			char const* kind;
 		case WARN_STATE_ON:
 			if (is_warn_on(WARN_ERROR)) {
