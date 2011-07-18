@@ -1628,27 +1628,6 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 	c = '\n';
 }
 
-void lexer_open_buffer(const char *buffer, size_t len, const char *input_name)
-{
-	input                = NULL;
-	lexer_pos.lineno     = 0;
-	lexer_pos.colno      = 0;
-	lexer_pos.input_name = input_name;
-
-#if 0 // TODO
-	bufpos = buffer;
-	bufend = buffer + len;
-
-	/* place a virtual \n at the beginning so the lexer knows that we're
-	 * at the beginning of a line */
-	c = '\n';
-#else
-	(void)buffer;
-	(void)len;
-	panic("builtin lexing not done yet");
-#endif
-}
-
 void exit_lexer(void)
 {
 	strset_destroy(&stringset);

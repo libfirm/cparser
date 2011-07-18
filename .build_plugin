@@ -4,29 +4,6 @@ for d in $(DIRS) {
 	SOURCES += [ Wildcard $(PLUGIN_DIR)/$(d) : *.c *.h ] ;
 }
 
-actions RunBuiltinGenerator bind GENERATOR {
-	$(GENERATOR) $(>) > $(<)
-}
-
-rule BuiltinGenerator {
-	local target = $(<) ;
-	local source = [ SearchSource $(>) ] ;
-	local generator = [ SearchSource $(3) ] ;
-	local header = $(target) ;
-	Depends $(target) : $(generator) ;
-	Depends $(target) : $(source) ;
-	RunBuiltinGenerator $(target) : $(source) ;
-	GENERATOR on $(target) = $(generator) ;
-
-	NP = $(header:D=) ;
-	Includes $(NP:G=) : $(header) ;
-
-	Clean clean : $(target) ;
-
-	return $(target) ;
-}
-BuiltinGenerator $(PLUGIN_DIR)/gen_builtins.h : $(PLUGIN_DIR)/builtins/builtins.c : $(PLUGIN_DIR)/create_builtins_h.sh ;
-
 Application cparser : $(SOURCES) ;
 IncludeDir cparser : libfirm/include libfirm/include/libfirm ;
 IncludeDir cparser : $(PLUGIN_DIR) ;

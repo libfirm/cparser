@@ -111,7 +111,6 @@ bool               freestanding              = false;
 static machine_triple_t *target_machine;
 static const char       *target_triple;
 static int               verbose;
-static bool              use_builtins;
 static struct obstack    cppflags_obst;
 static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
@@ -179,16 +178,9 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 		panic("filename too long");
 }
 
-#include "gen_builtins.h"
-
 static translation_unit_t *do_parsing(FILE *const in, const char *const input_name)
 {
 	start_parsing();
-
-	if (use_builtins) {
-		lexer_open_buffer(builtins, sizeof(builtins)-1, "<builtin>");
-		parse();
-	}
 
 	lexer_open_stream(in, input_name);
 	parse();
@@ -1078,9 +1070,7 @@ int main(int argc, char **argv)
 						opt += 3;
 					}
 
-					if (streq(opt, "builtins")) {
-						use_builtins = truth_value;
-					} else if (streq(opt, "diagnostics-show-option")) {
+					if (streq(opt, "diagnostics-show-option")) {
 						diagnostics_show_option = truth_value;
 					} else if (streq(opt, "dollars-in-identifiers")) {
 						allow_dollar_in_symbol = truth_value;

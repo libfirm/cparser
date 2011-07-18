@@ -37,7 +37,6 @@ void exit_lexer(void);
 void select_input_encoding(char const* encoding);
 
 void lexer_open_stream(FILE *stream, const char *input_name);
-void lexer_open_buffer(const char *buffer, size_t len, const char *input_name);
 
 string_t concat_strings(const string_t *s1, const string_t *s2);
 string_t make_string(const char *str);

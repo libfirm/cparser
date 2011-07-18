@@ -116,12 +116,6 @@ bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bo
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-gen_builtins.h: builtins/builtins.c create_builtins_h.sh
-	@echo '===> CREATE_BUILTINS $<'
-	$(Q)./create_builtins_h.sh "$<" > $@
-
-main.c: gen_builtins.h
-
 build/cpb/%.o: %.c build/cparser
 	@echo '===> CPARSER $<'
 	$(Q)./build/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
@@ -154,4 +148,4 @@ build/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf gen_builtins.h build/* $(GOAL) .depend
+	$(Q)rm -rf build/* $(GOAL) .depend
