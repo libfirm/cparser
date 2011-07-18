@@ -9,5 +9,5 @@ fool
 (2)
 
 (fool)
-(fool/*
-*/)
+(fool//
+)

@@ -1,9 +1,9 @@
 
 #define FOO1    bar
 # define FOO2   bar
-#	define FOO3 bar
+# define FOO3 bar
 # define FOO4/*  */bar
-#/*blup*/	/*bla*/define FOO5 bar
+#/*blup*/ /*bla*/define FOO5 bar
 #/*blup
   */define FOO6 bar
 #define FO\
@@ -28,7 +28,7 @@ FOO10
 
 #define foo foo1
 #/*inc*/include/* haha
-*/ "preproctest/simpleinc.h"
+*/ "simpleinc.h"
 #undef foo
 #define foo foo2
-#/*inc*/include/* haha*/<preproctest/simpleinc.h>
+#/*inc*/include/* haha*/<simpleinc.h>

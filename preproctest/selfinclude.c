@@ -1,2 +1,2 @@
 
-#include "preproctest/selfinclude.c"
+#include "selfinclude.c"
