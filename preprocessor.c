@@ -212,7 +212,7 @@ static inline void put_back(utf32 const pc)
 #define MATCH_NEWLINE(code)                   \
 	case '\r':                                \
 		next_char();                          \
-		if(input.c == '\n') {                 \
+		if (input.c == '\n') {                \
 			next_char();                      \
 		}                                     \
 		++input.position.lineno;              \
@@ -228,7 +228,7 @@ static void maybe_concat_lines(void)
 {
 	eat('\\');
 
-	switch(input.c) {
+	switch (input.c) {
 	MATCH_NEWLINE(return;)
 
 	default:
@@ -248,23 +248,23 @@ static inline void next_char(void)
 	next_real_char();
 
 	/* filter trigraphs and concatenated lines */
-	if(UNLIKELY(input.c == '\\')) {
+	if (UNLIKELY(input.c == '\\')) {
 		maybe_concat_lines();
 		goto end_of_next_char;
 	}
 
-	if(LIKELY(input.c != '?'))
+	if (LIKELY(input.c != '?'))
 		goto end_of_next_char;
 
 	next_real_char();
-	if(LIKELY(input.c != '?')) {
+	if (LIKELY(input.c != '?')) {
 		put_back(input.c);
 		input.c = '?';
 		goto end_of_next_char;
 	}
 
 	next_real_char();
-	switch(input.c) {
+	switch (input.c) {
 	case '=': input.c = '#'; break;
 	case '(': input.c = '['; break;
 	case '/': input.c = '\\'; maybe_concat_lines(); break;
@@ -296,7 +296,7 @@ end_of_next_char:;
  */
 static inline bool is_octal_digit(int chr)
 {
-	switch(chr) {
+	switch (chr) {
 	case '0':
 	case '1':
 	case '2':
@@ -361,7 +361,7 @@ static int parse_octal_sequence(const int first_digit)
 	value = 8 * value + digit_value(input.c);
 	next_char();
 
-	if(char_is_signed) {
+	if (char_is_signed) {
 		return (signed char) value;
 	} else {
 		return (unsigned char) value;
@@ -374,12 +374,12 @@ static int parse_octal_sequence(const int first_digit)
 static int parse_hex_sequence(void)
 {
 	int value = 0;
-	while(isxdigit(input.c)) {
+	while (isxdigit(input.c)) {
 		value = 16 * value + digit_value(input.c);
 		next_char();
 	}
 
-	if(char_is_signed) {
+	if (char_is_signed) {
 		return (signed char) value;
 	} else {
 		return (unsigned char) value;
@@ -396,7 +396,7 @@ static int parse_escape_sequence(void)
 	int ec = input.c;
 	next_char();
 
-	switch(ec) {
+	switch (ec) {
 	case '"':  return '"';
 	case '\'': return '\'';
 	case '\\': return '\\';
@@ -435,10 +435,10 @@ static void parse_string_literal(void)
 	eat('"');
 
 	int tc;
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case '\\':
-			if(resolve_escape_sequences) {
+			if (resolve_escape_sequences) {
 				tc = parse_escape_sequence();
 				obstack_1grow(&symbol_obstack, (char) tc);
 			} else {
@@ -478,7 +478,7 @@ end_of_string:
 #if 0 /* TODO hash */
 	/* check if there is already a copy of the string */
 	result = strset_insert(&stringset, string);
-	if(result != string) {
+	if (result != string) {
 		obstack_free(&symbol_obstack, string);
 	}
 #else
@@ -495,8 +495,8 @@ static void parse_wide_character_constant(void)
 	eat('\'');
 
 	int found_char = 0;
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case '\\':
 			found_char = parse_escape_sequence();
 			break;
@@ -516,7 +516,7 @@ static void parse_wide_character_constant(void)
 			return;
 
 		default:
-			if(found_char != 0) {
+			if (found_char != 0) {
 				parse_error("more than 1 characters in character "
 				            "constant");
 				goto end_of_wide_char_constant;
@@ -540,8 +540,8 @@ static void parse_character_constant(void)
 	eat('\'');
 
 	int tc;
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case '\\':
 			tc = parse_escape_sequence();
 			obstack_1grow(&symbol_obstack, (char) tc);
@@ -662,7 +662,7 @@ static void expand_next(void)
 	pp_definition_t *definition = current_expansion;
 
 restart:
-	if(definition->list_len == 0
+	if (definition->list_len == 0
 			|| definition->expand_pos >= definition->list_len) {
 		/* we're finished with the current macro, move up 1 level in the
 		 * expansion stack */
@@ -671,7 +671,7 @@ restart:
 		definition->is_expanding     = false;
 
 		/* it was the outermost expansion, parse normal pptoken */
-		if(parent == NULL) {
+		if (parent == NULL) {
 			current_expansion = NULL;
 			next_preprocessing_token();
 			return;
@@ -683,12 +683,12 @@ restart:
 	pp_token = definition->token_list[definition->expand_pos];
 	++definition->expand_pos;
 
-	if(pp_token.type != TP_IDENTIFIER)
+	if (pp_token.type != TP_IDENTIFIER)
 		return;
 
 	/* if it was an identifier then we might need to expand again */
 	pp_definition_t *symbol_definition = pp_token.symbol->pp_definition;
-	if(symbol_definition != NULL && !symbol_definition->is_expanding) {
+	if (symbol_definition != NULL && !symbol_definition->is_expanding) {
 		symbol_definition->parent_expansion = definition;
 		symbol_definition->expand_pos       = 0;
 		symbol_definition->is_expanding     = true;
@@ -700,11 +700,11 @@ restart:
 
 static void skip_line_comment(void)
 {
-	if(do_print_spaces)
+	if (do_print_spaces)
 		counted_spaces++;
 
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case EOF:
 			return;
 
@@ -721,12 +721,12 @@ static void skip_line_comment(void)
 
 static void skip_multiline_comment(void)
 {
-	if(do_print_spaces)
+	if (do_print_spaces)
 		counted_spaces++;
 
 	unsigned start_linenr = input.position.lineno;
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case '/':
 			next_char();
 			if (input.c == '*') {
@@ -735,14 +735,14 @@ static void skip_multiline_comment(void)
 			break;
 		case '*':
 			next_char();
-			if(input.c == '/') {
+			if (input.c == '/') {
 				next_char();
 				return;
 			}
 			break;
 
 		MATCH_NEWLINE(
-			if(do_print_spaces) {
+			if (do_print_spaces) {
 				counted_newlines++;
 				counted_spaces = 0;
 			}
@@ -796,7 +796,7 @@ static void skip_spaces(bool skip_newline)
 				return;
 
 			next_char();
-			if(input.c == '\n') {
+			if (input.c == '\n') {
 				next_char();
 			}
 			++input.position.lineno;
@@ -832,8 +832,8 @@ static void parse_symbol(void)
 	obstack_1grow(&symbol_obstack, (char) input.c);
 	next_char();
 
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		DIGITS
 		SYMBOL_CHARS
 			obstack_1grow(&symbol_obstack, (char) input.c);
@@ -902,8 +902,8 @@ static void parse_number(void)
 	obstack_1grow(&symbol_obstack, (char) input.c);
 	next_char();
 
-	while(1) {
-		switch(input.c) {
+	while (true) {
+		switch (input.c) {
 		case '.':
 		DIGITS
 		SYMBOL_CHARS_WITHOUT_E_P
@@ -917,7 +917,7 @@ static void parse_number(void)
 		case 'P':
 			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
-			if(input.c == '+' || input.c == '-') {
+			if (input.c == '+' || input.c == '-') {
 				obstack_1grow(&symbol_obstack, (char) input.c);
 				next_char();
 			}
@@ -941,8 +941,8 @@ end_number:
 
 #define MAYBE_PROLOG                                       \
 			next_char();                                   \
-			while(1) {                                     \
-				switch(input.c) {
+			while (true) {                                 \
+				switch (input.c) {
 
 #define MAYBE(ch, set_type)                                \
 				case ch:                                   \
@@ -955,7 +955,7 @@ end_number:
 					code                                   \
 					return;                                \
 				}                                          \
-			} /* end of while(1) */                        \
+			}
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
@@ -964,7 +964,7 @@ end_number:
 
 static void next_preprocessing_token(void)
 {
-	if(current_expansion != NULL) {
+	if (current_expansion != NULL) {
 		expand_next();
 		return;
 	}
@@ -972,7 +972,7 @@ static void next_preprocessing_token(void)
 	pp_token.source_position = input.position;
 
 restart:
-	switch(input.c) {
+	switch (input.c) {
 	case ' ':
 	case '\t':
 		if (do_print_spaces)
@@ -1163,7 +1163,7 @@ static void print_quoted_string(const char *const string)
 {
 	fputc('"', out);
 	for (const char *c = string; *c != 0; ++c) {
-		switch(*c) {
+		switch (*c) {
 		case '"': fputs("\\\"", out); break;
 		case '\\':  fputs("\\\\", out); break;
 		case '\a':  fputs("\\a", out); break;
@@ -1175,7 +1175,7 @@ static void print_quoted_string(const char *const string)
 		case '\v':  fputs("\\v", out); break;
 		case '\?':  fputs("\\?", out); break;
 		default:
-			if(!isprint(*c)) {
+			if (!isprint(*c)) {
 				fprintf(out, "\\%03o", (unsigned)*c);
 				break;
 			}
@@ -1227,7 +1227,7 @@ static void emit_pp_token(void)
 		input.had_non_space = true;
 	}
 
-	switch(pp_token.type) {
+	switch (pp_token.type) {
 	case TP_IDENTIFIER:
 		fputs(pp_token.symbol->string, out);
 		break;
@@ -1249,7 +1249,7 @@ static void emit_pp_token(void)
 
 static void eat_pp_directive(void)
 {
-	while(pp_token.type != '\n' && pp_token.type != TP_EOF) {
+	while (pp_token.type != '\n' && pp_token.type != TP_EOF) {
 		next_preprocessing_token();
 	}
 }
@@ -1257,13 +1257,13 @@ static void eat_pp_directive(void)
 static bool strings_equal(const string_t *string1, const string_t *string2)
 {
 	size_t size = string1->size;
-	if(size != string2->size)
+	if (size != string2->size)
 		return false;
 
 	const char *c1 = string1->begin;
 	const char *c2 = string2->begin;
-	for(size_t i = 0; i < size; ++i, ++c1, ++c2) {
-		if(*c1 != *c2)
+	for (size_t i = 0; i < size; ++i, ++c1, ++c2) {
+		if (*c1 != *c2)
 			return false;
 	}
 	return true;
@@ -1271,10 +1271,10 @@ static bool strings_equal(const string_t *string1, const string_t *string2)
 
 static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 {
-	if(token1->type != token2->type)
+	if (token1->type != token2->type)
 		return false;
 
-	switch(token1->type) {
+	switch (token1->type) {
 	case TP_HEADERNAME:
 		/* TODO */
 		return false;
@@ -1293,14 +1293,14 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 static bool pp_definitions_equal(const pp_definition_t *definition1,
                                  const pp_definition_t *definition2)
 {
-	if(definition1->list_len != definition2->list_len)
+	if (definition1->list_len != definition2->list_len)
 		return false;
 
 	size_t         len = definition1->list_len;
 	const token_t *t1  = definition1->token_list;
 	const token_t *t2  = definition2->token_list;
-	for(size_t i = 0; i < len; ++i, ++t1, ++t2) {
-		if(!pp_tokens_equal(t1, t2))
+	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
+		if (!pp_tokens_equal(t1, t2))
 			return false;
 	}
 	return true;
@@ -1417,7 +1417,7 @@ static void parse_undef_directive(void)
 {
 	eat_pp(TP_undef);
 
-	if(pp_token.type != TP_IDENTIFIER) {
+	if (pp_token.type != TP_IDENTIFIER) {
 		errorf(&input.position,
 		       "expected identifier after #undef, got '%t'", &pp_token);
 		eat_pp_directive();
@@ -1428,7 +1428,7 @@ static void parse_undef_directive(void)
 	symbol->pp_definition = NULL;
 	next_preprocessing_token();
 
-	if(pp_token.type != '\n') {
+	if (pp_token.type != '\n') {
 		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
 	}
 	/* eat until '\n' */
@@ -1697,7 +1697,7 @@ static void parse_preprocessing_directive(void)
 	eat_pp('#');
 
 	if (skip_mode) {
-		switch(pp_token.type) {
+		switch (pp_token.type) {
 		case TP_ifdef:
 		case TP_ifndef:
 			parse_ifdef_ifndef_directive();
@@ -1713,7 +1713,7 @@ static void parse_preprocessing_directive(void)
 			break;
 		}
 	} else {
-		switch(pp_token.type) {
+		switch (pp_token.type) {
 		case TP_define:
 			parse_define_directive();
 			break;
@@ -1783,14 +1783,14 @@ int pptest_main(int argc, char **argv)
 	bool ok = open_input(filename);
 	assert(ok);
 
-	while(true) {
+	while (true) {
 		/* we're at a line begin */
-		if(pp_token.type == '#') {
+		if (pp_token.type == '#') {
 			parse_preprocessing_directive();
 		} else {
 			/* parse+emit a line */
-			while(pp_token.type != '\n') {
-				if(pp_token.type == TP_EOF)
+			while (pp_token.type != '\n') {
+				if (pp_token.type == TP_EOF)
 					goto end_of_main_loop;
 				emit_pp_token();
 				next_preprocessing_token();
