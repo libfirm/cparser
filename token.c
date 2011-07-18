@@ -72,7 +72,7 @@ static void register_pp_token(unsigned mode, token_type_t id,
 	if (! (c_mode & mode))
 		return;
 
-	symbol_t *symbol = intern_register_token(id, string);
+	symbol_t *symbol = intern_register_pp_token(id, string);
 	symbol->pp_ID = id;
 }
 
