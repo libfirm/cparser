@@ -1,5 +1,11 @@
 #include <config.h>
 
+#include <assert.h>
+#include <errno.h>
+#include <string.h>
+#include <stdbool.h>
+#include <ctype.h>
+
 #include "token_t.h"
 #include "symbol_t.h"
 #include "adt/util.h"
@@ -7,14 +13,8 @@
 #include "lang_features.h"
 #include "diagnostic.h"
 #include "string_rep.h"
+#include "input.h"
 
-#include <assert.h>
-#include <errno.h>
-#include <string.h>
-#include <stdbool.h>
-#include <ctype.h>
-
-//#define DEBUG_CHARS
 #define MAX_PUTBACK 3
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */
 
@@ -52,17 +52,17 @@ struct pp_conditional_t {
 typedef struct pp_input_t pp_input_t;
 struct pp_input_t {
 	FILE              *file;
-	int                c;
-	char               buf[1024+MAX_PUTBACK];
-	const char        *bufend;
-	const char        *bufpos;
+	input_t           *input;
+	utf32              c;
+	utf32              buf[1024+MAX_PUTBACK];
+	const utf32       *bufend;
+	const utf32       *bufpos;
 	source_position_t  position;
 	bool               had_non_space;
 	pp_input_t        *parent;
 };
 
 static pp_input_t input;
-#define CC input.c
 
 static pp_input_t     *input_stack;
 static unsigned        n_inputs;
@@ -93,6 +93,7 @@ static bool open_input(const char *filename)
 		return false;
 
 	input.file                = file;
+	input.input               = input_from_stream(file, NULL);
 	input.bufend              = NULL;
 	input.bufpos              = NULL;
 	input.had_non_space       = false;
@@ -119,9 +120,11 @@ static void close_input(void)
 		fputc('\n', out);
 	}
 
+	input_free(input.input);
 	assert(input.file != NULL);
 
 	fclose(input.file);
+	input.input  = NULL;
 	input.file   = NULL;
 	input.bufend = NULL;
 	input.bufpos = NULL;
@@ -181,16 +184,17 @@ static inline void next_real_char(void)
 {
 	assert(input.bufpos <= input.bufend);
 	if (input.bufpos >= input.bufend) {
-		size_t s = fread(input.buf + MAX_PUTBACK, 1,
-		                 sizeof(input.buf) - MAX_PUTBACK, input.file);
-		if (s == 0) {
-			CC = EOF;
+		size_t n = decode(input.input, input.buf + MAX_PUTBACK,
+		                  sizeof(input.buf)/sizeof(input.buf[0]) - MAX_PUTBACK);
+		if (n == 0) {
+			input.c = EOF;
 			return;
 		}
 		input.bufpos = input.buf + MAX_PUTBACK;
-		input.bufend = input.buf + MAX_PUTBACK + s;
+		input.bufend = input.bufpos + n;
 	}
-	CC = *input.bufpos++;
+	input.c = *input.bufpos++;
+	++input.position.colno;
 }
 
 /**
@@ -198,20 +202,17 @@ static inline void next_real_char(void)
  *
  * @param pc  the character to put back
  */
-static inline void put_back(int pc)
+static inline void put_back(utf32 const pc)
 {
 	assert(input.bufpos > input.buf);
 	*(--input.bufpos - input.buf + input.buf) = (char) pc;
-
-#ifdef DEBUG_CHARS
-	printf("putback '%c'\n", pc);
-#endif
+	--input.position.colno;
 }
 
 #define MATCH_NEWLINE(code)                   \
 	case '\r':                                \
 		next_char();                          \
-		if(CC == '\n') {                      \
+		if(input.c == '\n') {                 \
 			next_char();                      \
 		}                                     \
 		++input.position.lineno;              \
@@ -221,21 +222,21 @@ static inline void put_back(int pc)
 		++input.position.lineno;              \
 		code
 
-#define eat(c_type) (assert(CC == c_type), next_char())
+#define eat(c_type) (assert(input.c == c_type), next_char())
 
 static void maybe_concat_lines(void)
 {
 	eat('\\');
 
-	switch(CC) {
+	switch(input.c) {
 	MATCH_NEWLINE(return;)
 
 	default:
 		break;
 	}
 
-	put_back(CC);
-	CC = '\\';
+	put_back(input.c);
+	input.c = '\\';
 }
 
 /**
@@ -247,42 +248,42 @@ static inline void next_char(void)
 	next_real_char();
 
 	/* filter trigraphs and concatenated lines */
-	if(UNLIKELY(CC == '\\')) {
+	if(UNLIKELY(input.c == '\\')) {
 		maybe_concat_lines();
 		goto end_of_next_char;
 	}
 
-	if(LIKELY(CC != '?'))
+	if(LIKELY(input.c != '?'))
 		goto end_of_next_char;
 
 	next_real_char();
-	if(LIKELY(CC != '?')) {
-		put_back(CC);
-		CC = '?';
+	if(LIKELY(input.c != '?')) {
+		put_back(input.c);
+		input.c = '?';
 		goto end_of_next_char;
 	}
 
 	next_real_char();
-	switch(CC) {
-	case '=': CC = '#'; break;
-	case '(': CC = '['; break;
-	case '/': CC = '\\'; maybe_concat_lines(); break;
-	case ')': CC = ']'; break;
-	case '\'': CC = '^'; break;
-	case '<': CC = '{'; break;
-	case '!': CC = '|'; break;
-	case '>': CC = '}'; break;
-	case '-': CC = '~'; break;
+	switch(input.c) {
+	case '=': input.c = '#'; break;
+	case '(': input.c = '['; break;
+	case '/': input.c = '\\'; maybe_concat_lines(); break;
+	case ')': input.c = ']'; break;
+	case '\'': input.c = '^'; break;
+	case '<': input.c = '{'; break;
+	case '!': input.c = '|'; break;
+	case '>': input.c = '}'; break;
+	case '-': input.c = '~'; break;
 	default:
-		put_back(CC);
+		put_back(input.c);
 		put_back('?');
-		CC = '?';
+		input.c = '?';
 		break;
 	}
 
 end_of_next_char:;
 #ifdef DEBUG_CHARS
-	printf("nchar '%c'\n", CC);
+	printf("nchar '%c'\n", input.c);
 #endif
 }
 
@@ -353,11 +354,11 @@ static int parse_octal_sequence(const int first_digit)
 {
 	assert(is_octal_digit(first_digit));
 	int value = digit_value(first_digit);
-	if (!is_octal_digit(CC)) return value;
-	value = 8 * value + digit_value(CC);
+	if (!is_octal_digit(input.c)) return value;
+	value = 8 * value + digit_value(input.c);
 	next_char();
-	if (!is_octal_digit(CC)) return value;
-	value = 8 * value + digit_value(CC);
+	if (!is_octal_digit(input.c)) return value;
+	value = 8 * value + digit_value(input.c);
 	next_char();
 
 	if(char_is_signed) {
@@ -373,8 +374,8 @@ static int parse_octal_sequence(const int first_digit)
 static int parse_hex_sequence(void)
 {
 	int value = 0;
-	while(isxdigit(CC)) {
-		value = 16 * value + digit_value(CC);
+	while(isxdigit(input.c)) {
+		value = 16 * value + digit_value(input.c);
 		next_char();
 	}
 
@@ -392,7 +393,7 @@ static int parse_escape_sequence(void)
 {
 	eat('\\');
 
-	int ec = CC;
+	int ec = input.c;
 	next_char();
 
 	switch(ec) {
@@ -435,15 +436,15 @@ static void parse_string_literal(void)
 
 	int tc;
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case '\\':
 			if(resolve_escape_sequences) {
 				tc = parse_escape_sequence();
 				obstack_1grow(&symbol_obstack, (char) tc);
 			} else {
-				obstack_1grow(&symbol_obstack, (char) CC);
+				obstack_1grow(&symbol_obstack, (char) input.c);
 				next_char();
-				obstack_1grow(&symbol_obstack, (char) CC);
+				obstack_1grow(&symbol_obstack, (char) input.c);
 				next_char();
 			}
 			break;
@@ -462,7 +463,7 @@ static void parse_string_literal(void)
 			goto end_of_string;
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) CC);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
 		}
@@ -495,7 +496,7 @@ static void parse_wide_character_constant(void)
 
 	int found_char = 0;
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case '\\':
 			found_char = parse_escape_sequence();
 			break;
@@ -520,7 +521,7 @@ static void parse_wide_character_constant(void)
 				            "constant");
 				goto end_of_wide_char_constant;
 			} else {
-				found_char = CC;
+				found_char = input.c;
 				next_char();
 			}
 			break;
@@ -540,7 +541,7 @@ static void parse_character_constant(void)
 
 	int tc;
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case '\\':
 			tc = parse_escape_sequence();
 			obstack_1grow(&symbol_obstack, (char) tc);
@@ -565,7 +566,7 @@ static void parse_character_constant(void)
 			goto end_of_char_constant;
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) CC);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
 
@@ -703,7 +704,7 @@ static void skip_line_comment(void)
 		counted_spaces++;
 
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case EOF:
 			return;
 
@@ -725,16 +726,16 @@ static void skip_multiline_comment(void)
 
 	unsigned start_linenr = input.position.lineno;
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case '/':
 			next_char();
-			if (CC == '*') {
+			if (input.c == '*') {
 				/* TODO: nested comment, warn here */
 			}
 			break;
 		case '*':
 			next_char();
-			if(CC == '/') {
+			if(input.c == '/') {
 				next_char();
 				return;
 			}
@@ -767,7 +768,7 @@ static void skip_multiline_comment(void)
 static void skip_spaces(bool skip_newline)
 {
 	while (true) {
-		switch (CC) {
+		switch (input.c) {
 		case ' ':
 		case '\t':
 			if (do_print_spaces)
@@ -776,17 +777,17 @@ static void skip_spaces(bool skip_newline)
 			continue;
 		case '/':
 			next_char();
-			if (CC == '/') {
+			if (input.c == '/') {
 				next_char();
 				skip_line_comment();
 				continue;
-			} else if (CC == '*') {
+			} else if (input.c == '*') {
 				next_char();
 				skip_multiline_comment();
 				continue;
 			} else {
-				put_back(CC);
-				CC = '/';
+				put_back(input.c);
+				input.c = '/';
 			}
 			return;
 
@@ -795,7 +796,7 @@ static void skip_spaces(bool skip_newline)
 				return;
 
 			next_char();
-			if(CC == '\n') {
+			if(input.c == '\n') {
 				next_char();
 			}
 			++input.position.lineno;
@@ -828,14 +829,14 @@ static void eat_pp(int type)
 
 static void parse_symbol(void)
 {
-	obstack_1grow(&symbol_obstack, (char) CC);
+	obstack_1grow(&symbol_obstack, (char) input.c);
 	next_char();
 
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		DIGITS
 		SYMBOL_CHARS
-			obstack_1grow(&symbol_obstack, (char) CC);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
 
@@ -849,11 +850,11 @@ end_symbol:
 	char *string = obstack_finish(&symbol_obstack);
 
 	/* might be a wide string or character constant ( L"string"/L'c' ) */
-	if (CC == '"' && string[0] == 'L' && string[1] == '\0') {
+	if (input.c == '"' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
 		/* TODO */
 		return;
-	} else if (CC == '\'' && string[0] == 'L' && string[1] == '\0') {
+	} else if (input.c == '\'' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
 		parse_wide_character_constant();
 		return;
@@ -879,7 +880,7 @@ end_symbol:
 	if (pp_definition->has_parameters) {
 		skip_spaces(true);
 		/* no opening brace -> no expansion */
-		if (CC != '(')
+		if (input.c != '(')
 			return;
 		next_preprocessing_token();
 		eat_pp('(');
@@ -898,15 +899,15 @@ end_symbol:
 
 static void parse_number(void)
 {
-	obstack_1grow(&symbol_obstack, (char) CC);
+	obstack_1grow(&symbol_obstack, (char) input.c);
 	next_char();
 
 	while(1) {
-		switch(CC) {
+		switch(input.c) {
 		case '.':
 		DIGITS
 		SYMBOL_CHARS_WITHOUT_E_P
-			obstack_1grow(&symbol_obstack, (char) CC);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
 
@@ -914,10 +915,10 @@ static void parse_number(void)
 		case 'p':
 		case 'E':
 		case 'P':
-			obstack_1grow(&symbol_obstack, (char) CC);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
-			if(CC == '+' || CC == '-') {
-				obstack_1grow(&symbol_obstack, (char) CC);
+			if(input.c == '+' || input.c == '-') {
+				obstack_1grow(&symbol_obstack, (char) input.c);
 				next_char();
 			}
 			break;
@@ -941,7 +942,7 @@ end_number:
 #define MAYBE_PROLOG                                       \
 			next_char();                                   \
 			while(1) {                                     \
-				switch(CC) {
+				switch(input.c) {
 
 #define MAYBE(ch, set_type)                                \
 				case ch:                                   \
@@ -971,7 +972,7 @@ static void next_preprocessing_token(void)
 	pp_token.source_position = input.position;
 
 restart:
-	switch(CC) {
+	switch(input.c) {
 	case ' ':
 	case '\t':
 		if (do_print_spaces)
@@ -1014,8 +1015,8 @@ restart:
 			case '7':
 			case '8':
 			case '9':
-				put_back(CC);
-				CC = '.';
+				put_back(input.c);
+				input.c = '.';
 				parse_number();
 				return;
 
@@ -1023,8 +1024,8 @@ restart:
 				MAYBE_PROLOG
 				MAYBE('.', TP_DOTDOTDOT)
 				ELSE_CODE(
-					put_back(CC);
-					CC = '.';
+					put_back(input.c);
+					input.c = '.';
 					pp_token.type = '.';
 				)
 		ELSE('.')
@@ -1074,8 +1075,8 @@ restart:
 						MAYBE_PROLOG
 						MAYBE(':', TP_HASHHASH)
 						ELSE_CODE(
-							put_back(CC);
-							CC = '%';
+							put_back(input.c);
+							input.c = '%';
 							pp_token.type = '#';
 						)
 				ELSE('#')
@@ -1131,7 +1132,7 @@ restart:
 	case ';':
 	case ',':
 	case '\\':
-		pp_token.type = CC;
+		pp_token.type = input.c;
 		next_char();
 		return;
 
@@ -1151,7 +1152,8 @@ restart:
 
 	default:
 		next_char();
-		errorf(&pp_token.source_position, "unknown character '%c' found\n", CC);
+		errorf(&pp_token.source_position, "unknown character '%c' found\n",
+		       input.c);
 		pp_token.type = TP_ERROR;
 		return;
 	}
@@ -1324,7 +1326,7 @@ static void parse_define_directive(void)
 	/* this is probably the only place where spaces are significant in the
 	 * lexer (except for the fact that they separate tokens). #define b(x)
 	 * is something else than #define b (x) */
-	if (CC == '(') {
+	if (input.c == '(') {
 		/* eat the '(' */
 		next_preprocessing_token();
 		/* get next token after '(' */
@@ -1446,7 +1448,7 @@ static const char *parse_headername(void)
 	assert(obstack_object_size(&input_obstack) == 0);
 
 	/* check wether we have a "... or <... headername */
-	switch (CC) {
+	switch (input.c) {
 	case '<':
 		/* for now until we have proper searchpath handling */
 		obstack_1grow(&input_obstack, '.');
@@ -1454,7 +1456,7 @@ static const char *parse_headername(void)
 
 		next_char();
 		while (true) {
-			switch (CC) {
+			switch (input.c) {
 			case EOF:
 				/* fallthrough */
 			MATCH_NEWLINE(
@@ -1465,7 +1467,7 @@ static const char *parse_headername(void)
 				next_char();
 				goto finished_headername;
 			}
-			obstack_1grow(&input_obstack, (char) CC);
+			obstack_1grow(&input_obstack, (char) input.c);
 			next_char();
 		}
 		/* we should never be here */
@@ -1477,7 +1479,7 @@ static const char *parse_headername(void)
 
 		next_char();
 		while (true) {
-			switch (CC) {
+			switch (input.c) {
 			case EOF:
 				/* fallthrough */
 			MATCH_NEWLINE(
@@ -1488,7 +1490,7 @@ static const char *parse_headername(void)
 				next_char();
 				goto finished_headername;
 			}
-			obstack_1grow(&input_obstack, (char) CC);
+			obstack_1grow(&input_obstack, (char) input.c);
 			next_char();
 		}
 		/* we should never be here */
