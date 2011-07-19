@@ -1,0 +1,5 @@
+bla
+  foo
+
+bla/*
+*/foo

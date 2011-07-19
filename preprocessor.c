@@ -58,9 +58,19 @@ struct pp_input_t {
 	const utf32       *bufend;
 	const utf32       *bufpos;
 	source_position_t  position;
-	bool               had_non_space;
 	pp_input_t        *parent;
+	unsigned           output_line;
 };
+
+/** additional info about the current token */
+typedef struct add_token_info_t {
+	/** whitespace from beginning of line to the token */
+	unsigned whitespace;
+	/** there has been any whitespace before the token */
+	bool     had_whitespace;
+	/** the token is at the beginning of the line */
+	bool     at_line_begin;
+} add_token_info_t;
 
 static pp_input_t input;
 
@@ -70,17 +80,19 @@ static struct obstack  input_obstack;
 
 static pp_conditional_t *conditional_stack;
 
-static token_t            pp_token;
-static bool               resolve_escape_sequences = false;
-static bool               do_print_spaces          = true;
-static bool               do_expansions;
-static bool               skip_mode;
-static FILE              *out;
-static struct obstack     pp_obstack;
-static unsigned           counted_newlines;
-static unsigned           counted_spaces;
-static const char        *printed_input_name = NULL;
-static pp_definition_t   *current_expansion  = NULL;
+static token_t           pp_token;
+static bool              resolve_escape_sequences = false;
+static bool              ignore_unknown_chars     = true;
+static bool              in_pp_directive;
+static bool              skip_mode;
+static FILE             *out;
+static struct obstack    pp_obstack;
+static const char       *printed_input_name = NULL;
+static source_position_t expansion_pos;
+static pp_definition_t  *current_expansion  = NULL;
+static preprocessor_token_type_t last_token = TP_ERROR;
+
+static add_token_info_t  info;
 
 static inline void next_char(void);
 static void next_preprocessing_token(void);
@@ -96,18 +108,16 @@ static bool open_input(const char *filename)
 	input.input               = input_from_stream(file, NULL);
 	input.bufend              = NULL;
 	input.bufpos              = NULL;
-	input.had_non_space       = false;
+	input.output_line         = 0;
 	input.position.input_name = filename;
 	input.position.lineno     = 1;
 
 	/* indicate that we're at a new input */
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
 
-	counted_newlines = 0;
-	counted_spaces   = 0;
-
-	/* read first char and first token */
-	next_char();
+	/* place a virtual '\n' so we realize we're at line begin */
+	input.position.lineno     = 0;
+	input.c = '\n';
 	next_preprocessing_token();
 
 	return true;
@@ -115,11 +125,6 @@ static bool open_input(const char *filename)
 
 static void close_input(void)
 {
-	/* ensure we have a newline at EOF */
-	if (input.had_non_space) {
-		fputc('\n', out);
-	}
-
 	input_free(input.input);
 	assert(input.file != NULL);
 
@@ -213,13 +218,12 @@ static inline void put_back(utf32 const pc)
 	case '\r':                                \
 		next_char();                          \
 		if (input.c == '\n') {                \
+	case '\n':                                \
 			next_char();                      \
 		}                                     \
+		info.whitespace = 0;                  \
 		++input.position.lineno;              \
-		code                                  \
-	case '\n':                                \
-		next_char();                          \
-		++input.position.lineno;              \
+		input.position.colno = 1;             \
 		code
 
 #define eat(c_type) (assert(input.c == c_type), next_char())
@@ -229,7 +233,9 @@ static void maybe_concat_lines(void)
 	eat('\\');
 
 	switch (input.c) {
-	MATCH_NEWLINE(return;)
+	MATCH_NEWLINE(
+		return;
+	)
 
 	default:
 		break;
@@ -428,16 +434,50 @@ static int parse_escape_sequence(void)
 	}
 }
 
+static void grow_symbol(utf32 const tc)
+{
+	struct obstack *const o  = &symbol_obstack;
+	if (tc < 0x80U) {
+		obstack_1grow(o, tc);
+	} else if (tc < 0x800) {
+		obstack_1grow(o, 0xC0 | (tc >> 6));
+		obstack_1grow(o, 0x80 | (tc & 0x3F));
+	} else if (tc < 0x10000) {
+		obstack_1grow(o, 0xE0 | ( tc >> 12));
+		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
+	} else {
+		obstack_1grow(o, 0xF0 | ( tc >> 18));
+		obstack_1grow(o, 0x80 | ((tc >> 12) & 0x3F));
+		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
+	}
+}
+
+static string_t identify_string(char *string, size_t len)
+{
+	/* TODO hash */
+#if 0
+	const char *result = strset_insert(&stringset, concat);
+	if (result != concat) {
+		obstack_free(&symbol_obstack, concat);
+	}
+#else
+	const char *result = string;
+#endif
+	return (string_t) {result, len};
+}
+
 static void parse_string_literal(void)
 {
 	const unsigned start_linenr = input.position.lineno;
 
 	eat('"');
 
-	int tc;
 	while (true) {
 		switch (input.c) {
-		case '\\':
+		case '\\': {
+			utf32 tc;
 			if (resolve_escape_sequences) {
 				tc = parse_escape_sequence();
 				obstack_1grow(&symbol_obstack, (char) tc);
@@ -448,6 +488,7 @@ static void parse_string_literal(void)
 				next_char();
 			}
 			break;
+		}
 
 		case EOF: {
 			source_position_t source_position;
@@ -463,7 +504,7 @@ static void parse_string_literal(void)
 			goto end_of_string;
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) input.c);
+			grow_symbol(input.c);
 			next_char();
 			break;
 		}
@@ -472,34 +513,34 @@ static void parse_string_literal(void)
 end_of_string:
 	/* add finishing 0 to the string */
 	obstack_1grow(&symbol_obstack, '\0');
-	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
-	const char *const string = obstack_finish(&symbol_obstack);
+	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
+	char *const  string = obstack_finish(&symbol_obstack);
 
-#if 0 /* TODO hash */
-	/* check if there is already a copy of the string */
-	result = strset_insert(&stringset, string);
-	if (result != string) {
-		obstack_free(&symbol_obstack, string);
-	}
-#else
-	const char *const result = string;
-#endif
+	pp_token.type    = TP_STRING_LITERAL;
+	pp_token.literal = identify_string(string, size);
+}
 
-	pp_token.type          = TP_STRING_LITERAL;
-	pp_token.literal.begin = result;
-	pp_token.literal.size  = size;
+/**
+ * Parse a wide string literal and set lexer_token.
+ */
+static void parse_wide_string_literal(void)
+{
+	parse_string_literal();
+	if (pp_token.type == TP_STRING_LITERAL)
+		pp_token.type = TP_WIDE_STRING_LITERAL;
 }
 
 static void parse_wide_character_constant(void)
 {
 	eat('\'');
 
-	int found_char = 0;
 	while (true) {
 		switch (input.c) {
-		case '\\':
-			found_char = parse_escape_sequence();
+		case '\\': {
+			const utf32 tc = parse_escape_sequence();
+			grow_symbol(tc);
 			break;
+		}
 
 		MATCH_NEWLINE(
 			parse_error("newline while parsing character constant");
@@ -516,21 +557,22 @@ static void parse_wide_character_constant(void)
 			return;
 
 		default:
-			if (found_char != 0) {
-				parse_error("more than 1 characters in character "
-				            "constant");
-				goto end_of_wide_char_constant;
-			} else {
-				found_char = input.c;
-				next_char();
-			}
+			grow_symbol(input.c);
+			next_char();
 			break;
 		}
 	}
 
 end_of_wide_char_constant:
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t  size = (size_t) obstack_object_size(&symbol_obstack)-1;
+	char   *string = obstack_finish(&symbol_obstack);
 	pp_token.type       = TP_WIDE_CHARACTER_CONSTANT;
-	/* TODO... */
+	pp_token.literal = identify_string(string, size);
+
+	if (size == 0) {
+		parse_error("empty character constant");
+	}
 }
 
 static void parse_character_constant(void)
@@ -681,6 +723,7 @@ restart:
 		goto restart;
 	}
 	pp_token = definition->token_list[definition->expand_pos];
+	pp_token.source_position = expansion_pos;
 	++definition->expand_pos;
 
 	if (pp_token.type != TP_IDENTIFIER)
@@ -700,16 +743,13 @@ restart:
 
 static void skip_line_comment(void)
 {
-	if (do_print_spaces)
-		counted_spaces++;
-
 	while (true) {
 		switch (input.c) {
 		case EOF:
 			return;
 
-		case '\n':
 		case '\r':
+		case '\n':
 			return;
 
 		default:
@@ -721,9 +761,6 @@ static void skip_line_comment(void)
 
 static void skip_multiline_comment(void)
 {
-	if (do_print_spaces)
-		counted_spaces++;
-
 	unsigned start_linenr = input.position.lineno;
 	while (true) {
 		switch (input.c) {
@@ -737,15 +774,13 @@ static void skip_multiline_comment(void)
 			next_char();
 			if (input.c == '/') {
 				next_char();
+				info.whitespace += input.position.colno-1;
 				return;
 			}
 			break;
 
 		MATCH_NEWLINE(
-			if (do_print_spaces) {
-				counted_newlines++;
-				counted_spaces = 0;
-			}
+			info.at_line_begin |= !in_pp_directive;
 			break;
 		)
 
@@ -764,17 +799,20 @@ static void skip_multiline_comment(void)
 	}
 }
 
-/* skip spaces advancing at the start of the next preprocessing token */
-static void skip_spaces(bool skip_newline)
+static void skip_whitespace(void)
 {
 	while (true) {
 		switch (input.c) {
 		case ' ':
 		case '\t':
-			if (do_print_spaces)
-				counted_spaces++;
 			next_char();
 			continue;
+
+		MATCH_NEWLINE(
+			info.at_line_begin = true;
+			return;
+		)
+
 		case '/':
 			next_char();
 			if (input.c == '/') {
@@ -790,30 +828,6 @@ static void skip_spaces(bool skip_newline)
 				input.c = '/';
 			}
 			return;
-
-		case '\r':
-			if (!skip_newline)
-				return;
-
-			next_char();
-			if (input.c == '\n') {
-				next_char();
-			}
-			++input.position.lineno;
-			if (do_print_spaces)
-				++counted_newlines;
-			continue;
-
-		case '\n':
-			if (!skip_newline)
-				return;
-
-			next_char();
-			++input.position.lineno;
-			if (do_print_spaces)
-				++counted_newlines;
-			continue;
-
 		default:
 			return;
 		}
@@ -852,7 +866,7 @@ end_symbol:
 	/* might be a wide string or character constant ( L"string"/L'c' ) */
 	if (input.c == '"' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
-		/* TODO */
+		parse_wide_string_literal();
 		return;
 	} else if (input.c == '\'' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
@@ -870,31 +884,6 @@ end_symbol:
 	if (symbol->string != string) {
 		obstack_free(&symbol_obstack, string);
 	}
-	if (!do_expansions)
-		return;
-
-	pp_definition_t *pp_definition = symbol->pp_definition;
-	if (pp_definition == NULL)
-		return;
-
-	if (pp_definition->has_parameters) {
-		skip_spaces(true);
-		/* no opening brace -> no expansion */
-		if (input.c != '(')
-			return;
-		next_preprocessing_token();
-		eat_pp('(');
-
-		/* parse arguments (TODO) */
-		while (pp_token.type != TP_EOF && pp_token.type != ')')
-			next_preprocessing_token();
-		next_preprocessing_token();
-	}
-
-	pp_definition->expand_pos   = 0;
-	pp_definition->is_expanding = true,
-	current_expansion           = pp_definition;
-	expand_next();
 }
 
 static void parse_number(void)
@@ -969,22 +958,22 @@ static void next_preprocessing_token(void)
 		return;
 	}
 
-	pp_token.source_position = input.position;
-
+	info.at_line_begin  = false;
+	info.had_whitespace = false;
 restart:
+	pp_token.source_position = input.position;
 	switch (input.c) {
 	case ' ':
 	case '\t':
-		if (do_print_spaces)
-			counted_spaces++;
+		++info.whitespace;
+		info.had_whitespace = true;
 		next_char();
 		goto restart;
 
 	MATCH_NEWLINE(
-		counted_newlines++;
-		counted_spaces = 0;
-		pp_token.type = '\n';
-		return;
+		info.at_line_begin = true;
+		info.had_whitespace = true;
+		goto restart;
 	)
 
 	SYMBOL_CHARS
@@ -1058,10 +1047,12 @@ restart:
 		MAYBE('=', TP_SLASHEQUAL)
 			case '*':
 				next_char();
+				info.had_whitespace = true;
 				skip_multiline_comment();
 				goto restart;
 			case '/':
 				next_char();
+				info.had_whitespace = true;
 				skip_line_comment();
 				goto restart;
 		ELSE('/')
@@ -1119,7 +1110,9 @@ restart:
 	case '#':
 		MAYBE_PROLOG
 		MAYBE('#', TP_HASHHASH)
-		ELSE('#')
+		ELSE_CODE(
+			pp_token.type = '#';
+		)
 
 	case '?':
 	case '[':
@@ -1140,21 +1133,25 @@ restart:
 		if (input_stack != NULL) {
 			close_input();
 			pop_restore_input();
-			counted_newlines = 0;
-			counted_spaces   = 0;
-			/* hack to output correct line number */
+			fputc('\n', out);
 			print_line_directive(&input.position, "2");
-			next_preprocessing_token();
+			goto restart;
 		} else {
+			pp_token.source_position.lineno++;
+			info.at_line_begin = true;
 			pp_token.type = TP_EOF;
 		}
 		return;
 
 	default:
 		next_char();
-		errorf(&pp_token.source_position, "unknown character '%c' found\n",
-		       input.c);
-		pp_token.type = TP_ERROR;
+		if (!ignore_unknown_chars) {
+			errorf(&pp_token.source_position, "unknown character '%c' found\n",
+			       input.c);
+			pp_token.type = TP_ERROR;
+		} else {
+			pp_token.type = input.c;
+		}
 		return;
 	}
 }
@@ -1194,27 +1191,25 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 		fputc(' ', out);
 		fputs(add, out);
 	}
-	fputc('\n', out);
 
 	printed_input_name = pos->input_name;
+	input.output_line  = pos->lineno-1;
 }
 
-static void print_spaces(void)
+static void emit_newlines(void)
 {
-	if (counted_newlines >= 9) {
-		if (input.had_non_space) {
+	unsigned delta = pp_token.source_position.lineno - input.output_line;
+
+	if (delta >= 9) {
+		fputc('\n', out);
+		print_line_directive(&pp_token.source_position, NULL);
+		fputc('\n', out);
+	} else {
+		for (unsigned i = 0; i < delta; ++i) {
 			fputc('\n', out);
 		}
-		print_line_directive(&pp_token.source_position, NULL);
-		counted_newlines = 0;
-	} else {
-		for (unsigned i = 0; i < counted_newlines; ++i)
-			fputc('\n', out);
-		counted_newlines = 0;
 	}
-	for (unsigned i = 0; i < counted_spaces; ++i)
-		fputc(' ', out);
-	counted_spaces = 0;
+	input.output_line = pp_token.source_position.lineno;
 }
 
 static void emit_pp_token(void)
@@ -1222,9 +1217,15 @@ static void emit_pp_token(void)
 	if (skip_mode)
 		return;
 
-	if (pp_token.type != '\n') {
-		print_spaces();
-		input.had_non_space = true;
+	if (info.at_line_begin) {
+		emit_newlines();
+
+		for (unsigned i = 0; i < info.whitespace; ++i)
+			fputc(' ', out);
+
+	} else if (info.had_whitespace ||
+			   tokens_would_paste(last_token, pp_token.type)) {
+		fputc(' ', out);
 	}
 
 	switch (pp_token.type) {
@@ -1234,22 +1235,30 @@ static void emit_pp_token(void)
 	case TP_NUMBER:
 		fputs(pp_token.literal.begin, out);
 		break;
+	case TP_WIDE_STRING_LITERAL:
+		fputc('L', out);
 	case TP_STRING_LITERAL:
 		fputc('"', out);
 		fputs(pp_token.literal.begin, out);
 		fputc('"', out);
 		break;
-	case '\n':
+	case TP_WIDE_CHARACTER_CONSTANT:
+		fputc('L', out);
+	case TP_CHARACTER_CONSTANT:
+		fputc('\'', out);
+		fputs(pp_token.literal.begin, out);
+		fputc('\'', out);
 		break;
 	default:
 		print_pp_token_type(out, pp_token.type);
 		break;
 	}
+	last_token = pp_token.type;
 }
 
 static void eat_pp_directive(void)
 {
-	while (pp_token.type != '\n' && pp_token.type != TP_EOF) {
+	while (!info.at_line_begin) {
 		next_preprocessing_token();
 	}
 }
@@ -1311,7 +1320,7 @@ static void parse_define_directive(void)
 	eat_pp(TP_define);
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (pp_token.type != TP_IDENTIFIER) {
+	if (pp_token.type != TP_IDENTIFIER || info.at_line_begin) {
 		errorf(&pp_token.source_position,
 		       "expected identifier after #define, got '%t'", &pp_token);
 		goto error_out;
@@ -1382,7 +1391,7 @@ static void parse_define_directive(void)
 	/* construct a new pp_definition on the obstack */
 	assert(obstack_object_size(&pp_obstack) == 0);
 	size_t list_len = 0;
-	while (pp_token.type != '\n' && pp_token.type != TP_EOF) {
+	while (!info.at_line_begin) {
 		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 		++list_len;
 		next_preprocessing_token();
@@ -1428,10 +1437,9 @@ static void parse_undef_directive(void)
 	symbol->pp_definition = NULL;
 	next_preprocessing_token();
 
-	if (pp_token.type != '\n') {
+	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
 	}
-	/* eat until '\n' */
 	eat_pp_directive();
 }
 
@@ -1441,9 +1449,12 @@ static const char *parse_headername(void)
 	 * They're only allowed behind an #include so they're not recognized
 	 * by the normal next_preprocessing_token. We handle them as a special
 	 * exception here */
+	skip_whitespace();
 
-	/* skip spaces so we reach start of next preprocessing token */
-	skip_spaces(false);
+	if (info.at_line_begin) {
+		parse_error("expected headername after #include");
+		return NULL;
+	}
 
 	assert(obstack_object_size(&input_obstack) == 0);
 
@@ -1488,7 +1499,7 @@ static const char *parse_headername(void)
 		/* we should never be here */
 
 	default:
-		/* TODO: do normale pp_token parsing and concatenate results */
+		/* TODO: do normal pp_token parsing and concatenate results */
 		panic("pp_token concat include not implemented yet");
 	}
 
@@ -1498,7 +1509,7 @@ finished_headername:
 
 	/* TODO: iterate search-path to find the file */
 
-	next_preprocessing_token();
+	skip_whitespace();
 
 	return headername;
 }
@@ -1508,15 +1519,13 @@ static bool parse_include_directive(void)
 	/* don't eat the TP_include here!
 	 * we need an alternative parsing for the next token */
 
-	print_spaces();
-
 	const char *headername = parse_headername();
 	if (headername == NULL) {
 		eat_pp_directive();
 		return false;
 	}
 
-	if (pp_token.type != '\n' && pp_token.type != TP_EOF) {
+	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #include directive");
 		eat_pp_directive();
 	}
@@ -1532,10 +1541,10 @@ static bool parse_include_directive(void)
 	 * because it is still disabled in directive parsing,
 	 * but we will trigger a preprocessing token reading of the new file
 	 * now and need expansions/space counting */
-	do_print_spaces = true;
-	do_expansions   = true;
+	in_pp_directive = false;
 
 	/* switch inputs */
+	emit_newlines();
 	push_input();
 	bool res = open_input(headername);
 	if (!res) {
@@ -1594,7 +1603,7 @@ static void parse_ifdef_ifndef_directive(void)
 		return;
 	}
 
-	if (pp_token.type != TP_IDENTIFIER) {
+	if (pp_token.type != TP_IDENTIFIER || info.at_line_begin) {
 		errorf(&pp_token.source_position,
 		       "expected identifier after #%s, got '%t'",
 		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
@@ -1607,7 +1616,7 @@ static void parse_ifdef_ifndef_directive(void)
 		pp_definition_t *pp_definition = symbol->pp_definition;
 		next_preprocessing_token();
 
-		if (pp_token.type != '\n') {
+		if (!info.at_line_begin) {
 			errorf(&pp_token.source_position,
 			       "extra tokens at end of #%s",
 			       is_ifndef ? "ifndef" : "ifdef");
@@ -1631,7 +1640,7 @@ static void parse_else_directive(void)
 {
 	eat_pp(TP_else);
 
-	if (pp_token.type != '\n') {
+	if (!info.at_line_begin) {
 		if (!skip_mode) {
 			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #else");
 		}
@@ -1663,7 +1672,7 @@ static void parse_endif_directive(void)
 {
 	eat_pp(TP_endif);
 
-	if (pp_token.type != '\n') {
+	if (!info.at_line_begin) {
 		if (!skip_mode) {
 			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #endif");
 		}
@@ -1684,8 +1693,7 @@ static void parse_endif_directive(void)
 
 static void parse_preprocessing_directive(void)
 {
-	do_print_spaces = false;
-	do_expansions   = false;
+	in_pp_directive = true;
 	eat_pp('#');
 
 	if (skip_mode) {
@@ -1722,17 +1730,14 @@ static void parse_preprocessing_directive(void)
 		case TP_endif:
 			parse_endif_directive();
 			break;
-		case TP_include: {
-			bool in_new_source = parse_include_directive();
-			/* no need to do anything if source file switched */
-			if (in_new_source)
-				return;
-			break;
-		}
-		case '\n':
-			/* the nop directive */
+		case TP_include:
+			parse_include_directive();
 			break;
 		default:
+			if (info.at_line_begin) {
+				/* the nop directive "#" */
+				break;
+			}
 			errorf(&pp_token.source_position,
 				   "invalid preprocessing directive #%t", &pp_token);
 			eat_pp_directive();
@@ -1740,15 +1745,9 @@ static void parse_preprocessing_directive(void)
 		}
 	}
 
-	do_print_spaces = true;
-	do_expansions   = true;
-
-	/* eat '\n' */
-	assert(pp_token.type == '\n' || pp_token.type == TP_EOF);
-	next_preprocessing_token();
+	in_pp_directive = false;
+	assert(info.at_line_begin);
 }
-
-#define GCC_COMPAT_MODE
 
 int pptest_main(int argc, char **argv);
 int pptest_main(int argc, char **argv)
@@ -1765,34 +1764,67 @@ int pptest_main(int argc, char **argv)
 
 	out = stdout;
 
-#ifdef GCC_COMPAT_MODE
-	/* this is here so we can directly compare "gcc -E" output and our output */
+	/* just here for gcc compatibility */
 	fprintf(out, "# 1 \"%s\"\n", filename);
-	fputs("# 1 \"<built-in>\"\n", out);
-	fputs("# 1 \"<command-line>\"\n", out);
-#endif
+	fprintf(out, "# 1 \"<built-in>\"\n");
+	fprintf(out, "# 1 \"<command-line>\"\n");
 
 	bool ok = open_input(filename);
 	assert(ok);
 
 	while (true) {
-		/* we're at a line begin */
-		if (pp_token.type == '#') {
+		if (pp_token.type == '#' && info.at_line_begin) {
 			parse_preprocessing_directive();
-		} else {
-			/* parse+emit a line */
-			while (pp_token.type != '\n') {
-				if (pp_token.type == TP_EOF)
-					goto end_of_main_loop;
-				emit_pp_token();
-				next_preprocessing_token();
+			continue;
+		} else if (pp_token.type == TP_EOF) {
+			goto end_of_main_loop;
+		} else if (pp_token.type == TP_IDENTIFIER && !in_pp_directive) {
+			symbol_t *symbol = pp_token.symbol;
+			pp_definition_t *pp_definition = symbol->pp_definition;
+			if (pp_definition != NULL && !pp_definition->is_expanding) {
+				expansion_pos = pp_token.source_position;
+				if (pp_definition->has_parameters) {
+					source_position_t position = pp_token.source_position;
+					add_token_info_t old_info = info;
+					next_preprocessing_token();
+					add_token_info_t new_info = info;
+
+					/* no opening brace -> no expansion */
+					if (pp_token.type == '(') {
+						eat_pp('(');
+
+						/* parse arguments (TODO) */
+						while (pp_token.type != TP_EOF && pp_token.type != ')')
+							next_preprocessing_token();
+					} else {
+						token_t next_token = pp_token;
+						/* restore identifier token */
+						pp_token.type            = TP_IDENTIFIER;
+						pp_token.symbol          = symbol;
+						pp_token.source_position = position;
+						info = old_info;
+						emit_pp_token();
+
+						info = new_info;
+						pp_token = next_token;
+						continue;
+					}
+					info = old_info;
+				}
+				pp_definition->expand_pos   = 0;
+				pp_definition->is_expanding = true;
+				current_expansion           = pp_definition;
+				expand_next();
+				continue;
 			}
-			emit_pp_token();
-			next_preprocessing_token();
 		}
+
+		emit_pp_token();
+		next_preprocessing_token();
 	}
 end_of_main_loop:
 
+	fputc('\n', out);
 	check_unclosed_conditionals();
 	close_input();
 

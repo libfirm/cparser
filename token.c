@@ -225,3 +225,39 @@ void print_pp_token(FILE *f, const token_t *token)
 		break;
 	}
 }
+
+bool tokens_would_paste(preprocessor_token_type_t token1,
+                        preprocessor_token_type_t token2)
+{
+	char c = token2 < 256 ? (char) token2 : pp_token_symbols[token2]->string[0];
+
+	switch (token1) {
+	case '>': return c == '>' || c == '=';
+	case '<': return c == '<' || c == '=' || c == '%' || c == ':';
+	case '+': return c == '+' || c == '=';
+	case '-': return c == '-' || c == '>';
+	case '/': return c == '/' || c == '=' || c == '*';
+	case '%': return c == ':' || c == '=' || c == '>';
+	case '&': return c == '&' || c == '=';
+	case '|': return c == '|' || c == '=';
+	case ':': return c == ':' || c == '>';
+	case '*': return c == '*' || c == '=';
+	case '.': return c == '.' || c == '%' || token2 == TP_NUMBER;
+	case '#': return c == '#' || c == '%';
+	case TP_GREATERGREATER: return c == '=';
+	case TP_LESSLESS:       return c == '=';
+	case '^':               return c == '=';
+	case '!':               return c == '=';
+	case TP_IDENTIFIER:
+		return token2 == TP_IDENTIFIER || token2 == TP_NUMBER ||
+		       token2 == TP_CHARACTER_CONSTANT ||
+		       token2 == TP_WIDE_CHARACTER_CONSTANT ||
+		       token2 == TP_WIDE_STRING_LITERAL ||
+		       token2 == TP_STRING_LITERAL; /* L */
+	case TP_NUMBER:
+		return token2 == TP_NUMBER || token2 == TP_IDENTIFIER ||
+		       token2 == '.' || token2 == '+' || token2 == '-';
+	default:
+		return false;
+	}
+}

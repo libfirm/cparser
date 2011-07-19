@@ -10,7 +10,6 @@ TS(WIDE_CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,          "string literal",)
 TS(WIDE_STRING_LITERAL,     "wide string literal",)
 TS(PUNCTUATOR,              "punctuator",)
-TS(NEWLINE,                 "newline", = '\n')
 
 #define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
 #define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)

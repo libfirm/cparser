@@ -77,4 +77,11 @@ symbol_t *get_token_symbol(const token_t *token);
 void print_pp_token_type(FILE *out, int type);
 void print_pp_token(FILE *out, const token_t *token);
 
+/**
+ * returns true if pasting 2 preprocessing tokens next to each other
+ * without a space in between would generate (an)other preprocessing token(s)
+ */
+bool tokens_would_paste(preprocessor_token_type_t token1,
+                        preprocessor_token_type_t token2);
+
 #endif
