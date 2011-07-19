@@ -1450,10 +1450,6 @@ static const char *parse_headername(void)
 	/* check wether we have a "... or <... headername */
 	switch (input.c) {
 	case '<':
-		/* for now until we have proper searchpath handling */
-		obstack_1grow(&input_obstack, '.');
-		obstack_1grow(&input_obstack, '/');
-
 		next_char();
 		while (true) {
 			switch (input.c) {
@@ -1473,10 +1469,6 @@ static const char *parse_headername(void)
 		/* we should never be here */
 
 	case '"':
-		/* for now until we have proper searchpath handling */
-		obstack_1grow(&input_obstack, '.');
-		obstack_1grow(&input_obstack, '/');
-
 		next_char();
 		while (true) {
 			switch (input.c) {
