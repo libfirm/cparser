@@ -10,6 +10,8 @@
 #include "symbol_t.h"
 #include "adt/util.h"
 #include "adt/error.h"
+#include "adt/strutil.h"
+#include "adt/strset.h"
 #include "lang_features.h"
 #include "diagnostic.h"
 #include "string_rep.h"
@@ -72,7 +74,13 @@ typedef struct add_token_info_t {
 	bool     at_line_begin;
 } add_token_info_t;
 
-static pp_input_t input;
+typedef struct searchpath_entry_t searchpath_entry_t;
+struct searchpath_entry_t {
+	const char         *path;
+	searchpath_entry_t *next;
+};
+
+static pp_input_t      input;
 
 static pp_input_t     *input_stack;
 static unsigned        n_inputs;
@@ -87,10 +95,14 @@ static bool              in_pp_directive;
 static bool              skip_mode;
 static FILE             *out;
 static struct obstack    pp_obstack;
+static struct obstack    config_obstack;
 static const char       *printed_input_name = NULL;
 static source_position_t expansion_pos;
 static pp_definition_t  *current_expansion  = NULL;
+static strset_t          stringset;
 static preprocessor_token_type_t last_token = TP_ERROR;
+
+static searchpath_entry_t *searchpath;
 
 static add_token_info_t  info;
 
@@ -98,12 +110,8 @@ static inline void next_char(void);
 static void next_preprocessing_token(void);
 static void print_line_directive(const source_position_t *pos, const char *add);
 
-static bool open_input(const char *filename)
+static void switch_input(FILE *file, const char *filename)
 {
-	FILE *file = fopen(filename, "r");
-	if (file == NULL)
-		return false;
-
 	input.file                = file;
 	input.input               = input_from_stream(file, NULL);
 	input.bufend              = NULL;
@@ -116,11 +124,9 @@ static bool open_input(const char *filename)
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
 
 	/* place a virtual '\n' so we realize we're at line begin */
-	input.position.lineno     = 0;
-	input.c = '\n';
+	input.position.lineno = 0;
+	input.c               = '\n';
 	next_preprocessing_token();
-
-	return true;
 }
 
 static void close_input(void)
@@ -454,17 +460,18 @@ static void grow_symbol(utf32 const tc)
 	}
 }
 
-static string_t identify_string(char *string, size_t len)
+static const char *identify_string(char *string)
 {
-	/* TODO hash */
-#if 0
-	const char *result = strset_insert(&stringset, concat);
-	if (result != concat) {
-		obstack_free(&symbol_obstack, concat);
+	const char *result = strset_insert(&stringset, string);
+	if (result != string) {
+		obstack_free(&symbol_obstack, string);
 	}
-#else
-	const char *result = string;
-#endif
+	return result;
+}
+
+static string_t make_string(char *string, size_t len)
+{
+	const char *result = identify_string(string);
 	return (string_t) {result, len};
 }
 
@@ -517,7 +524,7 @@ end_of_string:
 	char *const  string = obstack_finish(&symbol_obstack);
 
 	pp_token.type    = TP_STRING_LITERAL;
-	pp_token.literal = identify_string(string, size);
+	pp_token.literal = make_string(string, size);
 }
 
 /**
@@ -567,8 +574,8 @@ end_of_wide_char_constant:
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t  size = (size_t) obstack_object_size(&symbol_obstack)-1;
 	char   *string = obstack_finish(&symbol_obstack);
-	pp_token.type       = TP_WIDE_CHARACTER_CONSTANT;
-	pp_token.literal = identify_string(string, size);
+	pp_token.type    = TP_WIDE_CHARACTER_CONSTANT;
+	pp_token.literal = make_string(string, size);
 
 	if (size == 0) {
 		parse_error("empty character constant");
@@ -1449,14 +1456,12 @@ static const char *parse_headername(void)
 	 * They're only allowed behind an #include so they're not recognized
 	 * by the normal next_preprocessing_token. We handle them as a special
 	 * exception here */
-	skip_whitespace();
-
 	if (info.at_line_begin) {
 		parse_error("expected headername after #include");
 		return NULL;
 	}
 
-	assert(obstack_object_size(&input_obstack) == 0);
+	assert(obstack_object_size(&symbol_obstack) == 0);
 
 	/* check wether we have a "... or <... headername */
 	switch (input.c) {
@@ -1474,7 +1479,7 @@ static const char *parse_headername(void)
 				next_char();
 				goto finished_headername;
 			}
-			obstack_1grow(&input_obstack, (char) input.c);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 		}
 		/* we should never be here */
@@ -1493,7 +1498,7 @@ static const char *parse_headername(void)
 				next_char();
 				goto finished_headername;
 			}
-			obstack_1grow(&input_obstack, (char) input.c);
+			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 		}
 		/* we should never be here */
@@ -1504,21 +1509,60 @@ static const char *parse_headername(void)
 	}
 
 finished_headername:
-	obstack_1grow(&input_obstack, '\0');
-	char *headername = obstack_finish(&input_obstack);
+	obstack_1grow(&symbol_obstack, '\0');
+	char *headername = obstack_finish(&symbol_obstack);
 
 	/* TODO: iterate search-path to find the file */
 
 	skip_whitespace();
 
-	return headername;
+	return identify_string(headername);
+}
+
+static bool do_include(bool system_include, const char *headername)
+{
+	if (!system_include) {
+		/* for "bla" includes first try current dir
+		 * TODO: this isn't correct, should be the directory of the source file
+		 */
+		FILE *file = fopen(headername, "r");
+		if (file != NULL) {
+			switch_input(file, headername);
+			return true;
+		}
+	}
+
+	size_t headername_len = strlen(headername);
+	assert(obstack_object_size(&pp_obstack) == 0);
+	/* check searchpath */
+	for (searchpath_entry_t *entry = searchpath; entry != NULL;
+	     entry = entry->next) {
+	    const char *path = entry->path;
+	    size_t      len  = strlen(path);
+		obstack_grow(&pp_obstack, path, len);
+		if (path[len-1] != '/')
+			obstack_1grow(&pp_obstack, '/');
+		obstack_grow(&pp_obstack, headername, headername_len+1);
+
+		char *complete_path = obstack_finish(&pp_obstack);
+		FILE *file          = fopen(complete_path, "r");
+		if (file != NULL) {
+			const char *filename = identify_string(complete_path);
+			switch_input(file, filename);
+			return true;
+		}
+		obstack_free(&pp_obstack, complete_path);
+	}
+
+	return false;
 }
 
 static bool parse_include_directive(void)
 {
 	/* don't eat the TP_include here!
 	 * we need an alternative parsing for the next token */
-
+	skip_whitespace();
+	bool system_include = input.c == '<';
 	const char *headername = parse_headername();
 	if (headername == NULL) {
 		eat_pp_directive();
@@ -1546,7 +1590,7 @@ static bool parse_include_directive(void)
 	/* switch inputs */
 	emit_newlines();
 	push_input();
-	bool res = open_input(headername);
+	bool res = do_include(system_include, headername);
 	if (!res) {
 		errorf(&pp_token.source_position,
 		       "failed including '%s': %s", headername, strerror(errno));
@@ -1749,18 +1793,84 @@ static void parse_preprocessing_directive(void)
 	assert(info.at_line_begin);
 }
 
+static void prepend_include_path(const char *path)
+{
+	searchpath_entry_t *entry = OALLOCZ(&config_obstack, searchpath_entry_t);
+	entry->path = path;
+	entry->next = searchpath;
+	searchpath  = entry;
+}
+
+static void setup_include_path(void)
+{
+	/* built-in paths */
+	prepend_include_path("/usr/include");
+
+	/* parse environment variable */
+	const char *cpath = getenv("CPATH");
+	if (cpath != NULL && *cpath != '\0') {
+		const char *begin = cpath;
+		const char *c;
+		do {
+			c = begin;
+			while (*c != '\0' && *c != ':')
+				++c;
+
+			size_t len = c-begin;
+			if (len == 0) {
+				/* for gcc compatibility (Matze: I would expect that
+				 * nothing happens for an empty entry...) */
+				prepend_include_path(".");
+			} else {
+				char *string = obstack_alloc(&config_obstack, len+1);
+				memcpy(string, begin, len);
+				string[len] = '\0';
+
+				prepend_include_path(string);
+			}
+
+			begin = c+1;
+			/* skip : */
+			if (*begin == ':')
+				++begin;
+		} while(*c != '\0');
+	}
+}
+
 int pptest_main(int argc, char **argv);
 int pptest_main(int argc, char **argv)
 {
 	init_symbol_table();
 	init_tokens();
 
+	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
+	strset_init(&stringset);
 
-	const char *filename = "t.c";
-	if (argc > 1)
-		filename = argv[1];
+	setup_include_path();
+
+	/* simplistic commandline parser */
+	const char *filename = NULL;
+	for (int i = 1; i < argc; ++i) {
+		const char *opt = argv[i];
+		if (streq(opt, "-I")) {
+			prepend_include_path(argv[++i]);
+			continue;
+		} else if (streq(opt, "-E")) {
+			/* ignore */
+		} else if (opt[0] == '-') {
+			fprintf(stderr, "Unknown option '%s'\n", opt);
+		} else {
+			if (filename != NULL)
+				fprintf(stderr, "Multiple inputs not supported\n");
+			filename = argv[i];
+		}
+	}
+	if (filename == NULL) {
+		fprintf(stderr, "No input specified\n");
+		return 1;
+	}
 
 	out = stdout;
 
@@ -1769,8 +1879,12 @@ int pptest_main(int argc, char **argv)
 	fprintf(out, "# 1 \"<built-in>\"\n");
 	fprintf(out, "# 1 \"<command-line>\"\n");
 
-	bool ok = open_input(filename);
-	assert(ok);
+	FILE *file = fopen(filename, "r");
+	if (file == NULL) {
+		fprintf(stderr, "Couldn't open input '%s'\n", filename);
+		return 1;
+	}
+	switch_input(file, filename);
 
 	while (true) {
 		if (pp_token.type == '#' && info.at_line_begin) {
@@ -1830,6 +1944,9 @@ end_of_main_loop:
 
 	obstack_free(&input_obstack, NULL);
 	obstack_free(&pp_obstack, NULL);
+	obstack_free(&config_obstack, NULL);
+
+	strset_destroy(&stringset);
 
 	exit_tokens();
 	exit_symbol_table();
