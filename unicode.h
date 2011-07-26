@@ -2,6 +2,7 @@
 #define UNICODE_H
 
 #include <assert.h>
+#include "adt/obst.h"
 
 typedef unsigned int utf32;
 #define UTF32_PRINTF_FORMAT "%u"
@@ -42,6 +43,25 @@ static inline utf32 read_utf8_char(const char **p)
 
 	*p = (const char*) c;
 	return result;
+}
+
+static inline void obstack_grow_symbol(struct obstack *obstack, utf32 const tc)
+{
+	if (tc < 0x80U) {
+		obstack_1grow(obstack, tc);
+	} else if (tc < 0x800) {
+		obstack_1grow(obstack, 0xC0 | (tc >> 6));
+		obstack_1grow(obstack, 0x80 | (tc & 0x3F));
+	} else if (tc < 0x10000) {
+		obstack_1grow(obstack, 0xE0 | ( tc >> 12));
+		obstack_1grow(obstack, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(obstack, 0x80 | ( tc        & 0x3F));
+	} else {
+		obstack_1grow(obstack, 0xF0 | ( tc >> 18));
+		obstack_1grow(obstack, 0x80 | ((tc >> 12) & 0x3F));
+		obstack_1grow(obstack, 0x80 | ((tc >>  6) & 0x3F));
+		obstack_1grow(obstack, 0x80 | ( tc        & 0x3F));
+	}
 }
 
 #endif

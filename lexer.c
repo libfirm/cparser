@@ -632,26 +632,6 @@ string_t make_string(const char *string)
 	return identify_string(space, len);
 }
 
-static void grow_symbol(utf32 const tc)
-{
-	struct obstack *const o  = &symbol_obstack;
-	if (tc < 0x80U) {
-		obstack_1grow(o, tc);
-	} else if (tc < 0x800) {
-		obstack_1grow(o, 0xC0 | (tc >> 6));
-		obstack_1grow(o, 0x80 | (tc & 0x3F));
-	} else if (tc < 0x10000) {
-		obstack_1grow(o, 0xE0 | ( tc >> 12));
-		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
-		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
-	} else {
-		obstack_1grow(o, 0xF0 | ( tc >> 18));
-		obstack_1grow(o, 0x80 | ((tc >> 12) & 0x3F));
-		obstack_1grow(o, 0x80 | ((tc >>  6) & 0x3F));
-		obstack_1grow(o, 0x80 | ( tc        & 0x3F));
-	}
-}
-
 /**
  * Parse a string literal and set lexer_token.
  */
@@ -681,7 +661,7 @@ static void parse_string_literal(void)
 			goto end_of_string;
 
 		default:
-			grow_symbol(c);
+			obstack_grow_symbol(&symbol_obstack, c);
 			next_char();
 			break;
 		}
@@ -711,7 +691,7 @@ static void parse_wide_character_constant(void)
 		switch (c) {
 		case '\\': {
 			const utf32 tc = parse_escape_sequence();
-			grow_symbol(tc);
+			obstack_grow_symbol(&symbol_obstack, tc);
 			break;
 		}
 
@@ -732,7 +712,7 @@ static void parse_wide_character_constant(void)
 		}
 
 		default:
-			grow_symbol(c);
+			obstack_grow_symbol(&symbol_obstack, c);
 			next_char();
 			break;
 		}
@@ -796,7 +776,7 @@ static void parse_character_constant(void)
 		}
 
 		default:
-			grow_symbol(c);
+			obstack_grow_symbol(&symbol_obstack, c);
 			next_char();
 			break;
 
