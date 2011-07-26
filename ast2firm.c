@@ -1207,12 +1207,12 @@ static bool try_create_integer(literal_expression_t *literal,
 
 static void create_integer_tarval(literal_expression_t *literal)
 {
-	unsigned  us     = 0;
-	unsigned  ls     = 0;
-	symbol_t *suffix = literal->suffix;
+	unsigned        us     = 0;
+	unsigned        ls     = 0;
+	const string_t *suffix = &literal->suffix;
 	/* parse suffix */
-	if (suffix != NULL) {
-		for (const char *c = suffix->string; *c != '\0'; ++c) {
+	if (suffix->size > 0) {
+		for (const char *c = suffix->begin; *c != '\0'; ++c) {
 			if (*c == 'u' || *c == 'U') { ++us; }
 			if (*c == 'l' || *c == 'L') { ++ls; }
 		}

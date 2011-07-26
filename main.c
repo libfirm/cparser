@@ -197,7 +197,7 @@ static void lextest(FILE *in, const char *fname)
 		lexer_next_preprocessing_token();
 		print_token(stdout, &lexer_token);
 		putchar('\n');
-	} while (lexer_token.type != T_EOF);
+	} while (lexer_token.kind != T_EOF);
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)

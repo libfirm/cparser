@@ -277,12 +277,26 @@ end_symbol:
 	char     *string = obstack_finish(&symbol_obstack);
 	symbol_t *symbol = symbol_table_insert(string);
 
-	lexer_token.type   = symbol->ID;
-	lexer_token.symbol = symbol;
+	lexer_token.kind              = symbol->ID;
+	lexer_token.identifier.symbol = symbol;
 
 	if (symbol->string != string) {
 		obstack_free(&symbol_obstack, string);
 	}
+}
+
+static string_t identify_string(char *string, size_t len)
+{
+	/* TODO hash */
+#if 0
+	const char *result = strset_insert(&stringset, concat);
+	if (result != concat) {
+		obstack_free(&symbol_obstack, concat);
+	}
+#else
+	const char *result = string;
+#endif
+	return (string_t) {result, len};
 }
 
 /**
@@ -304,32 +318,16 @@ static void parse_number_suffix(void)
 	}
 finish_suffix:
 	if (obstack_object_size(&symbol_obstack) == 0) {
-		lexer_token.symbol = NULL;
+		lexer_token.number.suffix.begin = NULL;
+		lexer_token.number.suffix.size  = 0;
 		return;
 	}
 
 	obstack_1grow(&symbol_obstack, '\0');
+	size_t    size   = obstack_object_size(&symbol_obstack);
 	char     *string = obstack_finish(&symbol_obstack);
-	symbol_t *symbol = symbol_table_insert(string);
 
-	if (symbol->string != string) {
-		obstack_free(&symbol_obstack, string);
-	}
-	lexer_token.symbol = symbol;
-}
-
-static string_t identify_string(char *string, size_t len)
-{
-	/* TODO hash */
-#if 0
-	const char *result = strset_insert(&stringset, concat);
-	if (result != concat) {
-		obstack_free(&symbol_obstack, concat);
-	}
-#else
-	const char *result = string;
-#endif
-	return (string_t) {result, len};
+	lexer_token.number.suffix = identify_string(string, size);
 }
 
 /**
@@ -374,23 +372,23 @@ static void parse_number_hex(void)
 			next_char();
 		}
 	} else if (is_float) {
-		errorf(&lexer_token.source_position,
+		errorf(&lexer_token.base.source_position,
 		       "hexadecimal floatingpoint constant requires an exponent");
 	}
 	obstack_1grow(&symbol_obstack, '\0');
 
 	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
-	lexer_token.literal = identify_string(string, size);
+	lexer_token.number.number = identify_string(string, size);
 
-	lexer_token.type    =
+	lexer_token.kind    =
 		is_float ? T_FLOATINGPOINT_HEXADECIMAL : T_INTEGER_HEXADECIMAL;
 
 	if (!has_digits) {
-		errorf(&lexer_token.source_position, "invalid number literal '0x%S'",
-		       &lexer_token.literal);
-		lexer_token.literal.begin = "0";
-		lexer_token.literal.size  = 1;
+		errorf(&lexer_token.base.source_position,
+		       "invalid number literal '0x%S'", &lexer_token.number.number);
+		lexer_token.number.number.begin = "0";
+		lexer_token.number.number.size  = 1;
 	}
 
 	parse_number_suffix();
@@ -463,28 +461,28 @@ static void parse_number(void)
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
-	lexer_token.literal = identify_string(string, size);
+	lexer_token.number.number = identify_string(string, size);
 
 	/* is it an octal number? */
 	if (is_float) {
-		lexer_token.type = T_FLOATINGPOINT;
+		lexer_token.kind = T_FLOATINGPOINT;
 	} else if (string[0] == '0') {
-		lexer_token.type = T_INTEGER_OCTAL;
+		lexer_token.kind = T_INTEGER_OCTAL;
 
 		/* check for invalid octal digits */
 		for (size_t i= 0; i < size; ++i) {
 			char t = string[i];
 			if (t >= '8')
-				errorf(&lexer_token.source_position,
+				errorf(&lexer_token.base.source_position,
 				       "invalid digit '%c' in octal number", t);
 		}
 	} else {
-		lexer_token.type = T_INTEGER;
+		lexer_token.kind = T_INTEGER;
 	}
 
 	if (!has_digits) {
-		errorf(&lexer_token.source_position, "invalid number literal '%S'",
-		       &lexer_token.literal);
+		errorf(&lexer_token.base.source_position, "invalid number literal '%S'",
+		       &lexer_token.number.number);
 	}
 
 	parse_number_suffix();
@@ -673,8 +671,8 @@ static void parse_string_literal(void)
 		}
 
 		case EOF: {
-			errorf(&lexer_token.source_position, "string has no end");
-			lexer_token.type = T_ERROR;
+			errorf(&lexer_token.base.source_position, "string has no end");
+			lexer_token.kind = T_ERROR;
 			return;
 		}
 
@@ -698,8 +696,8 @@ end_of_string:
 	const size_t  size   = (size_t)obstack_object_size(&symbol_obstack);
 	char         *string = obstack_finish(&symbol_obstack);
 
-	lexer_token.type    = T_STRING_LITERAL;
-	lexer_token.literal = identify_string(string, size);
+	lexer_token.kind          = T_STRING_LITERAL;
+	lexer_token.string.string = identify_string(string, size);
 }
 
 /**
@@ -727,8 +725,9 @@ static void parse_wide_character_constant(void)
 			goto end_of_wide_char_constant;
 
 		case EOF: {
-			errorf(&lexer_token.source_position, "EOF while parsing character constant");
-			lexer_token.type = T_ERROR;
+			errorf(&lexer_token.base.source_position,
+			       "EOF while parsing character constant");
+			lexer_token.kind = T_ERROR;
 			return;
 		}
 
@@ -744,11 +743,11 @@ end_of_wide_char_constant:;
 	size_t  size   = (size_t) obstack_object_size(&symbol_obstack) - 1;
 	char   *string = obstack_finish(&symbol_obstack);
 
-	lexer_token.type     = T_WIDE_CHARACTER_CONSTANT;
-	lexer_token.literal  = identify_string(string, size);
+	lexer_token.kind          = T_WIDE_CHARACTER_CONSTANT;
+	lexer_token.string.string = identify_string(string, size);
 
 	if (size == 0) {
-		errorf(&lexer_token.source_position, "empty character constant");
+		errorf(&lexer_token.base.source_position, "empty character constant");
 	}
 }
 
@@ -758,8 +757,8 @@ end_of_wide_char_constant:;
 static void parse_wide_string_literal(void)
 {
 	parse_string_literal();
-	if (lexer_token.type == T_STRING_LITERAL)
-		lexer_token.type = T_WIDE_STRING_LITERAL;
+	if (lexer_token.kind == T_STRING_LITERAL)
+		lexer_token.kind = T_WIDE_STRING_LITERAL;
 }
 
 /**
@@ -790,8 +789,9 @@ static void parse_character_constant(void)
 			goto end_of_char_constant;
 
 		case EOF: {
-			errorf(&lexer_token.source_position, "EOF while parsing character constant");
-			lexer_token.type = T_ERROR;
+			errorf(&lexer_token.base.source_position,
+			       "EOF while parsing character constant");
+			lexer_token.kind = T_ERROR;
 			return;
 		}
 
@@ -808,11 +808,11 @@ end_of_char_constant:;
 	const size_t        size   = (size_t)obstack_object_size(&symbol_obstack)-1;
 	char         *const string = obstack_finish(&symbol_obstack);
 
-	lexer_token.type    = T_CHARACTER_CONSTANT;
-	lexer_token.literal = identify_string(string, size);
+	lexer_token.kind          = T_CHARACTER_CONSTANT;
+	lexer_token.string.string = identify_string(string, size);
 
 	if (size == 0) {
-		errorf(&lexer_token.source_position, "empty character constant");
+		errorf(&lexer_token.base.source_position, "empty character constant");
 	}
 }
 
@@ -841,7 +841,8 @@ static void skip_multiline_comment(void)
 		MATCH_NEWLINE(break;)
 
 		case EOF: {
-			errorf(&lexer_token.source_position, "at end of file while looking for comment end");
+			errorf(&lexer_token.base.source_position,
+			       "at end of file while looking for comment end");
 			return;
 		}
 
@@ -898,7 +899,7 @@ static inline void next_pp_token(void)
  */
 static void eat_until_newline(void)
 {
-	while (pp_token.type != '\n' && pp_token.type != T_EOF) {
+	while (pp_token.kind != '\n' && pp_token.kind != T_EOF) {
 		next_pp_token();
 	}
 }
@@ -909,7 +910,7 @@ static void eat_until_newline(void)
 static void define_directive(void)
 {
 	lexer_next_preprocessing_token();
-	if (lexer_token.type != T_IDENTIFIER) {
+	if (lexer_token.kind != T_IDENTIFIER) {
 		parse_error("expected identifier after #define\n");
 		eat_until_newline();
 	}
@@ -939,15 +940,15 @@ static void endif_directive(void)
  */
 static void parse_line_directive(void)
 {
-	if (pp_token.type != T_INTEGER) {
+	if (pp_token.kind != T_INTEGER) {
 		parse_error("expected integer");
 	} else {
 		/* use offset -1 as this is about the next line */
-		lexer_pos.lineno = atoi(pp_token.literal.begin) - 1;
+		lexer_pos.lineno = atoi(pp_token.number.number.begin) - 1;
 		next_pp_token();
 	}
-	if (pp_token.type == T_STRING_LITERAL) {
-		lexer_pos.input_name = pp_token.literal.begin;
+	if (pp_token.kind == T_STRING_LITERAL) {
+		lexer_pos.input_name = pp_token.string.string.begin;
 		next_pp_token();
 	}
 
@@ -982,13 +983,21 @@ static void parse_pragma(void)
 	bool unknown_pragma = true;
 
 	next_pp_token();
-	if (pp_token.symbol->pp_ID == TP_STDC) {
+	if (pp_token.kind != T_IDENTIFIER) {
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
+		         "expected identifier after #pragma");
+		eat_until_newline();
+		return;
+	}
+
+	symbol_t *symbol = pp_token.identifier.symbol;
+	if (symbol->pp_ID == TP_STDC) {
 		stdc_pragma_kind_t kind = STDC_UNKNOWN;
 		/* a STDC pragma */
 		if (c_mode & _C99) {
 			next_pp_token();
 
-			switch (pp_token.symbol->pp_ID) {
+			switch (pp_token.identifier.symbol->pp_ID) {
 			case TP_FP_CONTRACT:
 				kind = STDC_FP_CONTRACT;
 				break;
@@ -1004,7 +1013,7 @@ static void parse_pragma(void)
 			if (kind != STDC_UNKNOWN) {
 				stdc_pragma_value_kind_t value = STDC_VALUE_UNKNOWN;
 				next_pp_token();
-				switch (pp_token.symbol->pp_ID) {
+				switch (pp_token.identifier.symbol->pp_ID) {
 				case TP_ON:
 					value = STDC_VALUE_ON;
 					break;
@@ -1020,7 +1029,8 @@ static void parse_pragma(void)
 				if (value != STDC_VALUE_UNKNOWN) {
 					unknown_pragma = false;
 				} else {
-					errorf(&pp_token.source_position, "bad STDC pragma argument");
+					errorf(&pp_token.base.source_position,
+					       "bad STDC pragma argument");
 				}
 			}
 		}
@@ -1029,7 +1039,8 @@ static void parse_pragma(void)
 	}
 	eat_until_newline();
 	if (unknown_pragma) {
-		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.source_position, "encountered unknown #pragma");
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
+		         "encountered unknown #pragma");
 	}
 }
 
@@ -1038,8 +1049,8 @@ static void parse_pragma(void)
  */
 static void parse_preprocessor_identifier(void)
 {
-	assert(pp_token.type == T_IDENTIFIER);
-	symbol_t *symbol = pp_token.symbol;
+	assert(pp_token.kind == T_IDENTIFIER);
+	symbol_t *symbol = pp_token.identifier.symbol;
 
 	switch (symbol->pp_ID) {
 	case TP_include:
@@ -1082,7 +1093,7 @@ static void parse_preprocessor_directive(void)
 {
 	next_pp_token();
 
-	switch (pp_token.type) {
+	switch (pp_token.kind) {
 	case T_IDENTIFIER:
 		parse_preprocessor_identifier();
 		break;
@@ -1107,7 +1118,7 @@ static void parse_preprocessor_directive(void)
 #define MAYBE(ch, set_type)                                \
 				case ch:                                   \
 					next_char();                           \
-					lexer_token.type = set_type;           \
+					lexer_token.kind = set_type;           \
 					return;
 
 /* must use this as last thing */
@@ -1115,7 +1126,7 @@ static void parse_preprocessor_directive(void)
 				case ch:                                   \
 					if (c_mode & mode) {                   \
 						next_char();                       \
-						lexer_token.type = set_type;       \
+						lexer_token.kind = set_type;       \
 						return;                            \
 					}                                      \
 					/* fallthrough */
@@ -1129,13 +1140,13 @@ static void parse_preprocessor_directive(void)
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
-			lexer_token.type = set_type;                   \
+			lexer_token.kind = set_type;                   \
 		)
 
 void lexer_next_preprocessing_token(void)
 {
 	while (true) {
-		lexer_token.source_position = lexer_pos;
+		lexer_token.base.source_position = lexer_pos;
 
 		switch (c) {
 		case ' ':
@@ -1144,14 +1155,14 @@ void lexer_next_preprocessing_token(void)
 			break;
 
 		MATCH_NEWLINE(
-			lexer_token.type = '\n';
+			lexer_token.kind = '\n';
 			return;
 		)
 
 		SYMBOL_CHARS
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
-			if (lexer_token.symbol == symbol_L) {
+			if (lexer_token.identifier.symbol == symbol_L) {
 				switch (c) {
 					case '"':  parse_wide_string_literal();     break;
 					case '\'': parse_wide_character_constant(); break;
@@ -1185,7 +1196,7 @@ void lexer_next_preprocessing_token(void)
 					ELSE_CODE(
 						put_back(c);
 						c = '.';
-						lexer_token.type = '.';
+						lexer_token.kind = '.';
 					)
 			ELSE('.')
 		case '&':
@@ -1238,7 +1249,7 @@ void lexer_next_preprocessing_token(void)
 							ELSE_CODE(
 								put_back(c);
 								c = '%';
-								lexer_token.type = '#';
+								lexer_token.kind = '#';
 							)
 					ELSE('#')
 			ELSE('%')
@@ -1294,19 +1305,19 @@ void lexer_next_preprocessing_token(void)
 		case ';':
 		case ',':
 		case '\\':
-			lexer_token.type = c;
+			lexer_token.kind = c;
 			next_char();
 			return;
 
 		case EOF:
-			lexer_token.type = T_EOF;
+			lexer_token.kind = T_EOF;
 			return;
 
 		default:
 dollar_sign:
 			errorf(&lexer_pos, "unknown character '%c' found", c);
 			next_char();
-			lexer_token.type = T_ERROR;
+			lexer_token.kind = T_ERROR;
 			return;
 		}
 	}
@@ -1316,12 +1327,12 @@ void lexer_next_token(void)
 {
 	lexer_next_preprocessing_token();
 
-	while (lexer_token.type == '\n') {
+	while (lexer_token.kind == '\n') {
 newline_found:
 		lexer_next_preprocessing_token();
 	}
 
-	if (lexer_token.type == '#') {
+	if (lexer_token.kind == '#') {
 		parse_preprocessor_directive();
 		goto newline_found;
 	}

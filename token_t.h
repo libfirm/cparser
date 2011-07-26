@@ -26,7 +26,7 @@
 #include "symbol_table.h"
 #include "type.h"
 
-typedef enum token_type_t {
+typedef enum token_kind_t {
 	T_ERROR = -1,
 	T_NULL  =  0,
 	T_EOF   = '\x04', // EOT
@@ -36,9 +36,9 @@ typedef enum token_type_t {
 #undef TS
 #undef T
 	T_LAST_TOKEN
-} token_type_t;
+} token_kind_t;
 
-typedef enum preprocessor_token_type_t {
+typedef enum preprocessor_token_kind_t {
 	TP_NULL  = T_NULL,
 	TP_EOF   = T_EOF,
 	TP_ERROR = T_ERROR,
@@ -48,7 +48,7 @@ typedef enum preprocessor_token_type_t {
 #undef TS
 #undef T
 	TP_LAST_TOKEN
-} preprocessor_token_type_t;
+} preprocessor_token_kind_t;
 
 typedef struct source_position_t source_position_t;
 struct source_position_t {
@@ -60,28 +60,56 @@ struct source_position_t {
 /* position used for "builtin" declarations/types */
 extern const source_position_t builtin_source_position;
 
-typedef struct {
-	int                type;
-	symbol_t          *symbol;  /**< contains identifier. Contains number suffix for numbers */
-	string_t           literal; /**< string value/literal value */
-	source_position_t  source_position;
-} token_t;
+typedef struct token_base_t     token_base_t;
+typedef struct identifier_t     identifier_t;
+typedef struct string_literal_t string_literal_t;
+typedef struct number_literal_t number_literal_t;
+typedef union  token_t          token_t;
+
+struct token_base_t {
+	int               kind;
+	source_position_t source_position;
+};
+
+struct identifier_t {
+	token_base_t  base;
+	symbol_t     *symbol;
+};
+
+struct string_literal_t {
+	token_base_t  base;
+	string_t      string;
+};
+
+struct number_literal_t {
+	token_base_t  base;
+	string_t      number;
+	string_t      suffix;
+};
+
+union token_t {
+	int               kind;
+	token_base_t      base;
+	identifier_t      identifier;
+	string_literal_t  string;
+	number_literal_t  number;
+};
 
 void init_tokens(void);
 void exit_tokens(void);
-void print_token_type(FILE *out, token_type_t token_type);
+void print_token_kind(FILE *out, token_kind_t token_kind);
 void print_token(FILE *out, const token_t *token);
 
-symbol_t *get_token_symbol(const token_t *token);
+symbol_t *get_token_kind_symbol(int token_kind);
 
-void print_pp_token_type(FILE *out, int type);
+void print_pp_token_kind(FILE *out, int kind);
 void print_pp_token(FILE *out, const token_t *token);
 
 /**
  * returns true if pasting 2 preprocessing tokens next to each other
  * without a space in between would generate (an)other preprocessing token(s)
  */
-bool tokens_would_paste(preprocessor_token_type_t token1,
-                        preprocessor_token_type_t token2);
+bool tokens_would_paste(preprocessor_token_kind_t token1,
+                        preprocessor_token_kind_t token2);
 
 #endif

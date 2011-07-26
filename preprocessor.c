@@ -100,7 +100,7 @@ static const char       *printed_input_name = NULL;
 static source_position_t expansion_pos;
 static pp_definition_t  *current_expansion  = NULL;
 static strset_t          stringset;
-static preprocessor_token_type_t last_token = TP_ERROR;
+static preprocessor_token_kind_t last_token = TP_ERROR;
 
 static searchpath_entry_t *searchpath;
 
@@ -188,7 +188,7 @@ static void pop_restore_input(void)
  */
 static void parse_error(const char *msg)
 {
-	errorf(&pp_token.source_position,  "%s", msg);
+	errorf(&pp_token.base.source_position,  "%s", msg);
 }
 
 static inline void next_real_char(void)
@@ -499,10 +499,10 @@ static void parse_string_literal(void)
 
 		case EOF: {
 			source_position_t source_position;
-			source_position.input_name = pp_token.source_position.input_name;
+			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
 			errorf(&source_position, "string has no end");
-			pp_token.type = TP_ERROR;
+			pp_token.kind = TP_ERROR;
 			return;
 		}
 
@@ -523,8 +523,8 @@ end_of_string:
 	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
 	char *const  string = obstack_finish(&symbol_obstack);
 
-	pp_token.type    = TP_STRING_LITERAL;
-	pp_token.literal = make_string(string, size);
+	pp_token.kind          = TP_STRING_LITERAL;
+	pp_token.string.string = make_string(string, size);
 }
 
 /**
@@ -533,8 +533,8 @@ end_of_string:
 static void parse_wide_string_literal(void)
 {
 	parse_string_literal();
-	if (pp_token.type == TP_STRING_LITERAL)
-		pp_token.type = TP_WIDE_STRING_LITERAL;
+	if (pp_token.kind == TP_STRING_LITERAL)
+		pp_token.kind = TP_WIDE_STRING_LITERAL;
 }
 
 static void parse_wide_character_constant(void)
@@ -560,7 +560,7 @@ static void parse_wide_character_constant(void)
 
 		case EOF:
 			parse_error("EOF while parsing character constant");
-			pp_token.type = TP_ERROR;
+			pp_token.kind = TP_ERROR;
 			return;
 
 		default:
@@ -574,8 +574,8 @@ end_of_wide_char_constant:
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t  size = (size_t) obstack_object_size(&symbol_obstack)-1;
 	char   *string = obstack_finish(&symbol_obstack);
-	pp_token.type    = TP_WIDE_CHARACTER_CONSTANT;
-	pp_token.literal = make_string(string, size);
+	pp_token.kind          = TP_WIDE_CHARACTER_CONSTANT;
+	pp_token.string.string = make_string(string, size);
 
 	if (size == 0) {
 		parse_error("empty character constant");
@@ -603,10 +603,10 @@ static void parse_character_constant(void)
 
 		case EOF: {
 			source_position_t source_position;
-			source_position.input_name = pp_token.source_position.input_name;
+			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
 			errorf(&source_position, "EOF while parsing character constant");
-			pp_token.type = TP_ERROR;
+			pp_token.kind = TP_ERROR;
 			return;
 		}
 
@@ -623,12 +623,16 @@ static void parse_character_constant(void)
 	}
 
 end_of_char_constant:;
-	const size_t      size   = (size_t)obstack_object_size(&symbol_obstack);
-	const char *const string = obstack_finish(&symbol_obstack);
+	obstack_1grow(&symbol_obstack, '\0');
+	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
+	char *const  string = obstack_finish(&symbol_obstack);
 
-	pp_token.type          = TP_CHARACTER_CONSTANT;
-	pp_token.literal.begin = string;
-	pp_token.literal.size  = size;
+	pp_token.kind          = TP_CHARACTER_CONSTANT;
+	pp_token.string.string = make_string(string, size);
+
+	if (size == 0) {
+		parse_error("empty character constant");
+	}
 }
 
 #define SYMBOL_CHARS_WITHOUT_E_P \
@@ -730,14 +734,14 @@ restart:
 		goto restart;
 	}
 	pp_token = definition->token_list[definition->expand_pos];
-	pp_token.source_position = expansion_pos;
+	pp_token.base.source_position = expansion_pos;
 	++definition->expand_pos;
 
-	if (pp_token.type != TP_IDENTIFIER)
+	if (pp_token.kind != TP_IDENTIFIER)
 		return;
 
 	/* if it was an identifier then we might need to expand again */
-	pp_definition_t *symbol_definition = pp_token.symbol->pp_definition;
+	pp_definition_t *symbol_definition = pp_token.identifier.symbol->pp_definition;
 	if (symbol_definition != NULL && !symbol_definition->is_expanding) {
 		symbol_definition->parent_expansion = definition;
 		symbol_definition->expand_pos       = 0;
@@ -793,7 +797,7 @@ static void skip_multiline_comment(void)
 
 		case EOF: {
 			source_position_t source_position;
-			source_position.input_name = pp_token.source_position.input_name;
+			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
 			errorf(&source_position, "at end of file while looking for comment end");
 			return;
@@ -844,7 +848,7 @@ static void skip_whitespace(void)
 static void eat_pp(int type)
 {
 	(void) type;
-	assert(pp_token.type == type);
+	assert(pp_token.kind == type);
 	next_preprocessing_token();
 }
 
@@ -883,8 +887,8 @@ end_symbol:
 
 	symbol_t *symbol = symbol_table_insert(string);
 
-	pp_token.type   = symbol->pp_ID;
-	pp_token.symbol = symbol;
+	pp_token.kind              = symbol->pp_ID;
+	pp_token.identifier.symbol = symbol;
 
 	/* we can free the memory from symbol obstack if we already had an entry in
 	 * the symbol table */
@@ -929,9 +933,8 @@ end_number:
 	size_t  size   = obstack_object_size(&symbol_obstack);
 	char   *string = obstack_finish(&symbol_obstack);
 
-	pp_token.type          = TP_NUMBER;
-	pp_token.literal.begin = string;
-	pp_token.literal.size  = size;
+	pp_token.kind          = TP_NUMBER;
+	pp_token.number.number = make_string(string, size);
 }
 
 
@@ -943,7 +946,7 @@ end_number:
 #define MAYBE(ch, set_type)                                \
 				case ch:                                   \
 					next_char();                           \
-					pp_token.type = set_type;              \
+					pp_token.kind = set_type;              \
 					return;
 
 #define ELSE_CODE(code)                                    \
@@ -955,7 +958,7 @@ end_number:
 
 #define ELSE(set_type)                                     \
 		ELSE_CODE(                                         \
-			pp_token.type = set_type;                      \
+			pp_token.kind = set_type;                      \
 		)
 
 static void next_preprocessing_token(void)
@@ -968,7 +971,7 @@ static void next_preprocessing_token(void)
 	info.at_line_begin  = false;
 	info.had_whitespace = false;
 restart:
-	pp_token.source_position = input.position;
+	pp_token.base.source_position = input.position;
 	switch (input.c) {
 	case ' ':
 	case '\t':
@@ -1022,7 +1025,7 @@ restart:
 				ELSE_CODE(
 					put_back(input.c);
 					input.c = '.';
-					pp_token.type = '.';
+					pp_token.kind = '.';
 				)
 		ELSE('.')
 	case '&':
@@ -1075,7 +1078,7 @@ restart:
 						ELSE_CODE(
 							put_back(input.c);
 							input.c = '%';
-							pp_token.type = '#';
+							pp_token.kind = '#';
 						)
 				ELSE('#')
 		ELSE('%')
@@ -1118,7 +1121,7 @@ restart:
 		MAYBE_PROLOG
 		MAYBE('#', TP_HASHHASH)
 		ELSE_CODE(
-			pp_token.type = '#';
+			pp_token.kind = '#';
 		)
 
 	case '?':
@@ -1132,7 +1135,7 @@ restart:
 	case ';':
 	case ',':
 	case '\\':
-		pp_token.type = input.c;
+		pp_token.kind = input.c;
 		next_char();
 		return;
 
@@ -1144,20 +1147,20 @@ restart:
 			print_line_directive(&input.position, "2");
 			goto restart;
 		} else {
-			pp_token.source_position.lineno++;
+			pp_token.base.source_position.lineno++;
 			info.at_line_begin = true;
-			pp_token.type = TP_EOF;
+			pp_token.kind = TP_EOF;
 		}
 		return;
 
 	default:
 		next_char();
 		if (!ignore_unknown_chars) {
-			errorf(&pp_token.source_position, "unknown character '%c' found\n",
-			       input.c);
-			pp_token.type = TP_ERROR;
+			errorf(&pp_token.base.source_position,
+			       "unknown character '%c' found\n", input.c);
+			pp_token.kind = TP_ERROR;
 		} else {
-			pp_token.type = input.c;
+			pp_token.kind = input.c;
 		}
 		return;
 	}
@@ -1205,18 +1208,18 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 
 static void emit_newlines(void)
 {
-	unsigned delta = pp_token.source_position.lineno - input.output_line;
+	unsigned delta = pp_token.base.source_position.lineno - input.output_line;
 
 	if (delta >= 9) {
 		fputc('\n', out);
-		print_line_directive(&pp_token.source_position, NULL);
+		print_line_directive(&pp_token.base.source_position, NULL);
 		fputc('\n', out);
 	} else {
 		for (unsigned i = 0; i < delta; ++i) {
 			fputc('\n', out);
 		}
 	}
-	input.output_line = pp_token.source_position.lineno;
+	input.output_line = pp_token.base.source_position.lineno;
 }
 
 static void emit_pp_token(void)
@@ -1231,36 +1234,36 @@ static void emit_pp_token(void)
 			fputc(' ', out);
 
 	} else if (info.had_whitespace ||
-			   tokens_would_paste(last_token, pp_token.type)) {
+			   tokens_would_paste(last_token, pp_token.kind)) {
 		fputc(' ', out);
 	}
 
-	switch (pp_token.type) {
+	switch (pp_token.kind) {
 	case TP_IDENTIFIER:
-		fputs(pp_token.symbol->string, out);
+		fputs(pp_token.identifier.symbol->string, out);
 		break;
 	case TP_NUMBER:
-		fputs(pp_token.literal.begin, out);
+		fputs(pp_token.number.number.begin, out);
 		break;
 	case TP_WIDE_STRING_LITERAL:
 		fputc('L', out);
 	case TP_STRING_LITERAL:
 		fputc('"', out);
-		fputs(pp_token.literal.begin, out);
+		fputs(pp_token.string.string.begin, out);
 		fputc('"', out);
 		break;
 	case TP_WIDE_CHARACTER_CONSTANT:
 		fputc('L', out);
 	case TP_CHARACTER_CONSTANT:
 		fputc('\'', out);
-		fputs(pp_token.literal.begin, out);
+		fputs(pp_token.string.string.begin, out);
 		fputc('\'', out);
 		break;
 	default:
-		print_pp_token_type(out, pp_token.type);
+		print_pp_token_kind(out, pp_token.kind);
 		break;
 	}
-	last_token = pp_token.type;
+	last_token = pp_token.kind;
 }
 
 static void eat_pp_directive(void)
@@ -1287,19 +1290,16 @@ static bool strings_equal(const string_t *string1, const string_t *string2)
 
 static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 {
-	if (token1->type != token2->type)
+	if (token1->kind != token2->kind)
 		return false;
 
-	switch (token1->type) {
-	case TP_HEADERNAME:
-		/* TODO */
-		return false;
+	switch (token1->kind) {
 	case TP_IDENTIFIER:
-		return token1->symbol == token2->symbol;
+		return token1->identifier.symbol == token2->identifier.symbol;
 	case TP_NUMBER:
 	case TP_CHARACTER_CONSTANT:
 	case TP_STRING_LITERAL:
-		return strings_equal(&token1->literal, &token2->literal);
+		return strings_equal(&token1->string.string, &token2->string.string);
 
 	default:
 		return true;
@@ -1327,12 +1327,12 @@ static void parse_define_directive(void)
 	eat_pp(TP_define);
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (pp_token.type != TP_IDENTIFIER || info.at_line_begin) {
-		errorf(&pp_token.source_position,
+	if (pp_token.kind != TP_IDENTIFIER || info.at_line_begin) {
+		errorf(&pp_token.base.source_position,
 		       "expected identifier after #define, got '%t'", &pp_token);
 		goto error_out;
 	}
-	symbol_t *symbol = pp_token.symbol;
+	symbol_t *symbol = pp_token.identifier.symbol;
 
 	pp_definition_t *new_definition
 		= obstack_alloc(&pp_obstack, sizeof(new_definition[0]));
@@ -1349,27 +1349,27 @@ static void parse_define_directive(void)
 		next_preprocessing_token();
 
 		while (true) {
-			switch (pp_token.type) {
+			switch (pp_token.kind) {
 			case TP_DOTDOTDOT:
 				new_definition->is_variadic = true;
 				next_preprocessing_token();
-				if (pp_token.type != ')') {
+				if (pp_token.kind != ')') {
 					errorf(&input.position,
 							"'...' not at end of macro argument list");
 					goto error_out;
 				}
 				break;
 			case TP_IDENTIFIER:
-				obstack_ptr_grow(&pp_obstack, pp_token.symbol);
+				obstack_ptr_grow(&pp_obstack, pp_token.identifier.symbol);
 				next_preprocessing_token();
 
-				if (pp_token.type == ',') {
+				if (pp_token.kind == ',') {
 					next_preprocessing_token();
 					break;
 				}
 
-				if (pp_token.type != ')') {
-					errorf(&pp_token.source_position,
+				if (pp_token.kind != ')') {
+					errorf(&pp_token.base.source_position,
 					       "expected ',' or ')' after identifier, got '%t'",
 					       &pp_token);
 					goto error_out;
@@ -1379,7 +1379,7 @@ static void parse_define_directive(void)
 				next_preprocessing_token();
 				goto finish_argument_list;
 			default:
-				errorf(&pp_token.source_position,
+				errorf(&pp_token.base.source_position,
 				       "expected identifier, '...' or ')' in #define argument list, got '%t'",
 				       &pp_token);
 				goto error_out;
@@ -1433,14 +1433,14 @@ static void parse_undef_directive(void)
 {
 	eat_pp(TP_undef);
 
-	if (pp_token.type != TP_IDENTIFIER) {
+	if (pp_token.kind != TP_IDENTIFIER) {
 		errorf(&input.position,
 		       "expected identifier after #undef, got '%t'", &pp_token);
 		eat_pp_directive();
 		return;
 	}
 
-	symbol_t *symbol = pp_token.symbol;
+	symbol_t *symbol = pp_token.identifier.symbol;
 	symbol->pp_definition = NULL;
 	next_preprocessing_token();
 
@@ -1570,12 +1570,13 @@ static bool parse_include_directive(void)
 	}
 
 	if (!info.at_line_begin) {
-		warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #include directive");
+		warningf(WARN_OTHER, &pp_token.base.source_position,
+		         "extra tokens at end of #include directive");
 		eat_pp_directive();
 	}
 
 	if (n_inputs > INCLUDE_LIMIT) {
-		errorf(&pp_token.source_position, "#include nested too deeply");
+		errorf(&pp_token.base.source_position, "#include nested too deeply");
 		/* eat \n or EOF */
 		next_preprocessing_token();
 		return false;
@@ -1592,7 +1593,7 @@ static bool parse_include_directive(void)
 	push_input();
 	bool res = do_include(system_include, headername);
 	if (!res) {
-		errorf(&pp_token.source_position,
+		errorf(&pp_token.base.source_position,
 		       "failed including '%s': %s", headername, strerror(errno));
 		pop_restore_input();
 		return false;
@@ -1635,20 +1636,20 @@ static void check_unclosed_conditionals(void)
 
 static void parse_ifdef_ifndef_directive(void)
 {
-	bool is_ifndef = (pp_token.type == TP_ifndef);
+	bool is_ifndef = (pp_token.kind == TP_ifndef);
 	bool condition;
 	next_preprocessing_token();
 
 	if (skip_mode) {
 		eat_pp_directive();
 		pp_conditional_t *conditional = push_conditional();
-		conditional->source_position  = pp_token.source_position;
+		conditional->source_position  = pp_token.base.source_position;
 		conditional->skip             = true;
 		return;
 	}
 
-	if (pp_token.type != TP_IDENTIFIER || info.at_line_begin) {
-		errorf(&pp_token.source_position,
+	if (pp_token.kind != TP_IDENTIFIER || info.at_line_begin) {
+		errorf(&pp_token.base.source_position,
 		       "expected identifier after #%s, got '%t'",
 		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
 		eat_pp_directive();
@@ -1656,12 +1657,12 @@ static void parse_ifdef_ifndef_directive(void)
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
-		symbol_t        *symbol        = pp_token.symbol;
+		symbol_t        *symbol        = pp_token.identifier.symbol;
 		pp_definition_t *pp_definition = symbol->pp_definition;
 		next_preprocessing_token();
 
 		if (!info.at_line_begin) {
-			errorf(&pp_token.source_position,
+			errorf(&pp_token.base.source_position,
 			       "extra tokens at end of #%s",
 			       is_ifndef ? "ifndef" : "ifdef");
 			eat_pp_directive();
@@ -1672,7 +1673,7 @@ static void parse_ifdef_ifndef_directive(void)
 	}
 
 	pp_conditional_t *conditional = push_conditional();
-	conditional->source_position  = pp_token.source_position;
+	conditional->source_position  = pp_token.base.source_position;
 	conditional->condition        = condition;
 
 	if (!condition) {
@@ -1686,19 +1687,19 @@ static void parse_else_directive(void)
 
 	if (!info.at_line_begin) {
 		if (!skip_mode) {
-			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #else");
+			warningf(WARN_OTHER, &pp_token.base.source_position, "extra tokens at end of #else");
 		}
 		eat_pp_directive();
 	}
 
 	pp_conditional_t *conditional = conditional_stack;
 	if (conditional == NULL) {
-		errorf(&pp_token.source_position, "#else without prior #if");
+		errorf(&pp_token.base.source_position, "#else without prior #if");
 		return;
 	}
 
 	if (conditional->in_else) {
-		errorf(&pp_token.source_position,
+		errorf(&pp_token.base.source_position,
 		       "#else after #else (condition started %P)",
 		       conditional->source_position);
 		skip_mode = true;
@@ -1709,7 +1710,7 @@ static void parse_else_directive(void)
 	if (!conditional->skip) {
 		skip_mode = conditional->condition;
 	}
-	conditional->source_position = pp_token.source_position;
+	conditional->source_position = pp_token.base.source_position;
 }
 
 static void parse_endif_directive(void)
@@ -1718,14 +1719,14 @@ static void parse_endif_directive(void)
 
 	if (!info.at_line_begin) {
 		if (!skip_mode) {
-			warningf(WARN_OTHER, &pp_token.source_position, "extra tokens at end of #endif");
+			warningf(WARN_OTHER, &pp_token.base.source_position, "extra tokens at end of #endif");
 		}
 		eat_pp_directive();
 	}
 
 	pp_conditional_t *conditional = conditional_stack;
 	if (conditional == NULL) {
-		errorf(&pp_token.source_position, "#endif without prior #if");
+		errorf(&pp_token.base.source_position, "#endif without prior #if");
 		return;
 	}
 
@@ -1741,7 +1742,7 @@ static void parse_preprocessing_directive(void)
 	eat_pp('#');
 
 	if (skip_mode) {
-		switch (pp_token.type) {
+		switch (pp_token.kind) {
 		case TP_ifdef:
 		case TP_ifndef:
 			parse_ifdef_ifndef_directive();
@@ -1757,7 +1758,7 @@ static void parse_preprocessing_directive(void)
 			break;
 		}
 	} else {
-		switch (pp_token.type) {
+		switch (pp_token.kind) {
 		case TP_define:
 			parse_define_directive();
 			break;
@@ -1782,7 +1783,7 @@ static void parse_preprocessing_directive(void)
 				/* the nop directive "#" */
 				break;
 			}
-			errorf(&pp_token.source_position,
+			errorf(&pp_token.base.source_position,
 				   "invalid preprocessing directive #%t", &pp_token);
 			eat_pp_directive();
 			break;
@@ -1887,35 +1888,35 @@ int pptest_main(int argc, char **argv)
 	switch_input(file, filename);
 
 	while (true) {
-		if (pp_token.type == '#' && info.at_line_begin) {
+		if (pp_token.kind == '#' && info.at_line_begin) {
 			parse_preprocessing_directive();
 			continue;
-		} else if (pp_token.type == TP_EOF) {
+		} else if (pp_token.kind == TP_EOF) {
 			goto end_of_main_loop;
-		} else if (pp_token.type == TP_IDENTIFIER && !in_pp_directive) {
-			symbol_t *symbol = pp_token.symbol;
+		} else if (pp_token.kind == TP_IDENTIFIER && !in_pp_directive) {
+			symbol_t *symbol = pp_token.identifier.symbol;
 			pp_definition_t *pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {
-				expansion_pos = pp_token.source_position;
+				expansion_pos = pp_token.base.source_position;
 				if (pp_definition->has_parameters) {
-					source_position_t position = pp_token.source_position;
+					source_position_t position = pp_token.base.source_position;
 					add_token_info_t old_info = info;
 					next_preprocessing_token();
 					add_token_info_t new_info = info;
 
 					/* no opening brace -> no expansion */
-					if (pp_token.type == '(') {
+					if (pp_token.kind == '(') {
 						eat_pp('(');
 
 						/* parse arguments (TODO) */
-						while (pp_token.type != TP_EOF && pp_token.type != ')')
+						while (pp_token.kind != TP_EOF && pp_token.kind != ')')
 							next_preprocessing_token();
 					} else {
 						token_t next_token = pp_token;
 						/* restore identifier token */
-						pp_token.type            = TP_IDENTIFIER;
-						pp_token.symbol          = symbol;
-						pp_token.source_position = position;
+						pp_token.kind                 = TP_IDENTIFIER;
+						pp_token.identifier.symbol    = symbol;
+						pp_token.base.source_position = position;
 						info = old_info;
 						emit_pp_token();
 

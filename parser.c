@@ -137,7 +137,7 @@ static symbol_t *sym_anonymous = NULL;
 static unsigned short token_anchor_set[T_LAST_TOKEN];
 
 /** The current source position. */
-#define HERE (&token.source_position)
+#define HERE (&token.base.source_position)
 
 /** true if we are in GCC mode. */
 #define GNU_MODE ((c_mode & _GNUC) || in_gcc_extension)
@@ -372,7 +372,7 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 
 	res->base.kind            = kind;
 	res->base.parent          = current_parent;
-	res->base.source_position = token.source_position;
+	res->base.source_position = token.base.source_position;
 	return res;
 }
 
@@ -389,7 +389,7 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 
 	res->base.kind            = kind;
 	res->base.type            = type_error_type;
-	res->base.source_position = token.source_position;
+	res->base.source_position = token.base.source_position;
 	return res;
 }
 
@@ -484,7 +484,7 @@ static inline void next_token(void)
 
 static inline bool next_if(int const type)
 {
-	if (token.type == type) {
+	if (token.kind == type) {
 		next_token();
 		return true;
 	} else {
@@ -505,41 +505,41 @@ static inline const token_t *look_ahead(size_t num)
 /**
  * Adds a token type to the token type anchor set (a multi-set).
  */
-static void add_anchor_token(int token_type)
+static void add_anchor_token(int token_kind)
 {
-	assert(0 <= token_type && token_type < T_LAST_TOKEN);
-	++token_anchor_set[token_type];
+	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	++token_anchor_set[token_kind];
 }
 
 /**
  * Set the number of tokens types of the given type
  * to zero and return the old count.
  */
-static int save_and_reset_anchor_state(int token_type)
+static int save_and_reset_anchor_state(int token_kind)
 {
-	assert(0 <= token_type && token_type < T_LAST_TOKEN);
-	int count = token_anchor_set[token_type];
-	token_anchor_set[token_type] = 0;
+	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	int count = token_anchor_set[token_kind];
+	token_anchor_set[token_kind] = 0;
 	return count;
 }
 
 /**
  * Restore the number of token types to the given count.
  */
-static void restore_anchor_state(int token_type, int count)
+static void restore_anchor_state(int token_kind, int count)
 {
-	assert(0 <= token_type && token_type < T_LAST_TOKEN);
-	token_anchor_set[token_type] = count;
+	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	token_anchor_set[token_kind] = count;
 }
 
 /**
  * Remove a token type from the token type anchor set (a multi-set).
  */
-static void rem_anchor_token(int token_type)
+static void rem_anchor_token(int token_kind)
 {
-	assert(0 <= token_type && token_type < T_LAST_TOKEN);
-	assert(token_anchor_set[token_type] != 0);
-	--token_anchor_set[token_type];
+	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	assert(token_anchor_set[token_kind] != 0);
+	--token_anchor_set[token_kind];
 }
 
 /**
@@ -548,9 +548,9 @@ static void rem_anchor_token(int token_type)
  */
 static bool at_anchor(void)
 {
-	if (token.type < 0)
+	if (token.kind < 0)
 		return false;
-	return token_anchor_set[token.type];
+	return token_anchor_set[token.kind];
 }
 
 /**
@@ -569,11 +569,11 @@ static void eat_until_matching_token(int type)
 	unsigned parenthesis_count = 0;
 	unsigned brace_count       = 0;
 	unsigned bracket_count     = 0;
-	while (token.type        != end_token ||
+	while (token.kind        != end_token ||
 	       parenthesis_count != 0         ||
 	       brace_count       != 0         ||
 	       bracket_count     != 0) {
-		switch (token.type) {
+		switch (token.kind) {
 		case T_EOF: return;
 		case '(': ++parenthesis_count; break;
 		case '{': ++brace_count;       break;
@@ -593,7 +593,7 @@ static void eat_until_matching_token(int type)
 			if (bracket_count > 0)
 				--bracket_count;
 check_stop:
-			if (token.type        == end_token &&
+			if (token.kind        == end_token &&
 			    parenthesis_count == 0         &&
 			    brace_count       == 0         &&
 			    bracket_count     == 0)
@@ -612,9 +612,9 @@ check_stop:
  */
 static void eat_until_anchor(void)
 {
-	while (token_anchor_set[token.type] == 0) {
-		if (token.type == '(' || token.type == '{' || token.type == '[')
-			eat_until_matching_token(token.type);
+	while (token_anchor_set[token.kind] == 0) {
+		if (token.kind == '(' || token.kind == '{' || token.kind == '[')
+			eat_until_matching_token(token.kind);
 		next_token();
 	}
 }
@@ -628,7 +628,7 @@ static void eat_block(void)
 	next_if('}');
 }
 
-#define eat(token_type) (assert(token.type == (token_type)), next_token())
+#define eat(token_kind) (assert(token.kind == (token_kind)), next_token())
 
 /**
  * Report a parse error because an expected token was not found.
@@ -665,12 +665,12 @@ static void type_error_incompatible(const char *msg,
  */
 #define expect(expected, error_label)                     \
 	do {                                                  \
-		if (UNLIKELY(token.type != (expected))) {         \
+		if (UNLIKELY(token.kind != (expected))) {         \
 			parse_error_expected(NULL, (expected), NULL); \
 			add_anchor_token(expected);                   \
 			eat_until_anchor();                           \
 			rem_anchor_token(expected);                   \
-			if (token.type != (expected))                 \
+			if (token.kind != (expected))                 \
 			  goto error_label;                           \
 		}                                                 \
 		next_token();                                     \
@@ -1070,14 +1070,14 @@ static void warn_string_concat(const source_position_t *pos)
 
 static string_t parse_string_literals(void)
 {
-	assert(token.type == T_STRING_LITERAL);
-	string_t result = token.literal;
+	assert(token.kind == T_STRING_LITERAL);
+	string_t result = token.string.string;
 
 	next_token();
 
-	while (token.type == T_STRING_LITERAL) {
-		warn_string_concat(&token.source_position);
-		result = concat_strings(&result, &token.literal);
+	while (token.kind == T_STRING_LITERAL) {
+		warn_string_concat(&token.base.source_position);
+		result = concat_strings(&result, &token.string.string);
 		next_token();
 	}
 
@@ -1140,13 +1140,13 @@ static attribute_argument_t *parse_attribute_arguments(void)
 {
 	attribute_argument_t  *first  = NULL;
 	attribute_argument_t **anchor = &first;
-	if (token.type != ')') do {
+	if (token.kind != ')') do {
 		attribute_argument_t *argument = allocate_ast_zero(sizeof(*argument));
 
 		/* is it an identifier */
-		if (token.type == T_IDENTIFIER
-				&& (look_ahead(1)->type == ',' || look_ahead(1)->type == ')')) {
-			symbol_t *symbol   = token.symbol;
+		if (token.kind == T_IDENTIFIER
+				&& (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
+			symbol_t *symbol   = token.identifier.symbol;
 			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
 			argument->v.symbol = symbol;
 			next_token();
@@ -1186,9 +1186,9 @@ end_error:
 
 static symbol_t *get_symbol_from_token(void)
 {
-	switch(token.type) {
+	switch(token.kind) {
 	case T_IDENTIFIER:
-		return token.symbol;
+		return token.identifier.symbol;
 	case T_auto:
 	case T_char:
 	case T_double:
@@ -1218,7 +1218,7 @@ static symbol_t *get_symbol_from_token(void)
 	case T_volatile:
 	case T_inline:
 		/* maybe we need more tokens ... add them on demand */
-		return get_token_symbol(&token);
+		return get_token_kind_symbol(token.kind);
 	default:
 		return NULL;
 	}
@@ -1268,7 +1268,7 @@ static attribute_t *parse_attribute_gnu(void)
 	expect('(', end_error);
 	expect('(', end_error);
 
-	if (token.type != ')') do {
+	if (token.kind != ')') do {
 		attribute_t *attribute = parse_attribute_gnu_single();
 		if (attribute == NULL)
 			goto end_error;
@@ -1292,7 +1292,7 @@ static attribute_t *parse_attributes(attribute_t *first)
 			anchor = &(*anchor)->next;
 
 		attribute_t *attribute;
-		switch (token.type) {
+		switch (token.kind) {
 		case T___attribute__:
 			attribute = parse_attribute_gnu();
 			if (attribute == NULL)
@@ -1578,10 +1578,10 @@ static designator_t *parse_designation(void)
 
 	for (;;) {
 		designator_t *designator;
-		switch (token.type) {
+		switch (token.kind) {
 		case '[':
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.source_position;
+			designator->source_position = token.base.source_position;
 			next_token();
 			add_anchor_token(']');
 			designator->array_index = parse_constant_expression();
@@ -1590,14 +1590,14 @@ static designator_t *parse_designation(void)
 			break;
 		case '.':
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.source_position;
+			designator->source_position = token.base.source_position;
 			next_token();
-			if (token.type != T_IDENTIFIER) {
+			if (token.kind != T_IDENTIFIER) {
 				parse_error_expected("while parsing designator",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
-			designator->symbol = token.symbol;
+			designator->symbol = token.identifier.symbol;
 			next_token();
 			break;
 		default:
@@ -1713,12 +1713,12 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 {
 	/* there might be extra {} hierarchies */
 	int braces = 0;
-	if (token.type == '{') {
+	if (token.kind == '{') {
 		warningf(WARN_OTHER, HERE, "extra curly braces around scalar initializer");
 		do {
 			eat('{');
 			++braces;
-		} while (token.type == '{');
+		} while (token.kind == '{');
 	}
 
 	expression_t *expression = parse_assignment_expression();
@@ -1742,7 +1742,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 	bool additional_warning_displayed = false;
 	while (braces > 0) {
 		next_if(',');
-		if (token.type != '}') {
+		if (token.kind != '}') {
 			if (!additional_warning_displayed) {
 				warningf(WARN_OTHER, HERE, "additional elements in scalar initializer");
 				additional_warning_displayed = true;
@@ -2038,10 +2038,10 @@ static void skip_initializers(void)
 {
 	next_if('{');
 
-	while (token.type != '}') {
-		if (token.type == T_EOF)
+	while (token.kind != '}') {
+		if (token.kind == T_EOF)
 			return;
-		if (token.type == '{') {
+		if (token.kind == '{') {
 			eat_block();
 			continue;
 		}
@@ -2063,7 +2063,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		type_t *outer_type, size_t top_path_level,
 		parse_initializer_env_t *env)
 {
-	if (token.type == '}') {
+	if (token.kind == '}') {
 		/* empty initializer */
 		return create_empty_initializer();
 	}
@@ -2081,14 +2081,14 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 
 	while (true) {
 		designator_t *designator = NULL;
-		if (token.type == '.' || token.type == '[') {
+		if (token.kind == '.' || token.kind == '[') {
 			designator = parse_designation();
 			goto finish_designator;
-		} else if (token.type == T_IDENTIFIER && look_ahead(1)->type == ':') {
+		} else if (token.kind == T_IDENTIFIER && look_ahead(1)->kind == ':') {
 			/* GNU-style designator ("identifier: value") */
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.source_position;
-			designator->symbol          = token.symbol;
+			designator->source_position = token.base.source_position;
+			designator->symbol          = token.identifier.symbol;
 			eat(T_IDENTIFIER);
 			eat(':');
 
@@ -2111,7 +2111,7 @@ finish_designator:
 
 		initializer_t *sub;
 
-		if (token.type == '{') {
+		if (token.kind == '{') {
 			if (type != NULL && is_type_scalar(type)) {
 				sub = parse_scalar_initializer(type, env->must_be_constant);
 			} else {
@@ -2179,7 +2179,7 @@ finish_designator:
 				sub = initializer_from_expression(outer_type, expression);
 				if (sub != NULL) {
 					next_if(',');
-					if (token.type != '}') {
+					if (token.kind != '}') {
 						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", orig_type);
 					}
 					/* TODO: eat , ... */
@@ -2224,11 +2224,11 @@ finish_designator:
 		ARR_APP1(initializer_t*, initializers, sub);
 
 error_parse_next:
-		if (token.type == '}') {
+		if (token.kind == '}') {
 			break;
 		}
 		expect(',', end_error);
-		if (token.type == '}') {
+		if (token.kind == '}') {
 			break;
 		}
 
@@ -2287,7 +2287,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 
 	if (is_type_scalar(type)) {
 		result = parse_scalar_initializer(type, env->must_be_constant);
-	} else if (token.type == '{') {
+	} else if (token.kind == '{') {
 		eat('{');
 
 		type_path_t path;
@@ -2374,31 +2374,31 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	entity_t    *entity     = NULL;
 	attribute_t *attributes = NULL;
 
-	if (token.type == T___attribute__) {
+	if (token.kind == T___attribute__) {
 		attributes = parse_attributes(NULL);
 	}
 
 	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
-	if (token.type == T_IDENTIFIER) {
+	if (token.kind == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
-		symbol = token.symbol;
+		symbol = token.identifier.symbol;
 		entity = get_tag(symbol, kind);
 		next_token();
 
 		if (entity != NULL) {
 			if (entity->base.parent_scope != current_scope &&
-			    (token.type == '{' || token.type == ';')) {
+			    (token.kind == '{' || token.kind == ';')) {
 				/* we're in an inner scope and have a definition. Shadow
 				 * existing definition in outer scope */
 				entity = NULL;
-			} else if (entity->compound.complete && token.type == '{') {
+			} else if (entity->compound.complete && token.kind == '{') {
 				source_position_t const *const ppos = &entity->base.source_position;
 				errorf(&pos, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
 				/* clear members in the hope to avoid further errors */
 				entity->compound.members.entities = NULL;
 			}
 		}
-	} else if (token.type != '{') {
+	} else if (token.kind != '{') {
 		char const *const msg =
 			is_struct ? "while parsing struct type specifier" :
 			            "while parsing union type specifier";
@@ -2418,7 +2418,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		append_entity(current_scope, entity);
 	}
 
-	if (token.type == '{') {
+	if (token.kind == '{') {
 		parse_compound_type_entries(&entity->compound);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
@@ -2439,7 +2439,7 @@ static void parse_enum_entries(type_t *const enum_type)
 {
 	eat('{');
 
-	if (token.type == '}') {
+	if (token.kind == '}') {
 		errorf(HERE, "empty enum not allowed");
 		next_token();
 		return;
@@ -2447,16 +2447,18 @@ static void parse_enum_entries(type_t *const enum_type)
 
 	add_anchor_token('}');
 	do {
-		if (token.type != T_IDENTIFIER) {
+		if (token.kind != T_IDENTIFIER) {
 			parse_error_expected("while parsing enum entry", T_IDENTIFIER, NULL);
 			eat_block();
 			rem_anchor_token('}');
 			return;
 		}
 
-		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, token.symbol);
+		symbol_t *symbol       = token.identifier.symbol;
+		entity_t *const entity
+			= allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol);
 		entity->enum_value.enum_type = enum_type;
-		entity->base.source_position = token.source_position;
+		entity->base.source_position = token.base.source_position;
 		next_token();
 
 		if (next_if('=')) {
@@ -2469,7 +2471,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		}
 
 		record_entity(entity, false);
-	} while (next_if(',') && token.type != '}');
+	} while (next_if(',') && token.kind != '}');
 	rem_anchor_token('}');
 
 	expect('}', end_error);
@@ -2485,19 +2487,19 @@ static type_t *parse_enum_specifier(void)
 	symbol_t               *symbol;
 
 	eat(T_enum);
-	switch (token.type) {
+	switch (token.kind) {
 		case T_IDENTIFIER:
-			symbol = token.symbol;
+			symbol = token.identifier.symbol;
 			entity = get_tag(symbol, ENTITY_ENUM);
 			next_token();
 
 			if (entity != NULL) {
 				if (entity->base.parent_scope != current_scope &&
-						(token.type == '{' || token.type == ';')) {
+						(token.kind == '{' || token.kind == ';')) {
 					/* we're in an inner scope and have a definition. Shadow
 					 * existing definition in outer scope */
 					entity = NULL;
-				} else if (entity->enume.complete && token.type == '{') {
+				} else if (entity->enume.complete && token.kind == '{') {
 					source_position_t const *const ppos = &entity->base.source_position;
 					errorf(&pos, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
 				}
@@ -2525,7 +2527,7 @@ static type_t *parse_enum_specifier(void)
 	type->enumt.enume  = &entity->enume;
 	type->enumt.akind  = ATOMIC_TYPE_INT;
 
-	if (token.type == '{') {
+	if (token.kind == '{') {
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
@@ -2567,9 +2569,9 @@ static type_t *parse_typeof(void)
 
 	expression_t *expression  = NULL;
 
-	switch (token.type) {
+	switch (token.kind) {
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.symbol)) {
+		if (is_typedef_symbol(token.identifier.symbol)) {
 	DECLARATION_START
 			type = parse_typename();
 		} else {
@@ -2634,14 +2636,14 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		= allocate_ast_zero(sizeof(*property));
 
 	do {
-		if (token.type != T_IDENTIFIER) {
+		if (token.kind != T_IDENTIFIER) {
 			parse_error_expected("while parsing property declspec",
 			                     T_IDENTIFIER, NULL);
 			goto end_error;
 		}
 
 		symbol_t **prop;
-		symbol_t  *symbol = token.symbol;
+		symbol_t  *symbol = token.identifier.symbol;
 		if (strcmp(symbol->string, "put") == 0) {
 			prop = &property->put_symbol;
 		} else if (strcmp(symbol->string, "get") == 0) {
@@ -2652,13 +2654,13 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		}
 		eat(T_IDENTIFIER);
 		expect('=', end_error);
-		if (token.type != T_IDENTIFIER) {
+		if (token.kind != T_IDENTIFIER) {
 			parse_error_expected("while parsing property declspec",
 			                     T_IDENTIFIER, NULL);
 			goto end_error;
 		}
 		if (prop != NULL)
-			*prop = token.symbol;
+			*prop = token.identifier.symbol;
 		next_token();
 	} while (next_if(','));
 
@@ -2675,8 +2677,8 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	attribute_kind_t kind = ATTRIBUTE_UNKNOWN;
 	if (next_if(T_restrict)) {
 		kind = ATTRIBUTE_MS_RESTRICT;
-	} else if (token.type == T_IDENTIFIER) {
-		const char *name = token.symbol->string;
+	} else if (token.kind == T_IDENTIFIER) {
+		const char *name = token.identifier.symbol->string;
 		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
 		     ++k) {
 			const char *attribute_name = get_attribute_name(k);
@@ -2767,12 +2769,12 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	bool               saw_error       = false;
 
 	memset(specifiers, 0, sizeof(*specifiers));
-	specifiers->source_position = token.source_position;
+	specifiers->source_position = token.base.source_position;
 
 	while (true) {
 		specifiers->attributes = parse_attributes(specifiers->attributes);
 
-		switch (token.type) {
+		switch (token.kind) {
 		/* storage class */
 #define MATCH_STORAGE_CLASS(token, class)                                  \
 		case token:                                                        \
@@ -2923,7 +2925,7 @@ wrong_thread_storage_class:
 				/* Be somewhat resilient to typos like 'unsigned lng* f()' in a
 				 * declaration, so it doesn't generate errors about expecting '(' or
 				 * '{' later on. */
-				switch (look_ahead(1)->type) {
+				switch (look_ahead(1)->kind) {
 					STORAGE_CLASSES
 					TYPE_SPECIFIERS
 					case T_const:
@@ -2943,12 +2945,12 @@ wrong_thread_storage_class:
 				}
 			}
 
-			type_t *const typedef_type = get_typedef_type(token.symbol);
+			type_t *const typedef_type = get_typedef_type(token.identifier.symbol);
 			if (typedef_type == NULL) {
 				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
 				 * errors later on. */
-				token_type_t const la1_type = (token_type_t)look_ahead(1)->type;
+				token_kind_t const la1_type = (token_kind_t)look_ahead(1)->kind;
 				switch (la1_type) {
 					DECLARATION_START
 					case T_IDENTIFIER:
@@ -2956,8 +2958,9 @@ wrong_thread_storage_class:
 					case '*': {
 						errorf(HERE, "%K does not name a type", &token);
 
-						entity_t *entity =
-							create_error_entity(token.symbol, ENTITY_TYPEDEF);
+						symbol_t *symbol = token.identifier.symbol;
+						entity_t *entity
+							= create_error_entity(symbol, ENTITY_TYPEDEF);
 
 						type = allocate_type_zero(TYPE_TYPEDEF);
 						type->typedeft.typedefe = &entity->typedefe;
@@ -3185,7 +3188,7 @@ static type_qualifiers_t parse_type_qualifiers(void)
 	type_qualifiers_t qualifiers = TYPE_QUALIFIER_NONE;
 
 	while (true) {
-		switch (token.type) {
+		switch (token.kind) {
 		/* type qualifiers */
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
 		MATCH_TYPE_QUALIFIER(T_restrict, TYPE_QUALIFIER_RESTRICT);
@@ -3208,15 +3211,16 @@ static type_qualifiers_t parse_type_qualifiers(void)
  */
 static void parse_identifier_list(scope_t *scope)
 {
+	assert(token.kind == T_IDENTIFIER);
 	do {
-		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.symbol);
-		entity->base.source_position = token.source_position;
+		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.identifier.symbol);
+		entity->base.source_position = token.base.source_position;
 		/* a K&R parameter has no type, yet */
 		next_token();
 
 		if (scope != NULL)
 			append_entity(scope, entity);
-	} while (next_if(',') && token.type == T_IDENTIFIER);
+	} while (next_if(',') && token.kind == T_IDENTIFIER);
 }
 
 static entity_t *parse_parameter(void)
@@ -3247,18 +3251,19 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 static bool has_parameters(void)
 {
 	/* func(void) is not a parameter */
-	if (token.type == T_IDENTIFIER) {
-		entity_t const *const entity = get_entity(token.symbol, NAMESPACE_NORMAL);
+	if (token.kind == T_IDENTIFIER) {
+		entity_t const *const entity
+			= get_entity(token.identifier.symbol, NAMESPACE_NORMAL);
 		if (entity == NULL)
 			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
 			return true;
 		if (skip_typeref(entity->typedefe.type) != type_void)
 			return true;
-	} else if (token.type != T_void) {
+	} else if (token.kind != T_void) {
 		return true;
 	}
-	if (look_ahead(1)->type != ')')
+	if (look_ahead(1)->kind != ')')
 		return true;
 	next_token();
 	return false;
@@ -3274,9 +3279,9 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 	add_anchor_token(')');
 	int saved_comma_state = save_and_reset_anchor_state(',');
 
-	if (token.type == T_IDENTIFIER &&
-	    !is_typedef_symbol(token.symbol)) {
-		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
+	if (token.kind == T_IDENTIFIER
+	    && !is_typedef_symbol(token.identifier.symbol)) {
+		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
 		if (la1_type == ',' || la1_type == ')') {
 			type->kr_style_parameters = true;
 			parse_identifier_list(scope);
@@ -3284,14 +3289,14 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		}
 	}
 
-	if (token.type == ')') {
+	if (token.kind == ')') {
 		/* ISO/IEC 14882:1998(E) §C.1.6:1 */
 		if (!(c_mode & _CXX))
 			type->unspecified_parameters = true;
 	} else if (has_parameters()) {
 		function_parameter_t **anchor = &type->parameters;
 		do {
-			switch (token.type) {
+			switch (token.kind) {
 			case T_DOTDOTDOT:
 				next_token();
 				type->variadic = true;
@@ -3436,10 +3441,10 @@ static construct_type_t *parse_array_declarator(void)
 	array->is_static       = is_static;
 
 	expression_t *size = NULL;
-	if (token.type == '*' && look_ahead(1)->type == ']') {
+	if (token.kind == '*' && look_ahead(1)->kind == ']') {
 		array->is_variable = true;
 		next_token();
-	} else if (token.type != ']') {
+	} else if (token.kind != ']') {
 		size = parse_assignment_expression();
 
 		/* §6.7.5.2:1  Array size must have integer type */
@@ -3506,7 +3511,7 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 	for (;;) {
 		construct_type_t *type;
 		//variable_t       *based = NULL; /* MS __based extension */
-		switch (token.type) {
+		switch (token.kind) {
 			case '&':
 				type = parse_reference_declarator();
 				break;
@@ -3534,13 +3539,13 @@ static construct_type_t *parse_inner_declarator(parse_declarator_env_t *env)
 ptr_operator_end: ;
 	construct_type_t *inner_types = NULL;
 
-	switch (token.type) {
+	switch (token.kind) {
 	case T_IDENTIFIER:
 		if (env->must_be_abstract) {
 			errorf(HERE, "no identifier expected in typename");
 		} else {
-			env->symbol          = token.symbol;
-			env->source_position = token.source_position;
+			env->symbol          = token.identifier.symbol;
+			env->source_position = token.base.source_position;
 		}
 		next_token();
 		break;
@@ -3548,9 +3553,9 @@ ptr_operator_end: ;
 	case '(': {
 		/* Parenthesized declarator or function declarator? */
 		token_t const *const la1 = look_ahead(1);
-		switch (la1->type) {
+		switch (la1->kind) {
 			case T_IDENTIFIER:
-				if (is_typedef_symbol(la1->symbol)) {
+				if (is_typedef_symbol(la1->identifier.symbol)) {
 			case ')':
 					/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
 					 * interpreted as ``function with no parameter specification'', rather
@@ -3594,7 +3599,7 @@ ptr_operator_end: ;
 
 	for (;;) {
 		construct_type_t *type;
-		switch (token.type) {
+		switch (token.kind) {
 		case '(': {
 			scope_t *scope = NULL;
 			if (!env->must_be_abstract) {
@@ -4282,11 +4287,11 @@ static void parser_error_multiple_definition(entity_t *entity,
 
 static bool is_declaration_specifier(const token_t *token)
 {
-	switch (token->type) {
+	switch (token->kind) {
 		DECLARATION_START
 			return true;
 		case T_IDENTIFIER:
-			return is_typedef_symbol(token->symbol);
+			return is_typedef_symbol(token->identifier.symbol);
 
 		default:
 			return false;
@@ -4408,9 +4413,9 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 	add_anchor_token(';');
 	add_anchor_token(',');
 	while (true) {
-		entity_t *entity = finished_declaration(ndeclaration, token.type == '=');
+		entity_t *entity = finished_declaration(ndeclaration, token.kind == '=');
 
-		if (token.type == '=') {
+		if (token.kind == '=') {
 			parse_init_declarator_rest(entity);
 		} else if (entity->kind == ENTITY_VARIABLE) {
 			/* ISO/IEC 14882:1998(E) §8.5.3:3  The initializer can be omitted
@@ -4472,7 +4477,7 @@ static void parse_declaration(parsed_declaration_func finished_declaration,
 	parse_declaration_specifiers(&specifiers);
 	rem_anchor_token(';');
 
-	if (token.type == ';') {
+	if (token.kind == ';') {
 		parse_anonymous_declaration_rest(&specifiers);
 	} else {
 		entity_t *entity = parse_declarator(&specifiers, flags);
@@ -4518,7 +4523,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 
 	/* parse declaration list */
 	for (;;) {
-		switch (token.type) {
+		switch (token.kind) {
 			DECLARATION_START
 			/* This covers symbols, which are no type, too, and results in
 			 * better error messages.  The typical cases are misspelled type
@@ -5349,7 +5354,7 @@ static void parse_external_declaration(void)
 	rem_anchor_token(';');
 
 	/* must be a declaration */
-	if (token.type == ';') {
+	if (token.kind == ';') {
 		parse_anonymous_declaration_rest(&specifiers);
 		return;
 	}
@@ -5368,7 +5373,7 @@ static void parse_external_declaration(void)
 	rem_anchor_token(',');
 
 	/* must be a declaration */
-	switch (token.type) {
+	switch (token.kind) {
 		case ',':
 		case ';':
 		case '=':
@@ -5380,7 +5385,7 @@ static void parse_external_declaration(void)
 	/* must be a function definition */
 	parse_kr_declaration_list(ndeclaration);
 
-	if (token.type != '{') {
+	if (token.kind != '{') {
 		parse_error_expected("while parsing function definition", '{', NULL);
 		eat_until_matching_token(';');
 		return;
@@ -5654,7 +5659,7 @@ static void parse_compound_declarators(compound_t *compound,
 	do {
 		entity_t *entity;
 
-		if (token.type == ':') {
+		if (token.kind == ':') {
 			source_position_t source_position = *HERE;
 			next_token();
 
@@ -5700,7 +5705,7 @@ static void parse_compound_declarators(compound_t *compound,
 					}
 				}
 
-				if (token.type == ':') {
+				if (token.kind == ':') {
 					source_position_t source_position = *HERE;
 					next_token();
 					expression_t *size = parse_constant_expression();
@@ -5720,8 +5725,8 @@ static void parse_compound_declarators(compound_t *compound,
 					} else if (is_type_incomplete(type)) {
 						/* §6.7.2.1:16 flexible array member */
 						if (!is_type_array(type)       ||
-								token.type          != ';' ||
-								look_ahead(1)->type != '}') {
+								token.kind          != ';' ||
+								look_ahead(1)->kind != '}') {
 							errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
 						}
 					}
@@ -5743,7 +5748,7 @@ static void parse_compound_type_entries(compound_t *compound)
 	add_anchor_token('}');
 
 	for (;;) {
-		switch (token.type) {
+		switch (token.kind) {
 			DECLARATION_START
 			case T___extension__:
 			case T_IDENTIFIER: {
@@ -5804,7 +5809,7 @@ static expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 static expression_t *expected_expression_error(void)
 {
 	/* skip the error message if the error token was read */
-	if (token.type != T_ERROR) {
+	if (token.kind != T_ERROR) {
 		errorf(HERE, "expected expression, got token %K", &token);
 	}
 	next_token();
@@ -5827,17 +5832,17 @@ static type_t *get_wide_string_type(void)
  */
 static expression_t *parse_string_literal(void)
 {
-	source_position_t begin   = token.source_position;
-	string_t          res     = token.literal;
-	bool              is_wide = (token.type == T_WIDE_STRING_LITERAL);
+	source_position_t begin   = token.base.source_position;
+	string_t          res     = token.string.string;
+	bool              is_wide = (token.kind == T_WIDE_STRING_LITERAL);
 
 	next_token();
-	while (token.type == T_STRING_LITERAL
-			|| token.type == T_WIDE_STRING_LITERAL) {
-		warn_string_concat(&token.source_position);
-		res = concat_strings(&res, &token.literal);
+	while (token.kind == T_STRING_LITERAL
+			|| token.kind == T_WIDE_STRING_LITERAL) {
+		warn_string_concat(&token.base.source_position);
+		res = concat_strings(&res, &token.string.string);
 		next_token();
-		is_wide |= token.type == T_WIDE_STRING_LITERAL;
+		is_wide |= token.kind == T_WIDE_STRING_LITERAL;
 	}
 
 	expression_t *literal;
@@ -5870,17 +5875,18 @@ static expression_t *parse_boolean_literal(bool value)
 
 static void warn_traditional_suffix(void)
 {
-	warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%Y' suffix", token.symbol);
+	warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%S' suffix",
+	         &token.number.suffix);
 }
 
 static void check_integer_suffix(void)
 {
-	symbol_t *suffix = token.symbol;
-	if (suffix == NULL)
+	const string_t *suffix = &token.number.suffix;
+	if (suffix->size == 0)
 		return;
 
 	bool not_traditional = false;
-	const char *c = suffix->string;
+	const char *c = suffix->begin;
 	if (*c == 'l' || *c == 'L') {
 		++c;
 		if (*c == *(c-1)) {
@@ -5904,8 +5910,8 @@ static void check_integer_suffix(void)
 		}
 	}
 	if (*c != '\0') {
-		errorf(&token.source_position,
-		       "invalid suffix '%s' on integer constant", suffix->string);
+		errorf(&token.base.source_position,
+		       "invalid suffix '%S' on integer constant", suffix);
 	} else if (not_traditional) {
 		warn_traditional_suffix();
 	}
@@ -5913,13 +5919,13 @@ static void check_integer_suffix(void)
 
 static type_t *check_floatingpoint_suffix(void)
 {
-	symbol_t *suffix = token.symbol;
-	type_t   *type   = type_double;
-	if (suffix == NULL)
+	const string_t *suffix = &token.number.suffix;
+	type_t         *type   = type_double;
+	if (suffix->size == 0)
 		return type;
 
 	bool not_traditional = false;
-	const char *c = suffix->string;
+	const char *c = suffix->begin;
 	if (*c == 'f' || *c == 'F') {
 		++c;
 		type = type_float;
@@ -5928,8 +5934,8 @@ static type_t *check_floatingpoint_suffix(void)
 		type = type_long_double;
 	}
 	if (*c != '\0') {
-		errorf(&token.source_position,
-		       "invalid suffix '%s' on floatingpoint constant", suffix->string);
+		errorf(&token.base.source_position,
+		       "invalid suffix '%S' on floatingpoint constant", suffix);
 	} else if (not_traditional) {
 		warn_traditional_suffix();
 	}
@@ -5945,7 +5951,7 @@ static expression_t *parse_number_literal(void)
 	expression_kind_t  kind;
 	type_t            *type;
 
-	switch (token.type) {
+	switch (token.kind) {
 	case T_INTEGER:
 		kind = EXPR_LITERAL_INTEGER;
 		check_integer_suffix();
@@ -5975,8 +5981,8 @@ static expression_t *parse_number_literal(void)
 
 	expression_t *literal = allocate_expression_zero(kind);
 	literal->base.type      = type;
-	literal->literal.value  = token.literal;
-	literal->literal.suffix = token.symbol;
+	literal->literal.value  = token.number.number;
+	literal->literal.suffix = token.number.suffix;
 	next_token();
 
 	/* integer type depends on the size of the number and the size
@@ -5994,7 +6000,7 @@ static expression_t *parse_character_constant(void)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
 	literal->base.type     = c_mode & _CXX ? type_char : type_int;
-	literal->literal.value = token.literal;
+	literal->literal.value = token.string.string;
 
 	size_t len = literal->literal.value.size;
 	if (len > 1) {
@@ -6017,7 +6023,7 @@ static expression_t *parse_wide_character_constant(void)
 {
 	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
 	literal->base.type     = type_int;
-	literal->literal.value = token.literal;
+	literal->literal.value = token.string.string;
 
 	size_t len = wstrlen(&literal->literal.value);
 	if (len > 1) {
@@ -6169,11 +6175,11 @@ static entity_t *parse_qualified_identifier(void)
 
 	entity_t *entity;
 	while (true) {
-		if (token.type != T_IDENTIFIER) {
+		if (token.kind != T_IDENTIFIER) {
 			parse_error_expected("while parsing identifier", T_IDENTIFIER, NULL);
 			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 		}
-		symbol = token.symbol;
+		symbol = token.identifier.symbol;
 		pos    = *HERE;
 		next_token();
 
@@ -6204,7 +6210,7 @@ static entity_t *parse_qualified_identifier(void)
 	}
 
 	if (entity == NULL) {
-		if (!strict_mode && token.type == '(') {
+		if (!strict_mode && token.kind == '(') {
 			/* an implicitly declared function */
 			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos, "implicit declaration of function '%Y'", symbol);
 			entity = create_implicit_function(symbol, &pos);
@@ -6219,7 +6225,7 @@ static entity_t *parse_qualified_identifier(void)
 
 static expression_t *parse_reference(void)
 {
-	source_position_t const pos    = token.source_position;
+	source_position_t const pos    = token.base.source_position;
 	entity_t         *const entity = parse_qualified_identifier();
 
 	type_t *orig_type;
@@ -6345,7 +6351,7 @@ static expression_t *parse_cast(void)
 	rem_anchor_token(')');
 	expect(')', end_error);
 
-	if (token.type == '{') {
+	if (token.kind == '{') {
 		return parse_compound_literal(&pos, type);
 	}
 
@@ -6408,13 +6414,13 @@ end_error:
 static expression_t *parse_parenthesized_expression(void)
 {
 	token_t const* const la1 = look_ahead(1);
-	switch (la1->type) {
+	switch (la1->kind) {
 	case '{':
 		/* gcc extension: a statement expression */
 		return parse_statement_expression();
 
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(la1->symbol)) {
+		if (is_typedef_symbol(la1->identifier.symbol)) {
 	DECLARATION_START
 			return parse_cast();
 		}
@@ -6498,25 +6504,25 @@ static designator_t *parse_designator(void)
 	designator_t *result    = allocate_ast_zero(sizeof(result[0]));
 	result->source_position = *HERE;
 
-	if (token.type != T_IDENTIFIER) {
+	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing member designator",
 		                     T_IDENTIFIER, NULL);
 		return NULL;
 	}
-	result->symbol = token.symbol;
+	result->symbol = token.identifier.symbol;
 	next_token();
 
 	designator_t *last_designator = result;
 	while (true) {
 		if (next_if('.')) {
-			if (token.type != T_IDENTIFIER) {
+			if (token.kind != T_IDENTIFIER) {
 				parse_error_expected("while parsing member designator",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = *HERE;
-			designator->symbol          = token.symbol;
+			designator->symbol          = token.identifier.symbol;
 			next_token();
 
 			last_designator->next = designator;
@@ -6729,7 +6735,7 @@ static expression_t *parse_compare_builtin(void)
 {
 	expression_t *expression;
 
-	switch (token.type) {
+	switch (token.kind) {
 	case T___builtin_isgreater:
 		expression = allocate_expression_zero(EXPR_BINARY_ISGREATER);
 		break;
@@ -6805,10 +6811,10 @@ end_error:
  */
 static label_t *get_label(void)
 {
-	assert(token.type == T_IDENTIFIER);
+	assert(token.kind == T_IDENTIFIER);
 	assert(current_function != NULL);
 
-	entity_t *label = get_entity(token.symbol, NAMESPACE_LABEL);
+	entity_t *label = get_entity(token.identifier.symbol, NAMESPACE_LABEL);
 	/* If we find a local label, we already created the declaration. */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != current_scope) {
@@ -6817,7 +6823,7 @@ static label_t *get_label(void)
 		}
 	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.symbol);
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.identifier.symbol);
 		label_push(label);
 	}
 
@@ -6830,9 +6836,9 @@ static label_t *get_label(void)
  */
 static expression_t *parse_label_address(void)
 {
-	source_position_t source_position = token.source_position;
+	source_position_t source_position = token.base.source_position;
 	eat(T_ANDAND);
-	if (token.type != T_IDENTIFIER) {
+	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
 		return create_invalid_expression();
 	}
@@ -6863,13 +6869,13 @@ static expression_t *parse_noop_expression(void)
 
 	eat(T___noop);
 
-	if (token.type == '(') {
+	if (token.kind == '(') {
 		/* parse arguments */
 		eat('(');
 		add_anchor_token(')');
 		add_anchor_token(',');
 
-		if (token.type != ')') do {
+		if (token.kind != ')') do {
 			(void)parse_assignment_expression();
 		} while (next_if(','));
 	}
@@ -6886,7 +6892,7 @@ end_error:
  */
 static expression_t *parse_primary_expression(void)
 {
-	switch (token.type) {
+	switch (token.kind) {
 	case T_false:                        return parse_boolean_literal(false);
 	case T_true:                         return parse_boolean_literal(true);
 	case T_INTEGER:
@@ -6928,7 +6934,7 @@ static expression_t *parse_primary_expression(void)
 	case T_COLONCOLON:
 		return parse_reference();
 	case T_IDENTIFIER:
-		if (!is_typedef_symbol(token.symbol)) {
+		if (!is_typedef_symbol(token.identifier.symbol)) {
 			return parse_reference();
 		}
 		/* FALLTHROUGH */
@@ -7015,7 +7021,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 
 	type_t       *orig_type;
 	expression_t *expression;
-	if (token.type == '(' && is_declaration_specifier(look_ahead(1))) {
+	if (token.kind == '(' && is_declaration_specifier(look_ahead(1))) {
 		source_position_t const pos = *HERE;
 		next_token();
 		add_anchor_token(')');
@@ -7023,7 +7029,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 		rem_anchor_token(')');
 		expect(')', end_error);
 
-		if (token.type == '{') {
+		if (token.kind == '{') {
 			/* It was not sizeof(type) after all.  It is sizeof of an expression
 			 * starting with a compound literal */
 			expression = parse_compound_literal(&pos, orig_type);
@@ -7084,16 +7090,16 @@ static expression_t *parse_alignof(void)
 
 static expression_t *parse_select_expression(expression_t *addr)
 {
-	assert(token.type == '.' || token.type == T_MINUSGREATER);
-	bool select_left_arrow = (token.type == T_MINUSGREATER);
+	assert(token.kind == '.' || token.kind == T_MINUSGREATER);
+	bool select_left_arrow = (token.kind == T_MINUSGREATER);
 	source_position_t const pos = *HERE;
 	next_token();
 
-	if (token.type != T_IDENTIFIER) {
+	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
 		return create_invalid_expression();
 	}
-	symbol_t *symbol = token.symbol;
+	symbol_t *symbol = token.identifier.symbol;
 	next_token();
 
 	type_t *const orig_type = addr->base.type;
@@ -7294,7 +7300,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	add_anchor_token(')');
 	add_anchor_token(',');
 
-	if (token.type != ')') {
+	if (token.kind != ')') {
 		call_argument_t **anchor = &call->arguments;
 		do {
 			call_argument_t *argument = allocate_ast_zero(sizeof(*argument));
@@ -7451,7 +7457,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 
 	expression_t *true_expression = expression;
 	bool          gnu_cond = false;
-	if (GNU_MODE && token.type == ':') {
+	if (GNU_MODE && token.kind == ':') {
 		gnu_cond = true;
 	} else {
 		true_expression = parse_expression();
@@ -7627,7 +7633,7 @@ static expression_t *parse_throw(void)
 	eat(T_throw);
 
 	expression_t *value = NULL;
-	switch (token.type) {
+	switch (token.kind) {
 		EXPRESSION_START {
 			value = parse_assignment_expression();
 			/* ISO/IEC 14882:1998(E) §15.1:3 */
@@ -7849,12 +7855,12 @@ static void semantic_take_addr(unary_expression_t *expression)
 	expression->base.type = make_pointer_type(orig_type, TYPE_QUALIFIER_NONE);
 }
 
-#define CREATE_UNARY_EXPRESSION_PARSER(token_type, unexpression_type, sfunc) \
+#define CREATE_UNARY_EXPRESSION_PARSER(token_kind, unexpression_type, sfunc) \
 static expression_t *parse_##unexpression_type(void)                         \
 {                                                                            \
 	expression_t *unary_expression                                           \
 		= allocate_expression_zero(unexpression_type);                       \
-	eat(token_type);                                                         \
+	eat(token_kind);                                                         \
 	unary_expression->unary.value = parse_subexpression(PREC_UNARY);         \
 	                                                                         \
 	sfunc(&unary_expression->unary);                                         \
@@ -7879,13 +7885,13 @@ CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   EXPR_UNARY_PREFIX_INCREMENT,
 CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, EXPR_UNARY_PREFIX_DECREMENT,
                                semantic_incdec)
 
-#define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_type, unexpression_type, \
+#define CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(token_kind, unexpression_type, \
                                                sfunc)                         \
 static expression_t *parse_##unexpression_type(expression_t *left)            \
 {                                                                             \
 	expression_t *unary_expression                                            \
 		= allocate_expression_zero(unexpression_type);                        \
-	eat(token_type);                                                          \
+	eat(token_kind);                                                          \
 	unary_expression->unary.value = left;                                     \
 	                                                                          \
 	sfunc(&unary_expression->unary);                                          \
@@ -8663,12 +8669,12 @@ static void semantic_comma(binary_expression_t *expression)
 /**
  * @param prec_r precedence of the right operand
  */
-#define CREATE_BINEXPR_PARSER(token_type, binexpression_type, prec_r, sfunc) \
+#define CREATE_BINEXPR_PARSER(token_kind, binexpression_type, prec_r, sfunc) \
 static expression_t *parse_##binexpression_type(expression_t *left)          \
 {                                                                            \
 	expression_t *binexpr = allocate_expression_zero(binexpression_type);    \
 	binexpr->binary.left  = left;                                            \
-	eat(token_type);                                                         \
+	eat(token_kind);                                                         \
                                                                              \
 	expression_t *right = parse_subexpression(prec_r);                       \
                                                                              \
@@ -8712,12 +8718,12 @@ CREATE_BINEXPR_PARSER(',',                    EXPR_BINARY_COMMA,              PR
 
 static expression_t *parse_subexpression(precedence_t precedence)
 {
-	if (token.type < 0) {
+	if (token.kind < 0) {
 		return expected_expression_error();
 	}
 
 	expression_parser_function_t *parser
-		= &expression_parsers[token.type];
+		= &expression_parsers[token.kind];
 	expression_t                 *left;
 
 	if (parser->parser != NULL) {
@@ -8728,11 +8734,11 @@ static expression_t *parse_subexpression(precedence_t precedence)
 	assert(left != NULL);
 
 	while (true) {
-		if (token.type < 0) {
+		if (token.kind < 0) {
 			return expected_expression_error();
 		}
 
-		parser = &expression_parsers[token.type];
+		parser = &expression_parsers[token.kind];
 		if (parser->infix_parser == NULL)
 			break;
 		if (parser->infix_precedence < precedence)
@@ -8759,15 +8765,15 @@ static expression_t *parse_expression(void)
  * Register a parser for a prefix-like operator.
  *
  * @param parser      the parser function
- * @param token_type  the token type of the prefix token
+ * @param token_kind  the token type of the prefix token
  */
 static void register_expression_parser(parse_expression_function parser,
-                                       int token_type)
+                                       int token_kind)
 {
-	expression_parser_function_t *entry = &expression_parsers[token_type];
+	expression_parser_function_t *entry = &expression_parsers[token_kind];
 
 	if (entry->parser != NULL) {
-		diagnosticf("for token '%k'\n", (token_type_t)token_type);
+		diagnosticf("for token '%k'\n", (token_kind_t)token_kind);
 		panic("trying to register multiple expression parsers for a token");
 	}
 	entry->parser = parser;
@@ -8777,16 +8783,16 @@ static void register_expression_parser(parse_expression_function parser,
  * Register a parser for an infix operator with given precedence.
  *
  * @param parser      the parser function
- * @param token_type  the token type of the infix operator
+ * @param token_kind  the token type of the infix operator
  * @param precedence  the precedence of the operator
  */
 static void register_infix_parser(parse_expression_infix_function parser,
-                                  int token_type, precedence_t precedence)
+                                  int token_kind, precedence_t precedence)
 {
-	expression_parser_function_t *entry = &expression_parsers[token_type];
+	expression_parser_function_t *entry = &expression_parsers[token_kind];
 
 	if (entry->infix_parser != NULL) {
-		diagnosticf("for token '%k'\n", (token_type_t)token_type);
+		diagnosticf("for token '%k'\n", (token_kind_t)token_kind);
 		panic("trying to register multiple infix expression parsers for a "
 		      "token");
 	}
@@ -8863,17 +8869,17 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 	asm_argument_t  *result = NULL;
 	asm_argument_t **anchor = &result;
 
-	while (token.type == T_STRING_LITERAL || token.type == '[') {
+	while (token.kind == T_STRING_LITERAL || token.kind == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 		memset(argument, 0, sizeof(argument[0]));
 
 		if (next_if('[')) {
-			if (token.type != T_IDENTIFIER) {
+			if (token.kind != T_IDENTIFIER) {
 				parse_error_expected("while parsing asm argument",
 				                     T_IDENTIFIER, NULL);
 				return NULL;
 			}
-			argument->symbol = token.symbol;
+			argument->symbol = token.identifier.symbol;
 
 			expect(']', end_error);
 		}
@@ -8965,7 +8971,7 @@ static asm_clobber_t *parse_asm_clobbers(void)
 	asm_clobber_t *result  = NULL;
 	asm_clobber_t **anchor = &result;
 
-	while (token.type == T_STRING_LITERAL) {
+	while (token.kind == T_STRING_LITERAL) {
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 		clobber->clobber       = parse_string_literals();
 
@@ -8994,7 +9000,7 @@ static statement_t *parse_asm_statement(void)
 
 	expect('(', end_error);
 	add_anchor_token(')');
-	if (token.type != T_STRING_LITERAL) {
+	if (token.kind != T_STRING_LITERAL) {
 		parse_error_expected("after asm(", T_STRING_LITERAL, NULL);
 		goto end_of_asm;
 	}
@@ -9040,7 +9046,7 @@ end_error:
 static statement_t *parse_label_inner_statement(statement_t const *const label, char const *const label_kind)
 {
 	statement_t *inner_stmt;
-	switch (token.type) {
+	switch (token.kind) {
 		case '}':
 			errorf(&label->base.source_position, "%s at end of compound statement", label_kind);
 			inner_stmt = create_invalid_statement();
@@ -9217,7 +9223,7 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
-	if (token.type == T___attribute__ && !(c_mode & _CXX)) {
+	if (token.kind == T___attribute__ && !(c_mode & _CXX)) {
 		parse_attributes(NULL); // TODO process attributes
 	}
 
@@ -9487,7 +9493,7 @@ static statement_t *parse_for(void)
 
 	POP_EXTENSION();
 
-	if (token.type != ';') {
+	if (token.kind != ';') {
 		add_anchor_token(';');
 		expression_t *const cond = parse_expression();
 		statement->fors.condition = cond;
@@ -9498,7 +9504,7 @@ static statement_t *parse_for(void)
 		rem_anchor_token(';');
 	}
 	expect(';', end_error2);
-	if (token.type != ')') {
+	if (token.kind != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
 		mark_vars_read(step, ENT_ANY);
@@ -9551,7 +9557,7 @@ static statement_t *parse_goto(void)
 		}
 
 		statement->gotos.expression = expression;
-	} else if (token.type == T_IDENTIFIER) {
+	} else if (token.kind == T_IDENTIFIER) {
 		label_t *const label = get_label();
 		label->used            = true;
 		statement->gotos.label = label;
@@ -9688,7 +9694,7 @@ static statement_t *parse_return(void)
 	eat(T_return);
 
 	expression_t *return_value = NULL;
-	if (token.type != ';') {
+	if (token.kind != ';') {
 		return_value = parse_expression();
 		mark_vars_read(return_value, NULL);
 	}
@@ -9854,12 +9860,12 @@ static statement_t *parse_local_label_declaration(void)
 	entity_t *end     = NULL;
 	entity_t **anchor = &begin;
 	do {
-		if (token.type != T_IDENTIFIER) {
+		if (token.kind != T_IDENTIFIER) {
 			parse_error_expected("while parsing local label declaration",
 				T_IDENTIFIER, NULL);
 			goto end_error;
 		}
-		symbol_t *symbol = token.symbol;
+		symbol_t *symbol = token.identifier.symbol;
 		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 		if (entity != NULL && entity->base.parent_scope == current_scope) {
 			source_position_t const *const ppos = &entity->base.source_position;
@@ -9867,7 +9873,7 @@ static statement_t *parse_local_label_declaration(void)
 		} else {
 			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol);
 			entity->base.parent_scope    = current_scope;
-			entity->base.source_position = token.source_position;
+			entity->base.source_position = token.base.source_position;
 
 			*anchor = entity;
 			anchor  = &entity->base.next;
@@ -9891,8 +9897,8 @@ static void parse_namespace_definition(void)
 	entity_t *entity = NULL;
 	symbol_t *symbol = NULL;
 
-	if (token.type == T_IDENTIFIER) {
-		symbol = token.symbol;
+	if (token.kind == T_IDENTIFIER) {
+		symbol = token.identifier.symbol;
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
@@ -9900,7 +9906,7 @@ static void parse_namespace_definition(void)
 				&& entity->kind != ENTITY_NAMESPACE
 				&& entity->base.parent_scope == current_scope) {
 			if (is_entity_valid(entity)) {
-				error_redefined_as_different_kind(&token.source_position,
+				error_redefined_as_different_kind(&token.base.source_position,
 						entity, ENTITY_NAMESPACE);
 			}
 			entity = NULL;
@@ -9909,11 +9915,11 @@ static void parse_namespace_definition(void)
 
 	if (entity == NULL) {
 		entity = allocate_entity_zero(ENTITY_NAMESPACE, NAMESPACE_NORMAL, symbol);
-		entity->base.source_position = token.source_position;
+		entity->base.source_position = token.base.source_position;
 		entity->base.parent_scope    = current_scope;
 	}
 
-	if (token.type == '=') {
+	if (token.kind == '=') {
 		/* TODO: parse namespace alias */
 		panic("namespace alias definition not supported yet");
 	}
@@ -9947,12 +9953,12 @@ static statement_t *intern_parse_statement(void)
 
 	/* declaration or statement */
 	add_anchor_token(';');
-	switch (token.type) {
+	switch (token.kind) {
 	case T_IDENTIFIER: {
-		token_type_t la1_type = (token_type_t)look_ahead(1)->type;
+		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
 		if (la1_type == ':') {
 			statement = parse_label_statement();
-		} else if (is_typedef_symbol(token.symbol)) {
+		} else if (is_typedef_symbol(token.identifier.symbol)) {
 			statement = parse_declaration_statement();
 		} else {
 			/* it's an identifier, the grammar says this must be an
@@ -9962,7 +9968,7 @@ static statement_t *intern_parse_statement(void)
 			switch (la1_type) {
 			case '&':
 			case '*':
-				if (get_entity(token.symbol, NAMESPACE_NORMAL) != NULL) {
+				if (get_entity(token.identifier.symbol, NAMESPACE_NORMAL) != NULL) {
 			default:
 					statement = parse_expression_statement();
 				} else {
@@ -10152,8 +10158,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
-	while (token.type != '}') {
-		if (token.type == T_EOF) {
+	while (token.kind != '}') {
+		if (token.kind == T_EOF) {
 			errorf(&statement->base.source_position,
 			       "EOF while parsing compound statement");
 			break;
@@ -10382,9 +10388,9 @@ end_error:
 
 static void parse_external(void)
 {
-	switch (token.type) {
+	switch (token.kind) {
 		case T_extern:
-			if (look_ahead(1)->type == T_STRING_LITERAL) {
+			if (look_ahead(1)->kind == T_STRING_LITERAL) {
 				parse_linkage_specification();
 			} else {
 		DECLARATION_START_NO_EXTERN
@@ -10419,8 +10425,8 @@ static void parse_external(void)
 
 		default:
 			errorf(HERE, "stray %K outside of function", &token);
-			if (token.type == '(' || token.type == '{' || token.type == '[')
-				eat_until_matching_token(token.type);
+			if (token.kind == '(' || token.kind == '{' || token.kind == '[')
+				eat_until_matching_token(token.kind);
 			next_token();
 			return;
 	}
@@ -10437,7 +10443,7 @@ static void parse_externals(void)
 	memcpy(token_anchor_copy, token_anchor_set, sizeof(token_anchor_copy));
 #endif
 
-	while (token.type != T_EOF && token.type != '}') {
+	while (token.kind != T_EOF && token.kind != '}') {
 #ifndef NDEBUG
 		for (int i = 0; i < T_LAST_TOKEN; ++i) {
 			unsigned short count = token_anchor_set[i] - token_anchor_copy[i];
@@ -10469,12 +10475,12 @@ static void parse_translation_unit(void)
 	while (true) {
 		parse_externals();
 
-		if (token.type == T_EOF)
+		if (token.kind == T_EOF)
 			break;
 
 		errorf(HERE, "stray %K outside of function", &token);
-		if (token.type == '(' || token.type == '{' || token.type == '[')
-			eat_until_matching_token(token.type);
+		if (token.kind == '(' || token.kind == '{' || token.kind == '[')
+			eat_until_matching_token(token.kind);
 		next_token();
 	}
 }

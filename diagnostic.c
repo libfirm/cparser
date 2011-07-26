@@ -153,7 +153,7 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 						va_list*          toks      = va_arg(ap, va_list*);
 						const char* const delimiter = va_arg(ap, const char*);
 						for (;;) {
-							const token_type_t tok = va_arg(*toks, token_type_t);
+							const token_kind_t tok = va_arg(*toks, token_kind_t);
 							if (tok == 0)
 								break;
 							if (first) {
@@ -161,11 +161,11 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 							} else {
 								fputs(delimiter, stderr);
 							}
-							print_token_type(stderr, tok);
+							print_token_kind(stderr, tok);
 						}
 					} else {
-						const token_type_t token = va_arg(ap, token_type_t);
-						print_token_type(stderr, token);
+						const token_kind_t token = va_arg(ap, token_kind_t);
+						print_token_kind(stderr, token);
 					}
 					break;
 				}

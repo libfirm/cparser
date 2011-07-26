@@ -2,8 +2,7 @@
 #define TS(x,str,val)
 #endif
 
-TS(HEADERNAME,              "header name", = 256)
-TS(IDENTIFIER,              "identifier",)
+TS(IDENTIFIER,              "identifier", = 256)
 TS(NUMBER,                  "number",)
 TS(CHARACTER_CONSTANT,      "character constant",)
 TS(WIDE_CHARACTER_CONSTANT, "character constant",)

@@ -265,7 +265,7 @@ struct expression_base_t {
 struct literal_expression_t {
 	expression_base_t  base;
 	string_t           value;
-	symbol_t          *suffix;
+	string_t           suffix;
 
 	/* ast2firm data */
 	ir_tarval         *target_value;
