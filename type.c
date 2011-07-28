@@ -574,9 +574,6 @@ void print_enum_definition(const enum_t *enume)
 
 			/* skip the implicit cast */
 			expression_t *expression = entry->enum_value.value;
-			if (expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
-				expression = expression->unary.value;
-			}
 			print_expression(expression);
 		}
 		print_string(",\n");

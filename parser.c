@@ -888,23 +888,6 @@ static type_t *promote_integer(type_t *type)
 }
 
 /**
- * Create a cast expression.
- *
- * @param expression  the expression to cast
- * @param dest_type   the destination type
- */
-static expression_t *create_cast_expression(expression_t *expression,
-                                            type_t *dest_type)
-{
-	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST_IMPLICIT);
-
-	cast->unary.value = expression;
-	cast->base.type   = dest_type;
-
-	return cast;
-}
-
-/**
  * Check if a given expression represents a null pointer constant.
  *
  * @param expression  the expression to check
@@ -912,8 +895,7 @@ static expression_t *create_cast_expression(expression_t *expression,
 static bool is_null_pointer_constant(const expression_t *expression)
 {
 	/* skip void* cast */
-	if (expression->kind == EXPR_UNARY_CAST ||
-			expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+	if (expression->kind == EXPR_UNARY_CAST) {
 		type_t *const type = skip_typeref(expression->base.type);
 		if (types_compatible(type, type_void_ptr))
 			expression = expression->unary.value;
@@ -943,7 +925,12 @@ static expression_t *create_implicit_cast(expression_t *expression,
 	if (source_type == dest_type)
 		return expression;
 
-	return create_cast_expression(expression, dest_type);
+	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
+	cast->unary.value   = expression;
+	cast->base.type     = dest_type;
+	cast->base.implicit = true;
+
+	return cast;
 }
 
 typedef enum assign_error_t {
@@ -1506,7 +1493,6 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 		case EXPR_UNARY_POSTFIX_DECREMENT:
 		case EXPR_UNARY_PREFIX_INCREMENT:
 		case EXPR_UNARY_PREFIX_DECREMENT:
-		case EXPR_UNARY_CAST_IMPLICIT:
 		case EXPR_UNARY_ASSUME:
 unary:
 			mark_vars_read(expr->unary.value, lhs_ent);
@@ -5649,7 +5635,7 @@ static expression_t *find_create_select(const source_position_t *pos,
 
 			expression_t *sub_addr = create_select(pos, addr, qualifiers, iter);
 			sub_addr->base.source_position = *pos;
-			sub_addr->select.implicit      = true;
+			sub_addr->base.implicit        = true;
 			return find_create_select(pos, sub_addr, qualifiers, sub_compound,
 			                          symbol);
 		}
@@ -8610,7 +8596,6 @@ static bool expression_has_effect(const expression_t *const expr)
 			return is_type_atomic(type, ATOMIC_TYPE_VOID);
 		}
 
-		case EXPR_UNARY_CAST_IMPLICIT:        return true;
 		case EXPR_UNARY_ASSUME:               return true;
 		case EXPR_UNARY_DELETE:               return true;
 		case EXPR_UNARY_DELETE_ARRAY:         return true;

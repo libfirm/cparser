@@ -272,7 +272,7 @@ static void write_unary_expression(const unary_expression_t *expression)
 	case EXPR_UNARY_NOT:
 		fputc('!', out);
 		break;
-	case EXPR_UNARY_CAST_IMPLICIT:
+	case EXPR_UNARY_CAST:
 		write_expression(expression->value);
 		return;
 	default:

@@ -2593,7 +2593,6 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	case EXPR_UNARY_PREFIX_INCREMENT:
 	case EXPR_UNARY_PREFIX_DECREMENT:
 		return create_incdec(expression);
-	case EXPR_UNARY_CAST_IMPLICIT:
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
 		type_t  *from_type  = value->base.type;
@@ -4034,7 +4033,7 @@ static ir_initializer_t *create_ir_initializer_value(
 		type_t *skipped = skip_typeref(type);
 		if (skipped->kind == TYPE_BITFIELD) {
 			/* remove the bitfield cast... */
-			assert(expr->kind == EXPR_UNARY_CAST_IMPLICIT);
+			assert(expr->kind == EXPR_UNARY_CAST && expr->base.implicit);
 			expr = expr->unary.value;
 			type = skipped->bitfield.base_type;
 		}

@@ -108,7 +108,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
                                         const call_argument_t *arg,
                                         const format_spec_t *spec)
 {
-	while (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
+	while (fmt_expr->kind == EXPR_UNARY_CAST) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 
@@ -521,7 +521,7 @@ too_few_args:
 				}
 			} else if (get_unqualified_type(arg_skip) == expected_type_skip) {
 				goto next_arg;
-			} else if (arg->expression->kind == EXPR_UNARY_CAST_IMPLICIT) {
+			} else if (arg->expression->kind == EXPR_UNARY_CAST) {
 				expression_t const *const expr        = arg->expression->unary.value;
 				type_t             *const unprom_type = skip_typeref(expr->base.type);
 				if (get_unqualified_type(unprom_type) == expected_type_skip) {
@@ -595,7 +595,7 @@ static void check_scanf_format(const call_argument_t *arg,
 	}
 
 	const expression_t *fmt_expr = arg->expression;
-	if (fmt_expr->kind == EXPR_UNARY_CAST_IMPLICIT) {
+	if (fmt_expr->kind == EXPR_UNARY_CAST) {
 		fmt_expr = fmt_expr->unary.value;
 	}
 

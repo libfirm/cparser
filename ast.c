@@ -149,7 +149,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_PREFIX_INCREMENT]            = PREC_UNARY,
 		[EXPR_UNARY_PREFIX_DECREMENT]            = PREC_UNARY,
 		[EXPR_UNARY_CAST]                        = PREC_UNARY,
-		[EXPR_UNARY_CAST_IMPLICIT]               = PREC_UNARY,
 		[EXPR_UNARY_ASSUME]                      = PREC_PRIMARY,
 		[EXPR_UNARY_DELETE]                      = PREC_UNARY,
 		[EXPR_UNARY_DELETE_ARRAY]                = PREC_UNARY,
@@ -413,7 +412,6 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		print_expression_prec(unexpr->value, prec);
 		print_string("--");
 		return;
-	case EXPR_UNARY_CAST_IMPLICIT:
 	case EXPR_UNARY_CAST:
 		print_string("(");
 		print_type(unexpr->base.type);
@@ -672,7 +670,8 @@ static void print_statement_expression(const statement_expression_t *expression)
  */
 static void print_expression_prec(const expression_t *expression, unsigned top_prec)
 {
-	if (expression->kind == EXPR_UNARY_CAST_IMPLICIT && !print_implicit_casts) {
+	if (expression->kind == EXPR_UNARY_CAST
+	    && expression->base.implicit && !print_implicit_casts) {
 		expression = expression->unary.value;
 	}
 
@@ -1894,8 +1893,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	case EXPR_UNARY_NOT:
 		return is_constant_expression(expression->unary.value);
 
-	case EXPR_UNARY_CAST:
-	case EXPR_UNARY_CAST_IMPLICIT: {
+	case EXPR_UNARY_CAST: {
 		type_t *const type = skip_typeref(expression->base.type);
 		if (is_type_scalar(type))
 			return is_constant_expression(expression->unary.value);

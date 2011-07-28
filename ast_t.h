@@ -108,7 +108,6 @@ typedef enum expression_kind_t {
 	EXPR_UNARY_PREFIX_INCREMENT,
 	EXPR_UNARY_PREFIX_DECREMENT,
 	EXPR_UNARY_CAST,
-	EXPR_UNARY_CAST_IMPLICIT, /**< compiler generated cast */
 	EXPR_UNARY_ASSUME,        /**< MS __assume() */
 	EXPR_UNARY_DELETE,
 	EXPR_UNARY_DELETE_ARRAY,
@@ -217,7 +216,6 @@ typedef enum funcname_kind_t {
 	case EXPR_UNARY_PREFIX_INCREMENT:      \
 	case EXPR_UNARY_PREFIX_DECREMENT:      \
 	case EXPR_UNARY_CAST:                  \
-	case EXPR_UNARY_CAST_IMPLICIT:         \
 	case EXPR_UNARY_ASSUME:                \
 	case EXPR_UNARY_DELETE:                \
 	case EXPR_UNARY_DELETE_ARRAY:
@@ -254,6 +252,11 @@ struct expression_base_t {
 #ifndef NDEBUG
 	bool                transformed : 1;     /**< Set if this expression was transformed. */
 #endif
+	bool                implicit : 1;    /**< compiler generated expression.
+	                                          Examples:
+	                                             select into anonymous structs
+	                                             implicit casts
+	                                      */
 };
 
 /**
@@ -332,8 +335,6 @@ struct select_expression_t {
 	expression_base_t  base;
 	expression_t      *compound;
 	entity_t          *compound_entry;
-	bool               implicit : 1; /**< compiler generated select
-	                                      (for anonymous struct/union) */
 };
 
 struct array_access_expression_t {
