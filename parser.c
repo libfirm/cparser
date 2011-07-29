@@ -134,7 +134,7 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 static symbol_t *sym_anonymous = NULL;
 
 /** The token anchor set */
-static unsigned char token_anchor_set[T_LAST_TOKEN];
+static unsigned short token_anchor_set[T_LAST_TOKEN];
 
 /** The current source position. */
 #define HERE (&token.source_position)
@@ -10429,14 +10429,14 @@ static void parse_externals(void)
 
 #ifndef NDEBUG
 	/* make a copy of the anchor set, so we can check if it is restored after parsing */
-	unsigned char token_anchor_copy[T_LAST_TOKEN];
+	unsigned short token_anchor_copy[T_LAST_TOKEN];
 	memcpy(token_anchor_copy, token_anchor_set, sizeof(token_anchor_copy));
 #endif
 
 	while (token.type != T_EOF && token.type != '}') {
 #ifndef NDEBUG
 		for (int i = 0; i < T_LAST_TOKEN; ++i) {
-			unsigned char count = token_anchor_set[i] - token_anchor_copy[i];
+			unsigned short count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
 				/* the anchor set and its copy differs */
 				internal_errorf(HERE, "Leaked anchor token %k %d times", i, count);
