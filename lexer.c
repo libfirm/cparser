@@ -48,11 +48,6 @@
 #define MAX_PUTBACK 3
 #define BUF_SIZE    1024
 
-#if defined(_WIN32) || defined(__CYGWIN__)
-/* No strtold on windows and no replacement yet */
-#define strtold(s, e) strtod(s, e)
-#endif
-
 static utf32             c;
 static source_position_t lexer_pos;
 token_t                  lexer_token;
