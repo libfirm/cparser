@@ -9217,6 +9217,10 @@ static statement_t *parse_label_statement(void)
 
 	eat(':');
 
+	if (token.type == T___attribute__ && !(c_mode & _CXX)) {
+		parse_attributes(NULL); // TODO process attributes
+	}
+
 	statement->label.statement = parse_label_inner_statement(statement, "label");
 
 	/* remember the labels in a list for later checking */
