@@ -228,7 +228,6 @@ static void write_type(type_t *type)
 	case TYPE_TYPEDEF:
 		panic("invalid type found");
 	case TYPE_ARRAY:
-	case TYPE_BITFIELD:
 	case TYPE_REFERENCE:
 	case TYPE_FUNCTION:
 	case TYPE_COMPLEX:

@@ -44,7 +44,6 @@ typedef enum type_kind_t {
 	TYPE_POINTER,
 	TYPE_REFERENCE,
 	TYPE_ARRAY,
-	TYPE_BITFIELD,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
 } type_kind_t;
@@ -167,13 +166,6 @@ struct typeof_type_t {
 	type_t       *resolved_type;
 };
 
-struct bitfield_type_t {
-	type_base_t   base;
-	type_t       *base_type;
-	expression_t *size_expression; /**< The expression for the bit size. */
-	il_size_t     bit_size;        /**< Size of this bitfield in bits. */
-};
-
 union type_t {
 	type_kind_t      kind;
 	type_base_t      base;
@@ -187,7 +179,6 @@ union type_t {
 	compound_type_t  compound;
 	enum_type_t      enumt;
 	typedef_type_t   typedeft;
-	bitfield_type_t  bitfield;
 	typeof_type_t    typeoft;
 };
 

@@ -218,9 +218,6 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("typeref not resolved while manging?!?");
-
-	case TYPE_BITFIELD:
-		panic("no mangling for this type implemented yet");
 	}
 	panic("invalid type encountered while mangling");
 }

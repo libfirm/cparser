@@ -61,7 +61,6 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
 		[TYPE_COMPLEX]         = sizeof(complex_type_t),
 		[TYPE_IMAGINARY]       = sizeof(imaginary_type_t),
-		[TYPE_BITFIELD]        = sizeof(bitfield_type_t),
 		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
 		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
 		[TYPE_ENUM]            = sizeof(enum_type_t),
@@ -541,18 +540,6 @@ static void print_array_type_post(const array_type_t *type)
 }
 
 /**
- * Prints the postfix part of a bitfield type.
- *
- * @param type   The array type.
- */
-static void print_bitfield_type_post(const bitfield_type_t *type)
-{
-	print_string(" : ");
-	print_expression(type->size_expression);
-	intern_print_type_post(type->base_type);
-}
-
-/**
  * Prints an enum definition.
  *
  * @param declaration  The enum's type declaration.
@@ -720,9 +707,6 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_REFERENCE:
 		print_reference_type_pre(&type->reference);
 		return;
-	case TYPE_BITFIELD:
-		intern_print_type_pre(type->bitfield.base_type);
-		return;
 	case TYPE_ARRAY:
 		print_array_type_pre(&type->array);
 		return;
@@ -755,9 +739,6 @@ static void intern_print_type_post(const type_t *const type)
 		return;
 	case TYPE_ARRAY:
 		print_array_type_post(&type->array);
-		return;
-	case TYPE_BITFIELD:
-		print_bitfield_type_post(&type->bitfield);
 		return;
 	case TYPE_ERROR:
 	case TYPE_INVALID:
@@ -894,9 +875,6 @@ bool is_type_integer(const type_t *type)
 
 	if (type->kind == TYPE_ENUM)
 		return true;
-	if (type->kind == TYPE_BITFIELD)
-		return true;
-
 	if (type->kind != TYPE_ATOMIC)
 		return false;
 
@@ -960,9 +938,6 @@ bool is_type_signed(const type_t *type)
 	/* enum types are int for now */
 	if (type->kind == TYPE_ENUM)
 		return true;
-	if (type->kind == TYPE_BITFIELD)
-		return is_type_signed(type->bitfield.base_type);
-
 	if (type->kind != TYPE_ATOMIC)
 		return false;
 
@@ -980,7 +955,6 @@ bool is_type_arithmetic(const type_t *type)
 	assert(!is_typeref(type));
 
 	switch(type->kind) {
-	case TYPE_BITFIELD:
 	case TYPE_ENUM:
 		return true;
 	case TYPE_ATOMIC:
@@ -1054,7 +1028,6 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_IMAGINARY:
 		return type->imaginary.akind == ATOMIC_TYPE_VOID;
 
-	case TYPE_BITFIELD:
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
 	case TYPE_REFERENCE:
@@ -1194,18 +1167,11 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
-
-
 		break;
 	}
 	case TYPE_ENUM:
 		/* TODO: not implemented */
 		break;
-
-	case TYPE_BITFIELD:
-		/* not sure if this makes sense or is even needed, implement it if you
-		 * really need it! */
-		panic("type compatibility check for bitfield type");
 
 	case TYPE_ERROR:
 		/* Hmm, the error type should be compatible to all other types */
@@ -1305,8 +1271,6 @@ unsigned get_type_size(type_t *type)
 		il_size_t element_size = get_type_size(type->array.element_type);
 		return type->array.size * element_size;
 	}
-	case TYPE_BITFIELD:
-		return 0;
 	case TYPE_TYPEDEF:
 		return get_type_size(type->typedeft.typedefe->type);
 	case TYPE_TYPEOF:
@@ -1349,8 +1313,6 @@ unsigned get_type_alignment(type_t *type)
 		return 4;
 	case TYPE_ARRAY:
 		return get_type_alignment(type->array.element_type);
-	case TYPE_BITFIELD:
-		return 0;
 	case TYPE_TYPEDEF: {
 		il_alignment_t alignment
 			= get_type_alignment(type->typedeft.typedefe->type);
@@ -1386,7 +1348,6 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 	case TYPE_IMAGINARY:
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
-	case TYPE_BITFIELD:
 	case TYPE_ARRAY:
 		return 0;
 	case TYPE_TYPEDEF: {
@@ -1662,18 +1623,16 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 	for (member = first; member != NULL; member = member->base.next) {
 		if (member->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
-
-		type_t *type = member->declaration.type;
-		if (type->kind != TYPE_BITFIELD)
+		if (!member->compound_member.bitfield)
 			break;
 
-		type_t *base_type = skip_typeref(type->bitfield.base_type);
+		type_t *base_type = member->declaration.type;
 		il_alignment_t base_alignment = get_type_alignment(base_type);
 		il_alignment_t alignment_mask = base_alignment-1;
 		if (base_alignment > alignment)
 			alignment = base_alignment;
 
-		size_t bit_size = type->bitfield.bit_size;
+		size_t bit_size = member->compound_member.bit_size;
 		if (!packed) {
 			bit_offset += (offset & alignment_mask) * BITS_PER_BYTE;
 			offset     &= ~alignment_mask;
@@ -1736,7 +1695,7 @@ void layout_struct_type(compound_type_t *type)
 			continue;
 		}
 
-		if (skipped->kind == TYPE_BITFIELD) {
+		if (entry->compound_member.bitfield) {
 			entry = pack_bitfield_members(&offset, &alignment,
 			                              compound->packed, entry);
 			continue;

@@ -878,9 +878,6 @@ static int get_rank(const type_t *type)
  */
 static type_t *promote_integer(type_t *type)
 {
-	if (type->kind == TYPE_BITFIELD)
-		type = type->bitfield.base_type;
-
 	if (get_rank(type) < get_akind_rank(ATOMIC_TYPE_INT))
 		type = type_int;
 
@@ -1927,14 +1924,11 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 					return false;
 				}
 				assert(iter->kind == ENTITY_COMPOUND_MEMBER);
-				if (used_in_offsetof) {
-					type_t *real_type = skip_typeref(iter->declaration.type);
-					if (real_type->kind == TYPE_BITFIELD) {
-						errorf(&designator->source_position,
-						       "offsetof designator '%Y' must not specify bitfield",
-						       symbol);
-						return false;
-					}
+				if (used_in_offsetof && iter->compound_member.bitfield) {
+					errorf(&designator->source_position,
+						   "offsetof designator '%Y' must not specify bitfield",
+						   symbol);
+					return false;
 				}
 
 				top->type             = orig_type;
@@ -5504,45 +5498,6 @@ static void parse_external_declaration(void)
 	POP_SCOPE();
 }
 
-static type_t *make_bitfield_type(type_t *base_type, expression_t *size,
-                                  source_position_t *source_position,
-                                  const symbol_t *symbol)
-{
-	type_t *type = allocate_type_zero(TYPE_BITFIELD);
-
-	type->bitfield.base_type       = base_type;
-	type->bitfield.size_expression = size;
-
-	il_size_t bit_size;
-	type_t *skipped_type = skip_typeref(base_type);
-	if (!is_type_integer(skipped_type)) {
-		errorf(source_position, "bitfield base type '%T' is not an integer type", base_type);
-		bit_size = 0;
-	} else {
-		bit_size = get_type_size(base_type) * 8;
-	}
-
-	if (is_constant_expression(size) == EXPR_CLASS_CONSTANT) {
-		long v = fold_constant_to_int(size);
-		const symbol_t *user_symbol = symbol == NULL ? sym_anonymous : symbol;
-
-		if (v < 0) {
-			errorf(source_position, "negative width in bit-field '%Y'",
-			       user_symbol);
-		} else if (v == 0 && symbol != NULL) {
-			errorf(source_position, "zero width for bit-field '%Y'",
-			       user_symbol);
-		} else if (bit_size > 0 && (il_size_t)v > bit_size) {
-			errorf(source_position, "width of '%Y' exceeds its type",
-			       user_symbol);
-		} else {
-			type->bitfield.bit_size = v;
-		}
-	}
-
-	return type;
-}
-
 static entity_t *find_compound_entry(compound_t *compound, symbol_t *symbol)
 {
 	entity_t *iter = compound->members.entities;
@@ -5601,12 +5556,19 @@ static expression_t *create_select(const source_position_t *pos,
 	type_t *entry_type = entry->declaration.type;
 	type_t *res_type   = get_qualified_type(entry_type, qualifiers);
 
+	/* bitfields need special treatment */
+	if (entry->compound_member.bitfield) {
+		unsigned bit_size = entry->compound_member.bit_size;
+		/* if fewer bits than an int, convert to int (see §6.3.1.1) */
+		if (bit_size < get_atomic_type_size(ATOMIC_TYPE_INT) * BITS_PER_BYTE) {
+			res_type = type_int;
+		}
+	}
+
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
 	select->base.type = automatic_type_conversion(res_type);
-	if (res_type->kind == TYPE_BITFIELD) {
-		select->base.type = res_type->bitfield.base_type;
-	}
+
 
 	return select;
 }
@@ -5653,6 +5615,49 @@ static expression_t *find_create_select(const source_position_t *pos,
 	return NULL;
 }
 
+static void parse_bitfield_member(entity_t *entity)
+{
+	eat(':');
+
+	expression_t *size = parse_constant_expression();
+	long          size_long;
+
+	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
+	type_t *type = entity->declaration.type;
+	if (!is_type_integer(skip_typeref(type))) {
+		errorf(HERE, "bitfield base type '%T' is not an integer type",
+			   type);
+	}
+
+	if (is_constant_expression(size) != EXPR_CLASS_CONSTANT) {
+		/* error already reported by parse_constant_expression */
+		size_long = get_type_size(type) * 8;
+	} else {
+		size_long = fold_constant_to_int(size);
+
+		const symbol_t *symbol = entity->base.symbol;
+		const symbol_t *user_symbol
+			= symbol == NULL ? sym_anonymous : symbol;
+		unsigned bit_size = get_type_size(type) * 8;
+		if (size_long < 0) {
+			errorf(HERE, "negative width in bit-field '%Y'", user_symbol);
+		} else if (size_long == 0 && symbol != NULL) {
+			errorf(HERE, "zero width for bit-field '%Y'", user_symbol);
+		} else if (bit_size > 0 && (unsigned)size_long > bit_size) {
+			errorf(HERE, "width of bitfield '%Y' exceeds its type",
+				   user_symbol);
+		} else {
+			/* hope that people don't invent crazy types with more bits
+			 * than our struct can hold */
+			assert(size_long <
+				   (1 << sizeof(entity->compound_member.bit_size)*8));
+		}
+	}
+
+	entity->compound_member.bitfield = true;
+	entity->compound_member.bit_size = (unsigned char)size_long;
+}
+
 static void parse_compound_declarators(compound_t *compound,
 		const declaration_specifiers_t *specifiers)
 {
@@ -5660,31 +5665,27 @@ static void parse_compound_declarators(compound_t *compound,
 		entity_t *entity;
 
 		if (token.kind == ':') {
-			source_position_t source_position = *HERE;
-			next_token();
+			/* anonymous bitfield */
+			type_t *type = specifiers->type;
+			entity_t *entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER,
+			                                        NAMESPACE_NORMAL, NULL);
+			entity->base.source_position               = *HERE;
+			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
+			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
+			entity->declaration.type                   = type;
 
-			type_t *base_type = specifiers->type;
-			expression_t *size = parse_constant_expression();
-
-			type_t *type = make_bitfield_type(base_type, size,
-					&source_position, NULL);
+			parse_bitfield_member(entity);
 
 			attribute_t  *attributes = parse_attributes(NULL);
 			attribute_t **anchor     = &attributes;
 			while (*anchor != NULL)
 				anchor = &(*anchor)->next;
 			*anchor = specifiers->attributes;
-
-			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, NULL);
-			entity->base.source_position               = source_position;
-			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
-			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
-			entity->declaration.type                   = type;
-			entity->declaration.attributes             = attributes;
-
 			if (attributes != NULL) {
 				handle_entity_attributes(attributes, entity);
 			}
+			entity->declaration.attributes = attributes;
+
 			append_entity(&compound->members, entity);
 		} else {
 			entity = parse_declarator(specifiers,
@@ -5706,16 +5707,9 @@ static void parse_compound_declarators(compound_t *compound,
 				}
 
 				if (token.kind == ':') {
-					source_position_t source_position = *HERE;
-					next_token();
-					expression_t *size = parse_constant_expression();
-
-					type_t *type          = entity->declaration.type;
-					type_t *bitfield_type = make_bitfield_type(type, size,
-							&source_position, entity->base.symbol);
+					parse_bitfield_member(entity);
 
 					attribute_t *attributes = parse_attributes(NULL);
-					entity->declaration.type = bitfield_type;
 					handle_entity_attributes(attributes, entity);
 				} else {
 					type_t *orig_type = entity->declaration.type;
@@ -6101,8 +6095,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 		entity_t *entity = expression->select.compound_entry;
 		assert(is_declaration(entity));
 		type_t   *type   = entity->declaration.type;
-		return get_qualified_type(type,
-				expression->base.type->base.qualifiers);
+		return get_qualified_type(type, expression->base.type->base.qualifiers);
 	}
 
 	case EXPR_UNARY_DEREFERENCE: {
@@ -7012,6 +7005,12 @@ end_error:
 	return expr;
 }
 
+static bool is_bitfield(const expression_t *expression)
+{
+	return expression->kind == EXPR_SELECT
+		&& expression->select.compound_entry->compound_member.bitfield;
+}
+
 static expression_t *parse_typeprop(expression_kind_t const kind)
 {
 	expression_t  *tp_expression = allocate_expression_zero(kind);
@@ -7039,6 +7038,12 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 		expression = parse_subexpression(PREC_UNARY);
 
 typeprop_expression:
+		if (is_bitfield(expression)) {
+			char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
+			errorf(&tp_expression->base.source_position,
+				   "operand of %s expression must not be a bitfield", what);
+		}
+
 		tp_expression->typeprop.tp_expression = expression;
 
 		orig_type = revert_automatic_type_conversion(expression);
@@ -7060,12 +7065,7 @@ typeprop_expression:
 		} else {
 			wrong_type = "function";
 		}
-	} else {
-		if (is_type_incomplete(type))
-			wrong_type = "incomplete";
 	}
-	if (type->kind == TYPE_BITFIELD)
-		wrong_type = "bitfield";
 
 	if (wrong_type != NULL) {
 		char const* const what = kind == EXPR_SIZEOF ? "sizeof" : "alignof";
@@ -7844,10 +7844,9 @@ static void semantic_take_addr(unary_expression_t *expression)
 	if (!is_lvalue(value)) {
 		errorf(&expression->base.source_position, "'&' requires an lvalue");
 	}
-	if (type->kind == TYPE_BITFIELD) {
+	if (is_bitfield(value)) {
 		errorf(&expression->base.source_position,
-		       "'&' not allowed on object with bitfield type '%T'",
-		       type);
+		       "'&' not allowed on bitfield");
 	}
 
 	set_address_taken(value, false);

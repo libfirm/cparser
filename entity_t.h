@@ -210,6 +210,8 @@ struct compound_member_t {
 	declaration_t  base;
 	il_size_t      offset;     /**< the offset of this member in the compound */
 	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
+	unsigned char  bit_size;   /**< bitsize for bitfield members */
+	bool           bitfield      : 1;  /**< member is (part of) a bitfield */
 	bool           read          : 1;
 	bool           address_taken : 1;  /**< Set if the address of this
 	                                        declaration was taken. */

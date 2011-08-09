@@ -1424,6 +1424,13 @@ void print_declaration(const entity_t *entity)
 			}
 			break;
 
+		case ENTITY_COMPOUND_MEMBER:
+			print_type_ext(declaration->type, declaration->base.symbol, NULL);
+			if (entity->compound_member.bitfield) {
+				print_format(" : %u", entity->compound_member.bit_size);
+			}
+			break;
+
 		default:
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			break;
