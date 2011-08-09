@@ -362,50 +362,41 @@ static int digit_value(int digit)
  *
  * @param first_digit  the already read first digit
  */
-static int parse_octal_sequence(const int first_digit)
+static utf32 parse_octal_sequence(const utf32 first_digit)
 {
 	assert(is_octal_digit(first_digit));
-	int value = digit_value(first_digit);
+	utf32 value = digit_value(first_digit);
 	if (!is_octal_digit(input.c)) return value;
 	value = 8 * value + digit_value(input.c);
 	next_char();
 	if (!is_octal_digit(input.c)) return value;
 	value = 8 * value + digit_value(input.c);
 	next_char();
+	return value;
 
-	if (char_is_signed) {
-		return (signed char) value;
-	} else {
-		return (unsigned char) value;
-	}
 }
 
 /**
  * Parses a hex character sequence.
  */
-static int parse_hex_sequence(void)
+static utf32 parse_hex_sequence(void)
 {
-	int value = 0;
+	utf32 value = 0;
 	while (isxdigit(input.c)) {
 		value = 16 * value + digit_value(input.c);
 		next_char();
 	}
-
-	if (char_is_signed) {
-		return (signed char) value;
-	} else {
-		return (unsigned char) value;
-	}
+	return value;
 }
 
 /**
  * Parse an escape sequence.
  */
-static int parse_escape_sequence(void)
+static utf32 parse_escape_sequence(void)
 {
 	eat('\\');
 
-	int ec = input.c;
+	utf32 const ec = input.c;
 	next_char();
 
 	switch (ec) {
@@ -434,10 +425,23 @@ static int parse_escape_sequence(void)
 	case EOF:
 		parse_error("reached end of file while parsing escape sequence");
 		return EOF;
-	default:
-		parse_error("unknown escape sequence");
+	/* \E is not documented, but handled, by GCC.  It is acceptable according
+	 * to §6.11.4, whereas \e is not. */
+	case 'E':
+	case 'e':
+		if (c_mode & _GNUC)
+			return 27;   /* hopefully 27 is ALWAYS the code for ESCAPE */
+		break;
+	case 'u':
+	case 'U':
+		parse_error("universal character parsing not implemented yet");
 		return EOF;
+	default:
+		break;
 	}
+	/* §6.4.4.4:8 footnote 64 */
+	parse_error("unknown escape sequence");
+	return EOF;
 }
 
 static const char *identify_string(char *string)
