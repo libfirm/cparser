@@ -218,14 +218,5 @@ void create_microsoft_intrinsics(void)
 	MS_BUILTIN(_BitScanReverse,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
 	MS_BUILTIN(_InterlockedExchange,   make_function_2_type(type_long, type_long_ptr, type_long));
 	MS_BUILTIN(_InterlockedExchange64, make_function_2_type(type_int64, type_int64_ptr, type_int64));
-
-	if (machine_size <= 32) {
-		MS_BUILTIN(__readeflags,           make_function_0_type(type_unsigned_int));
-		MS_BUILTIN(__writeeflags,          make_function_1_type(type_void, type_unsigned_int));
-	} else {
-		MS_BUILTIN(__readeflags,           make_function_0_type(type_unsigned_int64));
-		MS_BUILTIN(__writeeflags,          make_function_1_type(type_void, type_unsigned_int64));
-	}
-
 #undef MS_BUILTIN
 }

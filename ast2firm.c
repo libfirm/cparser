@@ -181,6 +181,15 @@ static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
 static void create_local_declaration(entity_t *entity);
 
+static unsigned decide_modulo_shift(unsigned type_size)
+{
+	if (architecture_modulo_shift == 0)
+		return 0;
+	if (type_size < architecture_modulo_shift)
+		return architecture_modulo_shift;
+	return type_size;
+}
+
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);
@@ -191,7 +200,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 		ir_mode_sort    sort;
 		unsigned        bit_size     = size * 8;
 		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
-		unsigned        modulo_shift;
+		unsigned        modulo_shift = 0;
 		ir_mode_arithmetic arithmetic;
 
 		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
@@ -200,13 +209,12 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 			         bit_size);
 			sort         = irms_int_number;
 			arithmetic   = irma_twos_complement;
-			modulo_shift = bit_size < machine_size ? machine_size : bit_size;
+			modulo_shift = decide_modulo_shift(bit_size);
 		} else {
 			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
 			snprintf(name, sizeof(name), "F%u", bit_size);
 			sort         = irms_float_number;
 			arithmetic   = irma_ieee754;
-			modulo_shift = 0;
 		}
 		return new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
 		                   modulo_shift);
@@ -228,26 +236,6 @@ static void init_atomic_modes(void)
 
 	/* there's no real void type in firm */
 	atomic_modes[ATOMIC_TYPE_VOID] = atomic_modes[ATOMIC_TYPE_CHAR];
-
-	/* initialize pointer modes */
-	char            name[64];
-	ir_mode_sort    sort         = irms_reference;
-	unsigned        bit_size     = machine_size;
-	bool            is_signed    = 0;
-	ir_mode_arithmetic arithmetic   = irma_twos_complement;
-	unsigned        modulo_shift
-		= bit_size < machine_size ? machine_size : bit_size;
-
-	snprintf(name, sizeof(name), "p%u", machine_size);
-	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-	                                modulo_shift);
-
-	set_reference_mode_signed_eq(ptr_mode, atomic_modes[get_intptr_kind()]);
-	set_reference_mode_unsigned_eq(ptr_mode, atomic_modes[get_uintptr_kind()]);
-
-	/* Hmm, pointers should be machine size */
-	set_modeP_data(ptr_mode);
-	set_modeP_code(ptr_mode);
 }
 
 ir_mode *get_atomic_mode(atomic_type_kind_t kind)
@@ -1296,6 +1284,8 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 	}
 	case EXPR_LITERAL_CHARACTER: {
 		long long int v;
+		bool char_is_signed
+			= get_atomic_type_flags(ATOMIC_TYPE_CHAR) & ATOMIC_TYPE_FLAG_SIGNED;
 		if (size == 1 && char_is_signed) {
 			v = (signed char)string[0];
 		} else {
@@ -2189,10 +2179,14 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	ir_node  *load_mem  = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res  = new_d_Proj(dbgi, load, mode, pn_Load_res);
 
-	type_t   *type     = expression->base.type;
-	ir_mode  *resmode  = get_ir_mode_arithmetic(type);
-	unsigned  res_size = get_mode_size_bits(resmode);
-	load_res = create_conv(dbgi, load_res, resmode);
+	ir_mode  *amode     = mode;
+	/* optimisation, since shifting in modes < machine_size is usually
+	 * less efficient */
+	if (get_mode_size_bits(amode) < get_mode_size_bits(mode_uint)) {
+		amode = mode_uint;
+	}
+	unsigned amode_size = get_mode_size_bits(amode);
+	load_res = create_conv(dbgi, load_res, amode);
 
 	set_store(load_mem);
 
@@ -2200,22 +2194,24 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	assert(expression->compound_entry->kind == ENTITY_COMPOUND_MEMBER);
 	int        bitoffset   = entity->compound_member.bit_offset;
 	int        bitsize     = entity->compound_member.bit_size;
-	unsigned   shift_bitsl = res_size - bitoffset - bitsize;
+	unsigned   shift_bitsl = amode_size - bitoffset - bitsize;
 	ir_tarval *tvl         = new_tarval_from_long((long)shift_bitsl, mode_uint);
 	ir_node   *countl      = new_d_Const(dbgi, tvl);
-	ir_node   *shiftl      = new_d_Shl(dbgi, load_res, countl, resmode);
+	ir_node   *shiftl      = new_d_Shl(dbgi, load_res, countl, amode);
 
 	unsigned   shift_bitsr = bitoffset + shift_bitsl;
-	assert(shift_bitsr <= res_size);
+	assert(shift_bitsr <= amode_size);
 	ir_tarval *tvr         = new_tarval_from_long((long)shift_bitsr, mode_uint);
 	ir_node   *countr      = new_d_Const(dbgi, tvr);
 	ir_node   *shiftr;
 	if (mode_is_signed(mode)) {
-		shiftr = new_d_Shrs(dbgi, shiftl, countr, resmode);
+		shiftr = new_d_Shrs(dbgi, shiftl, countr, amode);
 	} else {
-		shiftr = new_d_Shr(dbgi, shiftl, countr, resmode);
+		shiftr = new_d_Shr(dbgi, shiftl, countr, amode);
 	}
 
+	type_t  *type    = expression->base.type;
+	ir_mode *resmode = get_ir_mode_arithmetic(type);
 	return create_conv(dbgi, shiftr, resmode);
 }
 

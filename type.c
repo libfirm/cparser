@@ -43,13 +43,6 @@ static bool           print_implicit_array_size = false;
 static void intern_print_type_pre(const type_t *type);
 static void intern_print_type_post(const type_t *type);
 
-typedef struct atomic_type_properties_t atomic_type_properties_t;
-struct atomic_type_properties_t {
-	unsigned   size;              /**< type size in bytes */
-	unsigned   alignment;         /**< type alignment in bytes */
-	unsigned   flags;             /**< type flags from atomic_type_flag_t */
-};
-
 /**
  * Returns the size of a type node.
  *
@@ -90,35 +83,32 @@ type_t *allocate_type_zero(type_kind_t kind)
 /**
  * Properties of atomic types.
  */
-static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
-	//ATOMIC_TYPE_INVALID = 0,
+atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	[ATOMIC_TYPE_VOID] = {
-		.size       = 0,
-		.alignment  = 0,
-		.flags      = ATOMIC_TYPE_FLAG_NONE
+		.size      = 0,
+		.alignment = 0,
+		.flags     = ATOMIC_TYPE_FLAG_NONE
 	},
 	[ATOMIC_TYPE_WCHAR_T] = {
-		.size       = (unsigned)-1,
-		.alignment  = (unsigned)-1,
-		/* signed flag will be set when known */
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.size      = (unsigned)-1,
+		.alignment = (unsigned)-1,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 	},
 	[ATOMIC_TYPE_CHAR] = {
-		.size       = 1,
-		.alignment  = 1,
-		/* signed flag will be set when known */
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.size      = 1,
+		.alignment = 1,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 	},
 	[ATOMIC_TYPE_SCHAR] = {
-		.size       = 1,
-		.alignment  = 1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.size      = 1,
+		.alignment = 1,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		           | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_UCHAR] = {
-		.size       = 1,
-		.alignment  = 1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.size      = 1,
+		.alignment = 1,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 	},
 	[ATOMIC_TYPE_SHORT] = {
 		.size       = 2,
@@ -153,41 +143,28 @@ static atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 	},
-	[ATOMIC_TYPE_LONGLONG] = {
-		.size       = (unsigned) -1,
-		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
-	},
-	[ATOMIC_TYPE_ULONGLONG] = {
-		.size       = (unsigned) -1,
-		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
-	},
 	[ATOMIC_TYPE_BOOL] = {
-		.size       = (unsigned) -1,
-		.alignment  = (unsigned) -1,
+		.size       = 1,
+		.alignment  = 1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
-		.alignment  = (unsigned) -1,
+		.alignment  = 4,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
 	[ATOMIC_TYPE_DOUBLE] = {
 		.size       = 8,
-		.alignment  = (unsigned) -1,
+		.alignment  = 8,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
 	},
-	[ATOMIC_TYPE_LONG_DOUBLE] = {
-		.size       = (unsigned) -1, /* will be filled in later */
-		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
-	},
-	/* complex and imaginary types are set in init_types */
+};
+atomic_type_properties_t pointer_properties = {
+	.size      = 4,
+	.alignment = 4,
+	.flags     = ATOMIC_TYPE_FLAG_NONE,
 };
 
 static inline bool is_po2(unsigned x)
@@ -195,64 +172,41 @@ static inline bool is_po2(unsigned x)
 	return (x & (x-1)) == 0;
 }
 
-void init_types(void)
+void init_types(unsigned machine_size)
 {
 	obstack_init(&type_obst);
 
 	atomic_type_properties_t *props = atomic_type_properties;
 
-	if (char_is_signed) {
-		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
-	}
+	/* atempt to set some sane defaults based on machine size */
 
 	unsigned int_size   = machine_size < 32 ? 2 : 4;
-	/* long is always 32bit on windows */
-	unsigned long_size  = c_mode & _MS ? 4 : (machine_size < 64 ? 4 : 8);
-	unsigned llong_size = machine_size < 32 ? 4 : 8;
+	unsigned long_size  = machine_size < 64 ? 4 : 8;
 
-	props[ATOMIC_TYPE_INT].size            = int_size;
-	props[ATOMIC_TYPE_INT].alignment       = int_size;
-	props[ATOMIC_TYPE_UINT].size           = int_size;
-	props[ATOMIC_TYPE_UINT].alignment      = int_size;
-	props[ATOMIC_TYPE_LONG].size           = long_size;
-	props[ATOMIC_TYPE_LONG].alignment      = long_size;
-	props[ATOMIC_TYPE_ULONG].size          = long_size;
-	props[ATOMIC_TYPE_ULONG].alignment     = long_size;
-	props[ATOMIC_TYPE_LONGLONG].size       = llong_size;
-	props[ATOMIC_TYPE_LONGLONG].alignment  = llong_size;
-	props[ATOMIC_TYPE_ULONGLONG].size      = llong_size;
-	props[ATOMIC_TYPE_ULONGLONG].alignment = llong_size;
+	props[ATOMIC_TYPE_INT].size        = int_size;
+	props[ATOMIC_TYPE_INT].alignment   = int_size;
+	props[ATOMIC_TYPE_UINT].size       = int_size;
+	props[ATOMIC_TYPE_UINT].alignment  = int_size;
+	props[ATOMIC_TYPE_LONG].size       = long_size;
+	props[ATOMIC_TYPE_LONG].alignment  = long_size;
+	props[ATOMIC_TYPE_ULONG].size      = long_size;
+	props[ATOMIC_TYPE_ULONG].alignment = long_size;
 
-	/* TODO: backend specific, need a way to query the backend for this.
-	 * The following are good settings for x86 */
-	if (machine_size <= 32) {
-		props[ATOMIC_TYPE_FLOAT].alignment       = 4;
-		props[ATOMIC_TYPE_DOUBLE].alignment      = 4;
-		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 4;
-		props[ATOMIC_TYPE_LONGLONG].alignment    = 4;
-		props[ATOMIC_TYPE_ULONGLONG].alignment   = 4;
-	} else {
-		props[ATOMIC_TYPE_FLOAT].alignment       = 4;
-		props[ATOMIC_TYPE_DOUBLE].alignment      = 8;
-		props[ATOMIC_TYPE_LONG_DOUBLE].alignment = 8;
-		props[ATOMIC_TYPE_LONGLONG].alignment    = 8;
-		props[ATOMIC_TYPE_ULONGLONG].alignment   = 8;
+	pointer_properties.size             = long_size;
+	pointer_properties.alignment        = long_size;
+	pointer_properties.struct_alignment = long_size;
+
+	props[ATOMIC_TYPE_LONGLONG]    = props[ATOMIC_TYPE_LONG];
+	props[ATOMIC_TYPE_ULONGLONG]   = props[ATOMIC_TYPE_ULONG];
+	props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
+
+	/* set struct alignments to the same value as alignment */
+	for (size_t i = 0;
+	     i < sizeof(atomic_type_properties)/sizeof(atomic_type_properties[0]);
+	     ++i) {
+		props[i].struct_alignment = props[i].alignment;
 	}
-
-	if (long_double_size > 0) {
-		props[ATOMIC_TYPE_LONG_DOUBLE].size      = long_double_size;
-		if (is_po2(long_double_size)) {
-			props[ATOMIC_TYPE_LONG_DOUBLE].alignment = long_double_size;
-		}
-	} else {
-		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-	}
-
-	/* TODO: make this configurable for platforms which do not use byte sized
-	 * bools. */
-	props[ATOMIC_TYPE_BOOL] = props[ATOMIC_TYPE_UCHAR];
-
-	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 }
 
 void exit_types(void)
@@ -1183,7 +1137,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		panic("typerefs not skipped in compatible types?!?");
 	}
 
-	/* TODO: incomplete */
 	return false;
 }
 
@@ -1264,8 +1217,7 @@ unsigned get_type_size(type_t *type)
 		return 0; /* non-const (but "address-const") */
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
-		/* TODO: make configurable by backend */
-		return 4;
+		return pointer_properties.size;
 	case TYPE_ARRAY: {
 		/* TODO: correct if element_type is aligned? */
 		il_size_t element_size = get_type_size(type->array.element_type);
@@ -1305,12 +1257,11 @@ unsigned get_type_alignment(type_t *type)
 	case TYPE_ENUM:
 		return get_atomic_type_alignment(type->enumt.akind);
 	case TYPE_FUNCTION:
-		/* what is correct here? */
-		return 4;
+		/* gcc says 1 here... */
+		return 1;
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
-		/* TODO: make configurable by backend */
-		return 4;
+		return pointer_properties.alignment;
 	case TYPE_ARRAY:
 		return get_type_alignment(type->array.element_type);
 	case TYPE_TYPEDEF: {
@@ -1329,6 +1280,13 @@ unsigned get_type_alignment(type_t *type)
 		}
 	}
 	panic("invalid type in get_type_alignment");
+}
+
+unsigned get_type_alignment_compound(type_t *type)
+{
+	if (type->kind == TYPE_ATOMIC)
+		return atomic_type_properties[type->atomic.akind].struct_alignment;
+	return get_type_alignment(type);
 }
 
 decl_modifiers_t get_type_modifiers(const type_t *type)
@@ -1414,26 +1372,6 @@ unsigned get_atomic_type_flags(atomic_type_kind_t kind)
 {
 	assert(kind <= ATOMIC_TYPE_LAST);
 	return atomic_type_properties[kind].flags;
-}
-
-atomic_type_kind_t get_intptr_kind(void)
-{
-	if (machine_size <= 32)
-		return ATOMIC_TYPE_INT;
-	else if (machine_size <= 64)
-		return ATOMIC_TYPE_LONG;
-	else
-		return ATOMIC_TYPE_LONGLONG;
-}
-
-atomic_type_kind_t get_uintptr_kind(void)
-{
-	if (machine_size <= 32)
-		return ATOMIC_TYPE_UINT;
-	else if (machine_size <= 64)
-		return ATOMIC_TYPE_ULONG;
-	else
-		return ATOMIC_TYPE_ULONGLONG;
 }
 
 /**
@@ -1627,7 +1565,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 			break;
 
 		type_t *base_type = member->declaration.type;
-		il_alignment_t base_alignment = get_type_alignment(base_type);
+		il_alignment_t base_alignment = get_type_alignment_compound(base_type);
 		il_alignment_t alignment_mask = base_alignment-1;
 		if (base_alignment > alignment)
 			alignment = base_alignment;
@@ -1701,7 +1639,7 @@ void layout_struct_type(compound_type_t *type)
 			continue;
 		}
 
-		il_alignment_t m_alignment = get_type_alignment(m_type);
+		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 
@@ -1764,7 +1702,7 @@ void layout_union_type(compound_type_t *type)
 		il_size_t m_size = get_type_size(m_type);
 		if (m_size > size)
 			size = m_size;
-		il_alignment_t m_alignment = get_type_alignment(m_type);
+		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 	}

@@ -98,15 +98,15 @@
 #define ASSEMBLER "gcc -c -xassembler"
 #endif
 
-unsigned int       c_mode                    = _C89 | _ANSI | _C99 | _GNUC;
-unsigned int       machine_size              = 32;
-bool               byte_order_big_endian     = false;
-bool               char_is_signed            = true;
-bool               strict_mode               = false;
-atomic_type_kind_t wchar_atomic_kind         = ATOMIC_TYPE_INT;
-unsigned           long_double_size          = 0;
-bool               enable_main_collect2_hack = false;
-bool               freestanding              = false;
+unsigned int        c_mode                    = _C89 | _ANSI | _C99 | _GNUC;
+bool                byte_order_big_endian     = false;
+bool                strict_mode               = false;
+bool                enable_main_collect2_hack = false;
+bool                freestanding              = false;
+unsigned            architecture_modulo_shift = 0;
+
+static bool               char_is_signed      = true;
+static atomic_type_kind_t wchar_atomic_kind   = ATOMIC_TYPE_INT;
 
 static machine_triple_t *target_machine;
 static const char       *target_triple;
@@ -798,6 +798,22 @@ static filetype_t get_filetype_from_string(const char *string)
 	return FILETYPE_UNKNOWN;
 }
 
+static bool is_windows_os(const char *os)
+{
+	return strstr(os, "mingw") != NULL || streq(os, "win32");
+}
+
+static bool is_unixish_os(const char *os)
+{
+	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
+	       || streq(os, "solaris");
+}
+
+static bool is_darwin_os(const char *os)
+{
+	return streq(os, "darwin");
+}
+
 static bool init_os_support(void)
 {
 	const char *os = target_machine->operating_system;
@@ -805,14 +821,12 @@ static bool init_os_support(void)
 	enable_main_collect2_hack = false;
 	define_intmax_types       = false;
 
-	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
-			|| streq(os, "solaris")) {
+	if (is_unixish_os(os)) {
 		set_create_ld_ident(create_name_linux_elf);
-	} else if (streq(os, "darwin")) {
-		long_double_size = 16;
+	} else if (is_darwin_os(os)) {
 		set_create_ld_ident(create_name_macho);
 		define_intmax_types = true;
-	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
+	} else if (is_windows_os(os)) {
 		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
 		set_create_ld_ident(create_name_win32);
@@ -834,22 +848,137 @@ static bool parse_target_triple(const char *arg)
 	return true;
 }
 
+static unsigned decide_modulo_shift(unsigned type_size)
+{
+	if (architecture_modulo_shift == 0)
+		return 0;
+	if (type_size < architecture_modulo_shift)
+		return architecture_modulo_shift;
+	return type_size;
+}
+
 static void setup_target_machine(void)
 {
 	if (!setup_firm_for_machine(target_machine))
 		exit(1);
 
+	init_os_support();
+}
+
+/**
+ * initialize cparser type properties based on a firm type
+ */
+static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
+{
+	props->size             = get_type_size_bytes(type);
+	props->alignment        = get_type_alignment_bytes(type);
+	props->struct_alignment = props->alignment;
+}
+
+static void init_types_and_adjust(void)
+{
 	const backend_params *be_params = be_get_backend_param();
-	if (be_params->long_double_size % 8 != 0) {
-		fprintf(stderr, "firm-target long double size is not a multiple of 8, cannot handle this\n");
-		exit(1);
+	unsigned machine_size = be_params->machine_size;
+	init_types(machine_size);
+
+	atomic_type_properties_t *props = atomic_type_properties;
+
+	/* adjust types as requested by target architecture */
+	ir_type *type_long_double = be_params->type_long_double;
+	if (type_long_double != NULL)
+		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_long_double);
+
+	ir_type *type_long_long = be_params->type_long_long;
+	if (type_long_long != NULL)
+		set_typeprops_type(&props[ATOMIC_TYPE_LONGLONG], type_long_long);
+
+	ir_type *type_unsigned_long_long = be_params->type_unsigned_long_long;
+	if (type_long_long != NULL)
+		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_unsigned_long_long);
+
+	/* operating system ABI specifics */
+	const char *os = target_machine->operating_system;
+	if (is_darwin_os(os)) {
+		if (machine_size == 32) {
+			props[ATOMIC_TYPE_DOUBLE].struct_alignment = 4;
+			props[ATOMIC_TYPE_LONG_DOUBLE].size        = 16;
+			props[ATOMIC_TYPE_LONG_DOUBLE].alignment   = 16;
+		}
+	} else if (is_windows_os(os)) {
+		if (machine_size == 64) {
+			/* to ease porting of old c-code microsoft decided to use 32bits
+			 * even for long */
+			props[ATOMIC_TYPE_LONG]  = props[ATOMIC_TYPE_INT];
+			props[ATOMIC_TYPE_ULONG] = props[ATOMIC_TYPE_UINT];
+		}
+
+		/* on windows long double is not supported */
+		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+	} else if (is_unixish_os(os)) {
+		if (machine_size == 32) {
+			/* System V has a broken alignment for double so we have to add
+			 * a hack here */
+			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
+			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
+			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
+		}
 	}
 
-	byte_order_big_endian = be_params->byte_order_big_endian;
-	machine_size          = be_params->machine_size;
-	long_double_size      = be_params->long_double_size / 8;
+	/* stuff decided after processing operating system specifics and
+	 * commandline flags */
+	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
+	if (char_is_signed) {
+		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
+	} else {
+		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
+	}
 
-	init_os_support();
+	/* initialize defaults for unsupported types */
+	if (type_long_long == NULL) {
+		props[ATOMIC_TYPE_LONGLONG] = props[ATOMIC_TYPE_LONG];
+	}
+	if (type_long_double == NULL) {
+		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+	}
+	if (type_unsigned_long_long == NULL) {
+		props[ATOMIC_TYPE_ULONGLONG] = props[ATOMIC_TYPE_ULONG];
+	}
+
+	/* initialize firm pointer modes */
+	char               name[64];
+	ir_mode_sort       sort         = irms_reference;
+	unsigned           bit_size     = machine_size;
+	bool               is_signed    = 0;
+	ir_mode_arithmetic arithmetic   = irma_twos_complement;
+	unsigned           modulo_shift = decide_modulo_shift(bit_size);
+
+	snprintf(name, sizeof(name), "p%u", machine_size);
+	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
+	                                modulo_shift);
+
+	if (machine_size == 16) {
+		set_reference_mode_signed_eq(ptr_mode, mode_Hs);
+		set_reference_mode_unsigned_eq(ptr_mode, mode_Hu);
+	} else if (machine_size == 32) {
+		set_reference_mode_signed_eq(ptr_mode, mode_Is);
+		set_reference_mode_unsigned_eq(ptr_mode, mode_Iu);
+	} else if (machine_size == 64) {
+		set_reference_mode_signed_eq(ptr_mode, mode_Ls);
+		set_reference_mode_unsigned_eq(ptr_mode, mode_Lu);
+	} else {
+		panic("strange machine_size when determining pointer modes");
+	}
+
+	/* Hmm, pointers should be machine size */
+	set_modeP_data(ptr_mode);
+	set_modeP_code(ptr_mode);
+
+	byte_order_big_endian = be_params->byte_order_big_endian;
+	if (be_params->modulo_shift_efficient) {
+		architecture_modulo_shift = machine_size;
+	} else {
+		architecture_modulo_shift = 0;
+	}
 }
 
 int main(int argc, char **argv)
@@ -1243,10 +1372,11 @@ int main(int argc, char **argv)
 						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
 						argument_errors = true;
 					} else {
+						unsigned machine_size = (unsigned)value;
+						/* TODO: choose/change backend based on this */
 						add_flag(&cppflags_obst, "-m%u", machine_size);
 						add_flag(&asflags_obst, "-m%u", machine_size);
 						add_flag(&ldflags_obst, "-m%u", machine_size);
-						/* TODO: choose/change backend based on this */
 					}
 				}
 			} else if (streq(option, "pg")) {
@@ -1451,9 +1581,15 @@ int main(int argc, char **argv)
 
 	gen_firm_init();
 	init_symbol_table();
-	init_types();
+	init_types_and_adjust();
 	init_typehash();
 	init_basic_types();
+	if (wchar_atomic_kind == ATOMIC_TYPE_INT)
+		init_wchar_types(type_int);
+	else if (wchar_atomic_kind == ATOMIC_TYPE_SHORT)
+		init_wchar_types(type_short);
+	else
+		panic("unexpected wchar type");
 	init_lexer();
 	init_ast();
 	init_parser();

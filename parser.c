@@ -8904,7 +8904,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 						size  = get_atomic_type_size(akind);
 					} else {
 						flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
-						size  = get_atomic_type_size(get_intptr_kind());
+						size  = get_type_size(type_void_ptr);
 					}
 
 					do {
@@ -8920,7 +8920,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 							value_size  = get_atomic_type_size(value_akind);
 						} else if (value_kind == TYPE_POINTER) {
 							value_flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
-							value_size  = get_atomic_type_size(get_intptr_kind());
+							value_size  = get_type_size(type_void_ptr);
 						} else {
 							break;
 						}

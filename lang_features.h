@@ -37,24 +37,17 @@ typedef enum lang_features_t {
 /** the current C mode/dialect */
 extern unsigned int c_mode;
 
-/** the 'machine size', 16, 32 or 64 bit */
-extern unsigned int machine_size;
+/**
+ * whether architecture shift instructions usually perform modulo bit_size
+ * on the shift amount, if yes this equals to the machine_size.
+ */
+extern unsigned int architecture_modulo_shift;
 
 /** byte-order: true = big-endian, false = little-endian */
 extern bool byte_order_big_endian;
 
-/** true if the char type is signed */
-extern bool char_is_signed;
-
 /** true for strict language checking. */
 extern bool strict_mode;
-
-/** atomic type of wchar_t */
-extern atomic_type_kind_t wchar_atomic_kind;
-
-/** size of long double in bits (this is the size stored to memory, not
- * necessary the precision of the arithmetic) */
-extern unsigned long_double_size;
 
 /** a hack that adds a call to __main into the main function, necessary on
  * mingw */

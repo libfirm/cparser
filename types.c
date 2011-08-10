@@ -178,14 +178,19 @@ void init_basic_types(void)
 	type_ptrdiff_t   = type_long;
 	type_uintmax_t   = type_unsigned_long_long;
 	type_uptrdiff_t  = type_unsigned_long;
-	type_wchar_t     = make_atomic_type(wchar_atomic_kind, TYPE_QUALIFIER_NONE);
 	type_wint_t      = type_int;
-	type_const_wchar_t
-		= make_atomic_type(wchar_atomic_kind, TYPE_QUALIFIER_CONST);
 
 	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);
 	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
 	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
+}
+
+void init_wchar_types(type_t *base)
+{
+	assert(base->kind == TYPE_ATOMIC);
+	type_wchar_t = base;
+	type_const_wchar_t
+		= make_atomic_type(base->atomic.akind, TYPE_QUALIFIER_CONST);
 	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
 	type_const_wchar_t_ptr
 		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);

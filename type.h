@@ -94,7 +94,14 @@ typedef struct bitfield_type_t       bitfield_type_t;
 typedef struct typeof_type_t         typeof_type_t;
 typedef union  type_t                type_t;
 
-void init_types(void);
+/**
+ * Initializes the type system. Attempts to set some defaults on the atomic
+ * types based on a given machine size.
+ * These type properties are not final but you should adapt them to your system
+ * as your architecture and operating systems application binary interface (ABI)
+ * requires.
+ */
+void init_types(unsigned machine_size);
 void exit_types(void);
 
 void print_type(const type_t *type);
@@ -193,12 +200,16 @@ unsigned         get_type_size(type_t *type);
 decl_modifiers_t get_type_modifiers(const type_t *type);
 
 /**
+ * get alignment of a type when used inside a compound.
+ * Some ABIs are broken and alignment inside a compound is different from
+ * recommended alignment of a type
+ */
+unsigned         get_type_alignment_compound(type_t *type);
+
+/**
  * returns flags of an atomic type kind
  */
 unsigned get_atomic_type_flags(atomic_type_kind_t kind);
-
-atomic_type_kind_t get_intptr_kind(void);
-atomic_type_kind_t get_uintptr_kind(void);
 
 /**
  * Find the atomic type kind representing a given size (signed).

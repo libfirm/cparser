@@ -182,6 +182,22 @@ union type_t {
 	typeof_type_t    typeoft;
 };
 
+typedef struct atomic_type_properties_t atomic_type_properties_t;
+struct atomic_type_properties_t {
+	unsigned   size;              /**< type size in bytes */
+	unsigned   alignment;         /**< type alignment in bytes */
+	/** some ABIs are broken and require an alignment different from the
+	 * recommended/best alignment inside structs. Fixing ABIs is difficult
+	 * so people rather stick with the wrong values for compatibility.
+	 * (double type on x86 System V ABI)
+	 */
+	unsigned   struct_alignment;
+	unsigned   flags;             /**< type flags from atomic_type_flag_t */
+};
+
+extern atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1];
+extern atomic_type_properties_t pointer_properties;
+
 /** The default calling convention for functions. */
 extern cc_kind_t default_calling_convention;
 
