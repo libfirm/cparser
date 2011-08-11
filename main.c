@@ -875,6 +875,15 @@ static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
 	props->struct_alignment = props->alignment;
 }
 
+static bool is_ia32_cpu(const char *architecture)
+{
+	return streq(architecture, "i386")
+	    || streq(architecture, "i486")
+	    || streq(architecture, "i586")
+	    || streq(architecture, "i686")
+	    || streq(architecture, "i786");
+}
+
 static void init_types_and_adjust(void)
 {
 	const backend_params *be_params = be_get_backend_param();
@@ -915,7 +924,7 @@ static void init_types_and_adjust(void)
 		/* on windows long double is not supported */
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	} else if (is_unixish_os(os)) {
-		if (machine_size == 32) {
+		if (is_ia32_cpu(target_machine->cpu_type)) {
 			/* System V has a broken alignment for double so we have to add
 			 * a hack here */
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
