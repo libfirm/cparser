@@ -22,6 +22,7 @@
 
 #include "symbol_table_t.h"
 #include "token_t.h"
+#include "input.h"
 
 extern token_t lexer_token;
 extern bool    allow_dollar_in_symbol;
@@ -34,9 +35,7 @@ void lexer_next_preprocessing_token(void);
 void init_lexer(void);
 void exit_lexer(void);
 
-void select_input_encoding(char const* encoding);
-
-void lexer_open_stream(FILE *stream, const char *input_name);
+void lexer_switch_input(input_t *input, const char *input_name);
 
 string_t concat_strings(const string_t *s1, const string_t *s2);
 string_t make_string(const char *str);

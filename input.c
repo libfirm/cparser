@@ -8,8 +8,17 @@
 
 typedef size_t (*decode_func)(input_t *input, utf32 *buffer, size_t buffer_size);
 
+typedef enum {
+	INPUT_FILE,
+	INPUT_STRING
+} input_kind_t;
+
 struct input_t {
-	FILE       *file;
+	input_kind_t kind;
+	union {
+		FILE *file;
+		const char *string;
+	} in;
 	decode_func decode;
 
 	/* state for utf-8 decoder */
@@ -25,25 +34,36 @@ void set_input_error_callback(input_error_callback_func new_func)
 	input_error = new_func;
 }
 
-static size_t read_block(FILE *file, unsigned char *const read_buf,
+static size_t read_block(input_t *input, unsigned char *const read_buf,
                          size_t const n)
 {
-	size_t const s = fread(read_buf, 1, n, file);
-	if (s == 0) {
-		/* on OS/X ferror appears to return true on eof as well when running
-		 * the application in gdb... */
-		if (!feof(file) && ferror(file))
-			input_error(0, 0, "read from input failed");
-		return 0;
+	if (input->kind == INPUT_FILE) {
+		FILE *file = input->in.file;
+		size_t const s = fread(read_buf, 1, n, file);
+		if (s == 0) {
+			/* on OS/X ferror appears to return true on eof as well when running
+			 * the application in gdb... */
+			if (!feof(file) && ferror(file))
+				input_error(0, 0, "read from input failed");
+			return 0;
+		}
+		return s;
+	} else {
+		assert(input->kind == INPUT_STRING);
+		size_t len = strlen(input->in.string);
+		if (len > n)
+			len = n;
+		memcpy(read_buf, input->in.string, len);
+		input->in.string += len;
+		return len;
 	}
-	return s;
 }
 
 static size_t decode_iso_8859_1(input_t *input, utf32 *buffer,
                                 size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
-	size_t const s = read_block(input->file, read_buf, sizeof(read_buf));
+	size_t const s = read_block(input, read_buf, sizeof(read_buf));
 
 	unsigned char const *src = read_buf;
 	unsigned char const *end = read_buf + s;
@@ -58,7 +78,7 @@ static size_t decode_iso_8859_15(input_t *input, utf32 *buffer,
                                  size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
-	size_t const s = read_block(input->file, read_buf, sizeof(read_buf));
+	size_t const s = read_block(input, read_buf, sizeof(read_buf));
 
 	unsigned char const *src = read_buf;
 	unsigned char const *end = read_buf + s;
@@ -86,7 +106,7 @@ static size_t decode_utf8(input_t *input, utf32 *buffer, size_t buffer_size)
 	unsigned char read_buf[buffer_size];
 
 	while (true) {
-		size_t const s = read_block(input->file, read_buf, sizeof(read_buf));
+		size_t const s = read_block(input, read_buf, sizeof(read_buf));
 		if (s == 0) {
 			if (input->utf8_part_decoded_rest_len > 0)
 				input_error(0, 0, "incomplete input char at end of input");
@@ -195,7 +215,7 @@ static size_t decode_windows_1252(input_t *input, utf32 *buffer,
                                   size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
-	size_t const s = read_block(input->file, read_buf, sizeof(read_buf));
+	size_t const s = read_block(input, read_buf, sizeof(read_buf));
 
 	unsigned char const *src = read_buf;
 	unsigned char const *end = read_buf + s;
@@ -274,11 +294,8 @@ static int my_strcasecmp(const char *s1, const char *s2)
 	return (unsigned char)*s1 - (unsigned char)*s2;
 }
 
-input_t *input_from_stream(FILE *file, const char *encoding)
+static void choose_decoder(input_t *result, const char *encoding)
 {
-	input_t *result = XMALLOCZ(input_t);
-	result->file = file;
-
 	if (encoding == NULL) {
 		result->decode = decode_utf8;
 	} else {
@@ -294,6 +311,26 @@ input_t *input_from_stream(FILE *file, const char *encoding)
 			result->decode = decode_utf8;
 		}
 	}
+}
+
+input_t *input_from_stream(FILE *file, const char *encoding)
+{
+	input_t *result = XMALLOCZ(input_t);
+	result->kind    = INPUT_FILE;
+	result->in.file = file;
+
+	choose_decoder(result, encoding);
+
+	return result;
+}
+
+input_t *input_from_string(const char *string, const char *encoding)
+{
+	input_t *result   = XMALLOCZ(input_t);
+	result->kind      = INPUT_STRING;
+	result->in.string = string;
+
+	choose_decoder(result, encoding);
 
 	return result;
 }

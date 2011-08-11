@@ -117,6 +117,7 @@ static struct obstack    asflags_obst;
 static char              dep_target[1024];
 static const char       *outname;
 static bool              define_intmax_types;
+static const char       *input_encoding;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -182,22 +183,26 @@ static translation_unit_t *do_parsing(FILE *const in, const char *const input_na
 {
 	start_parsing();
 
-	lexer_open_stream(in, input_name);
+	input_t *input = input_from_stream(in, input_encoding);
+	lexer_switch_input(input, input_name);
 	parse();
-
 	translation_unit_t *unit = finish_parsing();
+	input_free(input);
+
 	return unit;
 }
 
 static void lextest(FILE *in, const char *fname)
 {
-	lexer_open_stream(in, fname);
+	input_t *input = input_from_stream(in, input_encoding);
+	lexer_switch_input(input, fname);
 
 	do {
 		lexer_next_preprocessing_token();
 		print_token(stdout, &lexer_token);
 		putchar('\n');
 	} while (lexer_token.kind != T_EOF);
+	input_free(input);
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -1171,7 +1176,7 @@ int main(int argc, char **argv)
 
 				if (strstart(orig_opt, "input-charset=")) {
 					char const* const encoding = strchr(orig_opt, '=') + 1;
-					select_input_encoding(encoding);
+					input_encoding = encoding;
 				} else if (strstart(orig_opt, "align-loops=") ||
 				           strstart(orig_opt, "align-jumps=") ||
 				           strstart(orig_opt, "align-functions=")) {

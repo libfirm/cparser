@@ -57,7 +57,6 @@ static source_position_t  lexer_pos;
 token_t                   lexer_token;
 static symbol_t          *symbol_L;
 static strset_t           stringset;
-static char              *encoding;
 bool                      allow_dollar_in_symbol = true;
 
 /**
@@ -1332,26 +1331,14 @@ static void input_error(unsigned delta_lines, unsigned delta_cols,
 	errorf(&lexer_pos, "%s", message);
 }
 
-void select_input_encoding(char const* new_encoding)
+void lexer_switch_input(input_t *new_input, const char *input_name)
 {
-	if (encoding != NULL)
-		xfree(encoding);
-	encoding = xstrdup(new_encoding);
-}
-
-void lexer_open_stream(FILE *stream, const char *input_name)
-{
-	if (input != NULL) {
-		input_free(input);
-		input = NULL;
-	}
-
 	lexer_pos.lineno     = 0;
 	lexer_pos.colno      = 0;
 	lexer_pos.input_name = input_name;
 
 	set_input_error_callback(input_error);
-	input  = input_from_stream(stream, encoding);
+	input  = new_input;
 	bufpos = NULL;
 	bufend = NULL;
 
@@ -1362,10 +1349,6 @@ void lexer_open_stream(FILE *stream, const char *input_name)
 
 void exit_lexer(void)
 {
-	if (input != NULL) {
-		input_free(input);
-		input = NULL;
-	}
 	strset_destroy(&stringset);
 }
 
