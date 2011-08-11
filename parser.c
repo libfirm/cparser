@@ -8208,7 +8208,7 @@ static bool maybe_negative(expression_t const *const expr)
 {
 	switch (is_constant_expression(expr)) {
 		case EXPR_CLASS_ERROR:    return false;
-		case EXPR_CLASS_CONSTANT: return fold_constant_to_int(expr) < 0;
+		case EXPR_CLASS_CONSTANT: return constant_is_negative(expr);
 		default:                  return true;
 	}
 }
