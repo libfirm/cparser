@@ -81,6 +81,7 @@
 #include "help.h"
 #include "mangle.h"
 #include "printer.h"
+#include "ast_grep.h"
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
@@ -117,6 +118,7 @@ static struct obstack    asflags_obst;
 static char              dep_target[1024];
 static const char       *outname;
 static bool              define_intmax_types;
+static const char       *grep_expression;
 static const char       *input_encoding;
 
 typedef enum lang_standard_t {
@@ -1521,6 +1523,16 @@ int main(int argc, char **argv)
 					mode         = CompileDump;
 				} else if (streq(option, "export-ir")) {
 					mode = CompileExportIR;
+				} else if (streq(option, "grep")) {
+					++i;
+					if (i >= argc) {
+						fprintf(stderr, "error: "
+						        "expected argument after '--grep'\n");
+						argument_errors = true;
+						break;
+					}
+					grep_expression = argv[i];
+					mode            = ParseOnly;
 				} else {
 					fprintf(stderr, "error: unknown argument '%s'\n", arg);
 					argument_errors = true;
@@ -1860,6 +1872,12 @@ do_parsing:
 			translation_unit_to_firm(unit);
 			already_constructed_firm = true;
 			timer_pop(t_construct);
+
+			if (grep_expression != NULL) {
+				expression_t *pattern
+					= parse_grep_expression(unit, grep_expression);
+				ast_grep(unit, pattern);
+			}
 
 graph_built:
 			if (mode == ParseOnly) {

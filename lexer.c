@@ -1273,6 +1273,7 @@ void lexer_next_preprocessing_token(void)
 			MAYBE('#', T_HASHHASH)
 			ELSE('#')
 
+		case '@':
 		case '?':
 		case '[':
 		case ']':

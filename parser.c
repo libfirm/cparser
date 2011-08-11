@@ -23,7 +23,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#include "parser.h"
+#include "parser_t.h"
 #include "diagnostic.h"
 #include "format_check.h"
 #include "lexer.h"
@@ -77,7 +77,7 @@ typedef struct parse_initializer_env_t {
 typedef entity_t* (*parsed_declaration_func) (entity_t *declaration, bool is_definition);
 
 /** The current token. */
-static token_t              token;
+token_t                     token;
 /** The lookahead ring-buffer. */
 static token_t              lookahead_buffer[MAX_LOOKAHEAD];
 /** Position of the next token in the lookahead buffer. */
@@ -146,10 +146,9 @@ static statement_t *parse_compound_statement(bool inside_expression_statement);
 static statement_t *parse_statement(void);
 
 static expression_t *parse_subexpression(precedence_t);
-static expression_t *parse_expression(void);
-static type_t       *parse_typename(void);
 static void          parse_externals(void);
 static void          parse_external(void);
+expression_t *parse_expression(void);
 
 static void parse_compound_type_entries(compound_t *compound_declaration);
 
@@ -480,6 +479,11 @@ static inline void next_token(void)
 	print_token(stderr, &token);
 	fprintf(stderr, "\n");
 #endif
+}
+
+void parser_next_token(void)
+{
+	next_token();
 }
 
 static inline bool next_if(int const type)
@@ -5761,7 +5765,7 @@ end_error:
 	}
 }
 
-static type_t *parse_typename(void)
+type_t *parse_typename(void)
 {
 	declaration_specifiers_t specifiers;
 	parse_declaration_specifiers(&specifiers);
@@ -5781,7 +5785,6 @@ static type_t *parse_typename(void)
 
 
 
-typedef expression_t* (*parse_expression_function)(void);
 typedef expression_t* (*parse_expression_infix_function)(expression_t *left);
 
 typedef struct expression_parser_function_t expression_parser_function_t;
@@ -8749,7 +8752,7 @@ static expression_t *parse_subexpression(precedence_t precedence)
 /**
  * Parse an expression.
  */
-static expression_t *parse_expression(void)
+expression_t *parse_expression(void)
 {
 	return parse_subexpression(PREC_EXPRESSION);
 }
@@ -8760,8 +8763,8 @@ static expression_t *parse_expression(void)
  * @param parser      the parser function
  * @param token_kind  the token type of the prefix token
  */
-static void register_expression_parser(parse_expression_function parser,
-                                       int token_kind)
+void register_expression_parser(parse_expression_function parser,
+                                int token_kind)
 {
 	expression_parser_function_t *entry = &expression_parsers[token_kind];
 
@@ -10520,6 +10523,37 @@ void start_parsing(void)
 	create_gnu_builtins();
 	if (c_mode & _MS)
 		create_microsoft_intrinsics();
+}
+
+void start_parsing_into(translation_unit_t *old_unit)
+{
+	environment_stack = NEW_ARR_F(stack_entry_t, 0);
+	label_stack       = NEW_ARR_F(stack_entry_t, 0);
+	diagnostic_count  = 0;
+	error_count       = 0;
+	warning_count     = 0;
+
+	print_to_file(stderr);
+
+	unit = old_unit;
+
+	assert(file_scope == NULL);
+	file_scope = &unit->scope;
+
+	assert(current_scope == NULL);
+	scope_push(&unit->scope);
+
+	for (entity_t *entity = current_scope->entities; entity != NULL;
+	     entity = entity->base.next) {
+		symbol_t *symbol = entity->base.symbol;
+		if (symbol != NULL)
+			stack_push(&environment_stack, entity);
+	}
+
+	lookahead_bufpos = 0;
+	for (int i = 0; i < MAX_LOOKAHEAD + 2; ++i) {
+		next_token();
+	}
 }
 
 translation_unit_t *finish_parsing(void)

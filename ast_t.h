@@ -152,6 +152,8 @@ typedef enum expression_kind_t {
 	EXPR_BINARY_ISLESSGREATER,
 	EXPR_BINARY_ISUNORDERED,
 	EXPR_BINARY_LAST = EXPR_BINARY_ISUNORDERED,
+
+	EXPR_LAST = EXPR_BINARY_LAST,
 } expression_kind_t;
 
 typedef enum funcname_kind_t {
