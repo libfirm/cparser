@@ -3583,7 +3583,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_LABEL_ADDRESS:
 		return label_address_to_firm(&expression->label_address);
 
-	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
 		break;
 	}

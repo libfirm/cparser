@@ -100,7 +100,6 @@ static int right_to_left(unsigned precedence)
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
 	static const unsigned prec[] = {
-		[EXPR_UNKNOWN]                           = PREC_PRIMARY,
 		[EXPR_INVALID]                           = PREC_PRIMARY,
 		[EXPR_REFERENCE]                         = PREC_PRIMARY,
 		[EXPR_REFERENCE_ENUM_VALUE]              = PREC_PRIMARY,
@@ -678,7 +677,6 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	if (parenthesized)
 		print_string("(");
 	switch (expression->kind) {
-	case EXPR_UNKNOWN:
 	case EXPR_INVALID:
 		print_string("$invalid expression$");
 		break;
@@ -1970,9 +1968,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 
 	case EXPR_INVALID:
 		return EXPR_CLASS_ERROR;
-
-	case EXPR_UNKNOWN:
-		break;
 	}
 	panic("invalid expression found (is constant expression)");
 }

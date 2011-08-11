@@ -1547,7 +1547,6 @@ unary:
 			return;
 
 		EXPR_LITERAL_CASES
-		case EXPR_UNKNOWN:
 		case EXPR_INVALID:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
@@ -4830,9 +4829,6 @@ static bool expression_returns(expression_t const *const expr)
 			return
 				expression_returns(expr->binary.left) &&
 				expression_returns(expr->binary.right);
-
-		case EXPR_UNKNOWN:
-			break;
 	}
 
 	panic("unhandled expression");
@@ -8527,7 +8523,6 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
-		case EXPR_UNKNOWN:                    break;
 		case EXPR_INVALID:                    return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
 		case EXPR_REFERENCE_ENUM_VALUE:       return false;
@@ -8746,7 +8741,6 @@ static expression_t *parse_subexpression(precedence_t precedence)
 		left = parser->infix_parser(left);
 
 		assert(left != NULL);
-		assert(left->kind != EXPR_UNKNOWN);
 	}
 
 	return left;

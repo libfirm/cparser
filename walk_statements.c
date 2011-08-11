@@ -53,9 +53,6 @@ static void walk_expression(expression_t const *const expr,
 		}
 		return;
 
-	case EXPR_UNKNOWN:
-		panic("unexpected expr kind");
-
 	case EXPR_COMPOUND_LITERAL:
 		/* TODO... */
 		break;
