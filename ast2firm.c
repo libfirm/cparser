@@ -44,7 +44,7 @@
 #include "types.h"
 #include "type_hash.h"
 #include "mangle.h"
-#include "walk_statements.h"
+#include "walk.h"
 #include "warning.h"
 #include "printer.h"
 #include "entitymap_t.h"

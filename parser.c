@@ -36,7 +36,7 @@
 #include "entity_t.h"
 #include "attribute_t.h"
 #include "lang_features.h"
-#include "walk_statements.h"
+#include "walk.h"
 #include "warning.h"
 #include "printer.h"
 #include "adt/bitfiddle.h"
