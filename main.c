@@ -635,7 +635,13 @@ static void print_help_warnings(void)
 	put_help("-w",                             "Disable all warnings");
 	put_help("-Wno-trigraphs",                 "Warn if input contains trigraphs");
 	put_help("-Wundef",                        "Warn if an undefined macro is used in an #if");
+	put_help("-Wmissing-include-dirs",         "Warn about missing user-specified include directories");
+	put_help("-Wendif-labels",                 "Warn about stray text after #elif and #endif");
 	put_help("-Winit-self",                    "Ignored (gcc compatibility)");
+	put_help("-Wformat-y2k",                   "Ignored (gcc compatibility)");
+	put_help("-Wformat-security",              "Ignored (gcc compatibility)");
+	put_help("-Wold-style-declaration",        "Ignored (gcc compatibility)");
+	put_help("-Wtype-limits",                  "Ignored (gcc compatibility)");
 	print_warning_opt_help();
 }
 
@@ -1254,7 +1260,9 @@ int main(int argc, char **argv)
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
 					           streq(opt, "align-functions")         ||
-					           streq(opt, "PIC")) {
+					           streq(opt, "PIC")                     ||
+					           streq(opt, "stack-protector")         ||
+					           streq(opt, "stack-protector-all")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else {
 						int res = firm_option(orig_opt);
@@ -1295,10 +1303,17 @@ int main(int argc, char **argv)
 					GET_ARG_AFTER(opt, "-Wl,");
 					add_flag(&ldflags_obst, "-Wl,%s", opt);
 				} else if (streq(option + 1, "no-trigraphs")
-							|| streq(option + 1, "undef")) {
+							|| streq(option + 1, "undef")
+							|| streq(option + 1, "missing-include-dirs")
+							|| streq(option + 1, "endif-labels")) {
 					add_flag(&cppflags_obst, "%s", arg);
 				} else if (streq(option+1, "init-self")) {
-					/* ignored (gcc compatibility) */
+					/* ignored (asme as gcc does) */
+				} else if (streq(option+1, "format-y2k")
+				           || streq(option+1, "format-security")
+				           || streq(option+1, "old-style-declaration")
+				           || streq(option+1, "type-limits")) {
+				    /* ignore (gcc compatibility) */
 				} else {
 					set_warning_opt(&option[1]);
 				}

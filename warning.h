@@ -46,6 +46,7 @@ typedef enum warning_t {
 	WARN_DECLARATION_AFTER_STATEMENT,   /**< Warn when a declaration is found after a statement in a block */
 	WARN_DEPRECATED_DECLARATIONS,       /* TODO implement for types */ /**< Warn about uses of functions, variables and types marked as deprecated by using the 'deprecated' attribute */
 	WARN_DIV_BY_ZERO,                   /**< Warn about compile-time integer division by zero */
+	WARN_EMPTY_BODY,                    /**< Warn about an empty body of an if or else statement */
 	WARN_EMPTY_STATEMENT,               /**< Warn about empty statements, i.e. lone ';'  */
 #if 0 // TODO
 	WARN_ENDIF_LABELS,                  /**< Warn whenever an '#else' or an '#endif' are followed by text */
@@ -54,6 +55,7 @@ typedef enum warning_t {
 	WARN_FATAL_ERRORS,                  /**< First error stops the compilation */
 	WARN_FLOAT_EQUAL,                   /**< Warn if floating point values are used in equality comparisons */
 	WARN_FORMAT,                        /**< Check printf-style format strings */
+	WARN_IGNORED_QUALIFIERS,            /**< Warn when type qualifiers are meaningless */
 	WARN_IMPLICIT_FUNCTION_DECLARATION, /**< Warn whenever a function is used before being declared */
 	WARN_IMPLICIT_INT,                  /**< Warn when a declaration does not specify a type */
 #if 0 // TODO

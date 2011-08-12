@@ -3649,7 +3649,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 				errorf(pos, "function returning array is not allowed");
 			} else {
 				if (skipped_return_type->base.qualifiers != 0) {
-					warningf(WARN_OTHER, pos, "type qualifiers in return type of function type are meaningless");
+					warningf(WARN_IGNORED_QUALIFIERS, pos, "type qualifiers in return type of function type are meaningless");
 				}
 			}
 
@@ -9273,8 +9273,18 @@ end_error:
 	statement->ifs.true_statement = true_stmt;
 	rem_anchor_token(T_else);
 
+	if (true_stmt->kind == STATEMENT_EMPTY) {
+		warningf(WARN_EMPTY_BODY, HERE,
+		        "suggest braces around empty body in an ‘if’ statement");
+	}
+
 	if (next_if(T_else)) {
 		statement->ifs.false_statement = parse_inner_statement();
+
+		if (statement->ifs.false_statement->kind == STATEMENT_EMPTY) {
+			warningf(WARN_EMPTY_BODY, HERE,
+					"suggest braces around empty body in an ‘if’ statement");
+		}
 	} else if (true_stmt->kind == STATEMENT_IF &&
 			true_stmt->ifs.false_statement != NULL) {
 		source_position_t const *const pos = &true_stmt->base.source_position;
