@@ -64,6 +64,7 @@ static warning_switch_t warning[] = {
 	[WARN_SHADOW]                        = { WARN_STATE_NONE, "shadow",                       },
 	[WARN_SHADOW_LOCAL]                  = { WARN_STATE_NONE, "shadow-local",                 },
 	[WARN_SIGN_COMPARE]                  = { WARN_STATE_NONE, "sign-compare",                 },
+	[WARN_STRAY_SEMICOLON]               = { WARN_STATE_ON,   "stray-semicolon",              },
 	[WARN_STRICT_PROTOTYPES]             = { WARN_STATE_ON,   "strict-prototypes"             },
 	[WARN_SWITCH_DEFAULT]                = { WARN_STATE_NONE, "switch-default",               },
 	[WARN_SWITCH_ENUM]                   = { WARN_STATE_NONE, "switch-enum",                  },

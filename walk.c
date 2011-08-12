@@ -185,6 +185,7 @@ static void walk_expression(expression_t *const expr,
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
 	case EXPR_LABEL_ADDRESS:
+	case EXPR_ERROR:
 		return;
 	case EXPR_INVALID:
 		break;
