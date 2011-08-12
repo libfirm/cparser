@@ -1059,7 +1059,7 @@ static expression_t *parse_constant_expression(void)
 	return result;
 }
 
-static expression_t *parse_assignment_expression(void)
+expression_t *parse_assignment_expression(void)
 {
 	return parse_subexpression(PREC_ASSIGNMENT);
 }

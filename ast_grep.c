@@ -15,15 +15,22 @@
 
 #define HERE (&token.base.source_position)
 
-enum {
+typedef enum {
 	EXPR_MATCH_TYPE = EXPR_LAST + 1,
-	EXPR_MATCH_ANY
-};
+	EXPR_MATCH_ANY,
+	EXPR_MATCH_OR,
+} match_kind_t;
 
 typedef struct match_type_expression_t {
 	expression_base_t  base;
 	type_t            *pattern;
 } match_type_expression_t;
+
+typedef struct match_or_expression_t {
+	expression_base_t  base;
+	expression_t      *expr1;
+	expression_t      *expr2;
+} match_or_expression_t;
 
 static expression_t *parse_match_expression(void)
 {
@@ -57,6 +64,24 @@ static expression_t *parse_match_expression(void)
 		expr->base.kind = EXPR_MATCH_ANY;
 		expr->base.type = type_error_type;
 		return expr;
+	} else if (streq(name, "or")) {
+		assert(token.kind == '(');
+		parser_next_token();
+
+		match_or_expression_t *expr
+			= (match_or_expression_t*) allocate_ast_zero(sizeof(*expr));
+		memset(expr, 0, sizeof(*expr));
+		expr->base.kind = EXPR_MATCH_OR;
+		expr->base.type = type_error_type;
+		expr->expr1 = parse_assignment_expression();
+
+		assert(token.kind == ',');
+		parser_next_token();
+
+		expr->expr2 = parse_assignment_expression();
+
+		assert(token.kind == ')');
+		parser_next_token();
 	}
 
 	errorf(HERE, "unknown matcher '%s'", name);
@@ -109,11 +134,19 @@ static bool match_type(type_t *type, type_t *pattern)
 
 static bool match(expression_t *expression, expression_t *pattern)
 {
-	if (pattern->kind == EXPR_MATCH_TYPE) {
+	switch ((match_kind_t)pattern->kind) {
+	case EXPR_MATCH_TYPE: {
 		match_type_expression_t *matche = (match_type_expression_t*) pattern;
 		return match_type(expression->base.type, matche->pattern);
-	} else if (pattern->kind == EXPR_MATCH_ANY) {
+	}
+	case EXPR_MATCH_ANY:
 		return true;
+	case EXPR_MATCH_OR: {
+		match_or_expression_t *matcho = (match_or_expression_t*) pattern;
+		if (match(expression, matcho->expr1))
+			return true;
+		return match(expression, matcho->expr2);
+	}
 	}
 
 	if (pattern->kind != expression->kind)

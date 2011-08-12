@@ -9,9 +9,10 @@ typedef expression_t* (*parse_expression_function)(void);
 void register_expression_parser(parse_expression_function parser,
                                 int token_kind);
 
-void parser_next_token();
+void parser_next_token(void);
 
 expression_t *parse_expression(void);
+expression_t *parse_assignment_expression(void);
 type_t *parse_typename(void);
 
 #endif
