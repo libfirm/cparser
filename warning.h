@@ -94,6 +94,7 @@ typedef enum warning_t {
 	WARN_SHADOW,                        /**< Warn whenever a local variable shadows another local variable, parameter or global variable or whenever a built-in function is shadowed */
 	WARN_SHADOW_LOCAL,
 	WARN_SIGN_COMPARE,                  /**< Warn when a comparison between signed and unsigned values could produce an incorrect result when the signed value is converted to unsigned */
+	WARN_STRAY_SEMICOLON,               /**< Warn about stray semicolons outside of functions */
 #if 0 // TODO
 	WARN_STRICT_ALIASING,               /**< Warn about code which might break the strict aliasing rules that the compiler is using for optimization. */
 #endif

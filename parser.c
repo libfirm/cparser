@@ -10420,7 +10420,7 @@ static void parse_external(void)
 
 		case ';':
 			if (!strict_mode) {
-				warningf(WARN_OTHER, HERE, "stray ';' outside of function");
+				warningf(WARN_STRAY_SEMICOLON, HERE, "stray ';' outside of function");
 				next_token();
 				return;
 			}
