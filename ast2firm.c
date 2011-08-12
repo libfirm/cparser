@@ -1820,10 +1820,16 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case bk_gnu_builtin_ffs:
 		 return gen_unary_builtin(ir_bk_ffs,      call->arguments->expression, function_type, dbgi);
 	case bk_gnu_builtin_clz:
+	case bk_gnu_builtin_clzl:
+	case bk_gnu_builtin_clzll:
 		 return gen_unary_builtin(ir_bk_clz,      call->arguments->expression, function_type, dbgi);
 	case bk_gnu_builtin_ctz:
+	case bk_gnu_builtin_ctzl:
+	case bk_gnu_builtin_ctzll:
 		 return gen_unary_builtin(ir_bk_ctz,      call->arguments->expression, function_type, dbgi);
 	case bk_gnu_builtin_popcount:
+	case bk_gnu_builtin_popcountl:
+	case bk_gnu_builtin_popcountll:
 	case bk_ms__popcount:
 		 return gen_unary_builtin(ir_bk_popcount, call->arguments->expression, function_type, dbgi);
 	case bk_gnu_builtin_parity:

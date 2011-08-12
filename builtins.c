@@ -63,9 +63,17 @@ void create_gnu_builtins(void)
 	GNU_BUILTIN(return_address, make_function_1_type(type_void_ptr, type_unsigned_int));
 	GNU_BUILTIN(frame_address,  make_function_1_type(type_void_ptr, type_unsigned_int));
 	GNU_BUILTIN(ffs,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(ffsl,           make_function_1_type(type_int, type_unsigned_long));
+	GNU_BUILTIN(ffsll,          make_function_1_type(type_int, type_unsigned_long_long));
 	GNU_BUILTIN(clz,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(clzl,           make_function_1_type(type_int, type_unsigned_long));
+	GNU_BUILTIN(clzll,          make_function_1_type(type_int, type_unsigned_long_long));
 	GNU_BUILTIN(ctz,            make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(ctzl,           make_function_1_type(type_int, type_unsigned_long));
+	GNU_BUILTIN(ctzll,          make_function_1_type(type_int, type_unsigned_long_long));
 	GNU_BUILTIN(popcount,       make_function_1_type(type_int, type_unsigned_int));
+	GNU_BUILTIN(popcountl,      make_function_1_type(type_int, type_unsigned_long));
+	GNU_BUILTIN(popcountll,     make_function_1_type(type_int, type_unsigned_long_long));
 	GNU_BUILTIN(parity,         make_function_1_type(type_int, type_unsigned_int));
 	GNU_BUILTIN(prefetch,       make_function_1_type_variadic(type_float, type_void_ptr));
 	GNU_BUILTIN(trap,           make_function_type(type_void, 0, NULL, DM_NORETURN));
