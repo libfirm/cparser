@@ -63,6 +63,7 @@ typedef enum precedence_t {
  */
 typedef enum expression_kind_t {
 	EXPR_INVALID = 0,
+	EXPR_ERROR,
 	EXPR_REFERENCE,
 	EXPR_REFERENCE_ENUM_VALUE,
 	EXPR_LITERAL_BOOLEAN,

@@ -3115,7 +3115,7 @@ bool constant_is_negative(const expression_t *expression)
 
 long fold_constant_to_int(const expression_t *expression)
 {
-	if (expression->kind == EXPR_INVALID)
+	if (expression->kind == EXPR_ERROR)
 		return 0;
 
 	ir_tarval *tv = fold_constant_to_tarval(expression);
@@ -3128,7 +3128,7 @@ long fold_constant_to_int(const expression_t *expression)
 
 bool fold_constant_to_bool(const expression_t *expression)
 {
-	if (expression->kind == EXPR_INVALID)
+	if (expression->kind == EXPR_ERROR)
 		return false;
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	return !tarval_is_null(tv);
@@ -3524,6 +3524,12 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
+static ir_node *error_to_firm(const expression_t *expression)
+{
+	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
+	return new_Bad(mode);
+}
+
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
@@ -3589,6 +3595,8 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_LABEL_ADDRESS:
 		return label_address_to_firm(&expression->label_address);
 
+	case EXPR_ERROR:
+		return error_to_firm(expression);
 	case EXPR_INVALID:
 		break;
 	}

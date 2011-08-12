@@ -317,6 +317,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[EXPR_INVALID]                    = sizeof(expression_base_t),
+		[EXPR_ERROR]                      = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
 		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
 		[EXPR_LITERAL_BOOLEAN]            = sizeof(literal_expression_t),
@@ -397,9 +398,11 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
  * Creates a new invalid expression at the source position
  * of the current token.
  */
-static expression_t *create_invalid_expression(void)
+static expression_t *create_error_expression(void)
 {
-	return allocate_expression_zero(EXPR_INVALID);
+	expression_t *expression = allocate_expression_zero(EXPR_ERROR);
+	expression->base.type = type_error_type;
+	return expression;
 }
 
 /**
@@ -1548,6 +1551,7 @@ unary:
 
 		EXPR_LITERAL_CASES
 		case EXPR_INVALID:
+		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO init?
@@ -4778,6 +4782,7 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_OFFSETOF:
 		case EXPR_INVALID:
+		case EXPR_ERROR:
 			return true;
 
 		case EXPR_STATEMENT: {
@@ -5804,7 +5809,7 @@ static expression_t *expected_expression_error(void)
 	}
 	next_token();
 
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 static type_t *get_string_type(void)
@@ -6357,7 +6362,7 @@ static expression_t *parse_cast(void)
 
 	return cast;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6572,14 +6577,14 @@ static expression_t *parse_offsetof(void)
 	descend_into_subtype(&path);
 
 	if (!walk_designator(&path, designator, true)) {
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 
 	DEL_ARR_F(path.path);
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6615,7 +6620,7 @@ static expression_t *parse_va_start(void)
 	}
 	expect(')', end_error);
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6639,7 +6644,7 @@ static expression_t *parse_va_arg(void)
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6668,7 +6673,7 @@ static expression_t *parse_va_copy(void)
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6689,7 +6694,7 @@ static expression_t *parse_builtin_constant(void)
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6714,7 +6719,7 @@ static expression_t *parse_builtin_types_compatible(void)
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6771,7 +6776,7 @@ static expression_t *parse_compare_builtin(void)
 
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6792,7 +6797,7 @@ static expression_t *parse_assume(void)
 	expression->base.type = type_void;
 	return expression;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -6829,7 +6834,7 @@ static expression_t *parse_label_address(void)
 	eat(T_ANDAND);
 	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 
 	label_t *const label = get_label();
@@ -6933,13 +6938,13 @@ static expression_t *parse_primary_expression(void)
 		parse_declaration_specifiers(&specifiers);
 		type_t const *const type = parse_abstract_declarator(specifiers.type);
 		errorf(&pos, "encountered type '%T' while parsing expression", type);
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 	}
 
 	errorf(HERE, "unexpected token %K, expected an expression", &token);
 	eat_until_anchor();
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 static expression_t *parse_array_expression(expression_t *left)
@@ -7093,7 +7098,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 
 	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 	symbol_t *symbol = token.identifier.symbol;
 	next_token();
@@ -7127,14 +7132,14 @@ static expression_t *parse_select_expression(expression_t *addr)
 			       "request for member '%Y' in something not a struct or union, but '%T'",
 			       symbol, type_left);
 		}
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 
 	compound_t *compound = type_left->compound.compound;
 	if (!compound->complete) {
 		errorf(&pos, "request for member '%Y' in incomplete type '%T'",
 		       symbol, type_left);
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 
 	type_qualifiers_t  qualifiers = type_left->base.qualifiers;
@@ -7143,7 +7148,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 
 	if (result == NULL) {
 		errorf(&pos, "'%T' has no member named '%Y'", orig_type, symbol);
-		return create_invalid_expression();
+		return create_error_expression();
 	}
 
 	return result;
@@ -7580,7 +7585,7 @@ static expression_t *parse_builtin_classify_type(void)
 
 	return result;
 end_error:
-	return create_invalid_expression();
+	return create_error_expression();
 }
 
 /**
@@ -8523,6 +8528,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
+		case EXPR_ERROR:
 		case EXPR_INVALID:                    return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
 		case EXPR_REFERENCE_ENUM_VALUE:       return false;

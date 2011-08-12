@@ -677,8 +677,8 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	if (parenthesized)
 		print_string("(");
 	switch (expression->kind) {
-	case EXPR_INVALID:
-		print_string("$invalid expression$");
+	case EXPR_ERROR:
+		print_string("$error$");
 		break;
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_STRING_LITERAL:
@@ -746,6 +746,8 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_STATEMENT:
 		print_statement_expression(&expression->statement);
 		break;
+	case EXPR_INVALID:
+		panic("invalid expression found");
 
 #if 0
 	default:
@@ -1610,8 +1612,10 @@ static expression_classification_t is_object_with_linker_constant_address(
 		return EXPR_CLASS_VARIABLE;
 	}
 
-	case EXPR_INVALID:
+	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
+	case EXPR_INVALID:
+		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1736,8 +1740,10 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 		return EXPR_CLASS_VARIABLE;
 	}
 
-	case EXPR_INVALID:
+	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
+	case EXPR_INVALID:
+		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1816,8 +1822,10 @@ static expression_classification_t is_object_with_constant_address(const express
 	case EXPR_UNARY_DEREFERENCE:
 		return is_constant_pointer(expression->unary.value);
 
-	case EXPR_INVALID:
+	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
+	case EXPR_INVALID:
+		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1966,8 +1974,10 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		}
 	}
 
-	case EXPR_INVALID:
+	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
+	case EXPR_INVALID:
+		break;
 	}
 	panic("invalid expression found (is constant expression)");
 }
