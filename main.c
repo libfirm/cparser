@@ -522,7 +522,8 @@ typedef enum compile_mode_t {
 	LexTest,
 	PrintAst,
 	PrintFluffy,
-	PrintJna
+	PrintJna,
+	GrepAst
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -1532,7 +1533,7 @@ int main(int argc, char **argv)
 						break;
 					}
 					grep_expression = argv[i];
-					mode            = ParseOnly;
+					mode            = GrepAst;
 				} else {
 					fprintf(stderr, "error: unknown argument '%s'\n", arg);
 					argument_errors = true;
@@ -1659,6 +1660,7 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case PrintJna:
+		case GrepAst:
 		case LexTest:
 		case PreprocessOnly:
 		case ParseOnly:
@@ -1832,6 +1834,13 @@ do_parsing:
 				print_ast(unit);
 			}
 
+			if (mode == GrepAst) {
+				expression_t *pattern
+					= parse_grep_expression(unit, grep_expression);
+				ast_grep(unit, pattern);
+				continue;
+			}
+
 			if (error_count > 0) {
 				/* parsing failed because of errors */
 				fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
@@ -1872,12 +1881,6 @@ do_parsing:
 			translation_unit_to_firm(unit);
 			already_constructed_firm = true;
 			timer_pop(t_construct);
-
-			if (grep_expression != NULL) {
-				expression_t *pattern
-					= parse_grep_expression(unit, grep_expression);
-				ast_grep(unit, pattern);
-			}
 
 graph_built:
 			if (mode == ParseOnly) {
