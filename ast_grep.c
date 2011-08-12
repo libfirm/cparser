@@ -82,6 +82,7 @@ static expression_t *parse_match_expression(void)
 
 		assert(token.kind == ')');
 		parser_next_token();
+		return (expression_t*)expr;
 	}
 
 	errorf(HERE, "unknown matcher '%s'", name);
@@ -132,8 +133,19 @@ static bool match_type(type_t *type, type_t *pattern)
 	}
 }
 
+static expression_t *skip_implicit_cast(expression_t *expression)
+{
+	while (expression->kind == EXPR_UNARY_CAST && expression->base.implicit)
+		expression = expression->unary.value;
+	return expression;
+}
+
 static bool match(expression_t *expression, expression_t *pattern)
 {
+	/* skip implicit casts */
+	expression = skip_implicit_cast(expression);
+	pattern = skip_implicit_cast(pattern);
+
 	switch ((match_kind_t)pattern->kind) {
 	case EXPR_MATCH_TYPE: {
 		match_type_expression_t *matche = (match_type_expression_t*) pattern;
@@ -164,6 +176,24 @@ static bool match(expression_t *expression, expression_t *pattern)
 	EXPR_BINARY_CASES
 		return match(expression->binary.left, pattern->binary.left)
 		    && match(expression->binary.right, pattern->binary.right);
+
+	case EXPR_REFERENCE:
+		return expression->reference.entity == pattern->reference.entity;
+
+	case EXPR_CALL: {
+		if (!match(expression->call.function, pattern->call.function))
+			return false;
+		call_argument_t *arg1 = expression->call.arguments;
+		call_argument_t *arg2 = pattern->call.arguments;
+		for ( ; arg1 != NULL && arg2 != NULL;
+		     arg1 = arg1->next, arg2 = arg2->next) {
+		    if (!match(arg1->expression, arg2->expression))
+				return false;
+		}
+		if (arg1 != arg2)
+			return false;
+		return true;
+	}
 
 	default:
 		/* TODO */
