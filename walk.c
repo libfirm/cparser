@@ -196,7 +196,8 @@ static void walk_designator(const designator_t *designator,
                             const walk_env_t *const env)
 {
 	for ( ; designator != NULL; designator = designator->next) {
-		walk_expression(designator->array_index, env);
+		if (designator->array_index != NULL)
+			walk_expression(designator->array_index, env);
 	}
 }
 
@@ -237,7 +238,8 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 		return;
 	}
 	case ENTITY_ENUM_VALUE:
-		walk_expression(entity->enum_value.value, env);
+		if (entity->enum_value.value != NULL)
+			walk_expression(entity->enum_value.value, env);
 		return;
 	case ENTITY_TYPEDEF:
 		walk_type(entity->typedefe.type, env);
