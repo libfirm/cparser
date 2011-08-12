@@ -590,6 +590,12 @@ static void print_va_copy(const va_copy_expression_t *expression)
 static void print_select(const select_expression_t *expression)
 {
 	print_expression_prec(expression->compound, PREC_POSTFIX);
+	/* do not print anything for anonymous struct/union selects
+	 * FIXME: if the anonymous select was a '->' this will print '.'
+	 */
+	if (expression->compound_entry->base.symbol == NULL)
+		return;
+
 	if (is_type_pointer(skip_typeref(expression->compound->base.type))) {
 		print_string("->");
 	} else {
