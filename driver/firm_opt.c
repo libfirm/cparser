@@ -698,6 +698,7 @@ static void do_firm_lowering(const char *input_filename)
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
 
+		do_irg_opt(irg, "lower-blockcopy");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "deconv");
 		do_irg_opt(irg, "control-flow");
