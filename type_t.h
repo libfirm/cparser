@@ -106,8 +106,7 @@ struct function_parameter_t {
 
 /** Linkage specifications. */
 typedef enum linkage_kind_t {
-	LINKAGE_INVALID,
-	LINKAGE_C,       /**< C linkage. */
+	LINKAGE_C = 1,   /**< C linkage. */
 	LINKAGE_CXX      /**< C++ linkage. */
 } linkage_kind_t;
 

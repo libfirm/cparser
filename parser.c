@@ -93,7 +93,7 @@ static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
 static ms_try_statement_t  *current_try       = NULL;
-static linkage_kind_t       current_linkage   = LINKAGE_INVALID;
+static linkage_kind_t       current_linkage;
 static goto_statement_t    *goto_first        = NULL;
 static goto_statement_t   **goto_anchor       = NULL;
 static label_statement_t   *label_first       = NULL;
@@ -707,7 +707,6 @@ static void scope_pop(scope_t *old_scope)
 static entity_t *get_entity(const symbol_t *const symbol,
                             namespace_tag_t namespc)
 {
-	assert(namespc != NAMESPACE_INVALID);
 	entity_t *entity = symbol->entity;
 	for (; entity != NULL; entity = entity->base.symbol_next) {
 		if ((namespace_tag_t)entity->base.namespc == namespc)
@@ -740,7 +739,7 @@ static void stack_push(stack_entry_t **stack_ptr, entity_t *entity)
 {
 	symbol_t           *symbol  = entity->base.symbol;
 	entity_namespace_t  namespc = entity->base.namespc;
-	assert(namespc != NAMESPACE_INVALID);
+	assert(namespc != 0);
 
 	/* replace/add entity into entity list of the symbol */
 	entity_t **anchor;
@@ -3337,8 +3336,7 @@ end_error:
 }
 
 typedef enum construct_type_kind_t {
-	CONSTRUCT_INVALID,
-	CONSTRUCT_POINTER,
+	CONSTRUCT_POINTER = 1,
 	CONSTRUCT_REFERENCE,
 	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
@@ -3635,8 +3633,6 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 	for (; iter != NULL; iter = iter->base.next) {
 		source_position_t const* const pos = &iter->base.pos;
 		switch (iter->kind) {
-		case CONSTRUCT_INVALID:
-			break;
 		case CONSTRUCT_FUNCTION: {
 			construct_function_type_t *function      = &iter->function;
 			type_t                    *function_type = function->function_type;
@@ -10375,7 +10371,7 @@ static void parse_linkage_specification(void)
 		new_linkage = LINKAGE_CXX;
 	} else {
 		errorf(&pos, "linkage string \"%s\" not recognized", linkage);
-		new_linkage = LINKAGE_INVALID;
+		new_linkage = LINKAGE_C;
 	}
 	current_linkage = new_linkage;
 

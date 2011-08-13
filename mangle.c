@@ -291,9 +291,6 @@ ident *create_name_win32(entity_t *entity)
 		}
 
 		switch (type->function.linkage) {
-		case LINKAGE_INVALID:
-			panic("linkage type of function is invalid");
-
 		case LINKAGE_C:
 			obstack_printf(o, "%s", entity->base.symbol->string);
 			break;
@@ -344,8 +341,6 @@ ident *create_name_linux_elf(entity_t *entity)
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
 		switch (type->function.linkage) {
-			case LINKAGE_INVALID:
-				panic("linkage type of function is invalid");
 			case LINKAGE_C:
 				if (entity->function.actual_name != NULL)
 					name = entity->function.actual_name->string;
@@ -373,9 +368,6 @@ ident *create_name_macho(entity_t *entity)
 		assert(is_type_function(type));
 
 		switch (type->function.linkage) {
-			case LINKAGE_INVALID:
-				panic("linkage type of function is invalid");
-
 			default:
 				if (entity->function.actual_name != NULL)
 					return new_id_from_str(entity->function.actual_name->string);

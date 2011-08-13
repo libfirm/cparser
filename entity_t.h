@@ -45,8 +45,7 @@ typedef enum {
 typedef unsigned char entity_kind_t;
 
 typedef enum namespace_tag_t {
-	NAMESPACE_INVALID,
-	NAMESPACE_NORMAL,
+	NAMESPACE_NORMAL = 1,
 	NAMESPACE_TAG,
 	NAMESPACE_LABEL
 } namespace_tag_t;

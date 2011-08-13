@@ -312,9 +312,6 @@ static void print_imaginary_type(const imaginary_type_t *type)
 static void print_function_type_pre(const function_type_t *type)
 {
 	switch (type->linkage) {
-		case LINKAGE_INVALID:
-			break;
-
 		case LINKAGE_C:
 			if (c_mode & _CXX)
 				print_string("extern \"C\" ");
