@@ -43,7 +43,6 @@ const char *get_entity_kind_name(entity_kind_t kind)
 	case ENTITY_LOCAL_LABEL:     return "local label";
 	case ENTITY_TYPEDEF:         return "typedef";
 	case ENTITY_NAMESPACE:       return "namespace";
-	case ENTITY_INVALID:         break;
 	}
 
 	panic("Invalid entity kind encountered in get_entity_kind_name");

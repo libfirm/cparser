@@ -268,8 +268,6 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 	case ENTITY_LABEL:
 	case ENTITY_LOCAL_LABEL:
 		return;
-	case ENTITY_INVALID:
-		break;
 	}
 	panic("invalid entity found");
 }

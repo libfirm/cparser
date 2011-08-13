@@ -1501,8 +1501,6 @@ print_compound:
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:
 		panic("print_entity used on unexpected entity type");
-	case ENTITY_INVALID:
-		break;
 	}
 	panic("Invalid entity type encountered");
 }
