@@ -1360,19 +1360,17 @@ static entity_t *determine_lhs_ent(expression_t *const expr,
 				ent     = determine_lhs_ent(ref, lhs_ent);
 				lhs_ent = ent;
 			} else {
-				mark_vars_read(expr->select.compound, lhs_ent);
+				mark_vars_read(ref, lhs_ent);
 			}
 			mark_vars_read(expr->array_access.index, lhs_ent);
 			return ent;
 		}
 
 		case EXPR_SELECT: {
-			if (is_type_compound(skip_typeref(expr->base.type))) {
+			mark_vars_read(expr->select.compound, lhs_ent);
+			if (is_type_compound(skip_typeref(expr->base.type)))
 				return determine_lhs_ent(expr->select.compound, lhs_ent);
-			} else {
-				mark_vars_read(expr->select.compound, lhs_ent);
-				return NULL;
-			}
+			return NULL;
 		}
 
 		case EXPR_UNARY_DEREFERENCE: {
@@ -1449,10 +1447,13 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 			return;
 
 		case EXPR_ARRAY_ACCESS: {
-			expression_t *const ref = expr->array_access.array_ref;
-			mark_vars_read(ref, lhs_ent);
-			lhs_ent = determine_lhs_ent(ref, lhs_ent);
 			mark_vars_read(expr->array_access.index, lhs_ent);
+			expression_t *const ref = expr->array_access.array_ref;
+			if (!is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
+				if (lhs_ent == ENT_ANY)
+					lhs_ent = NULL;
+			}
+			mark_vars_read(ref, lhs_ent);
 			return;
 		}
 
