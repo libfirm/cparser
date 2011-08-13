@@ -283,8 +283,8 @@ static void semantic_comparison(binary_expression_t *expression);
 static size_t get_statement_struct_size(statement_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[STATEMENT_INVALID]     = sizeof(invalid_statement_t),
-		[STATEMENT_EMPTY]       = sizeof(empty_statement_t),
+		[STATEMENT_ERROR]       = sizeof(statement_base_t),
+		[STATEMENT_EMPTY]       = sizeof(statement_base_t),
 		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
 		[STATEMENT_RETURN]      = sizeof(return_statement_t),
 		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
@@ -407,9 +407,9 @@ static expression_t *create_error_expression(void)
 /**
  * Creates a new invalid statement.
  */
-static statement_t *create_invalid_statement(void)
+static statement_t *create_error_statement(void)
 {
-	return allocate_statement_zero(STATEMENT_INVALID);
+	return allocate_statement_zero(STATEMENT_ERROR);
 }
 
 /**
@@ -4873,7 +4873,7 @@ static void check_reachable(statement_t *const stmt)
 	statement_t *last = stmt;
 	statement_t *next;
 	switch (stmt->kind) {
-		case STATEMENT_INVALID:
+		case STATEMENT_ERROR:
 		case STATEMENT_EMPTY:
 		case STATEMENT_ASM:
 			next = stmt->base.next;
@@ -5145,7 +5145,7 @@ found_break_parent:
 		}
 
 		switch (next->kind) {
-			case STATEMENT_INVALID:
+			case STATEMENT_ERROR:
 			case STATEMENT_EMPTY:
 			case STATEMENT_DECLARATION:
 			case STATEMENT_EXPRESSION:
@@ -9035,7 +9035,7 @@ end_of_asm:
 
 	return statement;
 end_error:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_label_inner_statement(statement_t const *const label, char const *const label_kind)
@@ -9044,7 +9044,7 @@ static statement_t *parse_label_inner_statement(statement_t const *const label, 
 	switch (token.kind) {
 		case '}':
 			errorf(&label->base.source_position, "%s at end of compound statement", label_kind);
-			inner_stmt = create_invalid_statement();
+			inner_stmt = create_error_statement();
 			break;
 
 		case ';':
@@ -9384,7 +9384,7 @@ static statement_t *parse_switch(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
@@ -9426,7 +9426,7 @@ static statement_t *parse_while(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9461,7 +9461,7 @@ static statement_t *parse_do(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9532,7 +9532,7 @@ end_error2:
 	/* fallthrough */
 
 end_error1:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9572,7 +9572,7 @@ static statement_t *parse_goto(void)
 		else
 			parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_until_anchor();
-		return create_invalid_statement();
+		return create_error_statement();
 	}
 
 	/* remember the goto's in a list for later checking */
@@ -9840,11 +9840,11 @@ static statement_t *parse_ms_try_statment(void)
 		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
 		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
-		return create_invalid_statement();
+		return create_error_statement();
 	}
 	return statement;
 end_error:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_empty_statement(void)
@@ -10027,7 +10027,7 @@ static statement_t *intern_parse_statement(void)
 
 	default:
 		errorf(HERE, "unexpected token %K while parsing statement", &token);
-		statement = create_invalid_statement();
+		statement = create_error_statement();
 		if (!at_anchor())
 			next_token();
 		break;
@@ -10170,7 +10170,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 			break;
 		}
 		statement_t *sub_statement = intern_parse_statement();
-		if (is_invalid_statement(sub_statement)) {
+		if (sub_statement->kind == STATEMENT_ERROR) {
 			/* an error occurred. if we are at an anchor, return */
 			if (at_anchor())
 				goto end_error;

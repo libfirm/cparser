@@ -5494,8 +5494,8 @@ static void statement_to_firm(statement_t *statement)
 #endif
 
 	switch (statement->kind) {
-	case STATEMENT_INVALID:
-		panic("invalid statement found");
+	case STATEMENT_ERROR:
+		panic("error statement found");
 	case STATEMENT_EMPTY:
 		/* nothing */
 		return;

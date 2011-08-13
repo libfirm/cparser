@@ -1180,8 +1180,8 @@ void print_statement(const statement_t *statement)
 	case STATEMENT_LEAVE:
 		print_leave_statement(&statement->leave);
 		break;
-	case STATEMENT_INVALID:
-		print_string("$invalid statement$\n");
+	case STATEMENT_ERROR:
+		print_string("$error statement$\n");
 		break;
 	}
 }
