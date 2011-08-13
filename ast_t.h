@@ -62,8 +62,7 @@ typedef enum precedence_t {
  * Expression kinds.
  */
 typedef enum expression_kind_t {
-	EXPR_INVALID = 0,
-	EXPR_ERROR,
+	EXPR_ERROR = 1,
 	EXPR_REFERENCE,
 	EXPR_REFERENCE_ENUM_VALUE,
 	EXPR_LITERAL_BOOLEAN,
@@ -667,11 +666,6 @@ struct translation_unit_t {
 	scope_t      scope;
 	statement_t *global_asm;
 };
-
-static inline bool is_invalid_expression(expression_t *expression)
-{
-	return expression->base.kind == EXPR_INVALID;
-}
 
 static inline bool is_invalid_statement(statement_t *statement)
 {

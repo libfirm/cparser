@@ -185,8 +185,6 @@ static void walk_expression(expression_t *const expr,
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_ERROR:
 		return;
-	case EXPR_INVALID:
-		break;
 	}
 	panic("invalid expr kind");
 }

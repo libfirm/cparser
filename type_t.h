@@ -32,7 +32,7 @@
 #include "adt/obst.h"
 
 typedef enum type_kind_t {
-	TYPE_ERROR,
+	TYPE_ERROR = 1,
 	TYPE_ATOMIC,
 	TYPE_COMPLEX,
 	TYPE_IMAGINARY,

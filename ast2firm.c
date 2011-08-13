@@ -3595,8 +3595,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 
 	case EXPR_ERROR:
 		return error_to_firm(expression);
-	case EXPR_INVALID:
-		break;
 	}
 	panic("invalid expression found");
 }

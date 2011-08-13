@@ -100,7 +100,6 @@ static int right_to_left(unsigned precedence)
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
 	static const unsigned prec[] = {
-		[EXPR_INVALID]                           = PREC_PRIMARY,
 		[EXPR_REFERENCE]                         = PREC_PRIMARY,
 		[EXPR_REFERENCE_ENUM_VALUE]              = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER]                   = PREC_PRIMARY,
@@ -752,15 +751,6 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_STATEMENT:
 		print_statement_expression(&expression->statement);
 		break;
-	case EXPR_INVALID:
-		panic("invalid expression found");
-
-#if 0
-	default:
-		/* TODO */
-		print_format("some expression of type %d", (int)expression->kind);
-		break;
-#endif
 	}
 	if (parenthesized)
 		print_string(")");
@@ -1620,8 +1610,6 @@ static expression_classification_t is_object_with_linker_constant_address(
 
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
-	case EXPR_INVALID:
-		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1748,8 +1736,6 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
-	case EXPR_INVALID:
-		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1830,8 +1816,6 @@ static expression_classification_t is_object_with_constant_address(const express
 
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
-	case EXPR_INVALID:
-		panic("invalid expression found");
 
 	default:
 		return EXPR_CLASS_VARIABLE;
@@ -1982,8 +1966,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
-	case EXPR_INVALID:
-		break;
 	}
 	panic("invalid expression found (is constant expression)");
 }

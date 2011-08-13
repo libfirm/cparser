@@ -316,7 +316,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[EXPR_INVALID]                    = sizeof(expression_base_t),
 		[EXPR_ERROR]                      = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
 		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
@@ -1550,7 +1549,6 @@ unary:
 			return;
 
 		EXPR_LITERAL_CASES
-		case EXPR_INVALID:
 		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
@@ -4781,7 +4779,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_OFFSETOF:
-		case EXPR_INVALID:
 		case EXPR_ERROR:
 			return true;
 
@@ -8528,8 +8525,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
-		case EXPR_ERROR:
-		case EXPR_INVALID:                    return true; /* do NOT warn */
+		case EXPR_ERROR:                      return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
 		case EXPR_REFERENCE_ENUM_VALUE:       return false;
 		case EXPR_LABEL_ADDRESS:              return false;
