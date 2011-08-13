@@ -633,9 +633,6 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_ERROR:
 		print_string("<error>");
 		return;
-	case TYPE_INVALID:
-		print_string("<invalid>");
-		return;
 	case TYPE_ENUM:
 		print_type_enum(&type->enumt);
 		return;
@@ -695,7 +692,6 @@ static void intern_print_type_post(const type_t *const type)
 		print_array_type_post(&type->array);
 		return;
 	case TYPE_ERROR:
-	case TYPE_INVALID:
 	case TYPE_ATOMIC:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
@@ -797,17 +793,6 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 	}
 
 	return identify_new_type(copy);
-}
-
-/**
- * Check if a type is valid.
- *
- * @param type  The type to check.
- * @return true if type represents a valid type.
- */
-bool type_valid(const type_t *type)
-{
-	return type->kind != TYPE_INVALID;
 }
 
 static bool test_atomic_type_flag(atomic_type_kind_t kind,
@@ -991,8 +976,6 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("is_type_incomplete called without typerefs skipped");
-	case TYPE_INVALID:
-		break;
 	}
 
 	panic("invalid type found");
@@ -1130,8 +1113,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_ERROR:
 		/* Hmm, the error type should be compatible to all other types */
 		return true;
-	case TYPE_INVALID:
-		panic("invalid type found in compatible types");
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("typerefs not skipped in compatible types?!?");
@@ -1195,8 +1176,6 @@ type_t *skip_typeref(type_t *type)
 unsigned get_type_size(type_t *type)
 {
 	switch (type->kind) {
-	case TYPE_INVALID:
-		break;
 	case TYPE_ERROR:
 		return 0;
 	case TYPE_ATOMIC:
@@ -1238,8 +1217,6 @@ unsigned get_type_size(type_t *type)
 unsigned get_type_alignment(type_t *type)
 {
 	switch (type->kind) {
-	case TYPE_INVALID:
-		break;
 	case TYPE_ERROR:
 		return 0;
 	case TYPE_ATOMIC:
@@ -1292,7 +1269,6 @@ unsigned get_type_alignment_compound(type_t *type)
 decl_modifiers_t get_type_modifiers(const type_t *type)
 {
 	switch(type->kind) {
-	case TYPE_INVALID:
 	case TYPE_ERROR:
 		break;
 	case TYPE_COMPOUND_STRUCT:

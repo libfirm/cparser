@@ -82,8 +82,6 @@ static void walk_type(type_t *const type, const walk_env_t *const env)
 	case TYPE_ENUM:
 		walk_entity((entity_t*)type->enumt.enume, env);
 		return;
-	case TYPE_INVALID:
-		break;
 	}
 	panic("invalid type found");
 }

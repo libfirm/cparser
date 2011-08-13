@@ -38,7 +38,7 @@ static void mangle_type(type_t *type);
 static char get_atomic_type_mangle(atomic_type_kind_t kind)
 {
 	switch (kind) {
-	case ATOMIC_TYPE_INVALID: break;
+	case ATOMIC_TYPE_INVALID:     break;
 	case ATOMIC_TYPE_VOID:        return 'v';
 	case ATOMIC_TYPE_WCHAR_T:     return 'w';
 	case ATOMIC_TYPE_BOOL:        return 'b';
@@ -211,8 +211,6 @@ static void mangle_type(type_t *orig_type)
 	case TYPE_IMAGINARY:
 		mangle_imaginary_type(&type->imaginary);
 		return;
-	case TYPE_INVALID:
-		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
 		panic("error type encountered while mangling");
 	case TYPE_TYPEDEF:

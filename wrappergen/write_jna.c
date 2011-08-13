@@ -223,7 +223,6 @@ static void write_type(type_t *type)
 		write_enum_type(&type->enumt);
 		return;
 	case TYPE_ERROR:
-	case TYPE_INVALID:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		panic("invalid type found");

@@ -173,8 +173,6 @@ static void write_type(const type_t *type)
 	case TYPE_FUNCTION:
 		write_function_type(&type->function);
 		return;
-	case TYPE_INVALID:
-		panic("invalid type found");
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
 	default:

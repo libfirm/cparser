@@ -741,7 +741,6 @@ ir_type *get_ir_type(type_t *type)
 
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
-	case TYPE_INVALID:
 		break;
 	}
 	if (firm_type == NULL)
@@ -3331,7 +3330,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			/* typedef/typeof should be skipped already */
 			case TYPE_TYPEDEF:
 			case TYPE_TYPEOF:
-			case TYPE_INVALID:
 			case TYPE_ERROR:
 				break;
 		}

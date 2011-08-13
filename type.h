@@ -154,12 +154,6 @@ bool is_type_complex(const type_t *type);
 bool is_type_real(const type_t *type);
 
 /**
- * returns true if the type is valid. A type is valid if it contains no
- * unresolved references anymore and is not of TYPE_INVALID.
- */
-bool type_valid(const type_t *type);
-
-/**
  * returns true if the type is an arithmetic type (§6.2.5 clause 18)
  */
 bool is_type_arithmetic(const type_t *type);
