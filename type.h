@@ -34,6 +34,7 @@ typedef unsigned char il_alignment_t;
 typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
+	ATOMIC_TYPE_BOOL,
 	ATOMIC_TYPE_WCHAR_T,
 	ATOMIC_TYPE_CHAR,
 	ATOMIC_TYPE_SCHAR,
@@ -49,9 +50,8 @@ typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_FLOAT,
 	ATOMIC_TYPE_DOUBLE,
 	ATOMIC_TYPE_LONG_DOUBLE,
-	ATOMIC_TYPE_BOOL,
 
-	ATOMIC_TYPE_LAST = ATOMIC_TYPE_BOOL
+	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE
 } atomic_type_kind_t;
 
 typedef enum atomic_type_flag_t {
