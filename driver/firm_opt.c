@@ -292,11 +292,6 @@ static void rts_map(void)
 
 static int *irg_dump_no;
 
-static void do_lower_highlevel(ir_graph *irg)
-{
-	lower_highlevel_graph(irg, false);
-}
-
 static void do_stred(ir_graph *irg)
 {
 	opt_osr(irg, osr_flag_default | osr_flag_keep_reg_pressure | osr_flag_ignore_x86_shift);
@@ -384,7 +379,7 @@ static opt_config_t opts[] = {
 	IRG("invert-loops",      do_loop_inversion,        "loop inversion",                                        OPT_FLAG_NONE),
 	IRG("ivopts",            do_stred,                 "induction variable strength reduction",                 OPT_FLAG_NONE),
 	IRG("local",             optimize_graph_df,        "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
-	IRG("lower",             do_lower_highlevel,       "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
+	IRG("lower",             lower_highlevel_graph,    "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRG("lower-mux",         do_lower_mux,             "mux lowering",                                          OPT_FLAG_NONE),
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
 	IRG("opt-tail-rec",      opt_tail_rec_irg,         "tail-recursion eliminiation",                           OPT_FLAG_NONE),
