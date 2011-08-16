@@ -853,22 +853,11 @@ static void label_pop_to(size_t new_top)
 	stack_pop_to(&label_stack, new_top);
 }
 
-static int get_akind_rank(atomic_type_kind_t akind)
+static atomic_type_kind_t get_akind(const type_t *type)
 {
-	return (int) akind;
-}
-
-/**
- * Return the type rank for an atomic type.
- */
-static int get_rank(const type_t *type)
-{
-	assert(!is_typeref(type));
-	if (type->kind == TYPE_ENUM)
-		return get_akind_rank(type->enumt.akind);
-
-	assert(type->kind == TYPE_ATOMIC);
-	return get_akind_rank(type->atomic.akind);
+	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX
+	       || type->kind == TYPE_IMAGINARY || type->kind == TYPE_ENUM);
+	return type->atomic.akind;
 }
 
 /**
@@ -879,7 +868,7 @@ static int get_rank(const type_t *type)
  */
 static type_t *promote_integer(type_t *type)
 {
-	if (get_rank(type) < get_akind_rank(ATOMIC_TYPE_INT))
+	if (get_akind_rank(get_akind(type)) < get_akind_rank(ATOMIC_TYPE_INT))
 		type = type_int;
 
 	return type;
@@ -2518,9 +2507,9 @@ static type_t *parse_enum_specifier(void)
 		entity->base.parent_scope    = current_scope;
 	}
 
-	type_t *const type = allocate_type_zero(TYPE_ENUM);
-	type->enumt.enume  = &entity->enume;
-	type->enumt.akind  = ATOMIC_TYPE_INT;
+	type_t *const type     = allocate_type_zero(TYPE_ENUM);
+	type->enumt.enume      = &entity->enume;
+	type->enumt.base.akind = ATOMIC_TYPE_INT;
 
 	if (token.kind == '{') {
 		if (symbol != NULL) {
@@ -3146,15 +3135,13 @@ warn_about_long_long:
 		}
 
 		if (type_specifiers & SPECIFIER_COMPLEX) {
-			type                = allocate_type_zero(TYPE_COMPLEX);
-			type->complex.akind = atomic_type;
+			type = allocate_type_zero(TYPE_COMPLEX);
 		} else if (type_specifiers & SPECIFIER_IMAGINARY) {
-			type                  = allocate_type_zero(TYPE_IMAGINARY);
-			type->imaginary.akind = atomic_type;
+			type = allocate_type_zero(TYPE_IMAGINARY);
 		} else {
-			type                 = allocate_type_zero(TYPE_ATOMIC);
-			type->atomic.akind   = atomic_type;
+			type = allocate_type_zero(TYPE_ATOMIC);
 		}
+		type->atomic.akind = atomic_type;
 		newtype = true;
 	} else if (type_specifiers != 0) {
 		errorf(&specifiers->source_position, "multiple datatypes in declaration");
@@ -7931,45 +7918,44 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	if (type_left == type_right)
 		return type_left;
 
-	bool const signed_left  = is_type_signed(type_left);
-	bool const signed_right = is_type_signed(type_right);
-	int const  rank_left    = get_rank(type_left);
-	int const  rank_right   = get_rank(type_right);
+	bool     const signed_left  = is_type_signed(type_left);
+	bool     const signed_right = is_type_signed(type_right);
+	unsigned const rank_left    = get_akind_rank(get_akind(type_left));
+	unsigned const rank_right   = get_akind_rank(get_akind(type_right));
 
 	if (signed_left == signed_right)
 		return rank_left >= rank_right ? type_left : type_right;
 
-	int     s_rank;
-	int     u_rank;
+	unsigned           s_rank;
+	unsigned           u_rank;
+	atomic_type_kind_t s_akind;
+	atomic_type_kind_t u_akind;
 	type_t *s_type;
 	type_t *u_type;
 	if (signed_left) {
-		s_rank = rank_left;
 		s_type = type_left;
-		u_rank = rank_right;
 		u_type = type_right;
 	} else {
-		s_rank = rank_right;
 		s_type = type_right;
-		u_rank = rank_left;
 		u_type = type_left;
 	}
+	s_akind = get_akind(s_type);
+	u_akind = get_akind(u_type);
+	s_rank  = get_akind_rank(s_akind);
+	u_rank  = get_akind_rank(u_akind);
 
 	if (u_rank >= s_rank)
 		return u_type;
 
-	/* casting rank to atomic_type_kind is a bit hacky, but makes things
-	 * easier here... */
-	if (get_atomic_type_size((atomic_type_kind_t) s_rank)
-			> get_atomic_type_size((atomic_type_kind_t) u_rank))
+	if (get_atomic_type_size(s_akind) > get_atomic_type_size(u_akind))
 		return s_type;
 
-	switch (s_rank) {
-		case ATOMIC_TYPE_INT:      return type_unsigned_int;
-		case ATOMIC_TYPE_LONG:     return type_unsigned_long;
-		case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
+	switch (s_akind) {
+	case ATOMIC_TYPE_INT:      return type_unsigned_int;
+	case ATOMIC_TYPE_LONG:     return type_unsigned_long;
+	case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
 
-		default: panic("invalid atomic type");
+	default: panic("invalid atomic type");
 	}
 }
 
@@ -9364,7 +9350,7 @@ static statement_t *parse_switch(void)
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
-		if (get_rank(type) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
+		if (get_akind_rank(get_akind(type)) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
 			warningf(WARN_TRADITIONAL, &expr->base.source_position, "'%T' switch expression not converted to '%T' in ISO C", type, type_int);
 		}
 	} else if (is_type_valid(type)) {

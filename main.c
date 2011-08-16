@@ -920,6 +920,18 @@ static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
 	props->struct_alignment = props->alignment;
 }
 
+/**
+ * Copy atomic type properties except the integer conversion rank
+ */
+static void copy_typeprops(atomic_type_properties_t *dest,
+                           const atomic_type_properties_t *src)
+{
+	dest->size             = src->size;
+	dest->alignment        = src->alignment;
+	dest->struct_alignment = src->struct_alignment;
+	dest->flags            = src->flags;
+}
+
 static void init_types_and_adjust(void)
 {
 	const backend_params *be_params = be_get_backend_param();
@@ -971,22 +983,25 @@ static void init_types_and_adjust(void)
 
 	/* stuff decided after processing operating system specifics and
 	 * commandline flags */
-	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 	if (char_is_signed) {
 		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
 	} else {
 		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
 	}
+	/* copy over wchar_t properties (including rank) */
+	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
 	if (type_long_long == NULL) {
-		props[ATOMIC_TYPE_LONGLONG] = props[ATOMIC_TYPE_LONG];
-	}
-	if (type_long_double == NULL) {
-		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+		copy_typeprops(&props[ATOMIC_TYPE_LONGLONG], &props[ATOMIC_TYPE_LONG]);
 	}
 	if (type_unsigned_long_long == NULL) {
-		props[ATOMIC_TYPE_ULONGLONG] = props[ATOMIC_TYPE_ULONG];
+		copy_typeprops(&props[ATOMIC_TYPE_ULONGLONG],
+		               &props[ATOMIC_TYPE_ULONG]);
+	}
+	if (type_long_double == NULL) {
+		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
+		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
 
 	/* initialize firm pointer modes */

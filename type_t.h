@@ -55,17 +55,10 @@ struct type_base_t {
 	ir_type          *firm_type;
 };
 
+/**
+ * used for atomic types, complex and imaginary
+ */
 struct atomic_type_t {
-	type_base_t         base;
-	atomic_type_kind_t  akind;
-};
-
-struct complex_type_t {
-	type_base_t         base;
-	atomic_type_kind_t  akind;
-};
-
-struct imaginary_type_t {
 	type_base_t         base;
 	atomic_type_kind_t  akind;
 };
@@ -143,8 +136,7 @@ struct compound_type_t {
 };
 
 struct enum_type_t {
-	type_base_t         base;
-	atomic_type_kind_t  akind; /**< underlying atomic type */
+	atomic_type_t       base;
 	/** the enum entity. You can find the enum entries by walking the
 	 *  enum->base.next list until you don't find ENTITY_ENUM_VALUE entities
 	 *  anymore */
@@ -168,8 +160,6 @@ union type_t {
 	type_kind_t      kind;
 	type_base_t      base;
 	atomic_type_t    atomic;
-	complex_type_t   complex;
-	imaginary_type_t imaginary;
 	pointer_type_t   pointer;
 	reference_type_t reference;
 	array_type_t     array;
@@ -191,6 +181,7 @@ struct atomic_type_properties_t {
 	 */
 	unsigned   struct_alignment;
 	unsigned   flags;             /**< type flags from atomic_type_flag_t */
+	unsigned   rank;              /**< integer conversion rank */
 };
 
 extern atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1];
@@ -276,6 +267,14 @@ static inline bool is_type_valid(const type_t *type)
 {
 	assert(!is_typeref(type));
 	return type->kind != TYPE_ERROR;
+}
+
+/**
+ * return integer conversion rank of an atomic type kind
+ */
+static inline unsigned get_akind_rank(atomic_type_kind_t akind)
+{
+	return atomic_type_properties[akind].rank;
 }
 
 /**

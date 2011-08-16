@@ -150,13 +150,13 @@ static void mangle_array_type(const array_type_t *type)
 	mangle_type(type->element_type);
 }
 
-static void mangle_complex_type(const complex_type_t *type)
+static void mangle_complex_type(const atomic_type_t *type)
 {
 	obstack_1grow(&obst, 'C');
 	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
 }
 
-static void mangle_imaginary_type(const imaginary_type_t *type)
+static void mangle_imaginary_type(const atomic_type_t *type)
 {
 	obstack_1grow(&obst, 'G');
 	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
@@ -206,10 +206,10 @@ static void mangle_type(type_t *orig_type)
 		mangle_array_type(&type->array);
 		return;
 	case TYPE_COMPLEX:
-		mangle_complex_type(&type->complex);
+		mangle_complex_type(&type->atomic);
 		return;
 	case TYPE_IMAGINARY:
-		mangle_imaginary_type(&type->imaginary);
+		mangle_imaginary_type(&type->atomic);
 		return;
 	case TYPE_ERROR:
 		panic("error type encountered while mangling");
