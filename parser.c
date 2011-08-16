@@ -7730,6 +7730,13 @@ static void semantic_incdec(unary_expression_t *expression)
 	expression->base.type = orig_type;
 }
 
+static void promote_unary_int_expr(unary_expression_t *const expr, type_t *const type)
+{
+	type_t *const res_type = promote_integer(type);
+	expr->base.type = res_type;
+	expr->value     = create_implicit_cast(expr->value, res_type);
+}
+
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
@@ -7741,9 +7748,11 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 				"operation needs an arithmetic type");
 		}
 		return;
+	} else if (is_type_integer(type)) {
+		promote_unary_int_expr(expression, type);
+	} else {
+		expression->base.type = orig_type;
 	}
-
-	expression->base.type = orig_type;
 }
 
 static void semantic_unexpr_plus(unary_expression_t *expression)
@@ -7772,7 +7781,7 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 		return;
 	}
 
-	expression->base.type = orig_type;
+	promote_unary_int_expr(expression, type);
 }
 
 static void semantic_dereference(unary_expression_t *expression)
