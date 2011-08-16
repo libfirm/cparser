@@ -868,12 +868,46 @@ static unsigned decide_modulo_shift(unsigned type_size)
 	return type_size;
 }
 
-static void setup_target_machine(void)
+static bool is_ia32_cpu(const char *architecture)
+{
+	return streq(architecture, "i386")
+	    || streq(architecture, "i486")
+	    || streq(architecture, "i586")
+	    || streq(architecture, "i686")
+	    || streq(architecture, "i786");
+}
+
+static const char *setup_isa_from_tripel(const machine_triple_t *machine)
+{
+	const char *cpu = machine->cpu_type;
+
+	if (is_ia32_cpu(cpu)) {
+		return "ia32";
+	} else if (streq(cpu, "x86_64")) {
+		return "amd64";
+	} else if (streq(cpu, "sparc")) {
+		return "sparc";
+	} else if (streq(cpu, "arm")) {
+		return "arm";
+	} else {
+		fprintf(stderr, "Unknown cpu '%s' in target-triple\n", cpu);
+		return NULL;
+	}
+}
+
+static const char *setup_target_machine(void)
 {
 	if (!setup_firm_for_machine(target_machine))
 		exit(1);
 
+	const char *isa = setup_isa_from_tripel(target_machine);
+
+	if (isa == NULL)
+		exit(1);
+
 	init_os_support();
+
+	return isa;
 }
 
 /**
@@ -884,15 +918,6 @@ static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
 	props->size             = get_type_size_bytes(type);
 	props->alignment        = get_type_alignment_bytes(type);
 	props->struct_alignment = props->alignment;
-}
-
-static bool is_ia32_cpu(const char *architecture)
-{
-	return streq(architecture, "i386")
-	    || streq(architecture, "i486")
-	    || streq(architecture, "i586")
-	    || streq(architecture, "i686")
-	    || streq(architecture, "i786");
 }
 
 static void init_types_and_adjust(void)
@@ -1328,7 +1353,8 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_target_machine();
+						const char *isa = setup_target_machine();
+						strncpy(cpu_arch, isa, sizeof(cpu_arch));
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "triple=")) {
@@ -1336,7 +1362,8 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_target_machine();
+						const char *isa = setup_target_machine();
+						strncpy(cpu_arch, isa, sizeof(cpu_arch));
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "arch=")) {
