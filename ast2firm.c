@@ -91,6 +91,7 @@ static translation_unit_t *current_translation_unit;
 static trampoline_region  *current_trampolines;
 static ir_type            *current_outer_frame;
 static ir_node            *current_static_link;
+static ir_entity          *current_vararg_entity;
 
 static entitymap_t  entitymap;
 
@@ -3211,19 +3212,21 @@ static ir_node *statement_expression_to_firm(const statement_expression_t *expr)
 static ir_node *va_start_expression_to_firm(
 	const va_start_expression_t *const expr)
 {
-	ir_graph  *const irg         = current_ir_graph;
-	type_t    *const type        = current_function_entity->declaration.type;
-	ir_type   *const method_type = get_ir_type(type);
-	size_t     const n           = get_method_n_params(method_type);
-	ir_type   *const frame_type  = get_irg_frame_type(irg);
-	ir_type   *const param_type  = get_unknown_type();
-	ir_entity *const param_ent   =
-		new_parameter_entity(frame_type, n, param_type);
-	ir_node   *const frame       = get_irg_frame(irg);
-	dbg_info  *const dbgi        = get_dbg_info(&expr->base.source_position);
-	ir_node   *const no_mem      = new_NoMem();
-	ir_node   *const arg_sel     =
-		new_d_simpleSel(dbgi, no_mem, frame, param_ent);
+	ir_entity *param_ent = current_vararg_entity;
+	if (param_ent == NULL) {
+		type_t  *const type        = current_function_entity->declaration.type;
+		ir_type *const method_type = get_ir_type(type);
+		size_t   const n           = get_method_n_params(method_type);
+		ir_type *const frame_type  = get_irg_frame_type(current_ir_graph);
+		ir_type *const param_type  = get_unknown_type();
+		param_ent = new_parameter_entity(frame_type, n, param_type);
+		current_vararg_entity = param_ent;
+	}
+
+	ir_node  *const frame   = get_irg_frame(current_ir_graph);
+	dbg_info *const dbgi    = get_dbg_info(&expr->base.source_position);
+	ir_node  *const no_mem  = new_NoMem();
+	ir_node  *const arg_sel = new_d_simpleSel(dbgi, no_mem, frame, param_ent);
 
 	set_value_for_expression(expr->ap, arg_sel);
 
@@ -5625,6 +5628,9 @@ static void create_function(entity_t *entity)
 	ir_graph *old_current_function = current_function;
 	current_function = irg;
 
+	ir_entity *const old_current_vararg_entity = current_vararg_entity;
+	current_vararg_entity = NULL;
+
 	set_irg_fp_model(irg, firm_fp_model);
 	tarval_enable_fp_ops(1);
 	set_irn_dbg_info(get_irg_start_block(irg),
@@ -5729,7 +5735,8 @@ static void create_function(entity_t *entity)
 	set_type_alignment_bytes(frame_type, align_all);
 
 	irg_verify(irg, VERIFY_ENFORCE_SSA);
-	current_function = old_current_function;
+	current_vararg_entity = old_current_vararg_entity;
+	current_function      = old_current_function;
 
 	if (current_trampolines != NULL) {
 		DEL_ARR_F(current_trampolines);
