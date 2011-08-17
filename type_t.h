@@ -291,7 +291,8 @@ type_t *allocate_type_zero(type_kind_t kind);
  *
  * @param return_type    the return type
  */
-type_t *make_function_0_type(type_t *return_type);
+type_t *make_function_0_type(type_t *return_type,
+                             decl_modifiers_t modifiers);
 
 /**
  * Creates a return_type (func)(argument_type) function type if not
@@ -300,7 +301,8 @@ type_t *make_function_0_type(type_t *return_type);
  * @param return_type    the return type
  * @param argument_type  the argument type
  */
-type_t *make_function_1_type(type_t *return_type, type_t *argument_type1);
+type_t *make_function_1_type(type_t *return_type, type_t *argument_type1,
+                             decl_modifiers_t modifiers);
 
 
 /**
@@ -308,7 +310,8 @@ type_t *make_function_1_type(type_t *return_type, type_t *argument_type1);
  * if not already exists.
  */
 type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
-                             type_t *argument_type2);
+                             type_t *argument_type2,
+                             decl_modifiers_t modifiers);
 
 /**
  * Creates a return_type (func)(argument_type, ...) function type if not
@@ -317,7 +320,9 @@ type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
  * @param return_type    the return type
  * @param argument_type  the argument type
  */
-type_t *make_function_1_type_variadic(type_t *return_type, type_t *argument_type);
+type_t *make_function_1_type_variadic(type_t *return_type,
+                                      type_t *argument_type,
+                                      decl_modifiers_t modifiers);
 
 /**
  * Create a function type with n parameters

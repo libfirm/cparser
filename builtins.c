@@ -23,14 +23,14 @@
 #include "types.h"
 #include "entity_t.h"
 #include "ast_t.h"
+#include "symbol_t.h"
 #include "parser.h"
 #include "builtins.h"
 #include "lang_features.h"
 
-static entity_t *create_builtin_function(builtin_kind_t kind, const char *name,
+static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
                                          type_t *function_type)
 {
-	symbol_t *const symbol = symbol_table_insert(name);
 	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol);
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
@@ -44,187 +44,168 @@ static entity_t *create_builtin_function(builtin_kind_t kind, const char *name,
 	return entity;
 }
 
+static symbol_t *finalize_symbol_string(void)
+{
+	obstack_1grow(&symbol_obstack, '\0');
+	char *string = obstack_finish(&symbol_obstack);
+	symbol_t *symbol = symbol_table_insert(string);
+	if (symbol->string != string)
+		obstack_free(&symbol_obstack, string);
+	return symbol;
+}
+
+static entity_t *create_gnu_builtin(builtin_kind_t kind, const char *name,
+                                    type_t *type)
+{
+	obstack_printf(&symbol_obstack, "__builtin_%s", name);
+	symbol_t *symbol = finalize_symbol_string();
+	entity_t *entity = create_builtin_function(kind, symbol, type);
+	return entity;
+}
+
+static entity_t *create_gnu_builtin_firm(ir_builtin_kind kind, const char *name,
+                                         type_t *type)
+{
+	obstack_printf(&symbol_obstack, "__builtin_%s", name);
+	symbol_t *symbol = finalize_symbol_string();
+	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity->function.b.firm_builtin_kind = kind;
+	return entity;
+}
+
+static entity_t *create_gnu_builtin_libc(const char *name, type_t *type)
+{
+	obstack_printf(&symbol_obstack, "__builtin_%s", name);
+	symbol_t *symbol = finalize_symbol_string();
+	entity_t *entity = create_builtin_function(BUILTIN_LIBC, symbol, type);
+	entity->function.actual_name = symbol_table_insert(name);
+	return entity;
+}
+
+static entity_t *create_gnu_builtin_chk(const char *name, unsigned chk_arg_pos,
+                                        type_t *type)
+{
+	obstack_printf(&symbol_obstack, "__builtin___%s_chk", name);
+	symbol_t *symbol = finalize_symbol_string();
+	entity_t *entity = create_builtin_function(BUILTIN_LIBC_CHECK, symbol, type);
+	entity->function.actual_name   = symbol_table_insert(name);
+	entity->function.b.chk_arg_pos = chk_arg_pos;
+	return entity;
+}
+
 void create_gnu_builtins(void)
 {
-#define GNU_BUILTIN(a, b) create_builtin_function(bk_gnu_builtin_##a, "__builtin_" #a, b)
+	entity_t *(*b)(builtin_kind_t,const char*,type_t*) = create_gnu_builtin;
+	b(BUILTIN_ALLOCA,      "alloca",         make_function_1_type(type_void_ptr, type_size_t, DM_NONE));
+	b(BUILTIN_INF,         "huge_val",       make_function_0_type(type_double, DM_CONST));
+	b(BUILTIN_INF,         "huge_valf",      make_function_0_type(type_float, DM_CONST));
+	b(BUILTIN_INF,         "huge_vall",      make_function_0_type(type_long_double, DM_CONST));
+	b(BUILTIN_INF,         "inf",            make_function_0_type(type_double, DM_CONST));
+	b(BUILTIN_INF,         "inff",           make_function_0_type(type_float, DM_CONST));
+	b(BUILTIN_INF,         "infl",           make_function_0_type(type_long_double, DM_CONST));
+	b(BUILTIN_NAN,         "nan",            make_function_1_type(type_double, type_char_ptr, DM_CONST));
+	b(BUILTIN_NAN,         "nanf",           make_function_1_type(type_float, type_char_ptr, DM_CONST));
+	b(BUILTIN_NAN,         "nanl",           make_function_1_type(type_long_double, type_char_ptr, DM_CONST));
+	b(BUILTIN_VA_END,      "va_end",         make_function_1_type(type_void, type_valist, DM_NONE));
+	b(BUILTIN_EXPECT,      "expect",         make_function_2_type(type_long, type_long, type_long, DM_CONST));
+	b(BUILTIN_OBJECT_SIZE, "object_size",    make_function_2_type(type_size_t, type_void_ptr, type_int, DM_CONST));
 
-	GNU_BUILTIN(alloca,         make_function_1_type(type_void_ptr, type_size_t));
-	GNU_BUILTIN(huge_val,       make_function_0_type(type_double));
-	GNU_BUILTIN(huge_valf,      make_function_0_type(type_float));
-	GNU_BUILTIN(huge_vall,      make_function_0_type(type_long_double));
-	GNU_BUILTIN(inf,            make_function_0_type(type_double));
-	GNU_BUILTIN(inff,           make_function_0_type(type_float));
-	GNU_BUILTIN(infl,           make_function_0_type(type_long_double));
-	GNU_BUILTIN(nan,            make_function_1_type(type_double, type_char_ptr));
-	GNU_BUILTIN(nanf,           make_function_1_type(type_float, type_char_ptr));
-	GNU_BUILTIN(nanl,           make_function_1_type(type_long_double, type_char_ptr));
-	GNU_BUILTIN(va_end,         make_function_1_type(type_void, type_valist));
-	GNU_BUILTIN(expect,         make_function_2_type(type_long, type_long, type_long));
-	GNU_BUILTIN(return_address, make_function_1_type(type_void_ptr, type_unsigned_int));
-	GNU_BUILTIN(frame_address,  make_function_1_type(type_void_ptr, type_unsigned_int));
-	GNU_BUILTIN(ffs,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(ffsl,           make_function_1_type(type_int, type_unsigned_long));
-	GNU_BUILTIN(ffsll,          make_function_1_type(type_int, type_unsigned_long_long));
-	GNU_BUILTIN(clz,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(clzl,           make_function_1_type(type_int, type_unsigned_long));
-	GNU_BUILTIN(clzll,          make_function_1_type(type_int, type_unsigned_long_long));
-	GNU_BUILTIN(ctz,            make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(ctzl,           make_function_1_type(type_int, type_unsigned_long));
-	GNU_BUILTIN(ctzll,          make_function_1_type(type_int, type_unsigned_long_long));
-	GNU_BUILTIN(popcount,       make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(popcountl,      make_function_1_type(type_int, type_unsigned_long));
-	GNU_BUILTIN(popcountll,     make_function_1_type(type_int, type_unsigned_long_long));
-	GNU_BUILTIN(parity,         make_function_1_type(type_int, type_unsigned_int));
-	GNU_BUILTIN(prefetch,       make_function_1_type_variadic(type_float, type_void_ptr));
-	GNU_BUILTIN(trap,           make_function_type(type_void, 0, NULL, DM_NORETURN));
-	GNU_BUILTIN(object_size,    make_function_2_type(type_size_t, type_void_ptr, type_int));
-	GNU_BUILTIN(abort,          make_function_type(type_void, 0, NULL, DM_NORETURN));
-	GNU_BUILTIN(abs,            make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
-	GNU_BUILTIN(labs,           make_function_type(type_long, 1, (type_t *[]) { type_long }, DM_CONST));
-	GNU_BUILTIN(llabs,          make_function_type(type_long_long, 1, (type_t *[]) { type_long_long }, DM_CONST));
-	GNU_BUILTIN(memcpy,         make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__memcpy_chk,   make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t}, DM_NONE));
-	GNU_BUILTIN(memcmp,         make_function_type(type_int, 3, (type_t *[]) { type_const_void_ptr, type_const_void_ptr, type_size_t }, DM_PURE));
-	GNU_BUILTIN(memset,         make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__memset_chk,   make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr, type_int, type_size_t, type_size_t }, DM_NONE));
-	GNU_BUILTIN(memmove,        make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__memmove_chk,  make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
-	GNU_BUILTIN(strcat,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	GNU_BUILTIN(__strcat_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(strncat,        make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__strncat_chk,  make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
-	GNU_BUILTIN(strlen,         make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
-	GNU_BUILTIN(strcmp,         make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
-	GNU_BUILTIN(strcpy,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	GNU_BUILTIN(__strcpy_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(stpcpy,         make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
-	GNU_BUILTIN(__stpcpy_chk,   make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(strncpy,        make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
-	GNU_BUILTIN(__strncpy_chk,  make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
-	GNU_BUILTIN(exit,           make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
-	GNU_BUILTIN(malloc,         make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
+	entity_t *(*f)(ir_builtin_kind,const char*,type_t*)
+		= create_gnu_builtin_firm;
+	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
+	f(ir_bk_frame_address,  "frame_address",  make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
+	f(ir_bk_ffs,            "ffs",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_ffs,            "ffsl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_ffs,            "ffsll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_clz,            "clz",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_clz,            "clzl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_clz,            "clzll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_ctz,            "ctz",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_ctz,            "ctzl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_ctz,            "ctzll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_popcount,       "popcount",       make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_popcount,       "popcountl",      make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_popcount,       "popcountll",     make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_parity,         "parity",         make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_parity,         "parityl",        make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_parity,         "parityll",       make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_prefetch,       "prefetch",       make_function_1_type_variadic(type_float, type_void_ptr, DM_NONE));
+	f(ir_bk_trap,           "trap",           make_function_type(type_void, 0, NULL, DM_NORETURN));
+
+	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
+	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));
+	l("abs",     make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
+	l("labs",    make_function_type(type_long, 1, (type_t *[]) { type_long }, DM_CONST));
+	l("llabs",   make_function_type(type_long_long, 1, (type_t *[]) { type_long_long }, DM_CONST));
+	l("memcpy",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	l("memcmp",  make_function_type(type_int, 3, (type_t *[]) { type_const_void_ptr, type_const_void_ptr, type_size_t }, DM_PURE));
+	l("memset",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr, type_int, type_size_t }, DM_NONE));
+	l("memmove", make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));
+	l("strcat",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	l("strncat", make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	l("strlen",  make_function_type(type_size_t, 1, (type_t *[]) { type_const_char_ptr }, DM_PURE));
+	l("strcmp",  make_function_type(type_int, 2, (type_t *[]) { type_const_char_ptr, type_const_char_ptr }, DM_PURE));
+	l("strcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	l("stpcpy",  make_function_type(type_char_ptr, 2, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict }, DM_NONE));
+	l("strncpy", make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	l("exit",    make_function_type(type_void, 1, (type_t *[]) { type_int }, DM_NORETURN));
+	l("malloc",  make_function_type(type_void_ptr, 1, (type_t *[]) { type_size_t }, DM_MALLOC));
+
+	entity_t *(*c)(const char*,unsigned,type_t*) = create_gnu_builtin_chk;
+	c("memcpy",  3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t}, DM_NONE));
+	c("memset",  3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr, type_int, type_size_t, type_size_t }, DM_NONE));
+	c("memmove", 3, make_function_type(type_void_ptr, 4, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
+	c("strcat",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("strncat", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
+	c("strcpy",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("stpcpy",  2, make_function_type(type_char_ptr, 3, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t }, DM_NONE));
+	c("strncpy", 3, make_function_type(type_char_ptr, 4, (type_t *[]) { type_char_ptr_restrict, type_const_char_ptr_restrict, type_size_t, type_size_t }, DM_NONE));
 
 	/* TODO: gcc has a LONG list of builtin functions (nearly everything from
 	 * C89-C99 and others. Complete this */
-
-#undef GNU_BUILTIN
 }
 
-static const char *get_builtin_replacement_name(builtin_kind_t kind)
+static entity_t *create_intrinsic_firm(ir_builtin_kind kind, const char *name,
+                                       type_t *type)
 {
-	switch (kind) {
-	case bk_gnu_builtin___memcpy_chk:    return "memcpy";
-	case bk_gnu_builtin___memmove_chk:   return "memmove";
-	case bk_gnu_builtin___memset_chk:    return "memset";
-	case bk_gnu_builtin___snprintf_chk:  return "snprintf";
-	case bk_gnu_builtin___sprintf_chk:   return "sprintf";
-	case bk_gnu_builtin___stpcpy_chk:    return "stpcpy";
-	case bk_gnu_builtin___strcat_chk:    return "strcat";
-	case bk_gnu_builtin___strcpy_chk:    return "strcpy";
-	case bk_gnu_builtin___strncat_chk:   return "strncat";
-	case bk_gnu_builtin___strncpy_chk:   return "strncpy";
-	case bk_gnu_builtin___vsnprintf_chk: return "vsnprintf";
-	case bk_gnu_builtin___vsprintf_chk:  return "vsprintf";
-	case bk_gnu_builtin_abort:           return "abort";
-	case bk_gnu_builtin_abs:             return "abs";
-	case bk_gnu_builtin_exit:            return "exit";
-	case bk_gnu_builtin_labs:            return "labs";
-	case bk_gnu_builtin_llabs:           return "llabs";
-	case bk_gnu_builtin_malloc:          return "malloc";
-	case bk_gnu_builtin_memcmp:          return "memcmp";
-	case bk_gnu_builtin_memcpy:          return "memcpy";
-	case bk_gnu_builtin_memmove:         return "memmove";
-	case bk_gnu_builtin_memset:          return "memset";
-	case bk_gnu_builtin_snprintf:        return "snprintf";
-	case bk_gnu_builtin_sprintf:         return "sprintf";
-	case bk_gnu_builtin_stpcpy:          return "stpcpy";
-	case bk_gnu_builtin_strcat:          return "strcat";
-	case bk_gnu_builtin_strcmp:          return "strcmp";
-	case bk_gnu_builtin_strcpy:          return "strcpy";
-	case bk_gnu_builtin_strlen:          return "strlen";
-	case bk_gnu_builtin_strncat:         return "strncat";
-	case bk_gnu_builtin_strncpy:         return "strncpy";
-	case bk_gnu_builtin_vsnprintf:       return "vsnprintf";
-	case bk_gnu_builtin_vsprintf:        return "vsprintf";
-
-	default:
-		break;
-	}
-	return NULL;
+	symbol_t *symbol = symbol_table_insert(name);
+	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity->function.b.firm_builtin_kind = kind;
+	return entity;
 }
 
-int get_builtin_chk_arg_pos(builtin_kind_t kind)
+static entity_t *create_intrinsic(builtin_kind_t kind, const char *name,
+                                  type_t *type)
 {
-	switch (kind) {
-	case bk_gnu_builtin___sprintf_chk:
-	case bk_gnu_builtin___strcat_chk:
-	case bk_gnu_builtin___strcpy_chk:
-	case bk_gnu_builtin___vsprintf_chk:
-		return 2;
-	case bk_gnu_builtin___memcpy_chk:
-	case bk_gnu_builtin___memmove_chk:
-	case bk_gnu_builtin___memset_chk:
-	case bk_gnu_builtin___snprintf_chk:
-	case bk_gnu_builtin___strncat_chk:
-	case bk_gnu_builtin___strncpy_chk:
-	case bk_gnu_builtin___vsnprintf_chk:
-		return 3;
-	default:
-		break;
-	}
-	return -1;
-}
-
-entity_t *get_builtin_replacement(const entity_t *builtin_entity)
-{
-	builtin_kind_t  kind        = builtin_entity->function.btk;
-	const char     *replacement = get_builtin_replacement_name(kind);
-	if (replacement == NULL)
-		return NULL;
-
-	symbol_t *const symbol = symbol_table_insert(replacement);
-	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol);
-	entity->base.source_position  = builtin_source_position;
-	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
-	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
-	entity->declaration.type      = builtin_entity->declaration.type;
-	entity->declaration.implicit  = true;
-	entity->declaration.modifiers = builtin_entity->declaration.modifiers;
-
+	symbol_t *symbol = symbol_table_insert(name);
+	entity_t *entity = create_builtin_function(kind, symbol, type);
 	return entity;
 }
 
 void create_microsoft_intrinsics(void)
 {
-#define MS_BUILTIN(a, b) create_builtin_function(bk_ms##a, #a, b)
-
+	entity_t *(*i)(builtin_kind_t,const char*,type_t*) = create_intrinsic;
+	entity_t *(*f)(ir_builtin_kind,const char*,type_t*) = create_intrinsic_firm;
 	/* intrinsics for all architectures */
-	MS_BUILTIN(_rotl,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
-	MS_BUILTIN(_rotr,                  make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int));
-	MS_BUILTIN(_rotl64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
-	MS_BUILTIN(_rotr64,                make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int));
-	MS_BUILTIN(_byteswap_ushort,       make_function_1_type(type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(_byteswap_ulong,        make_function_1_type(type_unsigned_long,  type_unsigned_long));
-	MS_BUILTIN(_byteswap_uint64,       make_function_1_type(type_unsigned_int64, type_unsigned_int64));
+	i(BUILTIN_ROTL,   "_rotl",                make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int, DM_CONST));
+	i(BUILTIN_ROTL,   "_rotl64",              make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int, DM_CONST));
+	i(BUILTIN_ROTR,   "_rotr",                make_function_2_type(type_unsigned_int,   type_unsigned_int, type_int, DM_CONST));
+	i(BUILTIN_ROTR,   "_rotr64",              make_function_2_type(type_unsigned_int64, type_unsigned_int64, type_int, DM_CONST));
 
-	MS_BUILTIN(__debugbreak,            make_function_0_type(type_void));
-	MS_BUILTIN(_ReturnAddress,          make_function_0_type(type_void_ptr));
-	MS_BUILTIN(_AddressOfReturnAddress, make_function_0_type(type_void_ptr));
-	MS_BUILTIN(__popcount,              make_function_1_type(type_unsigned_int, type_unsigned_int));
+	f(ir_bk_bswap,    "_byteswap_ushort",     make_function_1_type(type_unsigned_short, type_unsigned_short, DM_CONST));
+	f(ir_bk_bswap,    "_byteswap_ulong",      make_function_1_type(type_unsigned_long,  type_unsigned_long, DM_CONST));
+	f(ir_bk_bswap,    "_byteswap_uint64",     make_function_1_type(type_unsigned_int64, type_unsigned_int64, DM_CONST));
+
+	f(ir_bk_debugbreak,     "__debugbreak",   make_function_0_type(type_void, DM_NONE));
+	f(ir_bk_return_address, "_ReturnAddress", make_function_0_type(type_void_ptr, DM_NONE));
+	f(ir_bk_popcount,       "__popcount",     make_function_1_type(type_unsigned_int, type_unsigned_int, DM_CONST));
 
 	/* x86/x64 only */
-	MS_BUILTIN(_enable,                make_function_0_type(type_void));
-	MS_BUILTIN(_disable,               make_function_0_type(type_void));
-	MS_BUILTIN(__inbyte,               make_function_1_type(type_unsigned_char, type_unsigned_short));
-	MS_BUILTIN(__inword,               make_function_1_type(type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(__indword,              make_function_1_type(type_unsigned_long, type_unsigned_short));
-	MS_BUILTIN(__outbyte,              make_function_2_type(type_void, type_unsigned_short, type_unsigned_char));
-	MS_BUILTIN(__outword,              make_function_2_type(type_void, type_unsigned_short, type_unsigned_short));
-	MS_BUILTIN(__outdword,             make_function_2_type(type_void, type_unsigned_short, type_unsigned_long));
-	MS_BUILTIN(__ud2,                  make_function_type(type_void, 0, NULL, DM_NORETURN));
-	MS_BUILTIN(_BitScanForward,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
-	MS_BUILTIN(_BitScanReverse,        make_function_2_type(type_unsigned_char, type_unsigned_long_ptr, type_unsigned_long));
-	MS_BUILTIN(_InterlockedExchange,   make_function_2_type(type_long, type_long_ptr, type_long));
-	MS_BUILTIN(_InterlockedExchange64, make_function_2_type(type_int64, type_int64_ptr, type_int64));
-#undef MS_BUILTIN
+	f(ir_bk_inport,   "__inbyte",             make_function_1_type(type_unsigned_char, type_unsigned_short, DM_NONE));
+	f(ir_bk_inport,   "__inword",             make_function_1_type(type_unsigned_short, type_unsigned_short, DM_NONE));
+	f(ir_bk_inport,   "__indword",            make_function_1_type(type_unsigned_long, type_unsigned_short, DM_NONE));
+	f(ir_bk_outport,  "__outbyte",            make_function_2_type(type_void, type_unsigned_short, type_unsigned_char, DM_NONE));
+	f(ir_bk_outport,  "__outword",            make_function_2_type(type_void, type_unsigned_short, type_unsigned_short, DM_NONE));
+	f(ir_bk_outport,  "__outdword",           make_function_2_type(type_void, type_unsigned_short, type_unsigned_long, DM_NONE));
+	f(ir_bk_trap,     "__ud2",                make_function_type(type_void, 0, NULL, DM_NORETURN));
 }

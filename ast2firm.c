@@ -928,15 +928,16 @@ static bool is_main(entity_t *entity)
 static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 {
 	assert(entity->kind == ENTITY_FUNCTION);
-	if (entity->function.irentity != NULL) {
+	if (entity->function.irentity != NULL)
 		return entity->function.irentity;
-	}
 
-	entity_t *original_entity = entity;
-	if (entity->function.btk != bk_none) {
-		entity = get_builtin_replacement(entity);
-		if (entity == NULL)
-			return NULL;
+	switch (entity->function.btk) {
+	case BUILTIN_NONE:
+	case BUILTIN_LIBC:
+	case BUILTIN_LIBC_CHECK:
+		break;
+	default:
+		return NULL;
 	}
 
 	if (is_main(entity)) {
@@ -978,7 +979,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		nested_function = true;
 
 	dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
-	irentity             = new_d_entity(owner_type, id, ir_type_method, dbgi);
+	irentity = new_d_entity(owner_type, id, ir_type_method, dbgi);
 
 	ident *ld_id;
 	if (nested_function)
@@ -1048,8 +1049,8 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	entitymap_insert(&entitymap, symbol, irentity);
 
 entity_created:
-	original_entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
-	original_entity->function.irentity = irentity;
+	entity->declaration.kind  = DECLARATION_KIND_FUNCTION;
+	entity->function.irentity = irentity;
 
 	return irentity;
 }
@@ -1527,7 +1528,8 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	/* make sure the type is constructed */
 	(void) get_ir_type(type);
 
-	if (entity->kind == ENTITY_FUNCTION && entity->function.btk != bk_none) {
+	if (entity->kind == ENTITY_FUNCTION
+	    && entity->function.btk != BUILTIN_NONE) {
 		ir_entity *irentity = get_function_entity(entity, NULL);
 		/* for gcc compatibility we have to produce (dummy) addresses for some
 		 * builtins which don't have entities */
@@ -1660,72 +1662,6 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 }
 
 /**
- * Generate an unary builtin.
- *
- * @param kind           the builtin kind to generate
- * @param op             the operand
- * @param function_type  the function type for the GNU builtin routine
- * @param db             debug info
- */
-static ir_node *gen_unary_builtin(ir_builtin_kind kind, expression_t *op, type_t *function_type, dbg_info *db)
-{
-	ir_node *in[1];
-	in[0] = expression_to_firm(op);
-
-	ir_type *tp  = get_ir_type(function_type);
-	ir_type *res = get_method_res_type(tp, 0);
-	ir_node *irn = new_d_Builtin(db, get_irg_no_mem(current_ir_graph), 1, in, kind, tp);
-	set_irn_pinned(irn, op_pin_state_floats);
-	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
-}
-
-/**
- * Generate a pinned unary builtin.
- *
- * @param kind           the builtin kind to generate
- * @param op             the operand
- * @param function_type  the function type for the GNU builtin routine
- * @param db             debug info
- */
-static ir_node *gen_unary_builtin_pinned(ir_builtin_kind kind, expression_t *op,
-                                         type_t *function_type, dbg_info *db)
-{
-	ir_node *in[1];
-	in[0] = expression_to_firm(op);
-
-	ir_type *tp  = get_ir_type(function_type);
-	ir_type *res = get_method_res_type(tp, 0);
-	ir_node *mem = get_store();
-	ir_node *irn = new_d_Builtin(db, mem, 1, in, kind, tp);
-	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-	return new_Proj(irn, get_type_mode(res), pn_Builtin_1_result);
-}
-
-/**
- * Generate an binary-void-return builtin.
- *
- * @param kind           the builtin kind to generate
- * @param op1            the first operand
- * @param op2            the second operand
- * @param function_type  the function type for the GNU builtin routine
- * @param db             debug info
- */
-static ir_node *gen_binary_builtin_mem(ir_builtin_kind kind, expression_t *op1,
-                                       expression_t *op2, type_t *function_type,
-									   dbg_info *db)
-{
-	ir_node *in[2];
-	in[0] = expression_to_firm(op1);
-	in[1] = expression_to_firm(op2);
-
-	ir_type *tp  = get_ir_type(function_type);
-	ir_node *mem = get_store();
-	ir_node *irn = new_d_Builtin(db, mem, 2, in, kind, tp);
-	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-	return NULL;
-}
-
-/**
  * Transform calls to builtin functions.
  */
 static ir_node *process_builtin_call(const call_expression_t *call)
@@ -1741,10 +1677,9 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	type_t *function_type = skip_typeref(expr_type->pointer.points_to);
 
 	switch (builtin->entity->function.btk) {
-	case bk_gnu_builtin_alloca: {
-		if (call->arguments == NULL || call->arguments->next != NULL) {
-			panic("invalid number of parameters on __builtin_alloca");
-		}
+	case BUILTIN_NONE:
+		break;
+	case BUILTIN_ALLOCA: {
 		expression_t *argument = call->arguments->expression;
 		ir_node      *size     = expression_to_firm(argument);
 
@@ -1757,22 +1692,14 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 		return res;
 	}
-
-	case bk_gnu_builtin_huge_val:
-	case bk_gnu_builtin_huge_valf:
-	case bk_gnu_builtin_huge_vall:
-	case bk_gnu_builtin_inf:
-	case bk_gnu_builtin_inff:
-	case bk_gnu_builtin_infl: {
+	case BUILTIN_INF: {
 		type_t    *type = function_type->function.return_type;
 		ir_mode   *mode = get_ir_mode_arithmetic(type);
 		ir_tarval *tv   = get_mode_infinite(mode);
 		ir_node   *res  = new_d_Const(dbgi, tv);
 		return res;
 	}
-	case bk_gnu_builtin_nan:
-	case bk_gnu_builtin_nanf:
-	case bk_gnu_builtin_nanl: {
+	case BUILTIN_NAN: {
 		/* Ignore string for now... */
 		assert(is_type_function(function_type));
 		type_t    *type = function_type->function.return_type;
@@ -1781,86 +1708,15 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node   *res  = new_d_Const(dbgi, tv);
 		return res;
 	}
-	case bk_gnu_builtin_expect: {
+	case BUILTIN_EXPECT: {
 		expression_t *argument = call->arguments->expression;
 		return _expression_to_firm(argument);
 	}
-	case bk_gnu_builtin_va_end:
+	case BUILTIN_VA_END:
 		/* evaluate the argument of va_end for its side effects */
 		_expression_to_firm(call->arguments->expression);
 		return NULL;
-	case bk_gnu_builtin_frame_address: {
-		expression_t *const expression = call->arguments->expression;
-		bool val = fold_constant_to_bool(expression);
-		if (!val) {
-			/* the nice case */
-			return get_irg_frame(current_ir_graph);
-		} else {
-			/* get the argument */
-			ir_node *in[2];
-
-			in[0] = expression_to_firm(expression);
-			in[1] = get_irg_frame(current_ir_graph);
-			ir_type *tp  = get_ir_type(function_type);
-			ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_frame_address, tp);
-			return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
-		}
-	}
-	case bk_gnu_builtin_return_address: {
-		expression_t *const expression = call->arguments->expression;
-		ir_node *in[2];
-
-		in[0] = expression_to_firm(expression);
-		in[1] = get_irg_frame(current_ir_graph);
-		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_return_address, tp);
-		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
-	}
-	case bk_gnu_builtin_ffs:
-		 return gen_unary_builtin(ir_bk_ffs,      call->arguments->expression, function_type, dbgi);
-	case bk_gnu_builtin_clz:
-	case bk_gnu_builtin_clzl:
-	case bk_gnu_builtin_clzll:
-		 return gen_unary_builtin(ir_bk_clz,      call->arguments->expression, function_type, dbgi);
-	case bk_gnu_builtin_ctz:
-	case bk_gnu_builtin_ctzl:
-	case bk_gnu_builtin_ctzll:
-		 return gen_unary_builtin(ir_bk_ctz,      call->arguments->expression, function_type, dbgi);
-	case bk_gnu_builtin_popcount:
-	case bk_gnu_builtin_popcountl:
-	case bk_gnu_builtin_popcountll:
-	case bk_ms__popcount:
-		 return gen_unary_builtin(ir_bk_popcount, call->arguments->expression, function_type, dbgi);
-	case bk_gnu_builtin_parity:
-		 return gen_unary_builtin(ir_bk_parity,   call->arguments->expression, function_type, dbgi);
-	case bk_gnu_builtin_prefetch: {
-		call_argument_t *const args = call->arguments;
-		expression_t *const addr    = args->expression;
-		ir_node *in[3];
-
-		in[0] = _expression_to_firm(addr);
-		if (args->next != NULL) {
-			expression_t *const rw = args->next->expression;
-
-			in[1] = _expression_to_firm(rw);
-
-			if (args->next->next != NULL) {
-				expression_t *const locality = args->next->next->expression;
-
-				in[2] = expression_to_firm(locality);
-			} else {
-				in[2] = new_Const_long(mode_int, 3);
-			}
-		} else {
-			in[1] = new_Const_long(mode_int, 0);
-			in[2] = new_Const_long(mode_int, 3);
-		}
-		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_prefetch, tp);
-		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-		return NULL;
-	}
-	case bk_gnu_builtin_object_size: {
+	case BUILTIN_OBJECT_SIZE: {
 		/* determine value of "type" */
 		expression_t *type_expression = call->arguments->next->expression;
 		long          type_val        = fold_constant_to_int(type_expression);
@@ -1872,38 +1728,13 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 		return new_d_Const(dbgi, result);
 	}
-	case bk_gnu_builtin_trap:
-	case bk_ms__ud2:
-	{
-		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), 0, NULL, ir_bk_trap, tp);
-		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-		return NULL;
-	}
-	case bk_ms__debugbreak: {
-		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_store(), 0, NULL, ir_bk_debugbreak, tp);
-		set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-		return NULL;
-	}
-	case bk_ms_ReturnAddress: {
-		ir_node *in[2];
-
-		in[0] = new_Const(get_mode_null(mode_int));
-		in[1] = get_irg_frame(current_ir_graph);
-		ir_type *tp  = get_ir_type(function_type);
-		ir_node *irn = new_d_Builtin(dbgi, get_irg_no_mem(current_ir_graph), 2, in, ir_bk_return_address, tp);
-		return new_Proj(irn, mode_P_data, pn_Builtin_1_result);
-	}
-	case bk_ms_rotl:
-	case bk_ms_rotl64: {
+	case BUILTIN_ROTL: {
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
 		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
 	}
-	case bk_ms_rotr:
-	case bk_ms_rotr64: {
+	case BUILTIN_ROTR: {
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
@@ -1911,22 +1742,13 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
 		return new_d_Rotl(dbgi, val, sub, mode);
 	}
-	case bk_ms_byteswap_ushort:
-	case bk_ms_byteswap_ulong:
-	case bk_ms_byteswap_uint64:
-		return gen_unary_builtin(ir_bk_bswap, call->arguments->expression, function_type, dbgi);
-	case bk_ms__inbyte:
-	case bk_ms__inword:
-	case bk_ms__indword:
-		return gen_unary_builtin_pinned(ir_bk_inport, call->arguments->expression, function_type, dbgi);
-	case bk_ms__outbyte:
-	case bk_ms__outword:
-	case bk_ms__outdword:
-		return gen_binary_builtin_mem(ir_bk_outport, call->arguments->expression,
-			call->arguments->next->expression, function_type, dbgi);
-	default:
-		panic("unsupported builtin found");
+	case BUILTIN_FIRM:
+		break;
+	case BUILTIN_LIBC:
+	case BUILTIN_LIBC_CHECK:
+		panic("builtin did not produce an entity");
 	}
+	panic("invalid builtin found");
 }
 
 /**
@@ -1941,42 +1763,27 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	dbg_info *const dbgi = get_dbg_info(&call->base.source_position);
 	assert(currently_reachable());
 
-	expression_t *function = call->function;
+	expression_t   *function = call->function;
+	ir_node        *callee   = NULL;
+	bool            firm_builtin = false;
+	ir_builtin_kind firm_builtin_kind = ir_bk_trap;
 	if (function->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref    = &function->reference;
 		entity_t                     *entity = ref->entity;
 
 		if (entity->kind == ENTITY_FUNCTION) {
-			ir_entity *irentity = entity->function.irentity;
-			if (irentity == NULL)
-				irentity = get_function_entity(entity, NULL);
-
-			if (irentity == NULL && entity->function.btk != bk_none) {
+			builtin_kind_t builtin = entity->function.btk;
+			if (builtin == BUILTIN_FIRM) {
+				firm_builtin = true;
+				firm_builtin_kind = entity->function.b.firm_builtin_kind;
+			} else if (builtin != BUILTIN_NONE && builtin != BUILTIN_LIBC
+			           && builtin != BUILTIN_LIBC_CHECK) {
 				return process_builtin_call(call);
 			}
-
-#if 0
-			if (irentity == rts_entities[rts_alloca]) {
-				/* handle alloca() call */
-				expression_t *argument = call->arguments->expression;
-				ir_node      *size     = expression_to_firm(argument);
-				ir_mode      *mode     = get_ir_mode_arithmetic(type_size_t);
-
-				size = create_conv(dbgi, size, mode);
-
-				ir_node  *store  = get_store();
-				ir_node  *alloca = new_d_Alloc(dbgi, store, size,
-				                               firm_unknown_type, stack_alloc);
-				ir_node  *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
-				set_store(proj_m);
-				ir_node  *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
-
-				return res;
-			}
-#endif
 		}
 	}
-	ir_node *callee = expression_to_firm(function);
+	if (!firm_builtin)
+		callee = expression_to_firm(function);
 
 	type_t *type = skip_typeref(function->base.type);
 	assert(is_type_pointer(type));
@@ -1985,7 +1792,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	assert(is_type_function(points_to));
 	function_type_t *function_type = &points_to->function;
 
-	int      n_parameters = 0;
+	int      n_parameters    = 0;
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
 	ir_type *new_method_type = NULL;
 	if (function_type->variadic || function_type->unspecified_parameters) {
@@ -2040,26 +1847,50 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		argument = argument->next;
 	}
 
-	ir_node  *store = get_store();
-	ir_node  *node  = new_d_Call(dbgi, store, callee, n_parameters, in,
-	                             ir_method_type);
-	ir_node  *mem   = new_d_Proj(dbgi, node, mode_M, pn_Call_M);
-	set_store(mem);
+	ir_node *store;
+	if (function_type->modifiers & DM_CONST) {
+		store = get_irg_no_mem(current_ir_graph);
+	} else {
+		store = get_store();
+	}
 
+	ir_node *node;
 	type_t  *return_type = skip_typeref(function_type->return_type);
 	ir_node *result      = NULL;
+	if (firm_builtin) {
+		node = new_d_Builtin(dbgi, store, n_parameters, in, firm_builtin_kind,
+		                     ir_method_type);
+		if (! (function_type->modifiers & DM_CONST)) {
+			ir_node *mem = new_Proj(node, mode_M, pn_Builtin_M);
+			set_store(mem);
+		}
 
-	if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-		ir_node *resproj = new_d_Proj(dbgi, node, mode_T, pn_Call_T_result);
-
-		if (is_type_scalar(return_type)) {
-			ir_mode *mode       = get_ir_mode_storage(return_type);
-			result              = new_d_Proj(dbgi, resproj, mode, 0);
+		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+			assert(is_type_scalar(return_type));
+			ir_mode *mode = get_ir_mode_storage(return_type);
+			result = new_Proj(node, mode, pn_Builtin_1_result);
 			ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
 			result              = create_conv(NULL, result, mode_arith);
-		} else {
-			ir_mode *mode = mode_P_data;
-			result        = new_d_Proj(dbgi, resproj, mode, 0);
+		}
+	} else {
+		node = new_d_Call(dbgi, store, callee, n_parameters, in, ir_method_type);
+		if (! (function_type->modifiers & DM_CONST)) {
+			ir_node *mem = new_Proj(node, mode_M, pn_Call_M);
+			set_store(mem);
+		}
+
+		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+			ir_node *resproj = new_Proj(node, mode_T, pn_Call_T_result);
+
+			if (is_type_scalar(return_type)) {
+				ir_mode *mode       = get_ir_mode_storage(return_type);
+				result              = new_Proj(resproj, mode, 0);
+				ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
+				result              = create_conv(NULL, result, mode_arith);
+			} else {
+				ir_mode *mode = mode_P_data;
+				result        = new_Proj(resproj, mode, 0);
+			}
 		}
 	}
 
@@ -3612,7 +3443,7 @@ static bool is_builtin_expect(const expression_t *expression)
 		return false;
 	reference_expression_t *ref = &function->reference;
 	if (ref->entity->kind         != ENTITY_FUNCTION ||
-	    ref->entity->function.btk != bk_gnu_builtin_expect)
+	    ref->entity->function.btk != BUILTIN_EXPECT)
 		return false;
 
 	return true;
@@ -5936,7 +5767,7 @@ static void scope_to_firm(scope_t *scope)
 			continue;
 
 		if (entity->kind == ENTITY_FUNCTION) {
-			if (entity->function.btk != bk_none) {
+			if (entity->function.btk != BUILTIN_NONE) {
 				/* builtins have no representation */
 				continue;
 			}
@@ -5955,7 +5786,7 @@ static void scope_to_firm(scope_t *scope)
 			continue;
 
 		if (entity->kind == ENTITY_FUNCTION) {
-			if (entity->function.btk != bk_none) {
+			if (entity->function.btk != BUILTIN_NONE) {
 				/* builtins have no representation */
 				continue;
 			}

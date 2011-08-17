@@ -22,100 +22,19 @@
 
 #include <stdbool.h>
 
-/**
- * GNU builtin or MS intrinsic functions.
- */
-typedef enum builtin_kind_t {
-	bk_none = 0,
-
-	bk_gnu_builtin___memcpy_chk,
-	bk_gnu_builtin___memmove_chk,
-	bk_gnu_builtin___memset_chk,
-	bk_gnu_builtin___snprintf_chk,
-	bk_gnu_builtin___sprintf_chk,
-	bk_gnu_builtin___stpcpy_chk,
-	bk_gnu_builtin___strcat_chk,
-	bk_gnu_builtin___strcpy_chk,
-	bk_gnu_builtin___strncat_chk,
-	bk_gnu_builtin___strncpy_chk,
-	bk_gnu_builtin___vsnprintf_chk,
-	bk_gnu_builtin___vsprintf_chk,
-	bk_gnu_builtin_abort,
-	bk_gnu_builtin_abs,
-	bk_gnu_builtin_alloca,
-	bk_gnu_builtin_clz,
-	bk_gnu_builtin_clzl,
-	bk_gnu_builtin_clzll,
-	bk_gnu_builtin_ctz,
-	bk_gnu_builtin_ctzl,
-	bk_gnu_builtin_ctzll,
-	bk_gnu_builtin_exit,
-	bk_gnu_builtin_expect,
-	bk_gnu_builtin_ffs,
-	bk_gnu_builtin_ffsl,
-	bk_gnu_builtin_ffsll,
-	bk_gnu_builtin_frame_address,
-	bk_gnu_builtin_huge_val,
-	bk_gnu_builtin_huge_valf,
-	bk_gnu_builtin_huge_vall,
-	bk_gnu_builtin_inf,
-	bk_gnu_builtin_inff,
-	bk_gnu_builtin_infl,
-	bk_gnu_builtin_labs,
-	bk_gnu_builtin_llabs,
-	bk_gnu_builtin_malloc,
-	bk_gnu_builtin_memcmp,
-	bk_gnu_builtin_memcpy,
-	bk_gnu_builtin_memmove,
-	bk_gnu_builtin_memset,
-	bk_gnu_builtin_nan,
-	bk_gnu_builtin_nanf,
-	bk_gnu_builtin_nanl,
-	bk_gnu_builtin_object_size,
-	bk_gnu_builtin_parity,
-	bk_gnu_builtin_popcount,
-	bk_gnu_builtin_popcountl,
-	bk_gnu_builtin_popcountll,
-	bk_gnu_builtin_prefetch,
-	bk_gnu_builtin_return_address,
-	bk_gnu_builtin_snprintf,
-	bk_gnu_builtin_sprintf,
-	bk_gnu_builtin_stpcpy,
-	bk_gnu_builtin_strcat,
-	bk_gnu_builtin_strcmp,
-	bk_gnu_builtin_strcpy,
-	bk_gnu_builtin_strlen,
-	bk_gnu_builtin_strncat,
-	bk_gnu_builtin_strncpy,
-	bk_gnu_builtin_trap,
-	bk_gnu_builtin_va_end,
-	bk_gnu_builtin_vsnprintf,
-	bk_gnu_builtin_vsprintf,
-
-	bk_ms_AddressOfReturnAddress,
-	bk_ms_BitScanForward,
-	bk_ms_BitScanReverse,
-	bk_ms_InterlockedExchange,
-	bk_ms_InterlockedExchange64,
-	bk_ms_ReturnAddress,
-	bk_ms__debugbreak,
-	bk_ms__inbyte,
-	bk_ms__indword,
-	bk_ms__inword,
-	bk_ms__outbyte,
-	bk_ms__outdword,
-	bk_ms__outword,
-	bk_ms__popcount,
-	bk_ms__ud2,
-	bk_ms_byteswap_uint64,
-	bk_ms_byteswap_ulong,
-	bk_ms_byteswap_ushort,
-	bk_ms_disable,
-	bk_ms_enable,
-	bk_ms_rotl,
-	bk_ms_rotl64,
-	bk_ms_rotr,
-	bk_ms_rotr64,
+typedef enum {
+	BUILTIN_NONE,
+	BUILTIN_ALLOCA,
+	BUILTIN_INF,
+	BUILTIN_NAN,
+	BUILTIN_EXPECT,
+	BUILTIN_VA_END,
+	BUILTIN_OBJECT_SIZE,
+	BUILTIN_ROTL,
+	BUILTIN_ROTR,
+	BUILTIN_LIBC,
+	BUILTIN_LIBC_CHECK,
+	BUILTIN_FIRM,
 } builtin_kind_t;
 
 /**
@@ -127,14 +46,5 @@ void create_gnu_builtins(void);
  * Create predefined MS intrinsics.
  */
 void create_microsoft_intrinsics(void);
-
-/**
- * Some of the gnu builtins are simply more elaborate declarations of
- * library functions. Return the library function name so we can simply
- * replace the builtins with these during code generation
- */
-entity_t *get_builtin_replacement(const entity_t *builtin_entity);
-
-int get_builtin_chk_arg_pos(builtin_kind_t kind);
 
 #endif

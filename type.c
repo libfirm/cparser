@@ -1695,7 +1695,7 @@ function_parameter_t *allocate_parameter(type_t *const type)
 }
 
 type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
-                             type_t *argument_type2)
+                             type_t *argument_type2, decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter2 = allocate_parameter(argument_type2);
 	function_parameter_t *const parameter1 = allocate_parameter(argument_type1);
@@ -1704,25 +1704,29 @@ type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter1;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
-type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
+type_t *make_function_1_type(type_t *return_type, type_t *argument_type,
+                             decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter = allocate_parameter(argument_type);
 
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
 type_t *make_function_1_type_variadic(type_t *return_type,
-                                      type_t *argument_type)
+                                      type_t *argument_type,
+                                      decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter = allocate_parameter(argument_type);
 
@@ -1730,16 +1734,18 @@ type_t *make_function_1_type_variadic(type_t *return_type,
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 	type->function.variadic    = true;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
-type_t *make_function_0_type(type_t *return_type)
+type_t *make_function_0_type(type_t *return_type, decl_modifiers_t modifiers)
 {
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = NULL;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
