@@ -3214,26 +3214,18 @@ static ir_node *va_start_expression_to_firm(
 	ir_graph  *const irg         = current_ir_graph;
 	type_t    *const type        = current_function_entity->declaration.type;
 	ir_type   *const method_type = get_ir_type(type);
-	size_t     const n           = get_method_n_params(method_type) - 1;
-	ir_type   *frame_type        = get_irg_frame_type(irg);
-	ir_type   *param_irtype      = get_method_param_type(method_type, n);
+	size_t     const n           = get_method_n_params(method_type);
+	ir_type   *const frame_type  = get_irg_frame_type(irg);
+	ir_type   *const param_type  = get_unknown_type();
 	ir_entity *const param_ent   =
-		new_parameter_entity(frame_type, n, param_irtype);
+		new_parameter_entity(frame_type, n, param_type);
 	ir_node   *const frame       = get_irg_frame(irg);
 	dbg_info  *const dbgi        = get_dbg_info(&expr->base.source_position);
 	ir_node   *const no_mem      = new_NoMem();
 	ir_node   *const arg_sel     =
 		new_d_simpleSel(dbgi, no_mem, frame, param_ent);
 
-	type_t    *const param_type  = expr->parameter->base.type;
-	ir_node   *const cnst        = get_type_size_node(param_type);
-	ir_mode   *const mode        = get_irn_mode(cnst);
-	ir_node   *const c1          = new_Const_long(mode, stack_param_align - 1);
-	ir_node   *const c2          = new_d_Add(dbgi, cnst, c1, mode);
-	ir_node   *const c3          = new_Const_long(mode, -(long)stack_param_align);
-	ir_node   *const c4          = new_d_And(dbgi, c2, c3, mode);
-	ir_node   *const add         = new_d_Add(dbgi, arg_sel, c4, mode_P_data);
-	set_value_for_expression(expr->ap, add);
+	set_value_for_expression(expr->ap, arg_sel);
 
 	return NULL;
 }
