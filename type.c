@@ -152,6 +152,19 @@ atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 		.rank       = 5,
 	},
+	[ATOMIC_TYPE_LONGLONG] = {
+		.size       = 8,
+		.alignment  = 8,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 6,
+	},
+	[ATOMIC_TYPE_ULONGLONG] = {
+		.size       = 8,
+		.alignment  = 8,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 6,
+	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
 		.alignment  = 4,
@@ -208,8 +221,6 @@ void init_types(unsigned machine_size)
 	pointer_properties.alignment        = long_size;
 	pointer_properties.struct_alignment = long_size;
 
-	props[ATOMIC_TYPE_LONGLONG]    = props[ATOMIC_TYPE_LONG];
-	props[ATOMIC_TYPE_ULONGLONG]   = props[ATOMIC_TYPE_ULONG];
 	props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
 
