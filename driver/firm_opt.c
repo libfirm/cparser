@@ -361,6 +361,7 @@ typedef struct {
 	} u;
 	const char   *description;
 	opt_flags_t   flags;
+	ir_timer_t   *timer;
 } opt_config_t;
 
 static opt_config_t opts[] = {
@@ -407,7 +408,6 @@ static opt_config_t opts[] = {
 #undef IRG
 };
 static const int n_opts = sizeof(opts) / sizeof(opts[0]);
-static ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
 
 static opt_config_t *get_opt(const char *name)
 {
@@ -441,20 +441,18 @@ static bool get_opt_enabled(const char *name)
  */
 static bool do_irg_opt(ir_graph *irg, const char *name)
 {
-	ir_graph     *old_irg;
-	opt_config_t *config = get_opt(name);
-	size_t        n      = config - opts;
+	opt_config_t *const config = get_opt(name);
 	assert(config != NULL);
 	assert(config->target == OPT_TARGET_IRG);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return false;
 
-	old_irg          = current_ir_graph;
+	ir_graph *const old_irg = current_ir_graph;
 	current_ir_graph = irg;
 
-	timer_push(timers[n]);
+	timer_push(config->timer);
 	config->u.transform_irg(irg);
-	timer_pop(timers[n]);
+	timer_pop(config->timer);
 
 	if (firm_dump.all_phases && firm_dump.ir_graph) {
 		dump_ir_graph(irg, name);
@@ -472,15 +470,14 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 
 static void do_irp_opt(const char *name)
 {
-	opt_config_t *config = get_opt(name);
-	size_t        n      = config - opts;
+	opt_config_t *const config = get_opt(name);
 	assert(config->target == OPT_TARGET_IRP);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return;
 
-	timer_push(timers[n]);
+	timer_push(config->timer);
 	config->u.transform_irp();
-	timer_pop(timers[n]);
+	timer_pop(config->timer);
 
 	if (firm_dump.ir_graph && firm_dump.all_phases) {
 		int i;
@@ -740,8 +737,8 @@ void gen_firm_init(void)
 	int      i;
 
 	for (i = 0; i < n_opts; ++i) {
-		timers[i] = ir_timer_new();
-		timer_register(timers[i], opts[i].description);
+		opts[i].timer = ir_timer_new();
+		timer_register(opts[i].timer, opts[i].description);
 	}
 	t_verify = ir_timer_new();
 	timer_register(t_verify, "Firm: verify pass");
