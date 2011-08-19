@@ -20,6 +20,7 @@
 #include "firm_timing.h"
 #include "ast2firm.h"
 #include "adt/strutil.h"
+#include "adt/util.h"
 
 /* optimization settings */
 struct a_firm_opt {
@@ -407,13 +408,12 @@ static opt_config_t opts[] = {
 #undef IRP
 #undef IRG
 };
-static const int n_opts = sizeof(opts) / sizeof(opts[0]);
+
+#define FOR_EACH_OPT(i) for (opt_config_t *i = opts; i != endof(opts); ++i)
 
 static opt_config_t *get_opt(const char *name)
 {
-	int i;
-	for (i = 0; i < n_opts; ++i) {
-		opt_config_t *config = &opts[i];
+	FOR_EACH_OPT(config) {
 		if (strcmp(config->name, name) == 0)
 			return config;
 	}
@@ -734,11 +734,10 @@ static void do_firm_lowering(const char *input_filename)
 void gen_firm_init(void)
 {
 	unsigned pattern = 0;
-	int      i;
 
-	for (i = 0; i < n_opts; ++i) {
-		opts[i].timer = ir_timer_new();
-		timer_register(opts[i].timer, opts[i].description);
+	FOR_EACH_OPT(i) {
+		i->timer = ir_timer_new();
+		timer_register(i->timer, i->description);
 	}
 	t_verify = ir_timer_new();
 	timer_register(t_verify, "Firm: verify pass");
@@ -867,8 +866,7 @@ static void disable_all_opts(void)
 	firm_opt.strict_alias    = false;
 	firm_opt.no_alias        = false;
 
-	for (int i = 0; i < n_opts; ++i) {
-		opt_config_t *config = &opts[i];
+	FOR_EACH_OPT(config) {
 		if (config->flags & OPT_FLAG_ESSENTIAL) {
 			config->flags |= OPT_FLAG_ENABLED;
 		} else {
@@ -898,11 +896,10 @@ void firm_option_help(print_option_help_func print_option_help)
 {
 	print_option_help(firm_options[0].option, firm_options[0].description);
 
-	for (int i = 0; i < n_opts; ++i) {
+	FOR_EACH_OPT(config) {
 		char buf[1024];
 		char buf2[1024];
 
-		const opt_config_t *config = &opts[i];
 		if (config->flags & OPT_FLAG_HIDE_OPTIONS)
 			continue;
 
