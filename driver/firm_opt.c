@@ -273,10 +273,10 @@ static void rts_map(void)
 		{ &rts_entities[rts_memset],  i_mapper_memset },
 		{ &rts_entities[rts_memcmp],  i_mapper_memcmp }
 	};
-	i_record rec[sizeof(mapper)/sizeof(mapper[0])];
-	unsigned i, n_map;
+	i_record rec[lengthof(mapper)];
+	size_t   n_map = 0;
 
-	for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i) {
+	for (size_t i = 0; i != lengthof(mapper); ++i) {
 		if (*mapper[i].ent != NULL) {
 			rec[n_map].i_call.kind     = INTRINSIC_CALL;
 			rec[n_map].i_call.i_ent    = *mapper[i].ent;
@@ -911,8 +911,7 @@ void firm_option_help(print_option_help_func print_option_help)
 		print_option_help(buf, buf2);
 	}
 
-	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
-	for (size_t k = 0; k < n_options; ++k) {
+	for (size_t k = 0; k != lengthof(firm_options); ++k) {
 		char buf[1024];
 		char buf2[1024];
 		snprintf(buf, sizeof(buf), "-f%s", firm_options[k].option);
@@ -942,8 +941,7 @@ int firm_option(const char *const opt)
 	}
 
 	size_t const len = strlen(opt);
-	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
-	for (size_t i = n_options; i != 0;) {
+	for (size_t i = lengthof(firm_options); i != 0;) {
 		struct params const* const o = &firm_options[--i];
 		if (len == o->opt_len && strncmp(opt, o->option, len) == 0) {
 			/* statistic options do accumulate */

@@ -195,8 +195,7 @@ static inline void next_real_char(void)
 {
 	assert(input.bufpos <= input.bufend);
 	if (input.bufpos >= input.bufend) {
-		size_t n = decode(input.input, input.buf + MAX_PUTBACK,
-		                  sizeof(input.buf)/sizeof(input.buf[0]) - MAX_PUTBACK);
+		size_t const n = decode(input.input, input.buf + MAX_PUTBACK, lengthof(input.buf) - MAX_PUTBACK);
 		if (n == 0) {
 			input.c = EOF;
 			return;

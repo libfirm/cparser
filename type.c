@@ -225,9 +225,7 @@ void init_types(unsigned machine_size)
 	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
 
 	/* set struct alignments to the same value as alignment */
-	for (size_t i = 0;
-	     i < sizeof(atomic_type_properties)/sizeof(atomic_type_properties[0]);
-	     ++i) {
+	for (size_t i = 0; i != lengthof(atomic_type_properties); ++i) {
 		props[i].struct_alignment = props[i].alignment;
 	}
 }
