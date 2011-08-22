@@ -139,6 +139,29 @@ static expression_t *skip_implicit_cast(expression_t *expression)
 	return expression;
 }
 
+static bool match(expression_t *expr, expression_t *pattern);
+
+static bool match_typeprop(expression_t *const expr, expression_t *const pattern)
+{
+	switch ((match_kind_t)pattern->kind) {
+		case EXPR_MATCH_TYPE:
+			return match_type(expr->base.type, ((match_type_expression_t*)pattern)->pattern);
+
+		case EXPR_MATCH_ANY:
+			return true;
+
+		case EXPR_MATCH_OR: {
+			match_or_expression_t *const matcho = (match_or_expression_t*)pattern;
+			return
+				match_typeprop(expr, matcho->expr1) ||
+				match_typeprop(expr, matcho->expr2);
+		}
+	}
+
+	expression_t *const sub_expr = expr->typeprop.tp_expression;
+	return sub_expr != NULL && match(sub_expr, pattern);
+}
+
 static bool match(expression_t *expression, expression_t *pattern)
 {
 	/* skip implicit casts */
@@ -193,6 +216,10 @@ static bool match(expression_t *expression, expression_t *pattern)
 			return false;
 		return true;
 	}
+
+	case EXPR_ALIGNOF:
+	case EXPR_SIZEOF:
+		return match_typeprop(expression, pattern->typeprop.tp_expression);
 
 	default:
 		panic("grep for expression kind not implemented");
