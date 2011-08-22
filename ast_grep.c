@@ -11,6 +11,7 @@
 #include "symbol_t.h"
 #include "types.h"
 #include "diagnostic.h"
+#include "adt/error.h"
 #include "adt/strutil.h"
 
 #define HERE (&token.base.source_position)
@@ -194,8 +195,7 @@ static bool match(expression_t *expression, expression_t *pattern)
 	}
 
 	default:
-		/* TODO */
-		return false;
+		panic("grep for expression kind not implemented");
 	}
 }
 
