@@ -62,8 +62,7 @@ typedef enum precedence_t {
  * Expression kinds.
  */
 typedef enum expression_kind_t {
-	EXPR_INVALID = 0,
-	EXPR_ERROR,
+	EXPR_ERROR = 1,
 	EXPR_REFERENCE,
 	EXPR_REFERENCE_ENUM_VALUE,
 	EXPR_LITERAL_BOOLEAN,
@@ -482,7 +481,7 @@ union initializer_t {
  * The statement kinds.
  */
 typedef enum statement_kind_t {
-	STATEMENT_INVALID,
+	STATEMENT_ERROR = 1,
 	STATEMENT_EMPTY,
 	STATEMENT_COMPOUND,
 	STATEMENT_RETURN,
@@ -515,14 +514,6 @@ struct statement_base_t {
 #ifndef NDEBUG
 	bool               transformed;
 #endif
-};
-
-struct invalid_statement_t {
-	statement_base_t  base;
-};
-
-struct empty_statement_t {
-	statement_base_t  base;
 };
 
 struct return_statement_t {
@@ -669,16 +660,6 @@ struct translation_unit_t {
 	scope_t      scope;
 	statement_t *global_asm;
 };
-
-static inline bool is_invalid_expression(expression_t *expression)
-{
-	return expression->base.kind == EXPR_INVALID;
-}
-
-static inline bool is_invalid_statement(statement_t *statement)
-{
-	return statement->base.kind == STATEMENT_INVALID;
-}
 
 /**
  * Allocate an AST node with given size and

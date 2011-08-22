@@ -93,7 +93,7 @@ static switch_statement_t  *current_switch    = NULL;
 static statement_t         *current_loop      = NULL;
 static statement_t         *current_parent    = NULL;
 static ms_try_statement_t  *current_try       = NULL;
-static linkage_kind_t       current_linkage   = LINKAGE_INVALID;
+static linkage_kind_t       current_linkage;
 static goto_statement_t    *goto_first        = NULL;
 static goto_statement_t   **goto_anchor       = NULL;
 static label_statement_t   *label_first       = NULL;
@@ -282,8 +282,8 @@ static void semantic_comparison(binary_expression_t *expression);
 static size_t get_statement_struct_size(statement_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[STATEMENT_INVALID]     = sizeof(invalid_statement_t),
-		[STATEMENT_EMPTY]       = sizeof(empty_statement_t),
+		[STATEMENT_ERROR]       = sizeof(statement_base_t),
+		[STATEMENT_EMPTY]       = sizeof(statement_base_t),
 		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
 		[STATEMENT_RETURN]      = sizeof(return_statement_t),
 		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
@@ -315,7 +315,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 static size_t get_expression_struct_size(expression_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[EXPR_INVALID]                    = sizeof(expression_base_t),
 		[EXPR_ERROR]                      = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
 		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
@@ -407,9 +406,9 @@ static expression_t *create_error_expression(void)
 /**
  * Creates a new invalid statement.
  */
-static statement_t *create_invalid_statement(void)
+static statement_t *create_error_statement(void)
 {
-	return allocate_statement_zero(STATEMENT_INVALID);
+	return allocate_statement_zero(STATEMENT_ERROR);
 }
 
 /**
@@ -712,7 +711,6 @@ static void scope_pop(scope_t *old_scope)
 static entity_t *get_entity(const symbol_t *const symbol,
                             namespace_tag_t namespc)
 {
-	assert(namespc != NAMESPACE_INVALID);
 	entity_t *entity = symbol->entity;
 	for (; entity != NULL; entity = entity->base.symbol_next) {
 		if ((namespace_tag_t)entity->base.namespc == namespc)
@@ -745,7 +743,7 @@ static void stack_push(stack_entry_t **stack_ptr, entity_t *entity)
 {
 	symbol_t           *symbol  = entity->base.symbol;
 	entity_namespace_t  namespc = entity->base.namespc;
-	assert(namespc != NAMESPACE_INVALID);
+	assert(namespc != 0);
 
 	/* replace/add entity into entity list of the symbol */
 	entity_t **anchor;
@@ -859,22 +857,11 @@ static void label_pop_to(size_t new_top)
 	stack_pop_to(&label_stack, new_top);
 }
 
-static int get_akind_rank(atomic_type_kind_t akind)
+static atomic_type_kind_t get_akind(const type_t *type)
 {
-	return (int) akind;
-}
-
-/**
- * Return the type rank for an atomic type.
- */
-static int get_rank(const type_t *type)
-{
-	assert(!is_typeref(type));
-	if (type->kind == TYPE_ENUM)
-		return get_akind_rank(type->enumt.akind);
-
-	assert(type->kind == TYPE_ATOMIC);
-	return get_akind_rank(type->atomic.akind);
+	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX
+	       || type->kind == TYPE_IMAGINARY || type->kind == TYPE_ENUM);
+	return type->atomic.akind;
 }
 
 /**
@@ -885,7 +872,7 @@ static int get_rank(const type_t *type)
  */
 static type_t *promote_integer(type_t *type)
 {
-	if (get_rank(type) < get_akind_rank(ATOMIC_TYPE_INT))
+	if (get_akind_rank(get_akind(type)) < get_akind_rank(ATOMIC_TYPE_INT))
 		type = type_int;
 
 	return type;
@@ -1366,19 +1353,17 @@ static entity_t *determine_lhs_ent(expression_t *const expr,
 				ent     = determine_lhs_ent(ref, lhs_ent);
 				lhs_ent = ent;
 			} else {
-				mark_vars_read(expr->select.compound, lhs_ent);
+				mark_vars_read(ref, lhs_ent);
 			}
 			mark_vars_read(expr->array_access.index, lhs_ent);
 			return ent;
 		}
 
 		case EXPR_SELECT: {
-			if (is_type_compound(skip_typeref(expr->base.type))) {
+			mark_vars_read(expr->select.compound, lhs_ent);
+			if (is_type_compound(skip_typeref(expr->base.type)))
 				return determine_lhs_ent(expr->select.compound, lhs_ent);
-			} else {
-				mark_vars_read(expr->select.compound, lhs_ent);
-				return NULL;
-			}
+			return NULL;
 		}
 
 		case EXPR_UNARY_DEREFERENCE: {
@@ -1455,10 +1440,13 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 			return;
 
 		case EXPR_ARRAY_ACCESS: {
-			expression_t *const ref = expr->array_access.array_ref;
-			mark_vars_read(ref, lhs_ent);
-			lhs_ent = determine_lhs_ent(ref, lhs_ent);
 			mark_vars_read(expr->array_access.index, lhs_ent);
+			expression_t *const ref = expr->array_access.array_ref;
+			if (!is_type_array(skip_typeref(revert_automatic_type_conversion(ref)))) {
+				if (lhs_ent == ENT_ANY)
+					lhs_ent = NULL;
+			}
+			mark_vars_read(ref, lhs_ent);
 			return;
 		}
 
@@ -1554,7 +1542,6 @@ unary:
 			return;
 
 		EXPR_LITERAL_CASES
-		case EXPR_INVALID:
 		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
@@ -2524,9 +2511,9 @@ static type_t *parse_enum_specifier(void)
 		entity->base.parent_scope    = current_scope;
 	}
 
-	type_t *const type = allocate_type_zero(TYPE_ENUM);
-	type->enumt.enume  = &entity->enume;
-	type->enumt.akind  = ATOMIC_TYPE_INT;
+	type_t *const type     = allocate_type_zero(TYPE_ENUM);
+	type->enumt.enume      = &entity->enume;
+	type->enumt.base.akind = ATOMIC_TYPE_INT;
 
 	if (token.kind == '{') {
 		if (symbol != NULL) {
@@ -3152,15 +3139,13 @@ warn_about_long_long:
 		}
 
 		if (type_specifiers & SPECIFIER_COMPLEX) {
-			type                = allocate_type_zero(TYPE_COMPLEX);
-			type->complex.akind = atomic_type;
+			type = allocate_type_zero(TYPE_COMPLEX);
 		} else if (type_specifiers & SPECIFIER_IMAGINARY) {
-			type                  = allocate_type_zero(TYPE_IMAGINARY);
-			type->imaginary.akind = atomic_type;
+			type = allocate_type_zero(TYPE_IMAGINARY);
 		} else {
-			type                 = allocate_type_zero(TYPE_ATOMIC);
-			type->atomic.akind   = atomic_type;
+			type = allocate_type_zero(TYPE_ATOMIC);
 		}
+		type->atomic.akind = atomic_type;
 		newtype = true;
 	} else if (type_specifiers != 0) {
 		errorf(&specifiers->source_position, "multiple datatypes in declaration");
@@ -3343,8 +3328,7 @@ end_error:
 }
 
 typedef enum construct_type_kind_t {
-	CONSTRUCT_INVALID,
-	CONSTRUCT_POINTER,
+	CONSTRUCT_POINTER = 1,
 	CONSTRUCT_REFERENCE,
 	CONSTRUCT_FUNCTION,
 	CONSTRUCT_ARRAY
@@ -3641,8 +3625,6 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 	for (; iter != NULL; iter = iter->base.next) {
 		source_position_t const* const pos = &iter->base.pos;
 		switch (iter->kind) {
-		case CONSTRUCT_INVALID:
-			break;
 		case CONSTRUCT_FUNCTION: {
 			construct_function_type_t *function      = &iter->function;
 			type_t                    *function_type = function->function_type;
@@ -4785,7 +4767,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_BUILTIN_CONSTANT_P:
 		case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 		case EXPR_OFFSETOF:
-		case EXPR_INVALID:
 		case EXPR_ERROR:
 			return true;
 
@@ -4880,7 +4861,7 @@ static void check_reachable(statement_t *const stmt)
 	statement_t *last = stmt;
 	statement_t *next;
 	switch (stmt->kind) {
-		case STATEMENT_INVALID:
+		case STATEMENT_ERROR:
 		case STATEMENT_EMPTY:
 		case STATEMENT_ASM:
 			next = stmt->base.next;
@@ -5152,7 +5133,7 @@ found_break_parent:
 		}
 
 		switch (next->kind) {
-			case STATEMENT_INVALID:
+			case STATEMENT_ERROR:
 			case STATEMENT_EMPTY:
 			case STATEMENT_DECLARATION:
 			case STATEMENT_EXPRESSION:
@@ -7739,6 +7720,13 @@ static void semantic_incdec(unary_expression_t *expression)
 	expression->base.type = orig_type;
 }
 
+static void promote_unary_int_expr(unary_expression_t *const expr, type_t *const type)
+{
+	type_t *const res_type = promote_integer(type);
+	expr->base.type = res_type;
+	expr->value     = create_implicit_cast(expr->value, res_type);
+}
+
 static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
@@ -7750,9 +7738,11 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 				"operation needs an arithmetic type");
 		}
 		return;
+	} else if (is_type_integer(type)) {
+		promote_unary_int_expr(expression, type);
+	} else {
+		expression->base.type = orig_type;
 	}
-
-	expression->base.type = orig_type;
 }
 
 static void semantic_unexpr_plus(unary_expression_t *expression)
@@ -7781,7 +7771,7 @@ static void semantic_unexpr_integer(unary_expression_t *expression)
 		return;
 	}
 
-	expression->base.type = orig_type;
+	promote_unary_int_expr(expression, type);
 }
 
 static void semantic_dereference(unary_expression_t *expression)
@@ -7931,45 +7921,44 @@ static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
 	if (type_left == type_right)
 		return type_left;
 
-	bool const signed_left  = is_type_signed(type_left);
-	bool const signed_right = is_type_signed(type_right);
-	int const  rank_left    = get_rank(type_left);
-	int const  rank_right   = get_rank(type_right);
+	bool     const signed_left  = is_type_signed(type_left);
+	bool     const signed_right = is_type_signed(type_right);
+	unsigned const rank_left    = get_akind_rank(get_akind(type_left));
+	unsigned const rank_right   = get_akind_rank(get_akind(type_right));
 
 	if (signed_left == signed_right)
 		return rank_left >= rank_right ? type_left : type_right;
 
-	int     s_rank;
-	int     u_rank;
+	unsigned           s_rank;
+	unsigned           u_rank;
+	atomic_type_kind_t s_akind;
+	atomic_type_kind_t u_akind;
 	type_t *s_type;
 	type_t *u_type;
 	if (signed_left) {
-		s_rank = rank_left;
 		s_type = type_left;
-		u_rank = rank_right;
 		u_type = type_right;
 	} else {
-		s_rank = rank_right;
 		s_type = type_right;
-		u_rank = rank_left;
 		u_type = type_left;
 	}
+	s_akind = get_akind(s_type);
+	u_akind = get_akind(u_type);
+	s_rank  = get_akind_rank(s_akind);
+	u_rank  = get_akind_rank(u_akind);
 
 	if (u_rank >= s_rank)
 		return u_type;
 
-	/* casting rank to atomic_type_kind is a bit hacky, but makes things
-	 * easier here... */
-	if (get_atomic_type_size((atomic_type_kind_t) s_rank)
-			> get_atomic_type_size((atomic_type_kind_t) u_rank))
+	if (get_atomic_type_size(s_akind) > get_atomic_type_size(u_akind))
 		return s_type;
 
-	switch (s_rank) {
-		case ATOMIC_TYPE_INT:      return type_unsigned_int;
-		case ATOMIC_TYPE_LONG:     return type_unsigned_long;
-		case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
+	switch (s_akind) {
+	case ATOMIC_TYPE_INT:      return type_unsigned_int;
+	case ATOMIC_TYPE_LONG:     return type_unsigned_long;
+	case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
 
-		default: panic("invalid atomic type");
+	default: panic("invalid atomic type");
 	}
 }
 
@@ -8531,8 +8520,7 @@ static void semantic_binexpr_assign(binary_expression_t *expression)
 static bool expression_has_effect(const expression_t *const expr)
 {
 	switch (expr->kind) {
-		case EXPR_ERROR:
-		case EXPR_INVALID:                    return true; /* do NOT warn */
+		case EXPR_ERROR:                      return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
 		case EXPR_REFERENCE_ENUM_VALUE:       return false;
 		case EXPR_LABEL_ADDRESS:              return false;
@@ -9042,7 +9030,7 @@ end_of_asm:
 
 	return statement;
 end_error:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_label_inner_statement(statement_t const *const label, char const *const label_kind)
@@ -9051,7 +9039,7 @@ static statement_t *parse_label_inner_statement(statement_t const *const label, 
 	switch (token.kind) {
 		case '}':
 			errorf(&label->base.source_position, "%s at end of compound statement", label_kind);
-			inner_stmt = create_invalid_statement();
+			inner_stmt = create_error_statement();
 			break;
 
 		case ';':
@@ -9365,7 +9353,7 @@ static statement_t *parse_switch(void)
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
-		if (get_rank(type) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
+		if (get_akind_rank(get_akind(type)) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
 			warningf(WARN_TRADITIONAL, &expr->base.source_position, "'%T' switch expression not converted to '%T' in ISO C", type, type_int);
 		}
 	} else if (is_type_valid(type)) {
@@ -9391,7 +9379,7 @@ static statement_t *parse_switch(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
@@ -9433,7 +9421,7 @@ static statement_t *parse_while(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9468,7 +9456,7 @@ static statement_t *parse_do(void)
 	return statement;
 end_error:
 	POP_PARENT();
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9539,7 +9527,7 @@ end_error2:
 	/* fallthrough */
 
 end_error1:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 /**
@@ -9579,7 +9567,7 @@ static statement_t *parse_goto(void)
 		else
 			parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 		eat_until_anchor();
-		return create_invalid_statement();
+		return create_error_statement();
 	}
 
 	/* remember the goto's in a list for later checking */
@@ -9847,11 +9835,11 @@ static statement_t *parse_ms_try_statment(void)
 		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
 		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
-		return create_invalid_statement();
+		return create_error_statement();
 	}
 	return statement;
 end_error:
-	return create_invalid_statement();
+	return create_error_statement();
 }
 
 static statement_t *parse_empty_statement(void)
@@ -10034,7 +10022,7 @@ static statement_t *intern_parse_statement(void)
 
 	default:
 		errorf(HERE, "unexpected token %K while parsing statement", &token);
-		statement = create_invalid_statement();
+		statement = create_error_statement();
 		if (!at_anchor())
 			next_token();
 		break;
@@ -10177,7 +10165,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 			break;
 		}
 		statement_t *sub_statement = intern_parse_statement();
-		if (is_invalid_statement(sub_statement)) {
+		if (sub_statement->kind == STATEMENT_ERROR) {
 			/* an error occurred. if we are at an anchor, return */
 			if (at_anchor())
 				goto end_error;
@@ -10382,7 +10370,7 @@ static void parse_linkage_specification(void)
 		new_linkage = LINKAGE_CXX;
 	} else {
 		errorf(&pos, "linkage string \"%s\" not recognized", linkage);
-		new_linkage = LINKAGE_INVALID;
+		new_linkage = LINKAGE_C;
 	}
 	current_linkage = new_linkage;
 

@@ -34,6 +34,7 @@ typedef unsigned char il_alignment_t;
 typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
+	ATOMIC_TYPE_BOOL,
 	ATOMIC_TYPE_WCHAR_T,
 	ATOMIC_TYPE_CHAR,
 	ATOMIC_TYPE_SCHAR,
@@ -49,9 +50,8 @@ typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_FLOAT,
 	ATOMIC_TYPE_DOUBLE,
 	ATOMIC_TYPE_LONG_DOUBLE,
-	ATOMIC_TYPE_BOOL,
 
-	ATOMIC_TYPE_LAST = ATOMIC_TYPE_BOOL
+	ATOMIC_TYPE_LAST = ATOMIC_TYPE_LONG_DOUBLE
 } atomic_type_kind_t;
 
 typedef enum atomic_type_flag_t {
@@ -152,12 +152,6 @@ bool is_type_float(const type_t *type);
 bool is_type_complex(const type_t *type);
 
 bool is_type_real(const type_t *type);
-
-/**
- * returns true if the type is valid. A type is valid if it contains no
- * unresolved references anymore and is not of TYPE_INVALID.
- */
-bool type_valid(const type_t *type);
 
 /**
  * returns true if the type is an arithmetic type (§6.2.5 clause 18)

@@ -38,7 +38,7 @@ static void mangle_type(type_t *type);
 static char get_atomic_type_mangle(atomic_type_kind_t kind)
 {
 	switch (kind) {
-	case ATOMIC_TYPE_INVALID: break;
+	case ATOMIC_TYPE_INVALID:     break;
 	case ATOMIC_TYPE_VOID:        return 'v';
 	case ATOMIC_TYPE_WCHAR_T:     return 'w';
 	case ATOMIC_TYPE_BOOL:        return 'b';
@@ -150,13 +150,13 @@ static void mangle_array_type(const array_type_t *type)
 	mangle_type(type->element_type);
 }
 
-static void mangle_complex_type(const complex_type_t *type)
+static void mangle_complex_type(const atomic_type_t *type)
 {
 	obstack_1grow(&obst, 'C');
 	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
 }
 
-static void mangle_imaginary_type(const imaginary_type_t *type)
+static void mangle_imaginary_type(const atomic_type_t *type)
 {
 	obstack_1grow(&obst, 'G');
 	obstack_1grow(&obst, get_atomic_type_mangle(type->akind));
@@ -206,13 +206,11 @@ static void mangle_type(type_t *orig_type)
 		mangle_array_type(&type->array);
 		return;
 	case TYPE_COMPLEX:
-		mangle_complex_type(&type->complex);
+		mangle_complex_type(&type->atomic);
 		return;
 	case TYPE_IMAGINARY:
-		mangle_imaginary_type(&type->imaginary);
+		mangle_imaginary_type(&type->atomic);
 		return;
-	case TYPE_INVALID:
-		panic("invalid type encountered while mangling");
 	case TYPE_ERROR:
 		panic("error type encountered while mangling");
 	case TYPE_TYPEDEF:
@@ -293,9 +291,6 @@ ident *create_name_win32(entity_t *entity)
 		}
 
 		switch (type->function.linkage) {
-		case LINKAGE_INVALID:
-			panic("linkage type of function is invalid");
-
 		case LINKAGE_C:
 			obstack_printf(o, "%s", entity->base.symbol->string);
 			break;
@@ -346,8 +341,6 @@ ident *create_name_linux_elf(entity_t *entity)
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
 		switch (type->function.linkage) {
-			case LINKAGE_INVALID:
-				panic("linkage type of function is invalid");
 			case LINKAGE_C:
 				if (entity->function.actual_name != NULL)
 					name = entity->function.actual_name->string;
@@ -375,9 +368,6 @@ ident *create_name_macho(entity_t *entity)
 		assert(is_type_function(type));
 
 		switch (type->function.linkage) {
-			case LINKAGE_INVALID:
-				panic("linkage type of function is invalid");
-
 			default:
 				if (entity->function.actual_name != NULL)
 					return new_id_from_str(entity->function.actual_name->string);

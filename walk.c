@@ -82,8 +82,6 @@ static void walk_type(type_t *const type, const walk_env_t *const env)
 	case TYPE_ENUM:
 		walk_entity((entity_t*)type->enumt.enume, env);
 		return;
-	case TYPE_INVALID:
-		break;
 	}
 	panic("invalid type found");
 }
@@ -187,8 +185,6 @@ static void walk_expression(expression_t *const expr,
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_ERROR:
 		return;
-	case EXPR_INVALID:
-		break;
 	}
 	panic("invalid expr kind");
 }
@@ -272,8 +268,6 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 	case ENTITY_LABEL:
 	case ENTITY_LOCAL_LABEL:
 		return;
-	case ENTITY_INVALID:
-		break;
 	}
 	panic("invalid entity found");
 }
@@ -365,7 +359,7 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		walk_statement(stmt->ms_try.final_statement, env);
 		return;
 
-	case STATEMENT_INVALID:
+	case STATEMENT_ERROR:
 	case STATEMENT_EMPTY:
 	case STATEMENT_CONTINUE:
 	case STATEMENT_BREAK:

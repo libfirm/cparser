@@ -305,7 +305,7 @@ static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
 /**
  * Creates a Firm type for a complex type
  */
-static ir_type *create_complex_type(const complex_type_t *type)
+static ir_type *create_complex_type(const atomic_type_t *type)
 {
 	atomic_type_kind_t  kind = type->akind;
 	ir_mode            *mode = atomic_modes[kind];
@@ -320,9 +320,9 @@ static ir_type *create_complex_type(const complex_type_t *type)
 /**
  * Creates a Firm type for an imaginary type
  */
-static ir_type *create_imaginary_type(imaginary_type_t *type)
+static ir_type *create_imaginary_type(const atomic_type_t *type)
 {
-	return create_atomic_type(type->akind, (const type_t*) type);
+	return create_atomic_type(type->akind, (const type_t*)type);
 }
 
 /**
@@ -639,7 +639,7 @@ static ir_type *create_compound_type(compound_type_t *type,
 
 static ir_type *create_enum_type(enum_type_t *const type)
 {
-	type->base.firm_type = ir_type_int;
+	type->base.base.firm_type = ir_type_int;
 
 	ir_mode   *const mode    = mode_int;
 	ir_tarval *const one     = get_mode_one(mode);
@@ -668,7 +668,7 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 	constant_folding = constant_folding_old;
 
-	return create_atomic_type(type->akind, (const type_t*) type);
+	return create_atomic_type(type->base.akind, (const type_t*) type);
 }
 
 static ir_type *get_ir_type_incomplete(type_t *type)
@@ -712,10 +712,10 @@ ir_type *get_ir_type(type_t *type)
 		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
 	case TYPE_COMPLEX:
-		firm_type = create_complex_type(&type->complex);
+		firm_type = create_complex_type(&type->atomic);
 		break;
 	case TYPE_IMAGINARY:
-		firm_type = create_imaginary_type(&type->imaginary);
+		firm_type = create_imaginary_type(&type->atomic);
 		break;
 	case TYPE_FUNCTION:
 		firm_type = create_method_type(&type->function, false);
@@ -741,7 +741,6 @@ ir_type *get_ir_type(type_t *type)
 
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
-	case TYPE_INVALID:
 		break;
 	}
 	if (firm_type == NULL)
@@ -3331,7 +3330,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			/* typedef/typeof should be skipped already */
 			case TYPE_TYPEDEF:
 			case TYPE_TYPEOF:
-			case TYPE_INVALID:
 			case TYPE_ERROR:
 				break;
 		}
@@ -3597,8 +3595,6 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 
 	case EXPR_ERROR:
 		return error_to_firm(expression);
-	case EXPR_INVALID:
-		break;
 	}
 	panic("invalid expression found");
 }
@@ -5498,8 +5494,8 @@ static void statement_to_firm(statement_t *statement)
 #endif
 
 	switch (statement->kind) {
-	case STATEMENT_INVALID:
-		panic("invalid statement found");
+	case STATEMENT_ERROR:
+		panic("error statement found");
 	case STATEMENT_EMPTY:
 		/* nothing */
 		return;

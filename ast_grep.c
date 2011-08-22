@@ -115,11 +115,9 @@ static bool match_type(type_t *type, type_t *pattern)
 
 	switch (type->kind) {
 	case TYPE_ATOMIC:
-		return type->atomic.akind == pattern->atomic.akind;
 	case TYPE_COMPLEX:
-		return type->complex.akind == pattern->complex.akind;
 	case TYPE_IMAGINARY:
-		return type->imaginary.akind == pattern->imaginary.akind;
+		return type->atomic.akind == pattern->atomic.akind;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 		return type->compound.compound == pattern->compound.compound;

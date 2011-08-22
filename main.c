@@ -871,12 +871,46 @@ static unsigned decide_modulo_shift(unsigned type_size)
 	return type_size;
 }
 
-static void setup_target_machine(void)
+static bool is_ia32_cpu(const char *architecture)
+{
+	return streq(architecture, "i386")
+	    || streq(architecture, "i486")
+	    || streq(architecture, "i586")
+	    || streq(architecture, "i686")
+	    || streq(architecture, "i786");
+}
+
+static const char *setup_isa_from_tripel(const machine_triple_t *machine)
+{
+	const char *cpu = machine->cpu_type;
+
+	if (is_ia32_cpu(cpu)) {
+		return "ia32";
+	} else if (streq(cpu, "x86_64")) {
+		return "amd64";
+	} else if (streq(cpu, "sparc")) {
+		return "sparc";
+	} else if (streq(cpu, "arm")) {
+		return "arm";
+	} else {
+		fprintf(stderr, "Unknown cpu '%s' in target-triple\n", cpu);
+		return NULL;
+	}
+}
+
+static const char *setup_target_machine(void)
 {
 	if (!setup_firm_for_machine(target_machine))
 		exit(1);
 
+	const char *isa = setup_isa_from_tripel(target_machine);
+
+	if (isa == NULL)
+		exit(1);
+
 	init_os_support();
+
+	return isa;
 }
 
 /**
@@ -889,13 +923,16 @@ static void set_typeprops_type(atomic_type_properties_t* props, ir_type *type)
 	props->struct_alignment = props->alignment;
 }
 
-static bool is_ia32_cpu(const char *architecture)
+/**
+ * Copy atomic type properties except the integer conversion rank
+ */
+static void copy_typeprops(atomic_type_properties_t *dest,
+                           const atomic_type_properties_t *src)
 {
-	return streq(architecture, "i386")
-	    || streq(architecture, "i486")
-	    || streq(architecture, "i586")
-	    || streq(architecture, "i686")
-	    || streq(architecture, "i786");
+	dest->size             = src->size;
+	dest->alignment        = src->alignment;
+	dest->struct_alignment = src->struct_alignment;
+	dest->flags            = src->flags;
 }
 
 static void init_types_and_adjust(void)
@@ -949,22 +986,25 @@ static void init_types_and_adjust(void)
 
 	/* stuff decided after processing operating system specifics and
 	 * commandline flags */
-	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 	if (char_is_signed) {
 		props[ATOMIC_TYPE_CHAR].flags |= ATOMIC_TYPE_FLAG_SIGNED;
 	} else {
 		props[ATOMIC_TYPE_CHAR].flags &= ~ATOMIC_TYPE_FLAG_SIGNED;
 	}
+	/* copy over wchar_t properties (including rank) */
+	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
 	if (type_long_long == NULL) {
-		props[ATOMIC_TYPE_LONGLONG] = props[ATOMIC_TYPE_LONG];
-	}
-	if (type_long_double == NULL) {
-		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
+		copy_typeprops(&props[ATOMIC_TYPE_LONGLONG], &props[ATOMIC_TYPE_LONG]);
 	}
 	if (type_unsigned_long_long == NULL) {
-		props[ATOMIC_TYPE_ULONGLONG] = props[ATOMIC_TYPE_ULONG];
+		copy_typeprops(&props[ATOMIC_TYPE_ULONGLONG],
+		               &props[ATOMIC_TYPE_ULONG]);
+	}
+	if (type_long_double == NULL) {
+		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
+		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
 
 	/* initialize firm pointer modes */
@@ -1331,7 +1371,8 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_target_machine();
+						const char *isa = setup_target_machine();
+						strncpy(cpu_arch, isa, sizeof(cpu_arch));
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "triple=")) {
@@ -1339,7 +1380,8 @@ int main(int argc, char **argv)
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
-						setup_target_machine();
+						const char *isa = setup_target_machine();
+						strncpy(cpu_arch, isa, sizeof(cpu_arch));
 						target_triple = opt;
 					}
 				} else if (strstart(opt, "arch=")) {

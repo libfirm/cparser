@@ -28,8 +28,7 @@
 #include "builtins.h"
 
 typedef enum {
-	ENTITY_INVALID,
-	ENTITY_VARIABLE,
+	ENTITY_VARIABLE = 1,
 	ENTITY_COMPOUND_MEMBER,
 	ENTITY_PARAMETER,
 	ENTITY_FUNCTION,
@@ -46,8 +45,7 @@ typedef enum {
 typedef unsigned char entity_kind_t;
 
 typedef enum namespace_tag_t {
-	NAMESPACE_INVALID,
-	NAMESPACE_NORMAL,
+	NAMESPACE_NORMAL = 1,
 	NAMESPACE_TAG,
 	NAMESPACE_LABEL
 } namespace_tag_t;

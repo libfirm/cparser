@@ -171,13 +171,9 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 		return orig_type;
 	}
 
-	if (type->kind == TYPE_ATOMIC) {
+	if (type->kind == TYPE_ATOMIC || type->kind == TYPE_ENUM) {
 		type_t *copy       = duplicate_type(type);
 		copy->atomic.akind = akind;
-		return identify_new_type(copy);
-	} else if (type->kind == TYPE_ENUM) {
-		type_t *copy      = duplicate_type(type);
-		copy->enumt.akind = akind;
 		return identify_new_type(copy);
 	} else if (is_type_pointer(type)) {
 		source_position_t const *const pos = &attribute->source_position;

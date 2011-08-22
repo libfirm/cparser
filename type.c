@@ -52,8 +52,6 @@ static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
-		[TYPE_COMPLEX]         = sizeof(complex_type_t),
-		[TYPE_IMAGINARY]       = sizeof(imaginary_type_t),
 		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
 		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
 		[TYPE_ENUM]            = sizeof(enum_type_t),
@@ -87,78 +85,92 @@ atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	[ATOMIC_TYPE_VOID] = {
 		.size      = 0,
 		.alignment = 0,
-		.flags     = ATOMIC_TYPE_FLAG_NONE
+		.flags     = ATOMIC_TYPE_FLAG_NONE,
+		.rank      = 0,
 	},
-	[ATOMIC_TYPE_WCHAR_T] = {
-		.size      = (unsigned)-1,
-		.alignment = (unsigned)-1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+	[ATOMIC_TYPE_BOOL] = {
+		.size       = 1,
+		.alignment  = 1,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 1,
 	},
 	[ATOMIC_TYPE_CHAR] = {
 		.size      = 1,
 		.alignment = 1,
 		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank      = 2,
 	},
 	[ATOMIC_TYPE_SCHAR] = {
 		.size      = 1,
 		.alignment = 1,
 		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
 		           | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank      = 2,
 	},
 	[ATOMIC_TYPE_UCHAR] = {
 		.size      = 1,
 		.alignment = 1,
 		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank      = 2,
 	},
 	[ATOMIC_TYPE_SHORT] = {
 		.size       = 2,
 		.alignment  = 2,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 3,
 	},
 	[ATOMIC_TYPE_USHORT] = {
 		.size       = 2,
 		.alignment  = 2,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 3,
 	},
 	[ATOMIC_TYPE_INT] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 4,
 	},
 	[ATOMIC_TYPE_UINT] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 4,
 	},
 	[ATOMIC_TYPE_LONG] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 5,
 	},
 	[ATOMIC_TYPE_ULONG] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
-	},
-	[ATOMIC_TYPE_BOOL] = {
-		.size       = 1,
-		.alignment  = 1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 5,
 	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
 		.alignment  = 4,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 0,
 	},
 	[ATOMIC_TYPE_DOUBLE] = {
 		.size       = 8,
 		.alignment  = 8,
 		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
 		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 0,
+	},
+	[ATOMIC_TYPE_WCHAR_T] = {
+		.size      = (unsigned)-1,
+		.alignment = (unsigned)-1,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank      = (unsigned)-1,
 	},
 };
 atomic_type_properties_t pointer_properties = {
@@ -285,7 +297,7 @@ static void print_atomic_type(const atomic_type_t *type)
  *
  * @param type  The type.
  */
-static void print_complex_type(const complex_type_t *type)
+static void print_complex_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string("_Complex");
@@ -297,7 +309,7 @@ static void print_complex_type(const complex_type_t *type)
  *
  * @param type  The type.
  */
-static void print_imaginary_type(const imaginary_type_t *type)
+static void print_imaginary_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 	print_string("_Imaginary ");
@@ -312,9 +324,6 @@ static void print_imaginary_type(const imaginary_type_t *type)
 static void print_function_type_pre(const function_type_t *type)
 {
 	switch (type->linkage) {
-		case LINKAGE_INVALID:
-			break;
-
 		case LINKAGE_C:
 			if (c_mode & _CXX)
 				print_string("extern \"C\" ");
@@ -532,7 +541,7 @@ void print_enum_definition(const enum_t *enume)
  */
 static void print_type_enum(const enum_type_t *type)
 {
-	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
+	print_type_qualifiers(type->base.base.qualifiers, QUAL_SEP_END);
 	print_string("enum ");
 
 	enum_t   *enume  = type->enume;
@@ -633,9 +642,6 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_ERROR:
 		print_string("<error>");
 		return;
-	case TYPE_INVALID:
-		print_string("<invalid>");
-		return;
 	case TYPE_ENUM:
 		print_type_enum(&type->enumt);
 		return;
@@ -643,10 +649,10 @@ static void intern_print_type_pre(const type_t *const type)
 		print_atomic_type(&type->atomic);
 		return;
 	case TYPE_COMPLEX:
-		print_complex_type(&type->complex);
+		print_complex_type(&type->atomic);
 		return;
 	case TYPE_IMAGINARY:
-		print_imaginary_type(&type->imaginary);
+		print_imaginary_type(&type->atomic);
 		return;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
@@ -695,7 +701,6 @@ static void intern_print_type_post(const type_t *const type)
 		print_array_type_post(&type->array);
 		return;
 	case TYPE_ERROR:
-	case TYPE_INVALID:
 	case TYPE_ATOMIC:
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
@@ -797,17 +802,6 @@ type_t *get_qualified_type(type_t *orig_type, type_qualifiers_t const qual)
 	}
 
 	return identify_new_type(copy);
-}
-
-/**
- * Check if a type is valid.
- *
- * @param type  The type to check.
- * @return true if type represents a valid type.
- */
-bool type_valid(const type_t *type)
-{
-	return type->kind != TYPE_INVALID;
 }
 
 static bool test_atomic_type_flag(atomic_type_kind_t kind,
@@ -912,11 +906,9 @@ bool is_type_arithmetic(const type_t *type)
 	case TYPE_ENUM:
 		return true;
 	case TYPE_ATOMIC:
-		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
 	case TYPE_COMPLEX:
-		return test_atomic_type_flag(type->complex.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
 	case TYPE_IMAGINARY:
-		return test_atomic_type_flag(type->imaginary.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
 	default:
 		return false;
 	}
@@ -974,13 +966,9 @@ bool is_type_incomplete(const type_t *type)
 			&& !type->array.size_constant;
 
 	case TYPE_ATOMIC:
-		return type->atomic.akind == ATOMIC_TYPE_VOID;
-
-	case TYPE_COMPLEX:
-		return type->complex.akind == ATOMIC_TYPE_VOID;
-
 	case TYPE_IMAGINARY:
-		return type->imaginary.akind == ATOMIC_TYPE_VOID;
+	case TYPE_COMPLEX:
+		return type->atomic.akind == ATOMIC_TYPE_VOID;
 
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
@@ -991,8 +979,6 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("is_type_incomplete called without typerefs skipped");
-	case TYPE_INVALID:
-		break;
 	}
 
 	panic("invalid type found");
@@ -1099,11 +1085,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_FUNCTION:
 		return function_types_compatible(&type1->function, &type2->function);
 	case TYPE_ATOMIC:
-		return type1->atomic.akind == type2->atomic.akind;
-	case TYPE_COMPLEX:
-		return type1->complex.akind == type2->complex.akind;
 	case TYPE_IMAGINARY:
-		return type1->imaginary.akind == type2->imaginary.akind;
+	case TYPE_COMPLEX:
+		return type1->atomic.akind == type2->atomic.akind;
 	case TYPE_ARRAY:
 		return array_types_compatible(&type1->array, &type2->array);
 
@@ -1130,8 +1114,6 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	case TYPE_ERROR:
 		/* Hmm, the error type should be compatible to all other types */
 		return true;
-	case TYPE_INVALID:
-		panic("invalid type found in compatible types");
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("typerefs not skipped in compatible types?!?");
@@ -1195,24 +1177,20 @@ type_t *skip_typeref(type_t *type)
 unsigned get_type_size(type_t *type)
 {
 	switch (type->kind) {
-	case TYPE_INVALID:
-		break;
 	case TYPE_ERROR:
 		return 0;
 	case TYPE_ATOMIC:
+	case TYPE_IMAGINARY:
+	case TYPE_ENUM:
 		return get_atomic_type_size(type->atomic.akind);
 	case TYPE_COMPLEX:
-		return get_atomic_type_size(type->complex.akind) * 2;
-	case TYPE_IMAGINARY:
-		return get_atomic_type_size(type->imaginary.akind);
+		return get_atomic_type_size(type->atomic.akind) * 2;
 	case TYPE_COMPOUND_UNION:
 		layout_union_type(&type->compound);
 		return type->compound.compound->size;
 	case TYPE_COMPOUND_STRUCT:
 		layout_struct_type(&type->compound);
 		return type->compound.compound->size;
-	case TYPE_ENUM:
-		return get_atomic_type_size(type->enumt.akind);
 	case TYPE_FUNCTION:
 		return 0; /* non-const (but "address-const") */
 	case TYPE_REFERENCE:
@@ -1238,24 +1216,19 @@ unsigned get_type_size(type_t *type)
 unsigned get_type_alignment(type_t *type)
 {
 	switch (type->kind) {
-	case TYPE_INVALID:
-		break;
 	case TYPE_ERROR:
 		return 0;
 	case TYPE_ATOMIC:
-		return get_atomic_type_alignment(type->atomic.akind);
-	case TYPE_COMPLEX:
-		return get_atomic_type_alignment(type->complex.akind);
 	case TYPE_IMAGINARY:
-		return get_atomic_type_alignment(type->imaginary.akind);
+	case TYPE_COMPLEX:
+	case TYPE_ENUM:
+		return get_atomic_type_alignment(type->atomic.akind);
 	case TYPE_COMPOUND_UNION:
 		layout_union_type(&type->compound);
 		return type->compound.compound->alignment;
 	case TYPE_COMPOUND_STRUCT:
 		layout_struct_type(&type->compound);
 		return type->compound.compound->alignment;
-	case TYPE_ENUM:
-		return get_atomic_type_alignment(type->enumt.akind);
 	case TYPE_FUNCTION:
 		/* gcc says 1 here... */
 		return 1;
@@ -1292,7 +1265,6 @@ unsigned get_type_alignment_compound(type_t *type)
 decl_modifiers_t get_type_modifiers(const type_t *type)
 {
 	switch(type->kind) {
-	case TYPE_INVALID:
 	case TYPE_ERROR:
 		break;
 	case TYPE_COMPOUND_STRUCT:
@@ -1464,11 +1436,12 @@ type_t *make_atomic_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
  * @param akind       The kind of the atomic type.
  * @param qualifiers  Type qualifiers for the new type.
  */
-type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
+type_t *make_complex_type(atomic_type_kind_t akind,
+                          type_qualifiers_t qualifiers)
 {
 	type_t *const type = allocate_type_zero(TYPE_COMPLEX);
 	type->base.qualifiers = qualifiers;
-	type->complex.akind   = akind;
+	type->atomic.akind   = akind;
 
 	return identify_new_type(type);
 }
@@ -1479,11 +1452,12 @@ type_t *make_complex_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers
  * @param akind       The kind of the atomic type.
  * @param qualifiers  Type qualifiers for the new type.
  */
-type_t *make_imaginary_type(atomic_type_kind_t akind, type_qualifiers_t qualifiers)
+type_t *make_imaginary_type(atomic_type_kind_t akind,
+                            type_qualifiers_t qualifiers)
 {
 	type_t *const type = allocate_type_zero(TYPE_IMAGINARY);
 	type->base.qualifiers = qualifiers;
-	type->imaginary.akind = akind;
+	type->atomic.akind = akind;
 
 	return identify_new_type(type);
 }
