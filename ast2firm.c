@@ -3214,9 +3214,7 @@ static ir_node *va_start_expression_to_firm(
 {
 	ir_entity *param_ent = current_vararg_entity;
 	if (param_ent == NULL) {
-		type_t  *const type        = current_function_entity->declaration.type;
-		ir_type *const method_type = get_ir_type(type);
-		size_t   const n           = get_method_n_params(method_type);
+		size_t   const n           = IR_VA_START_PARAMETER_NUMBER;
 		ir_type *const frame_type  = get_irg_frame_type(current_ir_graph);
 		ir_type *const param_type  = get_unknown_type();
 		param_ent = new_parameter_entity(frame_type, n, param_type);
