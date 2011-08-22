@@ -20,6 +20,7 @@
 #include "firm_timing.h"
 #include "ast2firm.h"
 #include "adt/strutil.h"
+#include "adt/util.h"
 
 /* optimization settings */
 struct a_firm_opt {
@@ -272,10 +273,10 @@ static void rts_map(void)
 		{ &rts_entities[rts_memset],  i_mapper_memset },
 		{ &rts_entities[rts_memcmp],  i_mapper_memcmp }
 	};
-	i_record rec[sizeof(mapper)/sizeof(mapper[0])];
-	unsigned i, n_map;
+	i_record rec[lengthof(mapper)];
+	size_t   n_map = 0;
 
-	for (i = n_map = 0; i < sizeof(mapper)/sizeof(mapper[0]); ++i) {
+	for (size_t i = 0; i != lengthof(mapper); ++i) {
 		if (*mapper[i].ent != NULL) {
 			rec[n_map].i_call.kind     = INTRINSIC_CALL;
 			rec[n_map].i_call.i_ent    = *mapper[i].ent;
@@ -361,6 +362,7 @@ typedef struct {
 	} u;
 	const char   *description;
 	opt_flags_t   flags;
+	ir_timer_t   *timer;
 } opt_config_t;
 
 static opt_config_t opts[] = {
@@ -406,14 +408,12 @@ static opt_config_t opts[] = {
 #undef IRP
 #undef IRG
 };
-static const int n_opts = sizeof(opts) / sizeof(opts[0]);
-static ir_timer_t *timers[sizeof(opts)/sizeof(opts[0])];
+
+#define FOR_EACH_OPT(i) for (opt_config_t *i = opts; i != endof(opts); ++i)
 
 static opt_config_t *get_opt(const char *name)
 {
-	int i;
-	for (i = 0; i < n_opts; ++i) {
-		opt_config_t *config = &opts[i];
+	FOR_EACH_OPT(config) {
 		if (strcmp(config->name, name) == 0)
 			return config;
 	}
@@ -441,20 +441,18 @@ static bool get_opt_enabled(const char *name)
  */
 static bool do_irg_opt(ir_graph *irg, const char *name)
 {
-	ir_graph     *old_irg;
-	opt_config_t *config = get_opt(name);
-	size_t        n      = config - opts;
+	opt_config_t *const config = get_opt(name);
 	assert(config != NULL);
 	assert(config->target == OPT_TARGET_IRG);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return false;
 
-	old_irg          = current_ir_graph;
+	ir_graph *const old_irg = current_ir_graph;
 	current_ir_graph = irg;
 
-	timer_push(timers[n]);
+	timer_push(config->timer);
 	config->u.transform_irg(irg);
-	timer_pop(timers[n]);
+	timer_pop(config->timer);
 
 	if (firm_dump.all_phases && firm_dump.ir_graph) {
 		dump_ir_graph(irg, name);
@@ -472,15 +470,14 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 
 static void do_irp_opt(const char *name)
 {
-	opt_config_t *config = get_opt(name);
-	size_t        n      = config - opts;
+	opt_config_t *const config = get_opt(name);
 	assert(config->target == OPT_TARGET_IRP);
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return;
 
-	timer_push(timers[n]);
+	timer_push(config->timer);
 	config->u.transform_irp();
-	timer_pop(timers[n]);
+	timer_pop(config->timer);
 
 	if (firm_dump.ir_graph && firm_dump.all_phases) {
 		int i;
@@ -737,11 +734,10 @@ static void do_firm_lowering(const char *input_filename)
 void gen_firm_init(void)
 {
 	unsigned pattern = 0;
-	int      i;
 
-	for (i = 0; i < n_opts; ++i) {
-		timers[i] = ir_timer_new();
-		timer_register(timers[i], opts[i].description);
+	FOR_EACH_OPT(i) {
+		i->timer = ir_timer_new();
+		timer_register(i->timer, i->description);
 	}
 	t_verify = ir_timer_new();
 	timer_register(t_verify, "Firm: verify pass");
@@ -870,8 +866,7 @@ static void disable_all_opts(void)
 	firm_opt.strict_alias    = false;
 	firm_opt.no_alias        = false;
 
-	for (int i = 0; i < n_opts; ++i) {
-		opt_config_t *config = &opts[i];
+	FOR_EACH_OPT(config) {
 		if (config->flags & OPT_FLAG_ESSENTIAL) {
 			config->flags |= OPT_FLAG_ENABLED;
 		} else {
@@ -901,11 +896,10 @@ void firm_option_help(print_option_help_func print_option_help)
 {
 	print_option_help(firm_options[0].option, firm_options[0].description);
 
-	for (int i = 0; i < n_opts; ++i) {
+	FOR_EACH_OPT(config) {
 		char buf[1024];
 		char buf2[1024];
 
-		const opt_config_t *config = &opts[i];
 		if (config->flags & OPT_FLAG_HIDE_OPTIONS)
 			continue;
 
@@ -917,8 +911,7 @@ void firm_option_help(print_option_help_func print_option_help)
 		print_option_help(buf, buf2);
 	}
 
-	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
-	for (size_t k = 0; k < n_options; ++k) {
+	for (size_t k = 0; k != lengthof(firm_options); ++k) {
 		char buf[1024];
 		char buf2[1024];
 		snprintf(buf, sizeof(buf), "-f%s", firm_options[k].option);
@@ -948,8 +941,7 @@ int firm_option(const char *const opt)
 	}
 
 	size_t const len = strlen(opt);
-	size_t const n_options = sizeof(firm_options)/sizeof(firm_options[0]);
-	for (size_t i = n_options; i != 0;) {
+	for (size_t i = lengthof(firm_options); i != 0;) {
 		struct params const* const o = &firm_options[--i];
 		if (len == o->opt_len && strncmp(opt, o->option, len) == 0) {
 			/* statistic options do accumulate */

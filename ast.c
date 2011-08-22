@@ -1754,15 +1754,8 @@ static expression_classification_t is_builtin_const_call(const expression_t *exp
 		return EXPR_CLASS_VARIABLE;
 
 	switch (ref->entity->function.btk) {
-	case bk_gnu_builtin_huge_val:
-	case bk_gnu_builtin_huge_valf:
-	case bk_gnu_builtin_huge_vall:
-	case bk_gnu_builtin_inf:
-	case bk_gnu_builtin_inff:
-	case bk_gnu_builtin_infl:
-	case bk_gnu_builtin_nan:
-	case bk_gnu_builtin_nanf:
-	case bk_gnu_builtin_nanl:
+	case BUILTIN_INF:
+	case BUILTIN_NAN:
 		return EXPR_CLASS_CONSTANT;
 	default:
 		return EXPR_CLASS_VARIABLE;

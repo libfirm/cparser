@@ -152,6 +152,19 @@ atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
 		.rank       = 5,
 	},
+	[ATOMIC_TYPE_LONGLONG] = {
+		.size       = 8,
+		.alignment  = 8,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
+		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.rank       = 6,
+	},
+	[ATOMIC_TYPE_ULONGLONG] = {
+		.size       = 8,
+		.alignment  = 8,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.rank       = 6,
+	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
 		.alignment  = 4,
@@ -208,15 +221,11 @@ void init_types(unsigned machine_size)
 	pointer_properties.alignment        = long_size;
 	pointer_properties.struct_alignment = long_size;
 
-	props[ATOMIC_TYPE_LONGLONG]    = props[ATOMIC_TYPE_LONG];
-	props[ATOMIC_TYPE_ULONGLONG]   = props[ATOMIC_TYPE_ULONG];
 	props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
 
 	/* set struct alignments to the same value as alignment */
-	for (size_t i = 0;
-	     i < sizeof(atomic_type_properties)/sizeof(atomic_type_properties[0]);
-	     ++i) {
+	for (size_t i = 0; i != lengthof(atomic_type_properties); ++i) {
 		props[i].struct_alignment = props[i].alignment;
 	}
 }
@@ -1695,7 +1704,7 @@ function_parameter_t *allocate_parameter(type_t *const type)
 }
 
 type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
-                             type_t *argument_type2)
+                             type_t *argument_type2, decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter2 = allocate_parameter(argument_type2);
 	function_parameter_t *const parameter1 = allocate_parameter(argument_type1);
@@ -1704,25 +1713,29 @@ type_t *make_function_2_type(type_t *return_type, type_t *argument_type1,
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter1;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
-type_t *make_function_1_type(type_t *return_type, type_t *argument_type)
+type_t *make_function_1_type(type_t *return_type, type_t *argument_type,
+                             decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter = allocate_parameter(argument_type);
 
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
 type_t *make_function_1_type_variadic(type_t *return_type,
-                                      type_t *argument_type)
+                                      type_t *argument_type,
+                                      decl_modifiers_t modifiers)
 {
 	function_parameter_t *const parameter = allocate_parameter(argument_type);
 
@@ -1730,16 +1743,18 @@ type_t *make_function_1_type_variadic(type_t *return_type,
 	type->function.return_type = return_type;
 	type->function.parameters  = parameter;
 	type->function.variadic    = true;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);
 }
 
-type_t *make_function_0_type(type_t *return_type)
+type_t *make_function_0_type(type_t *return_type, decl_modifiers_t modifiers)
 {
 	type_t *type               = allocate_type_zero(TYPE_FUNCTION);
 	type->function.return_type = return_type;
 	type->function.parameters  = NULL;
+	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
 	return identify_new_type(type);

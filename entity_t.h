@@ -265,9 +265,13 @@ struct function_t {
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
 
 	/* ast2firm info */
-	ir_entity     *irentity;
-	ir_node       *static_link;        /**< if need_closure is set, the node
-	                                        representing the static link. */
+	union {
+		ir_builtin_kind firm_builtin_kind;
+		unsigned        chk_arg_pos;
+	} b;
+	ir_entity      *irentity;
+	ir_node        *static_link;        /**< if need_closure is set, the node
+	                                         representing the static link. */
 };
 
 union entity_t {

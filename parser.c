@@ -6190,7 +6190,8 @@ static entity_t *parse_qualified_identifier(void)
 	if (entity == NULL) {
 		if (!strict_mode && token.kind == '(') {
 			/* an implicitly declared function */
-			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos, "implicit declaration of function '%Y'", symbol);
+			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos,
+			         "implicit declaration of function '%Y'", symbol);
 			entity = create_implicit_function(symbol, &pos);
 		} else {
 			errorf(&pos, "unknown identifier '%Y' found.", symbol);
@@ -7196,32 +7197,25 @@ static void check_call_argument(type_t          *expected_type,
 /**
  * Handle the semantic restrictions of builtin calls
  */
-static void handle_builtin_argument_restrictions(call_expression_t *call) {
-	switch (call->function->reference.entity->function.btk) {
-		case bk_gnu_builtin_return_address:
-		case bk_gnu_builtin_frame_address: {
+static void handle_builtin_argument_restrictions(call_expression_t *call)
+{
+	entity_t *entity = call->function->reference.entity;
+	switch (entity->function.btk) {
+	case BUILTIN_FIRM:
+		switch (entity->function.b.firm_builtin_kind) {
+		case ir_bk_return_address:
+		case ir_bk_frame_address: {
 			/* argument must be constant */
 			call_argument_t *argument = call->arguments;
 
 			if (is_constant_expression(argument->expression) == EXPR_CLASS_VARIABLE) {
 				errorf(&call->base.source_position,
-				       "argument of '%Y' must be a constant expression",
-				       call->function->reference.entity->base.symbol);
-			}
-			break;
-		}
-		case bk_gnu_builtin_object_size:
-			if (call->arguments == NULL)
-				break;
-
-			call_argument_t *arg = call->arguments->next;
-			if (arg != NULL && is_constant_expression(arg->expression) == EXPR_CLASS_VARIABLE) {
-				errorf(&call->base.source_position,
-					   "second argument of '%Y' must be a constant expression",
+					   "argument of '%Y' must be a constant expression",
 					   call->function->reference.entity->base.symbol);
 			}
 			break;
-		case bk_gnu_builtin_prefetch:
+		}
+		case ir_bk_prefetch:
 			/* second and third argument must be constant if existent */
 			if (call->arguments == NULL)
 				break;
@@ -7231,22 +7225,37 @@ static void handle_builtin_argument_restrictions(call_expression_t *call) {
 			if (rw != NULL) {
 				if (is_constant_expression(rw->expression) == EXPR_CLASS_VARIABLE) {
 					errorf(&call->base.source_position,
-					       "second argument of '%Y' must be a constant expression",
-					       call->function->reference.entity->base.symbol);
+						   "second argument of '%Y' must be a constant expression",
+						   call->function->reference.entity->base.symbol);
 				}
 				locality = rw->next;
 			}
 			if (locality != NULL) {
 				if (is_constant_expression(locality->expression) == EXPR_CLASS_VARIABLE) {
 					errorf(&call->base.source_position,
-					       "third argument of '%Y' must be a constant expression",
-					       call->function->reference.entity->base.symbol);
+						   "third argument of '%Y' must be a constant expression",
+						   call->function->reference.entity->base.symbol);
 				}
 				locality = rw->next;
 			}
 			break;
 		default:
 			break;
+		}
+
+	case BUILTIN_OBJECT_SIZE:
+		if (call->arguments == NULL)
+			break;
+
+		call_argument_t *arg = call->arguments->next;
+		if (arg != NULL && is_constant_expression(arg->expression) == EXPR_CLASS_VARIABLE) {
+			errorf(&call->base.source_position,
+				   "second argument of '%Y' must be a constant expression",
+				   call->function->reference.entity->base.symbol);
+		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -7342,7 +7351,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	if (expression->kind == EXPR_REFERENCE) {
 		reference_expression_t *reference = &expression->reference;
 		if (reference->entity->kind == ENTITY_FUNCTION &&
-		    reference->entity->function.btk != bk_none)
+		    reference->entity->function.btk != BUILTIN_NONE)
 			handle_builtin_argument_restrictions(call);
 	}
 
