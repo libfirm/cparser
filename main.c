@@ -1432,6 +1432,7 @@ int main(int argc, char **argv)
 					fprintf(stderr, "error: regparm convention not supported yet\n");
 					argument_errors = true;
 				} else if (streq(opt, "soft-float")) {
+					add_flag(&ldflags_obst, "-msoft-float");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=softfloat", cpu_arch);
 					int res = be_parse_arg(arch_opt);
 					if (res == 0)
