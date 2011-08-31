@@ -329,11 +329,6 @@ static void do_gcse(ir_graph *irg)
 	set_opt_global_cse(0);
 }
 
-static void lower_blockcopy(ir_graph *irg)
-{
-	lower_CopyB(irg, 128, 4);
-}
-
 typedef enum opt_target {
 	OPT_TARGET_IRG, /**< optimization function works on a single graph */
 	OPT_TARGET_IRP  /**< optimization function works on the complete program */
@@ -398,7 +393,6 @@ static opt_config_t opts[] = {
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
-	IRG("lower-blockcopy",   lower_blockcopy,          "replace small block copies with load/store sequences",  OPT_FLAG_NO_DUMP),
 	IRP("target-lowering",   be_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRP("opt-func-call",     optimize_funccalls,       "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
@@ -515,7 +509,6 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("confirm", true);
 	set_opt_enabled("opt-load-store", true);
 	set_opt_enabled("lower", true);
-	set_opt_enabled("lower-blockcopy", true);
 	set_opt_enabled("deconv", true);
 	set_opt_enabled("remove-confirms", true);
 	set_opt_enabled("ivopts", true);
@@ -690,7 +683,6 @@ static void do_firm_lowering(const char *input_filename)
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
 
-		do_irg_opt(irg, "lower-blockcopy");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "deconv");
 		do_irg_opt(irg, "control-flow");
@@ -827,7 +819,6 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
 		do_irg_opt(irg, "control-flow");
-		do_irg_opt(irg, "lower-blockcopy");
 	}
 
 	if (firm_dump.statistic & STAT_BEFORE_OPT) {
