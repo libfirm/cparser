@@ -950,7 +950,7 @@ static void init_types_and_adjust(void)
 		set_typeprops_type(&props[ATOMIC_TYPE_LONGLONG], type_long_long);
 
 	ir_type *type_unsigned_long_long = be_params->type_unsigned_long_long;
-	if (type_long_long != NULL)
+	if (type_unsigned_long_long != NULL)
 		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_unsigned_long_long);
 
 	/* operating system ABI specifics */
