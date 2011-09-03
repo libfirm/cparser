@@ -957,11 +957,12 @@ static void init_types_and_adjust(void)
 	const char *os = target_machine->operating_system;
 	if (is_darwin_os(os)) {
 		if (machine_size == 32) {
-			props[ATOMIC_TYPE_LONGLONG].struct_alignment  =  4;
-			props[ATOMIC_TYPE_ULONGLONG].struct_alignment =  4;
-			props[ATOMIC_TYPE_DOUBLE].struct_alignment    =  4;
-			props[ATOMIC_TYPE_LONG_DOUBLE].size           = 16;
-			props[ATOMIC_TYPE_LONG_DOUBLE].alignment      = 16;
+			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
+			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
+			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
+			props[ATOMIC_TYPE_LONG_DOUBLE].size             = 16;
+			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
+			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
 	} else if (is_windows_os(os)) {
 		if (machine_size == 64) {
