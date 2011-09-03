@@ -1821,6 +1821,16 @@ static type_path_entry_t *append_to_type_path(type_path_t *path)
 	return result;
 }
 
+static entity_t *skip_unnamed_bitfields(entity_t *entry)
+{
+	for (; entry != NULL; entry = entry->base.next) {
+		assert(entry->kind == ENTITY_COMPOUND_MEMBER);
+		if (!entry->compound_member.bitfield || entry->base.symbol != NULL)
+			break;
+	}
+	return entry;
+}
+
 /**
  * Descending into a sub-type. Enter the scope of the current top_type.
  */
@@ -1833,11 +1843,10 @@ static void descend_into_subtype(type_path_t *path)
 	top->type              = top_type;
 
 	if (is_type_compound(top_type)) {
-		compound_t *compound  = top_type->compound.compound;
-		entity_t   *entry     = compound->members.entities;
+		compound_t *const compound = top_type->compound.compound;
+		entity_t   *const entry    = skip_unnamed_bitfields(compound->members.entities);
 
 		if (entry != NULL) {
-			assert(entry->kind == ENTITY_COMPOUND_MEMBER);
 			top->v.compound_entry = &entry->declaration;
 			path->top_type = entry->declaration.type;
 		} else {
@@ -1977,7 +1986,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 	} else if (is_type_struct(type)) {
 		declaration_t *entry = top->v.compound_entry;
 
-		entity_t *next_entity = entry->base.next;
+		entity_t *const next_entity = skip_unnamed_bitfields(entry->base.next);
 		if (next_entity != NULL) {
 			assert(is_declaration(next_entity));
 			entry = &next_entity->declaration;
