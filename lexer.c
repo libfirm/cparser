@@ -884,37 +884,6 @@ static void eat_until_newline(void)
 }
 
 /**
- * Handle the define directive.
- */
-static void define_directive(void)
-{
-	lexer_next_preprocessing_token();
-	if (lexer_token.kind != T_IDENTIFIER) {
-		parse_error("expected identifier after #define\n");
-		eat_until_newline();
-	}
-}
-
-/**
- * Handle the ifdef directive.
- */
-static void ifdef_directive(int is_ifndef)
-{
-	(void) is_ifndef;
-	lexer_next_preprocessing_token();
-	//expect_identifier();
-	//extect_newline();
-}
-
-/**
- * Handle the endif directive.
- */
-static void endif_directive(void)
-{
-	//expect_newline();
-}
-
-/**
  * Parse the line directive.
  */
 static void parse_line_directive(void)
@@ -1032,35 +1001,16 @@ static void parse_preprocessor_identifier(void)
 	symbol_t *symbol = pp_token.identifier.symbol;
 
 	switch (symbol->pp_ID) {
-	case TP_include:
-		printf("include - enable header name parsing!\n");
-		break;
-	case TP_define:
-		define_directive();
-		break;
-	case TP_ifdef:
-		ifdef_directive(0);
-		break;
-	case TP_ifndef:
-		ifdef_directive(1);
-		break;
-	case TP_endif:
-		endif_directive();
-		break;
 	case TP_line:
 		next_pp_token();
 		parse_line_directive();
 		break;
-	case TP_if:
-	case TP_else:
-	case TP_elif:
-	case TP_undef:
-	case TP_error:
-		/* TODO; output the rest of the line */
-		parse_error("#error directive: ");
-		break;
 	case TP_pragma:
 		parse_pragma();
+		break;
+	case TP_error:
+		/* TODO; output the rest of the line */
+		parse_error("#error directive");
 		break;
 	}
 }
