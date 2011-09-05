@@ -104,3 +104,13 @@ elf_visibility_tag_t get_elf_visibility_from_string(const char *string)
 		return ELF_VISIBILITY_ERROR;
 	}
 }
+
+entity_t *skip_unnamed_bitfields(entity_t *entry)
+{
+	for (; entry != NULL; entry = entry->base.next) {
+		assert(entry->kind == ENTITY_COMPOUND_MEMBER);
+		if (!entry->compound_member.bitfield || entry->base.symbol != NULL)
+			break;
+	}
+	return entry;
+}

@@ -312,4 +312,6 @@ entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*);
 
 elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
 
+entity_t *skip_unnamed_bitfields(entity_t*);
+
 #endif

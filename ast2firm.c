@@ -3688,8 +3688,8 @@ static void descend_into_subtype(type_path_t *path)
 	size_t len;
 
 	if (is_type_compound(top_type)) {
-		compound_t *compound = top_type->compound.compound;
-		entity_t   *entry    = compound->members.entities;
+		compound_t *const compound = top_type->compound.compound;
+		entity_t   *const entry    = skip_unnamed_bitfields(compound->members.entities);
 
 		top->compound_entry = entry;
 		top->index          = 0;
@@ -3827,7 +3827,7 @@ static void advance_current_object(type_path_t *path)
 		entity_t *entry = top->compound_entry;
 
 		top->index++;
-		entry               = entry->base.next;
+		entry               = skip_unnamed_bitfields(entry->base.next);
 		top->compound_entry = entry;
 		if (entry != NULL) {
 			assert(entry->kind == ENTITY_COMPOUND_MEMBER);

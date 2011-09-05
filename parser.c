@@ -1821,16 +1821,6 @@ static type_path_entry_t *append_to_type_path(type_path_t *path)
 	return result;
 }
 
-static entity_t *skip_unnamed_bitfields(entity_t *entry)
-{
-	for (; entry != NULL; entry = entry->base.next) {
-		assert(entry->kind == ENTITY_COMPOUND_MEMBER);
-		if (!entry->compound_member.bitfield || entry->base.symbol != NULL)
-			break;
-	}
-	return entry;
-}
-
 /**
  * Descending into a sub-type. Enter the scope of the current top_type.
  */
