@@ -4104,8 +4104,15 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				goto finish;
 			}
 			if (previous_entity->kind == ENTITY_TYPEDEF) {
-				/* TODO: C++ allows this for exactly the same type */
-				errorf(pos, "redefinition of '%N' (declared %P)", entity, ppos);
+				type_t *const type      = skip_typeref(entity->typedefe.type);
+				type_t *const prev_type
+					= skip_typeref(previous_entity->typedefe.type);
+				/* gcc extension redef in system headers is allowed */
+				if ((!(c_mode & _CXX) && !pos->is_system_header)
+					|| !types_compatible(type, prev_type)) {
+					errorf(pos, "redefinition of '%N' (declared %P)",
+					       entity, ppos);
+				}
 				goto finish;
 			}
 
@@ -4185,7 +4192,7 @@ warn_redundant_declaration: ;
 						merge_in_attributes(decl, prev_decl->attributes);
 					} else if (!is_definition        &&
 							is_type_valid(prev_type) &&
-							strcmp(ppos->input_name, "<builtin>") != 0) {
+							!pos->is_system_header) {
 						warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%Y' (declared %P)", symbol, ppos);
 					}
 				} else if (current_function == NULL) {

@@ -897,7 +897,24 @@ static void parse_line_directive(void)
 	}
 	if (pp_token.kind == T_STRING_LITERAL) {
 		lexer_pos.input_name = pp_token.string.string.begin;
+		lexer_pos.is_system_header = false;
 		next_pp_token();
+
+		/* attempt to parse numeric flags as outputted by gcc preprocessor */
+		while (pp_token.kind == T_INTEGER) {
+			/* flags:
+			 * 1 - indicates start of a new file
+			 * 2 - indicates return from a file
+			 * 3 - indicates system header
+			 * 4 - indicates implicit extern "C" in C++ mode
+			 *
+			 * currently we're only interested in "3"
+			 */
+			if (strcmp(pp_token.number.number.begin, "3") == 0) {
+				lexer_pos.is_system_header = true;
+			}
+			next_pp_token();
+		}
 	}
 
 	eat_until_newline();
@@ -1306,6 +1323,6 @@ static __attribute__((unused))
 void dbg_pos(const source_position_t source_position)
 {
 	fprintf(stdout, "%s:%u:%u\n", source_position.input_name,
-	        source_position.lineno, source_position.colno);
+	        source_position.lineno, (unsigned)source_position.colno);
 	fflush(stdout);
 }

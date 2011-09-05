@@ -47,7 +47,7 @@ static void print_source_position(FILE *out, const source_position_t *pos)
 {
 	fprintf(out, "at line %u", pos->lineno);
 	if (show_column)
-		fprintf(out, ":%u", pos->colno);
+		fprintf(out, ":%u", (unsigned)pos->colno);
 	if (curr_pos == NULL || curr_pos->input_name != pos->input_name)
 		fprintf(out, " of \"%s\"", pos->input_name);
 }
@@ -216,7 +216,7 @@ static void diagnosticposvf(source_position_t const *const pos, char const *cons
 	FILE *const out = stderr;
 	fprintf(out, "%s:%u:", pos->input_name, pos->lineno);
 	if (show_column)
-		fprintf(out, "%u:", pos->colno);
+		fprintf(out, "%u:", (unsigned)pos->colno);
 	fprintf(out, " %s: ", kind);
 	curr_pos = pos;
 	diagnosticvf(fmt, ap);
