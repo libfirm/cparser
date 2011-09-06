@@ -1166,6 +1166,7 @@ int main(int argc, char **argv)
 			} else if (SINGLE_OPTION('v')) {
 				verbose = 1;
 			} else if (SINGLE_OPTION('w')) {
+				add_flag(&cppflags_obst, "-w");
 				disable_all_warnings();
 			} else if (option[0] == 'x') {
 				const char *opt;
