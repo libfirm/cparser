@@ -1213,11 +1213,7 @@ unsigned get_type_size(type_t *type)
 	case TYPE_TYPEDEF:
 		return get_type_size(type->typedeft.typedefe->type);
 	case TYPE_TYPEOF:
-		if (type->typeoft.typeof_type) {
-			return get_type_size(type->typeoft.typeof_type);
-		} else {
-			return get_type_size(type->typeoft.expression->base.type);
-		}
+		return get_type_size(type->typeoft.typeof_type);
 	}
 	panic("invalid type in get_type_size");
 }
@@ -1255,11 +1251,7 @@ unsigned get_type_alignment(type_t *type)
 		return alignment;
 	}
 	case TYPE_TYPEOF:
-		if (type->typeoft.typeof_type) {
-			return get_type_alignment(type->typeoft.typeof_type);
-		} else {
-			return get_type_alignment(type->typeoft.expression->base.type);
-		}
+		return get_type_alignment(type->typeoft.typeof_type);
 	}
 	panic("invalid type in get_type_alignment");
 }
@@ -1301,11 +1293,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 		return modifiers;
 	}
 	case TYPE_TYPEOF:
-		if (type->typeoft.typeof_type) {
-			return get_type_modifiers(type->typeoft.typeof_type);
-		} else {
-			return get_type_modifiers(type->typeoft.expression->base.type);
-		}
+		return get_type_modifiers(type->typeoft.typeof_type);
 	}
 	panic("invalid type found in get_type_modifiers");
 }
