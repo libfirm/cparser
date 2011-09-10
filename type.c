@@ -1266,6 +1266,7 @@ unsigned get_type_alignment(type_t *type)
 
 unsigned get_type_alignment_compound(type_t *type)
 {
+	assert(!is_typeref(type));
 	if (type->kind == TYPE_ATOMIC)
 		return atomic_type_properties[type->atomic.akind].struct_alignment;
 	return get_type_alignment(type);
@@ -1547,7 +1548,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 		if (!member->compound_member.bitfield)
 			break;
 
-		type_t *base_type = member->declaration.type;
+		type_t *const base_type = skip_typeref(member->declaration.type);
 		il_alignment_t base_alignment = get_type_alignment_compound(base_type);
 		il_alignment_t alignment_mask = base_alignment-1;
 		if (base_alignment > alignment)
@@ -1609,9 +1610,8 @@ void layout_struct_type(compound_type_t *type)
 			continue;
 		}
 
-		type_t *m_type  = entry->declaration.type;
-		type_t *skipped = skip_typeref(m_type);
-		if (! is_type_valid(skipped)) {
+		type_t *const m_type  = skip_typeref(entry->declaration.type);
+		if (!is_type_valid(m_type)) {
 			entry = entry->base.next;
 			continue;
 		}
@@ -1677,7 +1677,7 @@ void layout_union_type(compound_type_t *type)
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
-		type_t *m_type = entry->declaration.type;
+		type_t *m_type = skip_typeref(entry->declaration.type);
 		if (! is_type_valid(skip_typeref(m_type)))
 			continue;
 
