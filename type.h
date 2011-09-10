@@ -194,13 +194,6 @@ unsigned         get_type_size(type_t *type);
 decl_modifiers_t get_type_modifiers(const type_t *type);
 
 /**
- * get alignment of a type when used inside a compound.
- * Some ABIs are broken and alignment inside a compound is different from
- * recommended alignment of a type
- */
-unsigned         get_type_alignment_compound(type_t *type);
-
-/**
  * returns flags of an atomic type kind
  */
 unsigned get_atomic_type_flags(atomic_type_kind_t kind);

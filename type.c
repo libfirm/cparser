@@ -1264,7 +1264,12 @@ unsigned get_type_alignment(type_t *type)
 	panic("invalid type in get_type_alignment");
 }
 
-unsigned get_type_alignment_compound(type_t *type)
+/**
+ * get alignment of a type when used inside a compound.
+ * Some ABIs are broken and alignment inside a compound is different from
+ * recommended alignment of a type
+ */
+static unsigned get_type_alignment_compound(type_t *const type)
 {
 	assert(!is_typeref(type));
 	if (type->kind == TYPE_ATOMIC)
