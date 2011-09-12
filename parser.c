@@ -4107,12 +4107,16 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				type_t *const type      = skip_typeref(entity->typedefe.type);
 				type_t *const prev_type
 					= skip_typeref(previous_entity->typedefe.type);
-				/* gcc extension redef in system headers is allowed */
-				if ((!(c_mode & _CXX) && !pos->is_system_header)
-					|| !types_compatible(type, prev_type)) {
-					errorf(pos, "redefinition of '%N' (declared %P)",
-					       entity, ppos);
-				}
+				/* gcc extension: redef in system headers is allowed */
+				if ((pos->is_system_header || ppos->is_system_header)
+				    && types_compatible(type, prev_type))
+					goto finish;
+				/* c++ allows double typedef if they are identical
+				 * (after skipping typedefs) */
+				if ((c_mode & _CXX) && type == prev_type)
+					goto finish;
+				errorf(pos, "redefinition of '%N' (declared %P)",
+				       entity, ppos);
 				goto finish;
 			}
 
