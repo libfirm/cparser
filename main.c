@@ -1352,7 +1352,7 @@ int main(int argc, char **argv)
 							|| streq(option + 1, "endif-labels")) {
 					add_flag(&cppflags_obst, "%s", arg);
 				} else if (streq(option+1, "init-self")) {
-					/* ignored (asme as gcc does) */
+					/* ignored (same as gcc does) */
 				} else if (streq(option+1, "format-y2k")
 				           || streq(option+1, "format-security")
 				           || streq(option+1, "old-style-declaration")
