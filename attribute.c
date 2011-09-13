@@ -361,15 +361,11 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_CONST:         modifiers |= DM_CONST; break;
 		case ATTRIBUTE_GNU_DEPRECATED:    modifiers |= DM_DEPRECATED; break;
 		case ATTRIBUTE_GNU_NOINLINE:      modifiers |= DM_NOINLINE; break;
-		case ATTRIBUTE_GNU_RETURNS_TWICE: modifiers |= DM_RETURNS_TWICE; break;
-		case ATTRIBUTE_GNU_NORETURN:      modifiers |= DM_NORETURN; break;
 		case ATTRIBUTE_GNU_NAKED:         modifiers |= DM_NAKED; break;
 		case ATTRIBUTE_GNU_PURE:          modifiers |= DM_PURE; break;
 		case ATTRIBUTE_GNU_ALWAYS_INLINE: modifiers |= DM_FORCEINLINE; break;
-		case ATTRIBUTE_GNU_MALLOC:        modifiers |= DM_MALLOC; break;
 		case ATTRIBUTE_GNU_CONSTRUCTOR:   modifiers |= DM_CONSTRUCTOR; break;
 		case ATTRIBUTE_GNU_DESTRUCTOR:    modifiers |= DM_DESTRUCTOR; break;
-		case ATTRIBUTE_GNU_NOTHROW:       modifiers |= DM_NOTHROW; break;
 		case ATTRIBUTE_GNU_TRANSPARENT_UNION:
 										  modifiers |= DM_TRANSPARENT_UNION;
 										  break;
@@ -379,14 +375,10 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
 
-		case ATTRIBUTE_MS_ALLOCATE:      modifiers |= DM_MALLOC; break;
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_MS_NAKED:         modifiers |= DM_NAKED; break;
 		case ATTRIBUTE_MS_NOINLINE:      modifiers |= DM_NOINLINE; break;
-		case ATTRIBUTE_MS_RETURNS_TWICE: modifiers |= DM_RETURNS_TWICE; break;
-		case ATTRIBUTE_MS_NORETURN:      modifiers |= DM_NORETURN; break;
-		case ATTRIBUTE_MS_NOTHROW:       modifiers |= DM_NOTHROW; break;
 		case ATTRIBUTE_MS_THREAD:        modifiers |= DM_THREAD; break;
 		case ATTRIBUTE_MS_DEPRECATED:    modifiers |= DM_DEPRECATED; break;
 		case ATTRIBUTE_MS_RESTRICT:      modifiers |= DM_RESTRICT; break;
@@ -447,6 +439,20 @@ static type_t *change_calling_convention(type_t *type, cc_kind_t cconv)
 	return identify_new_type(new_type);
 }
 
+static type_t *add_modifiers(type_t *type, decl_modifiers_t modifiers)
+{
+	if (is_typeref(type) || !is_type_function(type)) {
+		return type;
+	}
+
+	if ((type->function.modifiers & modifiers) == modifiers)
+		return type;
+
+	type_t* new_type = duplicate_type(type);
+	new_type->function.modifiers |= modifiers;
+	return identify_new_type(new_type);
+}
+
 type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 {
 	const attribute_t *attribute = attributes;
@@ -469,6 +475,22 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 			break;
 		case ATTRIBUTE_MS_THISCALL:
 			type = change_calling_convention(type, CC_THISCALL);
+			break;
+		case ATTRIBUTE_GNU_RETURNS_TWICE:
+		case ATTRIBUTE_MS_RETURNS_TWICE:
+			type = add_modifiers(type, DM_RETURNS_TWICE);
+			break;
+		case ATTRIBUTE_GNU_NORETURN:
+		case ATTRIBUTE_MS_NORETURN:
+			type = add_modifiers(type, DM_NORETURN);
+			break;
+		case ATTRIBUTE_GNU_MALLOC:
+		case ATTRIBUTE_MS_ALLOCATE:
+			type = add_modifiers(type, DM_MALLOC);
+			break;
+		case ATTRIBUTE_GNU_NOTHROW:
+		case ATTRIBUTE_MS_NOTHROW:
+			type = add_modifiers(type, DM_NOTHROW);
 			break;
 		case ATTRIBUTE_GNU_MODE:
 			type = handle_attribute_mode(attribute, type);

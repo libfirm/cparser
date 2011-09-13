@@ -407,6 +407,20 @@ is_cdecl:
 	if (for_closure)
 		set_method_calling_convention(irtype, get_method_calling_convention(irtype) | cc_this_call);
 
+	const decl_modifiers_t modifiers = function_type->modifiers;
+	if (modifiers & DM_CONST)
+		add_method_additional_properties(irtype, mtp_property_const);
+	if (modifiers & DM_PURE)
+		add_method_additional_properties(irtype, mtp_property_pure);
+	if (modifiers & DM_RETURNS_TWICE)
+		add_method_additional_properties(irtype, mtp_property_returns_twice);
+	if (modifiers & DM_NORETURN)
+		add_method_additional_properties(irtype, mtp_property_noreturn);
+	if (modifiers & DM_NOTHROW)
+		add_method_additional_properties(irtype, mtp_property_nothrow);
+	if (modifiers & DM_MALLOC)
+		add_method_additional_properties(irtype, mtp_property_malloc);
+
 	return irtype;
 }
 
@@ -1895,8 +1909,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		}
 	}
 
-	if (function->kind == EXPR_REFERENCE &&
-	    function->reference.entity->declaration.modifiers & DM_NORETURN) {
+	if (function_type->modifiers & DM_NORETURN) {
 		/* A dead end:  Keep the Call and the Block.  Also place all further
 		 * nodes into a new and unreachable block. */
 		keep_alive(node);
@@ -5517,20 +5530,6 @@ static void initialize_function_parameters(entity_t *entity)
 static void handle_decl_modifier_irg(ir_graph_ptr irg,
                                      decl_modifiers_t decl_modifiers)
 {
-	if (decl_modifiers & DM_RETURNS_TWICE) {
-		/* TRUE if the declaration includes __attribute__((returns_twice)) */
-		add_irg_additional_properties(irg, mtp_property_returns_twice);
-	}
-	if (decl_modifiers & DM_NORETURN) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(noreturn) specifier. */
-		add_irg_additional_properties(irg, mtp_property_noreturn);
-	}
-	if (decl_modifiers & DM_NOTHROW) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(nothrow) specifier. */
-		add_irg_additional_properties(irg, mtp_property_nothrow);
-	}
 	if (decl_modifiers & DM_NAKED) {
 		/* TRUE if the declaration includes the Microsoft
 		   __declspec(naked) specifier. */
