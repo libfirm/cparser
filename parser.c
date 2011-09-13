@@ -3888,6 +3888,10 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		handle_entity_attributes(attributes, entity);
 	}
 
+	if (entity->kind == ENTITY_FUNCTION && !freestanding) {
+		adapt_special_functions(&entity->function);
+	}
+
 	return entity;
 }
 

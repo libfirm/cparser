@@ -47,4 +47,13 @@ void create_gnu_builtins(void);
  */
 void create_microsoft_intrinsics(void);
 
+/**
+ * Some functions like setjmp,longjmp are known from libc and need special
+ * attributes like noreturn or returns_twice.
+ * (Adding __attribute__(())s in the libc headers would be enough but apparently
+ *  this is not done in most cases since people rely on a list of hardcoded
+ *  names in gcc, so we have to duplicate this here)
+ */
+void adapt_special_functions(function_t *function);
+
 #endif

@@ -209,3 +209,59 @@ void create_microsoft_intrinsics(void)
 	f(ir_bk_outport,  "__outdword",           make_function_2_type(type_void, type_unsigned_short, type_unsigned_long, DM_NONE));
 	f(ir_bk_trap,     "__ud2",                make_function_type(type_void, 0, NULL, DM_NORETURN));
 }
+
+static type_t *add_type_modifier(type_t *orig_type, decl_modifiers_t modifiers)
+{
+	type_t *type = skip_typeref(orig_type);
+
+	assert(type->kind == TYPE_FUNCTION);
+	if ((type->function.modifiers & modifiers) == modifiers)
+		return orig_type;
+
+	type_t *new_type = duplicate_type(type);
+	new_type->function.modifiers |= modifiers;
+	return identify_new_type(new_type);
+}
+
+void adapt_special_functions(function_t *function)
+{
+	symbol_t *symbol = function->base.base.symbol;
+	if (symbol == NULL)
+		return;
+	const char *name = symbol->string;
+
+	/* the following list of names is taken from gcc (calls.c) */
+
+	/* Disregard prefix _, __, __x or __builtin_.  */
+	if (name[0] == '_') {
+		if (!strncmp(name + 3, "uiltin_", 7))
+			name += 10;
+		else if (name[1] == '_' && name[2] == 'x')
+			name += 3;
+		else if (name[1] == '_')
+			name += 2;
+		else
+			name += 1;
+	}
+
+	if (name[0] == 's') {
+		if ((name[1] == 'e' && (!strcmp(name, "setjmp")
+		                     || !strcmp(name, "setjmp_syscall")))
+		    || (name[1] == 'i' && !strcmp(name, "sigsetjmp"))
+		    || (name[1] == 'a' && !strcmp(name, "savectx"))) {
+			function->base.type
+				= add_type_modifier(function->base.type, DM_RETURNS_TWICE);
+		} else if (name[1] == 'i' && !strcmp(name, "siglongjmp")) {
+			function->base.type
+				= add_type_modifier(function->base.type, DM_NORETURN);
+		}
+	} else if ((name[0] == 'q' && !strcmp(name, "qsetjmp"))
+	           || (name[0] == 'v' && !strcmp(name, "vfork"))
+	           || (name[0] == 'g' && !strcmp(name, "getcontext"))) {
+		function->base.type
+			= add_type_modifier(function->base.type, DM_RETURNS_TWICE);
+	} else if (name[0] == 'l' && !strcmp(name, "longjmp")) {
+		function->base.type
+			= add_type_modifier(function->base.type, DM_NORETURN);
+	}
+}
