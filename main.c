@@ -695,6 +695,7 @@ static void print_help_linker(void)
 {
 	put_help("-l LIBRARY",               "");
 	put_help("-L PATH",                  "");
+	put_help("-s",                       "Do not produce symbol table and relocation information");
 	put_help("-shared",                  "Produce a shared library");
 	put_help("-static",                  "Produce statically linked binary");
 	put_help("-Wl,OPTION",               "Pass option directly to linker");
@@ -1139,6 +1140,8 @@ int main(int argc, char **argv)
 				mode = CompileAssemble;
 			} else if (SINGLE_OPTION('E')) {
 				mode = PreprocessOnly;
+			} else if (SINGLE_OPTION('s')) {
+				add_flag(&ldflags_obst, "-s");
 			} else if (SINGLE_OPTION('S')) {
 				mode = Compile;
 			} else if (option[0] == 'O') {
