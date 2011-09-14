@@ -931,7 +931,7 @@ int firm_option(const char *const opt)
 	size_t const len = strlen(opt);
 	for (size_t i = lengthof(firm_options); i != 0;) {
 		struct params const* const o = &firm_options[--i];
-		if (len == o->opt_len && strncmp(opt, o->option, len) == 0) {
+		if (len == o->opt_len && memcmp(opt, o->option, len) == 0) {
 			/* statistic options do accumulate */
 			if (o->flag == &firm_dump.statistic)
 				*o->flag = (bool) (*o->flag | o->set);
