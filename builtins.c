@@ -234,7 +234,7 @@ void adapt_special_functions(function_t *function)
 
 	/* Disregard prefix _, __, __x or __builtin_.  */
 	if (name[0] == '_') {
-		if (!strncmp(name + 3, "uiltin_", 7))
+		if (!strncmp(name + 1, "_builtin_", 9))
 			name += 10;
 		else if (name[1] == '_' && name[2] == 'x')
 			name += 3;
