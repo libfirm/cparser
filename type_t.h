@@ -201,7 +201,16 @@ type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);
 function_parameter_t *allocate_parameter(type_t*);
 
+/**
+ * Duplicates a type.
+ *
+ * @param type  The type to copy.
+ * @return A copy of the type.
+ *
+ * @note This does not produce a deep copy!
+ */
 type_t *duplicate_type(const type_t *type);
+
 type_t *identify_new_type(type_t *type);
 
 static inline bool is_typeref(const type_t *type)

@@ -511,11 +511,6 @@ static void print_array_type_post(const array_type_t *type)
 	intern_print_type_post(type->element_type);
 }
 
-/**
- * Prints an enum definition.
- *
- * @param declaration  The enum's type declaration.
- */
 void print_enum_definition(const enum_t *enume)
 {
 	print_string("{\n");
@@ -562,9 +557,6 @@ static void print_type_enum(const enum_type_t *type)
 	}
 }
 
-/**
- * Print the compound part of a compound type.
- */
 void print_compound_definition(const compound_t *compound)
 {
 	print_string("{\n");
@@ -722,11 +714,6 @@ static void intern_print_type_post(const type_t *const type)
 	}
 }
 
-/**
- * Prints a type.
- *
- * @param type   The type.
- */
 void print_type(const type_t *const type)
 {
 	print_type_ext(type, NULL, NULL);
@@ -747,14 +734,6 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 	}
 }
 
-/**
- * Duplicates a type.
- *
- * @param type  The type to copy.
- * @return A copy of the type.
- *
- * @note This does not produce a deep copy!
- */
 type_t *duplicate_type(const type_t *type)
 {
 	size_t size = get_type_struct_size(type->kind);
@@ -766,12 +745,6 @@ type_t *duplicate_type(const type_t *type)
 	return copy;
 }
 
-/**
- * Returns the unqualified type of a given type.
- *
- * @param type  The type.
- * @returns The unqualified type.
- */
 type_t *get_unqualified_type(type_t *type)
 {
 	assert(!is_typeref(type));
@@ -820,12 +793,6 @@ static bool test_atomic_type_flag(atomic_type_kind_t kind,
 	return (atomic_type_properties[kind].flags & flag) != 0;
 }
 
-/**
- * Returns true if the given type is an integer type.
- *
- * @param type  The type to check.
- * @return True if type is an integer type.
- */
 bool is_type_integer(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -838,24 +805,12 @@ bool is_type_integer(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_INTEGER);
 }
 
-/**
- * Returns true if the given type is an enum type.
- *
- * @param type  The type to check.
- * @return True if type is an enum type.
- */
 bool is_type_enum(const type_t *type)
 {
 	assert(!is_typeref(type));
 	return type->kind == TYPE_ENUM;
 }
 
-/**
- * Returns true if the given type is an floating point type.
- *
- * @param type  The type to check.
- * @return True if type is a floating point type.
- */
 bool is_type_float(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -866,12 +821,6 @@ bool is_type_float(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_FLOAT);
 }
 
-/**
- * Returns true if the given type is an complex type.
- *
- * @param type  The type to check.
- * @return True if type is a complex type.
- */
 bool is_type_complex(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -882,12 +831,6 @@ bool is_type_complex(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_COMPLEX);
 }
 
-/**
- * Returns true if the given type is a signed type.
- *
- * @param type  The type to check.
- * @return True if type is a signed type.
- */
 bool is_type_signed(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -901,12 +844,6 @@ bool is_type_signed(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_SIGNED);
 }
 
-/**
- * Returns true if the given type represents an arithmetic type.
- *
- * @param type  The type to check.
- * @return True if type represents an arithmetic type.
- */
 bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -923,24 +860,12 @@ bool is_type_arithmetic(const type_t *type)
 	}
 }
 
-/**
- * Returns true if the given type is an integer or float type.
- *
- * @param type  The type to check.
- * @return True if type is an integer or float type.
- */
 bool is_type_real(const type_t *type)
 {
 	/* 6.2.5 (17) */
 	return is_type_integer(type) || is_type_float(type);
 }
 
-/**
- * Returns true if the given type represents a scalar type.
- *
- * @param type  The type to check.
- * @return True if type represents a scalar type.
- */
 bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -951,12 +876,6 @@ bool is_type_scalar(const type_t *type)
 	return is_type_arithmetic(type);
 }
 
-/**
- * Check if a given type is incomplete.
- *
- * @param type  The type to check.
- * @return True if the given type is incomplete (ie. just forward).
- */
 bool is_type_incomplete(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -1070,9 +989,6 @@ static bool array_types_compatible(const array_type_t *array1,
 	return array1->size == array2->size;
 }
 
-/**
- * Check if two types are compatible.
- */
 bool types_compatible(const type_t *type1, const type_t *type2)
 {
 	assert(!is_typeref(type1));
