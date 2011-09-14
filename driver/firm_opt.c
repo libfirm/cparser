@@ -408,7 +408,7 @@ static opt_config_t opts[] = {
 static opt_config_t *get_opt(const char *name)
 {
 	FOR_EACH_OPT(config) {
-		if (strcmp(config->name, name) == 0)
+		if (streq(config->name, name))
 			return config;
 	}
 

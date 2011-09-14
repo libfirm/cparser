@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include "strset.h"
+#include "strutil.h"
 #include "hash_string.h"
 
 #define HashSet                    strset_t
@@ -30,7 +31,7 @@
 #define NullValue                  NULL
 #define DeletedValue               ((void*)-1)
 #define Hash(this, value)          hash_string(value)
-#define KeysEqual(this,key1,key2)  (strcmp(key1, key2) == 0)
+#define KeysEqual(this,key1,key2)  (streq(key1, key2))
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(strset_entry_t))
 #define SCALAR_RETURN
 

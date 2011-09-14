@@ -56,17 +56,17 @@ static bool is_system_header(const char *fname)
 
 static const char *fix_builtin_names(const char *name)
 {
-	if (strcmp(name, "class") == 0) {
+	if (streq(name, "class")) {
 		return "_class";
-	} else if(strcmp(name, "this") == 0) {
+	} else if (streq(name, "this")) {
 		return "_this";
-	} else if(strcmp(name, "public") == 0) {
+	} else if (streq(name, "public")) {
 		return "_public";
-	} else if(strcmp(name, "protected") == 0) {
+	} else if (streq(name, "protected")) {
 		return "_protected";
-	} else if(strcmp(name, "private") == 0) {
+	} else if (streq(name, "private")) {
 		return "_private";
-	} else if(strcmp(name, "final") == 0) {
+	} else if (streq(name, "final")) {
 		return "_final";
 	}
 	/* TODO put all reserved names here */
@@ -541,7 +541,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 			bool in_limits = false;
 			for (output_limit *limit = output_limits; limit != NULL;
 			     limit = limit->next) {
-			    if (strcmp(limit->filename, input_name) == 0) {
+			    if (streq(limit->filename, input_name)) {
 					in_limits = true;
 					break;
 				}

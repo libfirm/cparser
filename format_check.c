@@ -21,6 +21,7 @@
 
 #include <ctype.h>
 
+#include "adt/strutil.h"
 #include "adt/util.h"
 #include "format_check.h"
 #include "symbol_t.h"
@@ -1003,7 +1004,7 @@ void check_format(const call_expression_t *const call)
 	 */
 	const char *const name = entity->base.symbol->string;
 	for (size_t i = 0; i < lengthof(builtin_table); ++i) {
-		if (strcmp(name, builtin_table[i].name) == 0) {
+		if (streq(name, builtin_table[i].name)) {
 			switch (builtin_table[i].fmt_kind) {
 			case FORMAT_PRINTF:
 				check_printf_format(arg, &builtin_table[i]);

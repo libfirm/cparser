@@ -246,22 +246,22 @@ void adapt_special_functions(function_t *function)
 	}
 
 	if (name[0] == 's') {
-		if ((name[1] == 'e' && (!strcmp(name, "setjmp")
-		                     || !strcmp(name, "setjmp_syscall")))
-		    || (name[1] == 'i' && !strcmp(name, "sigsetjmp"))
-		    || (name[1] == 'a' && !strcmp(name, "savectx"))) {
+		if ((name[1] == 'e' && (streq(name, "setjmp")
+		                     || streq(name, "setjmp_syscall")))
+		    || (name[1] == 'i' && streq(name, "sigsetjmp"))
+		    || (name[1] == 'a' && streq(name, "savectx"))) {
 			function->base.type
 				= add_type_modifier(function->base.type, DM_RETURNS_TWICE);
-		} else if (name[1] == 'i' && !strcmp(name, "siglongjmp")) {
+		} else if (name[1] == 'i' && streq(name, "siglongjmp")) {
 			function->base.type
 				= add_type_modifier(function->base.type, DM_NORETURN);
 		}
-	} else if ((name[0] == 'q' && !strcmp(name, "qsetjmp"))
-	           || (name[0] == 'v' && !strcmp(name, "vfork"))
-	           || (name[0] == 'g' && !strcmp(name, "getcontext"))) {
+	} else if ((name[0] == 'q' && streq(name, "qsetjmp"))
+	           || (name[0] == 'v' && streq(name, "vfork"))
+	           || (name[0] == 'g' && streq(name, "getcontext"))) {
 		function->base.type
 			= add_type_modifier(function->base.type, DM_RETURNS_TWICE);
-	} else if (name[0] == 'l' && !strcmp(name, "longjmp")) {
+	} else if (name[0] == 'l' && streq(name, "longjmp")) {
 		function->base.type
 			= add_type_modifier(function->base.type, DM_NORETURN);
 	}

@@ -2611,9 +2611,9 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 
 		symbol_t **prop;
 		symbol_t  *symbol = token.identifier.symbol;
-		if (strcmp(symbol->string, "put") == 0) {
+		if (streq(symbol->string, "put")) {
 			prop = &property->put_symbol;
-		} else if (strcmp(symbol->string, "get") == 0) {
+		} else if (streq(symbol->string, "get")) {
 			prop = &property->get_symbol;
 		} else {
 			errorf(HERE, "expected put or get in property declspec");
@@ -2649,7 +2649,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
 		     ++k) {
 			const char *attribute_name = get_attribute_name(k);
-			if (attribute_name != NULL && strcmp(attribute_name, name) == 0) {
+			if (attribute_name != NULL && streq(attribute_name, name)) {
 				kind = k;
 				break;
 			}
@@ -3966,7 +3966,7 @@ warn_arg_count:
  */
 static bool is_sym_main(const symbol_t *const sym)
 {
-	return strcmp(sym->string, "main") == 0;
+	return streq(sym->string, "main");
 }
 
 static void error_redefined_as_different_kind(const source_position_t *pos,
@@ -10371,9 +10371,9 @@ static void parse_linkage_specification(void)
 
 	linkage_kind_t old_linkage = current_linkage;
 	linkage_kind_t new_linkage;
-	if (strcmp(linkage, "C") == 0) {
+	if (streq(linkage, "C")) {
 		new_linkage = LINKAGE_C;
-	} else if (strcmp(linkage, "C++") == 0) {
+	} else if (streq(linkage, "C++")) {
 		new_linkage = LINKAGE_CXX;
 	} else {
 		errorf(&pos, "linkage string \"%s\" not recognized", linkage);

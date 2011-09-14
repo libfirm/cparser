@@ -19,6 +19,7 @@
  */
 #include <config.h>
 
+#include "adt/strutil.h"
 #include "input.h"
 #include "diagnostic.h"
 #include "lexer.h"
@@ -910,7 +911,7 @@ static void parse_line_directive(void)
 			 *
 			 * currently we're only interested in "3"
 			 */
-			if (strcmp(pp_token.number.number.begin, "3") == 0) {
+			if (streq(pp_token.number.number.begin, "3")) {
 				lexer_pos.is_system_header = true;
 			}
 			next_pp_token();

@@ -32,6 +32,7 @@
 
 #include "adt/error.h"
 #include "adt/array.h"
+#include "adt/strutil.h"
 #include "adt/util.h"
 #include "symbol_t.h"
 #include "token_t.h"
@@ -5085,7 +5086,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 			continue;
 		}
 
-		if (strcmp(clobber_str, "memory") == 0) {
+		if (streq(clobber_str, "memory")) {
 			needs_memory = true;
 			continue;
 		}

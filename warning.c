@@ -119,7 +119,7 @@ void set_warning_opt(const char *const opt)
 	}
 
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
-		if (strcmp(i->name, s) == 0) {
+		if (streq(i->name, s)) {
 			i->state = (i->state & ~off) | on;
 			return;
 		}
@@ -128,7 +128,7 @@ void set_warning_opt(const char *const opt)
 	if (s[0] == '\0') { // -W is an alias for -Wextra
 		goto extra;
 	}
-#define OPTX(x)   else if (strcmp(s, x) == 0)
+#define OPTX(x)   else if (streq(s, x))
 #define SET(y)    (void)(warning[y].state = (warning[y].state & ~off) | on)
 	OPTX("all") {
 		/* Note: this switched on a lot more warnings than gcc's -Wall */
@@ -186,7 +186,7 @@ extra:
 	}
 #undef SET
 #undef OPT_X
-	else if (strcmp(opt /* sic */, "error-implicit-function-declaration") == 0) {
+	else if (streq(opt /* sic */, "error-implicit-function-declaration")) {
 		/* GCC legacy: This way it only can be activated. */
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
 		return;

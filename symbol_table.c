@@ -19,6 +19,7 @@
  */
 #include <config.h>
 
+#include "adt/strutil.h"
 #include "symbol_table_t.h"
 #include "symbol_t.h"
 #include "token_t.h"
@@ -48,7 +49,7 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 #define GetKey(value)              (value)->string
 #define InitData(this,value,key)   ((void)((value) = (ValueType)obstack_alloc(&symbol_obstack, sizeof(symbol_t)), init_symbol_table_entry((value), key)))
 #define Hash(this, key)            hash_string(key)
-#define KeysEqual(this,key1,key2)  (strcmp(key1, key2) == 0)
+#define KeysEqual(this,key1,key2)  (streq(key1, key2))
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(symbol_table_hash_entry_t))
 #define SCALAR_RETURN
 
