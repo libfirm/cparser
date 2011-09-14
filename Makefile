@@ -27,6 +27,7 @@ LFLAGS += $(FIRM_LIBS)
 SOURCES := \
 	adt/hashset.c \
 	adt/strset.c \
+	adt/strutil.c \
 	attribute.c \
 	parser.c \
 	ast.c \
