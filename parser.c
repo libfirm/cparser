@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include "adt/strutil.h"
 #include "parser.h"
 #include "diagnostic.h"
 #include "format_check.h"
@@ -1069,22 +1070,6 @@ static string_t parse_string_literals(void)
 	}
 
 	return result;
-}
-
-/**
- * compare two string, ignoring double underscores on the second.
- */
-static int strcmp_underscore(const char *s1, const char *s2)
-{
-	if (s2[0] == '_' && s2[1] == '_') {
-		size_t len2 = strlen(s2);
-		size_t len1 = strlen(s1);
-		if (len1 == len2-4 && s2[len2-2] == '_' && s2[len2-1] == '_') {
-			return strncmp(s1, s2+2, len2-4);
-		}
-	}
-
-	return strcmp(s1, s2);
 }
 
 static attribute_t *allocate_attribute_zero(attribute_kind_t kind)

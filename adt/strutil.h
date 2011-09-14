@@ -18,4 +18,9 @@ static inline char const* strstart(char const* str, char const* start)
 	return NULL;
 }
 
+/**
+ * compare two strings, ignoring double underscores on the second.
+ */
+int strcmp_underscore(const char *s1, const char *s2);
+
 #endif
