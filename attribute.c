@@ -139,16 +139,16 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 	const char         *symbol_str = arg->v.symbol->string;
 	bool                sign       = is_type_signed(type);
 	atomic_type_kind_t  akind;
-	if (strcmp_underscore("QI",   symbol_str) == 0 ||
-	    strcmp_underscore("byte", symbol_str) == 0) {
+	if (streq_underscore("QI",   symbol_str) ||
+	    streq_underscore("byte", symbol_str)) {
 		akind = sign ? ATOMIC_TYPE_CHAR : ATOMIC_TYPE_UCHAR;
-	} else if (strcmp_underscore("HI", symbol_str) == 0) {
+	} else if (streq_underscore("HI", symbol_str)) {
 		akind = sign ? ATOMIC_TYPE_SHORT : ATOMIC_TYPE_USHORT;
-	} else if (strcmp_underscore("SI",      symbol_str) == 0
-	        || strcmp_underscore("word",    symbol_str) == 0
-	        || strcmp_underscore("pointer", symbol_str) == 0) {
+	} else if (streq_underscore("SI",      symbol_str)
+	        || streq_underscore("word",    symbol_str)
+	        || streq_underscore("pointer", symbol_str)) {
 		akind = sign ? ATOMIC_TYPE_INT : ATOMIC_TYPE_UINT;
-	} else if (strcmp_underscore("DI", symbol_str) == 0) {
+	} else if (streq_underscore("DI", symbol_str)) {
 		akind = sign ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
 	} else {
 		source_position_t const *const pos = &attribute->source_position;

@@ -1216,8 +1216,7 @@ static attribute_t *parse_attribute_gnu_single(void)
 		}
 
 		const char *attribute_name = get_attribute_name(kind);
-		if (attribute_name != NULL
-				&& strcmp_underscore(attribute_name, name) == 0)
+		if (attribute_name != NULL && streq_underscore(attribute_name, name))
 			break;
 	}
 
