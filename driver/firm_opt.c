@@ -868,11 +868,8 @@ static void disable_all_opts(void)
 
 static bool firm_opt_option(const char *opt)
 {
-	bool enable = true;
-	if (strncmp(opt, "no-", 3) == 0) {
-		enable = false;
-		opt = opt + 3;
-	}
+	char const* const rest   = strstart(opt, "no-");
+	bool        const enable = rest ? opt = rest, false : true;
 
 	opt_config_t *config = get_opt(opt);
 	if (config == NULL || (config->flags & OPT_FLAG_HIDE_OPTIONS))

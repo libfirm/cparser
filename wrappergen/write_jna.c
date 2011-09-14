@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include "adt/strutil.h"
 #include "write_jna.h"
 #include "symbol_t.h"
 #include "ast_t.h"
@@ -46,7 +47,7 @@ static const char    *libname;
 
 static bool is_system_header(const char *fname)
 {
-	if (strncmp(fname, "/usr/include", 12) == 0)
+	if (strstart(fname, "/usr/include"))
 		return true;
 	if (fname == builtin_source_position.input_name)
 		return true;

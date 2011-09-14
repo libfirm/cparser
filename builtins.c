@@ -19,6 +19,7 @@
  */
 #include "config.h"
 
+#include "adt/strutil.h"
 #include "type_t.h"
 #include "types.h"
 #include "entity_t.h"
@@ -234,7 +235,7 @@ void adapt_special_functions(function_t *function)
 
 	/* Disregard prefix _, __, __x or __builtin_.  */
 	if (name[0] == '_') {
-		if (!strncmp(name + 1, "_builtin_", 9))
+		if (strstart(name + 1, "_builtin_"))
 			name += 10;
 		else if (name[1] == '_' && name[2] == 'x')
 			name += 3;

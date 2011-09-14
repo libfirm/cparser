@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "adt/strutil.h"
 #include "adt/util.h"
 #include "warning.h"
 #include "help.h"
@@ -99,8 +100,9 @@ void set_warning_opt(const char *const opt)
 {
 	/* Process prefixes: -W[no-][error=] */
 	char const *s     = opt;
-	bool const  no    = strncmp(s, "no-",    3) == 0 ? s += 3, true : false;
-	bool const  error = strncmp(s, "error=", 6) == 0 ? s += 6, true : false;
+	char const *rest;
+	bool const  no    = (rest = strstart(s, "no-"))    ? s = rest, true : false;
+	bool const  error = (rest = strstart(s, "error=")) ? s = rest, true : false;
 
 	warn_state_t on  = WARN_STATE_NONE;
 	warn_state_t off = WARN_STATE_NONE;
