@@ -771,7 +771,6 @@ void gen_firm_init(void)
 	set_opt_algebraic_simplification(firm_opt.const_folding);
 	set_opt_cse(firm_opt.cse);
 	set_opt_global_cse(0);
-	set_opt_unreachable_code(1);
 }
 
 /**
