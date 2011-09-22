@@ -744,7 +744,7 @@ void gen_firm_init(void)
 	if (firm_dump.stat_dag)
 		pattern |= FIRMSTAT_COUNT_DAG;
 
-	ir_init(NULL);
+	ir_init();
 	firm_init_stat(firm_dump.statistic == STAT_NONE ?
 			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
 			| FIRMSTAT_COUNT_CONSTS | pattern);
