@@ -14,6 +14,16 @@ static void set_be_option(const char *arg)
 	assert(res);
 }
 
+static ir_entity *underscore_compilerlib_entity_creator(ident *id, ir_type *mt)
+{
+	ir_entity *ent    = new_entity(get_glob_type(), id, mt);
+	ident     *ldname = id_mangle3("_", id, "");
+
+	set_entity_ld_ident(ent, ldname);
+
+	return ent;
+}
+
 /**
  * Initialize firm codegeneration for a specific operating system.
  * The argument is the operating system part of a target-triple
@@ -27,8 +37,10 @@ static bool setup_os_support(const char *os)
 		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
+		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
 	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
 		set_be_option("ia32-gasmode=mingw");
+		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
 	} else {
 		return false;
 	}
