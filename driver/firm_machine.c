@@ -16,12 +16,13 @@ static void set_be_option(const char *arg)
 
 static ir_entity *underscore_compilerlib_entity_creator(ident *id, ir_type *mt)
 {
-	ir_entity *ent    = new_entity(get_glob_type(), id, mt);
+	ir_entity *entity = new_entity(get_glob_type(), id, mt);
 	ident     *ldname = id_mangle3("_", id, "");
 
-	set_entity_ld_ident(ent, ldname);
+	set_entity_visibility(entity, ir_visibility_external);
+	set_entity_ld_ident(entity, ldname);
 
-	return ent;
+	return entity;
 }
 
 /**
