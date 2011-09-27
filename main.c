@@ -1463,8 +1463,9 @@ int main(int argc, char **argv)
 			} else if (streq(option, "pg")) {
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
-			} else if (streq(option, "pedantic") ||
-			           streq(option, "ansi")) {
+			} else if (streq(option, "ansi")) {
+				add_flag(&cppflags_obst, "-ansi");
+			} else if (streq(option, "pedantic")) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
