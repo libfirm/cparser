@@ -878,6 +878,12 @@ static bool is_ia32_cpu(const char *architecture)
 	    || streq(architecture, "i786");
 }
 
+static bool is_sparc_cpu(const char *architecture)
+{
+	return streq(architecture, "sparc")
+	    || streq(architecture, "icore");
+}
+
 static const char *setup_isa_from_tripel(const machine_triple_t *machine)
 {
 	const char *cpu = machine->cpu_type;
@@ -886,7 +892,7 @@ static const char *setup_isa_from_tripel(const machine_triple_t *machine)
 		return "ia32";
 	} else if (streq(cpu, "x86_64")) {
 		return "amd64";
-	} else if (streq(cpu, "sparc")) {
+	} else if (is_sparc_cpu(cpu)) {
 		return "sparc";
 	} else if (streq(cpu, "arm")) {
 		return "arm";

@@ -72,6 +72,9 @@ bool setup_firm_for_machine(const machine_triple_t *machine)
 		set_be_option("isa=amd64");
 	} else if (streq(cpu, "sparc")) {
 		set_be_option("isa=sparc");
+	} else if (streq(cpu, "icore")) {
+		set_be_option("isa=sparc");
+		set_be_option("sparc-arch=icore");
 	} else if (streq(cpu, "arm")) {
 		set_be_option("isa=arm");
 	} else {
