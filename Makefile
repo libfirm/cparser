@@ -14,9 +14,10 @@ CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
-CFLAGS += -O2 -g
-#CFLAGS += -O3 -march=pentium4 -fomit-frame-pointer -DNDEBUG
-#CFLAGS += -pg -O3 -fno-inline
+CFLAGS_debug = -O2 -g
+CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG
+CFLAGS_profile = -pg -O3 -fno-inline
+CFLAGS += $(CFLAGS_$(variant))
 ICC_CFLAGS = -O0 -g3 -std=c99 -Wall
 #LFLAGS += -pg
 ICC    ?= true
