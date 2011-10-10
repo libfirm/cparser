@@ -106,9 +106,9 @@ ifeq "$(wildcard $(FIRM_HOME) )" ""
 	@echo 'Download and extract libfirm tarball ...'
 	$(Q)curl -s -L "${FIRM_URL}" -o "libfirm-$(FIRM_VERSION).tar.bz2"
 	$(Q)tar xf "libfirm-$(FIRM_VERSION).tar.bz2"
-	$(Q)mv "libfirm-$(FIRM_VERSION)" libfirm
+	$(Q)mv "libfirm-$(FIRM_VERSION)" $(FIRM_HOME)
 endif
-	cd libfirm && $(MAKE) $(LIBFIRM_FILE)
+	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE)
 
 $(GOAL): $(FIRM_HOME)/$(LIBFIRM_FILE) $(OBJECTS)
 	@echo "===> LD $@"
