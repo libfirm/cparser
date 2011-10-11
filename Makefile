@@ -71,7 +71,7 @@ Q = @
 
 all: $(GOAL)
 
-.PHONY: all clean bootstrap bootstrap2 $(FIRM_HOME)/$(LIBFIRM_FILE)
+.PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint $(FIRM_HOME)/$(LIBFIRM_FILE)
 
 -include $(DEPENDS)
 
