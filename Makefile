@@ -59,6 +59,7 @@ SOURCES := \
 	wrappergen/write_jna.c
 
 OBJECTS = $(SOURCES:%.c=build/%.o)
+DEPENDS = $(OBJECTS:%.o=%.d)
 
 SPLINTS = $(addsuffix .splint, $(SOURCES))
 CPARSERS = $(addsuffix .cparser, $(SOURCES))
@@ -72,9 +73,7 @@ all: $(GOAL)
 
 .PHONY: all clean bootstrap bootstrap2 $(FIRM_HOME)/$(LIBFIRM_FILE)
 
-ifeq ($(findstring $(MAKECMDGOALS), clean depend),)
--include .depend
-endif
+-include $(DEPENDS)
 
 config.h:
 	cp config.h.in $@
@@ -89,10 +88,6 @@ UNUSED := $(shell \
 	REV="\#define cparser_REVISION \"$(REVISION)\""; \
 	echo "$$REV" | cmp -s - revision.h 2> /dev/null || echo "$$REV" > revision.h \
 )
-
-.depend: config.h revision.h $(SOURCES)
-	@echo "===> DEPEND"
-	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
 DIRS   := $(sort $(dir $(OBJECTS)))
 UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb2/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpbe/%))
@@ -154,10 +149,8 @@ cparser.bootstrap2: $(CPARSEROS2)
 
 build/%.o: %.c
 	@echo '===> CC $<'
-#$(Q)$(ICC) $(CPPFLAGS) $(ICC_CFLAGS) -c $< -o $@
-#$(Q)$(GCCO1) $(CPPFLAGS) $(CFLAGS) -O1 -c $< -o $@
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf build/* $(GOAL) .depend
+	$(Q)rm -rf build/* $(GOAL)
