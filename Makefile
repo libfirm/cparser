@@ -82,17 +82,13 @@ config.h:
 %.h:
 	@true
 
-REVISION ?= $(shell git describe --always --dirty --match '')
+REVISION ?= $(shell git describe --abbrev=40 --always --dirty --match '')
 
-revision.h:
-	@echo "===> GEN $@"
-	@echo "#define cparser_REVISION \"$(REVISION)\"" > .revision.h
-	$(Q)if diff -Nq .revision.h revision.h > /dev/null; then \
-	      rm .revision.h;                                    \
-	    else                                                 \
-	      echo "===> UPDATING revision.h";                   \
-	      mv .revision.h revision.h;                         \
-	    fi
+# Update revision.h if necessary
+UNUSED := $(shell \
+	REV="\#define cparser_REVISION \"$(REVISION)\""; \
+	echo "$$REV" | cmp -s - revision.h 2> /dev/null || echo "$$REV" > revision.h \
+)
 
 .depend: config.h revision.h $(SOURCES)
 	@echo "===> DEPEND"
