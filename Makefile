@@ -6,7 +6,7 @@ variant  ?= debug# Different libfirm variants (debug, optimize, profile)
 FIRM_HOME   = libfirm
 FIRM_CPPFLAGS = -I$(FIRM_HOME)/include
 FIRM_LIBS   = -lm
-LIBFIRM_FILE = build/$(variant)/libfirm.a
+LIBFIRM_FILE = $(BUILDDIR)/$(variant)/libfirm.a
 FIRM_VERSION = 1.19.1
 FIRM_URL = http://downloads.sourceforge.net/project/libfirm/libfirm/$(FIRM_VERSION)/libfirm-$(FIRM_VERSION).tar.bz2?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flibfirm%2Ffiles%2Flibfirm%2F&ts=1299786346&use_mirror=ignum
 
@@ -58,14 +58,14 @@ SOURCES := \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c
 
-OBJECTS = $(SOURCES:%.c=build/%.o)
+OBJECTS = $(SOURCES:%.c=$(BUILDDIR)/%.o)
 DEPENDS = $(OBJECTS:%.o=%.d)
 
 SPLINTS = $(addsuffix .splint, $(SOURCES))
 CPARSERS = $(addsuffix .cparser, $(SOURCES))
-CPARSEROS = $(SOURCES:%.c=build/cpb/%.o)
-CPARSEROS_E = $(SOURCES:%.c=build/cpbe/%.o)
-CPARSEROS2 = $(SOURCES:%.c=build/cpb2/%.o)
+CPARSEROS = $(SOURCES:%.c=$(BUILDDIR)/cpb/%.o)
+CPARSEROS_E = $(SOURCES:%.c=$(BUILDDIR)/cpbe/%.o)
+CPARSEROS2 = $(SOURCES:%.c=$(BUILDDIR)/cpb2/%.o)
 
 Q = @
 
@@ -123,21 +123,21 @@ bootstrap2: cparser.bootstrap2
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-build/cpb/%.o: %.c build/cparser
+$(BUILDDIR)/cpb/%.o: %.c $(BUILDDIR)/cparser
 	@echo '===> CPARSER $<'
-	$(Q)./build/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
+	$(Q)./$(BUILDDIR)/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
 
-build/cpbe/%.o: %.c
+$(BUILDDIR)/cpbe/%.o: %.c
 	@echo '===> ECCP $<'
 	$(Q)eccp $(CPPFLAGS) -std=c99 -Wall -c $< -o $@
 
-build/cpb2/%.o: %.c cparser.bootstrap
+$(BUILDDIR)/cpb2/%.o: %.c cparser.bootstrap
 	@echo '===> CPARSER.BOOTSTRAP $<'
 	$(Q)./cparser.bootstrap $(CPPFLAGS) -Wall -g -c $< -o $@
 
 cparser.bootstrap: $(CPARSEROS)
 	@echo "===> LD $@"
-	$(Q)./build/cparser $(CPARSEROS) $(LFLAGS) -o $@
+	$(Q)./$(BUILDDIR)/cparser $(CPARSEROS) $(LFLAGS) -o $@
 
 cparser.bootstrape: $(CPARSEROS_E)
 	@echo "===> LD $@"
@@ -147,10 +147,10 @@ cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 	@echo "===> LD $@"
 	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LFLAGS) -o $@
 
-build/%.o: %.c
+$(BUILDDIR)/%.o: %.c
 	@echo '===> CC $<'
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf build/* $(GOAL)
+	$(Q)rm -rf $(BUILDDIR)/ $(GOAL)
