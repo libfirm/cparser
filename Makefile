@@ -143,7 +143,7 @@ cparser.bootstrape: $(CPARSEROS_E)
 	@echo "===> LD $@"
 	$(Q)gcc $(CPARSEROS_E) $(LFLAGS) -o $@
 
-cparser.bootstrap2: $(CPARSEROS2)
+cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 	@echo "===> LD $@"
 	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LFLAGS) -o $@
 
