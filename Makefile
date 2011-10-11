@@ -94,8 +94,8 @@ UNUSED := $(shell \
 	@echo "===> DEPEND"
 	@rm -f $@ && touch $@ && makedepend -p "$@ build/" -Y -f $@ -- $(CPPFLAGS) -- $(SOURCES) 2> /dev/null && rm $@.bak
 
-DIRS = build build/adt build/driver build/wrappergen build/cpb build/cpb/adt build/cpb/driver build/cpb/wrappergen build/cpb2 build/cpb2/adt build/cpb2/driver build/cpb2/wrappergen build/cpbe build/cpbe/adt build/cpbe/driver build/cpbe2/wrappergen
-UNUSED := $(shell mkdir -p $(DIRS))
+DIRS   := $(sort $(dir $(OBJECTS)))
+UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb2/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpbe/%))
 
 $(FIRM_HOME)/$(LIBFIRM_FILE):
 ifeq "$(wildcard $(FIRM_HOME) )" ""
