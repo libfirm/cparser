@@ -109,11 +109,11 @@ splint: $(SPLINTS)
 
 selfcheck: $(CPARSERS)
 
-bootstrap: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS) cparser.bootstrap
+bootstrap: cparser.bootstrap
 
-bootstrape: build/cpb build/cpb/adt build/cpb/driver $(CPARSEROS_E) cparser.bootstrape
+bootstrape: cparser.bootstrape
 
-bootstrap2: build/cpb2 build/cpb2/adt build/cpb2/driver $(CPARSEROS2) cparser.bootstrap2
+bootstrap2: cparser.bootstrap2
 
 %.c.splint: %.c
 	@echo '===> SPLINT $<'
