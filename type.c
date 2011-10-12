@@ -525,10 +525,7 @@ void print_enum_definition(const enum_t *enume)
 		print_string(entry->base.symbol->string);
 		if (entry->enum_value.value != NULL) {
 			print_string(" = ");
-
-			/* skip the implicit cast */
-			expression_t *expression = entry->enum_value.value;
-			print_expression(expression);
+			print_expression(entry->enum_value.value);
 		}
 		print_string(",\n");
 	}

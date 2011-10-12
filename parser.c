@@ -5705,6 +5705,8 @@ static void parse_compound_declarators(compound_t *compound,
 								token.kind          != ';' ||
 								look_ahead(1)->kind != '}') {
 							errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
+						} else if (compound->members.entities == NULL) {
+							errorf(pos, "flexible array member in otherwise empty struct");
 						}
 					}
 				}
