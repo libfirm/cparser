@@ -653,11 +653,9 @@ static ir_type *create_compound_type(compound_type_t *type,
 	return irtype;
 }
 
-static ir_type *create_enum_type(enum_type_t *const type)
+static void determine_enum_values(enum_type_t *const type)
 {
-	type->base.base.firm_type = ir_type_int;
-
-	ir_mode   *const mode    = mode_int;
+	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);
 
@@ -678,12 +676,16 @@ static ir_type *create_enum_type(enum_type_t *const type)
 			}
 			tv_next = get_Const_tarval(cnst);
 		}
+		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);
 		entry->enum_value.tv = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
 
 	constant_folding = constant_folding_old;
+}
 
+static ir_type *create_enum_type(enum_type_t *const type)
+{
 	return create_atomic_type(type->base.akind, (const type_t*) type);
 }
 
@@ -1527,9 +1529,11 @@ static ir_node *reference_expression_enum_value_to_firm(
 		const reference_expression_t *ref)
 {
 	entity_t *entity = ref->entity;
-	type_t   *type   = skip_typeref(entity->enum_value.enum_type);
-	/* make sure the type is constructed */
-	(void) get_ir_type(type);
+	if (entity->enum_value.tv == NULL) {
+		type_t *type = skip_typeref(entity->enum_value.enum_type);
+		assert(type->kind == TYPE_ENUM);
+		determine_enum_values(&type->enumt);
+	}
 
 	return new_Const(entity->enum_value.tv);
 }
