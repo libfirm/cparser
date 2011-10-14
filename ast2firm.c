@@ -1982,24 +1982,27 @@ static ir_tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 }
 
 static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
-		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile)
+		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile,
+		bool need_return)
 {
 	ir_type *entity_type = get_entity_type(entity);
 	ir_type *base_type   = get_primitive_base_type(entity_type);
-	assert(base_type != NULL);
 	ir_mode *mode        = get_type_mode(base_type);
 
 	value = create_conv(dbgi, value, mode);
 
 	/* kill upper bits of value and shift to right position */
-	int        bitoffset       = get_entity_offset_bits_remainder(entity);
-	int        bitsize         = get_mode_size_bits(get_type_mode(entity_type));
-	ir_tarval *mask            = create_bitfield_mask(mode, 0, bitsize);
-	ir_node   *mask_node       = new_d_Const(dbgi, mask);
-	ir_node   *value_masked    = new_d_And(dbgi, value, mask_node, mode);
-	ir_tarval *shiftl          = new_tarval_from_long(bitoffset, mode_uint);
-	ir_node   *shiftcount      = new_d_Const(dbgi, shiftl);
-	ir_node   *value_maskshift = new_d_Shl(dbgi, value_masked, shiftcount, mode);
+	unsigned  bitoffset  = get_entity_offset_bits_remainder(entity);
+	unsigned  bitsize    = get_mode_size_bits(get_type_mode(entity_type));
+	unsigned  base_bits  = get_mode_size_bits(mode);
+	unsigned  shiftwidth = base_bits - bitsize;
+
+	ir_node  *shiftcount = new_Const_long(mode_uint, shiftwidth);
+	ir_node  *shiftl     = new_d_Shl(dbgi, value, shiftcount, mode);
+
+	unsigned  shrwidth   = base_bits - bitsize - bitoffset;
+	ir_node  *shrconst   = new_Const_long(mode_uint, shrwidth);
+	ir_node  *shiftr     = new_d_Shr(dbgi, shiftl, shrconst, mode);
 
 	/* load current value */
 	ir_node   *mem             = get_store();
@@ -2013,13 +2016,23 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	ir_node   *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node, mode);
 
 	/* construct new value and store */
-	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, value_maskshift, mode);
+	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, shiftr, mode);
 	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val,
 	                                 set_volatile ? cons_volatile : cons_none);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
 
-	return value_masked;
+	if (!need_return)
+		return NULL;
+
+	ir_node *res_shr;
+	ir_node *count_res_shr = new_Const_long(mode_uint, base_bits - bitsize);
+	if (mode_is_signed(mode)) {
+		res_shr = new_d_Shrs(dbgi, shiftl, count_res_shr, mode);
+	} else {
+		res_shr = new_d_Shr(dbgi, shiftl, count_res_shr, mode);
+	}
+	return res_shr;
 }
 
 static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
@@ -2047,8 +2060,8 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 
 	/* kill upper bits */
 	assert(expression->compound_entry->kind == ENTITY_COMPOUND_MEMBER);
-	int        bitoffset   = entity->compound_member.bit_offset;
-	int        bitsize     = entity->compound_member.bit_size;
+	unsigned   bitoffset   = entity->compound_member.bit_offset;
+	unsigned   bitsize     = entity->compound_member.bit_size;
 	unsigned   shift_bitsl = amode_size - bitoffset - bitsize;
 	ir_tarval *tvl         = new_tarval_from_long((long)shift_bitsl, mode_uint);
 	ir_node   *countl      = new_d_Const(dbgi, tvl);
@@ -2123,7 +2136,7 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 			bool       set_volatile
 				= select->base.type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
 			value = bitfield_store_to_firm(dbgi, irentity, addr, value,
-			                               set_volatile);
+			                               set_volatile, true);
 			return value;
 		}
 	}
@@ -4091,7 +4104,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 	/* is it a bitfield type? */
 	if (is_Primitive_type(ent_type) &&
 			get_primitive_base_type(ent_type) != NULL) {
-		bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+		bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 		return;
 	}
 
@@ -4115,7 +4128,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		/* is it a bitfield type? */
 		if (is_Primitive_type(ent_type) &&
 				get_primitive_base_type(ent_type) != NULL) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+			bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 			return;
 		}
 
@@ -4134,7 +4147,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		/* is it a bitfield type? */
 		if (is_Primitive_type(ent_type) &&
 				get_primitive_base_type(ent_type) != NULL) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false);
+			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false, false);
 			return;
 		}
 
