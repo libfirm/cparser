@@ -75,6 +75,7 @@ all: $(GOAL)
 
 -include $(DEPENDS)
 
+$(SOURCES): config.h
 config.h:
 	cp config.h.in $@
 
