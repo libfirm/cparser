@@ -1668,7 +1668,7 @@ int main(int argc, char **argv)
 	init_basic_types();
 	if (wchar_atomic_kind == ATOMIC_TYPE_INT)
 		init_wchar_types(type_int);
-	else if (wchar_atomic_kind == ATOMIC_TYPE_SHORT)
+	else if (wchar_atomic_kind == ATOMIC_TYPE_USHORT)
 		init_wchar_types(type_short);
 	else
 		panic("unexpected wchar type");
