@@ -5612,10 +5612,6 @@ static void create_function(entity_t *entity)
 	if (entity->function.statement == NULL)
 		return;
 
-	if (is_main(entity) && enable_main_collect2_hack) {
-		prepare_main_collect2(entity);
-	}
-
 	inner_functions     = NULL;
 	current_trampolines = NULL;
 

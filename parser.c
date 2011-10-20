@@ -5321,6 +5321,22 @@ warn_unreachable:
 	}
 }
 
+static bool is_main(entity_t *entity)
+{
+	static symbol_t *sym_main = NULL;
+	if (sym_main == NULL) {
+		sym_main = symbol_table_insert("main");
+	}
+
+	if (entity->base.symbol != sym_main)
+		return false;
+	/* must be in outermost scope */
+	if (entity->base.parent_scope != file_scope)
+		return false;
+
+	return true;
+}
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -5469,6 +5485,9 @@ static void parse_external_declaration(void)
 				warningf(WARN_MISSING_NORETURN, pos, "function '%#N' is candidate for attribute 'noreturn'", entity);
 			}
 		}
+
+		if (is_main(entity) && enable_main_collect2_hack)
+			prepare_main_collect2(entity);
 
 		POP_PARENT();
 		assert(current_function == function);
@@ -10573,6 +10592,8 @@ static void complete_incomplete_arrays(void)
 
 void prepare_main_collect2(entity_t *entity)
 {
+	PUSH_SCOPE(&entity->function.statement->compound.scope);
+
 	// create call to __main
 	symbol_t *symbol         = symbol_table_insert("__main");
 	entity_t *subsubmain_ent
@@ -10599,6 +10620,8 @@ void prepare_main_collect2(entity_t *entity)
 
 	expr_statement->base.next = compounds->statements;
 	compounds->statements     = expr_statement;
+
+	POP_SCOPE();
 }
 
 void parse(void)
