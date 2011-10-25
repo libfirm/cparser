@@ -943,8 +943,10 @@ static void init_types_and_adjust(void)
 
 	/* adjust types as requested by target architecture */
 	ir_type *type_long_double = be_params->type_long_double;
-	if (type_long_double != NULL)
+	if (type_long_double != NULL) {
 		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_long_double);
+		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_long_double);
+	}
 
 	ir_type *type_long_long = be_params->type_long_long;
 	if (type_long_long != NULL)
@@ -1010,15 +1012,11 @@ static void init_types_and_adjust(void)
 
 	/* initialize firm pointer modes */
 	char               name[64];
-	ir_mode_sort       sort         = irms_reference;
 	unsigned           bit_size     = machine_size;
-	bool               is_signed    = 0;
-	ir_mode_arithmetic arithmetic   = irma_twos_complement;
 	unsigned           modulo_shift = decide_modulo_shift(bit_size);
 
 	snprintf(name, sizeof(name), "p%u", machine_size);
-	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-	                                modulo_shift);
+	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
 
 	if (machine_size == 16) {
 		set_reference_mode_signed_eq(ptr_mode, mode_Hs);

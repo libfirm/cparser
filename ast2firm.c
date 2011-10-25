@@ -111,8 +111,6 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
 
-static ir_mode *get_ir_mode_storage(type_t *type);
-
 static ir_type *get_ir_type_incomplete(type_t *type);
 
 static void enqueue_inner_function(entity_t *entity)
@@ -175,9 +173,7 @@ static void set_unreachable_now(void)
 	set_cur_block(NULL);
 }
 
-static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
-
-static ir_mode *mode_int, *mode_uint;
+ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
@@ -196,30 +192,24 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
-	if ( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
-			&& !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+	if ((flags & ATOMIC_TYPE_FLAG_FLOAT)
+	    && !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+		if (size == 4) {
+			return get_modeF();
+		} else if (size == 8) {
+			return get_modeD();
+		} else {
+			panic("unexpected kind");
+		}
+	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 		char            name[64];
-		ir_mode_sort    sort;
 		unsigned        bit_size     = size * 8;
 		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
-		unsigned        modulo_shift = 0;
-		ir_mode_arithmetic arithmetic;
+		unsigned        modulo_shift = decide_modulo_shift(bit_size);
 
-		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
-			assert(! (flags & ATOMIC_TYPE_FLAG_FLOAT));
-			snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U",
-			         bit_size);
-			sort         = irms_int_number;
-			arithmetic   = irma_twos_complement;
-			modulo_shift = decide_modulo_shift(bit_size);
-		} else {
-			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
-			snprintf(name, sizeof(name), "F%u", bit_size);
-			sort         = irms_float_number;
-			arithmetic   = irma_ieee754;
-		}
-		return new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-		                   modulo_shift);
+		snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U", bit_size);
+		return new_int_mode(name, irma_twos_complement, bit_size, is_signed,
+		                    modulo_shift);
 	}
 
 	return NULL;
@@ -230,14 +220,12 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
  */
 static void init_atomic_modes(void)
 {
+	atomic_modes[ATOMIC_TYPE_VOID] = mode_ANY;
 	for (int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
+		if (atomic_modes[i] != NULL)
+			continue;
 		atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
 	}
-	mode_int  = atomic_modes[ATOMIC_TYPE_INT];
-	mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
-
-	/* there's no real void type in firm */
-	atomic_modes[ATOMIC_TYPE_VOID] = atomic_modes[ATOMIC_TYPE_CHAR];
 }
 
 ir_mode *get_atomic_mode(atomic_type_kind_t kind)
@@ -254,27 +242,6 @@ static ir_node *get_vla_size(array_type_t *const type)
 		type->size_node = size_node;
 	}
 	return size_node;
-}
-
-/**
- * Return a node representing the size of a type.
- */
-static ir_node *get_type_size_node(type_t *type)
-{
-	type = skip_typeref(type);
-
-	if (is_type_array(type) && type->array.is_vla) {
-		ir_node *size_node = get_vla_size(&type->array);
-		ir_node *elem_size = get_type_size_node(type->array.element_type);
-		ir_mode *mode      = get_irn_mode(size_node);
-		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
-		return real_size;
-	}
-
-	ir_mode *mode = get_ir_mode_storage(type_size_t);
-	symconst_symbol sym;
-	sym.type_p = get_ir_type(type);
-	return new_SymConst(mode, sym, symconst_type_size);
 }
 
 static unsigned count_parameters(const function_type_t *function_type)
@@ -299,6 +266,7 @@ static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
 	ir_type        *irtype    = new_d_type_primitive(mode, dbgi);
 	il_alignment_t  alignment = get_atomic_type_alignment(akind);
 
+	set_type_size_bytes(irtype, get_atomic_type_size(akind));
 	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
@@ -494,8 +462,7 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 		char name[32];
 
 		snprintf(name, sizeof(name), "bf_I%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 1, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
+		mode = new_int_mode(name, irma_twos_complement, size, 1, 0);
 		s_modes[size] = mode;
 	}
 
@@ -527,8 +494,7 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 		char name[32];
 
 		snprintf(name, sizeof(name), "bf_U%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 0, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
+		mode = new_int_mode(name, irma_twos_complement, size, 0, 0);
 		u_modes[size] = mode;
 	}
 
@@ -795,6 +761,26 @@ static ir_mode *get_ir_mode_arithmetic(type_t *type)
 	}
 
 	return mode;
+}
+
+/**
+ * Return a node representing the size of a type.
+ */
+static ir_node *get_type_size_node(type_t *type)
+{
+	unsigned size;
+	ir_mode *mode = get_ir_mode_arithmetic(type_size_t);
+	type = skip_typeref(type);
+
+	if (is_type_array(type) && type->array.is_vla) {
+		ir_node *size_node = get_vla_size(&type->array);
+		ir_node *elem_size = get_type_size_node(type->array.element_type);
+		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
+		return real_size;
+	}
+
+	size = get_type_size(type);
+	return new_Const_long(mode, size);
 }
 
 /** Names of the runtime functions. */
@@ -1756,12 +1742,14 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
+		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
 	}
 	case BUILTIN_ROTR: {
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
+		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
 		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
 		return new_d_Rotl(dbgi, val, sub, mode);
@@ -1967,6 +1955,7 @@ static ir_tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 {
 	ir_tarval *all_one   = get_mode_all_one(mode);
 	int        mode_size = get_mode_size_bits(mode);
+	ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	assert(offset >= 0);
 	assert(size   >= 0);
@@ -1992,6 +1981,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	ir_type *entity_type = get_entity_type(entity);
 	ir_type *base_type   = get_primitive_base_type(entity_type);
 	ir_mode *mode        = get_type_mode(base_type);
+	ir_mode *mode_uint   = atomic_modes[ATOMIC_TYPE_UINT];
 
 	value = create_conv(dbgi, value, mode);
 
@@ -2050,6 +2040,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	ir_node  *load      = new_d_Load(dbgi, mem, addr, mode, cons_none);
 	ir_node  *load_mem  = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res  = new_d_Proj(dbgi, load, mode, pn_Load_res);
+	ir_mode  *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	ir_mode  *amode     = mode;
 	/* optimisation, since shifting in modes < machine_size is usually
@@ -2529,7 +2520,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		mode  = get_ir_mode_arithmetic(expression->base.type);
-		right = create_conv(dbgi, right, mode_uint);
+		right = create_conv(dbgi, right, atomic_modes[ATOMIC_TYPE_UINT]);
 		break;
 
 	case EXPR_BINARY_SUB:
@@ -3078,9 +3069,9 @@ static ir_node *select_addr(const select_expression_t *expression)
 	assert(entry->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
 
 	if (constant_folding) {
-		ir_mode *mode = get_irn_mode(compound_addr);
-		/* FIXME: here, we need an integer mode with the same number of bits as mode */
-		ir_node *ofs  = new_Const_long(mode_uint, entry->compound_member.offset);
+		ir_mode *mode      = get_irn_mode(compound_addr);
+		ir_mode *mode_uint = get_reference_mode_unsigned_eq(mode);
+		ir_node *ofs       = new_Const_long(mode_uint, entry->compound_member.offset);
 		return new_d_Add(dbgi, compound_addr, ofs, mode);
 	} else {
 		ir_entity *irentity = entry->compound_member.entity;
@@ -3205,7 +3196,8 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 
 make_const:;
 	dbg_info  *const dbgi = get_dbg_info(&expr->base.source_position);
-	ir_tarval *const tv   = new_tarval_from_long(tc, mode_int);
+	ir_mode   *const mode = atomic_modes[ATOMIC_TYPE_INT];
+	ir_tarval *const tv   = new_tarval_from_long(tc, mode);
 	return new_d_Const(dbgi, tv);
 }
 
@@ -4091,6 +4083,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 		assert(has_array_upper_bound(ent_type, 0));
 		long n = get_array_upper_bound_int(ent_type, 0);
 		for (long i = 0; i < n; ++i) {
+			ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 			ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
 			ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 			ir_node   *in[1]    = { cnst };
@@ -4181,6 +4174,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			ir_type   *irtype;
 			ir_entity *sub_entity;
 			if (is_Array_type(type)) {
+				ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 				ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 				ir_node   *in[1]    = { cnst };
