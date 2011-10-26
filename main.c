@@ -536,7 +536,7 @@ static void print_cparser_version(void)
 
 	const char *revision = ir_get_version_revision();
 	if (revision[0] != 0) {
-		putchar(' ');
+		putchar('-');
 		fputs(revision, stdout);
 	}
 
