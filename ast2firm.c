@@ -1422,7 +1422,7 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-	return new_Proj(irn, mode, pn_Builtin_1_result);
+	return new_Proj(irn, mode, pn_Builtin_max+1);
 }
 
 /**
@@ -1880,7 +1880,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
-			result = new_Proj(node, mode, pn_Builtin_1_result);
+			result = new_Proj(node, mode, pn_Builtin_max+1);
 			ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
 			result              = create_conv(NULL, result, mode_arith);
 		}
