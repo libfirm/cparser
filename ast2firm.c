@@ -76,7 +76,7 @@ static unsigned stack_param_align;
 static int        next_value_number_function;
 static ir_node   *continue_label;
 static ir_node   *break_label;
-static ir_node   *current_switch_cond;
+static ir_node   *current_switch;
 static bool       saw_default_label;
 static label_t  **all_labels;
 static entity_t **inner_functions;
@@ -86,7 +86,6 @@ static bool       constant_folding;
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
-static switch_statement_t *current_switch;
 static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
 static trampoline_region  *current_trampolines;
@@ -4913,85 +4912,64 @@ static void create_jump_statement(const statement_t *statement,
 	set_unreachable_now();
 }
 
+static ir_switch_table *create_switch_table(const switch_statement_t *statement)
+{
+	/* determine number of cases */
+	size_t n_cases = 0;
+	for (case_label_statement_t *l = statement->first_case; l != NULL;
+	     l = l->next) {
+		/* default case */
+		if (l->expression == NULL)
+			continue;
+		if (l->is_empty_range)
+			continue;
+		++n_cases;
+	}
+
+	ir_switch_table *res = ir_new_switch_table(current_ir_graph, n_cases);
+	size_t           i   = 0;
+	for (case_label_statement_t *l = statement->first_case; l != NULL;
+	     l = l->next) {
+	    if (l->expression == NULL) {
+			l->pn = pn_Switch_default;
+			continue;
+		}
+		if (l->is_empty_range)
+			continue;
+		ir_tarval *min = fold_constant_to_tarval(l->expression);
+		ir_tarval *max = min;
+		long       pn  = (long) i+1;
+		if (l->end_range != NULL)
+			max = fold_constant_to_tarval(l->end_range);
+		ir_switch_table_set(res, i++, min, max, pn);
+		l->pn = pn;
+	}
+	return res;
+}
+
 static void switch_statement_to_firm(switch_statement_t *statement)
 {
 	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
-	ir_node  *cond        = NULL;
+	ir_node  *switch_node = NULL;
 
 	if (currently_reachable()) {
 		ir_node *expression = expression_to_firm(statement->expression);
-		cond                = new_d_Cond(dbgi, expression);
-		first_block         = get_cur_block();
+		ir_switch_table *table = create_switch_table(statement);
+		unsigned n_outs = (unsigned)ir_switch_table_get_n_entries(table) + 1;
+
+		switch_node = new_d_Switch(dbgi, expression, n_outs, table);
+		first_block = get_cur_block();
 	}
 
 	set_unreachable_now();
 
-	ir_node *const old_switch_cond       = current_switch_cond;
+	ir_node *const old_switch            = current_switch;
 	ir_node *const old_break_label       = break_label;
 	const bool     old_saw_default_label = saw_default_label;
 	saw_default_label                    = false;
-	current_switch_cond                  = cond;
+	current_switch                       = switch_node;
 	break_label                          = NULL;
-	switch_statement_t *const old_switch = current_switch;
-	current_switch                       = statement;
-
-	/* determine a free number for the default label */
-	unsigned long num_cases       = 0;
-	long          default_proj_nr = 0;
-	for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
-		if (l->expression == NULL) {
-			/* default case */
-			continue;
-		}
-		if (l->last_case >= l->first_case)
-			num_cases += l->last_case - l->first_case + 1;
-		if (l->last_case > default_proj_nr)
-			default_proj_nr = l->last_case;
-	}
-
-	if (default_proj_nr == LONG_MAX) {
-		/* Bad: an overflow will occur, we cannot be sure that the
-		 * maximum + 1 is a free number. Scan the values a second
-		 * time to find a free number.
-		 */
-		unsigned char *bits = xmalloc((num_cases + 7) >> 3);
-
-		memset(bits, 0, (num_cases + 7) >> 3);
-		for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
-			if (l->expression == NULL) {
-				/* default case */
-				continue;
-			}
-			unsigned long start = l->first_case > 0 ? (unsigned long)l->first_case : 0;
-			if (start < num_cases && l->last_case >= 0) {
-				unsigned long end  = (unsigned long)l->last_case < num_cases ?
-					(unsigned long)l->last_case : num_cases - 1;
-				for (unsigned long cns = start; cns <= end; ++cns) {
-					bits[cns >> 3] |= (1 << (cns & 7));
-				}
-			}
-		}
-		/* We look at the first num_cases constants:
-		 * Either they are dense, so we took the last (num_cases)
-		 * one, or they are not dense, so we will find one free
-		 * there...
-		 */
-		unsigned long i;
-		for (i = 0; i < num_cases; ++i)
-			if ((bits[i >> 3] & (1 << (i & 7))) == 0)
-				break;
-
-		free(bits);
-		default_proj_nr = i;
-	} else {
-		++default_proj_nr;
-	}
-	statement->default_proj_nr = default_proj_nr;
-	/* safety check: cond might already be folded to a Bad */
-	if (cond != NULL && is_Cond(cond)) {
-		set_Cond_default_proj(cond, default_proj_nr);
-	}
 
 	statement_to_firm(statement->body);
 
@@ -4999,7 +4977,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 	if (!saw_default_label && first_block != NULL) {
 		set_cur_block(first_block);
-		ir_node *const proj = new_d_Proj(dbgi, cond, mode_X, default_proj_nr);
+		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
 		add_immBlock_pred(get_break_label(), proj);
 	}
 
@@ -5008,11 +4986,10 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	}
 	set_cur_block(break_label);
 
-	assert(current_switch_cond == cond);
-	current_switch      = old_switch;
-	current_switch_cond = old_switch_cond;
-	break_label         = old_break_label;
-	saw_default_label   = old_saw_default_label;
+	assert(current_switch == switch_node);
+	current_switch    = old_switch;
+	break_label       = old_break_label;
+	saw_default_label = old_saw_default_label;
 }
 
 static void case_label_to_firm(const case_label_statement_t *statement)
@@ -5020,32 +4997,19 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	if (statement->is_empty_range)
 		return;
 
-	ir_node *block = new_immBlock();
-	/* Fallthrough from previous case */
-	jump_if_reachable(block);
+	if (current_switch != NULL) {
+		ir_node *block = new_immBlock();
+		/* Fallthrough from previous case */
+		jump_if_reachable(block);
 
-	if (current_switch_cond != NULL) {
-		set_cur_block(get_nodes_block(current_switch_cond));
-		dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
-		if (statement->expression != NULL) {
-			long pn     = statement->first_case;
-			long end_pn = statement->last_case;
-			assert(pn <= end_pn);
-			/* create jumps for all cases in the given range */
-			do {
-				ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
-				add_immBlock_pred(block, proj);
-			} while (pn++ < end_pn);
-		} else {
+		ir_node  *const proj = new_Proj(current_switch, mode_X, statement->pn);
+		add_immBlock_pred(block, proj);
+		if (statement->expression == NULL)
 			saw_default_label = true;
-			ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X,
-			                                 current_switch->default_proj_nr);
-			add_immBlock_pred(block, proj);
-		}
-	}
 
-	mature_immBlock(block);
-	set_cur_block(block);
+		mature_immBlock(block);
+		set_cur_block(block);
+	}
 
 	statement_to_firm(statement->statement);
 }
@@ -5875,7 +5839,7 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	/* just to be sure */
 	continue_label           = NULL;
 	break_label              = NULL;
-	current_switch_cond      = NULL;
+	current_switch           = NULL;
 	current_translation_unit = unit;
 
 	init_ir_types();
