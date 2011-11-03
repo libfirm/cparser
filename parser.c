@@ -5321,6 +5321,22 @@ warn_unreachable:
 	}
 }
 
+static bool is_main(entity_t *entity)
+{
+	static symbol_t *sym_main = NULL;
+	if (sym_main == NULL) {
+		sym_main = symbol_table_insert("main");
+	}
+
+	if (entity->base.symbol != sym_main)
+		return false;
+	/* must be in outermost scope */
+	if (entity->base.parent_scope != file_scope)
+		return false;
+
+	return true;
+}
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -5469,6 +5485,9 @@ static void parse_external_declaration(void)
 				warningf(WARN_MISSING_NORETURN, pos, "function '%#N' is candidate for attribute 'noreturn'", entity);
 			}
 		}
+
+		if (is_main(entity) && enable_main_collect2_hack)
+			prepare_main_collect2(entity);
 
 		POP_PARENT();
 		assert(current_function == function);
@@ -9084,7 +9103,22 @@ static statement_t *parse_case_statement(void)
 
 	eat(T_case);
 
-	expression_t *const expression   = parse_expression();
+	expression_t *expression = parse_expression();
+	type_t *expression_type = expression->base.type;
+	type_t *skipped         = skip_typeref(expression_type);
+	if (!is_type_integer(skipped) && is_type_valid(skipped)) {
+		errorf(pos, "case expression '%E' must have integer type but has type '%T'",
+		       expression, expression_type);
+	}
+
+	type_t *type = expression_type;
+	if (current_switch != NULL) {
+		type_t *switch_type = current_switch->expression->base.type;
+		if (is_type_valid(switch_type)) {
+			expression = create_implicit_cast(expression, switch_type);
+		}
+	}
+
 	statement->case_label.expression = expression;
 	expression_classification_t const expr_class = is_constant_expression(expression);
 	if (expr_class != EXPR_CLASS_CONSTANT) {
@@ -9100,7 +9134,15 @@ static statement_t *parse_case_statement(void)
 
 	if (GNU_MODE) {
 		if (next_if(T_DOTDOTDOT)) {
-			expression_t *const end_range   = parse_expression();
+			expression_t *end_range = parse_expression();
+			expression_type = expression->base.type;
+			skipped         = skip_typeref(expression_type);
+			if (!is_type_integer(skipped) && is_type_valid(skipped)) {
+				errorf(pos, "case expression '%E' must have integer type but has type '%T'",
+					   expression, expression_type);
+			}
+
+			end_range = create_implicit_cast(end_range, type);
 			statement->case_label.end_range = end_range;
 			expression_classification_t const end_class = is_constant_expression(end_range);
 			if (end_class != EXPR_CLASS_CONSTANT) {
@@ -10573,6 +10615,8 @@ static void complete_incomplete_arrays(void)
 
 void prepare_main_collect2(entity_t *entity)
 {
+	PUSH_SCOPE(&entity->function.statement->compound.scope);
+
 	// create call to __main
 	symbol_t *symbol         = symbol_table_insert("__main");
 	entity_t *subsubmain_ent
@@ -10599,6 +10643,8 @@ void prepare_main_collect2(entity_t *entity)
 
 	expr_statement->base.next = compounds->statements;
 	compounds->statements     = expr_statement;
+
+	POP_SCOPE();
 }
 
 void parse(void)

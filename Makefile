@@ -75,6 +75,7 @@ all: $(GOAL)
 
 -include $(DEPENDS)
 
+$(SOURCES): config.h
 config.h:
 	cp config.h.in $@
 
@@ -103,7 +104,7 @@ endif
 
 $(GOAL): $(FIRM_HOME)/$(LIBFIRM_FILE) $(OBJECTS)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(OBJECTS) $(LFLAGS) $(FIRM_HOME)/$(LIBFIRM_FILE) -o $(GOAL)
+	$(Q)$(CC) $(OBJECTS) $(FIRM_HOME)/$(LIBFIRM_FILE) -o $(GOAL) $(LFLAGS)
 
 splint: $(SPLINTS)
 

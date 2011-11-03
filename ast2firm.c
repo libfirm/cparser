@@ -76,7 +76,7 @@ static unsigned stack_param_align;
 static int        next_value_number_function;
 static ir_node   *continue_label;
 static ir_node   *break_label;
-static ir_node   *current_switch_cond;
+static ir_node   *current_switch;
 static bool       saw_default_label;
 static label_t  **all_labels;
 static entity_t **inner_functions;
@@ -86,7 +86,6 @@ static bool       constant_folding;
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
-static switch_statement_t *current_switch;
 static ir_graph           *current_function;
 static translation_unit_t *current_translation_unit;
 static trampoline_region  *current_trampolines;
@@ -110,8 +109,6 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_COMPOUND_MEMBER,
 	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
-
-static ir_mode *get_ir_mode_storage(type_t *type);
 
 static ir_type *get_ir_type_incomplete(type_t *type);
 
@@ -175,9 +172,7 @@ static void set_unreachable_now(void)
 	set_cur_block(NULL);
 }
 
-static ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
-
-static ir_mode *mode_int, *mode_uint;
+ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
@@ -196,30 +191,24 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
-	if ( (flags & (ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_FLOAT))
-			&& !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+	if ((flags & ATOMIC_TYPE_FLAG_FLOAT)
+	    && !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+		if (size == 4) {
+			return get_modeF();
+		} else if (size == 8) {
+			return get_modeD();
+		} else {
+			panic("unexpected kind");
+		}
+	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 		char            name[64];
-		ir_mode_sort    sort;
 		unsigned        bit_size     = size * 8;
 		bool            is_signed    = (flags & ATOMIC_TYPE_FLAG_SIGNED) != 0;
-		unsigned        modulo_shift = 0;
-		ir_mode_arithmetic arithmetic;
+		unsigned        modulo_shift = decide_modulo_shift(bit_size);
 
-		if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
-			assert(! (flags & ATOMIC_TYPE_FLAG_FLOAT));
-			snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U",
-			         bit_size);
-			sort         = irms_int_number;
-			arithmetic   = irma_twos_complement;
-			modulo_shift = decide_modulo_shift(bit_size);
-		} else {
-			assert(flags & ATOMIC_TYPE_FLAG_FLOAT);
-			snprintf(name, sizeof(name), "F%u", bit_size);
-			sort         = irms_float_number;
-			arithmetic   = irma_ieee754;
-		}
-		return new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-		                   modulo_shift);
+		snprintf(name, sizeof(name), "%s%u", is_signed ? "I" : "U", bit_size);
+		return new_int_mode(name, irma_twos_complement, bit_size, is_signed,
+		                    modulo_shift);
 	}
 
 	return NULL;
@@ -230,14 +219,12 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
  */
 static void init_atomic_modes(void)
 {
+	atomic_modes[ATOMIC_TYPE_VOID] = mode_ANY;
 	for (int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
+		if (atomic_modes[i] != NULL)
+			continue;
 		atomic_modes[i] = init_atomic_ir_mode((atomic_type_kind_t) i);
 	}
-	mode_int  = atomic_modes[ATOMIC_TYPE_INT];
-	mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
-
-	/* there's no real void type in firm */
-	atomic_modes[ATOMIC_TYPE_VOID] = atomic_modes[ATOMIC_TYPE_CHAR];
 }
 
 ir_mode *get_atomic_mode(atomic_type_kind_t kind)
@@ -254,27 +241,6 @@ static ir_node *get_vla_size(array_type_t *const type)
 		type->size_node = size_node;
 	}
 	return size_node;
-}
-
-/**
- * Return a node representing the size of a type.
- */
-static ir_node *get_type_size_node(type_t *type)
-{
-	type = skip_typeref(type);
-
-	if (is_type_array(type) && type->array.is_vla) {
-		ir_node *size_node = get_vla_size(&type->array);
-		ir_node *elem_size = get_type_size_node(type->array.element_type);
-		ir_mode *mode      = get_irn_mode(size_node);
-		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
-		return real_size;
-	}
-
-	ir_mode *mode = get_ir_mode_storage(type_size_t);
-	symconst_symbol sym;
-	sym.type_p = get_ir_type(type);
-	return new_SymConst(mode, sym, symconst_type_size);
 }
 
 static unsigned count_parameters(const function_type_t *function_type)
@@ -299,6 +265,7 @@ static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
 	ir_type        *irtype    = new_d_type_primitive(mode, dbgi);
 	il_alignment_t  alignment = get_atomic_type_alignment(akind);
 
+	set_type_size_bytes(irtype, get_atomic_type_size(akind));
 	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
@@ -494,8 +461,7 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 		char name[32];
 
 		snprintf(name, sizeof(name), "bf_I%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 1, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
+		mode = new_int_mode(name, irma_twos_complement, size, 1, 0);
 		s_modes[size] = mode;
 	}
 
@@ -527,8 +493,7 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 		char name[32];
 
 		snprintf(name, sizeof(name), "bf_U%u", size);
-		mode = new_ir_mode(name, irms_int_number, size, 0, irma_twos_complement,
-		                   size <= 32 ? 32 : size );
+		mode = new_int_mode(name, irma_twos_complement, size, 0, 0);
 		u_modes[size] = mode;
 	}
 
@@ -653,11 +618,9 @@ static ir_type *create_compound_type(compound_type_t *type,
 	return irtype;
 }
 
-static ir_type *create_enum_type(enum_type_t *const type)
+static void determine_enum_values(enum_type_t *const type)
 {
-	type->base.base.firm_type = ir_type_int;
-
-	ir_mode   *const mode    = mode_int;
+	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);
 
@@ -678,12 +641,16 @@ static ir_type *create_enum_type(enum_type_t *const type)
 			}
 			tv_next = get_Const_tarval(cnst);
 		}
+		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);
 		entry->enum_value.tv = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
 
 	constant_folding = constant_folding_old;
+}
 
+static ir_type *create_enum_type(enum_type_t *const type)
+{
 	return create_atomic_type(type->base.akind, (const type_t*) type);
 }
 
@@ -793,6 +760,26 @@ static ir_mode *get_ir_mode_arithmetic(type_t *type)
 	}
 
 	return mode;
+}
+
+/**
+ * Return a node representing the size of a type.
+ */
+static ir_node *get_type_size_node(type_t *type)
+{
+	unsigned size;
+	ir_mode *mode = get_ir_mode_arithmetic(type_size_t);
+	type = skip_typeref(type);
+
+	if (is_type_array(type) && type->array.is_vla) {
+		ir_node *size_node = get_vla_size(&type->array);
+		ir_node *elem_size = get_type_size_node(type->array.element_type);
+		ir_node *real_size = new_d_Mul(NULL, size_node, elem_size, mode);
+		return real_size;
+	}
+
+	size = get_type_size(type);
+	return new_Const_long(mode, size);
 }
 
 /** Names of the runtime functions. */
@@ -1434,7 +1421,7 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 
 	ir_node *irn = new_d_Builtin(dbgi, get_store(), 3, in, ir_bk_inner_trampoline, get_unknown_type());
 	set_store(new_Proj(irn, mode_M, pn_Builtin_M));
-	return new_Proj(irn, mode, pn_Builtin_1_result);
+	return new_Proj(irn, mode, pn_Builtin_max+1);
 }
 
 /**
@@ -1447,14 +1434,18 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 		                      ir_node *const addr)
 {
-	ir_type *irtype = get_ir_type(type);
+	type_t *skipped = skip_typeref(type);
+	if (is_type_incomplete(skipped))
+		return addr;
+
+	ir_type *irtype = get_ir_type(skipped);
 	if (is_compound_type(irtype)
-			|| is_Method_type(irtype)
-			|| is_Array_type(irtype)) {
+	    || is_Method_type(irtype)
+	    || is_Array_type(irtype)) {
 		return addr;
 	}
 
-	ir_cons_flags  flags    = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
+	ir_cons_flags  flags    = skipped->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 	                          ? cons_volatile : cons_none;
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
@@ -1464,7 +1455,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 
 	set_store(load_mem);
 
-	ir_mode *const mode_arithmetic = get_ir_mode_arithmetic(type);
+	ir_mode *const mode_arithmetic = get_ir_mode_arithmetic(skipped);
 	return create_conv(dbgi, load_res, mode_arithmetic);
 }
 
@@ -1527,9 +1518,11 @@ static ir_node *reference_expression_enum_value_to_firm(
 		const reference_expression_t *ref)
 {
 	entity_t *entity = ref->entity;
-	type_t   *type   = skip_typeref(entity->enum_value.enum_type);
-	/* make sure the type is constructed */
-	(void) get_ir_type(type);
+	if (entity->enum_value.tv == NULL) {
+		type_t *type = skip_typeref(entity->enum_value.enum_type);
+		assert(type->kind == TYPE_ENUM);
+		determine_enum_values(&type->enumt);
+	}
 
 	return new_Const(entity->enum_value.tv);
 }
@@ -1748,12 +1741,14 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
+		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
 	}
 	case BUILTIN_ROTR: {
 		ir_node *val  = expression_to_firm(call->arguments->expression);
 		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
+		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
 		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
 		return new_d_Rotl(dbgi, val, sub, mode);
@@ -1884,7 +1879,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
-			result = new_Proj(node, mode, pn_Builtin_1_result);
+			result = new_Proj(node, mode, pn_Builtin_max+1);
 			ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
 			result              = create_conv(NULL, result, mode_arith);
 		}
@@ -1959,6 +1954,7 @@ static ir_tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 {
 	ir_tarval *all_one   = get_mode_all_one(mode);
 	int        mode_size = get_mode_size_bits(mode);
+	ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	assert(offset >= 0);
 	assert(size   >= 0);
@@ -1978,24 +1974,28 @@ static ir_tarval *create_bitfield_mask(ir_mode *mode, int offset, int size)
 }
 
 static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
-		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile)
+		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile,
+		bool need_return)
 {
 	ir_type *entity_type = get_entity_type(entity);
 	ir_type *base_type   = get_primitive_base_type(entity_type);
-	assert(base_type != NULL);
 	ir_mode *mode        = get_type_mode(base_type);
+	ir_mode *mode_uint   = atomic_modes[ATOMIC_TYPE_UINT];
 
 	value = create_conv(dbgi, value, mode);
 
 	/* kill upper bits of value and shift to right position */
-	int        bitoffset       = get_entity_offset_bits_remainder(entity);
-	int        bitsize         = get_mode_size_bits(get_type_mode(entity_type));
-	ir_tarval *mask            = create_bitfield_mask(mode, 0, bitsize);
-	ir_node   *mask_node       = new_d_Const(dbgi, mask);
-	ir_node   *value_masked    = new_d_And(dbgi, value, mask_node, mode);
-	ir_tarval *shiftl          = new_tarval_from_long(bitoffset, mode_uint);
-	ir_node   *shiftcount      = new_d_Const(dbgi, shiftl);
-	ir_node   *value_maskshift = new_d_Shl(dbgi, value_masked, shiftcount, mode);
+	unsigned  bitoffset  = get_entity_offset_bits_remainder(entity);
+	unsigned  bitsize    = get_mode_size_bits(get_type_mode(entity_type));
+	unsigned  base_bits  = get_mode_size_bits(mode);
+	unsigned  shiftwidth = base_bits - bitsize;
+
+	ir_node  *shiftcount = new_Const_long(mode_uint, shiftwidth);
+	ir_node  *shiftl     = new_d_Shl(dbgi, value, shiftcount, mode);
+
+	unsigned  shrwidth   = base_bits - bitsize - bitoffset;
+	ir_node  *shrconst   = new_Const_long(mode_uint, shrwidth);
+	ir_node  *shiftr     = new_d_Shr(dbgi, shiftl, shrconst, mode);
 
 	/* load current value */
 	ir_node   *mem             = get_store();
@@ -2009,13 +2009,23 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 	ir_node   *load_res_masked = new_d_And(dbgi, load_res, inv_mask_node, mode);
 
 	/* construct new value and store */
-	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, value_maskshift, mode);
+	ir_node *new_val   = new_d_Or(dbgi, load_res_masked, shiftr, mode);
 	ir_node *store     = new_d_Store(dbgi, load_mem, addr, new_val,
 	                                 set_volatile ? cons_volatile : cons_none);
 	ir_node *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 	set_store(store_mem);
 
-	return value_masked;
+	if (!need_return)
+		return NULL;
+
+	ir_node *res_shr;
+	ir_node *count_res_shr = new_Const_long(mode_uint, base_bits - bitsize);
+	if (mode_is_signed(mode)) {
+		res_shr = new_d_Shrs(dbgi, shiftl, count_res_shr, mode);
+	} else {
+		res_shr = new_d_Shr(dbgi, shiftl, count_res_shr, mode);
+	}
+	return res_shr;
 }
 
 static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
@@ -2029,6 +2039,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 	ir_node  *load      = new_d_Load(dbgi, mem, addr, mode, cons_none);
 	ir_node  *load_mem  = new_d_Proj(dbgi, load, mode_M, pn_Load_M);
 	ir_node  *load_res  = new_d_Proj(dbgi, load, mode, pn_Load_res);
+	ir_mode  *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 
 	ir_mode  *amode     = mode;
 	/* optimisation, since shifting in modes < machine_size is usually
@@ -2043,8 +2054,8 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 
 	/* kill upper bits */
 	assert(expression->compound_entry->kind == ENTITY_COMPOUND_MEMBER);
-	int        bitoffset   = entity->compound_member.bit_offset;
-	int        bitsize     = entity->compound_member.bit_size;
+	unsigned   bitoffset   = entity->compound_member.bit_offset;
+	unsigned   bitsize     = entity->compound_member.bit_size;
 	unsigned   shift_bitsl = amode_size - bitoffset - bitsize;
 	ir_tarval *tvl         = new_tarval_from_long((long)shift_bitsl, mode_uint);
 	ir_node   *countl      = new_d_Const(dbgi, tvl);
@@ -2119,7 +2130,7 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 			bool       set_volatile
 				= select->base.type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
 			value = bitfield_store_to_firm(dbgi, irentity, addr, value,
-			                               set_volatile);
+			                               set_volatile, true);
 			return value;
 		}
 	}
@@ -2508,7 +2519,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		mode  = get_ir_mode_arithmetic(expression->base.type);
-		right = create_conv(dbgi, right, mode_uint);
+		right = create_conv(dbgi, right, atomic_modes[ATOMIC_TYPE_UINT]);
 		break;
 
 	case EXPR_BINARY_SUB:
@@ -3057,9 +3068,9 @@ static ir_node *select_addr(const select_expression_t *expression)
 	assert(entry->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
 
 	if (constant_folding) {
-		ir_mode *mode = get_irn_mode(compound_addr);
-		/* FIXME: here, we need an integer mode with the same number of bits as mode */
-		ir_node *ofs  = new_Const_long(mode_uint, entry->compound_member.offset);
+		ir_mode *mode      = get_irn_mode(compound_addr);
+		ir_mode *mode_uint = get_reference_mode_unsigned_eq(mode);
+		ir_node *ofs       = new_Const_long(mode_uint, entry->compound_member.offset);
 		return new_d_Add(dbgi, compound_addr, ofs, mode);
 	} else {
 		ir_entity *irentity = entry->compound_member.entity;
@@ -3184,7 +3195,8 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 
 make_const:;
 	dbg_info  *const dbgi = get_dbg_info(&expr->base.source_position);
-	ir_tarval *const tv   = new_tarval_from_long(tc, mode_int);
+	ir_mode   *const mode = atomic_modes[ATOMIC_TYPE_INT];
+	ir_tarval *const tv   = new_tarval_from_long(tc, mode);
 	return new_d_Const(dbgi, tv);
 }
 
@@ -4070,6 +4082,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 		assert(has_array_upper_bound(ent_type, 0));
 		long n = get_array_upper_bound_int(ent_type, 0);
 		for (long i = 0; i < n; ++i) {
+			ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 			ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
 			ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 			ir_node   *in[1]    = { cnst };
@@ -4087,7 +4100,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 	/* is it a bitfield type? */
 	if (is_Primitive_type(ent_type) &&
 			get_primitive_base_type(ent_type) != NULL) {
-		bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+		bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 		return;
 	}
 
@@ -4111,7 +4124,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		/* is it a bitfield type? */
 		if (is_Primitive_type(ent_type) &&
 				get_primitive_base_type(ent_type) != NULL) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, node, false);
+			bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 			return;
 		}
 
@@ -4130,7 +4143,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		/* is it a bitfield type? */
 		if (is_Primitive_type(ent_type) &&
 				get_primitive_base_type(ent_type) != NULL) {
-			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false);
+			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false, false);
 			return;
 		}
 
@@ -4160,6 +4173,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			ir_type   *irtype;
 			ir_entity *sub_entity;
 			if (is_Array_type(type)) {
+				ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 				ir_tarval *index_tv = new_tarval_from_long(i, mode_uint);
 				ir_node   *cnst     = new_d_Const(dbgi, index_tv);
 				ir_node   *in[1]    = { cnst };
@@ -4898,85 +4912,64 @@ static void create_jump_statement(const statement_t *statement,
 	set_unreachable_now();
 }
 
+static ir_switch_table *create_switch_table(const switch_statement_t *statement)
+{
+	/* determine number of cases */
+	size_t n_cases = 0;
+	for (case_label_statement_t *l = statement->first_case; l != NULL;
+	     l = l->next) {
+		/* default case */
+		if (l->expression == NULL)
+			continue;
+		if (l->is_empty_range)
+			continue;
+		++n_cases;
+	}
+
+	ir_switch_table *res = ir_new_switch_table(current_ir_graph, n_cases);
+	size_t           i   = 0;
+	for (case_label_statement_t *l = statement->first_case; l != NULL;
+	     l = l->next) {
+	    if (l->expression == NULL) {
+			l->pn = pn_Switch_default;
+			continue;
+		}
+		if (l->is_empty_range)
+			continue;
+		ir_tarval *min = fold_constant_to_tarval(l->expression);
+		ir_tarval *max = min;
+		long       pn  = (long) i+1;
+		if (l->end_range != NULL)
+			max = fold_constant_to_tarval(l->end_range);
+		ir_switch_table_set(res, i++, min, max, pn);
+		l->pn = pn;
+	}
+	return res;
+}
+
 static void switch_statement_to_firm(switch_statement_t *statement)
 {
 	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
-	ir_node  *cond        = NULL;
+	ir_node  *switch_node = NULL;
 
 	if (currently_reachable()) {
 		ir_node *expression = expression_to_firm(statement->expression);
-		cond                = new_d_Cond(dbgi, expression);
-		first_block         = get_cur_block();
+		ir_switch_table *table = create_switch_table(statement);
+		unsigned n_outs = (unsigned)ir_switch_table_get_n_entries(table) + 1;
+
+		switch_node = new_d_Switch(dbgi, expression, n_outs, table);
+		first_block = get_cur_block();
 	}
 
 	set_unreachable_now();
 
-	ir_node *const old_switch_cond       = current_switch_cond;
+	ir_node *const old_switch            = current_switch;
 	ir_node *const old_break_label       = break_label;
 	const bool     old_saw_default_label = saw_default_label;
 	saw_default_label                    = false;
-	current_switch_cond                  = cond;
+	current_switch                       = switch_node;
 	break_label                          = NULL;
-	switch_statement_t *const old_switch = current_switch;
-	current_switch                       = statement;
-
-	/* determine a free number for the default label */
-	unsigned long num_cases       = 0;
-	long          default_proj_nr = 0;
-	for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
-		if (l->expression == NULL) {
-			/* default case */
-			continue;
-		}
-		if (l->last_case >= l->first_case)
-			num_cases += l->last_case - l->first_case + 1;
-		if (l->last_case > default_proj_nr)
-			default_proj_nr = l->last_case;
-	}
-
-	if (default_proj_nr == LONG_MAX) {
-		/* Bad: an overflow will occur, we cannot be sure that the
-		 * maximum + 1 is a free number. Scan the values a second
-		 * time to find a free number.
-		 */
-		unsigned char *bits = xmalloc((num_cases + 7) >> 3);
-
-		memset(bits, 0, (num_cases + 7) >> 3);
-		for (case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
-			if (l->expression == NULL) {
-				/* default case */
-				continue;
-			}
-			unsigned long start = l->first_case > 0 ? (unsigned long)l->first_case : 0;
-			if (start < num_cases && l->last_case >= 0) {
-				unsigned long end  = (unsigned long)l->last_case < num_cases ?
-					(unsigned long)l->last_case : num_cases - 1;
-				for (unsigned long cns = start; cns <= end; ++cns) {
-					bits[cns >> 3] |= (1 << (cns & 7));
-				}
-			}
-		}
-		/* We look at the first num_cases constants:
-		 * Either they are dense, so we took the last (num_cases)
-		 * one, or they are not dense, so we will find one free
-		 * there...
-		 */
-		unsigned long i;
-		for (i = 0; i < num_cases; ++i)
-			if ((bits[i >> 3] & (1 << (i & 7))) == 0)
-				break;
-
-		free(bits);
-		default_proj_nr = i;
-	} else {
-		++default_proj_nr;
-	}
-	statement->default_proj_nr = default_proj_nr;
-	/* safety check: cond might already be folded to a Bad */
-	if (cond != NULL && is_Cond(cond)) {
-		set_Cond_default_proj(cond, default_proj_nr);
-	}
 
 	statement_to_firm(statement->body);
 
@@ -4984,7 +4977,7 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 	if (!saw_default_label && first_block != NULL) {
 		set_cur_block(first_block);
-		ir_node *const proj = new_d_Proj(dbgi, cond, mode_X, default_proj_nr);
+		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
 		add_immBlock_pred(get_break_label(), proj);
 	}
 
@@ -4993,11 +4986,10 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	}
 	set_cur_block(break_label);
 
-	assert(current_switch_cond == cond);
-	current_switch      = old_switch;
-	current_switch_cond = old_switch_cond;
-	break_label         = old_break_label;
-	saw_default_label   = old_saw_default_label;
+	assert(current_switch == switch_node);
+	current_switch    = old_switch;
+	break_label       = old_break_label;
+	saw_default_label = old_saw_default_label;
 }
 
 static void case_label_to_firm(const case_label_statement_t *statement)
@@ -5005,32 +4997,19 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 	if (statement->is_empty_range)
 		return;
 
-	ir_node *block = new_immBlock();
-	/* Fallthrough from previous case */
-	jump_if_reachable(block);
+	if (current_switch != NULL) {
+		ir_node *block = new_immBlock();
+		/* Fallthrough from previous case */
+		jump_if_reachable(block);
 
-	if (current_switch_cond != NULL) {
-		set_cur_block(get_nodes_block(current_switch_cond));
-		dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
-		if (statement->expression != NULL) {
-			long pn     = statement->first_case;
-			long end_pn = statement->last_case;
-			assert(pn <= end_pn);
-			/* create jumps for all cases in the given range */
-			do {
-				ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X, pn);
-				add_immBlock_pred(block, proj);
-			} while (pn++ < end_pn);
-		} else {
+		ir_node  *const proj = new_Proj(current_switch, mode_X, statement->pn);
+		add_immBlock_pred(block, proj);
+		if (statement->expression == NULL)
 			saw_default_label = true;
-			ir_node *const proj = new_d_Proj(dbgi, current_switch_cond, mode_X,
-			                                 current_switch->default_proj_nr);
-			add_immBlock_pred(block, proj);
-		}
-	}
 
-	mature_immBlock(block);
-	set_cur_block(block);
+		mature_immBlock(block);
+		set_cur_block(block);
+	}
 
 	statement_to_firm(statement->statement);
 }
@@ -5595,10 +5574,6 @@ static void create_function(entity_t *entity)
 	if (entity->function.statement == NULL)
 		return;
 
-	if (is_main(entity) && enable_main_collect2_hack) {
-		prepare_main_collect2(entity);
-	}
-
 	inner_functions     = NULL;
 	current_trampolines = NULL;
 
@@ -5864,7 +5839,7 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	/* just to be sure */
 	continue_label           = NULL;
 	break_label              = NULL;
-	current_switch_cond      = NULL;
+	current_switch           = NULL;
 	current_translation_unit = unit;
 
 	init_ir_types();

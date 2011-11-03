@@ -536,7 +536,7 @@ static void print_cparser_version(void)
 
 	const char *revision = ir_get_version_revision();
 	if (revision[0] != 0) {
-		putchar(' ');
+		putchar('-');
 		fputs(revision, stdout);
 	}
 
@@ -949,8 +949,10 @@ static void init_types_and_adjust(void)
 
 	/* adjust types as requested by target architecture */
 	ir_type *type_long_double = be_params->type_long_double;
-	if (type_long_double != NULL)
+	if (type_long_double != NULL) {
 		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_long_double);
+		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_long_double);
+	}
 
 	ir_type *type_long_long = be_params->type_long_long;
 	if (type_long_long != NULL)
@@ -1016,15 +1018,11 @@ static void init_types_and_adjust(void)
 
 	/* initialize firm pointer modes */
 	char               name[64];
-	ir_mode_sort       sort         = irms_reference;
 	unsigned           bit_size     = machine_size;
-	bool               is_signed    = 0;
-	ir_mode_arithmetic arithmetic   = irma_twos_complement;
 	unsigned           modulo_shift = decide_modulo_shift(bit_size);
 
 	snprintf(name, sizeof(name), "p%u", machine_size);
-	ir_mode *ptr_mode = new_ir_mode(name, sort, bit_size, is_signed, arithmetic,
-	                                modulo_shift);
+	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
 
 	if (machine_size == 16) {
 		set_reference_mode_signed_eq(ptr_mode, mode_Hs);
@@ -1469,8 +1467,9 @@ int main(int argc, char **argv)
 			} else if (streq(option, "pg")) {
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
-			} else if (streq(option, "pedantic") ||
-			           streq(option, "ansi")) {
+			} else if (streq(option, "ansi")) {
+				add_flag(&cppflags_obst, "-ansi");
+			} else if (streq(option, "pedantic")) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
@@ -1673,7 +1672,7 @@ int main(int argc, char **argv)
 	init_basic_types();
 	if (wchar_atomic_kind == ATOMIC_TYPE_INT)
 		init_wchar_types(type_int);
-	else if (wchar_atomic_kind == ATOMIC_TYPE_SHORT)
+	else if (wchar_atomic_kind == ATOMIC_TYPE_USHORT)
 		init_wchar_types(type_short);
 	else
 		panic("unexpected wchar type");

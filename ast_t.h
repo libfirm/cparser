@@ -543,9 +543,8 @@ struct switch_statement_t {
 	statement_base_t        base;
 	expression_t           *expression;
 	statement_t            *body;
-	case_label_statement_t *first_case, *last_case;  /**< List of all cases, including default. */
-	case_label_statement_t *default_label;           /**< The default label if existent. */
-	unsigned long           default_proj_nr;         /**< The Proj-number for the default Proj. */
+	case_label_statement_t *first_case, *last_case; /**< List of all cases, including default. */
+	case_label_statement_t *default_label;          /**< The default label if existent. */
 };
 
 struct goto_statement_t {
@@ -565,6 +564,7 @@ struct case_label_statement_t {
 	long                   last_case;      /**< The folded value of end_range. */
 	bool                   is_bad;         /**< If set marked as bad to suppress warnings. */
 	bool                   is_empty_range; /**< If set marked this as an empty range. */
+	long                   pn;
 };
 
 struct label_statement_t {

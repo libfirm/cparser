@@ -37,5 +37,6 @@ typedef ident* (*create_ld_ident_func)(entity_t *entity);
 void set_create_ld_ident(create_ld_ident_func func);
 
 extern fp_model_t firm_fp_model;
+extern ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 #endif

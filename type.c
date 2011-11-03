@@ -83,8 +83,8 @@ type_t *allocate_type_zero(type_kind_t kind)
  */
 atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	[ATOMIC_TYPE_VOID] = {
-		.size      = 0,
-		.alignment = 0,
+		.size      = 1,
+		.alignment = 1,
 		.flags     = ATOMIC_TYPE_FLAG_NONE,
 		.rank      = 0,
 	},
