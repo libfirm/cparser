@@ -9103,7 +9103,22 @@ static statement_t *parse_case_statement(void)
 
 	eat(T_case);
 
-	expression_t *const expression   = parse_expression();
+	expression_t *expression = parse_expression();
+	type_t *expression_type = expression->base.type;
+	type_t *skipped         = skip_typeref(expression_type);
+	if (!is_type_integer(skipped) && is_type_valid(skipped)) {
+		errorf(pos, "case expression '%E' must have integer type but has type '%T'",
+		       expression, expression_type);
+	}
+
+	type_t *type = expression_type;
+	if (current_switch != NULL) {
+		type_t *switch_type = current_switch->expression->base.type;
+		if (is_type_valid(switch_type)) {
+			expression = create_implicit_cast(expression, switch_type);
+		}
+	}
+
 	statement->case_label.expression = expression;
 	expression_classification_t const expr_class = is_constant_expression(expression);
 	if (expr_class != EXPR_CLASS_CONSTANT) {
@@ -9119,7 +9134,15 @@ static statement_t *parse_case_statement(void)
 
 	if (GNU_MODE) {
 		if (next_if(T_DOTDOTDOT)) {
-			expression_t *const end_range   = parse_expression();
+			expression_t *end_range = parse_expression();
+			expression_type = expression->base.type;
+			skipped         = skip_typeref(expression_type);
+			if (!is_type_integer(skipped) && is_type_valid(skipped)) {
+				errorf(pos, "case expression '%E' must have integer type but has type '%T'",
+					   expression, expression_type);
+			}
+
+			end_range = create_implicit_cast(end_range, type);
 			statement->case_label.end_range = end_range;
 			expression_classification_t const end_class = is_constant_expression(end_range);
 			if (end_class != EXPR_CLASS_CONSTANT) {
