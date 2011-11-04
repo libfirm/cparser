@@ -375,7 +375,7 @@ static opt_config_t opts[] = {
 	IRG("if-conversion",     opt_if_conv,              "if-conversion",                                         OPT_FLAG_NONE),
 	IRG("invert-loops",      do_loop_inversion,        "loop inversion",                                        OPT_FLAG_NONE),
 	IRG("ivopts",            do_stred,                 "induction variable strength reduction",                 OPT_FLAG_NONE),
-	IRG("local",             optimize_graph_df,        "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
+	IRG("local",             local_opts,               "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
 	IRG("lower",             lower_highlevel_graph,    "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRG("lower-mux",         do_lower_mux,             "mux lowering",                                          OPT_FLAG_NONE),
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
