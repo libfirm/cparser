@@ -1,12 +1,9 @@
 /**
- *
- * @file firm_opt.c -- Firm-generating back end optimizations.
- *
- * (C) 2005-2010  Michael Beck   beck@ipd.info.uni-karlsruhe.de
- *
- * $Id$
+ * (C) 2005-2010
+ * @file
+ * @author Michael Beck, Matthias Braun
+ * @brief Firm-generating back end optimizations.
  */
-
 #include <config.h>
 
 #include <stdbool.h>

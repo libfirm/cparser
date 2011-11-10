@@ -23,7 +23,6 @@
  * @date    16.03.2007
  * @brief   Various utility functions that wrap compiler specific extensions
  * @author  Matthias Braun
- * @version $Id$
  */
 #ifndef _FIRM_UTIL_H_
 #define _FIRM_UTIL_H_
