@@ -323,8 +323,8 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		add_flag(&cppflags_obst, "-MF");
 		add_flag(&cppflags_obst, dep_target);
 		if (outname != NULL) {
-				add_flag(&cppflags_obst, "-MQ");
-				add_flag(&cppflags_obst, outname);
+			add_flag(&cppflags_obst, "-MQ");
+			add_flag(&cppflags_obst, outname);
 		}
 	}
 	add_flag(&cppflags_obst, fname);
