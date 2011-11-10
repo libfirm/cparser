@@ -741,7 +741,6 @@ void gen_firm_init(void)
 	if (firm_dump.stat_dag)
 		pattern |= FIRMSTAT_COUNT_DAG;
 
-	ir_init();
 	firm_init_stat(firm_dump.statistic == STAT_NONE ?
 			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
 			| FIRMSTAT_COUNT_CONSTS | pattern);
@@ -993,7 +992,7 @@ void choose_optimization_pack(int level)
 void firm_early_init(void)
 {
 	/* arg: need this here for command line options */
-	be_opt_register();
+	ir_init();
 
 	enable_safe_defaults();
 }
