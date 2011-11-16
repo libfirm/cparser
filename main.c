@@ -1954,7 +1954,11 @@ graph_built:
 			}
 		} else if (filetype == FILETYPE_IR) {
 			fclose(in);
-			ir_import(filename);
+			int res = ir_import(filename);
+			if (res != 0) {
+				fprintf(stderr, "Firm-Program import failed\n");
+				return EXIT_FAILURE;
+			}
 			goto graph_built;
 		} else if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
 			copy_file(asm_out, in);
