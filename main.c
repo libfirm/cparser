@@ -1943,8 +1943,11 @@ graph_built:
 			}
 
 			if (mode == CompileExportIR) {
-				fclose(out);
-				ir_export(outname);
+				ir_export_file(out);
+				if (ferror(out) != 0) {
+					fprintf(stderr, "Error while writing to output\n");
+					return EXIT_FAILURE;
+				}
 				return EXIT_SUCCESS;
 			}
 
