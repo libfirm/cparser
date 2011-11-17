@@ -5194,7 +5194,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 			ir_asm_constraint constraint;
 			constraint.pos              = pos;
 			constraint.constraint       = new_id_from_str(constraints);
-			constraint.mode             = NULL;
+			constraint.mode             = mode_M;
 			tmp_in_constraints[in_size] = constraint;
 
 			ins[in_size]          = expression_to_addr(expr);
