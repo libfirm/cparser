@@ -5688,22 +5688,12 @@ static void create_function(entity_t *entity)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	bool has_computed_gotos = false;
 	for (int i = ARR_LEN(all_labels) - 1; i >= 0; --i) {
 		label_t *label = all_labels[i];
 		if (label->address_taken) {
 			gen_ijmp_branches(label->block);
-			has_computed_gotos = true;
 		}
 		mature_immBlock(label->block);
-	}
-	if (has_computed_gotos) {
-		/* if we have computed goto's in the function, we cannot inline it */
-		if (get_irg_inline_property(irg) >= irg_inline_recomended) {
-			source_position_t const *const pos = &entity->base.source_position;
-			warningf(WARN_OTHER, pos, "'%N' can never be inlined because it contains a computed goto", entity);
-		}
-		set_irg_inline_property(irg, irg_inline_forbidden);
 	}
 
 	DEL_ARR_F(all_labels);
