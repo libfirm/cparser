@@ -1045,8 +1045,6 @@ static void init_types_and_adjust(void)
 
 int main(int argc, char **argv)
 {
-	firm_early_init();
-
 	const char        *dumpfunction         = NULL;
 	const char        *print_file_name_file = NULL;
 	compile_mode_t     mode                 = CompileAssembleLink;
@@ -1094,6 +1092,9 @@ int main(int argc, char **argv)
 	} while (0)
 
 #define SINGLE_OPTION(ch) (option[0] == (ch) && option[1] == '\0')
+
+	/* initialize this early because it has to parse options */
+	gen_firm_init();
 
 	/* early options parsing (find out optimization level and OS) */
 	for (int i = 1; i < argc; ++i) {
@@ -1659,7 +1660,6 @@ int main(int argc, char **argv)
 		set_be_option("profileuse");
 	}
 
-	gen_firm_init();
 	init_symbol_table();
 	init_types_and_adjust();
 	init_typehash();
@@ -1951,7 +1951,7 @@ graph_built:
 				return EXIT_SUCCESS;
 			}
 
-			gen_firm_finish(asm_out, filename);
+			generate_code(asm_out, filename);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
@@ -2065,6 +2065,7 @@ graph_built:
 	obstack_free(&asflags_obst, NULL);
 	obstack_free(&file_obst, NULL);
 
+	gen_firm_finish();
 	exit_mangle();
 	exit_ast2firm();
 	exit_parser();
