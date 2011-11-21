@@ -1,12 +1,9 @@
 /**
- *
- * @file firm_opt.c -- Firm-generating back end optimizations.
- *
- * (C) 2005-2010  Michael Beck   beck@ipd.info.uni-karlsruhe.de
- *
- * $Id$
+ * (C) 2005-2010
+ * @file
+ * @author Michael Beck, Matthias Braun
+ * @brief Firm-generating back end optimizations.
  */
-
 #include <config.h>
 
 #include <stdbool.h>
@@ -38,7 +35,6 @@ struct a_firm_opt {
 	int      clone_threshold; /**< The threshold value for procedure cloning. */
 	unsigned inline_maxsize;  /**< Maximum function size for inlining. */
 	unsigned inline_threshold;/**< Inlining benefice threshold. */
-	bool     verify_edges;    /**< verify edges */
 };
 
 /** statistic options */
@@ -55,8 +51,6 @@ typedef enum a_firmstat_selection_tag {
 struct a_firm_dump {
 	bool debug_print;   /**< enable debug print */
 	bool all_types;     /**< dump the All_types graph */
-	bool no_blocks;     /**< dump non-blocked graph */
-	bool extbb;         /**< dumps extended basic blocks */
 	bool ir_graph;      /**< dump all graphs */
 	bool all_phases;    /**< dump the IR graph after all phases */
 	bool statistic;     /**< Firm statistic setting */
@@ -85,15 +79,12 @@ static struct a_firm_opt firm_opt = {
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
 	.inline_threshold =  0,
-	.verify_edges     =  false,
 };
 
 /* dumping options */
 static struct a_firm_dump firm_dump = {
 	.debug_print  = false,
 	.all_types    = false,
-	.no_blocks    = false,
-	.extbb        = false,
 	.ir_graph     = false,
 	.all_phases   = false,
 	.statistic    = STAT_NONE,
@@ -141,14 +132,10 @@ static const struct params {
   { X("verify-report"),          &firm_opt.verify,           FIRM_VERIFICATION_REPORT, "node verification, report only" },
   { X("check-all"),              &firm_opt.check_all,        1, "enable checking all Firm phases" },
   { X("no-check-all"),           &firm_opt.check_all,        0, "disable checking all Firm phases" },
-  { X("verify-edges-on"),        &firm_opt.verify_edges,     1, "enable out edge verification" },
-  { X("verify-edges-off"),       &firm_opt.verify_edges,     0, "disable out edge verification" },
 
   /* dumping */
   { X("dump-ir"),                &firm_dump.ir_graph,        1, "dump IR graph" },
   { X("dump-all-types"),         &firm_dump.all_types,       1, "dump graph of all types" },
-  { X("dump-no-blocks"),         &firm_dump.no_blocks,       1, "dump non-blocked graph" },
-  { X("dump-extbb"),             &firm_dump.extbb,           1, "dump extended basic blocks" },
   { X("dump-all-phases"),        &firm_dump.all_phases,      1, "dump graphs for all optimization phases" },
   { X("dump-filter=<string>"),   NULL,                       0, "set dumper filter" },
 
@@ -167,6 +154,7 @@ static const struct params {
 static ir_timer_t *t_vcg_dump;
 static ir_timer_t *t_verify;
 static ir_timer_t *t_all_opt;
+static ir_timer_t *t_backend;
 static bool do_irg_opt(ir_graph *irg, const char *name);
 
 /** dump all the graphs depending on cond */
@@ -375,7 +363,7 @@ static opt_config_t opts[] = {
 	IRG("if-conversion",     opt_if_conv,              "if-conversion",                                         OPT_FLAG_NONE),
 	IRG("invert-loops",      do_loop_inversion,        "loop inversion",                                        OPT_FLAG_NONE),
 	IRG("ivopts",            do_stred,                 "induction variable strength reduction",                 OPT_FLAG_NONE),
-	IRG("local",             optimize_graph_df,        "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
+	IRG("local",             local_opts,               "local graph optimizations",                             OPT_FLAG_HIDE_OPTIONS),
 	IRG("lower",             lower_highlevel_graph,    "lowering",                                              OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRG("lower-mux",         do_lower_mux,             "mux lowering",                                          OPT_FLAG_NONE),
 	IRG("opt-load-store",    optimize_load_store,      "load store optimization",                               OPT_FLAG_NONE),
@@ -725,7 +713,8 @@ static void do_firm_lowering(const char *input_filename)
  */
 void gen_firm_init(void)
 {
-	unsigned pattern = 0;
+	ir_init();
+	enable_safe_defaults();
 
 	FOR_EACH_OPT(i) {
 		i->timer = ir_timer_new();
@@ -737,6 +726,13 @@ void gen_firm_init(void)
 	timer_register(t_vcg_dump, "Firm: vcg dumping");
 	t_all_opt = ir_timer_new();
 	timer_register(t_all_opt, "Firm: all optimizations");
+	t_backend = ir_timer_new();
+	timer_register(t_backend, "Firm: backend");
+}
+
+static void init_statistics(void)
+{
+	unsigned pattern = 0;
 
 	if (firm_dump.stat_pattern)
 		pattern |= FIRMSTAT_PATTERN_ENABLED;
@@ -744,33 +740,9 @@ void gen_firm_init(void)
 	if (firm_dump.stat_dag)
 		pattern |= FIRMSTAT_COUNT_DAG;
 
-	ir_init();
 	firm_init_stat(firm_dump.statistic == STAT_NONE ?
 			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
 			| FIRMSTAT_COUNT_CONSTS | pattern);
-
-	edges_init_dbg(firm_opt.verify_edges);
-
-	/* Sel node cannot produce NULL pointers */
-	set_opt_sel_based_null_check_elim(1);
-
-	/* dynamic dispatch works currently only if whole world scenarios */
-	set_opt_dyn_meth_dispatch(0);
-
-	/* do not run architecture dependent optimizations in building phase */
-	arch_dep_set_opts(arch_dep_none);
-
-	do_node_verification((firm_verification_t) firm_opt.verify);
-	if (firm_dump.extbb)
-		ir_add_dump_flags(ir_dump_flag_group_extbb);
-	if (firm_dump.no_blocks)
-		ir_remove_dump_flags(ir_dump_flag_blocks_as_subgraphs);
-
-	set_optimize(1);
-	set_opt_constant_folding(firm_opt.const_folding);
-	set_opt_algebraic_simplification(firm_opt.const_folding);
-	set_opt_cse(firm_opt.cse);
-	set_opt_global_cse(0);
 }
 
 /**
@@ -779,15 +751,23 @@ void gen_firm_init(void)
  *
  * @param out                a file handle for the output, may be NULL
  * @param input_filename     the name of the (main) source file
- * @param c_mode             non-zero if "C" was compiled
  */
-void gen_firm_finish(FILE *out, const char *input_filename)
+void generate_code(FILE *out, const char *input_filename)
 {
 	int i;
 
+	set_optimize(1);
+	set_opt_constant_folding(firm_opt.const_folding);
+	set_opt_algebraic_simplification(firm_opt.const_folding);
+	set_opt_cse(firm_opt.cse);
+	set_opt_global_cse(0);
+
+	init_statistics();
+
+	do_node_verification((firm_verification_t) firm_opt.verify);
+
 	/* the general for dumping option must be set, or the others will not work*/
-	firm_dump.ir_graph
-		= (bool) (firm_dump.ir_graph | firm_dump.all_phases | firm_dump.extbb);
+	firm_dump.ir_graph = (bool) (firm_dump.ir_graph | firm_dump.all_phases);
 
 	ir_add_dump_flags(ir_dump_flag_keepalive_edges
 			| ir_dump_flag_consts_local | ir_dump_flag_dominance);
@@ -800,11 +780,6 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 		dump_ir_prog_ext(dump_typegraph, "types.vcg");
 	}
 
-	/* finalize all graphs */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-		ir_graph *irg = get_irp_irg(i);
-		irg_finalize_cons(irg);
-	}
 	dump_all("");
 
 	timer_push(t_verify);
@@ -835,14 +810,17 @@ void gen_firm_finish(FILE *out, const char *input_filename)
 		stat_dump_snapshot(input_filename, "final-ir");
 
 	/* run the code generator */
-	ir_timer_t *timer = ir_timer_new();
-	timer_register(timer, "Firm: backend");
-	timer_start(timer);
+	timer_start(t_backend);
 	be_main(out, input_filename);
-	timer_stop(timer);
+	timer_stop(t_backend);
 
 	if (firm_dump.statistic & STAT_FINAL)
 		stat_dump_snapshot(input_filename, "final");
+}
+
+void gen_firm_finish(void)
+{
+	ir_finish();
 }
 
 static void disable_all_opts(void)
@@ -988,15 +966,4 @@ void choose_optimization_pack(int level)
 		set_be_option("omitfp");
 		break;
 	}
-}
-
-/**
- * Do very early initializations
- */
-void firm_early_init(void)
-{
-	/* arg: need this here for command line options */
-	be_opt_register();
-
-	enable_safe_defaults();
 }

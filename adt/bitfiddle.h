@@ -23,7 +23,6 @@
  * @date    28.9.2004
  * @brief   Functions from hackers delight.
  * @author  Sebastian Hack, Matthias Braun
- * @version $Id$
  */
 #ifndef _FIRM_BITFIDDLE_H_
 #define _FIRM_BITFIDDLE_H_

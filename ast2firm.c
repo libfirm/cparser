@@ -1072,6 +1072,37 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
 }
 
+static ir_node *create_conv_from_b(dbg_info *dbgi, ir_node *value,
+                                   ir_mode *dest_mode)
+{
+	if (is_Const(value)) {
+		if (is_Const_null(value)) {
+			return new_Const(get_mode_null(dest_mode));
+		} else {
+			return new_Const(get_mode_one(dest_mode));
+		}
+	}
+
+	ir_node *cond       = new_d_Cond(dbgi, value);
+	ir_node *proj_true  = new_Proj(cond, mode_X, pn_Cond_true);
+	ir_node *proj_false = new_Proj(cond, mode_X, pn_Cond_false);
+	ir_node *tblock     = new_Block(1, &proj_true);
+	ir_node *fblock     = new_Block(1, &proj_false);
+	set_cur_block(tblock);
+	ir_node *const1 = new_Const(get_mode_one(dest_mode));
+	ir_node *tjump  = new_Jmp();
+	set_cur_block(fblock);
+	ir_node *const0 = new_Const(get_mode_null(dest_mode));
+	ir_node *fjump  = new_Jmp();
+
+	ir_node *in[2]      = { tjump, fjump };
+	ir_node *mergeblock = new_Block(2, in);
+	set_cur_block(mergeblock);
+	ir_node *phi_in[2]  = { const1, const0 };
+	ir_node *phi        = new_Phi(2, phi_in, dest_mode);
+	return phi;
+}
+
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 {
 	ir_mode *value_mode = get_irn_mode(value);
@@ -1083,6 +1114,8 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 		ir_node *zero = new_Const(get_mode_null(value_mode));
 		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_less_greater);
 		return cmp;
+	} else if (value_mode == mode_b) {
+		return create_conv_from_b(dbgi, value, dest_mode);
 	}
 
 	return new_d_Conv(dbgi, value, dest_mode);
@@ -5161,7 +5194,7 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 			ir_asm_constraint constraint;
 			constraint.pos              = pos;
 			constraint.constraint       = new_id_from_str(constraints);
-			constraint.mode             = NULL;
+			constraint.mode             = mode_M;
 			tmp_in_constraints[in_size] = constraint;
 
 			ins[in_size]          = expression_to_addr(expr);
@@ -5655,22 +5688,12 @@ static void create_function(entity_t *entity)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	bool has_computed_gotos = false;
 	for (int i = ARR_LEN(all_labels) - 1; i >= 0; --i) {
 		label_t *label = all_labels[i];
 		if (label->address_taken) {
 			gen_ijmp_branches(label->block);
-			has_computed_gotos = true;
 		}
 		mature_immBlock(label->block);
-	}
-	if (has_computed_gotos) {
-		/* if we have computed goto's in the function, we cannot inline it */
-		if (get_irg_inline_property(irg) >= irg_inline_recomended) {
-			source_position_t const *const pos = &entity->base.source_position;
-			warningf(WARN_OTHER, pos, "'%N' can never be inlined because it contains a computed goto", entity);
-		}
-		set_irg_inline_property(irg, irg_inline_forbidden);
 	}
 
 	DEL_ARR_F(all_labels);
