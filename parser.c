@@ -1666,15 +1666,6 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 }
 
 /**
- * Checks if a given expression can be used as a constant initializer.
- */
-static bool is_initializer_constant(const expression_t *expression)
-{
-	return is_constant_expression(expression) != EXPR_CLASS_VARIABLE ||
-	       is_linker_constant(expression)     != EXPR_CLASS_VARIABLE;
-}
-
-/**
  * Parses an scalar initializer.
  *
  * §6.7.8.11; eat {} without warning
@@ -1694,7 +1685,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	expression_t *expression = parse_assignment_expression();
 	mark_vars_read(expression, NULL);
-	if (must_be_constant && !is_initializer_constant(expression)) {
+	if (must_be_constant && !is_linker_constant(expression)) {
 		errorf(&expression->base.source_position,
 		       "initialisation expression '%E' is not constant",
 		       expression);
@@ -2114,7 +2105,7 @@ finish_designator:
 			expression_t *expression = parse_assignment_expression();
 			mark_vars_read(expression, NULL);
 
-			if (env->must_be_constant && !is_initializer_constant(expression)) {
+			if (env->must_be_constant && !is_linker_constant(expression)) {
 				errorf(&expression->base.source_position,
 				       "Initialisation expression '%E' is not constant",
 				       expression);
