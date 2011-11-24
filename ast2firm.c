@@ -2866,29 +2866,60 @@ static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
                                      ir_entity *entity, type_t *type);
+static ir_initializer_t *create_ir_initializer(
+		const initializer_t *initializer, type_t *type);
+
+static ir_entity *create_initializer_entity(dbg_info *dbgi,
+                                            initializer_t *initializer,
+                                            type_t *type)
+{
+	/* create the ir_initializer */
+	ir_graph *const old_current_ir_graph = current_ir_graph;
+	current_ir_graph = get_const_code_irg();
+
+	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
+
+	assert(current_ir_graph == get_const_code_irg());
+	current_ir_graph = old_current_ir_graph;
+
+	ident     *const id          = id_unique("initializer.%u");
+	ir_type   *const irtype      = get_ir_type(type);
+	ir_type   *const global_type = get_glob_type();
+	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
+	set_entity_ld_ident(entity, id);
+	set_entity_visibility(entity, ir_visibility_private);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
+	set_entity_initializer(entity, irinitializer);
+	return entity;
+}
 
 static ir_node *compound_literal_to_firm(
 		const compound_literal_expression_t *expression)
 {
-	type_t *type = expression->type;
-
-	/* create an entity on the stack */
-	ir_type *frame_type = get_irg_frame_type(current_ir_graph);
-
-	ident     *const id     = id_unique("CompLit.%u");
-	ir_type   *const irtype = get_ir_type(type);
-	dbg_info  *const dbgi   = get_dbg_info(&expression->base.source_position);
-	ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
-	set_entity_ld_ident(entity, id);
-
-	/* create initialisation code */
+	dbg_info      *dbgi        = get_dbg_info(&expression->base.source_position);
+	type_t        *type        = expression->type;
 	initializer_t *initializer = expression->initializer;
-	create_local_initializer(initializer, dbgi, entity, type);
 
-	/* create a sel for the compound literal address */
-	ir_node *frame = get_irg_frame(current_ir_graph);
-	ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-	return sel;
+	if (is_constant_initializer(initializer) == EXPR_CLASS_CONSTANT) {
+		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
+		return create_symconst(dbgi, entity);
+	} else {
+		/* create an entity on the stack */
+		ident   *const id     = id_unique("CompLit.%u");
+		ir_type *const irtype = get_ir_type(type);
+		ir_type *frame_type   = get_irg_frame_type(current_ir_graph);
+
+		ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
+		set_entity_ld_ident(entity, id);
+
+		/* create initialisation code */
+		create_local_initializer(initializer, dbgi, entity, type);
+
+		/* create a sel for the compound literal address */
+		ir_node *frame = get_irg_frame(current_ir_graph);
+		ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+		return sel;
+	}
 }
 
 /**
@@ -3915,9 +3946,6 @@ static void advance_current_object(type_path_t *path)
 }
 
 
-static ir_initializer_t *create_ir_initializer(
-		const initializer_t *initializer, type_t *type);
-
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
 {
@@ -4269,28 +4297,11 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 		return;
 	}
 
-	/* create the ir_initializer */
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
-	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
-
 	/* create a "template" entity which is copied to the entity on the stack */
-	ident     *const id          = id_unique("initializer.%u");
-	ir_type   *const irtype      = get_ir_type(type);
-	ir_type   *const global_type = get_glob_type();
-	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
-	set_entity_ld_ident(init_entity, id);
-
-	set_entity_visibility(init_entity, ir_visibility_private);
-	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
-
-	set_entity_initializer(init_entity, irinitializer);
-
+	ir_entity *const init_entity
+		= create_initializer_entity(dbgi, initializer, type);
 	ir_node *const src_addr = create_symconst(dbgi, init_entity);
+	ir_type *const irtype   = get_ir_type(type);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
