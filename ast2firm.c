@@ -4339,16 +4339,29 @@ static void create_variable_initializer(entity_t *entity)
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 		dbg_info            *dbgi = get_dbg_info(&entity->base.source_position);
+		expression_t        *value     = initializer_value->value;
+		type_t              *init_type = value->base.type;
+		type_t              *skipped   = skip_typeref(init_type);
 
-		ir_node *value = expression_to_firm(initializer_value->value);
+		if (!is_type_scalar(skipped)) {
+			/* skip convs */
+			while (value->kind == EXPR_UNARY_CAST)
+				value = value->unary.value;
 
-		type_t  *init_type = initializer_value->value->base.type;
+			if (value->kind != EXPR_COMPOUND_LITERAL)
+				panic("expected non-scalar initializer to be a compound literal");
+			initializer = value->compound_literal.initializer;
+			goto have_initializer;
+		}
+
+		ir_node *node = expression_to_firm(initializer_value->value);
+
 		ir_mode *mode      = get_ir_mode_storage(init_type);
-		value = create_conv(dbgi, value, mode);
-		value = do_strict_conv(dbgi, value);
+		node = create_conv(dbgi, node, mode);
+		node = do_strict_conv(dbgi, node);
 
 		if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
-			set_value(entity->variable.v.value_number, value);
+			set_value(entity->variable.v.value_number, node);
 		} else {
 			assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
@@ -4358,9 +4371,10 @@ static void create_variable_initializer(entity_t *entity)
 					&& get_entity_owner(irentity) != get_tls_type()) {
 				add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 			}
-			set_atomic_ent_value(irentity, value);
+			set_atomic_ent_value(irentity, node);
 		}
 	} else {
+have_initializer:
 		assert(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY ||
 		       declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
