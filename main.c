@@ -731,18 +731,18 @@ static void print_help_firm(void)
 
 typedef enum {
 	HELP_NONE          = 0,
-	HELP_BASIC         = 1u << 0,
-	HELP_PREPROCESSOR  = 1u << 1,
-	HELP_PARSER        = 1u << 2,
-	HELP_WARNINGS      = 1u << 3,
-	HELP_OPTIMIZATION  = 1u << 4,
-	HELP_CODEGEN       = 1u << 5,
-	HELP_LINKER        = 1u << 6,
-	HELP_LANGUAGETOOLS = 1u << 7,
-	HELP_DEBUG         = 1u << 8,
-	HELP_FIRM          = 1u << 9,
+	HELP_BASIC         = 1 << 0,
+	HELP_PREPROCESSOR  = 1 << 1,
+	HELP_PARSER        = 1 << 2,
+	HELP_WARNINGS      = 1 << 3,
+	HELP_OPTIMIZATION  = 1 << 4,
+	HELP_CODEGEN       = 1 << 5,
+	HELP_LINKER        = 1 << 6,
+	HELP_LANGUAGETOOLS = 1 << 7,
+	HELP_DEBUG         = 1 << 8,
+	HELP_FIRM          = 1 << 9,
 
-	HELP_ALL           = (unsigned)-1
+	HELP_ALL           = -1
 } help_sections_t;
 
 static void print_help(const char *argv0, help_sections_t sections)
