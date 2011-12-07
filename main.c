@@ -1306,6 +1306,7 @@ int main(int argc, char **argv)
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
 					           streq(opt, "align-functions")         ||
+					           streq(opt, "unroll-loops")            ||
 					           streq(opt, "PIC")                     ||
 					           streq(opt, "stack-protector")         ||
 					           streq(opt, "stack-protector-all")) {
@@ -1573,6 +1574,8 @@ int main(int argc, char **argv)
 					mode         = CompileDump;
 				} else if (streq(option, "export-ir")) {
 					mode = CompileExportIR;
+				} else if (streq(option, "unroll-loops")) {
+					/* ignore (gcc compatibility) */
 				} else {
 					fprintf(stderr, "error: unknown argument '%s'\n", arg);
 					argument_errors = true;
