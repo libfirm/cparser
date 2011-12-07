@@ -1,14 +1,8 @@
-                                   cparser
-                         A recursive descent C99 parser
-
-Contents:
-1. Introduction
-2. Building and Installation
-3. Contact
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cparser - A C99 parser (with gnu extensions)
+============================================
 
 1. Introduction
+---------------
 
 cparser is a recursive descent C99 parser written in C99. It contains lexer,
 parser, constructs an AST and does semantic analysis. It is currently used as
@@ -16,22 +10,21 @@ a frontend to the libFirm intermediate representation, but can be used
 independently. cparser is able to bootstrap itself. It currently uses an
 external preprocessor.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 2. Building and Installation
+----------------------------
 
 Requirements:
- * A C99 compiler (gcc and icc are known to work).
- * pkg-config (recommended)
- * libFirm-1.12.1 or later
+
+* A C99 compiler (gcc and icc are known to work).
+* pkg-config (recommended)
+* libFirm-1.12.1 or later
 
 Make sure you have installed libFirm and pkg-config can find the libfirm.pc
 files ("pkg-config --modversion libfirm" should work). Use (GNU)-make to build
 cparser.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-4. Contact
+3. Contact
+----------
 
 There's a Bugtracker at http://pp.info.uni-karlsruhe.de/~firm/bugs
 You can contact me at matze@braunis.de

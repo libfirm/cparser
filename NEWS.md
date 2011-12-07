@@ -1,4 +1,15 @@
-cparser 0.9.12 (2009-05-15)
+cpasrer 0.9.13 (2011-12-07)
+---------------------------
+
+* Adapt to libfirm-1.20.0
+* Implement --help
+* More work on preprocessor (still not finished though)
+* Refactoring work so others can reuse input, optimization order logic
+* Columns in source positions (but external preprocessor doesn't preserve all spaces)
+* Improvements to gnu builtins/attributes
+* Bugfixes (we did alot of csmith testing)
+
+cparser 0.9.12 (2011-03-15)
 ---------------------------
 
 * Adapt to libfirm-1.19.0
