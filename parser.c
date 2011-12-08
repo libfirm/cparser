@@ -4723,10 +4723,12 @@ static bool expression_returns(expression_t const *const expr)
 	switch (expr->kind) {
 		case EXPR_CALL: {
 			expression_t const *const func = expr->call.function;
-			if (func->kind == EXPR_REFERENCE) {
-				entity_t *entity = func->reference.entity;
-				if (entity->kind == ENTITY_FUNCTION
-						&& entity->declaration.modifiers & DM_NORETURN)
+			type_t       const *const type = skip_typeref(func->base.type);
+			if (type->kind == TYPE_POINTER) {
+				type_t const *const points_to
+					= skip_typeref(type->pointer.points_to);
+				if (points_to->kind == TYPE_FUNCTION
+				    && points_to->function.modifiers & DM_NORETURN)
 					return false;
 			}
 
