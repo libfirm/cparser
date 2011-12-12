@@ -170,7 +170,7 @@ static void dump_all(const char *suffix)
 }
 
 /* entities of runtime functions */
-ir_entity_ptr rts_entities[rts_max];
+ir_entity *rts_entities[rts_max];
 
 /**
  * Map runtime functions.
@@ -178,7 +178,7 @@ ir_entity_ptr rts_entities[rts_max];
 static void rts_map(void)
 {
 	static const struct {
-		ir_entity_ptr *ent; /**< address of the rts entity */
+		ir_entity   **ent; /**< address of the rts entity */
 		i_mapper_func func; /**< mapper function. */
 	} mapper[] = {
 		/* integer */

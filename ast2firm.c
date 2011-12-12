@@ -521,7 +521,7 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 	}
 }
 
-#define INVALID_TYPE ((ir_type_ptr)-1)
+#define INVALID_TYPE ((ir_type*)-1)
 
 enum {
 	COMPOUND_IS_STRUCT = false,
@@ -5565,7 +5565,7 @@ static void initialize_function_parameters(entity_t *entity)
  * @param irg            the IR-graph
  * @param dec_modifiers  additional modifiers
  */
-static void handle_decl_modifier_irg(ir_graph_ptr irg,
+static void handle_decl_modifier_irg(ir_graph *irg,
                                      decl_modifiers_t decl_modifiers)
 {
 	if (decl_modifiers & DM_NAKED) {
