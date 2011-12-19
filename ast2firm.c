@@ -1726,7 +1726,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node      *size     = expression_to_firm(argument);
 
 		ir_node *store  = get_store();
-		ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+		ir_node *alloca = new_d_Alloc(dbgi, store, size, get_unknown_type(),
 		                              stack_alloc);
 		ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
 		set_store(proj_m);
@@ -5667,8 +5667,6 @@ static void create_function(entity_t *entity)
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
-	ir_node *first_block = get_cur_block();
-
 	/* set inline flags */
 	if (entity->function.is_inline)
 		set_irg_inline_property(irg, irg_inline_recomended);
@@ -5723,9 +5721,6 @@ static void create_function(entity_t *entity)
 
 	DEL_ARR_F(all_labels);
 	all_labels = NULL;
-
-	mature_immBlock(first_block);
-	mature_immBlock(end_block);
 
 	irg_finalize_cons(irg);
 
