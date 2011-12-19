@@ -71,7 +71,7 @@ Q = @
 
 all: $(GOAL)
 
-.PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint $(FIRM_HOME)/$(LIBFIRM_FILE)
+.PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint libfirm_subdir
 
 -include $(DEPENDS)
 
@@ -93,7 +93,11 @@ UNUSED := $(shell \
 DIRS   := $(sort $(dir $(OBJECTS)))
 UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb2/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpbe/%))
 
-$(FIRM_HOME)/$(LIBFIRM_FILE):
+# Build libFirm in subdirectory
+$(FIRM_HOME)/$(LIBFIRM_FILE): libfirm_subdir
+## Re-evaluate Makefile after libfirm_subdir has been executed
+Makefile: libfirm_subdir
+libfirm_subdir:
 ifeq "$(wildcard $(FIRM_HOME) )" ""
 	@echo 'Download and extract libfirm tarball ...'
 	$(Q)curl -s -L "${FIRM_URL}" -o "libfirm-$(FIRM_VERSION).tar.bz2"
