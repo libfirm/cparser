@@ -550,6 +550,11 @@ static void print_cparser_version(void)
 	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
 }
 
+static void print_cparser_version_short(void)
+{
+	puts(cparser_REVISION);
+}
+
 static void print_help_basic(const char *argv0)
 {
 	usage(argv0);
@@ -1486,6 +1491,11 @@ int main(int argc, char **argv)
 					(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
 			} else if (streq(option, "version")) {
 				print_cparser_version();
+				return EXIT_SUCCESS;
+			} else if (streq(option, "dumpversion")) {
+				/* gcc compatibility option */
+				print_cparser_version_short();
+				return EXIT_SUCCESS;
 			} else if (strstart(option, "print-file-name=")) {
 				GET_ARG_AFTER(print_file_name_file, "-print-file-name=");
 			} else if (option[0] == '-') {
