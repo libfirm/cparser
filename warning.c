@@ -92,7 +92,9 @@ void print_warning_opt_help(void)
 {
 	/* TODO: write explanations */
 	for (warning_switch_t* i = warning; i != endof(warning); ++i) {
-		put_help(i->name, "");
+		char buf[256];
+		snprintf(buf, sizeof(buf), "-W%s", i->name);
+		put_help(buf, "");
 	}
 }
 

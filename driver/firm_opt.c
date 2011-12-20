@@ -859,8 +859,6 @@ static bool firm_opt_option(const char *opt)
 
 void firm_option_help(print_option_help_func print_option_help)
 {
-	print_option_help(firm_options[0].option, firm_options[0].description);
-
 	FOR_EACH_OPT(config) {
 		char buf[1024];
 		char buf2[1024];
