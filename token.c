@@ -66,7 +66,7 @@ static void register_token(unsigned mode, token_kind_t id, const char *string)
 	}
 }
 
-static void register_pp_token(unsigned mode, token_kind_t id,
+static void register_pp_token(unsigned mode, preprocessor_token_kind_t id,
                               const char *string)
 {
 	if (! (c_mode & mode))

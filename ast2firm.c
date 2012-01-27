@@ -521,7 +521,7 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 	}
 }
 
-#define INVALID_TYPE ((ir_type_ptr)-1)
+#define INVALID_TYPE ((ir_type*)-1)
 
 enum {
 	COMPOUND_IS_STRUCT = false,
@@ -1726,7 +1726,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node      *size     = expression_to_firm(argument);
 
 		ir_node *store  = get_store();
-		ir_node *alloca = new_d_Alloc(dbgi, store, size, firm_unknown_type,
+		ir_node *alloca = new_d_Alloc(dbgi, store, size, get_unknown_type(),
 		                              stack_alloc);
 		ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
 		set_store(proj_m);
@@ -2866,29 +2866,60 @@ static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
                                      ir_entity *entity, type_t *type);
+static ir_initializer_t *create_ir_initializer(
+		const initializer_t *initializer, type_t *type);
+
+static ir_entity *create_initializer_entity(dbg_info *dbgi,
+                                            initializer_t *initializer,
+                                            type_t *type)
+{
+	/* create the ir_initializer */
+	ir_graph *const old_current_ir_graph = current_ir_graph;
+	current_ir_graph = get_const_code_irg();
+
+	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
+
+	assert(current_ir_graph == get_const_code_irg());
+	current_ir_graph = old_current_ir_graph;
+
+	ident     *const id          = id_unique("initializer.%u");
+	ir_type   *const irtype      = get_ir_type(type);
+	ir_type   *const global_type = get_glob_type();
+	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
+	set_entity_ld_ident(entity, id);
+	set_entity_visibility(entity, ir_visibility_private);
+	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
+	set_entity_initializer(entity, irinitializer);
+	return entity;
+}
 
 static ir_node *compound_literal_to_firm(
 		const compound_literal_expression_t *expression)
 {
-	type_t *type = expression->type;
-
-	/* create an entity on the stack */
-	ir_type *frame_type = get_irg_frame_type(current_ir_graph);
-
-	ident     *const id     = id_unique("CompLit.%u");
-	ir_type   *const irtype = get_ir_type(type);
-	dbg_info  *const dbgi   = get_dbg_info(&expression->base.source_position);
-	ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
-	set_entity_ld_ident(entity, id);
-
-	/* create initialisation code */
+	dbg_info      *dbgi        = get_dbg_info(&expression->base.source_position);
+	type_t        *type        = expression->type;
 	initializer_t *initializer = expression->initializer;
-	create_local_initializer(initializer, dbgi, entity, type);
 
-	/* create a sel for the compound literal address */
-	ir_node *frame = get_irg_frame(current_ir_graph);
-	ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
-	return sel;
+	if (is_constant_initializer(initializer) == EXPR_CLASS_CONSTANT) {
+		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
+		return create_symconst(dbgi, entity);
+	} else {
+		/* create an entity on the stack */
+		ident   *const id     = id_unique("CompLit.%u");
+		ir_type *const irtype = get_ir_type(type);
+		ir_type *frame_type   = get_irg_frame_type(current_ir_graph);
+
+		ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
+		set_entity_ld_ident(entity, id);
+
+		/* create initialisation code */
+		create_local_initializer(initializer, dbgi, entity, type);
+
+		/* create a sel for the compound literal address */
+		ir_node *frame = get_irg_frame(current_ir_graph);
+		ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
+		return sel;
+	}
 }
 
 /**
@@ -3915,9 +3946,6 @@ static void advance_current_object(type_path_t *path)
 }
 
 
-static ir_initializer_t *create_ir_initializer(
-		const initializer_t *initializer, type_t *type);
-
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
 {
@@ -4269,28 +4297,11 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 		return;
 	}
 
-	/* create the ir_initializer */
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
-	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
-
 	/* create a "template" entity which is copied to the entity on the stack */
-	ident     *const id          = id_unique("initializer.%u");
-	ir_type   *const irtype      = get_ir_type(type);
-	ir_type   *const global_type = get_glob_type();
-	ir_entity *const init_entity = new_d_entity(global_type, id, irtype, dbgi);
-	set_entity_ld_ident(init_entity, id);
-
-	set_entity_visibility(init_entity, ir_visibility_private);
-	add_entity_linkage(init_entity, IR_LINKAGE_CONSTANT);
-
-	set_entity_initializer(init_entity, irinitializer);
-
+	ir_entity *const init_entity
+		= create_initializer_entity(dbgi, initializer, type);
 	ir_node *const src_addr = create_symconst(dbgi, init_entity);
+	ir_type *const irtype   = get_ir_type(type);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
 
 	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
@@ -4328,16 +4339,29 @@ static void create_variable_initializer(entity_t *entity)
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 		dbg_info            *dbgi = get_dbg_info(&entity->base.source_position);
+		expression_t        *value     = initializer_value->value;
+		type_t              *init_type = value->base.type;
+		type_t              *skipped   = skip_typeref(init_type);
 
-		ir_node *value = expression_to_firm(initializer_value->value);
+		if (!is_type_scalar(skipped)) {
+			/* skip convs */
+			while (value->kind == EXPR_UNARY_CAST)
+				value = value->unary.value;
 
-		type_t  *init_type = initializer_value->value->base.type;
+			if (value->kind != EXPR_COMPOUND_LITERAL)
+				panic("expected non-scalar initializer to be a compound literal");
+			initializer = value->compound_literal.initializer;
+			goto have_initializer;
+		}
+
+		ir_node *node = expression_to_firm(initializer_value->value);
+
 		ir_mode *mode      = get_ir_mode_storage(init_type);
-		value = create_conv(dbgi, value, mode);
-		value = do_strict_conv(dbgi, value);
+		node = create_conv(dbgi, node, mode);
+		node = do_strict_conv(dbgi, node);
 
 		if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
-			set_value(entity->variable.v.value_number, value);
+			set_value(entity->variable.v.value_number, node);
 		} else {
 			assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
@@ -4347,9 +4371,10 @@ static void create_variable_initializer(entity_t *entity)
 					&& get_entity_owner(irentity) != get_tls_type()) {
 				add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 			}
-			set_atomic_ent_value(irentity, value);
+			set_atomic_ent_value(irentity, node);
 		}
 	} else {
+have_initializer:
 		assert(declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE_ENTITY ||
 		       declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
 
@@ -5540,7 +5565,7 @@ static void initialize_function_parameters(entity_t *entity)
  * @param irg            the IR-graph
  * @param dec_modifiers  additional modifiers
  */
-static void handle_decl_modifier_irg(ir_graph_ptr irg,
+static void handle_decl_modifier_irg(ir_graph *irg,
                                      decl_modifiers_t decl_modifiers)
 {
 	if (decl_modifiers & DM_NAKED) {
@@ -5642,8 +5667,6 @@ static void create_function(entity_t *entity)
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
-	ir_node *first_block = get_cur_block();
-
 	/* set inline flags */
 	if (entity->function.is_inline)
 		set_irg_inline_property(irg, irg_inline_recomended);
@@ -5698,9 +5721,6 @@ static void create_function(entity_t *entity)
 
 	DEL_ARR_F(all_labels);
 	all_labels = NULL;
-
-	mature_immBlock(first_block);
-	mature_immBlock(end_block);
 
 	irg_finalize_cons(irg);
 

@@ -91,7 +91,7 @@ enum rts_names {
 	rts_max
 };
 
-extern ir_entity_ptr rts_entities[rts_max];
+extern ir_entity *rts_entities[rts_max];
 
 /** Initialize for the Firm-generating back end. */
 void gen_firm_init(void);

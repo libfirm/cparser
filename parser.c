@@ -1666,15 +1666,6 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 }
 
 /**
- * Checks if a given expression can be used as a constant initializer.
- */
-static bool is_initializer_constant(const expression_t *expression)
-{
-	return is_constant_expression(expression) != EXPR_CLASS_VARIABLE ||
-	       is_linker_constant(expression)     != EXPR_CLASS_VARIABLE;
-}
-
-/**
  * Parses an scalar initializer.
  *
  * §6.7.8.11; eat {} without warning
@@ -1694,7 +1685,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	expression_t *expression = parse_assignment_expression();
 	mark_vars_read(expression, NULL);
-	if (must_be_constant && !is_initializer_constant(expression)) {
+	if (must_be_constant && !is_linker_constant(expression)) {
 		errorf(&expression->base.source_position,
 		       "initialisation expression '%E' is not constant",
 		       expression);
@@ -2114,7 +2105,7 @@ finish_designator:
 			expression_t *expression = parse_assignment_expression();
 			mark_vars_read(expression, NULL);
 
-			if (env->must_be_constant && !is_initializer_constant(expression)) {
+			if (env->must_be_constant && !is_linker_constant(expression)) {
 				errorf(&expression->base.source_position,
 				       "Initialisation expression '%E' is not constant",
 				       expression);
@@ -4732,10 +4723,12 @@ static bool expression_returns(expression_t const *const expr)
 	switch (expr->kind) {
 		case EXPR_CALL: {
 			expression_t const *const func = expr->call.function;
-			if (func->kind == EXPR_REFERENCE) {
-				entity_t *entity = func->reference.entity;
-				if (entity->kind == ENTITY_FUNCTION
-						&& entity->declaration.modifiers & DM_NORETURN)
+			type_t       const *const type = skip_typeref(func->base.type);
+			if (type->kind == TYPE_POINTER) {
+				type_t const *const points_to
+					= skip_typeref(type->pointer.points_to);
+				if (points_to->kind == TYPE_FUNCTION
+				    && points_to->function.modifiers & DM_NORETURN)
 					return false;
 			}
 

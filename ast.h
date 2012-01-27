@@ -112,10 +112,8 @@ typedef enum expression_classification_t {
 } expression_classification_t;
 
 /**
- * Returns true if a given expression is a compile time
- * constant. §6.6
- *
- * @param expression  the expression to check
+ * Returns true when an initializer contains only constants/linker_constant
+ * values.
  */
 expression_classification_t is_constant_initializer(const initializer_t *initializer);
 
@@ -129,7 +127,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 
 /**
  * Checks if an expression is a constant/known value to the linker. Examples:
- *  - all constant expression casted to a pointer type
+ *  - all constant/linker constant expression casted to a pointer type
  *  - "&x", with x being a global variable.
  *  - "array" or "a.array" in case array is an array and array and a,
  *  respectively is an object with link time constant address
