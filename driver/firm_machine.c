@@ -34,7 +34,7 @@ static bool setup_os_support(const char *os)
 	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
 			|| streq(os, "solaris")) {
 		set_be_option("ia32-gasmode=elf");
-	} else if (streq(os, "darwin")) {
+	} else if (strstart(os, "darwin")) {
 		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
