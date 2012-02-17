@@ -113,29 +113,34 @@ void create_gnu_builtins(void)
 
 	entity_t *(*f)(ir_builtin_kind,const char*,type_t*)
 		= create_gnu_builtin_firm;
-	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
-	f(ir_bk_frame_address,  "frame_address",  make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
-	f(ir_bk_ffs,            "ffs",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
-	f(ir_bk_ffs,            "ffsl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
-	f(ir_bk_ffs,            "ffsll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_bswap,          "bswap32",        make_function_1_type(type_int32_t, type_int32_t, DM_CONST));
+	f(ir_bk_bswap,          "bswap64",        make_function_1_type(type_int64_t, type_int64_t, DM_CONST));
 	f(ir_bk_clz,            "clz",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
 	f(ir_bk_clz,            "clzl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_clz,            "clzll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
 	f(ir_bk_ctz,            "ctz",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
 	f(ir_bk_ctz,            "ctzl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_ctz,            "ctzll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
-	f(ir_bk_popcount,       "popcount",       make_function_1_type(type_int, type_unsigned_int, DM_CONST));
-	f(ir_bk_popcount,       "popcountl",      make_function_1_type(type_int, type_unsigned_long, DM_CONST));
-	f(ir_bk_popcount,       "popcountll",     make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_ffs,            "ffs",            make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_ffs,            "ffsl",           make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_ffs,            "ffsll",          make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_frame_address,  "frame_address",  make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
 	f(ir_bk_parity,         "parity",         make_function_1_type(type_int, type_unsigned_int, DM_CONST));
 	f(ir_bk_parity,         "parityl",        make_function_1_type(type_int, type_unsigned_long, DM_CONST));
 	f(ir_bk_parity,         "parityll",       make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
+	f(ir_bk_popcount,       "popcount",       make_function_1_type(type_int, type_unsigned_int, DM_CONST));
+	f(ir_bk_popcount,       "popcountl",      make_function_1_type(type_int, type_unsigned_long, DM_CONST));
+	f(ir_bk_popcount,       "popcountll",     make_function_1_type(type_int, type_unsigned_long_long, DM_CONST));
 	f(ir_bk_prefetch,       "prefetch",       make_function_1_type_variadic(type_float, type_void_ptr, DM_NONE));
+	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
 	f(ir_bk_trap,           "trap",           make_function_type(type_void, 0, NULL, DM_NORETURN));
 
 	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
 	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));
 	l("abs",     make_function_type(type_int, 1, (type_t *[]) { type_int }, DM_CONST));
+	l("fabs",    make_function_type(type_double, 1, (type_t *[]) { type_double }, DM_CONST));
+	l("fabsf",   make_function_type(type_float, 1, (type_t *[]) { type_float }, DM_CONST));
+	l("fabsl",   make_function_type(type_long_double, 1, (type_t *[]) { type_long_double }, DM_CONST));
 	l("labs",    make_function_type(type_long, 1, (type_t *[]) { type_long }, DM_CONST));
 	l("llabs",   make_function_type(type_long_long, 1, (type_t *[]) { type_long_long }, DM_CONST));
 	l("memcpy",  make_function_type(type_void_ptr, 3, (type_t *[]) { type_void_ptr_restrict, type_const_void_ptr_restrict, type_size_t }, DM_NONE));

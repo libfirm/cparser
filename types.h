@@ -70,6 +70,8 @@ extern type_t *type_wchar_t;
 extern type_t *type_const_wchar_t;
 extern type_t *type_wchar_ptr_t;
 extern type_t *type_wint_t;
+extern type_t *type_int32_t;
+extern type_t *type_int64_t;
 
 extern type_t *type_intmax_t_ptr;
 extern type_t *type_ptrdiff_t_ptr;
