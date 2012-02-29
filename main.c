@@ -1428,6 +1428,9 @@ int main(int argc, char **argv)
 					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
+				} else if (streq(opt, "sse2")) {
+					/* ignore for now, our x86 backend always uses sse when
+					 * sse is requested */
 				} else {
 					long int value = strtol(opt, NULL, 10);
 					if (value == 0) {
