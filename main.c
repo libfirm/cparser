@@ -1113,9 +1113,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	const char *target = getenv("TARGET");
-	if (target != NULL)
-		parse_target_triple(target);
 	if (target_machine == NULL) {
 		target_machine = firm_get_host_machine();
 	}
