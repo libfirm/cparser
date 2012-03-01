@@ -3005,6 +3005,10 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
+	int old_optimize         = get_optimize();
+	int old_constant_folding = get_opt_constant_folding();
+	set_optimize(1);
+	set_opt_constant_folding(1);
 
 	init_ir_types();
 
@@ -3015,6 +3019,8 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	ir_node *cnst = expression_to_firm(expression);
 	current_ir_graph = old_current_ir_graph;
+	set_optimize(old_optimize);
+	set_opt_constant_folding(old_constant_folding);
 
 	if (!is_Const(cnst)) {
 		panic("couldn't fold constant");

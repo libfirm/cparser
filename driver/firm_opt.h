@@ -118,4 +118,10 @@ void firm_option_help(print_option_help_func func);
  * switches) */
 void choose_optimization_pack(int level);
 
+/**
+ * Initialize implicit optimization settings in firm. Frontends should call this
+ * before starting graph construction
+ */
+void init_implicit_optimizations(void);
+
 #endif

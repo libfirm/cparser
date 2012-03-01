@@ -1903,6 +1903,7 @@ do_parsing:
 			if (already_constructed_firm) {
 				panic("compiling multiple files/translation units not possible");
 			}
+			init_implicit_optimizations();
 			translation_unit_to_firm(unit);
 			already_constructed_firm = true;
 			timer_pop(t_construct);
