@@ -756,6 +756,22 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		print_string(")");
 }
 
+static void print_indented_statement(statement_t const *const stmt)
+{
+	switch (stmt->kind) {
+	case STATEMENT_LABEL:
+		break;
+
+	case STATEMENT_CASE_LABEL:
+		--indent;
+		/* FALLTHROUGH */
+	default:
+		print_indent();
+		break;
+	}
+	print_statement(stmt);
+}
+
 /**
  * Print an compound statement.
  *
@@ -768,11 +784,7 @@ static void print_compound_statement(const compound_statement_t *block)
 
 	statement_t *statement = block->statements;
 	while (statement != NULL) {
-		if (statement->base.kind == STATEMENT_CASE_LABEL)
-			--indent;
-		if (statement->kind != STATEMENT_LABEL)
-			print_indent();
-		print_statement(statement);
+		print_indented_statement(statement);
 		print_char('\n');
 
 		statement = statement->base.next;
@@ -835,8 +847,7 @@ static void print_goto_statement(const goto_statement_t *statement)
 static void print_label_statement(const label_statement_t *statement)
 {
 	print_format("%s:\n", statement->label->base.symbol->string);
-	print_indent();
-	print_statement(statement->statement);
+	print_indented_statement(statement->statement);
 }
 
 /**
@@ -891,11 +902,7 @@ static void print_case_label(const case_label_statement_t *statement)
 		print_string(":\n");
 	}
 	++indent;
-	if (statement->statement->base.kind == STATEMENT_CASE_LABEL) {
-		--indent;
-	}
-	print_indent();
-	print_statement(statement->statement);
+	print_indented_statement(statement->statement);
 }
 
 static void print_typedef(const entity_t *entity)
@@ -1406,8 +1413,7 @@ void print_declaration(const entity_t *entity)
 
 			if (entity->function.statement != NULL) {
 				print_string("\n");
-				print_indent();
-				print_statement(entity->function.statement);
+				print_indented_statement(entity->function.statement);
 				print_char('\n');
 				return;
 			}
