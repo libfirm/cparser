@@ -313,13 +313,10 @@ static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
 	print_char('(');
-	int first = 1;
+	char const *sep = "";
 	for (call_argument_t const *arg = call->arguments; arg; arg = arg->next) {
-		if (!first) {
-			print_string(", ");
-		} else {
-			first = 0;
-		}
+		print_string(sep);
+		sep = ", ";
 		print_assignment_expression(arg->expression);
 	}
 	print_char(')');
