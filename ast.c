@@ -773,12 +773,13 @@ static void print_compound_statement(const compound_statement_t *block)
 		if (statement->kind != STATEMENT_LABEL)
 			print_indent();
 		print_statement(statement);
+		print_char('\n');
 
 		statement = statement->base.next;
 	}
 	--indent;
 	print_indent();
-	print_string(block->stmt_expr ? "}" : "}\n");
+	print_char('}');
 }
 
 /**
@@ -792,9 +793,9 @@ static void print_return_statement(const return_statement_t *statement)
 	if (val != NULL) {
 		print_string("return ");
 		print_expression(val);
-		print_string(";\n");
+		print_char(';');
 	} else {
-		print_string("return;\n");
+		print_string("return;");
 	}
 }
 
@@ -806,7 +807,7 @@ static void print_return_statement(const return_statement_t *statement)
 static void print_expression_statement(const expression_statement_t *statement)
 {
 	print_expression(statement->expression);
-	print_string(";\n");
+	print_char(';');
 }
 
 /**
@@ -823,7 +824,7 @@ static void print_goto_statement(const goto_statement_t *statement)
 	} else {
 		print_string(statement->label->base.symbol->string);
 	}
-	print_string(";\n");
+	print_char(';');
 }
 
 /**
@@ -851,6 +852,7 @@ static void print_if_statement(const if_statement_t *statement)
 	print_statement(statement->true_statement);
 
 	if (statement->false_statement != NULL) {
+		print_char('\n');
 		print_indent();
 		print_string("else ");
 		print_statement(statement->false_statement);
@@ -929,7 +931,7 @@ static void print_declaration_statement(
 	bool first = true;
 	entity_t *entity = statement->declarations_begin;
 	if (entity == NULL) {
-		print_string("/* empty declaration statement */\n");
+		print_string("/* empty declaration statement */");
 		return;
 	}
 
@@ -941,13 +943,13 @@ static void print_declaration_statement(
 			continue;
 
 		if (!first) {
+			print_char('\n');
 			print_indent();
 		} else {
 			first = false;
 		}
 
 		print_entity(entity);
-		print_string("\n");
 	}
 }
 
@@ -973,10 +975,11 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 {
 	print_string("do ");
 	print_statement(statement->body);
+	print_char('\n');
 	print_indent();
 	print_string("while (");
 	print_expression(statement->condition);
-	print_string(");\n");
+	print_string(");");
 }
 
 /**
@@ -1082,7 +1085,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 	print_asm_clobbers(statement->clobbers);
 
 end_of_print_asm_statement:
-	print_string(");\n");
+	print_string(");");
 }
 
 /**
@@ -1094,6 +1097,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 {
 	print_string("__try ");
 	print_statement(statement->try_statement);
+	print_char('\n');
 	print_indent();
 	if (statement->except_expression != NULL) {
 		print_string("__except(");
@@ -1113,7 +1117,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 static void print_leave_statement(const leave_statement_t *statement)
 {
 	(void)statement;
-	print_string("__leave;\n");
+	print_string("__leave;");
 }
 
 /**
@@ -1125,7 +1129,7 @@ void print_statement(const statement_t *statement)
 {
 	switch (statement->kind) {
 	case STATEMENT_EMPTY:
-		print_string(";\n");
+		print_char(';');
 		break;
 	case STATEMENT_COMPOUND:
 		print_compound_statement(&statement->compound);
@@ -1143,10 +1147,10 @@ void print_statement(const statement_t *statement)
 		print_goto_statement(&statement->gotos);
 		break;
 	case STATEMENT_CONTINUE:
-		print_string("continue;\n");
+		print_string("continue;");
 		break;
 	case STATEMENT_BREAK:
-		print_string("break;\n");
+		print_string("break;");
 		break;
 	case STATEMENT_IF:
 		print_if_statement(&statement->ifs);
@@ -1179,7 +1183,7 @@ void print_statement(const statement_t *statement)
 		print_leave_statement(&statement->leave);
 		break;
 	case STATEMENT_ERROR:
-		print_string("$error statement$\n");
+		print_string("$error statement$");
 		break;
 	}
 }
@@ -1404,6 +1408,7 @@ void print_declaration(const entity_t *entity)
 				print_string("\n");
 				print_indent();
 				print_statement(entity->function.statement);
+				print_char('\n');
 				return;
 			}
 			break;
