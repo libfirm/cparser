@@ -313,17 +313,14 @@ static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
 	print_char('(');
-	call_argument_t *argument = call->arguments;
-	int              first    = 1;
-	while (argument != NULL) {
+	int first = 1;
+	for (call_argument_t const *arg = call->arguments; arg; arg = arg->next) {
 		if (!first) {
 			print_string(", ");
 		} else {
 			first = 0;
 		}
-		print_assignment_expression(argument->expression);
-
-		argument = argument->next;
+		print_assignment_expression(arg->expression);
 	}
 	print_char(')');
 }
@@ -785,13 +782,11 @@ static void print_compound_statement(const compound_statement_t *block)
 	print_string("{\n");
 	++indent;
 
-	statement_t *statement = block->statements;
-	while (statement != NULL) {
-		print_indented_statement(statement);
+	for (statement_t const *stmt = block->statements; stmt; stmt = stmt->base.next) {
+		print_indented_statement(stmt);
 		print_char('\n');
-
-		statement = statement->base.next;
 	}
+
 	--indent;
 	print_indent();
 	print_char('}');
