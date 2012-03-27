@@ -64,7 +64,7 @@ void change_indent(int delta)
 void print_indent(void)
 {
 	for (int i = 0; i < indent; ++i)
-		print_string("\t");
+		print_char('\t');
 }
 
 static void print_stringrep(const string_t *string)
@@ -208,7 +208,7 @@ static void print_quoted_string(const string_t *const string, char border,
 	for (const char *c = string->begin; c != end; ++c) {
 		const char tc = *c;
 		if (tc == border) {
-			print_string("\\");
+			print_char('\\');
 		}
 		switch (tc) {
 		case '\\': print_string("\\\\"); break;
@@ -293,9 +293,9 @@ static void print_funcname(const funcname_expression_t *funcname)
 static void print_compound_literal(
 		const compound_literal_expression_t *expression)
 {
-	print_string("(");
+	print_char('(');
 	print_type(expression->type);
-	print_string(")");
+	print_char(')');
 	print_initializer(expression->initializer);
 }
 
@@ -312,7 +312,7 @@ static void print_assignment_expression(const expression_t *const expr)
 static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
-	print_string("(");
+	print_char('(');
 	call_argument_t *argument = call->arguments;
 	int              first    = 1;
 	while (argument != NULL) {
@@ -325,7 +325,7 @@ static void print_call_expression(const call_expression_t *call)
 
 		argument = argument->next;
 	}
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -387,14 +387,14 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch (unexpr->base.kind) {
-	case EXPR_UNARY_NEGATE:           print_string("-"); break;
-	case EXPR_UNARY_PLUS:             print_string("+"); break;
-	case EXPR_UNARY_NOT:              print_string("!"); break;
-	case EXPR_UNARY_BITWISE_NEGATE:   print_string("~"); break;
+	case EXPR_UNARY_NEGATE:           print_char  ('-' ); break;
+	case EXPR_UNARY_PLUS:             print_char  ('+' ); break;
+	case EXPR_UNARY_NOT:              print_char  ('!' ); break;
+	case EXPR_UNARY_BITWISE_NEGATE:   print_char  ('~' ); break;
 	case EXPR_UNARY_PREFIX_INCREMENT: print_string("++"); break;
 	case EXPR_UNARY_PREFIX_DECREMENT: print_string("--"); break;
-	case EXPR_UNARY_DEREFERENCE:      print_string("*"); break;
-	case EXPR_UNARY_TAKE_ADDRESS:     print_string("&"); break;
+	case EXPR_UNARY_DEREFERENCE:      print_char  ('*' ); break;
+	case EXPR_UNARY_TAKE_ADDRESS:     print_char  ('&' ); break;
 	case EXPR_UNARY_DELETE:           print_string("delete "); break;
 	case EXPR_UNARY_DELETE_ARRAY:     print_string("delete [] "); break;
 
@@ -407,14 +407,14 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		print_string("--");
 		return;
 	case EXPR_UNARY_CAST:
-		print_string("(");
+		print_char('(');
 		print_type(unexpr->base.type);
-		print_string(")");
+		print_char(')');
 		break;
 	case EXPR_UNARY_ASSUME:
 		print_string("__assume(");
 		print_assignment_expression(unexpr->value);
-		print_string(")");
+		print_char(')');
 		return;
 
 	case EXPR_UNARY_THROW:
@@ -460,14 +460,14 @@ static void print_array_expression(const array_access_expression_t *expression)
 {
 	if (!expression->flipped) {
 		print_expression_prec(expression->array_ref, PREC_POSTFIX);
-		print_string("[");
+		print_char('[');
 		print_expression(expression->index);
-		print_string("]");
+		print_char(']');
 	} else {
 		print_expression_prec(expression->index, PREC_POSTFIX);
-		print_string("[");
+		print_char('[');
 		print_expression(expression->array_ref);
-		print_string("]");
+		print_char(']');
 	}
 }
 
@@ -488,9 +488,9 @@ static void print_typeprop_expression(const typeprop_expression_t *expression)
 		/* PREC_TOP: always print the '()' here, sizeof x is right but unusual */
 		print_expression_prec(expression->tp_expression, PREC_TOP);
 	} else {
-		print_string("(");
+		print_char('(');
 		print_type(expression->type);
-		print_string(")");
+		print_char(')');
 	}
 }
 
@@ -503,7 +503,7 @@ static void print_builtin_constant(const builtin_constant_expression_t *expressi
 {
 	print_string("__builtin_constant_p(");
 	print_assignment_expression(expression->value);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -518,7 +518,7 @@ static void print_builtin_types_compatible(
 	print_type(expression->left);
 	print_string(", ");
 	print_type(expression->right);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -551,7 +551,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 	print_assignment_expression(expression->ap);
 	print_string(", ");
 	print_string(expression->parameter->base.base.symbol->string);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -565,7 +565,7 @@ static void print_va_arg(const va_arg_expression_t *expression)
 	print_assignment_expression(expression->ap);
 	print_string(", ");
 	print_type(expression->base.type);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -579,7 +579,7 @@ static void print_va_copy(const va_copy_expression_t *expression)
 	print_assignment_expression(expression->dst);
 	print_string(", ");
 	print_assignment_expression(expression->src);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -599,7 +599,7 @@ static void print_select(const select_expression_t *expression)
 	if (is_type_pointer(skip_typeref(expression->compound->base.type))) {
 		print_string("->");
 	} else {
-		print_string(".");
+		print_char('.');
 	}
 	print_string(expression->compound_entry->base.symbol->string);
 }
@@ -614,7 +614,7 @@ static void print_classify_type_expression(
 {
 	print_string("__builtin_classify_type(");
 	print_assignment_expression(expr->type_expression);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -626,11 +626,11 @@ static void print_designator(const designator_t *designator)
 {
 	for ( ; designator != NULL; designator = designator->next) {
 		if (designator->symbol == NULL) {
-			print_string("[");
+			print_char('[');
 			print_expression(designator->array_index);
-			print_string("]");
+			print_char(']');
 		} else {
-			print_string(".");
+			print_char('.');
 			print_string(designator->symbol->string);
 		}
 	}
@@ -645,9 +645,9 @@ static void print_offsetof_expression(const offsetof_expression_t *expression)
 {
 	print_string("__builtin_offsetof(");
 	print_type(expression->type);
-	print_string(",");
+	print_char(',');
 	print_designator(expression->designator);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -657,9 +657,9 @@ static void print_offsetof_expression(const offsetof_expression_t *expression)
  */
 static void print_statement_expression(const statement_expression_t *expression)
 {
-	print_string("(");
+	print_char('(');
 	print_statement(expression->statement);
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -681,7 +681,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		top_prec > get_expression_precedence(expression->base.kind);
 
 	if (parenthesized)
-		print_string("(");
+		print_char('(');
 	switch (expression->kind) {
 	case EXPR_ERROR:
 		print_string("$error$");
@@ -754,7 +754,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 		break;
 	}
 	if (parenthesized)
-		print_string(")");
+		print_char(')');
 }
 
 static void print_indented_statement(statement_t const *const stmt)
@@ -834,7 +834,7 @@ static void print_goto_statement(const goto_statement_t *statement)
 {
 	print_string("goto ");
 	if (statement->expression != NULL) {
-		print_string("*");
+		print_char('*');
 		print_expression(statement->expression);
 	} else {
 		print_string(statement->label->base.symbol->string);
@@ -944,7 +944,7 @@ static void print_typedef(const entity_t *entity)
 {
 	print_string("typedef ");
 	print_type_ext(entity->typedefe.type, entity->base.symbol, NULL);
-	print_string(";");
+	print_char(';');
 }
 
 /**
@@ -1033,7 +1033,7 @@ static void print_for_statement(const for_statement_t *statement)
 	print_string("for (");
 	if (statement->initialisation != NULL) {
 		print_expression(statement->initialisation);
-		print_string(";");
+		print_char(';');
 	} else {
 		entity_t const *entity = statement->scope.entities;
 		for (; entity != NULL; entity = entity->base.next) {
@@ -1044,12 +1044,12 @@ static void print_for_statement(const for_statement_t *statement)
 		}
 	}
 	if (statement->condition != NULL) {
-		print_string(" ");
+		print_char(' ');
 		print_expression(statement->condition);
 	}
-	print_string(";");
+	print_char(';');
 	if (statement->step != NULL) {
-		print_string(" ");
+		print_char(' ');
 		print_expression(statement->step);
 	}
 	print_char(')');
@@ -1074,7 +1074,7 @@ static void print_asm_arguments(asm_argument_t *arguments)
 		print_quoted_string(&argument->constraints, '"', 1);
 		print_string(" (");
 		print_expression(argument->expression);
-		print_string(")");
+		print_char(')');
 	}
 }
 
@@ -1105,7 +1105,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 	if (statement->is_volatile) {
 		print_string("volatile ");
 	}
-	print_string("(");
+	print_char('(');
 	print_quoted_string(&statement->asm_text, '"', 1);
 	if (statement->outputs  == NULL &&
 	    statement->inputs   == NULL &&
@@ -1332,7 +1332,7 @@ static void print_ms_modifiers(const declaration_t *declaration)
 				}
 				if (variable->put_property_sym != NULL)
 					print_format("%sput=%s", comma, variable->put_property_sym->string);
-				print_string(")");
+				print_char(')');
 			}
 		}
 	}
@@ -1395,7 +1395,7 @@ static void print_scope(const scope_t *scope)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		print_indent();
 		print_entity(entity);
-		print_string("\n");
+		print_char('\n');
 	}
 }
 
@@ -1404,7 +1404,7 @@ static void print_namespace(const namespace_t *namespace)
 	print_string("namespace ");
 	if (namespace->base.symbol != NULL) {
 		print_string(namespace->base.symbol->string);
-		print_string(" ");
+		print_char(' ');
 	}
 
 	print_string("{\n");
@@ -1445,7 +1445,7 @@ void print_declaration(const entity_t *entity)
 					&entity->function.parameters);
 
 			if (entity->function.statement != NULL) {
-				print_string("\n");
+				print_char('\n');
 				print_indented_statement(entity->function.statement);
 				print_char('\n');
 				return;
@@ -1473,7 +1473,7 @@ void print_declaration(const entity_t *entity)
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			break;
 	}
-	print_string(";");
+	print_char(';');
 }
 
 /**
@@ -1520,17 +1520,17 @@ void print_entity(const entity_t *entity)
 print_compound:
 		print_string(entity->base.symbol->string);
 		if (entity->compound.complete) {
-			print_string(" ");
+			print_char(' ');
 			print_compound_definition(&entity->compound);
 		}
-		print_string(";");
+		print_char(';');
 		return;
 	case ENTITY_ENUM:
 		print_string("enum ");
 		print_string(entity->base.symbol->string);
-		print_string(" ");
+		print_char(' ');
 		print_enum_definition(&entity->enume);
-		print_string(";");
+		print_char(';');
 		return;
 	case ENTITY_NAMESPACE:
 		print_namespace(&entity->namespacee);
@@ -1538,7 +1538,7 @@ print_compound:
 	case ENTITY_LOCAL_LABEL:
 		print_string("__label__ ");
 		print_string(entity->base.symbol->string);
-		print_string(";");
+		print_char(';');
 		return;
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:
@@ -1566,7 +1566,7 @@ void print_ast(const translation_unit_t *unit)
 
 		print_indent();
 		print_entity(entity);
-		print_string("\n");
+		print_char('\n');
 	}
 }
 

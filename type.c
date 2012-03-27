@@ -373,7 +373,7 @@ restart:
 static void print_function_type_post(const function_type_t *type,
                                      const scope_t *parameters)
 {
-	print_string("(");
+	print_char('(');
 	bool first = true;
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
@@ -415,7 +415,7 @@ static void print_function_type_post(const function_type_t *type,
 	if (first && !type->unspecified_parameters) {
 		print_string("void");
 	}
-	print_string(")");
+	print_char(')');
 
 	intern_print_type_post(type->return_type);
 }
@@ -437,7 +437,7 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 		print_string(variable->base.base.symbol->string);
 		print_string(") ");
 	}
-	print_string("*");
+	print_char('*');
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_START);
 }
 
@@ -450,7 +450,7 @@ static void print_pointer_type_post(const pointer_type_t *type)
 {
 	type_t const *const points_to = type->points_to;
 	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
-		print_string(")");
+		print_char(')');
 	intern_print_type_post(points_to);
 }
 
@@ -465,7 +465,7 @@ static void print_reference_type_pre(const reference_type_t *type)
 	intern_print_type_pre(refers_to);
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
 		print_string(" (");
-	print_string("&");
+	print_char('&');
 }
 
 /**
@@ -477,7 +477,7 @@ static void print_reference_type_post(const reference_type_t *type)
 {
 	type_t const *const refers_to = type->refers_to;
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
-		print_string(")");
+		print_char(')');
 	intern_print_type_post(refers_to);
 }
 
@@ -498,7 +498,7 @@ static void print_array_type_pre(const array_type_t *type)
  */
 static void print_array_type_post(const array_type_t *type)
 {
-	print_string("[");
+	print_char('[');
 	if (type->is_static) {
 		print_string("static ");
 	}
@@ -507,7 +507,7 @@ static void print_array_type_post(const array_type_t *type)
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
 	}
-	print_string("]");
+	print_char(']');
 	intern_print_type_post(type->element_type);
 }
 
@@ -532,7 +532,7 @@ void print_enum_definition(const enum_t *enume)
 
 	change_indent(-1);
 	print_indent();
-	print_string("}");
+	print_char('}');
 }
 
 /**
@@ -566,12 +566,12 @@ void print_compound_definition(const compound_t *compound)
 
 		print_indent();
 		print_entity(entity);
-		print_string("\n");
+		print_char('\n');
 	}
 
 	change_indent(-1);
 	print_indent();
-	print_string("}");
+	print_char('}');
 	if (compound->modifiers & DM_TRANSPARENT_UNION) {
 		print_string("__attribute__((__transparent_union__))");
 	}
@@ -626,7 +626,7 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 	} else {
 		print_type(type->typeof_type);
 	}
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -721,7 +721,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 {
 	intern_print_type_pre(type);
 	if (symbol != NULL) {
-		print_string(" ");
+		print_char(' ');
 		print_string(symbol->string);
 	}
 	if (type->kind == TYPE_FUNCTION) {
@@ -1693,6 +1693,6 @@ void dbg_type(const type_t *type)
 {
 	print_to_file(stderr);
 	print_type(type);
-	print_string("\n");
+	print_char('\n');
 	fflush(stderr);
 }
