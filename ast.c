@@ -850,6 +850,19 @@ static void print_label_statement(const label_statement_t *statement)
 	print_indented_statement(statement->statement);
 }
 
+static void print_inner_statement(statement_t const *const stmt)
+{
+	if (stmt->kind == STATEMENT_COMPOUND) {
+		print_char(' ');
+		print_compound_statement(&stmt->compound);
+	} else {
+		print_char('\n');
+		++indent;
+		print_indented_statement(stmt);
+		--indent;
+	}
+}
+
 /**
  * Print an if statement.
  *
@@ -859,14 +872,20 @@ static void print_if_statement(const if_statement_t *statement)
 {
 	print_string("if (");
 	print_expression(statement->condition);
-	print_string(") ");
-	print_statement(statement->true_statement);
+	print_char(')');
+	print_inner_statement(statement->true_statement);
 
-	if (statement->false_statement != NULL) {
+	statement_t const *const f = statement->false_statement;
+	if (f) {
 		print_char('\n');
 		print_indent();
-		print_string("else ");
-		print_statement(statement->false_statement);
+		print_string("else");
+		if (f->kind == STATEMENT_IF) {
+			print_char(' ');
+			print_if_statement(&f->ifs);
+		} else {
+			print_inner_statement(f);
+		}
 	}
 }
 
@@ -879,8 +898,8 @@ static void print_switch_statement(const switch_statement_t *statement)
 {
 	print_string("switch (");
 	print_expression(statement->expression);
-	print_string(") ");
-	print_statement(statement->body);
+	print_char(')');
+	print_inner_statement(statement->body);
 }
 
 /**
@@ -969,8 +988,8 @@ static void print_while_statement(const while_statement_t *statement)
 {
 	print_string("while (");
 	print_expression(statement->condition);
-	print_string(") ");
-	print_statement(statement->body);
+	print_char(')');
+	print_inner_statement(statement->body);
 }
 
 /**
@@ -980,8 +999,8 @@ static void print_while_statement(const while_statement_t *statement)
  */
 static void print_do_while_statement(const do_while_statement_t *statement)
 {
-	print_string("do ");
-	print_statement(statement->body);
+	print_string("do");
+	print_inner_statement(statement->body);
 	print_char('\n');
 	print_indent();
 	print_string("while (");
@@ -1018,8 +1037,8 @@ static void print_for_statement(const for_statement_t *statement)
 		print_string(" ");
 		print_expression(statement->step);
 	}
-	print_string(") ");
-	print_statement(statement->body);
+	print_char(')');
+	print_inner_statement(statement->body);
 }
 
 /**
@@ -1102,18 +1121,18 @@ end_of_print_asm_statement:
  */
 static void print_ms_try_statement(const ms_try_statement_t *statement)
 {
-	print_string("__try ");
-	print_statement(statement->try_statement);
+	print_string("__try");
+	print_inner_statement(statement->try_statement);
 	print_char('\n');
 	print_indent();
 	if (statement->except_expression != NULL) {
 		print_string("__except(");
 		print_expression(statement->except_expression);
-		print_string(") ");
+		print_char(')');
 	} else {
-		print_string("__finally ");
+		print_string("__finally");
 	}
-	print_statement(statement->final_statement);
+	print_inner_statement(statement->final_statement);
 }
 
 /**
