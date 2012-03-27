@@ -47,6 +47,7 @@
 struct obstack ast_obstack;
 
 static int indent;
+static int case_indent;
 
 bool print_implicit_casts = false;
 bool print_parenthesis = false;
@@ -763,8 +764,10 @@ static void print_indented_statement(statement_t const *const stmt)
 		break;
 
 	case STATEMENT_CASE_LABEL:
-		--indent;
-		/* FALLTHROUGH */
+		for (int i = 0; i != case_indent; ++i)
+			print_char('\t');
+		break;
+
 	default:
 		print_indent();
 		break;
@@ -896,10 +899,15 @@ static void print_if_statement(const if_statement_t *statement)
  */
 static void print_switch_statement(const switch_statement_t *statement)
 {
+	int const old_case_indent = case_indent;
+	case_indent = indent;
+
 	print_string("switch (");
 	print_expression(statement->expression);
 	print_char(')');
 	print_inner_statement(statement->body);
+
+	case_indent = old_case_indent;
 }
 
 /**
@@ -920,7 +928,6 @@ static void print_case_label(const case_label_statement_t *statement)
 		}
 		print_string(":\n");
 	}
-	++indent;
 	print_indented_statement(statement->statement);
 }
 
