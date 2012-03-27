@@ -889,13 +889,11 @@ static void print_case_label(const case_label_statement_t *statement)
 		print_string(":\n");
 	}
 	++indent;
-	if (statement->statement != NULL) {
-		if (statement->statement->base.kind == STATEMENT_CASE_LABEL) {
-			--indent;
-		}
-		print_indent();
-		print_statement(statement->statement);
+	if (statement->statement->base.kind == STATEMENT_CASE_LABEL) {
+		--indent;
 	}
+	print_indent();
+	print_statement(statement->statement);
 }
 
 static void print_typedef(const entity_t *entity)
