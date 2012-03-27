@@ -866,6 +866,16 @@ static void print_inner_statement(statement_t const *const stmt)
 	}
 }
 
+static void print_after_inner_statement(statement_t const *const stmt)
+{
+	if (stmt->kind == STATEMENT_COMPOUND) {
+		print_char(' ');
+	} else {
+		print_char('\n');
+		print_indent();
+	}
+}
+
 /**
  * Print an if statement.
  *
@@ -880,8 +890,7 @@ static void print_if_statement(const if_statement_t *statement)
 
 	statement_t const *const f = statement->false_statement;
 	if (f) {
-		print_char('\n');
-		print_indent();
+		print_after_inner_statement(statement->true_statement);
 		print_string("else");
 		if (f->kind == STATEMENT_IF) {
 			print_char(' ');
@@ -1008,8 +1017,7 @@ static void print_do_while_statement(const do_while_statement_t *statement)
 {
 	print_string("do");
 	print_inner_statement(statement->body);
-	print_char('\n');
-	print_indent();
+	print_after_inner_statement(statement->body);
 	print_string("while (");
 	print_expression(statement->condition);
 	print_string(");");
@@ -1130,8 +1138,7 @@ static void print_ms_try_statement(const ms_try_statement_t *statement)
 {
 	print_string("__try");
 	print_inner_statement(statement->try_statement);
-	print_char('\n');
-	print_indent();
+	print_after_inner_statement(statement->try_statement);
 	if (statement->except_expression != NULL) {
 		print_string("__except(");
 		print_expression(statement->except_expression);
