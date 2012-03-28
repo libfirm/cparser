@@ -359,9 +359,8 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		walk_statement(stmt->ms_try.final_statement, env);
 		return;
 
-	case STATEMENT_GOTO:
-		if (stmt->gotos.expression)
-			walk_expression(stmt->gotos.expression, env);
+	case STATEMENT_COMPUTED_GOTO:
+		walk_expression(stmt->computed_goto.expression, env);
 		return;
 
 	case STATEMENT_ERROR:
@@ -369,6 +368,7 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 	case STATEMENT_CONTINUE:
 	case STATEMENT_BREAK:
 	case STATEMENT_ASM:
+	case STATEMENT_GOTO:
 	case STATEMENT_LEAVE:
 		return;
 	}

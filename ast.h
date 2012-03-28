@@ -72,6 +72,7 @@ typedef struct if_statement_t                        if_statement_t;
 typedef struct switch_statement_t                    switch_statement_t;
 typedef struct declaration_statement_t               declaration_statement_t;
 typedef struct expression_statement_t                expression_statement_t;
+typedef struct computed_goto_statement_t             computed_goto_statement_t;
 typedef struct goto_statement_t                      goto_statement_t;
 typedef struct label_statement_t                     label_statement_t;
 typedef struct case_label_statement_t                case_label_statement_t;

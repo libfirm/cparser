@@ -489,6 +489,7 @@ typedef enum statement_kind_t {
 	STATEMENT_EXPRESSION,
 	STATEMENT_CONTINUE,
 	STATEMENT_BREAK,
+	STATEMENT_COMPUTED_GOTO,
 	STATEMENT_GOTO,
 	STATEMENT_LABEL,
 	STATEMENT_CASE_LABEL,
@@ -550,8 +551,12 @@ struct switch_statement_t {
 struct goto_statement_t {
 	statement_base_t  base;
 	label_t          *label;         /**< The destination label. */
-	expression_t     *expression;    /**< The expression for an assigned goto. */
 	goto_statement_t *next;          /**< links all goto statements of a function */
+};
+
+struct computed_goto_statement_t {
+	statement_base_t  base;
+	expression_t     *expression; /**< The expression for the computed goto. */
 };
 
 struct case_label_statement_t {
@@ -635,23 +640,24 @@ struct leave_statement_t {
 };
 
 union statement_t {
-	statement_kind_t         kind;
-	statement_base_t         base;
-	return_statement_t       returns;
-	compound_statement_t     compound;
-	declaration_statement_t  declaration;
-	if_statement_t           ifs;
-	switch_statement_t       switchs;
-	goto_statement_t         gotos;
-	case_label_statement_t   case_label;
-	label_statement_t        label;
-	expression_statement_t   expression;
-	while_statement_t        whiles;
-	do_while_statement_t     do_while;
-	for_statement_t          fors;
-	asm_statement_t          asms;
-	ms_try_statement_t       ms_try;
-	leave_statement_t        leave;
+	statement_kind_t          kind;
+	statement_base_t          base;
+	return_statement_t        returns;
+	compound_statement_t      compound;
+	declaration_statement_t   declaration;
+	if_statement_t            ifs;
+	switch_statement_t        switchs;
+	computed_goto_statement_t computed_goto;
+	goto_statement_t          gotos;
+	case_label_statement_t    case_label;
+	label_statement_t         label;
+	expression_statement_t    expression;
+	while_statement_t         whiles;
+	do_while_statement_t      do_while;
+	for_statement_t           fors;
+	asm_statement_t           asms;
+	ms_try_statement_t        ms_try;
+	leave_statement_t         leave;
 };
 
 struct translation_unit_t {

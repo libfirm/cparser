@@ -284,25 +284,26 @@ static void semantic_comparison(binary_expression_t *expression);
 static size_t get_statement_struct_size(statement_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[STATEMENT_ERROR]       = sizeof(statement_base_t),
-		[STATEMENT_EMPTY]       = sizeof(statement_base_t),
-		[STATEMENT_COMPOUND]    = sizeof(compound_statement_t),
-		[STATEMENT_RETURN]      = sizeof(return_statement_t),
-		[STATEMENT_DECLARATION] = sizeof(declaration_statement_t),
-		[STATEMENT_IF]          = sizeof(if_statement_t),
-		[STATEMENT_SWITCH]      = sizeof(switch_statement_t),
-		[STATEMENT_EXPRESSION]  = sizeof(expression_statement_t),
-		[STATEMENT_CONTINUE]    = sizeof(statement_base_t),
-		[STATEMENT_BREAK]       = sizeof(statement_base_t),
-		[STATEMENT_GOTO]        = sizeof(goto_statement_t),
-		[STATEMENT_LABEL]       = sizeof(label_statement_t),
-		[STATEMENT_CASE_LABEL]  = sizeof(case_label_statement_t),
-		[STATEMENT_WHILE]       = sizeof(while_statement_t),
-		[STATEMENT_DO_WHILE]    = sizeof(do_while_statement_t),
-		[STATEMENT_FOR]         = sizeof(for_statement_t),
-		[STATEMENT_ASM]         = sizeof(asm_statement_t),
-		[STATEMENT_MS_TRY]      = sizeof(ms_try_statement_t),
-		[STATEMENT_LEAVE]       = sizeof(leave_statement_t)
+		[STATEMENT_ERROR]         = sizeof(statement_base_t),
+		[STATEMENT_EMPTY]         = sizeof(statement_base_t),
+		[STATEMENT_COMPOUND]      = sizeof(compound_statement_t),
+		[STATEMENT_RETURN]        = sizeof(return_statement_t),
+		[STATEMENT_DECLARATION]   = sizeof(declaration_statement_t),
+		[STATEMENT_IF]            = sizeof(if_statement_t),
+		[STATEMENT_SWITCH]        = sizeof(switch_statement_t),
+		[STATEMENT_EXPRESSION]    = sizeof(expression_statement_t),
+		[STATEMENT_CONTINUE]      = sizeof(statement_base_t),
+		[STATEMENT_BREAK]         = sizeof(statement_base_t),
+		[STATEMENT_COMPUTED_GOTO] = sizeof(computed_goto_statement_t),
+		[STATEMENT_GOTO]          = sizeof(goto_statement_t),
+		[STATEMENT_LABEL]         = sizeof(label_statement_t),
+		[STATEMENT_CASE_LABEL]    = sizeof(case_label_statement_t),
+		[STATEMENT_WHILE]         = sizeof(while_statement_t),
+		[STATEMENT_DO_WHILE]      = sizeof(do_while_statement_t),
+		[STATEMENT_FOR]           = sizeof(for_statement_t),
+		[STATEMENT_ASM]           = sizeof(asm_statement_t),
+		[STATEMENT_MS_TRY]        = sizeof(ms_try_statement_t),
+		[STATEMENT_LEAVE]         = sizeof(leave_statement_t)
 	};
 	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
@@ -4620,10 +4621,6 @@ static void check_labels(void)
 	for (const goto_statement_t *goto_statement = goto_first;
 	    goto_statement != NULL;
 	    goto_statement = goto_statement->next) {
-		/* skip computed gotos */
-		if (goto_statement->expression != NULL)
-			continue;
-
 		label_t *label = goto_statement->label;
 		if (label->base.source_position.input_name == NULL) {
 			print_in_function();
@@ -5003,20 +5000,21 @@ static void check_reachable(statement_t *const stmt)
 found_break_parent:
 			break;
 
-		case STATEMENT_GOTO:
-			if (stmt->gotos.expression) {
-				if (!expression_returns(stmt->gotos.expression))
-					return;
+		case STATEMENT_COMPUTED_GOTO: {
+			if (!expression_returns(stmt->computed_goto.expression))
+				return;
 
-				statement_t *parent = stmt->base.parent;
-				if (parent == NULL) /* top level goto */
-					return;
-				next = parent;
-			} else {
-				next = stmt->gotos.label->statement;
-				if (next == NULL) /* missing label */
-					return;
-			}
+			statement_t *parent = stmt->base.parent;
+			if (parent == NULL) /* top level goto */
+				return;
+			next = parent;
+			break;
+		}
+
+		case STATEMENT_GOTO:
+			next = stmt->gotos.label->statement;
+			if (next == NULL) /* missing label */
+				return;
 			break;
 
 		case STATEMENT_LABEL:
@@ -5131,6 +5129,7 @@ found_break_parent:
 			case STATEMENT_RETURN:
 			case STATEMENT_CONTINUE:
 			case STATEMENT_BREAK:
+			case STATEMENT_COMPUTED_GOTO:
 			case STATEMENT_GOTO:
 			case STATEMENT_LEAVE:
 				panic("invalid control flow in function");
@@ -9579,10 +9578,12 @@ end_error1:
  */
 static statement_t *parse_goto(void)
 {
-	statement_t *statement = allocate_statement_zero(STATEMENT_GOTO);
-	eat(T_goto);
+	statement_t *statement;
+	if (GNU_MODE && look_ahead(1)->kind == '*') {
+		statement = allocate_statement_zero(STATEMENT_COMPUTED_GOTO);
+		eat(T_goto);
+		eat('*');
 
-	if (GNU_MODE && next_if('*')) {
 		expression_t *expression = parse_expression();
 		mark_vars_read(expression, NULL);
 
@@ -9600,23 +9601,27 @@ static statement_t *parse_goto(void)
 			expression = create_implicit_cast(expression, type_void_ptr);
 		}
 
-		statement->gotos.expression = expression;
-	} else if (token.kind == T_IDENTIFIER) {
-		label_t *const label = get_label();
-		label->used            = true;
-		statement->gotos.label = label;
+		statement->computed_goto.expression = expression;
 	} else {
-		if (GNU_MODE)
-			parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
-		else
-			parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
-		eat_until_anchor();
-		return create_error_statement();
-	}
+		statement = allocate_statement_zero(STATEMENT_GOTO);
+		eat(T_goto);
+		if (token.kind == T_IDENTIFIER) {
+			label_t *const label = get_label();
+			label->used            = true;
+			statement->gotos.label = label;
 
-	/* remember the goto's in a list for later checking */
-	*goto_anchor = &statement->gotos;
-	goto_anchor  = &statement->gotos.next;
+			/* remember the goto's in a list for later checking */
+			*goto_anchor = &statement->gotos;
+			goto_anchor  = &statement->gotos.next;
+		} else {
+			if (GNU_MODE)
+				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
+			else
+				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
+			eat_until_anchor();
+			return create_error_statement();
+		}
+	}
 
 	expect(';', end_error);
 

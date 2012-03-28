@@ -774,6 +774,18 @@ static void print_expression_statement(const expression_statement_t *statement)
 }
 
 /**
+ * Print a computed goto statement.
+ *
+ * @param statement  the computed goto statement
+ */
+static void print_computed_goto_statement(computed_goto_statement_t const *const stmt)
+{
+	print_string("goto *");
+	print_expression(stmt->expression);
+	print_char(';');
+}
+
+/**
  * Print a goto statement.
  *
  * @param statement  the goto statement
@@ -781,12 +793,7 @@ static void print_expression_statement(const expression_statement_t *statement)
 static void print_goto_statement(const goto_statement_t *statement)
 {
 	print_string("goto ");
-	if (statement->expression != NULL) {
-		print_char('*');
-		print_expression(statement->expression);
-	} else {
-		print_string(statement->label->base.symbol->string);
-	}
+	print_string(statement->label->base.symbol->string);
 	print_char(';');
 }
 
@@ -1116,25 +1123,26 @@ static void print_leave_statement(const leave_statement_t *statement)
 void print_statement(statement_t const *const stmt)
 {
 	switch (stmt->kind) {
-	case STATEMENT_ASM:         print_asm_statement(        &stmt->asms);        break;
-	case STATEMENT_BREAK:       print_string("break;");                          break;
-	case STATEMENT_CASE_LABEL:  print_case_label(           &stmt->case_label);  break;
-	case STATEMENT_COMPOUND:    print_compound_statement(   &stmt->compound);    break;
-	case STATEMENT_CONTINUE:    print_string("continue;");                       break;
-	case STATEMENT_DECLARATION: print_declaration_statement(&stmt->declaration); break;
-	case STATEMENT_DO_WHILE:    print_do_while_statement(   &stmt->do_while);    break;
-	case STATEMENT_EMPTY:       print_char(';');                                 break;
-	case STATEMENT_ERROR:       print_string("$error statement$");               break;
-	case STATEMENT_EXPRESSION:  print_expression_statement( &stmt->expression);  break;
-	case STATEMENT_FOR:         print_for_statement(        &stmt->fors);        break;
-	case STATEMENT_GOTO:        print_goto_statement(       &stmt->gotos);       break;
-	case STATEMENT_IF:          print_if_statement(         &stmt->ifs);         break;
-	case STATEMENT_LABEL:       print_label_statement(      &stmt->label);       break;
-	case STATEMENT_LEAVE:       print_leave_statement(      &stmt->leave);       break;
-	case STATEMENT_MS_TRY:      print_ms_try_statement(     &stmt->ms_try);      break;
-	case STATEMENT_RETURN:      print_return_statement(     &stmt->returns);     break;
-	case STATEMENT_SWITCH:      print_switch_statement(     &stmt->switchs);     break;
-	case STATEMENT_WHILE:       print_while_statement(      &stmt->whiles);      break;
+	case STATEMENT_ASM:           print_asm_statement(          &stmt->asms);          break;
+	case STATEMENT_BREAK:         print_string("break;");                              break;
+	case STATEMENT_CASE_LABEL:    print_case_label(             &stmt->case_label);    break;
+	case STATEMENT_COMPOUND:      print_compound_statement(     &stmt->compound);      break;
+	case STATEMENT_COMPUTED_GOTO: print_computed_goto_statement(&stmt->computed_goto); break;
+	case STATEMENT_CONTINUE:      print_string("continue;");                           break;
+	case STATEMENT_DECLARATION:   print_declaration_statement(  &stmt->declaration);   break;
+	case STATEMENT_DO_WHILE:      print_do_while_statement(     &stmt->do_while);      break;
+	case STATEMENT_EMPTY:         print_char(';');                                     break;
+	case STATEMENT_ERROR:         print_string("$error statement$");                   break;
+	case STATEMENT_EXPRESSION:    print_expression_statement(   &stmt->expression);    break;
+	case STATEMENT_FOR:           print_for_statement(          &stmt->fors);          break;
+	case STATEMENT_GOTO:          print_goto_statement(         &stmt->gotos);         break;
+	case STATEMENT_IF:            print_if_statement(           &stmt->ifs);           break;
+	case STATEMENT_LABEL:         print_label_statement(        &stmt->label);         break;
+	case STATEMENT_LEAVE:         print_leave_statement(        &stmt->leave);         break;
+	case STATEMENT_MS_TRY:        print_ms_try_statement(       &stmt->ms_try);        break;
+	case STATEMENT_RETURN:        print_return_statement(       &stmt->returns);       break;
+	case STATEMENT_SWITCH:        print_switch_statement(       &stmt->switchs);       break;
+	case STATEMENT_WHILE:         print_while_statement(        &stmt->whiles);        break;
 	}
 }
 

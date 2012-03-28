@@ -5090,23 +5090,30 @@ static void label_to_firm(const label_statement_t *statement)
 	statement_to_firm(statement->statement);
 }
 
+static void computed_goto_to_firm(computed_goto_statement_t const *const statement)
+{
+	if (!currently_reachable())
+		return;
+
+	ir_node  *const irn  = expression_to_firm(statement->expression);
+	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
+	ir_node  *const ijmp = new_d_IJmp(dbgi, irn);
+
+	set_irn_link(ijmp, ijmp_list);
+	ijmp_list = ijmp;
+
+	set_unreachable_now();
+}
+
 static void goto_to_firm(const goto_statement_t *statement)
 {
 	if (!currently_reachable())
 		return;
 
-	if (statement->expression) {
-		ir_node  *irn  = expression_to_firm(statement->expression);
-		dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-		ir_node  *ijmp = new_d_IJmp(dbgi, irn);
+	ir_node *block = get_label_block(statement->label);
+	ir_node *jmp   = new_Jmp();
+	add_immBlock_pred(block, jmp);
 
-		set_irn_link(ijmp, ijmp_list);
-		ijmp_list = ijmp;
-	} else {
-		ir_node *block = get_label_block(statement->label);
-		ir_node *jmp   = new_Jmp();
-		add_immBlock_pred(block, jmp);
-	}
 	set_unreachable_now();
 }
 
@@ -5418,6 +5425,9 @@ static void statement_to_firm(statement_t *statement)
 		return;
 	case STATEMENT_LABEL:
 		label_to_firm(&statement->label);
+		return;
+	case STATEMENT_COMPUTED_GOTO:
+		computed_goto_to_firm(&statement->computed_goto);
 		return;
 	case STATEMENT_GOTO:
 		goto_to_firm(&statement->gotos);
