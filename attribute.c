@@ -200,7 +200,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 
 	switch (entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		entity->declaration.alignment = alignment;
 	case ENTITY_TYPEDEF:
 		entity->typedefe.alignment = alignment;

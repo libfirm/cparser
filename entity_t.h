@@ -290,16 +290,16 @@ union entity_t {
 	compound_member_t  compound_member;
 };
 
-#define DECLARATION_KIND_CASES        \
-	case ENTITY_FUNCTION:             \
-	case ENTITY_VARIABLE:             \
-	case ENTITY_PARAMETER:            \
-	case ENTITY_COMPOUND_MEMBER:
+#define DECLARATION_KIND_CASES \
+	     ENTITY_FUNCTION:        \
+	case ENTITY_VARIABLE:        \
+	case ENTITY_PARAMETER:       \
+	case ENTITY_COMPOUND_MEMBER
 
 static inline bool is_declaration(const entity_t *entity)
 {
 	switch(entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		return true;
 	default:
 		return false;

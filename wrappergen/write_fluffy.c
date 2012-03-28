@@ -225,7 +225,7 @@ static void write_expression(const expression_t *expression)
 	case EXPR_LITERAL_INTEGER:
 		fprintf(out, "%s", expression->literal.value.begin);
 		break;
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		write_unary_expression((const unary_expression_t*) expression);
 		break;
 	default:

@@ -2953,7 +2953,7 @@ static entity_t *get_expression_entity(const expression_t *expression)
 static unsigned get_cparser_entity_alignment(const entity_t *entity)
 {
 	switch(entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		return entity->declaration.alignment;
 	case ENTITY_STRUCT:
 	case ENTITY_UNION:
@@ -3463,7 +3463,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 #endif
 
 	switch (expression->kind) {
-	EXPR_LITERAL_CASES
+	case EXPR_LITERAL_CASES:
 		return literal_to_firm(&expression->literal);
 	case EXPR_STRING_LITERAL:
 		return string_to_firm(&expression->base.source_position, "str.%u",
@@ -3476,9 +3476,9 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return reference_expression_enum_value_to_firm(&expression->reference);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		return unary_expression_to_firm(&expression->unary);
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		return binary_expression_to_firm(&expression->binary);
 	case EXPR_ARRAY_ACCESS:
 		return array_access_to_firm(&expression->array_access);

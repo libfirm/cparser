@@ -162,83 +162,83 @@ typedef enum funcname_kind_t {
 } funcname_kind_t;
 
 /* convenience macros */
-#define EXPR_BINARY_CASES                  \
-	case EXPR_BINARY_ADD:                  \
-	case EXPR_BINARY_SUB:                  \
-	case EXPR_BINARY_MUL:                  \
-	case EXPR_BINARY_DIV:                  \
-	case EXPR_BINARY_MOD:                  \
-	case EXPR_BINARY_EQUAL:                \
-	case EXPR_BINARY_NOTEQUAL:             \
-	case EXPR_BINARY_LESS:                 \
-	case EXPR_BINARY_LESSEQUAL:            \
-	case EXPR_BINARY_GREATER:              \
-	case EXPR_BINARY_GREATEREQUAL:         \
-	case EXPR_BINARY_BITWISE_AND:          \
-	case EXPR_BINARY_BITWISE_OR:           \
-	case EXPR_BINARY_BITWISE_XOR:          \
-	case EXPR_BINARY_LOGICAL_AND:          \
-	case EXPR_BINARY_LOGICAL_OR:           \
-	case EXPR_BINARY_SHIFTLEFT:            \
-	case EXPR_BINARY_SHIFTRIGHT:           \
-	case EXPR_BINARY_ASSIGN:               \
-	case EXPR_BINARY_MUL_ASSIGN:           \
-	case EXPR_BINARY_DIV_ASSIGN:           \
-	case EXPR_BINARY_MOD_ASSIGN:           \
-	case EXPR_BINARY_ADD_ASSIGN:           \
-	case EXPR_BINARY_SUB_ASSIGN:           \
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:     \
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:    \
-	case EXPR_BINARY_BITWISE_AND_ASSIGN:   \
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN:   \
-	case EXPR_BINARY_BITWISE_OR_ASSIGN:    \
-	case EXPR_BINARY_COMMA:                \
-	case EXPR_BINARY_ISGREATER:            \
-	case EXPR_BINARY_ISGREATEREQUAL:       \
-	case EXPR_BINARY_ISLESS:               \
-	case EXPR_BINARY_ISLESSEQUAL:          \
-	case EXPR_BINARY_ISLESSGREATER:        \
-	case EXPR_BINARY_ISUNORDERED:
+#define EXPR_BINARY_CASES              \
+	     EXPR_BINARY_ADD:                \
+	case EXPR_BINARY_SUB:                \
+	case EXPR_BINARY_MUL:                \
+	case EXPR_BINARY_DIV:                \
+	case EXPR_BINARY_MOD:                \
+	case EXPR_BINARY_EQUAL:              \
+	case EXPR_BINARY_NOTEQUAL:           \
+	case EXPR_BINARY_LESS:               \
+	case EXPR_BINARY_LESSEQUAL:          \
+	case EXPR_BINARY_GREATER:            \
+	case EXPR_BINARY_GREATEREQUAL:       \
+	case EXPR_BINARY_BITWISE_AND:        \
+	case EXPR_BINARY_BITWISE_OR:         \
+	case EXPR_BINARY_BITWISE_XOR:        \
+	case EXPR_BINARY_LOGICAL_AND:        \
+	case EXPR_BINARY_LOGICAL_OR:         \
+	case EXPR_BINARY_SHIFTLEFT:          \
+	case EXPR_BINARY_SHIFTRIGHT:         \
+	case EXPR_BINARY_ASSIGN:             \
+	case EXPR_BINARY_MUL_ASSIGN:         \
+	case EXPR_BINARY_DIV_ASSIGN:         \
+	case EXPR_BINARY_MOD_ASSIGN:         \
+	case EXPR_BINARY_ADD_ASSIGN:         \
+	case EXPR_BINARY_SUB_ASSIGN:         \
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:   \
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  \
+	case EXPR_BINARY_BITWISE_AND_ASSIGN: \
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN: \
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:  \
+	case EXPR_BINARY_COMMA:              \
+	case EXPR_BINARY_ISGREATER:          \
+	case EXPR_BINARY_ISGREATEREQUAL:     \
+	case EXPR_BINARY_ISLESS:             \
+	case EXPR_BINARY_ISLESSEQUAL:        \
+	case EXPR_BINARY_ISLESSGREATER:      \
+	case EXPR_BINARY_ISUNORDERED
 
 /**
  * unary expression with mandatory operand
  */
-#define EXPR_UNARY_CASES_MANDATORY         \
-	case EXPR_UNARY_NEGATE:                \
-	case EXPR_UNARY_PLUS:                  \
-	case EXPR_UNARY_BITWISE_NEGATE:        \
-	case EXPR_UNARY_NOT:                   \
-	case EXPR_UNARY_DEREFERENCE:           \
-	case EXPR_UNARY_TAKE_ADDRESS:          \
-	case EXPR_UNARY_POSTFIX_INCREMENT:     \
-	case EXPR_UNARY_POSTFIX_DECREMENT:     \
-	case EXPR_UNARY_PREFIX_INCREMENT:      \
-	case EXPR_UNARY_PREFIX_DECREMENT:      \
-	case EXPR_UNARY_CAST:                  \
-	case EXPR_UNARY_ASSUME:                \
-	case EXPR_UNARY_DELETE:                \
-	case EXPR_UNARY_DELETE_ARRAY:
+#define EXPR_UNARY_CASES_MANDATORY   \
+	     EXPR_UNARY_NEGATE:            \
+	case EXPR_UNARY_PLUS:              \
+	case EXPR_UNARY_BITWISE_NEGATE:    \
+	case EXPR_UNARY_NOT:               \
+	case EXPR_UNARY_DEREFERENCE:       \
+	case EXPR_UNARY_TAKE_ADDRESS:      \
+	case EXPR_UNARY_POSTFIX_INCREMENT: \
+	case EXPR_UNARY_POSTFIX_DECREMENT: \
+	case EXPR_UNARY_PREFIX_INCREMENT:  \
+	case EXPR_UNARY_PREFIX_DECREMENT:  \
+	case EXPR_UNARY_CAST:              \
+	case EXPR_UNARY_ASSUME:            \
+	case EXPR_UNARY_DELETE:            \
+	case EXPR_UNARY_DELETE_ARRAY
 
 /**
  * unary expression with optional operand
  */
 #define EXPR_UNARY_CASES_OPTIONAL \
-	case EXPR_UNARY_THROW:        \
+	EXPR_UNARY_THROW
 
-#define EXPR_UNARY_CASES       \
-	EXPR_UNARY_CASES_MANDATORY \
-	EXPR_UNARY_CASES_OPTIONAL
+#define EXPR_UNARY_CASES           \
+	     EXPR_UNARY_CASES_MANDATORY: \
+	case EXPR_UNARY_CASES_OPTIONAL
 
-#define EXPR_LITERAL_CASES                        \
-	case EXPR_LITERAL_BOOLEAN:                    \
-	case EXPR_LITERAL_INTEGER:                    \
-	case EXPR_LITERAL_INTEGER_OCTAL:              \
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:        \
-	case EXPR_LITERAL_FLOATINGPOINT:              \
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:  \
-	case EXPR_LITERAL_CHARACTER:                  \
-	case EXPR_LITERAL_WIDE_CHARACTER:             \
-	case EXPR_LITERAL_MS_NOOP:
+#define EXPR_LITERAL_CASES                     \
+	     EXPR_LITERAL_BOOLEAN:                   \
+	case EXPR_LITERAL_INTEGER:                   \
+	case EXPR_LITERAL_INTEGER_OCTAL:             \
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:       \
+	case EXPR_LITERAL_FLOATINGPOINT:             \
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: \
+	case EXPR_LITERAL_CHARACTER:                 \
+	case EXPR_LITERAL_WIDE_CHARACTER:            \
+	case EXPR_LITERAL_MS_NOOP
 
 /**
  * The base class of every expression.

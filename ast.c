@@ -685,7 +685,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_STRING_LITERAL:
 		print_string_literal(&expression->string_literal);
 		break;
-	EXPR_LITERAL_CASES
+	case EXPR_LITERAL_CASES:
 		print_literal(&expression->literal);
 		break;
 	case EXPR_FUNCNAME:
@@ -697,7 +697,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_CALL:
 		print_call_expression(&expression->call);
 		break;
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		print_binary_expression(&expression->binary);
 		break;
 	case EXPR_REFERENCE:
@@ -710,7 +710,7 @@ static void print_expression_prec(const expression_t *expression, unsigned top_p
 	case EXPR_LABEL_ADDRESS:
 		print_label_address_expression(&expression->label_address);
 		break;
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		print_unary_expression(&expression->unary);
 		break;
 	case EXPR_SIZEOF:
@@ -1847,7 +1847,7 @@ static expression_classification_t is_object_with_constant_address(const express
 expression_classification_t is_constant_expression(const expression_t *expression)
 {
 	switch (expression->kind) {
-	EXPR_LITERAL_CASES
+	case EXPR_LITERAL_CASES:
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:

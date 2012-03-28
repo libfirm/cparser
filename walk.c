@@ -96,16 +96,16 @@ static void walk_expression(expression_t *const expr,
 		walk_statement(expr->statement.statement, env);
 		return;
 
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		walk_expression(expr->binary.left, env);
 		walk_expression(expr->binary.right, env);
 		return;
 
-	EXPR_UNARY_CASES_OPTIONAL
+	case EXPR_UNARY_CASES_OPTIONAL:
 		if (expr->unary.value == NULL)
 			return;
 		/* FALLTHROUGH */
-	EXPR_UNARY_CASES_MANDATORY
+	case EXPR_UNARY_CASES_MANDATORY:
 		walk_expression(expr->unary.value, env);
 		return;
 
@@ -176,7 +176,7 @@ static void walk_expression(expression_t *const expr,
 		walk_designator(expr->offsetofe.designator, env);
 		return;
 
-	EXPR_LITERAL_CASES
+	case EXPR_LITERAL_CASES:
 	case EXPR_REFERENCE:
 	case EXPR_REFERENCE_ENUM_VALUE:
 	case EXPR_STRING_LITERAL:

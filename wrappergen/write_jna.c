@@ -321,10 +321,10 @@ static void write_expression(const expression_t *expression)
 		fprintf(out, ".%s.val", entity->base.symbol->string);
 		break;
 	}
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		write_unary_expression(&expression->unary);
 		break;
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		write_binary_expression(&expression->binary);
 		break;
 	default:

@@ -1521,7 +1521,7 @@ unary:
 			determine_lhs_ent(expr->va_starte.ap, lhs_ent);
 			return;
 
-		EXPR_LITERAL_CASES
+		case EXPR_LITERAL_CASES:
 		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
@@ -4745,7 +4745,7 @@ static bool expression_returns(expression_t const *const expr)
 
 		case EXPR_REFERENCE:
 		case EXPR_REFERENCE_ENUM_VALUE:
-		EXPR_LITERAL_CASES
+		case EXPR_LITERAL_CASES:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO descend into initialisers
@@ -4798,13 +4798,13 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_VA_COPY:
 			return expression_returns(expr->va_copye.src);
 
-		EXPR_UNARY_CASES_MANDATORY
+		case EXPR_UNARY_CASES_MANDATORY:
 			return expression_returns(expr->unary.value);
 
 		case EXPR_UNARY_THROW:
 			return false;
 
-		EXPR_BINARY_CASES
+		case EXPR_BINARY_CASES:
 			// TODO handle constant lhs of && and ||
 			return
 				expression_returns(expr->binary.left) &&
