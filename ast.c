@@ -663,90 +663,45 @@ static void print_statement_expression(const statement_expression_t *expression)
  * @param expression  the expression to print
  * @param top_prec    the precedence of the user of this expression.
  */
-static void print_expression_prec(const expression_t *expression, unsigned top_prec)
+static void print_expression_prec(expression_t const *expr, unsigned const top_prec)
 {
-	if (expression->kind == EXPR_UNARY_CAST
-	    && expression->base.implicit && !print_implicit_casts) {
-		expression = expression->unary.value;
+	if (expr->kind == EXPR_UNARY_CAST && expr->base.implicit && !print_implicit_casts) {
+		expr = expr->unary.value;
 	}
 
 	bool parenthesized =
-		expression->base.parenthesized                 ||
+		expr->base.parenthesized                       ||
 		(print_parenthesis && top_prec != PREC_BOTTOM) ||
-		top_prec > get_expression_precedence(expression->base.kind);
+		top_prec > get_expression_precedence(expr->base.kind);
 
 	if (parenthesized)
 		print_char('(');
-	switch (expression->kind) {
-	case EXPR_ERROR:
-		print_string("$error$");
-		break;
-	case EXPR_WIDE_STRING_LITERAL:
-	case EXPR_STRING_LITERAL:
-		print_string_literal(&expression->string_literal);
-		break;
-	case EXPR_LITERAL_CASES:
-		print_literal(&expression->literal);
-		break;
-	case EXPR_FUNCNAME:
-		print_funcname(&expression->funcname);
-		break;
-	case EXPR_COMPOUND_LITERAL:
-		print_compound_literal(&expression->compound_literal);
-		break;
-	case EXPR_CALL:
-		print_call_expression(&expression->call);
-		break;
-	case EXPR_BINARY_CASES:
-		print_binary_expression(&expression->binary);
-		break;
-	case EXPR_REFERENCE:
-	case EXPR_REFERENCE_ENUM_VALUE:
-		print_reference_expression(&expression->reference);
-		break;
-	case EXPR_ARRAY_ACCESS:
-		print_array_expression(&expression->array_access);
-		break;
-	case EXPR_LABEL_ADDRESS:
-		print_label_address_expression(&expression->label_address);
-		break;
-	case EXPR_UNARY_CASES:
-		print_unary_expression(&expression->unary);
-		break;
-	case EXPR_SIZEOF:
+	switch (expr->kind) {
 	case EXPR_ALIGNOF:
-		print_typeprop_expression(&expression->typeprop);
-		break;
-	case EXPR_BUILTIN_CONSTANT_P:
-		print_builtin_constant(&expression->builtin_constant);
-		break;
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-		print_builtin_types_compatible(&expression->builtin_types_compatible);
-		break;
-	case EXPR_CONDITIONAL:
-		print_conditional(&expression->conditional);
-		break;
-	case EXPR_VA_START:
-		print_va_start(&expression->va_starte);
-		break;
-	case EXPR_VA_ARG:
-		print_va_arg(&expression->va_arge);
-		break;
-	case EXPR_VA_COPY:
-		print_va_copy(&expression->va_copye);
-		break;
-	case EXPR_SELECT:
-		print_select(&expression->select);
-		break;
-	case EXPR_CLASSIFY_TYPE:
-		print_classify_type_expression(&expression->classify_type);
-		break;
-	case EXPR_OFFSETOF:
-		print_offsetof_expression(&expression->offsetofe);
-		break;
-	case EXPR_STATEMENT:
-		print_statement_expression(&expression->statement);
-		break;
+	case EXPR_SIZEOF:                     print_typeprop_expression(     &expr->typeprop);                 break;
+	case EXPR_ARRAY_ACCESS:               print_array_expression(        &expr->array_access);             break;
+	case EXPR_BINARY_CASES:               print_binary_expression(       &expr->binary);                   break;
+	case EXPR_BUILTIN_CONSTANT_P:         print_builtin_constant(        &expr->builtin_constant);         break;
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: print_builtin_types_compatible(&expr->builtin_types_compatible); break;
+	case EXPR_CALL:                       print_call_expression(         &expr->call);                     break;
+	case EXPR_CLASSIFY_TYPE:              print_classify_type_expression(&expr->classify_type);            break;
+	case EXPR_COMPOUND_LITERAL:           print_compound_literal(        &expr->compound_literal);         break;
+	case EXPR_CONDITIONAL:                print_conditional(             &expr->conditional);              break;
+	case EXPR_ERROR:                      print_string("$error$");                                         break;
+	case EXPR_FUNCNAME:                   print_funcname(                &expr->funcname);                 break;
+	case EXPR_LABEL_ADDRESS:              print_label_address_expression(&expr->label_address);            break;
+	case EXPR_LITERAL_CASES:              print_literal(                 &expr->literal);                  break;
+	case EXPR_OFFSETOF:                   print_offsetof_expression(     &expr->offsetofe);                break;
+	case EXPR_REFERENCE:
+	case EXPR_REFERENCE_ENUM_VALUE:       print_reference_expression(    &expr->reference);                break;
+	case EXPR_SELECT:                     print_select(                  &expr->select);                   break;
+	case EXPR_STATEMENT:                  print_statement_expression(    &expr->statement);                break;
+	case EXPR_STRING_LITERAL:
+	case EXPR_WIDE_STRING_LITERAL:        print_string_literal(          &expr->string_literal);           break;
+	case EXPR_UNARY_CASES:                print_unary_expression(        &expr->unary);                    break;
+	case EXPR_VA_ARG:                     print_va_arg(                  &expr->va_arge);                  break;
+	case EXPR_VA_COPY:                    print_va_copy(                 &expr->va_copye);                 break;
+	case EXPR_VA_START:                   print_va_start(                &expr->va_starte);                break;
 	}
 	if (parenthesized)
 		print_char(')');
@@ -1158,66 +1113,28 @@ static void print_leave_statement(const leave_statement_t *statement)
  *
  * @param statement   the statement
  */
-void print_statement(const statement_t *statement)
+void print_statement(statement_t const *const stmt)
 {
-	switch (statement->kind) {
-	case STATEMENT_EMPTY:
-		print_char(';');
-		break;
-	case STATEMENT_COMPOUND:
-		print_compound_statement(&statement->compound);
-		break;
-	case STATEMENT_RETURN:
-		print_return_statement(&statement->returns);
-		break;
-	case STATEMENT_EXPRESSION:
-		print_expression_statement(&statement->expression);
-		break;
-	case STATEMENT_LABEL:
-		print_label_statement(&statement->label);
-		break;
-	case STATEMENT_GOTO:
-		print_goto_statement(&statement->gotos);
-		break;
-	case STATEMENT_CONTINUE:
-		print_string("continue;");
-		break;
-	case STATEMENT_BREAK:
-		print_string("break;");
-		break;
-	case STATEMENT_IF:
-		print_if_statement(&statement->ifs);
-		break;
-	case STATEMENT_SWITCH:
-		print_switch_statement(&statement->switchs);
-		break;
-	case STATEMENT_CASE_LABEL:
-		print_case_label(&statement->case_label);
-		break;
-	case STATEMENT_DECLARATION:
-		print_declaration_statement(&statement->declaration);
-		break;
-	case STATEMENT_WHILE:
-		print_while_statement(&statement->whiles);
-		break;
-	case STATEMENT_DO_WHILE:
-		print_do_while_statement(&statement->do_while);
-		break;
-	case STATEMENT_FOR:
-		print_for_statement(&statement->fors);
-		break;
-	case STATEMENT_ASM:
-		print_asm_statement(&statement->asms);
-		break;
-	case STATEMENT_MS_TRY:
-		print_ms_try_statement(&statement->ms_try);
-		break;
-	case STATEMENT_LEAVE:
-		print_leave_statement(&statement->leave);
-		break;
-	case STATEMENT_ERROR:
-		print_string("$error statement$");
-		break;
+	switch (stmt->kind) {
+	case STATEMENT_ASM:         print_asm_statement(        &stmt->asms);        break;
+	case STATEMENT_BREAK:       print_string("break;");                          break;
+	case STATEMENT_CASE_LABEL:  print_case_label(           &stmt->case_label);  break;
+	case STATEMENT_COMPOUND:    print_compound_statement(   &stmt->compound);    break;
+	case STATEMENT_CONTINUE:    print_string("continue;");                       break;
+	case STATEMENT_DECLARATION: print_declaration_statement(&stmt->declaration); break;
+	case STATEMENT_DO_WHILE:    print_do_while_statement(   &stmt->do_while);    break;
+	case STATEMENT_EMPTY:       print_char(';');                                 break;
+	case STATEMENT_ERROR:       print_string("$error statement$");               break;
+	case STATEMENT_EXPRESSION:  print_expression_statement( &stmt->expression);  break;
+	case STATEMENT_FOR:         print_for_statement(        &stmt->fors);        break;
+	case STATEMENT_GOTO:        print_goto_statement(       &stmt->gotos);       break;
+	case STATEMENT_IF:          print_if_statement(         &stmt->ifs);         break;
+	case STATEMENT_LABEL:       print_label_statement(      &stmt->label);       break;
+	case STATEMENT_LEAVE:       print_leave_statement(      &stmt->leave);       break;
+	case STATEMENT_MS_TRY:      print_ms_try_statement(     &stmt->ms_try);      break;
+	case STATEMENT_RETURN:      print_return_statement(     &stmt->returns);     break;
+	case STATEMENT_SWITCH:      print_switch_statement(     &stmt->switchs);     break;
+	case STATEMENT_WHILE:       print_while_statement(      &stmt->whiles);      break;
 	}
 }
 
