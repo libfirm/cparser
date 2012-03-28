@@ -101,6 +101,7 @@ static int right_to_left(unsigned precedence)
 static unsigned get_expression_precedence(expression_kind_t kind)
 {
 	static const unsigned prec[] = {
+		[EXPR_ERROR]                             = PREC_PRIMARY,
 		[EXPR_REFERENCE]                         = PREC_PRIMARY,
 		[EXPR_REFERENCE_ENUM_VALUE]              = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER]                   = PREC_PRIMARY,
