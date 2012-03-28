@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "write_fluffy.h"
+#include "separator_t.h"
 #include "symbol_t.h"
 #include "ast_t.h"
 #include "type_t.h"
@@ -127,13 +128,9 @@ static void write_function_type(const function_type_t *type)
 	fprintf(out, "(func(");
 
 	function_parameter_t *parameter = type->parameters;
-	int                   first     = 1;
+	separator_t           sep       = { "", ", " };
 	while(parameter != NULL) {
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
+		fputs(sep_next(&sep), out);
 
 #if 0
 		if(parameter->symbol != NULL) {
@@ -270,15 +267,11 @@ static void write_function(const entity_t *entity)
 	const function_type_t *function_type
 		= (const function_type_t*) entity->declaration.type;
 
-	entity_t *parameter = entity->function.parameters.entities;
-	int       first     = 1;
+	entity_t   *parameter = entity->function.parameters.entities;
+	separator_t sep       = { "", ", " };
 	for( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->kind == ENTITY_PARAMETER);
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
+		fputs(sep_next(&sep), out);
 		if(parameter->base.symbol != NULL) {
 			fprintf(out, "%s : ", parameter->base.symbol->string);
 		} else {
@@ -287,9 +280,7 @@ static void write_function(const entity_t *entity)
 		write_type(parameter->declaration.type);
 	}
 	if(function_type->variadic) {
-		if(!first) {
-			fprintf(out, ", ");
-		}
+		fputs(sep_next(&sep), out);
 		fputs("...", out);
 	}
 	fprintf(out, ")");

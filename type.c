@@ -33,6 +33,7 @@
 #include "warning.h"
 #include "diagnostic.h"
 #include "printer.h"
+#include "separator_t.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;
@@ -373,15 +374,11 @@ static void print_function_type_post(const function_type_t *type,
                                      const scope_t *parameters)
 {
 	print_char('(');
-	bool first = true;
+	separator_t sep = { "", ", " };
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
-			if (first) {
-				first = false;
-			} else {
-				print_string(", ");
-			}
+			print_string(sep_next(&sep));
 			print_type(parameter->type);
 		}
 	} else {
@@ -390,11 +387,7 @@ static void print_function_type_post(const function_type_t *type,
 			if (parameter->kind != ENTITY_PARAMETER)
 				continue;
 
-			if (first) {
-				first = false;
-			} else {
-				print_string(", ");
-			}
+			print_string(sep_next(&sep));
 			const type_t *const param_type = parameter->declaration.type;
 			if (param_type == NULL) {
 				print_string(parameter->base.symbol->string);
@@ -404,14 +397,10 @@ static void print_function_type_post(const function_type_t *type,
 		}
 	}
 	if (type->variadic) {
-		if (first) {
-			first = false;
-		} else {
-			print_string(", ");
-		}
+		print_string(sep_next(&sep));
 		print_string("...");
 	}
-	if (first && !type->unspecified_parameters) {
+	if (sep_at_first(&sep) && !type->unspecified_parameters) {
 		print_string("void");
 	}
 	print_char(')');

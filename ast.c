@@ -26,6 +26,7 @@
 #include "lang_features.h"
 #include "entity_t.h"
 #include "printer.h"
+#include "separator_t.h"
 #include "types.h"
 
 #include <assert.h>
@@ -288,10 +289,9 @@ static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
 	print_char('(');
-	char const *sep = "";
+	separator_t sep = { "", ", " };
 	for (call_argument_t const *arg = call->arguments; arg; arg = arg->next) {
-		print_string(sep);
-		sep = ", ";
+		print_string(sep_next(&sep));
 		print_assignment_expression(arg->expression);
 	}
 	print_char(')');
@@ -1007,11 +1007,10 @@ static void print_for_statement(const for_statement_t *statement)
  */
 static void print_asm_arguments(asm_argument_t *arguments)
 {
+	separator_t     sep      = { "", ", " };
 	asm_argument_t *argument = arguments;
 	for (; argument != NULL; argument = argument->next) {
-		if (argument != arguments)
-			print_string(", ");
-
+		print_string(sep_next(&sep));
 		if (argument->symbol) {
 			print_format("[%s] ", argument->symbol->string);
 		}
@@ -1029,11 +1028,10 @@ static void print_asm_arguments(asm_argument_t *arguments)
  */
 static void print_asm_clobbers(asm_clobber_t *clobbers)
 {
+	separator_t    sep     = { "", ", " };
 	asm_clobber_t *clobber = clobbers;
 	for (; clobber != NULL; clobber = clobber->next) {
-		if (clobber != clobbers)
-			print_string(", ");
-
+		print_string(sep_next(&sep));
 		print_quoted_string(&clobber->clobber, '"');
 	}
 }
@@ -1206,26 +1204,20 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 	decl_modifiers_t modifiers = declaration->modifiers;
 
-	bool        ds_shown = false;
-	const char *next     = "(";
+	separator_t sep = { "__declspec(", ", " };
 
 	if (declaration->base.kind == ENTITY_VARIABLE) {
 		variable_t *variable = (variable_t*)declaration;
 		if (variable->alignment != 0
 				|| variable->get_property_sym != NULL
 				|| variable->put_property_sym != NULL) {
-			if (!ds_shown) {
-				print_string("__declspec");
-				ds_shown = true;
-			}
-
 			if (variable->alignment != 0) {
-				print_string(next); next = ", "; print_format("align(%u)", variable->alignment);
+				print_format("%salign(%u)", sep_next(&sep), variable->alignment);
 			}
 			if (variable->get_property_sym != NULL
 					|| variable->put_property_sym != NULL) {
 				char *comma = "";
-				print_string(next); next = ", "; print_string("property(");
+				print_format("%sproperty(", sep_next(&sep));
 				if (variable->get_property_sym != NULL) {
 					print_format("get=%s", variable->get_property_sym->string);
 					comma = ", ";
@@ -1239,52 +1231,48 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 	/* DM_FORCEINLINE handled outside. */
 	if ((modifiers & ~DM_FORCEINLINE) != 0) {
-		if (!ds_shown) {
-			print_string("__declspec");
-			ds_shown = true;
-		}
 		if (modifiers & DM_DLLIMPORT) {
-			print_string(next); next = ", "; print_string("dllimport");
+			print_format("%sdllimport", sep_next(&sep));
 		}
 		if (modifiers & DM_DLLEXPORT) {
-			print_string(next); next = ", "; print_string("dllexport");
+			print_format("%sdllexport", sep_next(&sep));
 		}
 		if (modifiers & DM_THREAD) {
-			print_string(next); next = ", "; print_string("thread");
+			print_format("%sthread", sep_next(&sep));
 		}
 		if (modifiers & DM_NAKED) {
-			print_string(next); next = ", "; print_string("naked");
+			print_format("%snaked", sep_next(&sep));
 		}
 		if (modifiers & DM_THREAD) {
-			print_string(next); next = ", "; print_string("thread");
+			print_format("%sthread", sep_next(&sep));
 		}
 		if (modifiers & DM_SELECTANY) {
-			print_string(next); next = ", "; print_string("selectany");
+			print_format("%sselectany", sep_next(&sep));
 		}
 		if (modifiers & DM_NOTHROW) {
-			print_string(next); next = ", "; print_string("nothrow");
+			print_format("%snothrow", sep_next(&sep));
 		}
 		if (modifiers & DM_NORETURN) {
-			print_string(next); next = ", "; print_string("noreturn");
+			print_format("%snoreturn", sep_next(&sep));
 		}
 		if (modifiers & DM_NOINLINE) {
-			print_string(next); next = ", "; print_string("noinline");
+			print_format("%snoinline", sep_next(&sep));
 		}
 		if (modifiers & DM_DEPRECATED) {
-			print_string(next); next = ", "; print_string("deprecated");
+			print_format("%sdeprecated", sep_next(&sep));
 			if (declaration->deprecated_string != NULL)
 				print_format("(\"%s\")",
 				        declaration->deprecated_string);
 		}
 		if (modifiers & DM_RESTRICT) {
-			print_string(next); next = ", "; print_string("restrict");
+			print_format("%srestrict", sep_next(&sep));
 		}
 		if (modifiers & DM_NOALIAS) {
-			print_string(next); next = ", "; print_string("noalias");
+			print_format("%snoalias", sep_next(&sep));
 		}
 	}
 
-	if (ds_shown)
+	if (!sep_at_first(&sep))
 		print_string(") ");
 }
 #endif

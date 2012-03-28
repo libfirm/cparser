@@ -23,6 +23,7 @@
 #include "diagnostic.h"
 #include "adt/error.h"
 #include "entity_t.h"
+#include "separator_t.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "ast.h"
@@ -185,18 +186,13 @@ done_flags:;
 
 		case 'k': {
 			if (extended) {
-				bool              first     = true;
-				va_list*          toks      = va_arg(ap, va_list*);
-				const char* const delimiter = va_arg(ap, const char*);
+				va_list* const toks = va_arg(ap, va_list*);
+				separator_t    sep  = { "", va_arg(ap, const char*) };
 				for (;;) {
 					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
 					if (tok == 0)
 						break;
-					if (first) {
-						first = false;
-					} else {
-						fputs(delimiter, stderr);
-					}
+					fputs(sep_next(&sep), stderr);
 					print_token_kind(stderr, tok);
 				}
 			} else {
