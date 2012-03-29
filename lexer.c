@@ -324,8 +324,8 @@ finish_suffix:
 	}
 
 	obstack_1grow(&symbol_obstack, '\0');
-	size_t    size   = obstack_object_size(&symbol_obstack);
-	char     *string = obstack_finish(&symbol_obstack);
+	size_t size   = obstack_object_size(&symbol_obstack) - 1;
+	char  *string = obstack_finish(&symbol_obstack);
 
 	lexer_token.number.suffix = identify_string(string, size);
 }
