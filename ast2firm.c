@@ -4739,41 +4739,33 @@ static void if_statement_to_firm(if_statement_t *statement)
 		false_block = new_immBlock();
 		create_condition_evaluation(statement->condition, true_block, false_block);
 		mature_immBlock(true_block);
-	}
-
-	/* Create the false statement.
-	 * Handle false before true, so if no false statement is present, then the
-	 * empty false block is reused as fallthrough block. */
-	ir_node *fallthrough_block = NULL;
-	if (statement->false_statement != NULL) {
-		if (false_block != NULL) {
-			mature_immBlock(false_block);
-		}
-		set_cur_block(false_block);
-		statement_to_firm(statement->false_statement);
-		if (currently_reachable()) {
-			fallthrough_block = new_immBlock();
-			add_immBlock_pred(fallthrough_block, new_Jmp());
-		}
-	} else {
-		fallthrough_block = false_block;
+		mature_immBlock(false_block);
 	}
 
 	/* Create the true statement. */
 	set_cur_block(true_block);
 	statement_to_firm(statement->true_statement);
-	if (currently_reachable()) {
-		if (fallthrough_block == NULL) {
-			fallthrough_block = new_immBlock();
-		}
-		add_immBlock_pred(fallthrough_block, new_Jmp());
+	ir_node *fallthrough_block = get_cur_block();
+
+	/* Create the false statement. */
+	set_cur_block(false_block);
+	if (statement->false_statement != NULL) {
+		statement_to_firm(statement->false_statement);
 	}
 
-	/* Handle the block after the if-statement. */
-	if (fallthrough_block != NULL) {
-		mature_immBlock(fallthrough_block);
+	/* Handle the block after the if-statement.  Minor simplification and
+	 * optimisation: Reuse the false/true block as fallthrough block, if the
+	 * true/false statement does not pass control to the fallthrough block, e.g.
+	 * in the typical if (x) return; pattern. */
+	if (fallthrough_block) {
+		if (currently_reachable()) {
+			ir_node *const t_jump = new_r_Jmp(fallthrough_block);
+			ir_node *const f_jump = new_Jmp();
+			ir_node *const in[]   = { t_jump, f_jump };
+			fallthrough_block = new_Block(2, in);
+		}
+		set_cur_block(fallthrough_block);
 	}
-	set_cur_block(fallthrough_block);
 }
 
 /* Create a jump node which jumps into target_block, if the current block is
