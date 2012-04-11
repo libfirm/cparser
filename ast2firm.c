@@ -1112,7 +1112,7 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 
 	if (dest_mode == mode_b) {
 		ir_node *zero = new_Const(get_mode_null(value_mode));
-		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_less_greater);
+		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_unordered_less_greater);
 		return cmp;
 	} else if (value_mode == mode_b) {
 		return create_conv_from_b(dbgi, value, dest_mode);
