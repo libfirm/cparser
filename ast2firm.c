@@ -2893,8 +2893,7 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	return entity;
 }
 
-static ir_node *compound_literal_to_firm(
-		const compound_literal_expression_t *expression)
+static ir_node *compound_literal_addr(compound_literal_expression_t const *const expression)
 {
 	dbg_info      *dbgi        = get_dbg_info(&expression->base.source_position);
 	type_t        *type        = expression->type;
@@ -2920,6 +2919,14 @@ static ir_node *compound_literal_to_firm(
 		ir_node *sel   = new_d_simpleSel(dbgi, new_NoMem(), frame, entity);
 		return sel;
 	}
+}
+
+static ir_node *compound_literal_to_firm(compound_literal_expression_t const* const expr)
+{
+	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
+	type_t   *const type = expr->type;
+	ir_node  *const addr = compound_literal_addr(expr);
+	return deref_address(dbgi, type, addr);
 }
 
 /**
@@ -3376,7 +3383,7 @@ static ir_node *expression_to_addr(const expression_t *expression)
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
 	case EXPR_COMPOUND_LITERAL:
-		return compound_literal_to_firm(&expression->compound_literal);
+		return compound_literal_addr(&expression->compound_literal);
 	case EXPR_REFERENCE:
 		return reference_addr(&expression->reference);
 	case EXPR_SELECT:
