@@ -5361,73 +5361,36 @@ static void leave_statement_to_firm(leave_statement_t *statement)
 /**
  * Transform a statement.
  */
-static void statement_to_firm(statement_t *statement)
+static void statement_to_firm(statement_t *const stmt)
 {
 #ifndef NDEBUG
-	assert(!statement->base.transformed);
-	statement->base.transformed = true;
+	assert(!stmt->base.transformed);
+	stmt->base.transformed = true;
 #endif
 
-	switch (statement->kind) {
-	case STATEMENT_ERROR:
-		panic("error statement found");
-	case STATEMENT_EMPTY:
-		/* nothing */
-		return;
-	case STATEMENT_COMPOUND:
-		compound_statement_to_firm(&statement->compound);
-		return;
-	case STATEMENT_RETURN:
-		return_statement_to_firm(&statement->returns);
-		return;
-	case STATEMENT_EXPRESSION:
-		expression_statement_to_firm(&statement->expression);
-		return;
-	case STATEMENT_IF:
-		if_statement_to_firm(&statement->ifs);
-		return;
-	case STATEMENT_WHILE:
-		while_statement_to_firm(&statement->whiles);
-		return;
-	case STATEMENT_DO_WHILE:
-		do_while_statement_to_firm(&statement->do_while);
-		return;
-	case STATEMENT_DECLARATION:
-		declaration_statement_to_firm(&statement->declaration);
-		return;
-	case STATEMENT_BREAK:
-		create_jump_statement(statement, get_break_label());
-		return;
-	case STATEMENT_CONTINUE:
-		create_jump_statement(statement, continue_label);
-		return;
-	case STATEMENT_SWITCH:
-		switch_statement_to_firm(&statement->switchs);
-		return;
-	case STATEMENT_CASE_LABEL:
-		case_label_to_firm(&statement->case_label);
-		return;
-	case STATEMENT_FOR:
-		for_statement_to_firm(&statement->fors);
-		return;
-	case STATEMENT_LABEL:
-		label_to_firm(&statement->label);
-		return;
-	case STATEMENT_COMPUTED_GOTO:
-		computed_goto_to_firm(&statement->computed_goto);
-		return;
-	case STATEMENT_GOTO:
-		create_jump_statement(statement, get_label_block(statement->gotos.label));
-		return;
-	case STATEMENT_ASM:
-		asm_statement_to_firm(&statement->asms);
-		return;
-	case STATEMENT_MS_TRY:
-		ms_try_statement_to_firm(&statement->ms_try);
-		return;
-	case STATEMENT_LEAVE:
-		leave_statement_to_firm(&statement->leave);
-		return;
+	switch (stmt->kind) {
+	case STATEMENT_ASM:           asm_statement_to_firm(        &stmt->asms);          return;
+	case STATEMENT_CASE_LABEL:    case_label_to_firm(           &stmt->case_label);    return;
+	case STATEMENT_COMPOUND:      compound_statement_to_firm(   &stmt->compound);      return;
+	case STATEMENT_COMPUTED_GOTO: computed_goto_to_firm(        &stmt->computed_goto); return;
+	case STATEMENT_DECLARATION:   declaration_statement_to_firm(&stmt->declaration);   return;
+	case STATEMENT_DO_WHILE:      do_while_statement_to_firm(   &stmt->do_while);      return;
+	case STATEMENT_EMPTY:         /* nothing */                                        return;
+	case STATEMENT_EXPRESSION:    expression_statement_to_firm( &stmt->expression);    return;
+	case STATEMENT_FOR:           for_statement_to_firm(        &stmt->fors);          return;
+	case STATEMENT_IF:            if_statement_to_firm(         &stmt->ifs);           return;
+	case STATEMENT_LABEL:         label_to_firm(                &stmt->label);         return;
+	case STATEMENT_LEAVE:         leave_statement_to_firm(      &stmt->leave);         return;
+	case STATEMENT_MS_TRY:        ms_try_statement_to_firm(     &stmt->ms_try);        return;
+	case STATEMENT_RETURN:        return_statement_to_firm(     &stmt->returns);       return;
+	case STATEMENT_SWITCH:        switch_statement_to_firm(     &stmt->switchs);       return;
+	case STATEMENT_WHILE:         while_statement_to_firm(      &stmt->whiles);        return;
+
+	case STATEMENT_BREAK:         create_jump_statement(stmt, get_break_label());                  return;
+	case STATEMENT_CONTINUE:      create_jump_statement(stmt, continue_label);                     return;
+	case STATEMENT_GOTO:          create_jump_statement(stmt, get_label_block(stmt->gotos.label)); return;
+
+	case STATEMENT_ERROR: panic("error statement found");
 	}
 	panic("statement not implemented");
 }
