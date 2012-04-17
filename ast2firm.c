@@ -2997,7 +2997,7 @@ static void init_ir_types(void);
 
 static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 {
-	assert(is_type_valid(skip_typeref(expression->base.type)));
+	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
@@ -3007,8 +3007,6 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	set_opt_constant_folding(1);
 
 	init_ir_types();
-
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
