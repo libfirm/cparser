@@ -680,10 +680,6 @@ ir_type *get_ir_type(type_t *type)
 
 	ir_type *firm_type = NULL;
 	switch (type->kind) {
-	case TYPE_ERROR:
-		/* Happens while constant folding, when there was an error */
-		return create_atomic_type(ATOMIC_TYPE_VOID, NULL);
-
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
@@ -715,6 +711,7 @@ ir_type *get_ir_type(type_t *type)
 		firm_type = create_enum_type(&type->enumt);
 		break;
 
+	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		break;
@@ -3034,9 +3031,6 @@ bool constant_is_negative(const expression_t *expression)
 
 long fold_constant_to_int(const expression_t *expression)
 {
-	if (expression->kind == EXPR_ERROR)
-		return 0;
-
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	if (!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer");
@@ -3047,8 +3041,6 @@ long fold_constant_to_int(const expression_t *expression)
 
 bool fold_constant_to_bool(const expression_t *expression)
 {
-	if (expression->kind == EXPR_ERROR)
-		return false;
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	return !tarval_is_null(tv);
 }
@@ -3435,12 +3427,6 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
-static ir_node *error_to_firm(const expression_t *expression)
-{
-	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
-	return new_Bad(mode);
-}
-
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
@@ -3507,7 +3493,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return label_address_to_firm(&expression->label_address);
 
 	case EXPR_ERROR:
-		return error_to_firm(expression);
+		break;
 	}
 	panic("invalid expression found");
 }
