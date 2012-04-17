@@ -2439,12 +2439,12 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 	type_t   *type = skip_typeref(expression->base.type);
 
-	if (expression->base.kind == EXPR_UNARY_TAKE_ADDRESS)
-		return expression_to_addr(expression->value);
-
 	const expression_t *value = expression->value;
 
 	switch(expression->base.kind) {
+	case EXPR_UNARY_TAKE_ADDRESS:
+		return expression_to_addr(value);
+
 	case EXPR_UNARY_NEGATE: {
 		ir_node *value_node = expression_to_firm(value);
 		ir_mode *mode       = get_ir_mode_arithmetic(type);
