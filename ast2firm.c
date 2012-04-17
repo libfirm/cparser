@@ -5104,18 +5104,6 @@ static void computed_goto_to_firm(computed_goto_statement_t const *const stateme
 	set_unreachable_now();
 }
 
-static void goto_to_firm(const goto_statement_t *statement)
-{
-	if (!currently_reachable())
-		return;
-
-	ir_node *block = get_label_block(statement->label);
-	ir_node *jmp   = new_Jmp();
-	add_immBlock_pred(block, jmp);
-
-	set_unreachable_now();
-}
-
 static void asm_statement_to_firm(const asm_statement_t *statement)
 {
 	bool needs_memory = false;
@@ -5429,7 +5417,7 @@ static void statement_to_firm(statement_t *statement)
 		computed_goto_to_firm(&statement->computed_goto);
 		return;
 	case STATEMENT_GOTO:
-		goto_to_firm(&statement->gotos);
+		create_jump_statement(statement, get_label_block(statement->gotos.label));
 		return;
 	case STATEMENT_ASM:
 		asm_statement_to_firm(&statement->asms);
