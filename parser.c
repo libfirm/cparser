@@ -6868,9 +6868,10 @@ static expression_t *parse_noop_expression(void)
 		if (token.kind != ')') do {
 			(void)parse_assignment_expression();
 		} while (next_if(','));
+
+		rem_anchor_token(',');
+		rem_anchor_token(')');
 	}
-	rem_anchor_token(',');
-	rem_anchor_token(')');
 	expect(')', end_error);
 
 end_error:
