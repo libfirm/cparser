@@ -1072,15 +1072,16 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
 }
 
+static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
+{
+	return new_Const((v ? get_mode_one : get_mode_null)(mode));
+}
+
 static ir_node *create_conv_from_b(dbg_info *dbgi, ir_node *value,
                                    ir_mode *dest_mode)
 {
 	if (is_Const(value)) {
-		if (is_Const_null(value)) {
-			return new_Const(get_mode_null(dest_mode));
-		} else {
-			return new_Const(get_mode_one(dest_mode));
-		}
+		return create_Const_from_bool(dest_mode, !is_Const_null(value));
 	}
 
 	ir_node *cond       = new_d_Cond(dbgi, value);
@@ -1119,11 +1120,6 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	}
 
 	return new_d_Conv(dbgi, value, dest_mode);
-}
-
-static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
-{
-	return new_Const((v ? get_mode_one : get_mode_null)(mode));
 }
 
 /**
