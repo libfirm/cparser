@@ -1533,8 +1533,7 @@ static void keep_all_memory(ir_node *block)
 	set_cur_block(old);
 }
 
-static ir_node *reference_expression_enum_value_to_firm(
-		const reference_expression_t *ref)
+static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
 {
 	entity_t *entity = ref->entity;
 	if (entity->enum_value.tv == NULL) {
@@ -3452,7 +3451,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 	case EXPR_REFERENCE:
 		return reference_expression_to_firm(&expression->reference);
 	case EXPR_REFERENCE_ENUM_VALUE:
-		return reference_expression_enum_value_to_firm(&expression->reference);
+		return enum_constant_to_firm(&expression->reference);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
 	case EXPR_UNARY_CASES:
