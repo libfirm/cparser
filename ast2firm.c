@@ -618,14 +618,13 @@ static ir_type *create_compound_type(compound_type_t *type,
 	return irtype;
 }
 
+static ir_tarval *fold_constant_to_tarval(expression_t const *);
+
 static void determine_enum_values(enum_type_t *const type)
 {
 	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);
-
-	bool constant_folding_old = constant_folding;
-	constant_folding = true;
 
 	enum_t   *enume = type->enume;
 	entity_t *entry = enume->base.next;
@@ -635,18 +634,12 @@ static void determine_enum_values(enum_type_t *const type)
 
 		expression_t *const init = entry->enum_value.value;
 		if (init != NULL) {
-			ir_node *const cnst = expression_to_firm(init);
-			if (!is_Const(cnst)) {
-				panic("couldn't fold constant");
-			}
-			tv_next = get_Const_tarval(cnst);
+			tv_next = fold_constant_to_tarval(init);
 		}
 		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);
 		entry->enum_value.tv = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
-
-	constant_folding = constant_folding_old;
 }
 
 static ir_type *create_enum_type(enum_type_t *const type)
