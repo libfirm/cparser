@@ -3431,68 +3431,43 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
  * and expression_to_firm is, that this version might produce mode_b nodes
  * instead of mode_Is.
  */
-static ir_node *_expression_to_firm(const expression_t *expression)
+static ir_node *_expression_to_firm(expression_t const *const expr)
 {
 #ifndef NDEBUG
 	if (!constant_folding) {
-		assert(!expression->base.transformed);
-		((expression_t*) expression)->base.transformed = true;
+		assert(!expr->base.transformed);
+		((expression_t*)expr)->base.transformed = true;
 	}
 #endif
 
-	switch (expression->kind) {
-	case EXPR_LITERAL_CASES:
-		return literal_to_firm(&expression->literal);
-	case EXPR_STRING_LITERAL:
-		return string_to_firm(&expression->base.source_position, "str.%u",
-		                      &expression->literal.value);
-	case EXPR_WIDE_STRING_LITERAL:
-		return wide_string_literal_to_firm(&expression->string_literal);
-	case EXPR_REFERENCE:
-		return reference_expression_to_firm(&expression->reference);
-	case EXPR_ENUM_CONSTANT:
-		return enum_constant_to_firm(&expression->reference);
-	case EXPR_CALL:
-		return call_expression_to_firm(&expression->call);
-	case EXPR_UNARY_CASES:
-		return unary_expression_to_firm(&expression->unary);
-	case EXPR_BINARY_CASES:
-		return binary_expression_to_firm(&expression->binary);
-	case EXPR_ARRAY_ACCESS:
-		return array_access_to_firm(&expression->array_access);
-	case EXPR_SIZEOF:
-		return sizeof_to_firm(&expression->typeprop);
-	case EXPR_ALIGNOF:
-		return alignof_to_firm(&expression->typeprop);
-	case EXPR_CONDITIONAL:
-		return conditional_to_firm(&expression->conditional);
-	case EXPR_SELECT:
-		return select_to_firm(&expression->select);
-	case EXPR_CLASSIFY_TYPE:
-		return classify_type_to_firm(&expression->classify_type);
-	case EXPR_FUNCNAME:
-		return function_name_to_firm(&expression->funcname);
-	case EXPR_STATEMENT:
-		return statement_expression_to_firm(&expression->statement);
-	case EXPR_VA_START:
-		return va_start_expression_to_firm(&expression->va_starte);
-	case EXPR_VA_ARG:
-		return va_arg_expression_to_firm(&expression->va_arge);
-	case EXPR_VA_COPY:
-		return va_copy_expression_to_firm(&expression->va_copye);
-	case EXPR_BUILTIN_CONSTANT_P:
-		return builtin_constant_to_firm(&expression->builtin_constant);
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-		return builtin_types_compatible_to_firm(&expression->builtin_types_compatible);
-	case EXPR_OFFSETOF:
-		return offsetof_to_firm(&expression->offsetofe);
-	case EXPR_COMPOUND_LITERAL:
-		return compound_literal_to_firm(&expression->compound_literal);
-	case EXPR_LABEL_ADDRESS:
-		return label_address_to_firm(&expression->label_address);
+	switch (expr->kind) {
+	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
+	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
+	case EXPR_BINARY_CASES:               return binary_expression_to_firm(       &expr->binary);
+	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_firm(        &expr->builtin_constant);
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_firm(&expr->builtin_types_compatible);
+	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
+	case EXPR_CLASSIFY_TYPE:              return classify_type_to_firm(           &expr->classify_type);
+	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
+	case EXPR_CONDITIONAL:                return conditional_to_firm(             &expr->conditional);
+	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
+	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
+	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
+	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
+	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
+	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
+	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
+	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
+	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
+	case EXPR_UNARY_CASES:                return unary_expression_to_firm(        &expr->unary);
+	case EXPR_VA_ARG:                     return va_arg_expression_to_firm(       &expr->va_arge);
+	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
+	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
+	case EXPR_WIDE_STRING_LITERAL:        return wide_string_literal_to_firm(     &expr->string_literal);
 
-	case EXPR_ERROR:
-		break;
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->literal.value);
+
+	case EXPR_ERROR: break;
 	}
 	panic("invalid expression found");
 }
