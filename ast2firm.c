@@ -3028,7 +3028,6 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 /* this function is only used in parser.c, but it relies on libfirm functionality */
 bool constant_is_negative(const expression_t *expression)
 {
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	return tarval_is_negative(tv);
 }
