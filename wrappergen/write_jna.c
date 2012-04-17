@@ -314,7 +314,7 @@ static void write_expression(const expression_t *expression)
 	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
 		fprintf(out, "0x%s", expression->literal.value.begin);
 		break;
-	case EXPR_REFERENCE_ENUM_VALUE: {
+	case EXPR_ENUM_CONSTANT: {
 		/* UHOH... hacking */
 		entity_t *entity = expression->reference.entity;
 		write_enum_name(& entity->enum_value.enum_type->enumt);

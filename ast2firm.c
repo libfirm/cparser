@@ -3450,7 +3450,7 @@ static ir_node *_expression_to_firm(const expression_t *expression)
 		return wide_string_literal_to_firm(&expression->string_literal);
 	case EXPR_REFERENCE:
 		return reference_expression_to_firm(&expression->reference);
-	case EXPR_REFERENCE_ENUM_VALUE:
+	case EXPR_ENUM_CONSTANT:
 		return enum_constant_to_firm(&expression->reference);
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);

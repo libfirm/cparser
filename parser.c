@@ -320,7 +320,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 	static const size_t sizes[] = {
 		[EXPR_ERROR]                      = sizeof(expression_base_t),
 		[EXPR_REFERENCE]                  = sizeof(reference_expression_t),
-		[EXPR_REFERENCE_ENUM_VALUE]       = sizeof(reference_expression_t),
+		[EXPR_ENUM_CONSTANT]              = sizeof(reference_expression_t),
 		[EXPR_LITERAL_BOOLEAN]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER_OCTAL]      = sizeof(literal_expression_t),
@@ -1536,7 +1536,7 @@ unary:
 		case EXPR_OFFSETOF:
 		case EXPR_STATEMENT: // TODO
 		case EXPR_LABEL_ADDRESS:
-		case EXPR_REFERENCE_ENUM_VALUE:
+		case EXPR_ENUM_CONSTANT:
 			return;
 	}
 
@@ -4741,7 +4741,7 @@ static bool expression_returns(expression_t const *const expr)
 		}
 
 		case EXPR_REFERENCE:
-		case EXPR_REFERENCE_ENUM_VALUE:
+		case EXPR_ENUM_CONSTANT:
 		case EXPR_LITERAL_CASES:
 		case EXPR_STRING_LITERAL:
 		case EXPR_WIDE_STRING_LITERAL:
@@ -6233,7 +6233,7 @@ static expression_t *parse_reference(void)
 
 	expression_kind_t kind = EXPR_REFERENCE;
 	if (entity->kind == ENTITY_ENUM_VALUE)
-		kind = EXPR_REFERENCE_ENUM_VALUE;
+		kind = EXPR_ENUM_CONSTANT;
 
 	expression_t *expression         = allocate_expression_zero(kind);
 	expression->base.source_position = pos;
@@ -8543,7 +8543,7 @@ static bool expression_has_effect(const expression_t *const expr)
 	switch (expr->kind) {
 		case EXPR_ERROR:                      return true; /* do NOT warn */
 		case EXPR_REFERENCE:                  return false;
-		case EXPR_REFERENCE_ENUM_VALUE:       return false;
+		case EXPR_ENUM_CONSTANT:              return false;
 		case EXPR_LABEL_ADDRESS:              return false;
 
 		/* suppress the warning for microsoft __noop operations */

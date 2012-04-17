@@ -103,7 +103,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 	static const unsigned prec[] = {
 		[EXPR_ERROR]                             = PREC_PRIMARY,
 		[EXPR_REFERENCE]                         = PREC_PRIMARY,
-		[EXPR_REFERENCE_ENUM_VALUE]              = PREC_PRIMARY,
+		[EXPR_ENUM_CONSTANT]                     = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER]                   = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER_OCTAL]             = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER_HEXADECIMAL]       = PREC_PRIMARY,
@@ -693,7 +693,7 @@ static void print_expression_prec(expression_t const *expr, unsigned const top_p
 	case EXPR_LITERAL_CASES:              print_literal(                 &expr->literal);                  break;
 	case EXPR_OFFSETOF:                   print_offsetof_expression(     &expr->offsetofe);                break;
 	case EXPR_REFERENCE:
-	case EXPR_REFERENCE_ENUM_VALUE:       print_reference_expression(    &expr->reference);                break;
+	case EXPR_ENUM_CONSTANT:              print_reference_expression(    &expr->reference);                break;
 	case EXPR_SELECT:                     print_select(                  &expr->select);                   break;
 	case EXPR_STATEMENT:                  print_statement_expression(    &expr->statement);                break;
 	case EXPR_STRING_LITERAL:
@@ -1778,7 +1778,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	case EXPR_ALIGNOF:
 	case EXPR_BUILTIN_CONSTANT_P:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-	case EXPR_REFERENCE_ENUM_VALUE:
+	case EXPR_ENUM_CONSTANT:
 		return EXPR_CLASS_CONSTANT;
 
 	case EXPR_SIZEOF: {

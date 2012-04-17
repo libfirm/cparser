@@ -178,7 +178,7 @@ static void walk_expression(expression_t *const expr,
 
 	case EXPR_LITERAL_CASES:
 	case EXPR_REFERENCE:
-	case EXPR_REFERENCE_ENUM_VALUE:
+	case EXPR_ENUM_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
