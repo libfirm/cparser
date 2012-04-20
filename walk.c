@@ -327,6 +327,11 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		return;
 
 	case STATEMENT_CASE_LABEL:
+		if (stmt->case_label.expression) {
+			walk_expression(stmt->case_label.expression, env);
+			if (stmt->case_label.end_range)
+				walk_expression(stmt->case_label.end_range, env);
+		}
 		walk_statement(stmt->case_label.statement, env);
 		return;
 
