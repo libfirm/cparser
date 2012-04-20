@@ -1935,7 +1935,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	return result;
 }
 
-static void statement_to_firm(statement_t *statement);
+static ir_node *statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
@@ -4457,10 +4457,10 @@ static void create_local_static_variable(entity_t *entity)
 
 
 
-static void return_statement_to_firm(return_statement_t *statement)
+static ir_node *return_statement_to_firm(return_statement_t *statement)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
 	type_t   *type        = current_function_entity->declaration.type;
@@ -4505,6 +4505,7 @@ static void return_statement_to_firm(return_statement_t *statement)
 	add_immBlock_pred(end_block, ret);
 
 	set_unreachable_now();
+	return NULL;
 }
 
 static ir_node *expression_statement_to_firm(expression_statement_t *statement)
@@ -4528,13 +4529,7 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for ( ; statement != NULL; statement = statement->base.next) {
-		if (statement->base.next == NULL
-				&& statement->kind == STATEMENT_EXPRESSION) {
-			result = expression_statement_to_firm(
-					&statement->expression);
-			break;
-		}
-		statement_to_firm(statement);
+		result = statement_to_firm(statement);
 	}
 
 	return result;
@@ -4659,11 +4654,11 @@ static void initialize_local_declaration(entity_t *entity)
 	panic("invalid declaration kind");
 }
 
-static void declaration_statement_to_firm(declaration_statement_t *statement)
+static ir_node *declaration_statement_to_firm(declaration_statement_t *statement)
 {
 	entity_t *entity = statement->declarations_begin;
 	if (entity == NULL)
-		return;
+		return NULL;
 
 	entity_t *const last = statement->declarations_end;
 	for ( ;; entity = entity->base.next) {
@@ -4680,9 +4675,11 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 		if (entity == last)
 			break;
 	}
+
+	return NULL;
 }
 
-static void if_statement_to_firm(if_statement_t *statement)
+static ir_node *if_statement_to_firm(if_statement_t *statement)
 {
 	/* Create the condition. */
 	ir_node *true_block  = NULL;
@@ -4719,6 +4716,8 @@ static void if_statement_to_firm(if_statement_t *statement)
 		}
 		set_cur_block(fallthrough_block);
 	}
+
+	return NULL;
 }
 
 /* Create a jump node which jumps into target_block, if the current block is
@@ -4729,7 +4728,7 @@ static void jump_if_reachable(ir_node *const target_block)
 	add_immBlock_pred(target_block, pred);
 }
 
-static void while_statement_to_firm(while_statement_t *statement)
+static ir_node *while_statement_to_firm(while_statement_t *statement)
 {
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
@@ -4777,6 +4776,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	assert(continue_label == header_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
+	return NULL;
 }
 
 static ir_node *get_break_label(void)
@@ -4787,7 +4787,7 @@ static ir_node *get_break_label(void)
 	return break_label;
 }
 
-static void do_while_statement_to_firm(do_while_statement_t *statement)
+static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
@@ -4820,9 +4820,10 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	mature_immBlock(false_block);
 
 	set_cur_block(false_block);
+	return NULL;
 }
 
-static void for_statement_to_firm(for_statement_t *statement)
+static ir_node *for_statement_to_firm(for_statement_t *statement)
 {
 	/* create declarations */
 	entity_t *entity = statement->scope.entities;
@@ -4906,19 +4907,20 @@ static void for_statement_to_firm(for_statement_t *statement)
 	assert(continue_label == step_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
+	return NULL;
 }
 
-static void create_jump_statement(const statement_t *statement,
-                                  ir_node *target_block)
+static ir_node *create_jump_statement(const statement_t *statement, ir_node *target_block)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 	ir_node  *jump = new_d_Jmp(dbgi);
 	add_immBlock_pred(target_block, jump);
 
 	set_unreachable_now();
+	return NULL;
 }
 
 static ir_switch_table *create_switch_table(const switch_statement_t *statement)
@@ -4956,7 +4958,7 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 	return res;
 }
 
-static void switch_statement_to_firm(switch_statement_t *statement)
+static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
 	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
@@ -4999,12 +5001,13 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	current_switch    = old_switch;
 	break_label       = old_break_label;
 	saw_default_label = old_saw_default_label;
+	return NULL;
 }
 
-static void case_label_to_firm(const case_label_statement_t *statement)
+static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
 	if (statement->is_empty_range)
-		return;
+		return NULL;
 
 	if (current_switch != NULL) {
 		ir_node *block = new_immBlock();
@@ -5020,10 +5023,10 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		set_cur_block(block);
 	}
 
-	statement_to_firm(statement->statement);
+	return statement_to_firm(statement->statement);
 }
 
-static void label_to_firm(const label_statement_t *statement)
+static ir_node *label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
 	jump_if_reachable(block);
@@ -5032,13 +5035,13 @@ static void label_to_firm(const label_statement_t *statement)
 	keep_alive(block);
 	keep_all_memory(block);
 
-	statement_to_firm(statement->statement);
+	return statement_to_firm(statement->statement);
 }
 
-static void computed_goto_to_firm(computed_goto_statement_t const *const statement)
+static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
 	ir_node  *const irn  = expression_to_firm(statement->expression);
 	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
@@ -5048,9 +5051,10 @@ static void computed_goto_to_firm(computed_goto_statement_t const *const stateme
 	ijmp_list = ijmp;
 
 	set_unreachable_now();
+	return NULL;
 }
 
-static void asm_statement_to_firm(const asm_statement_t *statement)
+static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 {
 	bool needs_memory = false;
 
@@ -5290,24 +5294,28 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
+
+	return NULL;
 }
 
-static void ms_try_statement_to_firm(ms_try_statement_t *statement)
+static ir_node *ms_try_statement_to_firm(ms_try_statement_t *statement)
 {
 	statement_to_firm(statement->try_statement);
 	source_position_t const *const pos = &statement->base.source_position;
 	warningf(WARN_OTHER, pos, "structured exception handling ignored");
+	return NULL;
 }
 
-static void leave_statement_to_firm(leave_statement_t *statement)
+static ir_node *leave_statement_to_firm(leave_statement_t *statement)
 {
 	errorf(&statement->base.source_position, "__leave not supported yet");
+	return NULL;
 }
 
 /**
  * Transform a statement.
  */
-static void statement_to_firm(statement_t *const stmt)
+static ir_node *statement_to_firm(statement_t *const stmt)
 {
 #ifndef NDEBUG
 	assert(!stmt->base.transformed);
@@ -5315,26 +5323,26 @@ static void statement_to_firm(statement_t *const stmt)
 #endif
 
 	switch (stmt->kind) {
-	case STATEMENT_ASM:           asm_statement_to_firm(        &stmt->asms);          return;
-	case STATEMENT_CASE_LABEL:    case_label_to_firm(           &stmt->case_label);    return;
-	case STATEMENT_COMPOUND:      compound_statement_to_firm(   &stmt->compound);      return;
-	case STATEMENT_COMPUTED_GOTO: computed_goto_to_firm(        &stmt->computed_goto); return;
-	case STATEMENT_DECLARATION:   declaration_statement_to_firm(&stmt->declaration);   return;
-	case STATEMENT_DO_WHILE:      do_while_statement_to_firm(   &stmt->do_while);      return;
-	case STATEMENT_EMPTY:         /* nothing */                                        return;
-	case STATEMENT_EXPRESSION:    expression_statement_to_firm( &stmt->expression);    return;
-	case STATEMENT_FOR:           for_statement_to_firm(        &stmt->fors);          return;
-	case STATEMENT_IF:            if_statement_to_firm(         &stmt->ifs);           return;
-	case STATEMENT_LABEL:         label_to_firm(                &stmt->label);         return;
-	case STATEMENT_LEAVE:         leave_statement_to_firm(      &stmt->leave);         return;
-	case STATEMENT_MS_TRY:        ms_try_statement_to_firm(     &stmt->ms_try);        return;
-	case STATEMENT_RETURN:        return_statement_to_firm(     &stmt->returns);       return;
-	case STATEMENT_SWITCH:        switch_statement_to_firm(     &stmt->switchs);       return;
-	case STATEMENT_WHILE:         while_statement_to_firm(      &stmt->whiles);        return;
+	case STATEMENT_ASM:           return asm_statement_to_firm(        &stmt->asms);
+	case STATEMENT_CASE_LABEL:    return case_label_to_firm(           &stmt->case_label);
+	case STATEMENT_COMPOUND:      return compound_statement_to_firm(   &stmt->compound);
+	case STATEMENT_COMPUTED_GOTO: return computed_goto_to_firm(        &stmt->computed_goto);
+	case STATEMENT_DECLARATION:   return declaration_statement_to_firm(&stmt->declaration);
+	case STATEMENT_DO_WHILE:      return do_while_statement_to_firm(   &stmt->do_while);
+	case STATEMENT_EMPTY:         return NULL; /* nothing */
+	case STATEMENT_EXPRESSION:    return expression_statement_to_firm( &stmt->expression);
+	case STATEMENT_FOR:           return for_statement_to_firm(        &stmt->fors);
+	case STATEMENT_IF:            return if_statement_to_firm(         &stmt->ifs);
+	case STATEMENT_LABEL:         return label_to_firm(                &stmt->label);
+	case STATEMENT_LEAVE:         return leave_statement_to_firm(      &stmt->leave);
+	case STATEMENT_MS_TRY:        return ms_try_statement_to_firm(     &stmt->ms_try);
+	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
+	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
+	case STATEMENT_WHILE:         return while_statement_to_firm(      &stmt->whiles);
 
-	case STATEMENT_BREAK:         create_jump_statement(stmt, get_break_label());                  return;
-	case STATEMENT_CONTINUE:      create_jump_statement(stmt, continue_label);                     return;
-	case STATEMENT_GOTO:          create_jump_statement(stmt, get_label_block(stmt->gotos.label)); return;
+	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
+	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);
+	case STATEMENT_GOTO:          return create_jump_statement(stmt, get_label_block(stmt->gotos.label));
 
 	case STATEMENT_ERROR: panic("error statement found");
 	}
