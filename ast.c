@@ -650,6 +650,33 @@ static void print_statement_expression(const statement_expression_t *expression)
 	print_char(')');
 }
 
+static bool needs_parentheses(expression_t const *const expr, unsigned const top_prec)
+{
+	if (expr->base.parenthesized)
+		return true;
+
+	if (top_prec > get_expression_precedence(expr->base.kind))
+		return true;
+
+	if (print_parenthesis && top_prec != PREC_BOTTOM) {
+		switch (expr->kind) {
+		case EXPR_ENUM_CONSTANT:
+		case EXPR_FUNCNAME:
+		case EXPR_LITERAL_CASES:
+		case EXPR_REFERENCE:
+		case EXPR_STRING_LITERAL:
+		case EXPR_WIDE_STRING_LITERAL:
+			/* Do not print () around subexpressions consisting of a single token. */
+			return false;
+
+		default:
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * Prints an expression with parenthesis if needed.
  *
@@ -662,10 +689,7 @@ static void print_expression_prec(expression_t const *expr, unsigned const top_p
 		expr = expr->unary.value;
 	}
 
-	bool parenthesized =
-		expr->base.parenthesized                       ||
-		(print_parenthesis && top_prec != PREC_BOTTOM) ||
-		top_prec > get_expression_precedence(expr->base.kind);
+	bool const parenthesized = needs_parentheses(expr, top_prec);
 
 	if (parenthesized)
 		print_char('(');
