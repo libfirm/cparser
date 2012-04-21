@@ -4720,19 +4720,33 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	return NULL;
 }
 
-/* Create a jump node which jumps into target_block, if the current block is
- * reachable. */
-static void jump_if_reachable(ir_node *const target_block)
+/**
+ * Add an unconditional jump to the target block.  If the source block is not
+ * reachable, then a Bad predecessor is created to prevent Phi-less unreachable
+ * loops.  This is necessary if the jump potentially enters a loop.
+ */
+static void jump_to(ir_node *const target_block)
 {
 	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
 	add_immBlock_pred(target_block, pred);
+}
+
+/**
+ * Add an unconditional jump to the target block, if the current block is
+ * reachable and do nothing otherwise.  This is only valid if the jump does not
+ * enter a loop (a back edge is ok).
+ */
+static void jump_if_reachable(ir_node *const target_block)
+{
+	if (currently_reachable())
+		add_immBlock_pred(target_block, new_Jmp());
 }
 
 static ir_node *while_statement_to_firm(while_statement_t *statement)
 {
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	jump_if_reachable(header_block);
+	jump_to(header_block);
 
 	/* Create the condition. */
 	ir_node      *      body_block;
@@ -4794,7 +4808,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	jump_if_reachable(body_block);
+	jump_to(body_block);
 
 	ir_node *old_continue_label = continue_label;
 	ir_node *old_break_label    = break_label;
@@ -4850,7 +4864,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	jump_if_reachable(header_block);
+	jump_to(header_block);
 
 	/* Create the condition. */
 	ir_node *body_block;
@@ -5026,7 +5040,7 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 static ir_node *label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
-	jump_if_reachable(block);
+	jump_to(block);
 
 	set_cur_block(block);
 	keep_alive(block);
