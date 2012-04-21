@@ -4960,7 +4960,6 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 
 static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
-	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
 	ir_node  *switch_node = NULL;
 
@@ -4970,7 +4969,6 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 		unsigned n_outs = (unsigned)ir_switch_table_get_n_entries(table) + 1;
 
 		switch_node = new_d_Switch(dbgi, expression, n_outs, table);
-		first_block = get_cur_block();
 	}
 
 	set_unreachable_now();
@@ -4986,8 +4984,7 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 	jump_if_reachable(get_break_label());
 
-	if (!saw_default_label && first_block != NULL) {
-		set_cur_block(first_block);
+	if (!saw_default_label && switch_node) {
 		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
 		add_immBlock_pred(get_break_label(), proj);
 	}
