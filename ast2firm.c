@@ -4996,7 +4996,9 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 	statement_to_firm(statement->body);
 
-	jump_if_reachable(get_break_label());
+	if (currently_reachable()) {
+		add_immBlock_pred(get_break_label(), new_Jmp());
+	}
 
 	if (!saw_default_label && switch_node) {
 		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
