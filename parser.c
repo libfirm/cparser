@@ -9758,7 +9758,7 @@ static statement_t *parse_return(void)
 		type_t *return_value_type = skip_typeref(return_value->base.type);
 
 		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			if (is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
+			if (!is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
 				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
 				/* Only warn in C mode, because GCC does the same */
 				if (c_mode & _CXX || strict_mode) {
