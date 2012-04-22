@@ -3220,7 +3220,11 @@ static bool has_parameters(void)
 		type_t const *const type = skip_typeref(entity->typedefe.type);
 		if (!is_type_void(type))
 			return true;
-		if (type->base.qualifiers != TYPE_QUALIFIER_NONE) {
+		if (c_mode & _CXX) {
+			/* ISO/IEC 14882:1998(E) §8.3.5:2  It must be literally (void).  A typedef
+			 * is not allowed. */
+			errorf(HERE, "empty parameter list defined with a typedef of 'void' not allowed in C++");
+		} else if (type->base.qualifiers != TYPE_QUALIFIER_NONE) {
 			/* §6.7.5.3:10  Qualification is not allowed here. */
 			errorf(HERE, "'void' as parameter must not have type qualifiers");
 		}
