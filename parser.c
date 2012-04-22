@@ -6278,7 +6278,7 @@ static bool semantic_cast(expression_t *cast)
 	source_position_t const *pos             = &cast->base.source_position;
 
 	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
-	if (dst_type == type_void)
+	if (is_type_void(dst_type))
 		return true;
 
 	/* only integer and pointer can be casted to pointer */

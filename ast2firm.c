@@ -314,11 +314,11 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 
 	int            n_parameters = count_parameters(function_type)
 	                               + (for_closure ? 1 : 0);
-	int            n_results    = return_type == type_void ? 0 : 1;
+	int            n_results    = is_type_void(return_type) ? 0 : 1;
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
 	ir_type       *irtype       = new_d_type_method(n_parameters, n_results, dbgi);
 
-	if (return_type != type_void) {
+	if (!is_type_void(return_type)) {
 		ir_type *restype = get_ir_type(return_type);
 		set_method_res_type(irtype, 0, restype);
 	}
@@ -1025,7 +1025,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 				continue;
 
 			type_t *return_type = skip_typeref(function_type->return_type);
-			int     n_res       = return_type != type_void ? 1 : 0;
+			int     n_res       = is_type_void(return_type) ? 0 : 1;
 			if (n_res != rts_data[i].n_res)
 				continue;
 
@@ -2372,7 +2372,7 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
                             type_t *from_type, type_t *type)
 {
 	type = skip_typeref(type);
-	if (type == type_void) {
+	if (is_type_void(type)) {
 		/* make sure firm type is constructed */
 		(void) get_ir_type(type);
 		return NULL;
