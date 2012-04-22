@@ -999,10 +999,10 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 			points_to_left  = get_unqualified_type(points_to_left);
 			points_to_right = get_unqualified_type(points_to_right);
 
-			if (is_type_atomic(points_to_left, ATOMIC_TYPE_VOID))
+			if (is_type_void(points_to_left))
 				return res;
 
-			if (is_type_atomic(points_to_right, ATOMIC_TYPE_VOID)) {
+			if (is_type_void(points_to_right)) {
 				/* ISO/IEC 14882:1998(E) §C.1.2:6 */
 				return c_mode & _CXX ? ASSIGN_ERROR_INCOMPATIBLE : res;
 			}
@@ -1441,7 +1441,7 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 
 		case EXPR_UNARY_CAST:
 			/* Special case: Use void cast to mark a variable as "read" */
-			if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_VOID))
+			if (is_type_void(skip_typeref(expr->base.type)))
 				lhs_ent = NULL;
 			goto unary;
 
@@ -5111,8 +5111,8 @@ found_break_parent:
 			type_t *const type = skip_typeref(current_function->base.type);
 			assert(is_type_function(type));
 			type_t *const ret  = skip_typeref(type->function.return_type);
-			if (!is_type_atomic(ret, ATOMIC_TYPE_VOID) &&
-			    is_type_valid(ret)                     &&
+			if (!is_type_void(ret) &&
+			    is_type_valid(ret) &&
 			    !is_sym_main(current_function->base.base.symbol)) {
 				source_position_t const *const pos = &stmt->base.source_position;
 				warningf(WARN_RETURN_TYPE, pos, "control reaches end of non-void function");
@@ -7052,7 +7052,7 @@ typeprop_expression:
 	type_t const* const type       = skip_typeref(orig_type);
 	char   const*       wrong_type = NULL;
 	if (is_type_incomplete(type)) {
-		if (!is_type_atomic(type, ATOMIC_TYPE_VOID) || !GNU_MODE)
+		if (!is_type_void(type) || !GNU_MODE)
 			wrong_type = "incomplete";
 	} else if (type->kind == TYPE_FUNCTION) {
 		if (GNU_MODE) {
@@ -7482,16 +7482,14 @@ end_error:;
 	/* 6.5.15.3 */
 	source_position_t const *const pos = &conditional->base.source_position;
 	type_t                        *result_type;
-	if (is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
-			is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+	if (is_type_void(true_type) || is_type_void(false_type)) {
 		/* ISO/IEC 14882:1998(E) §5.16:2 */
 		if (true_expression->kind == EXPR_UNARY_THROW) {
 			result_type = false_type;
 		} else if (false_expression->kind == EXPR_UNARY_THROW) {
 			result_type = true_type;
 		} else {
-			if (!is_type_atomic(true_type,  ATOMIC_TYPE_VOID) ||
-			    !is_type_atomic(false_type, ATOMIC_TYPE_VOID)) {
+			if (!is_type_void(true_type) || !is_type_void(false_type)) {
 				warningf(WARN_OTHER, pos, "ISO C forbids conditional expression with only one void side");
 			}
 			result_type = type_void;
@@ -7524,8 +7522,7 @@ end_error:;
 			type_t *to2 = skip_typeref(other_type->pointer.points_to);
 
 			type_t *to;
-			if (is_type_atomic(to1, ATOMIC_TYPE_VOID) ||
-			    is_type_atomic(to2, ATOMIC_TYPE_VOID)) {
+			if (is_type_void(to1) || is_type_void(to2)) {
 				to = type_void;
 			} else if (types_compatible(get_unqualified_type(to1),
 			                            get_unqualified_type(to2))) {
@@ -7619,7 +7616,7 @@ end_error:;
 			errorf(&value->base.source_position,
 					"operand of delete must have pointer type");
 		}
-	} else if (is_type_atomic(skip_typeref(type->pointer.points_to), ATOMIC_TYPE_VOID)) {
+	} else if (is_type_void(skip_typeref(type->pointer.points_to))) {
 		source_position_t const *const pos = &value->base.source_position;
 		warningf(WARN_OTHER, pos, "deleting 'void*' is undefined");
 	}
@@ -7650,8 +7647,7 @@ static expression_t *parse_throw(void)
 						"cannot throw object of incomplete type '%T'", orig_type);
 			} else if (is_type_pointer(type)) {
 				type_t *const points_to = skip_typeref(type->pointer.points_to);
-				if (is_type_incomplete(points_to) &&
-						!is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+				if (is_type_incomplete(points_to) && !is_type_void(points_to)) {
 					errorf(&value->base.source_position,
 							"cannot throw pointer to incomplete type '%T'", orig_type);
 				}
@@ -7674,7 +7670,7 @@ static bool check_pointer_arithmetic(const source_position_t *source_position,
 	points_to = skip_typeref(points_to);
 
 	if (is_type_incomplete(points_to)) {
-		if (!GNU_MODE || !is_type_atomic(points_to, ATOMIC_TYPE_VOID)) {
+		if (!GNU_MODE || !is_type_void(points_to)) {
 			errorf(source_position,
 			       "arithmetic with pointer to incomplete type '%T' not allowed",
 			       orig_pointer_type);
@@ -8188,7 +8184,7 @@ static void semantic_sub(binary_expression_t *expression)
 			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
 		} else if (!is_type_object(unqual_left)) {
-			if (!is_type_atomic(unqual_left, ATOMIC_TYPE_VOID)) {
+			if (!is_type_void(unqual_left)) {
 				errorf(pos, "subtracting pointers to non-object types '%T'",
 				       orig_type_left);
 			} else {
@@ -8611,7 +8607,7 @@ static bool expression_has_effect(const expression_t *const expr)
 		 * suppress the warning */
 		case EXPR_UNARY_CAST: {
 			type_t *const type = skip_typeref(expr->base.type);
-			return is_type_atomic(type, ATOMIC_TYPE_VOID);
+			return is_type_void(type);
 		}
 
 		case EXPR_UNARY_ASSUME:               return true;
@@ -9766,8 +9762,8 @@ static statement_t *parse_return(void)
 	if (return_value != NULL) {
 		type_t *return_value_type = skip_typeref(return_value->base.type);
 
-		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			if (!is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
+		if (is_type_void(return_type)) {
+			if (!is_type_void(return_value_type)) {
 				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
 				/* Only warn in C mode, because GCC does the same */
 				err_or_warn(pos, "'return' with a value, in function returning 'void'");
@@ -9788,7 +9784,7 @@ static statement_t *parse_return(void)
 				warningf(WARN_OTHER, pos, "function returns address of local variable");
 			}
 		}
-	} else if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+	} else if (!is_type_void(return_type)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
 		err_or_warn(pos, "'return' without value, in function returning non-void");
 	}

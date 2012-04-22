@@ -297,7 +297,7 @@ static void write_function(const entity_t *entity)
 	fprintf(out, ")");
 
 	const type_t *return_type = skip_typeref(function_type->return_type);
-	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+	if (!is_type_void(return_type)) {
 		fprintf(out, " : ");
 		write_type(return_type);
 	}

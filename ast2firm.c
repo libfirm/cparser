@@ -1892,7 +1892,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			set_store(mem);
 		}
 
-		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (!is_type_void(return_type)) {
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
 			result = new_Proj(node, mode, pn_Builtin_max+1);
@@ -1906,7 +1906,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			set_store(mem);
 		}
 
-		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (!is_type_void(return_type)) {
 			ir_node *resproj = new_Proj(node, mode_T, pn_Call_T_result);
 
 			if (is_type_scalar(return_type)) {
@@ -5620,7 +5620,7 @@ static void create_function(entity_t *entity)
 			= skip_typeref(func_type->return_type);
 
 		ir_node *ret;
-		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (is_type_void(return_type)) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
 			ir_mode *mode;
