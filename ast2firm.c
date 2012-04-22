@@ -64,8 +64,6 @@ static const backend_params *be_params;
 static ir_type *ir_type_char;
 static ir_type *ir_type_const_char;
 static ir_type *ir_type_wchar_t;
-static ir_type *ir_type_void;
-static ir_type *ir_type_int;
 
 /* architecture specific floating point arithmetic mode (if any) */
 static ir_mode *mode_float_arithmetic;
@@ -5771,11 +5769,9 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	ir_type_int        = get_ir_type(type_int);
 	ir_type_char       = get_ir_type(type_char);
 	ir_type_const_char = get_ir_type(type_const_char);
 	ir_type_wchar_t    = get_ir_type(type_wchar_t);
-	ir_type_void       = get_ir_type(type_void);
 
 	be_params             = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
