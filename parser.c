@@ -9735,6 +9735,15 @@ entity_t *expression_is_variable(const expression_t *expression)
 	return entity;
 }
 
+static void err_or_warn(source_position_t const *const pos, char const *const msg)
+{
+	if (c_mode & _CXX || strict_mode) {
+		errorf(pos, msg);
+	} else {
+		warningf(WARN_OTHER, pos, msg);
+	}
+}
+
 /**
  * Parse a return statement.
  */
@@ -9761,20 +9770,10 @@ static statement_t *parse_return(void)
 			if (!is_type_atomic(return_value_type, ATOMIC_TYPE_VOID)) {
 				/* ISO/IEC 14882:1998(E) §6.6.3:2 */
 				/* Only warn in C mode, because GCC does the same */
-				if (c_mode & _CXX || strict_mode) {
-					errorf(pos,
-							"'return' with a value, in function returning 'void'");
-				} else {
-					warningf(WARN_OTHER, pos, "'return' with a value, in function returning 'void'");
-				}
+				err_or_warn(pos, "'return' with a value, in function returning 'void'");
 			} else if (!(c_mode & _CXX)) { /* ISO/IEC 14882:1998(E) §6.6.3:3 */
 				/* Only warn in C mode, because GCC does the same */
-				if (strict_mode) {
-					errorf(pos,
-							"'return' with expression in function returning 'void'");
-				} else {
-					warningf(WARN_OTHER, pos, "'return' with expression in function returning 'void'");
-				}
+				err_or_warn(pos, "'return' with expression in function returning 'void'");
 			}
 		} else {
 			assign_error_t error = semantic_assign(return_type, return_value);
@@ -9791,12 +9790,7 @@ static statement_t *parse_return(void)
 		}
 	} else if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
 		/* ISO/IEC 14882:1998(E) §6.6.3:3 */
-		if (c_mode & _CXX || strict_mode) {
-			errorf(pos,
-			       "'return' without value, in function returning non-void");
-		} else {
-			warningf(WARN_OTHER, pos, "'return' without value, in function returning non-void");
-		}
+		err_or_warn(pos, "'return' without value, in function returning non-void");
 	}
 	statement->returns.value = return_value;
 
