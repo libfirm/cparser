@@ -3208,6 +3208,8 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 static bool has_parameters(void)
 {
 	/* func(void) is not a parameter */
+	if (look_ahead(1)->kind != ')')
+		return true;
 	if (token.kind == T_IDENTIFIER) {
 		entity_t const *const entity
 			= get_entity(token.identifier.symbol, NAMESPACE_NORMAL);
@@ -3215,13 +3217,16 @@ static bool has_parameters(void)
 			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
 			return true;
-		if (skip_typeref(entity->typedefe.type) != type_void)
+		type_t const *const type = skip_typeref(entity->typedefe.type);
+		if (!is_type_void(type))
 			return true;
+		if (type->base.qualifiers != TYPE_QUALIFIER_NONE) {
+			/* §6.7.5.3:10  Qualification is not allowed here. */
+			errorf(HERE, "'void' as parameter must not have type qualifiers");
+		}
 	} else if (token.kind != T_void) {
 		return true;
 	}
-	if (look_ahead(1)->kind != ')')
-		return true;
 	next_token();
 	return false;
 }
