@@ -519,8 +519,6 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 	}
 }
 
-#define INVALID_TYPE ((ir_type*)-1)
-
 enum {
 	COMPOUND_IS_STRUCT = false,
 	COMPOUND_IS_UNION  = true
@@ -651,7 +649,6 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
-		assert(type->base.firm_type != INVALID_TYPE);
 		return type->base.firm_type;
 	}
 
@@ -672,7 +669,6 @@ ir_type *get_ir_type(type_t *type)
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
-		assert(type->base.firm_type != INVALID_TYPE);
 		return type->base.firm_type;
 	}
 
