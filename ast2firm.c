@@ -4458,38 +4458,25 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 
 	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
 	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
+	ir_node  *      res  = statement->value ? expression_to_firm(statement->value) : NULL;
 
-	ir_node *in[1];
-	int      in_len;
+	int in_len;
 	if (!is_type_void(type)) {
-		if (statement->value != NULL) {
-			ir_node *node = expression_to_firm(statement->value);
-			if (!is_type_compound(type)) {
-				ir_mode *const mode = get_ir_mode_storage(type);
-				node = create_conv(dbgi, node, mode);
-				node = do_strict_conv(dbgi, node);
-			}
-			in[0] = node;
+		ir_mode *const mode = is_type_compound(type) ? mode_P_data : get_ir_mode_storage(type);
+		if (res) {
+			res = create_conv(dbgi, res, mode);
+			res = do_strict_conv(dbgi, res);
 		} else {
-			ir_mode *mode;
-			if (is_type_compound(type)) {
-				mode = mode_P_data;
-			} else {
-				mode = get_ir_mode_storage(type);
-			}
-			in[0] = new_Unknown(mode);
+			res = new_Unknown(mode);
 		}
 		in_len = 1;
 	} else {
-		/* build return_value for its side effects */
-		if (statement->value != NULL) {
-			expression_to_firm(statement->value);
-		}
 		in_len = 0;
 	}
 
-	ir_node  *store = get_store();
-	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
+	ir_node *const in[1] = { res };
+	ir_node *const store = get_store();
+	ir_node *const ret   = new_d_Return(dbgi, store, in_len, in);
 
 	ir_node *end_block = get_irg_end_block(current_ir_graph);
 	add_immBlock_pred(end_block, ret);
