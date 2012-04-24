@@ -128,14 +128,14 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	return new_r_Unknown(irg, mode);
 }
 
-static const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
+static src_loc_t dbg_retrieve(const dbg_info *dbg)
 {
-	const source_position_t *pos = (const source_position_t*) dbg;
-	if (pos == NULL)
-		return NULL;
-	if (line != NULL)
-		*line = pos->lineno;
-	return pos->input_name;
+	source_position_t const *const pos = (source_position_t const*)dbg;
+	if (pos) {
+		return (src_loc_t){ pos->input_name, pos->lineno, pos->colno };
+	} else {
+		return (src_loc_t){ NULL, 0, 0 };
+	}
 }
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
