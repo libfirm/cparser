@@ -1511,16 +1511,12 @@ void layout_struct_type(compound_type_t *type)
 
 	entity_t *entry = compound->members.entities;
 	while (entry != NULL) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER) {
-			entry = entry->base.next;
-			continue;
-		}
+		if (entry->kind != ENTITY_COMPOUND_MEMBER)
+			goto next;
 
-		type_t *const m_type  = skip_typeref(entry->declaration.type);
-		if (!is_type_valid(m_type)) {
-			entry = entry->base.next;
-			continue;
-		}
+		type_t *const m_type = skip_typeref(entry->declaration.type);
+		if (!is_type_valid(m_type))
+			goto next;
 
 		if (entry->compound_member.bitfield) {
 			entry = pack_bitfield_members(&offset, &alignment,
@@ -1544,6 +1540,7 @@ void layout_struct_type(compound_type_t *type)
 		entry->compound_member.offset = offset;
 		offset += get_type_size(m_type);
 
+next:
 		entry = entry->base.next;
 	}
 
