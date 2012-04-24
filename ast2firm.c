@@ -4456,30 +4456,26 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 	if (!currently_reachable())
 		return NULL;
 
-	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
-	type_t   *type        = current_function_entity->declaration.type;
-	ir_type  *func_irtype = get_ir_type(type);
+	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
+	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
 
 	ir_node *in[1];
 	int      in_len;
-	if (get_method_n_ress(func_irtype) > 0) {
-		ir_type *res_type = get_method_res_type(func_irtype, 0);
-
+	if (!is_type_void(type)) {
 		if (statement->value != NULL) {
 			ir_node *node = expression_to_firm(statement->value);
-			if (!is_compound_type(res_type)) {
-				type_t  *ret_value_type = statement->value->base.type;
-				ir_mode *mode           = get_ir_mode_storage(ret_value_type);
-				node                    = create_conv(dbgi, node, mode);
-				node                    = do_strict_conv(dbgi, node);
+			if (!is_type_compound(type)) {
+				ir_mode *const mode = get_ir_mode_storage(type);
+				node = create_conv(dbgi, node, mode);
+				node = do_strict_conv(dbgi, node);
 			}
 			in[0] = node;
 		} else {
 			ir_mode *mode;
-			if (is_compound_type(res_type)) {
+			if (is_type_compound(type)) {
 				mode = mode_P_data;
 			} else {
-				mode = get_type_mode(res_type);
+				mode = get_ir_mode_storage(type);
 			}
 			in[0] = new_Unknown(mode);
 		}
