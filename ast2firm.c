@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <limits.h>
 
 #include <libfirm/firm.h>
@@ -5781,8 +5782,27 @@ static void global_asm_to_firm(statement_t *s)
 	}
 }
 
+static const char *get_cwd(void)
+{
+	static char buf[1024];
+	if (buf[0] == '\0')
+		getcwd(buf, sizeof(buf));
+	return buf;
+}
+
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	if (c_mode & _CXX) {
+		be_dwarf_set_source_language(DW_LANG_C_plus_plus);
+	} else if (c_mode & _C99) {
+		be_dwarf_set_source_language(DW_LANG_C99);
+	} else if (c_mode & _C89) {
+		be_dwarf_set_source_language(DW_LANG_C89);
+	} else {
+		be_dwarf_set_source_language(DW_LANG_C);
+	}
+	be_dwarf_set_compilation_directory(get_cwd());
+
 	/* initialize firm arithmetic */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
 	ir_set_uninitialized_local_variable_func(uninitialized_local_var);

@@ -1116,8 +1116,8 @@ int main(int argc, char **argv)
 			if (option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
 			} else if (option[0] == 'g') {
-				set_be_option("debuginfo=stabs");
-				set_be_option("omitfp=no");
+				/* TODO: parse -gX with 0<=x<=3... */
+				set_be_option("debug=frameinfo");
 				set_be_option("ia32-nooptcc=yes");
 			} else if (SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
