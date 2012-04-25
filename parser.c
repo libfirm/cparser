@@ -9864,13 +9864,10 @@ static statement_t *parse_ms_try_statment(void)
 			type = type_error_type;
 		}
 		statement->ms_try.except_expression = create_implicit_cast(expr, type);
-		statement->ms_try.final_statement   = parse_compound_statement(false);
-	} else if (next_if(T__finally)) {
-		statement->ms_try.final_statement = parse_compound_statement(false);
-	} else {
+	} else if (!next_if(T__finally)) {
 		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
-		return create_error_statement();
 	}
+	statement->ms_try.final_statement = parse_compound_statement(false);
 	return statement;
 }
 
