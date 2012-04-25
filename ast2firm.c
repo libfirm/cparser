@@ -1862,9 +1862,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 
 		type_t *arg_type = skip_typeref(expression->base.type);
 		if (!is_type_compound(arg_type)) {
-			ir_mode *mode = get_ir_mode_storage(expression->base.type);
-			arg_node      = create_conv(dbgi, arg_node, mode);
-			arg_node      = do_strict_conv(dbgi, arg_node);
+			ir_mode *const mode = get_ir_mode_storage(arg_type);
+			arg_node = create_conv(dbgi, arg_node, mode);
+			arg_node = do_strict_conv(dbgi, arg_node);
 		}
 
 		in[n] = arg_node;
