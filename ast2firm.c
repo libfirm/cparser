@@ -4276,10 +4276,9 @@ static void create_variable_initializer(entity_t *entity)
 	type_qualifiers_t  tq   = get_type_qualifier(type, true);
 
 	if (initializer->kind == INITIALIZER_VALUE) {
-		initializer_value_t *initializer_value = &initializer->value;
-		dbg_info            *dbgi = get_dbg_info(&entity->base.source_position);
-		expression_t        *value     = initializer_value->value;
-		type_t              *init_type = skip_typeref(value->base.type);
+		dbg_info     *const dbgi      = get_dbg_info(&entity->base.source_position);
+		expression_t *      value     = initializer->value.value;
+		type_t       *const init_type = skip_typeref(value->base.type);
 
 		if (!is_type_scalar(init_type)) {
 			/* skip convs */
@@ -4292,7 +4291,7 @@ static void create_variable_initializer(entity_t *entity)
 			goto have_initializer;
 		}
 
-		ir_node *node = expression_to_firm(initializer_value->value);
+		ir_node *node = expression_to_firm(value);
 
 		ir_mode *mode      = get_ir_mode_storage(init_type);
 		node = create_conv(dbgi, node, mode);
