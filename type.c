@@ -1114,7 +1114,7 @@ unsigned get_type_size(type_t *type)
 		layout_struct_type(&type->compound);
 		return type->compound.compound->size;
 	case TYPE_FUNCTION:
-		return 0; /* non-const (but "address-const") */
+		return 1; /* strange GNU extensions: sizeof(function) == 1 */
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
 		return pointer_properties.size;

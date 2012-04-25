@@ -2915,11 +2915,6 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 			&& expression->tp_expression != NULL) {
 		expression_to_firm(expression->tp_expression);
 	}
-	/* strange gnu extensions: sizeof(function) == 1 */
-	if (is_type_function(type)) {
-		ir_mode *mode = get_ir_mode_storage(type_size_t);
-		return new_Const(get_mode_one(mode));
-	}
 
 	return get_type_size_node(type);
 }
