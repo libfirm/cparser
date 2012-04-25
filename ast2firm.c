@@ -4279,10 +4279,9 @@ static void create_variable_initializer(entity_t *entity)
 		initializer_value_t *initializer_value = &initializer->value;
 		dbg_info            *dbgi = get_dbg_info(&entity->base.source_position);
 		expression_t        *value     = initializer_value->value;
-		type_t              *init_type = value->base.type;
-		type_t              *skipped   = skip_typeref(init_type);
+		type_t              *init_type = skip_typeref(value->base.type);
 
-		if (!is_type_scalar(skipped)) {
+		if (!is_type_scalar(init_type)) {
 			/* skip convs */
 			while (value->kind == EXPR_UNARY_CAST)
 				value = value->unary.value;
