@@ -10001,7 +10001,6 @@ static statement_t *intern_parse_statement(void)
 	statement_t *statement = NULL;
 
 	/* declaration or statement */
-	add_anchor_token(';');
 	switch (token.kind) {
 	case T_IDENTIFIER: {
 		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
@@ -10075,7 +10074,6 @@ static statement_t *intern_parse_statement(void)
 		eat_until_anchor();
 		break;
 	}
-	rem_anchor_token(';');
 
 	assert(statement != NULL
 			&& statement->base.source_position.input_name != NULL);
@@ -10123,6 +10121,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token('*');
 	add_anchor_token('+');
 	add_anchor_token('-');
+	add_anchor_token(';');
 	add_anchor_token('{');
 	add_anchor_token('~');
 	add_anchor_token(T_CHARACTER_CONSTANT);
@@ -10335,6 +10334,7 @@ end_error:
 	rem_anchor_token(T_CHARACTER_CONSTANT);
 	rem_anchor_token('~');
 	rem_anchor_token('{');
+	rem_anchor_token(';');
 	rem_anchor_token('-');
 	rem_anchor_token('+');
 	rem_anchor_token('*');
