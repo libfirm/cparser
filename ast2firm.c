@@ -720,14 +720,15 @@ ir_type *get_ir_type(type_t *type)
 
 static ir_mode *get_ir_mode_storage(type_t *type)
 {
-	ir_type *irtype = get_ir_type(type);
+	type = skip_typeref(type);
 
-	/* firm doesn't report a mode for arrays somehow... */
-	if (is_Array_type(irtype)) {
+	/* Firm doesn't report a mode for arrays and structs/unions. */
+	if (!is_type_scalar(type)) {
 		return mode_P_data;
 	}
 
-	ir_mode *mode = get_type_mode(irtype);
+	ir_type *const irtype = get_ir_type(type);
+	ir_mode *const mode   = get_type_mode(irtype);
 	assert(mode != NULL);
 	return mode;
 }
@@ -1904,17 +1905,11 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		}
 
 		if (!is_type_void(return_type)) {
-			ir_node *resproj = new_Proj(node, mode_T, pn_Call_T_result);
-
-			if (is_type_scalar(return_type)) {
-				ir_mode *mode       = get_ir_mode_storage(return_type);
-				result              = new_Proj(resproj, mode, 0);
-				ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
-				result              = create_conv(NULL, result, mode_arith);
-			} else {
-				ir_mode *mode = mode_P_data;
-				result        = new_Proj(resproj, mode, 0);
-			}
+			ir_node *const resproj    = new_Proj(node, mode_T, pn_Call_T_result);
+			ir_mode *const mode       = get_ir_mode_storage(return_type);
+			result                    = new_Proj(resproj, mode, 0);
+			ir_mode *const mode_arith = get_ir_mode_arithmetic(return_type);
+			result                    = create_conv(NULL, result, mode_arith);
 		}
 	}
 
@@ -3090,12 +3085,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	ir_node *const in[2] = { true_val, false_val };
 	type_t  *const type  = skip_typeref(expression->base.type);
-	ir_mode *mode;
-	if (is_type_compound(type)) {
-		mode = mode_P;
-	} else {
-		mode = get_ir_mode_arithmetic(type);
-	}
+	ir_mode *const mode  = get_ir_mode_arithmetic(type);
 	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
@@ -4463,7 +4453,7 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 
 	int in_len;
 	if (!is_type_void(type)) {
-		ir_mode *const mode = is_type_compound(type) ? mode_P_data : get_ir_mode_storage(type);
+		ir_mode *const mode = get_ir_mode_storage(type);
 		if (res) {
 			res = create_conv(dbgi, res, mode);
 			res = do_strict_conv(dbgi, res);
@@ -5595,20 +5585,13 @@ static void create_function(entity_t *entity)
 	if (currently_reachable()) {
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
-		const function_type_t *func_type   = &type->function;
-		const type_t          *return_type
-			= skip_typeref(func_type->return_type);
+		type_t *const return_type = skip_typeref(type->function.return_type);
 
 		ir_node *ret;
 		if (is_type_void(return_type)) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
-			ir_mode *mode;
-			if (is_type_scalar(return_type)) {
-				mode = get_ir_mode_storage(func_type->return_type);
-			} else {
-				mode = mode_P_data;
-			}
+			ir_mode *const mode = get_ir_mode_storage(return_type);
 
 			ir_node *in[1];
 			/* §5.1.2.2.3 main implicitly returns 0 */
