@@ -10072,8 +10072,7 @@ static statement_t *intern_parse_statement(void)
 	default:
 		errorf(HERE, "unexpected token %K while parsing statement", &token);
 		statement = create_error_statement();
-		if (!at_anchor())
-			next_token();
+		eat_until_anchor();
 		break;
 	}
 	rem_anchor_token(';');
