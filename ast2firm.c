@@ -2385,7 +2385,7 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 			if (from_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, from_var->v.entity);
 				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
-				value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
+				value_node = new_d_Add(dbgi, value_node, base, mode);
 			}
 			if (to_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, to_var->v.entity);
