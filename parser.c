@@ -9288,6 +9288,23 @@ static statement_t *parse_inner_statement(void)
 }
 
 /**
+ * Parse an expression in parentheses and mark its variables as read.
+ */
+static expression_t *parse_condition(void)
+{
+	expect('(', end_error0);
+	add_anchor_token(')');
+	expression_t *const expr = parse_expression();
+	mark_vars_read(expr, NULL);
+	rem_anchor_token(')');
+	expect(')', end_error1);
+end_error1:
+	return expr;
+end_error0:
+	return create_error_expression();
+}
+
+/**
  * Parse an if statement.
  */
 static statement_t *parse_if(void)
@@ -9300,18 +9317,12 @@ static statement_t *parse_if(void)
 
 	add_anchor_token('{');
 
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression_t *const expr = parse_expression();
+	expression_t *const expr = parse_condition();
 	statement->ifs.condition = expr;
 	/* §6.8.4.1:1  The controlling expression of an if statement shall have
 	 *             scalar type. */
 	semantic_condition(expr, "condition of 'if'-statment");
-	mark_vars_read(expr, NULL);
-	rem_anchor_token(')');
-	expect(')', end_error);
 
-end_error:
 	rem_anchor_token('{');
 
 	add_anchor_token(T_else);
@@ -9395,10 +9406,7 @@ static statement_t *parse_switch(void)
 
 	PUSH_PARENT(statement);
 
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression_t *const expr = parse_expression();
-	mark_vars_read(expr, NULL);
+	expression_t *const expr = parse_condition();
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
@@ -9411,8 +9419,6 @@ static statement_t *parse_switch(void)
 		type = type_error_type;
 	}
 	statement->switchs.expression = create_implicit_cast(expr, type);
-	expect(')', end_error);
-	rem_anchor_token(')');
 
 	switch_statement_t *rem = current_switch;
 	current_switch          = &statement->switchs;
@@ -9426,9 +9432,6 @@ static statement_t *parse_switch(void)
 
 	POP_PARENT();
 	return statement;
-end_error:
-	POP_PARENT();
-	return create_error_statement();
 }
 
 static statement_t *parse_loop_body(statement_t *const loop)
@@ -9453,24 +9456,16 @@ static statement_t *parse_while(void)
 
 	PUSH_PARENT(statement);
 
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression_t *const cond = parse_expression();
+	expression_t *const cond = parse_condition();
 	statement->whiles.condition = cond;
 	/* §6.8.5:2    The controlling expression of an iteration statement shall
 	 *             have scalar type. */
 	semantic_condition(cond, "condition of 'while'-statement");
-	mark_vars_read(cond, NULL);
-	rem_anchor_token(')');
-	expect(')', end_error);
 
 	statement->whiles.body = parse_loop_body(statement);
 
 	POP_PARENT();
 	return statement;
-end_error:
-	POP_PARENT();
-	return create_error_statement();
 }
 
 /**
@@ -9489,16 +9484,11 @@ static statement_t *parse_do(void)
 	rem_anchor_token(T_while);
 
 	expect(T_while, end_error);
-	expect('(', end_error);
-	add_anchor_token(')');
-	expression_t *const cond = parse_expression();
+	expression_t *const cond = parse_condition();
 	statement->do_while.condition = cond;
 	/* §6.8.5:2    The controlling expression of an iteration statement shall
 	 *             have scalar type. */
 	semantic_condition(cond, "condition of 'do-while'-statement");
-	mark_vars_read(cond, NULL);
-	rem_anchor_token(')');
-	expect(')', end_error);
 	expect(';', end_error);
 
 	POP_PARENT();
@@ -9864,10 +9854,7 @@ static statement_t *parse_ms_try_statment(void)
 	POP_PARENT();
 
 	if (next_if(T___except)) {
-		expect('(', end_error);
-		add_anchor_token(')');
-		expression_t *const expr = parse_expression();
-		mark_vars_read(expr, NULL);
+		expression_t *const expr = parse_condition();
 		type_t       *      type = skip_typeref(expr->base.type);
 		if (is_type_integer(type)) {
 			type = promote_integer(type);
@@ -9877,9 +9864,7 @@ static statement_t *parse_ms_try_statment(void)
 			type = type_error_type;
 		}
 		statement->ms_try.except_expression = create_implicit_cast(expr, type);
-		rem_anchor_token(')');
-		expect(')', end_error);
-		statement->ms_try.final_statement = parse_compound_statement(false);
+		statement->ms_try.final_statement   = parse_compound_statement(false);
 	} else if (next_if(T__finally)) {
 		statement->ms_try.final_statement = parse_compound_statement(false);
 	} else {
@@ -9887,8 +9872,6 @@ static statement_t *parse_ms_try_statment(void)
 		return create_error_statement();
 	}
 	return statement;
-end_error:
-	return create_error_statement();
 }
 
 static statement_t *parse_empty_statement(void)
