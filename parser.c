@@ -9998,9 +9998,8 @@ end_error:
  */
 static statement_t *intern_parse_statement(void)
 {
-	statement_t *statement = NULL;
-
 	/* declaration or statement */
+	statement_t *statement;
 	switch (token.kind) {
 	case T_IDENTIFIER: {
 		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
@@ -10074,9 +10073,6 @@ static statement_t *intern_parse_statement(void)
 		eat_until_anchor();
 		break;
 	}
-
-	assert(statement != NULL
-			&& statement->base.source_position.input_name != NULL);
 
 	return statement;
 }
