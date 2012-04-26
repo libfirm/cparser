@@ -9527,7 +9527,8 @@ static statement_t *parse_for(void)
 			warningf(WARN_UNUSED_VALUE, &init->base.source_position, "initialisation of 'for'-statement has no effect");
 		}
 		rem_anchor_token(';');
-		expect(';', end_error2);
+		expect(';', end_error3);
+end_error3:;
 	}
 
 	POP_EXTENSION();
