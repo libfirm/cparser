@@ -2673,7 +2673,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 		attribute_t *attribute
 			= parse_microsoft_extended_decl_modifier_single();
 		if (attribute == NULL)
-			goto end_error;
+			break;
 
 		*anchor = attribute;
 		anchor  = &attribute->next;
@@ -2681,10 +2681,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 
 	rem_anchor_token(')');
 	expect(')', end_error);
-	return first;
-
 end_error:
-	rem_anchor_token(')');
 	return first;
 }
 
