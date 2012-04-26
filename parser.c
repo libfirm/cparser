@@ -2659,27 +2659,25 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 	eat(T__declspec);
 
 	expect('(', end_error);
+	if (token.kind != ')') {
+		add_anchor_token(')');
 
-	if (next_if(')'))
-		return NULL;
+		attribute_t **anchor = &first;
+		do {
+			while (*anchor != NULL)
+				anchor = &(*anchor)->next;
 
-	add_anchor_token(')');
+			attribute_t *attribute
+				= parse_microsoft_extended_decl_modifier_single();
+			if (attribute == NULL)
+				break;
 
-	attribute_t **anchor = &first;
-	do {
-		while (*anchor != NULL)
-			anchor = &(*anchor)->next;
+			*anchor = attribute;
+			anchor  = &attribute->next;
+		} while (next_if(','));
 
-		attribute_t *attribute
-			= parse_microsoft_extended_decl_modifier_single();
-		if (attribute == NULL)
-			break;
-
-		*anchor = attribute;
-		anchor  = &attribute->next;
-	} while (next_if(','));
-
-	rem_anchor_token(')');
+		rem_anchor_token(')');
+	}
 	expect(')', end_error);
 end_error:
 	return first;
