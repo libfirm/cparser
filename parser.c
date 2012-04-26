@@ -4382,12 +4382,10 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 			/* ISO/IEC 14882:1998(E) §8.5.3:3  The initializer can be omitted
 			 * [...] where the extern specifier is explicitly used. */
 			declaration_t *decl = &entity->declaration;
-			if (decl->storage_class != STORAGE_CLASS_EXTERN) {
-				type_t *type = decl->type;
-				if (is_type_reference(skip_typeref(type))) {
-					source_position_t const *const pos = &entity->base.source_position;
-					errorf(pos, "reference '%#N' must be initialized", entity);
-				}
+			if (decl->storage_class != STORAGE_CLASS_EXTERN &&
+			    is_type_reference(skip_typeref(decl->type))) {
+				source_position_t const *const pos = &entity->base.source_position;
+				errorf(pos, "reference '%#N' must be initialized", entity);
 			}
 		}
 
