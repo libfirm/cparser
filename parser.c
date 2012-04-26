@@ -9615,7 +9615,7 @@ static statement_t *parse_goto(void)
 			else
 				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 			eat_until_anchor();
-			return create_error_statement();
+			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous)->label;
 		}
 	}
 
