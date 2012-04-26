@@ -9507,11 +9507,11 @@ static statement_t *parse_for(void)
 
 	eat(T_for);
 
-	expect('(', end_error1);
-	add_anchor_token(')');
-
 	PUSH_PARENT(statement);
 	PUSH_SCOPE(&statement->fors.scope);
+
+	expect('(', end_error1);
+	add_anchor_token(')');
 
 	PUSH_EXTENSION();
 
@@ -9544,6 +9544,7 @@ end_error3:;
 		rem_anchor_token(';');
 	}
 	expect(';', end_error2);
+end_error2:
 	if (token.kind != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
@@ -9552,22 +9553,14 @@ end_error3:;
 			warningf(WARN_UNUSED_VALUE, &step->base.source_position, "step of 'for'-statement has no effect");
 		}
 	}
-	expect(')', end_error2);
 	rem_anchor_token(')');
+	expect(')', end_error1);
+end_error1:
 	statement->fors.body = parse_loop_body(statement);
 
 	POP_SCOPE();
 	POP_PARENT();
 	return statement;
-
-end_error2:
-	POP_PARENT();
-	rem_anchor_token(')');
-	POP_SCOPE();
-	/* fallthrough */
-
-end_error1:
-	return create_error_statement();
 }
 
 /**
