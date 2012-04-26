@@ -8865,7 +8865,6 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 
 	while (token.kind == T_STRING_LITERAL || token.kind == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
-		memset(argument, 0, sizeof(argument[0]));
 
 		if (next_if('[')) {
 			if (token.kind != T_IDENTIFIER) {
