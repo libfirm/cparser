@@ -9483,19 +9483,18 @@ static statement_t *parse_do(void)
 	statement->do_while.body = parse_loop_body(statement);
 	rem_anchor_token(T_while);
 
-	expect(T_while, end_error);
+	expect(T_while, end_error0);
+end_error0:;
 	expression_t *const cond = parse_condition();
 	statement->do_while.condition = cond;
 	/* §6.8.5:2    The controlling expression of an iteration statement shall
 	 *             have scalar type. */
 	semantic_condition(cond, "condition of 'do-while'-statement");
-	expect(';', end_error);
+	expect(';', end_error1);
+end_error1:
 
 	POP_PARENT();
 	return statement;
-end_error:
-	POP_PARENT();
-	return create_error_statement();
 }
 
 /**
