@@ -547,17 +547,6 @@ static void rem_anchor_token(int token_kind)
 }
 
 /**
- * Return true if the token type of the current token is
- * in the anchor set.
- */
-static bool at_anchor(void)
-{
-	if (token.kind < 0)
-		return false;
-	return token_anchor_set[token.kind];
-}
-
-/**
  * Eat tokens until a matching token type is found.
  */
 static void eat_until_matching_token(int type)
@@ -10177,10 +10166,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		}
 		statement_t *sub_statement = intern_parse_statement();
 		if (sub_statement->kind == STATEMENT_ERROR) {
-			/* an error occurred. if we are at an anchor, return */
-			if (at_anchor())
-				goto end_error;
-			continue;
+			goto end_error;
 		}
 
 		if (sub_statement->kind != STATEMENT_DECLARATION) {
