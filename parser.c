@@ -4400,12 +4400,12 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 		ndeclaration = parse_declarator(specifiers, flags);
 		rem_anchor_token('=');
 	}
+	rem_anchor_token(',');
+	rem_anchor_token(';');
 	expect(';', end_error);
 
 end_error:
 	anonymous_entity = NULL;
-	rem_anchor_token(';');
-	rem_anchor_token(',');
 }
 
 static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
