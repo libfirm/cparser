@@ -10177,11 +10177,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		}
 
 		*anchor = sub_statement;
-
-		while (sub_statement->base.next != NULL)
-			sub_statement = sub_statement->base.next;
-
-		anchor = &sub_statement->base.next;
+		anchor  = &sub_statement->base.next;
 	}
 	next_token();
 
