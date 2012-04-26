@@ -1136,11 +1136,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		anchor  = &argument->next;
 	} while (next_if(','));
 	expect(')', end_error);
-
-	return first;
-
 end_error:
-	/* TODO... */
 	return first;
 }
 
