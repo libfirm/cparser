@@ -9048,6 +9048,7 @@ end_of_asm:
 	expect(')', end_error);
 	expect(';', end_error);
 
+end_error:
 	if (asm_statement->outputs == NULL) {
 		/* GCC: An 'asm' instruction without any output operands will be treated
 		 * identically to a volatile 'asm' instruction. */
@@ -9055,8 +9056,6 @@ end_of_asm:
 	}
 
 	return statement;
-end_error:
-	return create_error_statement();
 }
 
 static statement_t *parse_label_inner_statement(statement_t const *const label, char const *const label_kind)
