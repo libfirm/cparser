@@ -10158,15 +10158,10 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 
 	statement_t **anchor            = &statement->compound.statements;
 	bool          only_decls_so_far = true;
-	while (token.kind != '}') {
-		if (token.kind == T_EOF) {
-			errorf(&statement->base.source_position,
-			       "EOF while parsing compound statement");
-			break;
-		}
+	while (token.kind != '}' && token.kind != T_EOF) {
 		statement_t *sub_statement = intern_parse_statement();
 		if (sub_statement->kind == STATEMENT_ERROR) {
-			goto end_error;
+			break;
 		}
 
 		if (sub_statement->kind != STATEMENT_DECLARATION) {
@@ -10179,7 +10174,8 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		*anchor = sub_statement;
 		anchor  = &sub_statement->base.next;
 	}
-	next_token();
+	expect('}', end_error);
+end_error:
 
 	/* look over all statements again to produce no effect warnings */
 	if (is_warn_on(WARN_UNUSED_VALUE)) {
@@ -10199,7 +10195,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		}
 	}
 
-end_error:
 	rem_anchor_token(T_while);
 	rem_anchor_token(T_wchar_t);
 	rem_anchor_token(T_volatile);
