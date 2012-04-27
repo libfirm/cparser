@@ -653,21 +653,20 @@ static void type_error_incompatible(const char *msg,
 
 /**
  * Expect the current token is the expected token.
- * If not, generate an error, eat the current statement,
- * and goto the error_label label.
+ * If not, generate an error and skip until the next anchor.
  */
-#define expect(expected, error_label)                     \
-	do {                                                  \
-		if (UNLIKELY(token.kind != (expected))) {         \
-			parse_error_expected(NULL, (expected), NULL); \
-			add_anchor_token(expected);                   \
-			eat_until_anchor();                           \
-			rem_anchor_token(expected);                   \
-			if (token.kind != (expected))                 \
-			  goto error_label;                           \
-		}                                                 \
-		next_token();                                     \
-	} while (0)
+static void expect(token_kind_t const expected)
+{
+	if (UNLIKELY(token.kind != expected)) {
+		parse_error_expected(NULL, expected, NULL);
+		add_anchor_token(expected);
+		eat_until_anchor();
+		rem_anchor_token(expected);
+		if (token.kind != expected)
+			return;
+	}
+	eat(expected);
+}
 
 static symbol_t *expect_identifier(char const *const context, source_position_t *const pos)
 {
@@ -1141,8 +1140,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		*anchor = argument;
 		anchor  = &argument->next;
 	} while (next_if(','));
-	expect(')', end_error);
-end_error:
+	expect(')');
 	return first;
 }
 
@@ -1150,13 +1148,9 @@ static attribute_t *parse_attribute_asm(void)
 {
 	attribute_t *attribute = allocate_attribute_zero(ATTRIBUTE_GNU_ASM);
 	eat(T_asm);
-
-	expect('(', end_error);
+	expect('(');
 	attribute->a.arguments = parse_attribute_arguments();
 	return attribute;
-
-end_error:
-	return NULL;
 }
 
 static symbol_t *get_symbol_from_token(void)
@@ -1239,8 +1233,8 @@ static attribute_t *parse_attribute_gnu(void)
 	attribute_t **anchor = &first;
 
 	eat(T___attribute__);
-	expect('(', end_error);
-	expect('(', end_error);
+	expect('(');
+	expect('(');
 
 	add_anchor_token(')');
 	add_anchor_token(',');
@@ -1254,10 +1248,8 @@ static attribute_t *parse_attribute_gnu(void)
 	rem_anchor_token(',');
 	rem_anchor_token(')');
 
-	expect(')', end_error);
-	expect(')', end_error);
-
-end_error:
+	expect(')');
+	expect(')');
 	return first;
 }
 
@@ -1564,7 +1556,7 @@ static designator_t *parse_designation(void)
 			add_anchor_token(']');
 			designator->array_index = parse_constant_expression();
 			rem_anchor_token(']');
-			expect(']', end_error);
+			expect(']');
 			break;
 		case '.':
 			designator = allocate_ast_zero(sizeof(designator[0]));
@@ -1575,7 +1567,7 @@ static designator_t *parse_designation(void)
 				return NULL;
 			break;
 		default:
-			expect('=', end_error);
+			expect('=');
 			return result;
 		}
 
@@ -1583,8 +1575,6 @@ static designator_t *parse_designation(void)
 		*anchor = designator;
 		anchor  = &designator->next;
 	}
-end_error:
-	return NULL;
 }
 
 static initializer_t *initializer_from_string(array_type_t *const type,
@@ -2095,13 +2085,12 @@ finish_designator:
 				                            env);
 				rem_anchor_token('}');
 
-				if (type != NULL) {
-					ascend_from_subtype(path);
-					expect('}', end_error);
-				} else {
-					expect('}', end_error);
+				expect('}');
+
+				if (!type)
 					goto error_parse_next;
-				}
+
+				ascend_from_subtype(path);
 			}
 		} else {
 			/* must be an expression */
@@ -2188,7 +2177,9 @@ error_parse_next:
 		if (token.kind == '}') {
 			break;
 		}
-		expect(',', end_error);
+		add_anchor_token('}');
+		expect(',');
+		rem_anchor_token('}');
 		if (token.kind == '}') {
 			break;
 		}
@@ -2265,8 +2256,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 		max_index = path.max_index;
 		DEL_ARR_F(path.path);
 
-		expect('}', end_error);
-end_error:;
+		expect('}');
 	} else {
 		/* parse_scalar_initializer() also works in this case: we simply
 		 * have an expression without {} around it */
@@ -2429,10 +2419,7 @@ static void parse_enum_entries(type_t *const enum_type)
 	rem_anchor_token(',');
 	rem_anchor_token('}');
 
-	expect('}', end_error);
-
-end_error:
-	;
+	expect('}');
 }
 
 static type_t *parse_enum_specifier(void)
@@ -2518,7 +2505,7 @@ static type_t *parse_typeof(void)
 
 	type_t *type;
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 
 	expression_t *expression  = NULL;
@@ -2537,15 +2524,13 @@ static type_t *parse_typeof(void)
 	}
 
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
 	type_t *typeof_type              = allocate_type_zero(TYPE_TYPEOF);
 	typeof_type->typeoft.expression  = expression;
 	typeof_type->typeoft.typeof_type = type;
 
 	return typeof_type;
-end_error:
-	return NULL;
 }
 
 typedef enum specifiers_t {
@@ -2584,10 +2569,9 @@ static type_t *get_typedef_type(symbol_t *symbol)
 
 static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 {
-	expect('(', end_error);
+	attribute_property_argument_t *const property = allocate_ast_zero(sizeof(*property));
 
-	attribute_property_argument_t *property
-		= allocate_ast_zero(sizeof(*property));
+	expect('(');
 
 	add_anchor_token(')');
 	add_anchor_token(',');
@@ -2609,8 +2593,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		}
 
 		add_anchor_token(T_IDENTIFIER);
-		expect('=', end_error1);
-end_error1:
+		expect('=');
 		rem_anchor_token(T_IDENTIFIER);
 
 		symbol_t *const sym = expect_identifier("while parsing property declspec", NULL);
@@ -2622,9 +2605,7 @@ end_error1:
 
 	attribute->a.property = property;
 
-	expect(')', end_error);
-
-end_error:
+	expect(')');
 	return attribute;
 }
 
@@ -2670,7 +2651,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 {
 	eat(T__declspec);
 
-	expect('(', end_error);
+	expect('(');
 	if (token.kind != ')') {
 		add_anchor_token(')');
 
@@ -2690,8 +2671,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 
 		rem_anchor_token(')');
 	}
-	expect(')', end_error);
-end_error:
+	expect(')');
 	return first;
 }
 
@@ -3291,9 +3271,8 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 
 parameters_finished:
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
-end_error:
 	restore_anchor_state(',', saved_comma_state);
 }
 
@@ -3419,9 +3398,7 @@ static construct_type_t *parse_array_declarator(void)
 		errorf(&array->base.pos, "static array parameters require a size");
 
 	rem_anchor_token(']');
-	expect(']', end_error);
-
-end_error:
+	expect(']');
 	return cons;
 }
 
@@ -3535,7 +3512,7 @@ ptr_operator_end: ;
 						env->must_be_abstract = true;
 					}
 					rem_anchor_token(')');
-					expect(')', end_error);
+					expect(')');
 				}
 				break;
 		}
@@ -3584,8 +3561,6 @@ declarator_finished:
 	*anchor = inner_types;
 
 	return first;
-end_error:
-	return NULL;
 }
 
 static type_t *construct_declarator_type(construct_type_t *construct_list,
@@ -4409,9 +4384,8 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 	}
 	rem_anchor_token(',');
 	rem_anchor_token(';');
-	expect(';', end_error);
+	expect(';');
 
-end_error:
 	anonymous_entity = NULL;
 }
 
@@ -5651,6 +5625,8 @@ static void parse_bitfield_member(entity_t *entity)
 static void parse_compound_declarators(compound_t *compound,
 		const declaration_specifiers_t *specifiers)
 {
+	add_anchor_token(';');
+	add_anchor_token(',');
 	do {
 		entity_t *entity;
 
@@ -5720,9 +5696,10 @@ static void parse_compound_declarators(compound_t *compound,
 			}
 		}
 	} while (next_if(','));
-	expect(';', end_error);
+	rem_anchor_token(',');
+	rem_anchor_token(';');
+	expect(';');
 
-end_error:
 	anonymous_entity = NULL;
 }
 
@@ -5746,8 +5723,7 @@ static void parse_compound_type_entries(compound_t *compound)
 
 			default:
 				rem_anchor_token('}');
-				expect('}', end_error);
-end_error:
+				expect('}');
 				/* §6.7.2.1:7 */
 				compound->complete = true;
 				return;
@@ -6327,7 +6303,7 @@ static expression_t *parse_cast(void)
 	type_t *type = parse_typename();
 
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
 	if (token.kind == '{') {
 		return parse_compound_literal(&pos, type);
@@ -6345,8 +6321,6 @@ static expression_t *parse_cast(void)
 	}
 
 	return cast;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6380,9 +6354,7 @@ static expression_t *parse_statement_expression(void)
 	expression->base.type = type;
 
 	rem_anchor_token(')');
-	expect(')', end_error);
-
-end_error:
+	expect(')');
 	return expression;
 }
 
@@ -6409,9 +6381,8 @@ static expression_t *parse_parenthesized_expression(void)
 	expression_t *result = parse_expression();
 	result->base.parenthesized = true;
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
-end_error:
 	return result;
 }
 
@@ -6502,7 +6473,7 @@ static designator_t *parse_designator(void)
 			designator->source_position = *HERE;
 			designator->array_index     = parse_expression();
 			rem_anchor_token(']');
-			expect(']', end_error);
+			expect(']');
 			if (designator->array_index == NULL) {
 				return NULL;
 			}
@@ -6515,8 +6486,6 @@ static designator_t *parse_designator(void)
 	}
 
 	return result;
-end_error:
-	return NULL;
 }
 
 /**
@@ -6529,15 +6498,15 @@ static expression_t *parse_offsetof(void)
 
 	eat(T___builtin_offsetof);
 
-	expect('(', end_error);
+	expect('(');
+	add_anchor_token(')');
 	add_anchor_token(',');
 	type_t *type = parse_typename();
 	rem_anchor_token(',');
-	expect(',', end_error);
-	add_anchor_token(')');
+	expect(',');
 	designator_t *designator = parse_designator();
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
 	expression->offsetofe.type       = type;
 	expression->offsetofe.designator = designator;
@@ -6556,8 +6525,6 @@ static expression_t *parse_offsetof(void)
 	DEL_ARR_F(path.path);
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6569,11 +6536,12 @@ static expression_t *parse_va_start(void)
 
 	eat(T___builtin_va_start);
 
-	expect('(', end_error);
+	expect('(');
+	add_anchor_token(')');
 	add_anchor_token(',');
 	expression->va_starte.ap = parse_assignment_expression();
 	rem_anchor_token(',');
-	expect(',', end_error);
+	expect(',');
 	expression_t *const expr = parse_assignment_expression();
 	if (expr->kind == EXPR_REFERENCE) {
 		entity_t *const entity = expr->reference.entity;
@@ -6588,12 +6556,12 @@ static expression_t *parse_va_start(void)
 		} else {
 			expression->va_starte.parameter = &entity->variable;
 		}
-		expect(')', end_error);
-		return expression;
+	} else {
+		expression = create_error_expression();
 	}
-	expect(')', end_error);
-end_error:
-	return create_error_expression();
+	rem_anchor_token(')');
+	expect(')');
+	return expression;
 }
 
 /**
@@ -6605,19 +6573,21 @@ static expression_t *parse_va_arg(void)
 
 	eat(T___builtin_va_arg);
 
-	expect('(', end_error);
+	expect('(');
+	add_anchor_token(')');
+	add_anchor_token(',');
 	call_argument_t ap;
 	ap.expression = parse_assignment_expression();
 	expression->va_arge.ap = ap.expression;
 	check_call_argument(type_valist, &ap, 1);
 
-	expect(',', end_error);
+	rem_anchor_token(',');
+	expect(',');
 	expression->base.type = parse_typename();
-	expect(')', end_error);
+	rem_anchor_token(')');
+	expect(')');
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6629,24 +6599,26 @@ static expression_t *parse_va_copy(void)
 
 	eat(T___builtin_va_copy);
 
-	expect('(', end_error);
+	expect('(');
+	add_anchor_token(')');
+	add_anchor_token(',');
 	expression_t *dst = parse_assignment_expression();
 	assign_error_t error = semantic_assign(type_valist, dst);
 	report_assign_error(error, type_valist, dst, "call argument 1",
 	                    &dst->base.source_position);
 	expression->va_copye.dst = dst;
 
-	expect(',', end_error);
+	rem_anchor_token(',');
+	expect(',');
 
 	call_argument_t src;
 	src.expression = parse_assignment_expression();
 	check_call_argument(type_valist, &src, 2);
 	expression->va_copye.src = src.expression;
-	expect(')', end_error);
+	rem_anchor_token(')');
+	expect(')');
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6658,16 +6630,14 @@ static expression_t *parse_builtin_constant(void)
 
 	eat(T___builtin_constant_p);
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 	expression->builtin_constant.value = parse_assignment_expression();
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 	expression->base.type = type_int;
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6679,20 +6649,18 @@ static expression_t *parse_builtin_types_compatible(void)
 
 	eat(T___builtin_types_compatible_p);
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
 	expression->builtin_types_compatible.left = parse_typename();
 	rem_anchor_token(',');
-	expect(',', end_error);
+	expect(',');
 	expression->builtin_types_compatible.right = parse_typename();
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 	expression->base.type = type_int;
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6727,11 +6695,15 @@ static expression_t *parse_compare_builtin(void)
 	expression->base.source_position = *HERE;
 	next_token();
 
-	expect('(', end_error);
+	expect('(');
+	add_anchor_token(')');
+	add_anchor_token(',');
 	expression->binary.left = parse_assignment_expression();
-	expect(',', end_error);
+	rem_anchor_token(',');
+	expect(',');
 	expression->binary.right = parse_assignment_expression();
-	expect(')', end_error);
+	rem_anchor_token(')');
+	expect(')');
 
 	type_t *const orig_type_left  = expression->binary.left->base.type;
 	type_t *const orig_type_right = expression->binary.right->base.type;
@@ -6748,8 +6720,6 @@ static expression_t *parse_compare_builtin(void)
 	}
 
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6761,16 +6731,14 @@ static expression_t *parse_assume(void)
 
 	eat(T__assume);
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 	expression->unary.value = parse_assignment_expression();
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
 	expression->base.type = type_void;
 	return expression;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -6850,9 +6818,8 @@ static expression_t *parse_noop_expression(void)
 		rem_anchor_token(',');
 		rem_anchor_token(')');
 	}
-	expect(')', end_error);
+	expect(')');
 
-end_error:
 	return literal;
 }
 
@@ -6976,8 +6943,7 @@ check_idx:
 	arr->base.type = res_type;
 
 	rem_anchor_token(']');
-	expect(']', end_error);
-end_error:
+	expect(']');
 	return expr;
 }
 
@@ -7002,7 +6968,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 		add_anchor_token(')');
 		orig_type = parse_typename();
 		rem_anchor_token(')');
-		expect(')', end_error);
+		expect(')');
 
 		if (token.kind == '{') {
 			/* It was not sizeof(type) after all.  It is sizeof of an expression
@@ -7050,7 +7016,6 @@ typeprop_expression:
 				what, wrong_type, orig_type);
 	}
 
-end_error:
 	return tp_expression;
 }
 
@@ -7293,7 +7258,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	}
 	rem_anchor_token(',');
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 
 	if (function_type == NULL)
 		return result;
@@ -7342,7 +7307,6 @@ static expression_t *parse_call_expression(expression_t *expression)
 			handle_builtin_argument_restrictions(call);
 	}
 
-end_error:
 	return result;
 }
 
@@ -7444,8 +7408,7 @@ static expression_t *parse_conditional_expression(expression_t *expression)
 		true_expression = parse_expression();
 	}
 	rem_anchor_token(':');
-	expect(':', end_error);
-end_error:;
+	expect(':');
 	expression_t *false_expression =
 		parse_subexpression(c_mode & _CXX ? PREC_ASSIGNMENT : PREC_CONDITIONAL);
 
@@ -7553,16 +7516,14 @@ static expression_t *parse_builtin_classify_type(void)
 
 	eat(T___builtin_classify_type);
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 	expression_t *expression = parse_expression();
 	rem_anchor_token(')');
-	expect(')', end_error);
+	expect(')');
 	result->classify_type.type_expression = expression;
 
 	return result;
-end_error:
-	return create_error_expression();
 }
 
 /**
@@ -7578,8 +7539,7 @@ static expression_t *parse_delete(void)
 
 	if (next_if('[')) {
 		result->kind = EXPR_UNARY_DELETE_ARRAY;
-		expect(']', end_error);
-end_error:;
+		expect(']');
 	}
 
 	expression_t *const value = parse_subexpression(PREC_CAST);
@@ -8858,13 +8818,13 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 			add_anchor_token(']');
 			argument->symbol = expect_identifier("while parsing asm argument", NULL);
 			rem_anchor_token(']');
-			expect(']', end_error);
+			expect(']');
 			if (!argument->symbol)
 				return NULL;
 		}
 
 		argument->constraints = parse_string_literals();
-		expect('(', end_error);
+		expect('(');
 		add_anchor_token(')');
 		expression_t *expression = parse_expression();
 		rem_anchor_token(')');
@@ -8926,7 +8886,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 			mark_vars_read(expression, NULL);
 		}
 		argument->expression = expression;
-		expect(')', end_error);
+		expect(')');
 
 		set_address_taken(expression, true);
 
@@ -8938,8 +8898,6 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 	}
 
 	return result;
-end_error:
-	return NULL;
 }
 
 /**
@@ -8977,7 +8935,7 @@ static statement_t *parse_asm_statement(void)
 	if (next_if(T_volatile))
 		asm_statement->is_volatile = true;
 
-	expect('(', end_error);
+	expect('(');
 	add_anchor_token(')');
 	if (token.kind != T_STRING_LITERAL) {
 		parse_error_expected("after asm(", T_STRING_LITERAL, NULL);
@@ -9008,10 +8966,9 @@ static statement_t *parse_asm_statement(void)
 
 end_of_asm:
 	rem_anchor_token(')');
-	expect(')', end_error);
-	expect(';', end_error);
+	expect(')');
+	expect(';');
 
-end_error:
 	if (asm_statement->outputs == NULL) {
 		/* GCC: An 'asm' instruction without any output operands will be treated
 		 * identically to a volatile 'asm' instruction. */
@@ -9062,6 +9019,7 @@ static statement_t *parse_case_statement(void)
 	source_position_t *const pos       = &statement->base.source_position;
 
 	eat(T_case);
+	add_anchor_token(':');
 
 	expression_t *expression = parse_expression();
 	type_t *expression_type = expression->base.type;
@@ -9124,8 +9082,8 @@ static statement_t *parse_case_statement(void)
 
 	PUSH_PARENT(statement);
 
-	expect(':', end_error);
-end_error:
+	rem_anchor_token(':');
+	expect(':');
 
 	if (current_switch != NULL) {
 		if (! statement->case_label.is_bad) {
@@ -9171,8 +9129,7 @@ static statement_t *parse_default_statement(void)
 
 	PUSH_PARENT(statement);
 
-	expect(':', end_error);
-end_error:
+	expect(':');
 
 	if (current_switch != NULL) {
 		const case_label_statement_t *def_label = current_switch->default_label;
@@ -9254,16 +9211,13 @@ static statement_t *parse_inner_statement(void)
  */
 static expression_t *parse_condition(void)
 {
-	expect('(', end_error0);
+	expect('(');
 	add_anchor_token(')');
 	expression_t *const expr = parse_expression();
 	mark_vars_read(expr, NULL);
 	rem_anchor_token(')');
-	expect(')', end_error1);
-end_error1:
+	expect(')');
 	return expr;
-end_error0:
-	return create_error_expression();
 }
 
 /**
@@ -9445,15 +9399,13 @@ static statement_t *parse_do(void)
 	statement->do_while.body = parse_loop_body(statement);
 	rem_anchor_token(T_while);
 
-	expect(T_while, end_error0);
-end_error0:;
+	expect(T_while);
 	expression_t *const cond = parse_condition();
 	statement->do_while.condition = cond;
 	/* §6.8.5:2    The controlling expression of an iteration statement shall
 	 *             have scalar type. */
 	semantic_condition(cond, "condition of 'do-while'-statement");
-	expect(';', end_error1);
-end_error1:
+	expect(';');
 
 	POP_PARENT();
 	return statement;
@@ -9471,7 +9423,7 @@ static statement_t *parse_for(void)
 	PUSH_PARENT(statement);
 	PUSH_SCOPE(&statement->fors.scope);
 
-	expect('(', end_error1);
+	expect('(');
 	add_anchor_token(')');
 
 	PUSH_EXTENSION();
@@ -9488,8 +9440,7 @@ static statement_t *parse_for(void)
 			warningf(WARN_UNUSED_VALUE, &init->base.source_position, "initialisation of 'for'-statement has no effect");
 		}
 		rem_anchor_token(';');
-		expect(';', end_error3);
-end_error3:;
+		expect(';');
 	}
 
 	POP_EXTENSION();
@@ -9504,8 +9455,7 @@ end_error3:;
 		mark_vars_read(cond, NULL);
 		rem_anchor_token(';');
 	}
-	expect(';', end_error2);
-end_error2:
+	expect(';');
 	if (token.kind != ')') {
 		expression_t *const step = parse_expression();
 		statement->fors.step = step;
@@ -9515,8 +9465,7 @@ end_error2:
 		}
 	}
 	rem_anchor_token(')');
-	expect(')', end_error1);
-end_error1:
+	expect(')');
 	statement->fors.body = parse_loop_body(statement);
 
 	POP_SCOPE();
@@ -9574,9 +9523,7 @@ static statement_t *parse_goto(void)
 		}
 	}
 
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9592,9 +9539,7 @@ static statement_t *parse_continue(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_CONTINUE);
 
 	eat(T_continue);
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9610,9 +9555,7 @@ static statement_t *parse_break(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_BREAK);
 
 	eat(T_break);
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9628,9 +9571,7 @@ static statement_t *parse_leave_statement(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_LEAVE);
 
 	eat(T___leave);
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9744,9 +9685,7 @@ static statement_t *parse_return(void)
 	}
 	statement->returns.value = return_value;
 
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9784,9 +9723,7 @@ static statement_t *parse_expression_statement(void)
 	statement->expression.expression = expr;
 	mark_vars_read(expr, ENT_ANY);
 
-	expect(';', end_error);
-
-end_error:
+	expect(';');
 	return statement;
 }
 
@@ -9864,7 +9801,7 @@ static statement_t *parse_local_label_declaration(void)
 			environment_push(entity);
 		}
 	} while (next_if(','));
-	expect(';', end_error);
+	expect(';');
 end_error:
 	statement->declaration.declarations_begin = begin;
 	statement->declaration.declarations_end   = end;
@@ -9912,11 +9849,12 @@ static void parse_namespace_definition(void)
 	entity_t     *old_current_entity = current_entity;
 	current_entity = entity;
 
-	expect('{', end_error);
+	add_anchor_token('}');
+	expect('{');
 	parse_externals();
-	expect('}', end_error);
+	rem_anchor_token('}');
+	expect('}');
 
-end_error:
 	assert(current_entity == entity);
 	current_entity = old_current_entity;
 	POP_SCOPE();
@@ -10148,8 +10086,7 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 		*anchor = sub_statement;
 		anchor  = &sub_statement->base.next;
 	}
-	expect('}', end_error);
-end_error:
+	expect('}');
 
 	/* look over all statements again to produce no effect warnings */
 	if (is_warn_on(WARN_UNUSED_VALUE)) {
@@ -10306,16 +10243,20 @@ static void parse_global_asm(void)
 	statement_t *statement = allocate_statement_zero(STATEMENT_ASM);
 
 	eat(T_asm);
-	expect('(', end_error);
+	add_anchor_token(';');
+	add_anchor_token(')');
+	add_anchor_token(T_STRING_LITERAL);
+	expect('(');
 
+	rem_anchor_token(T_STRING_LITERAL);
 	statement->asms.asm_text = parse_string_literals();
 	statement->base.next     = unit->global_asm;
 	unit->global_asm         = statement;
 
-	expect(')', end_error);
-	expect(';', end_error);
-
-end_error:;
+	rem_anchor_token(')');
+	expect(')');
+	rem_anchor_token(';');
+	expect(';');
 }
 
 static void parse_linkage_specification(void)
@@ -10339,12 +10280,11 @@ static void parse_linkage_specification(void)
 
 	if (next_if('{')) {
 		parse_externals();
-		expect('}', end_error);
+		expect('}');
 	} else {
 		parse_external();
 	}
 
-end_error:
 	assert(current_linkage == new_linkage);
 	current_linkage = old_linkage;
 }
