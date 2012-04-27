@@ -31,7 +31,6 @@
 #include "adt/util.h"
 #include "types.h"
 #include "type_t.h"
-#include "target_architecture.h"
 #include "parser.h"
 #include "warning.h"
 #include "lang_features.h"
