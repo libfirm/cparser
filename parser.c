@@ -2352,10 +2352,9 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (entity == NULL) {
-		entity = allocate_entity_zero(kind, NAMESPACE_TAG, symbol);
-		entity->compound.alignment   = 1;
-		entity->base.source_position = pos;
-		entity->base.parent_scope    = current_scope;
+		entity = allocate_entity_zero(kind, NAMESPACE_TAG, symbol, &pos);
+		entity->compound.alignment = 1;
+		entity->base.parent_scope  = current_scope;
 		if (symbol != NULL) {
 			environment_push(entity);
 		}
@@ -2399,10 +2398,8 @@ static void parse_enum_entries(type_t *const enum_type)
 		}
 
 		symbol_t *symbol       = token.identifier.symbol;
-		entity_t *const entity
-			= allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol);
+		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol, HERE);
 		entity->enum_value.enum_type = enum_type;
-		entity->base.source_position = token.base.source_position;
 		next_token();
 
 		if (next_if('=')) {
@@ -2462,9 +2459,8 @@ static type_t *parse_enum_specifier(void)
 	}
 
 	if (entity == NULL) {
-		entity = allocate_entity_zero(ENTITY_ENUM, NAMESPACE_TAG, symbol);
-		entity->base.source_position = pos;
-		entity->base.parent_scope    = current_scope;
+		entity = allocate_entity_zero(ENTITY_ENUM, NAMESPACE_TAG, symbol, &pos);
+		entity->base.parent_scope = current_scope;
 	}
 
 	type_t *const type     = allocate_type_zero(TYPE_ENUM);
@@ -2685,8 +2681,7 @@ end_error:
 
 static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
 {
-	entity_t *const entity = allocate_entity_zero(kind, NAMESPACE_NORMAL, symbol);
-	entity->base.source_position = *HERE;
+	entity_t *const entity = allocate_entity_zero(kind, NAMESPACE_NORMAL, symbol, HERE);
 	if (is_declaration(entity)) {
 		entity->declaration.type     = type_error_type;
 		entity->declaration.implicit = true;
@@ -3150,8 +3145,7 @@ static void parse_identifier_list(scope_t *scope)
 {
 	assert(token.kind == T_IDENTIFIER);
 	do {
-		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.identifier.symbol);
-		entity->base.source_position = token.base.source_position;
+		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.identifier.symbol, HERE);
 		/* a K&R parameter has no type, yet */
 		next_token();
 
@@ -3749,9 +3743,8 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 	entity_t *entity;
 	if (specifiers->storage_class == STORAGE_CLASS_TYPEDEF) {
-		entity = allocate_entity_zero(ENTITY_TYPEDEF, NAMESPACE_NORMAL, env.symbol);
-		entity->base.source_position = env.source_position;
-		entity->typedefe.type        = orig_type;
+		entity = allocate_entity_zero(ENTITY_TYPEDEF, NAMESPACE_NORMAL, env.symbol, &env.source_position);
+		entity->typedefe.type = orig_type;
 
 		if (anonymous_entity != NULL) {
 			if (is_type_compound(type)) {
@@ -3769,8 +3762,9 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 		}
 	} else {
 		/* create a declaration type entity */
+		source_position_t const *const pos = env.symbol ? &env.source_position : &specifiers->source_position;
 		if (flags & DECL_CREATE_COMPOUND_MEMBER) {
-			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, env.symbol);
+			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, env.symbol, pos);
 
 			if (env.symbol != NULL) {
 				if (specifiers->is_inline && is_type_valid(type)) {
@@ -3786,10 +3780,10 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				}
 			}
 		} else if (flags & DECL_IS_PARAMETER) {
-			entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol);
+			entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
 			orig_type = semantic_parameter(&env.source_position, orig_type, specifiers, entity);
 		} else if (is_type_function(type)) {
-			entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol);
+			entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
 			entity->function.is_inline      = specifiers->is_inline;
 			entity->function.elf_visibility = default_visibility;
 			entity->function.parameters     = env.parameters;
@@ -3807,7 +3801,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 				}
 			}
 		} else {
-			entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol);
+			entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
 			entity->variable.elf_visibility = default_visibility;
 			entity->variable.thread_local   = specifiers->thread_local;
 
@@ -3835,7 +3829,6 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 			}
 		}
 
-		entity->base.source_position   = env.symbol != NULL ? env.source_position : specifiers->source_position;
 		entity->declaration.type       = orig_type;
 		entity->declaration.alignment  = get_type_alignment(orig_type);
 		entity->declaration.modifiers  = env.modifiers;
@@ -5648,9 +5641,7 @@ static void parse_compound_declarators(compound_t *compound,
 		if (token.kind == ':') {
 			/* anonymous bitfield */
 			type_t *type = specifiers->type;
-			entity_t *entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER,
-			                                        NAMESPACE_NORMAL, NULL);
-			entity->base.source_position               = *HERE;
+			entity_t *const entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, NULL, HERE);
 			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
 			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
 			entity->declaration.type                   = type;
@@ -6011,8 +6002,7 @@ static expression_t *parse_wide_character_constant(void)
 	return literal;
 }
 
-static entity_t *create_implicit_function(symbol_t *symbol,
-		const source_position_t *source_position)
+static entity_t *create_implicit_function(symbol_t *symbol, source_position_t const *const pos)
 {
 	type_t *ntype                          = allocate_type_zero(TYPE_FUNCTION);
 	ntype->function.return_type            = type_int;
@@ -6020,12 +6010,11 @@ static entity_t *create_implicit_function(symbol_t *symbol,
 	ntype->function.linkage                = LINKAGE_C;
 	type_t *type                           = identify_new_type(ntype);
 
-	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol);
+	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol, pos);
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
 	entity->declaration.type                   = type;
 	entity->declaration.implicit               = true;
-	entity->base.source_position               = *source_position;
 
 	if (current_scope != NULL)
 		record_entity(entity, false);
@@ -6800,7 +6789,8 @@ static label_t *get_label(void)
 		}
 	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.identifier.symbol);
+		source_position_t const nowhere = { NULL, 0, 0, false };
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.identifier.symbol, &nowhere);
 		label_push(label);
 	}
 
@@ -9584,7 +9574,7 @@ static statement_t *parse_goto(void)
 			else
 				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
 			eat_until_anchor();
-			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous)->label;
+			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous, &builtin_source_position)->label;
 		}
 	}
 
@@ -9869,9 +9859,8 @@ static statement_t *parse_local_label_declaration(void)
 			source_position_t const *const ppos = &entity->base.source_position;
 			errorf(HERE, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
 		} else {
-			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol);
-			entity->base.parent_scope    = current_scope;
-			entity->base.source_position = token.base.source_position;
+			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, HERE);
+			entity->base.parent_scope = current_scope;
 
 			*anchor = entity;
 			anchor  = &entity->base.next;
@@ -9912,9 +9901,8 @@ static void parse_namespace_definition(void)
 	}
 
 	if (entity == NULL) {
-		entity = allocate_entity_zero(ENTITY_NAMESPACE, NAMESPACE_NORMAL, symbol);
-		entity->base.source_position = token.base.source_position;
-		entity->base.parent_scope    = current_scope;
+		entity = allocate_entity_zero(ENTITY_NAMESPACE, NAMESPACE_NORMAL, symbol, HERE);
+		entity->base.parent_scope = current_scope;
 	}
 
 	if (token.kind == '=') {

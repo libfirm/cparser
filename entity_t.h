@@ -308,7 +308,7 @@ static inline bool is_declaration(const entity_t *entity)
 
 const char *get_entity_kind_name(entity_kind_t kind);
 
-entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*);
+entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*, source_position_t const*);
 
 elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
 
