@@ -1242,14 +1242,18 @@ static attribute_t *parse_attribute_gnu(void)
 	expect('(', end_error);
 	expect('(', end_error);
 
+	add_anchor_token(')');
+	add_anchor_token(',');
 	if (token.kind != ')') do {
 		attribute_t *attribute = parse_attribute_gnu_single();
-		if (attribute == NULL)
-			goto end_error;
-
-		*anchor = attribute;
-		anchor  = &attribute->next;
+		if (attribute) {
+			*anchor = attribute;
+			anchor  = &attribute->next;
+		}
 	} while (next_if(','));
+	rem_anchor_token(',');
+	rem_anchor_token(')');
+
 	expect(')', end_error);
 	expect(')', end_error);
 
