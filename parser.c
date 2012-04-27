@@ -669,6 +669,23 @@ static void type_error_incompatible(const char *msg,
 		next_token();                                     \
 	} while (0)
 
+static symbol_t *expect_identifier(char const *const context, source_position_t *const pos)
+{
+	if (token.kind != T_IDENTIFIER) {
+		parse_error_expected(context, T_IDENTIFIER, NULL);
+		add_anchor_token(T_IDENTIFIER);
+		eat_until_anchor();
+		rem_anchor_token(T_IDENTIFIER);
+		if (token.kind != T_IDENTIFIER)
+			return NULL;
+	}
+	symbol_t *const sym = token.identifier.symbol;
+	if (pos)
+		*pos = *HERE;
+	eat(T_IDENTIFIER);
+	return sym;
+}
+
 /**
  * Push a given scope on the scope stack and make it the
  * current scope
@@ -1549,13 +1566,9 @@ static designator_t *parse_designation(void)
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = token.base.source_position;
 			next_token();
-			if (token.kind != T_IDENTIFIER) {
-				parse_error_expected("while parsing designator",
-				                     T_IDENTIFIER, NULL);
+			designator->symbol = expect_identifier("while parsing designator", NULL);
+			if (!designator->symbol)
 				return NULL;
-			}
-			designator->symbol = token.identifier.symbol;
-			next_token();
 			break;
 		default:
 			expect('=', end_error);
@@ -2389,18 +2402,14 @@ static void parse_enum_entries(type_t *const enum_type)
 	}
 
 	add_anchor_token('}');
+	add_anchor_token(',');
 	do {
-		if (token.kind != T_IDENTIFIER) {
-			parse_error_expected("while parsing enum entry", T_IDENTIFIER, NULL);
-			eat_block();
-			rem_anchor_token('}');
-			return;
-		}
-
-		symbol_t *symbol       = token.identifier.symbol;
-		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol, HERE);
+		add_anchor_token('=');
+		source_position_t pos;
+		symbol_t *const symbol = expect_identifier("while parsing enum entry", &pos);
+		entity_t *const entity = allocate_entity_zero(ENTITY_ENUM_VALUE, NAMESPACE_NORMAL, symbol, &pos);
 		entity->enum_value.enum_type = enum_type;
-		next_token();
+		rem_anchor_token('=');
 
 		if (next_if('=')) {
 			expression_t *value = parse_constant_expression();
@@ -2413,6 +2422,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 		record_entity(entity, false);
 	} while (next_if(',') && token.kind != '}');
+	rem_anchor_token(',');
 	rem_anchor_token('}');
 
 	expect('}', end_error);
@@ -2575,34 +2585,36 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 	attribute_property_argument_t *property
 		= allocate_ast_zero(sizeof(*property));
 
+	add_anchor_token(')');
+	add_anchor_token(',');
 	do {
-		if (token.kind != T_IDENTIFIER) {
-			parse_error_expected("while parsing property declspec",
-			                     T_IDENTIFIER, NULL);
-			goto end_error;
+		add_anchor_token('=');
+		source_position_t pos;
+		symbol_t *const prop_sym = expect_identifier("while parsing property declspec", &pos);
+		rem_anchor_token('=');
+
+		symbol_t **prop = NULL;
+		if (prop_sym) {
+			if (streq(prop_sym->string, "put")) {
+				prop = &property->put_symbol;
+			} else if (streq(prop_sym->string, "get")) {
+				prop = &property->get_symbol;
+			} else {
+				errorf(&pos, "expected put or get in property declspec, but got '%Y'", prop_sym);
+			}
 		}
 
-		symbol_t **prop;
-		symbol_t  *symbol = token.identifier.symbol;
-		if (streq(symbol->string, "put")) {
-			prop = &property->put_symbol;
-		} else if (streq(symbol->string, "get")) {
-			prop = &property->get_symbol;
-		} else {
-			errorf(HERE, "expected put or get in property declspec");
-			prop = NULL;
-		}
-		eat(T_IDENTIFIER);
-		expect('=', end_error);
-		if (token.kind != T_IDENTIFIER) {
-			parse_error_expected("while parsing property declspec",
-			                     T_IDENTIFIER, NULL);
-			goto end_error;
-		}
+		add_anchor_token(T_IDENTIFIER);
+		expect('=', end_error1);
+end_error1:
+		rem_anchor_token(T_IDENTIFIER);
+
+		symbol_t *const sym = expect_identifier("while parsing property declspec", NULL);
 		if (prop != NULL)
-			*prop = token.identifier.symbol;
-		next_token();
+			*prop = sym ? sym : sym_anonymous;
 	} while (next_if(','));
+	rem_anchor_token(',');
+	rem_anchor_token(')');
 
 	attribute->a.property = property;
 
@@ -6140,13 +6152,9 @@ static entity_t *parse_qualified_identifier(void)
 
 	entity_t *entity;
 	while (true) {
-		if (token.kind != T_IDENTIFIER) {
-			parse_error_expected("while parsing identifier", T_IDENTIFIER, NULL);
+		symbol = expect_identifier("while parsing identifier", &pos);
+		if (!symbol)
 			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
-		}
-		symbol = token.identifier.symbol;
-		pos    = *HERE;
-		next_token();
 
 		/* lookup entity */
 		entity = lookup_entity(lookup_scope, symbol, NAMESPACE_NORMAL);
@@ -6467,29 +6475,18 @@ static expression_t *parse_funcdname_keyword(void)
 
 static designator_t *parse_designator(void)
 {
-	designator_t *result    = allocate_ast_zero(sizeof(result[0]));
-	result->source_position = *HERE;
-
-	if (token.kind != T_IDENTIFIER) {
-		parse_error_expected("while parsing member designator",
-		                     T_IDENTIFIER, NULL);
+	designator_t *const result = allocate_ast_zero(sizeof(result[0]));
+	result->symbol = expect_identifier("while parsing member designator", &result->source_position);
+	if (!result->symbol)
 		return NULL;
-	}
-	result->symbol = token.identifier.symbol;
-	next_token();
 
 	designator_t *last_designator = result;
 	while (true) {
 		if (next_if('.')) {
-			if (token.kind != T_IDENTIFIER) {
-				parse_error_expected("while parsing member designator",
-				                     T_IDENTIFIER, NULL);
+			designator_t *const designator = allocate_ast_zero(sizeof(result[0]));
+			designator->symbol = expect_identifier("while parsing member designator", &designator->source_position);
+			if (!designator->symbol)
 				return NULL;
-			}
-			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
-			designator->source_position = *HERE;
-			designator->symbol          = token.identifier.symbol;
-			next_token();
 
 			last_designator->next = designator;
 			last_designator       = designator;
@@ -7070,12 +7067,9 @@ static expression_t *parse_select_expression(expression_t *addr)
 	source_position_t const pos = *HERE;
 	next_token();
 
-	if (token.kind != T_IDENTIFIER) {
-		parse_error_expected("while parsing select", T_IDENTIFIER, NULL);
+	symbol_t *const symbol = expect_identifier("while parsing select", NULL);
+	if (!symbol)
 		return create_error_expression();
-	}
-	symbol_t *symbol = token.identifier.symbol;
-	next_token();
 
 	type_t *const orig_type = addr->base.type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -8857,14 +8851,12 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
 		if (next_if('[')) {
-			if (token.kind != T_IDENTIFIER) {
-				parse_error_expected("while parsing asm argument",
-				                     T_IDENTIFIER, NULL);
-				return NULL;
-			}
-			argument->symbol = token.identifier.symbol;
-
+			add_anchor_token(']');
+			argument->symbol = expect_identifier("while parsing asm argument", NULL);
+			rem_anchor_token(']');
 			expect(']', end_error);
+			if (!argument->symbol)
+				return NULL;
 		}
 
 		argument->constraints = parse_string_literals();
@@ -9848,18 +9840,17 @@ static statement_t *parse_local_label_declaration(void)
 	entity_t *end     = NULL;
 	entity_t **anchor = &begin;
 	do {
-		if (token.kind != T_IDENTIFIER) {
-			parse_error_expected("while parsing local label declaration",
-				T_IDENTIFIER, NULL);
+		source_position_t pos;
+		symbol_t *const symbol = expect_identifier("while parsing local label declaration", &pos);
+		if (!symbol)
 			goto end_error;
-		}
-		symbol_t *symbol = token.identifier.symbol;
+
 		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 		if (entity != NULL && entity->base.parent_scope == current_scope) {
 			source_position_t const *const ppos = &entity->base.source_position;
-			errorf(HERE, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
+			errorf(&pos, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
 		} else {
-			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, HERE);
+			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, &pos);
 			entity->base.parent_scope = current_scope;
 
 			*anchor = entity;
@@ -9868,7 +9859,6 @@ static statement_t *parse_local_label_declaration(void)
 
 			environment_push(entity);
 		}
-		next_token();
 	} while (next_if(','));
 	expect(';', end_error);
 end_error:
