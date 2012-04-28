@@ -520,22 +520,18 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 	}
 }
 
-enum {
-	COMPOUND_IS_STRUCT = false,
-	COMPOUND_IS_UNION  = true
-};
-
 /**
  * Construct firm type from ast struct type.
  */
-static ir_type *create_compound_type(compound_type_t *type,
-                                     bool incomplete, bool is_union)
+static ir_type *create_compound_type(compound_type_t *const type, bool const incomplete)
 {
 	compound_t *compound = type->compound;
 
 	if (compound->irtype != NULL && (compound->irtype_complete || incomplete)) {
 		return compound->irtype;
 	}
+
+	bool const is_union = type->base.kind == TYPE_COMPOUND_UNION;
 
 	symbol_t *type_symbol = compound->base.symbol;
 	ident    *id;
@@ -653,12 +649,9 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 		return type->base.firm_type;
 	}
 
-	switch (type->kind) {
-	case TYPE_COMPOUND_STRUCT:
-		return create_compound_type(&type->compound, true, COMPOUND_IS_STRUCT);
-	case TYPE_COMPOUND_UNION:
-		return create_compound_type(&type->compound, true, COMPOUND_IS_UNION);
-	default:
+	if (is_type_compound(type)) {
+		return create_compound_type(&type->compound, true);
+	} else {
 		return get_ir_type(type);
 	}
 }
@@ -697,10 +690,8 @@ ir_type *get_ir_type(type_t *type)
 		firm_type = create_array_type(&type->array);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_compound_type(&type->compound, false, COMPOUND_IS_STRUCT);
-		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_compound_type(&type->compound, false, COMPOUND_IS_UNION);
+		firm_type = create_compound_type(&type->compound, false);
 		break;
 	case TYPE_ENUM:
 		firm_type = create_enum_type(&type->enumt);
