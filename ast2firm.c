@@ -2985,7 +2985,8 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
-	ir_node *cnst = expression_to_firm(expression);
+	ir_node *const cnst = _expression_to_firm(expression);
+
 	current_ir_graph = old_current_ir_graph;
 	set_optimize(old_optimize);
 	set_opt_constant_folding(old_constant_folding);
@@ -2996,7 +2997,9 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	constant_folding = constant_folding_old;
 
-	return get_Const_tarval(cnst);
+	ir_tarval *const tv   = get_Const_tarval(cnst);
+	ir_mode   *const mode = get_ir_mode_arithmetic(skip_typeref(expression->base.type));
+	return tarval_convert_to(tv, mode);
 }
 
 /* this function is only used in parser.c, but it relies on libfirm functionality */
@@ -3505,13 +3508,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	}
 
 	if (is_constant_expression(expression) == EXPR_CLASS_CONSTANT) {
-		bool const constant_folding_old = constant_folding;
-		constant_folding = true;
-		ir_node *res  = _expression_to_firm(expression);
-		constant_folding = constant_folding_old;
-		ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
-		assert(is_Const(res));
-		return create_Const_from_bool(mode, !is_Const_null(res));
+		return new_Const(fold_constant_to_tarval(expression));
 	}
 
 	/* we have to produce a 0/1 from the mode_b expression */
