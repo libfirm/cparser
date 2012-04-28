@@ -51,7 +51,6 @@ typedef struct va_copy_expression_t                  va_copy_expression_t;
 typedef struct builtin_constant_expression_t         builtin_constant_expression_t;
 typedef struct builtin_types_compatible_expression_t builtin_types_compatible_expression_t;
 typedef struct classify_type_expression_t            classify_type_expression_t;
-typedef struct bitfield_extract_expression_t         bitfield_extract_expression_t;
 typedef struct label_address_expression_t            label_address_expression_t;
 typedef union  expression_t                          expression_t;
 
