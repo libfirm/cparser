@@ -1289,8 +1289,9 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		size_t len = snprintf(buf, sizeof(buf), UTF32_PRINTF_FORMAT, v);
 
 		tv = new_tarval_from_str(buf, len, mode);
-		goto make_const;
+		break;
 	}
+
 	case EXPR_LITERAL_CHARACTER: {
 		long long int v;
 		bool char_is_signed
@@ -1307,41 +1308,42 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		size_t len = snprintf(buf, sizeof(buf), "%lld", v);
 
 		tv = new_tarval_from_str(buf, len, mode);
-		goto make_const;
+		break;
 	}
+
 	case EXPR_LITERAL_INTEGER:
 	case EXPR_LITERAL_INTEGER_OCTAL:
 	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
 		assert(literal->target_value != NULL);
 		tv = literal->target_value;
-		goto make_const;
+		break;
+
 	case EXPR_LITERAL_FLOATINGPOINT:
 		tv = new_tarval_from_str(string, size, mode);
-		goto make_const;
+		break;
+
 	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: {
 		char buffer[size + 2];
 		memcpy(buffer, "0x", 2);
 		memcpy(buffer+2, string, size);
 		tv = new_tarval_from_str(buffer, size+2, mode);
-		goto make_const;
+		break;
 	}
+
 	case EXPR_LITERAL_BOOLEAN:
 		if (string[0] == 't') {
 			tv = get_mode_one(mode);
 		} else {
 			assert(string[0] == 'f');
+	case EXPR_LITERAL_MS_NOOP:
 			tv = get_mode_null(mode);
 		}
-		goto make_const;
-	case EXPR_LITERAL_MS_NOOP:
-		tv = get_mode_null(mode);
-		goto make_const;
-	default:
 		break;
-	}
-	panic("Invalid literal kind found");
 
-make_const: ;
+	default:
+		panic("Invalid literal kind found");
+	}
+
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
 	ir_node  *res        = new_d_Const(dbgi, tv);
 	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
