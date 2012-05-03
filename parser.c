@@ -9231,7 +9231,7 @@ static statement_t *parse_if(void)
 
 	PUSH_PARENT(statement);
 
-	add_anchor_token('{');
+	add_anchor_token(T_else);
 
 	expression_t *const expr = parse_condition();
 	statement->ifs.condition = expr;
@@ -9239,9 +9239,6 @@ static statement_t *parse_if(void)
 	 *             scalar type. */
 	semantic_condition(expr, "condition of 'if'-statment");
 
-	rem_anchor_token('{');
-
-	add_anchor_token(T_else);
 	statement_t *const true_stmt = parse_inner_statement();
 	statement->ifs.true_statement = true_stmt;
 	rem_anchor_token(T_else);
