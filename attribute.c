@@ -51,6 +51,7 @@ static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_GCC_STRUCT]             = "gcc_struct",
 	[ATTRIBUTE_GNU_INTERRUPT_HANDLER]      = "interrupt_handler",
 	[ATTRIBUTE_GNU_INTERRUPT]              = "interrupt",
+	[ATTRIBUTE_GNU_LEAF]                   = "leaf",
 	[ATTRIBUTE_GNU_LONGCALL]               = "longcall",
 	[ATTRIBUTE_GNU_LONG_CALL]              = "long_call",
 	[ATTRIBUTE_GNU_MALLOC]                 = "malloc",
@@ -359,6 +360,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_GNU_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
+		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
