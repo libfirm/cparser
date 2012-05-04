@@ -854,6 +854,27 @@ void set_create_ld_ident(ident *(*func)(entity_t*))
 	create_ld_ident = func;
 }
 
+static bool declaration_is_definition(const entity_t *entity)
+{
+	switch (entity->kind) {
+	case ENTITY_VARIABLE:
+		return entity->variable.initializer != NULL;
+	case ENTITY_FUNCTION:
+		return entity->function.statement != NULL;
+	case ENTITY_PARAMETER:
+	case ENTITY_COMPOUND_MEMBER:
+		return false;
+	case ENTITY_TYPEDEF:
+	case ENTITY_ENUM:
+	case ENTITY_ENUM_VALUE:
+	case ENTITY_NAMESPACE:
+	case ENTITY_LABEL:
+	case ENTITY_LOCAL_LABEL:
+		break;
+	}
+	panic("declaration_is_definition called on non-declaration");
+}
+
 /**
  * Handle GNU attributes for entities
  *
@@ -873,10 +894,11 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 			add_entity_additional_properties(irentity, mtp_property_const);
 		}
 	}
-	if (modifiers & DM_USED) {
+	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
 	}
-	if (modifiers & DM_WEAK) {
+	if ((modifiers & DM_WEAK) && declaration_is_definition(entity)
+	    && entity->declaration.storage_class != STORAGE_CLASS_EXTERN) {
 		add_entity_linkage(irentity, IR_LINKAGE_WEAK);
 	}
 }
@@ -938,10 +960,6 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
 	bool const has_body = entity->function.statement != NULL;
 	if (irentity != NULL) {
-		if (get_entity_visibility(irentity) == ir_visibility_external
-				&& has_body) {
-			set_entity_visibility(irentity, ir_visibility_default);
-		}
 		goto entity_created;
 	}
 
@@ -970,23 +988,21 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	handle_decl_modifiers(irentity, entity);
 
 	if (! nested_function) {
-		/* static inline             => local
-		 * extern inline             => local
-		 * inline without definition => local
-		 * inline with definition    => external_visible */
 		storage_class_tag_t const storage_class
 			= (storage_class_tag_t) entity->declaration.storage_class;
-		bool                const is_inline     = entity->function.is_inline;
-
-		if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
-		    set_entity_visibility(irentity, ir_visibility_default);
-		} else if (storage_class == STORAGE_CLASS_STATIC ||
-		           (is_inline && has_body)) {
+		if (storage_class == STORAGE_CLASS_STATIC) {
 		    set_entity_visibility(irentity, ir_visibility_local);
-		} else if (has_body) {
-		    set_entity_visibility(irentity, ir_visibility_default);
 		} else {
 		    set_entity_visibility(irentity, ir_visibility_external);
+		}
+
+		bool const is_inline = entity->function.is_inline;
+		if (is_inline && has_body) {
+			if (((c_mode & _C99) && storage_class == STORAGE_CLASS_NONE)
+			    || ((c_mode & _C99) == 0
+			        && storage_class == STORAGE_CLASS_EXTERN)) {
+				add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
+			}
 		}
 	} else {
 		/* nested functions are always local */
@@ -4412,6 +4428,11 @@ static void create_local_static_variable(entity_t *entity)
 	set_entity_ld_ident(irentity, id);
 	set_entity_visibility(irentity, ir_visibility_local);
 
+	if (entity->variable.initializer == NULL) {
+		ir_initializer_t *null_init = get_initializer_null();
+		set_entity_initializer(irentity, null_init);
+	}
+
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
@@ -4482,36 +4503,44 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_global_variable(entity_t *entity)
 {
-	ir_linkage    linkage    = IR_LINKAGE_DEFAULT;
-	ir_visibility visibility = ir_visibility_default;
-	ir_entity    *irentity;
+	ir_linkage          linkage    = IR_LINKAGE_DEFAULT;
+	ir_visibility       visibility = ir_visibility_external;
+	storage_class_tag_t storage
+		= (storage_class_tag_t)entity->declaration.storage_class;
+	decl_modifiers_t    modifiers  = entity->declaration.modifiers;
 	assert(entity->kind == ENTITY_VARIABLE);
 
-	switch ((storage_class_tag_t)entity->declaration.storage_class) {
+	switch (storage) {
 	case STORAGE_CLASS_EXTERN: visibility = ir_visibility_external; break;
 	case STORAGE_CLASS_STATIC: visibility = ir_visibility_local;    break;
-	case STORAGE_CLASS_NONE:
-		visibility = ir_visibility_default;
-		/* uninitialized globals get merged in C */
-		if (entity->variable.initializer == NULL)
-			linkage |= IR_LINKAGE_MERGE;
-		break;
+	case STORAGE_CLASS_NONE:   visibility = ir_visibility_external; break;
 	case STORAGE_CLASS_TYPEDEF:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
 		panic("invalid storage class for global var");
 	}
 
+	/* "common" symbols */
+	if (storage == STORAGE_CLASS_NONE
+	    && entity->variable.initializer == NULL
+	    && !entity->variable.thread_local
+	    && (modifiers & DM_WEAK) == 0) {
+		linkage |= IR_LINKAGE_MERGE;
+	}
+
 	ir_type *var_type = get_glob_type();
 	if (entity->variable.thread_local) {
 		var_type = get_tls_type();
-		/* LINKAGE_MERGE not supported by current linkers */
-		linkage &= ~IR_LINKAGE_MERGE;
 	}
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
-	irentity = entity->variable.v.entity;
+	ir_entity *irentity = entity->variable.v.entity;
 	add_entity_linkage(irentity, linkage);
 	set_entity_visibility(irentity, visibility);
+	if (entity->variable.initializer == NULL
+	    && storage != STORAGE_CLASS_EXTERN) {
+		ir_initializer_t *null_init = get_initializer_null();
+		set_entity_initializer(irentity, null_init);
+	}
 }
 
 static void create_local_declaration(entity_t *entity)
