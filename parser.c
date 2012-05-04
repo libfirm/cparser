@@ -1136,40 +1136,20 @@ static attribute_t *parse_attribute_asm(void)
 static symbol_t *get_symbol_from_token(void)
 {
 	switch(token.kind) {
-	case T_IDENTIFIER:
-		return token.identifier.symbol;
-	case T_auto:
-	case T_char:
-	case T_double:
-	case T_enum:
-	case T_extern:
-	case T_float:
-	case T_int:
-	case T_long:
-	case T_register:
-	case T_short:
-	case T_static:
-	case T_struct:
-	case T_union:
-	case T_unsigned:
-	case T_void:
-	case T_bool:
-	case T__Bool:
-	case T_class:
-	case T_explicit:
-	case T_export:
-	case T_wchar_t:
-	case T_const:
-	case T_signed:
-	case T___real__:
-	case T___imag__:
-	case T_restrict:
-	case T_volatile:
-	case T_inline:
-		/* maybe we need more tokens ... add them on demand */
-		return get_token_kind_symbol(token.kind);
-	default:
+	case T_CHARACTER_CONSTANT:
+	case T_EOF:
+	case T_FLOATINGPOINT:
+	case T_FLOATINGPOINT_HEXADECIMAL:
+	case T_INTEGER:
+	case T_INTEGER_HEXADECIMAL:
+	case T_INTEGER_OCTAL:
+	case T_STRING_LITERAL:
+	case T_WIDE_CHARACTER_CONSTANT:
+	case T_WIDE_STRING_LITERAL:
 		return NULL;
+
+	default:
+		return token.identifier.symbol;
 	}
 }
 

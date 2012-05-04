@@ -99,8 +99,6 @@ void exit_tokens(void);
 void print_token_kind(FILE *out, token_kind_t token_kind);
 void print_token(FILE *out, const token_t *token);
 
-symbol_t *get_token_kind_symbol(int token_kind);
-
 void print_pp_token_kind(FILE *out, int kind);
 void print_pp_token(FILE *out, const token_t *token);
 

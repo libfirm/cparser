@@ -123,11 +123,6 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 	}
 }
 
-symbol_t *get_token_kind_symbol(int kind)
-{
-	return token_symbols[kind];
-}
-
 static void print_stringrep(const string_t *string, FILE *f)
 {
 	for (size_t i = 0; i < string->size; ++i) {
