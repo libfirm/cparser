@@ -4634,6 +4634,8 @@ static ir_node *declaration_statement_to_firm(declaration_statement_t *statement
 
 static ir_node *if_statement_to_firm(if_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	/* Create the condition. */
 	ir_node *true_block  = NULL;
 	ir_node *false_block = NULL;
@@ -4697,6 +4699,8 @@ static void jump_if_reachable(ir_node *const target_block)
 
 static ir_node *while_statement_to_firm(while_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
 	jump_to(header_block);
@@ -4756,6 +4760,8 @@ static ir_node *get_break_label(void)
 
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
 

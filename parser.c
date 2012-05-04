@@ -118,8 +118,9 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 #define PUSH_SCOPE(scope) \
 	size_t   const top       = environment_top(); \
 	scope_t *const new_scope = (scope); \
-	scope_t *const old_scope = scope_push(new_scope)
-#define POP_SCOPE() (assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top))
+	scope_t *const old_scope = (new_scope ? scope_push(new_scope) : NULL)
+#define PUSH_SCOPE_STATEMENT(scope) PUSH_SCOPE(c_mode & (_C99 | _CXX) ? (scope) : NULL)
+#define POP_SCOPE() (new_scope ? assert(current_scope == new_scope), scope_pop(old_scope), environment_pop_to(top) : (void)0)
 
 #define PUSH_EXTENSION() \
 	(void)0; \
@@ -9230,6 +9231,7 @@ static statement_t *parse_if(void)
 	eat(T_if);
 
 	PUSH_PARENT(statement);
+	PUSH_SCOPE_STATEMENT(&statement->ifs.scope);
 
 	add_anchor_token(T_else);
 
@@ -9261,6 +9263,7 @@ static statement_t *parse_if(void)
 		warningf(WARN_PARENTHESES, pos, "suggest explicit braces to avoid ambiguous 'else'");
 	}
 
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 }
@@ -9318,6 +9321,7 @@ static statement_t *parse_switch(void)
 	eat(T_switch);
 
 	PUSH_PARENT(statement);
+	PUSH_SCOPE_STATEMENT(&statement->switchs.scope);
 
 	expression_t *const expr = parse_condition();
 	type_t       *      type = skip_typeref(expr->base.type);
@@ -9343,6 +9347,7 @@ static statement_t *parse_switch(void)
 	}
 	check_enum_cases(&statement->switchs);
 
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 }
@@ -9368,6 +9373,7 @@ static statement_t *parse_while(void)
 	eat(T_while);
 
 	PUSH_PARENT(statement);
+	PUSH_SCOPE_STATEMENT(&statement->whiles.scope);
 
 	expression_t *const cond = parse_condition();
 	statement->whiles.condition = cond;
@@ -9377,6 +9383,7 @@ static statement_t *parse_while(void)
 
 	statement->whiles.body = parse_loop_body(statement);
 
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 }
@@ -9391,6 +9398,7 @@ static statement_t *parse_do(void)
 	eat(T_do);
 
 	PUSH_PARENT(statement);
+	PUSH_SCOPE_STATEMENT(&statement->do_while.scope);
 
 	add_anchor_token(T_while);
 	statement->do_while.body = parse_loop_body(statement);
@@ -9404,6 +9412,7 @@ static statement_t *parse_do(void)
 	semantic_condition(cond, "condition of 'do-while'-statement");
 	expect(';');
 
+	POP_SCOPE();
 	POP_PARENT();
 	return statement;
 }
@@ -9418,7 +9427,7 @@ static statement_t *parse_for(void)
 	eat(T_for);
 
 	PUSH_PARENT(statement);
-	PUSH_SCOPE(&statement->fors.scope);
+	PUSH_SCOPE_STATEMENT(&statement->fors.scope);
 
 	expect('(');
 	add_anchor_token(')');

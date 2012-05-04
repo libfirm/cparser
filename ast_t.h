@@ -535,6 +535,7 @@ struct declaration_statement_t {
 
 struct if_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *true_statement;
 	statement_t      *false_statement;
@@ -542,6 +543,7 @@ struct if_statement_t {
 
 struct switch_statement_t {
 	statement_base_t        base;
+	scope_t                 scope;
 	expression_t           *expression;
 	statement_t            *body;
 	case_label_statement_t *first_case, *last_case; /**< List of all cases, including default. */
@@ -586,23 +588,25 @@ struct expression_statement_t {
 
 struct while_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct do_while_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct for_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *initialisation;
 	expression_t     *condition;
 	expression_t     *step;
 	statement_t      *body;
-	scope_t           scope;
 	bool              condition_reachable:1;
 	bool              step_reachable:1;
 };
