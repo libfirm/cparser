@@ -175,7 +175,6 @@ ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
-static void create_local_declaration(entity_t *entity);
 
 static unsigned decide_modulo_shift(unsigned type_size)
 {
@@ -4466,15 +4465,11 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 	return expression_to_firm(statement->expression);
 }
 
+static void create_local_declarations(entity_t*);
+
 static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
-	entity_t *entity = compound->scope.entities;
-	for ( ; entity != NULL; entity = entity->base.next) {
-		if (!is_declaration(entity))
-			continue;
-
-		create_local_declaration(entity);
-	}
+	create_local_declarations(compound->scope.entities);
 
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
@@ -4566,6 +4561,14 @@ static void create_local_declaration(entity_t *entity)
 		break;
 	}
 	panic("invalid storage class found");
+}
+
+static void create_local_declarations(entity_t *e)
+{
+	for (; e; e = e->base.next) {
+		if (is_declaration(e))
+			create_local_declaration(e);
+	}
 }
 
 static void initialize_local_declaration(entity_t *entity)
@@ -4789,17 +4792,10 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 
 static ir_node *for_statement_to_firm(for_statement_t *statement)
 {
-	/* create declarations */
-	entity_t *entity = statement->scope.entities;
-	for ( ; entity != NULL; entity = entity->base.next) {
-		if (!is_declaration(entity))
-			continue;
-
-		create_local_declaration(entity);
-	}
+	create_local_declarations(statement->scope.entities);
 
 	if (currently_reachable()) {
-		entity = statement->scope.entities;
+		entity_t *entity = statement->scope.entities;
 		for ( ; entity != NULL; entity = entity->base.next) {
 			if (!is_declaration(entity))
 				continue;
