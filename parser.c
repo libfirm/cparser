@@ -517,27 +517,6 @@ static void add_anchor_token(int token_kind)
 }
 
 /**
- * Set the number of tokens types of the given type
- * to zero and return the old count.
- */
-static int save_and_reset_anchor_state(int token_kind)
-{
-	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
-	int count = token_anchor_set[token_kind];
-	token_anchor_set[token_kind] = 0;
-	return count;
-}
-
-/**
- * Restore the number of token types to the given count.
- */
-static void restore_anchor_state(int token_kind, int count)
-{
-	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
-	token_anchor_set[token_kind] = count;
-}
-
-/**
  * Remove a token type from the token type anchor set (a multi-set).
  */
 static void rem_anchor_token(int token_kind)
@@ -3214,7 +3193,6 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 {
 	eat('(');
 	add_anchor_token(')');
-	int saved_comma_state = save_and_reset_anchor_state(',');
 
 	if (token.kind == T_IDENTIFIER
 	    && !is_typedef_symbol(token.identifier.symbol)) {
@@ -3273,8 +3251,6 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 parameters_finished:
 	rem_anchor_token(')');
 	expect(')');
-
-	restore_anchor_state(',', saved_comma_state);
 }
 
 typedef enum construct_type_kind_t {
