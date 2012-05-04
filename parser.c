@@ -487,7 +487,7 @@ static inline void next_token(void)
 #endif
 }
 
-static inline bool next_if(int const type)
+static inline bool next_if(token_kind_t const type)
 {
 	if (token.kind == type) {
 		next_token();
@@ -510,18 +510,18 @@ static inline const token_t *look_ahead(size_t num)
 /**
  * Adds a token type to the token type anchor set (a multi-set).
  */
-static void add_anchor_token(int token_kind)
+static void add_anchor_token(token_kind_t const token_kind)
 {
-	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	assert(token_kind < T_LAST_TOKEN);
 	++token_anchor_set[token_kind];
 }
 
 /**
  * Remove a token type from the token type anchor set (a multi-set).
  */
-static void rem_anchor_token(int token_kind)
+static void rem_anchor_token(token_kind_t const token_kind)
 {
-	assert(0 <= token_kind && token_kind < T_LAST_TOKEN);
+	assert(token_kind < T_LAST_TOKEN);
 	assert(token_anchor_set[token_kind] != 0);
 	--token_anchor_set[token_kind];
 }
@@ -529,9 +529,9 @@ static void rem_anchor_token(int token_kind)
 /**
  * Eat tokens until a matching token type is found.
  */
-static void eat_until_matching_token(int type)
+static void eat_until_matching_token(token_kind_t const type)
 {
-	int end_token;
+	token_kind_t end_token;
 	switch (type) {
 		case '(': end_token = ')';  break;
 		case '{': end_token = '}';  break;
@@ -5737,20 +5737,6 @@ struct expression_parser_function_t {
 
 static expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
-/**
- * Prints an error message if an expression was expected but not read
- */
-static expression_t *expected_expression_error(void)
-{
-	/* skip the error message if the error token was read */
-	if (token.kind != T_ERROR) {
-		errorf(HERE, "expected expression, got token %K", &token);
-	}
-	next_token();
-
-	return create_error_expression();
-}
-
 static type_t *get_string_type(void)
 {
 	return is_warn_on(WARN_WRITE_STRINGS) ? type_const_char_ptr : type_char_ptr;
@@ -8635,10 +8621,6 @@ CREATE_BINEXPR_PARSER(',',                    EXPR_BINARY_COMMA,              PR
 
 static expression_t *parse_subexpression(precedence_t precedence)
 {
-	if (token.kind < 0) {
-		return expected_expression_error();
-	}
-
 	expression_parser_function_t *parser
 		= &expression_parsers[token.kind];
 	expression_t                 *left;
@@ -8651,10 +8633,6 @@ static expression_t *parse_subexpression(precedence_t precedence)
 	assert(left != NULL);
 
 	while (true) {
-		if (token.kind < 0) {
-			return expected_expression_error();
-		}
-
 		parser = &expression_parsers[token.kind];
 		if (parser->infix_parser == NULL)
 			break;

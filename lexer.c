@@ -649,11 +649,9 @@ static void parse_string_literal(void)
 			break;
 		}
 
-		case EOF: {
+		case EOF:
 			errorf(&lexer_token.base.source_position, "string has no end");
-			lexer_token.kind = T_ERROR;
-			return;
-		}
+			goto end_of_string;
 
 		case '"':
 			next_char();
@@ -703,12 +701,9 @@ static void parse_wide_character_constant(void)
 			next_char();
 			goto end_of_wide_char_constant;
 
-		case EOF: {
-			errorf(&lexer_token.base.source_position,
-			       "EOF while parsing character constant");
-			lexer_token.kind = T_ERROR;
-			return;
-		}
+		case EOF:
+			errorf(&lexer_token.base.source_position, "EOF while parsing character constant");
+			goto end_of_wide_char_constant;
 
 		default:
 			obstack_grow_symbol(&symbol_obstack, c);
@@ -767,12 +762,9 @@ static void parse_character_constant(void)
 			next_char();
 			goto end_of_char_constant;
 
-		case EOF: {
-			errorf(&lexer_token.base.source_position,
-			       "EOF while parsing character constant");
-			lexer_token.kind = T_ERROR;
-			return;
-		}
+		case EOF:
+			errorf(&lexer_token.base.source_position, "EOF while parsing character constant");
+			goto end_of_char_constant;
 
 		default:
 			obstack_grow_symbol(&symbol_obstack, c);
@@ -1263,8 +1255,7 @@ void lexer_next_preprocessing_token(void)
 dollar_sign:
 			errorf(&lexer_pos, "unknown character '%c' found", c);
 			next_char();
-			lexer_token.kind = T_ERROR;
-			return;
+			break;
 		}
 	}
 }

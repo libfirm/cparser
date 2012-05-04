@@ -28,17 +28,18 @@
 #include "symbol.h"
 #include "lang_features.h"
 #include "adt/array.h"
+#include "adt/util.h"
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
 static symbol_t *pp_token_symbols[TP_LAST_TOKEN];
 
 const source_position_t builtin_source_position = { "<built-in>", 0, 0, true };
 
-static int last_id;
+static token_kind_t last_id;
 
 static symbol_t *intern_register_token(token_kind_t id, const char *string)
 {
-	assert(0 <= id && id < T_LAST_TOKEN);
+	assert(id < T_LAST_TOKEN);
 	symbol_t *symbol = symbol_table_insert(string);
 	if (token_symbols[id] == NULL)
 		token_symbols[id] = symbol;
@@ -47,7 +48,7 @@ static symbol_t *intern_register_token(token_kind_t id, const char *string)
 
 static symbol_t *intern_register_pp_token(preprocessor_token_kind_t id, const char *string)
 {
-	assert(0 <= id && id < TP_LAST_TOKEN);
+	assert(id < TP_LAST_TOKEN);
 	symbol_t *symbol = symbol_table_insert(string);
 	if (pp_token_symbols[id] == NULL)
 		pp_token_symbols[id] = symbol;
@@ -81,8 +82,6 @@ void init_tokens(void)
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 	memset(pp_token_symbols, 0, TP_LAST_TOKEN * sizeof(pp_token_symbols[0]));
 
-	last_id = -2;
-
 #define T(mode,x,str,val)  register_token(mode, T_##x, str);
 #define TS(x,str,val)      intern_register_token(T_##x, str);
 #include "tokens.inc"
@@ -106,13 +105,8 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 		fputs("end of file", f);
 		return;
 	}
-	if(token_kind == T_ERROR) {
-		fputs("error", f);
-		return;
-	}
 
-	int token_symbols_len = T_LAST_TOKEN;
-	if(token_kind < 0 || token_kind >= token_symbols_len) {
+	if (token_kind >= lengthof(token_symbols)) {
 		fputs("invalid token", f);
 		return;
 	}
@@ -121,7 +115,7 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 	if(symbol != NULL) {
 		fputs(symbol->string, f);
 	} else {
-		if(token_kind >= 0 && token_kind < 256) {
+		if (token_kind < 256) {
 			fputc(token_kind, f);
 			return;
 		}
@@ -183,10 +177,6 @@ void print_pp_token_kind(FILE *f, int token_kind)
 {
 	if (token_kind == TP_EOF) {
 		fputs("end of file", f);
-		return;
-	}
-	if (token_kind == TP_ERROR) {
-		fputs("error", f);
 		return;
 	}
 

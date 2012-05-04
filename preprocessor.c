@@ -100,7 +100,7 @@ static const char       *printed_input_name = NULL;
 static source_position_t expansion_pos;
 static pp_definition_t  *current_expansion  = NULL;
 static strset_t          stringset;
-static preprocessor_token_kind_t last_token = TP_ERROR;
+static preprocessor_token_kind_t last_token;
 
 static searchpath_entry_t *searchpath;
 
@@ -485,8 +485,7 @@ static void parse_string_literal(void)
 			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
 			errorf(&source_position, "string has no end");
-			pp_token.kind = TP_ERROR;
-			return;
+			goto end_of_string;
 		}
 
 		case '"':
@@ -543,8 +542,7 @@ static void parse_wide_character_constant(void)
 
 		case EOF:
 			parse_error("EOF while parsing character constant");
-			pp_token.kind = TP_ERROR;
-			return;
+			goto end_of_wide_char_constant;
 
 		default:
 			obstack_grow_symbol(&symbol_obstack, input.c);
@@ -589,8 +587,7 @@ static void parse_character_constant(void)
 			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
 			errorf(&source_position, "EOF while parsing character constant");
-			pp_token.kind = TP_ERROR;
-			return;
+			goto end_of_char_constant;
 		}
 
 		case '\'':
@@ -828,7 +825,7 @@ static void skip_whitespace(void)
 	}
 }
 
-static void eat_pp(int type)
+static void eat_pp(preprocessor_token_kind_t const type)
 {
 	(void) type;
 	assert(pp_token.kind == type);
@@ -1141,11 +1138,11 @@ restart:
 		if (!ignore_unknown_chars) {
 			errorf(&pp_token.base.source_position,
 			       "unknown character '%c' found\n", input.c);
-			pp_token.kind = TP_ERROR;
+			goto restart;
 		} else {
 			pp_token.kind = input.c;
+			return;
 		}
-		return;
 	}
 }
 

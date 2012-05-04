@@ -27,7 +27,6 @@
 #include "type.h"
 
 typedef enum token_kind_t {
-	T_ERROR = -1,
 	T_NULL  =  0,
 	T_EOF   = '\x04', // EOT
 #define T(mode,x,str,val) T_##x val,
@@ -41,7 +40,6 @@ typedef enum token_kind_t {
 typedef enum preprocessor_token_kind_t {
 	TP_NULL  = T_NULL,
 	TP_EOF   = T_EOF,
-	TP_ERROR = T_ERROR,
 #define T(mode,x,str,val) TP_##x val,
 #define TS(x,str,val) TP_##x val,
 #include "tokens_preprocessor.inc"
@@ -68,7 +66,7 @@ typedef struct number_literal_t number_literal_t;
 typedef union  token_t          token_t;
 
 struct token_base_t {
-	int               kind;
+	unsigned          kind;
 	source_position_t source_position;
 };
 
@@ -89,7 +87,7 @@ struct number_literal_t {
 };
 
 union token_t {
-	int               kind;
+	unsigned          kind;
 	token_base_t      base;
 	identifier_t      identifier;
 	string_literal_t  string;
