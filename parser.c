@@ -5253,6 +5253,8 @@ static bool is_main(entity_t *entity)
 	return true;
 }
 
+static void prepare_main_collect2(entity_t*);
+
 static void parse_external_declaration(void)
 {
 	/* function-definitions and declarations both start with declaration
@@ -10402,7 +10404,7 @@ static void complete_incomplete_arrays(void)
 	}
 }
 
-void prepare_main_collect2(entity_t *entity)
+static void prepare_main_collect2(entity_t *const entity)
 {
 	PUSH_SCOPE(&entity->function.statement->compound.scope);
 
