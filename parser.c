@@ -3194,22 +3194,18 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 	eat('(');
 	add_anchor_token(')');
 
-	if (token.kind == T_IDENTIFIER
-	    && !is_typedef_symbol(token.identifier.symbol)) {
-		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
-		if (la1_type == ',' || la1_type == ')') {
-			type->kr_style_parameters = true;
-			parse_identifier_list(scope);
-			goto parameters_finished;
-		}
-	}
-
-	if (token.kind == ')') {
+	if (token.kind == T_IDENTIFIER                  &&
+	    !is_typedef_symbol(token.identifier.symbol) &&
+	    (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
+		type->kr_style_parameters = true;
+		parse_identifier_list(scope);
+	} else if (token.kind == ')') {
 		/* ISO/IEC 14882:1998(E) §C.1.6:1 */
 		if (!(c_mode & _CXX))
 			type->unspecified_parameters = true;
 	} else if (has_parameters()) {
 		function_parameter_t **anchor = &type->parameters;
+		add_anchor_token(',');
 		do {
 			switch (token.kind) {
 			case T_DOTDOTDOT:
@@ -3246,9 +3242,10 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 				goto parameters_finished;
 			}
 		} while (next_if(','));
+parameters_finished:
+		rem_anchor_token(',');
 	}
 
-parameters_finished:
 	rem_anchor_token(')');
 	expect(')');
 }
