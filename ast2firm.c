@@ -2962,12 +2962,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	if (tp_expression != NULL) {
 		entity_t *entity = get_expression_entity(tp_expression);
 		if (entity != NULL) {
-			if (entity->kind == ENTITY_FUNCTION) {
-				/* a gnu-extension */
-				alignment = 1;
-			} else {
-				alignment = get_cparser_entity_alignment(entity);
-			}
+			alignment = get_cparser_entity_alignment(entity);
 		}
 	}
 
