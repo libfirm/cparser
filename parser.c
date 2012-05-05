@@ -5348,8 +5348,6 @@ static void parse_external_declaration(void)
 	if (ndeclaration != entity) {
 		function->parameters = ndeclaration->function.parameters;
 	}
-	assert(is_declaration(entity));
-	type = skip_typeref(entity->declaration.type);
 
 	PUSH_SCOPE(&function->parameters);
 
