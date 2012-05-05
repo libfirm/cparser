@@ -302,20 +302,16 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		obstack_printf(&cppflags_obst, PREPROCESSOR);
 	}
 
+	char const *lang;
 	switch (filetype) {
-	case FILETYPE_C:
-		add_flag(&cppflags_obst, "-std=c99");
-		break;
-	case FILETYPE_CXX:
-		add_flag(&cppflags_obst, "-std=c++98");
-		break;
-	case FILETYPE_ASSEMBLER:
-		add_flag(&cppflags_obst, "-x");
-		add_flag(&cppflags_obst, "assembler-with-cpp");
-		break;
-	default:
-		break;
+	case FILETYPE_C:         lang = "c";                  break;
+	case FILETYPE_CXX:       lang = "c++";                break;
+	case FILETYPE_ASSEMBLER: lang = "assembler-with-cpp"; break;
+	default:                 lang = NULL;                 break;
 	}
+	if (lang)
+		add_flag(&cppflags_obst, "-x%s", lang);
+
 	obstack_printf(&cppflags_obst, "%s", common_flags);
 
 	/* handle dependency generation */
