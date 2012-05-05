@@ -4616,11 +4616,7 @@ static void check_declarations(void)
 {
 	if (is_warn_on(WARN_UNUSED_PARAMETER)) {
 		const scope_t *scope = &current_function->parameters;
-
-		/* do not issue unused warnings for main */
-		if (!is_sym_main(current_function->base.base.symbol)) {
-			warn_unused_entity(WARN_UNUSED_PARAMETER, scope->entities, NULL);
-		}
+		warn_unused_entity(WARN_UNUSED_PARAMETER, scope->entities, NULL);
 	}
 	if (is_warn_on(WARN_UNUSED_VARIABLE)) {
 		walk_statements(current_function->statement, check_unused_variables,
