@@ -109,6 +109,12 @@ static declaration_t      **incomplete_arrays;
 static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 
 
+#define PUSH_CURRENT_ENTITY(entity) \
+	entity_t *const new_current_entity = (entity); \
+	entity_t *const old_current_entity = current_entity; \
+	((void)(current_entity = new_current_entity))
+#define POP_CURRENT_ENTITY() (assert(current_entity == new_current_entity), (void)(current_entity = old_current_entity))
+
 #define PUSH_PARENT(stmt) \
 	statement_t *const new_parent = (stmt); \
 	statement_t *const old_parent = current_parent; \
@@ -5369,9 +5375,8 @@ static void parse_external_declaration(void)
 		/* parse function body */
 		int         label_stack_top      = label_top();
 		function_t *old_current_function = current_function;
-		entity_t   *old_current_entity   = current_entity;
 		current_function                 = function;
-		current_entity                   = entity;
+		PUSH_CURRENT_ENTITY(entity);
 		PUSH_PARENT(NULL);
 
 		goto_first   = NULL;
@@ -5401,10 +5406,9 @@ static void parse_external_declaration(void)
 		if (is_main(entity) && enable_main_collect2_hack)
 			prepare_main_collect2(entity);
 
+		POP_CURRENT_ENTITY();
 		POP_PARENT();
 		assert(current_function == function);
-		assert(current_entity   == entity);
-		current_entity   = old_current_entity;
 		current_function = old_current_function;
 		label_pop_to(label_stack_top);
 	}
@@ -9778,9 +9782,7 @@ static void parse_namespace_definition(void)
 	append_entity(current_scope, entity);
 
 	PUSH_SCOPE(&entity->namespacee.members);
-
-	entity_t     *old_current_entity = current_entity;
-	current_entity = entity;
+	PUSH_CURRENT_ENTITY(entity);
 
 	add_anchor_token('}');
 	expect('{');
@@ -9788,8 +9790,7 @@ static void parse_namespace_definition(void)
 	rem_anchor_token('}');
 	expect('}');
 
-	assert(current_entity == entity);
-	current_entity = old_current_entity;
+	POP_CURRENT_ENTITY();
 	POP_SCOPE();
 }
 
