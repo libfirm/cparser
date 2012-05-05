@@ -3886,14 +3886,6 @@ warn_arg_count:
 	}
 }
 
-/**
- * Check if a symbol is the equal to "main".
- */
-static bool is_sym_main(const symbol_t *const sym)
-{
-	return streq(sym->string, "main");
-}
-
 static void error_redefined_as_different_kind(const source_position_t *pos,
 		const entity_t *old, entity_kind_t new_kind)
 {
@@ -3953,6 +3945,8 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 	}
 }
 
+static bool is_main(entity_t*);
+
 /**
  * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
  * for various problems that occur for multiple definitions
@@ -3966,6 +3960,10 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	/* can happen in error cases */
 	if (symbol == NULL)
 		return entity;
+
+	assert(!entity->base.parent_scope);
+	assert(current_scope);
+	entity->base.parent_scope = current_scope;
 
 	entity_t *const previous_entity = get_entity(symbol, namespc);
 	/* pushing the same entity twice will break the stack structure */
@@ -3982,7 +3980,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			warningf(WARN_STRICT_PROTOTYPES, pos, "function declaration '%#N' is not a prototype", entity);
 		}
 
-		if (current_scope == file_scope && is_sym_main(symbol)) {
+		if (is_main(entity)) {
 			check_main(entity);
 		}
 	}
@@ -4086,7 +4084,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 						case STORAGE_CLASS_EXTERN:
 							if (is_definition) {
-								if (prev_type->function.unspecified_parameters && !is_sym_main(symbol)) {
+								if (prev_type->function.unspecified_parameters && !is_main(entity)) {
 									warningf(WARN_MISSING_PROTOTYPES, pos, "no previous prototype for '%#N'", entity);
 								}
 							} else if (new_storage_class == STORAGE_CLASS_NONE) {
@@ -4156,7 +4154,7 @@ error_redeclaration:
 	if (entity->kind == ENTITY_FUNCTION) {
 		if (is_definition &&
 				entity->declaration.storage_class != STORAGE_CLASS_STATIC &&
-				!is_sym_main(symbol)) {
+				!is_main(entity)) {
 			if (is_warn_on(WARN_MISSING_PROTOTYPES)) {
 				warningf(WARN_MISSING_PROTOTYPES, pos, "no previous prototype for '%#N'", entity);
 			} else {
@@ -4173,10 +4171,6 @@ warn_missing_declaration:
 	}
 
 finish:
-	assert(entity->base.parent_scope == NULL);
-	assert(current_scope != NULL);
-
-	entity->base.parent_scope = current_scope;
 	environment_push(entity);
 	append_entity(current_scope, entity);
 
@@ -5039,7 +5033,7 @@ found_break_parent:
 			type_t *const ret  = skip_typeref(type->function.return_type);
 			if (!is_type_void(ret) &&
 			    is_type_valid(ret) &&
-			    !is_sym_main(current_function->base.base.symbol)) {
+			    !is_main(current_entity)) {
 				source_position_t const *const pos = &stmt->base.source_position;
 				warningf(WARN_RETURN_TYPE, pos, "control reaches end of non-void function");
 			}
