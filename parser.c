@@ -248,7 +248,6 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_ANDAND:                    \
 	case T_CHARACTER_CONSTANT:        \
 	case T_FLOATINGPOINT:             \
-	case T_FLOATINGPOINT_HEXADECIMAL: \
 	case T_INTEGER:                   \
 	case T_MINUSMINUS:                \
 	case T_PLUSPLUS:                  \
@@ -1140,7 +1139,6 @@ static symbol_t *get_symbol_from_token(void)
 	case T_CHARACTER_CONSTANT:
 	case T_EOF:
 	case T_FLOATINGPOINT:
-	case T_FLOATINGPOINT_HEXADECIMAL:
 	case T_INTEGER:
 	case T_STRING_LITERAL:
 	case T_WIDE_CHARACTER_CONSTANT:
@@ -5857,7 +5855,6 @@ static expression_t *parse_number_literal(void)
 		break;
 
 	case T_FLOATINGPOINT:
-	case T_FLOATINGPOINT_HEXADECIMAL:
 		kind = EXPR_LITERAL_FLOATINGPOINT;
 		type = check_floatingpoint_suffix();
 		break;
@@ -6759,8 +6756,7 @@ static expression_t *parse_primary_expression(void)
 	case T_false:                        return parse_boolean_literal(false);
 	case T_true:                         return parse_boolean_literal(true);
 	case T_INTEGER:
-	case T_FLOATINGPOINT:
-	case T_FLOATINGPOINT_HEXADECIMAL:    return parse_number_literal();
+	case T_FLOATINGPOINT:                return parse_number_literal();
 	case T_CHARACTER_CONSTANT:           return parse_character_constant();
 	case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
 	case T_STRING_LITERAL:

@@ -387,8 +387,7 @@ static void parse_number_hex(void)
 	char   *string = obstack_finish(&symbol_obstack);
 	lexer_token.number.number = identify_string(string, size);
 
-	lexer_token.kind    =
-		is_float ? T_FLOATINGPOINT_HEXADECIMAL : T_INTEGER;
+	lexer_token.kind = is_float ? T_FLOATINGPOINT : T_INTEGER;
 
 	if (!has_digits) {
 		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);

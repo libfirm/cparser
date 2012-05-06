@@ -138,7 +138,6 @@ void print_token(FILE *f, const token_t *token)
 		break;
 	case T_INTEGER:
 	case T_FLOATINGPOINT:
-	case T_FLOATINGPOINT_HEXADECIMAL:
 		print_token_kind(f, (token_kind_t)token->kind);
 		fputs(" '", f);
 		print_stringrep(&token->number.number, f);
