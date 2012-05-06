@@ -329,6 +329,19 @@ finish_suffix:
 	lexer_token.number.suffix = identify_string(string, size);
 }
 
+static void parse_exponent(void)
+{
+	if (c == '-' || c == '+') {
+		obstack_1grow(&symbol_obstack, (char)c);
+		next_char();
+	}
+
+	while (isdigit(c)) {
+		obstack_1grow(&symbol_obstack, (char)c);
+		next_char();
+	}
+}
+
 /**
  * Parses a hex number including hex floats and set the
  * lexer_token.
@@ -360,16 +373,7 @@ static void parse_number_hex(void)
 		is_float = true;
 		obstack_1grow(&symbol_obstack, (char) c);
 		next_char();
-
-		if (c == '-' || c == '+') {
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-		}
-
-		while (isxdigit(c)) {
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-		}
+		parse_exponent();
 	} else if (is_float) {
 		errorf(&lexer_token.base.source_position,
 		       "hexadecimal floatingpoint constant requires an exponent");
@@ -445,16 +449,7 @@ static void parse_number(void)
 		is_float = true;
 		obstack_1grow(&symbol_obstack, 'e');
 		next_char();
-
-		if (c == '-' || c == '+') {
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-		}
-
-		while (isdigit(c)) {
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-		}
+		parse_exponent();
 	}
 
 	obstack_1grow(&symbol_obstack, '\0');
