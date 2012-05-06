@@ -5397,8 +5397,19 @@ static void parse_external_declaration(void)
 			}
 		}
 
-		if (is_main(entity) && enable_main_collect2_hack)
-			prepare_main_collect2(entity);
+		if (is_main(entity)) {
+			/* Force main to C linkage. */
+			type_t *const type = entity->declaration.type;
+			assert(is_type_function(type));
+			if (type->function.linkage != LINKAGE_C) {
+				type_t *new_type           = duplicate_type(type);
+				new_type->function.linkage = LINKAGE_C;
+				entity->declaration.type   = identify_new_type(new_type);
+			}
+
+			if (enable_main_collect2_hack)
+				prepare_main_collect2(entity);
+		}
 
 		POP_CURRENT_ENTITY();
 		POP_PARENT();

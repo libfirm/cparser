@@ -941,18 +941,6 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		return NULL;
 	}
 
-	if (is_main(entity)) {
-		/* force main to C linkage */
-		type_t *type = entity->declaration.type;
-		assert(is_type_function(type));
-		if (type->function.linkage != LINKAGE_C) {
-			type_t *new_type           = duplicate_type(type);
-			new_type->function.linkage = LINKAGE_C;
-			type                       = identify_new_type(new_type);
-			entity->declaration.type   = type;
-		}
-	}
-
 	symbol_t *symbol = entity->base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
 
