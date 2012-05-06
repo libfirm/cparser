@@ -330,8 +330,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_ENUM_CONSTANT]              = sizeof(reference_expression_t),
 		[EXPR_LITERAL_BOOLEAN]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
-		[EXPR_LITERAL_INTEGER_OCTAL]      = sizeof(literal_expression_t),
-		[EXPR_LITERAL_INTEGER_HEXADECIMAL]= sizeof(literal_expression_t),
 		[EXPR_LITERAL_FLOATINGPOINT]      = sizeof(literal_expression_t),
 		[EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL] = sizeof(literal_expression_t),
 		[EXPR_LITERAL_CHARACTER]          = sizeof(literal_expression_t),
@@ -5858,20 +5856,13 @@ static expression_t *parse_number_literal(void)
 
 	switch (token.kind) {
 	case T_INTEGER:
+	case T_INTEGER_OCTAL:
+	case T_INTEGER_HEXADECIMAL:
 		kind = EXPR_LITERAL_INTEGER;
 		check_integer_suffix();
 		type = type_int;
 		break;
-	case T_INTEGER_OCTAL:
-		kind = EXPR_LITERAL_INTEGER_OCTAL;
-		check_integer_suffix();
-		type = type_int;
-		break;
-	case T_INTEGER_HEXADECIMAL:
-		kind = EXPR_LITERAL_INTEGER_HEXADECIMAL;
-		check_integer_suffix();
-		type = type_int;
-		break;
+
 	case T_FLOATINGPOINT:
 		kind = EXPR_LITERAL_FLOATINGPOINT;
 		type = check_floatingpoint_suffix();
@@ -8428,8 +8419,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_LITERAL_CHARACTER:
 		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_LITERAL_INTEGER:
-		case EXPR_LITERAL_INTEGER_OCTAL:
-		case EXPR_LITERAL_INTEGER_HEXADECIMAL:
 		case EXPR_LITERAL_FLOATINGPOINT:
 		case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: return false;
 		case EXPR_STRING_LITERAL:             return false;

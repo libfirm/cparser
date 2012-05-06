@@ -105,8 +105,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_REFERENCE]                         = PREC_PRIMARY,
 		[EXPR_ENUM_CONSTANT]                     = PREC_PRIMARY,
 		[EXPR_LITERAL_INTEGER]                   = PREC_PRIMARY,
-		[EXPR_LITERAL_INTEGER_OCTAL]             = PREC_PRIMARY,
-		[EXPR_LITERAL_INTEGER_HEXADECIMAL]       = PREC_PRIMARY,
 		[EXPR_LITERAL_FLOATINGPOINT]             = PREC_PRIMARY,
 		[EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL] = PREC_PRIMARY,
 		[EXPR_LITERAL_CHARACTER]                 = PREC_PRIMARY,
@@ -257,8 +255,6 @@ static void print_literal(const literal_expression_t *literal)
 	case EXPR_LITERAL_FLOATINGPOINT:
 	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-	case EXPR_LITERAL_INTEGER_OCTAL:
 		print_stringrep(&literal->value);
 		print_stringrep(&literal->suffix);
 		return;

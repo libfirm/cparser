@@ -1207,7 +1207,7 @@ static bool try_create_integer(literal_expression_t *literal, type_t *type)
 static void create_integer_tarval(literal_expression_t *literal)
 {
 	/* -1: signed only, 0: any, 1: unsigned only */
-	int             sign   = literal->base.kind == EXPR_LITERAL_INTEGER ? -1 : 0;
+	int             sign   = literal->value.begin[0] != '0' /* decimal */ ? -1 : 0;
 	unsigned        ls     = 0;
 	const string_t *suffix = &literal->suffix;
 	/* parse suffix */
@@ -1255,8 +1255,6 @@ void determine_literal_type(literal_expression_t *literal)
 {
 	switch (literal->base.kind) {
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
 		create_integer_tarval(literal);
 		return;
 	default:
@@ -1305,8 +1303,6 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 	}
 
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
 		assert(literal->target_value != NULL);
 		tv = literal->target_value;
 		break;

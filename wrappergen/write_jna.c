@@ -308,8 +308,6 @@ static void write_expression(const expression_t *expression)
 	/* TODO */
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-	case EXPR_LITERAL_INTEGER_OCTAL:
 		fprintf(out, "%s", expression->literal.value.begin);
 		break;
 
