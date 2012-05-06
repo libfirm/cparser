@@ -1186,8 +1186,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	return create_symconst(dbgi, entity);
 }
 
-static bool try_create_integer(literal_expression_t *literal,
-                               type_t *type, unsigned char base)
+static bool try_create_integer(literal_expression_t *literal, type_t *type)
 {
 	const char *string = literal->value.begin;
 	size_t      size   = literal->value.size;
@@ -1195,8 +1194,8 @@ static bool try_create_integer(literal_expression_t *literal,
 	assert(type->kind == TYPE_ATOMIC);
 	atomic_type_kind_t akind = type->atomic.akind;
 
-	ir_mode   *mode = atomic_modes[akind];
-	ir_tarval *tv   = new_integer_tarval_from_str(string, size, 1, base, mode);
+	ir_mode   *const mode = atomic_modes[akind];
+	ir_tarval *const tv   = new_tarval_from_str(string, size, mode);
 	if (tv == tarval_bad)
 		return false;
 
@@ -1219,40 +1218,32 @@ static void create_integer_tarval(literal_expression_t *literal)
 		}
 	}
 
-	unsigned base;
-	switch (literal->base.kind) {
-		case EXPR_LITERAL_INTEGER_OCTAL:       base =  8; break;
-		case EXPR_LITERAL_INTEGER:             base = 10; break;
-		case EXPR_LITERAL_INTEGER_HEXADECIMAL: base = 16; break;
-		default: panic("invalid literal kind");
-	}
-
 	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
 
 	/* now try if the constant is small enough for some types */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
 	if (ls < 1) {
-		if (sign <= 0 && try_create_integer(literal, type_int, base))
+		if (sign <= 0 && try_create_integer(literal, type_int))
 			goto finished;
-		if (sign >= 0 && try_create_integer(literal, type_unsigned_int, base))
+		if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
 			goto finished;
 	}
 	if (ls < 2) {
-		if (sign <= 0 && try_create_integer(literal, type_long, base))
+		if (sign <= 0 && try_create_integer(literal, type_long))
 			goto finished;
-		if (sign >= 0 && try_create_integer(literal, type_unsigned_long, base))
+		if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
 			goto finished;
 	}
 	/* last try? then we should not report tarval_bad */
 	if (sign < 0)
 		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
-	if (sign <= 0 && try_create_integer(literal, type_long_long, base))
+	if (sign <= 0 && try_create_integer(literal, type_long_long))
 		goto finished;
 
 	/* last try */
 	assert(sign >= 0);
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
-	bool res = try_create_integer(literal, type_unsigned_long_long, base);
+	bool res = try_create_integer(literal, type_unsigned_long_long);
 	if (!res)
 		panic("internal error when parsing number literal");
 
@@ -1321,16 +1312,9 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		break;
 
 	case EXPR_LITERAL_FLOATINGPOINT:
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
 		tv = new_tarval_from_str(string, size, mode);
 		break;
-
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: {
-		char buffer[size + 2];
-		memcpy(buffer, "0x", 2);
-		memcpy(buffer+2, string, size);
-		tv = new_tarval_from_str(buffer, size+2, mode);
-		break;
-	}
 
 	case EXPR_LITERAL_BOOLEAN:
 		if (string[0] == 't') {

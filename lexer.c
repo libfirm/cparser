@@ -355,7 +355,6 @@ static void parse_number_hex(void)
 	bool is_float   = false;
 	bool has_digits = false;
 
-	assert(obstack_object_size(&symbol_obstack) == 0);
 	while (isxdigit(c)) {
 		has_digits = true;
 		obstack_1grow(&symbol_obstack, (char) c);
@@ -392,8 +391,7 @@ static void parse_number_hex(void)
 		is_float ? T_FLOATINGPOINT_HEXADECIMAL : T_INTEGER_HEXADECIMAL;
 
 	if (!has_digits) {
-		errorf(&lexer_token.base.source_position,
-		       "invalid number literal '0x%S'", &lexer_token.number.number);
+		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);
 		lexer_token.number.number.begin = "0";
 		lexer_token.number.number.size  = 1;
 	}
@@ -421,15 +419,16 @@ static void parse_number(void)
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	if (c == '0') {
+		obstack_1grow(&symbol_obstack, (char)c);
 		next_char();
 		if (c == 'x' || c == 'X') {
+			obstack_1grow(&symbol_obstack, (char)c);
 			next_char();
 			parse_number_hex();
 			return;
 		} else {
 			has_digits = true;
 		}
-		obstack_1grow(&symbol_obstack, '0');
 	}
 
 	while (isdigit(c)) {

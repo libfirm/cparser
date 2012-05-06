@@ -252,14 +252,13 @@ static void print_literal(const literal_expression_t *literal)
 	case EXPR_LITERAL_MS_NOOP:
 		print_string("__noop");
 		return;
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
-		print_string("0x");
-		/* FALLTHROUGH */
+
 	case EXPR_LITERAL_BOOLEAN:
-	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
 	case EXPR_LITERAL_FLOATINGPOINT:
+	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
+	case EXPR_LITERAL_INTEGER_OCTAL:
 		print_stringrep(&literal->value);
 		print_stringrep(&literal->suffix);
 		return;
