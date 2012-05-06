@@ -1207,13 +1207,14 @@ static bool try_create_integer(literal_expression_t *literal,
 
 static void create_integer_tarval(literal_expression_t *literal)
 {
-	unsigned        us     = 0;
+	/* -1: signed only, 0: any, 1: unsigned only */
+	int             sign   = literal->base.kind == EXPR_LITERAL_INTEGER ? -1 : 0;
 	unsigned        ls     = 0;
 	const string_t *suffix = &literal->suffix;
 	/* parse suffix */
 	if (suffix->size > 0) {
 		for (const char *c = suffix->begin; *c != '\0'; ++c) {
-			if (*c == 'u' || *c == 'U') { ++us; }
+			if (*c == 'u' || *c == 'U') sign = 1;
 			if (*c == 'l' || *c == 'L') { ++ls; }
 		}
 	}
@@ -1231,27 +1232,25 @@ static void create_integer_tarval(literal_expression_t *literal)
 	/* now try if the constant is small enough for some types */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
 	if (ls < 1) {
-		if (us == 0 && try_create_integer(literal, type_int, base))
+		if (sign <= 0 && try_create_integer(literal, type_int, base))
 			goto finished;
-		if ((us == 1 || base != 10)
-				&& try_create_integer(literal, type_unsigned_int, base))
+		if (sign >= 0 && try_create_integer(literal, type_unsigned_int, base))
 			goto finished;
 	}
 	if (ls < 2) {
-		if (us == 0 && try_create_integer(literal, type_long, base))
+		if (sign <= 0 && try_create_integer(literal, type_long, base))
 			goto finished;
-		if ((us == 1 || base != 10)
-				&& try_create_integer(literal, type_unsigned_long, base))
+		if (sign >= 0 && try_create_integer(literal, type_unsigned_long, base))
 			goto finished;
 	}
 	/* last try? then we should not report tarval_bad */
-	if (us != 1 && base == 10)
+	if (sign < 0)
 		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
-	if (us == 0 && try_create_integer(literal, type_long_long, base))
+	if (sign <= 0 && try_create_integer(literal, type_long_long, base))
 		goto finished;
 
 	/* last try */
-	assert(us == 1 || base != 10);
+	assert(sign >= 0);
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
 	bool res = try_create_integer(literal, type_unsigned_long_long, base);
 	if (!res)
