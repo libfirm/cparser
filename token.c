@@ -137,8 +137,6 @@ void print_token(FILE *f, const token_t *token)
 		fprintf(f, "identifier '%s'", token->identifier.symbol->string);
 		break;
 	case T_INTEGER:
-	case T_INTEGER_OCTAL:
-	case T_INTEGER_HEXADECIMAL:
 	case T_FLOATINGPOINT:
 	case T_FLOATINGPOINT_HEXADECIMAL:
 		print_token_kind(f, (token_kind_t)token->kind);

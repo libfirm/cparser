@@ -11,8 +11,6 @@
 
 TS(IDENTIFIER,                "identifier",)
 TS(INTEGER,                   "integer number",)
-TS(INTEGER_OCTAL,             "octal integer number",)
-TS(INTEGER_HEXADECIMAL,       "hexadecimal integer number",)
 TS(FLOATINGPOINT,             "floatingpoint number",)
 TS(FLOATINGPOINT_HEXADECIMAL, "hexadecimal floatingpoint number",)
 TS(CHARACTER_CONSTANT,        "character constant",)

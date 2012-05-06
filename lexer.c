@@ -388,7 +388,7 @@ static void parse_number_hex(void)
 	lexer_token.number.number = identify_string(string, size);
 
 	lexer_token.kind    =
-		is_float ? T_FLOATINGPOINT_HEXADECIMAL : T_INTEGER_HEXADECIMAL;
+		is_float ? T_FLOATINGPOINT_HEXADECIMAL : T_INTEGER;
 
 	if (!has_digits) {
 		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);
@@ -460,21 +460,19 @@ static void parse_number(void)
 	char   *string = obstack_finish(&symbol_obstack);
 	lexer_token.number.number = identify_string(string, size);
 
-	/* is it an octal number? */
 	if (is_float) {
 		lexer_token.kind = T_FLOATINGPOINT;
-	} else if (string[0] == '0') {
-		lexer_token.kind = T_INTEGER_OCTAL;
-
-		/* check for invalid octal digits */
-		for (size_t i= 0; i < size; ++i) {
-			char t = string[i];
-			if (t >= '8')
-				errorf(&lexer_token.base.source_position,
-				       "invalid digit '%c' in octal number", t);
-		}
 	} else {
 		lexer_token.kind = T_INTEGER;
+
+		if (string[0] == '0') {
+			/* check for invalid octal digits */
+			for (size_t i= 0; i < size; ++i) {
+				char t = string[i];
+				if (t >= '8')
+					errorf(&lexer_token.base.source_position, "invalid digit '%c' in octal number", t);
+			}
+		}
 	}
 
 	if (!has_digits) {
