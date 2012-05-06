@@ -331,7 +331,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_LITERAL_BOOLEAN]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_FLOATINGPOINT]      = sizeof(literal_expression_t),
-		[EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL] = sizeof(literal_expression_t),
 		[EXPR_LITERAL_CHARACTER]          = sizeof(literal_expression_t),
 		[EXPR_LITERAL_WIDE_CHARACTER]     = sizeof(literal_expression_t),
 		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
@@ -5864,13 +5863,11 @@ static expression_t *parse_number_literal(void)
 		break;
 
 	case T_FLOATINGPOINT:
+	case T_FLOATINGPOINT_HEXADECIMAL:
 		kind = EXPR_LITERAL_FLOATINGPOINT;
 		type = check_floatingpoint_suffix();
 		break;
-	case T_FLOATINGPOINT_HEXADECIMAL:
-		kind = EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL;
-		type = check_floatingpoint_suffix();
-		break;
+
 	default:
 		panic("unexpected token type in parse_number_literal");
 	}
@@ -8420,7 +8417,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_LITERAL_INTEGER:
 		case EXPR_LITERAL_FLOATINGPOINT:
-		case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: return false;
 		case EXPR_STRING_LITERAL:             return false;
 		case EXPR_WIDE_STRING_LITERAL:        return false;
 

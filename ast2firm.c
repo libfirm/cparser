@@ -1308,7 +1308,6 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		break;
 
 	case EXPR_LITERAL_FLOATINGPOINT:
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:
 		tv = new_tarval_from_str(string, size, mode);
 		break;
 
