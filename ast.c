@@ -261,9 +261,9 @@ static void print_literal(const literal_expression_t *literal)
 	case EXPR_LITERAL_INTEGER_OCTAL:
 	case EXPR_LITERAL_FLOATINGPOINT:
 		print_stringrep(&literal->value);
-		if (literal->suffix.size > 0)
-			print_stringrep(&literal->suffix);
+		print_stringrep(&literal->suffix);
 		return;
+
 	case EXPR_LITERAL_WIDE_CHARACTER:
 		print_char('L');
 		/* FALLTHROUGH */
