@@ -398,6 +398,31 @@ static void parse_number_hex(void)
 	parse_number_suffix();
 }
 
+static void parse_number_bin(void)
+{
+	bool has_digits = false;
+
+	while (c == '0' || c == '1') {
+		has_digits = true;
+		obstack_1grow(&symbol_obstack, (char)c);
+		next_char();
+	}
+	obstack_1grow(&symbol_obstack, '\0');
+
+	size_t  const size   = obstack_object_size(&symbol_obstack) - 1;
+	char   *const string = obstack_finish(&symbol_obstack);
+	lexer_token.number.number = identify_string(string, size);
+	lexer_token.kind          = T_INTEGER;
+
+	if (!has_digits) {
+		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);
+		lexer_token.number.number.begin = "0";
+		lexer_token.number.number.size  = 1;
+	}
+
+	parse_number_suffix();
+}
+
 /**
  * Returns true if the given char is a octal digit.
  *
@@ -425,9 +450,14 @@ static void parse_number(void)
 			next_char();
 			parse_number_hex();
 			return;
-		} else {
-			has_digits = true;
+		} else if (c == 'b' || c == 'B') {
+			/* GCC extension: binary constant 0x[bB][01]+.  */
+			obstack_1grow(&symbol_obstack, (char)c);
+			next_char();
+			parse_number_bin();
+			return;
 		}
+		has_digits = true;
 	}
 
 	while (isdigit(c)) {
