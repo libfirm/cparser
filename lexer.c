@@ -336,9 +336,13 @@ static void parse_exponent(void)
 		next_char();
 	}
 
-	while (isdigit(c)) {
-		obstack_1grow(&symbol_obstack, (char)c);
-		next_char();
+	if (isdigit(c)) {
+		do {
+			obstack_1grow(&symbol_obstack, (char)c);
+			next_char();
+		} while (isdigit(c));
+	} else {
+		errorf(&lexer_token.base.source_position, "exponent has no digits");
 	}
 }
 
