@@ -2007,9 +2007,7 @@ finish_designator:
 			} else {
 				if (type == NULL) {
 					if (env->entity != NULL) {
-						errorf(HERE,
-						     "extra brace group at end of initializer for '%Y'",
-						     env->entity->base.symbol);
+						errorf(HERE, "extra brace group at end of initializer for '%N'", env->entity);
 					} else {
 						errorf(HERE, "extra brace group at end of initializer");
 					}
@@ -2054,7 +2052,7 @@ finish_designator:
 
 				source_position_t const* const pos = &expression->base.source_position;
 				if (env->entity != NULL) {
-					warningf(WARN_OTHER, pos, "excess elements in initializer for '%Y'", env->entity->base.symbol);
+					warningf(WARN_OTHER, pos, "excess elements in initializer for '%N'", env->entity);
 				} else {
 					warningf(WARN_OTHER, pos, "excess elements in initializer");
 				}
@@ -3689,15 +3687,12 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 
 			if (env.symbol != NULL) {
 				if (specifiers->is_inline && is_type_valid(type)) {
-					errorf(&env.source_position,
-							"compound member '%Y' declared 'inline'", env.symbol);
+					errorf(&env.source_position, "'%N' declared 'inline'", entity);
 				}
 
 				if (specifiers->thread_local ||
 						specifiers->storage_class != STORAGE_CLASS_NONE) {
-					errorf(&env.source_position,
-							"compound member '%Y' must have no storage class",
-							env.symbol);
+					errorf(&env.source_position, "'%N' must have no storage class", entity);
 				}
 			}
 		} else if (flags & DECL_IS_PARAMETER) {
@@ -4081,12 +4076,12 @@ warn_redundant_declaration: ;
 					} else if (!is_definition        &&
 							is_type_valid(prev_type) &&
 							!pos->is_system_header) {
-						warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%Y' (declared %P)", symbol, ppos);
+						warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%N' (declared %P)", entity, ppos);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC &&
 							new_storage_class == STORAGE_CLASS_STATIC) {
-						errorf(pos, "static declaration of '%Y' follows non-static declaration (declared %P)", symbol, ppos);
+						errorf(pos, "static declaration of '%N' follows non-static declaration (declared %P)", entity, ppos);
 					} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						prev_decl->storage_class          = STORAGE_CLASS_NONE;
 						prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
@@ -4099,9 +4094,9 @@ warn_redundant_declaration: ;
 				} else if (is_type_valid(prev_type)) {
 					if (old_storage_class == new_storage_class) {
 error_redeclaration:
-						errorf(pos, "redeclaration of '%Y' (declared %P)", symbol, ppos);
+						errorf(pos, "redeclaration of '%N' (declared %P)", entity, ppos);
 					} else {
-						errorf(pos, "redeclaration of '%Y' with different linkage (declared %P)", symbol, ppos);
+						errorf(pos, "redeclaration of '%N' with different linkage (declared %P)", entity, ppos);
 					}
 				}
 			}
@@ -4150,8 +4145,7 @@ finish:
 static void parser_error_multiple_definition(entity_t *entity,
 		const source_position_t *source_position)
 {
-	errorf(source_position, "multiple definition of '%Y' (declared %P)",
-	       entity->base.symbol, &entity->base.source_position);
+	errorf(source_position, "redefinition of '%N' (declared %P)", entity, &entity->base.source_position);
 }
 
 static bool is_declaration_specifier(const token_t *token)
@@ -5595,7 +5589,7 @@ static void parse_compound_declarators(compound_t *compound,
 					entity_t *prev = find_compound_entry(compound, symbol);
 					if (prev != NULL) {
 						source_position_t const *const ppos = &prev->base.source_position;
-						errorf(pos, "multiple declarations of symbol '%Y' (declared %P)", symbol, ppos);
+						errorf(pos, "multiple declarations of '%N' (declared %P)", entity, ppos);
 					}
 				}
 
@@ -6068,9 +6062,8 @@ static entity_t *parse_qualified_identifier(void)
 	if (entity == NULL) {
 		if (!strict_mode && token.kind == '(') {
 			/* an implicitly declared function */
-			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos,
-			         "implicit declaration of function '%Y'", symbol);
 			entity = create_implicit_function(symbol, &pos);
+			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos, "implicit declaration of '%N'", entity);
 		} else {
 			errorf(&pos, "unknown identifier '%Y' found.", symbol);
 			entity = create_error_entity(symbol, ENTITY_VARIABLE);

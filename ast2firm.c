@@ -1532,8 +1532,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
 			source_position_t const *const pos = &ref->base.source_position;
-			symbol_t          const *const sym = ref->entity->base.symbol;
-			warningf(WARN_OTHER, pos, "taking address of builtin '%Y'", sym);
+			warningf(WARN_OTHER, pos, "taking address of builtin '%N'", ref->entity);
 
 			/* simply create a NULL pointer */
 			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
