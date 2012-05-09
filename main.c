@@ -121,7 +121,6 @@ static const char       *input_encoding;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
-	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
 	STANDARD_C89,     /* ISO C90 (sic) */
 	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
 	STANDARD_C99,     /* ISO C99 */
@@ -130,8 +129,6 @@ typedef enum lang_standard_t {
 	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
 	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
 } lang_standard_t;
-
-static lang_standard_t standard;
 
 typedef struct file_list_entry_t file_list_entry_t;
 
@@ -258,7 +255,8 @@ static const char *type_to_string(type_t *type)
 	return get_atomic_kind_name(type->atomic.akind);
 }
 
-static FILE *preprocess(const char *fname, filetype_t filetype)
+static FILE *preprocess(const char *fname, filetype_t filetype,
+                        lang_standard_t standard)
 {
 	static const char *common_flags = NULL;
 
@@ -311,6 +309,20 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 	}
 	if (lang)
 		add_flag(&cppflags_obst, "-x%s", lang);
+
+	char const *std = NULL;
+	switch (standard) {
+	case STANDARD_C89:     std = "-std=c89";            break;
+	case STANDARD_C90:     std = "-std=iso9899:199409"; break;
+	case STANDARD_C99:     std = "-std=c99";            break;
+	case STANDARD_GNU89:   std = "-std=gnu89";          break;
+	case STANDARD_GNU99:   std = "-std=gnu99";          break;
+	case STANDARD_CXX98:   std = "-std=c++98";          break;
+	case STANDARD_GNUXX98: std = "-std=gnu++98";        break;
+	case STANDARD_DEFAULT: panic("invalid standard");
+	}
+	if (std)
+	    add_flag(&cppflags_obst, std);
 
 	obstack_printf(&cppflags_obst, "%s", common_flags);
 
@@ -1098,7 +1110,7 @@ int main(int argc, char **argv)
 	setup_target_machine();
 
 	/* parse rest of options */
-	                standard        = STANDARD_DEFAULT;
+	lang_standard_t standard        = STANDARD_DEFAULT;
 	unsigned        features_on     = 0;
 	unsigned        features_off    = 0;
 	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
@@ -1738,12 +1750,27 @@ int main(int argc, char **argv)
 	file_list_entry_t *file;
 	bool               already_constructed_firm = false;
 	for (file = files; file != NULL; file = file->next) {
-		char        asm_tempfile[1024];
-		const char *filename = file->name;
-		filetype_t  filetype = file->type;
+		char            asm_tempfile[1024];
+		const char     *filename = file->name;
+		filetype_t      filetype = file->type;
+		lang_standard_t file_standard = standard;
 
 		if (filetype == FILETYPE_OBJECT)
 			continue;
+		if (file_standard == STANDARD_DEFAULT) {
+			switch (filetype) {
+			case FILETYPE_C:
+			case FILETYPE_PREPROCESSED_C:
+				file_standard = STANDARD_GNU99;
+				break;
+			case FILETYPE_CXX:
+			case FILETYPE_PREPROCESSED_CXX:
+				file_standard = STANDARD_GNUXX98;
+				break;
+			default:
+				break;
+			}
+		}
 
 		FILE *in = NULL;
 		if (mode == LexTest) {
@@ -1771,7 +1798,8 @@ preprocess:
 				if (in != NULL)
 					panic("internal compiler error: in for preprocessor != NULL");
 
-				preprocessed_in = preprocess(filename, filetype);
+				preprocessed_in = preprocess(filename, filetype,
+				                             file_standard);
 				if (mode == PreprocessOnly) {
 					copy_file(out, preprocessed_in);
 					int pp_result = pclose(preprocessed_in);
@@ -1804,44 +1832,42 @@ preprocess:
 		/* preprocess and compile */
 		if (filetype == FILETYPE_PREPROCESSED_C) {
 			char const* invalid_mode;
-			switch (standard) {
-				case STANDARD_ANSI:
-				case STANDARD_C89:   c_mode = _C89;                break;
-				/* TODO determine difference between these two */
-				case STANDARD_C90:   c_mode = _C89;                break;
-				case STANDARD_C99:   c_mode = _C89 | _C99;         break;
-				case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
+			switch (file_standard) {
+			case STANDARD_C89:   c_mode = _C89;                break;
+			/* TODO determine difference between these two */
+			case STANDARD_C90:   c_mode = _C89;                break;
+			case STANDARD_C99:   c_mode = _C89 | _C99;         break;
+			case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
 
 default_c_warn:
-					fprintf(stderr,
-							"warning: command line option \"-std=%s\" is not valid for C\n",
-							invalid_mode);
-					/* FALLTHROUGH */
-				case STANDARD_DEFAULT:
-				case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
+				fprintf(stderr,
+						"warning: command line option \"-std=%s\" is not valid for C\n",
+						invalid_mode);
+				/* FALLTHROUGH */
+			case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
 
-				case STANDARD_CXX98:   invalid_mode = "c++98"; goto default_c_warn;
-				case STANDARD_GNUXX98: invalid_mode = "gnu98"; goto default_c_warn;
+			case STANDARD_CXX98:   invalid_mode = "c++98"; goto default_c_warn;
+			case STANDARD_GNUXX98: invalid_mode = "gnu98"; goto default_c_warn;
+			case STANDARD_DEFAULT: panic("invalid standard");
 			}
 			goto do_parsing;
 		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
 			char const* invalid_mode;
-			switch (standard) {
-				case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
-				case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
-				case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
-				case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
-				case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
+			switch (file_standard) {
+			case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
+			case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
+			case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
+			case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
+			case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
 
-				case STANDARD_ANSI:
-				case STANDARD_CXX98: c_mode = _CXX; break;
+			case STANDARD_CXX98: c_mode = _CXX; break;
 
 default_cxx_warn:
-					fprintf(stderr,
-							"warning: command line option \"-std=%s\" is not valid for C++\n",
-							invalid_mode);
-				case STANDARD_DEFAULT:
-				case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+				fprintf(stderr,
+						"warning: command line option \"-std=%s\" is not valid for C++\n",
+						invalid_mode);
+			case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+			case STANDARD_DEFAULT: panic("invalid standard");
 			}
 
 do_parsing:
