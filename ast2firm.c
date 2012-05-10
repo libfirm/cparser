@@ -858,7 +858,7 @@ static bool declaration_is_definition(const entity_t *entity)
 {
 	switch (entity->kind) {
 	case ENTITY_VARIABLE:
-		return entity->variable.initializer != NULL;
+		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
 	case ENTITY_FUNCTION:
 		return entity->function.statement != NULL;
 	case ENTITY_PARAMETER:
