@@ -134,7 +134,7 @@ void print_token(FILE *f, const token_t *token)
 {
 	switch(token->kind) {
 	case T_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->identifier.symbol->string);
+		fprintf(f, "identifier '%s'", token->base.symbol->string);
 		break;
 	case T_INTEGER:
 	case T_FLOATINGPOINT:
@@ -194,7 +194,7 @@ void print_pp_token(FILE *f, const token_t *token)
 {
 	switch((preprocessor_token_kind_t) token->kind) {
 	case TP_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->identifier.symbol->string);
+		fprintf(f, "identifier '%s'", token->base.symbol->string);
 		break;
 	case TP_NUMBER:
 		fprintf(f, "number '%s'", token->number.number.begin);

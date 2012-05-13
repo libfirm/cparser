@@ -658,7 +658,7 @@ static symbol_t *expect_identifier(char const *const context, source_position_t 
 		if (token.kind != T_IDENTIFIER)
 			return NULL;
 	}
-	symbol_t *const sym = token.identifier.symbol;
+	symbol_t *const sym = token.base.symbol;
 	if (pos)
 		*pos = *HERE;
 	eat(T_IDENTIFIER);
@@ -1104,9 +1104,8 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		/* is it an identifier */
 		if (token.kind == T_IDENTIFIER
 				&& (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
-			symbol_t *symbol   = token.identifier.symbol;
 			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
-			argument->v.symbol = symbol;
+			argument->v.symbol = token.base.symbol;
 			next_token();
 		} else {
 			/* must be an expression */
@@ -1133,27 +1132,10 @@ static attribute_t *parse_attribute_asm(void)
 	return attribute;
 }
 
-static symbol_t *get_symbol_from_token(void)
-{
-	switch(token.kind) {
-	case T_CHARACTER_CONSTANT:
-	case T_EOF:
-	case T_FLOATINGPOINT:
-	case T_INTEGER:
-	case T_STRING_LITERAL:
-	case T_WIDE_CHARACTER_CONSTANT:
-	case T_WIDE_STRING_LITERAL:
-		return NULL;
-
-	default:
-		return token.identifier.symbol;
-	}
-}
-
 static attribute_t *parse_attribute_gnu_single(void)
 {
 	/* parse "any-word" */
-	symbol_t *symbol = get_symbol_from_token();
+	symbol_t *const symbol = token.base.symbol;
 	if (symbol == NULL) {
 		parse_error_expected("while parsing attribute((", T_IDENTIFIER, NULL);
 		return NULL;
@@ -1996,7 +1978,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 			/* GNU-style designator ("identifier: value") */
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = token.base.source_position;
-			designator->symbol          = token.identifier.symbol;
+			designator->symbol          = token.base.symbol;
 			eat(T_IDENTIFIER);
 			eat(':');
 
@@ -2289,7 +2271,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	entity_kind_tag_t const kind = is_struct ? ENTITY_STRUCT : ENTITY_UNION;
 	if (token.kind == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
-		symbol = token.identifier.symbol;
+		symbol = token.base.symbol;
 		entity = get_tag(symbol, kind);
 		next_token();
 
@@ -2388,7 +2370,7 @@ static type_t *parse_enum_specifier(void)
 	eat(T_enum);
 	switch (token.kind) {
 		case T_IDENTIFIER:
-			symbol = token.identifier.symbol;
+			symbol = token.base.symbol;
 			entity = get_tag(symbol, ENTITY_ENUM);
 			next_token();
 
@@ -2469,7 +2451,7 @@ static type_t *parse_typeof(void)
 
 	switch (token.kind) {
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.identifier.symbol)) {
+		if (is_typedef_symbol(token.base.symbol)) {
 	DECLARATION_START
 			type = parse_typename();
 		} else {
@@ -2572,7 +2554,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	if (next_if(T_restrict)) {
 		kind = ATTRIBUTE_MS_RESTRICT;
 	} else if (token.kind == T_IDENTIFIER) {
-		const char *name = token.identifier.symbol->string;
+		char const *const name = token.base.symbol->string;
 		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
 		     ++k) {
 			const char *attribute_name = get_attribute_name(k);
@@ -2832,7 +2814,7 @@ wrong_thread_storage_class:
 				}
 			}
 
-			type_t *const typedef_type = get_typedef_type(token.identifier.symbol);
+			type_t *const typedef_type = get_typedef_type(token.base.symbol);
 			if (typedef_type == NULL) {
 				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
@@ -2845,9 +2827,7 @@ wrong_thread_storage_class:
 					case '*': {
 						errorf(HERE, "%K does not name a type", &token);
 
-						symbol_t *symbol = token.identifier.symbol;
-						entity_t *entity
-							= create_error_entity(symbol, ENTITY_TYPEDEF);
+						entity_t *const entity = create_error_entity(token.base.symbol, ENTITY_TYPEDEF);
 
 						type = allocate_type_zero(TYPE_TYPEDEF);
 						type->typedeft.typedefe = &entity->typedefe;
@@ -3098,7 +3078,7 @@ static void parse_identifier_list(scope_t *scope)
 {
 	assert(token.kind == T_IDENTIFIER);
 	do {
-		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.identifier.symbol, HERE);
+		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.base.symbol, HERE);
 		/* a K&R parameter has no type, yet */
 		next_token();
 
@@ -3138,8 +3118,7 @@ static bool has_parameters(void)
 	if (look_ahead(1)->kind != ')')
 		return true;
 	if (token.kind == T_IDENTIFIER) {
-		entity_t const *const entity
-			= get_entity(token.identifier.symbol, NAMESPACE_NORMAL);
+		entity_t const *const entity = get_entity(token.base.symbol, NAMESPACE_NORMAL);
 		if (entity == NULL)
 			return true;
 		if (entity->kind != ENTITY_TYPEDEF)
@@ -3171,8 +3150,8 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 	eat('(');
 	add_anchor_token(')');
 
-	if (token.kind == T_IDENTIFIER                  &&
-	    !is_typedef_symbol(token.identifier.symbol) &&
+	if (token.kind == T_IDENTIFIER            &&
+	    !is_typedef_symbol(token.base.symbol) &&
 	    (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
 		type->kr_style_parameters = true;
 		parse_identifier_list(scope);
@@ -3427,7 +3406,7 @@ ptr_operator_end: ;
 		if (env->must_be_abstract) {
 			errorf(HERE, "no identifier expected in typename");
 		} else {
-			env->symbol          = token.identifier.symbol;
+			env->symbol          = token.base.symbol;
 			env->source_position = token.base.source_position;
 		}
 		next_token();
@@ -3438,7 +3417,7 @@ ptr_operator_end: ;
 		token_t const *const la1 = look_ahead(1);
 		switch (la1->kind) {
 			case T_IDENTIFIER:
-				if (is_typedef_symbol(la1->identifier.symbol)) {
+				if (is_typedef_symbol(la1->base.symbol)) {
 			case ')':
 					/* §6.7.6:2 footnote 126:  Empty parentheses in a type name are
 					 * interpreted as ``function with no parameter specification'', rather
@@ -4181,7 +4160,7 @@ static bool is_declaration_specifier(const token_t *token)
 		DECLARATION_START
 			return true;
 		case T_IDENTIFIER:
-			return is_typedef_symbol(token->identifier.symbol);
+			return is_typedef_symbol(token->base.symbol);
 
 		default:
 			return false;
@@ -6294,7 +6273,7 @@ static expression_t *parse_parenthesized_expression(void)
 		return parse_statement_expression();
 
 	case T_IDENTIFIER:
-		if (is_typedef_symbol(la1->identifier.symbol)) {
+		if (is_typedef_symbol(la1->base.symbol)) {
 	DECLARATION_START
 			return parse_cast();
 		}
@@ -6673,7 +6652,7 @@ static label_t *get_label(void)
 	assert(token.kind == T_IDENTIFIER);
 	assert(current_function != NULL);
 
-	entity_t *label = get_entity(token.identifier.symbol, NAMESPACE_LABEL);
+	entity_t *label = get_entity(token.base.symbol, NAMESPACE_LABEL);
 	/* If we find a local label, we already created the declaration. */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != current_scope) {
@@ -6683,7 +6662,7 @@ static label_t *get_label(void)
 	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
 		source_position_t const nowhere = { NULL, 0, 0, false };
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.identifier.symbol, &nowhere);
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.base.symbol, &nowhere);
 		label_push(label);
 	}
 
@@ -6791,7 +6770,7 @@ static expression_t *parse_primary_expression(void)
 	case T_COLONCOLON:
 		return parse_reference();
 	case T_IDENTIFIER:
-		if (!is_typedef_symbol(token.identifier.symbol)) {
+		if (!is_typedef_symbol(token.base.symbol)) {
 			return parse_reference();
 		}
 		/* FALLTHROUGH */
@@ -9731,7 +9710,7 @@ static void parse_namespace_definition(void)
 	symbol_t *symbol = NULL;
 
 	if (token.kind == T_IDENTIFIER) {
-		symbol = token.identifier.symbol;
+		symbol = token.base.symbol;
 		next_token();
 
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
@@ -9786,7 +9765,7 @@ static statement_t *intern_parse_statement(void)
 		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
 		if (la1_type == ':') {
 			statement = parse_label_statement();
-		} else if (is_typedef_symbol(token.identifier.symbol)) {
+		} else if (is_typedef_symbol(token.base.symbol)) {
 			statement = parse_declaration_statement();
 		} else {
 			/* it's an identifier, the grammar says this must be an
@@ -9796,7 +9775,7 @@ static statement_t *intern_parse_statement(void)
 			switch (la1_type) {
 			case '&':
 			case '*':
-				if (get_entity(token.identifier.symbol, NAMESPACE_NORMAL) != NULL) {
+				if (get_entity(token.base.symbol, NAMESPACE_NORMAL) != NULL) {
 			default:
 					statement = parse_expression_statement();
 				} else {

@@ -721,7 +721,7 @@ restart:
 		return;
 
 	/* if it was an identifier then we might need to expand again */
-	pp_definition_t *symbol_definition = pp_token.identifier.symbol->pp_definition;
+	pp_definition_t *const symbol_definition = pp_token.base.symbol->pp_definition;
 	if (symbol_definition != NULL && !symbol_definition->is_expanding) {
 		symbol_definition->parent_expansion = definition;
 		symbol_definition->expand_pos       = 0;
@@ -867,8 +867,8 @@ end_symbol:
 
 	symbol_t *symbol = symbol_table_insert(string);
 
-	pp_token.kind              = symbol->pp_ID;
-	pp_token.identifier.symbol = symbol;
+	pp_token.kind        = symbol->pp_ID;
+	pp_token.base.symbol = symbol;
 
 	/* we can free the memory from symbol obstack if we already had an entry in
 	 * the symbol table */
@@ -952,6 +952,8 @@ static void next_preprocessing_token(void)
 	info.had_whitespace = false;
 restart:
 	pp_token.base.source_position = input.position;
+	pp_token.base.symbol          = NULL;
+
 	switch (input.c) {
 	case ' ':
 	case '\t':
@@ -1220,7 +1222,7 @@ static void emit_pp_token(void)
 
 	switch (pp_token.kind) {
 	case TP_IDENTIFIER:
-		fputs(pp_token.identifier.symbol->string, out);
+		fputs(pp_token.base.symbol->string, out);
 		break;
 	case TP_NUMBER:
 		fputs(pp_token.number.number.begin, out);
@@ -1275,7 +1277,8 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 
 	switch (token1->kind) {
 	case TP_IDENTIFIER:
-		return token1->identifier.symbol == token2->identifier.symbol;
+		return token1->base.symbol == token2->base.symbol;
+
 	case TP_NUMBER:
 	case TP_CHARACTER_CONSTANT:
 	case TP_STRING_LITERAL:
@@ -1312,7 +1315,7 @@ static void parse_define_directive(void)
 		       "expected identifier after #define, got '%t'", &pp_token);
 		goto error_out;
 	}
-	symbol_t *symbol = pp_token.identifier.symbol;
+	symbol_t *const symbol = pp_token.base.symbol;
 
 	pp_definition_t *new_definition
 		= obstack_alloc(&pp_obstack, sizeof(new_definition[0]));
@@ -1340,7 +1343,7 @@ static void parse_define_directive(void)
 				}
 				break;
 			case TP_IDENTIFIER:
-				obstack_ptr_grow(&pp_obstack, pp_token.identifier.symbol);
+				obstack_ptr_grow(&pp_obstack, pp_token.base.symbol);
 				next_preprocessing_token();
 
 				if (pp_token.kind == ',') {
@@ -1420,8 +1423,7 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	symbol_t *symbol = pp_token.identifier.symbol;
-	symbol->pp_definition = NULL;
+	pp_token.base.symbol->pp_definition = NULL;
 	next_preprocessing_token();
 
 	if (!info.at_line_begin) {
@@ -1637,8 +1639,7 @@ static void parse_ifdef_ifndef_directive(void)
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
-		symbol_t        *symbol        = pp_token.identifier.symbol;
-		pp_definition_t *pp_definition = symbol->pp_definition;
+		pp_definition_t *const pp_definition = pp_token.base.symbol->pp_definition;
 		next_preprocessing_token();
 
 		if (!info.at_line_begin) {
@@ -1874,8 +1875,8 @@ int pptest_main(int argc, char **argv)
 		} else if (pp_token.kind == TP_EOF) {
 			goto end_of_main_loop;
 		} else if (pp_token.kind == TP_IDENTIFIER && !in_pp_directive) {
-			symbol_t *symbol = pp_token.identifier.symbol;
-			pp_definition_t *pp_definition = symbol->pp_definition;
+			symbol_t        *const symbol        = pp_token.base.symbol;
+			pp_definition_t *const pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {
 				expansion_pos = pp_token.base.source_position;
 				if (pp_definition->has_parameters) {
@@ -1895,7 +1896,7 @@ int pptest_main(int argc, char **argv)
 						token_t next_token = pp_token;
 						/* restore identifier token */
 						pp_token.kind                 = TP_IDENTIFIER;
-						pp_token.identifier.symbol    = symbol;
+						pp_token.base.symbol          = symbol;
 						pp_token.base.source_position = position;
 						info = old_info;
 						emit_pp_token();

@@ -60,7 +60,6 @@ struct source_position_t {
 extern const source_position_t builtin_source_position;
 
 typedef struct token_base_t     token_base_t;
-typedef struct identifier_t     identifier_t;
 typedef struct string_literal_t string_literal_t;
 typedef struct number_literal_t number_literal_t;
 typedef union  token_t          token_t;
@@ -68,11 +67,7 @@ typedef union  token_t          token_t;
 struct token_base_t {
 	unsigned          kind;
 	source_position_t source_position;
-};
-
-struct identifier_t {
-	token_base_t  base;
-	symbol_t     *symbol;
+	symbol_t         *symbol;
 };
 
 struct string_literal_t {
@@ -89,7 +84,6 @@ struct number_literal_t {
 union token_t {
 	unsigned          kind;
 	token_base_t      base;
-	identifier_t      identifier;
 	string_literal_t  string;
 	number_literal_t  number;
 };

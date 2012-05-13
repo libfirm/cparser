@@ -276,8 +276,8 @@ end_symbol:
 	char     *string = obstack_finish(&symbol_obstack);
 	symbol_t *symbol = symbol_table_insert(string);
 
-	lexer_token.kind              = symbol->ID;
-	lexer_token.identifier.symbol = symbol;
+	lexer_token.kind        = symbol->ID;
+	lexer_token.base.symbol = symbol;
 
 	if (symbol->string != string) {
 		obstack_free(&symbol_obstack, string);
@@ -972,14 +972,13 @@ static void parse_pragma(void)
 		return;
 	}
 
-	symbol_t *symbol = pp_token.identifier.symbol;
-	if (symbol->pp_ID == TP_STDC) {
+	if (pp_token.base.symbol->pp_ID == TP_STDC) {
 		stdc_pragma_kind_t kind = STDC_UNKNOWN;
 		/* a STDC pragma */
 		if (c_mode & _C99) {
 			next_pp_token();
 
-			switch (pp_token.identifier.symbol->pp_ID) {
+			switch (pp_token.base.symbol->pp_ID) {
 			case TP_FP_CONTRACT:
 				kind = STDC_FP_CONTRACT;
 				break;
@@ -995,7 +994,7 @@ static void parse_pragma(void)
 			if (kind != STDC_UNKNOWN) {
 				stdc_pragma_value_kind_t value = STDC_VALUE_UNKNOWN;
 				next_pp_token();
-				switch (pp_token.identifier.symbol->pp_ID) {
+				switch (pp_token.base.symbol->pp_ID) {
 				case TP_ON:
 					value = STDC_VALUE_ON;
 					break;
@@ -1032,9 +1031,7 @@ static void parse_pragma(void)
 static void parse_preprocessor_identifier(void)
 {
 	assert(pp_token.kind == T_IDENTIFIER);
-	symbol_t *symbol = pp_token.identifier.symbol;
-
-	switch (symbol->pp_ID) {
+	switch (pp_token.base.symbol->pp_ID) {
 	case TP_line:
 		next_pp_token();
 		parse_line_directive();
@@ -1110,6 +1107,7 @@ void lexer_next_preprocessing_token(void)
 {
 	while (true) {
 		lexer_token.base.source_position = lexer_pos;
+		lexer_token.base.symbol          = NULL;
 
 		switch (c) {
 		case ' ':
@@ -1125,7 +1123,7 @@ void lexer_next_preprocessing_token(void)
 		SYMBOL_CHARS
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
-			if (lexer_token.identifier.symbol == symbol_L) {
+			if (lexer_token.base.symbol == symbol_L) {
 				switch (c) {
 					case '"':  parse_wide_string_literal();     break;
 					case '\'': parse_wide_character_constant(); break;
