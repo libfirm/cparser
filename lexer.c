@@ -962,8 +962,6 @@ typedef enum stdc_pragma_value_kind_t {
  */
 static void parse_pragma(void)
 {
-	bool unknown_pragma = true;
-
 	next_pp_token();
 	if (pp_token.kind != T_IDENTIFIER) {
 		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
@@ -972,54 +970,34 @@ static void parse_pragma(void)
 		return;
 	}
 
-	if (pp_token.base.symbol->pp_ID == TP_STDC) {
-		stdc_pragma_kind_t kind = STDC_UNKNOWN;
+	stdc_pragma_kind_t kind = STDC_UNKNOWN;
+	if (pp_token.base.symbol->pp_ID == TP_STDC && c_mode & _C99) {
 		/* a STDC pragma */
-		if (c_mode & _C99) {
-			next_pp_token();
+		next_pp_token();
 
+		switch (pp_token.base.symbol->pp_ID) {
+		case TP_FP_CONTRACT:      kind = STDC_FP_CONTRACT;      break;
+		case TP_FENV_ACCESS:      kind = STDC_FENV_ACCESS;      break;
+		case TP_CX_LIMITED_RANGE: kind = STDC_CX_LIMITED_RANGE; break;
+		default:                  break;
+		}
+		if (kind != STDC_UNKNOWN) {
+			next_pp_token();
+			stdc_pragma_value_kind_t value;
 			switch (pp_token.base.symbol->pp_ID) {
-			case TP_FP_CONTRACT:
-				kind = STDC_FP_CONTRACT;
-				break;
-			case TP_FENV_ACCESS:
-				kind = STDC_FENV_ACCESS;
-				break;
-			case TP_CX_LIMITED_RANGE:
-				kind = STDC_CX_LIMITED_RANGE;
-				break;
-			default:
-				break;
+			case TP_ON:      value = STDC_VALUE_ON;      break;
+			case TP_OFF:     value = STDC_VALUE_OFF;     break;
+			case TP_DEFAULT: value = STDC_VALUE_DEFAULT; break;
+			default:         value = STDC_VALUE_UNKNOWN; break;
 			}
-			if (kind != STDC_UNKNOWN) {
-				stdc_pragma_value_kind_t value = STDC_VALUE_UNKNOWN;
-				next_pp_token();
-				switch (pp_token.base.symbol->pp_ID) {
-				case TP_ON:
-					value = STDC_VALUE_ON;
-					break;
-				case TP_OFF:
-					value = STDC_VALUE_OFF;
-					break;
-				case TP_DEFAULT:
-					value = STDC_VALUE_DEFAULT;
-					break;
-				default:
-					break;
-				}
-				if (value != STDC_VALUE_UNKNOWN) {
-					unknown_pragma = false;
-				} else {
-					errorf(&pp_token.base.source_position,
-					       "bad STDC pragma argument");
-				}
+			if (value == STDC_VALUE_UNKNOWN) {
+				kind = STDC_UNKNOWN;
+				errorf(&pp_token.base.source_position, "bad STDC pragma argument");
 			}
 		}
-	} else {
-		unknown_pragma = true;
 	}
 	eat_until_newline();
-	if (unknown_pragma) {
+	if (kind == STDC_UNKNOWN) {
 		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
 		         "encountered unknown #pragma");
 	}
