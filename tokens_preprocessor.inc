@@ -7,7 +7,6 @@ TS(NUMBER,             "number",)
 TS(CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,     "string literal",)
 TS(HEADERNAME,         "headername",)
-TS(PUNCTUATOR,         "punctuator",)
 
 #define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
 #define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
