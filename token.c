@@ -157,10 +157,15 @@ void print_token(FILE *f, const token_t *token)
 		print_stringrep(&token->string.string, f);
 		fputs("'", f);
 		break;
+
 	default:
-		fputc('\'', f);
-		print_token_kind(f, (token_kind_t)token->kind);
-		fputc('\'', f);
+		if (token->base.symbol) {
+			fprintf(f, "'%s'", token->base.symbol->string);
+		} else {
+			fputc('\'', f);
+			print_token_kind(f, (token_kind_t)token->kind);
+			fputc('\'', f);
+		}
 		break;
 	}
 }
