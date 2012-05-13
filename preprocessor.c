@@ -1639,7 +1639,9 @@ static void parse_ifdef_ifndef_directive(void)
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
-		pp_definition_t *const pp_definition = pp_token.base.symbol->pp_definition;
+		/* evaluate wether we are in true or false case */
+		condition = !pp_token.base.symbol->pp_definition == is_ifndef;
+
 		next_preprocessing_token();
 
 		if (!info.at_line_begin) {
@@ -1648,9 +1650,6 @@ static void parse_ifdef_ifndef_directive(void)
 			       is_ifndef ? "ifndef" : "ifdef");
 			eat_pp_directive();
 		}
-
-		/* evaluate wether we are in true or false case */
-		condition = is_ifndef ? pp_definition == NULL : pp_definition != NULL;
 	}
 
 	pp_conditional_t *conditional = push_conditional();
