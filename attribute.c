@@ -212,13 +212,10 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 			entity->compound.alignment = alignment;
 		}
 		break;
-	default: {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "alignment attribute specification on %s '%S' ignored", what, sym);
+
+	default:
+		warningf(WARN_OTHER, &attribute->source_position, "alignment attribute specification on '%N' ignored", entity);
 		break;
-	}
 	}
 }
 
@@ -265,13 +262,10 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 	case ENTITY_FUNCTION:
 		entity->function.elf_visibility = visibility;
 		break;
-	default: {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "visibility attribute specification on %s '%S' ignored", what, sym);
+
+	default:
+		warningf(WARN_OTHER, &attribute->source_position, "visibility attribute specification on '%N' ignored", entity);
 		break;
-	}
 	}
 }
 
@@ -290,10 +284,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 {
 #if 0
 	if (entity->kind != ENTITY_STRUCT) {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "packed attribute on %s '%S' ignored", what, sym);
+		warningf(WARN_OTHER, &attribute->source_position, "packed attribute on '%N' ignored", entity);
 		return;
 	}
 #endif
