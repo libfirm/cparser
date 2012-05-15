@@ -3740,7 +3740,7 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 					}
 				}
 				if (invalid_storage_class) {
-					errorf(&env.source_position, "invalid storage class for variable '%N'", entity);
+					errorf(&env.source_position, "invalid storage class for '%N'", entity);
 				}
 			}
 		}
