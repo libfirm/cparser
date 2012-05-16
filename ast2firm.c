@@ -1515,15 +1515,11 @@ static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
 	return new_Const(entity->enum_value.tv);
 }
 
-static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
+static ir_node *reference_addr(const reference_expression_t *ref)
 {
 	dbg_info *dbgi   = get_dbg_info(&ref->base.source_position);
 	entity_t *entity = ref->entity;
 	assert(is_declaration(entity));
-	type_t   *type   = skip_typeref(entity->declaration.type);
-
-	/* make sure the type is constructed */
-	(void) get_ir_type(type);
 
 	if (entity->kind == ENTITY_FUNCTION
 	    && entity->function.btk != BUILTIN_NONE) {
@@ -1541,60 +1537,6 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 			return res;
 		}
 	}
-
-	switch ((declaration_kind_t) entity->declaration.kind) {
-	case DECLARATION_KIND_UNKNOWN:
-		break;
-
-	case DECLARATION_KIND_LOCAL_VARIABLE:
-	case DECLARATION_KIND_PARAMETER: {
-		ir_mode *const mode  = get_ir_mode_storage(type);
-		ir_node *const value = get_value(entity->variable.v.value_number, mode);
-		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
-	}
-
-	case DECLARATION_KIND_FUNCTION: {
-		return create_symconst(dbgi, entity->function.irentity);
-	}
-	case DECLARATION_KIND_INNER_FUNCTION: {
-		ir_mode *const mode = get_ir_mode_storage(type);
-		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
-			/* inner function not using the closure */
-			return create_symconst(dbgi, entity->function.irentity);
-		} else {
-			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity->function.irentity);
-		}
-	}
-	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		const variable_t *variable = &entity->variable;
-		ir_node *const addr = create_symconst(dbgi, variable->v.entity);
-		return deref_address(dbgi, variable->base.type, addr);
-	}
-
-	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
-	case DECLARATION_KIND_PARAMETER_ENTITY: {
-		ir_entity *irentity = entity->variable.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-		return deref_address(dbgi, entity->declaration.type, sel);
-	}
-
-	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
-		return entity->variable.v.vla_base;
-
-	case DECLARATION_KIND_COMPOUND_MEMBER:
-		panic("not implemented reference type");
-	}
-
-	panic("reference to declaration with unknown type found");
-}
-
-static ir_node *reference_addr(const reference_expression_t *ref)
-{
-	dbg_info *dbgi   = get_dbg_info(&ref->base.source_position);
-	entity_t *entity = ref->entity;
-	assert(is_declaration(entity));
 
 	switch((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_UNKNOWN:
@@ -1641,6 +1583,28 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 
 	panic("reference to declaration with unknown type found");
+}
+
+static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
+{
+	dbg_info *const dbgi   = get_dbg_info(&ref->base.source_position);
+	entity_t *const entity = ref->entity;
+	assert(is_declaration(entity));
+
+	switch ((declaration_kind_t)entity->declaration.kind) {
+	case DECLARATION_KIND_LOCAL_VARIABLE:
+	case DECLARATION_KIND_PARAMETER: {
+		type_t  *const type  = skip_typeref(entity->declaration.type);
+		ir_mode *const mode  = get_ir_mode_storage(type);
+		ir_node *const value = get_value(entity->variable.v.value_number, mode);
+		return create_conv(dbgi, value, get_ir_mode_arithmetic(type));
+	}
+
+	default: {
+		ir_node *const addr = reference_addr(ref);
+		return deref_address(dbgi, entity->declaration.type, addr);
+	}
+	}
 }
 
 /**
