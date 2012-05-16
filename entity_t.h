@@ -240,18 +240,6 @@ struct variable_t {
 	} v;
 };
 
-struct parameter_t {
-	declaration_t  base;
-	bool           address_taken : 1;
-	bool           read          : 1;
-
-	/* ast2firm info */
-	union {
-		unsigned int  value_number;
-		ir_entity    *entity;
-	} v;
-};
-
 struct function_t {
 	declaration_t  base;
 	bool           is_inline      : 1;
@@ -286,7 +274,6 @@ union entity_t {
 	typedef_t          typedefe;
 	declaration_t      declaration;
 	variable_t         variable;
-	parameter_t        parameter;
 	function_t         function;
 	compound_member_t  compound_member;
 };

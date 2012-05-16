@@ -1325,11 +1325,7 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 				return;
 
 			if (lhs_ent != entity && lhs_ent != ENT_ANY) {
-				if (entity->kind == ENTITY_VARIABLE) {
-					entity->variable.read = true;
-				} else {
-					entity->parameter.read = true;
-				}
+				entity->variable.read = true;
 			}
 			return;
 		}
@@ -6109,12 +6105,8 @@ static expression_t *parse_reference(void)
 		&& (current_function != NULL
 			&& entity->base.parent_scope->depth < current_function->parameters.depth)
 		&& (entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER)) {
-		if (entity->kind == ENTITY_VARIABLE) {
-			/* access of a variable from an outer function */
-			entity->variable.address_taken = true;
-		} else if (entity->kind == ENTITY_PARAMETER) {
-			entity->parameter.address_taken = true;
-		}
+		/* access of a variable from an outer function */
+		entity->variable.address_taken = true;
 		current_function->need_closure = true;
 	}
 
@@ -7658,12 +7650,7 @@ static void set_address_taken(expression_t *expression, bool may_be_register)
 		errorf(pos, "address of register '%N' requested", entity);
 	}
 
-	if (entity->kind == ENTITY_VARIABLE) {
-		entity->variable.address_taken = true;
-	} else {
-		assert(entity->kind == ENTITY_PARAMETER);
-		entity->parameter.address_taken = true;
-	}
+	entity->variable.address_taken = true;
 }
 
 /**

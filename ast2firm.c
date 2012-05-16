@@ -1546,16 +1546,13 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_KIND_UNKNOWN:
 		break;
 
-	case DECLARATION_KIND_LOCAL_VARIABLE: {
+	case DECLARATION_KIND_LOCAL_VARIABLE:
+	case DECLARATION_KIND_PARAMETER: {
 		ir_mode *const mode  = get_ir_mode_storage(type);
 		ir_node *const value = get_value(entity->variable.v.value_number, mode);
 		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
 	}
-	case DECLARATION_KIND_PARAMETER: {
-		ir_mode *const mode  = get_ir_mode_storage(type);
-		ir_node *const value = get_value(entity->parameter.v.value_number,mode);
-		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
-	}
+
 	case DECLARATION_KIND_FUNCTION: {
 		return create_symconst(dbgi, entity->function.irentity);
 	}
@@ -1575,14 +1572,9 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		return deref_address(dbgi, variable->base.type, addr);
 	}
 
-	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
-		ir_entity *irentity = entity->variable.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-		return deref_address(dbgi, entity->declaration.type, sel);
-	}
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
 	case DECLARATION_KIND_PARAMETER_ENTITY: {
-		ir_entity *irentity = entity->parameter.v.entity;
+		ir_entity *irentity = entity->variable.v.entity;
 		ir_node   *frame    = get_local_frame(irentity);
 		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
 		return deref_address(dbgi, entity->declaration.type, sel);
@@ -1616,18 +1608,12 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_node *const addr = create_symconst(dbgi, entity->variable.v.entity);
 		return addr;
 	}
-	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
+
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
+	case DECLARATION_KIND_PARAMETER_ENTITY: {
 		ir_entity *irentity = entity->variable.v.entity;
 		ir_node   *frame    = get_local_frame(irentity);
 		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-
-		return sel;
-	}
-	case DECLARATION_KIND_PARAMETER_ENTITY: {
-		ir_entity *irentity = entity->parameter.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-
 		return sel;
 	}
 
@@ -2086,11 +2072,9 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 		entity_t *entity = ref->entity;
 		assert(is_declaration(entity));
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
-		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
 			set_value(entity->variable.v.value_number, value);
-			return value;
-		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
-			set_value(entity->parameter.v.value_number, value);
 			return value;
 		}
 	}
@@ -2137,15 +2121,9 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 				|| entity->kind == ENTITY_PARAMETER);
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
 		int value_number;
-		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
 			value_number = entity->variable.v.value_number;
-			assert(addr == NULL);
-			type_t  *type = skip_typeref(expression->base.type);
-			ir_mode *mode = get_ir_mode_storage(type);
-			ir_node *res  = get_value(value_number, mode);
-			return create_conv(NULL, res, get_ir_mode_arithmetic(type));
-		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
-			value_number = entity->parameter.v.value_number;
 			assert(addr == NULL);
 			type_t  *type = skip_typeref(expression->base.type);
 			ir_mode *mode = get_ir_mode_storage(type);
@@ -5309,20 +5287,9 @@ static int count_local_variables(const entity_t *entity,
 	int count = 0;
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
-		type_t *type;
-		bool    address_taken;
-
-		if (entity->kind == ENTITY_VARIABLE) {
-			type          = skip_typeref(entity->declaration.type);
-			address_taken = entity->variable.address_taken;
-		} else if (entity->kind == ENTITY_PARAMETER) {
-			type          = skip_typeref(entity->declaration.type);
-			address_taken = entity->parameter.address_taken;
-		} else {
-			continue;
-		}
-
-		if (!address_taken && is_type_scalar(type))
+		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
+		    !entity->variable.address_taken                                       &&
+		    is_type_scalar(skip_typeref(entity->declaration.type)))
 			++count;
 	}
 	return count;
@@ -5398,20 +5365,16 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		bool needs_entity = parameter->parameter.address_taken;
 		assert(!is_type_array(type));
-		if (is_type_compound(type)) {
-			needs_entity = true;
-		}
+		bool const needs_entity = parameter->variable.address_taken || is_type_compound(type);
 
 		ir_type *param_irtype = get_method_param_type(function_irtype, n);
 		if (needs_entity) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
 				= new_parameter_entity(frame_type, n, param_irtype);
-			parameter->declaration.kind
-				= DECLARATION_KIND_PARAMETER_ENTITY;
-			parameter->parameter.v.entity = param;
+			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
+			parameter->variable.v.entity = param;
 			continue;
 		}
 
@@ -5423,13 +5386,13 @@ static void initialize_function_parameters(entity_t *entity)
 		value = create_conv(NULL, value, mode);
 		value = do_strict_conv(NULL, value);
 
-		parameter->declaration.kind         = DECLARATION_KIND_PARAMETER;
-		parameter->parameter.v.value_number = next_value_number_function;
+		parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
+		parameter->variable.v.value_number = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function,
 		                        parameter);
 		++next_value_number_function;
 
-		set_value(parameter->parameter.v.value_number, value);
+		set_value(parameter->variable.v.value_number, value);
 	}
 }
 

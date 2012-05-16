@@ -57,7 +57,7 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[ENTITY_VARIABLE]        = sizeof(variable_t),
-		[ENTITY_PARAMETER]       = sizeof(parameter_t),
+		[ENTITY_PARAMETER]       = sizeof(variable_t),
 		[ENTITY_COMPOUND_MEMBER] = sizeof(compound_member_t),
 		[ENTITY_FUNCTION]        = sizeof(function_t),
 		[ENTITY_TYPEDEF]         = sizeof(typedef_t),
