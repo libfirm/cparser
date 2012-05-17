@@ -4,7 +4,6 @@
 
 #include <ctype.h>
 #include "lexer.h"
-#include "diagnostic.h"
 
 typedef size_t (*decode_func)(input_t *input, utf32 *buffer, size_t buffer_size);
 
