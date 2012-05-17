@@ -6415,6 +6415,20 @@ static expression_t *parse_offsetof(void)
 	return expression;
 }
 
+static bool is_last_parameter(expression_t *const param)
+{
+	if (param->kind == EXPR_REFERENCE) {
+		entity_t *const entity = param->reference.entity;
+		if (entity->kind == ENTITY_PARAMETER &&
+		    !entity->base.next               &&
+		    entity->base.parent_scope == &current_function->parameters) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * Parses a _builtin_va_start() expression.
  */
@@ -6439,16 +6453,8 @@ static expression_t *parse_va_start(void)
 		errorf(&expression->base.source_position, "'va_start' used outside of function");
 	} else if (!current_function->base.type->function.variadic) {
 		errorf(&expression->base.source_position, "'va_start' used in non-variadic function");
-	} else if (param->kind == EXPR_REFERENCE) {
-		entity_t *const entity = param->reference.entity;
-		if (entity->base.parent_scope != &current_function->parameters ||
-				entity->base.next != NULL ||
-				entity->kind != ENTITY_PARAMETER) {
-			errorf(&param->base.source_position,
-			       "second argument of 'va_start' must be last parameter of the current function");
-		}
-	} else {
-		expression = create_error_expression();
+	} else if (!is_last_parameter(param)) {
+		errorf(&param->base.source_position, "second argument of 'va_start' must be last parameter of the current function");
 	}
 
 	return expression;
