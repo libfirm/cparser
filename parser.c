@@ -6431,6 +6431,7 @@ static expression_t *parse_va_start(void)
 	rem_anchor_token(',');
 	expect(',');
 	expression_t *const param = parse_assignment_expression();
+	expression->va_starte.parameter = param;
 	rem_anchor_token(')');
 	expect(')');
 
@@ -6444,8 +6445,6 @@ static expression_t *parse_va_start(void)
 				entity->kind != ENTITY_PARAMETER) {
 			errorf(&param->base.source_position,
 			       "second argument of 'va_start' must be last parameter of the current function");
-		} else {
-			expression->va_starte.parameter = &entity->variable;
 		}
 	} else {
 		expression = create_error_expression();

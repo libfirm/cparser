@@ -538,7 +538,7 @@ static void print_va_start(const va_start_expression_t *const expression)
 	print_string("__builtin_va_start(");
 	print_assignment_expression(expression->ap);
 	print_string(", ");
-	print_string(expression->parameter->base.base.symbol->string);
+	print_assignment_expression(expression->parameter);
 	print_char(')');
 }
 

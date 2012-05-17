@@ -359,7 +359,7 @@ struct offsetof_expression_t {
 struct va_start_expression_t {
 	expression_base_t  base;
 	expression_t      *ap;
-	variable_t        *parameter;
+	expression_t      *parameter;
 };
 
 struct va_arg_expression_t {
