@@ -6437,12 +6437,11 @@ static expression_t *parse_va_start(void)
 
 	if (!current_function) {
 		errorf(&expression->base.source_position, "'va_start' used outside of function");
+	} else if (!current_function->base.type->function.variadic) {
+		errorf(&expression->base.source_position, "'va_start' used in non-variadic function");
 	} else if (param->kind == EXPR_REFERENCE) {
 		entity_t *const entity = param->reference.entity;
-		if (!current_function->base.type->function.variadic) {
-			errorf(&param->base.source_position,
-					"'va_start' used in non-variadic function");
-		} else if (entity->base.parent_scope != &current_function->parameters ||
+		if (entity->base.parent_scope != &current_function->parameters ||
 				entity->base.next != NULL ||
 				entity->kind != ENTITY_PARAMETER) {
 			errorf(&param->base.source_position,
