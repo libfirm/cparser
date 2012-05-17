@@ -6435,7 +6435,9 @@ static expression_t *parse_va_start(void)
 	rem_anchor_token(')');
 	expect(')');
 
-	if (param->kind == EXPR_REFERENCE) {
+	if (!current_function) {
+		errorf(&expression->base.source_position, "'va_start' used outside of function");
+	} else if (param->kind == EXPR_REFERENCE) {
 		entity_t *const entity = param->reference.entity;
 		if (!current_function->base.type->function.variadic) {
 			errorf(&param->base.source_position,
