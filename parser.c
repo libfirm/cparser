@@ -6433,7 +6433,7 @@ static bool is_last_parameter(expression_t *const param)
 }
 
 /**
- * Parses a _builtin_va_start() expression.
+ * Parses a __builtin_va_start() expression.
  */
 static expression_t *parse_va_start(void)
 {
