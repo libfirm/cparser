@@ -6431,6 +6431,9 @@ static expression_t *parse_va_start(void)
 	rem_anchor_token(',');
 	expect(',');
 	expression_t *const expr = parse_assignment_expression();
+	rem_anchor_token(')');
+	expect(')');
+
 	if (expr->kind == EXPR_REFERENCE) {
 		entity_t *const entity = expr->reference.entity;
 		if (!current_function->base.type->function.variadic) {
@@ -6447,8 +6450,7 @@ static expression_t *parse_va_start(void)
 	} else {
 		expression = create_error_expression();
 	}
-	rem_anchor_token(')');
-	expect(')');
+
 	return expression;
 }
 
