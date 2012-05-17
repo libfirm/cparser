@@ -6426,6 +6426,9 @@ static bool is_last_parameter(expression_t *const param)
 		}
 	}
 
+	if (!is_type_valid(skip_typeref(param->base.type)))
+		return true;
+
 	return false;
 }
 
