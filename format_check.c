@@ -535,7 +535,7 @@ too_few_args:
 			if (is_type_valid(arg_skip)) {
 				source_position_t const *const apos = &arg->expression->base.source_position;
 				char              const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:
@@ -916,7 +916,7 @@ error_arg_type:
 			if (is_type_valid(arg_skip)) {
 				source_position_t const *const apos = &arg->expression->base.source_position;
 				char              const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T*' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:
