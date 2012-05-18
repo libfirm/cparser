@@ -1504,6 +1504,7 @@ void layout_struct_type(compound_type_t *type)
 		return;
 	if (type->compound->layouted)
 		return;
+	compound->layouted = true;
 
 	il_size_t      offset    = 0;
 	il_alignment_t alignment = compound->alignment;
@@ -1561,7 +1562,6 @@ next:
 
 	compound->size      = offset;
 	compound->alignment = alignment;
-	compound->layouted  = true;
 }
 
 void layout_union_type(compound_type_t *type)
@@ -1571,6 +1571,9 @@ void layout_union_type(compound_type_t *type)
 	compound_t *compound = type->compound;
 	if (! compound->complete)
 		return;
+	if (compound->layouted)
+		return;
+	compound->layouted = true;
 
 	il_size_t      size      = 0;
 	il_alignment_t alignment = compound->alignment;
