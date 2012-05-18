@@ -1833,6 +1833,7 @@ int pptest_main(int argc, char **argv)
 
 	/* simplistic commandline parser */
 	const char *filename = NULL;
+	const char *output = NULL;
 	for (int i = 1; i < argc; ++i) {
 		const char *opt = argv[i];
 		if (streq(opt, "-I")) {
@@ -1840,6 +1841,9 @@ int pptest_main(int argc, char **argv)
 			continue;
 		} else if (streq(opt, "-E")) {
 			/* ignore */
+		} else if (streq(opt, "-o")) {
+			output = argv[++i];
+			continue;
 		} else if (opt[0] == '-') {
 			fprintf(stderr, "Unknown option '%s'\n", opt);
 		} else {
@@ -1853,7 +1857,15 @@ int pptest_main(int argc, char **argv)
 		return 1;
 	}
 
-	out = stdout;
+	if (output == NULL) {
+		out = stdout;
+	} else {
+		out = fopen(output, "w");
+		if (out == NULL) {
+			fprintf(stderr, "Couldn't open output '%s'\n", output);
+			return 1;
+		}
+	}
 
 	/* just here for gcc compatibility */
 	fprintf(out, "# 1 \"%s\"\n", filename);
@@ -1922,6 +1934,8 @@ end_of_main_loop:
 	fputc('\n', out);
 	check_unclosed_conditionals();
 	close_input();
+	if (out != stdout)
+		fclose(out);
 
 	obstack_free(&input_obstack, NULL);
 	obstack_free(&pp_obstack, NULL);
