@@ -1503,10 +1503,19 @@ finished_headername:
 
 static bool do_include(bool system_include, const char *headername)
 {
+	size_t headername_len = strlen(headername);
 	if (!system_include) {
-		/* for "bla" includes first try current dir
-		 * TODO: this isn't correct, should be the directory of the source file
-		 */
+		/* put dirname of current input on obstack */
+		const char *filename   = input.position.input_name;
+		const char *last_slash = strrchr(filename, '/');
+		if (last_slash != NULL) {
+			size_t len = last_slash - filename;
+			obstack_grow(&symbol_obstack, filename, len + 1);
+			obstack_grow0(&symbol_obstack, headername, headername_len);
+			char *complete_path = obstack_finish(&symbol_obstack);
+			headername = identify_string(complete_path);
+		}
+
 		FILE *file = fopen(headername, "r");
 		if (file != NULL) {
 			switch_input(file, headername);
@@ -1514,26 +1523,26 @@ static bool do_include(bool system_include, const char *headername)
 		}
 	}
 
-	size_t headername_len = strlen(headername);
-	assert(obstack_object_size(&pp_obstack) == 0);
+	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
 	for (searchpath_entry_t *entry = searchpath; entry != NULL;
 	     entry = entry->next) {
 	    const char *path = entry->path;
 	    size_t      len  = strlen(path);
-		obstack_grow(&pp_obstack, path, len);
+		obstack_grow(&symbol_obstack, path, len);
 		if (path[len-1] != '/')
-			obstack_1grow(&pp_obstack, '/');
-		obstack_grow(&pp_obstack, headername, headername_len+1);
+			obstack_1grow(&symbol_obstack, '/');
+		obstack_grow(&symbol_obstack, headername, headername_len+1);
 
-		char *complete_path = obstack_finish(&pp_obstack);
+		char *complete_path = obstack_finish(&symbol_obstack);
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
 			switch_input(file, filename);
 			return true;
+		} else {
+			obstack_free(&symbol_obstack, complete_path);
 		}
-		obstack_free(&pp_obstack, complete_path);
 	}
 
 	return false;
