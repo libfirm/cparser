@@ -1,5 +1,0 @@
-bla
-  foo
-
-bla/*
-*/foo
