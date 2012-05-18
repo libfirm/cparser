@@ -843,7 +843,7 @@ check_c_width:
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
 			}
-			expected_type = type_void_ptr;
+			expected_type = type_void;
 			break;
 
 		case 'n': {
