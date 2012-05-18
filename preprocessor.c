@@ -91,7 +91,6 @@ static pp_conditional_t *conditional_stack;
 static token_t           pp_token;
 static bool              resolve_escape_sequences = false;
 static bool              ignore_unknown_chars     = true;
-static bool              in_pp_directive;
 static bool              skip_mode;
 static FILE             *out;
 static struct obstack    pp_obstack;
@@ -764,14 +763,14 @@ static void skip_multiline_comment(void)
 		case '*':
 			next_char();
 			if (input.c == '/') {
+				if (input.position.lineno != input.output_line)
+					info.whitespace = input.position.colno;
 				next_char();
-				info.whitespace += input.position.colno-1;
 				return;
 			}
 			break;
 
 		MATCH_NEWLINE(
-			info.at_line_begin |= !in_pp_directive;
 			break;
 		)
 
@@ -1188,9 +1187,11 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 	input.output_line  = pos->lineno-1;
 }
 
-static void emit_newlines(void)
+static bool emit_newlines(void)
 {
 	unsigned delta = pp_token.base.source_position.lineno - input.output_line;
+	if (delta == 0)
+		return false;
 
 	if (delta >= 9) {
 		fputc('\n', out);
@@ -1202,6 +1203,11 @@ static void emit_newlines(void)
 		}
 	}
 	input.output_line = pp_token.base.source_position.lineno;
+
+	for (unsigned i = 0; i < info.whitespace; ++i)
+		fputc(' ', out);
+
+	return true;
 }
 
 static void emit_pp_token(void)
@@ -1209,16 +1215,9 @@ static void emit_pp_token(void)
 	if (skip_mode)
 		return;
 
-	if (info.at_line_begin) {
-		emit_newlines();
-
-		for (unsigned i = 0; i < info.whitespace; ++i)
-			fputc(' ', out);
-
-	} else if (info.had_whitespace ||
-			   tokens_would_paste(last_token, pp_token.kind)) {
+	if (!emit_newlines() &&
+	    (info.had_whitespace || tokens_would_paste(last_token, pp_token.kind)))
 		fputc(' ', out);
-	}
 
 	switch (pp_token.kind) {
 	case TP_IDENTIFIER:
@@ -1432,18 +1431,20 @@ static void parse_undef_directive(void)
 	eat_pp_directive();
 }
 
-static const char *parse_headername(void)
+static void parse_headername(void)
 {
+	const source_position_t start_position = input.position;
+	string_t                string         = {NULL, 0};
+	assert(obstack_object_size(&symbol_obstack) == 0);
+
 	/* behind an #include we can have the special headername lexems.
 	 * They're only allowed behind an #include so they're not recognized
 	 * by the normal next_preprocessing_token. We handle them as a special
 	 * exception here */
 	if (info.at_line_begin) {
 		parse_error("expected headername after #include");
-		return NULL;
+		goto finish_error;
 	}
-
-	assert(obstack_object_size(&symbol_obstack) == 0);
 
 	/* check wether we have a "... or <... headername */
 	switch (input.c) {
@@ -1455,7 +1456,7 @@ static const char *parse_headername(void)
 				/* fallthrough */
 			MATCH_NEWLINE(
 				parse_error("header name without closing '>'");
-				return NULL;
+				goto finish_error;
 			)
 			case '>':
 				next_char();
@@ -1474,7 +1475,7 @@ static const char *parse_headername(void)
 				/* fallthrough */
 			MATCH_NEWLINE(
 				parse_error("header name without closing '>'");
-				return NULL;
+				goto finish_error;
 			)
 			case '"':
 				next_char();
@@ -1492,13 +1493,14 @@ static const char *parse_headername(void)
 
 finished_headername:
 	obstack_1grow(&symbol_obstack, '\0');
-	char *headername = obstack_finish(&symbol_obstack);
+	const size_t size       = (size_t)obstack_object_size(&symbol_obstack);
+	char *const  headername = obstack_finish(&symbol_obstack);
+	string                  = make_string(headername, size);
 
-	/* TODO: iterate search-path to find the file */
-
-	skip_whitespace();
-
-	return identify_string(headername);
+finish_error:
+	pp_token.base.source_position = start_position;
+	pp_token.kind                 = TP_HEADERNAME;
+	pp_token.string.string        = string;
 }
 
 static bool do_include(bool system_include, const char *headername)
@@ -1548,22 +1550,41 @@ static bool do_include(bool system_include, const char *headername)
 	return false;
 }
 
+/* read till next newline character, only for parse_include_directive(),
+ * use eat_pp_directive() in all other cases */
+static void skip_till_newline(void)
+{
+	/* skip till newline */
+	while (true) {
+		switch (input.c) {
+		MATCH_NEWLINE(
+			return;
+		)
+		case EOF:
+			return;
+		}
+		next_char();
+	}
+}
+
 static bool parse_include_directive(void)
 {
 	/* don't eat the TP_include here!
 	 * we need an alternative parsing for the next token */
 	skip_whitespace();
 	bool system_include = input.c == '<';
-	const char *headername = parse_headername();
-	if (headername == NULL) {
+	parse_headername();
+	string_t headername = pp_token.string.string;
+	if (headername.begin == NULL) {
 		eat_pp_directive();
 		return false;
 	}
 
+	skip_whitespace();
 	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &pp_token.base.source_position,
 		         "extra tokens at end of #include directive");
-		eat_pp_directive();
+		skip_till_newline();
 	}
 
 	if (n_inputs > INCLUDE_LIMIT) {
@@ -1573,19 +1594,13 @@ static bool parse_include_directive(void)
 		return false;
 	}
 
-	/* we have to reenable space counting and macro expansion here,
-	 * because it is still disabled in directive parsing,
-	 * but we will trigger a preprocessing token reading of the new file
-	 * now and need expansions/space counting */
-	in_pp_directive = false;
-
 	/* switch inputs */
 	emit_newlines();
 	push_input();
-	bool res = do_include(system_include, headername);
+	bool res = do_include(system_include, pp_token.string.string.begin);
 	if (!res) {
 		errorf(&pp_token.base.source_position,
-		       "failed including '%s': %s", headername, strerror(errno));
+		       "failed including '%S': %s", pp_token.string, strerror(errno));
 		pop_restore_input();
 		return false;
 	}
@@ -1727,8 +1742,12 @@ static void parse_endif_directive(void)
 
 static void parse_preprocessing_directive(void)
 {
-	in_pp_directive = true;
 	eat_pp('#');
+
+	if (info.at_line_begin) {
+		/* empty directive */
+		return;
+	}
 
 	if (skip_mode) {
 		switch (pp_token.kind) {
@@ -1779,7 +1798,6 @@ static void parse_preprocessing_directive(void)
 		}
 	}
 
-	in_pp_directive = false;
 	assert(info.at_line_begin);
 }
 
@@ -1894,7 +1912,7 @@ int pptest_main(int argc, char **argv)
 			continue;
 		} else if (pp_token.kind == TP_EOF) {
 			goto end_of_main_loop;
-		} else if (pp_token.kind == TP_IDENTIFIER && !in_pp_directive) {
+		} else if (pp_token.kind == TP_IDENTIFIER) {
 			symbol_t        *const symbol        = pp_token.base.symbol;
 			pp_definition_t *const pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {

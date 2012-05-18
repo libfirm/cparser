@@ -8,6 +8,7 @@ TS(CHARACTER_CONSTANT,      "character constant",)
 TS(WIDE_CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,          "string literal",)
 TS(WIDE_STRING_LITERAL,     "wide string literal",)
+TS(HEADERNAME,              "headername",)
 TS(PUNCTUATOR,              "punctuator",)
 
 #define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
