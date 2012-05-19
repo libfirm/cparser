@@ -487,10 +487,12 @@ static inline void next_token(void)
 #endif
 }
 
+#define eat(token_kind) (assert(token.kind == (token_kind)), next_token())
+
 static inline bool next_if(token_kind_t const type)
 {
 	if (token.kind == type) {
-		next_token();
+		eat(type);
 		return true;
 	} else {
 		return false;
@@ -600,8 +602,6 @@ static void eat_block(void)
 	eat_until_matching_token('{');
 	next_if('}');
 }
-
-#define eat(token_kind) (assert(token.kind == (token_kind)), next_token())
 
 /**
  * Report a parse error because an expected token was not found.
@@ -1047,12 +1047,12 @@ static string_t parse_string_literals(void)
 	assert(token.kind == T_STRING_LITERAL);
 	string_t result = token.string.string;
 
-	next_token();
+	eat(T_STRING_LITERAL);
 
 	while (token.kind == T_STRING_LITERAL) {
 		warn_string_concat(HERE);
 		result = concat_strings(&result, &token.string.string);
-		next_token();
+		eat(T_STRING_LITERAL);
 	}
 
 	return result;
@@ -1106,7 +1106,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 				&& (look_ahead(1)->kind == ',' || look_ahead(1)->kind == ')')) {
 			argument->kind     = ATTRIBUTE_ARGUMENT_SYMBOL;
 			argument->v.symbol = token.base.symbol;
-			next_token();
+			eat(T_IDENTIFIER);
 		} else {
 			/* must be an expression */
 			expression_t *expression = parse_assignment_expression();
@@ -1487,7 +1487,7 @@ static designator_t *parse_designation(void)
 		case '[':
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = *HERE;
-			next_token();
+			eat('[');
 			add_anchor_token(']');
 			designator->array_index = parse_constant_expression();
 			rem_anchor_token(']');
@@ -1496,7 +1496,7 @@ static designator_t *parse_designation(void)
 		case '.':
 			designator = allocate_ast_zero(sizeof(designator[0]));
 			designator->source_position = *HERE;
-			next_token();
+			eat('.');
 			designator->symbol = expect_identifier("while parsing designator", NULL);
 			if (!designator->symbol)
 				return NULL;
@@ -2267,7 +2267,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		/* the compound has a name, check if we have seen it already */
 		symbol = token.base.symbol;
 		entity = get_tag(symbol, kind);
-		next_token();
+		eat(T_IDENTIFIER);
 
 		if (entity != NULL) {
 			if (entity->base.parent_scope != current_scope &&
@@ -2324,7 +2324,7 @@ static void parse_enum_entries(type_t *const enum_type)
 
 	if (token.kind == '}') {
 		errorf(HERE, "empty enum not allowed");
-		next_token();
+		eat('}');
 		return;
 	}
 
@@ -2366,7 +2366,7 @@ static type_t *parse_enum_specifier(void)
 		case T_IDENTIFIER:
 			symbol = token.base.symbol;
 			entity = get_tag(symbol, ENTITY_ENUM);
-			next_token();
+			eat(T_IDENTIFIER);
 
 			if (entity != NULL) {
 				if (entity->base.parent_scope != current_scope &&
@@ -2647,7 +2647,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 			specifiers->storage_class = class;                             \
 			if (specifiers->thread_local)                                  \
 				goto check_thread_storage_class;                           \
-			next_token();                                                  \
+			eat(token); \
 			break;
 
 		MATCH_STORAGE_CLASS(T_typedef,  STORAGE_CLASS_TYPEDEF)
@@ -2689,7 +2689,7 @@ wrong_thread_storage_class:
 #define MATCH_TYPE_QUALIFIER(token, qualifier)                          \
 		case token:                                                     \
 			qualifiers |= qualifier;                                    \
-			next_token();                                               \
+			eat(token); \
 			break
 
 		MATCH_TYPE_QUALIFIER(T_const,    TYPE_QUALIFIER_CONST);
@@ -2709,7 +2709,7 @@ wrong_thread_storage_class:
 			} else {                                                    \
 				type_specifiers |= specifier;                           \
 			}                                                           \
-			next_token();                                               \
+			eat(token); \
 			break
 
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
@@ -2732,13 +2732,13 @@ wrong_thread_storage_class:
 		MATCH_SPECIFIER(T_wchar_t,    SPECIFIER_WCHAR_T,   "wchar_t");
 
 		case T_inline:
-			next_token();
+			eat(T_inline);
 			specifiers->is_inline = true;
 			break;
 
 #if 0
 		case T__forceinline:
-			next_token();
+			eat(T__forceinline);
 			specifiers->modifiers |= DM_FORCEINLINE;
 			break;
 #endif
@@ -2751,7 +2751,7 @@ wrong_thread_storage_class:
 			} else {
 				type_specifiers |= SPECIFIER_LONG;
 			}
-			next_token();
+			eat(T_long);
 			break;
 
 #define CHECK_DOUBLE_TYPE() \
@@ -2779,7 +2779,7 @@ wrong_thread_storage_class:
 		case T___builtin_va_list:
 			CHECK_DOUBLE_TYPE();
 			type = duplicate_type(type_valist);
-			next_token();
+			eat(T___builtin_va_list);
 			break;
 
 		case T_IDENTIFIER: {
@@ -2800,7 +2800,7 @@ wrong_thread_storage_class:
 					case '&':
 					case '*':
 						errorf(HERE, "discarding stray %K in declaration specifier", &token);
-						next_token();
+						eat(T_IDENTIFIER);
 						continue;
 
 					default:
@@ -2826,7 +2826,7 @@ wrong_thread_storage_class:
 						type = allocate_type_zero(TYPE_TYPEDEF);
 						type->typedeft.typedefe = &entity->typedefe;
 
-						next_token();
+						eat(T_IDENTIFIER);
 						saw_error = true;
 						continue;
 					}
@@ -2836,7 +2836,7 @@ wrong_thread_storage_class:
 				}
 			}
 
-			next_token();
+			eat(T_IDENTIFIER);
 			type = typedef_type;
 			break;
 		}
@@ -3074,7 +3074,7 @@ static void parse_identifier_list(scope_t *scope)
 	do {
 		entity_t *const entity = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, token.base.symbol, HERE);
 		/* a K&R parameter has no type, yet */
-		next_token();
+		eat(T_IDENTIFIER);
 
 		if (scope != NULL)
 			append_entity(scope, entity);
@@ -3159,7 +3159,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 		do {
 			switch (token.kind) {
 			case T_DOTDOTDOT:
-				next_token();
+				eat(T_DOTDOTDOT);
 				type->variadic = true;
 				goto parameters_finished;
 
@@ -3301,7 +3301,7 @@ static construct_type_t *parse_array_declarator(void)
 	expression_t *size = NULL;
 	if (token.kind == '*' && look_ahead(1)->kind == ']') {
 		array->is_variable = true;
-		next_token();
+		eat('*');
 	} else if (token.kind != ']') {
 		size = parse_assignment_expression();
 
@@ -3403,7 +3403,7 @@ ptr_operator_end: ;
 			env->symbol          = token.base.symbol;
 			env->source_position = *HERE;
 		}
-		next_token();
+		eat(T_IDENTIFIER);
 		break;
 
 	case '(': {
@@ -3428,7 +3428,7 @@ ptr_operator_end: ;
 			case '[':
 			case T___attribute__: /* FIXME __attribute__ might also introduce a parameter of a function declarator. */
 					/* Paranthesized declarator. */
-					next_token();
+					eat('(');
 					add_anchor_token(')');
 					inner_types = parse_inner_declarator(env);
 					if (inner_types != NULL) {
@@ -5734,7 +5734,7 @@ static expression_t *parse_boolean_literal(bool value)
 	literal->literal.value.begin = value ? "true" : "false";
 	literal->literal.value.size  = value ? 4 : 5;
 
-	next_token();
+	eat(value ? T_true : T_false);
 	return literal;
 }
 
@@ -5863,7 +5863,7 @@ static expression_t *parse_character_constant(void)
 		}
 	}
 
-	next_token();
+	eat(T_CHARACTER_CONSTANT);
 	return literal;
 }
 
@@ -5881,7 +5881,7 @@ static expression_t *parse_wide_character_constant(void)
 		warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
 	}
 
-	next_token();
+	eat(T_WIDE_CHARACTER_CONSTANT);
 	return literal;
 }
 
@@ -6858,7 +6858,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 	expression_t *expression;
 	if (token.kind == '(' && is_declaration_specifier(look_ahead(1))) {
 		source_position_t const pos = *HERE;
-		next_token();
+		eat('(');
 		add_anchor_token(')');
 		orig_type = parse_typename();
 		rem_anchor_token(')');
@@ -8871,7 +8871,7 @@ static statement_t *parse_label_inner_statement(statement_t const *const label, 
 				 * statement after a label.  label:; is commonly used to have a label
 				 * before a closing brace. */
 				inner_stmt = create_empty_statement();
-				next_token();
+				eat(';');
 				break;
 			}
 			/* FALLTHROUGH */
@@ -10200,7 +10200,7 @@ static void parse_external(void)
 		case ';':
 			if (!strict_mode) {
 				warningf(WARN_STRAY_SEMICOLON, HERE, "stray ';' outside of function");
-				next_token();
+				eat(';');
 				return;
 			}
 			/* FALLTHROUGH */
