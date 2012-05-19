@@ -375,7 +375,7 @@ static statement_t *allocate_statement_zero(statement_kind_t kind)
 
 	res->base.kind            = kind;
 	res->base.parent          = current_parent;
-	res->base.source_position = token.base.source_position;
+	res->base.source_position = *HERE;
 	return res;
 }
 
@@ -392,7 +392,7 @@ static expression_t *allocate_expression_zero(expression_kind_t kind)
 
 	res->base.kind            = kind;
 	res->base.type            = type_error_type;
-	res->base.source_position = token.base.source_position;
+	res->base.source_position = *HERE;
 	return res;
 }
 
@@ -1050,7 +1050,7 @@ static string_t parse_string_literals(void)
 	next_token();
 
 	while (token.kind == T_STRING_LITERAL) {
-		warn_string_concat(&token.base.source_position);
+		warn_string_concat(HERE);
 		result = concat_strings(&result, &token.string.string);
 		next_token();
 	}
@@ -1486,7 +1486,7 @@ static designator_t *parse_designation(void)
 		switch (token.kind) {
 		case '[':
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.base.source_position;
+			designator->source_position = *HERE;
 			next_token();
 			add_anchor_token(']');
 			designator->array_index = parse_constant_expression();
@@ -1495,7 +1495,7 @@ static designator_t *parse_designation(void)
 			break;
 		case '.':
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.base.source_position;
+			designator->source_position = *HERE;
 			next_token();
 			designator->symbol = expect_identifier("while parsing designator", NULL);
 			if (!designator->symbol)
@@ -1973,7 +1973,7 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		} else if (token.kind == T_IDENTIFIER && look_ahead(1)->kind == ':') {
 			/* GNU-style designator ("identifier: value") */
 			designator = allocate_ast_zero(sizeof(designator[0]));
-			designator->source_position = token.base.source_position;
+			designator->source_position = *HERE;
 			designator->symbol          = token.base.symbol;
 			eat(T_IDENTIFIER);
 			eat(':');
@@ -2632,7 +2632,7 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	bool               saw_error       = false;
 
 	memset(specifiers, 0, sizeof(*specifiers));
-	specifiers->source_position = token.base.source_position;
+	specifiers->source_position = *HERE;
 
 	while (true) {
 		specifiers->attributes = parse_attributes(specifiers->attributes);
@@ -3401,7 +3401,7 @@ ptr_operator_end: ;
 			errorf(HERE, "no identifier expected in typename");
 		} else {
 			env->symbol          = token.base.symbol;
-			env->source_position = token.base.source_position;
+			env->source_position = *HERE;
 		}
 		next_token();
 		break;
@@ -5697,14 +5697,14 @@ static type_t *get_wide_string_type(void)
  */
 static expression_t *parse_string_literal(void)
 {
-	source_position_t begin   = token.base.source_position;
+	source_position_t begin   = *HERE;
 	string_t          res     = token.string.string;
 	bool              is_wide = (token.kind == T_WIDE_STRING_LITERAL);
 
 	next_token();
 	while (token.kind == T_STRING_LITERAL
 			|| token.kind == T_WIDE_STRING_LITERAL) {
-		warn_string_concat(&token.base.source_position);
+		warn_string_concat(HERE);
 		res = concat_strings(&res, &token.string.string);
 		next_token();
 		is_wide |= token.kind == T_WIDE_STRING_LITERAL;
@@ -5775,8 +5775,7 @@ static void check_integer_suffix(void)
 		}
 	}
 	if (*c != '\0') {
-		errorf(&token.base.source_position,
-		       "invalid suffix '%S' on integer constant", suffix);
+		errorf(HERE, "invalid suffix '%S' on integer constant", suffix);
 	} else if (not_traditional) {
 		warn_traditional_suffix();
 	}
@@ -5799,8 +5798,7 @@ static type_t *check_floatingpoint_suffix(void)
 		type = type_long_double;
 	}
 	if (*c != '\0') {
-		errorf(&token.base.source_position,
-		       "invalid suffix '%S' on floatingpoint constant", suffix);
+		errorf(HERE, "invalid suffix '%S' on floatingpoint constant", suffix);
 	} else if (not_traditional) {
 		warn_traditional_suffix();
 	}
@@ -6071,7 +6069,7 @@ static entity_t *parse_qualified_identifier(void)
 
 static expression_t *parse_reference(void)
 {
-	source_position_t const pos    = token.base.source_position;
+	source_position_t const pos    = *HERE;
 	entity_t         *const entity = parse_qualified_identifier();
 
 	type_t *orig_type;
@@ -6671,7 +6669,7 @@ static label_t *get_label(void)
  */
 static expression_t *parse_label_address(void)
 {
-	source_position_t source_position = token.base.source_position;
+	source_position_t const source_position = *HERE;
 	eat(T_ANDAND);
 	if (token.kind != T_IDENTIFIER) {
 		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
@@ -9709,8 +9707,7 @@ static void parse_namespace_definition(void)
 				&& entity->kind != ENTITY_NAMESPACE
 				&& entity->base.parent_scope == current_scope) {
 			if (is_entity_valid(entity)) {
-				error_redefined_as_different_kind(&token.base.source_position,
-						entity, ENTITY_NAMESPACE);
+				error_redefined_as_different_kind(HERE, entity, ENTITY_NAMESPACE);
 			}
 			entity = NULL;
 		}
