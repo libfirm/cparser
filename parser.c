@@ -1172,11 +1172,11 @@ static attribute_t *parse_attribute_gnu(void)
 	attribute_t **anchor = &first;
 
 	eat(T___attribute__);
+	add_anchor_token(')');
+	add_anchor_token(',');
 	expect('(');
 	expect('(');
 
-	add_anchor_token(')');
-	add_anchor_token(',');
 	if (token.kind != ')') do {
 		attribute_t *attribute = parse_attribute_gnu_single();
 		if (attribute) {
@@ -2438,8 +2438,8 @@ static type_t *parse_typeof(void)
 
 	type_t *type;
 
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 
 	expression_t *expression  = NULL;
 
@@ -2504,10 +2504,10 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 {
 	attribute_property_argument_t *const property = allocate_ast_zero(sizeof(*property));
 
-	expect('(');
-
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
+
 	do {
 		add_anchor_token('=');
 		source_position_t pos;
@@ -2584,10 +2584,9 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 {
 	eat(T__declspec);
 
+	add_anchor_token(')');
 	expect('(');
 	if (token.kind != ')') {
-		add_anchor_token(')');
-
 		attribute_t **anchor = &first;
 		do {
 			while (*anchor != NULL)
@@ -2601,9 +2600,8 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 			*anchor = attribute;
 			anchor  = &attribute->next;
 		} while (next_if(','));
-
-		rem_anchor_token(')');
 	}
+	rem_anchor_token(')');
 	expect(')');
 	return first;
 }
@@ -3141,8 +3139,8 @@ static bool has_parameters(void)
  */
 static void parse_parameters(function_type_t *type, scope_t *scope)
 {
-	eat('(');
 	add_anchor_token(')');
+	eat('(');
 
 	if (token.kind == T_IDENTIFIER            &&
 	    !is_typedef_symbol(token.base.symbol) &&
@@ -6384,9 +6382,9 @@ static expression_t *parse_offsetof(void)
 
 	eat(T___builtin_offsetof);
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	type_t *type = parse_typename();
 	rem_anchor_token(',');
 	expect(',');
@@ -6439,9 +6437,9 @@ static expression_t *parse_va_start(void)
 
 	eat(T___builtin_va_start);
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	expression->va_starte.ap = parse_assignment_expression();
 	rem_anchor_token(',');
 	expect(',');
@@ -6470,9 +6468,9 @@ static expression_t *parse_va_arg(void)
 
 	eat(T___builtin_va_arg);
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	call_argument_t ap;
 	ap.expression = parse_assignment_expression();
 	expression->va_arge.ap = ap.expression;
@@ -6496,9 +6494,9 @@ static expression_t *parse_va_copy(void)
 
 	eat(T___builtin_va_copy);
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	expression_t *dst = parse_assignment_expression();
 	assign_error_t error = semantic_assign(type_valist, dst);
 	report_assign_error(error, type_valist, dst, "call argument 1",
@@ -6527,8 +6525,8 @@ static expression_t *parse_builtin_constant(void)
 
 	eat(T___builtin_constant_p);
 
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 	expression->builtin_constant.value = parse_assignment_expression();
 	rem_anchor_token(')');
 	expect(')');
@@ -6546,9 +6544,9 @@ static expression_t *parse_builtin_types_compatible(void)
 
 	eat(T___builtin_types_compatible_p);
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	expression->builtin_types_compatible.left = parse_typename();
 	rem_anchor_token(',');
 	expect(',');
@@ -6592,9 +6590,9 @@ static expression_t *parse_compare_builtin(void)
 	expression->base.source_position = *HERE;
 	next_token();
 
-	expect('(');
 	add_anchor_token(')');
 	add_anchor_token(',');
+	expect('(');
 	expression->binary.left = parse_assignment_expression();
 	rem_anchor_token(',');
 	expect(',');
@@ -6628,8 +6626,8 @@ static expression_t *parse_assume(void)
 
 	eat(T__assume);
 
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 	expression->unary.value = parse_assignment_expression();
 	rem_anchor_token(')');
 	expect(')');
@@ -7410,8 +7408,8 @@ static expression_t *parse_builtin_classify_type(void)
 
 	eat(T___builtin_classify_type);
 
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 	expression_t *expression = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
@@ -8702,8 +8700,8 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		}
 
 		argument->constraints = parse_string_literals();
-		expect('(');
 		add_anchor_token(')');
+		expect('(');
 		expression_t *expression = parse_expression();
 		rem_anchor_token(')');
 		if (is_out) {
@@ -9089,8 +9087,8 @@ static statement_t *parse_inner_statement(void)
  */
 static expression_t *parse_condition(void)
 {
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 	expression_t *const expr = parse_expression();
 	mark_vars_read(expr, NULL);
 	rem_anchor_token(')');
@@ -9306,8 +9304,8 @@ static statement_t *parse_for(void)
 	PUSH_PARENT(statement);
 	PUSH_SCOPE_STATEMENT(&statement->fors.scope);
 
-	expect('(');
 	add_anchor_token(')');
+	expect('(');
 
 	PUSH_EXTENSION();
 
