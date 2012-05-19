@@ -144,10 +144,6 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 			continue;
 		fmt = *(++c);
 
-		if (fmt == '\0') {
-			warningf(WARN_FORMAT, pos, "dangling %% in format string");
-			break;
-		}
 		if (fmt == '%')
 			continue;
 
@@ -322,6 +318,10 @@ break_fmt_flags:
 				break;
 		}
 
+		if (fmt == '\0') {
+			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			break;
+		}
 
 		type_t            *expected_type;
 		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
