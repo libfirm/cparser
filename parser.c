@@ -139,9 +139,6 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 #define POP_EXTENSION() \
 	((void)(in_gcc_extension = old_gcc_extension))
 
-/** special symbol used for anonymous entities. */
-static symbol_t *sym_anonymous = NULL;
-
 /** The token anchor set */
 static unsigned short token_anchor_set[T_LAST_TOKEN];
 
@@ -10332,8 +10329,6 @@ void parse(void)
  */
 void init_parser(void)
 {
-	sym_anonymous = symbol_table_insert("<anonymous>");
-
 	memset(token_anchor_set, 0, sizeof(token_anchor_set));
 
 	init_expression_parsers();
