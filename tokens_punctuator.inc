@@ -7,8 +7,8 @@ PUNCTUATOR(PERCENTCOLONPERCENTCOLON, "%:%:", = T_HASHHASH)*/
 
 PUNCTUATOR(LBRACK,          "[", = '[')
 PUNCTUATOR(RBRACK,          "]", = ']')
-PUNCTUATOR(LBRACE,          "(", = '(')
-PUNCTUATOR(RBRACE,          ")", = ')')
+PUNCTUATOR(LPAREN,          "(", = '(')
+PUNCTUATOR(RPAREN,          ")", = ')')
 PUNCTUATOR(LCURLY,          "{", = '{')
 PUNCTUATOR(RCURLY,          "}", = '}')
 PUNCTUATOR(DOT,             ".", = '.')
