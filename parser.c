@@ -6270,64 +6270,17 @@ static expression_t *parse_parenthesized_expression(void)
 	return result;
 }
 
-static expression_t *parse_function_keyword(void)
+static expression_t *parse_function_keyword(funcname_kind_t const kind)
 {
-	/* TODO */
-
 	if (current_function == NULL) {
-		errorf(HERE, "'__func__' used outside of a function");
+		errorf(HERE, "'%K' used outside of a function", &token);
 	}
 
 	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
 	expression->base.type     = type_char_ptr;
-	expression->funcname.kind = FUNCNAME_FUNCTION;
+	expression->funcname.kind = kind;
 
 	next_token();
-
-	return expression;
-}
-
-static expression_t *parse_pretty_function_keyword(void)
-{
-	if (current_function == NULL) {
-		errorf(HERE, "'__PRETTY_FUNCTION__' used outside of a function");
-	}
-
-	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
-	expression->base.type     = type_char_ptr;
-	expression->funcname.kind = FUNCNAME_PRETTY_FUNCTION;
-
-	eat(T___PRETTY_FUNCTION__);
-
-	return expression;
-}
-
-static expression_t *parse_funcsig_keyword(void)
-{
-	if (current_function == NULL) {
-		errorf(HERE, "'__FUNCSIG__' used outside of a function");
-	}
-
-	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
-	expression->base.type     = type_char_ptr;
-	expression->funcname.kind = FUNCNAME_FUNCSIG;
-
-	eat(T___FUNCSIG__);
-
-	return expression;
-}
-
-static expression_t *parse_funcdname_keyword(void)
-{
-	if (current_function == NULL) {
-		errorf(HERE, "'__FUNCDNAME__' used outside of a function");
-	}
-
-	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
-	expression->base.type     = type_char_ptr;
-	expression->funcname.kind = FUNCNAME_FUNCDNAME;
-
-	eat(T___FUNCDNAME__);
 
 	return expression;
 }
@@ -6733,10 +6686,10 @@ static expression_t *parse_primary_expression(void)
 	case T_STRING_LITERAL:
 	case T_WIDE_STRING_LITERAL:          return parse_string_literal();
 	case T___FUNCTION__:
-	case T___func__:                     return parse_function_keyword();
-	case T___PRETTY_FUNCTION__:          return parse_pretty_function_keyword();
-	case T___FUNCSIG__:                  return parse_funcsig_keyword();
-	case T___FUNCDNAME__:                return parse_funcdname_keyword();
+	case T___func__:                     return parse_function_keyword(FUNCNAME_FUNCTION);
+	case T___PRETTY_FUNCTION__:          return parse_function_keyword(FUNCNAME_PRETTY_FUNCTION);
+	case T___FUNCSIG__:                  return parse_function_keyword(FUNCNAME_FUNCSIG);
+	case T___FUNCDNAME__:                return parse_function_keyword(FUNCNAME_FUNCDNAME);
 	case T___builtin_offsetof:           return parse_offsetof();
 	case T___builtin_va_start:           return parse_va_start();
 	case T___builtin_va_arg:             return parse_va_arg();
