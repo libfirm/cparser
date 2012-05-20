@@ -6516,30 +6516,17 @@ static expression_t *parse_builtin_types_compatible(void)
  */
 static expression_t *parse_compare_builtin(void)
 {
-	expression_t *expression;
-
+	expression_kind_t kind;
 	switch (token.kind) {
-	case T___builtin_isgreater:
-		expression = allocate_expression_zero(EXPR_BINARY_ISGREATER);
-		break;
-	case T___builtin_isgreaterequal:
-		expression = allocate_expression_zero(EXPR_BINARY_ISGREATEREQUAL);
-		break;
-	case T___builtin_isless:
-		expression = allocate_expression_zero(EXPR_BINARY_ISLESS);
-		break;
-	case T___builtin_islessequal:
-		expression = allocate_expression_zero(EXPR_BINARY_ISLESSEQUAL);
-		break;
-	case T___builtin_islessgreater:
-		expression = allocate_expression_zero(EXPR_BINARY_ISLESSGREATER);
-		break;
-	case T___builtin_isunordered:
-		expression = allocate_expression_zero(EXPR_BINARY_ISUNORDERED);
-		break;
-	default:
-		internal_errorf(HERE, "invalid compare builtin found");
+	case T___builtin_isgreater:      kind = EXPR_BINARY_ISGREATER;      break;
+	case T___builtin_isgreaterequal: kind = EXPR_BINARY_ISGREATEREQUAL; break;
+	case T___builtin_isless:         kind = EXPR_BINARY_ISLESS;         break;
+	case T___builtin_islessequal:    kind = EXPR_BINARY_ISLESSEQUAL;    break;
+	case T___builtin_islessgreater:  kind = EXPR_BINARY_ISLESSGREATER;  break;
+	case T___builtin_isunordered:    kind = EXPR_BINARY_ISUNORDERED;    break;
+	default: internal_errorf(HERE, "invalid compare builtin found");
 	}
+	expression_t *const expression = allocate_expression_zero(kind);
 	expression->base.source_position = *HERE;
 	next_token();
 
