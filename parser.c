@@ -1829,7 +1829,8 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			}
 		} else {
 			expression_t *array_index = designator->array_index;
-			assert(designator->array_index != NULL);
+			if (is_constant_expression(array_index) != EXPR_CLASS_CONSTANT)
+				return true;
 
 			if (!is_type_array(type)) {
 				if (is_type_valid(type)) {
