@@ -6578,12 +6578,15 @@ static expression_t *parse_assume(void)
 /**
  * Return the label for the current symbol or create a new one.
  */
-static label_t *get_label(void)
+static label_t *get_label(char const *const context)
 {
-	assert(token.kind == T_IDENTIFIER);
 	assert(current_function != NULL);
 
-	entity_t *label = get_entity(token.base.symbol, NAMESPACE_LABEL);
+	symbol_t *const sym = expect_identifier(context, NULL);
+	if (!sym)
+		return NULL;
+
+	entity_t *label = get_entity(sym, NAMESPACE_LABEL);
 	/* If we find a local label, we already created the declaration. */
 	if (label != NULL && label->kind == ENTITY_LOCAL_LABEL) {
 		if (label->base.parent_scope != current_scope) {
@@ -6593,11 +6596,10 @@ static label_t *get_label(void)
 	} else if (label == NULL || label->base.parent_scope != &current_function->parameters) {
 		/* There is no matching label in the same function, so create a new one. */
 		source_position_t const nowhere = { NULL, 0, 0, false };
-		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, token.base.symbol, &nowhere);
+		label = allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym, &nowhere);
 		label_push(label);
 	}
 
-	eat(T_IDENTIFIER);
 	return &label->label;
 }
 
@@ -6608,12 +6610,11 @@ static expression_t *parse_label_address(void)
 {
 	source_position_t const source_position = *HERE;
 	eat(T_ANDAND);
-	if (token.kind != T_IDENTIFIER) {
-		parse_error_expected("while parsing label address", T_IDENTIFIER, NULL);
-		return create_error_expression();
-	}
 
-	label_t *const label = get_label();
+	label_t *const label = get_label("while parsing label address");
+	if (!label)
+		return create_error_expression();
+
 	label->used          = true;
 	label->address_taken = true;
 
@@ -8978,7 +8979,7 @@ static statement_t *parse_default_statement(void)
 static statement_t *parse_label_statement(void)
 {
 	statement_t *const statement = allocate_statement_zero(STATEMENT_LABEL);
-	label_t     *const label     = get_label();
+	label_t     *const label     = get_label(NULL /* Cannot fail, token is T_IDENTIFIER. */);
 	statement->label.label = label;
 
 	PUSH_PARENT(statement);
@@ -9325,8 +9326,9 @@ static statement_t *parse_goto(void)
 	} else {
 		statement = allocate_statement_zero(STATEMENT_GOTO);
 		eat(T_goto);
-		if (token.kind == T_IDENTIFIER) {
-			label_t *const label = get_label();
+
+		label_t *const label = get_label("while parsing goto");
+		if (label) {
 			label->used            = true;
 			statement->gotos.label = label;
 
@@ -9334,11 +9336,6 @@ static statement_t *parse_goto(void)
 			*goto_anchor = &statement->gotos;
 			goto_anchor  = &statement->gotos.next;
 		} else {
-			if (GNU_MODE)
-				parse_error_expected("while parsing goto", T_IDENTIFIER, '*', NULL);
-			else
-				parse_error_expected("while parsing goto", T_IDENTIFIER, NULL);
-			eat_until_anchor();
 			statement->gotos.label = &allocate_entity_zero(ENTITY_LABEL, NAMESPACE_LABEL, sym_anonymous, &builtin_source_position)->label;
 		}
 	}
