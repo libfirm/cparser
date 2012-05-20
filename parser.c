@@ -9600,29 +9600,31 @@ static statement_t *parse_local_label_declaration(void)
 	entity_t *begin   = NULL;
 	entity_t *end     = NULL;
 	entity_t **anchor = &begin;
+	add_anchor_token(';');
+	add_anchor_token(',');
 	do {
 		source_position_t pos;
 		symbol_t *const symbol = expect_identifier("while parsing local label declaration", &pos);
-		if (!symbol)
-			goto end_error;
+		if (symbol) {
+			entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
+			if (entity != NULL && entity->base.parent_scope == current_scope) {
+				source_position_t const *const ppos = &entity->base.source_position;
+				errorf(&pos, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
+			} else {
+				entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, &pos);
+				entity->base.parent_scope = current_scope;
 
-		entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
-		if (entity != NULL && entity->base.parent_scope == current_scope) {
-			source_position_t const *const ppos = &entity->base.source_position;
-			errorf(&pos, "multiple definitions of '%N' (previous definition %P)", entity, ppos);
-		} else {
-			entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, &pos);
-			entity->base.parent_scope = current_scope;
+				*anchor = entity;
+				anchor  = &entity->base.next;
+				end     = entity;
 
-			*anchor = entity;
-			anchor  = &entity->base.next;
-			end     = entity;
-
-			environment_push(entity);
+				environment_push(entity);
+			}
 		}
 	} while (next_if(','));
+	rem_anchor_token(',');
+	rem_anchor_token(';');
 	expect(';');
-end_error:
 	statement->declaration.declarations_begin = begin;
 	statement->declaration.declarations_end   = end;
 	return statement;
