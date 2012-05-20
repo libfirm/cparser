@@ -9639,8 +9639,6 @@ static void parse_namespace_definition(void)
 
 	if (token.kind == T_IDENTIFIER) {
 		symbol = token.base.symbol;
-		next_token();
-
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
 		if (entity != NULL
 				&& entity->kind != ENTITY_NAMESPACE
@@ -9650,6 +9648,7 @@ static void parse_namespace_definition(void)
 			}
 			entity = NULL;
 		}
+		eat(T_IDENTIFIER);
 	}
 
 	if (entity == NULL) {
