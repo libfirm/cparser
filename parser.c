@@ -9640,13 +9640,11 @@ static void parse_namespace_definition(void)
 	if (token.kind == T_IDENTIFIER) {
 		symbol = token.base.symbol;
 		entity = get_entity(symbol, NAMESPACE_NORMAL);
-		if (entity != NULL
-				&& entity->kind != ENTITY_NAMESPACE
-				&& entity->base.parent_scope == current_scope) {
-			if (is_entity_valid(entity)) {
+		if (entity && entity->kind != ENTITY_NAMESPACE) {
+			entity = NULL;
+			if (entity->base.parent_scope == current_scope && is_entity_valid(entity)) {
 				error_redefined_as_different_kind(HERE, entity, ENTITY_NAMESPACE);
 			}
-			entity = NULL;
 		}
 		eat(T_IDENTIFIER);
 	}
