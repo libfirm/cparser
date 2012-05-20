@@ -6527,7 +6527,6 @@ static expression_t *parse_compare_builtin(void)
 	default: internal_errorf(HERE, "invalid compare builtin found");
 	}
 	expression_t *const expression = allocate_expression_zero(kind);
-	expression->base.source_position = *HERE;
 	next_token();
 
 	add_anchor_token(')');
