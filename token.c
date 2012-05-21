@@ -162,9 +162,8 @@ void print_token(FILE *f, const token_t *token)
 		break;
 
 	case T_CHARACTER_CONSTANT:
-	case T_WIDE_CHARACTER_CONSTANT:
 		print_token_kind(f, (token_kind_t)token->kind);
-		fputs(" \'", f);
+		fprintf(f, " %s'", get_string_encoding_prefix(token->string.encoding));
 		print_stringrep(&token->string.string, f);
 		fputs("'", f);
 		break;

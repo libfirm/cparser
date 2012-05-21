@@ -252,7 +252,6 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_MINUSMINUS:                \
 	case T_PLUSPLUS:                  \
 	case T_STRING_LITERAL:            \
-	case T_WIDE_CHARACTER_CONSTANT:   \
 	case T___FUNCDNAME__:             \
 	case T___FUNCSIG__:               \
 	case T___FUNCTION__:              \
@@ -5872,39 +5871,39 @@ static expression_t *parse_number_literal(void)
  */
 static expression_t *parse_character_constant(void)
 {
-	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
-	literal->base.type     = c_mode & _CXX ? type_char : type_int;
-	literal->literal.value = token.string.string;
+	expression_t *literal;
+	switch (token.string.encoding) {
+	case STRING_ENCODING_CHAR: {
+		literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
+		literal->base.type     = c_mode & _CXX ? type_char : type_int;
+		literal->literal.value = token.string.string;
 
-	size_t len = literal->literal.value.size;
-	if (len > 1) {
-		if (!GNU_MODE && !(c_mode & _C99)) {
-			errorf(HERE, "more than 1 character in character constant");
-		} else {
-			literal->base.type = type_int;
+		size_t len = literal->literal.value.size;
+		if (len > 1) {
+			if (!GNU_MODE && !(c_mode & _C99)) {
+				errorf(HERE, "more than 1 character in character constant");
+			} else {
+				literal->base.type = type_int;
+				warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
+			}
+		}
+		break;
+	}
+
+	case STRING_ENCODING_WIDE: {
+		literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
+		literal->base.type     = type_int;
+		literal->literal.value = token.string.string;
+
+		size_t len = wstrlen(&literal->literal.value);
+		if (len > 1) {
 			warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
 		}
+		break;
+	}
 	}
 
 	eat(T_CHARACTER_CONSTANT);
-	return literal;
-}
-
-/**
- * Parse a wide character constant.
- */
-static expression_t *parse_wide_character_constant(void)
-{
-	expression_t *literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
-	literal->base.type     = type_int;
-	literal->literal.value = token.string.string;
-
-	size_t len = wstrlen(&literal->literal.value);
-	if (len > 1) {
-		warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
-	}
-
-	eat(T_WIDE_CHARACTER_CONSTANT);
 	return literal;
 }
 
@@ -6694,7 +6693,6 @@ static expression_t *parse_primary_expression(void)
 	case T_INTEGER:
 	case T_FLOATINGPOINT:                return parse_number_literal();
 	case T_CHARACTER_CONSTANT:           return parse_character_constant();
-	case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
 	case T_STRING_LITERAL:               return parse_string_literal();
 	case T___FUNCTION__:
 	case T___func__:                     return parse_function_keyword(FUNCNAME_FUNCTION);
@@ -9833,7 +9831,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_MINUSMINUS);
 	add_anchor_token(T_PLUSPLUS);
 	add_anchor_token(T_STRING_LITERAL);
-	add_anchor_token(T_WIDE_CHARACTER_CONSTANT);
 	add_anchor_token(T__Bool);
 	add_anchor_token(T__Complex);
 	add_anchor_token(T__Imaginary);
@@ -10009,7 +10006,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T__Imaginary);
 	rem_anchor_token(T__Complex);
 	rem_anchor_token(T__Bool);
-	rem_anchor_token(T_WIDE_CHARACTER_CONSTANT);
 	rem_anchor_token(T_STRING_LITERAL);
 	rem_anchor_token(T_PLUSPLUS);
 	rem_anchor_token(T_MINUSMINUS);

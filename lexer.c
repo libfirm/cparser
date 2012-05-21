@@ -689,57 +689,9 @@ end_of_string:
 }
 
 /**
- * Parse a wide character constant and set lexer_token.
- */
-static void parse_wide_character_constant(void)
-{
-	eat('\'');
-
-	while (true) {
-		switch (c) {
-		case '\\': {
-			const utf32 tc = parse_escape_sequence();
-			obstack_grow_symbol(&symbol_obstack, tc);
-			break;
-		}
-
-		MATCH_NEWLINE(
-			parse_error("newline while parsing character constant");
-			break;
-		)
-
-		case '\'':
-			next_char();
-			goto end_of_wide_char_constant;
-
-		case EOF:
-			errorf(&lexer_token.base.source_position, "EOF while parsing character constant");
-			goto end_of_wide_char_constant;
-
-		default:
-			obstack_grow_symbol(&symbol_obstack, c);
-			next_char();
-			break;
-		}
-	}
-
-end_of_wide_char_constant:;
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t  size   = (size_t) obstack_object_size(&symbol_obstack) - 1;
-	char   *string = obstack_finish(&symbol_obstack);
-
-	lexer_token.kind          = T_WIDE_CHARACTER_CONSTANT;
-	lexer_token.string.string = identify_string(string, size);
-
-	if (size == 0) {
-		errorf(&lexer_token.base.source_position, "empty character constant");
-	}
-}
-
-/**
  * Parse a character constant and set lexer_token.
  */
-static void parse_character_constant(void)
+static void parse_character_constant(string_encoding_t const enc)
 {
 	eat('\'');
 
@@ -747,10 +699,14 @@ static void parse_character_constant(void)
 		switch (c) {
 		case '\\': {
 			utf32 const tc = parse_escape_sequence();
-			if (tc >= 0x100) {
-				warningf(WARN_OTHER, &lexer_pos, "escape sequence out of range");
+			if (enc == STRING_ENCODING_CHAR) {
+				if (tc >= 0x100) {
+					warningf(WARN_OTHER, &lexer_pos, "escape sequence out of range");
+				}
+				obstack_1grow(&symbol_obstack, tc);
+			} else {
+				obstack_grow_symbol(&symbol_obstack, tc);
 			}
-			obstack_1grow(&symbol_obstack, tc);
 			break;
 		}
 
@@ -780,8 +736,9 @@ end_of_char_constant:;
 	const size_t        size   = (size_t)obstack_object_size(&symbol_obstack)-1;
 	char         *const string = obstack_finish(&symbol_obstack);
 
-	lexer_token.kind          = T_CHARACTER_CONSTANT;
-	lexer_token.string.string = identify_string(string, size);
+	lexer_token.kind            = T_CHARACTER_CONSTANT;
+	lexer_token.string.encoding = enc;
+	lexer_token.string.string   = identify_string(string, size);
 
 	if (size == 0) {
 		errorf(&lexer_token.base.source_position, "empty character constant");
@@ -1080,8 +1037,8 @@ void lexer_next_preprocessing_token(void)
 			string_encoding_t const enc = STRING_ENCODING_WIDE;
 			if (lexer_token.base.symbol == symbol_L) {
 				switch (c) {
-					case '"':  parse_string_literal(enc);       break;
-					case '\'': parse_wide_character_constant(); break;
+				case '"':  parse_string_literal(enc);     break;
+				case '\'': parse_character_constant(enc); break;
 				}
 			}
 			return;
@@ -1096,7 +1053,7 @@ void lexer_next_preprocessing_token(void)
 			return;
 
 		case '\'':
-			parse_character_constant();
+			parse_character_constant(STRING_ENCODING_CHAR);
 			return;
 
 		case '.':
