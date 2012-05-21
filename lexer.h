@@ -37,7 +37,6 @@ void exit_lexer(void);
 
 void lexer_switch_input(input_t *input, const char *input_name);
 
-string_t concat_strings(const string_t *s1, const string_t *s2);
 string_t make_string(const char *str);
 
 #endif

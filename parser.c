@@ -1037,25 +1037,58 @@ static expression_t *parse_assignment_expression(void)
 	return parse_subexpression(PREC_ASSIGNMENT);
 }
 
-static void warn_string_concat(const source_position_t *pos)
+static void append_string(string_t const *const s)
 {
-	warningf(WARN_TRADITIONAL, pos, "traditional C rejects string constant concatenation");
+	/* FIXME Using the ast_obstack is a hack.  Using the symbol_obstack is not
+	 * possible, because other tokens are grown there alongside. */
+	obstack_grow(&ast_obstack, s->begin, s->size - 1);
+}
+
+static string_t finish_string(void)
+{
+	obstack_1grow(&ast_obstack, '\0');
+	size_t      const size   = obstack_object_size(&ast_obstack);
+	char const *const string = obstack_finish(&ast_obstack);
+	return (string_t){ string, size };
+}
+
+static string_t concat_string_literals(bool *const out_is_wide)
+{
+	assert(token.kind == T_STRING_LITERAL || token.kind == T_WIDE_STRING_LITERAL);
+
+	string_t           result;
+	bool               is_wide = token.kind == T_WIDE_STRING_LITERAL;
+	token_kind_t const la1     = (token_kind_t)look_ahead(1)->kind;
+	if (la1 == T_STRING_LITERAL || la1 == T_WIDE_STRING_LITERAL) {
+		append_string(&token.string.string);
+		next_token();
+		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects string constant concatenation");
+		do {
+			is_wide |= token.kind == T_WIDE_STRING_LITERAL;
+			append_string(&token.string.string);
+			next_token();
+		} while (token.kind == T_STRING_LITERAL || token.kind == T_WIDE_STRING_LITERAL);
+		result = finish_string();
+	} else {
+		result = token.string.string;
+		next_token();
+	}
+
+	*out_is_wide = is_wide;
+	return result;
 }
 
 static string_t parse_string_literals(void)
 {
-	assert(token.kind == T_STRING_LITERAL);
-	string_t result = token.string.string;
+	bool                    is_wide;
+	source_position_t const pos = *HERE;
+	string_t          const res = concat_string_literals(&is_wide);
 
-	eat(T_STRING_LITERAL);
-
-	while (token.kind == T_STRING_LITERAL) {
-		warn_string_concat(HERE);
-		result = concat_strings(&result, &token.string.string);
-		eat(T_STRING_LITERAL);
+	if (is_wide) {
+		errorf(&pos, "expected plain string literal, got wide string literal");
 	}
 
-	return result;
+	return res;
 }
 
 static attribute_t *allocate_attribute_zero(attribute_kind_t kind)
@@ -5696,18 +5729,9 @@ static type_t *get_wide_string_type(void)
  */
 static expression_t *parse_string_literal(void)
 {
-	source_position_t begin   = *HERE;
-	string_t          res     = token.string.string;
-	bool              is_wide = (token.kind == T_WIDE_STRING_LITERAL);
-
-	next_token();
-	while (token.kind == T_STRING_LITERAL
-			|| token.kind == T_WIDE_STRING_LITERAL) {
-		warn_string_concat(HERE);
-		res = concat_strings(&res, &token.string.string);
-		next_token();
-		is_wide |= token.kind == T_WIDE_STRING_LITERAL;
-	}
+	bool                    is_wide;
+	source_position_t const pos = *HERE;
+	string_t          const res = concat_string_literals(&is_wide);
 
 	expression_t *literal;
 	if (is_wide) {
@@ -5717,7 +5741,7 @@ static expression_t *parse_string_literal(void)
 		literal = allocate_expression_zero(EXPR_STRING_LITERAL);
 		literal->base.type = get_string_type();
 	}
-	literal->base.source_position = begin;
+	literal->base.source_position = pos;
 	literal->literal.value        = res;
 
 	return literal;

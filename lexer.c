@@ -632,21 +632,6 @@ static utf32 parse_escape_sequence(void)
 	return EOF;
 }
 
-/**
- * Concatenate two strings.
- */
-string_t concat_strings(const string_t *const s1, const string_t *const s2)
-{
-	const size_t len1 = s1->size - 1;
-	const size_t len2 = s2->size - 1;
-
-	char *const concat = obstack_alloc(&symbol_obstack, len1 + len2 + 1);
-	memcpy(concat, s1->begin, len1);
-	memcpy(concat + len1, s2->begin, len2 + 1);
-
-	return identify_string(concat, len1 + len2 + 1);
-}
-
 string_t make_string(const char *string)
 {
 	size_t      len   = strlen(string) + 1;
