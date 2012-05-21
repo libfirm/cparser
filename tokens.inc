@@ -15,6 +15,7 @@ TS(NUMBER,             "number constant",)
 TS(CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,     "string literal",)
 TS(HEADERNAME,         "headername",)
+TS(MACRO_PARAMETER,    "macro parameter",)
 TS(UNKNOWN_CHAR,       "unknown character",)
 
 #define S(mode,x)   T(mode,x,#x,)

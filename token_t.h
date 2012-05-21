@@ -59,9 +59,10 @@ extern symbol_t *token_symbols[];
 /* position used for "builtin" declarations/types */
 extern const source_position_t builtin_source_position;
 
-typedef struct token_base_t token_base_t;
-typedef struct literal_t    literal_t;
-typedef union  token_t      token_t;
+typedef struct token_base_t      token_base_t;
+typedef struct literal_t         literal_t;
+typedef struct macro_parameter_t macro_parameter_t;
+typedef union  token_t           token_t;
 
 struct token_base_t {
 	token_kind_t      kind;
@@ -74,10 +75,16 @@ struct literal_t {
 	string_t     string;
 };
 
+struct macro_parameter_t {
+	token_base_t     base;
+	pp_definition_t *def;
+};
+
 union token_t {
-	unsigned     kind;
-	token_base_t base;
-	literal_t    literal;
+	unsigned          kind;
+	token_base_t      base;
+	literal_t         literal;
+	macro_parameter_t macro_parameter;
 };
 
 char const *get_string_encoding_prefix(string_encoding_t);

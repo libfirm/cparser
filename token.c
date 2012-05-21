@@ -110,6 +110,7 @@ void print_token(FILE *f, const token_t *token)
 	char const *val;
 	switch (token->kind) {
 	case T_IDENTIFIER:
+	case T_MACRO_PARAMETER:
 	case T_UNKNOWN_CHAR:
 		val = token->base.symbol->string;
 		break;
