@@ -644,7 +644,7 @@ string_t make_string(const char *string)
 /**
  * Parse a string literal and set lexer_token.
  */
-static void parse_string_literal(void)
+static void parse_string_literal(string_encoding_t const enc)
 {
 	eat('"');
 
@@ -683,8 +683,9 @@ end_of_string:
 	const size_t  size   = (size_t)obstack_object_size(&symbol_obstack);
 	char         *string = obstack_finish(&symbol_obstack);
 
-	lexer_token.kind          = T_STRING_LITERAL;
-	lexer_token.string.string = identify_string(string, size);
+	lexer_token.kind            = T_STRING_LITERAL;
+	lexer_token.string.encoding = enc;
+	lexer_token.string.string   = identify_string(string, size);
 }
 
 /**
@@ -733,16 +734,6 @@ end_of_wide_char_constant:;
 	if (size == 0) {
 		errorf(&lexer_token.base.source_position, "empty character constant");
 	}
-}
-
-/**
- * Parse a wide string literal and set lexer_token.
- */
-static void parse_wide_string_literal(void)
-{
-	parse_string_literal();
-	if (lexer_token.kind == T_STRING_LITERAL)
-		lexer_token.kind = T_WIDE_STRING_LITERAL;
 }
 
 /**
@@ -897,7 +888,7 @@ static void parse_line_directive(void)
 		lexer_pos.lineno = atoi(pp_token.number.number.begin) - 1;
 		next_pp_token();
 	}
-	if (pp_token.kind == T_STRING_LITERAL) {
+	if (pp_token.kind == T_STRING_LITERAL && pp_token.string.encoding == STRING_ENCODING_CHAR) {
 		lexer_pos.input_name = pp_token.string.string.begin;
 		lexer_pos.is_system_header = false;
 		next_pp_token();
@@ -1083,23 +1074,25 @@ void lexer_next_preprocessing_token(void)
 			return;
 		)
 
-		SYMBOL_CHARS
+		SYMBOL_CHARS {
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
+			string_encoding_t const enc = STRING_ENCODING_WIDE;
 			if (lexer_token.base.symbol == symbol_L) {
 				switch (c) {
-					case '"':  parse_wide_string_literal();     break;
+					case '"':  parse_string_literal(enc);       break;
 					case '\'': parse_wide_character_constant(); break;
 				}
 			}
 			return;
+		}
 
 		DIGITS
 			parse_number();
 			return;
 
 		case '"':
-			parse_string_literal();
+			parse_string_literal(STRING_ENCODING_CHAR);
 			return;
 
 		case '\'':

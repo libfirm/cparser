@@ -253,7 +253,6 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_PLUSPLUS:                  \
 	case T_STRING_LITERAL:            \
 	case T_WIDE_CHARACTER_CONSTANT:   \
-	case T_WIDE_STRING_LITERAL:       \
 	case T___FUNCDNAME__:             \
 	case T___FUNCSIG__:               \
 	case T___FUNCTION__:              \
@@ -1052,39 +1051,40 @@ static string_t finish_string(void)
 	return (string_t){ string, size };
 }
 
-static string_t concat_string_literals(bool *const out_is_wide)
+static string_t concat_string_literals(string_encoding_t *const out_enc)
 {
-	assert(token.kind == T_STRING_LITERAL || token.kind == T_WIDE_STRING_LITERAL);
+	assert(token.kind == T_STRING_LITERAL);
 
-	string_t           result;
-	bool               is_wide = token.kind == T_WIDE_STRING_LITERAL;
-	token_kind_t const la1     = (token_kind_t)look_ahead(1)->kind;
-	if (la1 == T_STRING_LITERAL || la1 == T_WIDE_STRING_LITERAL) {
+	string_t          result;
+	string_encoding_t enc = token.string.encoding;
+	if (look_ahead(1)->kind == T_STRING_LITERAL) {
 		append_string(&token.string.string);
-		next_token();
+		eat(T_STRING_LITERAL);
 		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects string constant concatenation");
 		do {
-			is_wide |= token.kind == T_WIDE_STRING_LITERAL;
+			if (token.string.encoding != STRING_ENCODING_CHAR) {
+				enc = token.string.encoding;
+			}
 			append_string(&token.string.string);
-			next_token();
-		} while (token.kind == T_STRING_LITERAL || token.kind == T_WIDE_STRING_LITERAL);
+			eat(T_STRING_LITERAL);
+		} while (token.kind == T_STRING_LITERAL);
 		result = finish_string();
 	} else {
 		result = token.string.string;
-		next_token();
+		eat(T_STRING_LITERAL);
 	}
 
-	*out_is_wide = is_wide;
+	*out_enc = enc;
 	return result;
 }
 
 static string_t parse_string_literals(void)
 {
-	bool                    is_wide;
+	string_encoding_t       enc;
 	source_position_t const pos = *HERE;
-	string_t          const res = concat_string_literals(&is_wide);
+	string_t          const res = concat_string_literals(&enc);
 
-	if (is_wide) {
+	if (enc != STRING_ENCODING_CHAR) {
 		errorf(&pos, "expected plain string literal, got wide string literal");
 	}
 
@@ -5729,12 +5729,12 @@ static type_t *get_wide_string_type(void)
  */
 static expression_t *parse_string_literal(void)
 {
-	bool                    is_wide;
+	string_encoding_t       enc;
 	source_position_t const pos = *HERE;
-	string_t          const res = concat_string_literals(&is_wide);
+	string_t          const res = concat_string_literals(&enc);
 
 	expression_t *literal;
-	if (is_wide) {
+	if (enc != STRING_ENCODING_CHAR) {
 		literal = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
 		literal->base.type = get_wide_string_type();
 	} else {
@@ -6695,8 +6695,7 @@ static expression_t *parse_primary_expression(void)
 	case T_FLOATINGPOINT:                return parse_number_literal();
 	case T_CHARACTER_CONSTANT:           return parse_character_constant();
 	case T_WIDE_CHARACTER_CONSTANT:      return parse_wide_character_constant();
-	case T_STRING_LITERAL:
-	case T_WIDE_STRING_LITERAL:          return parse_string_literal();
+	case T_STRING_LITERAL:               return parse_string_literal();
 	case T___FUNCTION__:
 	case T___func__:                     return parse_function_keyword(FUNCNAME_FUNCTION);
 	case T___PRETTY_FUNCTION__:          return parse_function_keyword(FUNCNAME_PRETTY_FUNCTION);
@@ -9835,7 +9834,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_PLUSPLUS);
 	add_anchor_token(T_STRING_LITERAL);
 	add_anchor_token(T_WIDE_CHARACTER_CONSTANT);
-	add_anchor_token(T_WIDE_STRING_LITERAL);
 	add_anchor_token(T__Bool);
 	add_anchor_token(T__Complex);
 	add_anchor_token(T__Imaginary);
@@ -10011,7 +10009,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T__Imaginary);
 	rem_anchor_token(T__Complex);
 	rem_anchor_token(T__Bool);
-	rem_anchor_token(T_WIDE_STRING_LITERAL);
 	rem_anchor_token(T_WIDE_CHARACTER_CONSTANT);
 	rem_anchor_token(T_STRING_LITERAL);
 	rem_anchor_token(T_PLUSPLUS);

@@ -28,6 +28,7 @@
 #include "symbol.h"
 #include "lang_features.h"
 #include "adt/array.h"
+#include "adt/error.h"
 #include "adt/util.h"
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
@@ -123,6 +124,15 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 	}
 }
 
+char const *get_string_encoding_prefix(string_encoding_t const enc)
+{
+	switch (enc) {
+	case STRING_ENCODING_CHAR: return "";
+	case STRING_ENCODING_WIDE: return "L";
+	}
+	panic("invalid string encoding");
+}
+
 static void print_stringrep(const string_t *string, FILE *f)
 {
 	for (size_t i = 0; i < string->size; ++i) {
@@ -145,11 +155,12 @@ void print_token(FILE *f, const token_t *token)
 			print_stringrep(&token->number.suffix, f);
 		fputc('\'', f);
 		break;
-	case T_WIDE_STRING_LITERAL:
+
 	case T_STRING_LITERAL:
 		print_token_kind(f, (token_kind_t)token->kind);
-		fprintf(f, " \"%s\"", token->string.string.begin);
+		fprintf(f, " %s\"%s\"", get_string_encoding_prefix(token->string.encoding), token->string.string.begin);
 		break;
+
 	case T_CHARACTER_CONSTANT:
 	case T_WIDE_CHARACTER_CONSTANT:
 		print_token_kind(f, (token_kind_t)token->kind);

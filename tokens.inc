@@ -15,7 +15,6 @@ TS(FLOATINGPOINT,           "floatingpoint number",)
 TS(CHARACTER_CONSTANT,      "character constant",)
 TS(WIDE_CHARACTER_CONSTANT, "wide character constant",)
 TS(STRING_LITERAL,          "string literal",)
-TS(WIDE_STRING_LITERAL,     "wide string literal",)
 
 #define S(mode,x)   T(mode,x,#x,)
 S(_ALL, auto)

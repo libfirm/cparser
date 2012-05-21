@@ -70,9 +70,16 @@ struct token_base_t {
 	symbol_t         *symbol;
 };
 
+enum string_encoding_t {
+	STRING_ENCODING_CHAR,
+	STRING_ENCODING_WIDE
+};
+typedef enum string_encoding_t string_encoding_t;
+
 struct string_literal_t {
-	token_base_t  base;
-	string_t      string;
+	token_base_t      base;
+	string_encoding_t encoding;
+	string_t          string;
 };
 
 struct number_literal_t {
@@ -87,6 +94,8 @@ union token_t {
 	string_literal_t  string;
 	number_literal_t  number;
 };
+
+char const *get_string_encoding_prefix(string_encoding_t);
 
 void init_tokens(void);
 void exit_tokens(void);
