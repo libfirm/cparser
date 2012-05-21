@@ -228,7 +228,7 @@ static const char *get_argument_string(const attribute_argument_t *argument)
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		return NULL;
-	return expression->literal.value.begin;
+	return expression->string_literal.value.begin;
 }
 
 static void handle_attribute_visibility(const attribute_t *attribute,

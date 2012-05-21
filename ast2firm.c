@@ -3358,7 +3358,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
 	case EXPR_WIDE_STRING_LITERAL:        return wide_string_literal_to_firm(     &expr->string_literal);
 
-	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->literal.value);
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->string_literal.value);
 
 	case EXPR_ERROR: break;
 	}

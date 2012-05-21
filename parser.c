@@ -5741,7 +5741,7 @@ static expression_t *parse_string_literal(void)
 		literal->base.type = get_string_type();
 	}
 	literal->base.source_position = pos;
-	literal->literal.value        = res;
+	literal->string_literal.value = res;
 
 	return literal;
 }
