@@ -108,16 +108,17 @@ static inline void put_back(utf32 const pc)
 
 static inline void next_char(void);
 
-#define MATCH_NEWLINE(code)  \
-	case '\r':               \
-		next_char();         \
-		if (c == '\n') {     \
-	case '\n':               \
-			next_char();     \
-		}                    \
-		lexer_pos.lineno++;  \
+#define NEWLINE  \
+	'\r': \
+		next_char(); \
+		if (c == '\n') { \
+	case '\n': \
+			next_char(); \
+		} \
+		lexer_pos.lineno++; \
 		lexer_pos.colno = 1; \
-		code
+		goto newline; \
+		newline // Let it look like an ordinary case label.
 
 #define eat(c_type) (assert(c == c_type), next_char())
 
@@ -126,7 +127,8 @@ static void maybe_concat_lines(void)
 	eat('\\');
 
 	switch (c) {
-	MATCH_NEWLINE(return;)
+	case NEWLINE:
+		return;
 
 	default:
 		break;
@@ -660,10 +662,9 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 			break;
 		}
 
-		MATCH_NEWLINE(
+		case NEWLINE:
 			errorf(&lexer_pos, "newline while parsing %s", context);
 			break;
-		)
 
 		case EOF:
 			errorf(&lexer_token.base.source_position, "EOF while parsing %s", context);
@@ -732,7 +733,8 @@ static void skip_multiline_comment(void)
 			}
 			break;
 
-		MATCH_NEWLINE(break;)
+		case NEWLINE:
+			break;
 
 		case EOF: {
 			errorf(&lexer_token.base.source_position,
@@ -991,10 +993,9 @@ void lexer_next_preprocessing_token(void)
 			next_char();
 			break;
 
-		MATCH_NEWLINE(
+		case NEWLINE:
 			lexer_token.kind = '\n';
 			return;
-		)
 
 		SYMBOL_CHARS {
 			parse_symbol();

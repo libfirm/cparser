@@ -1119,8 +1119,8 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 		elem_type   = ir_type_char;
 		initializer = create_initializer_compound(slen);
 
-		ir_mode  *const mode = get_type_mode(elem_type);
-		char const     *p    = value->begin;
+		ir_mode *const mode = get_type_mode(elem_type);
+		char const    *p    = value->begin;
 		for (size_t i = 0; i < slen; ++i) {
 			ir_tarval        *tv  = new_tarval_from_long(*p++, mode);
 			ir_initializer_t *val = create_initializer_tarval(tv);
