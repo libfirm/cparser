@@ -51,8 +51,7 @@ void parse(void);
  */
 translation_unit_t *finish_parsing(void);
 
-type_t   *revert_automatic_type_conversion(const expression_t *expression);
-entity_t *expression_is_variable(const expression_t *expression);
+type_t *revert_automatic_type_conversion(const expression_t *expression);
 
 entity_t *record_entity(entity_t *entity, bool is_definition);
 

@@ -9414,22 +9414,6 @@ static bool expression_is_local_variable(const expression_t *expression)
 	return is_local_variable(entity);
 }
 
-/**
- * Check if a given expression represents a local variable and
- * return its declaration then, else return NULL.
- */
-entity_t *expression_is_variable(const expression_t *expression)
-{
-	if (expression->base.kind != EXPR_REFERENCE) {
-		return NULL;
-	}
-	entity_t *entity = expression->reference.entity;
-	if (entity->kind != ENTITY_VARIABLE)
-		return NULL;
-
-	return entity;
-}
-
 static void err_or_warn(source_position_t const *const pos, char const *const msg)
 {
 	if (c_mode & _CXX || strict_mode) {
