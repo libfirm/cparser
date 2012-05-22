@@ -1102,83 +1102,65 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 }
 
 /**
- * Creates a SymConst node representing a wide string literal.
- *
- * @param literal   the wide string literal
- */
-static ir_node *wide_string_literal_to_firm(
-		const string_literal_expression_t *literal)
-{
-	ir_type  *const global_type = get_glob_type();
-	ir_type  *const elem_type   = ir_type_wchar_t;
-	dbg_info *const dbgi        = get_dbg_info(&literal->base.source_position);
-	ir_type  *const type        = new_type_array(1, elem_type);
-
-	ident     *const id     = id_unique("str.%u");
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_mode      *const mode = get_type_mode(elem_type);
-	const size_t        slen = wstrlen(&literal->value);
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen * get_mode_size_bytes(mode));
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	const char              *p    = literal->value.begin;
-	for (size_t i = 0; i < slen; ++i) {
-		assert(p < literal->value.begin + literal->value.size);
-		utf32             v   = read_utf8_char(&p);
-		ir_tarval        *tv  = new_tarval_from_long(v, mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
-	}
-	set_entity_initializer(entity, initializer);
-
-	return create_symconst(dbgi, entity);
-}
-
-/**
  * Creates a SymConst node representing a string constant.
  *
  * @param src_pos    the source position of the string constant
  * @param id_prefix  a prefix for the name of the generated string constant
  * @param value      the value of the string constant
  */
-static ir_node *string_to_firm(const source_position_t *const src_pos,
-                               const char *const id_prefix,
-                               const string_t *const value)
+static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_encoding_t const enc, string_t const *const value)
 {
-	ir_type  *const global_type = get_glob_type();
-	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const elem_type   = ir_type_char;
-	ir_type  *const type        = new_type_array(1, elem_type);
+	size_t            slen;
+	ir_type          *elem_type;
+	ir_initializer_t *initializer;
+	switch (enc) {
+	case STRING_ENCODING_CHAR: {
+		slen        = value->size;
+		elem_type   = ir_type_char;
+		initializer = create_initializer_compound(slen);
 
-	ident     *const id     = id_unique(id_prefix);
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_mode    *const mode   = get_type_mode(elem_type);
-	const char* const string = value->begin;
-	const size_t      slen   = value->size;
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen);
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	for (size_t i = 0; i < slen; ++i) {
-		ir_tarval        *tv  = new_tarval_from_long(string[i], mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
+		ir_mode  *const mode = get_type_mode(elem_type);
+		char const     *p    = value->begin;
+		for (size_t i = 0; i < slen; ++i) {
+			ir_tarval        *tv  = new_tarval_from_long(*p++, mode);
+			ir_initializer_t *val = create_initializer_tarval(tv);
+			set_initializer_compound_value(initializer, i, val);
+		}
+		goto finish;
 	}
+
+	case STRING_ENCODING_WIDE: {
+		slen        = wstrlen(value);
+		elem_type   = ir_type_wchar_t;
+		initializer = create_initializer_compound(slen);
+
+		ir_mode *const mode = get_type_mode(elem_type);
+		char const    *p    = value->begin;
+		for (size_t i = 0; i < slen; ++i) {
+			assert(p < value->begin + value->size);
+			utf32             v   = read_utf8_char(&p);
+			ir_tarval        *tv  = new_tarval_from_long(v, mode);
+			ir_initializer_t *val = create_initializer_tarval(tv);
+			set_initializer_compound_value(initializer, i, val);
+		}
+		goto finish;
+	}
+	}
+	panic("invalid string encoding");
+
+finish:;
+	ir_type *const type = new_type_array(1, elem_type);
+	set_array_bounds_int(type, 0, 0, slen);
+	set_type_size_bytes( type, slen * get_type_size_bytes(elem_type));
+	set_type_state(      type, layout_fixed);
+
+	ir_type   *const global_type = get_glob_type();
+	ident     *const id          = id_unique(id_prefix);
+	dbg_info  *const dbgi        = get_dbg_info(src_pos);
+	ir_entity *const entity      = new_d_entity(global_type, id, type, dbgi);
+	set_entity_ld_ident(   entity, id);
+	set_entity_visibility( entity, ir_visibility_private);
+	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, initializer);
 
 	return create_symconst(dbgi, entity);
@@ -3156,7 +3138,7 @@ static ir_node *function_name_to_firm(
 			const source_position_t *const src_pos = &expr->base.source_position;
 			const char    *name  = current_function_entity->base.symbol->string;
 			const string_t string = { name, strlen(name) + 1 };
-			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
+			current_function_name = string_to_firm(src_pos, "__func__.%u", STRING_ENCODING_CHAR, &string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
@@ -3165,7 +3147,7 @@ static ir_node *function_name_to_firm(
 			ir_entity *ent = get_irg_entity(current_ir_graph);
 			const char *const name = get_entity_ld_name(ent);
 			const string_t string = { name, strlen(name) + 1 };
-			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
+			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", STRING_ENCODING_CHAR, &string);
 		}
 		return current_funcsig;
 	}
@@ -3354,9 +3336,8 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_VA_ARG:                     return va_arg_expression_to_firm(       &expr->va_arge);
 	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
 	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
-	case EXPR_WIDE_STRING_LITERAL:        return wide_string_literal_to_firm(     &expr->string_literal);
 
-	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->string_literal.value);
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", expr->string_literal.encoding, &expr->string_literal.value);
 
 	case EXPR_ERROR: break;
 	}

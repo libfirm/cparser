@@ -72,7 +72,6 @@ typedef enum expression_kind_t {
 	EXPR_LITERAL_WIDE_CHARACTER,
 	EXPR_LITERAL_MS_NOOP, /**< MS __noop extension */
 	EXPR_STRING_LITERAL,
-	EXPR_WIDE_STRING_LITERAL,
 	EXPR_COMPOUND_LITERAL,
 	EXPR_CALL,
 	EXPR_CONDITIONAL,
@@ -266,6 +265,7 @@ struct literal_expression_t {
 
 struct string_literal_expression_t {
 	expression_base_t  base;
+	string_encoding_t  encoding;
 	string_t           value;
 };
 

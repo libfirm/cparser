@@ -180,7 +180,6 @@ static void walk_expression(expression_t *const expr,
 	case EXPR_REFERENCE:
 	case EXPR_ENUM_CONSTANT:
 	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_ERROR:

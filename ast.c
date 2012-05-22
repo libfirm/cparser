@@ -110,7 +110,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_LITERAL_WIDE_CHARACTER]     = PREC_PRIMARY,
 		[EXPR_LITERAL_MS_NOOP]            = PREC_PRIMARY,
 		[EXPR_STRING_LITERAL]             = PREC_PRIMARY,
-		[EXPR_WIDE_STRING_LITERAL]        = PREC_PRIMARY,
 		[EXPR_COMPOUND_LITERAL]           = PREC_UNARY,
 		[EXPR_CALL]                       = PREC_POSTFIX,
 		[EXPR_CONDITIONAL]                = PREC_CONDITIONAL,
@@ -237,9 +236,7 @@ static void print_quoted_string(const string_t *const string, char border,
 
 static void print_string_literal(const string_literal_expression_t *literal)
 {
-	if (literal->base.kind == EXPR_WIDE_STRING_LITERAL) {
-		print_char('L');
-	}
+	print_string(get_string_encoding_prefix(literal->encoding));
 	print_quoted_string(&literal->value, '"', 1);
 }
 
@@ -665,7 +662,6 @@ static bool needs_parentheses(expression_t const *const expr, unsigned const top
 		case EXPR_LITERAL_CASES:
 		case EXPR_REFERENCE:
 		case EXPR_STRING_LITERAL:
-		case EXPR_WIDE_STRING_LITERAL:
 			/* Do not print () around subexpressions consisting of a single token. */
 			return false;
 
@@ -713,8 +709,7 @@ static void print_expression_prec(expression_t const *expr, unsigned const top_p
 	case EXPR_ENUM_CONSTANT:              print_reference_expression(    &expr->reference);                break;
 	case EXPR_SELECT:                     print_select(                  &expr->select);                   break;
 	case EXPR_STATEMENT:                  print_statement_expression(    &expr->statement);                break;
-	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:        print_string_literal(          &expr->string_literal);           break;
+	case EXPR_STRING_LITERAL:             print_string_literal(          &expr->string_literal);           break;
 	case EXPR_UNARY_CASES:                print_unary_expression(        &expr->unary);                    break;
 	case EXPR_VA_ARG:                     print_va_arg(                  &expr->va_arge);                  break;
 	case EXPR_VA_COPY:                    print_va_copy(                 &expr->va_copye);                 break;
@@ -1595,7 +1590,6 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 {
 	switch (expression->kind) {
 	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
 	case EXPR_LABEL_ADDRESS:
 		return EXPR_CLASS_CONSTANT;
@@ -1806,7 +1800,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	}
 
 	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_SELECT:

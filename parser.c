@@ -329,7 +329,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_LITERAL_CHARACTER]          = sizeof(literal_expression_t),
 		[EXPR_LITERAL_WIDE_CHARACTER]     = sizeof(literal_expression_t),
 		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
-		[EXPR_WIDE_STRING_LITERAL]        = sizeof(string_literal_expression_t),
 		[EXPR_COMPOUND_LITERAL]           = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                       = sizeof(call_expression_t),
 		[EXPR_UNARY_FIRST]                = sizeof(unary_expression_t),
@@ -1490,7 +1489,6 @@ unary:
 		case EXPR_LITERAL_CASES:
 		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
-		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO init?
 		case EXPR_SIZEOF:
 		case EXPR_CLASSIFY_TYPE:
@@ -1586,10 +1584,10 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
 
-		if (element_type->kind == TYPE_ATOMIC) {
-			atomic_type_kind_t akind = element_type->atomic.akind;
-			switch (expression->kind) {
-			case EXPR_STRING_LITERAL:
+		if (element_type->kind == TYPE_ATOMIC && expression->kind == EXPR_STRING_LITERAL) {
+			switch (expression->string_literal.encoding) {
+			case STRING_ENCODING_CHAR: {
+				atomic_type_kind_t const akind = element_type->atomic.akind;
 				if (akind == ATOMIC_TYPE_CHAR
 						|| akind == ATOMIC_TYPE_SCHAR
 						|| akind == ATOMIC_TYPE_UCHAR) {
@@ -1597,8 +1595,9 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 							&expression->string_literal.value);
 				}
 				break;
+			}
 
-			case EXPR_WIDE_STRING_LITERAL: {
+			case STRING_ENCODING_WIDE: {
 				type_t *bare_wchar_type = skip_typeref(type_wchar_t);
 				if (get_unqualified_type(element_type) == bare_wchar_type) {
 					return initializer_from_wide_string(array_type,
@@ -1606,9 +1605,6 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 				}
 				break;
 			}
-
-			default:
-				break;
 			}
 		}
 	}
@@ -2089,9 +2085,7 @@ finish_designator:
 			}
 
 			/* handle { "string" } special case */
-			if ((expression->kind == EXPR_STRING_LITERAL
-					|| expression->kind == EXPR_WIDE_STRING_LITERAL)
-					&& outer_type != NULL) {
+			if (expression->kind == EXPR_STRING_LITERAL && outer_type != NULL) {
 				sub = initializer_from_expression(outer_type, expression);
 				if (sub != NULL) {
 					next_if(',');
@@ -4655,7 +4649,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_ENUM_CONSTANT:
 		case EXPR_LITERAL_CASES:
 		case EXPR_STRING_LITERAL:
-		case EXPR_WIDE_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO descend into initialisers
 		case EXPR_LABEL_ADDRESS:
 		case EXPR_CLASSIFY_TYPE:
@@ -5713,14 +5706,14 @@ struct expression_parser_function_t {
 
 static expression_parser_function_t expression_parsers[T_LAST_TOKEN];
 
-static type_t *get_string_type(void)
+static type_t *get_string_type(string_encoding_t const enc)
 {
-	return is_warn_on(WARN_WRITE_STRINGS) ? type_const_char_ptr : type_char_ptr;
-}
-
-static type_t *get_wide_string_type(void)
-{
-	return is_warn_on(WARN_WRITE_STRINGS) ? type_const_wchar_t_ptr : type_wchar_t_ptr;
+	bool const warn = is_warn_on(WARN_WRITE_STRINGS);
+	switch (enc) {
+	case STRING_ENCODING_CHAR: return warn ? type_const_char_ptr    : type_char_ptr;
+	case STRING_ENCODING_WIDE: return warn ? type_const_wchar_t_ptr : type_wchar_t_ptr;
+	}
+	panic("invalid string encoding");
 }
 
 /**
@@ -5728,22 +5721,10 @@ static type_t *get_wide_string_type(void)
  */
 static expression_t *parse_string_literal(void)
 {
-	string_encoding_t       enc;
-	source_position_t const pos = *HERE;
-	string_t          const res = concat_string_literals(&enc);
-
-	expression_t *literal;
-	if (enc != STRING_ENCODING_CHAR) {
-		literal = allocate_expression_zero(EXPR_WIDE_STRING_LITERAL);
-		literal->base.type = get_wide_string_type();
-	} else {
-		literal = allocate_expression_zero(EXPR_STRING_LITERAL);
-		literal->base.type = get_string_type();
-	}
-	literal->base.source_position = pos;
-	literal->string_literal.value = res;
-
-	return literal;
+	expression_t *const expr = allocate_expression_zero(EXPR_STRING_LITERAL);
+	expr->string_literal.value = concat_string_literals(&expr->string_literal.encoding);
+	expr->base.type            = get_string_type(expr->string_literal.encoding);
+	return expr;
 }
 
 /**
@@ -5992,13 +5973,9 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t size = expression->string_literal.value.size;
-		return make_array_type(type_char, size, TYPE_QUALIFIER_NONE);
-	}
-
-	case EXPR_WIDE_STRING_LITERAL: {
-		size_t size = wstrlen(&expression->string_literal.value);
-		return make_array_type(type_wchar_t, size, TYPE_QUALIFIER_NONE);
+		size_t  const size = expression->string_literal.value.size;
+		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
+		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
 	}
 
 	case EXPR_COMPOUND_LITERAL:
@@ -7991,8 +7968,7 @@ static void warn_string_literal_address(expression_t const* expr)
 		expr = expr->unary.value;
 	}
 
-	if (expr->kind == EXPR_STRING_LITERAL
-			|| expr->kind == EXPR_WIDE_STRING_LITERAL) {
+	if (expr->kind == EXPR_STRING_LITERAL) {
 		source_position_t const *const pos = &expr->base.source_position;
 		warningf(WARN_ADDRESS, pos, "comparison with string literal results in unspecified behaviour");
 	}
@@ -8334,7 +8310,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_LITERAL_INTEGER:
 		case EXPR_LITERAL_FLOATINGPOINT:
 		case EXPR_STRING_LITERAL:             return false;
-		case EXPR_WIDE_STRING_LITERAL:        return false;
 
 		case EXPR_CALL: {
 			const call_expression_t *const call = &expr->call;

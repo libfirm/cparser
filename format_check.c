@@ -127,8 +127,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 		return nt > nf ? nt : nf;
 	}
 
-	if (fmt_expr->kind != EXPR_STRING_LITERAL
-			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
+	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return -1;
 
 	const char *string = fmt_expr->string_literal.value.begin;
@@ -600,8 +599,7 @@ static void check_scanf_format(const call_argument_t *arg,
 		fmt_expr = fmt_expr->unary.value;
 	}
 
-	if (fmt_expr->kind != EXPR_STRING_LITERAL
-			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
+	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return;
 
 	const char *string = fmt_expr->string_literal.value.begin;
