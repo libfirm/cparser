@@ -680,8 +680,8 @@ end_of_string:
 
 	/* add finishing 0 to the string */
 	obstack_1grow(&symbol_obstack, '\0');
-	const size_t  size   = (size_t)obstack_object_size(&symbol_obstack);
-	char         *string = obstack_finish(&symbol_obstack);
+	size_t const size   = (size_t)obstack_object_size(&symbol_obstack) - 1;
+	char        *string = obstack_finish(&symbol_obstack);
 
 	lexer_token.kind            = T_STRING_LITERAL;
 	lexer_token.string.encoding = enc;

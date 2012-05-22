@@ -1115,7 +1115,7 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 	ir_initializer_t *initializer;
 	switch (enc) {
 	case STRING_ENCODING_CHAR: {
-		slen        = value->size;
+		slen        = value->size + 1;
 		elem_type   = ir_type_char;
 		initializer = create_initializer_compound(slen);
 
@@ -1130,14 +1130,14 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 	}
 
 	case STRING_ENCODING_WIDE: {
-		slen        = wstrlen(value);
+		slen        = wstrlen(value) + 1;
 		elem_type   = ir_type_wchar_t;
 		initializer = create_initializer_compound(slen);
 
 		ir_mode *const mode = get_type_mode(elem_type);
 		char const    *p    = value->begin;
 		for (size_t i = 0; i < slen; ++i) {
-			assert(p < value->begin + value->size);
+			assert(p <= value->begin + value->size);
 			utf32             v   = read_utf8_char(&p);
 			ir_tarval        *tv  = new_tarval_from_long(v, mode);
 			ir_initializer_t *val = create_initializer_tarval(tv);
@@ -3137,7 +3137,7 @@ static ir_node *function_name_to_firm(
 		if (current_function_name == NULL) {
 			const source_position_t *const src_pos = &expr->base.source_position;
 			const char    *name  = current_function_entity->base.symbol->string;
-			const string_t string = { name, strlen(name) + 1 };
+			const string_t string = { name, strlen(name) };
 			current_function_name = string_to_firm(src_pos, "__func__.%u", STRING_ENCODING_CHAR, &string);
 		}
 		return current_function_name;
@@ -3146,7 +3146,7 @@ static ir_node *function_name_to_firm(
 			const source_position_t *const src_pos = &expr->base.source_position;
 			ir_entity *ent = get_irg_entity(current_ir_graph);
 			const char *const name = get_entity_ld_name(ent);
-			const string_t string = { name, strlen(name) + 1 };
+			const string_t string = { name, strlen(name) };
 			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", STRING_ENCODING_CHAR, &string);
 		}
 		return current_funcsig;
@@ -5632,13 +5632,8 @@ static void global_asm_to_firm(statement_t *s)
 		assert(s->kind == STATEMENT_ASM);
 
 		char const *const text = s->asms.asm_text.begin;
-		size_t            size = s->asms.asm_text.size;
-
-		/* skip the last \0 */
-		if (text[size - 1] == '\0')
-			--size;
-
-		ident *const id = new_id_from_chars(text, size);
+		size_t      const size = s->asms.asm_text.size;
+		ident      *const id   = new_id_from_chars(text, size);
 		add_irp_asm(id);
 	}
 }

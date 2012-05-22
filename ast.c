@@ -195,13 +195,11 @@ static unsigned get_expression_precedence(expression_kind_t kind)
  *
  * @param string  the string constant
  * @param border  the border char
- * @param skip    number of chars to skip at the end
  */
-static void print_quoted_string(const string_t *const string, char border,
-                                int skip)
+static void print_quoted_string(const string_t *const string, char border)
 {
 	print_char(border);
-	const char *end = string->begin + string->size - skip;
+	const char *end = string->begin + string->size;
 	for (const char *c = string->begin; c != end; ++c) {
 		const char tc = *c;
 		if (tc == border) {
@@ -237,7 +235,7 @@ static void print_quoted_string(const string_t *const string, char border,
 static void print_string_literal(const string_literal_expression_t *literal)
 {
 	print_string(get_string_encoding_prefix(literal->encoding));
-	print_quoted_string(&literal->value, '"', 1);
+	print_quoted_string(&literal->value, '"');
 }
 
 static void print_literal(const literal_expression_t *literal)
@@ -258,7 +256,7 @@ static void print_literal(const literal_expression_t *literal)
 		print_char('L');
 		/* FALLTHROUGH */
 	case EXPR_LITERAL_CHARACTER:
-		print_quoted_string(&literal->value, '\'', 0);
+		print_quoted_string(&literal->value, '\'');
 		return;
 	default:
 		break;
@@ -1038,7 +1036,7 @@ static void print_asm_arguments(asm_argument_t *arguments)
 		if (argument->symbol) {
 			print_format("[%s] ", argument->symbol->string);
 		}
-		print_quoted_string(&argument->constraints, '"', 1);
+		print_quoted_string(&argument->constraints, '"');
 		print_string(" (");
 		print_expression(argument->expression);
 		print_char(')');
@@ -1057,7 +1055,7 @@ static void print_asm_clobbers(asm_clobber_t *clobbers)
 		if (clobber != clobbers)
 			print_string(", ");
 
-		print_quoted_string(&clobber->clobber, '"', 1);
+		print_quoted_string(&clobber->clobber, '"');
 	}
 }
 
@@ -1073,7 +1071,7 @@ static void print_asm_statement(const asm_statement_t *statement)
 		print_string("volatile ");
 	}
 	print_char('(');
-	print_quoted_string(&statement->asm_text, '"', 1);
+	print_quoted_string(&statement->asm_text, '"');
 	if (statement->outputs  == NULL &&
 	    statement->inputs   == NULL &&
 	    statement->clobbers == NULL)
@@ -1211,10 +1209,10 @@ void print_initializer(const initializer_t *initializer)
 		return;
 	}
 	case INITIALIZER_STRING:
-		print_quoted_string(&initializer->string.string, '"', 1);
+		print_quoted_string(&initializer->string.string, '"');
 		return;
 	case INITIALIZER_WIDE_STRING:
-		print_quoted_string(&initializer->string.string, '"', 1);
+		print_quoted_string(&initializer->string.string, '"');
 		return;
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);

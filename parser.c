@@ -1038,13 +1038,13 @@ static void append_string(string_t const *const s)
 {
 	/* FIXME Using the ast_obstack is a hack.  Using the symbol_obstack is not
 	 * possible, because other tokens are grown there alongside. */
-	obstack_grow(&ast_obstack, s->begin, s->size - 1);
+	obstack_grow(&ast_obstack, s->begin, s->size);
 }
 
 static string_t finish_string(void)
 {
 	obstack_1grow(&ast_obstack, '\0');
-	size_t      const size   = obstack_object_size(&ast_obstack);
+	size_t      const size   = obstack_object_size(&ast_obstack) - 1;
 	char const *const string = obstack_finish(&ast_obstack);
 	return (string_t){ string, size };
 }
@@ -2235,7 +2235,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		case INITIALIZER_STRING:
-			size = result->string.string.size;
+			size = result->string.string.size + 1;
 			break;
 
 		case INITIALIZER_WIDE_STRING:
@@ -5973,7 +5973,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t  const size = expression->string_literal.value.size;
+		size_t  const size = expression->string_literal.value.size + 1;
 		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
 		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
 	}
