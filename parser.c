@@ -1076,8 +1076,11 @@ static string_t concat_string_literals(string_encoding_t *const out_enc)
 	return result;
 }
 
-static string_t parse_string_literals(void)
+static string_t parse_string_literals(char const *const context)
 {
+	if (!skip_till(T_STRING_LITERAL, context))
+		return (string_t){ "", 0 };
+
 	string_encoding_t       enc;
 	source_position_t const pos = *HERE;
 	string_t          const res = concat_string_literals(&enc);
@@ -8636,7 +8639,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 				return NULL;
 		}
 
-		argument->constraints = parse_string_literals();
+		argument->constraints = parse_string_literals("asm argument");
 		add_anchor_token(')');
 		expect('(');
 		expression_t *expression = parse_expression();
@@ -8723,7 +8726,7 @@ static asm_clobber_t *parse_asm_clobbers(void)
 
 	while (token.kind == T_STRING_LITERAL) {
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
-		clobber->clobber       = parse_string_literals();
+		clobber->clobber       = parse_string_literals(NULL);
 
 		*anchor = clobber;
 		anchor  = &clobber->next;
@@ -8750,11 +8753,7 @@ static statement_t *parse_asm_statement(void)
 
 	expect('(');
 	add_anchor_token(')');
-	if (token.kind != T_STRING_LITERAL) {
-		parse_error_expected("after asm(", T_STRING_LITERAL, NULL);
-		goto end_of_asm;
-	}
-	asm_statement->asm_text = parse_string_literals();
+	asm_statement->asm_text = parse_string_literals("asm statement");
 
 	add_anchor_token(':');
 	if (!next_if(':')) {
@@ -10054,7 +10053,7 @@ static void parse_global_asm(void)
 	expect('(');
 
 	rem_anchor_token(T_STRING_LITERAL);
-	statement->asms.asm_text = parse_string_literals();
+	statement->asms.asm_text = parse_string_literals("global asm");
 	statement->base.next     = unit->global_asm;
 	unit->global_asm         = statement;
 
@@ -10069,7 +10068,7 @@ static void parse_linkage_specification(void)
 	eat(T_extern);
 
 	source_position_t const pos     = *HERE;
-	char const       *const linkage = parse_string_literals().begin;
+	char const       *const linkage = parse_string_literals(NULL).begin;
 
 	linkage_kind_t old_linkage = current_linkage;
 	linkage_kind_t new_linkage;
