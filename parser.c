@@ -8747,36 +8747,27 @@ static statement_t *parse_asm_statement(void)
 	asm_statement_t *asm_statement = &statement->asms;
 
 	eat(T_asm);
+	add_anchor_token(')');
+	add_anchor_token(':');
+	add_anchor_token(T_STRING_LITERAL);
 
 	if (next_if(T_volatile))
 		asm_statement->is_volatile = true;
 
 	expect('(');
-	add_anchor_token(')');
+	rem_anchor_token(T_STRING_LITERAL);
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
-	add_anchor_token(':');
-	if (!next_if(':')) {
-		rem_anchor_token(':');
-		goto end_of_asm;
-	}
+	if (next_if(':'))
+		asm_statement->outputs = parse_asm_arguments(true);
 
-	asm_statement->outputs = parse_asm_arguments(true);
-	if (!next_if(':')) {
-		rem_anchor_token(':');
-		goto end_of_asm;
-	}
+	if (next_if(':'))
+		asm_statement->inputs = parse_asm_arguments(false);
 
-	asm_statement->inputs = parse_asm_arguments(false);
-	if (!next_if(':')) {
-		rem_anchor_token(':');
-		goto end_of_asm;
-	}
 	rem_anchor_token(':');
+	if (next_if(':'))
+		asm_statement->clobbers = parse_asm_clobbers();
 
-	asm_statement->clobbers = parse_asm_clobbers();
-
-end_of_asm:
 	rem_anchor_token(')');
 	expect(')');
 	expect(';');
