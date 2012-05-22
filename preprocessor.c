@@ -1340,16 +1340,16 @@ static void parse_undef_directive(void)
 	eat_pp_directive();
 }
 
+/** behind an #include we can have the special headername lexems.
+ * They're only allowed behind an #include so they're not recognized
+ * by the normal next_preprocessing_token. We handle them as a special
+ * exception here */
 static void parse_headername(void)
 {
 	const source_position_t start_position = input.position;
 	string_t                string         = { NULL, 0, STRING_ENCODING_CHAR };
 	assert(obstack_object_size(&symbol_obstack) == 0);
 
-	/* behind an #include we can have the special headername lexems.
-	 * They're only allowed behind an #include so they're not recognized
-	 * by the normal next_preprocessing_token. We handle them as a special
-	 * exception here */
 	if (info.at_line_begin) {
 		parse_error("expected headername after #include");
 		goto finish_error;
