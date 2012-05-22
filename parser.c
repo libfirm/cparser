@@ -628,33 +628,33 @@ static void type_error_incompatible(const char *msg,
 	       msg, type1, type2);
 }
 
+static bool skip_till(token_kind_t const expected, char const *const context)
+{
+	if (UNLIKELY(token.kind != expected)) {
+		parse_error_expected(context, expected, NULL);
+		add_anchor_token(expected);
+		eat_until_anchor();
+		rem_anchor_token(expected);
+		if (token.kind != expected)
+			return false;
+	}
+	return true;
+}
+
 /**
  * Expect the current token is the expected token.
  * If not, generate an error and skip until the next anchor.
  */
 static void expect(token_kind_t const expected)
 {
-	if (UNLIKELY(token.kind != expected)) {
-		parse_error_expected(NULL, expected, NULL);
-		add_anchor_token(expected);
-		eat_until_anchor();
-		rem_anchor_token(expected);
-		if (token.kind != expected)
-			return;
-	}
-	eat(expected);
+	if (skip_till(expected, NULL))
+		eat(expected);
 }
 
 static symbol_t *expect_identifier(char const *const context, source_position_t *const pos)
 {
-	if (token.kind != T_IDENTIFIER) {
-		parse_error_expected(context, T_IDENTIFIER, NULL);
-		add_anchor_token(T_IDENTIFIER);
-		eat_until_anchor();
-		rem_anchor_token(T_IDENTIFIER);
-		if (token.kind != T_IDENTIFIER)
-			return NULL;
-	}
+	if (!skip_till(T_IDENTIFIER, context))
+		return NULL;
 	symbol_t *const sym = token.base.symbol;
 	if (pos)
 		*pos = *HERE;
