@@ -641,59 +641,9 @@ string_t make_string(const char *string)
 	return identify_string(space, len);
 }
 
-/**
- * Parse a string literal and set lexer_token.
- */
-static void parse_string_literal(string_encoding_t const enc)
+static void parse_string(utf32 const delim, token_kind_t const kind, string_encoding_t const enc, char const *const context)
 {
-	eat('"');
-
-	while (true) {
-		switch (c) {
-		case '\\': {
-			utf32 const tc = parse_escape_sequence();
-			if (tc >= 0x100) {
-				warningf(WARN_OTHER, &lexer_pos, "escape sequence out of range");
-			}
-			obstack_1grow(&symbol_obstack, tc);
-			break;
-		}
-
-		case EOF:
-			errorf(&lexer_token.base.source_position, "string has no end");
-			goto end_of_string;
-
-		case '"':
-			next_char();
-			goto end_of_string;
-
-		default:
-			obstack_grow_symbol(&symbol_obstack, c);
-			next_char();
-			break;
-		}
-	}
-
-end_of_string:
-
-	/* TODO: concatenate multiple strings separated by whitespace... */
-
-	/* add finishing 0 to the string */
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t const size   = (size_t)obstack_object_size(&symbol_obstack) - 1;
-	char        *string = obstack_finish(&symbol_obstack);
-
-	lexer_token.kind            = T_STRING_LITERAL;
-	lexer_token.string.encoding = enc;
-	lexer_token.string.string   = identify_string(string, size);
-}
-
-/**
- * Parse a character constant and set lexer_token.
- */
-static void parse_character_constant(string_encoding_t const enc)
-{
-	eat('\'');
+	eat(delim);
 
 	while (true) {
 		switch (c) {
@@ -711,36 +661,51 @@ static void parse_character_constant(string_encoding_t const enc)
 		}
 
 		MATCH_NEWLINE(
-			parse_error("newline while parsing character constant");
+			errorf(&lexer_pos, "newline while parsing %s", context);
 			break;
 		)
 
-		case '\'':
-			next_char();
-			goto end_of_char_constant;
-
 		case EOF:
-			errorf(&lexer_token.base.source_position, "EOF while parsing character constant");
-			goto end_of_char_constant;
+			errorf(&lexer_token.base.source_position, "EOF while parsing %s", context);
+			goto end_of_string;
 
 		default:
-			obstack_grow_symbol(&symbol_obstack, c);
-			next_char();
-			break;
-
+			if (c == delim) {
+				next_char();
+				goto end_of_string;
+			} else {
+				obstack_grow_symbol(&symbol_obstack, c);
+				next_char();
+				break;
+			}
 		}
 	}
 
-end_of_char_constant:;
+end_of_string:
 	obstack_1grow(&symbol_obstack, '\0');
-	const size_t        size   = (size_t)obstack_object_size(&symbol_obstack)-1;
-	char         *const string = obstack_finish(&symbol_obstack);
+	size_t const size   = obstack_object_size(&symbol_obstack) - 1;
+	char  *const string = obstack_finish(&symbol_obstack);
 
-	lexer_token.kind            = T_CHARACTER_CONSTANT;
+	lexer_token.kind            = kind;
 	lexer_token.string.encoding = enc;
 	lexer_token.string.string   = identify_string(string, size);
+}
 
-	if (size == 0) {
+/**
+ * Parse a string literal and set lexer_token.
+ */
+static void parse_string_literal(string_encoding_t const enc)
+{
+	parse_string('"', T_STRING_LITERAL, enc, "string literal");
+}
+
+/**
+ * Parse a character constant and set lexer_token.
+ */
+static void parse_character_constant(string_encoding_t const enc)
+{
+	parse_string('\'', T_CHARACTER_CONSTANT, enc, "character constant");
+	if (lexer_token.string.string.size == 0) {
 		errorf(&lexer_token.base.source_position, "empty character constant");
 	}
 }
