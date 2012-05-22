@@ -63,7 +63,6 @@ fp_model_t firm_fp_model = fp_model_precise;
 static const backend_params *be_params;
 
 static ir_type *ir_type_char;
-static ir_type *ir_type_const_char;
 static ir_type *ir_type_wchar_t;
 
 /* architecture specific floating point arithmetic mode (if any) */
@@ -1156,7 +1155,8 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 {
 	ir_type  *const global_type = get_glob_type();
 	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const type        = new_type_array(1, ir_type_const_char);
+	ir_type  *const elem_type   = ir_type_char;
+	ir_type  *const type        = new_type_array(1, elem_type);
 
 	ident     *const id     = id_unique(id_prefix);
 	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
@@ -1164,9 +1164,7 @@ static ir_node *string_to_firm(const source_position_t *const src_pos,
 	set_entity_visibility(entity, ir_visibility_private);
 	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
 
-	ir_type *const elem_type = ir_type_const_char;
-	ir_mode *const mode      = get_type_mode(elem_type);
-
+	ir_mode    *const mode   = get_type_mode(elem_type);
 	const char* const string = value->begin;
 	const size_t      slen   = value->size;
 
@@ -5632,9 +5630,8 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	ir_type_char       = get_ir_type(type_char);
-	ir_type_const_char = get_ir_type(type_const_char);
-	ir_type_wchar_t    = get_ir_type(type_wchar_t);
+	ir_type_char    = get_ir_type(type_char);
+	ir_type_wchar_t = get_ir_type(type_wchar_t);
 
 	be_params             = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
