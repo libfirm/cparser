@@ -509,63 +509,26 @@ end_of_string:
 	pp_token.string.string   = make_string(string, size);
 }
 
-static void parse_wide_character_constant(void)
-{
-	eat('\'');
-
-	while (true) {
-		switch (input.c) {
-		case '\\': {
-			const utf32 tc = parse_escape_sequence();
-			obstack_grow_symbol(&symbol_obstack, tc);
-			break;
-		}
-
-		MATCH_NEWLINE(
-			parse_error("newline while parsing character constant");
-			break;
-		)
-
-		case '\'':
-			next_char();
-			goto end_of_wide_char_constant;
-
-		case EOF:
-			parse_error("EOF while parsing character constant");
-			goto end_of_wide_char_constant;
-
-		default:
-			obstack_grow_symbol(&symbol_obstack, input.c);
-			next_char();
-			break;
-		}
-	}
-
-end_of_wide_char_constant:
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t  size = (size_t) obstack_object_size(&symbol_obstack)-1;
-	char   *string = obstack_finish(&symbol_obstack);
-	pp_token.kind          = TP_WIDE_CHARACTER_CONSTANT;
-	pp_token.string.string = make_string(string, size);
-
-	if (size == 0) {
-		parse_error("empty character constant");
-	}
-}
-
-static void parse_character_constant(void)
+static void parse_character_constant(string_encoding_t const enc)
 {
 	const unsigned start_linenr = input.position.lineno;
 
 	eat('\'');
 
-	int tc;
 	while (true) {
 		switch (input.c) {
-		case '\\':
-			tc = parse_escape_sequence();
-			obstack_1grow(&symbol_obstack, (char) tc);
+		case '\\': {
+			utf32 const tc = parse_escape_sequence();
+			if (enc == STRING_ENCODING_CHAR) {
+				if (tc >= 0x100) {
+					warningf(WARN_OTHER, &pp_token.base.source_position, "escape sequence out of range");
+				}
+				obstack_1grow(&symbol_obstack, tc);
+			} else {
+				obstack_grow_symbol(&symbol_obstack, tc);
+			}
 			break;
+		}
 
 		MATCH_NEWLINE(
 			parse_error("newline while parsing character constant");
@@ -585,7 +548,7 @@ static void parse_character_constant(void)
 			goto end_of_char_constant;
 
 		default:
-			obstack_1grow(&symbol_obstack, (char) input.c);
+			obstack_grow_symbol(&symbol_obstack, input.c);
 			next_char();
 			break;
 
@@ -594,11 +557,12 @@ static void parse_character_constant(void)
 
 end_of_char_constant:;
 	obstack_1grow(&symbol_obstack, '\0');
-	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
-	char *const  string = obstack_finish(&symbol_obstack);
+	size_t const size   = obstack_object_size(&symbol_obstack) - 1;
+	char  *const string = obstack_finish(&symbol_obstack);
 
-	pp_token.kind          = TP_CHARACTER_CONSTANT;
-	pp_token.string.string = make_string(string, size);
+	pp_token.kind            = TP_CHARACTER_CONSTANT;
+	pp_token.string.encoding = enc;
+	pp_token.string.string   = make_string(string, size);
 
 	if (size == 0) {
 		parse_error("empty character constant");
@@ -851,7 +815,7 @@ end_symbol:
 		return;
 	} else if (input.c == '\'' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
-		parse_wide_character_constant();
+		parse_character_constant(STRING_ENCODING_WIDE);
 		return;
 	}
 
@@ -971,7 +935,7 @@ restart:
 		return;
 
 	case '\'':
-		parse_character_constant();
+		parse_character_constant(STRING_ENCODING_CHAR);
 		return;
 
 	case '.':
@@ -1224,9 +1188,9 @@ static void emit_pp_token(void)
 		fputs(pp_token.string.string.begin, out);
 		fputc('"', out);
 		break;
-	case TP_WIDE_CHARACTER_CONSTANT:
-		fputc('L', out);
+
 	case TP_CHARACTER_CONSTANT:
+		fputs(get_string_encoding_prefix(pp_token.string.encoding), out);
 		fputc('\'', out);
 		fputs(pp_token.string.string.begin, out);
 		fputc('\'', out);
