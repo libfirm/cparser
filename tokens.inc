@@ -9,12 +9,11 @@
 #undef PUNCTUATOR
 #undef ALTERNATE
 
-TS(IDENTIFIER,              "identifier",)
-TS(INTEGER,                 "integer number",)
-TS(FLOATINGPOINT,           "floatingpoint number",)
-TS(CHARACTER_CONSTANT,      "character constant",)
-TS(WIDE_CHARACTER_CONSTANT, "wide character constant",)
-TS(STRING_LITERAL,          "string literal",)
+TS(IDENTIFIER,         "identifier",)
+TS(INTEGER,            "integer number",)
+TS(FLOATINGPOINT,      "floatingpoint number",)
+TS(CHARACTER_CONSTANT, "character constant",)
+TS(STRING_LITERAL,     "string literal",)
 
 #define S(mode,x)   T(mode,x,#x,)
 S(_ALL, auto)
