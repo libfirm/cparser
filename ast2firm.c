@@ -1294,8 +1294,8 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 	size_t      size   = literal->value.size;
 	ir_tarval  *tv;
 
-	switch (literal->base.kind) {
-	case EXPR_LITERAL_WIDE_CHARACTER: {
+	switch (literal->encoding) {
+	case STRING_ENCODING_WIDE: {
 		utf32  v = read_utf8_char(&string);
 		char   buf[128];
 		size_t len = snprintf(buf, sizeof(buf), UTF32_PRINTF_FORMAT, v);
@@ -1304,7 +1304,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 		break;
 	}
 
-	case EXPR_LITERAL_CHARACTER: {
+	case STRING_ENCODING_CHAR: {
 		long long int v;
 		bool char_is_signed
 			= get_atomic_type_flags(ATOMIC_TYPE_CHAR) & ATOMIC_TYPE_FLAG_SIGNED;
@@ -3348,8 +3348,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
 	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
 	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
-	case EXPR_LITERAL_CHARACTER:
-	case EXPR_LITERAL_WIDE_CHARACTER:     return char_literal_to_firm(            &expr->string_literal);
+	case EXPR_LITERAL_CHARACTER:          return char_literal_to_firm(            &expr->string_literal);
 	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
 	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
 	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);

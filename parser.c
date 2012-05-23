@@ -326,7 +326,6 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_FLOATINGPOINT]      = sizeof(literal_expression_t),
 		[EXPR_LITERAL_CHARACTER]          = sizeof(string_literal_expression_t),
-		[EXPR_LITERAL_WIDE_CHARACTER]     = sizeof(string_literal_expression_t),
 		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
 		[EXPR_COMPOUND_LITERAL]           = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                       = sizeof(call_expression_t),
@@ -1490,7 +1489,6 @@ unary:
 
 		case EXPR_LITERAL_CASES:
 		case EXPR_LITERAL_CHARACTER:
-		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_ERROR:
 		case EXPR_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO init?
@@ -4653,7 +4651,6 @@ static bool expression_returns(expression_t const *const expr)
 		case EXPR_ENUM_CONSTANT:
 		case EXPR_LITERAL_CASES:
 		case EXPR_LITERAL_CHARACTER:
-		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_STRING_LITERAL:
 		case EXPR_COMPOUND_LITERAL: // TODO descend into initialisers
 		case EXPR_LABEL_ADDRESS:
@@ -5858,13 +5855,13 @@ static expression_t *parse_number_literal(void)
  */
 static expression_t *parse_character_constant(void)
 {
-	expression_t *literal;
-	switch (token.string.encoding) {
-	case STRING_ENCODING_CHAR: {
-		literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
-		literal->base.type            = c_mode & _CXX ? type_char : type_int;
-		literal->string_literal.value = token.string.string;
+	expression_t *const literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
+	literal->string_literal.encoding = token.string.encoding;
+	literal->string_literal.value    = token.string.string;
 
+	switch (token.string.encoding) {
+	case STRING_ENCODING_CHAR:
+		literal->base.type = c_mode & _CXX ? type_char : type_int;
 		if (literal->string_literal.value.size > 1) {
 			if (!GNU_MODE && !(c_mode & _C99)) {
 				errorf(HERE, "more than 1 character in character constant");
@@ -5874,18 +5871,13 @@ static expression_t *parse_character_constant(void)
 			}
 		}
 		break;
-	}
 
-	case STRING_ENCODING_WIDE: {
-		literal = allocate_expression_zero(EXPR_LITERAL_WIDE_CHARACTER);
-		literal->base.type            = type_int;
-		literal->string_literal.value = token.string.string;
-
+	case STRING_ENCODING_WIDE:
+		literal->base.type = type_int;
 		if (wstrlen(&literal->string_literal.value) > 1) {
 			warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
 		}
 		break;
-	}
 	}
 
 	eat(T_CHARACTER_CONSTANT);
@@ -8309,7 +8301,6 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_LITERAL_MS_NOOP:            return true;
 		case EXPR_LITERAL_BOOLEAN:
 		case EXPR_LITERAL_CHARACTER:
-		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_LITERAL_INTEGER:
 		case EXPR_LITERAL_FLOATINGPOINT:
 		case EXPR_STRING_LITERAL:             return false;

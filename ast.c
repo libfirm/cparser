@@ -107,7 +107,6 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_LITERAL_INTEGER]            = PREC_PRIMARY,
 		[EXPR_LITERAL_FLOATINGPOINT]      = PREC_PRIMARY,
 		[EXPR_LITERAL_CHARACTER]          = PREC_PRIMARY,
-		[EXPR_LITERAL_WIDE_CHARACTER]     = PREC_PRIMARY,
 		[EXPR_LITERAL_MS_NOOP]            = PREC_PRIMARY,
 		[EXPR_STRING_LITERAL]             = PREC_PRIMARY,
 		[EXPR_COMPOUND_LITERAL]           = PREC_UNARY,
@@ -232,17 +231,10 @@ static void print_quoted_string(const string_t *const string, char border)
 	print_char(border);
 }
 
-static void print_char_literal(string_literal_expression_t const *const literal)
-{
-	if (literal->base.kind == EXPR_LITERAL_WIDE_CHARACTER)
-		print_char('L');
-	print_quoted_string(&literal->value, '\'');
-}
-
-static void print_string_literal(const string_literal_expression_t *literal)
+static void print_string_literal(string_literal_expression_t const *const literal, char const delimiter)
 {
 	print_string(get_string_encoding_prefix(literal->encoding));
-	print_quoted_string(&literal->value, '"');
+	print_quoted_string(&literal->value, delimiter);
 }
 
 static void print_literal(const literal_expression_t *literal)
@@ -660,7 +652,6 @@ static bool needs_parentheses(expression_t const *const expr, unsigned const top
 		case EXPR_FUNCNAME:
 		case EXPR_LITERAL_CASES:
 		case EXPR_LITERAL_CHARACTER:
-		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_REFERENCE:
 		case EXPR_STRING_LITERAL:
 			/* Do not print () around subexpressions consisting of a single token. */
@@ -705,14 +696,13 @@ static void print_expression_prec(expression_t const *expr, unsigned const top_p
 	case EXPR_FUNCNAME:                   print_funcname(                &expr->funcname);                 break;
 	case EXPR_LABEL_ADDRESS:              print_label_address_expression(&expr->label_address);            break;
 	case EXPR_LITERAL_CASES:              print_literal(                 &expr->literal);                  break;
-	case EXPR_LITERAL_CHARACTER:
-	case EXPR_LITERAL_WIDE_CHARACTER:     print_char_literal(            &expr->string_literal);           break;
+	case EXPR_LITERAL_CHARACTER:          print_string_literal(          &expr->string_literal, '\'');     break;
 	case EXPR_OFFSETOF:                   print_offsetof_expression(     &expr->offsetofe);                break;
 	case EXPR_REFERENCE:
 	case EXPR_ENUM_CONSTANT:              print_reference_expression(    &expr->reference);                break;
 	case EXPR_SELECT:                     print_select(                  &expr->select);                   break;
 	case EXPR_STATEMENT:                  print_statement_expression(    &expr->statement);                break;
-	case EXPR_STRING_LITERAL:             print_string_literal(          &expr->string_literal);           break;
+	case EXPR_STRING_LITERAL:             print_string_literal(          &expr->string_literal, '"');      break;
 	case EXPR_UNARY_CASES:                print_unary_expression(        &expr->unary);                    break;
 	case EXPR_VA_ARG:                     print_va_arg(                  &expr->va_arge);                  break;
 	case EXPR_VA_COPY:                    print_va_copy(                 &expr->va_copye);                 break;
@@ -1788,7 +1778,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	switch (expression->kind) {
 	case EXPR_LITERAL_CASES:
 	case EXPR_LITERAL_CHARACTER:
-	case EXPR_LITERAL_WIDE_CHARACTER:
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
