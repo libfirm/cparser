@@ -1556,7 +1556,7 @@ static void parse_ifdef_ifndef_directive(void)
 		condition = true;
 	} else {
 		/* evaluate wether we are in true or false case */
-		condition = !pp_token.base.symbol->pp_definition == is_ifndef;
+		condition = (bool)!pp_token.base.symbol->pp_definition == is_ifndef;
 
 		next_preprocessing_token();
 
