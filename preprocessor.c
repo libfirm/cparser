@@ -457,7 +457,7 @@ static string_t make_string(char *string, size_t len)
 	return (string_t) {result, len};
 }
 
-static void parse_string_literal(void)
+static void parse_string_literal(string_encoding_t const enc)
 {
 	const unsigned start_linenr = input.position.lineno;
 
@@ -504,18 +504,9 @@ end_of_string:
 	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
 	char *const  string = obstack_finish(&symbol_obstack);
 
-	pp_token.kind          = TP_STRING_LITERAL;
-	pp_token.string.string = make_string(string, size);
-}
-
-/**
- * Parse a wide string literal and set lexer_token.
- */
-static void parse_wide_string_literal(void)
-{
-	parse_string_literal();
-	if (pp_token.kind == TP_STRING_LITERAL)
-		pp_token.kind = TP_WIDE_STRING_LITERAL;
+	pp_token.kind            = TP_STRING_LITERAL;
+	pp_token.string.encoding = enc;
+	pp_token.string.string   = make_string(string, size);
 }
 
 static void parse_wide_character_constant(void)
@@ -856,7 +847,7 @@ end_symbol:
 	/* might be a wide string or character constant ( L"string"/L'c' ) */
 	if (input.c == '"' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
-		parse_wide_string_literal();
+		parse_string_literal(STRING_ENCODING_WIDE);
 		return;
 	} else if (input.c == '\'' && string[0] == 'L' && string[1] == '\0') {
 		obstack_free(&symbol_obstack, string);
@@ -976,7 +967,7 @@ restart:
 		return;
 
 	case '"':
-		parse_string_literal();
+		parse_string_literal(STRING_ENCODING_CHAR);
 		return;
 
 	case '\'':
@@ -1226,9 +1217,9 @@ static void emit_pp_token(void)
 	case TP_NUMBER:
 		fputs(pp_token.number.number.begin, out);
 		break;
-	case TP_WIDE_STRING_LITERAL:
-		fputc('L', out);
+
 	case TP_STRING_LITERAL:
+		fputs(get_string_encoding_prefix(pp_token.string.encoding), out);
 		fputc('"', out);
 		fputs(pp_token.string.string.begin, out);
 		fputc('"', out);

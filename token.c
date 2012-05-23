@@ -247,7 +247,6 @@ bool tokens_would_paste(preprocessor_token_kind_t token1,
 		return token2 == TP_IDENTIFIER || token2 == TP_NUMBER ||
 		       token2 == TP_CHARACTER_CONSTANT ||
 		       token2 == TP_WIDE_CHARACTER_CONSTANT ||
-		       token2 == TP_WIDE_STRING_LITERAL ||
 		       token2 == TP_STRING_LITERAL; /* L */
 	case TP_NUMBER:
 		return token2 == TP_NUMBER || token2 == TP_IDENTIFIER ||
