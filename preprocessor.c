@@ -218,17 +218,18 @@ static inline void put_back(utf32 const pc)
 	--input.position.colno;
 }
 
-#define MATCH_NEWLINE(code)                   \
-	case '\r':                                \
-		next_char();                          \
-		if (input.c == '\n') {                \
-	case '\n':                                \
-			next_char();                      \
-		}                                     \
-		info.whitespace = 0;                  \
-		++input.position.lineno;              \
-		input.position.colno = 1;             \
-		code
+#define NEWLINE \
+	'\r': \
+		next_char(); \
+		if (input.c == '\n') { \
+	case '\n': \
+			next_char(); \
+		} \
+		info.whitespace = 0; \
+		++input.position.lineno; \
+		input.position.colno = 1; \
+		goto newline; \
+		newline // Let it look like an ordinary case label.
 
 #define eat(c_type) (assert(input.c == c_type), next_char())
 
@@ -237,9 +238,8 @@ static void maybe_concat_lines(void)
 	eat('\\');
 
 	switch (input.c) {
-	MATCH_NEWLINE(
+	case NEWLINE:
 		return;
-	)
 
 	default:
 		break;
@@ -485,10 +485,9 @@ static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const 
 			break;
 		}
 
-		MATCH_NEWLINE(
+		case NEWLINE:
 			errorf(&pp_token.base.source_position, "newline while parsing %s", context);
 			break;
-		)
 
 		case EOF: {
 			source_position_t source_position;
@@ -689,9 +688,8 @@ static void skip_multiline_comment(void)
 			}
 			break;
 
-		MATCH_NEWLINE(
+		case NEWLINE:
 			break;
-		)
 
 		case EOF: {
 			source_position_t source_position;
@@ -717,10 +715,9 @@ static void skip_whitespace(void)
 			next_char();
 			continue;
 
-		MATCH_NEWLINE(
+		case NEWLINE:
 			info.at_line_begin = true;
 			return;
-		)
 
 		case '/':
 			next_char();
@@ -880,11 +877,10 @@ restart:
 		next_char();
 		goto restart;
 
-	MATCH_NEWLINE(
+	case NEWLINE:
 		info.at_line_begin = true;
 		info.had_whitespace = true;
 		goto restart;
-	)
 
 	SYMBOL_CHARS
 		parse_symbol();
@@ -1375,12 +1371,10 @@ parse_name:
 		next_char();
 		while (true) {
 			switch (input.c) {
+			case NEWLINE:
 			case EOF:
-				/* fallthrough */
-			MATCH_NEWLINE(
 				errorf(&pp_token.base.source_position, "header name without closing '%c'", (char)delimiter);
 				goto finish_error;
-			)
 
 			default:
 				if (input.c == delimiter) {
@@ -1467,9 +1461,7 @@ static void skip_till_newline(void)
 	/* skip till newline */
 	while (true) {
 		switch (input.c) {
-		MATCH_NEWLINE(
-			return;
-		)
+		case NEWLINE:
 		case EOF:
 			return;
 		}
