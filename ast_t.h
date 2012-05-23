@@ -229,8 +229,6 @@ typedef enum funcname_kind_t {
 	     EXPR_LITERAL_BOOLEAN:                   \
 	case EXPR_LITERAL_INTEGER:                   \
 	case EXPR_LITERAL_FLOATINGPOINT:             \
-	case EXPR_LITERAL_CHARACTER:                 \
-	case EXPR_LITERAL_WIDE_CHARACTER:            \
 	case EXPR_LITERAL_MS_NOOP
 
 /**
@@ -252,7 +250,7 @@ struct expression_base_t {
 };
 
 /**
- * integer/float constants, character and string literals
+ * integer, float and boolean constants
  */
 struct literal_expression_t {
 	expression_base_t  base;
@@ -263,6 +261,9 @@ struct literal_expression_t {
 	ir_tarval         *target_value;
 };
 
+/**
+ * string and character literals
+ */
 struct string_literal_expression_t {
 	expression_base_t  base;
 	string_encoding_t  encoding;

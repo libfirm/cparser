@@ -232,6 +232,13 @@ static void print_quoted_string(const string_t *const string, char border)
 	print_char(border);
 }
 
+static void print_char_literal(string_literal_expression_t const *const literal)
+{
+	if (literal->base.kind == EXPR_LITERAL_WIDE_CHARACTER)
+		print_char('L');
+	print_quoted_string(&literal->value, '\'');
+}
+
 static void print_string_literal(const string_literal_expression_t *literal)
 {
 	print_string(get_string_encoding_prefix(literal->encoding));
@@ -252,12 +259,6 @@ static void print_literal(const literal_expression_t *literal)
 		print_stringrep(&literal->suffix);
 		return;
 
-	case EXPR_LITERAL_WIDE_CHARACTER:
-		print_char('L');
-		/* FALLTHROUGH */
-	case EXPR_LITERAL_CHARACTER:
-		print_quoted_string(&literal->value, '\'');
-		return;
 	default:
 		break;
 	}
@@ -658,6 +659,8 @@ static bool needs_parentheses(expression_t const *const expr, unsigned const top
 		case EXPR_ENUM_CONSTANT:
 		case EXPR_FUNCNAME:
 		case EXPR_LITERAL_CASES:
+		case EXPR_LITERAL_CHARACTER:
+		case EXPR_LITERAL_WIDE_CHARACTER:
 		case EXPR_REFERENCE:
 		case EXPR_STRING_LITERAL:
 			/* Do not print () around subexpressions consisting of a single token. */
@@ -702,6 +705,8 @@ static void print_expression_prec(expression_t const *expr, unsigned const top_p
 	case EXPR_FUNCNAME:                   print_funcname(                &expr->funcname);                 break;
 	case EXPR_LABEL_ADDRESS:              print_label_address_expression(&expr->label_address);            break;
 	case EXPR_LITERAL_CASES:              print_literal(                 &expr->literal);                  break;
+	case EXPR_LITERAL_CHARACTER:
+	case EXPR_LITERAL_WIDE_CHARACTER:     print_char_literal(            &expr->string_literal);           break;
 	case EXPR_OFFSETOF:                   print_offsetof_expression(     &expr->offsetofe);                break;
 	case EXPR_REFERENCE:
 	case EXPR_ENUM_CONSTANT:              print_reference_expression(    &expr->reference);                break;
@@ -1782,6 +1787,8 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 {
 	switch (expression->kind) {
 	case EXPR_LITERAL_CASES:
+	case EXPR_LITERAL_CHARACTER:
+	case EXPR_LITERAL_WIDE_CHARACTER:
 	case EXPR_CLASSIFY_TYPE:
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:

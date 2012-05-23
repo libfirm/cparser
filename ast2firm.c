@@ -1254,6 +1254,47 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 	ir_tarval  *tv;
 
 	switch (literal->base.kind) {
+	case EXPR_LITERAL_INTEGER:
+		assert(literal->target_value != NULL);
+		tv = literal->target_value;
+		break;
+
+	case EXPR_LITERAL_FLOATINGPOINT:
+		tv = new_tarval_from_str(string, size, mode);
+		break;
+
+	case EXPR_LITERAL_BOOLEAN:
+		if (string[0] == 't') {
+			tv = get_mode_one(mode);
+		} else {
+			assert(string[0] == 'f');
+	case EXPR_LITERAL_MS_NOOP:
+			tv = get_mode_null(mode);
+		}
+		break;
+
+	default:
+		panic("Invalid literal kind found");
+	}
+
+	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
+	ir_node  *res        = new_d_Const(dbgi, tv);
+	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
+	return create_conv(dbgi, res, mode_arith);
+}
+
+/**
+ * Creates a Const node representing a character constant.
+ */
+static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
+{
+	type_t     *type   = skip_typeref(literal->base.type);
+	ir_mode    *mode   = get_ir_mode_storage(type);
+	const char *string = literal->value.begin;
+	size_t      size   = literal->value.size;
+	ir_tarval  *tv;
+
+	switch (literal->base.kind) {
 	case EXPR_LITERAL_WIDE_CHARACTER: {
 		utf32  v = read_utf8_char(&string);
 		char   buf[128];
@@ -1281,25 +1322,6 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		tv = new_tarval_from_str(buf, len, mode);
 		break;
 	}
-
-	case EXPR_LITERAL_INTEGER:
-		assert(literal->target_value != NULL);
-		tv = literal->target_value;
-		break;
-
-	case EXPR_LITERAL_FLOATINGPOINT:
-		tv = new_tarval_from_str(string, size, mode);
-		break;
-
-	case EXPR_LITERAL_BOOLEAN:
-		if (string[0] == 't') {
-			tv = get_mode_one(mode);
-		} else {
-			assert(string[0] == 'f');
-	case EXPR_LITERAL_MS_NOOP:
-			tv = get_mode_null(mode);
-		}
-		break;
 
 	default:
 		panic("Invalid literal kind found");
@@ -3326,6 +3348,8 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
 	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
 	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
+	case EXPR_LITERAL_CHARACTER:
+	case EXPR_LITERAL_WIDE_CHARACTER:     return char_literal_to_firm(            &expr->string_literal);
 	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
 	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
 	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
