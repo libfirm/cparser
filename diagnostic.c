@@ -61,10 +61,21 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 		if (*f == '%') {
 			++f;
 
-			bool extended = false;
-			if (*f == '#') {
-				extended = true;
+			bool extended  = false;
+			bool flag_zero = false;
+			for (;; ++f) {
+				switch (*f) {
+				case '#': extended  = true; break;
+				case '0': flag_zero = true; break;
+				default:  goto done_flags;
+				}
+			}
+done_flags:;
+
+			int field_width = 0;
+			if (*f == '*') {
 				++f;
+				field_width = va_arg(ap, int);
 			}
 
 			switch (*f) {
@@ -101,6 +112,13 @@ static void diagnosticvf(const char *const fmt, va_list ap)
 				case 'u': {
 					const unsigned int val = va_arg(ap, unsigned int);
 					fprintf(stderr, "%u", val);
+					break;
+				}
+
+				case 'X': {
+					unsigned int const val = va_arg(ap, unsigned int);
+					char const  *const fmt = flag_zero ? "%0*X" : "%*X";
+					fprintf(stderr, fmt, field_width, val);
 					break;
 				}
 
