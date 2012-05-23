@@ -1367,43 +1367,34 @@ static void parse_headername(void)
 
 	/* check wether we have a "... or <... headername */
 	switch (input.c) {
-	case '<':
+	{
+		utf32 delimiter;
+	case '<': delimiter = '>'; goto parse_name;
+	case '"': delimiter = '"'; goto parse_name;
+parse_name:
 		next_char();
 		while (true) {
 			switch (input.c) {
 			case EOF:
 				/* fallthrough */
 			MATCH_NEWLINE(
-				parse_error("header name without closing '>'");
+				errorf(&pp_token.base.source_position, "header name without closing '%c'", (char)delimiter);
 				goto finish_error;
 			)
-			case '>':
-				next_char();
-				goto finished_headername;
-			}
-			obstack_1grow(&symbol_obstack, (char) input.c);
-			next_char();
-		}
-		/* we should never be here */
 
-	case '"':
-		next_char();
-		while (true) {
-			switch (input.c) {
-			case EOF:
-				/* fallthrough */
-			MATCH_NEWLINE(
-				parse_error("header name without closing '>'");
-				goto finish_error;
-			)
-			case '"':
-				next_char();
-				goto finished_headername;
+			default:
+				if (input.c == delimiter) {
+					next_char();
+					goto finished_headername;
+				} else {
+					obstack_1grow(&symbol_obstack, (char)input.c);
+					next_char();
+				}
+				break;
 			}
-			obstack_1grow(&symbol_obstack, (char) input.c);
-			next_char();
 		}
 		/* we should never be here */
+	}
 
 	default:
 		/* TODO: do normal pp_token parsing and concatenate results */
