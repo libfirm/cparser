@@ -457,81 +457,36 @@ static string_t make_string(char *string, size_t len)
 	return (string_t) {result, len};
 }
 
-static void parse_string_literal(string_encoding_t const enc)
+static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const kind, string_encoding_t const enc, char const *const context)
 {
 	const unsigned start_linenr = input.position.lineno;
 
-	eat('"');
+	eat(delimiter);
 
 	while (true) {
 		switch (input.c) {
 		case '\\': {
-			utf32 tc;
 			if (resolve_escape_sequences) {
-				tc = parse_escape_sequence();
-				obstack_1grow(&symbol_obstack, (char) tc);
-			} else {
-				obstack_1grow(&symbol_obstack, (char) input.c);
-				next_char();
-				obstack_1grow(&symbol_obstack, (char) input.c);
-				next_char();
-			}
-			break;
-		}
-
-		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = pp_token.base.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "string has no end");
-			goto end_of_string;
-		}
-
-		case '"':
-			next_char();
-			goto end_of_string;
-
-		default:
-			obstack_grow_symbol(&symbol_obstack, input.c);
-			next_char();
-			break;
-		}
-	}
-
-end_of_string:
-	/* add finishing 0 to the string */
-	obstack_1grow(&symbol_obstack, '\0');
-	const size_t size   = (size_t)obstack_object_size(&symbol_obstack);
-	char *const  string = obstack_finish(&symbol_obstack);
-
-	pp_token.kind            = TP_STRING_LITERAL;
-	pp_token.string.encoding = enc;
-	pp_token.string.string   = make_string(string, size);
-}
-
-static void parse_character_constant(string_encoding_t const enc)
-{
-	const unsigned start_linenr = input.position.lineno;
-
-	eat('\'');
-
-	while (true) {
-		switch (input.c) {
-		case '\\': {
-			utf32 const tc = parse_escape_sequence();
-			if (enc == STRING_ENCODING_CHAR) {
-				if (tc >= 0x100) {
-					warningf(WARN_OTHER, &pp_token.base.source_position, "escape sequence out of range");
+				utf32 const tc = parse_escape_sequence();
+				if (enc == STRING_ENCODING_CHAR) {
+					if (tc >= 0x100) {
+						warningf(WARN_OTHER, &pp_token.base.source_position, "escape sequence out of range");
+					}
+					obstack_1grow(&symbol_obstack, tc);
+				} else {
+					obstack_grow_symbol(&symbol_obstack, tc);
 				}
-				obstack_1grow(&symbol_obstack, tc);
 			} else {
-				obstack_grow_symbol(&symbol_obstack, tc);
+				obstack_1grow(&symbol_obstack, (char)input.c);
+				next_char();
+				obstack_1grow(&symbol_obstack, (char)input.c);
+				next_char();
 			}
 			break;
 		}
 
 		MATCH_NEWLINE(
-			parse_error("newline while parsing character constant");
+			errorf(&pp_token.base.source_position, "newline while parsing %s", context);
 			break;
 		)
 
@@ -539,32 +494,41 @@ static void parse_character_constant(string_encoding_t const enc)
 			source_position_t source_position;
 			source_position.input_name = pp_token.base.source_position.input_name;
 			source_position.lineno     = start_linenr;
-			errorf(&source_position, "EOF while parsing character constant");
-			goto end_of_char_constant;
+			errorf(&source_position, "EOF while parsing %s", context);
+			goto end_of_string;
 		}
 
-		case '\'':
-			next_char();
-			goto end_of_char_constant;
-
 		default:
-			obstack_grow_symbol(&symbol_obstack, input.c);
-			next_char();
-			break;
-
+			if (input.c == delimiter) {
+				next_char();
+				goto end_of_string;
+			} else {
+				obstack_grow_symbol(&symbol_obstack, input.c);
+				next_char();
+				break;
+			}
 		}
 	}
 
-end_of_char_constant:;
+end_of_string:;
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t const size   = obstack_object_size(&symbol_obstack) - 1;
 	char  *const string = obstack_finish(&symbol_obstack);
 
-	pp_token.kind            = TP_CHARACTER_CONSTANT;
+	pp_token.kind            = kind;
 	pp_token.string.encoding = enc;
 	pp_token.string.string   = make_string(string, size);
+}
 
-	if (size == 0) {
+static void parse_string_literal(string_encoding_t const enc)
+{
+	parse_string('"', TP_STRING_LITERAL, enc, "string literal");
+}
+
+static void parse_character_constant(string_encoding_t const enc)
+{
+	parse_string('\'', TP_CHARACTER_CONSTANT, enc, "character constant");
+	if (pp_token.string.string.size == 0) {
 		parse_error("empty character constant");
 	}
 }
