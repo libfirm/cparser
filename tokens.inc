@@ -101,9 +101,7 @@ S(_ALL, __builtin_islessequal)
 S(_ALL, __builtin_islessgreater)
 S(_ALL, __builtin_isunordered)
 S(_ALL, __PRETTY_FUNCTION__)
-S(_ALL, __FUNCTION__)
 S(_ALL, __label__)
-S(_C99, __func__)
 S(_MS, __FUNCSIG__)
 S(_MS, __FUNCDNAME__)
 #undef S
@@ -131,6 +129,8 @@ S(_MS, __FUNCDNAME__)
 #undef __restrict
 
 #define S(mode, x, val) T(mode, x, #x, val)
+S(_C99,            __func__,)
+S(_ALL,            __FUNCTION__,           = T___func__)
 S(_ANSI|_C99|_CXX,   signed,               )
 S(_ALL,            __signed,               = T_signed)
 S(_ALL,            __signed__,             = T_signed)

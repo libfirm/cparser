@@ -254,7 +254,6 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_STRING_LITERAL:            \
 	case T___FUNCDNAME__:             \
 	case T___FUNCSIG__:               \
-	case T___FUNCTION__:              \
 	case T___PRETTY_FUNCTION__:       \
 	case T___alignof__:               \
 	case T___builtin_classify_type:   \
@@ -6674,7 +6673,6 @@ static expression_t *parse_primary_expression(void)
 	case T_FLOATINGPOINT:                return parse_number_literal();
 	case T_CHARACTER_CONSTANT:           return parse_character_constant();
 	case T_STRING_LITERAL:               return parse_string_literal();
-	case T___FUNCTION__:
 	case T___func__:                     return parse_function_keyword(FUNCNAME_FUNCTION);
 	case T___PRETTY_FUNCTION__:          return parse_function_keyword(FUNCNAME_PRETTY_FUNCTION);
 	case T___FUNCSIG__:                  return parse_function_keyword(FUNCNAME_FUNCSIG);
@@ -9783,7 +9781,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T__Bool);
 	add_anchor_token(T__Complex);
 	add_anchor_token(T__Imaginary);
-	add_anchor_token(T___FUNCTION__);
 	add_anchor_token(T___PRETTY_FUNCTION__);
 	add_anchor_token(T___alignof__);
 	add_anchor_token(T___attribute__);
@@ -9951,7 +9948,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T___attribute__);
 	rem_anchor_token(T___alignof__);
 	rem_anchor_token(T___PRETTY_FUNCTION__);
-	rem_anchor_token(T___FUNCTION__);
 	rem_anchor_token(T__Imaginary);
 	rem_anchor_token(T__Complex);
 	rem_anchor_token(T__Bool);
