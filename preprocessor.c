@@ -90,7 +90,7 @@ static pp_conditional_t *conditional_stack;
 
 static token_t           pp_token;
 static bool              resolve_escape_sequences = false;
-static bool              ignore_unknown_chars     = true;
+static bool              error_on_unknown_chars   = true;
 static bool              skip_mode;
 static FILE             *out;
 static struct obstack    pp_obstack;
@@ -1052,13 +1052,23 @@ restart:
 		return;
 
 	default:
-		next_char();
-		if (!ignore_unknown_chars) {
+		if (error_on_unknown_chars) {
 			errorf(&pp_token.base.source_position,
 			       "unknown character '%lc' found\n", input.c);
+			next_char();
 			goto restart;
 		} else {
-			pp_token.kind = input.c;
+			assert(obstack_object_size(&symbol_obstack) == 0);
+			obstack_grow_utf8(&symbol_obstack, input.c);
+			obstack_1grow(&symbol_obstack, '\0');
+			char     *const string = obstack_finish(&symbol_obstack);
+			symbol_t *const symbol = symbol_table_insert(string);
+			if (symbol->string != string)
+				obstack_free(&symbol_obstack, string);
+
+			pp_token.kind        = T_UNKNOWN_CHAR;
+			pp_token.base.symbol = symbol;
+			next_char();
 			return;
 		}
 	}
@@ -1737,6 +1747,8 @@ int pptest_main(int argc, char **argv)
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
+
+	error_on_unknown_chars = false;
 
 	setup_include_path();
 

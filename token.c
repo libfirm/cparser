@@ -96,16 +96,7 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 		return;
 	}
 
-	const symbol_t *symbol = token_symbols[token_kind];
-	if(symbol != NULL) {
-		fputs(symbol->string, f);
-	} else {
-		if (token_kind < 256) {
-			fputc(token_kind, f);
-			return;
-		}
-		fputs("unknown token", f);
-	}
+	fputs(token_symbols[token_kind]->string, f);
 }
 
 char const *get_string_encoding_prefix(string_encoding_t const enc)
@@ -128,7 +119,9 @@ void print_token(FILE *f, const token_t *token)
 {
 	switch(token->kind) {
 	case T_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->base.symbol->string);
+	case T_UNKNOWN_CHAR:
+		print_token_kind(f, (token_kind_t)token->kind);
+		fprintf(f, " '%s'", token->base.symbol->string);
 		break;
 
 	case T_NUMBER:
@@ -159,7 +152,7 @@ print_string:
 
 bool tokens_would_paste(token_kind_t token1, token_kind_t token2)
 {
-	char const c = token2 < 256 ? (char)token2 : token_symbols[token2]->string[0];
+	char const c = token_symbols[token2]->string[0];
 
 	switch (token1) {
 	case '>': return c == '>' || c == '=';
