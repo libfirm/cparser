@@ -1048,7 +1048,7 @@ restart:
 		next_char();
 		if (!ignore_unknown_chars) {
 			errorf(&pp_token.base.source_position,
-			       "unknown character '%c' found\n", input.c);
+			       "unknown character '%lc' found\n", input.c);
 			goto restart;
 		} else {
 			pp_token.kind = input.c;

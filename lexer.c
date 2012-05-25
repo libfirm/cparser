@@ -1110,7 +1110,7 @@ void lexer_next_preprocessing_token(void)
 
 		default:
 dollar_sign:
-			errorf(&lexer_pos, "unknown character '%c' found", c);
+			errorf(&lexer_pos, "unknown character '%lc' found", c);
 			next_char();
 			break;
 		}

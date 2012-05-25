@@ -50,6 +50,25 @@ static void print_source_position(FILE *out, const source_position_t *pos)
 		fprintf(out, " of \"%s\"", pos->input_name);
 }
 
+static void fpututf32(utf32 const c, FILE *const out)
+{
+	if (c < 0x80U) {
+		fputc(c, out);
+	} else if (c < 0x800) {
+		fputc(0xC0 | (c >> 6), out);
+		fputc(0x80 | (c & 0x3F), out);
+	} else if (c < 0x10000) {
+		fputc(0xE0 | ( c >> 12), out);
+		fputc(0x80 | ((c >>  6) & 0x3F), out);
+		fputc(0x80 | ( c        & 0x3F), out);
+	} else {
+		fputc(0xF0 | ( c >> 18), out);
+		fputc(0x80 | ((c >> 12) & 0x3F), out);
+		fputc(0x80 | ((c >>  6) & 0x3F), out);
+		fputc(0x80 | ( c        & 0x3F), out);
+	}
+}
+
 /**
  * Issue a diagnostic message.
  */
@@ -61,10 +80,12 @@ static void diagnosticvf(char const *fmt, va_list ap)
 
 		bool extended  = false;
 		bool flag_zero = false;
+		bool flag_long = false;
 		for (;; ++f) {
 			switch (*f) {
 			case '#': extended  = true; break;
 			case '0': flag_zero = true; break;
+			case 'l': flag_long = true; break;
 			default:  goto done_flags;
 			}
 		}
@@ -82,8 +103,13 @@ done_flags:;
 			break;
 
 		case 'c': {
-			const unsigned char val = (unsigned char) va_arg(ap, int);
-			fputc(val, stderr);
+			if (flag_long) {
+				const utf32 val = va_arg(ap, utf32);
+				fpututf32(val, stderr);
+			} else {
+				const unsigned char val = (unsigned char) va_arg(ap, int);
+				fputc(val, stderr);
+			}
 			break;
 		}
 
