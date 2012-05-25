@@ -47,7 +47,7 @@ static symbol_t *intern_register_token(token_kind_t id, const char *string)
 	return symbol;
 }
 
-static symbol_t *intern_register_pp_token(preprocessor_token_kind_t id, const char *string)
+static symbol_t *intern_register_pp_token(token_kind_t id, const char *string)
 {
 	assert(id < TP_LAST_TOKEN);
 	symbol_t *symbol = symbol_table_insert(string);
@@ -68,7 +68,7 @@ static void register_token(unsigned mode, token_kind_t id, const char *string)
 	}
 }
 
-static void register_pp_token(unsigned mode, preprocessor_token_kind_t id,
+static void register_pp_token(unsigned mode, token_kind_t id,
                               const char *string)
 {
 	if (! (c_mode & mode))
@@ -200,7 +200,7 @@ void print_pp_token_kind(FILE *f, int token_kind)
 
 void print_pp_token(FILE *f, const token_t *token)
 {
-	switch((preprocessor_token_kind_t) token->kind) {
+	switch ((token_kind_t)token->kind) {
 	case TP_IDENTIFIER:
 		fprintf(f, "identifier '%s'", token->base.symbol->string);
 		break;
@@ -211,13 +211,12 @@ void print_pp_token(FILE *f, const token_t *token)
 		fprintf(f, "string \"%s\"", token->literal.string.begin);
 		break;
 	default:
-		print_pp_token_kind(f, (preprocessor_token_kind_t) token->kind);
+		print_pp_token_kind(f, (token_kind_t) token->kind);
 		break;
 	}
 }
 
-bool tokens_would_paste(preprocessor_token_kind_t token1,
-                        preprocessor_token_kind_t token2)
+bool tokens_would_paste(token_kind_t token1, token_kind_t token2)
 {
 	char c = token2 < 256 ? (char) token2 : pp_token_symbols[token2]->string[0];
 

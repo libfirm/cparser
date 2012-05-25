@@ -26,7 +26,7 @@
 #include "symbol_table.h"
 #include "type.h"
 
-typedef enum token_kind_t {
+typedef enum token_kind_tag_t {
 	T_NULL  =  0,
 	T_EOF   = '\x04', // EOT
 #define T(mode,x,str,val) T_##x val,
@@ -35,9 +35,9 @@ typedef enum token_kind_t {
 #undef TS
 #undef T
 	T_LAST_TOKEN
-} token_kind_t;
+} token_kind_tag_t;
 
-typedef enum preprocessor_token_kind_t {
+typedef enum preprocessor_token_kind_tag_t {
 	TP_NULL  = T_NULL,
 	TP_EOF   = T_EOF,
 #define T(mode,x,str,val) TP_##x val,
@@ -46,7 +46,8 @@ typedef enum preprocessor_token_kind_t {
 #undef TS
 #undef T
 	TP_LAST_TOKEN
-} preprocessor_token_kind_t;
+} preprocessor_token_kind_tag_t;
+typedef unsigned short token_kind_t;
 
 typedef struct source_position_t source_position_t;
 struct source_position_t {
@@ -64,7 +65,7 @@ typedef struct literal_t    literal_t;
 typedef union  token_t      token_t;
 
 struct token_base_t {
-	unsigned          kind;
+	token_kind_t      kind;
 	source_position_t source_position;
 	symbol_t         *symbol;
 };
@@ -94,7 +95,6 @@ void print_pp_token(FILE *out, const token_t *token);
  * returns true if pasting 2 preprocessing tokens next to each other
  * without a space in between would generate (an)other preprocessing token(s)
  */
-bool tokens_would_paste(preprocessor_token_kind_t token1,
-                        preprocessor_token_kind_t token2);
+bool tokens_would_paste(token_kind_t token1, token_kind_t token2);
 
 #endif

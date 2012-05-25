@@ -481,12 +481,17 @@ static inline void next_token(void)
 #endif
 }
 
-#define eat(token_kind) (assert(token.kind == (token_kind)), next_token())
-
-static inline bool next_if(token_kind_t const type)
+static inline void eat(token_kind_t const kind)
 {
-	if (token.kind == type) {
-		eat(type);
+	assert(token.kind == kind);
+	(void)kind;
+	next_token();
+}
+
+static inline bool next_if(token_kind_t const kind)
+{
+	if (token.kind == kind) {
+		eat(kind);
 		return true;
 	} else {
 		return false;

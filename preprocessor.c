@@ -99,7 +99,7 @@ static const char       *printed_input_name = NULL;
 static source_position_t expansion_pos;
 static pp_definition_t  *current_expansion  = NULL;
 static strset_t          stringset;
-static preprocessor_token_kind_t last_token;
+static token_kind_t      last_token;
 
 static searchpath_entry_t *searchpath;
 
@@ -460,7 +460,9 @@ static string_t sym_make_string(string_encoding_t const enc)
 	return (string_t){ result, len, enc };
 }
 
-static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const kind, string_encoding_t const enc, char const *const context)
+static void parse_string(utf32 const delimiter, token_kind_t const kind,
+                         string_encoding_t const enc,
+                         char const *const context)
 {
 	const unsigned start_linenr = input.position.lineno;
 
@@ -738,10 +740,10 @@ static void skip_whitespace(void)
 	}
 }
 
-static void eat_pp(preprocessor_token_kind_t const type)
+static inline void eat_pp(token_kind_t const kind)
 {
-	(void) type;
-	assert(pp_token.kind == type);
+	assert(pp_token.kind == kind);
+	(void) kind;
 	next_preprocessing_token();
 }
 

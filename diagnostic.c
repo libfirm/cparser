@@ -169,7 +169,7 @@ done_flags:;
 				va_list*          toks      = va_arg(ap, va_list*);
 				const char* const delimiter = va_arg(ap, const char*);
 				for (;;) {
-					const token_kind_t tok = va_arg(*toks, token_kind_t);
+					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
 					if (tok == 0)
 						break;
 					if (first) {
@@ -180,7 +180,7 @@ done_flags:;
 					print_token_kind(stderr, tok);
 				}
 			} else {
-				const token_kind_t token = va_arg(ap, token_kind_t);
+				const token_kind_t token = (token_kind_t)va_arg(ap, int);
 				print_token_kind(stderr, token);
 			}
 			break;
