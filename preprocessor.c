@@ -109,6 +109,23 @@ static inline void next_char(void);
 static void next_preprocessing_token(void);
 static void print_line_directive(const source_position_t *pos, const char *add);
 
+static symbol_t *symbol_colongreater;
+static symbol_t *symbol_lesscolon;
+static symbol_t *symbol_lesspercent;
+static symbol_t *symbol_percentcolon;
+static symbol_t *symbol_percentcolonpercentcolon;
+static symbol_t *symbol_percentgreater;
+
+static void init_symbols(void)
+{
+	symbol_colongreater             = symbol_table_insert(":>");
+	symbol_lesscolon                = symbol_table_insert("<:");
+	symbol_lesspercent              = symbol_table_insert("<%");
+	symbol_percentcolon             = symbol_table_insert("%:");
+	symbol_percentcolonpercentcolon = symbol_table_insert("%:%:");
+	symbol_percentgreater           = symbol_table_insert("%>");
+}
+
 static void switch_input(FILE *file, const char *filename)
 {
 	input.file                = file;
@@ -602,6 +619,18 @@ static void parse_character_constant(string_encoding_t const enc)
 	case '8':  \
 	case '9'
 
+static inline void set_punctuator(token_kind_t const kind)
+{
+	pp_token.kind        = kind;
+	pp_token.base.symbol = token_symbols[kind];
+}
+
+static inline void set_digraph(token_kind_t const kind, symbol_t *const symbol)
+{
+	pp_token.kind        = kind;
+	pp_token.base.symbol = symbol;
+}
+
 /**
  * returns next final token from a preprocessor macro expansion
  */
@@ -842,7 +871,13 @@ end_number:
 #define MAYBE(ch, kind) \
 	case ch: \
 		next_char(); \
-		pp_token.kind = kind; \
+		set_punctuator(kind); \
+		return;
+
+#define MAYBE_DIGRAPH(ch, kind, symbol) \
+	case ch: \
+		next_char(); \
+		set_digraph(kind, symbol); \
 		return;
 
 #define ELSE_CODE(code) \
@@ -851,7 +886,7 @@ end_number:
 		return; \
 	}
 
-#define ELSE(kind) ELSE_CODE(pp_token.kind = kind;)
+#define ELSE(kind) ELSE_CODE(set_punctuator(kind);)
 
 static void next_preprocessing_token(void)
 {
@@ -918,7 +953,7 @@ restart:
 				ELSE_CODE(
 					put_back(input.c);
 					input.c = '.';
-					pp_token.kind = '.';
+					set_punctuator('.');
 				)
 		ELSE('.')
 	case '&':
@@ -961,24 +996,27 @@ restart:
 		ELSE('/')
 	case '%':
 		MAYBE_PROLOG
-		MAYBE('>', '}')
+		MAYBE_DIGRAPH('>', '}', symbol_percentgreater)
 		MAYBE('=', T_PERCENTEQUAL)
 		case ':':
 			MAYBE_PROLOG
 			case '%':
 				MAYBE_PROLOG
-				MAYBE(':', T_HASHHASH)
+				MAYBE_DIGRAPH(':', T_HASHHASH, symbol_percentcolonpercentcolon)
 				ELSE_CODE(
 					put_back(input.c);
 					input.c = '%';
-					pp_token.kind = '#';
+					goto digraph_percentcolon;
 				)
-			ELSE('#')
+			ELSE_CODE(
+digraph_percentcolon:
+				set_digraph('#', symbol_percentcolon);
+			)
 		ELSE('%')
 	case '<':
 		MAYBE_PROLOG
-		MAYBE(':', '[')
-		MAYBE('%', '{')
+		MAYBE_DIGRAPH(':', '[', symbol_lesscolon)
+		MAYBE_DIGRAPH('%', '{', symbol_lesspercent)
 		MAYBE('=', T_LESSEQUAL)
 		case '<':
 			MAYBE_PROLOG
@@ -1004,7 +1042,7 @@ restart:
 		ELSE('|')
 	case ':':
 		MAYBE_PROLOG
-		MAYBE('>', ']')
+		MAYBE_DIGRAPH('>', ']', symbol_colongreater)
 		ELSE(':')
 	case '=':
 		MAYBE_PROLOG
@@ -1013,9 +1051,7 @@ restart:
 	case '#':
 		MAYBE_PROLOG
 		MAYBE('#', T_HASHHASH)
-		ELSE_CODE(
-			pp_token.kind = '#';
-		)
+		ELSE('#')
 
 	case '?':
 	case '[':
@@ -1027,7 +1063,7 @@ restart:
 	case '~':
 	case ';':
 	case ',':
-		pp_token.kind = input.c;
+		set_punctuator(input.c);
 		next_char();
 		return;
 
@@ -1041,7 +1077,7 @@ restart:
 		} else {
 			pp_token.base.source_position.lineno++;
 			info.at_line_begin = true;
-			pp_token.kind      = T_EOF;
+			set_punctuator(T_EOF);
 		}
 		return;
 
@@ -1160,11 +1196,7 @@ static void emit_pp_token(void)
 		break;
 
 	default:
-		if (pp_token.base.symbol) {
-			fputs(pp_token.base.symbol->string, out);
-		} else {
-			print_token_kind(out, pp_token.kind);
-		}
+		fputs(pp_token.base.symbol->string, out);
 		break;
 	}
 	last_token = pp_token.kind;
@@ -1198,16 +1230,13 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 		return false;
 
 	switch (token1->kind) {
-	case T_IDENTIFIER:
-		return token1->base.symbol == token2->base.symbol;
-
 	case T_NUMBER:
 	case T_CHARACTER_CONSTANT:
 	case T_STRING_LITERAL:
 		return strings_equal(&token1->literal.string, &token2->literal.string);
 
 	default:
-		return true;
+		return token1->base.symbol == token2->base.symbol;
 	}
 }
 
@@ -1736,6 +1765,7 @@ int pptest_main(int argc, char **argv)
 {
 	init_symbol_table();
 	init_tokens();
+	init_symbols();
 
 	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);

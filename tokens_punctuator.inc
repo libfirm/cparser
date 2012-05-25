@@ -1,10 +1,3 @@
-/*PUNCTUATOR(LESSCOLON,                "<:",   = '[')
-PUNCTUATOR(COLONGREATER,             ":>",   = ']')
-PUNCTUATOR(LESSPERCENT,              "<%",   = '{')
-PUNCTUATOR(PERCENTGREATER,           "%>",   = '}')
-PUNCTUATOR(PERCENTCOLON,             "%:",   = '#')
-PUNCTUATOR(PERCENTCOLONPERCENTCOLON, "%:%:", = T_HASHHASH)*/
-
 PUNCTUATOR(LBRACK,          "[", = '[')
 PUNCTUATOR(RBRACK,          "]", = ']')
 PUNCTUATOR(LPAREN,          "(", = '(')

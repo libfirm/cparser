@@ -31,7 +31,7 @@
 #include "adt/error.h"
 #include "adt/util.h"
 
-static symbol_t *token_symbols[T_LAST_TOKEN];
+symbol_t *token_symbols[T_LAST_TOKEN];
 
 const source_position_t builtin_source_position = { "<built-in>", 0, 0, true };
 

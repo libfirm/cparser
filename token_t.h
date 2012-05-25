@@ -54,6 +54,8 @@ struct source_position_t {
 	unsigned    is_system_header : 1;
 };
 
+extern symbol_t *token_symbols[];
+
 /* position used for "builtin" declarations/types */
 extern const source_position_t builtin_source_position;
 
