@@ -759,6 +759,67 @@ static void finished_expanding(pp_definition_t *definition)
 	current_expansion = parent;
 }
 
+static void grow_string_escaped(struct obstack *obst, const string_t *string, char const *delimiter)
+{
+	char const *prefix = get_string_encoding_prefix(string->encoding);
+	obstack_printf(obst, "%s%s", prefix, delimiter);
+	size_t      size = string->size;
+	const char *str  = string->begin;
+	if (resolve_escape_sequences) {
+		obstack_grow(obst, str, size);
+	} else {
+		for (size_t i = 0; i < size; ++i) {
+			const char c = str[i];
+			if (c == '\\' || c == '"')
+				obstack_1grow(obst, '\\');
+			obstack_1grow(obst, c);
+		}
+	}
+	obstack_printf(obst, "%s", delimiter);
+}
+
+static void grow_token(struct obstack *obst, const token_t *token)
+{
+	switch (token->kind) {
+	case T_NUMBER:
+		obstack_grow(obst, token->literal.string.begin, token->literal.string.size);
+		break;
+
+	case T_STRING_LITERAL: {
+		char const *const delimiter = resolve_escape_sequences ? "\"" : "\\\"";
+		grow_string_escaped(obst, &token->literal.string, delimiter);
+		break;
+	}
+
+	case T_CHARACTER_CONSTANT:
+		grow_string_escaped(obst, &token->literal.string, "'");
+		break;
+
+	case T_IDENTIFIER:
+	default: {
+		const char *str = token->base.symbol->string;
+		size_t      len = strlen(str);
+		obstack_grow(obst, str, len);
+		break;
+	}
+	}
+}
+
+static void stringify(const pp_definition_t *definition)
+{
+	assert(obstack_object_size(&symbol_obstack) == 0);
+
+	size_t list_len = definition->list_len;
+	for (size_t p = 0; p < list_len; ++p) {
+		const saved_token_t *saved = &definition->token_list[p];
+		if (p > 0 && saved->had_whitespace)
+			obstack_1grow(&symbol_obstack, ' ');
+		grow_token(&symbol_obstack, &saved->token);
+	}
+	pp_token.kind           = T_STRING_LITERAL;
+	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+}
+
 static inline void set_punctuator(token_kind_t const kind)
 {
 	pp_token.kind        = kind;
@@ -791,11 +852,22 @@ restart:;
 	}
 	const saved_token_t *saved = &current_expansion->token_list[pos++];
 	pp_token = saved->token;
+	if (pp_token.kind == '#') {
+		if (pos < current_expansion->list_len) {
+			const saved_token_t *next = &current_expansion->token_list[pos];
+			if (next->token.kind == T_MACRO_PARAMETER) {
+				pp_definition_t *def = next->token.macro_parameter.def;
+				assert(def != NULL && def->is_parameter);
+				stringify(def);
+				++pos;
+			}
+		}
+	}
 
 	if (current_expansion->expand_pos > 0)
 		info.had_whitespace = saved->had_whitespace;
+	current_expansion->expand_pos = pos;
 	pp_token.base.source_position = expansion_pos;
-	++current_expansion->expand_pos;
 
 	return true;
 }
@@ -1517,6 +1589,12 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	return true;
 }
 
+static void missing_macro_param_error(void)
+{
+	errorf(&pp_token.base.source_position,
+	       "'#' is not followed by a macro parameter");
+}
+
 static bool is_defineable_token(char const *const context)
 {
 	if (info.at_line_begin) {
@@ -1653,6 +1731,7 @@ static void parse_define_directive(void)
 
 	/* construct token list */
 	assert(obstack_object_size(&pp_obstack) == 0);
+	bool next_must_be_param = false;
 	while (!info.at_line_begin) {
 		if (pp_token.kind == T_IDENTIFIER) {
 			const symbol_t  *symbol     = pp_token.base.symbol;
@@ -1663,12 +1742,19 @@ static void parse_define_directive(void)
 			    pp_token.macro_parameter.def = definition;
 			}
 		}
+		if (next_must_be_param && pp_token.kind != T_MACRO_PARAMETER) {
+			missing_macro_param_error();
+		}
 		saved_token_t saved_token;
 		saved_token.token = pp_token;
 		saved_token.had_whitespace = info.had_whitespace;
 		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+		next_must_be_param
+			= new_definition->has_parameters && pp_token.kind == '#';
 		next_input_token();
 	}
+	if (next_must_be_param)
+		missing_macro_param_error();
 
 	new_definition->list_len   = obstack_object_size(&pp_obstack)
 		/ sizeof(new_definition->token_list[0]);
