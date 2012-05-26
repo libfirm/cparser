@@ -1478,7 +1478,12 @@ static bool emit_newlines(void)
 	}
 	input.output_line = pp_token.base.source_position.lineno;
 
-	for (unsigned i = 0; i < info.whitespace_at_line_begin; ++i)
+	unsigned whitespace = info.whitespace_at_line_begin;
+	/* make sure there is at least 1 whitespace before a (macro-expanded)
+	 * '#' at line begin. I'm not sure why this is good, but gcc does it. */
+	if (pp_token.kind == '#' && whitespace == 0)
+		++whitespace;
+	for (unsigned i = 0; i < whitespace; ++i)
 		fputc(' ', out);
 
 	return true;
