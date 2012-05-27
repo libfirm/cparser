@@ -1043,6 +1043,13 @@ digraph_percentcolon:
 	case ':':
 		MAYBE_PROLOG
 		MAYBE_DIGRAPH('>', ']', symbol_colongreater)
+		case ':':
+			if (c_mode & _CXX) {
+				next_char();
+				set_punctuator(T_COLONCOLON);
+				return;
+			}
+			/* FALLTHROUGH */
 		ELSE(':')
 	case '=':
 		MAYBE_PROLOG
