@@ -479,7 +479,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 					}
 					obstack_1grow(&symbol_obstack, tc);
 				} else {
-					obstack_grow_symbol(&symbol_obstack, tc);
+					obstack_grow_utf8(&symbol_obstack, tc);
 				}
 			} else {
 				obstack_1grow(&symbol_obstack, (char)input.c);
@@ -507,7 +507,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 				next_char();
 				goto end_of_string;
 			} else {
-				obstack_grow_symbol(&symbol_obstack, input.c);
+				obstack_grow_utf8(&symbol_obstack, input.c);
 				next_char();
 				break;
 			}

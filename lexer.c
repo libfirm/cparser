@@ -377,7 +377,7 @@ universal:
 				} else if (obstack_object_size(&symbol_obstack) == 0 && !is_universal_char_valid_identifier_start(v)) {
 					errorf(&lexer_pos, "universal character \\%c%0*X is not valid as start of an identifier", n == 4 ? 'u' : 'U', (int)n, v);
 				} else {
-					obstack_grow_symbol(&symbol_obstack, v);
+					obstack_grow_utf8(&symbol_obstack, v);
 				}
 				break;
 			}
@@ -601,7 +601,7 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 				}
 				obstack_1grow(&symbol_obstack, tc);
 			} else {
-				obstack_grow_symbol(&symbol_obstack, tc);
+				obstack_grow_utf8(&symbol_obstack, tc);
 			}
 			break;
 		}
@@ -619,7 +619,7 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 				next_char();
 				goto end_of_string;
 			} else {
-				obstack_grow_symbol(&symbol_obstack, c);
+				obstack_grow_utf8(&symbol_obstack, c);
 				next_char();
 				break;
 			}

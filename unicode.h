@@ -45,22 +45,22 @@ static inline utf32 read_utf8_char(const char **p)
 	return result;
 }
 
-static inline void obstack_grow_symbol(struct obstack *obstack, utf32 const tc)
+static inline void obstack_grow_utf8(struct obstack *const obst, utf32 const c)
 {
-	if (tc < 0x80U) {
-		obstack_1grow(obstack, tc);
-	} else if (tc < 0x800) {
-		obstack_1grow(obstack, 0xC0 | (tc >> 6));
-		obstack_1grow(obstack, 0x80 | (tc & 0x3F));
-	} else if (tc < 0x10000) {
-		obstack_1grow(obstack, 0xE0 | ( tc >> 12));
-		obstack_1grow(obstack, 0x80 | ((tc >>  6) & 0x3F));
-		obstack_1grow(obstack, 0x80 | ( tc        & 0x3F));
+	if (c < 0x80U) {
+		obstack_1grow(obst, c);
+	} else if (c < 0x800) {
+		obstack_1grow(obst, 0xC0 | (c >> 6));
+		obstack_1grow(obst, 0x80 | (c & 0x3F));
+	} else if (c < 0x10000) {
+		obstack_1grow(obst, 0xE0 | ( c >> 12));
+		obstack_1grow(obst, 0x80 | ((c >>  6) & 0x3F));
+		obstack_1grow(obst, 0x80 | ( c        & 0x3F));
 	} else {
-		obstack_1grow(obstack, 0xF0 | ( tc >> 18));
-		obstack_1grow(obstack, 0x80 | ((tc >> 12) & 0x3F));
-		obstack_1grow(obstack, 0x80 | ((tc >>  6) & 0x3F));
-		obstack_1grow(obstack, 0x80 | ( tc        & 0x3F));
+		obstack_1grow(obst, 0xF0 | ( c >> 18));
+		obstack_1grow(obst, 0x80 | ((c >> 12) & 0x3F));
+		obstack_1grow(obst, 0x80 | ((c >>  6) & 0x3F));
+		obstack_1grow(obst, 0x80 | ( c        & 0x3F));
 	}
 }
 
