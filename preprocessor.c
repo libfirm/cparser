@@ -521,12 +521,12 @@ end_of_string:
 
 static void parse_string_literal(string_encoding_t const enc)
 {
-	parse_string('"', TP_STRING_LITERAL, enc, "string literal");
+	parse_string('"', T_STRING_LITERAL, enc, "string literal");
 }
 
 static void parse_character_constant(string_encoding_t const enc)
 {
-	parse_string('\'', TP_CHARACTER_CONSTANT, enc, "character constant");
+	parse_string('\'', T_CHARACTER_CONSTANT, enc, "character constant");
 	if (pp_token.literal.string.size == 0) {
 		parse_error("empty character constant");
 	}
@@ -634,7 +634,7 @@ restart:
 	pp_token.base.source_position = expansion_pos;
 	++definition->expand_pos;
 
-	if (pp_token.kind != TP_IDENTIFIER)
+	if (pp_token.kind != T_IDENTIFIER)
 		return;
 
 	/* if it was an identifier then we might need to expand again */
@@ -740,9 +740,9 @@ static void skip_whitespace(void)
 	}
 }
 
-static inline void eat_pp(token_kind_t const kind)
+static inline void eat_pp(pp_token_kind_t const kind)
 {
-	assert(pp_token.kind == kind);
+	assert(pp_token.base.symbol->pp_ID == kind);
 	(void) kind;
 	next_preprocessing_token();
 }
@@ -782,7 +782,7 @@ end_symbol:
 
 	symbol_t *symbol = symbol_table_insert(string);
 
-	pp_token.kind        = symbol->pp_ID;
+	pp_token.kind        = symbol->ID;
 	pp_token.base.symbol = symbol;
 
 	/* we can free the memory from symbol obstack if we already had an entry in
@@ -824,7 +824,7 @@ static void parse_number(void)
 	}
 
 end_number:
-	pp_token.kind           = TP_NUMBER;
+	pp_token.kind           = T_NUMBER;
 	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
 }
 
@@ -913,7 +913,7 @@ restart:
 
 			case '.':
 				MAYBE_PROLOG
-				MAYBE('.', TP_DOTDOTDOT)
+				MAYBE('.', T_DOTDOTDOT)
 				ELSE_CODE(
 					put_back(input.c);
 					input.c = '.';
@@ -922,31 +922,31 @@ restart:
 		ELSE('.')
 	case '&':
 		MAYBE_PROLOG
-		MAYBE('&', TP_ANDAND)
-		MAYBE('=', TP_ANDEQUAL)
+		MAYBE('&', T_ANDAND)
+		MAYBE('=', T_ANDEQUAL)
 		ELSE('&')
 	case '*':
 		MAYBE_PROLOG
-		MAYBE('=', TP_ASTERISKEQUAL)
+		MAYBE('=', T_ASTERISKEQUAL)
 		ELSE('*')
 	case '+':
 		MAYBE_PROLOG
-		MAYBE('+', TP_PLUSPLUS)
-		MAYBE('=', TP_PLUSEQUAL)
+		MAYBE('+', T_PLUSPLUS)
+		MAYBE('=', T_PLUSEQUAL)
 		ELSE('+')
 	case '-':
 		MAYBE_PROLOG
-		MAYBE('>', TP_MINUSGREATER)
-		MAYBE('-', TP_MINUSMINUS)
-		MAYBE('=', TP_MINUSEQUAL)
+		MAYBE('>', T_MINUSGREATER)
+		MAYBE('-', T_MINUSMINUS)
+		MAYBE('=', T_MINUSEQUAL)
 		ELSE('-')
 	case '!':
 		MAYBE_PROLOG
-		MAYBE('=', TP_EXCLAMATIONMARKEQUAL)
+		MAYBE('=', T_EXCLAMATIONMARKEQUAL)
 		ELSE('!')
 	case '/':
 		MAYBE_PROLOG
-		MAYBE('=', TP_SLASHEQUAL)
+		MAYBE('=', T_SLASHEQUAL)
 			case '*':
 				next_char();
 				info.had_whitespace = true;
@@ -961,12 +961,12 @@ restart:
 	case '%':
 		MAYBE_PROLOG
 		MAYBE('>', '}')
-		MAYBE('=', TP_PERCENTEQUAL)
+		MAYBE('=', T_PERCENTEQUAL)
 			case ':':
 				MAYBE_PROLOG
 					case '%':
 						MAYBE_PROLOG
-						MAYBE(':', TP_HASHHASH)
+						MAYBE(':', T_HASHHASH)
 						ELSE_CODE(
 							put_back(input.c);
 							input.c = '%';
@@ -978,28 +978,28 @@ restart:
 		MAYBE_PROLOG
 		MAYBE(':', '[')
 		MAYBE('%', '{')
-		MAYBE('=', TP_LESSEQUAL)
+		MAYBE('=', T_LESSEQUAL)
 			case '<':
 				MAYBE_PROLOG
-				MAYBE('=', TP_LESSLESSEQUAL)
-				ELSE(TP_LESSLESS)
+				MAYBE('=', T_LESSLESSEQUAL)
+				ELSE(T_LESSLESS)
 		ELSE('<')
 	case '>':
 		MAYBE_PROLOG
-		MAYBE('=', TP_GREATEREQUAL)
+		MAYBE('=', T_GREATEREQUAL)
 			case '>':
 				MAYBE_PROLOG
-				MAYBE('=', TP_GREATERGREATEREQUAL)
-				ELSE(TP_GREATERGREATER)
+				MAYBE('=', T_GREATERGREATEREQUAL)
+				ELSE(T_GREATERGREATER)
 		ELSE('>')
 	case '^':
 		MAYBE_PROLOG
-		MAYBE('=', TP_CARETEQUAL)
+		MAYBE('=', T_CARETEQUAL)
 		ELSE('^')
 	case '|':
 		MAYBE_PROLOG
-		MAYBE('=', TP_PIPEEQUAL)
-		MAYBE('|', TP_PIPEPIPE)
+		MAYBE('=', T_PIPEEQUAL)
+		MAYBE('|', T_PIPEPIPE)
 		ELSE('|')
 	case ':':
 		MAYBE_PROLOG
@@ -1007,11 +1007,11 @@ restart:
 		ELSE(':')
 	case '=':
 		MAYBE_PROLOG
-		MAYBE('=', TP_EQUALEQUAL)
+		MAYBE('=', T_EQUALEQUAL)
 		ELSE('=')
 	case '#':
 		MAYBE_PROLOG
-		MAYBE('#', TP_HASHHASH)
+		MAYBE('#', T_HASHHASH)
 		ELSE_CODE(
 			pp_token.kind = '#';
 		)
@@ -1040,7 +1040,7 @@ restart:
 		} else {
 			pp_token.base.source_position.lineno++;
 			info.at_line_begin = true;
-			pp_token.kind = TP_EOF;
+			pp_token.kind      = T_EOF;
 		}
 		return;
 
@@ -1130,28 +1130,30 @@ static void emit_pp_token(void)
 		fputc(' ', out);
 
 	switch (pp_token.kind) {
-	case TP_IDENTIFIER:
-		fputs(pp_token.base.symbol->string, out);
-		break;
-	case TP_NUMBER:
+	case T_NUMBER:
 		fputs(pp_token.literal.string.begin, out);
 		break;
 
-	case TP_STRING_LITERAL:
+	case T_STRING_LITERAL:
 		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
 		fputc('"', out);
 		fputs(pp_token.literal.string.begin, out);
 		fputc('"', out);
 		break;
 
-	case TP_CHARACTER_CONSTANT:
+	case T_CHARACTER_CONSTANT:
 		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
 		fputc('\'', out);
 		fputs(pp_token.literal.string.begin, out);
 		fputc('\'', out);
 		break;
+
 	default:
-		print_pp_token_kind(out, pp_token.kind);
+		if (pp_token.base.symbol) {
+			fputs(pp_token.base.symbol->string, out);
+		} else {
+			print_token_kind(out, pp_token.kind);
+		}
 		break;
 	}
 	last_token = pp_token.kind;
@@ -1185,12 +1187,12 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 		return false;
 
 	switch (token1->kind) {
-	case TP_IDENTIFIER:
+	case T_IDENTIFIER:
 		return token1->base.symbol == token2->base.symbol;
 
-	case TP_NUMBER:
-	case TP_CHARACTER_CONSTANT:
-	case TP_STRING_LITERAL:
+	case T_NUMBER:
+	case T_CHARACTER_CONSTANT:
+	case T_STRING_LITERAL:
 		return strings_equal(&token1->literal.string, &token2->literal.string);
 
 	default:
@@ -1224,9 +1226,9 @@ static void parse_define_directive(void)
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (pp_token.kind != TP_IDENTIFIER || info.at_line_begin) {
+	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
 		errorf(&pp_token.base.source_position,
-		       "expected identifier after #define, got '%t'", &pp_token);
+		       "expected identifier after #define, got %K", &pp_token);
 		goto error_out;
 	}
 	symbol_t *const symbol = pp_token.base.symbol;
@@ -1247,7 +1249,7 @@ static void parse_define_directive(void)
 
 		while (true) {
 			switch (pp_token.kind) {
-			case TP_DOTDOTDOT:
+			case T_DOTDOTDOT:
 				new_definition->is_variadic = true;
 				next_preprocessing_token();
 				if (pp_token.kind != ')') {
@@ -1256,7 +1258,7 @@ static void parse_define_directive(void)
 					goto error_out;
 				}
 				break;
-			case TP_IDENTIFIER:
+			case T_IDENTIFIER:
 				obstack_ptr_grow(&pp_obstack, pp_token.base.symbol);
 				next_preprocessing_token();
 
@@ -1267,7 +1269,7 @@ static void parse_define_directive(void)
 
 				if (pp_token.kind != ')') {
 					errorf(&pp_token.base.source_position,
-					       "expected ',' or ')' after identifier, got '%t'",
+					       "expected ',' or ')' after identifier, got %K",
 					       &pp_token);
 					goto error_out;
 				}
@@ -1277,7 +1279,7 @@ static void parse_define_directive(void)
 				goto finish_argument_list;
 			default:
 				errorf(&pp_token.base.source_position,
-				       "expected identifier, '...' or ')' in #define argument list, got '%t'",
+				       "expected identifier, '...' or ')' in #define argument list, got %K",
 				       &pp_token);
 				goto error_out;
 			}
@@ -1334,9 +1336,9 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	if (pp_token.kind != TP_IDENTIFIER) {
+	if (pp_token.kind != T_IDENTIFIER) {
 		errorf(&input.position,
-		       "expected identifier after #undef, got '%t'", &pp_token);
+		       "expected identifier after #undef, got %K", &pp_token);
 		eat_pp_directive();
 		return;
 	}
@@ -1404,7 +1406,7 @@ finished_headername:
 
 finish_error:
 	pp_token.base.source_position = start_position;
-	pp_token.kind                 = TP_HEADERNAME;
+	pp_token.kind                 = T_HEADERNAME;
 	pp_token.literal.string       = string;
 }
 
@@ -1549,7 +1551,7 @@ static void check_unclosed_conditionals(void)
 
 static void parse_ifdef_ifndef_directive(void)
 {
-	bool is_ifndef = (pp_token.kind == TP_ifndef);
+	bool is_ifndef = pp_token.base.symbol->pp_ID == TP_ifndef;
 	bool condition;
 	next_preprocessing_token();
 
@@ -1561,9 +1563,9 @@ static void parse_ifdef_ifndef_directive(void)
 		return;
 	}
 
-	if (pp_token.kind != TP_IDENTIFIER || info.at_line_begin) {
+	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
 		errorf(&pp_token.base.source_position,
-		       "expected identifier after #%s, got '%t'",
+		       "expected identifier after #%s, got %K",
 		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
 		eat_pp_directive();
 
@@ -1649,28 +1651,30 @@ static void parse_endif_directive(void)
 
 static void parse_preprocessing_directive(void)
 {
-	eat_pp('#');
+	next_preprocessing_token(); /* Eat '#'. */
 
 	if (info.at_line_begin) {
 		/* empty directive */
 		return;
 	}
 
-	switch (pp_token.kind) {
-	case TP_define:  parse_define_directive();       break;
-	case TP_else:    parse_else_directive();         break;
-	case TP_endif:   parse_endif_directive();        break;
-	case TP_ifdef:
-	case TP_ifndef:  parse_ifdef_ifndef_directive(); break;
-	case TP_include: parse_include_directive();      break;
-	case TP_undef:   parse_undef_directive();        break;
-
-	default:
+	if (pp_token.base.symbol) {
+		switch (pp_token.base.symbol->pp_ID) {
+		case TP_define:  parse_define_directive();       break;
+		case TP_else:    parse_else_directive();         break;
+		case TP_endif:   parse_endif_directive();        break;
+		case TP_ifdef:
+		case TP_ifndef:  parse_ifdef_ifndef_directive(); break;
+		case TP_include: parse_include_directive();      break;
+		case TP_undef:   parse_undef_directive();        break;
+		default:         goto skip;
+		}
+	} else {
+skip:
 		if (!skip_mode) {
 			errorf(&pp_token.base.source_position, "invalid preprocessing directive #%K", &pp_token);
 		}
 		eat_pp_directive();
-		break;
 	}
 
 	assert(info.at_line_begin);
@@ -1785,9 +1789,9 @@ int pptest_main(int argc, char **argv)
 		if (pp_token.kind == '#' && info.at_line_begin) {
 			parse_preprocessing_directive();
 			continue;
-		} else if (pp_token.kind == TP_EOF) {
+		} else if (pp_token.kind == T_EOF) {
 			goto end_of_main_loop;
-		} else if (pp_token.kind == TP_IDENTIFIER) {
+		} else if (pp_token.kind == T_IDENTIFIER) {
 			symbol_t        *const symbol        = pp_token.base.symbol;
 			pp_definition_t *const pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {
@@ -1800,15 +1804,15 @@ int pptest_main(int argc, char **argv)
 
 					/* no opening brace -> no expansion */
 					if (pp_token.kind == '(') {
-						eat_pp('(');
+						next_preprocessing_token(); /* Eat '('. */
 
 						/* parse arguments (TODO) */
-						while (pp_token.kind != TP_EOF && pp_token.kind != ')')
+						while (pp_token.kind != T_EOF && pp_token.kind != ')')
 							next_preprocessing_token();
 					} else {
 						token_t next_token = pp_token;
 						/* restore identifier token */
-						pp_token.kind                 = TP_IDENTIFIER;
+						pp_token.kind                 = T_IDENTIFIER;
 						pp_token.base.symbol          = symbol;
 						pp_token.base.source_position = position;
 						info = old_info;

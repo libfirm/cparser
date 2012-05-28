@@ -26,11 +26,11 @@
 #include "token_t.h"
 
 struct symbol_t {
-	const char       *string;
-	unsigned short    ID;
-	unsigned short    pp_ID;
-	entity_t         *entity;
-	pp_definition_t  *pp_definition;
+	char const      *string;
+	unsigned short   ID;
+	pp_token_kind_t  pp_ID;
+	entity_t        *entity;
+	pp_definition_t *pp_definition;
 };
 
 #endif

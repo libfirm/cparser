@@ -36,18 +36,16 @@ typedef enum token_kind_tag_t {
 #undef T
 	T_LAST_TOKEN
 } token_kind_tag_t;
+typedef unsigned short token_kind_t;
 
-typedef enum preprocessor_token_kind_tag_t {
-	TP_NULL  = T_NULL,
-	TP_EOF   = T_EOF,
-#define T(mode,x,str,val) TP_##x val,
-#define TS(x,str,val) TP_##x val,
+typedef enum pp_token_kind_tag_t {
+	TP_NULL = 0,
+#define T(token) TP_##token,
 #include "tokens_preprocessor.inc"
-#undef TS
 #undef T
 	TP_LAST_TOKEN
-} preprocessor_token_kind_tag_t;
-typedef unsigned short token_kind_t;
+} pp_token_kind_tag_t;
+typedef unsigned short pp_token_kind_t;
 
 typedef struct source_position_t source_position_t;
 struct source_position_t {
@@ -87,9 +85,6 @@ void init_tokens(void);
 void exit_tokens(void);
 void print_token_kind(FILE *out, token_kind_t token_kind);
 void print_token(FILE *out, const token_t *token);
-
-void print_pp_token_kind(FILE *out, int kind);
-void print_pp_token(FILE *out, const token_t *token);
 
 /**
  * returns true if pasting 2 preprocessing tokens next to each other

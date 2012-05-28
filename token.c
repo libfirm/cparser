@@ -32,7 +32,6 @@
 #include "adt/util.h"
 
 static symbol_t *token_symbols[T_LAST_TOKEN];
-static symbol_t *pp_token_symbols[TP_LAST_TOKEN];
 
 const source_position_t builtin_source_position = { "<built-in>", 0, 0, true };
 
@@ -44,15 +43,6 @@ static symbol_t *intern_register_token(token_kind_t id, const char *string)
 	symbol_t *symbol = symbol_table_insert(string);
 	if (token_symbols[id] == NULL)
 		token_symbols[id] = symbol;
-	return symbol;
-}
-
-static symbol_t *intern_register_pp_token(token_kind_t id, const char *string)
-{
-	assert(id < TP_LAST_TOKEN);
-	symbol_t *symbol = symbol_table_insert(string);
-	if (pp_token_symbols[id] == NULL)
-		pp_token_symbols[id] = symbol;
 	return symbol;
 }
 
@@ -68,20 +58,16 @@ static void register_token(unsigned mode, token_kind_t id, const char *string)
 	}
 }
 
-static void register_pp_token(unsigned mode, token_kind_t id,
-                              const char *string)
+static void register_pp_token(pp_token_kind_t const id, char const *const string)
 {
-	if (! (c_mode & mode))
-		return;
-
-	symbol_t *symbol = intern_register_pp_token(id, string);
+	assert(id < TP_LAST_TOKEN);
+	symbol_t *const symbol = symbol_table_insert(string);
 	symbol->pp_ID = id;
 }
 
 void init_tokens(void)
 {
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
-	memset(pp_token_symbols, 0, TP_LAST_TOKEN * sizeof(pp_token_symbols[0]));
 
 #define T(mode,x,str,val)  register_token(mode, T_##x, str);
 #define TS(x,str,val)      intern_register_token(T_##x, str);
@@ -89,10 +75,8 @@ void init_tokens(void)
 #undef TS
 #undef T
 
-#define T(mode,x,str,val)  register_pp_token(mode, TP_##x, str);
-#define TS(x,str,val)      intern_register_pp_token(TP_##x, str);
+#define T(token) register_pp_token(TP_##token, #token);
 #include "tokens_preprocessor.inc"
-#undef TS
 #undef T
 }
 
@@ -173,52 +157,9 @@ print_string:
 	}
 }
 
-void print_pp_token_kind(FILE *f, int token_kind)
-{
-	if (token_kind == TP_EOF) {
-		fputs("end of file", f);
-		return;
-	}
-
-	int token_symbols_len = TP_LAST_TOKEN;
-	if (token_kind < 0 || token_kind >= token_symbols_len) {
-		fputs("invalid token", f);
-		return;
-	}
-
-	const symbol_t *symbol = pp_token_symbols[token_kind];
-	if (symbol != NULL) {
-		fputs(symbol->string, f);
-	} else {
-		if(token_kind >= 0 && token_kind < 256) {
-			fputc(token_kind, f);
-			return;
-		}
-		fputs("unknown token", f);
-	}
-}
-
-void print_pp_token(FILE *f, const token_t *token)
-{
-	switch ((token_kind_t)token->kind) {
-	case TP_IDENTIFIER:
-		fprintf(f, "identifier '%s'", token->base.symbol->string);
-		break;
-	case TP_NUMBER:
-		fprintf(f, "number '%s'", token->literal.string.begin);
-		break;
-	case TP_STRING_LITERAL:
-		fprintf(f, "string \"%s\"", token->literal.string.begin);
-		break;
-	default:
-		print_pp_token_kind(f, (token_kind_t) token->kind);
-		break;
-	}
-}
-
 bool tokens_would_paste(token_kind_t token1, token_kind_t token2)
 {
-	char c = token2 < 256 ? (char) token2 : pp_token_symbols[token2]->string[0];
+	char const c = token2 < 256 ? (char)token2 : token_symbols[token2]->string[0];
 
 	switch (token1) {
 	case '>': return c == '>' || c == '=';
@@ -231,19 +172,23 @@ bool tokens_would_paste(token_kind_t token1, token_kind_t token2)
 	case '|': return c == '|' || c == '=';
 	case ':': return c == ':' || c == '>';
 	case '*': return c == '*' || c == '=';
-	case '.': return c == '.' || c == '%' || token2 == TP_NUMBER;
+	case '.': return c == '.' || c == '%' || token2 == T_NUMBER;
 	case '#': return c == '#' || c == '%';
-	case TP_GREATERGREATER: return c == '=';
-	case TP_LESSLESS:       return c == '=';
-	case '^':               return c == '=';
-	case '!':               return c == '=';
-	case TP_IDENTIFIER:
-		return token2 == TP_IDENTIFIER || token2 == TP_NUMBER ||
-		       token2 == TP_CHARACTER_CONSTANT ||
-		       token2 == TP_STRING_LITERAL; /* L */
-	case TP_NUMBER:
-		return token2 == TP_NUMBER || token2 == TP_IDENTIFIER ||
+	case T_GREATERGREATER: return c == '=';
+	case T_LESSLESS:       return c == '=';
+	case '^':              return c == '=';
+	case '!':              return c == '=';
+
+	case T_IDENTIFIER:
+		return token2 == T_CHARACTER_CONSTANT ||
+		       token2 == T_IDENTIFIER         ||
+		       token2 == T_NUMBER             ||
+		       token2 == T_STRING_LITERAL; /* L */
+
+	case T_NUMBER:
+		return token2 == T_IDENTIFIER || token2 == T_NUMBER ||
 		       token2 == '.' || token2 == '+' || token2 == '-';
+
 	default:
 		return false;
 	}

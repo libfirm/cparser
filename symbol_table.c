@@ -33,7 +33,7 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 {
 	entry->string        = string;
 	entry->ID            = T_IDENTIFIER;
-	entry->pp_ID         = TP_IDENTIFIER;
+	entry->pp_ID         = TP_NULL;
 	entry->entity        = NULL;
 	entry->pp_definition = NULL;
 }

@@ -13,6 +13,7 @@ TS(IDENTIFIER,         "identifier",)
 TS(NUMBER,             "number constant",)
 TS(CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,     "string literal",)
+TS(HEADERNAME,         "headername",)
 
 #define S(mode,x)   T(mode,x,#x,)
 S(_ALL, auto)
