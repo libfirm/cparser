@@ -1597,7 +1597,7 @@ static void parse_else_directive(void)
 	if (conditional->in_else) {
 		errorf(&pp_token.base.source_position,
 		       "#else after #else (condition started %P)",
-		       conditional->source_position);
+		       &conditional->source_position);
 		skip_mode = true;
 		return;
 	}
