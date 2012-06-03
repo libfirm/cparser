@@ -1826,36 +1826,39 @@ static void parse_undef_directive(void)
  * They're only allowed behind an #include so they're not recognized
  * by the normal next_preprocessing_token. We handle them as a special
  * exception here */
-static void parse_headername(void)
+static const char *parse_headername(bool *system_include)
 {
-	const source_position_t start_position = input.position;
-	string_t                string         = { NULL, 0, STRING_ENCODING_CHAR };
-	assert(obstack_object_size(&symbol_obstack) == 0);
-
 	if (info.at_line_begin) {
 		parse_error("expected headername after #include");
-		goto finish_error;
+		return NULL;
 	}
 
 	/* check wether we have a "... or <... headername */
+	source_position_t position = input.position;
 	switch (input.c) {
 	{
 		utf32 delimiter;
-	case '<': delimiter = '>'; goto parse_name;
-	case '"': delimiter = '"'; goto parse_name;
+	case '<': delimiter = '>'; *system_include = true;  goto parse_name;
+	case '"': delimiter = '"'; *system_include = false; goto parse_name;
 parse_name:
+		assert(obstack_object_size(&symbol_obstack) == 0);
 		next_char();
 		while (true) {
 			switch (input.c) {
 			case NEWLINE:
 			case EOF:
-				errorf(&pp_token.base.source_position, "header name without closing '%c'", (char)delimiter);
-				goto finish_error;
+				{
+					char *dummy = obstack_finish(&symbol_obstack);
+					obstack_free(&symbol_obstack, dummy);
+				}
+				errorf(&pp_token.base.source_position,
+				       "header name without closing '%c'", (char)delimiter);
+				return NULL;
 
 			default:
 				if (input.c == delimiter) {
 					next_char();
-					goto finished_headername;
+					goto finish_headername;
 				} else {
 					obstack_1grow(&symbol_obstack, (char)input.c);
 					next_char();
@@ -1867,17 +1870,68 @@ parse_name:
 	}
 
 	default:
-		/* TODO: do normal pp_token parsing and concatenate results */
-		panic("pp_token concat include not implemented yet");
+		next_preprocessing_token();
+		if (info.at_line_begin) {
+			/* TODO: if we are already in the new line then we parsed more than
+			 * wanted. We reuse the token, but could produce following errors
+			 * misbehaviours... */
+			goto error_invalid_input;
+		}
+		if (pp_token.kind == T_STRING_LITERAL) {
+			*system_include = false;
+			return pp_token.literal.string.begin;
+		} else if (pp_token.kind == '<') {
+			*system_include = true;
+			assert(obstack_object_size(&pp_obstack) == 0);
+			while (true) {
+				next_preprocessing_token();
+				if (info.at_line_begin) {
+					/* TODO: we shouldn't have parsed/expanded something on the
+					 * next line yet... */
+					char *dummy = obstack_finish(&pp_obstack);
+					obstack_free(&pp_obstack, dummy);
+					goto error_invalid_input;
+				}
+				if (pp_token.kind == '>')
+					break;
+
+				saved_token_t saved;
+				saved.token          = pp_token;
+				saved.had_whitespace = info.had_whitespace;
+				obstack_grow(&pp_obstack, &saved, sizeof(saved));
+			}
+			size_t size = obstack_object_size(&pp_obstack);
+			assert(size % sizeof(saved_token_t) == 0);
+			size_t n_tokens = size / sizeof(saved_token_t);
+			saved_token_t *tokens = obstack_finish(&pp_obstack);
+			assert(obstack_object_size(&symbol_obstack) == 0);
+			for (size_t i = 0; i < n_tokens; ++i) {
+				const saved_token_t *saved = &tokens[i];
+				if (i > 0 && saved->had_whitespace)
+					obstack_1grow(&symbol_obstack, ' ');
+				grow_token(&symbol_obstack, &saved->token);
+			}
+			obstack_free(&pp_obstack, tokens);
+			goto finish_headername;
+		} else {
+error_invalid_input:
+			{
+				char *dummy = obstack_finish(&symbol_obstack);
+				obstack_free(&symbol_obstack, dummy);
+			}
+
+			errorf(&pp_token.base.source_position,
+			       "expected \"FILENAME\" or <FILENAME> after #include");
+			return NULL;
+		}
 	}
 
-finished_headername:
-	string = sym_make_string(STRING_ENCODING_CHAR);
-
-finish_error:
-	pp_token.base.source_position = start_position;
-	pp_token.kind                 = T_HEADERNAME;
-	pp_token.literal.string       = string;
+finish_headername:
+	obstack_1grow(&symbol_obstack, '\0');
+	char *const  headername = obstack_finish(&symbol_obstack);
+	const char  *identified = identify_string(headername);
+	pp_token.base.source_position = position;
+	return identified;
 }
 
 static bool do_include(bool const system_include, bool const include_next, char const *const headername)
@@ -1943,20 +1997,19 @@ static void parse_include_directive(bool const include_next)
 		return;
 	}
 
-	/* don't eat the TP_include here!
-	 * we need an alternative parsing for the next token */
+	/* do not eat the TP_include, since it would already parse the next token
+	 * which needs special handling here. */
 	skip_till_newline(true);
-	bool system_include = input.c == '<';
-	parse_headername();
-	string_t headername = pp_token.literal.string;
-	if (headername.begin == NULL) {
+	bool system_include;
+	const char *headername = parse_headername(&system_include);
+	if (headername == NULL) {
 		eat_pp_directive();
 		return;
 	}
 
 	bool had_nonwhitespace = skip_till_newline(false);
 	if (had_nonwhitespace) {
-		warningf(WARN_OTHER, &pp_token.base.source_position,
+		warningf(WARN_OTHER, &input.position,
 		         "extra tokens at end of #include directive");
 	}
 
@@ -1973,11 +2026,11 @@ static void parse_include_directive(bool const include_next)
 	info.at_line_begin            = true;
 	emit_newlines();
 	push_input();
-	bool res = do_include(system_include, include_next, pp_token.literal.string.begin);
+	bool res = do_include(system_include, include_next, headername);
 	if (res) {
 		next_input_token();
 	} else {
-		errorf(&pp_token.base.source_position, "failed including '%S': %s", &pp_token.literal.string, strerror(errno));
+		errorf(&pp_token.base.source_position, "failed including '%s': %s", headername, strerror(errno));
 		pop_restore_input();
 	}
 }

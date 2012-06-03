@@ -113,7 +113,6 @@ void print_token(FILE *f, const token_t *token)
 		val = token->base.symbol->string;
 		break;
 
-	case T_HEADERNAME:
 	case T_STRING_LITERAL:
 		delim = '"';
 		/* FALLTHROUGH */

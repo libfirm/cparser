@@ -11,7 +11,6 @@ S(IDENTIFIER,         "identifier")
 S(NUMBER,             "number constant")
 S(CHARACTER_CONSTANT, "character constant")
 S(STRING_LITERAL,     "string literal")
-S(HEADERNAME,         "headername")
 S(MACRO_PARAMETER,    "macro parameter")
 S(UNKNOWN_CHAR,       "unknown character")
 #undef S
