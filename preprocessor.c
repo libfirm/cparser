@@ -1024,7 +1024,6 @@ restart:
 	case '~':
 	case ';':
 	case ',':
-	case '\\':
 		pp_token.kind = input.c;
 		next_char();
 		return;
