@@ -272,7 +272,6 @@ struct string_literal_expression_t {
 struct funcname_expression_t {
 	expression_base_t  base;
 	funcname_kind_t    kind;
-	string_t           value;     /**< the value once assigned. */
 };
 
 struct compound_literal_expression_t {
