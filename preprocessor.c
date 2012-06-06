@@ -1590,6 +1590,8 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
 		if (!pp_tokens_equal(&t1->token, &t2->token))
 			return false;
+		if (t1->had_whitespace != t2->had_whitespace)
+			return false;
 	}
 	return true;
 }
