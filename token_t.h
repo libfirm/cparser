@@ -70,12 +70,6 @@ struct token_base_t {
 	symbol_t         *symbol;
 };
 
-enum string_encoding_t {
-	STRING_ENCODING_CHAR,
-	STRING_ENCODING_WIDE
-};
-typedef enum string_encoding_t string_encoding_t;
-
 struct string_literal_t {
 	token_base_t      base;
 	string_encoding_t encoding;

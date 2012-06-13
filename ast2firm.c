@@ -1103,14 +1103,12 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
  */
 static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_encoding_t const enc, string_t const *const value)
 {
-	size_t            slen;
-	ir_type          *elem_type;
-	ir_initializer_t *initializer;
+	size_t            const slen        = get_string_len(enc, value) + 1;
+	ir_initializer_t *const initializer = create_initializer_compound(slen);
+	ir_type          *      elem_type;
 	switch (enc) {
 	case STRING_ENCODING_CHAR: {
-		slen        = value->size + 1;
-		elem_type   = ir_type_char;
-		initializer = create_initializer_compound(slen);
+		elem_type = ir_type_char;
 
 		ir_mode *const mode = get_type_mode(elem_type);
 		char const    *p    = value->begin;
@@ -1123,9 +1121,7 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 	}
 
 	case STRING_ENCODING_WIDE: {
-		slen        = wstrlen(value) + 1;
-		elem_type   = ir_type_wchar_t;
-		initializer = create_initializer_compound(slen);
+		elem_type = ir_type_wchar_t;
 
 		ir_mode *const mode = get_type_mode(elem_type);
 		char const    *p    = value->begin;

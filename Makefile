@@ -52,6 +52,7 @@ SOURCES := \
 	mangle.c \
 	preprocessor.c \
 	printer.c \
+	string_rep.c \
 	symbol_table.c \
 	token.c \
 	type.c \

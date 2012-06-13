@@ -2222,7 +2222,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		case INITIALIZER_STRING:
-			size = result->string.string.size + 1;
+			size = get_string_len(result->string.encoding, &result->string.string) + 1;
 			break;
 
 		case INITIALIZER_DESIGNATOR:
@@ -5839,10 +5839,11 @@ static expression_t *parse_character_constant(void)
 	literal->string_literal.encoding = token.string.encoding;
 	literal->string_literal.value    = token.string.string;
 
+	size_t const size = get_string_len(token.string.encoding, &token.string.string);
 	switch (token.string.encoding) {
 	case STRING_ENCODING_CHAR:
 		literal->base.type = c_mode & _CXX ? type_char : type_int;
-		if (literal->string_literal.value.size > 1) {
+		if (size > 1) {
 			if (!GNU_MODE && !(c_mode & _C99)) {
 				errorf(HERE, "more than 1 character in character constant");
 			} else {
@@ -5854,7 +5855,7 @@ static expression_t *parse_character_constant(void)
 
 	case STRING_ENCODING_WIDE:
 		literal->base.type = type_int;
-		if (wstrlen(&literal->string_literal.value) > 1) {
+		if (size > 1) {
 			warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
 		}
 		break;
@@ -5949,7 +5950,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t  const size = expression->string_literal.value.size + 1;
+		size_t  const size = get_string_len(expression->string_literal.encoding, &expression->string_literal.value) + 1;
 		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
 		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
 	}
