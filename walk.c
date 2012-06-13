@@ -214,8 +214,8 @@ static void walk_initializer(const initializer_t  *initializer,
 	case INITIALIZER_DESIGNATOR:
 		walk_designator(initializer->designator.designator, env);
 		return;
+
 	case INITIALIZER_STRING:
-	case INITIALIZER_WIDE_STRING:
 		return;
 	}
 }

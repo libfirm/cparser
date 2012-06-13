@@ -1201,12 +1201,12 @@ void print_initializer(const initializer_t *initializer)
 		print_string(" }");
 		return;
 	}
+
 	case INITIALIZER_STRING:
+		print_string(get_string_encoding_prefix(initializer->string.encoding));
 		print_quoted_string(&initializer->string.string, '"');
 		return;
-	case INITIALIZER_WIDE_STRING:
-		print_quoted_string(&initializer->string.string, '"');
-		return;
+
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
 		print_string(" = ");
@@ -1495,7 +1495,6 @@ expression_classification_t is_constant_initializer(const initializer_t *initial
 {
 	switch (initializer->kind) {
 	case INITIALIZER_STRING:
-	case INITIALIZER_WIDE_STRING:
 	case INITIALIZER_DESIGNATOR:
 		return EXPR_CLASS_CONSTANT;
 

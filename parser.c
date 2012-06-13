@@ -428,7 +428,6 @@ static size_t get_initializer_size(initializer_kind_t kind)
 	static const size_t sizes[] = {
 		[INITIALIZER_VALUE]       = sizeof(initializer_value_t),
 		[INITIALIZER_STRING]      = sizeof(initializer_string_t),
-		[INITIALIZER_WIDE_STRING] = sizeof(initializer_wide_string_t),
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
 		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
@@ -1544,27 +1543,14 @@ static designator_t *parse_designation(void)
 	}
 }
 
-static initializer_t *initializer_from_string(array_type_t *const type,
-                                              const string_t *const string)
+static initializer_t *initializer_from_string(array_type_t *const type, string_encoding_t const enc, string_t const *const string)
 {
 	/* TODO: check len vs. size of array type */
 	(void) type;
 
 	initializer_t *initializer = allocate_initializer_zero(INITIALIZER_STRING);
-	initializer->string.string = *string;
-
-	return initializer;
-}
-
-static initializer_t *initializer_from_wide_string(array_type_t *const type,
-                                                   const string_t *const string)
-{
-	/* TODO: check len vs. size of array type */
-	(void) type;
-
-	initializer_t *const initializer =
-		allocate_initializer_zero(INITIALIZER_WIDE_STRING);
-	initializer->wide_string.string = *string;
+	initializer->string.encoding = enc;
+	initializer->string.string   = *string;
 
 	return initializer;
 }
@@ -1593,8 +1579,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 				if (akind == ATOMIC_TYPE_CHAR
 						|| akind == ATOMIC_TYPE_SCHAR
 						|| akind == ATOMIC_TYPE_UCHAR) {
-					return initializer_from_string(array_type,
-							&expression->string_literal.value);
+					goto make_string_init;
 				}
 				break;
 			}
@@ -1602,8 +1587,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 			case STRING_ENCODING_WIDE: {
 				type_t *bare_wchar_type = skip_typeref(type_wchar_t);
 				if (get_unqualified_type(element_type) == bare_wchar_type) {
-					return initializer_from_wide_string(array_type,
-							&expression->string_literal.value);
+make_string_init:
+					return initializer_from_string(array_type, expression->string_literal.encoding, &expression->string_literal.value);
 				}
 				break;
 			}
@@ -2238,10 +2223,6 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 
 		case INITIALIZER_STRING:
 			size = result->string.string.size + 1;
-			break;
-
-		case INITIALIZER_WIDE_STRING:
-			size = result->wide_string.string.size;
 			break;
 
 		case INITIALIZER_DESIGNATOR:
@@ -4736,7 +4717,6 @@ static bool initializer_returns(initializer_t const *const init)
 		}
 
 		case INITIALIZER_STRING:
-		case INITIALIZER_WIDE_STRING:
 		case INITIALIZER_DESIGNATOR: // designators have no payload
 			return true;
 	}

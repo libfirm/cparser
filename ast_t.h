@@ -424,7 +424,6 @@ typedef enum initializer_kind_t {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
-	INITIALIZER_WIDE_STRING,
 	INITIALIZER_DESIGNATOR
 } initializer_kind_t;
 
@@ -445,12 +444,8 @@ struct initializer_list_t {
 
 struct initializer_string_t {
 	initializer_base_t base;
+	string_encoding_t  encoding;
 	string_t           string;
-};
-
-struct initializer_wide_string_t {
-	initializer_base_t  base;
-	string_t            string;
 };
 
 struct initializer_designator_t {
@@ -464,7 +459,6 @@ union initializer_t {
 	initializer_value_t       value;
 	initializer_list_t        list;
 	initializer_string_t      string;
-	initializer_wide_string_t wide_string;
 	initializer_designator_t  designator;
 };
 

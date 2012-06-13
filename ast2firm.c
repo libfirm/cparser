@@ -3827,8 +3827,7 @@ static ir_initializer_t *create_ir_initializer_list(
 					break;
 				descend_into_subtype(&path);
 			}
-		} else if (sub_initializer->kind == INITIALIZER_STRING
-				|| sub_initializer->kind == INITIALIZER_WIDE_STRING) {
+		} else if (sub_initializer->kind == INITIALIZER_STRING) {
 			/* we might have to descend into types until we're at a scalar
 			 * type */
 			while (true) {
@@ -3861,58 +3860,38 @@ static ir_initializer_t *create_ir_initializer_list(
 	return result;
 }
 
-static ir_initializer_t *create_ir_initializer_string(
-		const initializer_string_t *initializer, type_t *type)
+static ir_initializer_t *create_ir_initializer_string(initializer_string_t const *const initializer, type_t *type)
 {
 	type = skip_typeref(type);
 
-	size_t            string_len    = initializer->string.size;
 	assert(type->kind == TYPE_ARRAY);
 	assert(type->array.size_constant);
-	size_t            len           = type->array.size;
-	ir_initializer_t *irinitializer = create_initializer_compound(len);
-
-	const char *string = initializer->string.begin;
-	ir_mode    *mode   = get_ir_mode_storage(type->array.element_type);
-
-	for (size_t i = 0; i < len; ++i) {
-		char c = 0;
-		if (i < string_len)
-			c = string[i];
-
-		ir_tarval        *tv = new_tarval_from_long(c, mode);
-		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
-
-		set_initializer_compound_value(irinitializer, i, char_initializer);
-	}
-
-	return irinitializer;
-}
-
-static ir_initializer_t *create_ir_initializer_wide_string(
-		const initializer_wide_string_t *initializer, type_t *type)
-{
-	assert(type->kind == TYPE_ARRAY);
-	assert(type->array.size_constant);
-	size_t            len           = type->array.size;
-	size_t            string_len    = wstrlen(&initializer->string);
-	ir_initializer_t *irinitializer = create_initializer_compound(len);
-
-	const char *p    = initializer->string.begin;
-	ir_mode    *mode = get_type_mode(ir_type_wchar_t);
-
-	for (size_t i = 0; i < len; ++i) {
-		utf32 c = 0;
-		if (i < string_len) {
-			c = read_utf8_char(&p);
+	size_t            const str_len = initializer->string.size;
+	size_t            const arr_len = type->array.size;
+	ir_initializer_t *const irinit  = create_initializer_compound(arr_len);
+	ir_mode          *const mode    = get_ir_mode_storage(type->array.element_type);
+	char const       *      p       = initializer->string.begin;
+	switch (initializer->encoding) {
+	case STRING_ENCODING_CHAR:
+		for (size_t i = 0; i != arr_len; ++i) {
+			char              const c      = i < str_len ? *p++ : 0;
+			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
+			ir_initializer_t *const tvinit = create_initializer_tarval(tv);
+			set_initializer_compound_value(irinit, i, tvinit);
 		}
-		ir_tarval *tv = new_tarval_from_long(c, mode);
-		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
+		break;
 
-		set_initializer_compound_value(irinitializer, i, char_initializer);
+	case STRING_ENCODING_WIDE:
+		for (size_t i = 0; i != arr_len; ++i) {
+			utf32             const c      = i < str_len ? read_utf8_char(&p) : 0;
+			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
+			ir_initializer_t *const tvinit = create_initializer_tarval(tv);
+			set_initializer_compound_value(irinit, i, tvinit);
+		}
+		break;
 	}
 
-	return irinitializer;
+	return irinit;
 }
 
 static ir_initializer_t *create_ir_initializer(
@@ -3921,10 +3900,6 @@ static ir_initializer_t *create_ir_initializer(
 	switch(initializer->kind) {
 		case INITIALIZER_STRING:
 			return create_ir_initializer_string(&initializer->string, type);
-
-		case INITIALIZER_WIDE_STRING:
-			return create_ir_initializer_wide_string(&initializer->wide_string,
-			                                         type);
 
 		case INITIALIZER_LIST:
 			return create_ir_initializer_list(&initializer->list, type);
