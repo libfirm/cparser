@@ -29,8 +29,6 @@
 #include "type.h"
 #include "warning.h"
 
-/** Number of occurred diagnostics. */
-unsigned diagnostic_count        = 0;
 /** Number of occurred errors. */
 unsigned error_count             = 0;
 /** Number of occurred warnings. */
@@ -221,7 +219,6 @@ void diagnosticf(const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	++diagnostic_count;
 	curr_pos = NULL;
 	diagnosticvf(fmt, ap);
 	va_end(ap);
