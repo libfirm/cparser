@@ -3009,7 +3009,8 @@ warn_about_long_long:
 			} else {
 				errorf(pos, "multiple datatypes in declaration");
 			}
-			goto end_error;
+			specifiers->type = type_error_type;
+			return;
 		}
 		}
 
@@ -3038,10 +3039,6 @@ warn_about_long_long:
 	if (specifiers->attributes != NULL)
 		type = handle_type_attributes(specifiers->attributes, type);
 	specifiers->type = type;
-	return;
-
-end_error:
-	specifiers->type = type_error_type;
 }
 
 static type_qualifiers_t parse_type_qualifiers(void)
