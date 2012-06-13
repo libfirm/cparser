@@ -238,7 +238,6 @@ static void diagnosticposvf(source_position_t const *const pos, char const *cons
 static void errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	curr_pos = pos;
 	++error_count;
 	diagnosticposvf(pos, "error", fmt, ap);
 	fputc('\n', stderr);
@@ -293,7 +292,6 @@ void internal_errorf(const source_position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = pos;
 	internal_errorvf(pos, fmt, ap);
 	va_end(ap);
 	abort();
