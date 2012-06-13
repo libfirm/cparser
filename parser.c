@@ -1563,36 +1563,30 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 {
 	/* TODO check that expression is a constant expression */
 
-	/* §6.7.8.14/15 char array may be initialized by string literals */
-	type_t *type           = skip_typeref(orig_type);
-	type_t *expr_type_orig = expression->base.type;
-	type_t *expr_type      = skip_typeref(expr_type_orig);
+	type_t *const type = skip_typeref(orig_type);
 
-	if (is_type_array(type) && expr_type->kind == TYPE_POINTER) {
+	/* §6.7.8.14/15 char array may be initialized by string literals */
+	if (expression->kind == EXPR_STRING_LITERAL && is_type_array(type)) {
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
-
-		if (element_type->kind == TYPE_ATOMIC && expression->kind == EXPR_STRING_LITERAL) {
-			switch (expression->string_literal.encoding) {
-			case STRING_ENCODING_CHAR: {
-				atomic_type_kind_t const akind = element_type->atomic.akind;
-				if (akind == ATOMIC_TYPE_CHAR
-						|| akind == ATOMIC_TYPE_SCHAR
-						|| akind == ATOMIC_TYPE_UCHAR) {
-					goto make_string_init;
-				}
-				break;
+		switch (expression->string_literal.encoding) {
+		case STRING_ENCODING_CHAR: {
+			if (is_type_atomic(element_type, ATOMIC_TYPE_CHAR)  ||
+			    is_type_atomic(element_type, ATOMIC_TYPE_SCHAR) ||
+			    is_type_atomic(element_type, ATOMIC_TYPE_UCHAR)) {
+				goto make_string_init;
 			}
+			break;
+		}
 
-			case STRING_ENCODING_WIDE: {
-				type_t *bare_wchar_type = skip_typeref(type_wchar_t);
-				if (get_unqualified_type(element_type) == bare_wchar_type) {
+		case STRING_ENCODING_WIDE: {
+			type_t *bare_wchar_type = skip_typeref(type_wchar_t);
+			if (get_unqualified_type(element_type) == bare_wchar_type) {
 make_string_init:
-					return initializer_from_string(array_type, expression->string_literal.encoding, &expression->string_literal.value);
-				}
-				break;
+				return initializer_from_string(array_type, expression->string_literal.encoding, &expression->string_literal.value);
 			}
-			}
+			break;
+		}
 		}
 	}
 
