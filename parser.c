@@ -8521,10 +8521,7 @@ static void register_expression_parser(parse_expression_function parser,
 {
 	expression_parser_function_t *entry = &expression_parsers[token_kind];
 
-	if (entry->parser != NULL) {
-		diagnosticf("for token '%k'\n", (token_kind_t)token_kind);
-		panic("trying to register multiple expression parsers for a token");
-	}
+	assert(!entry->parser);
 	entry->parser = parser;
 }
 
@@ -8540,11 +8537,7 @@ static void register_infix_parser(parse_expression_infix_function parser,
 {
 	expression_parser_function_t *entry = &expression_parsers[token_kind];
 
-	if (entry->infix_parser != NULL) {
-		diagnosticf("for token '%k'\n", (token_kind_t)token_kind);
-		panic("trying to register multiple infix expression parsers for a "
-		      "token");
-	}
+	assert(!entry->infix_parser);
 	entry->infix_parser     = parser;
 	entry->infix_precedence = precedence;
 }

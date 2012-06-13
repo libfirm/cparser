@@ -454,11 +454,10 @@ static void print_array_expression(const array_access_expression_t *expression)
  */
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
-	if (expression->base.kind == EXPR_SIZEOF) {
-		print_string("sizeof");
-	} else {
-		assert(expression->base.kind == EXPR_ALIGNOF);
-		print_string("__alignof__");
+	switch (expression->base.kind) {
+	case EXPR_SIZEOF:  print_string("sizeof");      break;
+	case EXPR_ALIGNOF: print_string("__alignof__"); break;
+	default:           panic("invalid typeprop kind");
 	}
 	if (expression->tp_expression != NULL) {
 		/* PREC_TOP: always print the '()' here, sizeof x is right but unusual */
@@ -1188,7 +1187,6 @@ void print_initializer(const initializer_t *initializer)
 		return;
 	}
 	case INITIALIZER_LIST: {
-		assert(initializer->kind == INITIALIZER_LIST);
 		print_string("{ ");
 		const initializer_list_t *list = &initializer->list;
 

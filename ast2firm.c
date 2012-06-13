@@ -190,12 +190,10 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	unsigned size  = get_atomic_type_size(kind);
 	if ((flags & ATOMIC_TYPE_FLAG_FLOAT)
 	    && !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
-		if (size == 4) {
-			return get_modeF();
-		} else if (size == 8) {
-			return get_modeD();
-		} else {
-			panic("unexpected kind");
+		switch (size) {
+		case 4:  return get_modeF();
+		case 8:  return get_modeD();
+		default: panic("unexpected kind");
 		}
 	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 		char            name[64];
@@ -505,12 +503,11 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 {
 	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 	type_t *base = skip_typeref(entity->declaration.type);
-	assert(base->kind == TYPE_ATOMIC || base->kind == TYPE_ENUM);
+	assert(is_type_integer(base));
 	ir_type *irbase = get_ir_type(base);
 
 	unsigned bit_size = entity->compound_member.bit_size;
 
-	assert(!is_type_float(base));
 	if (is_type_signed(base)) {
 		return get_signed_int_type_for_bit_size(irbase, bit_size, base);
 	} else {
@@ -576,8 +573,7 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 			/* anonymous bitfield member, skip */
 			if (entry->compound_member.bitfield)
 				continue;
-			assert(entry_type->kind == TYPE_COMPOUND_STRUCT
-					|| entry_type->kind == TYPE_COMPOUND_UNION);
+			assert(is_type_compound(entry_type));
 			ident = id_unique("anon.%u");
 		} else {
 			ident = new_id_from_str(symbol->string);
@@ -640,7 +636,6 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 static ir_type *get_ir_type_incomplete(type_t *type)
 {
-	assert(type != NULL);
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
@@ -656,8 +651,6 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 
 ir_type *get_ir_type(type_t *type)
 {
-	assert(type != NULL);
-
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
@@ -2192,7 +2185,7 @@ static ir_relation get_relation(const expression_kind_t kind)
 	default:
 		break;
 	}
-	panic("trying to get pn_Cmp from non-comparison binexpr type");
+	panic("trying to get ir_relation from non-comparison binexpr type");
 }
 
 /**
@@ -2529,7 +2522,6 @@ normal_node:
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN: {
 		ir_node *pin = new_Pin(new_NoMem());
-		assert(!mode_is_float(mode));
 		ir_node *op  = new_d_Mod(dbgi, pin, left, right, mode,
 		                         op_pin_state_floats);
 		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
@@ -2670,7 +2662,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		return create_assign_binop(expression);
 	default:
-		panic("TODO binexpr type");
+		panic("invalid binexpr type");
 	}
 }
 
@@ -2715,12 +2707,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.entities;
-			for ( ; iter != NULL; iter = iter->base.next) {
-				if (iter->base.symbol == symbol) {
-					break;
-				}
-			}
-			assert(iter != NULL);
+			for (; iter->base.symbol != symbol; iter = iter->base.next) {}
 
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 			assert(iter->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
@@ -3687,13 +3674,8 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.entities;
-			for ( ; iter != NULL; iter = iter->base.next, ++index) {
-				if (iter->base.symbol == symbol) {
-					assert(iter->kind == ENTITY_COMPOUND_MEMBER);
-					break;
-				}
-			}
-			assert(iter != NULL);
+			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index) {}
+			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
 			/* revert previous initialisations of other union elements */
 			if (type->kind == TYPE_COMPOUND_UNION) {
@@ -3722,17 +3704,10 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			orig_type           = iter->declaration.type;
 		} else {
 			expression_t *array_index = designator->array_index;
-			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
 			long index = fold_constant_to_int(array_index);
-			assert(index >= 0);
-#ifndef NDEBUG
-			if (type->array.size_constant) {
-				long array_size = type->array.size;
-				assert(index < array_size);
-			}
-#endif
+			assert(0 <= index && (!type->array.size_constant || (size_t)index < type->array.size));
 
 			top->type  = orig_type;
 			top->index = (size_t) index;

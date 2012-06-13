@@ -586,11 +586,10 @@ static void print_compound_type(const compound_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
 
-	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
-		print_string("struct ");
-	} else {
-		assert(type->base.kind == TYPE_COMPOUND_UNION);
-		print_string("union ");
+	switch (type->base.kind) {
+	case TYPE_COMPOUND_STRUCT: print_string("struct "); break;
+	case TYPE_COMPOUND_UNION:  print_string("union ");  break;
+	default:                   panic("invalid type");
 	}
 
 	compound_t *compound = type->compound;
