@@ -319,8 +319,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 			continue;
 
 		type_t *type = entity->typedefe.type;
-		if(type->kind == TYPE_COMPOUND_STRUCT
-				|| type->kind == TYPE_COMPOUND_UNION) {
+		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
 		} else if(type->kind == TYPE_ENUM) {
 			write_enum(entity->base.symbol, &type->enumt);

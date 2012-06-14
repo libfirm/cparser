@@ -517,8 +517,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 		}
 
 #if 0
-		if(type->kind == TYPE_COMPOUND_STRUCT
-				|| type->kind == TYPE_COMPOUND_UNION) {
+		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
 		}
 #endif

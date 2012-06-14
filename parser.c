@@ -5472,8 +5472,7 @@ static expression_t *find_create_select(const source_position_t *pos,
 		symbol_t *iter_symbol = iter->base.symbol;
 		if (iter_symbol == NULL) {
 			type_t *type = iter->declaration.type;
-			if (type->kind != TYPE_COMPOUND_STRUCT
-					&& type->kind != TYPE_COMPOUND_UNION)
+			if (!is_type_compound(type))
 				continue;
 
 			compound_t *sub_compound = type->compound.compound;
@@ -6859,9 +6858,7 @@ static expression_t *parse_select_expression(expression_t *addr)
 		type_left = type;
 	}
 
-	if (type_left->kind != TYPE_COMPOUND_STRUCT &&
-	    type_left->kind != TYPE_COMPOUND_UNION) {
-
+	if (!is_type_compound(type_left)) {
 		if (is_type_valid(type_left) && !saw_error) {
 			errorf(&pos,
 			       "request for member '%Y' in something not a struct or union, but '%T'",
