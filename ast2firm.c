@@ -3851,18 +3851,19 @@ static ir_initializer_t *create_ir_initializer_list(
 	return result;
 }
 
-static ir_initializer_t *create_ir_initializer_string(initializer_string_t const *const initializer, type_t *type)
+static ir_initializer_t *create_ir_initializer_string(initializer_t const *const init, type_t *type)
 {
 	type = skip_typeref(type);
 
 	assert(type->kind == TYPE_ARRAY);
 	assert(type->array.size_constant);
-	size_t            const str_len = initializer->string.size;
+	string_literal_expression_t const *const str = get_init_string(init);
+	size_t            const str_len = str->value.size;
 	size_t            const arr_len = type->array.size;
 	ir_initializer_t *const irinit  = create_initializer_compound(arr_len);
 	ir_mode          *const mode    = get_ir_mode_storage(type->array.element_type);
-	char const       *      p       = initializer->string.begin;
-	switch (initializer->encoding) {
+	char const       *      p       = str->value.begin;
+	switch (str->encoding) {
 	case STRING_ENCODING_CHAR:
 		for (size_t i = 0; i != arr_len; ++i) {
 			char              const c      = i < str_len ? *p++ : 0;
@@ -3890,7 +3891,7 @@ static ir_initializer_t *create_ir_initializer(
 {
 	switch(initializer->kind) {
 		case INITIALIZER_STRING:
-			return create_ir_initializer_string(&initializer->string, type);
+			return create_ir_initializer_string(initializer, type);
 
 		case INITIALIZER_LIST:
 			return create_ir_initializer_list(&initializer->list, type);

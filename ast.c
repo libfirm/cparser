@@ -1203,8 +1203,7 @@ void print_initializer(const initializer_t *initializer)
 	}
 
 	case INITIALIZER_STRING:
-		print_string(get_string_encoding_prefix(initializer->string.encoding));
-		print_quoted_string(&initializer->string.string, '"');
+		print_string_literal(get_init_string(initializer), '"');
 		return;
 
 	case INITIALIZER_DESIGNATOR:

@@ -427,7 +427,7 @@ static size_t get_initializer_size(initializer_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[INITIALIZER_VALUE]       = sizeof(initializer_value_t),
-		[INITIALIZER_STRING]      = sizeof(initializer_string_t),
+		[INITIALIZER_STRING]      = sizeof(initializer_value_t),
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
 		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
@@ -1543,18 +1543,6 @@ static designator_t *parse_designation(void)
 	}
 }
 
-static initializer_t *initializer_from_string(array_type_t *const type, string_encoding_t const enc, string_t const *const string)
-{
-	/* TODO: check len vs. size of array type */
-	(void) type;
-
-	initializer_t *initializer = allocate_initializer_zero(INITIALIZER_STRING);
-	initializer->string.encoding = enc;
-	initializer->string.string   = *string;
-
-	return initializer;
-}
-
 /**
  * Build an initializer from a given expression.
  */
@@ -1582,8 +1570,10 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		case STRING_ENCODING_WIDE: {
 			type_t *bare_wchar_type = skip_typeref(type_wchar_t);
 			if (get_unqualified_type(element_type) == bare_wchar_type) {
-make_string_init:
-				return initializer_from_string(array_type, expression->string_literal.encoding, &expression->string_literal.value);
+make_string_init:;
+				initializer_t *const init = allocate_initializer_zero(INITIALIZER_STRING);
+				init->value.value = expression;
+				return init;
 			}
 			break;
 		}
@@ -2215,9 +2205,11 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			size = max_index + 1;
 			break;
 
-		case INITIALIZER_STRING:
-			size = get_string_len(result->string.encoding, &result->string.string) + 1;
+		case INITIALIZER_STRING: {
+			string_literal_expression_t const *const str = get_init_string(result);
+			size = get_string_len(str->encoding, &str->value) + 1;
 			break;
+		}
 
 		case INITIALIZER_DESIGNATOR:
 		case INITIALIZER_VALUE:

@@ -442,12 +442,6 @@ struct initializer_list_t {
 	initializer_t      *initializers[];
 };
 
-struct initializer_string_t {
-	initializer_base_t base;
-	string_encoding_t  encoding;
-	string_t           string;
-};
-
 struct initializer_designator_t {
 	initializer_base_t  base;
 	designator_t       *designator;
@@ -458,9 +452,15 @@ union initializer_t {
 	initializer_base_t        base;
 	initializer_value_t       value;
 	initializer_list_t        list;
-	initializer_string_t      string;
 	initializer_designator_t  designator;
 };
+
+static inline string_literal_expression_t const *get_init_string(initializer_t const *const init)
+{
+	assert(init->kind == INITIALIZER_STRING);
+	assert(init->value.value->kind == EXPR_STRING_LITERAL);
+	return &init->value.value->string_literal;
+}
 
 /**
  * The statement kinds.
