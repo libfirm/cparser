@@ -994,53 +994,48 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	if (type1 == type2)
 		return true;
 
-	if (!is_type_valid(type1) || !is_type_valid(type2))
-		return true;
+	if (type1->base.qualifiers == type2->base.qualifiers &&
+	    type1->kind            == type2->kind) {
+		switch (type1->kind) {
+		case TYPE_FUNCTION:
+			return function_types_compatible(&type1->function, &type2->function);
+		case TYPE_ATOMIC:
+		case TYPE_IMAGINARY:
+		case TYPE_COMPLEX:
+			return type1->atomic.akind == type2->atomic.akind;
+		case TYPE_ARRAY:
+			return array_types_compatible(&type1->array, &type2->array);
 
-	if (type1->base.qualifiers != type2->base.qualifiers)
-		return false;
-	if (type1->kind != type2->kind)
-		return false;
+		case TYPE_POINTER: {
+			const type_t *const to1 = skip_typeref(type1->pointer.points_to);
+			const type_t *const to2 = skip_typeref(type2->pointer.points_to);
+			return types_compatible(to1, to2);
+		}
 
-	switch (type1->kind) {
-	case TYPE_FUNCTION:
-		return function_types_compatible(&type1->function, &type2->function);
-	case TYPE_ATOMIC:
-	case TYPE_IMAGINARY:
-	case TYPE_COMPLEX:
-		return type1->atomic.akind == type2->atomic.akind;
-	case TYPE_ARRAY:
-		return array_types_compatible(&type1->array, &type2->array);
+		case TYPE_REFERENCE: {
+			const type_t *const to1 = skip_typeref(type1->reference.refers_to);
+			const type_t *const to2 = skip_typeref(type2->reference.refers_to);
+			return types_compatible(to1, to2);
+		}
 
-	case TYPE_POINTER: {
-		const type_t *const to1 = skip_typeref(type1->pointer.points_to);
-		const type_t *const to2 = skip_typeref(type2->pointer.points_to);
-		return types_compatible(to1, to2);
+		case TYPE_COMPOUND_STRUCT:
+		case TYPE_COMPOUND_UNION:
+			break;
+
+		case TYPE_ENUM:
+			/* TODO: not implemented */
+			break;
+
+		case TYPE_ERROR:
+			/* Hmm, the error type should be compatible to all other types */
+			return true;
+		case TYPE_TYPEDEF:
+		case TYPE_TYPEOF:
+			panic("typerefs not skipped in compatible types?!?");
+		}
 	}
 
-	case TYPE_REFERENCE: {
-		const type_t *const to1 = skip_typeref(type1->reference.refers_to);
-		const type_t *const to2 = skip_typeref(type2->reference.refers_to);
-		return types_compatible(to1, to2);
-	}
-
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION: {
-		break;
-	}
-	case TYPE_ENUM:
-		/* TODO: not implemented */
-		break;
-
-	case TYPE_ERROR:
-		/* Hmm, the error type should be compatible to all other types */
-		return true;
-	case TYPE_TYPEDEF:
-	case TYPE_TYPEOF:
-		panic("typerefs not skipped in compatible types?!?");
-	}
-
-	return false;
+	return !is_type_valid(type1) || !is_type_valid(type2);
 }
 
 /**
