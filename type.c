@@ -580,17 +580,13 @@ void print_compound_definition(const compound_t *compound)
 /**
  * Prints a compound type.
  *
+ * @param kind  The name of the compound kind.
  * @param type  The compound type.
  */
-static void print_compound_type(const compound_type_t *type)
+static void print_compound_type(char const *const kind, compound_type_t const *const type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
-
-	switch (type->base.kind) {
-	case TYPE_COMPOUND_STRUCT: print_string("struct "); break;
-	case TYPE_COMPOUND_UNION:  print_string("union ");  break;
-	default:                   panic("invalid type");
-	}
+	print_string(kind);
 
 	compound_t *compound = type->compound;
 	symbol_t   *symbol   = compound->base.symbol;
@@ -636,19 +632,19 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 static void intern_print_type_pre(const type_t *const type)
 {
 	switch(type->kind) {
-	case TYPE_ARRAY:           print_array_type_pre(    &type->array);     return;
-	case TYPE_ATOMIC:          print_atomic_type(       &type->atomic);    return;
-	case TYPE_COMPLEX:         print_complex_type(      &type->atomic);    return;
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  print_compound_type(     &type->compound);  return;
-	case TYPE_ENUM:            print_type_enum(         &type->enumt);     return;
-	case TYPE_ERROR:           print_string("<error>");                    return;
-	case TYPE_FUNCTION:        print_function_type_pre( &type->function);  return;
-	case TYPE_IMAGINARY:       print_imaginary_type(    &type->atomic);    return;
-	case TYPE_POINTER:         print_pointer_type_pre(  &type->pointer);   return;
-	case TYPE_REFERENCE:       print_reference_type_pre(&type->reference); return;
-	case TYPE_TYPEDEF:         print_typedef_type_pre(  &type->typedeft);  return;
-	case TYPE_TYPEOF:          print_typeof_type_pre(   &type->typeoft);   return;
+	case TYPE_ARRAY:           print_array_type_pre(          &type->array);     return;
+	case TYPE_ATOMIC:          print_atomic_type(             &type->atomic);    return;
+	case TYPE_COMPLEX:         print_complex_type(            &type->atomic);    return;
+	case TYPE_COMPOUND_STRUCT: print_compound_type("struct ", &type->compound);  return;
+	case TYPE_COMPOUND_UNION:  print_compound_type("union ",  &type->compound);  return;
+	case TYPE_ENUM:            print_type_enum(               &type->enumt);     return;
+	case TYPE_ERROR:           print_string("<error>");                          return;
+	case TYPE_FUNCTION:        print_function_type_pre(       &type->function);  return;
+	case TYPE_IMAGINARY:       print_imaginary_type(          &type->atomic);    return;
+	case TYPE_POINTER:         print_pointer_type_pre(        &type->pointer);   return;
+	case TYPE_REFERENCE:       print_reference_type_pre(      &type->reference); return;
+	case TYPE_TYPEDEF:         print_typedef_type_pre(        &type->typedeft);  return;
+	case TYPE_TYPEOF:          print_typeof_type_pre(         &type->typeoft);   return;
 	}
 	print_string("unknown");
 }
