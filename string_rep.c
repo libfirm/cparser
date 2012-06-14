@@ -13,9 +13,9 @@ static inline size_t wstrlen(const string_t *string)
 	return result;
 }
 
-size_t get_string_len(string_encoding_t const enc, string_t const *const str)
+size_t get_string_len(string_t const *const str)
 {
-	switch (enc) {
+	switch (str->encoding) {
 	case STRING_ENCODING_CHAR: return str->size;
 	case STRING_ENCODING_WIDE: return wstrlen(str);
 	}

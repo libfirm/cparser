@@ -71,9 +71,8 @@ struct token_base_t {
 };
 
 struct string_literal_t {
-	token_base_t      base;
-	string_encoding_t encoding;
-	string_t          string;
+	token_base_t base;
+	string_t     string;
 };
 
 struct number_literal_t {

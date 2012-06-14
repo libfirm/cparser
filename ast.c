@@ -197,6 +197,8 @@ static unsigned get_expression_precedence(expression_kind_t kind)
  */
 static void print_quoted_string(const string_t *const string, char border)
 {
+	print_string(get_string_encoding_prefix(string->encoding));
+
 	print_char(border);
 	const char *end = string->begin + string->size;
 	for (const char *c = string->begin; c != end; ++c) {
@@ -233,7 +235,6 @@ static void print_quoted_string(const string_t *const string, char border)
 
 static void print_string_literal(string_literal_expression_t const *const literal, char const delimiter)
 {
-	print_string(get_string_encoding_prefix(literal->encoding));
 	print_quoted_string(&literal->value, delimiter);
 }
 

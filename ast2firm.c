@@ -1101,12 +1101,12 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
  * @param id_prefix  a prefix for the name of the generated string constant
  * @param value      the value of the string constant
  */
-static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_encoding_t const enc, string_t const *const value)
+static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_t const *const value)
 {
-	size_t            const slen        = get_string_len(enc, value) + 1;
+	size_t            const slen        = get_string_len(value) + 1;
 	ir_initializer_t *const initializer = create_initializer_compound(slen);
 	ir_type          *      elem_type;
-	switch (enc) {
+	switch (value->encoding) {
 	case STRING_ENCODING_CHAR: {
 		elem_type = ir_type_char;
 
@@ -1283,7 +1283,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 	size_t      size   = literal->value.size;
 	ir_tarval  *tv;
 
-	switch (literal->encoding) {
+	switch (literal->value.encoding) {
 	case STRING_ENCODING_WIDE: {
 		utf32  v = read_utf8_char(&string);
 		char   buf[128];
@@ -3140,19 +3140,19 @@ static ir_node *function_name_to_firm(
 	case FUNCNAME_PRETTY_FUNCTION:
 	case FUNCNAME_FUNCDNAME:
 		if (current_function_name == NULL) {
-			const source_position_t *const src_pos = &expr->base.source_position;
-			const char    *name  = current_function_entity->base.symbol->string;
-			const string_t string = { name, strlen(name) };
-			current_function_name = string_to_firm(src_pos, "__func__.%u", STRING_ENCODING_CHAR, &string);
+			source_position_t const *const src_pos = &expr->base.source_position;
+			char              const *const name    = current_function_entity->base.symbol->string;
+			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
+			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
 		if (current_funcsig == NULL) {
-			const source_position_t *const src_pos = &expr->base.source_position;
-			ir_entity *ent = get_irg_entity(current_ir_graph);
-			const char *const name = get_entity_ld_name(ent);
-			const string_t string = { name, strlen(name) };
-			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", STRING_ENCODING_CHAR, &string);
+			source_position_t const *const src_pos = &expr->base.source_position;
+			ir_entity               *const ent     = get_irg_entity(current_ir_graph);
+			char              const *const name    = get_entity_ld_name(ent);
+			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
+			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
 		}
 		return current_funcsig;
 	}
@@ -3343,7 +3343,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
 	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
 
-	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", expr->string_literal.encoding, &expr->string_literal.value);
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->string_literal.value);
 
 	case EXPR_ERROR: break;
 	}
@@ -3863,7 +3863,7 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 	ir_initializer_t *const irinit  = create_initializer_compound(arr_len);
 	ir_mode          *const mode    = get_ir_mode_storage(type->array.element_type);
 	char const       *      p       = str->value.begin;
-	switch (str->encoding) {
+	switch (str->value.encoding) {
 	case STRING_ENCODING_CHAR:
 		for (size_t i = 0; i != arr_len; ++i) {
 			char              const c      = i < str_len ? *p++ : 0;

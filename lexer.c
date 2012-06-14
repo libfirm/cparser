@@ -402,7 +402,7 @@ end_symbol:
 	}
 }
 
-static string_t sym_make_string(void)
+static string_t sym_make_string(string_encoding_t const enc)
 {
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t const len    = obstack_object_size(&symbol_obstack) - 1;
@@ -417,7 +417,7 @@ static string_t sym_make_string(void)
 #else
 	const char *result = string;
 #endif
-	return (string_t) {result, len};
+	return (string_t){ result, len, enc };
 }
 
 /**
@@ -444,7 +444,7 @@ finish_suffix:
 		return;
 	}
 
-	lexer_token.number.suffix = sym_make_string();
+	lexer_token.number.suffix = sym_make_string(STRING_ENCODING_CHAR);
 }
 
 static void parse_exponent(void)
@@ -500,7 +500,7 @@ static void parse_number_hex(void)
 		       "hexadecimal floatingpoint constant requires an exponent");
 	}
 
-	lexer_token.number.number = sym_make_string();
+	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
 
 	lexer_token.kind = is_float ? T_FLOATINGPOINT : T_INTEGER;
 
@@ -523,7 +523,7 @@ static void parse_number_bin(void)
 		next_char();
 	}
 
-	lexer_token.number.number = sym_make_string();
+	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
 	lexer_token.kind          = T_INTEGER;
 
 	if (!has_digits) {
@@ -596,7 +596,7 @@ static void parse_number(void)
 		parse_exponent();
 	}
 
-	lexer_token.number.number = sym_make_string();
+	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
 
 	if (is_float) {
 		lexer_token.kind = T_FLOATINGPOINT;
@@ -744,7 +744,7 @@ static utf32 parse_escape_sequence(void)
 string_t make_string(const char *string)
 {
 	obstack_grow(&symbol_obstack, string, strlen(string));
-	return sym_make_string();
+	return sym_make_string(STRING_ENCODING_CHAR);
 }
 
 static void parse_string(utf32 const delim, token_kind_t const kind, string_encoding_t const enc, char const *const context)
@@ -787,9 +787,8 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 	}
 
 end_of_string:
-	lexer_token.kind            = kind;
-	lexer_token.string.encoding = enc;
-	lexer_token.string.string   = sym_make_string();
+	lexer_token.kind          = kind;
+	lexer_token.string.string = sym_make_string(enc);
 }
 
 /**
@@ -912,8 +911,8 @@ static void parse_line_directive(void)
 		lexer_pos.lineno = atoi(pp_token.number.number.begin) - 1;
 		next_pp_token();
 	}
-	if (pp_token.kind == T_STRING_LITERAL && pp_token.string.encoding == STRING_ENCODING_CHAR) {
-		lexer_pos.input_name = pp_token.string.string.begin;
+	if (pp_token.kind == T_STRING_LITERAL && pp_token.string.string.encoding == STRING_ENCODING_CHAR) {
+		lexer_pos.input_name       = pp_token.string.string.begin;
 		lexer_pos.is_system_header = false;
 		next_pp_token();
 

@@ -161,7 +161,7 @@ void print_token(FILE *f, const token_t *token)
 	case T_CHARACTER_CONSTANT: delim = '\''; goto print_string;
 print_string:
 		print_token_kind(f, (token_kind_t)token->kind);
-		fprintf(f, " %s%c", get_string_encoding_prefix(token->string.encoding), delim);
+		fprintf(f, " %s%c", get_string_encoding_prefix(token->string.string.encoding), delim);
 		print_stringrep(&token->string.string, f);
 		fputc(delim, f);
 		break;

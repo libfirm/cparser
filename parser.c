@@ -1038,51 +1038,49 @@ static void append_string(string_t const *const s)
 	obstack_grow(&ast_obstack, s->begin, s->size);
 }
 
-static string_t finish_string(void)
+static string_t finish_string(string_encoding_t const enc)
 {
 	obstack_1grow(&ast_obstack, '\0');
 	size_t      const size   = obstack_object_size(&ast_obstack) - 1;
 	char const *const string = obstack_finish(&ast_obstack);
-	return (string_t){ string, size };
+	return (string_t){ string, size, enc };
 }
 
-static string_t concat_string_literals(string_encoding_t *const out_enc)
+static string_t concat_string_literals(void)
 {
 	assert(token.kind == T_STRING_LITERAL);
 
-	string_t          result;
-	string_encoding_t enc = token.string.encoding;
+	string_t result;
 	if (look_ahead(1)->kind == T_STRING_LITERAL) {
 		append_string(&token.string.string);
 		eat(T_STRING_LITERAL);
 		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects string constant concatenation");
+		string_encoding_t enc = token.string.string.encoding;
 		do {
-			if (token.string.encoding != STRING_ENCODING_CHAR) {
-				enc = token.string.encoding;
+			if (token.string.string.encoding != STRING_ENCODING_CHAR) {
+				enc = token.string.string.encoding;
 			}
 			append_string(&token.string.string);
 			eat(T_STRING_LITERAL);
 		} while (token.kind == T_STRING_LITERAL);
-		result = finish_string();
+		result = finish_string(enc);
 	} else {
 		result = token.string.string;
 		eat(T_STRING_LITERAL);
 	}
 
-	*out_enc = enc;
 	return result;
 }
 
 static string_t parse_string_literals(char const *const context)
 {
 	if (!skip_till(T_STRING_LITERAL, context))
-		return (string_t){ "", 0 };
+		return (string_t){ "", 0, STRING_ENCODING_CHAR };
 
-	string_encoding_t       enc;
 	source_position_t const pos = *HERE;
-	string_t          const res = concat_string_literals(&enc);
+	string_t          const res = concat_string_literals();
 
-	if (enc != STRING_ENCODING_CHAR) {
+	if (res.encoding != STRING_ENCODING_CHAR) {
 		errorf(&pos, "expected plain string literal, got wide string literal");
 	}
 
@@ -1557,7 +1555,7 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 	if (expression->kind == EXPR_STRING_LITERAL && is_type_array(type)) {
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
-		switch (expression->string_literal.encoding) {
+		switch (expression->string_literal.value.encoding) {
 		case STRING_ENCODING_CHAR: {
 			if (is_type_atomic(element_type, ATOMIC_TYPE_CHAR)  ||
 			    is_type_atomic(element_type, ATOMIC_TYPE_SCHAR) ||
@@ -2206,8 +2204,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		case INITIALIZER_STRING: {
-			string_literal_expression_t const *const str = get_init_string(result);
-			size = get_string_len(str->encoding, &str->value) + 1;
+			size = get_string_len(&get_init_string(result)->value) + 1;
 			break;
 		}
 
@@ -5687,8 +5684,8 @@ static type_t *get_string_type(string_encoding_t const enc)
 static expression_t *parse_string_literal(void)
 {
 	expression_t *const expr = allocate_expression_zero(EXPR_STRING_LITERAL);
-	expr->string_literal.value = concat_string_literals(&expr->string_literal.encoding);
-	expr->base.type            = get_string_type(expr->string_literal.encoding);
+	expr->string_literal.value = concat_string_literals();
+	expr->base.type            = get_string_type(expr->string_literal.value.encoding);
 	return expr;
 }
 
@@ -5818,11 +5815,10 @@ static expression_t *parse_number_literal(void)
 static expression_t *parse_character_constant(void)
 {
 	expression_t *const literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
-	literal->string_literal.encoding = token.string.encoding;
-	literal->string_literal.value    = token.string.string;
+	literal->string_literal.value = token.string.string;
 
-	size_t const size = get_string_len(token.string.encoding, &token.string.string);
-	switch (token.string.encoding) {
+	size_t const size = get_string_len(&token.string.string);
+	switch (token.string.string.encoding) {
 	case STRING_ENCODING_CHAR:
 		literal->base.type = c_mode & _CXX ? type_char : type_int;
 		if (size > 1) {
@@ -5932,7 +5928,7 @@ type_t *revert_automatic_type_conversion(const expression_t *expression)
 	}
 
 	case EXPR_STRING_LITERAL: {
-		size_t  const size = get_string_len(expression->string_literal.encoding, &expression->string_literal.value) + 1;
+		size_t  const size = get_string_len(&expression->string_literal.value) + 1;
 		type_t *const elem = get_unqualified_type(expression->base.type->pointer.points_to);
 		return make_array_type(elem, size, TYPE_QUALIFIER_NONE);
 	}

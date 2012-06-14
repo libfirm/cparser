@@ -264,9 +264,8 @@ struct literal_expression_t {
  * string and character literals
  */
 struct string_literal_expression_t {
-	expression_base_t  base;
-	string_encoding_t  encoding;
-	string_t           value;
+	expression_base_t base;
+	string_t          value;
 };
 
 struct funcname_expression_t {

@@ -451,13 +451,13 @@ static const char *identify_string(char *string)
 	return result;
 }
 
-static string_t sym_make_string(void)
+static string_t sym_make_string(string_encoding_t const enc)
 {
 	obstack_1grow(&symbol_obstack, '\0');
 	size_t      const len    = obstack_object_size(&symbol_obstack) - 1;
 	char       *const string = obstack_finish(&symbol_obstack);
 	char const *const result = identify_string(string);
-	return (string_t) {result, len};
+	return (string_t){ result, len, enc };
 }
 
 static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const kind, string_encoding_t const enc, char const *const context)
@@ -513,9 +513,8 @@ static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const 
 	}
 
 end_of_string:
-	pp_token.kind            = kind;
-	pp_token.string.encoding = enc;
-	pp_token.string.string   = sym_make_string();
+	pp_token.kind          = kind;
+	pp_token.string.string = sym_make_string(enc);
 }
 
 static void parse_string_literal(string_encoding_t const enc)
@@ -824,7 +823,7 @@ static void parse_number(void)
 
 end_number:
 	pp_token.kind          = TP_NUMBER;
-	pp_token.number.number = sym_make_string();
+	pp_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
 }
 
 
@@ -1138,14 +1137,14 @@ static void emit_pp_token(void)
 		break;
 
 	case TP_STRING_LITERAL:
-		fputs(get_string_encoding_prefix(pp_token.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.string.string.encoding), out);
 		fputc('"', out);
 		fputs(pp_token.string.string.begin, out);
 		fputc('"', out);
 		break;
 
 	case TP_CHARACTER_CONSTANT:
-		fputs(get_string_encoding_prefix(pp_token.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.string.string.encoding), out);
 		fputc('\'', out);
 		fputs(pp_token.string.string.begin, out);
 		fputc('\'', out);
@@ -1344,7 +1343,7 @@ static void parse_undef_directive(void)
 static void parse_headername(void)
 {
 	const source_position_t start_position = input.position;
-	string_t                string         = {NULL, 0};
+	string_t                string         = { NULL, 0, STRING_ENCODING_CHAR };
 	assert(obstack_object_size(&symbol_obstack) == 0);
 
 	/* behind an #include we can have the special headername lexems.
@@ -1391,7 +1390,7 @@ parse_name:
 	}
 
 finished_headername:
-	string = sym_make_string();
+	string = sym_make_string(STRING_ENCODING_CHAR);
 
 finish_error:
 	pp_token.base.source_position = start_position;
