@@ -402,8 +402,12 @@ end_symbol:
 	}
 }
 
-static string_t identify_string(char *string, size_t len)
+static string_t sym_make_string(void)
 {
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t const len    = obstack_object_size(&symbol_obstack) - 1;
+	char  *const string = obstack_finish(&symbol_obstack);
+
 	/* TODO hash */
 #if 0
 	const char *result = strset_insert(&stringset, concat);
@@ -440,11 +444,7 @@ finish_suffix:
 		return;
 	}
 
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t size   = obstack_object_size(&symbol_obstack) - 1;
-	char  *string = obstack_finish(&symbol_obstack);
-
-	lexer_token.number.suffix = identify_string(string, size);
+	lexer_token.number.suffix = sym_make_string();
 }
 
 static void parse_exponent(void)
@@ -499,11 +499,8 @@ static void parse_number_hex(void)
 		errorf(&lexer_token.base.source_position,
 		       "hexadecimal floatingpoint constant requires an exponent");
 	}
-	obstack_1grow(&symbol_obstack, '\0');
 
-	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
-	char   *string = obstack_finish(&symbol_obstack);
-	lexer_token.number.number = identify_string(string, size);
+	lexer_token.number.number = sym_make_string();
 
 	lexer_token.kind = is_float ? T_FLOATINGPOINT : T_INTEGER;
 
@@ -525,11 +522,8 @@ static void parse_number_bin(void)
 		obstack_1grow(&symbol_obstack, (char)c);
 		next_char();
 	}
-	obstack_1grow(&symbol_obstack, '\0');
 
-	size_t  const size   = obstack_object_size(&symbol_obstack) - 1;
-	char   *const string = obstack_finish(&symbol_obstack);
-	lexer_token.number.number = identify_string(string, size);
+	lexer_token.number.number = sym_make_string();
 	lexer_token.kind          = T_INTEGER;
 
 	if (!has_digits) {
@@ -602,20 +596,17 @@ static void parse_number(void)
 		parse_exponent();
 	}
 
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t  size   = obstack_object_size(&symbol_obstack) - 1;
-	char   *string = obstack_finish(&symbol_obstack);
-	lexer_token.number.number = identify_string(string, size);
+	lexer_token.number.number = sym_make_string();
 
 	if (is_float) {
 		lexer_token.kind = T_FLOATINGPOINT;
 	} else {
 		lexer_token.kind = T_INTEGER;
 
-		if (string[0] == '0') {
+		if (lexer_token.number.number.begin[0] == '0') {
 			/* check for invalid octal digits */
-			for (size_t i= 0; i < size; ++i) {
-				char t = string[i];
+			for (size_t i= 0; i < lexer_token.number.number.size; ++i) {
+				char t = lexer_token.number.number.begin[i];
 				if (t >= '8')
 					errorf(&lexer_token.base.source_position, "invalid digit '%c' in octal number", t);
 			}
@@ -752,11 +743,8 @@ static utf32 parse_escape_sequence(void)
 
 string_t make_string(const char *string)
 {
-	size_t      len   = strlen(string) + 1;
-	char *const space = obstack_alloc(&symbol_obstack, len);
-	memcpy(space, string, len);
-
-	return identify_string(space, len);
+	obstack_grow(&symbol_obstack, string, strlen(string));
+	return sym_make_string();
 }
 
 static void parse_string(utf32 const delim, token_kind_t const kind, string_encoding_t const enc, char const *const context)
@@ -799,13 +787,9 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 	}
 
 end_of_string:
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t const size   = obstack_object_size(&symbol_obstack) - 1;
-	char  *const string = obstack_finish(&symbol_obstack);
-
 	lexer_token.kind            = kind;
 	lexer_token.string.encoding = enc;
-	lexer_token.string.string   = identify_string(string, size);
+	lexer_token.string.string   = sym_make_string();
 }
 
 /**

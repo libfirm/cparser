@@ -451,9 +451,12 @@ static const char *identify_string(char *string)
 	return result;
 }
 
-static string_t make_string(char *string, size_t len)
+static string_t sym_make_string(void)
 {
-	const char *result = identify_string(string);
+	obstack_1grow(&symbol_obstack, '\0');
+	size_t      const len    = obstack_object_size(&symbol_obstack) - 1;
+	char       *const string = obstack_finish(&symbol_obstack);
+	char const *const result = identify_string(string);
 	return (string_t) {result, len};
 }
 
@@ -509,14 +512,10 @@ static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const 
 		}
 	}
 
-end_of_string:;
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t const size   = obstack_object_size(&symbol_obstack) - 1;
-	char  *const string = obstack_finish(&symbol_obstack);
-
+end_of_string:
 	pp_token.kind            = kind;
 	pp_token.string.encoding = enc;
-	pp_token.string.string   = make_string(string, size);
+	pp_token.string.string   = sym_make_string();
 }
 
 static void parse_string_literal(string_encoding_t const enc)
@@ -824,12 +823,8 @@ static void parse_number(void)
 	}
 
 end_number:
-	obstack_1grow(&symbol_obstack, '\0');
-	size_t  size   = obstack_object_size(&symbol_obstack);
-	char   *string = obstack_finish(&symbol_obstack);
-
 	pp_token.kind          = TP_NUMBER;
-	pp_token.number.number = make_string(string, size);
+	pp_token.number.number = sym_make_string();
 }
 
 
@@ -1396,10 +1391,7 @@ parse_name:
 	}
 
 finished_headername:
-	obstack_1grow(&symbol_obstack, '\0');
-	const size_t size       = (size_t)obstack_object_size(&symbol_obstack);
-	char *const  headername = obstack_finish(&symbol_obstack);
-	string                  = make_string(headername, size);
+	string = sym_make_string();
 
 finish_error:
 	pp_token.base.source_position = start_position;
