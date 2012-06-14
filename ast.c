@@ -1182,11 +1182,11 @@ void print_initializer(const initializer_t *initializer)
 	}
 
 	switch (initializer->kind) {
-	case INITIALIZER_VALUE: {
-		const initializer_value_t *value = &initializer->value;
-		print_assignment_expression(value->value);
+	case INITIALIZER_STRING:
+	case INITIALIZER_VALUE:
+		print_assignment_expression(initializer->value.value);
 		return;
-	}
+
 	case INITIALIZER_LIST: {
 		print_string("{ ");
 		const initializer_list_t *list = &initializer->list;
@@ -1202,10 +1202,6 @@ void print_initializer(const initializer_t *initializer)
 		print_string(" }");
 		return;
 	}
-
-	case INITIALIZER_STRING:
-		print_string_literal(get_init_string(initializer), '"');
-		return;
 
 	case INITIALIZER_DESIGNATOR:
 		print_designator(initializer->designator.designator);
