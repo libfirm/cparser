@@ -692,7 +692,7 @@ static void do_firm_lowering(const char *input_filename)
 			do_irg_opt(irg, "control-flow");
 		}
 
-		set_irg_state(irg, IR_GRAPH_STATE_NORMALISATION2);
+		add_irg_constraints(irg, IR_GRAPH_CONSTRAINT_NORMALISATION2);
 		do_irg_opt(irg, "local");
 
 		do_irg_opt(irg, "parallelize-mem");
