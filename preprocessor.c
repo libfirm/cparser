@@ -530,8 +530,8 @@ static void parse_character_constant(string_encoding_t const enc)
 	}
 }
 
-#define SYMBOL_CHARS_WITHOUT_E_P \
-	case 'a': \
+#define SYMBOL_CASES_WITHOUT_E_P \
+	     'a': \
 	case 'b': \
 	case 'c': \
 	case 'd': \
@@ -579,17 +579,17 @@ static void parse_character_constant(string_encoding_t const enc)
 	case 'X': \
 	case 'Y': \
 	case 'Z': \
-	case '_':
+	case '_'
 
-#define SYMBOL_CHARS \
-	SYMBOL_CHARS_WITHOUT_E_P \
+#define SYMBOL_CASES \
+	     SYMBOL_CASES_WITHOUT_E_P: \
 	case 'e': \
 	case 'p': \
 	case 'E': \
-	case 'P':
+	case 'P'
 
-#define DIGITS \
-	case '0':  \
+#define DIGIT_CASES \
+	     '0':  \
 	case '1':  \
 	case '2':  \
 	case '3':  \
@@ -598,7 +598,7 @@ static void parse_character_constant(string_encoding_t const enc)
 	case '6':  \
 	case '7':  \
 	case '8':  \
-	case '9':
+	case '9'
 
 /**
  * returns next final token from a preprocessor macro expansion
@@ -752,8 +752,8 @@ static void parse_symbol(void)
 
 	while (true) {
 		switch (input.c) {
-		DIGITS
-		SYMBOL_CHARS
+		case DIGIT_CASES:
+		case SYMBOL_CASES:
 			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
@@ -798,8 +798,8 @@ static void parse_number(void)
 	while (true) {
 		switch (input.c) {
 		case '.':
-		DIGITS
-		SYMBOL_CHARS_WITHOUT_E_P
+		case DIGIT_CASES:
+		case SYMBOL_CASES_WITHOUT_E_P:
 			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
@@ -876,11 +876,11 @@ restart:
 		info.had_whitespace = true;
 		goto restart;
 
-	SYMBOL_CHARS
+	case SYMBOL_CASES:
 		parse_symbol();
 		return;
 
-	DIGITS
+	case DIGIT_CASES:
 		parse_number();
 		return;
 

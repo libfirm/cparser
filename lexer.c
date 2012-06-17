@@ -182,7 +182,7 @@ static inline void next_char(void)
 }
 
 #define SYMBOL_CHARS_WITHOUT_E_P \
-	case '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
+	     '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
 	case 'a':         \
 	case 'b':         \
 	case 'c':         \
@@ -231,20 +231,20 @@ static inline void next_char(void)
 	case 'X':         \
 	case 'Y':         \
 	case 'Z':         \
-	case '_':
+	case '_'
 
 #define SYMBOL_CHARS_E_P \
-	case 'E': \
+	     'E': \
 	case 'P': \
 	case 'e': \
-	case 'p':
+	case 'p'
 
 #define SYMBOL_CHARS  \
-	SYMBOL_CHARS_WITHOUT_E_P \
-	SYMBOL_CHARS_E_P
+	     SYMBOL_CHARS_WITHOUT_E_P: \
+	case SYMBOL_CHARS_E_P
 
 #define DIGITS        \
-	case '0':         \
+	     '0':         \
 	case '1':         \
 	case '2':         \
 	case '3':         \
@@ -253,7 +253,7 @@ static inline void next_char(void)
 	case '6':         \
 	case '7':         \
 	case '8':         \
-	case '9':
+	case '9'
 
 static bool is_universal_char_valid(utf32 const v)
 {
@@ -354,8 +354,8 @@ static void parse_symbol(void)
 {
 	while (true) {
 		switch (c) {
-		DIGITS
-		SYMBOL_CHARS
+		case DIGITS:
+		case SYMBOL_CHARS:
 			obstack_1grow(&symbol_obstack, (char) c);
 			next_char();
 			break;
@@ -430,13 +430,13 @@ static void parse_pp_number(void)
 {
 	for (;;) {
 		switch (c) {
-		SYMBOL_CHARS_E_P
+		case SYMBOL_CHARS_E_P:
 			obstack_1grow(&symbol_obstack, (char)c);
 			next_char();
 			if (c == '+' || c == '-') {
 		case '.':
-		DIGITS
-		SYMBOL_CHARS_WITHOUT_E_P
+		case DIGITS:
+		case SYMBOL_CHARS_WITHOUT_E_P:
 				obstack_1grow(&symbol_obstack, (char)c);
 				next_char();
 			}
@@ -942,7 +942,7 @@ void lexer_next_preprocessing_token(void)
 			lexer_token.kind = '\n';
 			return;
 
-		SYMBOL_CHARS {
+		case SYMBOL_CHARS: {
 			parse_symbol();
 			/* might be a wide string ( L"string" ) */
 			string_encoding_t const enc = STRING_ENCODING_WIDE;
@@ -955,7 +955,7 @@ void lexer_next_preprocessing_token(void)
 			return;
 		}
 
-		DIGITS
+		case DIGITS:
 			parse_pp_number();
 			return;
 
@@ -969,7 +969,7 @@ void lexer_next_preprocessing_token(void)
 
 		case '.':
 			MAYBE_PROLOG
-				DIGITS
+				case DIGITS:
 					put_back(c);
 					c = '.';
 					parse_pp_number();
