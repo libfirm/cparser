@@ -20,6 +20,7 @@
 #include <config.h>
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
@@ -247,8 +248,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case '~':                         \
 	case T_ANDAND:                    \
 	case T_CHARACTER_CONSTANT:        \
-	case T_FLOATINGPOINT:             \
-	case T_INTEGER:                   \
+	case T_NUMBER:                    \
 	case T_MINUSMINUS:                \
 	case T_PLUSPLUS:                  \
 	case T_STRING_LITERAL:            \
@@ -1052,20 +1052,20 @@ static string_t concat_string_literals(void)
 
 	string_t result;
 	if (look_ahead(1)->kind == T_STRING_LITERAL) {
-		append_string(&token.string.string);
+		append_string(&token.literal.string);
 		eat(T_STRING_LITERAL);
 		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects string constant concatenation");
-		string_encoding_t enc = token.string.string.encoding;
+		string_encoding_t enc = token.literal.string.encoding;
 		do {
-			if (token.string.string.encoding != STRING_ENCODING_CHAR) {
-				enc = token.string.string.encoding;
+			if (token.literal.string.encoding != STRING_ENCODING_CHAR) {
+				enc = token.literal.string.encoding;
 			}
-			append_string(&token.string.string);
+			append_string(&token.literal.string);
 			eat(T_STRING_LITERAL);
 		} while (token.kind == T_STRING_LITERAL);
 		result = finish_string(enc);
 	} else {
-		result = token.string.string;
+		result = token.literal.string;
 		eat(T_STRING_LITERAL);
 	}
 
@@ -2460,6 +2460,7 @@ static type_t *parse_typeof(void)
 }
 
 typedef enum specifiers_t {
+	SPECIFIER_NONE      = 0,
 	SPECIFIER_SIGNED    = 1 << 0,
 	SPECIFIER_UNSIGNED  = 1 << 1,
 	SPECIFIER_LONG      = 1 << 2,
@@ -5703,110 +5704,204 @@ static expression_t *parse_boolean_literal(bool value)
 	return literal;
 }
 
-static void warn_traditional_suffix(void)
+static void warn_traditional_suffix(char const *const suffix)
 {
-	warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%S' suffix",
-	         &token.number.suffix);
+	warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%s' suffix", suffix);
 }
 
-static void check_integer_suffix(void)
+static void check_integer_suffix(expression_t *const expr, char const *const suffix)
 {
-	const string_t *suffix = &token.number.suffix;
-	if (suffix->size == 0)
-		return;
-
-	bool not_traditional = false;
-	const char *c = suffix->begin;
-	if (*c == 'l' || *c == 'L') {
-		++c;
-		if (*c == *(c-1)) {
-			not_traditional = true;
-			++c;
-			if (*c == 'u' || *c == 'U') {
+	specifiers_t spec = SPECIFIER_NONE;
+	char const  *c    = suffix;
+	for (;;) {
+		specifiers_t add;
+		if (*c == 'L' || *c == 'l') {
+			add = SPECIFIER_LONG;
+			if (*c == c[1]) {
+				add |= SPECIFIER_LONG_LONG;
 				++c;
 			}
-		} else if (*c == 'u' || *c == 'U') {
-			not_traditional = true;
-			++c;
+		} else if (*c == 'U' || *c == 'u') {
+			add = SPECIFIER_UNSIGNED;
+		} else {
+			break;
 		}
-	} else if (*c == 'u' || *c == 'U') {
-		not_traditional = true;
 		++c;
-		if (*c == 'l' || *c == 'L') {
-			++c;
-			if (*c == *(c-1)) {
-				++c;
-			}
-		}
+		if (spec & add)
+			goto error;
+		spec |= add;
 	}
-	if (*c != '\0') {
-		errorf(HERE, "invalid suffix '%S' on integer constant", suffix);
-	} else if (not_traditional) {
-		warn_traditional_suffix();
+
+	if (*c == '\0') {
+		type_t *type;
+		switch (spec) {
+		case SPECIFIER_NONE:                                            type = type_int;                break;
+		case                      SPECIFIER_LONG:                       type = type_long;               break;
+		case                      SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_long_long;          break;
+		case SPECIFIER_UNSIGNED:                                        type = type_unsigned_int;       break;
+		case SPECIFIER_UNSIGNED | SPECIFIER_LONG:                       type = type_unsigned_long;      break;
+		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_unsigned_long_long; break;
+		default: panic("inconsistent suffix");
+		}
+		if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG) {
+			warn_traditional_suffix(suffix);
+		}
+		expr->base.type = type;
+		/* Integer type depends on the size of the number and the size
+		 * representable by the types. The backend/codegeneration has to
+		 * determine that. */
+		determine_literal_type(&expr->literal);
+	} else {
+error:
+		errorf(HERE, "invalid suffix '%s' on integer constant", suffix);
 	}
 }
 
-static type_t *check_floatingpoint_suffix(void)
+static void check_floatingpoint_suffix(expression_t *const expr, char const *const suffix)
 {
-	const string_t *suffix = &token.number.suffix;
-	type_t         *type   = type_double;
-	if (suffix->size == 0)
-		return type;
-
-	bool not_traditional = false;
-	const char *c = suffix->begin;
-	if (*c == 'f' || *c == 'F') {
-		++c;
-		type = type_float;
-	} else if (*c == 'l' || *c == 'L') {
-		++c;
-		type = type_long_double;
-	}
-	if (*c != '\0') {
-		errorf(HERE, "invalid suffix '%S' on floatingpoint constant", suffix);
-	} else if (not_traditional) {
-		warn_traditional_suffix();
+	type_t     *type;
+	char const *c    = suffix;
+	switch (*c) {
+	case 'F':
+	case 'f': type = type_float;       ++c; break;
+	case 'L':
+	case 'l': type = type_long_double; ++c; break;
+	default:  type = type_double;           break;
 	}
 
-	return type;
+	if (*c == '\0') {
+		expr->base.type = type;
+		if (suffix[0] != '\0') {
+			warn_traditional_suffix(suffix);
+		}
+	} else {
+		errorf(HERE, "invalid suffix '%s' on floatingpoint constant", suffix);
+	}
 }
 
-/**
- * Parse an integer constant.
- */
 static expression_t *parse_number_literal(void)
 {
-	expression_kind_t  kind;
-	type_t            *type;
+	string_t const *const str      = &token.literal.string;
+	char     const *      i        = str->begin;
+	unsigned              digits   = 0;
+	bool                  is_float = false;
 
-	switch (token.kind) {
-	case T_INTEGER:
-		kind = EXPR_LITERAL_INTEGER;
-		check_integer_suffix();
-		type = type_int;
+	/* Parse base prefix. */
+	unsigned base;
+	if (*i == '0') {
+		switch (*++i) {
+		case 'B': case 'b': base =  2; ++i;               break;
+		case 'X': case 'x': base = 16; ++i;               break;
+		default:            base =  8; digits |= 1U << 0; break;
+		}
+	} else {
+		base = 10;
+	}
+
+	/* Parse mantissa. */
+	for (;; ++i) {
+		unsigned digit;
+		switch (*i) {
+		case '.':
+			if (is_float) {
+				errorf(HERE, "multiple decimal points in %K", &token);
+				i = 0;
+				goto done;
+			}
+			is_float = true;
+			if (base == 8)
+				base = 10;
+			continue;
+
+		case '0':           digit =  0; break;
+		case '1':           digit =  1; break;
+		case '2':           digit =  2; break;
+		case '3':           digit =  3; break;
+		case '4':           digit =  4; break;
+		case '5':           digit =  5; break;
+		case '6':           digit =  6; break;
+		case '7':           digit =  7; break;
+		case '8':           digit =  8; break;
+		case '9':           digit =  9; break;
+		case 'A': case 'a': digit = 10; break;
+		case 'B': case 'b': digit = 11; break;
+		case 'C': case 'c': digit = 12; break;
+		case 'D': case 'd': digit = 13; break;
+		case 'E': case 'e': digit = 14; break;
+		case 'F': case 'f': digit = 15; break;
+
+		default: goto done_mantissa;
+		}
+
+		if (digit >= 10 && base != 16)
+			goto done_mantissa;
+
+		digits |= 1U << digit;
+	}
+done_mantissa:
+
+	/* Parse exponent. */
+	switch (base) {
+	case 2:
+		if (is_float)
+			errorf(HERE, "binary floating %K not allowed", &token);
 		break;
 
-	case T_FLOATINGPOINT:
-		kind = EXPR_LITERAL_FLOATINGPOINT;
-		type = check_floatingpoint_suffix();
+	case  8:
+	case 10:
+		if (*i == 'E' || *i == 'e') {
+			base = 10;
+			goto parse_exponent;
+		}
+		break;
+
+	case 16:
+		if (*i == 'P' || *i == 'p') {
+parse_exponent:
+			++i;
+			is_float = true;
+
+			if (*i == '-' || *i == '+')
+				++i;
+
+			if (isdigit(*i)) {
+				do {
+					++i;
+				} while (isdigit(*i));
+			} else {
+				errorf(HERE, "exponent of %K has no digits", &token);
+			}
+		} else if (is_float) {
+			errorf(HERE, "hexadecimal floating %K requires an exponent", &token);
+			i = 0;
+		}
 		break;
 
 	default:
-		panic("unexpected token type in parse_number_literal");
+		panic("invalid base");
 	}
 
-	expression_t *literal = allocate_expression_zero(kind);
-	literal->base.type      = type;
-	literal->literal.value  = token.number.number;
-	literal->literal.suffix = token.number.suffix;
-	next_token();
+done:;
+	expression_t *const expr = allocate_expression_zero(is_float ? EXPR_LITERAL_FLOATINGPOINT : EXPR_LITERAL_INTEGER);
+	expr->literal.value = *str;
 
-	/* integer type depends on the size of the number and the size
-	 * representable by the types. The backend/codegeneration has to determine
-	 * that
-	 */
-	determine_literal_type(&literal->literal);
-	return literal;
+	if (i) {
+		if (digits == 0) {
+			errorf(HERE, "%K has no digits", &token);
+		} else if (digits & ~((1U << base) - 1)) {
+			errorf(HERE, "invalid digit in %K", &token);
+		} else {
+			expr->literal.suffix = i;
+			if (is_float) {
+				check_floatingpoint_suffix(expr, i);
+			} else {
+				check_integer_suffix(expr, i);
+			}
+		}
+	}
+
+	eat(T_NUMBER);
+	return expr;
 }
 
 /**
@@ -5815,10 +5910,10 @@ static expression_t *parse_number_literal(void)
 static expression_t *parse_character_constant(void)
 {
 	expression_t *const literal = allocate_expression_zero(EXPR_LITERAL_CHARACTER);
-	literal->string_literal.value = token.string.string;
+	literal->string_literal.value = token.literal.string;
 
-	size_t const size = get_string_len(&token.string.string);
-	switch (token.string.string.encoding) {
+	size_t const size = get_string_len(&token.literal.string);
+	switch (token.literal.string.encoding) {
 	case STRING_ENCODING_CHAR:
 		literal->base.type = c_mode & _CXX ? type_char : type_int;
 		if (size > 1) {
@@ -6622,8 +6717,7 @@ static expression_t *parse_primary_expression(void)
 	switch (token.kind) {
 	case T_false:                        return parse_boolean_literal(false);
 	case T_true:                         return parse_boolean_literal(true);
-	case T_INTEGER:
-	case T_FLOATINGPOINT:                return parse_number_literal();
+	case T_NUMBER:                       return parse_number_literal();
 	case T_CHARACTER_CONSTANT:           return parse_character_constant();
 	case T_STRING_LITERAL:               return parse_string_literal();
 	case T___func__:                     return parse_function_keyword(FUNCNAME_FUNCTION);
@@ -9715,10 +9809,9 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token('~');
 	add_anchor_token(T_CHARACTER_CONSTANT);
 	add_anchor_token(T_COLONCOLON);
-	add_anchor_token(T_FLOATINGPOINT);
 	add_anchor_token(T_IDENTIFIER);
-	add_anchor_token(T_INTEGER);
 	add_anchor_token(T_MINUSMINUS);
+	add_anchor_token(T_NUMBER);
 	add_anchor_token(T_PLUSPLUS);
 	add_anchor_token(T_STRING_LITERAL);
 	add_anchor_token(T__Bool);
@@ -9896,10 +9989,9 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T__Bool);
 	rem_anchor_token(T_STRING_LITERAL);
 	rem_anchor_token(T_PLUSPLUS);
+	rem_anchor_token(T_NUMBER);
 	rem_anchor_token(T_MINUSMINUS);
-	rem_anchor_token(T_INTEGER);
 	rem_anchor_token(T_IDENTIFIER);
-	rem_anchor_token(T_FLOATINGPOINT);
 	rem_anchor_token(T_COLONCOLON);
 	rem_anchor_token(T_CHARACTER_CONSTANT);
 	rem_anchor_token('~');

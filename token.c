@@ -146,14 +146,9 @@ void print_token(FILE *f, const token_t *token)
 	case T_IDENTIFIER:
 		fprintf(f, "identifier '%s'", token->base.symbol->string);
 		break;
-	case T_INTEGER:
-	case T_FLOATINGPOINT:
-		print_token_kind(f, (token_kind_t)token->kind);
-		fputs(" '", f);
-		print_stringrep(&token->number.number, f);
-		if (token->number.suffix.size > 0)
-			print_stringrep(&token->number.suffix, f);
-		fputc('\'', f);
+
+	case T_NUMBER:
+		fprintf(f, "number '%s'", token->literal.string.begin);
 		break;
 
 		char delim;
@@ -161,8 +156,8 @@ void print_token(FILE *f, const token_t *token)
 	case T_CHARACTER_CONSTANT: delim = '\''; goto print_string;
 print_string:
 		print_token_kind(f, (token_kind_t)token->kind);
-		fprintf(f, " %s%c", get_string_encoding_prefix(token->string.string.encoding), delim);
-		print_stringrep(&token->string.string, f);
+		fprintf(f, " %s%c", get_string_encoding_prefix(token->literal.string.encoding), delim);
+		print_stringrep(&token->literal.string, f);
 		fputc(delim, f);
 		break;
 
@@ -210,10 +205,10 @@ void print_pp_token(FILE *f, const token_t *token)
 		fprintf(f, "identifier '%s'", token->base.symbol->string);
 		break;
 	case TP_NUMBER:
-		fprintf(f, "number '%s'", token->number.number.begin);
+		fprintf(f, "number '%s'", token->literal.string.begin);
 		break;
 	case TP_STRING_LITERAL:
-		fprintf(f, "string \"%s\"", token->string.string.begin);
+		fprintf(f, "string \"%s\"", token->literal.string.begin);
 		break;
 	default:
 		print_pp_token_kind(f, (preprocessor_token_kind_t) token->kind);

@@ -252,12 +252,12 @@ struct expression_base_t {
  * integer, float and boolean constants
  */
 struct literal_expression_t {
-	expression_base_t  base;
-	string_t           value;
-	string_t           suffix;
+	expression_base_t base;
+	string_t          value;
+	char const       *suffix; /**< Start of the suffix in value. */
 
 	/* ast2firm data */
-	ir_tarval         *target_value;
+	ir_tarval        *target_value;
 };
 
 /**

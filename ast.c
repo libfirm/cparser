@@ -67,13 +67,6 @@ void print_indent(void)
 		print_char('\t');
 }
 
-static void print_stringrep(const string_t *string)
-{
-	for (size_t i = 0; i < string->size; ++i) {
-		print_char(string->begin[i]);
-	}
-}
-
 /**
  * Returns 1 if a given precedence level has right-to-left
  * associativity, else 0.
@@ -248,8 +241,7 @@ static void print_literal(const literal_expression_t *literal)
 	case EXPR_LITERAL_BOOLEAN:
 	case EXPR_LITERAL_FLOATINGPOINT:
 	case EXPR_LITERAL_INTEGER:
-		print_stringrep(&literal->value);
-		print_stringrep(&literal->suffix);
+		print_string(literal->value.begin);
 		return;
 
 	default:

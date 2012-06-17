@@ -10,8 +10,7 @@
 #undef ALTERNATE
 
 TS(IDENTIFIER,         "identifier",)
-TS(INTEGER,            "integer number",)
-TS(FLOATINGPOINT,      "floatingpoint number",)
+TS(NUMBER,             "number constant",)
 TS(CHARACTER_CONSTANT, "character constant",)
 TS(STRING_LITERAL,     "string literal",)
 

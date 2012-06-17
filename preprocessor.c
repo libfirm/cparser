@@ -513,8 +513,8 @@ static void parse_string(utf32 const delimiter, preprocessor_token_kind_t const 
 	}
 
 end_of_string:
-	pp_token.kind          = kind;
-	pp_token.string.string = sym_make_string(enc);
+	pp_token.kind           = kind;
+	pp_token.literal.string = sym_make_string(enc);
 }
 
 static void parse_string_literal(string_encoding_t const enc)
@@ -525,7 +525,7 @@ static void parse_string_literal(string_encoding_t const enc)
 static void parse_character_constant(string_encoding_t const enc)
 {
 	parse_string('\'', TP_CHARACTER_CONSTANT, enc, "character constant");
-	if (pp_token.string.string.size == 0) {
+	if (pp_token.literal.string.size == 0) {
 		parse_error("empty character constant");
 	}
 }
@@ -822,8 +822,8 @@ static void parse_number(void)
 	}
 
 end_number:
-	pp_token.kind          = TP_NUMBER;
-	pp_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
+	pp_token.kind           = TP_NUMBER;
+	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
 }
 
 
@@ -1133,20 +1133,20 @@ static void emit_pp_token(void)
 		fputs(pp_token.base.symbol->string, out);
 		break;
 	case TP_NUMBER:
-		fputs(pp_token.number.number.begin, out);
+		fputs(pp_token.literal.string.begin, out);
 		break;
 
 	case TP_STRING_LITERAL:
-		fputs(get_string_encoding_prefix(pp_token.string.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
 		fputc('"', out);
-		fputs(pp_token.string.string.begin, out);
+		fputs(pp_token.literal.string.begin, out);
 		fputc('"', out);
 		break;
 
 	case TP_CHARACTER_CONSTANT:
-		fputs(get_string_encoding_prefix(pp_token.string.string.encoding), out);
+		fputs(get_string_encoding_prefix(pp_token.literal.string.encoding), out);
 		fputc('\'', out);
-		fputs(pp_token.string.string.begin, out);
+		fputs(pp_token.literal.string.begin, out);
 		fputc('\'', out);
 		break;
 	default:
@@ -1190,7 +1190,7 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 	case TP_NUMBER:
 	case TP_CHARACTER_CONSTANT:
 	case TP_STRING_LITERAL:
-		return strings_equal(&token1->string.string, &token2->string.string);
+		return strings_equal(&token1->literal.string, &token2->literal.string);
 
 	default:
 		return true;
@@ -1395,7 +1395,7 @@ finished_headername:
 finish_error:
 	pp_token.base.source_position = start_position;
 	pp_token.kind                 = TP_HEADERNAME;
-	pp_token.string.string        = string;
+	pp_token.literal.string       = string;
 }
 
 static bool do_include(bool system_include, const char *headername)
@@ -1467,7 +1467,7 @@ static bool parse_include_directive(void)
 	skip_whitespace();
 	bool system_include = input.c == '<';
 	parse_headername();
-	string_t headername = pp_token.string.string;
+	string_t headername = pp_token.literal.string;
 	if (headername.begin == NULL) {
 		eat_pp_directive();
 		return false;
@@ -1490,10 +1490,9 @@ static bool parse_include_directive(void)
 	/* switch inputs */
 	emit_newlines();
 	push_input();
-	bool res = do_include(system_include, pp_token.string.string.begin);
+	bool res = do_include(system_include, pp_token.literal.string.begin);
 	if (!res) {
-		errorf(&pp_token.base.source_position,
-		       "failed including '%S': %s", pp_token.string, strerror(errno));
+		errorf(&pp_token.base.source_position, "failed including '%S': %s", &pp_token.literal, strerror(errno));
 		pop_restore_input();
 		return false;
 	}

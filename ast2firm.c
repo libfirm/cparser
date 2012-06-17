@@ -1157,14 +1157,12 @@ finish:;
 
 static bool try_create_integer(literal_expression_t *literal, type_t *type)
 {
-	const char *string = literal->value.begin;
-	size_t      size   = literal->value.size;
-
 	assert(type->kind == TYPE_ATOMIC);
 	atomic_type_kind_t akind = type->atomic.akind;
 
-	ir_mode   *const mode = atomic_modes[akind];
-	ir_tarval *const tv   = new_tarval_from_str(string, size, mode);
+	ir_mode    *const mode = atomic_modes[akind];
+	char const *const str  = literal->value.begin;
+	ir_tarval  *const tv   = new_tarval_from_str(str, literal->suffix - str, mode);
 	if (tv == tarval_bad)
 		return false;
 
@@ -1173,36 +1171,29 @@ static bool try_create_integer(literal_expression_t *literal, type_t *type)
 	return true;
 }
 
-static void create_integer_tarval(literal_expression_t *literal)
+void determine_literal_type(literal_expression_t *const literal)
 {
+	assert(literal->base.kind == EXPR_LITERAL_INTEGER);
+
 	/* -1: signed only, 0: any, 1: unsigned only */
-	int             sign   = literal->value.begin[0] != '0' /* decimal */ ? -1 : 0;
-	unsigned        ls     = 0;
-	const string_t *suffix = &literal->suffix;
-	/* parse suffix */
-	if (suffix->size > 0) {
-		for (const char *c = suffix->begin; *c != '\0'; ++c) {
-			if (*c == 'u' || *c == 'U') sign = 1;
-			if (*c == 'l' || *c == 'L') { ++ls; }
-		}
-	}
+	int const sign =
+		!is_type_signed(literal->base.type) ? 1 :
+		literal->value.begin[0] == '0'      ? 0 :
+		-1; /* Decimal literals only try signed types. */
 
 	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
+	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
+
+	if (try_create_integer(literal, literal->base.type))
+		goto finished;
 
 	/* now try if the constant is small enough for some types */
-	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
-	if (ls < 1) {
-		if (sign <= 0 && try_create_integer(literal, type_int))
-			goto finished;
-		if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
-			goto finished;
-	}
-	if (ls < 2) {
-		if (sign <= 0 && try_create_integer(literal, type_long))
-			goto finished;
-		if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
-			goto finished;
-	}
+	if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
+		goto finished;
+	if (sign <= 0 && try_create_integer(literal, type_long))
+		goto finished;
+	if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
+		goto finished;
 	/* last try? then we should not report tarval_bad */
 	if (sign < 0)
 		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
@@ -1218,17 +1209,6 @@ static void create_integer_tarval(literal_expression_t *literal)
 
 finished:
 	tarval_set_integer_overflow_mode(old_mode);
-}
-
-void determine_literal_type(literal_expression_t *literal)
-{
-	switch (literal->base.kind) {
-	case EXPR_LITERAL_INTEGER:
-		create_integer_tarval(literal);
-		return;
-	default:
-		break;
-	}
 }
 
 /**

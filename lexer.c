@@ -181,13 +181,12 @@ static inline void next_char(void)
 	}
 }
 
-#define SYMBOL_CHARS  \
+#define SYMBOL_CHARS_WITHOUT_E_P \
 	case '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
 	case 'a':         \
 	case 'b':         \
 	case 'c':         \
 	case 'd':         \
-	case 'e':         \
 	case 'f':         \
 	case 'g':         \
 	case 'h':         \
@@ -198,7 +197,6 @@ static inline void next_char(void)
 	case 'm':         \
 	case 'n':         \
 	case 'o':         \
-	case 'p':         \
 	case 'q':         \
 	case 'r':         \
 	case 's':         \
@@ -213,7 +211,6 @@ static inline void next_char(void)
 	case 'B':         \
 	case 'C':         \
 	case 'D':         \
-	case 'E':         \
 	case 'F':         \
 	case 'G':         \
 	case 'H':         \
@@ -224,7 +221,6 @@ static inline void next_char(void)
 	case 'M':         \
 	case 'N':         \
 	case 'O':         \
-	case 'P':         \
 	case 'Q':         \
 	case 'R':         \
 	case 'S':         \
@@ -236,6 +232,16 @@ static inline void next_char(void)
 	case 'Y':         \
 	case 'Z':         \
 	case '_':
+
+#define SYMBOL_CHARS_E_P \
+	case 'E': \
+	case 'P': \
+	case 'e': \
+	case 'p':
+
+#define SYMBOL_CHARS  \
+	SYMBOL_CHARS_WITHOUT_E_P \
+	SYMBOL_CHARS_E_P
 
 #define DIGITS        \
 	case '0':         \
@@ -420,119 +426,29 @@ static string_t sym_make_string(string_encoding_t const enc)
 	return (string_t){ result, len, enc };
 }
 
-/**
- * parse suffixes like 'LU' or 'f' after numbers
- */
-static void parse_number_suffix(void)
+static void parse_pp_number(void)
 {
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	while (true) {
+	for (;;) {
 		switch (c) {
-		SYMBOL_CHARS
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-			break;
-		default:
-		dollar_sign:
-			goto finish_suffix;
-		}
-	}
-finish_suffix:
-	if (obstack_object_size(&symbol_obstack) == 0) {
-		lexer_token.number.suffix.begin = NULL;
-		lexer_token.number.suffix.size  = 0;
-		return;
-	}
-
-	lexer_token.number.suffix = sym_make_string(STRING_ENCODING_CHAR);
-}
-
-static void parse_exponent(void)
-{
-	if (c == '-' || c == '+') {
-		obstack_1grow(&symbol_obstack, (char)c);
-		next_char();
-	}
-
-	if (isdigit(c)) {
-		do {
+		SYMBOL_CHARS_E_P
 			obstack_1grow(&symbol_obstack, (char)c);
 			next_char();
-		} while (isdigit(c));
-	} else {
-		errorf(&lexer_token.base.source_position, "exponent has no digits");
-	}
-}
+			if (c == '+' || c == '-') {
+		case '.':
+		DIGITS
+		SYMBOL_CHARS_WITHOUT_E_P
+				obstack_1grow(&symbol_obstack, (char)c);
+				next_char();
+			}
+			break;
 
-/**
- * Parses a hex number including hex floats and set the
- * lexer_token.
- */
-static void parse_number_hex(void)
-{
-	bool is_float   = false;
-	bool has_digits = false;
-
-	while (isxdigit(c)) {
-		has_digits = true;
-		obstack_1grow(&symbol_obstack, (char) c);
-		next_char();
-	}
-
-	if (c == '.') {
-		is_float = true;
-		obstack_1grow(&symbol_obstack, (char) c);
-		next_char();
-
-		while (isxdigit(c)) {
-			has_digits = true;
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
+		default:
+dollar_sign:
+			lexer_token.kind           = T_NUMBER;
+			lexer_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+			return;
 		}
 	}
-	if (c == 'p' || c == 'P') {
-		is_float = true;
-		obstack_1grow(&symbol_obstack, (char) c);
-		next_char();
-		parse_exponent();
-	} else if (is_float) {
-		errorf(&lexer_token.base.source_position,
-		       "hexadecimal floatingpoint constant requires an exponent");
-	}
-
-	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
-
-	lexer_token.kind = is_float ? T_FLOATINGPOINT : T_INTEGER;
-
-	if (!has_digits) {
-		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);
-		lexer_token.number.number.begin = "0";
-		lexer_token.number.number.size  = 1;
-	}
-
-	parse_number_suffix();
-}
-
-static void parse_number_bin(void)
-{
-	bool has_digits = false;
-
-	while (c == '0' || c == '1') {
-		has_digits = true;
-		obstack_1grow(&symbol_obstack, (char)c);
-		next_char();
-	}
-
-	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
-	lexer_token.kind          = T_INTEGER;
-
-	if (!has_digits) {
-		errorf(&lexer_token.base.source_position, "invalid number literal '%S'", &lexer_token.number.number);
-		lexer_token.number.number.begin = "0";
-		lexer_token.number.number.size  = 1;
-	}
-
-	parse_number_suffix();
 }
 
 /**
@@ -543,82 +459,6 @@ static void parse_number_bin(void)
 static bool is_octal_digit(utf32 chr)
 {
 	return '0' <= chr && chr <= '7';
-}
-
-/**
- * Parses a number and sets the lexer_token.
- */
-static void parse_number(void)
-{
-	bool is_float   = false;
-	bool has_digits = false;
-
-	assert(obstack_object_size(&symbol_obstack) == 0);
-	if (c == '0') {
-		obstack_1grow(&symbol_obstack, (char)c);
-		next_char();
-		if (c == 'x' || c == 'X') {
-			obstack_1grow(&symbol_obstack, (char)c);
-			next_char();
-			parse_number_hex();
-			return;
-		} else if (c == 'b' || c == 'B') {
-			/* GCC extension: binary constant 0x[bB][01]+.  */
-			obstack_1grow(&symbol_obstack, (char)c);
-			next_char();
-			parse_number_bin();
-			return;
-		}
-		has_digits = true;
-	}
-
-	while (isdigit(c)) {
-		has_digits = true;
-		obstack_1grow(&symbol_obstack, (char) c);
-		next_char();
-	}
-
-	if (c == '.') {
-		is_float = true;
-		obstack_1grow(&symbol_obstack, '.');
-		next_char();
-
-		while (isdigit(c)) {
-			has_digits = true;
-			obstack_1grow(&symbol_obstack, (char) c);
-			next_char();
-		}
-	}
-	if (c == 'e' || c == 'E') {
-		is_float = true;
-		obstack_1grow(&symbol_obstack, 'e');
-		next_char();
-		parse_exponent();
-	}
-
-	lexer_token.number.number = sym_make_string(STRING_ENCODING_CHAR);
-
-	if (is_float) {
-		lexer_token.kind = T_FLOATINGPOINT;
-	} else {
-		lexer_token.kind = T_INTEGER;
-
-		if (lexer_token.number.number.begin[0] == '0') {
-			/* check for invalid octal digits */
-			for (size_t i= 0; i < lexer_token.number.number.size; ++i) {
-				char t = lexer_token.number.number.begin[i];
-				if (t >= '8')
-					errorf(&lexer_token.base.source_position, "invalid digit '%c' in octal number", t);
-			}
-		}
-	}
-
-	if (!has_digits) {
-		errorf(&lexer_token.base.source_position, "invalid number literal '%S'",
-		       &lexer_token.number.number);
-	}
-
-	parse_number_suffix();
 }
 
 /**
@@ -787,8 +627,8 @@ static void parse_string(utf32 const delim, token_kind_t const kind, string_enco
 	}
 
 end_of_string:
-	lexer_token.kind          = kind;
-	lexer_token.string.string = sym_make_string(enc);
+	lexer_token.kind           = kind;
+	lexer_token.literal.string = sym_make_string(enc);
 }
 
 /**
@@ -805,7 +645,7 @@ static void parse_string_literal(string_encoding_t const enc)
 static void parse_character_constant(string_encoding_t const enc)
 {
 	parse_string('\'', T_CHARACTER_CONSTANT, enc, "character constant");
-	if (lexer_token.string.string.size == 0) {
+	if (lexer_token.literal.string.size == 0) {
 		errorf(&lexer_token.base.source_position, "empty character constant");
 	}
 }
@@ -904,20 +744,26 @@ static void eat_until_newline(void)
  */
 static void parse_line_directive(void)
 {
-	if (pp_token.kind != T_INTEGER) {
+	if (pp_token.kind != T_NUMBER) {
 		parse_error("expected integer");
 	} else {
 		/* use offset -1 as this is about the next line */
-		lexer_pos.lineno = atoi(pp_token.number.number.begin) - 1;
+		char      *end;
+		long const line = strtol(pp_token.literal.string.begin, &end, 0);
+		if (*end == '\0') {
+			lexer_pos.lineno = line - 1;
+		} else {
+			errorf(&lexer_pos, "'%S' is not a valid line number", &pp_token.literal.string);
+		}
 		next_pp_token();
 	}
-	if (pp_token.kind == T_STRING_LITERAL && pp_token.string.string.encoding == STRING_ENCODING_CHAR) {
-		lexer_pos.input_name       = pp_token.string.string.begin;
+	if (pp_token.kind == T_STRING_LITERAL && pp_token.literal.string.encoding == STRING_ENCODING_CHAR) {
+		lexer_pos.input_name       = pp_token.literal.string.begin;
 		lexer_pos.is_system_header = false;
 		next_pp_token();
 
 		/* attempt to parse numeric flags as outputted by gcc preprocessor */
-		while (pp_token.kind == T_INTEGER) {
+		while (pp_token.kind == T_NUMBER) {
 			/* flags:
 			 * 1 - indicates start of a new file
 			 * 2 - indicates return from a file
@@ -926,7 +772,7 @@ static void parse_line_directive(void)
 			 *
 			 * currently we're only interested in "3"
 			 */
-			if (streq(pp_token.number.number.begin, "3")) {
+			if (streq(pp_token.literal.string.begin, "3")) {
 				lexer_pos.is_system_header = true;
 			}
 			next_pp_token();
@@ -1034,7 +880,7 @@ static void parse_preprocessor_directive(void)
 	case T_IDENTIFIER:
 		parse_preprocessor_identifier();
 		break;
-	case T_INTEGER:
+	case T_NUMBER:
 		parse_line_directive();
 		break;
 	case '\n':
@@ -1110,7 +956,7 @@ void lexer_next_preprocessing_token(void)
 		}
 
 		DIGITS
-			parse_number();
+			parse_pp_number();
 			return;
 
 		case '"':
@@ -1126,7 +972,7 @@ void lexer_next_preprocessing_token(void)
 				DIGITS
 					put_back(c);
 					c = '.';
-					parse_number();
+					parse_pp_number();
 					return;
 
 				case '.':
