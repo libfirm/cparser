@@ -1813,6 +1813,111 @@ static void parse_endif_directive(void)
 	pop_conditional();
 }
 
+typedef enum stdc_pragma_kind_t {
+	STDC_UNKNOWN,
+	STDC_FP_CONTRACT,
+	STDC_FENV_ACCESS,
+	STDC_CX_LIMITED_RANGE
+} stdc_pragma_kind_t;
+
+typedef enum stdc_pragma_value_kind_t {
+	STDC_VALUE_UNKNOWN,
+	STDC_VALUE_ON,
+	STDC_VALUE_OFF,
+	STDC_VALUE_DEFAULT
+} stdc_pragma_value_kind_t;
+
+static void parse_pragma_directive(void)
+{
+	eat_pp(TP_pragma);
+
+	if (pp_token.kind != T_IDENTIFIER) {
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
+		         "expected identifier after #pragma");
+		eat_pp_directive();
+		return;
+	}
+
+	stdc_pragma_kind_t kind = STDC_UNKNOWN;
+	if (pp_token.base.symbol->pp_ID == TP_STDC && c_mode & _C99) {
+		/* a STDC pragma */
+		next_input_token();
+
+		switch (pp_token.base.symbol->pp_ID) {
+		case TP_FP_CONTRACT:      kind = STDC_FP_CONTRACT;      break;
+		case TP_FENV_ACCESS:      kind = STDC_FENV_ACCESS;      break;
+		case TP_CX_LIMITED_RANGE: kind = STDC_CX_LIMITED_RANGE; break;
+		default:                  break;
+		}
+		if (kind != STDC_UNKNOWN) {
+			next_input_token();
+			stdc_pragma_value_kind_t value;
+			switch (pp_token.base.symbol->pp_ID) {
+			case TP_ON:      value = STDC_VALUE_ON;      break;
+			case TP_OFF:     value = STDC_VALUE_OFF;     break;
+			case TP_DEFAULT: value = STDC_VALUE_DEFAULT; break;
+			default:         value = STDC_VALUE_UNKNOWN; break;
+			}
+			if (value == STDC_VALUE_UNKNOWN) {
+				kind = STDC_UNKNOWN;
+				errorf(&pp_token.base.source_position, "bad STDC pragma argument");
+			}
+		}
+	}
+	eat_pp_directive();
+	if (kind == STDC_UNKNOWN) {
+		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
+		         "encountered unknown #pragma");
+	}
+}
+
+static void parse_line_directive(void)
+{
+	if (pp_token.kind != T_NUMBER) {
+		if (!skip_mode)
+			parse_error("expected integer");
+	} else {
+		char      *end;
+		long const line = strtol(pp_token.literal.string.begin, &end, 0);
+		if (*end == '\0') {
+			/* use offset -1 as this is about the next line */
+			input.position.lineno = line - 1;
+			/* force output of line */
+			input.output_line = input.position.lineno - 20;
+		} else {
+			if (!skip_mode) {
+				errorf(&input.position, "'%S' is not a valid line number",
+					   &pp_token.literal.string);
+			}
+		}
+		next_input_token();
+	}
+	if (pp_token.kind == T_STRING_LITERAL
+	    && pp_token.literal.string.encoding == STRING_ENCODING_CHAR) {
+		input.position.input_name       = pp_token.literal.string.begin;
+		input.position.is_system_header = false;
+		next_input_token();
+
+		/* attempt to parse numeric flags as outputted by gcc preprocessor */
+		while (pp_token.kind == T_NUMBER) {
+			/* flags:
+			 * 1 - indicates start of a new file
+			 * 2 - indicates return from a file
+			 * 3 - indicates system header
+			 * 4 - indicates implicit extern "C" in C++ mode
+			 *
+			 * currently we're only interested in "3"
+			 */
+			if (streq(pp_token.literal.string.begin, "3")) {
+				input.position.is_system_header = true;
+			}
+			next_input_token();
+		}
+	}
+
+	eat_pp_directive();
+}
+
 static void parse_preprocessing_directive(void)
 {
 	eat_token('#');
@@ -1830,9 +1935,14 @@ static void parse_preprocessing_directive(void)
 		case TP_ifdef:   parse_ifdef_ifndef_directive(true);  break;
 		case TP_ifndef:  parse_ifdef_ifndef_directive(false); break;
 		case TP_include: parse_include_directive();           break;
+		case TP_line:    next_input_token(); goto line_directive;
+		case TP_pragma:  parse_pragma_directive();            break;
 		case TP_undef:   parse_undef_directive();             break;
 		default:         goto skip;
 		}
+	} else if (pp_token.kind == T_NUMBER) {
+line_directive:
+		parse_line_directive();
 	} else {
 skip:
 		if (!skip_mode) {
