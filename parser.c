@@ -5716,7 +5716,7 @@ static void warn_traditional_suffix(char const *const suffix)
 
 static void check_integer_suffix(expression_t *const expr, char const *const suffix)
 {
-	specifiers_t spec = SPECIFIER_NONE;
+	unsigned     spec = SPECIFIER_NONE;
 	char const  *c    = suffix;
 	for (;;) {
 		specifiers_t add;
