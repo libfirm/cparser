@@ -1383,6 +1383,9 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 		fputc(' ', out);
 		fputs(add, out);
 	}
+	if (pos->is_system_header) {
+		fputs(" 3", out);
+	}
 
 	printed_input_name = pos->input_name;
 	input.output_line  = pos->lineno-1;
