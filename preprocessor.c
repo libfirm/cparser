@@ -411,6 +411,101 @@ static utf32 parse_hex_sequence(void)
 	return value;
 }
 
+static bool is_universal_char_valid(utf32 const v)
+{
+	/* C11 §6.4.3:2 */
+	if (v < 0xA0U && v != 0x24 && v != 0x40 && v != 0x60)
+		return false;
+	if (0xD800 <= v && v <= 0xDFFF)
+		return false;
+	return true;
+}
+
+static utf32 parse_universal_char(unsigned const n_digits)
+{
+	utf32 v = 0;
+	for (unsigned k = n_digits; k != 0; --k) {
+		if (isxdigit(input.c)) {
+			v = 16 * v + digit_value(input.c);
+			if (!resolve_escape_sequences)
+				obstack_1grow(&symbol_obstack, input.c);
+			next_char();
+		} else {
+			errorf(&input.position,
+			       "short universal character name, expected %u more digits",
+				   k);
+			break;
+		}
+	}
+	if (!is_universal_char_valid(v)) {
+		errorf(&input.position,
+		       "\\%c%0*X is not a valid universal character name",
+		       n_digits == 4 ? 'u' : 'U', (int)n_digits, v);
+	}
+	return v;
+}
+
+static bool is_universal_char_valid_identifier(utf32 const v)
+{
+	/* C11 Annex D.1 */
+	if (                v == 0x000A8) return true;
+	if (                v == 0x000AA) return true;
+	if (                v == 0x000AD) return true;
+	if (                v == 0x000AF) return true;
+	if (0x000B2 <= v && v <= 0x000B5) return true;
+	if (0x000B7 <= v && v <= 0x000BA) return true;
+	if (0x000BC <= v && v <= 0x000BE) return true;
+	if (0x000C0 <= v && v <= 0x000D6) return true;
+	if (0x000D8 <= v && v <= 0x000F6) return true;
+	if (0x000F8 <= v && v <= 0x000FF) return true;
+	if (0x00100 <= v && v <= 0x0167F) return true;
+	if (0x01681 <= v && v <= 0x0180D) return true;
+	if (0x0180F <= v && v <= 0x01FFF) return true;
+	if (0x0200B <= v && v <= 0x0200D) return true;
+	if (0x0202A <= v && v <= 0x0202E) return true;
+	if (0x0203F <= v && v <= 0x02040) return true;
+	if (                v == 0x02054) return true;
+	if (0x02060 <= v && v <= 0x0206F) return true;
+	if (0x02070 <= v && v <= 0x0218F) return true;
+	if (0x02460 <= v && v <= 0x024FF) return true;
+	if (0x02776 <= v && v <= 0x02793) return true;
+	if (0x02C00 <= v && v <= 0x02DFF) return true;
+	if (0x02E80 <= v && v <= 0x02FFF) return true;
+	if (0x03004 <= v && v <= 0x03007) return true;
+	if (0x03021 <= v && v <= 0x0302F) return true;
+	if (0x03031 <= v && v <= 0x0303F) return true;
+	if (0x03040 <= v && v <= 0x0D7FF) return true;
+	if (0x0F900 <= v && v <= 0x0FD3D) return true;
+	if (0x0FD40 <= v && v <= 0x0FDCF) return true;
+	if (0x0FDF0 <= v && v <= 0x0FE44) return true;
+	if (0x0FE47 <= v && v <= 0x0FFFD) return true;
+	if (0x10000 <= v && v <= 0x1FFFD) return true;
+	if (0x20000 <= v && v <= 0x2FFFD) return true;
+	if (0x30000 <= v && v <= 0x3FFFD) return true;
+	if (0x40000 <= v && v <= 0x4FFFD) return true;
+	if (0x50000 <= v && v <= 0x5FFFD) return true;
+	if (0x60000 <= v && v <= 0x6FFFD) return true;
+	if (0x70000 <= v && v <= 0x7FFFD) return true;
+	if (0x80000 <= v && v <= 0x8FFFD) return true;
+	if (0x90000 <= v && v <= 0x9FFFD) return true;
+	if (0xA0000 <= v && v <= 0xAFFFD) return true;
+	if (0xB0000 <= v && v <= 0xBFFFD) return true;
+	if (0xC0000 <= v && v <= 0xCFFFD) return true;
+	if (0xD0000 <= v && v <= 0xDFFFD) return true;
+	if (0xE0000 <= v && v <= 0xEFFFD) return true;
+	return false;
+}
+
+static bool is_universal_char_valid_identifier_start(utf32 const v)
+{
+	/* C11 Annex D.2 */
+	if (0x0300 <= v && v <= 0x036F) return false;
+	if (0x1DC0 <= v && v <= 0x1DFF) return false;
+	if (0x20D0 <= v && v <= 0x20FF) return false;
+	if (0xFE20 <= v && v <= 0xFE2F) return false;
+	return true;
+}
+
 /**
  * Parse an escape sequence.
  */
@@ -454,10 +549,10 @@ static utf32 parse_escape_sequence(void)
 		if (c_mode & _GNUC)
 			return 27;   /* hopefully 27 is ALWAYS the code for ESCAPE */
 		break;
-	case 'u':
-	case 'U':
-		parse_error("universal character parsing not implemented yet");
-		return EOF;
+
+	case 'U': return parse_universal_char(8);
+	case 'u': return parse_universal_char(4);
+
 	default:
 		break;
 	}
@@ -864,9 +959,7 @@ static inline void eat_token(token_kind_t const kind)
 
 static void parse_symbol(void)
 {
-	obstack_1grow(&symbol_obstack, (char) input.c);
-	next_char();
-
+	assert(obstack_object_size(&symbol_obstack) == 0);
 	while (true) {
 		switch (input.c) {
 		case DIGIT_CASES:
@@ -874,6 +967,42 @@ static void parse_symbol(void)
 			obstack_1grow(&symbol_obstack, (char) input.c);
 			next_char();
 			break;
+
+		case '\\':
+			next_char();
+			switch (input.c) {
+			{
+				unsigned n;
+			case 'U': n = 8; goto universal;
+			case 'u': n = 4; goto universal;
+universal:
+				if (!resolve_escape_sequences) {
+					obstack_1grow(&symbol_obstack, '\\');
+					obstack_1grow(&symbol_obstack, input.c);
+				}
+				next_char();
+				utf32 const v = parse_universal_char(n);
+				if (!is_universal_char_valid_identifier(v)) {
+					if (is_universal_char_valid(v)) {
+						errorf(&input.position,
+							   "universal character \\%c%0*X is not valid in an identifier",
+							   n == 4 ? 'u' : 'U', (int)n, v);
+					}
+				} else if (obstack_object_size(&symbol_obstack) == 0 && !is_universal_char_valid_identifier_start(v)) {
+					errorf(&input.position,
+						   "universal character \\%c%0*X is not valid as start of an identifier",
+						   n == 4 ? 'u' : 'U', (int)n, v);
+				} else if (resolve_escape_sequences) {
+					obstack_grow_utf8(&symbol_obstack, v);
+				}
+				break;
+			}
+
+			default:
+				put_back(input.c);
+				input.c = '\\';
+				goto end_symbol;
+			}
 
 		default:
 			goto end_symbol;
@@ -1169,6 +1298,16 @@ digraph_percentcolon:
 		}
 		return;
 
+	case '\\':
+		next_char();
+		int next_c = input.c;
+		put_back(input.c);
+		input.c = '\\';
+		if (next_c == 'U' || next_c == 'u') {
+			parse_symbol();
+			return;
+		}
+		/* FALLTHROUGH */
 	default:
 		if (error_on_unknown_chars) {
 			errorf(&pp_token.base.source_position,
