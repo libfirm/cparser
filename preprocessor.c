@@ -124,6 +124,8 @@ static symbol_t *symbol_percentcolon;
 static symbol_t *symbol_percentcolonpercentcolon;
 static symbol_t *symbol_percentgreater;
 
+extern bool      allow_dollar_in_symbol;
+
 static void init_symbols(void)
 {
 	symbol_colongreater             = symbol_table_insert(":>");
@@ -652,7 +654,8 @@ static void parse_character_constant(string_encoding_t const enc)
 }
 
 #define SYMBOL_CASES_WITHOUT_E_P \
-	     'a': \
+	     '$': if (!allow_dollar_in_symbol) goto dollar_sign; \
+	case 'a': \
 	case 'b': \
 	case 'c': \
 	case 'd': \
@@ -1005,6 +1008,7 @@ universal:
 			}
 
 		default:
+dollar_sign:
 			goto end_symbol;
 		}
 	}
@@ -1063,6 +1067,7 @@ static void parse_number(void)
 			break;
 
 		default:
+dollar_sign:
 			goto end_number;
 		}
 	}
@@ -1309,6 +1314,7 @@ digraph_percentcolon:
 		}
 		/* FALLTHROUGH */
 	default:
+dollar_sign:
 		if (error_on_unknown_chars) {
 			errorf(&pp_token.base.source_position,
 			       "unknown character '%lc' found\n", input.c);
