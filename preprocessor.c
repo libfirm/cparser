@@ -835,29 +835,23 @@ end_number:
 	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
 }
 
+#define MAYBE_PROLOG \
+	next_char(); \
+	switch (input.c) {
 
-#define MAYBE_PROLOG                                       \
-			next_char();                                   \
-			while (true) {                                 \
-				switch (input.c) {
+#define MAYBE(ch, kind) \
+	case ch: \
+		next_char(); \
+		pp_token.kind = kind; \
+		return;
 
-#define MAYBE(ch, set_type)                                \
-				case ch:                                   \
-					next_char();                           \
-					pp_token.kind = set_type;              \
-					return;
+#define ELSE_CODE(code) \
+	default: \
+		code \
+		return; \
+	}
 
-#define ELSE_CODE(code)                                    \
-				default:                                   \
-					code                                   \
-					return;                                \
-				}                                          \
-			}
-
-#define ELSE(set_type)                                     \
-		ELSE_CODE(                                         \
-			pp_token.kind = set_type;                      \
-		)
+#define ELSE(kind) ELSE_CODE(pp_token.kind = kind;)
 
 static void next_preprocessing_token(void)
 {
