@@ -108,46 +108,35 @@ char const *get_string_encoding_prefix(string_encoding_t const enc)
 	panic("invalid string encoding");
 }
 
-static void print_stringrep(const string_t *string, FILE *f)
-{
-	for (size_t i = 0; i < string->size; ++i) {
-		fputc(string->begin[i], f);
-	}
-}
-
 void print_token(FILE *f, const token_t *token)
 {
-	switch(token->kind) {
+	char        delim = '\'';
+	char const *enc   = "";
+	char const *val;
+	switch (token->kind) {
 	case T_IDENTIFIER:
 	case T_UNKNOWN_CHAR:
-		print_token_kind(f, (token_kind_t)token->kind);
-		fprintf(f, " '%s'", token->base.symbol->string);
+		val = token->base.symbol->string;
 		break;
 
+	case T_HEADERNAME:
+	case T_STRING_LITERAL:
+		delim = '"';
+		/* FALLTHROUGH */
+	case T_CHARACTER_CONSTANT:
+		enc = get_string_encoding_prefix(token->literal.string.encoding);
+		/* FALLTHROUGH */
 	case T_NUMBER:
-		fprintf(f, "number '%s'", token->literal.string.begin);
+		val = token->literal.string.begin;
 		break;
 
-		char delim;
-	case T_STRING_LITERAL:     delim = '"';  goto print_string;
-	case T_CHARACTER_CONSTANT: delim = '\''; goto print_string;
-print_string:
-		print_token_kind(f, (token_kind_t)token->kind);
-		fprintf(f, " %s%c", get_string_encoding_prefix(token->literal.string.encoding), delim);
-		print_stringrep(&token->literal.string, f);
-		fputc(delim, f);
-		break;
-
-	default:
-		if (token->base.symbol) {
-			fprintf(f, "'%s'", token->base.symbol->string);
-		} else {
-			fputc('\'', f);
-			print_token_kind(f, (token_kind_t)token->kind);
-			fputc('\'', f);
-		}
-		break;
+	default: {
+		char const *kind  = (token->base.symbol ? token->base.symbol : token_symbols[token->kind])->string;
+		fprintf(f, "'%s'", kind);
+		return;
 	}
+	}
+	fprintf(f, "%s %s%c%s%c", token_symbols[token->kind]->string, enc, delim, val, delim);
 }
 
 bool tokens_would_paste(token_kind_t token1, token_kind_t token2)
