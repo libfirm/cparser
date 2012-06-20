@@ -1557,11 +1557,10 @@ static void check_unclosed_conditionals(void)
 	}
 }
 
-static void parse_ifdef_ifndef_directive(void)
+static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 {
-	bool is_ifndef = pp_token.base.symbol->pp_ID == TP_ifndef;
 	bool condition;
-	eat_pp(is_ifndef ? TP_ifndef : TP_ifdef);
+	eat_pp(is_ifdef ? TP_ifdef : TP_ifndef);
 
 	if (skip_mode) {
 		eat_pp_directive();
@@ -1574,20 +1573,20 @@ static void parse_ifdef_ifndef_directive(void)
 	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
 		errorf(&pp_token.base.source_position,
 		       "expected identifier after #%s, got %K",
-		       is_ifndef ? "ifndef" : "ifdef", &pp_token);
+		       is_ifdef ? "ifdef" : "ifndef", &pp_token);
 		eat_pp_directive();
 
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
 		/* evaluate wether we are in true or false case */
-		condition = (bool)!pp_token.base.symbol->pp_definition == is_ifndef;
+		condition = (bool)pp_token.base.symbol->pp_definition == is_ifdef;
 		eat_token(T_IDENTIFIER);
 
 		if (!info.at_line_begin) {
 			errorf(&pp_token.base.source_position,
 			       "extra tokens at end of #%s",
-			       is_ifndef ? "ifndef" : "ifdef");
+			       is_ifdef ? "ifdef" : "ifndef");
 			eat_pp_directive();
 		}
 	}
@@ -1667,13 +1666,13 @@ static void parse_preprocessing_directive(void)
 
 	if (pp_token.base.symbol) {
 		switch (pp_token.base.symbol->pp_ID) {
-		case TP_define:  parse_define_directive();       break;
-		case TP_else:    parse_else_directive();         break;
-		case TP_endif:   parse_endif_directive();        break;
-		case TP_ifdef:
-		case TP_ifndef:  parse_ifdef_ifndef_directive(); break;
-		case TP_include: parse_include_directive();      break;
-		case TP_undef:   parse_undef_directive();        break;
+		case TP_define:  parse_define_directive();            break;
+		case TP_else:    parse_else_directive();              break;
+		case TP_endif:   parse_endif_directive();             break;
+		case TP_ifdef:   parse_ifdef_ifndef_directive(true);  break;
+		case TP_ifndef:  parse_ifdef_ifndef_directive(false); break;
+		case TP_include: parse_include_directive();           break;
+		case TP_undef:   parse_undef_directive();             break;
 		default:         goto skip;
 		}
 	} else {
