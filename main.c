@@ -60,7 +60,7 @@
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
-#include "lexer.h"
+#include "preprocessor.h"
 #include "token_t.h"
 #include "types.h"
 #include "type_hash.h"
@@ -180,26 +180,23 @@ static translation_unit_t *do_parsing(FILE *const in, const char *const input_na
 {
 	start_parsing();
 
-	input_t *input = input_from_stream(in, input_encoding);
-	lexer_switch_input(input, input_name);
+	switch_input(in, input_name);
 	parse();
 	translation_unit_t *unit = finish_parsing();
-	input_free(input);
+	close_input();
 
 	return unit;
 }
 
 static void lextest(FILE *in, const char *fname)
 {
-	input_t *input = input_from_stream(in, input_encoding);
-	lexer_switch_input(input, fname);
-
+	switch_input(in, fname);
 	do {
-		lexer_next_preprocessing_token();
-		print_token(stdout, &lexer_token);
+		next_preprocessing_token();
+		print_token(stdout, &pp_token);
 		putchar('\n');
-	} while (lexer_token.kind != T_EOF);
-	input_free(input);
+	} while (pp_token.kind != T_EOF);
+	close_input();
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -1673,7 +1670,7 @@ int main(int argc, char **argv)
 		init_wchar_types(type_short);
 	else
 		panic("unexpected wchar type");
-	init_lexer();
+	init_preprocessor();
 	init_ast();
 	init_parser();
 	init_ast2firm();
@@ -2088,7 +2085,7 @@ graph_built:
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();
-	exit_lexer();
+	exit_preprocessor();
 	exit_typehash();
 	exit_types();
 	exit_tokens();

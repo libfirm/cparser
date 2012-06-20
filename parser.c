@@ -28,7 +28,7 @@
 #include "parser.h"
 #include "diagnostic.h"
 #include "format_check.h"
-#include "lexer.h"
+#include "preprocessor.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "types.h"
@@ -467,8 +467,8 @@ static size_t label_top(void)
 static inline void next_token(void)
 {
 	token                              = lookahead_buffer[lookahead_bufpos];
-	lookahead_buffer[lookahead_bufpos] = lexer_token;
-	lexer_next_token();
+	lookahead_buffer[lookahead_bufpos] = pp_token;
+	next_preprocessing_token();
 
 	lookahead_bufpos = (lookahead_bufpos + 1) % MAX_LOOKAHEAD;
 

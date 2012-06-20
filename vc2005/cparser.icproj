@@ -190,10 +190,6 @@
 		<File 
 			RelativePath="..\format_check.h"/>
 		<File 
-			RelativePath="..\lexer.c"/>
-		<File 
-			RelativePath="..\lexer.h"/>
-		<File 
 			RelativePath="..\main.c"/>
 		<File 
 			RelativePath="..\parser.c"/>

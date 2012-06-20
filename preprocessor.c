@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+#include "preprocessor.h"
 #include "token_t.h"
 #include "symbol_t.h"
 #include "adt/util.h"
@@ -91,8 +92,9 @@ static struct obstack  input_obstack;
 
 static pp_conditional_t *conditional_stack;
 
-static token_t           pp_token;
-static bool              resolve_escape_sequences = false;
+token_t                  pp_token;
+bool                     allow_dollar_in_symbol   = true;
+static bool              resolve_escape_sequences = true;
 static bool              error_on_unknown_chars   = true;
 static bool              skip_mode;
 static FILE             *out;
@@ -124,8 +126,6 @@ static symbol_t *symbol_percentcolon;
 static symbol_t *symbol_percentcolonpercentcolon;
 static symbol_t *symbol_percentgreater;
 
-extern bool      allow_dollar_in_symbol;
-
 static void init_symbols(void)
 {
 	symbol_colongreater             = symbol_table_insert(":>");
@@ -136,7 +136,7 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-static void switch_input(FILE *file, const char *filename)
+void switch_input(FILE *const file, char const *const filename)
 {
 	input.file                = file;
 	input.input               = input_from_stream(file, NULL);
@@ -154,17 +154,20 @@ static void switch_input(FILE *file, const char *filename)
 	input.c               = '\n';
 }
 
-static void close_input(void)
+FILE* close_input(void)
 {
 	input_free(input.input);
-	assert(input.file != NULL);
 
-	fclose(input.file);
+	FILE* const file = input.file;
+	assert(file);
+
 	input.input  = NULL;
 	input.file   = NULL;
 	input.bufend = NULL;
 	input.bufpos = NULL;
 	input.c      = EOF;
+
+	return file;
 }
 
 static void push_input(void)
@@ -579,6 +582,12 @@ static string_t sym_make_string(string_encoding_t const enc)
 	char       *const string = obstack_finish(&symbol_obstack);
 	char const *const result = identify_string(string);
 	return (string_t){ result, len, enc };
+}
+
+string_t make_string(char const *const string)
+{
+	obstack_grow(&symbol_obstack, string, strlen(string));
+	return sym_make_string(STRING_ENCODING_CHAR);
 }
 
 static void parse_string(utf32 const delimiter, token_kind_t const kind,
@@ -1290,7 +1299,7 @@ digraph_percentcolon:
 
 	case EOF:
 		if (input_stack != NULL) {
-			close_input();
+			fclose(close_input());
 			pop_restore_input();
 			fputc('\n', out);
 			if (input.c == (utf32)EOF)
@@ -1366,6 +1375,9 @@ static void print_quoted_string(const char *const string)
 
 static void print_line_directive(const source_position_t *pos, const char *add)
 {
+	if (!out)
+		return;
+
 	fprintf(out, "# %u ", pos->lineno);
 	print_quoted_string(pos->input_name);
 	if (add != NULL) {
@@ -2108,7 +2120,7 @@ static void finish_current_argument(void)
 	current_argument->token_list = obstack_finish(&pp_obstack);
 }
 
-static void next_preprocessing_token(void)
+void next_preprocessing_token(void)
 {
 restart:
 	if (!expand_next()) {
@@ -2274,11 +2286,8 @@ static void setup_include_path(void)
 	}
 }
 
-int pptest_main(int argc, char **argv);
-int pptest_main(int argc, char **argv)
+void init_preprocessor(void)
 {
-	init_symbol_table();
-	init_tokens();
 	init_symbols();
 
 	obstack_init(&config_obstack);
@@ -2286,9 +2295,27 @@ int pptest_main(int argc, char **argv)
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
 
-	error_on_unknown_chars = false;
-
 	setup_include_path();
+}
+
+void exit_preprocessor(void)
+{
+	obstack_free(&input_obstack, NULL);
+	obstack_free(&pp_obstack, NULL);
+	obstack_free(&config_obstack, NULL);
+
+	strset_destroy(&stringset);
+}
+
+int pptest_main(int argc, char **argv);
+int pptest_main(int argc, char **argv)
+{
+	init_symbol_table();
+	init_preprocessor();
+	init_tokens();
+
+	error_on_unknown_chars   = false;
+	resolve_escape_sequences = false;
 
 	/* simplistic commandline parser */
 	const char *filename = NULL;
@@ -2347,17 +2374,12 @@ int pptest_main(int argc, char **argv)
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	close_input();
+	fclose(close_input());
 	if (out != stdout)
 		fclose(out);
 
-	obstack_free(&input_obstack, NULL);
-	obstack_free(&pp_obstack, NULL);
-	obstack_free(&config_obstack, NULL);
-
-	strset_destroy(&stringset);
-
 	exit_tokens();
+	exit_preprocessor();
 	exit_symbol_table();
 
 	return 0;

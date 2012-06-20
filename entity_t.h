@@ -20,12 +20,12 @@
 #ifndef ENTITY_T_H
 #define ENTITY_T_H
 
-#include "lexer.h"
 #include "symbol.h"
 #include "entity.h"
 #include "attribute.h"
 #include <libfirm/firm_types.h>
 #include "builtins.h"
+#include "token_t.h"
 
 typedef enum {
 	ENTITY_VARIABLE = 1,
