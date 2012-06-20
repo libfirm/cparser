@@ -1217,6 +1217,11 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 static void parse_define_directive(void)
 {
 	eat_pp(TP_define);
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
+
 	assert(obstack_object_size(&pp_obstack) == 0);
 
 	if (pp_token.kind != TP_IDENTIFIER || info.at_line_begin) {
@@ -1324,6 +1329,10 @@ error_out:
 static void parse_undef_directive(void)
 {
 	eat_pp(TP_undef);
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
 
 	if (pp_token.kind != TP_IDENTIFIER) {
 		errorf(&input.position,
@@ -1463,6 +1472,11 @@ static void skip_till_newline(void)
 
 static bool parse_include_directive(void)
 {
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
+
 	/* don't eat the TP_include here!
 	 * we need an alternative parsing for the next token */
 	skip_whitespace();
@@ -1642,53 +1656,21 @@ static void parse_preprocessing_directive(void)
 		return;
 	}
 
-	if (skip_mode) {
-		switch (pp_token.kind) {
-		case TP_ifdef:
-		case TP_ifndef:
-			parse_ifdef_ifndef_directive();
-			break;
-		case TP_else:
-			parse_else_directive();
-			break;
-		case TP_endif:
-			parse_endif_directive();
-			break;
-		default:
-			eat_pp_directive();
-			break;
+	switch (pp_token.kind) {
+	case TP_define:  parse_define_directive();       break;
+	case TP_else:    parse_else_directive();         break;
+	case TP_endif:   parse_endif_directive();        break;
+	case TP_ifdef:
+	case TP_ifndef:  parse_ifdef_ifndef_directive(); break;
+	case TP_include: parse_include_directive();      break;
+	case TP_undef:   parse_undef_directive();        break;
+
+	default:
+		if (!skip_mode) {
+			errorf(&pp_token.base.source_position, "invalid preprocessing directive #%K", &pp_token);
 		}
-	} else {
-		switch (pp_token.kind) {
-		case TP_define:
-			parse_define_directive();
-			break;
-		case TP_undef:
-			parse_undef_directive();
-			break;
-		case TP_ifdef:
-		case TP_ifndef:
-			parse_ifdef_ifndef_directive();
-			break;
-		case TP_else:
-			parse_else_directive();
-			break;
-		case TP_endif:
-			parse_endif_directive();
-			break;
-		case TP_include:
-			parse_include_directive();
-			break;
-		default:
-			if (info.at_line_begin) {
-				/* the nop directive "#" */
-				break;
-			}
-			errorf(&pp_token.base.source_position,
-				   "invalid preprocessing directive #%t", &pp_token);
-			eat_pp_directive();
-			break;
-		}
+		eat_pp_directive();
+		break;
 	}
 
 	assert(info.at_line_begin);
