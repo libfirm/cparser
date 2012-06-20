@@ -9,6 +9,7 @@
 #undef PUNCTUATOR
 #undef ALTERNATE
 
+TS(EOF,                "end of input",)
 TS(IDENTIFIER,         "identifier",)
 TS(NUMBER,             "number constant",)
 TS(CHARACTER_CONSTANT, "character constant",)

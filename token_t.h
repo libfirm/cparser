@@ -28,7 +28,6 @@
 
 typedef enum token_kind_tag_t {
 	T_NULL  =  0,
-	T_EOF   = '\x04', // EOT
 #define T(mode,x,str,val) T_##x val,
 #define TS(x,str,val) T_##x val,
 #include "tokens.inc"
