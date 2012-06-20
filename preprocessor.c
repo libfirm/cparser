@@ -954,50 +954,50 @@ restart:
 	case '/':
 		MAYBE_PROLOG
 		MAYBE('=', T_SLASHEQUAL)
-			case '*':
-				next_char();
-				info.had_whitespace = true;
-				skip_multiline_comment();
-				goto restart;
-			case '/':
-				next_char();
-				info.had_whitespace = true;
-				skip_line_comment();
-				goto restart;
+		case '*':
+			next_char();
+			info.had_whitespace = true;
+			skip_multiline_comment();
+			goto restart;
+		case '/':
+			next_char();
+			info.had_whitespace = true;
+			skip_line_comment();
+			goto restart;
 		ELSE('/')
 	case '%':
 		MAYBE_PROLOG
 		MAYBE('>', '}')
 		MAYBE('=', T_PERCENTEQUAL)
-			case ':':
+		case ':':
+			MAYBE_PROLOG
+			case '%':
 				MAYBE_PROLOG
-					case '%':
-						MAYBE_PROLOG
-						MAYBE(':', T_HASHHASH)
-						ELSE_CODE(
-							put_back(input.c);
-							input.c = '%';
-							pp_token.kind = '#';
-						)
-				ELSE('#')
+				MAYBE(':', T_HASHHASH)
+				ELSE_CODE(
+					put_back(input.c);
+					input.c = '%';
+					pp_token.kind = '#';
+				)
+			ELSE('#')
 		ELSE('%')
 	case '<':
 		MAYBE_PROLOG
 		MAYBE(':', '[')
 		MAYBE('%', '{')
 		MAYBE('=', T_LESSEQUAL)
-			case '<':
-				MAYBE_PROLOG
-				MAYBE('=', T_LESSLESSEQUAL)
-				ELSE(T_LESSLESS)
+		case '<':
+			MAYBE_PROLOG
+			MAYBE('=', T_LESSLESSEQUAL)
+			ELSE(T_LESSLESS)
 		ELSE('<')
 	case '>':
 		MAYBE_PROLOG
 		MAYBE('=', T_GREATEREQUAL)
-			case '>':
-				MAYBE_PROLOG
-				MAYBE('=', T_GREATERGREATEREQUAL)
-				ELSE(T_GREATERGREATER)
+		case '>':
+			MAYBE_PROLOG
+			MAYBE('=', T_GREATERGREATEREQUAL)
+			ELSE(T_GREATERGREATER)
 		ELSE('>')
 	case '^':
 		MAYBE_PROLOG
