@@ -1480,7 +1480,7 @@ static void skip_till_newline(void)
 	}
 }
 
-static bool parse_include_directive(void)
+static void parse_include_directive(void)
 {
 	if (skip_mode) {
 		eat_pp_directive();
@@ -1495,7 +1495,7 @@ static bool parse_include_directive(void)
 	string_t headername = pp_token.literal.string;
 	if (headername.begin == NULL) {
 		eat_pp_directive();
-		return false;
+		return;
 	}
 
 	skip_whitespace();
@@ -1509,7 +1509,7 @@ static bool parse_include_directive(void)
 		errorf(&pp_token.base.source_position, "#include nested too deeply");
 		/* eat \n or EOF */
 		next_preprocessing_token();
-		return false;
+		return;
 	}
 
 	/* switch inputs */
@@ -1519,10 +1519,7 @@ static bool parse_include_directive(void)
 	if (!res) {
 		errorf(&pp_token.base.source_position, "failed including '%S': %s", &pp_token.literal, strerror(errno));
 		pop_restore_input();
-		return false;
 	}
-
-	return true;
 }
 
 static pp_conditional_t *push_conditional(void)
