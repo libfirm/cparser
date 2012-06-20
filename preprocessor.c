@@ -747,6 +747,13 @@ static inline void eat_pp(pp_token_kind_t const kind)
 	next_preprocessing_token();
 }
 
+static inline void eat_token(token_kind_t const kind)
+{
+	assert(pp_token.kind == kind);
+	(void)kind;
+	next_preprocessing_token();
+}
+
 static void parse_symbol(void)
 {
 	obstack_1grow(&symbol_obstack, (char) input.c);
@@ -1242,28 +1249,27 @@ static void parse_define_directive(void)
 	 * lexer (except for the fact that they separate tokens). #define b(x)
 	 * is something else than #define b (x) */
 	if (input.c == '(') {
-		/* eat the '(' */
-		next_preprocessing_token();
-		/* get next token after '(' */
-		next_preprocessing_token();
+		eat_token(T_IDENTIFIER);
+		eat_token('(');
 
 		while (true) {
 			switch (pp_token.kind) {
 			case T_DOTDOTDOT:
 				new_definition->is_variadic = true;
-				next_preprocessing_token();
+				eat_token(T_DOTDOTDOT);
 				if (pp_token.kind != ')') {
 					errorf(&input.position,
 							"'...' not at end of macro argument list");
 					goto error_out;
 				}
 				break;
+
 			case T_IDENTIFIER:
 				obstack_ptr_grow(&pp_obstack, pp_token.base.symbol);
-				next_preprocessing_token();
+				eat_token(T_IDENTIFIER);
 
 				if (pp_token.kind == ',') {
-					next_preprocessing_token();
+					eat_token(',');
 					break;
 				}
 
@@ -1274,9 +1280,11 @@ static void parse_define_directive(void)
 					goto error_out;
 				}
 				break;
+
 			case ')':
-				next_preprocessing_token();
+				eat_token(')');
 				goto finish_argument_list;
+
 			default:
 				errorf(&pp_token.base.source_position,
 				       "expected identifier, '...' or ')' in #define argument list, got %K",
@@ -1291,7 +1299,7 @@ static void parse_define_directive(void)
 			= obstack_object_size(&pp_obstack) / sizeof(new_definition->parameters[0]);
 		new_definition->parameters = obstack_finish(&pp_obstack);
 	} else {
-		next_preprocessing_token();
+		eat_token(T_IDENTIFIER);
 	}
 
 	/* construct a new pp_definition on the obstack */
@@ -1344,7 +1352,7 @@ static void parse_undef_directive(void)
 	}
 
 	pp_token.base.symbol->pp_definition = NULL;
-	next_preprocessing_token();
+	eat_token(T_IDENTIFIER);
 
 	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
@@ -1553,7 +1561,7 @@ static void parse_ifdef_ifndef_directive(void)
 {
 	bool is_ifndef = pp_token.base.symbol->pp_ID == TP_ifndef;
 	bool condition;
-	next_preprocessing_token();
+	eat_pp(is_ifndef ? TP_ifndef : TP_ifdef);
 
 	if (skip_mode) {
 		eat_pp_directive();
@@ -1574,8 +1582,7 @@ static void parse_ifdef_ifndef_directive(void)
 	} else {
 		/* evaluate wether we are in true or false case */
 		condition = (bool)!pp_token.base.symbol->pp_definition == is_ifndef;
-
-		next_preprocessing_token();
+		eat_token(T_IDENTIFIER);
 
 		if (!info.at_line_begin) {
 			errorf(&pp_token.base.source_position,
@@ -1651,7 +1658,7 @@ static void parse_endif_directive(void)
 
 static void parse_preprocessing_directive(void)
 {
-	next_preprocessing_token(); /* Eat '#'. */
+	eat_token('#');
 
 	if (info.at_line_begin) {
 		/* empty directive */
@@ -1799,12 +1806,12 @@ int pptest_main(int argc, char **argv)
 				if (pp_definition->has_parameters) {
 					source_position_t position = pp_token.base.source_position;
 					add_token_info_t old_info = info;
-					next_preprocessing_token();
+					eat_token(T_IDENTIFIER);
 					add_token_info_t new_info = info;
 
 					/* no opening brace -> no expansion */
 					if (pp_token.kind == '(') {
-						next_preprocessing_token(); /* Eat '('. */
+						eat_token('(');
 
 						/* parse arguments (TODO) */
 						while (pp_token.kind != T_EOF && pp_token.kind != ')')
