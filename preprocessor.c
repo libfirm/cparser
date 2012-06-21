@@ -1105,10 +1105,9 @@ end_number:
 #define ELSE_CODE(code) \
 	default: \
 		code \
-		return; \
 	}
 
-#define ELSE(kind) ELSE_CODE(set_punctuator(kind);)
+#define ELSE(kind) ELSE_CODE(set_punctuator(kind); return;)
 
 /** identifies and returns the next preprocessing token contained in the
  * input stream. No macro expansion is performed. */
@@ -1179,6 +1178,7 @@ restart:
 					put_back(input.c);
 					input.c = '.';
 					set_punctuator('.');
+					return;
 				)
 		ELSE('.')
 	case '&':
@@ -1234,6 +1234,7 @@ restart:
 			ELSE_CODE(
 digraph_percentcolon:
 				set_digraph('#', symbol_percentcolon);
+				return;
 			)
 		ELSE('%')
 	case '<':
