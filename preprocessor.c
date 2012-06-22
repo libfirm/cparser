@@ -9,7 +9,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <libfirm/firm_common.h>
+#include <libfirm/irmode.h>
+#include <libfirm/tv.h>
 
+#include "ast_t.h"
 #include "preprocessor.h"
 #include "symbol_t.h"
 #include "adt/util.h"
@@ -2543,6 +2547,399 @@ void check_unclosed_conditionals(void)
 	}
 }
 
+static ir_tarval *pp_null;
+static ir_tarval *pp_one;
+
+static void       next_condition_token(void);
+static bool       next_expansion_token(void);
+static ir_tarval *parse_pp_expression(precedence_t prec);
+
+static ir_tarval *parse_pp_operand(void)
+{
+	if (info.at_line_begin) {
+		errorf(&pp_token.base.pos, "unexpected end of preprocessor condition");
+		return tarval_bad;
+	}
+
+	token_kind_t const kind = pp_token.kind;
+	switch (kind) {
+	case T_CHARACTER_CONSTANT: {
+		char       const *const str = pp_token.literal.string.begin;
+		string_encoding_t const enc = pp_token.literal.string.encoding;
+		next_condition_token();
+		switch (enc) {
+		case STRING_ENCODING_CHAR:
+		case STRING_ENCODING_UTF8: {
+			long const v = str[0];
+			return new_tarval_from_long(v, mode_Ls);
+		}
+
+		case STRING_ENCODING_CHAR16:
+		case STRING_ENCODING_CHAR32:
+		case STRING_ENCODING_WIDE: {
+			char const *i = str;
+			long const  v = read_utf8_char(&i);
+			return new_tarval_from_long(v, mode_Ls);
+		}
+		}
+		panic("invalid encoding");
+	}
+
+	case T_NUMBER: {
+		char const *const str = pp_token.literal.string.begin;
+
+		char const *i = str;
+		while (isxdigit((unsigned char)*i) || *i == 'X' || *i == 'x')
+			++i;
+
+		char const *const suffix      = i;
+		bool              is_long     = false;
+		bool              is_unsigned = false;
+		for (;;) {
+			if (*i == 'L' || *i == 'l') {
+				if (is_long)
+					goto error;
+				is_long = true;
+				if (*i == i[1])
+					++i;
+			} else if (*i == 'U' || *i == 'u') {
+				if (is_unsigned)
+					goto error;
+				is_unsigned = true;
+			} else {
+				break;
+			}
+			++i;
+		}
+
+		ir_tarval *res;
+		if (*i != '\0') {
+error:
+			errorf(&pp_token.base.pos, "invalid suffix '%s' on integer constant in preprocessor condition", suffix);
+			res = tarval_bad;
+		} else {
+			ir_mode *const mode = is_unsigned ? mode_Lu : mode_Ls;
+			res  = new_tarval_from_str(str, suffix - str, mode);
+			if (res == tarval_bad) {
+				errorf(&pp_token.base.pos, "invalid %K in preprocessor condition", &pp_token);
+			}
+		}
+		next_condition_token();
+		return res;
+	}
+
+	case '(': {
+		next_condition_token();
+		ir_tarval *const res = parse_pp_expression(PREC_BOTTOM);
+		if (info.at_line_begin) {
+			errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ')'");
+		} else if (pp_token.kind == ')') {
+			next_condition_token();
+		} else {
+			errorf(&pp_token.base.pos, "missing ')' in preprocessor condition");
+		}
+		return res;
+	}
+
+	case '+':
+	case '-':
+	case '~':
+	case '!': {
+		next_condition_token();
+		ir_tarval *const v = parse_pp_operand();
+		if (v == tarval_bad)
+			return v;
+
+		switch (kind) {
+		case '+': return v;
+		case '-': return tarval_neg(v);
+		case '~': return tarval_not(v);
+		case '!': return tarval_is_null(v) ? pp_one : pp_null;
+		default:  panic("invalid operation");
+		}
+	}
+
+	default:
+		if (!is_identifierlike_token(&pp_token)) {
+			errorf(&pp_token.base.pos, "unexpected %K in preprocessor condition", &pp_token);
+			return tarval_bad;
+		} else if (pp_token.base.symbol->pp_ID == TP_defined) {
+			// Prevent macro expansion after 'defined'.
+			bool has_paren = false;
+
+			if (!expand_next()) {
+				next_input_token();
+				if (info.at_line_begin) {
+					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected '(' or identifier");
+					return tarval_bad;
+				}
+				if (pp_token.kind == '(') {
+					goto has_paren;
+				} else {
+					goto next;
+				}
+			} else if (pp_token.kind == '(') {
+				if (!expand_next()) {
+has_paren:
+					next_input_token();
+					if (info.at_line_begin) {
+						errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected identifier");
+						return tarval_bad;
+					}
+				}
+				has_paren = true;
+			}
+
+			if (pp_token.kind == T_MACRO_PARAMETER) {
+				start_expanding(pp_token.macro_parameter.def);
+				pp_definition_t *const expansion_before = current_expansion;
+restart:
+				do {
+					if (!expand_next())
+						goto read_input;
+				} while (!next_expansion_token());
+				if (pp_token.kind == '(' && !has_paren) {
+					has_paren = true;
+					while (current_expansion->expand_pos >= current_expansion->list_len) {
+						if (current_expansion == expansion_before) {
+							if (!expand_next()) {
+read_input:
+								next_input_token();
+								if (info.at_line_begin) {
+									errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected identifier");
+									return tarval_bad;
+								}
+							}
+							goto next;
+						}
+						finished_expanding(current_expansion);
+					}
+					goto restart;
+				}
+			}
+next:
+
+			if (info.at_line_begin) {
+				errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected '(' or identifier");
+				return tarval_bad;
+			}
+
+			ir_tarval *res;
+			if (is_identifierlike_token(&pp_token)) {
+				res = pp_token.base.symbol->pp_definition ? pp_one : pp_null;
+				next_condition_token();
+			} else {
+				errorf(&pp_token.base.pos, "unexpected %K in preprocessor condition, expected identifier", &pp_token);
+				res = tarval_bad;
+			}
+
+			if (has_paren) {
+				if (info.at_line_begin) {
+					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ')'");
+				} else if (pp_token.kind == ')') {
+					next_condition_token();
+				} else {
+					errorf(&pp_token.base.pos, "unexpected %K in preprocessor condition, expected ')'", &pp_token);
+				}
+			}
+
+			return res;
+		} else {
+			next_condition_token();
+			return pp_null;
+		}
+	}
+}
+
+static ir_tarval *parse_pp_expression(precedence_t const prev_prec)
+{
+	ir_tarval *res = parse_pp_operand();
+	for (;;) {
+		if (info.at_line_begin)
+			return res;
+
+		precedence_t       prec;
+		token_kind_t const kind = pp_token.kind;
+		switch (kind) {
+		case '*':
+		case '/':
+		case '%':                    prec = PREC_MULTIPLICATIVE; break;
+		case '+':
+		case '-':                    prec = PREC_ADDITIVE;       break;
+		case T_LESSLESS:
+		case T_GREATERGREATER:       prec = PREC_SHIFT;          break;
+		case T_LESS:
+		case T_GREATER:
+		case T_LESSEQUAL:
+		case T_GREATEREQUAL:         prec = PREC_RELATIONAL;     break;
+		case T_EQUALEQUAL:
+		case T_EXCLAMATIONMARKEQUAL: prec = PREC_EQUALITY;       break;
+		case '&':                    prec = PREC_AND;            break;
+		case '^':                    prec = PREC_XOR;            break;
+		case '|':                    prec = PREC_OR;             break;
+		case T_ANDAND:               prec = PREC_LOGICAL_AND;    break;
+		case T_PIPEPIPE:             prec = PREC_LOGICAL_OR;     break;
+		case '?':                    prec = PREC_CONDITIONAL;    break;
+
+		default:
+			return res;
+		}
+
+		if (prev_prec >= prec)
+			return res;
+
+		next_condition_token();
+		if (info.at_line_begin) {
+			errorf(&pp_token.base.pos, "unexpected end of preprocessor condition");
+			return pp_null;
+		}
+
+		if (kind == '?')
+			prec = PREC_BOTTOM;
+		ir_tarval *right = parse_pp_expression(prec);
+
+		if ((res != tarval_bad && right != tarval_bad) || kind == '?') {
+			ir_mode *mode = get_tarval_mode(res);
+			if (kind != T_LESSLESS && kind != T_GREATERGREATER && kind != '?') {
+				bool const lsigned = mode_is_signed(mode);
+				bool const rsigned = mode_is_signed(get_tarval_mode(right));
+				if (lsigned != rsigned) {
+					mode = mode_Lu;
+					if (lsigned) {
+						res = tarval_convert_to(res, mode);
+					} else {
+						right = tarval_convert_to(right, mode);
+					}
+				}
+			}
+
+			switch (kind) {
+			case '*':              res = tarval_mul(res, right); break;
+			case '/':              res = tarval_div(res, right); break;
+			case '%':              res = tarval_mod(res, right); break;
+			case '+':              res = tarval_add(res, right); break;
+			case '-':              res = tarval_sub(res, right, mode); break;
+			case T_LESSLESS:       res = tarval_shl(res, right); break;
+			case T_GREATERGREATER: res = (mode_is_signed(mode) ? tarval_shrs : tarval_shr)(res, right); break;
+
+			{
+				ir_relation rel;
+			case T_LESS:                 rel = ir_relation_less;          goto cmp;
+			case T_GREATER:              rel = ir_relation_greater;       goto cmp;
+			case T_LESSEQUAL:            rel = ir_relation_less_equal;    goto cmp;
+			case T_GREATEREQUAL:         rel = ir_relation_greater_equal; goto cmp;
+			case T_EQUALEQUAL:           rel = ir_relation_equal;         goto cmp;
+			case T_EXCLAMATIONMARKEQUAL: rel = ir_relation_less_greater;  goto cmp;
+cmp:
+				res = tarval_cmp(res, right) & rel ? pp_one : pp_null;
+				break;
+			}
+
+			case '&':        res = tarval_and(res, right); break;
+			case '^':        res = tarval_eor(res, right); break;
+			case '|':        res = tarval_or (res, right); break;
+			case T_ANDAND:   res = !tarval_is_null(res) && !tarval_is_null(right) ? pp_one : pp_null; break;
+			case T_PIPEPIPE: res = !tarval_is_null(res) || !tarval_is_null(right) ? pp_one : pp_null; break;
+
+			case '?': {
+				ir_tarval *t = right;
+				if (info.at_line_begin) {
+					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ':'");
+					return pp_null;
+				} else if (pp_token.kind != ':') {
+					errorf(&pp_token.base.pos, "unexpected %K in preprocessor condition, expected ':'", &pp_token);
+				} else {
+					next_condition_token();
+				}
+				ir_tarval *f = parse_pp_expression(PREC_CONDITIONAL);
+
+				if (res != tarval_bad) {
+					if (t != tarval_bad && f != tarval_bad) {
+						bool const tsigned = mode_is_signed(get_tarval_mode(t));
+						bool const fsigned = mode_is_signed(get_tarval_mode(f));
+						if (tsigned != fsigned) {
+							if (tsigned) {
+								t = tarval_convert_to(t, mode_Lu);
+							} else {
+								f = tarval_convert_to(f, mode_Lu);
+							}
+						}
+					}
+
+					res = tarval_is_null(res) ? f : t;
+				}
+				break;
+			}
+
+			default: panic("invalid operation");
+			}
+		} else {
+			res = tarval_bad;
+		}
+	}
+}
+
+static bool parse_pp_condition(void)
+{
+	bool const old_resolve_escape_sequences = resolve_escape_sequences;
+	resolve_escape_sequences = true;
+
+	next_condition_token();
+	bool const res = !tarval_is_null(parse_pp_expression(PREC_BOTTOM));
+	if (!info.at_line_begin) {
+		errorf(&pp_token.base.pos, "extra tokens at end of condition");
+		eat_pp_directive();
+	}
+
+	resolve_escape_sequences = old_resolve_escape_sequences;
+
+	return res;
+}
+
+static void parse_elif_directive(void)
+{
+	pp_conditional_t *const cond = conditional_stack;
+	if (cond == NULL) {
+		errorf(&pp_token.base.pos, "#elif without prior #if");
+		eat_pp_directive();
+		return;
+	}
+
+	if (cond->in_else) {
+		errorf(&pp_token.base.pos, "#elif after #else (condition started %P)",
+		       &cond->pos);
+		skip_mode = true;
+		eat_pp_directive();
+		return;
+	}
+
+	cond->pos = pp_token.base.pos;
+
+	if (cond->skip || cond->condition) {
+		eat_pp_directive();
+		skip_mode = true;
+	} else {
+		skip_mode       = false;
+		cond->condition = parse_pp_condition();
+		skip_mode       = !cond->condition;
+	}
+}
+
+static void parse_if_directive(void)
+{
+	pp_conditional_t *const cond = push_conditional();
+	cond->pos = pp_token.base.pos;
+
+	if (skip_mode) {
+		cond->skip = true;
+		eat_pp_directive();
+		return;
+	}
+
+	cond->condition = parse_pp_condition();
+	skip_mode       = !cond->condition;
+}
+
 static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 {
 	bool condition;
@@ -2811,9 +3208,11 @@ static void parse_preprocessing_directive(void)
 	if (pp_token.base.symbol) {
 		switch (pp_token.base.symbol->pp_ID) {
 		case TP_define:       parse_define_directive();            break;
+		case TP_elif:         parse_elif_directive();              break;
 		case TP_else:         parse_else_directive();              break;
 		case TP_endif:        parse_endif_directive();             break;
 		case TP_error:        parse_error_directive();             break;
+		case TP_if:           parse_if_directive();                break;
 		case TP_ifdef:        parse_ifdef_ifndef_directive(true);  break;
 		case TP_ifndef:       parse_ifdef_ifndef_directive(false); break;
 		case TP_include:      parse_include_directive(false);      break;
@@ -2846,18 +3245,8 @@ static void finish_current_argument(void)
 	current_argument->token_list = obstack_finish(&pp_obstack);
 }
 
-void next_preprocessing_token(void)
+static bool next_expansion_token(void)
 {
-restart:
-	if (!expand_next()) {
-		do {
-			next_input_token();
-			while (pp_token.kind == '#' && info.at_line_begin) {
-				parse_preprocessing_directive();
-			}
-		} while (skip_mode && pp_token.kind != T_EOF);
-	}
-
 	const token_kind_t kind = pp_token.kind;
 	if (current_call == NULL || argument_expanding != NULL) {
 		symbol_t *const symbol = pp_token.base.symbol;
@@ -2865,7 +3254,7 @@ restart:
 			if (kind == T_MACRO_PARAMETER) {
 				assert(current_expansion != NULL);
 				start_expanding(pp_token.macro_parameter.def);
-				goto restart;
+				return false;
 			}
 
 			pp_definition_t *const pp_definition = symbol->pp_definition;
@@ -2898,19 +3287,19 @@ restart:
 							current_argument = &current_call->parameters[0];
 							assert(argument_brace_count == 0);
 						}
-						goto restart;
+						return false;
 					} else {
 						/* skip_whitespaces() skipped newlines and whitespace,
 						 * remember results for next token */
 						next_info = info;
 						info      = old_info;
-						return;
+						return true;
 					}
 				} else {
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
 					start_expanding(pp_definition);
-					goto restart;
+					return false;
 				}
 			}
 		}
@@ -2930,7 +3319,7 @@ restart:
 				info = current_call->expand_info;
 				current_call     = NULL;
 				current_argument = NULL;
-				goto restart;
+				return false;
 			}
 		} else if (kind == ',' && argument_brace_count == 0) {
 			finish_current_argument();
@@ -2944,7 +3333,7 @@ restart:
 				current_argument
 					= &current_call->parameters[current_call->expand_pos];
 			}
-			goto restart;
+			return false;
 		} else if (kind == T_MACRO_PARAMETER) {
 			/* parameters have to be fully expanded before being used as
 			 * parameters for another macro-call */
@@ -2952,12 +3341,12 @@ restart:
 			pp_definition_t *argument = pp_token.macro_parameter.def;
 			argument_expanding = argument;
 			start_expanding(argument);
-			goto restart;
+			return false;
 		} else if (kind == T_EOF) {
 			errorf(&expansion_pos,
 			       "reached end of file while parsing arguments for '%Y'",
 			       current_call->symbol);
-			return;
+			return true;
 		}
 		if (current_argument != NULL) {
 			saved_token_t saved;
@@ -2965,8 +3354,32 @@ restart:
 			saved.had_whitespace = info.had_whitespace;
 			obstack_grow(&pp_obstack, &saved, sizeof(saved));
 		}
-		goto restart;
+		return false;
 	}
+
+	return true;
+}
+
+void next_preprocessing_token(void)
+{
+	do {
+		if (!expand_next()) {
+			do {
+				next_input_token();
+				while (pp_token.kind == '#' && info.at_line_begin) {
+					parse_preprocessing_directive();
+				}
+			} while (skip_mode && pp_token.kind != T_EOF);
+		}
+	} while (!next_expansion_token());
+}
+
+static void next_condition_token(void)
+{
+	do {
+		if (!expand_next())
+			next_input_token();
+	} while (!next_expansion_token());
 }
 
 void append_include_path(searchpath_t *paths, const char *path)
@@ -3053,6 +3466,9 @@ void init_preprocessor(void)
 	setup_include_path();
 
 	set_input_error_callback(input_error);
+
+	pp_null = get_mode_null(mode_Ls);
+	pp_one  = get_mode_one(mode_Ls);
 }
 
 void exit_preprocessor(void)
