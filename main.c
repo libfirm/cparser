@@ -60,7 +60,7 @@
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
 
-#include "lexer.h"
+#include "preprocessor.h"
 #include "token_t.h"
 #include "types.h"
 #include "type_hash.h"
@@ -121,7 +121,6 @@ static const char       *input_encoding;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
-	STANDARD_ANSI,    /* c89 (for C) or c++98 (for C++) */
 	STANDARD_C89,     /* ISO C90 (sic) */
 	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
 	STANDARD_C99,     /* ISO C99 */
@@ -130,8 +129,6 @@ typedef enum lang_standard_t {
 	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
 	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
 } lang_standard_t;
-
-static lang_standard_t standard;
 
 typedef struct file_list_entry_t file_list_entry_t;
 
@@ -183,26 +180,23 @@ static translation_unit_t *do_parsing(FILE *const in, const char *const input_na
 {
 	start_parsing();
 
-	input_t *input = input_from_stream(in, input_encoding);
-	lexer_switch_input(input, input_name);
+	switch_input(in, input_name);
 	parse();
 	translation_unit_t *unit = finish_parsing();
-	input_free(input);
+	close_input();
 
 	return unit;
 }
 
 static void lextest(FILE *in, const char *fname)
 {
-	input_t *input = input_from_stream(in, input_encoding);
-	lexer_switch_input(input, fname);
-
+	switch_input(in, fname);
 	do {
-		lexer_next_preprocessing_token();
-		print_token(stdout, &lexer_token);
+		next_preprocessing_token();
+		print_token(stdout, &pp_token);
 		putchar('\n');
-	} while (lexer_token.kind != T_EOF);
-	input_free(input);
+	} while (pp_token.kind != T_EOF);
+	close_input();
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -258,7 +252,8 @@ static const char *type_to_string(type_t *type)
 	return get_atomic_kind_name(type->atomic.akind);
 }
 
-static FILE *preprocess(const char *fname, filetype_t filetype)
+static FILE *preprocess(const char *fname, filetype_t filetype,
+                        lang_standard_t standard)
 {
 	static const char *common_flags = NULL;
 
@@ -302,20 +297,30 @@ static FILE *preprocess(const char *fname, filetype_t filetype)
 		obstack_printf(&cppflags_obst, PREPROCESSOR);
 	}
 
+	char const *lang;
 	switch (filetype) {
-	case FILETYPE_C:
-		add_flag(&cppflags_obst, "-std=c99");
-		break;
-	case FILETYPE_CXX:
-		add_flag(&cppflags_obst, "-std=c++98");
-		break;
-	case FILETYPE_ASSEMBLER:
-		add_flag(&cppflags_obst, "-x");
-		add_flag(&cppflags_obst, "assembler-with-cpp");
-		break;
-	default:
-		break;
+	case FILETYPE_C:         lang = "c";                  break;
+	case FILETYPE_CXX:       lang = "c++";                break;
+	case FILETYPE_ASSEMBLER: lang = "assembler-with-cpp"; break;
+	default:                 lang = NULL;                 break;
 	}
+	if (lang)
+		add_flag(&cppflags_obst, "-x%s", lang);
+
+	char const *std = NULL;
+	switch (standard) {
+	case STANDARD_C89:     std = "-std=c89";            break;
+	case STANDARD_C90:     std = "-std=iso9899:199409"; break;
+	case STANDARD_C99:     std = "-std=c99";            break;
+	case STANDARD_GNU89:   std = "-std=gnu89";          break;
+	case STANDARD_GNU99:   std = "-std=gnu99";          break;
+	case STANDARD_CXX98:   std = "-std=c++98";          break;
+	case STANDARD_GNUXX98: std = "-std=gnu++98";        break;
+	case STANDARD_DEFAULT: panic("invalid standard");
+	}
+	if (std)
+	    add_flag(&cppflags_obst, std);
+
 	obstack_printf(&cppflags_obst, "%s", common_flags);
 
 	/* handle dependency generation */
@@ -815,35 +820,18 @@ static filetype_t get_filetype_from_string(const char *string)
 	return FILETYPE_UNKNOWN;
 }
 
-static bool is_windows_os(const char *os)
-{
-	return strstr(os, "mingw") != NULL || streq(os, "win32");
-}
-
-static bool is_unixish_os(const char *os)
-{
-	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
-	       || streq(os, "solaris");
-}
-
-static bool is_darwin_os(const char *os)
-{
-	return streq(os, "darwin");
-}
-
 static bool init_os_support(void)
 {
-	const char *os = target_machine->operating_system;
 	wchar_atomic_kind         = ATOMIC_TYPE_INT;
 	enable_main_collect2_hack = false;
 	define_intmax_types       = false;
 
-	if (is_unixish_os(os)) {
+	if (firm_is_unixish_os(target_machine)) {
 		set_create_ld_ident(create_name_linux_elf);
-	} else if (is_darwin_os(os)) {
+	} else if (firm_is_darwin_os(target_machine)) {
 		set_create_ld_ident(create_name_macho);
 		define_intmax_types = true;
-	} else if (is_windows_os(os)) {
+	} else if (firm_is_windows_os(target_machine)) {
 		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
 		set_create_ld_ident(create_name_win32);
@@ -968,8 +956,7 @@ static void init_types_and_adjust(void)
 		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_unsigned_long_long);
 
 	/* operating system ABI specifics */
-	const char *os = target_machine->operating_system;
-	if (is_darwin_os(os)) {
+	if (firm_is_darwin_os(target_machine)) {
 		if (machine_size == 32) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
@@ -978,7 +965,7 @@ static void init_types_and_adjust(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].alignment        = 16;
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
-	} else if (is_windows_os(os)) {
+	} else if (firm_is_windows_os(target_machine)) {
 		if (machine_size == 64) {
 			/* to ease porting of old c-code microsoft decided to use 32bits
 			 * even for long */
@@ -988,7 +975,7 @@ static void init_types_and_adjust(void)
 
 		/* on windows long double is not supported */
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
-	} else if (is_unixish_os(os)) {
+	} else if (firm_is_unixish_os(target_machine)) {
 		if (is_ia32_cpu(target_machine->cpu_type)) {
 			/* System V has a broken alignment for double so we have to add
 			 * a hack here */
@@ -1119,9 +1106,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	const char *target = getenv("TARGET");
-	if (target != NULL)
-		parse_target_triple(target);
 	if (target_machine == NULL) {
 		target_machine = firm_get_host_machine();
 	}
@@ -1129,7 +1113,7 @@ int main(int argc, char **argv)
 	setup_target_machine();
 
 	/* parse rest of options */
-	                standard        = STANDARD_DEFAULT;
+	lang_standard_t standard        = STANDARD_DEFAULT;
 	unsigned        features_on     = 0;
 	unsigned        features_off    = 0;
 	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
@@ -1143,8 +1127,8 @@ int main(int argc, char **argv)
 			if (option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
 			} else if (option[0] == 'g') {
-				set_be_option("debuginfo=stabs");
-				set_be_option("omitfp=no");
+				/* TODO: parse -gX with 0<=x<=3... */
+				set_be_option("debug=frameinfo");
 				set_be_option("ia32-nooptcc=yes");
 			} else if (SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
@@ -1455,6 +1439,9 @@ int main(int argc, char **argv)
 					int res = be_parse_arg(arch_opt);
 					if (res == 0)
 						argument_errors = true;
+				} else if (streq(opt, "sse2")) {
+					/* ignore for now, our x86 backend always uses sse when
+					 * sse is requested */
 				} else {
 					long int value = strtol(opt, NULL, 10);
 					if (value == 0) {
@@ -1689,7 +1676,7 @@ int main(int argc, char **argv)
 		init_wchar_types(type_short);
 	else
 		panic("unexpected wchar type");
-	init_lexer();
+	init_preprocessor();
 	init_ast();
 	init_parser();
 	init_ast2firm();
@@ -1766,12 +1753,27 @@ int main(int argc, char **argv)
 	file_list_entry_t *file;
 	bool               already_constructed_firm = false;
 	for (file = files; file != NULL; file = file->next) {
-		char        asm_tempfile[1024];
-		const char *filename = file->name;
-		filetype_t  filetype = file->type;
+		char            asm_tempfile[1024];
+		const char     *filename = file->name;
+		filetype_t      filetype = file->type;
+		lang_standard_t file_standard = standard;
 
 		if (filetype == FILETYPE_OBJECT)
 			continue;
+		if (file_standard == STANDARD_DEFAULT) {
+			switch (filetype) {
+			case FILETYPE_C:
+			case FILETYPE_PREPROCESSED_C:
+				file_standard = STANDARD_GNU99;
+				break;
+			case FILETYPE_CXX:
+			case FILETYPE_PREPROCESSED_CXX:
+				file_standard = STANDARD_GNUXX98;
+				break;
+			default:
+				break;
+			}
+		}
 
 		FILE *in = NULL;
 		if (mode == LexTest) {
@@ -1799,7 +1801,8 @@ preprocess:
 				if (in != NULL)
 					panic("internal compiler error: in for preprocessor != NULL");
 
-				preprocessed_in = preprocess(filename, filetype);
+				preprocessed_in = preprocess(filename, filetype,
+				                             file_standard);
 				if (mode == PreprocessOnly) {
 					copy_file(out, preprocessed_in);
 					int pp_result = pclose(preprocessed_in);
@@ -1832,44 +1835,42 @@ preprocess:
 		/* preprocess and compile */
 		if (filetype == FILETYPE_PREPROCESSED_C) {
 			char const* invalid_mode;
-			switch (standard) {
-				case STANDARD_ANSI:
-				case STANDARD_C89:   c_mode = _C89;                break;
-				/* TODO determine difference between these two */
-				case STANDARD_C90:   c_mode = _C89;                break;
-				case STANDARD_C99:   c_mode = _C89 | _C99;         break;
-				case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
+			switch (file_standard) {
+			case STANDARD_C89:   c_mode = _C89;                break;
+			/* TODO determine difference between these two */
+			case STANDARD_C90:   c_mode = _C89;                break;
+			case STANDARD_C99:   c_mode = _C89 | _C99;         break;
+			case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
 
 default_c_warn:
-					fprintf(stderr,
-							"warning: command line option \"-std=%s\" is not valid for C\n",
-							invalid_mode);
-					/* FALLTHROUGH */
-				case STANDARD_DEFAULT:
-				case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
+				fprintf(stderr,
+						"warning: command line option \"-std=%s\" is not valid for C\n",
+						invalid_mode);
+				/* FALLTHROUGH */
+			case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
 
-				case STANDARD_CXX98:   invalid_mode = "c++98"; goto default_c_warn;
-				case STANDARD_GNUXX98: invalid_mode = "gnu98"; goto default_c_warn;
+			case STANDARD_CXX98:   invalid_mode = "c++98"; goto default_c_warn;
+			case STANDARD_GNUXX98: invalid_mode = "gnu98"; goto default_c_warn;
+			case STANDARD_DEFAULT: panic("invalid standard");
 			}
 			goto do_parsing;
 		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
 			char const* invalid_mode;
-			switch (standard) {
-				case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
-				case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
-				case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
-				case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
-				case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
+			switch (file_standard) {
+			case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
+			case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
+			case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
+			case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
+			case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
 
-				case STANDARD_ANSI:
-				case STANDARD_CXX98: c_mode = _CXX; break;
+			case STANDARD_CXX98: c_mode = _CXX; break;
 
 default_cxx_warn:
-					fprintf(stderr,
-							"warning: command line option \"-std=%s\" is not valid for C++\n",
-							invalid_mode);
-				case STANDARD_DEFAULT:
-				case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+				fprintf(stderr,
+						"warning: command line option \"-std=%s\" is not valid for C++\n",
+						invalid_mode);
+			case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+			case STANDARD_DEFAULT: panic("invalid standard");
 			}
 
 do_parsing:
@@ -1927,6 +1928,7 @@ do_parsing:
 			if (already_constructed_firm) {
 				panic("compiling multiple files/translation units not possible");
 			}
+			init_implicit_optimizations();
 			translation_unit_to_firm(unit);
 			already_constructed_firm = true;
 			timer_pop(t_construct);
@@ -2089,7 +2091,7 @@ graph_built:
 	exit_ast2firm();
 	exit_parser();
 	exit_ast();
-	exit_lexer();
+	exit_preprocessor();
 	exit_typehash();
 	exit_types();
 	exit_tokens();

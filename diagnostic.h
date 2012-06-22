@@ -63,7 +63,6 @@ void errorf(const source_position_t *pos, const char *fmt, ...);
 void warningf(warning_t, const source_position_t *pos, const char *fmt, ...);
 NORETURN internal_errorf(const source_position_t *pos, const char *fmt, ...);
 
-extern unsigned diagnostic_count;
 extern unsigned error_count;
 extern unsigned warning_count;
 extern bool     show_column;             /**< Show column in diagnostic messages */

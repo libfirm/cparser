@@ -308,23 +308,20 @@ static void write_expression(const expression_t *expression)
 	/* TODO */
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
 		fprintf(out, "%s", expression->literal.value.begin);
 		break;
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-		fprintf(out, "0x%s", expression->literal.value.begin);
-		break;
-	case EXPR_REFERENCE_ENUM_VALUE: {
+
+	case EXPR_ENUM_CONSTANT: {
 		/* UHOH... hacking */
 		entity_t *entity = expression->reference.entity;
 		write_enum_name(& entity->enum_value.enum_type->enumt);
 		fprintf(out, ".%s.val", entity->base.symbol->string);
 		break;
 	}
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		write_unary_expression(&expression->unary);
 		break;
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		write_binary_expression(&expression->binary);
 		break;
 	default:
@@ -520,8 +517,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 		}
 
 #if 0
-		if(type->kind == TYPE_COMPOUND_STRUCT
-				|| type->kind == TYPE_COMPOUND_UNION) {
+		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
 		}
 #endif

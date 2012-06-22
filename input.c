@@ -3,8 +3,6 @@
 #include "input.h"
 
 #include <ctype.h>
-#include "lexer.h"
-#include "diagnostic.h"
 
 typedef size_t (*decode_func)(input_t *input, utf32 *buffer, size_t buffer_size);
 
@@ -105,7 +103,7 @@ static size_t decode_utf8(input_t *input, utf32 *buffer, size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
 
-	while (true) {
+	for (;;) {
 		size_t const s = read_block(input, read_buf, sizeof(read_buf));
 		if (s == 0) {
 			if (input->utf8_part_decoded_rest_len > 0)

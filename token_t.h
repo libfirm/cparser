@@ -26,29 +26,25 @@
 #include "symbol_table.h"
 #include "type.h"
 
-typedef enum token_kind_t {
-	T_ERROR = -1,
+typedef enum token_kind_tag_t {
 	T_NULL  =  0,
-	T_EOF   = '\x04', // EOT
 #define T(mode,x,str,val) T_##x val,
 #define TS(x,str,val) T_##x val,
 #include "tokens.inc"
 #undef TS
 #undef T
 	T_LAST_TOKEN
-} token_kind_t;
+} token_kind_tag_t;
+typedef unsigned short token_kind_t;
 
-typedef enum preprocessor_token_kind_t {
-	TP_NULL  = T_NULL,
-	TP_EOF   = T_EOF,
-	TP_ERROR = T_ERROR,
-#define T(mode,x,str,val) TP_##x val,
-#define TS(x,str,val) TP_##x val,
+typedef enum pp_token_kind_tag_t {
+	TP_NULL = 0,
+#define T(token) TP_##token,
 #include "tokens_preprocessor.inc"
-#undef TS
 #undef T
 	TP_LAST_TOKEN
-} preprocessor_token_kind_t;
+} pp_token_kind_tag_t;
+typedef unsigned short pp_token_kind_t;
 
 typedef struct source_position_t source_position_t;
 struct source_position_t {
@@ -58,59 +54,50 @@ struct source_position_t {
 	unsigned    is_system_header : 1;
 };
 
+extern symbol_t *token_symbols[];
+
 /* position used for "builtin" declarations/types */
 extern const source_position_t builtin_source_position;
 
-typedef struct token_base_t     token_base_t;
-typedef struct identifier_t     identifier_t;
-typedef struct string_literal_t string_literal_t;
-typedef struct number_literal_t number_literal_t;
-typedef union  token_t          token_t;
+typedef struct token_base_t      token_base_t;
+typedef struct literal_t         literal_t;
+typedef struct macro_parameter_t macro_parameter_t;
+typedef union  token_t           token_t;
 
 struct token_base_t {
-	int               kind;
+	token_kind_t      kind;
 	source_position_t source_position;
+	symbol_t         *symbol;
 };
 
-struct identifier_t {
-	token_base_t  base;
-	symbol_t     *symbol;
+struct literal_t {
+	token_base_t base;
+	string_t     string;
 };
 
-struct string_literal_t {
-	token_base_t  base;
-	string_t      string;
-};
-
-struct number_literal_t {
-	token_base_t  base;
-	string_t      number;
-	string_t      suffix;
+struct macro_parameter_t {
+	token_base_t     base;
+	pp_definition_t *def;
 };
 
 union token_t {
-	int               kind;
+	unsigned          kind;
 	token_base_t      base;
-	identifier_t      identifier;
-	string_literal_t  string;
-	number_literal_t  number;
+	literal_t         literal;
+	macro_parameter_t macro_parameter;
 };
+
+char const *get_string_encoding_prefix(string_encoding_t);
 
 void init_tokens(void);
 void exit_tokens(void);
 void print_token_kind(FILE *out, token_kind_t token_kind);
 void print_token(FILE *out, const token_t *token);
 
-symbol_t *get_token_kind_symbol(int token_kind);
-
-void print_pp_token_kind(FILE *out, int kind);
-void print_pp_token(FILE *out, const token_t *token);
-
 /**
  * returns true if pasting 2 preprocessing tokens next to each other
  * without a space in between would generate (an)other preprocessing token(s)
  */
-bool tokens_would_paste(preprocessor_token_kind_t token1,
-                        preprocessor_token_kind_t token2);
+bool tokens_would_paste(token_kind_t token1, token_kind_t token2);
 
 #endif

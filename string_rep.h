@@ -23,22 +23,18 @@
 #include <stdlib.h>
 #include "unicode.h"
 
+enum string_encoding_t {
+	STRING_ENCODING_CHAR,
+	STRING_ENCODING_WIDE
+};
+typedef enum string_encoding_t string_encoding_t;
+
 typedef struct string_t {
-	const char *begin; /**< UTF-8 encoded string, the last character is
-						* guaranteed to be 0 */
-	size_t      size;  /**< size of string in bytes (not characters) */
+	char const       *begin; /**< UTF-8 encoded string, the last character is guaranteed to be \0. */
+	size_t            size;  /**< size of string in bytes (not characters), without terminating \0. */
+	string_encoding_t encoding;
 } string_t;
 
-static inline size_t wstrlen(const string_t *string)
-{
-	size_t      result = 0;
-	const char *p      = string->begin;
-	const char *end    = p + string->size;
-	while (p < end) {
-		read_utf8_char(&p);
-		++result;
-	}
-	return result;
-}
+size_t get_string_len(string_t const *str);
 
 #endif

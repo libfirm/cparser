@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <limits.h>
 
 #include <libfirm/firm.h>
@@ -62,10 +63,7 @@ fp_model_t firm_fp_model = fp_model_precise;
 static const backend_params *be_params;
 
 static ir_type *ir_type_char;
-static ir_type *ir_type_const_char;
 static ir_type *ir_type_wchar_t;
-static ir_type *ir_type_void;
-static ir_type *ir_type_int;
 
 /* architecture specific floating point arithmetic mode (if any) */
 static ir_mode *mode_float_arithmetic;
@@ -130,14 +128,14 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	return new_r_Unknown(irg, mode);
 }
 
-static const char *dbg_retrieve(const dbg_info *dbg, unsigned *line)
+static src_loc_t dbg_retrieve(const dbg_info *dbg)
 {
-	const source_position_t *pos = (const source_position_t*) dbg;
-	if (pos == NULL)
-		return NULL;
-	if (line != NULL)
-		*line = pos->lineno;
-	return pos->input_name;
+	source_position_t const *const pos = (source_position_t const*)dbg;
+	if (pos) {
+		return (src_loc_t){ pos->input_name, pos->lineno, pos->colno };
+	} else {
+		return (src_loc_t){ NULL, 0, 0 };
+	}
 }
 
 static dbg_info *get_dbg_info(const source_position_t *pos)
@@ -176,7 +174,6 @@ ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_node *_expression_to_firm(const expression_t *expression);
 static ir_node *expression_to_firm(const expression_t *expression);
-static void create_local_declaration(entity_t *entity);
 
 static unsigned decide_modulo_shift(unsigned type_size)
 {
@@ -193,12 +190,10 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 	unsigned size  = get_atomic_type_size(kind);
 	if ((flags & ATOMIC_TYPE_FLAG_FLOAT)
 	    && !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
-		if (size == 4) {
-			return get_modeF();
-		} else if (size == 8) {
-			return get_modeD();
-		} else {
-			panic("unexpected kind");
+		switch (size) {
+		case 4:  return get_modeF();
+		case 8:  return get_modeD();
+		default: panic("unexpected kind");
 		}
 	} else if (flags & ATOMIC_TYPE_FLAG_INTEGER) {
 		char            name[64];
@@ -316,11 +311,11 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 
 	int            n_parameters = count_parameters(function_type)
 	                               + (for_closure ? 1 : 0);
-	int            n_results    = return_type == type_void ? 0 : 1;
+	int            n_results    = is_type_void(return_type) ? 0 : 1;
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
 	ir_type       *irtype       = new_d_type_method(n_parameters, n_results, dbgi);
 
-	if (return_type != type_void) {
+	if (!is_type_void(return_type)) {
 		ir_type *restype = get_ir_type(return_type);
 		set_method_res_type(irtype, 0, restype);
 	}
@@ -508,12 +503,11 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 {
 	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 	type_t *base = skip_typeref(entity->declaration.type);
-	assert(base->kind == TYPE_ATOMIC || base->kind == TYPE_ENUM);
+	assert(is_type_integer(base));
 	ir_type *irbase = get_ir_type(base);
 
 	unsigned bit_size = entity->compound_member.bit_size;
 
-	assert(!is_type_float(base));
 	if (is_type_signed(base)) {
 		return get_signed_int_type_for_bit_size(irbase, bit_size, base);
 	} else {
@@ -521,24 +515,18 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 	}
 }
 
-#define INVALID_TYPE ((ir_type*)-1)
-
-enum {
-	COMPOUND_IS_STRUCT = false,
-	COMPOUND_IS_UNION  = true
-};
-
 /**
  * Construct firm type from ast struct type.
  */
-static ir_type *create_compound_type(compound_type_t *type,
-                                     bool incomplete, bool is_union)
+static ir_type *create_compound_type(compound_type_t *const type, bool const incomplete)
 {
 	compound_t *compound = type->compound;
 
 	if (compound->irtype != NULL && (compound->irtype_complete || incomplete)) {
 		return compound->irtype;
 	}
+
+	bool const is_union = type->base.kind == TYPE_COMPOUND_UNION;
 
 	symbol_t *type_symbol = compound->base.symbol;
 	ident    *id;
@@ -585,8 +573,7 @@ static ir_type *create_compound_type(compound_type_t *type,
 			/* anonymous bitfield member, skip */
 			if (entry->compound_member.bitfield)
 				continue;
-			assert(entry_type->kind == TYPE_COMPOUND_STRUCT
-					|| entry_type->kind == TYPE_COMPOUND_UNION);
+			assert(is_type_compound(entry_type));
 			ident = id_unique("anon.%u");
 		} else {
 			ident = new_id_from_str(symbol->string);
@@ -618,14 +605,13 @@ static ir_type *create_compound_type(compound_type_t *type,
 	return irtype;
 }
 
+static ir_tarval *fold_constant_to_tarval(expression_t const *);
+
 static void determine_enum_values(enum_type_t *const type)
 {
 	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
 	ir_tarval *      tv_next = get_mode_null(mode);
-
-	bool constant_folding_old = constant_folding;
-	constant_folding = true;
 
 	enum_t   *enume = type->enume;
 	entity_t *entry = enume->base.next;
@@ -635,18 +621,12 @@ static void determine_enum_values(enum_type_t *const type)
 
 		expression_t *const init = entry->enum_value.value;
 		if (init != NULL) {
-			ir_node *const cnst = expression_to_firm(init);
-			if (!is_Const(cnst)) {
-				panic("couldn't fold constant");
-			}
-			tv_next = get_Const_tarval(cnst);
+			tv_next = fold_constant_to_tarval(init);
 		}
 		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);
 		entry->enum_value.tv = tv_next;
 		tv_next = tarval_add(tv_next, one);
 	}
-
-	constant_folding = constant_folding_old;
 }
 
 static ir_type *create_enum_type(enum_type_t *const type)
@@ -656,41 +636,29 @@ static ir_type *create_enum_type(enum_type_t *const type)
 
 static ir_type *get_ir_type_incomplete(type_t *type)
 {
-	assert(type != NULL);
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
-		assert(type->base.firm_type != INVALID_TYPE);
 		return type->base.firm_type;
 	}
 
-	switch (type->kind) {
-	case TYPE_COMPOUND_STRUCT:
-		return create_compound_type(&type->compound, true, COMPOUND_IS_STRUCT);
-	case TYPE_COMPOUND_UNION:
-		return create_compound_type(&type->compound, true, COMPOUND_IS_UNION);
-	default:
+	if (is_type_compound(type)) {
+		return create_compound_type(&type->compound, true);
+	} else {
 		return get_ir_type(type);
 	}
 }
 
 ir_type *get_ir_type(type_t *type)
 {
-	assert(type != NULL);
-
 	type = skip_typeref(type);
 
 	if (type->base.firm_type != NULL) {
-		assert(type->base.firm_type != INVALID_TYPE);
 		return type->base.firm_type;
 	}
 
 	ir_type *firm_type = NULL;
 	switch (type->kind) {
-	case TYPE_ERROR:
-		/* Happens while constant folding, when there was an error */
-		return create_atomic_type(ATOMIC_TYPE_VOID, NULL);
-
 	case TYPE_ATOMIC:
 		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
@@ -713,15 +681,14 @@ ir_type *get_ir_type(type_t *type)
 		firm_type = create_array_type(&type->array);
 		break;
 	case TYPE_COMPOUND_STRUCT:
-		firm_type = create_compound_type(&type->compound, false, COMPOUND_IS_STRUCT);
-		break;
 	case TYPE_COMPOUND_UNION:
-		firm_type = create_compound_type(&type->compound, false, COMPOUND_IS_UNION);
+		firm_type = create_compound_type(&type->compound, false);
 		break;
 	case TYPE_ENUM:
 		firm_type = create_enum_type(&type->enumt);
 		break;
 
+	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		break;
@@ -735,14 +702,15 @@ ir_type *get_ir_type(type_t *type)
 
 static ir_mode *get_ir_mode_storage(type_t *type)
 {
-	ir_type *irtype = get_ir_type(type);
+	type = skip_typeref(type);
 
-	/* firm doesn't report a mode for arrays somehow... */
-	if (is_Array_type(irtype)) {
+	/* Firm doesn't report a mode for arrays and structs/unions. */
+	if (!is_type_scalar(type)) {
 		return mode_P_data;
 	}
 
-	ir_mode *mode = get_type_mode(irtype);
+	ir_type *const irtype = get_ir_type(type);
+	ir_mode *const mode   = get_type_mode(irtype);
 	assert(mode != NULL);
 	return mode;
 }
@@ -878,6 +846,27 @@ void set_create_ld_ident(ident *(*func)(entity_t*))
 	create_ld_ident = func;
 }
 
+static bool declaration_is_definition(const entity_t *entity)
+{
+	switch (entity->kind) {
+	case ENTITY_VARIABLE:
+		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
+	case ENTITY_FUNCTION:
+		return entity->function.statement != NULL;
+	case ENTITY_PARAMETER:
+	case ENTITY_COMPOUND_MEMBER:
+		return false;
+	case ENTITY_TYPEDEF:
+	case ENTITY_ENUM:
+	case ENTITY_ENUM_VALUE:
+	case ENTITY_NAMESPACE:
+	case ENTITY_LABEL:
+	case ENTITY_LOCAL_LABEL:
+		break;
+	}
+	panic("declaration_is_definition called on non-declaration");
+}
+
 /**
  * Handle GNU attributes for entities
  *
@@ -897,10 +886,11 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 			add_entity_additional_properties(irentity, mtp_property_const);
 		}
 	}
-	if (modifiers & DM_USED) {
+	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
 	}
-	if (modifiers & DM_WEAK) {
+	if ((modifiers & DM_WEAK) && declaration_is_definition(entity)
+	    && entity->declaration.storage_class != STORAGE_CLASS_EXTERN) {
 		add_entity_linkage(irentity, IR_LINKAGE_WEAK);
 	}
 }
@@ -943,18 +933,6 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 		return NULL;
 	}
 
-	if (is_main(entity)) {
-		/* force main to C linkage */
-		type_t *type = entity->declaration.type;
-		assert(is_type_function(type));
-		if (type->function.linkage != LINKAGE_C) {
-			type_t *new_type           = duplicate_type(type);
-			new_type->function.linkage = LINKAGE_C;
-			type                       = identify_new_type(new_type);
-			entity->declaration.type   = type;
-		}
-	}
-
 	symbol_t *symbol = entity->base.symbol;
 	ident    *id     = new_id_from_str(symbol->string);
 
@@ -962,10 +940,6 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
 	bool const has_body = entity->function.statement != NULL;
 	if (irentity != NULL) {
-		if (get_entity_visibility(irentity) == ir_visibility_external
-				&& has_body) {
-			set_entity_visibility(irentity, ir_visibility_default);
-		}
 		goto entity_created;
 	}
 
@@ -994,23 +968,21 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	handle_decl_modifiers(irentity, entity);
 
 	if (! nested_function) {
-		/* static inline             => local
-		 * extern inline             => local
-		 * inline without definition => local
-		 * inline with definition    => external_visible */
 		storage_class_tag_t const storage_class
 			= (storage_class_tag_t) entity->declaration.storage_class;
-		bool                const is_inline     = entity->function.is_inline;
-
-		if (is_inline && storage_class == STORAGE_CLASS_NONE && has_body) {
-		    set_entity_visibility(irentity, ir_visibility_default);
-		} else if (storage_class == STORAGE_CLASS_STATIC ||
-		           (is_inline && has_body)) {
+		if (storage_class == STORAGE_CLASS_STATIC) {
 		    set_entity_visibility(irentity, ir_visibility_local);
-		} else if (has_body) {
-		    set_entity_visibility(irentity, ir_visibility_default);
 		} else {
 		    set_entity_visibility(irentity, ir_visibility_external);
+		}
+
+		bool const is_inline = entity->function.is_inline;
+		if (is_inline && has_body) {
+			if (((c_mode & _C99) && storage_class == STORAGE_CLASS_NONE)
+			    || ((c_mode & _C99) == 0
+			        && storage_class == STORAGE_CLASS_EXTERN)) {
+				add_entity_linkage(irentity, IR_LINKAGE_NO_CODEGEN);
+			}
 		}
 	} else {
 		/* nested functions are always local */
@@ -1037,7 +1009,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 				continue;
 
 			type_t *return_type = skip_typeref(function_type->return_type);
-			int     n_res       = return_type != type_void ? 1 : 0;
+			int     n_res       = is_type_void(return_type) ? 0 : 1;
 			if (n_res != rts_data[i].n_res)
 				continue;
 
@@ -1072,15 +1044,16 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
 }
 
+static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
+{
+	return new_Const((v ? get_mode_one : get_mode_null)(mode));
+}
+
 static ir_node *create_conv_from_b(dbg_info *dbgi, ir_node *value,
                                    ir_mode *dest_mode)
 {
 	if (is_Const(value)) {
-		if (is_Const_null(value)) {
-			return new_Const(get_mode_null(dest_mode));
-		} else {
-			return new_Const(get_mode_one(dest_mode));
-		}
+		return create_Const_from_bool(dest_mode, !is_Const_null(value));
 	}
 
 	ir_node *cond       = new_d_Cond(dbgi, value);
@@ -1112,59 +1085,13 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 
 	if (dest_mode == mode_b) {
 		ir_node *zero = new_Const(get_mode_null(value_mode));
-		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_less_greater);
+		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_unordered_less_greater);
 		return cmp;
 	} else if (value_mode == mode_b) {
 		return create_conv_from_b(dbgi, value, dest_mode);
 	}
 
 	return new_d_Conv(dbgi, value, dest_mode);
-}
-
-static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
-{
-	return new_Const((v ? get_mode_one : get_mode_null)(mode));
-}
-
-/**
- * Creates a SymConst node representing a wide string literal.
- *
- * @param literal   the wide string literal
- */
-static ir_node *wide_string_literal_to_firm(
-		const string_literal_expression_t *literal)
-{
-	ir_type  *const global_type = get_glob_type();
-	ir_type  *const elem_type   = ir_type_wchar_t;
-	dbg_info *const dbgi        = get_dbg_info(&literal->base.source_position);
-	ir_type  *const type        = new_type_array(1, elem_type);
-
-	ident     *const id     = id_unique("str.%u");
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_mode      *const mode = get_type_mode(elem_type);
-	const size_t        slen = wstrlen(&literal->value);
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen * get_mode_size_bytes(mode));
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	const char              *p    = literal->value.begin;
-	for (size_t i = 0; i < slen; ++i) {
-		assert(p < literal->value.begin + literal->value.size);
-		utf32             v   = read_utf8_char(&p);
-		ir_tarval        *tv  = new_tarval_from_long(v, mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
-	}
-	set_entity_initializer(entity, initializer);
-
-	return create_symconst(dbgi, entity);
 }
 
 /**
@@ -1174,53 +1101,68 @@ static ir_node *wide_string_literal_to_firm(
  * @param id_prefix  a prefix for the name of the generated string constant
  * @param value      the value of the string constant
  */
-static ir_node *string_to_firm(const source_position_t *const src_pos,
-                               const char *const id_prefix,
-                               const string_t *const value)
+static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_t const *const value)
 {
-	ir_type  *const global_type = get_glob_type();
-	dbg_info *const dbgi        = get_dbg_info(src_pos);
-	ir_type  *const type        = new_type_array(1, ir_type_const_char);
+	size_t            const slen        = get_string_len(value) + 1;
+	ir_initializer_t *const initializer = create_initializer_compound(slen);
+	ir_type          *      elem_type;
+	switch (value->encoding) {
+	case STRING_ENCODING_CHAR: {
+		elem_type = ir_type_char;
 
-	ident     *const id     = id_unique(id_prefix);
-	ir_entity *const entity = new_d_entity(global_type, id, type, dbgi);
-	set_entity_ld_ident(entity, id);
-	set_entity_visibility(entity, ir_visibility_private);
-	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
-
-	ir_type *const elem_type = ir_type_const_char;
-	ir_mode *const mode      = get_type_mode(elem_type);
-
-	const char* const string = value->begin;
-	const size_t      slen   = value->size;
-
-	set_array_lower_bound_int(type, 0, 0);
-	set_array_upper_bound_int(type, 0, slen);
-	set_type_size_bytes(type, slen);
-	set_type_state(type, layout_fixed);
-
-	ir_initializer_t *initializer = create_initializer_compound(slen);
-	for (size_t i = 0; i < slen; ++i) {
-		ir_tarval        *tv  = new_tarval_from_long(string[i], mode);
-		ir_initializer_t *val = create_initializer_tarval(tv);
-		set_initializer_compound_value(initializer, i, val);
+		ir_mode *const mode = get_type_mode(elem_type);
+		char const    *p    = value->begin;
+		for (size_t i = 0; i < slen; ++i) {
+			ir_tarval        *tv  = new_tarval_from_long(*p++, mode);
+			ir_initializer_t *val = create_initializer_tarval(tv);
+			set_initializer_compound_value(initializer, i, val);
+		}
+		goto finish;
 	}
+
+	case STRING_ENCODING_WIDE: {
+		elem_type = ir_type_wchar_t;
+
+		ir_mode *const mode = get_type_mode(elem_type);
+		char const    *p    = value->begin;
+		for (size_t i = 0; i < slen; ++i) {
+			assert(p <= value->begin + value->size);
+			utf32             v   = read_utf8_char(&p);
+			ir_tarval        *tv  = new_tarval_from_long(v, mode);
+			ir_initializer_t *val = create_initializer_tarval(tv);
+			set_initializer_compound_value(initializer, i, val);
+		}
+		goto finish;
+	}
+	}
+	panic("invalid string encoding");
+
+finish:;
+	ir_type *const type = new_type_array(1, elem_type);
+	set_array_bounds_int(type, 0, 0, slen);
+	set_type_size_bytes( type, slen * get_type_size_bytes(elem_type));
+	set_type_state(      type, layout_fixed);
+
+	ir_type   *const global_type = get_glob_type();
+	ident     *const id          = id_unique(id_prefix);
+	dbg_info  *const dbgi        = get_dbg_info(src_pos);
+	ir_entity *const entity      = new_d_entity(global_type, id, type, dbgi);
+	set_entity_ld_ident(   entity, id);
+	set_entity_visibility( entity, ir_visibility_private);
+	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
 	set_entity_initializer(entity, initializer);
 
 	return create_symconst(dbgi, entity);
 }
 
-static bool try_create_integer(literal_expression_t *literal,
-                               type_t *type, unsigned char base)
+static bool try_create_integer(literal_expression_t *literal, type_t *type)
 {
-	const char *string = literal->value.begin;
-	size_t      size   = literal->value.size;
-
 	assert(type->kind == TYPE_ATOMIC);
 	atomic_type_kind_t akind = type->atomic.akind;
 
-	ir_mode   *mode = atomic_modes[akind];
-	ir_tarval *tv   = new_integer_tarval_from_str(string, size, 1, base, mode);
+	ir_mode    *const mode = atomic_modes[akind];
+	char const *const str  = literal->value.begin;
+	ir_tarval  *const tv   = new_tarval_from_str(str, literal->suffix - str, mode);
 	if (tv == tarval_bad)
 		return false;
 
@@ -1229,73 +1171,44 @@ static bool try_create_integer(literal_expression_t *literal,
 	return true;
 }
 
-static void create_integer_tarval(literal_expression_t *literal)
+void determine_literal_type(literal_expression_t *const literal)
 {
-	unsigned        us     = 0;
-	unsigned        ls     = 0;
-	const string_t *suffix = &literal->suffix;
-	/* parse suffix */
-	if (suffix->size > 0) {
-		for (const char *c = suffix->begin; *c != '\0'; ++c) {
-			if (*c == 'u' || *c == 'U') { ++us; }
-			if (*c == 'l' || *c == 'L') { ++ls; }
-		}
-	}
+	assert(literal->base.kind == EXPR_LITERAL_INTEGER);
 
-	unsigned base;
-	switch (literal->base.kind) {
-		case EXPR_LITERAL_INTEGER_OCTAL:       base =  8; break;
-		case EXPR_LITERAL_INTEGER:             base = 10; break;
-		case EXPR_LITERAL_INTEGER_HEXADECIMAL: base = 16; break;
-		default: panic("invalid literal kind");
-	}
+	/* -1: signed only, 0: any, 1: unsigned only */
+	int const sign =
+		!is_type_signed(literal->base.type) ? 1 :
+		literal->value.begin[0] == '0'      ? 0 :
+		-1; /* Decimal literals only try signed types. */
 
 	tarval_int_overflow_mode_t old_mode = tarval_get_integer_overflow_mode();
+	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
+
+	if (try_create_integer(literal, literal->base.type))
+		goto finished;
 
 	/* now try if the constant is small enough for some types */
-	tarval_set_integer_overflow_mode(TV_OVERFLOW_BAD);
-	if (ls < 1) {
-		if (us == 0 && try_create_integer(literal, type_int, base))
-			goto finished;
-		if ((us == 1 || base != 10)
-				&& try_create_integer(literal, type_unsigned_int, base))
-			goto finished;
-	}
-	if (ls < 2) {
-		if (us == 0 && try_create_integer(literal, type_long, base))
-			goto finished;
-		if ((us == 1 || base != 10)
-				&& try_create_integer(literal, type_unsigned_long, base))
-			goto finished;
-	}
+	if (sign >= 0 && try_create_integer(literal, type_unsigned_int))
+		goto finished;
+	if (sign <= 0 && try_create_integer(literal, type_long))
+		goto finished;
+	if (sign >= 0 && try_create_integer(literal, type_unsigned_long))
+		goto finished;
 	/* last try? then we should not report tarval_bad */
-	if (us != 1 && base == 10)
+	if (sign < 0)
 		tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
-	if (us == 0 && try_create_integer(literal, type_long_long, base))
+	if (sign <= 0 && try_create_integer(literal, type_long_long))
 		goto finished;
 
 	/* last try */
-	assert(us == 1 || base != 10);
+	assert(sign >= 0);
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
-	bool res = try_create_integer(literal, type_unsigned_long_long, base);
+	bool res = try_create_integer(literal, type_unsigned_long_long);
 	if (!res)
 		panic("internal error when parsing number literal");
 
 finished:
 	tarval_set_integer_overflow_mode(old_mode);
-}
-
-void determine_literal_type(literal_expression_t *literal)
-{
-	switch (literal->base.kind) {
-	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-		create_integer_tarval(literal);
-		return;
-	default:
-		break;
-	}
 }
 
 /**
@@ -1310,15 +1223,57 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 	ir_tarval  *tv;
 
 	switch (literal->base.kind) {
-	case EXPR_LITERAL_WIDE_CHARACTER: {
+	case EXPR_LITERAL_INTEGER:
+		assert(literal->target_value != NULL);
+		tv = literal->target_value;
+		break;
+
+	case EXPR_LITERAL_FLOATINGPOINT:
+		tv = new_tarval_from_str(string, size, mode);
+		break;
+
+	case EXPR_LITERAL_BOOLEAN:
+		if (string[0] == 't') {
+			tv = get_mode_one(mode);
+		} else {
+			assert(string[0] == 'f');
+	case EXPR_LITERAL_MS_NOOP:
+			tv = get_mode_null(mode);
+		}
+		break;
+
+	default:
+		panic("Invalid literal kind found");
+	}
+
+	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
+	ir_node  *res        = new_d_Const(dbgi, tv);
+	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
+	return create_conv(dbgi, res, mode_arith);
+}
+
+/**
+ * Creates a Const node representing a character constant.
+ */
+static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
+{
+	type_t     *type   = skip_typeref(literal->base.type);
+	ir_mode    *mode   = get_ir_mode_storage(type);
+	const char *string = literal->value.begin;
+	size_t      size   = literal->value.size;
+	ir_tarval  *tv;
+
+	switch (literal->value.encoding) {
+	case STRING_ENCODING_WIDE: {
 		utf32  v = read_utf8_char(&string);
 		char   buf[128];
 		size_t len = snprintf(buf, sizeof(buf), UTF32_PRINTF_FORMAT, v);
 
 		tv = new_tarval_from_str(buf, len, mode);
-		goto make_const;
+		break;
 	}
-	case EXPR_LITERAL_CHARACTER: {
+
+	case STRING_ENCODING_CHAR: {
 		long long int v;
 		bool char_is_signed
 			= get_atomic_type_flags(ATOMIC_TYPE_CHAR) & ATOMIC_TYPE_FLAG_SIGNED;
@@ -1334,41 +1289,13 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		size_t len = snprintf(buf, sizeof(buf), "%lld", v);
 
 		tv = new_tarval_from_str(buf, len, mode);
-		goto make_const;
-	}
-	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_INTEGER_OCTAL:
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:
-		assert(literal->target_value != NULL);
-		tv = literal->target_value;
-		goto make_const;
-	case EXPR_LITERAL_FLOATINGPOINT:
-		tv = new_tarval_from_str(string, size, mode);
-		goto make_const;
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL: {
-		char buffer[size + 2];
-		memcpy(buffer, "0x", 2);
-		memcpy(buffer+2, string, size);
-		tv = new_tarval_from_str(buffer, size+2, mode);
-		goto make_const;
-	}
-	case EXPR_LITERAL_BOOLEAN:
-		if (string[0] == 't') {
-			tv = get_mode_one(mode);
-		} else {
-			assert(string[0] == 'f');
-			tv = get_mode_null(mode);
-		}
-		goto make_const;
-	case EXPR_LITERAL_MS_NOOP:
-		tv = get_mode_null(mode);
-		goto make_const;
-	default:
 		break;
 	}
-	panic("Invalid literal kind found");
 
-make_const: ;
+	default:
+		panic("Invalid literal kind found");
+	}
+
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
 	ir_node  *res        = new_d_Const(dbgi, tv);
 	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
@@ -1547,8 +1474,7 @@ static void keep_all_memory(ir_node *block)
 	set_cur_block(old);
 }
 
-static ir_node *reference_expression_enum_value_to_firm(
-		const reference_expression_t *ref)
+static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
 {
 	entity_t *entity = ref->entity;
 	if (entity->enum_value.tv == NULL) {
@@ -1560,15 +1486,11 @@ static ir_node *reference_expression_enum_value_to_firm(
 	return new_Const(entity->enum_value.tv);
 }
 
-static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
+static ir_node *reference_addr(const reference_expression_t *ref)
 {
 	dbg_info *dbgi   = get_dbg_info(&ref->base.source_position);
 	entity_t *entity = ref->entity;
 	assert(is_declaration(entity));
-	type_t   *type   = skip_typeref(entity->declaration.type);
-
-	/* make sure the type is constructed */
-	(void) get_ir_type(type);
 
 	if (entity->kind == ENTITY_FUNCTION
 	    && entity->function.btk != BUILTIN_NONE) {
@@ -1577,8 +1499,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
 			source_position_t const *const pos = &ref->base.source_position;
-			symbol_t          const *const sym = ref->entity->base.symbol;
-			warningf(WARN_OTHER, pos, "taking address of builtin '%Y'", sym);
+			warningf(WARN_OTHER, pos, "taking address of builtin '%N'", ref->entity);
 
 			/* simply create a NULL pointer */
 			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
@@ -1587,68 +1508,6 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 			return res;
 		}
 	}
-
-	switch ((declaration_kind_t) entity->declaration.kind) {
-	case DECLARATION_KIND_UNKNOWN:
-		break;
-
-	case DECLARATION_KIND_LOCAL_VARIABLE: {
-		ir_mode *const mode  = get_ir_mode_storage(type);
-		ir_node *const value = get_value(entity->variable.v.value_number, mode);
-		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
-	}
-	case DECLARATION_KIND_PARAMETER: {
-		ir_mode *const mode  = get_ir_mode_storage(type);
-		ir_node *const value = get_value(entity->parameter.v.value_number,mode);
-		return create_conv(NULL, value, get_ir_mode_arithmetic(type));
-	}
-	case DECLARATION_KIND_FUNCTION: {
-		return create_symconst(dbgi, entity->function.irentity);
-	}
-	case DECLARATION_KIND_INNER_FUNCTION: {
-		ir_mode *const mode = get_ir_mode_storage(type);
-		if (!entity->function.goto_to_outer && !entity->function.need_closure) {
-			/* inner function not using the closure */
-			return create_symconst(dbgi, entity->function.irentity);
-		} else {
-			/* need trampoline here */
-			return create_trampoline(dbgi, mode, entity->function.irentity);
-		}
-	}
-	case DECLARATION_KIND_GLOBAL_VARIABLE: {
-		const variable_t *variable = &entity->variable;
-		ir_node *const addr = create_symconst(dbgi, variable->v.entity);
-		return deref_address(dbgi, variable->base.type, addr);
-	}
-
-	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
-		ir_entity *irentity = entity->variable.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-		return deref_address(dbgi, entity->declaration.type, sel);
-	}
-	case DECLARATION_KIND_PARAMETER_ENTITY: {
-		ir_entity *irentity = entity->parameter.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-		return deref_address(dbgi, entity->declaration.type, sel);
-	}
-
-	case DECLARATION_KIND_VARIABLE_LENGTH_ARRAY:
-		return entity->variable.v.vla_base;
-
-	case DECLARATION_KIND_COMPOUND_MEMBER:
-		panic("not implemented reference type");
-	}
-
-	panic("reference to declaration with unknown type found");
-}
-
-static ir_node *reference_addr(const reference_expression_t *ref)
-{
-	dbg_info *dbgi   = get_dbg_info(&ref->base.source_position);
-	entity_t *entity = ref->entity;
-	assert(is_declaration(entity));
 
 	switch((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_UNKNOWN:
@@ -1662,18 +1521,12 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		ir_node *const addr = create_symconst(dbgi, entity->variable.v.entity);
 		return addr;
 	}
-	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY: {
+
+	case DECLARATION_KIND_LOCAL_VARIABLE_ENTITY:
+	case DECLARATION_KIND_PARAMETER_ENTITY: {
 		ir_entity *irentity = entity->variable.v.entity;
 		ir_node   *frame    = get_local_frame(irentity);
 		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-
-		return sel;
-	}
-	case DECLARATION_KIND_PARAMETER_ENTITY: {
-		ir_entity *irentity = entity->parameter.v.entity;
-		ir_node   *frame    = get_local_frame(irentity);
-		ir_node   *sel = new_d_simpleSel(dbgi, new_NoMem(), frame, irentity);
-
 		return sel;
 	}
 
@@ -1701,6 +1554,28 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 	}
 
 	panic("reference to declaration with unknown type found");
+}
+
+static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
+{
+	dbg_info *const dbgi   = get_dbg_info(&ref->base.source_position);
+	entity_t *const entity = ref->entity;
+	assert(is_declaration(entity));
+
+	switch ((declaration_kind_t)entity->declaration.kind) {
+	case DECLARATION_KIND_LOCAL_VARIABLE:
+	case DECLARATION_KIND_PARAMETER: {
+		type_t  *const type  = skip_typeref(entity->declaration.type);
+		ir_mode *const mode  = get_ir_mode_storage(type);
+		ir_node *const value = get_value(entity->variable.v.value_number, mode);
+		return create_conv(dbgi, value, get_ir_mode_arithmetic(type));
+	}
+
+	default: {
+		ir_node *const addr = reference_addr(ref);
+		return deref_address(dbgi, entity->declaration.type, addr);
+	}
+	}
 }
 
 /**
@@ -1881,9 +1756,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 
 		type_t *arg_type = skip_typeref(expression->base.type);
 		if (!is_type_compound(arg_type)) {
-			ir_mode *mode = get_ir_mode_storage(expression->base.type);
-			arg_node      = create_conv(dbgi, arg_node, mode);
-			arg_node      = do_strict_conv(dbgi, arg_node);
+			ir_mode *const mode = get_ir_mode_storage(arg_type);
+			arg_node = create_conv(dbgi, arg_node, mode);
+			arg_node = do_strict_conv(dbgi, arg_node);
 		}
 
 		in[n] = arg_node;
@@ -1909,7 +1784,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			set_store(mem);
 		}
 
-		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (!is_type_void(return_type)) {
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
 			result = new_Proj(node, mode, pn_Builtin_max+1);
@@ -1923,18 +1798,12 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			set_store(mem);
 		}
 
-		if (!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
-			ir_node *resproj = new_Proj(node, mode_T, pn_Call_T_result);
-
-			if (is_type_scalar(return_type)) {
-				ir_mode *mode       = get_ir_mode_storage(return_type);
-				result              = new_Proj(resproj, mode, 0);
-				ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
-				result              = create_conv(NULL, result, mode_arith);
-			} else {
-				ir_mode *mode = mode_P_data;
-				result        = new_Proj(resproj, mode, 0);
-			}
+		if (!is_type_void(return_type)) {
+			ir_node *const resproj    = new_Proj(node, mode_T, pn_Call_T_result);
+			ir_mode *const mode       = get_ir_mode_storage(return_type);
+			result                    = new_Proj(resproj, mode, 0);
+			ir_mode *const mode_arith = get_ir_mode_arithmetic(return_type);
+			result                    = create_conv(NULL, result, mode_arith);
 		}
 	}
 
@@ -1950,7 +1819,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	return result;
 }
 
-static void statement_to_firm(statement_t *statement);
+static ir_node *statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
@@ -2138,11 +2007,9 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 		entity_t *entity = ref->entity;
 		assert(is_declaration(entity));
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
-		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
 			set_value(entity->variable.v.value_number, value);
-			return value;
-		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
-			set_value(entity->parameter.v.value_number, value);
 			return value;
 		}
 	}
@@ -2189,15 +2056,9 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 				|| entity->kind == ENTITY_PARAMETER);
 		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
 		int value_number;
-		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
 			value_number = entity->variable.v.value_number;
-			assert(addr == NULL);
-			type_t  *type = skip_typeref(expression->base.type);
-			ir_mode *mode = get_ir_mode_storage(type);
-			ir_node *res  = get_value(value_number, mode);
-			return create_conv(NULL, res, get_ir_mode_arithmetic(type));
-		} else if (entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
-			value_number = entity->parameter.v.value_number;
 			assert(addr == NULL);
 			type_t  *type = skip_typeref(expression->base.type);
 			ir_mode *mode = get_ir_mode_storage(type);
@@ -2300,7 +2161,7 @@ static ir_relation get_relation(const expression_kind_t kind)
 	default:
 		break;
 	}
-	panic("trying to get pn_Cmp from non-comparison binexpr type");
+	panic("trying to get ir_relation from non-comparison binexpr type");
 }
 
 /**
@@ -2389,7 +2250,7 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
                             type_t *from_type, type_t *type)
 {
 	type = skip_typeref(type);
-	if (type == type_void) {
+	if (is_type_void(type)) {
 		/* make sure firm type is constructed */
 		(void) get_ir_type(type);
 		return NULL;
@@ -2410,7 +2271,7 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 			if (from_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, from_var->v.entity);
 				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
-				value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(from_type));
+				value_node = new_d_Add(dbgi, value_node, base, mode);
 			}
 			if (to_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, to_var->v.entity);
@@ -2439,12 +2300,12 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
 	type_t   *type = skip_typeref(expression->base.type);
 
-	if (expression->base.kind == EXPR_UNARY_TAKE_ADDRESS)
-		return expression_to_addr(expression->value);
-
 	const expression_t *value = expression->value;
 
 	switch(expression->base.kind) {
+	case EXPR_UNARY_TAKE_ADDRESS:
+		return expression_to_addr(value);
+
 	case EXPR_UNARY_NEGATE: {
 		ir_node *value_node = expression_to_firm(value);
 		ir_mode *mode       = get_ir_mode_arithmetic(type);
@@ -2637,7 +2498,6 @@ normal_node:
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN: {
 		ir_node *pin = new_Pin(new_NoMem());
-		assert(!mode_is_float(mode));
 		ir_node *op  = new_d_Mod(dbgi, pin, left, right, mode,
 		                         op_pin_state_floats);
 		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Mod_res);
@@ -2778,7 +2638,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		return create_assign_binop(expression);
 	default:
-		panic("TODO binexpr type");
+		panic("invalid binexpr type");
 	}
 }
 
@@ -2823,12 +2683,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.entities;
-			for ( ; iter != NULL; iter = iter->base.next) {
-				if (iter->base.symbol == symbol) {
-					break;
-				}
-			}
-			assert(iter != NULL);
+			for (; iter->base.symbol != symbol; iter = iter->base.next) {}
 
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 			assert(iter->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
@@ -2893,8 +2748,7 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	return entity;
 }
 
-static ir_node *compound_literal_to_firm(
-		const compound_literal_expression_t *expression)
+static ir_node *compound_literal_addr(compound_literal_expression_t const *const expression)
 {
 	dbg_info      *dbgi        = get_dbg_info(&expression->base.source_position);
 	type_t        *type        = expression->type;
@@ -2922,6 +2776,14 @@ static ir_node *compound_literal_to_firm(
 	}
 }
 
+static ir_node *compound_literal_to_firm(compound_literal_expression_t const* const expr)
+{
+	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
+	type_t   *const type = expr->type;
+	ir_node  *const addr = compound_literal_addr(expr);
+	return deref_address(dbgi, type, addr);
+}
+
 /**
  * Transform a sizeof expression into Firm code.
  */
@@ -2932,11 +2794,6 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	if (is_type_array(type) && type->array.is_vla
 			&& expression->tp_expression != NULL) {
 		expression_to_firm(expression->tp_expression);
-	}
-	/* strange gnu extensions: sizeof(function) == 1 */
-	if (is_type_function(type)) {
-		ir_mode *mode = get_ir_mode_storage(type_size_t);
-		return new_Const(get_mode_one(mode));
 	}
 
 	return get_type_size_node(type);
@@ -2953,7 +2810,7 @@ static entity_t *get_expression_entity(const expression_t *expression)
 static unsigned get_cparser_entity_alignment(const entity_t *entity)
 {
 	switch(entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		return entity->declaration.alignment;
 	case ENTITY_STRUCT:
 	case ENTITY_UNION:
@@ -2977,12 +2834,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	if (tp_expression != NULL) {
 		entity_t *entity = get_expression_entity(tp_expression);
 		if (entity != NULL) {
-			if (entity->kind == ENTITY_FUNCTION) {
-				/* a gnu-extension */
-				alignment = 1;
-			} else {
-				alignment = get_cparser_entity_alignment(entity);
-			}
+			alignment = get_cparser_entity_alignment(entity);
 		}
 	}
 
@@ -3001,20 +2853,25 @@ static void init_ir_types(void);
 
 static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 {
-	assert(is_type_valid(skip_typeref(expression->base.type)));
+	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
+	int old_optimize         = get_optimize();
+	int old_constant_folding = get_opt_constant_folding();
+	set_optimize(1);
+	set_opt_constant_folding(1);
 
 	init_ir_types();
-
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
 	ir_graph *old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
-	ir_node *cnst = expression_to_firm(expression);
+	ir_node *const cnst = _expression_to_firm(expression);
+
 	current_ir_graph = old_current_ir_graph;
+	set_optimize(old_optimize);
+	set_opt_constant_folding(old_constant_folding);
 
 	if (!is_Const(cnst)) {
 		panic("couldn't fold constant");
@@ -3022,22 +2879,20 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	constant_folding = constant_folding_old;
 
-	return get_Const_tarval(cnst);
+	ir_tarval *const tv   = get_Const_tarval(cnst);
+	ir_mode   *const mode = get_ir_mode_arithmetic(skip_typeref(expression->base.type));
+	return tarval_convert_to(tv, mode);
 }
 
 /* this function is only used in parser.c, but it relies on libfirm functionality */
 bool constant_is_negative(const expression_t *expression)
 {
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	return tarval_is_negative(tv);
 }
 
 long fold_constant_to_int(const expression_t *expression)
 {
-	if (expression->kind == EXPR_ERROR)
-		return 0;
-
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	if (!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer");
@@ -3048,8 +2903,6 @@ long fold_constant_to_int(const expression_t *expression)
 
 bool fold_constant_to_bool(const expression_t *expression)
 {
-	if (expression->kind == EXPR_ERROR)
-		return false;
 	ir_tarval *tv = fold_constant_to_tarval(expression);
 	return !tarval_is_null(tv);
 }
@@ -3105,12 +2958,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	ir_node *const in[2] = { true_val, false_val };
 	type_t  *const type  = skip_typeref(expression->base.type);
-	ir_mode *mode;
-	if (is_type_compound(type)) {
-		mode = mode_P;
-	} else {
-		mode = get_ir_mode_arithmetic(type);
-	}
+	ir_mode *const mode  = get_ir_mode_arithmetic(type);
 	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
 
 	return val;
@@ -3272,18 +3120,18 @@ static ir_node *function_name_to_firm(
 	case FUNCNAME_PRETTY_FUNCTION:
 	case FUNCNAME_FUNCDNAME:
 		if (current_function_name == NULL) {
-			const source_position_t *const src_pos = &expr->base.source_position;
-			const char    *name  = current_function_entity->base.symbol->string;
-			const string_t string = { name, strlen(name) + 1 };
+			source_position_t const *const src_pos = &expr->base.source_position;
+			char              const *const name    = current_function_entity->base.symbol->string;
+			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
 			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
 		if (current_funcsig == NULL) {
-			const source_position_t *const src_pos = &expr->base.source_position;
-			ir_entity *ent = get_irg_entity(current_ir_graph);
-			const char *const name = get_entity_ld_name(ent);
-			const string_t string = { name, strlen(name) + 1 };
+			source_position_t const *const src_pos = &expr->base.source_position;
+			ir_entity               *const ent     = get_irg_entity(current_ir_graph);
+			char              const *const name    = get_entity_ld_name(ent);
+			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
 			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
 		}
 		return current_funcsig;
@@ -3370,7 +3218,7 @@ static ir_node *expression_to_addr(const expression_t *expression)
 	case EXPR_CALL:
 		return call_expression_to_firm(&expression->call);
 	case EXPR_COMPOUND_LITERAL:
-		return compound_literal_to_firm(&expression->compound_literal);
+		return compound_literal_addr(&expression->compound_literal);
 	case EXPR_REFERENCE:
 		return reference_addr(&expression->reference);
 	case EXPR_SELECT:
@@ -3436,79 +3284,48 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
-static ir_node *error_to_firm(const expression_t *expression)
-{
-	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
-	return new_Bad(mode);
-}
-
 /**
  * creates firm nodes for an expression. The difference between this function
  * and expression_to_firm is, that this version might produce mode_b nodes
  * instead of mode_Is.
  */
-static ir_node *_expression_to_firm(const expression_t *expression)
+static ir_node *_expression_to_firm(expression_t const *const expr)
 {
 #ifndef NDEBUG
 	if (!constant_folding) {
-		assert(!expression->base.transformed);
-		((expression_t*) expression)->base.transformed = true;
+		assert(!expr->base.transformed);
+		((expression_t*)expr)->base.transformed = true;
 	}
 #endif
 
-	switch (expression->kind) {
-	EXPR_LITERAL_CASES
-		return literal_to_firm(&expression->literal);
-	case EXPR_STRING_LITERAL:
-		return string_to_firm(&expression->base.source_position, "str.%u",
-		                      &expression->literal.value);
-	case EXPR_WIDE_STRING_LITERAL:
-		return wide_string_literal_to_firm(&expression->string_literal);
-	case EXPR_REFERENCE:
-		return reference_expression_to_firm(&expression->reference);
-	case EXPR_REFERENCE_ENUM_VALUE:
-		return reference_expression_enum_value_to_firm(&expression->reference);
-	case EXPR_CALL:
-		return call_expression_to_firm(&expression->call);
-	EXPR_UNARY_CASES
-		return unary_expression_to_firm(&expression->unary);
-	EXPR_BINARY_CASES
-		return binary_expression_to_firm(&expression->binary);
-	case EXPR_ARRAY_ACCESS:
-		return array_access_to_firm(&expression->array_access);
-	case EXPR_SIZEOF:
-		return sizeof_to_firm(&expression->typeprop);
-	case EXPR_ALIGNOF:
-		return alignof_to_firm(&expression->typeprop);
-	case EXPR_CONDITIONAL:
-		return conditional_to_firm(&expression->conditional);
-	case EXPR_SELECT:
-		return select_to_firm(&expression->select);
-	case EXPR_CLASSIFY_TYPE:
-		return classify_type_to_firm(&expression->classify_type);
-	case EXPR_FUNCNAME:
-		return function_name_to_firm(&expression->funcname);
-	case EXPR_STATEMENT:
-		return statement_expression_to_firm(&expression->statement);
-	case EXPR_VA_START:
-		return va_start_expression_to_firm(&expression->va_starte);
-	case EXPR_VA_ARG:
-		return va_arg_expression_to_firm(&expression->va_arge);
-	case EXPR_VA_COPY:
-		return va_copy_expression_to_firm(&expression->va_copye);
-	case EXPR_BUILTIN_CONSTANT_P:
-		return builtin_constant_to_firm(&expression->builtin_constant);
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
-		return builtin_types_compatible_to_firm(&expression->builtin_types_compatible);
-	case EXPR_OFFSETOF:
-		return offsetof_to_firm(&expression->offsetofe);
-	case EXPR_COMPOUND_LITERAL:
-		return compound_literal_to_firm(&expression->compound_literal);
-	case EXPR_LABEL_ADDRESS:
-		return label_address_to_firm(&expression->label_address);
+	switch (expr->kind) {
+	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
+	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
+	case EXPR_BINARY_CASES:               return binary_expression_to_firm(       &expr->binary);
+	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_firm(        &expr->builtin_constant);
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_firm(&expr->builtin_types_compatible);
+	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
+	case EXPR_CLASSIFY_TYPE:              return classify_type_to_firm(           &expr->classify_type);
+	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
+	case EXPR_CONDITIONAL:                return conditional_to_firm(             &expr->conditional);
+	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
+	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
+	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
+	case EXPR_LITERAL_CHARACTER:          return char_literal_to_firm(            &expr->string_literal);
+	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
+	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
+	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
+	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
+	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
+	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
+	case EXPR_UNARY_CASES:                return unary_expression_to_firm(        &expr->unary);
+	case EXPR_VA_ARG:                     return va_arg_expression_to_firm(       &expr->va_arge);
+	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
+	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
 
-	case EXPR_ERROR:
-		return error_to_firm(expression);
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->string_literal.value);
+
+	case EXPR_ERROR: break;
 	}
 	panic("invalid expression found");
 }
@@ -3573,13 +3390,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	}
 
 	if (is_constant_expression(expression) == EXPR_CLASS_CONSTANT) {
-		bool const constant_folding_old = constant_folding;
-		constant_folding = true;
-		ir_node *res  = _expression_to_firm(expression);
-		constant_folding = constant_folding_old;
-		ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
-		assert(is_Const(res));
-		return create_Const_from_bool(mode, !is_Const_null(res));
+		return new_Const(fold_constant_to_tarval(expression));
 	}
 
 	/* we have to produce a 0/1 from the mode_b expression */
@@ -3839,13 +3650,8 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.entities;
-			for ( ; iter != NULL; iter = iter->base.next, ++index) {
-				if (iter->base.symbol == symbol) {
-					assert(iter->kind == ENTITY_COMPOUND_MEMBER);
-					break;
-				}
-			}
-			assert(iter != NULL);
+			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index) {}
+			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
 			/* revert previous initialisations of other union elements */
 			if (type->kind == TYPE_COMPOUND_UNION) {
@@ -3874,17 +3680,10 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			orig_type           = iter->declaration.type;
 		} else {
 			expression_t *array_index = designator->array_index;
-			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
 			long index = fold_constant_to_int(array_index);
-			assert(index >= 0);
-#ifndef NDEBUG
-			if (type->array.size_constant) {
-				long array_size = type->array.size;
-				assert(index < array_size);
-			}
-#endif
+			assert(0 <= index && (!type->array.size_constant || (size_t)index < type->array.size));
 
 			top->type  = orig_type;
 			top->index = (size_t) index;
@@ -3963,15 +3762,10 @@ static ir_initializer_t *create_ir_initializer_value(
 /** test wether type can be initialized by a string constant */
 static bool is_string_type(type_t *type)
 {
-	type_t *inner;
-	if (is_type_pointer(type)) {
-		inner = skip_typeref(type->pointer.points_to);
-	} else if(is_type_array(type)) {
-		inner = skip_typeref(type->array.element_type);
-	} else {
+	if (!is_type_array(type))
 		return false;
-	}
 
+	type_t *const inner = skip_typeref(type->array.element_type);
 	return is_type_integer(inner);
 }
 
@@ -4004,8 +3798,7 @@ static ir_initializer_t *create_ir_initializer_list(
 					break;
 				descend_into_subtype(&path);
 			}
-		} else if (sub_initializer->kind == INITIALIZER_STRING
-				|| sub_initializer->kind == INITIALIZER_WIDE_STRING) {
+		} else if (sub_initializer->kind == INITIALIZER_STRING) {
 			/* we might have to descend into types until we're at a scalar
 			 * type */
 			while (true) {
@@ -4038,58 +3831,39 @@ static ir_initializer_t *create_ir_initializer_list(
 	return result;
 }
 
-static ir_initializer_t *create_ir_initializer_string(
-		const initializer_string_t *initializer, type_t *type)
+static ir_initializer_t *create_ir_initializer_string(initializer_t const *const init, type_t *type)
 {
 	type = skip_typeref(type);
 
-	size_t            string_len    = initializer->string.size;
 	assert(type->kind == TYPE_ARRAY);
 	assert(type->array.size_constant);
-	size_t            len           = type->array.size;
-	ir_initializer_t *irinitializer = create_initializer_compound(len);
-
-	const char *string = initializer->string.begin;
-	ir_mode    *mode   = get_ir_mode_storage(type->array.element_type);
-
-	for (size_t i = 0; i < len; ++i) {
-		char c = 0;
-		if (i < string_len)
-			c = string[i];
-
-		ir_tarval        *tv = new_tarval_from_long(c, mode);
-		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
-
-		set_initializer_compound_value(irinitializer, i, char_initializer);
-	}
-
-	return irinitializer;
-}
-
-static ir_initializer_t *create_ir_initializer_wide_string(
-		const initializer_wide_string_t *initializer, type_t *type)
-{
-	assert(type->kind == TYPE_ARRAY);
-	assert(type->array.size_constant);
-	size_t            len           = type->array.size;
-	size_t            string_len    = wstrlen(&initializer->string);
-	ir_initializer_t *irinitializer = create_initializer_compound(len);
-
-	const char *p    = initializer->string.begin;
-	ir_mode    *mode = get_type_mode(ir_type_wchar_t);
-
-	for (size_t i = 0; i < len; ++i) {
-		utf32 c = 0;
-		if (i < string_len) {
-			c = read_utf8_char(&p);
+	string_literal_expression_t const *const str = get_init_string(init);
+	size_t            const str_len = str->value.size;
+	size_t            const arr_len = type->array.size;
+	ir_initializer_t *const irinit  = create_initializer_compound(arr_len);
+	ir_mode          *const mode    = get_ir_mode_storage(type->array.element_type);
+	char const       *      p       = str->value.begin;
+	switch (str->value.encoding) {
+	case STRING_ENCODING_CHAR:
+		for (size_t i = 0; i != arr_len; ++i) {
+			char              const c      = i < str_len ? *p++ : 0;
+			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
+			ir_initializer_t *const tvinit = create_initializer_tarval(tv);
+			set_initializer_compound_value(irinit, i, tvinit);
 		}
-		ir_tarval *tv = new_tarval_from_long(c, mode);
-		ir_initializer_t *char_initializer = create_initializer_tarval(tv);
+		break;
 
-		set_initializer_compound_value(irinitializer, i, char_initializer);
+	case STRING_ENCODING_WIDE:
+		for (size_t i = 0; i != arr_len; ++i) {
+			utf32             const c      = i < str_len ? read_utf8_char(&p) : 0;
+			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
+			ir_initializer_t *const tvinit = create_initializer_tarval(tv);
+			set_initializer_compound_value(irinit, i, tvinit);
+		}
+		break;
 	}
 
-	return irinitializer;
+	return irinit;
 }
 
 static ir_initializer_t *create_ir_initializer(
@@ -4097,11 +3871,7 @@ static ir_initializer_t *create_ir_initializer(
 {
 	switch(initializer->kind) {
 		case INITIALIZER_STRING:
-			return create_ir_initializer_string(&initializer->string, type);
-
-		case INITIALIZER_WIDE_STRING:
-			return create_ir_initializer_wide_string(&initializer->wide_string,
-			                                         type);
+			return create_ir_initializer_string(initializer, type);
 
 		case INITIALIZER_LIST:
 			return create_ir_initializer_list(&initializer->list, type);
@@ -4337,13 +4107,10 @@ static void create_variable_initializer(entity_t *entity)
 	type_qualifiers_t  tq   = get_type_qualifier(type, true);
 
 	if (initializer->kind == INITIALIZER_VALUE) {
-		initializer_value_t *initializer_value = &initializer->value;
-		dbg_info            *dbgi = get_dbg_info(&entity->base.source_position);
-		expression_t        *value     = initializer_value->value;
-		type_t              *init_type = value->base.type;
-		type_t              *skipped   = skip_typeref(init_type);
+		expression_t *      value     = initializer->value.value;
+		type_t       *const init_type = skip_typeref(value->base.type);
 
-		if (!is_type_scalar(skipped)) {
+		if (!is_type_scalar(init_type)) {
 			/* skip convs */
 			while (value->kind == EXPR_UNARY_CAST)
 				value = value->unary.value;
@@ -4354,9 +4121,9 @@ static void create_variable_initializer(entity_t *entity)
 			goto have_initializer;
 		}
 
-		ir_node *node = expression_to_firm(initializer_value->value);
-
-		ir_mode *mode      = get_ir_mode_storage(init_type);
+		ir_node  *      node = expression_to_firm(value);
+		dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
+		ir_mode  *const mode = get_ir_mode_storage(init_type);
 		node = create_conv(dbgi, node, mode);
 		node = do_strict_conv(dbgi, node);
 
@@ -4487,6 +4254,11 @@ static void create_local_static_variable(entity_t *entity)
 	set_entity_ld_ident(irentity, id);
 	set_entity_visibility(irentity, ir_visibility_local);
 
+	if (entity->variable.initializer == NULL) {
+		ir_initializer_t *null_init = get_initializer_null();
+		set_entity_initializer(irentity, null_init);
+	}
+
 	ir_graph *const old_current_ir_graph = current_ir_graph;
 	current_ir_graph = get_const_code_irg();
 
@@ -4498,54 +4270,38 @@ static void create_local_static_variable(entity_t *entity)
 
 
 
-static void return_statement_to_firm(return_statement_t *statement)
+static ir_node *return_statement_to_firm(return_statement_t *statement)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
-	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
-	type_t   *type        = current_function_entity->declaration.type;
-	ir_type  *func_irtype = get_ir_type(type);
+	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
+	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
+	ir_node  *      res  = statement->value ? expression_to_firm(statement->value) : NULL;
 
-	ir_node *in[1];
-	int      in_len;
-	if (get_method_n_ress(func_irtype) > 0) {
-		ir_type *res_type = get_method_res_type(func_irtype, 0);
-
-		if (statement->value != NULL) {
-			ir_node *node = expression_to_firm(statement->value);
-			if (!is_compound_type(res_type)) {
-				type_t  *ret_value_type = statement->value->base.type;
-				ir_mode *mode           = get_ir_mode_storage(ret_value_type);
-				node                    = create_conv(dbgi, node, mode);
-				node                    = do_strict_conv(dbgi, node);
-			}
-			in[0] = node;
+	int in_len;
+	if (!is_type_void(type)) {
+		ir_mode *const mode = get_ir_mode_storage(type);
+		if (res) {
+			res = create_conv(dbgi, res, mode);
+			res = do_strict_conv(dbgi, res);
 		} else {
-			ir_mode *mode;
-			if (is_compound_type(res_type)) {
-				mode = mode_P_data;
-			} else {
-				mode = get_type_mode(res_type);
-			}
-			in[0] = new_Unknown(mode);
+			res = new_Unknown(mode);
 		}
 		in_len = 1;
 	} else {
-		/* build return_value for its side effects */
-		if (statement->value != NULL) {
-			expression_to_firm(statement->value);
-		}
 		in_len = 0;
 	}
 
-	ir_node  *store = get_store();
-	ir_node  *ret   = new_d_Return(dbgi, store, in_len, in);
+	ir_node *const in[1] = { res };
+	ir_node *const store = get_store();
+	ir_node *const ret   = new_d_Return(dbgi, store, in_len, in);
 
 	ir_node *end_block = get_irg_end_block(current_ir_graph);
 	add_immBlock_pred(end_block, ret);
 
 	set_unreachable_now();
+	return NULL;
 }
 
 static ir_node *expression_statement_to_firm(expression_statement_t *statement)
@@ -4556,26 +4312,16 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 	return expression_to_firm(statement->expression);
 }
 
+static void create_local_declarations(entity_t*);
+
 static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
-	entity_t *entity = compound->scope.entities;
-	for ( ; entity != NULL; entity = entity->base.next) {
-		if (!is_declaration(entity))
-			continue;
-
-		create_local_declaration(entity);
-	}
+	create_local_declarations(compound->scope.entities);
 
 	ir_node     *result    = NULL;
 	statement_t *statement = compound->statements;
 	for ( ; statement != NULL; statement = statement->base.next) {
-		if (statement->base.next == NULL
-				&& statement->kind == STATEMENT_EXPRESSION) {
-			result = expression_statement_to_firm(
-					&statement->expression);
-			break;
-		}
-		statement_to_firm(statement);
+		result = statement_to_firm(statement);
 	}
 
 	return result;
@@ -4583,36 +4329,44 @@ static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 
 static void create_global_variable(entity_t *entity)
 {
-	ir_linkage    linkage    = IR_LINKAGE_DEFAULT;
-	ir_visibility visibility = ir_visibility_default;
-	ir_entity    *irentity;
+	ir_linkage          linkage    = IR_LINKAGE_DEFAULT;
+	ir_visibility       visibility = ir_visibility_external;
+	storage_class_tag_t storage
+		= (storage_class_tag_t)entity->declaration.storage_class;
+	decl_modifiers_t    modifiers  = entity->declaration.modifiers;
 	assert(entity->kind == ENTITY_VARIABLE);
 
-	switch ((storage_class_tag_t)entity->declaration.storage_class) {
+	switch (storage) {
 	case STORAGE_CLASS_EXTERN: visibility = ir_visibility_external; break;
 	case STORAGE_CLASS_STATIC: visibility = ir_visibility_local;    break;
-	case STORAGE_CLASS_NONE:
-		visibility = ir_visibility_default;
-		/* uninitialized globals get merged in C */
-		if (entity->variable.initializer == NULL)
-			linkage |= IR_LINKAGE_MERGE;
-		break;
+	case STORAGE_CLASS_NONE:   visibility = ir_visibility_external; break;
 	case STORAGE_CLASS_TYPEDEF:
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
 		panic("invalid storage class for global var");
 	}
 
+	/* "common" symbols */
+	if (storage == STORAGE_CLASS_NONE
+	    && entity->variable.initializer == NULL
+	    && !entity->variable.thread_local
+	    && (modifiers & DM_WEAK) == 0) {
+		linkage |= IR_LINKAGE_MERGE;
+	}
+
 	ir_type *var_type = get_glob_type();
 	if (entity->variable.thread_local) {
 		var_type = get_tls_type();
-		/* LINKAGE_MERGE not supported by current linkers */
-		linkage &= ~IR_LINKAGE_MERGE;
 	}
 	create_variable_entity(entity, DECLARATION_KIND_GLOBAL_VARIABLE, var_type);
-	irentity = entity->variable.v.entity;
+	ir_entity *irentity = entity->variable.v.entity;
 	add_entity_linkage(irentity, linkage);
 	set_entity_visibility(irentity, visibility);
+	if (entity->variable.initializer == NULL
+	    && storage != STORAGE_CLASS_EXTERN) {
+		ir_initializer_t *null_init = get_initializer_null();
+		set_entity_initializer(irentity, null_init);
+	}
 }
 
 static void create_local_declaration(entity_t *entity)
@@ -4664,6 +4418,14 @@ static void create_local_declaration(entity_t *entity)
 	panic("invalid storage class found");
 }
 
+static void create_local_declarations(entity_t *e)
+{
+	for (; e; e = e->base.next) {
+		if (is_declaration(e))
+			create_local_declaration(e);
+	}
+}
+
 static void initialize_local_declaration(entity_t *entity)
 {
 	if (entity->base.symbol == NULL)
@@ -4700,11 +4462,11 @@ static void initialize_local_declaration(entity_t *entity)
 	panic("invalid declaration kind");
 }
 
-static void declaration_statement_to_firm(declaration_statement_t *statement)
+static ir_node *declaration_statement_to_firm(declaration_statement_t *statement)
 {
 	entity_t *entity = statement->declarations_begin;
 	if (entity == NULL)
-		return;
+		return NULL;
 
 	entity_t *const last = statement->declarations_end;
 	for ( ;; entity = entity->base.next) {
@@ -4721,10 +4483,14 @@ static void declaration_statement_to_firm(declaration_statement_t *statement)
 		if (entity == last)
 			break;
 	}
+
+	return NULL;
 }
 
-static void if_statement_to_firm(if_statement_t *statement)
+static ir_node *if_statement_to_firm(if_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	/* Create the condition. */
 	ir_node *true_block  = NULL;
 	ir_node *false_block = NULL;
@@ -4733,56 +4499,66 @@ static void if_statement_to_firm(if_statement_t *statement)
 		false_block = new_immBlock();
 		create_condition_evaluation(statement->condition, true_block, false_block);
 		mature_immBlock(true_block);
-	}
-
-	/* Create the false statement.
-	 * Handle false before true, so if no false statement is present, then the
-	 * empty false block is reused as fallthrough block. */
-	ir_node *fallthrough_block = NULL;
-	if (statement->false_statement != NULL) {
-		if (false_block != NULL) {
-			mature_immBlock(false_block);
-		}
-		set_cur_block(false_block);
-		statement_to_firm(statement->false_statement);
-		if (currently_reachable()) {
-			fallthrough_block = new_immBlock();
-			add_immBlock_pred(fallthrough_block, new_Jmp());
-		}
-	} else {
-		fallthrough_block = false_block;
+		mature_immBlock(false_block);
 	}
 
 	/* Create the true statement. */
 	set_cur_block(true_block);
 	statement_to_firm(statement->true_statement);
-	if (currently_reachable()) {
-		if (fallthrough_block == NULL) {
-			fallthrough_block = new_immBlock();
-		}
-		add_immBlock_pred(fallthrough_block, new_Jmp());
+	ir_node *fallthrough_block = get_cur_block();
+
+	/* Create the false statement. */
+	set_cur_block(false_block);
+	if (statement->false_statement != NULL) {
+		statement_to_firm(statement->false_statement);
 	}
 
-	/* Handle the block after the if-statement. */
-	if (fallthrough_block != NULL) {
-		mature_immBlock(fallthrough_block);
+	/* Handle the block after the if-statement.  Minor simplification and
+	 * optimisation: Reuse the false/true block as fallthrough block, if the
+	 * true/false statement does not pass control to the fallthrough block, e.g.
+	 * in the typical if (x) return; pattern. */
+	if (fallthrough_block) {
+		if (currently_reachable()) {
+			ir_node *const t_jump = new_r_Jmp(fallthrough_block);
+			ir_node *const f_jump = new_Jmp();
+			ir_node *const in[]   = { t_jump, f_jump };
+			fallthrough_block = new_Block(2, in);
+		}
+		set_cur_block(fallthrough_block);
 	}
-	set_cur_block(fallthrough_block);
+
+	return NULL;
 }
 
-/* Create a jump node which jumps into target_block, if the current block is
- * reachable. */
-static void jump_if_reachable(ir_node *const target_block)
+/**
+ * Add an unconditional jump to the target block.  If the source block is not
+ * reachable, then a Bad predecessor is created to prevent Phi-less unreachable
+ * loops.  This is necessary if the jump potentially enters a loop.
+ */
+static void jump_to(ir_node *const target_block)
 {
 	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
 	add_immBlock_pred(target_block, pred);
 }
 
-static void while_statement_to_firm(while_statement_t *statement)
+/**
+ * Add an unconditional jump to the target block, if the current block is
+ * reachable and do nothing otherwise.  This is only valid if the jump does not
+ * enter a loop (a back edge is ok).
+ */
+static void jump_if_reachable(ir_node *const target_block)
 {
+	if (currently_reachable())
+		add_immBlock_pred(target_block, new_Jmp());
+}
+
+static ir_node *while_statement_to_firm(while_statement_t *statement)
+{
+	create_local_declarations(statement->scope.entities);
+
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	jump_if_reachable(header_block);
+	jump_to(header_block);
 
 	/* Create the condition. */
 	ir_node      *      body_block;
@@ -4826,6 +4602,7 @@ static void while_statement_to_firm(while_statement_t *statement)
 	assert(continue_label == header_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
+	return NULL;
 }
 
 static ir_node *get_break_label(void)
@@ -4836,14 +4613,16 @@ static ir_node *get_break_label(void)
 	return break_label;
 }
 
-static void do_while_statement_to_firm(do_while_statement_t *statement)
+static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
+	create_local_declarations(statement->scope.entities);
+
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
 
 	/* the loop body */
 	ir_node *body_block = new_immBlock();
-	jump_if_reachable(body_block);
+	jump_to(body_block);
 
 	ir_node *old_continue_label = continue_label;
 	ir_node *old_break_label    = break_label;
@@ -4869,21 +4648,15 @@ static void do_while_statement_to_firm(do_while_statement_t *statement)
 	mature_immBlock(false_block);
 
 	set_cur_block(false_block);
+	return NULL;
 }
 
-static void for_statement_to_firm(for_statement_t *statement)
+static ir_node *for_statement_to_firm(for_statement_t *statement)
 {
-	/* create declarations */
-	entity_t *entity = statement->scope.entities;
-	for ( ; entity != NULL; entity = entity->base.next) {
-		if (!is_declaration(entity))
-			continue;
-
-		create_local_declaration(entity);
-	}
+	create_local_declarations(statement->scope.entities);
 
 	if (currently_reachable()) {
-		entity = statement->scope.entities;
+		entity_t *entity = statement->scope.entities;
 		for ( ; entity != NULL; entity = entity->base.next) {
 			if (!is_declaration(entity))
 				continue;
@@ -4898,7 +4671,7 @@ static void for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the header block */
 	ir_node *const header_block = new_immBlock();
-	jump_if_reachable(header_block);
+	jump_to(header_block);
 
 	/* Create the condition. */
 	ir_node *body_block;
@@ -4955,19 +4728,20 @@ static void for_statement_to_firm(for_statement_t *statement)
 	assert(continue_label == step_block);
 	continue_label = old_continue_label;
 	break_label    = old_break_label;
+	return NULL;
 }
 
-static void create_jump_statement(const statement_t *statement,
-                                  ir_node *target_block)
+static ir_node *create_jump_statement(const statement_t *statement, ir_node *target_block)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
 	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
 	ir_node  *jump = new_d_Jmp(dbgi);
 	add_immBlock_pred(target_block, jump);
 
 	set_unreachable_now();
+	return NULL;
 }
 
 static ir_switch_table *create_switch_table(const switch_statement_t *statement)
@@ -5005,9 +4779,8 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 	return res;
 }
 
-static void switch_statement_to_firm(switch_statement_t *statement)
+static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
-	ir_node  *first_block = NULL;
 	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
 	ir_node  *switch_node = NULL;
 
@@ -5017,7 +4790,6 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 		unsigned n_outs = (unsigned)ir_switch_table_get_n_entries(table) + 1;
 
 		switch_node = new_d_Switch(dbgi, expression, n_outs, table);
-		first_block = get_cur_block();
 	}
 
 	set_unreachable_now();
@@ -5031,10 +4803,11 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 
 	statement_to_firm(statement->body);
 
-	jump_if_reachable(get_break_label());
+	if (currently_reachable()) {
+		add_immBlock_pred(get_break_label(), new_Jmp());
+	}
 
-	if (!saw_default_label && first_block != NULL) {
-		set_cur_block(first_block);
+	if (!saw_default_label && switch_node) {
 		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
 		add_immBlock_pred(get_break_label(), proj);
 	}
@@ -5048,12 +4821,13 @@ static void switch_statement_to_firm(switch_statement_t *statement)
 	current_switch    = old_switch;
 	break_label       = old_break_label;
 	saw_default_label = old_saw_default_label;
+	return NULL;
 }
 
-static void case_label_to_firm(const case_label_statement_t *statement)
+static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
 	if (statement->is_empty_range)
-		return;
+		return NULL;
 
 	if (current_switch != NULL) {
 		ir_node *block = new_immBlock();
@@ -5069,42 +4843,38 @@ static void case_label_to_firm(const case_label_statement_t *statement)
 		set_cur_block(block);
 	}
 
-	statement_to_firm(statement->statement);
+	return statement_to_firm(statement->statement);
 }
 
-static void label_to_firm(const label_statement_t *statement)
+static ir_node *label_to_firm(const label_statement_t *statement)
 {
 	ir_node *block = get_label_block(statement->label);
-	jump_if_reachable(block);
+	jump_to(block);
 
 	set_cur_block(block);
 	keep_alive(block);
 	keep_all_memory(block);
 
-	statement_to_firm(statement->statement);
+	return statement_to_firm(statement->statement);
 }
 
-static void goto_to_firm(const goto_statement_t *statement)
+static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
 {
 	if (!currently_reachable())
-		return;
+		return NULL;
 
-	if (statement->expression) {
-		ir_node  *irn  = expression_to_firm(statement->expression);
-		dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-		ir_node  *ijmp = new_d_IJmp(dbgi, irn);
+	ir_node  *const irn  = expression_to_firm(statement->expression);
+	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
+	ir_node  *const ijmp = new_d_IJmp(dbgi, irn);
 
-		set_irn_link(ijmp, ijmp_list);
-		ijmp_list = ijmp;
-	} else {
-		ir_node *block = get_label_block(statement->label);
-		ir_node *jmp   = new_Jmp();
-		add_immBlock_pred(block, jmp);
-	}
+	set_irn_link(ijmp, ijmp_list);
+	ijmp_list = ijmp;
+
 	set_unreachable_now();
+	return NULL;
 }
 
-static void asm_statement_to_firm(const asm_statement_t *statement)
+static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 {
 	bool needs_memory = false;
 
@@ -5344,87 +5114,57 @@ static void asm_statement_to_firm(const asm_statement_t *statement)
 
 		set_value_for_expression_addr(out_expr, proj, addr);
 	}
+
+	return NULL;
 }
 
-static void ms_try_statement_to_firm(ms_try_statement_t *statement)
+static ir_node *ms_try_statement_to_firm(ms_try_statement_t *statement)
 {
 	statement_to_firm(statement->try_statement);
 	source_position_t const *const pos = &statement->base.source_position;
 	warningf(WARN_OTHER, pos, "structured exception handling ignored");
+	return NULL;
 }
 
-static void leave_statement_to_firm(leave_statement_t *statement)
+static ir_node *leave_statement_to_firm(leave_statement_t *statement)
 {
 	errorf(&statement->base.source_position, "__leave not supported yet");
+	return NULL;
 }
 
 /**
  * Transform a statement.
  */
-static void statement_to_firm(statement_t *statement)
+static ir_node *statement_to_firm(statement_t *const stmt)
 {
 #ifndef NDEBUG
-	assert(!statement->base.transformed);
-	statement->base.transformed = true;
+	assert(!stmt->base.transformed);
+	stmt->base.transformed = true;
 #endif
 
-	switch (statement->kind) {
-	case STATEMENT_ERROR:
-		panic("error statement found");
-	case STATEMENT_EMPTY:
-		/* nothing */
-		return;
-	case STATEMENT_COMPOUND:
-		compound_statement_to_firm(&statement->compound);
-		return;
-	case STATEMENT_RETURN:
-		return_statement_to_firm(&statement->returns);
-		return;
-	case STATEMENT_EXPRESSION:
-		expression_statement_to_firm(&statement->expression);
-		return;
-	case STATEMENT_IF:
-		if_statement_to_firm(&statement->ifs);
-		return;
-	case STATEMENT_WHILE:
-		while_statement_to_firm(&statement->whiles);
-		return;
-	case STATEMENT_DO_WHILE:
-		do_while_statement_to_firm(&statement->do_while);
-		return;
-	case STATEMENT_DECLARATION:
-		declaration_statement_to_firm(&statement->declaration);
-		return;
-	case STATEMENT_BREAK:
-		create_jump_statement(statement, get_break_label());
-		return;
-	case STATEMENT_CONTINUE:
-		create_jump_statement(statement, continue_label);
-		return;
-	case STATEMENT_SWITCH:
-		switch_statement_to_firm(&statement->switchs);
-		return;
-	case STATEMENT_CASE_LABEL:
-		case_label_to_firm(&statement->case_label);
-		return;
-	case STATEMENT_FOR:
-		for_statement_to_firm(&statement->fors);
-		return;
-	case STATEMENT_LABEL:
-		label_to_firm(&statement->label);
-		return;
-	case STATEMENT_GOTO:
-		goto_to_firm(&statement->gotos);
-		return;
-	case STATEMENT_ASM:
-		asm_statement_to_firm(&statement->asms);
-		return;
-	case STATEMENT_MS_TRY:
-		ms_try_statement_to_firm(&statement->ms_try);
-		return;
-	case STATEMENT_LEAVE:
-		leave_statement_to_firm(&statement->leave);
-		return;
+	switch (stmt->kind) {
+	case STATEMENT_ASM:           return asm_statement_to_firm(        &stmt->asms);
+	case STATEMENT_CASE_LABEL:    return case_label_to_firm(           &stmt->case_label);
+	case STATEMENT_COMPOUND:      return compound_statement_to_firm(   &stmt->compound);
+	case STATEMENT_COMPUTED_GOTO: return computed_goto_to_firm(        &stmt->computed_goto);
+	case STATEMENT_DECLARATION:   return declaration_statement_to_firm(&stmt->declaration);
+	case STATEMENT_DO_WHILE:      return do_while_statement_to_firm(   &stmt->do_while);
+	case STATEMENT_EMPTY:         return NULL; /* nothing */
+	case STATEMENT_EXPRESSION:    return expression_statement_to_firm( &stmt->expression);
+	case STATEMENT_FOR:           return for_statement_to_firm(        &stmt->fors);
+	case STATEMENT_IF:            return if_statement_to_firm(         &stmt->ifs);
+	case STATEMENT_LABEL:         return label_to_firm(                &stmt->label);
+	case STATEMENT_LEAVE:         return leave_statement_to_firm(      &stmt->leave);
+	case STATEMENT_MS_TRY:        return ms_try_statement_to_firm(     &stmt->ms_try);
+	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
+	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
+	case STATEMENT_WHILE:         return while_statement_to_firm(      &stmt->whiles);
+
+	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
+	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);
+	case STATEMENT_GOTO:          return create_jump_statement(stmt, get_label_block(stmt->gotos.label));
+
+	case STATEMENT_ERROR: panic("error statement found");
 	}
 	panic("statement not implemented");
 }
@@ -5435,20 +5175,9 @@ static int count_local_variables(const entity_t *entity,
 	int count = 0;
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
-		type_t *type;
-		bool    address_taken;
-
-		if (entity->kind == ENTITY_VARIABLE) {
-			type          = skip_typeref(entity->declaration.type);
-			address_taken = entity->variable.address_taken;
-		} else if (entity->kind == ENTITY_PARAMETER) {
-			type          = skip_typeref(entity->declaration.type);
-			address_taken = entity->parameter.address_taken;
-		} else {
-			continue;
-		}
-
-		if (!address_taken && is_type_scalar(type))
+		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
+		    !entity->variable.address_taken                                       &&
+		    is_type_scalar(skip_typeref(entity->declaration.type)))
 			++count;
 	}
 	return count;
@@ -5524,20 +5253,16 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		bool needs_entity = parameter->parameter.address_taken;
 		assert(!is_type_array(type));
-		if (is_type_compound(type)) {
-			needs_entity = true;
-		}
+		bool const needs_entity = parameter->variable.address_taken || is_type_compound(type);
 
 		ir_type *param_irtype = get_method_param_type(function_irtype, n);
 		if (needs_entity) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
 				= new_parameter_entity(frame_type, n, param_irtype);
-			parameter->declaration.kind
-				= DECLARATION_KIND_PARAMETER_ENTITY;
-			parameter->parameter.v.entity = param;
+			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
+			parameter->variable.v.entity = param;
 			continue;
 		}
 
@@ -5549,13 +5274,13 @@ static void initialize_function_parameters(entity_t *entity)
 		value = create_conv(NULL, value, mode);
 		value = do_strict_conv(NULL, value);
 
-		parameter->declaration.kind         = DECLARATION_KIND_PARAMETER;
-		parameter->parameter.v.value_number = next_value_number_function;
+		parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
+		parameter->variable.v.value_number = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function,
 		                        parameter);
 		++next_value_number_function;
 
-		set_value(parameter->parameter.v.value_number, value);
+		set_value(parameter->variable.v.value_number, value);
 	}
 }
 
@@ -5684,20 +5409,13 @@ static void create_function(entity_t *entity)
 	if (currently_reachable()) {
 		type_t *type = skip_typeref(entity->declaration.type);
 		assert(is_type_function(type));
-		const function_type_t *func_type   = &type->function;
-		const type_t          *return_type
-			= skip_typeref(func_type->return_type);
+		type_t *const return_type = skip_typeref(type->function.return_type);
 
 		ir_node *ret;
-		if (is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+		if (is_type_void(return_type)) {
 			ret = new_Return(get_store(), 0, NULL);
 		} else {
-			ir_mode *mode;
-			if (is_type_scalar(return_type)) {
-				mode = get_ir_mode_storage(func_type->return_type);
-			} else {
-				mode = mode_P_data;
-			}
+			ir_mode *const mode = get_ir_mode_storage(return_type);
 
 			ir_node *in[1];
 			/* §5.1.2.2.3 main implicitly returns 0 */
@@ -5838,11 +5556,8 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	ir_type_int        = get_ir_type(type_int);
-	ir_type_char       = get_ir_type(type_char);
-	ir_type_const_char = get_ir_type(type_const_char);
-	ir_type_wchar_t    = get_ir_type(type_wchar_t);
-	ir_type_void       = get_ir_type(type_void);
+	ir_type_char    = get_ir_type(type_char);
+	ir_type_wchar_t = get_ir_type(type_wchar_t);
 
 	be_params             = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
@@ -5862,19 +5577,33 @@ static void global_asm_to_firm(statement_t *s)
 		assert(s->kind == STATEMENT_ASM);
 
 		char const *const text = s->asms.asm_text.begin;
-		size_t            size = s->asms.asm_text.size;
-
-		/* skip the last \0 */
-		if (text[size - 1] == '\0')
-			--size;
-
-		ident *const id = new_id_from_chars(text, size);
+		size_t      const size = s->asms.asm_text.size;
+		ident      *const id   = new_id_from_chars(text, size);
 		add_irp_asm(id);
 	}
 }
 
+static const char *get_cwd(void)
+{
+	static char buf[1024];
+	if (buf[0] == '\0')
+		getcwd(buf, sizeof(buf));
+	return buf;
+}
+
 void translation_unit_to_firm(translation_unit_t *unit)
 {
+	if (c_mode & _CXX) {
+		be_dwarf_set_source_language(DW_LANG_C_plus_plus);
+	} else if (c_mode & _C99) {
+		be_dwarf_set_source_language(DW_LANG_C99);
+	} else if (c_mode & _C89) {
+		be_dwarf_set_source_language(DW_LANG_C89);
+	} else {
+		be_dwarf_set_source_language(DW_LANG_C);
+	}
+	be_dwarf_set_compilation_directory(get_cwd());
+
 	/* initialize firm arithmetic */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);
 	ir_set_uninitialized_local_variable_func(uninitialized_local_var);

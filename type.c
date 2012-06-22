@@ -373,7 +373,7 @@ restart:
 static void print_function_type_post(const function_type_t *type,
                                      const scope_t *parameters)
 {
-	print_string("(");
+	print_char('(');
 	bool first = true;
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
@@ -415,7 +415,7 @@ static void print_function_type_post(const function_type_t *type,
 	if (first && !type->unspecified_parameters) {
 		print_string("void");
 	}
-	print_string(")");
+	print_char(')');
 
 	intern_print_type_post(type->return_type);
 }
@@ -437,7 +437,7 @@ static void print_pointer_type_pre(const pointer_type_t *type)
 		print_string(variable->base.base.symbol->string);
 		print_string(") ");
 	}
-	print_string("*");
+	print_char('*');
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_START);
 }
 
@@ -450,7 +450,7 @@ static void print_pointer_type_post(const pointer_type_t *type)
 {
 	type_t const *const points_to = type->points_to;
 	if (points_to->kind == TYPE_ARRAY || points_to->kind == TYPE_FUNCTION)
-		print_string(")");
+		print_char(')');
 	intern_print_type_post(points_to);
 }
 
@@ -465,7 +465,7 @@ static void print_reference_type_pre(const reference_type_t *type)
 	intern_print_type_pre(refers_to);
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
 		print_string(" (");
-	print_string("&");
+	print_char('&');
 }
 
 /**
@@ -477,7 +477,7 @@ static void print_reference_type_post(const reference_type_t *type)
 {
 	type_t const *const refers_to = type->refers_to;
 	if (refers_to->kind == TYPE_ARRAY || refers_to->kind == TYPE_FUNCTION)
-		print_string(")");
+		print_char(')');
 	intern_print_type_post(refers_to);
 }
 
@@ -498,7 +498,7 @@ static void print_array_type_pre(const array_type_t *type)
  */
 static void print_array_type_post(const array_type_t *type)
 {
-	print_string("[");
+	print_char('[');
 	if (type->is_static) {
 		print_string("static ");
 	}
@@ -507,7 +507,7 @@ static void print_array_type_post(const array_type_t *type)
 			&& (print_implicit_array_size || !type->has_implicit_size)) {
 		print_expression(type->size_expression);
 	}
-	print_string("]");
+	print_char(']');
 	intern_print_type_post(type->element_type);
 }
 
@@ -532,7 +532,7 @@ void print_enum_definition(const enum_t *enume)
 
 	change_indent(-1);
 	print_indent();
-	print_string("}");
+	print_char('}');
 }
 
 /**
@@ -566,12 +566,12 @@ void print_compound_definition(const compound_t *compound)
 
 		print_indent();
 		print_entity(entity);
-		print_string("\n");
+		print_char('\n');
 	}
 
 	change_indent(-1);
 	print_indent();
-	print_string("}");
+	print_char('}');
 	if (compound->modifiers & DM_TRANSPARENT_UNION) {
 		print_string("__attribute__((__transparent_union__))");
 	}
@@ -580,18 +580,13 @@ void print_compound_definition(const compound_t *compound)
 /**
  * Prints a compound type.
  *
+ * @param kind  The name of the compound kind.
  * @param type  The compound type.
  */
-static void print_compound_type(const compound_type_t *type)
+static void print_compound_type(char const *const kind, compound_type_t const *const type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
-
-	if (type->base.kind == TYPE_COMPOUND_STRUCT) {
-		print_string("struct ");
-	} else {
-		assert(type->base.kind == TYPE_COMPOUND_UNION);
-		print_string("union ");
-	}
+	print_string(kind);
 
 	compound_t *compound = type->compound;
 	symbol_t   *symbol   = compound->base.symbol;
@@ -626,7 +621,7 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 	} else {
 		print_type(type->typeof_type);
 	}
-	print_string(")");
+	print_char(')');
 }
 
 /**
@@ -637,43 +632,19 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 static void intern_print_type_pre(const type_t *const type)
 {
 	switch(type->kind) {
-	case TYPE_ERROR:
-		print_string("<error>");
-		return;
-	case TYPE_ENUM:
-		print_type_enum(&type->enumt);
-		return;
-	case TYPE_ATOMIC:
-		print_atomic_type(&type->atomic);
-		return;
-	case TYPE_COMPLEX:
-		print_complex_type(&type->atomic);
-		return;
-	case TYPE_IMAGINARY:
-		print_imaginary_type(&type->atomic);
-		return;
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:
-		print_compound_type(&type->compound);
-		return;
-	case TYPE_FUNCTION:
-		print_function_type_pre(&type->function);
-		return;
-	case TYPE_POINTER:
-		print_pointer_type_pre(&type->pointer);
-		return;
-	case TYPE_REFERENCE:
-		print_reference_type_pre(&type->reference);
-		return;
-	case TYPE_ARRAY:
-		print_array_type_pre(&type->array);
-		return;
-	case TYPE_TYPEDEF:
-		print_typedef_type_pre(&type->typedeft);
-		return;
-	case TYPE_TYPEOF:
-		print_typeof_type_pre(&type->typeoft);
-		return;
+	case TYPE_ARRAY:           print_array_type_pre(          &type->array);     return;
+	case TYPE_ATOMIC:          print_atomic_type(             &type->atomic);    return;
+	case TYPE_COMPLEX:         print_complex_type(            &type->atomic);    return;
+	case TYPE_COMPOUND_STRUCT: print_compound_type("struct ", &type->compound);  return;
+	case TYPE_COMPOUND_UNION:  print_compound_type("union ",  &type->compound);  return;
+	case TYPE_ENUM:            print_type_enum(               &type->enumt);     return;
+	case TYPE_ERROR:           print_string("<error>");                          return;
+	case TYPE_FUNCTION:        print_function_type_pre(       &type->function);  return;
+	case TYPE_IMAGINARY:       print_imaginary_type(          &type->atomic);    return;
+	case TYPE_POINTER:         print_pointer_type_pre(        &type->pointer);   return;
+	case TYPE_REFERENCE:       print_reference_type_pre(      &type->reference); return;
+	case TYPE_TYPEDEF:         print_typedef_type_pre(        &type->typedeft);  return;
+	case TYPE_TYPEOF:          print_typeof_type_pre(         &type->typeoft);   return;
 	}
 	print_string("unknown");
 }
@@ -721,7 +692,7 @@ void print_type_ext(const type_t *const type, const symbol_t *symbol,
 {
 	intern_print_type_pre(type);
 	if (symbol != NULL) {
-		print_string(" ");
+		print_char(' ');
 		print_string(symbol->string);
 	}
 	if (type->kind == TYPE_FUNCTION) {
@@ -995,53 +966,48 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 	if (type1 == type2)
 		return true;
 
-	if (!is_type_valid(type1) || !is_type_valid(type2))
-		return true;
+	if (type1->base.qualifiers == type2->base.qualifiers &&
+	    type1->kind            == type2->kind) {
+		switch (type1->kind) {
+		case TYPE_FUNCTION:
+			return function_types_compatible(&type1->function, &type2->function);
+		case TYPE_ATOMIC:
+		case TYPE_IMAGINARY:
+		case TYPE_COMPLEX:
+			return type1->atomic.akind == type2->atomic.akind;
+		case TYPE_ARRAY:
+			return array_types_compatible(&type1->array, &type2->array);
 
-	if (type1->base.qualifiers != type2->base.qualifiers)
-		return false;
-	if (type1->kind != type2->kind)
-		return false;
+		case TYPE_POINTER: {
+			const type_t *const to1 = skip_typeref(type1->pointer.points_to);
+			const type_t *const to2 = skip_typeref(type2->pointer.points_to);
+			return types_compatible(to1, to2);
+		}
 
-	switch (type1->kind) {
-	case TYPE_FUNCTION:
-		return function_types_compatible(&type1->function, &type2->function);
-	case TYPE_ATOMIC:
-	case TYPE_IMAGINARY:
-	case TYPE_COMPLEX:
-		return type1->atomic.akind == type2->atomic.akind;
-	case TYPE_ARRAY:
-		return array_types_compatible(&type1->array, &type2->array);
+		case TYPE_REFERENCE: {
+			const type_t *const to1 = skip_typeref(type1->reference.refers_to);
+			const type_t *const to2 = skip_typeref(type2->reference.refers_to);
+			return types_compatible(to1, to2);
+		}
 
-	case TYPE_POINTER: {
-		const type_t *const to1 = skip_typeref(type1->pointer.points_to);
-		const type_t *const to2 = skip_typeref(type2->pointer.points_to);
-		return types_compatible(to1, to2);
+		case TYPE_COMPOUND_STRUCT:
+		case TYPE_COMPOUND_UNION:
+			break;
+
+		case TYPE_ENUM:
+			/* TODO: not implemented */
+			break;
+
+		case TYPE_ERROR:
+			/* Hmm, the error type should be compatible to all other types */
+			return true;
+		case TYPE_TYPEDEF:
+		case TYPE_TYPEOF:
+			panic("typerefs not skipped in compatible types?!?");
+		}
 	}
 
-	case TYPE_REFERENCE: {
-		const type_t *const to1 = skip_typeref(type1->reference.refers_to);
-		const type_t *const to2 = skip_typeref(type2->reference.refers_to);
-		return types_compatible(to1, to2);
-	}
-
-	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION: {
-		break;
-	}
-	case TYPE_ENUM:
-		/* TODO: not implemented */
-		break;
-
-	case TYPE_ERROR:
-		/* Hmm, the error type should be compatible to all other types */
-		return true;
-	case TYPE_TYPEDEF:
-	case TYPE_TYPEOF:
-		panic("typerefs not skipped in compatible types?!?");
-	}
-
-	return false;
+	return !is_type_valid(type1) || !is_type_valid(type2);
 }
 
 /**
@@ -1114,7 +1080,7 @@ unsigned get_type_size(type_t *type)
 		layout_struct_type(&type->compound);
 		return type->compound.compound->size;
 	case TYPE_FUNCTION:
-		return 0; /* non-const (but "address-const") */
+		return 1; /* strange GNU extensions: sizeof(function) == 1 */
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
 		return pointer_properties.size;
@@ -1504,6 +1470,7 @@ void layout_struct_type(compound_type_t *type)
 		return;
 	if (type->compound->layouted)
 		return;
+	compound->layouted = true;
 
 	il_size_t      offset    = 0;
 	il_alignment_t alignment = compound->alignment;
@@ -1511,16 +1478,12 @@ void layout_struct_type(compound_type_t *type)
 
 	entity_t *entry = compound->members.entities;
 	while (entry != NULL) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER) {
-			entry = entry->base.next;
-			continue;
-		}
+		if (entry->kind != ENTITY_COMPOUND_MEMBER)
+			goto next;
 
-		type_t *const m_type  = skip_typeref(entry->declaration.type);
-		if (!is_type_valid(m_type)) {
-			entry = entry->base.next;
-			continue;
-		}
+		type_t *const m_type = skip_typeref(entry->declaration.type);
+		if (!is_type_valid(m_type))
+			goto next;
 
 		if (entry->compound_member.bitfield) {
 			entry = pack_bitfield_members(&offset, &alignment,
@@ -1544,6 +1507,7 @@ void layout_struct_type(compound_type_t *type)
 		entry->compound_member.offset = offset;
 		offset += get_type_size(m_type);
 
+next:
 		entry = entry->base.next;
 	}
 
@@ -1564,7 +1528,6 @@ void layout_struct_type(compound_type_t *type)
 
 	compound->size      = offset;
 	compound->alignment = alignment;
-	compound->layouted  = true;
 }
 
 void layout_union_type(compound_type_t *type)
@@ -1574,6 +1537,9 @@ void layout_union_type(compound_type_t *type)
 	compound_t *compound = type->compound;
 	if (! compound->complete)
 		return;
+	if (compound->layouted)
+		return;
+	compound->layouted = true;
 
 	il_size_t      size      = 0;
 	il_alignment_t alignment = compound->alignment;
@@ -1693,6 +1659,6 @@ void dbg_type(const type_t *type)
 {
 	print_to_file(stderr);
 	print_type(type);
-	print_string("\n");
+	print_char('\n');
 	fflush(stderr);
 }

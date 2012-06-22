@@ -47,11 +47,11 @@ SOURCES := \
 	entitymap.c \
 	format_check.c \
 	input.c \
-	lexer.c \
 	main.c \
 	mangle.c \
 	preprocessor.c \
 	printer.c \
+	string_rep.c \
 	symbol_table.c \
 	token.c \
 	type.c \

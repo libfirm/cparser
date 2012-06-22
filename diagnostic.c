@@ -29,8 +29,6 @@
 #include "type.h"
 #include "warning.h"
 
-/** Number of occurred diagnostics. */
-unsigned diagnostic_count        = 0;
 /** Number of occurred errors. */
 unsigned error_count             = 0;
 /** Number of occurred warnings. */
@@ -52,160 +50,195 @@ static void print_source_position(FILE *out, const source_position_t *pos)
 		fprintf(out, " of \"%s\"", pos->input_name);
 }
 
+static void fpututf32(utf32 const c, FILE *const out)
+{
+	if (c < 0x80U) {
+		fputc(c, out);
+	} else if (c < 0x800) {
+		fputc(0xC0 | (c >> 6), out);
+		fputc(0x80 | (c & 0x3F), out);
+	} else if (c < 0x10000) {
+		fputc(0xE0 | ( c >> 12), out);
+		fputc(0x80 | ((c >>  6) & 0x3F), out);
+		fputc(0x80 | ( c        & 0x3F), out);
+	} else {
+		fputc(0xF0 | ( c >> 18), out);
+		fputc(0x80 | ((c >> 12) & 0x3F), out);
+		fputc(0x80 | ((c >>  6) & 0x3F), out);
+		fputc(0x80 | ( c        & 0x3F), out);
+	}
+}
+
 /**
  * Issue a diagnostic message.
  */
-static void diagnosticvf(const char *const fmt, va_list ap)
+static void diagnosticvf(char const *fmt, va_list ap)
 {
-	for (const char* f = fmt; *f != '\0'; ++f) {
-		if (*f == '%') {
-			++f;
+	for (char const *f; (f = strchr(fmt, '%')); fmt = f) {
+		fwrite(fmt, sizeof(*fmt), f - fmt, stderr); // Print till '%'.
+		++f; // Skip '%'.
 
-			bool extended = false;
-			if (*f == '#') {
-				extended = true;
-				++f;
-			}
-
+		bool extended  = false;
+		bool flag_zero = false;
+		bool flag_long = false;
+		for (;; ++f) {
 			switch (*f) {
-				case '%':
-					fputc(*f, stderr);
-					break;
-
-				case 'c': {
-					const unsigned char val = (unsigned char) va_arg(ap, int);
-					fputc(val, stderr);
-					break;
-				}
-
-				case 'd': {
-					const int val = va_arg(ap, int);
-					fprintf(stderr, "%d", val);
-					break;
-				}
-
-				case 's': {
-					const char* const str = va_arg(ap, const char*);
-					fputs(str, stderr);
-					break;
-				}
-
-				case 'S': {
-					const string_t *str = va_arg(ap, const string_t*);
-					for (size_t i = 0; i < str->size; ++i) {
-						fputc(str->begin[i], stderr);
-					}
-					break;
-				}
-
-				case 'u': {
-					const unsigned int val = va_arg(ap, unsigned int);
-					fprintf(stderr, "%u", val);
-					break;
-				}
-
-				case 'Y': {
-					const symbol_t *const symbol = va_arg(ap, const symbol_t*);
-					if (symbol == NULL)
-						fputs("(null)", stderr);
-					else
-						fputs(symbol->string, stderr);
-					break;
-				}
-
-				case 'E': {
-					const expression_t* const expr = va_arg(ap, const expression_t*);
-					print_expression(expr);
-					break;
-				}
-
-				case 'Q': {
-					const unsigned qualifiers = va_arg(ap, unsigned);
-					print_type_qualifiers(qualifiers, QUAL_SEP_NONE);
-					break;
-				}
-
-				case 'T': {
-					const type_t* const type = va_arg(ap, const type_t*);
-					const symbol_t*     sym  = NULL;
-					if (extended) {
-						sym = va_arg(ap, const symbol_t*);
-					}
-					print_type_ext(type, sym, NULL);
-					break;
-				}
-
-				case 't': {
-					const token_t *const token = va_arg(ap, const token_t*);
-					print_pp_token(stderr, token);
-					break;
-				}
-
-				case 'K': {
-					const token_t* const token = va_arg(ap, const token_t*);
-					print_token(stderr, token);
-					break;
-				}
-
-				case 'k': {
-					if (extended) {
-						bool              first     = true;
-						va_list*          toks      = va_arg(ap, va_list*);
-						const char* const delimiter = va_arg(ap, const char*);
-						for (;;) {
-							const token_kind_t tok = va_arg(*toks, token_kind_t);
-							if (tok == 0)
-								break;
-							if (first) {
-								first = false;
-							} else {
-								fputs(delimiter, stderr);
-							}
-							print_token_kind(stderr, tok);
-						}
-					} else {
-						const token_kind_t token = va_arg(ap, token_kind_t);
-						print_token_kind(stderr, token);
-					}
-					break;
-				}
-
-				case 'N': {
-					entity_t const *const ent = va_arg(ap, entity_t const*);
-					if (extended && is_declaration(ent)) {
-						print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
-					} else {
-						char     const *const kind = get_entity_kind_name(ent->kind);
-						symbol_t const *const sym  = ent->base.symbol;
-						if (sym) {
-							fprintf(stderr, "%s %s", kind, sym->string);
-						} else {
-							fprintf(stderr, "anonymous %s", kind);
-						}
-					}
-					break;
-				}
-
-				case 'P': {
-					const source_position_t *pos = va_arg(ap, const source_position_t *);
-					print_source_position(stderr, pos);
-					break;
-				}
-
-				default:
-					panic("unknown format specifier");
+			case '#': extended  = true; break;
+			case '0': flag_zero = true; break;
+			case 'l': flag_long = true; break;
+			default:  goto done_flags;
 			}
-		} else {
-			fputc(*f, stderr);
+		}
+done_flags:;
+
+		int field_width = 0;
+		if (*f == '*') {
+			++f;
+			field_width = va_arg(ap, int);
+		}
+
+		switch (*f++) {
+		case '%':
+			fputc('%', stderr);
+			break;
+
+		case 'c': {
+			if (flag_long) {
+				const utf32 val = va_arg(ap, utf32);
+				fpututf32(val, stderr);
+			} else {
+				const unsigned char val = (unsigned char) va_arg(ap, int);
+				fputc(val, stderr);
+			}
+			break;
+		}
+
+		case 'd': {
+			const int val = va_arg(ap, int);
+			fprintf(stderr, "%d", val);
+			break;
+		}
+
+		case 's': {
+			const char* const str = va_arg(ap, const char*);
+			fputs(str, stderr);
+			break;
+		}
+
+		case 'S': {
+			const string_t *str = va_arg(ap, const string_t*);
+			for (size_t i = 0; i < str->size; ++i) {
+				fputc(str->begin[i], stderr);
+			}
+			break;
+		}
+
+		case 'u': {
+			const unsigned int val = va_arg(ap, unsigned int);
+			fprintf(stderr, "%u", val);
+			break;
+		}
+
+		case 'X': {
+			unsigned int const val = va_arg(ap, unsigned int);
+			char const  *const fmt = flag_zero ? "%0*X" : "%*X";
+			fprintf(stderr, fmt, field_width, val);
+			break;
+		}
+
+		case 'Y': {
+			const symbol_t *const symbol = va_arg(ap, const symbol_t*);
+			if (symbol == NULL)
+				fputs("(null)", stderr);
+			else
+				fputs(symbol->string, stderr);
+			break;
+		}
+
+		case 'E': {
+			const expression_t* const expr = va_arg(ap, const expression_t*);
+			print_expression(expr);
+			break;
+		}
+
+		case 'Q': {
+			const unsigned qualifiers = va_arg(ap, unsigned);
+			print_type_qualifiers(qualifiers, QUAL_SEP_NONE);
+			break;
+		}
+
+		case 'T': {
+			const type_t* const type = va_arg(ap, const type_t*);
+			const symbol_t*     sym  = NULL;
+			if (extended) {
+				sym = va_arg(ap, const symbol_t*);
+			}
+			print_type_ext(type, sym, NULL);
+			break;
+		}
+
+		case 'K': {
+			const token_t* const token = va_arg(ap, const token_t*);
+			print_token(stderr, token);
+			break;
+		}
+
+		case 'k': {
+			if (extended) {
+				bool              first     = true;
+				va_list*          toks      = va_arg(ap, va_list*);
+				const char* const delimiter = va_arg(ap, const char*);
+				for (;;) {
+					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
+					if (tok == 0)
+						break;
+					if (first) {
+						first = false;
+					} else {
+						fputs(delimiter, stderr);
+					}
+					print_token_kind(stderr, tok);
+				}
+			} else {
+				const token_kind_t token = (token_kind_t)va_arg(ap, int);
+				print_token_kind(stderr, token);
+			}
+			break;
+		}
+
+		case 'N': {
+			entity_t const *const ent = va_arg(ap, entity_t const*);
+			if (extended && is_declaration(ent)) {
+				print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
+			} else {
+				char     const *const kind = get_entity_kind_name(ent->kind);
+				symbol_t const *const sym  = ent->base.symbol;
+				if (sym) {
+					fprintf(stderr, "%s %s", kind, sym->string);
+				} else {
+					fprintf(stderr, "anonymous %s", kind);
+				}
+			}
+			break;
+		}
+
+		case 'P': {
+			const source_position_t *pos = va_arg(ap, const source_position_t *);
+			print_source_position(stderr, pos);
+			break;
+		}
+
+		default:
+			panic("unknown format specifier");
 		}
 	}
+	fputs(fmt, stderr); // Print rest.
 }
 
 void diagnosticf(const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	++diagnostic_count;
 	curr_pos = NULL;
 	diagnosticvf(fmt, ap);
 	va_end(ap);
@@ -225,7 +258,6 @@ static void diagnosticposvf(source_position_t const *const pos, char const *cons
 static void errorvf(const source_position_t *pos,
                     const char *const fmt, va_list ap)
 {
-	curr_pos = pos;
 	++error_count;
 	diagnosticposvf(pos, "error", fmt, ap);
 	fputc('\n', stderr);
@@ -280,7 +312,6 @@ void internal_errorf(const source_position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = pos;
 	internal_errorvf(pos, fmt, ap);
 	va_end(ap);
 	abort();

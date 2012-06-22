@@ -32,7 +32,6 @@ typedef struct compound_literal_expression_t         compound_literal_expression
 typedef struct reference_expression_t                reference_expression_t;
 typedef struct cast_expression_t                     cast_expression_t;
 typedef struct call_argument_t                       call_argument_t;
-typedef struct type_argument_t                       type_argument_t;
 typedef struct call_expression_t                     call_expression_t;
 typedef struct binary_expression_t                   binary_expression_t;
 typedef struct unary_expression_t                    unary_expression_t;
@@ -51,15 +50,12 @@ typedef struct va_copy_expression_t                  va_copy_expression_t;
 typedef struct builtin_constant_expression_t         builtin_constant_expression_t;
 typedef struct builtin_types_compatible_expression_t builtin_types_compatible_expression_t;
 typedef struct classify_type_expression_t            classify_type_expression_t;
-typedef struct bitfield_extract_expression_t         bitfield_extract_expression_t;
 typedef struct label_address_expression_t            label_address_expression_t;
 typedef union  expression_t                          expression_t;
 
 typedef struct initializer_base_t                    initializer_base_t;
 typedef struct initializer_list_t                    initializer_list_t;
 typedef struct initializer_value_t                   initializer_value_t;
-typedef struct initializer_string_t                  initializer_string_t;
-typedef struct initializer_wide_string_t             initializer_wide_string_t;
 typedef struct initializer_designator_t              initializer_designator_t;
 typedef union  initializer_t                         initializer_t;
 
@@ -72,6 +68,7 @@ typedef struct if_statement_t                        if_statement_t;
 typedef struct switch_statement_t                    switch_statement_t;
 typedef struct declaration_statement_t               declaration_statement_t;
 typedef struct expression_statement_t                expression_statement_t;
+typedef struct computed_goto_statement_t             computed_goto_statement_t;
 typedef struct goto_statement_t                      goto_statement_t;
 typedef struct label_statement_t                     label_statement_t;
 typedef struct case_label_statement_t                case_label_statement_t;

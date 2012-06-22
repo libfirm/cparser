@@ -225,7 +225,7 @@ static void write_expression(const expression_t *expression)
 	case EXPR_LITERAL_INTEGER:
 		fprintf(out, "%s", expression->literal.value.begin);
 		break;
-	EXPR_UNARY_CASES
+	case EXPR_UNARY_CASES:
 		write_unary_expression((const unary_expression_t*) expression);
 		break;
 	default:
@@ -297,7 +297,7 @@ static void write_function(const entity_t *entity)
 	fprintf(out, ")");
 
 	const type_t *return_type = skip_typeref(function_type->return_type);
-	if(!is_type_atomic(return_type, ATOMIC_TYPE_VOID)) {
+	if (!is_type_void(return_type)) {
 		fprintf(out, " : ");
 		write_type(return_type);
 	}
@@ -319,8 +319,7 @@ void write_fluffy_decls(FILE *output, const translation_unit_t *unit)
 			continue;
 
 		type_t *type = entity->typedefe.type;
-		if(type->kind == TYPE_COMPOUND_STRUCT
-				|| type->kind == TYPE_COMPOUND_UNION) {
+		if (is_type_compound(type)) {
 			write_compound(entity->base.symbol, &type->compound);
 		} else if(type->kind == TYPE_ENUM) {
 			write_enum(entity->base.symbol, &type->enumt);

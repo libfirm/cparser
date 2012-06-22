@@ -228,14 +228,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\lexer.c"
-				>
-			</File>
-			<File
-				RelativePath="..\lexer.h"
-				>
-			</File>
-			<File
 				RelativePath="..\main.c"
 				>
 			</File>

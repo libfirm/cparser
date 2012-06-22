@@ -64,18 +64,13 @@ typedef enum precedence_t {
 typedef enum expression_kind_t {
 	EXPR_ERROR = 1,
 	EXPR_REFERENCE,
-	EXPR_REFERENCE_ENUM_VALUE,
+	EXPR_ENUM_CONSTANT,
 	EXPR_LITERAL_BOOLEAN,
 	EXPR_LITERAL_INTEGER,
-	EXPR_LITERAL_INTEGER_OCTAL,
-	EXPR_LITERAL_INTEGER_HEXADECIMAL,
 	EXPR_LITERAL_FLOATINGPOINT,
-	EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL,
 	EXPR_LITERAL_CHARACTER,
-	EXPR_LITERAL_WIDE_CHARACTER,
 	EXPR_LITERAL_MS_NOOP, /**< MS __noop extension */
 	EXPR_STRING_LITERAL,
-	EXPR_WIDE_STRING_LITERAL,
 	EXPR_COMPOUND_LITERAL,
 	EXPR_CALL,
 	EXPR_CONDITIONAL,
@@ -162,83 +157,78 @@ typedef enum funcname_kind_t {
 } funcname_kind_t;
 
 /* convenience macros */
-#define EXPR_BINARY_CASES                  \
-	case EXPR_BINARY_ADD:                  \
-	case EXPR_BINARY_SUB:                  \
-	case EXPR_BINARY_MUL:                  \
-	case EXPR_BINARY_DIV:                  \
-	case EXPR_BINARY_MOD:                  \
-	case EXPR_BINARY_EQUAL:                \
-	case EXPR_BINARY_NOTEQUAL:             \
-	case EXPR_BINARY_LESS:                 \
-	case EXPR_BINARY_LESSEQUAL:            \
-	case EXPR_BINARY_GREATER:              \
-	case EXPR_BINARY_GREATEREQUAL:         \
-	case EXPR_BINARY_BITWISE_AND:          \
-	case EXPR_BINARY_BITWISE_OR:           \
-	case EXPR_BINARY_BITWISE_XOR:          \
-	case EXPR_BINARY_LOGICAL_AND:          \
-	case EXPR_BINARY_LOGICAL_OR:           \
-	case EXPR_BINARY_SHIFTLEFT:            \
-	case EXPR_BINARY_SHIFTRIGHT:           \
-	case EXPR_BINARY_ASSIGN:               \
-	case EXPR_BINARY_MUL_ASSIGN:           \
-	case EXPR_BINARY_DIV_ASSIGN:           \
-	case EXPR_BINARY_MOD_ASSIGN:           \
-	case EXPR_BINARY_ADD_ASSIGN:           \
-	case EXPR_BINARY_SUB_ASSIGN:           \
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:     \
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:    \
-	case EXPR_BINARY_BITWISE_AND_ASSIGN:   \
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN:   \
-	case EXPR_BINARY_BITWISE_OR_ASSIGN:    \
-	case EXPR_BINARY_COMMA:                \
-	case EXPR_BINARY_ISGREATER:            \
-	case EXPR_BINARY_ISGREATEREQUAL:       \
-	case EXPR_BINARY_ISLESS:               \
-	case EXPR_BINARY_ISLESSEQUAL:          \
-	case EXPR_BINARY_ISLESSGREATER:        \
-	case EXPR_BINARY_ISUNORDERED:
+#define EXPR_BINARY_CASES              \
+	     EXPR_BINARY_ADD:                \
+	case EXPR_BINARY_SUB:                \
+	case EXPR_BINARY_MUL:                \
+	case EXPR_BINARY_DIV:                \
+	case EXPR_BINARY_MOD:                \
+	case EXPR_BINARY_EQUAL:              \
+	case EXPR_BINARY_NOTEQUAL:           \
+	case EXPR_BINARY_LESS:               \
+	case EXPR_BINARY_LESSEQUAL:          \
+	case EXPR_BINARY_GREATER:            \
+	case EXPR_BINARY_GREATEREQUAL:       \
+	case EXPR_BINARY_BITWISE_AND:        \
+	case EXPR_BINARY_BITWISE_OR:         \
+	case EXPR_BINARY_BITWISE_XOR:        \
+	case EXPR_BINARY_LOGICAL_AND:        \
+	case EXPR_BINARY_LOGICAL_OR:         \
+	case EXPR_BINARY_SHIFTLEFT:          \
+	case EXPR_BINARY_SHIFTRIGHT:         \
+	case EXPR_BINARY_ASSIGN:             \
+	case EXPR_BINARY_MUL_ASSIGN:         \
+	case EXPR_BINARY_DIV_ASSIGN:         \
+	case EXPR_BINARY_MOD_ASSIGN:         \
+	case EXPR_BINARY_ADD_ASSIGN:         \
+	case EXPR_BINARY_SUB_ASSIGN:         \
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:   \
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:  \
+	case EXPR_BINARY_BITWISE_AND_ASSIGN: \
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN: \
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:  \
+	case EXPR_BINARY_COMMA:              \
+	case EXPR_BINARY_ISGREATER:          \
+	case EXPR_BINARY_ISGREATEREQUAL:     \
+	case EXPR_BINARY_ISLESS:             \
+	case EXPR_BINARY_ISLESSEQUAL:        \
+	case EXPR_BINARY_ISLESSGREATER:      \
+	case EXPR_BINARY_ISUNORDERED
 
 /**
  * unary expression with mandatory operand
  */
-#define EXPR_UNARY_CASES_MANDATORY         \
-	case EXPR_UNARY_NEGATE:                \
-	case EXPR_UNARY_PLUS:                  \
-	case EXPR_UNARY_BITWISE_NEGATE:        \
-	case EXPR_UNARY_NOT:                   \
-	case EXPR_UNARY_DEREFERENCE:           \
-	case EXPR_UNARY_TAKE_ADDRESS:          \
-	case EXPR_UNARY_POSTFIX_INCREMENT:     \
-	case EXPR_UNARY_POSTFIX_DECREMENT:     \
-	case EXPR_UNARY_PREFIX_INCREMENT:      \
-	case EXPR_UNARY_PREFIX_DECREMENT:      \
-	case EXPR_UNARY_CAST:                  \
-	case EXPR_UNARY_ASSUME:                \
-	case EXPR_UNARY_DELETE:                \
-	case EXPR_UNARY_DELETE_ARRAY:
+#define EXPR_UNARY_CASES_MANDATORY   \
+	     EXPR_UNARY_NEGATE:            \
+	case EXPR_UNARY_PLUS:              \
+	case EXPR_UNARY_BITWISE_NEGATE:    \
+	case EXPR_UNARY_NOT:               \
+	case EXPR_UNARY_DEREFERENCE:       \
+	case EXPR_UNARY_TAKE_ADDRESS:      \
+	case EXPR_UNARY_POSTFIX_INCREMENT: \
+	case EXPR_UNARY_POSTFIX_DECREMENT: \
+	case EXPR_UNARY_PREFIX_INCREMENT:  \
+	case EXPR_UNARY_PREFIX_DECREMENT:  \
+	case EXPR_UNARY_CAST:              \
+	case EXPR_UNARY_ASSUME:            \
+	case EXPR_UNARY_DELETE:            \
+	case EXPR_UNARY_DELETE_ARRAY
 
 /**
  * unary expression with optional operand
  */
 #define EXPR_UNARY_CASES_OPTIONAL \
-	case EXPR_UNARY_THROW:        \
+	EXPR_UNARY_THROW
 
-#define EXPR_UNARY_CASES       \
-	EXPR_UNARY_CASES_MANDATORY \
-	EXPR_UNARY_CASES_OPTIONAL
+#define EXPR_UNARY_CASES           \
+	     EXPR_UNARY_CASES_MANDATORY: \
+	case EXPR_UNARY_CASES_OPTIONAL
 
-#define EXPR_LITERAL_CASES                        \
-	case EXPR_LITERAL_BOOLEAN:                    \
-	case EXPR_LITERAL_INTEGER:                    \
-	case EXPR_LITERAL_INTEGER_OCTAL:              \
-	case EXPR_LITERAL_INTEGER_HEXADECIMAL:        \
-	case EXPR_LITERAL_FLOATINGPOINT:              \
-	case EXPR_LITERAL_FLOATINGPOINT_HEXADECIMAL:  \
-	case EXPR_LITERAL_CHARACTER:                  \
-	case EXPR_LITERAL_WIDE_CHARACTER:             \
-	case EXPR_LITERAL_MS_NOOP:
+#define EXPR_LITERAL_CASES                     \
+	     EXPR_LITERAL_BOOLEAN:                   \
+	case EXPR_LITERAL_INTEGER:                   \
+	case EXPR_LITERAL_FLOATINGPOINT:             \
+	case EXPR_LITERAL_MS_NOOP
 
 /**
  * The base class of every expression.
@@ -259,26 +249,28 @@ struct expression_base_t {
 };
 
 /**
- * integer/float constants, character and string literals
+ * integer, float and boolean constants
  */
 struct literal_expression_t {
-	expression_base_t  base;
-	string_t           value;
-	string_t           suffix;
+	expression_base_t base;
+	string_t          value;
+	char const       *suffix; /**< Start of the suffix in value. */
 
 	/* ast2firm data */
-	ir_tarval         *target_value;
+	ir_tarval        *target_value;
 };
 
+/**
+ * string and character literals
+ */
 struct string_literal_expression_t {
-	expression_base_t  base;
-	string_t           value;
+	expression_base_t base;
+	string_t          value;
 };
 
 struct funcname_expression_t {
 	expression_base_t  base;
 	funcname_kind_t    kind;
-	string_t           value;     /**< the value once assigned. */
 };
 
 struct compound_literal_expression_t {
@@ -365,7 +357,7 @@ struct offsetof_expression_t {
 struct va_start_expression_t {
 	expression_base_t  base;
 	expression_t      *ap;
-	variable_t        *parameter;
+	expression_t      *parameter;
 };
 
 struct va_arg_expression_t {
@@ -431,7 +423,6 @@ typedef enum initializer_kind_t {
 	INITIALIZER_VALUE,
 	INITIALIZER_LIST,
 	INITIALIZER_STRING,
-	INITIALIZER_WIDE_STRING,
 	INITIALIZER_DESIGNATOR
 } initializer_kind_t;
 
@@ -450,16 +441,6 @@ struct initializer_list_t {
 	initializer_t      *initializers[];
 };
 
-struct initializer_string_t {
-	initializer_base_t base;
-	string_t           string;
-};
-
-struct initializer_wide_string_t {
-	initializer_base_t  base;
-	string_t            string;
-};
-
 struct initializer_designator_t {
 	initializer_base_t  base;
 	designator_t       *designator;
@@ -470,10 +451,15 @@ union initializer_t {
 	initializer_base_t        base;
 	initializer_value_t       value;
 	initializer_list_t        list;
-	initializer_string_t      string;
-	initializer_wide_string_t wide_string;
 	initializer_designator_t  designator;
 };
+
+static inline string_literal_expression_t const *get_init_string(initializer_t const *const init)
+{
+	assert(init->kind == INITIALIZER_STRING);
+	assert(init->value.value->kind == EXPR_STRING_LITERAL);
+	return &init->value.value->string_literal;
+}
 
 /**
  * The statement kinds.
@@ -489,6 +475,7 @@ typedef enum statement_kind_t {
 	STATEMENT_EXPRESSION,
 	STATEMENT_CONTINUE,
 	STATEMENT_BREAK,
+	STATEMENT_COMPUTED_GOTO,
 	STATEMENT_GOTO,
 	STATEMENT_LABEL,
 	STATEMENT_CASE_LABEL,
@@ -534,6 +521,7 @@ struct declaration_statement_t {
 
 struct if_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *true_statement;
 	statement_t      *false_statement;
@@ -541,6 +529,7 @@ struct if_statement_t {
 
 struct switch_statement_t {
 	statement_base_t        base;
+	scope_t                 scope;
 	expression_t           *expression;
 	statement_t            *body;
 	case_label_statement_t *first_case, *last_case; /**< List of all cases, including default. */
@@ -550,8 +539,12 @@ struct switch_statement_t {
 struct goto_statement_t {
 	statement_base_t  base;
 	label_t          *label;         /**< The destination label. */
-	expression_t     *expression;    /**< The expression for an assigned goto. */
 	goto_statement_t *next;          /**< links all goto statements of a function */
+};
+
+struct computed_goto_statement_t {
+	statement_base_t  base;
+	expression_t     *expression; /**< The expression for the computed goto. */
 };
 
 struct case_label_statement_t {
@@ -581,23 +574,25 @@ struct expression_statement_t {
 
 struct while_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct do_while_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *condition;
 	statement_t      *body;
 };
 
 struct for_statement_t {
 	statement_base_t  base;
+	scope_t           scope;
 	expression_t     *initialisation;
 	expression_t     *condition;
 	expression_t     *step;
 	statement_t      *body;
-	scope_t           scope;
 	bool              condition_reachable:1;
 	bool              step_reachable:1;
 };
@@ -635,23 +630,24 @@ struct leave_statement_t {
 };
 
 union statement_t {
-	statement_kind_t         kind;
-	statement_base_t         base;
-	return_statement_t       returns;
-	compound_statement_t     compound;
-	declaration_statement_t  declaration;
-	if_statement_t           ifs;
-	switch_statement_t       switchs;
-	goto_statement_t         gotos;
-	case_label_statement_t   case_label;
-	label_statement_t        label;
-	expression_statement_t   expression;
-	while_statement_t        whiles;
-	do_while_statement_t     do_while;
-	for_statement_t          fors;
-	asm_statement_t          asms;
-	ms_try_statement_t       ms_try;
-	leave_statement_t        leave;
+	statement_kind_t          kind;
+	statement_base_t          base;
+	return_statement_t        returns;
+	compound_statement_t      compound;
+	declaration_statement_t   declaration;
+	if_statement_t            ifs;
+	switch_statement_t        switchs;
+	computed_goto_statement_t computed_goto;
+	goto_statement_t          gotos;
+	case_label_statement_t    case_label;
+	label_statement_t         label;
+	expression_statement_t    expression;
+	while_statement_t         whiles;
+	do_while_statement_t      do_while;
+	for_statement_t           fors;
+	asm_statement_t           asms;
+	ms_try_statement_t        ms_try;
+	leave_statement_t         leave;
 };
 
 struct translation_unit_t {

@@ -20,12 +20,12 @@
 #ifndef ENTITY_T_H
 #define ENTITY_T_H
 
-#include "lexer.h"
 #include "symbol.h"
 #include "entity.h"
 #include "attribute.h"
 #include <libfirm/firm_types.h>
 #include "builtins.h"
+#include "token_t.h"
 
 typedef enum {
 	ENTITY_VARIABLE = 1,
@@ -91,6 +91,7 @@ typedef enum decl_modifier_t {
 	DM_RETURNS_TWICE     = 1 << 25,
 	DM_MALLOC            = 1 << 26,
 	DM_WEAK              = 1 << 27,
+	DM_LEAF              = 1 << 28,
 } decl_modifier_t;
 
 typedef enum elf_visibility_tag_t {
@@ -239,18 +240,6 @@ struct variable_t {
 	} v;
 };
 
-struct parameter_t {
-	declaration_t  base;
-	bool           address_taken : 1;
-	bool           read          : 1;
-
-	/* ast2firm info */
-	union {
-		unsigned int  value_number;
-		ir_entity    *entity;
-	} v;
-};
-
 struct function_t {
 	declaration_t  base;
 	bool           is_inline      : 1;
@@ -285,21 +274,20 @@ union entity_t {
 	typedef_t          typedefe;
 	declaration_t      declaration;
 	variable_t         variable;
-	parameter_t        parameter;
 	function_t         function;
 	compound_member_t  compound_member;
 };
 
-#define DECLARATION_KIND_CASES        \
-	case ENTITY_FUNCTION:             \
-	case ENTITY_VARIABLE:             \
-	case ENTITY_PARAMETER:            \
-	case ENTITY_COMPOUND_MEMBER:
+#define DECLARATION_KIND_CASES \
+	     ENTITY_FUNCTION:        \
+	case ENTITY_VARIABLE:        \
+	case ENTITY_PARAMETER:       \
+	case ENTITY_COMPOUND_MEMBER
 
 static inline bool is_declaration(const entity_t *entity)
 {
 	switch(entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		return true;
 	default:
 		return false;
@@ -308,7 +296,7 @@ static inline bool is_declaration(const entity_t *entity)
 
 const char *get_entity_kind_name(entity_kind_t kind);
 
-entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*);
+entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*, source_position_t const*);
 
 elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
 

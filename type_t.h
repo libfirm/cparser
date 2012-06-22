@@ -229,6 +229,11 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_kind_t atype)
 	return atomic_type->akind == atype;
 }
 
+static inline bool is_type_void(type_t const *const type)
+{
+	return is_type_atomic(type, ATOMIC_TYPE_VOID);
+}
+
 static inline bool is_type_pointer(const type_t *type)
 {
 	assert(!is_typeref(type));

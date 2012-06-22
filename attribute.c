@@ -29,89 +29,90 @@
 #include "type_t.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
-	[ATTRIBUTE_GNU_CONST]                  = "const",
-	[ATTRIBUTE_GNU_VOLATILE]               = "volatile",
-	[ATTRIBUTE_GNU_CDECL]                  = "cdecl",
-	[ATTRIBUTE_GNU_STDCALL]                = "stdcall",
-	[ATTRIBUTE_GNU_FASTCALL]               = "fastcall",
-	[ATTRIBUTE_GNU_DEPRECATED]             = "deprecated",
-	[ATTRIBUTE_GNU_NOINLINE]               = "noinline",
-	[ATTRIBUTE_GNU_RETURNS_TWICE]          = "returns_twice",
-	[ATTRIBUTE_GNU_NORETURN]               = "noreturn",
-	[ATTRIBUTE_GNU_NAKED]                  = "naked",
-	[ATTRIBUTE_GNU_PURE]                   = "pure",
-	[ATTRIBUTE_GNU_ALWAYS_INLINE]          = "always_inline",
-	[ATTRIBUTE_GNU_MALLOC]                 = "malloc",
-	[ATTRIBUTE_GNU_WEAK]                   = "weak",
-	[ATTRIBUTE_GNU_CONSTRUCTOR]            = "constructor",
-	[ATTRIBUTE_GNU_DESTRUCTOR]             = "destructor",
-	[ATTRIBUTE_GNU_NOTHROW]                = "nothrow",
-	[ATTRIBUTE_GNU_TRANSPARENT_UNION]      = "transparent_union",
-	[ATTRIBUTE_GNU_COMMON]                 = "common",
-	[ATTRIBUTE_GNU_NOCOMMON]               = "nocommon",
-	[ATTRIBUTE_GNU_PACKED]                 = "packed",
-	[ATTRIBUTE_GNU_SHARED]                 = "shared",
-	[ATTRIBUTE_GNU_NOTSHARED]              = "notshared",
-	[ATTRIBUTE_GNU_USED]                   = "used",
-	[ATTRIBUTE_GNU_UNUSED]                 = "unused",
-	[ATTRIBUTE_GNU_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
-	[ATTRIBUTE_GNU_WARN_UNUSED_RESULT]     = "warn_unused_result",
-	[ATTRIBUTE_GNU_LONGCALL]               = "longcall",
-	[ATTRIBUTE_GNU_SHORTCALL]              = "shortcall",
-	[ATTRIBUTE_GNU_LONG_CALL]              = "long_call",
-	[ATTRIBUTE_GNU_SHORT_CALL]             = "short_call",
-	[ATTRIBUTE_GNU_FUNCTION_VECTOR]        = "function_vector",
-	[ATTRIBUTE_GNU_INTERRUPT]              = "interrupt",
-	[ATTRIBUTE_GNU_INTERRUPT_HANDLER]      = "interrupt_handler",
-	[ATTRIBUTE_GNU_NMI_HANDLER]            = "nmi_handler",
-	[ATTRIBUTE_GNU_NESTING]                = "nesting",
-	[ATTRIBUTE_GNU_NEAR]                   = "near",
-	[ATTRIBUTE_GNU_FAR]                    = "far",
-	[ATTRIBUTE_GNU_SIGNAL]                 = "signal",
-	[ATTRIBUTE_GNU_EIGTHBIT_DATA]          = "eightbit_data",
-	[ATTRIBUTE_GNU_TINY_DATA]              = "tiny_data",
-	[ATTRIBUTE_GNU_SAVEALL]                = "saveall",
-	[ATTRIBUTE_GNU_FLATTEN]                = "flatten",
-	[ATTRIBUTE_GNU_SSEREGPARM]             = "sseregparm",
-	[ATTRIBUTE_GNU_EXTERNALLY_VISIBLE]     = "externally_visible",
-	[ATTRIBUTE_GNU_MAY_ALIAS]              = "may_alias",
-	[ATTRIBUTE_GNU_MS_STRUCT]              = "ms_struct",
-	[ATTRIBUTE_GNU_GCC_STRUCT]             = "gcc_struct",
-	[ATTRIBUTE_GNU_DLLIMPORT]              = "dllimport",
-	[ATTRIBUTE_GNU_DLLEXPORT]              = "dllexport",
-	[ATTRIBUTE_GNU_ALIGNED]                = "aligned",
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",
-	[ATTRIBUTE_GNU_SECTION]                = "section",
-	[ATTRIBUTE_GNU_FORMAT]                 = "format",
+	[ATTRIBUTE_GNU_ALIGNED]                = "aligned",
+	[ATTRIBUTE_GNU_ALWAYS_INLINE]          = "always_inline",
+	[ATTRIBUTE_GNU_CDECL]                  = "cdecl",
+	[ATTRIBUTE_GNU_COMMON]                 = "common",
+	[ATTRIBUTE_GNU_CONST]                  = "const",
+	[ATTRIBUTE_GNU_CONSTRUCTOR]            = "constructor",
+	[ATTRIBUTE_GNU_DEPRECATED]             = "deprecated",
+	[ATTRIBUTE_GNU_DESTRUCTOR]             = "destructor",
+	[ATTRIBUTE_GNU_DLLEXPORT]              = "dllexport",
+	[ATTRIBUTE_GNU_DLLIMPORT]              = "dllimport",
+	[ATTRIBUTE_GNU_EIGTHBIT_DATA]          = "eightbit_data",
+	[ATTRIBUTE_GNU_EXTERNALLY_VISIBLE]     = "externally_visible",
+	[ATTRIBUTE_GNU_FAR]                    = "far",
+	[ATTRIBUTE_GNU_FASTCALL]               = "fastcall",
+	[ATTRIBUTE_GNU_FLATTEN]                = "flatten",
 	[ATTRIBUTE_GNU_FORMAT_ARG]             = "format_arg",
-	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
-	[ATTRIBUTE_GNU_NONNULL]                = "nonnull",
-	[ATTRIBUTE_GNU_TLS_MODEL]              = "tls_model",
-	[ATTRIBUTE_GNU_VISIBILITY]             = "visibility",
-	[ATTRIBUTE_GNU_REGPARM]                = "regparm",
-	[ATTRIBUTE_GNU_MODE]                   = "mode",
+	[ATTRIBUTE_GNU_FORMAT]                 = "format",
+	[ATTRIBUTE_GNU_FUNCTION_VECTOR]        = "function_vector",
+	[ATTRIBUTE_GNU_GCC_STRUCT]             = "gcc_struct",
+	[ATTRIBUTE_GNU_INTERRUPT_HANDLER]      = "interrupt_handler",
+	[ATTRIBUTE_GNU_INTERRUPT]              = "interrupt",
+	[ATTRIBUTE_GNU_LEAF]                   = "leaf",
+	[ATTRIBUTE_GNU_LONGCALL]               = "longcall",
+	[ATTRIBUTE_GNU_LONG_CALL]              = "long_call",
+	[ATTRIBUTE_GNU_MALLOC]                 = "malloc",
+	[ATTRIBUTE_GNU_MAY_ALIAS]              = "may_alias",
 	[ATTRIBUTE_GNU_MODEL]                  = "model",
-	[ATTRIBUTE_GNU_TRAP_EXIT]              = "trap_exit",
-	[ATTRIBUTE_GNU_SP_SWITCH]              = "sp_switch",
+	[ATTRIBUTE_GNU_MODE]                   = "mode",
+	[ATTRIBUTE_GNU_MS_STRUCT]              = "ms_struct",
+	[ATTRIBUTE_GNU_NAKED]                  = "naked",
+	[ATTRIBUTE_GNU_NEAR]                   = "near",
+	[ATTRIBUTE_GNU_NESTING]                = "nesting",
+	[ATTRIBUTE_GNU_NMI_HANDLER]            = "nmi_handler",
+	[ATTRIBUTE_GNU_NOCOMMON]               = "nocommon",
+	[ATTRIBUTE_GNU_NOINLINE]               = "noinline",
+	[ATTRIBUTE_GNU_NO_INSTRUMENT_FUNCTION] = "no_instrument_function",
+	[ATTRIBUTE_GNU_NONNULL]                = "nonnull",
+	[ATTRIBUTE_GNU_NORETURN]               = "noreturn",
+	[ATTRIBUTE_GNU_NOTHROW]                = "nothrow",
+	[ATTRIBUTE_GNU_NOTSHARED]              = "notshared",
+	[ATTRIBUTE_GNU_PACKED]                 = "packed",
+	[ATTRIBUTE_GNU_PURE]                   = "pure",
+	[ATTRIBUTE_GNU_REGPARM]                = "regparm",
+	[ATTRIBUTE_GNU_RETURNS_TWICE]          = "returns_twice",
+	[ATTRIBUTE_GNU_SAVEALL]                = "saveall",
+	[ATTRIBUTE_GNU_SECTION]                = "section",
 	[ATTRIBUTE_GNU_SENTINEL]               = "sentinel",
+	[ATTRIBUTE_GNU_SHARED]                 = "shared",
+	[ATTRIBUTE_GNU_SHORTCALL]              = "shortcall",
+	[ATTRIBUTE_GNU_SHORT_CALL]             = "short_call",
+	[ATTRIBUTE_GNU_SIGNAL]                 = "signal",
+	[ATTRIBUTE_GNU_SP_SWITCH]              = "sp_switch",
+	[ATTRIBUTE_GNU_SSEREGPARM]             = "sseregparm",
+	[ATTRIBUTE_GNU_STDCALL]                = "stdcall",
+	[ATTRIBUTE_GNU_TINY_DATA]              = "tiny_data",
+	[ATTRIBUTE_GNU_TLS_MODEL]              = "tls_model",
+	[ATTRIBUTE_GNU_TRANSPARENT_UNION]      = "transparent_union",
+	[ATTRIBUTE_GNU_TRAP_EXIT]              = "trap_exit",
+	[ATTRIBUTE_GNU_UNUSED]                 = "unused",
+	[ATTRIBUTE_GNU_USED]                   = "used",
+	[ATTRIBUTE_GNU_VISIBILITY]             = "visibility",
+	[ATTRIBUTE_GNU_VOLATILE]               = "volatile",
+	[ATTRIBUTE_GNU_WARN_UNUSED_RESULT]     = "warn_unused_result",
+	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
+	[ATTRIBUTE_GNU_WEAK]                   = "weak",
 
 	[ATTRIBUTE_MS_ALIGN]                   = "align",
 	[ATTRIBUTE_MS_ALLOCATE]                = "allocate",
-	[ATTRIBUTE_MS_DLLIMPORT]               = "dllimport",
+	[ATTRIBUTE_MS_DEPRECATED]              = "deprecated",
 	[ATTRIBUTE_MS_DLLEXPORT]               = "dllexport",
+	[ATTRIBUTE_MS_DLLIMPORT]               = "dllimport",
 	[ATTRIBUTE_MS_NAKED]                   = "naked",
+	[ATTRIBUTE_MS_NOALIAS]                 = "noalias",
 	[ATTRIBUTE_MS_NOINLINE]                = "noinline",
-	[ATTRIBUTE_MS_RETURNS_TWICE]           = "returns_twice",
 	[ATTRIBUTE_MS_NORETURN]                = "noreturn",
 	[ATTRIBUTE_MS_NOTHROW]                 = "nothrow",
 	[ATTRIBUTE_MS_NOVTABLE]                = "novtable",
 	[ATTRIBUTE_MS_PROPERTY]                = "property",
+	[ATTRIBUTE_MS_RESTRICT]                = "restrict",
+	[ATTRIBUTE_MS_RETURNS_TWICE]           = "returns_twice",
 	[ATTRIBUTE_MS_SELECTANY]               = "selectany",
 	[ATTRIBUTE_MS_THREAD]                  = "thread",
 	[ATTRIBUTE_MS_UUID]                    = "uuid",
-	[ATTRIBUTE_MS_DEPRECATED]              = "deprecated",
-	[ATTRIBUTE_MS_RESTRICT]                = "restrict",
-	[ATTRIBUTE_MS_NOALIAS]                 = "noalias",
 };
 
 const char *get_attribute_name(attribute_kind_t kind)
@@ -200,7 +201,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 
 	switch (entity->kind) {
-	DECLARATION_KIND_CASES
+	case DECLARATION_KIND_CASES:
 		entity->declaration.alignment = alignment;
 	case ENTITY_TYPEDEF:
 		entity->typedefe.alignment = alignment;
@@ -211,13 +212,10 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 			entity->compound.alignment = alignment;
 		}
 		break;
-	default: {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "alignment attribute specification on %s '%S' ignored", what, sym);
+
+	default:
+		warningf(WARN_OTHER, &attribute->source_position, "alignment attribute specification on '%N' ignored", entity);
 		break;
-	}
 	}
 }
 
@@ -230,7 +228,7 @@ static const char *get_argument_string(const attribute_argument_t *argument)
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		return NULL;
-	return expression->literal.value.begin;
+	return expression->string_literal.value.begin;
 }
 
 static void handle_attribute_visibility(const attribute_t *attribute,
@@ -264,13 +262,10 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 	case ENTITY_FUNCTION:
 		entity->function.elf_visibility = visibility;
 		break;
-	default: {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "visibility attribute specification on %s '%S' ignored", what, sym);
+
+	default:
+		warningf(WARN_OTHER, &attribute->source_position, "visibility attribute specification on '%N' ignored", entity);
 		break;
-	}
 	}
 }
 
@@ -289,10 +284,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 {
 #if 0
 	if (entity->kind != ENTITY_STRUCT) {
-		source_position_t const *const pos  = &attribute->source_position;
-		char              const *const what = get_entity_kind_name(entity->kind);
-		symbol_t          const *const sym  = entity->base.symbol;
-		warningf(WARN_OTHER, pos, "packed attribute on %s '%S' ignored", what, sym);
+		warningf(WARN_OTHER, &attribute->source_position, "packed attribute on '%N' ignored", entity);
 		return;
 	}
 #endif
@@ -359,6 +351,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_GNU_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_GNU_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;
 		case ATTRIBUTE_GNU_WEAK:          modifiers |= DM_WEAK; break;
+		case ATTRIBUTE_GNU_LEAF:          modifiers |= DM_LEAF; break;
 
 		case ATTRIBUTE_MS_DLLIMPORT:     modifiers |= DM_DLLIMPORT; break;
 		case ATTRIBUTE_MS_DLLEXPORT:     modifiers |= DM_DLLEXPORT; break;

@@ -25,21 +25,39 @@ static ir_entity *underscore_compilerlib_entity_creator(ident *id, ir_type *mt)
 	return entity;
 }
 
+bool firm_is_unixish_os(const machine_triple_t *machine)
+{
+	const char *os = machine->operating_system;
+	return strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
+		|| strstart(os, "solaris");
+}
+
+bool firm_is_darwin_os(const machine_triple_t *machine)
+{
+	const char *os = machine->operating_system;
+	return strstart(os, "darwin");
+}
+
+bool firm_is_windows_os(const machine_triple_t *machine)
+{
+	const char *os = machine->operating_system;
+	return strstart(os, "mingw") || streq(os, "win32");
+}
+
 /**
  * Initialize firm codegeneration for a specific operating system.
  * The argument is the operating system part of a target-triple
  */
-static bool setup_os_support(const char *os)
+static bool setup_os_support(const machine_triple_t *machine)
 {
-	if (strstr(os, "linux") != NULL || strstr(os, "bsd") != NULL
-			|| streq(os, "solaris")) {
+	if (firm_is_unixish_os(machine)) {
 		set_be_option("ia32-gasmode=elf");
-	} else if (streq(os, "darwin")) {
+	} else if (firm_is_darwin_os(machine)) {
 		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
 		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
-	} else if (strstr(os, "mingw") != NULL || streq(os, "win32")) {
+	} else if (firm_is_windows_os(machine)) {
 		set_be_option("ia32-gasmode=mingw");
 		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
 	} else {
@@ -83,7 +101,7 @@ bool setup_firm_for_machine(const machine_triple_t *machine)
 	}
 
 	/* process operating system */
-	if (!setup_os_support(machine->operating_system)) {
+	if (!setup_os_support(machine)) {
 		fprintf(stderr, "Unknown operating system '%s' in target-triple\n", machine->operating_system);
 		return false;
 	}

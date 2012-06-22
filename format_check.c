@@ -127,12 +127,11 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 		return nt > nf ? nt : nf;
 	}
 
-	if (fmt_expr->kind != EXPR_STRING_LITERAL
-			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
+	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return -1;
 
-	const char *string = fmt_expr->literal.value.begin;
-	size_t      size   = fmt_expr->literal.value.size;
+	const char *string = fmt_expr->string_literal.value.begin;
+	size_t      size   = fmt_expr->string_literal.value.size;
 	const char *c      = string;
 
 	const source_position_t *pos = &fmt_expr->base.source_position;
@@ -144,10 +143,6 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 			continue;
 		fmt = *(++c);
 
-		if (fmt == '\0') {
-			warningf(WARN_FORMAT, pos, "dangling %% in format string");
-			break;
-		}
 		if (fmt == '%')
 			continue;
 
@@ -322,6 +317,10 @@ break_fmt_flags:
 				break;
 		}
 
+		if (fmt == '\0') {
+			warningf(WARN_FORMAT, pos, "dangling %% in format string");
+			break;
+		}
 
 		type_t            *expected_type;
 		type_qualifiers_t  expected_qual = TYPE_QUALIFIER_NONE;
@@ -535,7 +534,7 @@ too_few_args:
 			if (is_type_valid(arg_skip)) {
 				source_position_t const *const apos = &arg->expression->base.source_position;
 				char              const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:
@@ -600,12 +599,11 @@ static void check_scanf_format(const call_argument_t *arg,
 		fmt_expr = fmt_expr->unary.value;
 	}
 
-	if (fmt_expr->kind != EXPR_STRING_LITERAL
-			&& fmt_expr->kind != EXPR_WIDE_STRING_LITERAL)
+	if (fmt_expr->kind != EXPR_STRING_LITERAL)
 		return;
 
-	const char *string = fmt_expr->literal.value.begin;
-	size_t      size   = fmt_expr->literal.value.size;
+	const char *string = fmt_expr->string_literal.value.begin;
+	size_t      size   = fmt_expr->string_literal.value.size;
 	const char *c      = string;
 
 	/* find the real args */
@@ -843,7 +841,7 @@ check_c_width:
 				warn_invalid_length_modifier(pos, fmt_mod, fmt);
 				goto next_arg;
 			}
-			expected_type = type_void_ptr;
+			expected_type = type_void;
 			break;
 
 		case 'n': {
@@ -916,7 +914,7 @@ error_arg_type:
 			if (is_type_valid(arg_skip)) {
 				source_position_t const *const apos = &arg->expression->base.source_position;
 				char              const *const mod  = get_length_modifier_name(fmt_mod);
-				warningf(WARN_FORMAT, apos, "argument type '%T' does not match conversion specifier '%%%s%c' at position %u", arg_type, mod, (char)fmt, num_fmt);
+				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T*' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}
 next_arg:

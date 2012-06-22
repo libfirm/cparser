@@ -96,16 +96,16 @@ static void walk_expression(expression_t *const expr,
 		walk_statement(expr->statement.statement, env);
 		return;
 
-	EXPR_BINARY_CASES
+	case EXPR_BINARY_CASES:
 		walk_expression(expr->binary.left, env);
 		walk_expression(expr->binary.right, env);
 		return;
 
-	EXPR_UNARY_CASES_OPTIONAL
+	case EXPR_UNARY_CASES_OPTIONAL:
 		if (expr->unary.value == NULL)
 			return;
 		/* FALLTHROUGH */
-	EXPR_UNARY_CASES_MANDATORY
+	case EXPR_UNARY_CASES_MANDATORY:
 		walk_expression(expr->unary.value, env);
 		return;
 
@@ -176,11 +176,11 @@ static void walk_expression(expression_t *const expr,
 		walk_designator(expr->offsetofe.designator, env);
 		return;
 
-	EXPR_LITERAL_CASES
+	case EXPR_LITERAL_CASES:
+	case EXPR_LITERAL_CHARACTER:
 	case EXPR_REFERENCE:
-	case EXPR_REFERENCE_ENUM_VALUE:
+	case EXPR_ENUM_CONSTANT:
 	case EXPR_STRING_LITERAL:
-	case EXPR_WIDE_STRING_LITERAL:
 	case EXPR_FUNCNAME:
 	case EXPR_LABEL_ADDRESS:
 	case EXPR_ERROR:
@@ -214,8 +214,8 @@ static void walk_initializer(const initializer_t  *initializer,
 	case INITIALIZER_DESIGNATOR:
 		walk_designator(initializer->designator.designator, env);
 		return;
+
 	case INITIALIZER_STRING:
-	case INITIALIZER_WIDE_STRING:
 		return;
 	}
 }
@@ -327,6 +327,11 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		return;
 
 	case STATEMENT_CASE_LABEL:
+		if (stmt->case_label.expression) {
+			walk_expression(stmt->case_label.expression, env);
+			if (stmt->case_label.end_range)
+				walk_expression(stmt->case_label.end_range, env);
+		}
 		walk_statement(stmt->case_label.statement, env);
 		return;
 
@@ -359,12 +364,16 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		walk_statement(stmt->ms_try.final_statement, env);
 		return;
 
+	case STATEMENT_COMPUTED_GOTO:
+		walk_expression(stmt->computed_goto.expression, env);
+		return;
+
 	case STATEMENT_ERROR:
 	case STATEMENT_EMPTY:
 	case STATEMENT_CONTINUE:
 	case STATEMENT_BREAK:
-	case STATEMENT_GOTO:
 	case STATEMENT_ASM:
+	case STATEMENT_GOTO:
 	case STATEMENT_LEAVE:
 		return;
 	}

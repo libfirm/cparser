@@ -692,7 +692,7 @@ static void do_firm_lowering(const char *input_filename)
 			do_irg_opt(irg, "control-flow");
 		}
 
-		set_irg_state(irg, IR_GRAPH_STATE_NORMALISATION2);
+		add_irg_constraints(irg, IR_GRAPH_CONSTRAINT_NORMALISATION2);
 		do_irg_opt(irg, "local");
 
 		do_irg_opt(irg, "parallelize-mem");
@@ -756,12 +756,9 @@ void generate_code(FILE *out, const char *input_filename)
 {
 	int i;
 
-	set_optimize(1);
-	set_opt_constant_folding(firm_opt.const_folding);
-	set_opt_algebraic_simplification(firm_opt.const_folding);
-	set_opt_cse(firm_opt.cse);
-	set_opt_global_cse(0);
-
+	/* initialize implicit opts, just to be sure because really the frontend
+	 * should have called it already before starting graph construction */
+	init_implicit_optimizations();
 	init_statistics();
 
 	do_node_verification((firm_verification_t) firm_opt.verify);
@@ -833,6 +830,7 @@ static void disable_all_opts(void)
 	firm_opt.alias_analysis  = false;
 	firm_opt.strict_alias    = false;
 	firm_opt.no_alias        = false;
+	firm_opt.const_folding   = false;
 
 	FOR_EACH_OPT(config) {
 		if (config->flags & OPT_FLAG_ESSENTIAL) {
@@ -964,4 +962,13 @@ void choose_optimization_pack(int level)
 		set_be_option("omitfp");
 		break;
 	}
+}
+
+void init_implicit_optimizations(void)
+{
+	set_optimize(1);
+	set_opt_constant_folding(firm_opt.const_folding);
+	set_opt_algebraic_simplification(firm_opt.const_folding);
+	set_opt_cse(firm_opt.cse);
+	set_opt_global_cse(0);
 }

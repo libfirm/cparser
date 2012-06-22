@@ -33,7 +33,7 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 {
 	entry->string        = string;
 	entry->ID            = T_IDENTIFIER;
-	entry->pp_ID         = TP_IDENTIFIER;
+	entry->pp_ID         = TP_NULL;
 	entry->entity        = NULL;
 	entry->pp_definition = NULL;
 }
@@ -68,6 +68,8 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 
 static symbol_table_t  symbol_table;
 
+symbol_t *sym_anonymous;
+
 symbol_t *symbol_table_insert(const char *string)
 {
 	return _symbol_table_insert(&symbol_table, string);
@@ -77,6 +79,7 @@ void init_symbol_table(void)
 {
 	obstack_init(&symbol_obstack);
 	_symbol_table_init(&symbol_table);
+	sym_anonymous = symbol_table_insert("<anonymous>");
 }
 
 void exit_symbol_table(void)
