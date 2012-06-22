@@ -2090,6 +2090,57 @@ static void parse_line_directive(void)
 	eat_pp_directive();
 }
 
+static void parse_error_directive(void)
+{
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
+
+	bool const old_resolve_escape_sequences = resolve_escape_sequences;
+	resolve_escape_sequences = false;
+
+	source_position_t const pos = pp_token.base.source_position;
+	do {
+		if (info.had_whitespace && obstack_object_size(&pp_obstack) != 0)
+			obstack_1grow(&pp_obstack, ' ');
+
+		switch (pp_token.kind) {
+		case T_NUMBER: {
+			string_t const *const str = &pp_token.literal.string;
+			obstack_grow(&pp_obstack, str->begin, str->size);
+			break;
+		}
+
+		{
+			char delim;
+		case T_STRING_LITERAL:     delim =  '"'; goto string;
+		case T_CHARACTER_CONSTANT: delim = '\''; goto string;
+string:;
+			string_t const *const str = &pp_token.literal.string;
+			char     const *const enc = get_string_encoding_prefix(str->encoding);
+			obstack_printf(&pp_obstack, "%s%c%s%c", enc, delim, str->begin, delim);
+			break;
+		}
+
+		default: {
+			char const *const str = pp_token.base.symbol->string;
+			obstack_grow(&pp_obstack, str, strlen(str));
+			break;
+		}
+		}
+
+		next_input_token();
+	} while (!info.at_line_begin);
+
+	resolve_escape_sequences = old_resolve_escape_sequences;
+
+	obstack_1grow(&pp_obstack, '\0');
+	char *const str = obstack_finish(&pp_obstack);
+	errorf(&pos, "#%s", str);
+	obstack_free(&pp_obstack, str);
+}
+
 static void parse_preprocessing_directive(void)
 {
 	eat_token('#');
@@ -2104,6 +2155,7 @@ static void parse_preprocessing_directive(void)
 		case TP_define:  parse_define_directive();            break;
 		case TP_else:    parse_else_directive();              break;
 		case TP_endif:   parse_endif_directive();             break;
+		case TP_error:   parse_error_directive();             break;
 		case TP_ifdef:   parse_ifdef_ifndef_directive(true);  break;
 		case TP_ifndef:  parse_ifdef_ifndef_directive(false); break;
 		case TP_include: parse_include_directive();           break;
