@@ -2350,6 +2350,14 @@ static void setup_include_path(void)
 	}
 }
 
+static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
+{
+	source_position_t pos = pp_token.base.source_position;
+	pos.lineno += delta_lines;
+	pos.colno  += delta_cols;
+	errorf(&pos, "%s", message);
+}
+
 void init_preprocessor(void)
 {
 	init_symbols();
@@ -2360,6 +2368,8 @@ void init_preprocessor(void)
 	strset_init(&stringset);
 
 	setup_include_path();
+
+	set_input_error_callback(input_error);
 }
 
 void exit_preprocessor(void)
