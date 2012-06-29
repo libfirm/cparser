@@ -6,6 +6,7 @@ T(OFF)
 T(ON)
 T(STDC)
 T(define)
+T(defined)
 T(elif)
 T(else)  /* remember that this gives T_else, not T_IDENTIFIER like most others */
 T(endif)

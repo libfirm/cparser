@@ -1515,6 +1515,41 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	return true;
 }
 
+static bool is_defineable_token(char const *const context)
+{
+	if (info.at_line_begin) {
+		errorf(&pp_token.base.source_position, "unexpected end of line after %s", context);
+	}
+
+	symbol_t *const symbol = pp_token.base.symbol;
+	if (!symbol)
+		goto no_ident;
+
+	if (pp_token.kind != T_IDENTIFIER) {
+		switch (symbol->string[0]) {
+		case SYMBOL_CASES:
+dollar_sign:
+			break;
+
+		default:
+no_ident:
+			errorf(&pp_token.base.source_position, "expected identifier after %s, got %K", context, &pp_token);
+			return false;
+		}
+	}
+
+	/* TODO turn this into a flag in pp_def. */
+	switch (symbol->pp_ID) {
+	/* §6.10.8:4 */
+	case TP_defined:
+		errorf(&pp_token.base.source_position, "%K cannot be used as macro name in %s", &pp_token, context);
+		return false;
+
+	default:
+		return true;
+	}
+}
+
 static void parse_define_directive(void)
 {
 	eat_pp(TP_define);
@@ -1525,11 +1560,8 @@ static void parse_define_directive(void)
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
-		errorf(&pp_token.base.source_position,
-		       "expected identifier after #define, got %K", &pp_token);
+	if (!is_defineable_token("#define"))
 		goto error_out;
-	}
 	symbol_t *const symbol = pp_token.base.symbol;
 
 	pp_definition_t *new_definition
@@ -1542,7 +1574,7 @@ static void parse_define_directive(void)
 	 * lexer (except for the fact that they separate tokens). #define b(x)
 	 * is something else than #define b (x) */
 	if (input.c == '(') {
-		eat_token(T_IDENTIFIER);
+		next_input_token();
 		eat_token('(');
 
 		while (true) {
@@ -1614,7 +1646,7 @@ static void parse_define_directive(void)
 			symbol->pp_definition      = param;
 		}
 	} else {
-		eat_token(T_IDENTIFIER);
+		next_input_token();
 	}
 
 	/* construct token list */
@@ -1683,15 +1715,13 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	if (pp_token.kind != T_IDENTIFIER) {
-		errorf(&input.position,
-		       "expected identifier after #undef, got %K", &pp_token);
+	if (!is_defineable_token("#undef")) {
 		eat_pp_directive();
 		return;
 	}
 
 	pp_token.base.symbol->pp_definition = NULL;
-	eat_token(T_IDENTIFIER);
+	next_input_token();
 
 	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
@@ -2201,8 +2231,14 @@ restart:
 
 	const token_kind_t kind = pp_token.kind;
 	if (current_call == NULL || argument_expanding != NULL) {
-		if (kind == T_IDENTIFIER) {
-			symbol_t        *const symbol        = pp_token.base.symbol;
+		symbol_t *const symbol = pp_token.base.symbol;
+		if (symbol) {
+			if (kind == T_MACRO_PARAMETER) {
+				assert(current_expansion != NULL);
+				start_expanding(pp_token.macro_parameter.def);
+				goto restart;
+			}
+
 			pp_definition_t *const pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {
 				if (pp_definition->has_parameters) {
@@ -2248,10 +2284,6 @@ restart:
 					goto restart;
 				}
 			}
-		} else if (kind == T_MACRO_PARAMETER) {
-			assert(current_expansion != NULL);
-			start_expanding(pp_token.macro_parameter.def);
-			goto restart;
 		}
 	}
 
