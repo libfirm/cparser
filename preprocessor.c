@@ -806,13 +806,11 @@ restart:;
  */
 static token_kind_t peek_expansion(void)
 {
-	pp_definition_t *expansion = current_expansion;
-	while (expansion != NULL && expansion->expand_pos >= expansion->list_len) {
-		expansion = expansion->parent_expansion;
+	for (pp_definition_t *e = current_expansion; e; e = e->parent_expansion) {
+		if (e->expand_pos < e->list_len)
+			return e->token_list[e->expand_pos].token.kind;
 	}
-	if (expansion == NULL)
-		return T_EOF;
-	return expansion->token_list[expansion->expand_pos].token.kind;
+	return T_EOF;
 }
 
 static void skip_line_comment(void)
