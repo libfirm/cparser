@@ -67,18 +67,18 @@ struct pp_conditional_t {
 
 typedef struct pp_input_t pp_input_t;
 struct pp_input_t {
-	FILE              *file;
-	input_t           *input;
-	utf32              c;
-	utf32              buf[1024+MAX_PUTBACK];
-	const utf32       *bufend;
-	const utf32       *bufpos;
-	source_position_t  position;
-	pp_input_t        *parent;
-	unsigned           output_line;
+	FILE               *file;
+	input_t            *input;
+	utf32               c;
+	utf32               buf[1024+MAX_PUTBACK];
+	const utf32        *bufend;
+	const utf32        *bufpos;
+	source_position_t   position;
+	pp_input_t         *parent;
+	unsigned            output_line;
+	searchpath_entry_t *path;
 };
 
-typedef struct searchpath_entry_t searchpath_entry_t;
 struct searchpath_entry_t {
 	const char         *path;
 	searchpath_entry_t *next;
@@ -136,7 +136,7 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-void switch_pp_input(FILE *const file, char const *const filename)
+void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path)
 {
 	input.file                = file;
 	input.input               = input_from_stream(file, NULL);
@@ -145,6 +145,7 @@ void switch_pp_input(FILE *const file, char const *const filename)
 	input.output_line         = 0;
 	input.position.input_name = filename;
 	input.position.lineno     = 1;
+	input.path                = path;
 
 	/* indicate that we're at a new input */
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
@@ -1787,35 +1788,41 @@ finish_error:
 	pp_token.literal.string       = string;
 }
 
-static bool do_include(bool system_include, char const *const headername)
+static bool do_include(bool const system_include, bool const include_next, char const *const headername)
 {
-	size_t headername_len = strlen(headername);
-	if (!system_include) {
-		/* put dirname of current input on obstack */
-		const char *filename   = input.position.input_name;
-		const char *last_slash = strrchr(filename, '/');
-		const char *full_name;
-		if (last_slash != NULL) {
-			size_t len = last_slash - filename;
-			obstack_grow(&symbol_obstack, filename, len + 1);
-			obstack_grow0(&symbol_obstack, headername, headername_len);
-			char *complete_path = obstack_finish(&symbol_obstack);
-			full_name = identify_string(complete_path);
-		} else {
-			full_name = headername;
+	size_t const        headername_len = strlen(headername);
+	searchpath_entry_t *entry;
+	if (include_next) {
+		entry = input.path ? input.path->next : searchpath;
+	} else {
+		if (!system_include) {
+			/* put dirname of current input on obstack */
+			const char *filename   = input.position.input_name;
+			const char *last_slash = strrchr(filename, '/');
+			const char *full_name;
+			if (last_slash != NULL) {
+				size_t len = last_slash - filename;
+				obstack_grow(&symbol_obstack, filename, len + 1);
+				obstack_grow0(&symbol_obstack, headername, headername_len);
+				char *complete_path = obstack_finish(&symbol_obstack);
+				full_name = identify_string(complete_path);
+			} else {
+				full_name = headername;
+			}
+
+			FILE *file = fopen(full_name, "r");
+			if (file != NULL) {
+				switch_pp_input(file, full_name, NULL);
+				return true;
+			}
 		}
 
-		FILE *file = fopen(full_name, "r");
-		if (file != NULL) {
-			switch_pp_input(file, full_name);
-			return true;
-		}
+		entry = searchpath;
 	}
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
-	for (searchpath_entry_t *entry = searchpath; entry != NULL;
-	     entry = entry->next) {
+	for (; entry; entry = entry->next) {
 	    const char *path = entry->path;
 	    size_t      len  = strlen(path);
 		obstack_grow(&symbol_obstack, path, len);
@@ -1827,7 +1834,7 @@ static bool do_include(bool system_include, char const *const headername)
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
-			switch_pp_input(file, filename);
+			switch_pp_input(file, filename, entry);
 			return true;
 		} else {
 			obstack_free(&symbol_obstack, complete_path);
@@ -1837,7 +1844,7 @@ static bool do_include(bool system_include, char const *const headername)
 	return false;
 }
 
-static void parse_include_directive(void)
+static void parse_include_directive(bool const include_next)
 {
 	if (skip_mode) {
 		eat_pp_directive();
@@ -1874,7 +1881,7 @@ static void parse_include_directive(void)
 	info.at_line_begin            = true;
 	emit_newlines();
 	push_input();
-	bool res = do_include(system_include, pp_token.literal.string.begin);
+	bool res = do_include(system_include, include_next, pp_token.literal.string.begin);
 	if (res) {
 		next_input_token();
 	} else {
@@ -2186,17 +2193,18 @@ static void parse_preprocessing_directive(void)
 
 	if (pp_token.base.symbol) {
 		switch (pp_token.base.symbol->pp_ID) {
-		case TP_define:  parse_define_directive();            break;
-		case TP_else:    parse_else_directive();              break;
-		case TP_endif:   parse_endif_directive();             break;
-		case TP_error:   parse_error_directive();             break;
-		case TP_ifdef:   parse_ifdef_ifndef_directive(true);  break;
-		case TP_ifndef:  parse_ifdef_ifndef_directive(false); break;
-		case TP_include: parse_include_directive();           break;
-		case TP_line:    next_input_token(); goto line_directive;
-		case TP_pragma:  parse_pragma_directive();            break;
-		case TP_undef:   parse_undef_directive();             break;
-		default:         goto skip;
+		case TP_define:       parse_define_directive();            break;
+		case TP_else:         parse_else_directive();              break;
+		case TP_endif:        parse_endif_directive();             break;
+		case TP_error:        parse_error_directive();             break;
+		case TP_ifdef:        parse_ifdef_ifndef_directive(true);  break;
+		case TP_ifndef:       parse_ifdef_ifndef_directive(false); break;
+		case TP_include:      parse_include_directive(false);      break;
+		case TP_include_next: parse_include_directive(true);       break;
+		case TP_line:         next_input_token(); goto line_directive;
+		case TP_pragma:       parse_pragma_directive();            break;
+		case TP_undef:        parse_undef_directive();             break;
+		default:              goto skip;
 		}
 	} else if (pp_token.kind == T_NUMBER) {
 line_directive:
@@ -2473,7 +2481,7 @@ int pptest_main(int argc, char **argv)
 		fprintf(stderr, "Couldn't open input '%s'\n", filename);
 		return 1;
 	}
-	switch_pp_input(file, filename);
+	switch_pp_input(file, filename, NULL);
 
 	for (;;) {
 		next_preprocessing_token();

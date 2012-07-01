@@ -15,6 +15,7 @@ T(if)    /* remember that this gives T_if */
 T(ifdef)
 T(ifndef)
 T(include)
+T(include_next)
 T(line)
 T(pragma)
 T(undef)

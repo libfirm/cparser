@@ -7,8 +7,10 @@ void init_preprocessor(void);
 
 void exit_preprocessor(void);
 
+typedef struct searchpath_entry_t searchpath_entry_t;
+
 /** Switch input to another file. The current token is not changed. */
-void switch_pp_input(FILE *file, char const *filename);
+void switch_pp_input(FILE *file, char const *filename, searchpath_entry_t *entry);
 
 FILE *close_pp_input(void);
 

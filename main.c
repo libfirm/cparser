@@ -225,7 +225,7 @@ static void do_parsing(compilation_unit_t *unit)
 
 	start_parsing();
 
-	switch_pp_input(unit->input, unit->name);
+	switch_pp_input(unit->input, unit->name, NULL);
 	parse();
 	unit->ast = finish_parsing();
 	check_unclosed_conditionals();
@@ -1148,7 +1148,7 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 	fprintf(out, "# 1 \"<command-line>\"\n");
 
 	set_preprocessor_output(out);
-	switch_pp_input(unit->input, unit->name);
+	switch_pp_input(unit->input, unit->name, NULL);
 
 	for (;;) {
 		next_preprocessing_token();
