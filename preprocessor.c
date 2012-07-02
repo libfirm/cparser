@@ -2030,6 +2030,10 @@ typedef enum stdc_pragma_value_kind_t {
 static void parse_pragma_directive(void)
 {
 	eat_pp(TP_pragma);
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
 
 	if (pp_token.kind != T_IDENTIFIER) {
 		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
