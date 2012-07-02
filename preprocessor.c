@@ -16,6 +16,7 @@
 #include "ast_t.h"
 #include "preprocessor.h"
 #include "symbol_t.h"
+#include "adt/array.h"
 #include "adt/util.h"
 #include "adt/error.h"
 #include "adt/strutil.h"
@@ -45,23 +46,38 @@ typedef struct whitespace_info_t {
 } whitespace_info_t;
 
 struct pp_definition_t {
-	symbol_t          *symbol;
-	position_t         pos;
-	pp_definition_t   *parent_expansion;
-	size_t             expand_pos;
-	whitespace_info_t  expand_info;
-	bool               is_variadic    : 1;
-	bool               is_expanding   : 1;
-	bool               has_parameters : 1;
-	bool               is_parameter   : 1;
-	pp_definition_t   *function_definition;
-	size_t             n_parameters;
-	pp_definition_t   *parameters;
+	symbol_t        *symbol;
+	position_t       pos;
+	bool             is_variadic    : 1;
+	bool             is_expanding   : 1;
+	bool             may_recurse    : 1;
+	bool             has_parameters : 1;
+	bool             is_parameter   : 1;
+	pp_definition_t *function_definition;
+	pp_definition_t *previous_definition;
+	size_t           n_parameters;
+	pp_definition_t *parameters;
 
 	/* replacement */
+	size_t           list_len;
+	saved_token_t   *token_list;
+};
+
+typedef struct pp_expansion_state_t {
+	pp_definition_t   *definition;
 	size_t             list_len;
 	saved_token_t     *token_list;
-};
+
+	size_t             pos;
+	whitespace_info_t  expand_info;
+	unsigned           argument_brace_count;
+} pp_expansion_state_t;
+
+typedef struct pp_argument_t {
+	size_t         list_len;
+	saved_token_t *token_list;
+	bool           is_expanding;
+} pp_argument_t;
 
 typedef struct pp_conditional_t pp_conditional_t;
 struct pp_conditional_t {
@@ -101,23 +117,27 @@ static struct obstack  input_obstack;
 
 static pp_conditional_t *conditional_stack;
 
-token_t                  pp_token;
-bool                     allow_dollar_in_symbol   = true;
-static bool              resolve_escape_sequences = true;
-static bool              error_on_unknown_chars   = true;
-static bool              skip_mode;
-static FILE             *out;
-static struct obstack    pp_obstack;
-static struct obstack    config_obstack;
-static const char       *printed_input_name = NULL;
-static position_t        expansion_pos;
-static pp_definition_t  *current_expansion  = NULL;
-static pp_definition_t  *current_call       = NULL;
-static pp_definition_t  *current_argument   = NULL;
-static pp_definition_t  *argument_expanding = NULL;
-static unsigned          argument_brace_count;
-static strset_t          stringset;
-static token_kind_t      last_token;
+token_t                      pp_token;
+bool                         allow_dollar_in_symbol   = true;
+static bool                  resolve_escape_sequences = true;
+static bool                  error_on_unknown_chars   = true;
+static bool                  skip_mode;
+static FILE                 *out;
+static struct obstack        pp_obstack;
+static struct obstack        config_obstack;
+static const char           *printed_input_name = NULL;
+static position_t            expansion_pos;
+static pp_expansion_state_t *current_expansion  = NULL;
+static pp_definition_t      *current_call       = NULL;
+static unsigned              call_arg           = 0;
+static whitespace_info_t     call_whitespace_info;
+static pp_definition_t      *current_argument   = NULL;
+static pp_definition_t      *argument_expanding = NULL;
+static unsigned              argument_brace_count;
+static strset_t              stringset;
+static token_kind_t          last_token;
+static pp_expansion_state_t *expansion_stack;
+static pp_argument_t        *argument_stack;
 
 struct searchpath_t {
 	searchpath_entry_t  *first;
@@ -420,7 +440,6 @@ static utf32 parse_octal_sequence(const utf32 first_digit)
 	value = 8 * value + digit_value(input.c);
 	next_char();
 	return value;
-
 }
 
 /**
@@ -852,32 +871,114 @@ static void parse_character_constant(string_encoding_t const enc)
 	case '\t': \
 	case '\v'
 
+static pp_expansion_state_t *push_expansion(pp_definition_t *definition)
+{
+	ARR_EXTEND(pp_expansion_state_t, expansion_stack, 1);
+	size_t len = ARR_LEN(expansion_stack);
+	pp_expansion_state_t *result = &expansion_stack[len-1];
+	memset(result, 0, sizeof(*result));
+	result->definition = definition;
+	result->list_len   = definition->list_len;
+	result->token_list = definition->token_list;
+	result->pos        = 0;
+	current_expansion = result;
+	return result;
+}
+
+static void push_function_expansion(pp_definition_t *function)
+{
+	function->is_expanding = false;
+	function->may_recurse  = false;
+
+	size_t n_parameters = function->n_parameters;
+	for (size_t i = 0; i < n_parameters; ++i) {
+		pp_definition_t *parameter = &function->parameters[i];
+		pp_argument_t    arg = {
+			parameter->list_len,
+			parameter->token_list,
+			parameter->is_expanding
+		};
+		ARR_APP1(pp_argument_t, argument_stack, arg);
+	}
+}
+
+static void pop_function_expansion(pp_definition_t *function)
+{
+	size_t argument_stack_top = ARR_LEN(argument_stack);
+	size_t n_parameters       = function->n_parameters;
+	assert(argument_stack_top >= n_parameters);
+	for (size_t i = n_parameters; i-- > 0; ) {
+		pp_definition_t     *parameter = &function->parameters[i];
+		const pp_argument_t *arg       = &argument_stack[--argument_stack_top];
+		parameter->list_len     = arg->list_len;
+		parameter->token_list   = arg->token_list;
+		parameter->is_expanding = arg->is_expanding;
+	}
+	ARR_SHRINKLEN(argument_stack, argument_stack_top);
+
+	function->is_expanding = true;
+}
+
+static bool pop_expansion(void)
+{
+	assert(current_expansion != NULL);
+	pp_expansion_state_t *expansion  = current_expansion;
+	pp_definition_t      *definition = expansion->definition;
+	if (definition->n_parameters > 0) {
+		pop_function_expansion(definition);
+	}
+	assert(definition->is_expanding);
+	definition->is_expanding = false;
+
+	if (definition->is_parameter) {
+		pp_definition_t *function = definition->function_definition;
+		function->may_recurse = false;
+
+		/* stop further expanding once we expanded a parameter used in a
+		 * sub macro-call */
+		if (definition == argument_expanding) {
+			argument_expanding = NULL;
+		}
+	}
+
+	size_t top = ARR_LEN(expansion_stack);
+	assert(current_expansion == &expansion_stack[top-1]);
+	ARR_SHRINKLEN(expansion_stack, top-1);
+	if (top == 1) {
+		current_expansion = NULL;
+		return false;
+	}
+
+	current_expansion = &expansion_stack[top-2];
+
+
+	return true;
+}
+
+static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo)
+{
+	current_call = definition;
+	call_whitespace_info = wsinfo;
+	if (definition->n_parameters > 0) {
+		current_argument = &definition->parameters[0];
+		push_function_expansion(definition);
+	}
+	assert(argument_brace_count == 0);
+	call_arg = 0;
+}
+
 static void start_expanding(pp_definition_t *definition)
 {
-	definition->parent_expansion = current_expansion;
-	definition->expand_pos       = 0;
-	definition->is_expanding     = true;
+	push_expansion(definition);
+	definition->is_expanding = true;
+
 	if (definition->list_len > 0) {
 		definition->token_list[0].had_whitespace
 			= info.had_whitespace;
 	}
-	current_expansion = definition;
-}
-
-static void finished_expanding(pp_definition_t *definition)
-{
-	assert(definition->is_expanding);
-	pp_definition_t *parent = definition->parent_expansion;
-	definition->parent_expansion = NULL;
-	definition->is_expanding     = false;
-
-	/* stop further expanding once we expanded a parameter used in a
-	 * sub macro-call */
-	if (definition == argument_expanding)
-		argument_expanding = NULL;
-
-	assert(current_expansion == definition);
-	current_expansion = parent;
+	if (definition->is_parameter) {
+		definition->function_definition->may_recurse = true;
+	}
 }
 
 static void grow_string_escaped(struct obstack *obst, const string_t *string, char const *delimiter)
@@ -1099,12 +1200,16 @@ static bool concat_macro_parameters(const position_t *pos,
 		const saved_token_t *saved = &def0->token_list[len0 - 1];
 		token0     = &saved->token;
 		whitespace = saved->had_whitespace;
+		newdef->function_definition = def0->function_definition;
 	}
 	pp_definition_t *def1 = NULL;
 	if (token1->kind == T_MACRO_PARAMETER) {
 		def1 = token1->macro_parameter.def;
 		assert(def1->list_len > 0);
 		token1 = &def1->token_list[0].token;
+		assert(newdef->function_definition == NULL
+		       || newdef->function_definition == def1->function_definition);
+		newdef->function_definition = def1->function_definition;
 	}
 	if (!concat_tokens(pos, token0, token1)) {
 		char *dummy = obstack_finish(&pp_obstack);
@@ -1316,26 +1421,23 @@ static bool expand_next(void)
 	if (current_expansion == NULL)
 		return false;
 
-restart:;
-	size_t pos = current_expansion->expand_pos;
-	if (pos >= current_expansion->list_len) {
-		finished_expanding(current_expansion);
-		/* it was the outermost expansion, parse pptoken normally */
-		if (current_expansion == NULL) {
+	size_t pos = current_expansion->pos;
+	while (pos >= current_expansion->list_len) {
+		if (!pop_expansion())
 			return false;
-		}
-		goto restart;
+		pos = current_expansion->pos;
 	}
+
 	const saved_token_t *saved = &current_expansion->token_list[pos++];
 	pp_token = saved->token;
-	if (current_expansion->expand_pos > 0)
+	if (current_expansion->pos > 0)
 		info.had_whitespace = saved->had_whitespace;
 more_concat:
 	if (pos < current_expansion->list_len) {
 		const saved_token_t *next = &current_expansion->token_list[pos];
 		token_kind_t         next_kind = next->token.kind;
 		if (next_kind == T_HASHHASH && pos+1 < current_expansion->list_len
-		    && !current_expansion->is_parameter) {
+		    && !current_expansion->definition->is_parameter) {
 			const saved_token_t *next_but_one
 				= &current_expansion->token_list[pos+1];
 			if (concat_tokens(&next->token.base.pos,
@@ -1351,10 +1453,10 @@ more_concat:
 		}
 	}
 
-	if (current_expansion->expand_pos > 0)
+	if (current_expansion->pos > 0)
 		info.had_whitespace = saved->had_whitespace;
-	current_expansion->expand_pos = pos;
-	pp_token.base.pos             = expansion_pos;
+	current_expansion->pos = pos;
+	pp_token.base.pos      = expansion_pos;
 
 	return true;
 }
@@ -1365,9 +1467,10 @@ more_concat:
  */
 static token_kind_t peek_expansion(void)
 {
-	for (pp_definition_t *e = current_expansion; e; e = e->parent_expansion) {
-		if (e->expand_pos < e->list_len)
-			return e->token_list[e->expand_pos].token.kind;
+	for (size_t i = ARR_LEN(expansion_stack); i-- > 0; ) {
+		pp_expansion_state_t *e = &expansion_stack[i];
+	    if (e->pos < e->list_len)
+			return e->token_list[e->pos].token.kind;
 	}
 	return T_EOF;
 }
@@ -2173,7 +2276,7 @@ static void parse_define_directive(void)
 				eat_token(T_DOTDOTDOT);
 				if (pp_token.kind != ')') {
 					errorf(&input.pos,
-							"'...' not at end of macro argument list");
+					       "'...' not at end of macro argument list");
 					goto error_out;
 				}
 				break;
@@ -2229,7 +2332,7 @@ static void parse_define_directive(void)
 				param->symbol = sym_anonymous;
 				continue;
 			}
-			param->parent_expansion    = previous;
+			param->previous_definition = previous;
 			param->function_definition = new_definition;
 			param_sym->pp_definition   = param;
 		}
@@ -2245,8 +2348,8 @@ static void parse_define_directive(void)
 			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
 			if (definition != NULL
 			    && definition->function_definition == new_definition) {
-			    pp_token.kind                = T_MACRO_PARAMETER;
-			    pp_token.macro_parameter.def = definition;
+				pp_token.kind                = T_MACRO_PARAMETER;
+				pp_token.macro_parameter.def = definition;
 			}
 		}
 		if (next_must_be_param && pp_token.kind != T_MACRO_PARAMETER) {
@@ -2287,8 +2390,8 @@ static void parse_define_directive(void)
 				continue;
 			assert(param_sym->pp_definition == param);
 			assert(param->function_definition == new_definition);
-			param_sym->pp_definition = param->parent_expansion;
-			param->parent_expansion  = NULL;
+			param_sym->pp_definition   = param->previous_definition;
+			param->previous_definition = NULL;
 		}
 	}
 
@@ -2730,7 +2833,7 @@ has_paren:
 
 			if (pp_token.kind == T_MACRO_PARAMETER) {
 				start_expanding(pp_token.macro_parameter.def);
-				pp_definition_t *const expansion_before = current_expansion;
+				pp_expansion_state_t *const expansion_before = current_expansion;
 restart:
 				do {
 					if (!expand_next())
@@ -2738,7 +2841,7 @@ restart:
 				} while (!next_expansion_token());
 				if (pp_token.kind == '(' && !has_paren) {
 					has_paren = true;
-					while (current_expansion->expand_pos >= current_expansion->list_len) {
+					while (current_expansion->pos >= current_expansion->list_len) {
 						if (current_expansion == expansion_before) {
 							if (!expand_next()) {
 read_input:
@@ -2750,7 +2853,7 @@ read_input:
 							}
 							goto next;
 						}
-						finished_expanding(current_expansion);
+						pop_expansion();
 					}
 					goto restart;
 				}
@@ -3282,6 +3385,7 @@ static void finish_current_argument(void)
 	size_t size = obstack_object_size(&pp_obstack);
 	current_argument->list_len   = size/sizeof(current_argument->token_list[0]);
 	current_argument->token_list = obstack_finish(&pp_obstack);
+	current_argument->is_expanding = false;
 }
 
 static bool next_expansion_token(void)
@@ -3291,13 +3395,15 @@ static bool next_expansion_token(void)
 		symbol_t *const symbol = pp_token.base.symbol;
 		if (symbol) {
 			if (kind == T_MACRO_PARAMETER) {
+				pp_definition_t *def = pp_token.macro_parameter.def;
 				assert(current_expansion != NULL);
-				start_expanding(pp_token.macro_parameter.def);
+				start_expanding(def);
 				return false;
 			}
 
 			pp_definition_t *const pp_definition = symbol->pp_definition;
-			if (pp_definition != NULL && !pp_definition->is_expanding) {
+			if (pp_definition != NULL &&
+			    (!pp_definition->is_expanding || pp_definition->may_recurse)) {
 				if (pp_definition->has_parameters) {
 
 					/* check if next token is a '(' */
@@ -3318,14 +3424,7 @@ static bool next_expansion_token(void)
 						next_preprocessing_token();
 						assert(pp_token.kind == '(');
 
-						pp_definition->parent_expansion = current_expansion;
-						current_call              = pp_definition;
-						current_call->expand_pos  = 0;
-						current_call->expand_info = old_info;
-						if (current_call->n_parameters > 0) {
-							current_argument = &current_call->parameters[0];
-							assert(argument_brace_count == 0);
-						}
+						start_call(pp_definition, old_info);
 						return false;
 					} else {
 						/* skip_whitespaces() skipped newlines and whitespace,
@@ -3355,28 +3454,26 @@ static bool next_expansion_token(void)
 				finish_current_argument();
 				assert(kind == ')');
 				start_expanding(current_call);
-				info = current_call->expand_info;
+				info = call_whitespace_info;
 				current_call     = NULL;
 				current_argument = NULL;
 				return false;
 			}
 		} else if (kind == ',' && argument_brace_count == 0) {
 			finish_current_argument();
-			current_call->expand_pos++;
-			if (current_call->expand_pos >= current_call->n_parameters) {
+			call_arg++;
+			if (call_arg >= current_call->n_parameters) {
 				errorf(&pp_token.base.pos,
 					   "too many arguments passed for macro '%Y'",
 					   current_call->symbol);
 				current_argument = NULL;
 			} else {
-				current_argument
-					= &current_call->parameters[current_call->expand_pos];
+				current_argument = &current_call->parameters[call_arg];
 			}
 			return false;
 		} else if (kind == T_MACRO_PARAMETER) {
 			/* parameters have to be fully expanded before being used as
 			 * parameters for another macro-call */
-			assert(current_expansion != NULL);
 			pp_definition_t *argument = pp_token.macro_parameter.def;
 			argument_expanding = argument;
 			start_expanding(argument);
@@ -3501,6 +3598,8 @@ void init_preprocessor(void)
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
+	expansion_stack = NEW_ARR_F(pp_expansion_state_t, 0);
+	argument_stack  = NEW_ARR_F(pp_argument_t, 0);
 
 	setup_include_path();
 
@@ -3512,6 +3611,8 @@ void init_preprocessor(void)
 
 void exit_preprocessor(void)
 {
+	DEL_ARR_F(argument_stack);
+	DEL_ARR_F(expansion_stack);
 	obstack_free(&input_obstack, NULL);
 	obstack_free(&pp_obstack, NULL);
 	obstack_free(&config_obstack, NULL);
