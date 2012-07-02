@@ -82,6 +82,7 @@ struct pp_input_t {
 struct searchpath_entry_t {
 	const char         *path;
 	searchpath_entry_t *next;
+	bool                is_system_path;
 };
 
 static pp_input_t      input;
@@ -113,11 +114,12 @@ static token_kind_t      last_token;
 struct searchpath_t {
 	searchpath_entry_t  *first;
 	searchpath_entry_t **anchor;
+	bool                 is_system_path;
 };
 
-searchpath_t bracket_searchpath = { NULL, &bracket_searchpath.first };
-searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first   };
-searchpath_t system_searchpath  = { NULL, &system_searchpath.first  };
+searchpath_t bracket_searchpath = { NULL, &bracket_searchpath.first, false };
+searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first,   false };
+searchpath_t system_searchpath  = { NULL, &system_searchpath.first,  true  };
 
 static whitespace_info_t next_info; /* valid if had_whitespace is true */
 static whitespace_info_t info;
@@ -143,16 +145,17 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path)
+void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path, bool const is_system_header)
 {
-	input.file                = file;
-	input.input               = input_from_stream(file, NULL);
-	input.bufend              = NULL;
-	input.bufpos              = NULL;
-	input.output_line         = 0;
-	input.position.input_name = filename;
-	input.position.lineno     = 1;
-	input.path                = path;
+	input.file                      = file;
+	input.input                     = input_from_stream(file, NULL);
+	input.bufend                    = NULL;
+	input.bufpos                    = NULL;
+	input.output_line               = 0;
+	input.position.input_name       = filename;
+	input.position.lineno           = 1;
+	input.position.is_system_header = is_system_header;
+	input.path                      = path;
 
 	/* indicate that we're at a new input */
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
@@ -1947,16 +1950,16 @@ finish_headername:
 	return identified;
 }
 
-static bool do_include(bool const system_include, bool const include_next, char const *const headername)
+static bool do_include(bool const bracket_include, bool const include_next, char const *const headername)
 {
 	size_t const        headername_len = strlen(headername);
 	searchpath_entry_t *entry;
 	if (include_next) {
-		entry = input.path != NULL ? input.path->next
-		      : system_include ? bracket_searchpath.first
-			                   : quote_searchpath.first;
+		entry = input.path      ? input.path->next
+		      : bracket_include ? bracket_searchpath.first
+		      : quote_searchpath.first;
 	} else {
-		if (!system_include) {
+		if (!bracket_include) {
 			/* put dirname of current input on obstack */
 			const char *filename   = input.position.input_name;
 			const char *last_slash = strrchr(filename, '/');
@@ -1973,7 +1976,7 @@ static bool do_include(bool const system_include, bool const include_next, char 
 
 			FILE *file = fopen(full_name, "r");
 			if (file != NULL) {
-				switch_pp_input(file, full_name, NULL);
+				switch_pp_input(file, full_name, NULL, false);
 				return true;
 			}
 			entry = quote_searchpath.first;
@@ -1996,7 +1999,7 @@ static bool do_include(bool const system_include, bool const include_next, char 
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
-			switch_pp_input(file, filename, entry);
+			switch_pp_input(file, filename, entry, entry->is_system_path);
 			return true;
 		} else {
 			obstack_free(&symbol_obstack, complete_path);
@@ -2516,7 +2519,8 @@ restart:
 void append_include_path(searchpath_t *paths, const char *path)
 {
 	searchpath_entry_t *entry = OALLOCZ(&config_obstack, searchpath_entry_t);
-	entry->path = path;
+	entry->path           = path;
+	entry->is_system_path = paths->is_system_path;
 
 	*paths->anchor = entry;
 	paths->anchor  = &entry->next;
@@ -2663,7 +2667,7 @@ int pptest_main(int argc, char **argv)
 		fprintf(stderr, "Couldn't open input '%s'\n", filename);
 		return 1;
 	}
-	switch_pp_input(file, filename, NULL);
+	switch_pp_input(file, filename, NULL, false);
 
 	for (;;) {
 		next_preprocessing_token();
