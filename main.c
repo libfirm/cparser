@@ -1851,11 +1851,11 @@ default_c_warn:
 		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
 			char const* invalid_mode;
 			switch (file_standard) {
-			case STANDARD_C89:     invalid_mode = "c89";   goto default_cxx_warn;
-			case STANDARD_C89AMD1: invalid_mode = "c90";   goto default_cxx_warn;
-			case STANDARD_C99:     invalid_mode = "c99";   goto default_cxx_warn;
-			case STANDARD_GNU89:   invalid_mode = "gnu89"; goto default_cxx_warn;
-			case STANDARD_GNU99:   invalid_mode = "gnu99"; goto default_cxx_warn;
+			case STANDARD_C89:     invalid_mode = "c89";            goto default_cxx_warn;
+			case STANDARD_C89AMD1: invalid_mode = "iso9899:199409"; goto default_cxx_warn;
+			case STANDARD_C99:     invalid_mode = "c99";            goto default_cxx_warn;
+			case STANDARD_GNU89:   invalid_mode = "gnu89";          goto default_cxx_warn;
+			case STANDARD_GNU99:   invalid_mode = "gnu99";          goto default_cxx_warn;
 
 			case STANDARD_CXX98: c_mode = _CXX; break;
 
