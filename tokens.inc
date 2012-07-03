@@ -1,7 +1,3 @@
-#ifndef TS
-#define TS(x,str,val)
-#endif
-
 /* These must go first. Some set explicit values. */
 #define ALTERNATE(name, val)          T(_CXX, T_##name, #name,  val)
 #define PUNCTUATOR(name, string, val) T(_ALL, T_##name, string, val)
@@ -9,7 +5,7 @@
 #undef PUNCTUATOR
 #undef ALTERNATE
 
-#define S(name, description) TS(T_##name, description,)
+#define S(name, description) T(_ALL, T_##name, description,)
 S(EOF,                "end of input")
 S(IDENTIFIER,         "identifier")
 S(NUMBER,             "number constant")

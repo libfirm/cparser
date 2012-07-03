@@ -70,9 +70,7 @@ void init_tokens(void)
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
 #define T(mode,x,str,val)  register_token(mode, x, str);
-#define TS(x,str,val)      intern_register_token(x, str);
 #include "tokens.inc"
-#undef TS
 #undef T
 
 #define T(token) register_pp_token(TP_##token, #token);
