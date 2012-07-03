@@ -48,11 +48,12 @@ typedef struct whitespace_info_t {
 struct pp_definition_t {
 	symbol_t        *symbol;
 	position_t       pos;
-	bool             is_variadic    : 1;
-	bool             is_expanding   : 1;
-	bool             may_recurse    : 1;
-	bool             has_parameters : 1;
-	bool             is_parameter   : 1;
+	bool             is_variadic     : 1;
+	bool             is_expanding    : 1;
+	bool             may_recurse     : 1;
+	bool             has_parameters  : 1;
+	bool             is_parameter    : 1;
+	bool             standard_define : 1;
 	pp_definition_t *function_definition;
 	pp_definition_t *previous_definition;
 	size_t           n_parameters;
@@ -981,22 +982,29 @@ static void start_expanding(pp_definition_t *definition)
 	}
 }
 
+static void grow_escaped(struct obstack *obst, const char *string, size_t size)
+{
+	if (resolve_escape_sequences) {
+		obstack_grow(obst, string, size);
+	} else {
+		for (size_t i = 0; i < size; ++i) {
+			const char c = string[i];
+			if (c == '\\' || c == '"')
+				obstack_1grow(obst, '\\');
+			obstack_1grow(obst, c);
+		}
+	}
+}
+
 static void grow_string_escaped(struct obstack *obst, const string_t *string, char const *delimiter)
 {
 	char const *prefix = get_string_encoding_prefix(string->encoding);
 	obstack_printf(obst, "%s%s", prefix, delimiter);
 	size_t      size = string->size;
 	const char *str  = string->begin;
-	if (resolve_escape_sequences) {
-		obstack_grow(obst, str, size);
-	} else {
-		for (size_t i = 0; i < size; ++i) {
-			const char c = str[i];
-			if (c == '\\' || c == '"')
-				obstack_1grow(obst, '\\');
-			obstack_1grow(obst, c);
-		}
-	}
+
+	grow_escaped(obst, str, size);
+
 	obstack_printf(obst, "%s", delimiter);
 }
 
@@ -2173,16 +2181,29 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	return true;
 }
 
-void add_define(char const *const name, char const *const val)
+static pp_definition_t *add_define_(char const *const name,
+                                    bool standard_define)
 {
-	symbol_t *const sym = symbol_table_insert(name);
+	size_t    const name_len = strlen(name);
+	char     *const string   = obstack_copy(&symbol_obstack, name, name_len+1);
+	symbol_t *const sym      = symbol_table_insert(string);
+	if (sym->string != string)
+		obstack_free(&symbol_obstack, string);
 
 	pp_definition_t *const def = obstack_alloc(&pp_obstack, sizeof(def[0]));
 	memset(def, 0, sizeof(*def));
-	def->symbol = sym;
-	def->pos    = builtin_position;
+	def->symbol          = sym;
+	def->pos             = builtin_position;
+	def->standard_define = standard_define;
 
 	sym->pp_definition = def;
+	return def;
+}
+
+void add_define(char const *const name, char const *const val,
+                bool standard_define)
+{
+	pp_definition_t *const def = add_define_(name, standard_define);
 
 	input.file        = 0;
 	input.input       = input_from_string(val, NULL);
@@ -2194,6 +2215,7 @@ void add_define(char const *const name, char const *const val)
 	/* place a virtual '\n' so we realize we're at line begin */
 	input.c           = '\n';
 
+	assert(obstack_object_size(&pp_obstack) == 0);
 	for (;;) {
 		next_input_token();
 		if (pp_token.kind == T_EOF)
@@ -2208,6 +2230,30 @@ void add_define(char const *const name, char const *const val)
 	input_free(input.input);
 
 	def->list_len   = obstack_object_size(&pp_obstack) / sizeof(def->token_list[0]);
+	def->token_list = obstack_finish(&pp_obstack);
+}
+
+void add_define_string(char const *const name, char const *const val,
+                       bool standard_define)
+{
+	pp_definition_t *const def = add_define_(name, standard_define);
+
+	assert(obstack_object_size(&symbol_obstack) == 0);
+	size_t  const val_len = strlen(val);
+	char   *const string  = obstack_copy(&symbol_obstack, val, val_len+1);
+	grow_escaped(&symbol_obstack, string, val_len);
+
+	token_t stringtok;
+	stringtok.kind           = T_STRING_LITERAL;
+	stringtok.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+
+	saved_token_t saved_token;
+	saved_token.token          = stringtok;
+	saved_token.had_whitespace = false;
+
+	assert(obstack_object_size(&pp_obstack) == 0);
+	obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+	def->list_len   = 1;
 	def->token_list = obstack_finish(&pp_obstack);
 }
 

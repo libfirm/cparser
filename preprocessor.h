@@ -20,7 +20,13 @@ FILE *close_pp_input(void);
 
 void next_preprocessing_token(void);
 
-void add_define(char const *name, char const *val);
+/**
+ * @param standard_define    The definition is mentioned as predefined macro
+ *                           in the C standard (so we issue warnings/errors
+ *                           on #undef and redefinition)
+ */
+void add_define(char const *name, char const *val, bool standard_define);
+void add_define_string(char const *name, char const *val, bool standard_define);
 
 string_t make_string(char const *string);
 
