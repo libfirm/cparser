@@ -98,6 +98,7 @@ unsigned            architecture_modulo_shift = 0;
 
 static bool               char_is_signed      = true;
 static atomic_type_kind_t wchar_atomic_kind   = ATOMIC_TYPE_INT;
+static const char        *user_label_prefix   = "";
 static unsigned           features_on         = 0;
 static unsigned           features_off        = 0;
 static const char        *dumpfunction        = NULL;
@@ -871,13 +872,16 @@ static bool init_os_support(void)
 
 	if (firm_is_unixish_os(target_machine)) {
 		set_create_ld_ident(create_name_linux_elf);
+		user_label_prefix = "";
 	} else if (firm_is_darwin_os(target_machine)) {
 		set_create_ld_ident(create_name_macho);
+		user_label_prefix = "_";
 		define_intmax_types = true;
 	} else if (firm_is_windows_os(target_machine)) {
 		wchar_atomic_kind         = ATOMIC_TYPE_USHORT;
 		enable_main_collect2_hack = true;
 		set_create_ld_ident(create_name_win32);
+		user_label_prefix = "_";
 	} else {
 		return false;
 	}
@@ -1071,91 +1075,387 @@ static void init_types_and_adjust(void)
 	}
 }
 
+static const char *get_max_string(atomic_type_kind_t akind)
+{
+	/* float not implemented yet */
+	unsigned flags = get_atomic_type_flags(akind);
+	assert(flags & ATOMIC_TYPE_FLAG_INTEGER);
+
+	unsigned bits = get_atomic_type_size(akind) * BITS_PER_BYTE;
+	if (flags & ATOMIC_TYPE_FLAG_SIGNED)
+		--bits;
+	switch (bits) {
+	case 7:  return "127";
+	case 8:  return "255";
+	case 15: return "32767";
+	case 16: return "65535";
+	case 31: return "2147483647";
+	case 32: return "4294967295";
+	case 63: return "9223372036854775807";
+	case 64: return "18446744073709551615";
+	}
+	panic("unexpected number of bits requested");
+}
+
+static const char *get_literal_suffix(atomic_type_kind_t kind)
+{
+	switch (kind) {
+	case ATOMIC_TYPE_BOOL:
+	case ATOMIC_TYPE_CHAR:
+	case ATOMIC_TYPE_SCHAR:
+	case ATOMIC_TYPE_UCHAR:
+	case ATOMIC_TYPE_SHORT:
+	case ATOMIC_TYPE_USHORT:
+	case ATOMIC_TYPE_INT:
+	case ATOMIC_TYPE_DOUBLE:
+	case ATOMIC_TYPE_WCHAR_T:
+		return "";
+	case ATOMIC_TYPE_UINT:        return "U";
+	case ATOMIC_TYPE_LONG:        return "L";
+	case ATOMIC_TYPE_ULONG:       return "UL";
+	case ATOMIC_TYPE_LONGLONG:    return "LL";
+	case ATOMIC_TYPE_ULONGLONG:   return "ULL";
+	case ATOMIC_TYPE_FLOAT:       return "F";
+	case ATOMIC_TYPE_LONG_DOUBLE: return "L";
+	}
+	panic("invalid kind in get_literal_suffix");
+}
+
+static void define_type_max(const char *name, atomic_type_kind_t akind)
+{
+	char buf[64];
+	snprintf(buf, sizeof(buf), "__%s_MAX__", name);
+	const char *literal_suffix = get_literal_suffix(akind);
+	char max[64];
+	snprintf(max, sizeof(max), "%s%s", get_max_string(akind), literal_suffix);
+	add_define(buf, max, false);
+}
+
+static void define_type_min(const char *name, atomic_type_kind_t akind)
+{
+	char buf[64];
+	snprintf(buf, sizeof(buf), "__%s_MIN__", name);
+	unsigned flags = get_atomic_type_flags(akind);
+
+	char min[64];
+	if (flags & ATOMIC_TYPE_FLAG_SIGNED) {
+		/* float not implemented yet */
+		assert(flags & ATOMIC_TYPE_FLAG_INTEGER);
+		snprintf(min, sizeof(min), "(-__%s__MAX__ - 1)", name);
+	} else {
+		snprintf(min, sizeof(min), "0%s", get_literal_suffix(akind));
+	}
+	add_define(buf, min, false);
+}
+
+static void define_type_type_max(const char *name, atomic_type_kind_t akind)
+{
+	const char *type = get_atomic_kind_name(akind);
+	char        buf[64];
+	snprintf(buf, sizeof(buf), "__%s_TYPE__", name);
+	add_define(buf, type, false);
+
+	define_type_max(name, akind);
+}
+
+static void add_define_int(const char *name, int value)
+{
+	char buf[32];
+	snprintf(buf, sizeof(buf), "%d", value);
+	add_define(name, buf, false);
+}
+
+static void define_sizeof(const char *name, atomic_type_kind_t akind)
+{
+	char buf[64];
+	snprintf(buf, sizeof(buf), "__SIZEOF_%s__", name);
+	int size = get_atomic_type_size(akind);
+	add_define_int(buf, size);
+}
+
+static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
+                               atomic_type_kind_t signed_kind)
+{
+	char buf[10];
+
+	assert(size == get_atomic_type_size(signed_kind) * BITS_PER_BYTE);
+	snprintf(buf, sizeof(buf), "INT%u", size);
+	define_type_type_max(buf, signed_kind);
+	snprintf(buf, sizeof(buf), "INT_LEAST%u", size);
+	define_type_type_max(buf, signed_kind);
+	snprintf(buf, sizeof(buf), "INT_FAST%u", size);
+	define_type_type_max(buf, signed_kind);
+
+	assert(size == get_atomic_type_size(unsigned_kind) * BITS_PER_BYTE);
+	snprintf(buf, sizeof(buf), "UINT%u", size);
+	define_type_type_max(buf, unsigned_kind);
+	snprintf(buf, sizeof(buf), "UINT_LEAST%u", size);
+	define_type_type_max(buf, unsigned_kind);
+	snprintf(buf, sizeof(buf), "UINT_FAST%u", size);
+	define_type_type_max(buf, unsigned_kind);
+
+	/* TODO: need support for macros in add_define
+	snprintf(buf, sizeof(buf), "__%sINT_C(c)", u, size);
+	add_define(buf, "c ## " + literal_suffix, false);
+	*/
+}
+
 static void add_standard_defines(void)
 {
-	add_define("OBJC_NEW_PROPERTIES",    "1",                                 false);
-	add_define("__APPLE_CC__",           "5490",                              false);
-	add_define("__APPLE__",              "1",                                 false);
-	add_define("__CHAR_BIT__",           "8",                                 false);
-	add_define("__CONSTANT_CFSTRINGS__", "1",                                 false);
-	add_define("__DBL_DENORM_MIN__",     "4.9406564584124654e-324",           false);
-	add_define("__DBL_DIG__",            "15",                                false);
-	add_define("__DBL_EPSILON__",        "2.2204460492503131e-16",            false);
-	add_define("__DBL_HAS_INFINITY__",   "1",                                 false);
-	add_define("__DBL_HAS_QUIET_NAN__",  "1",                                 false);
-	add_define("__DBL_MANT_DIG__",       "53",                                false);
-	add_define("__DBL_MAX_10_EXP__",     "308",                               false);
-	add_define("__DBL_MAX_EXP__",        "1024",                              false);
-	add_define("__DBL_MAX__",            "1.7976931348623157e+308",           false);
-	add_define("__DBL_MIN_10_EXP__",     "(-307)",                            false);
-	add_define("__DBL_MIN_EXP__",        "(-1021)",                           false);
-	add_define("__DBL_MIN__",            "2.2250738585072014e-308",           false);
-	add_define("__DECIMAL_DIG__",        "21",                                false);
-	add_define("__DYNAMIC__",            "1",                                 false);
-	add_define("__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1058",       false);
-	add_define("__FINITE_MATH_ONLY__",   "0",                                 false);
-	add_define("__FLT_DENORM_MIN__",     "1.40129846e-45F",                   false);
-	add_define("__FLT_DIG__",            "6",                                 false);
-	add_define("__FLT_EPSILON__",        "1.19209290e-7F",                    false);
-	add_define("__FLT_EVAL_METHOD__",    "0",                                 false);
-	add_define("__FLT_HAS_INFINITY__",   "1",                                 false);
-	add_define("__FLT_HAS_QUIET_NAN__",  "1",                                 false);
-	add_define("__FLT_MANT_DIG__",       "24",                                false);
-	add_define("__FLT_MAX_10_EXP__",     "38",                                false);
-	add_define("__FLT_MAX_EXP__",        "128",                               false);
-	add_define("__FLT_MAX__",            "3.40282347e+38F",                   false);
-	add_define("__FLT_MIN_10_EXP__",     "(-37)",                             false);
-	add_define("__FLT_MIN_EXP__",        "(-125)",                            false);
-	add_define("__FLT_MIN__",            "1.17549435e-38F",                   false);
-	add_define("__FLT_RADIX__",          "2",                                 false);
-	add_define("__GNUC_GNU_INLINE__",    "1",                                 false);
-	add_define("__GNUC_MINOR__",         "2",                                 false);
-	add_define("__GNUC_PATCHLEVEL__",    "1",                                 false);
-	add_define("__GNUC__",               "4",                                 false);
-	add_define("__GXX_ABI_VERSION",      "1002",                              false);
-	add_define("__INTMAX_MAX__",         "9223372036854775807LL",             false);
-	add_define("__INTMAX_TYPE__",        "long long int",                     false);
-	add_define("__INT_MAX__",            "2147483647",                        false);
-	add_define("__LDBL_DENORM_MIN__",    "3.64519953188247460253e-4951L",     false);
-	add_define("__LDBL_DIG__",           "18",                                false);
-	add_define("__LDBL_EPSILON__",       "1.08420217248550443401e-19L",       false);
-	add_define("__LDBL_HAS_INFINITY__",  "1",                                 false);
-	add_define("__LDBL_HAS_QUIET_NAN__", "1",                                 false);
-	add_define("__LDBL_MANT_DIG__",      "64",                                false);
-	add_define("__LDBL_MAX_10_EXP__",    "4932",                              false);
-	add_define("__LDBL_MAX_EXP__",       "16384",                             false);
-	add_define("__LDBL_MAX__",           "1.18973149535723176502e+4932L",     false);
-	add_define("__LDBL_MIN_10_EXP__",    "(-4931)",                           false);
-	add_define("__LDBL_MIN_EXP__",       "(-16381)",                          false);
-	add_define("__LDBL_MIN__",           "3.36210314311209350626e-4932L",     false);
-	add_define("__LITTLE_ENDIAN__",      "1",                                 false);
-	add_define("__LONG_LONG_MAX__",      "9223372036854775807LL",             false);
-	add_define("__LONG_MAX__",           "2147483647L",                       false);
-	add_define("__MACH__",               "1",                                 false);
-	add_define("__MMX__",                "1",                                 false);
-	add_define("__NO_INLINE__",          "1",                                 false);
-	add_define("__PIC__",                "1",                                 false);
-	add_define("__PTRDIFF_TYPE__",       "int",                               false);
-	add_define("__REGISTER_PREFIX__",    "",                                  false);
-	add_define("__SCHAR_MAX__",          "127",                               false);
-	add_define("__SHRT_MAX__",           "32767",                             false);
-	add_define("__SIZE_TYPE__",          "long unsigned int",                 false);
-	add_define("__SSE2_MATH__",          "1",                                 false);
-	add_define("__SSE2__",               "1",                                 false);
-	add_define("__SSE_MATH__",           "1",                                 false);
-	add_define("__SSE__",                "1",                                 false);
-	add_define("__STDC_HOSTED__",        "1",                                 true);
-	add_define("__UINTMAX_TYPE__",       "long long unsigned int",            false);
-	add_define("__USER_LABEL_PREFIX__",  "_",                                 false);
-	add_define("__VERSION__",            "\"4.0.1 (Apple Inc. build 5490)\"", false);
-	add_define("__WCHAR_MAX__",          "2147483647",                        false);
-	add_define("__WCHAR_TYPE__",         "int",                               false);
-	add_define("__WINT_TYPE__",          "int",                               false);
-	add_define("__i386",                 "1",                                 false);
-	add_define("__i386__",               "1",                                 false);
-	add_define("__strong",               "",                                  false);
-	add_define("__weak",                 "",                                  false);
-	add_define("i386",                   "1",                                 false);
+	add_define("__STDC__", "1", true);
+	/* C99 predefined macros, but defining them for other language standards too
+	 * shouldn't hurt */
+	add_define("__STDC_HOSTED__", freestanding ? "0" : "1", true);
+
+	if (c_mode & _C99) {
+		add_define("__STDC_VERSION__", "199901L", true);
+	}
+	if (c_mode & _CXX) {
+		add_define("__cplusplus", "1", true);
+	}
+	if (! (c_mode & (_GNUC | _MS | _CXX)))
+		add_define("__STRICT_ANSI__", "1", false);
+
+	add_define_string("__VERSION__", cparser_REVISION, false);
+
+	/* let's pretend we are a GCC compiler */
+	add_define("__GNUC__",            "4", false);
+	add_define("__GNUC_MINOR__",      "6", false);
+	add_define("__GNUC_PATCHLEVEL__", "0", false);
+	if (c_mode & _CXX)
+		add_define("__GNUG__", "4", false);
+
+	/* TODO */
+	//add_define("__NO_INLINE__", "1");
+	if (c_mode & _C99) {
+		add_define("__GNUC_STDC_INLINE__", "1", false);
+	} else {
+		add_define("__GNUC_GNU_INLINE__", "1", false);
+	}
+
+	if (firm_is_unixish_os(target_machine)) {
+		if (c_mode & _GNUC)
+			add_define("unix",     "1", false);
+		add_define("__unix",   "1", false);
+		add_define("__unix__", "1", false);
+		add_define("__ELF__",  "1", false);
+		if (strstr(target_machine->operating_system, "linux") != NULL) {
+			if (c_mode & _GNUC)
+				add_define("linux",     "1", false);
+			add_define("__linux",   "1", false);
+			add_define("__linux__", "1", false);
+			if (strstr(target_machine->operating_system, "gnu") != NULL) {
+				add_define("__gnu_linux__", "1", false);
+			}
+		}
+	} else if (firm_is_darwin_os(target_machine)) {
+		add_define("__MACH__",     "1", false);
+		add_define("__APPLE__",    "1", false);
+		add_define("__APPLE_CC__", "1", false);
+		add_define("__weak",       "",  false);
+		add_define("__strong",     "",  false);
+		/* TODO: when are these disabled? */
+		add_define("__CONSTANT_CFSTRINGS__", "1", false);
+		add_define("__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__", "1050",
+		           false);
+		/* TODO: the following should depend on -fPIC and others... */
+		add_define("__PIC__",      "2", false);
+		add_define("__pic__",      "2", false);
+		add_define("__DYNAMIC__",  "1", false);
+		if (!byte_order_big_endian) {
+			add_define("__LITTLE_ENDIAN__", "1", false);
+		}
+	}
+	add_define("__ORDER_BIG_ENDIAN__",    "4321", false);
+	add_define("__ORDER_LITTLE_ENDIAN__", "1234", false);
+	add_define("__ORDER_PDP_ENDIAN__",    "3412", false);
+	add_define("__BYTE_ORDER__", byte_order_big_endian
+	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
+	add_define("__FLOAT_WORD_ORDER__", byte_order_big_endian
+	           ? "__ORDER_BIG_ENDIAN__" : "__ORDER_LITTLE_ENDIAN__", false);
+
+	add_define("__FINITE_MATH_ONLY__",    "0",    false);
+
+	const char *cpu = target_machine->cpu_type;
+	if (is_ia32_cpu(cpu)) {
+		if (c_mode & _GNUC)
+			add_define("i386",     "1", false);
+		add_define("__i386",   "1", false);
+		add_define("__i386__", "1", false);
+		if (streq(cpu, "i486")) {
+			add_define("__i486",   "1", false);
+			add_define("__i486__", "1", false);
+		} else if (streq(cpu, "i586")) {
+			add_define("__i586",      "1", false);
+			add_define("__i586__",    "1", false);
+			add_define("__pentium",   "1", false);
+			add_define("__pentium__", "1", false);
+			//add_define("__pentium_mmx__", "1", false);
+		} else if (streq(cpu, "i686")) {
+			add_define("__pentiumpro",   "1", false);
+			add_define("__pentiumpro__", "1", false);
+			add_define("__i686",         "1", false);
+			add_define("__i686__",       "1", false);
+		} else if (streq(cpu, "i786")) {
+			add_define("__pentium4",     "1", false);
+			add_define("__pentium4__",   "1", false);
+		}
+		/* TODO: __MMX__, __SSE__, __SSE2__, __SSE3__ */
+		/* x87 rounds towards positive infinity */
+		add_define("__FLT_EVAL_METHOD__", "2", false);
+	} else {
+		/* round towards zero */
+		add_define("__FLT_EVAL_METHOD__", "0", false);
+	}
+	/* TODO: query from backend? */
+	add_define("__USER_LABEL_PREFIX__", user_label_prefix, false);
+	add_define("__REGISTER_PREFIX__", "", false);
+	/* TODO: GCC_HAVE_SYNC_COMPARE_AND_SWAP_XX */
+
+	atomic_type_properties_t *props = atomic_type_properties;
+	if ((props[ATOMIC_TYPE_CHAR].flags & ATOMIC_TYPE_FLAG_SIGNED) == 0) {
+		add_define("__CHAR_UNSIGNED__", "1", false);
+	}
+	if ((props[ATOMIC_TYPE_WCHAR_T].flags & ATOMIC_TYPE_FLAG_SIGNED) == 0) {
+		add_define("__WCHAR_UNSIGNED__", "1", false);
+	}
+	add_define_int("__CHAR_BIT__", BITS_PER_BYTE);
+
+	assert(type_size_t->kind    == TYPE_ATOMIC);
+	assert(type_wint_t->kind    == TYPE_ATOMIC);
+	assert(type_ptrdiff_t->kind == TYPE_ATOMIC);
+
+	define_sizeof("SHORT",       ATOMIC_TYPE_SHORT);
+	define_sizeof("INT",         ATOMIC_TYPE_INT);
+	define_sizeof("LONG",        ATOMIC_TYPE_LONG);
+	define_sizeof("LONG_LONG",   ATOMIC_TYPE_LONGLONG);
+	define_sizeof("FLOAT",       ATOMIC_TYPE_FLOAT);
+	define_sizeof("DOUBLE",      ATOMIC_TYPE_DOUBLE);
+	define_sizeof("LONG_DOUBLE", ATOMIC_TYPE_LONG_DOUBLE);
+	define_sizeof("SIZE_T",      type_size_t->atomic.akind);
+	define_sizeof("WCHAR_T",     wchar_atomic_kind);
+	define_sizeof("WINT_T",      type_wint_t->atomic.akind);
+	define_sizeof("PTRDIFF_T",   type_ptrdiff_t->atomic.akind);
+	add_define_int("__SIZEOF_POINTER__", get_type_size(type_void_ptr));
+
+	define_type_max("SCHAR",     ATOMIC_TYPE_SCHAR);
+	define_type_max("SHRT",      ATOMIC_TYPE_SHORT);
+	define_type_max("INT",       ATOMIC_TYPE_INT);
+	define_type_max("LONG",      ATOMIC_TYPE_LONG);
+	define_type_max("LONG_LONG", ATOMIC_TYPE_LONGLONG);
+
+	define_type_type_max("WCHAR",   wchar_atomic_kind);
+	define_type_min(     "WCHAR",   wchar_atomic_kind);
+	define_type_type_max("SIZE",    type_size_t->atomic.akind);
+	define_type_type_max("WINT",    type_wint_t->atomic.akind);
+	define_type_min(     "WINT",    type_wint_t->atomic.akind);
+	define_type_type_max("PTRDIFF", type_ptrdiff_t->atomic.akind);
+
+	/* TODO: what to choose here... */
+	define_type_type_max("SIG_ATOMIC", ATOMIC_TYPE_INT);
+	define_type_min(     "SIG_ATOMIC", ATOMIC_TYPE_INT);
+
+	define_int_n_types(8,  ATOMIC_TYPE_UCHAR,  ATOMIC_TYPE_UCHAR);
+	define_int_n_types(16, ATOMIC_TYPE_USHORT, ATOMIC_TYPE_SHORT);
+	define_int_n_types(32, ATOMIC_TYPE_INT,    ATOMIC_TYPE_UINT);
+	if (get_type_size(type_void_ptr) == 4) {
+		define_type_type_max("UINTPTR", ATOMIC_TYPE_UINT);
+		define_type_type_max("INTPTR",  ATOMIC_TYPE_INT);
+	} else if (get_type_size(type_void_ptr) == 8) {
+		assert(props[ATOMIC_TYPE_LONG].size == 8);
+		assert(props[ATOMIC_TYPE_ULONG].size == 8);
+		define_type_type_max("UINTPTR", ATOMIC_TYPE_ULONG);
+		define_type_type_max("INTPTR",  ATOMIC_TYPE_LONG);
+	}
+	if (props[ATOMIC_TYPE_LONG].size == 8) {
+		define_int_n_types(64, ATOMIC_TYPE_ULONG, ATOMIC_TYPE_LONG);
+	} else if (props[ATOMIC_TYPE_LONGLONG].size == 8) {
+		define_int_n_types(64, ATOMIC_TYPE_ULONGLONG, ATOMIC_TYPE_LONGLONG);
+	}
+
+	unsigned           intmax_size  = 0;
+	atomic_type_kind_t intmax_kind  = ATOMIC_TYPE_FIRST;
+	unsigned           uintmax_size = 0;
+	atomic_type_kind_t uintmax_kind = ATOMIC_TYPE_FIRST;
+	for (atomic_type_kind_t i = ATOMIC_TYPE_FIRST; i <= ATOMIC_TYPE_LAST; ++i) {
+		unsigned flags = get_atomic_type_flags(i);
+		if (! (flags & ATOMIC_TYPE_FLAG_INTEGER))
+			continue;
+		unsigned size = get_atomic_type_size(i);
+		if (flags & ATOMIC_TYPE_FLAG_SIGNED) {
+			if (size > intmax_size) {
+				intmax_kind = i;
+				intmax_size = size;
+			}
+		} else {
+			if (size > uintmax_size) {
+				uintmax_kind = i;
+				uintmax_size = size;
+			}
+		}
+	}
+	define_type_type_max("UINTMAX", uintmax_kind);
+	define_type_type_max("INTMAX",  intmax_kind);
+
+	/* TODO: less hardcoding for the following... */
+	add_define("__FLT_RADIX__",    "2",  false);
+	const char *biggest_decimal_dig = "17";
+	assert(get_atomic_type_size(ATOMIC_TYPE_FLOAT) == 4);
+	add_define("__FLT_MANT_DIG__",      "24",                          false);
+	add_define("__FLT_DIG__",           "6",                           false);
+	add_define("__FLT_MIN_EXP__",       "(-125)",                      false);
+	add_define("__FLT_MIN_10_EXP__",    "(-37)",                       false);
+	add_define("__FLT_MAX_EXP__",       "128",                         false);
+	add_define("__FLT_MAX_10_EXP__",    "38",                          false);
+	add_define("__FLT_DECIMAL_DIG__",   "9",                           false);
+	add_define("__FLT_MAX__",           "3.40282346638528859812e+38F", false);
+	add_define("__FLT_MIN__",           "1.17549435082228750797e-38F", false);
+	add_define("__FLT_EPSILON__",       "1.19209289550781250000e-7F",  false);
+	add_define("__FLT_DENORM_MIN__",    "1.40129846432481707092e-45F", false);
+	add_define("__FLT_HAS_DENORM__",    "1",                           false);
+	add_define("__FLT_HAS_INFINITY__",  "1",                           false);
+	add_define("__FLT_HAS_QUIET_NAN__", "1",                           false);
+	assert(get_atomic_type_size(ATOMIC_TYPE_DOUBLE) == 8);
+	add_define("__DBL_MANT_DIG__",      "53",                          false);
+	add_define("__DBL_DIG__",           "15",                          false);
+	add_define("__DBL_MIN_EXP__",       "(-1021)",                     false);
+	add_define("__DBL_MIN_10_EXP__",    "(-307)",                      false);
+	add_define("__DBL_MAX_EXP__",       "1024",                        false);
+	add_define("__DBL_MAX_10_EXP__",    "308",                         false);
+	add_define("__DBL_DECIMAL_DIG__",   "17",                          false);
+	add_define("__DBL_MAX__",           "((double)1.79769313486231570815e+308L)", false);
+	add_define("__DBL_MIN__",           "((double)2.22507385850720138309e-308L)", false);
+	add_define("__DBL_EPSILON__",       "((double)2.22044604925031308085e-16L)", false);
+	add_define("__DBL_DENORM_MIN__",    "((double)4.94065645841246544177e-324L)", false);
+	add_define("__DBL_HAS_DENORM__",    "1",                           false);
+	add_define("__DBL_HAS_INFINITY__",  "1",                           false);
+	add_define("__DBL_HAS_QUIET_NAN__", "1",                           false);
+	ir_mode *mode = atomic_modes[ATOMIC_TYPE_LONG_DOUBLE];
+	if (mode != NULL && get_mode_arithmetic(mode) == irma_x86_extended_float
+	    && get_mode_exponent_size(mode) == 15
+	    && get_mode_mantissa_size(mode) == 63) {
+		add_define("__LDBL_MANT_DIG__",      "64",                            false);
+		add_define("__LDBL_DIG__",           "18",                            false);
+		add_define("__LDBL_MIN_EXP__",       "(-16381)",                      false);
+		add_define("__LDBL_MIN_10_EXP__",    "(-4931)",                       false);
+		add_define("__LDBL_DECIMAL_DIG__",   "21",                            false);
+		add_define("__LDBL_MAX_EXP__",       "16384",                         false);
+		add_define("__LDBL_MAX_10_EXP__",    "4932",                          false);
+		add_define("__LDBL_MAX__",           "1.18973149535723176502e+4932L", false);
+		add_define("__LDBL_MIN__",           "3.36210314311209350626e-4932L", false);
+		add_define("__LDBL_EPSILON__",       "1.08420217248550443401e-19L",   false);
+		add_define("__LDBL_DENORM_MIN__",    "3.64519953188247460253e-4951L", false);
+		add_define("__LDBL_HAS_DENORM__",    "1",                             false);
+		add_define("__LDBL_HAS_INFINITY__",  "1",                             false);
+		add_define("__LDBL_HAS_QUIET_NAN__", "1",                             false);
+		biggest_decimal_dig = "21";
+	}
+	add_define("__DECIMAL_DIG__", biggest_decimal_dig, false);
+
+	/* TODO: __CHAR16_TYPE__, __CHAR32_TYPE__ */
+	/* TODO: query this from backend? (if we just look for all alignments in
+	 *       our atomic types it's usually < 16... */
+	add_define_int("__BIGGEST_ALIGNMENT__", 16);
 }
 
 static void setup_cmode(const compilation_unit_t *unit)

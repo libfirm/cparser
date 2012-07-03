@@ -234,12 +234,12 @@ const char *get_atomic_kind_name(atomic_type_kind_t kind)
 	case ATOMIC_TYPE_UCHAR:       return "unsigned char";
 	case ATOMIC_TYPE_INT:         return "int";
 	case ATOMIC_TYPE_UINT:        return "unsigned int";
-	case ATOMIC_TYPE_SHORT:       return "short";
-	case ATOMIC_TYPE_USHORT:      return "unsigned short";
-	case ATOMIC_TYPE_LONG:        return "long";
-	case ATOMIC_TYPE_ULONG:       return "unsigned long";
-	case ATOMIC_TYPE_LONGLONG:    return "long long";
-	case ATOMIC_TYPE_ULONGLONG:   return "unsigned long long";
+	case ATOMIC_TYPE_SHORT:       return "short int";
+	case ATOMIC_TYPE_USHORT:      return "short unsigned int";
+	case ATOMIC_TYPE_LONG:        return "long int";
+	case ATOMIC_TYPE_ULONG:       return "long unsigned int";
+	case ATOMIC_TYPE_LONGLONG:    return "long long int";
+	case ATOMIC_TYPE_ULONGLONG:   return "long long unsigned int";
 	case ATOMIC_TYPE_LONG_DOUBLE: return "long double";
 	case ATOMIC_TYPE_FLOAT:       return "float";
 	case ATOMIC_TYPE_DOUBLE:      return "double";
