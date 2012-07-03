@@ -122,7 +122,7 @@ static const char       *input_encoding;
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
 	STANDARD_C89,     /* ISO C90 (sic) */
-	STANDARD_C90,     /* ISO C90 as modified in amendment 1 */
+	STANDARD_C89AMD1, /* ISO C90 as modified in amendment 1 */
 	STANDARD_C99,     /* ISO C99 */
 	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
 	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
@@ -310,7 +310,7 @@ static FILE *preprocess(const char *fname, filetype_t filetype,
 	char const *std = NULL;
 	switch (standard) {
 	case STANDARD_C89:     std = "-std=c89";            break;
-	case STANDARD_C90:     std = "-std=iso9899:199409"; break;
+	case STANDARD_C89AMD1: std = "-std=iso9899:199409"; break;
 	case STANDARD_C99:     std = "-std=c99";            break;
 	case STANDARD_GNU89:   std = "-std=gnu89";          break;
 	case STANDARD_GNU99:   std = "-std=gnu99";          break;
@@ -1472,7 +1472,7 @@ int main(int argc, char **argv)
 					streq(o, "gnu99")          ? STANDARD_GNU99   :
 					streq(o, "gnu9x")          ? STANDARD_GNU99   : // deprecated
 					streq(o, "iso9899:1990")   ? STANDARD_C89     :
-					streq(o, "iso9899:199409") ? STANDARD_C90     :
+					streq(o, "iso9899:199409") ? STANDARD_C89AMD1 :
 					streq(o, "iso9899:1999")   ? STANDARD_C99     :
 					streq(o, "iso9899:199x")   ? STANDARD_C99     : // deprecated
 					(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
@@ -1830,11 +1830,11 @@ preprocess:
 		if (filetype == FILETYPE_PREPROCESSED_C) {
 			char const* invalid_mode;
 			switch (file_standard) {
-			case STANDARD_C89:   c_mode = _C89;                break;
+			case STANDARD_C89:     c_mode = _C89;                break;
 			/* TODO determine difference between these two */
-			case STANDARD_C90:   c_mode = _C89;                break;
-			case STANDARD_C99:   c_mode = _C89 | _C99;         break;
-			case STANDARD_GNU89: c_mode = _C89 |        _GNUC; break;
+			case STANDARD_C89AMD1: c_mode = _C89;                break;
+			case STANDARD_C99:     c_mode = _C89 | _C99;         break;
+			case STANDARD_GNU89:   c_mode = _C89 |        _GNUC; break;
 
 default_c_warn:
 				fprintf(stderr,
@@ -1851,11 +1851,11 @@ default_c_warn:
 		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
 			char const* invalid_mode;
 			switch (file_standard) {
-			case STANDARD_C89:   invalid_mode = "c89";   goto default_cxx_warn;
-			case STANDARD_C90:   invalid_mode = "c90";   goto default_cxx_warn;
-			case STANDARD_C99:   invalid_mode = "c99";   goto default_cxx_warn;
-			case STANDARD_GNU89: invalid_mode = "gnu89"; goto default_cxx_warn;
-			case STANDARD_GNU99: invalid_mode = "gnu99"; goto default_cxx_warn;
+			case STANDARD_C89:     invalid_mode = "c89";   goto default_cxx_warn;
+			case STANDARD_C89AMD1: invalid_mode = "c90";   goto default_cxx_warn;
+			case STANDARD_C99:     invalid_mode = "c99";   goto default_cxx_warn;
+			case STANDARD_GNU89:   invalid_mode = "gnu89"; goto default_cxx_warn;
+			case STANDARD_GNU99:   invalid_mode = "gnu99"; goto default_cxx_warn;
 
 			case STANDARD_CXX98: c_mode = _CXX; break;
 
