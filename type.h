@@ -32,8 +32,7 @@ typedef unsigned char il_alignment_t;
 /* note that the constant values represent the rank of the types as defined
  * in § 6.3.1 */
 typedef enum atomic_type_kind_t {
-	ATOMIC_TYPE_INVALID = 0,
-	ATOMIC_TYPE_VOID,
+	ATOMIC_TYPE_VOID = 1,
 	ATOMIC_TYPE_BOOL,
 	ATOMIC_TYPE_WCHAR_T, /* only used in C++, in C code wchar_t is a pp-macro */
 	ATOMIC_TYPE_CHAR,

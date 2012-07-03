@@ -257,7 +257,6 @@ void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparato
 const char *get_atomic_kind_name(atomic_type_kind_t kind)
 {
 	switch(kind) {
-	case ATOMIC_TYPE_INVALID: break;
 	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
 	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
@@ -1236,7 +1235,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if (kind == ATOMIC_TYPE_INVALID) {
+	if (kind == (atomic_type_kind_t)0) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_SCHAR,
 			ATOMIC_TYPE_SHORT,
@@ -1264,7 +1263,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if (kind == ATOMIC_TYPE_INVALID) {
+	if (kind == (atomic_type_kind_t)0) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_UCHAR,
 			ATOMIC_TYPE_USHORT,

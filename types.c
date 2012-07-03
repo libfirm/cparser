@@ -82,16 +82,16 @@ type_t *type_const_wchar_t_ptr;
 type_t *type_valist;
 
 /* microsoft types */
-atomic_type_kind_t int8_type_kind            = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t int16_type_kind           = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t int32_type_kind           = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t int64_type_kind           = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t int128_type_kind          = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t unsigned_int8_type_kind   = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t unsigned_int16_type_kind  = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t unsigned_int32_type_kind  = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t unsigned_int64_type_kind  = ATOMIC_TYPE_INVALID;
-atomic_type_kind_t unsigned_int128_type_kind = ATOMIC_TYPE_INVALID;
+atomic_type_kind_t int8_type_kind;
+atomic_type_kind_t int16_type_kind;
+atomic_type_kind_t int32_type_kind;
+atomic_type_kind_t int64_type_kind;
+atomic_type_kind_t int128_type_kind;
+atomic_type_kind_t unsigned_int8_type_kind;
+atomic_type_kind_t unsigned_int16_type_kind;
+atomic_type_kind_t unsigned_int32_type_kind;
+atomic_type_kind_t unsigned_int64_type_kind;
+atomic_type_kind_t unsigned_int128_type_kind;
 
 type_t *type_int8;
 type_t *type_int16;

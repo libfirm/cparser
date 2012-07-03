@@ -3047,11 +3047,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_ATOMIC: {
 				const atomic_type_t *const atomic_type = &type->atomic;
 				switch (atomic_type->akind) {
-					/* should not be reached */
-					case ATOMIC_TYPE_INVALID:
-						tc = no_type_class;
-						goto make_const;
-
 					/* gcc cannot do that */
 					case ATOMIC_TYPE_VOID:
 						tc = void_type_class;
