@@ -121,6 +121,7 @@ static const char       *input_encoding;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
+	STANDARD_ANSI,    /* ISO C90 (for C) or ISO C++ 1998 (for C++) */
 	STANDARD_C89,     /* ISO C90 (sic) */
 	STANDARD_C89AMD1, /* ISO C90 as modified in amendment 1 */
 	STANDARD_C99,     /* ISO C99 */
@@ -262,6 +263,7 @@ static char const* str_lang_standard(lang_standard_t const standard)
 	case STANDARD_GNU99:   return "gnu99";
 	case STANDARD_CXX98:   return "c++98";
 	case STANDARD_GNUXX98: return "gnu++98";
+	case STANDARD_ANSI:    break;
 	case STANDARD_DEFAULT: break;
 	}
 	panic("invalid standard");
@@ -639,7 +641,7 @@ static void print_help_parser(void)
 	put_choice("iso9899:1999",           "ISO C99");
 	put_choice("iso9899:199x",           "Deprecated");
 	put_help("-pedantic",                "Ignored (gcc compatibility)");
-	put_help("-ansi",                    "Ignored (gcc compatibility)");
+	put_help("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
 	put_help("--strict",                 "Enable strict conformance checking");
 }
 
@@ -1460,7 +1462,7 @@ int main(int argc, char **argv)
 				set_be_option("gprof");
 				add_flag(&ldflags_obst, "-pg");
 			} else if (streq(option, "ansi")) {
-				add_flag(&cppflags_obst, "-ansi");
+				standard = STANDARD_ANSI;
 			} else if (streq(option, "pedantic")) {
 				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
 			} else if (strstart(option, "std=")) {
@@ -1759,19 +1761,28 @@ int main(int argc, char **argv)
 
 		if (filetype == FILETYPE_OBJECT)
 			continue;
-		if (file_standard == STANDARD_DEFAULT) {
+		switch (file_standard) {
+		case STANDARD_ANSI:
 			switch (filetype) {
 			case FILETYPE_C:
-			case FILETYPE_PREPROCESSED_C:
-				file_standard = STANDARD_GNU99;
-				break;
+			case FILETYPE_PREPROCESSED_C:   file_standard = STANDARD_C89;   break;
 			case FILETYPE_CXX:
-			case FILETYPE_PREPROCESSED_CXX:
-				file_standard = STANDARD_GNUXX98;
-				break;
-			default:
-				break;
+			case FILETYPE_PREPROCESSED_CXX: file_standard = STANDARD_CXX98; break;
+			default:                        break;
 			}
+			break;
+
+		case STANDARD_DEFAULT:
+			switch (filetype) {
+			case FILETYPE_C:
+			case FILETYPE_PREPROCESSED_C:   file_standard = STANDARD_GNU99;   break;
+			case FILETYPE_CXX:
+			case FILETYPE_PREPROCESSED_CXX: file_standard = STANDARD_GNUXX98; break;
+			default:                        break;
+			}
+			break;
+
+		default: break;
 		}
 
 		FILE *in = NULL;
@@ -1840,6 +1851,7 @@ preprocess:
 			case STANDARD_C99:     c_mode = _C89 | _C99;         break;
 			case STANDARD_GNU89:   c_mode = _C89 |        _GNUC; break;
 
+			case STANDARD_ANSI:
 			case STANDARD_CXX98:
 			case STANDARD_GNUXX98:
 			case STANDARD_DEFAULT:
@@ -1852,6 +1864,7 @@ preprocess:
 			switch (file_standard) {
 			case STANDARD_CXX98: c_mode = _CXX; break;
 
+			case STANDARD_ANSI:
 			case STANDARD_C89:
 			case STANDARD_C89AMD1:
 			case STANDARD_C99:
