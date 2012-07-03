@@ -35,7 +35,7 @@ typedef enum atomic_type_kind_t {
 	ATOMIC_TYPE_INVALID = 0,
 	ATOMIC_TYPE_VOID,
 	ATOMIC_TYPE_BOOL,
-	ATOMIC_TYPE_WCHAR_T,
+	ATOMIC_TYPE_WCHAR_T, /* only used in C++, in C code wchar_t is a pp-macro */
 	ATOMIC_TYPE_CHAR,
 	ATOMIC_TYPE_SCHAR,
 	ATOMIC_TYPE_UCHAR,

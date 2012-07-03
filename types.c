@@ -191,13 +191,11 @@ void init_basic_types(void)
 	type_ssize_t_ptr   = make_pointer_type(type_ssize_t,   TYPE_QUALIFIER_NONE);
 }
 
-void init_wchar_types(type_t *base)
+void init_wchar_types(atomic_type_kind_t akind)
 {
-	assert(base->kind == TYPE_ATOMIC);
-	type_wchar_t = base;
-	type_const_wchar_t
-		= make_atomic_type(base->atomic.akind, TYPE_QUALIFIER_CONST);
-	type_wchar_t_ptr   = make_pointer_type(type_wchar_t,   TYPE_QUALIFIER_NONE);
+	type_wchar_t       = make_atomic_type(akind, TYPE_QUALIFIER_NONE);
+	type_const_wchar_t = make_atomic_type(akind, TYPE_QUALIFIER_CONST);
+	type_wchar_t_ptr   = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
 	type_const_wchar_t_ptr
 		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
 }

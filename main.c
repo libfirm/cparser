@@ -1671,12 +1671,11 @@ int main(int argc, char **argv)
 	init_types_and_adjust();
 	init_typehash();
 	init_basic_types();
-	if (wchar_atomic_kind == ATOMIC_TYPE_INT)
-		init_wchar_types(type_int);
-	else if (wchar_atomic_kind == ATOMIC_TYPE_USHORT)
-		init_wchar_types(type_short);
-	else
-		panic("unexpected wchar type");
+	if (c_mode & _CXX) {
+		init_wchar_types(ATOMIC_TYPE_WCHAR_T);
+	} else {
+		init_wchar_types(wchar_atomic_kind);
+	}
 	init_preprocessor();
 	init_ast();
 	init_parser();

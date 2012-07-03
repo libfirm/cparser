@@ -106,6 +106,6 @@ extern type_t *type_unsigned_int64;
 extern type_t *type_unsigned_int128;
 
 void init_basic_types(void);
-void init_wchar_types(type_t *base);
+void init_wchar_types(atomic_type_kind_t wchar_akind);
 
 #endif
