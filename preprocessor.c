@@ -172,10 +172,7 @@ FILE* close_input(void)
 
 static void push_input(void)
 {
-	pp_input_t *saved_input
-		= obstack_alloc(&input_obstack, sizeof(*saved_input));
-
-	memcpy(saved_input, &input, sizeof(*saved_input));
+	pp_input_t *const saved_input = obstack_copy(&input_obstack, &input, sizeof(input));
 
 	/* adjust buffer positions */
 	if (input.bufpos != NULL)
@@ -2272,10 +2269,7 @@ static void setup_include_path(void)
 				 * nothing happens for an empty entry...) */
 				prepend_include_path(".");
 			} else {
-				char *string = obstack_alloc(&config_obstack, len+1);
-				memcpy(string, begin, len);
-				string[len] = '\0';
-
+				char *const string = obstack_copy0(&config_obstack, begin, len);
 				prepend_include_path(string);
 			}
 

@@ -706,8 +706,7 @@ type_t *duplicate_type(const type_t *type)
 {
 	size_t size = get_type_struct_size(type->kind);
 
-	type_t *const copy = obstack_alloc(&type_obst, size);
-	memcpy(copy, type, size);
+	type_t *const copy = obstack_copy(&type_obst, type, size);
 	copy->base.firm_type = NULL;
 
 	return copy;
