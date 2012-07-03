@@ -3,22 +3,24 @@
 #endif
 
 /* These must go first. Some set explicit values. */
-#define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
-#define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
+#define ALTERNATE(name, val)          T(_CXX, T_##name, #name,  val)
+#define PUNCTUATOR(name, string, val) T(_ALL, T_##name, string, val)
 #include "tokens_punctuator.inc"
 #undef PUNCTUATOR
 #undef ALTERNATE
 
-TS(EOF,                "end of input",)
-TS(IDENTIFIER,         "identifier",)
-TS(NUMBER,             "number constant",)
-TS(CHARACTER_CONSTANT, "character constant",)
-TS(STRING_LITERAL,     "string literal",)
-TS(HEADERNAME,         "headername",)
-TS(MACRO_PARAMETER,    "macro parameter",)
-TS(UNKNOWN_CHAR,       "unknown character",)
+#define S(name, description) TS(T_##name, description,)
+S(EOF,                "end of input")
+S(IDENTIFIER,         "identifier")
+S(NUMBER,             "number constant")
+S(CHARACTER_CONSTANT, "character constant")
+S(STRING_LITERAL,     "string literal")
+S(HEADERNAME,         "headername")
+S(MACRO_PARAMETER,    "macro parameter")
+S(UNKNOWN_CHAR,       "unknown character")
+#undef S
 
-#define S(mode,x)   T(mode,x,#x,)
+#define S(mode,x)   T(mode,T_##x,#x,)
 S(_ALL, auto)
 S(_ALL, break)
 S(_ALL, case)
@@ -50,9 +52,7 @@ S(_ALL, void)
 S(_ALL, while)
 
 /* C++ keywords */
-#undef bool
 S(_CXX, bool)
-#define bool _Bool
 S(_CXX, catch)
 S(_CXX, class)
 S(_CXX, const_cast)
@@ -60,9 +60,7 @@ S(_CXX, delete)
 S(_CXX, dynamic_cast)
 S(_CXX, explicit)
 S(_CXX, export)
-#undef false
 S(_CXX, false)
-#define false 0
 S(_CXX, friend)
 S(_CXX, mutable)
 S(_CXX, namespace)
@@ -76,9 +74,7 @@ S(_CXX, static_cast)
 S(_CXX, template)
 S(_CXX, this)
 S(_CXX, throw)
-#undef true
 S(_CXX, true)
-#define true 1
 S(_CXX, try)
 S(_CXX, typeid)
 S(_CXX, typename)
@@ -108,29 +104,7 @@ S(_MS, __FUNCSIG__)
 S(_MS, __FUNCDNAME__)
 #undef S
 
-/* needed on Windows */
-#undef __w64
-#undef __ptr32
-#undef __ptr64
-
-/* needed on MinGW */
-#undef __int8
-#undef __int16
-#undef __int32
-#undef __int64
-
-/* needed on MinGW and Cygwin */
-#undef __cdecl
-#undef __stdcall
-#undef __fastcall
-
-/* needed on Darwin... */
-#undef __signed
-#undef __volatile
-#undef __const
-#undef __restrict
-
-#define S(mode, x, val) T(mode, x, #x, val)
+#define S(mode, x, val) T(mode, T_##x, #x, val)
 S(_C99,            __func__,)
 S(_ALL,            __FUNCTION__,           = T___func__)
 S(_ALL,              signed,               )
