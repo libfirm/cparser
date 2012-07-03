@@ -98,7 +98,7 @@
 #define ASSEMBLER "gcc -c -xassembler"
 #endif
 
-unsigned int        c_mode                    = _C89 | _ANSI | _C99 | _GNUC;
+unsigned int        c_mode                    = _C89 | _C99 | _GNUC;
 bool                byte_order_big_endian     = false;
 bool                strict_mode               = false;
 bool                enable_main_collect2_hack = false;
