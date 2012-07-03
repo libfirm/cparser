@@ -1468,6 +1468,7 @@ int main(int argc, char **argv)
 					streq(o, "c++")            ? STANDARD_CXX98   :
 					streq(o, "c++98")          ? STANDARD_CXX98   :
 					streq(o, "c89")            ? STANDARD_C89     :
+					streq(o, "c90")            ? STANDARD_C89     :
 					streq(o, "c99")            ? STANDARD_C99     :
 					streq(o, "c9x")            ? STANDARD_C99     : // deprecated
 					streq(o, "gnu++98")        ? STANDARD_GNUXX98 :
