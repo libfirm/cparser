@@ -627,6 +627,7 @@ static void print_help_parser(void)
 	put_help("-std=STANDARD",            "Specify language standard:");
 	put_choice("c99",                    "ISO C99 standard");
 	put_choice("c89",                    "ISO C89 standard");
+	put_choice("c90",                    "Same as -std=c89");
 	put_choice("c9x",                    "Deprecated");
 	put_choice("c++",                    "ISO C++ 98");
 	put_choice("c++98",                  "ISO C++ 98");
