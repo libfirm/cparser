@@ -19,6 +19,9 @@ typedef enum warning_t {
 	WARN_ATTRIBUTE,                     /**< Warn if an unexpected `__attribute__' is used or function attributes applied to variables, etc. */
 #if 0 // TODO
 	WARN_BAD_FUNCTION_CAST,             /**< Warn whenever a function call is cast to a non-matching type */
+#endif
+	WARN_BUILTIN_MACRO_REDEFINED,       /**< warn when undefining/redefining builtin macros */
+#if 0
 	WARN_CAST_ALIGN,                    /**< Warn whenever a pointer is cast such that the required alignment of the target is increased */
 #endif
 	WARN_CAST_QUAL,                     /**< Warn whenever a pointer is cast so as to remove a type qualifier from the target type */

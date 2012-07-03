@@ -2282,10 +2282,8 @@ static bool is_defineable_token(char const *const context)
 		errorf(&pp_token.base.pos, "%K cannot be used as macro name in %s",
 		       &pp_token, context);
 		return false;
-
-	default:
-		return true;
 	}
+	return true;
 }
 
 static void parse_define_directive(void)
@@ -2443,7 +2441,10 @@ static void parse_define_directive(void)
 
 	pp_definition_t *old_definition = symbol->pp_definition;
 	if (old_definition != NULL) {
-		if (!pp_definitions_equal(old_definition, new_definition)) {
+		if (old_definition->standard_define) {
+			warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
+					 "redefining builtin macro '%Y'", symbol);
+		} else if (!pp_definitions_equal(old_definition, new_definition)) {
 			warningf(WARN_OTHER, &input.pos,
 			         "multiple definition of macro '%Y' (first defined %P)",
 			         symbol, &old_definition->pos);
@@ -2476,6 +2477,13 @@ static void parse_undef_directive(void)
 	if (!is_defineable_token("#undef")) {
 		eat_pp_directive();
 		return;
+	}
+
+	symbol_t        *symbol = pp_token.base.symbol;
+	pp_definition_t *old    = symbol->pp_definition;
+	if (old != NULL && old->standard_define) {
+		warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
+		         "undefining builtin macro '%Y'", symbol);
 	}
 
 	pp_token.base.symbol->pp_definition = NULL;
