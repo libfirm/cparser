@@ -2046,6 +2046,8 @@ static void parse_line_directive(void)
 			}
 		}
 		next_input_token();
+		if (info.at_line_begin)
+			return;
 	}
 	if (pp_token.kind == T_STRING_LITERAL
 	    && pp_token.literal.string.encoding == STRING_ENCODING_CHAR) {
@@ -2054,7 +2056,7 @@ static void parse_line_directive(void)
 		next_input_token();
 
 		/* attempt to parse numeric flags as outputted by gcc preprocessor */
-		while (pp_token.kind == T_NUMBER) {
+		while (!info.at_line_begin && pp_token.kind == T_NUMBER) {
 			/* flags:
 			 * 1 - indicates start of a new file
 			 * 2 - indicates return from a file
