@@ -2061,7 +2061,7 @@ finish_designator:
 				if (sub != NULL) {
 					next_if(',');
 					if (token.kind != '}') {
-						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", orig_type);
+						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", outer_type);
 					}
 					/* TODO: eat , ... */
 					return sub;
