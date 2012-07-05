@@ -2070,6 +2070,44 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	return true;
 }
 
+void add_define(char const *const name, char const *const val)
+{
+	symbol_t *const sym = symbol_table_insert(name);
+
+	pp_definition_t *const def = obstack_alloc(&pp_obstack, sizeof(def[0]));
+	memset(def, 0, sizeof(*def));
+	def->symbol = sym;
+	def->pos    = builtin_position;
+
+	sym->pp_definition = def;
+
+	input.file        = 0;
+	input.input       = input_from_string(val, NULL);
+	input.bufend      = NULL;
+	input.bufpos      = NULL;
+	input.output_line = 0;
+	input.pos         = builtin_position;
+	input.pos.lineno  = 0;
+	/* place a virtual '\n' so we realize we're at line begin */
+	input.c           = '\n';
+
+	for (;;) {
+		next_input_token();
+		if (pp_token.kind == T_EOF)
+			break;
+
+		saved_token_t saved_token;
+		saved_token.token          = pp_token;
+		saved_token.had_whitespace = info.had_whitespace;
+		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+	}
+
+	input_free(input.input);
+
+	def->list_len   = obstack_object_size(&pp_obstack) / sizeof(def->token_list[0]);
+	def->token_list = obstack_finish(&pp_obstack);
+}
+
 static void error_missing_macro_param(void)
 {
 	errorf(&pp_token.base.pos, "'#' is not followed by a macro parameter");

@@ -20,6 +20,8 @@ FILE *close_pp_input(void);
 
 void next_preprocessing_token(void);
 
+void add_define(char const *name, char const *val);
+
 string_t make_string(char const *string);
 
 extern bool    allow_dollar_in_symbol;
