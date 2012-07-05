@@ -1370,7 +1370,8 @@ digraph_percentcolon:
 		if (input_stack != NULL) {
 			fclose(close_pp_input());
 			pop_restore_input();
-			fputc('\n', out);
+			if (out)
+				fputc('\n', out);
 			if (input.c == (utf32)EOF)
 				--input.position.lineno;
 			print_line_directive(&input.position, "2");
@@ -1463,6 +1464,9 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 
 static bool emit_newlines(void)
 {
+	if (!out)
+		return true;
+
 	unsigned delta = pp_token.base.source_position.lineno - input.output_line;
 	if (delta == 0)
 		return false;
