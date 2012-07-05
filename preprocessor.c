@@ -110,7 +110,14 @@ static unsigned          argument_brace_count;
 static strset_t          stringset;
 static token_kind_t      last_token;
 
-static searchpath_entry_t *searchpath;
+struct searchpath_t {
+	searchpath_entry_t  *first;
+	searchpath_entry_t **anchor;
+};
+
+searchpath_t bracket_searchpath = { NULL, &bracket_searchpath.first };
+searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first   };
+searchpath_t system_searchpath  = { NULL, &system_searchpath.first  };
 
 static whitespace_info_t next_info; /* valid if had_whitespace is true */
 static whitespace_info_t info;
@@ -1945,7 +1952,9 @@ static bool do_include(bool const system_include, bool const include_next, char 
 	size_t const        headername_len = strlen(headername);
 	searchpath_entry_t *entry;
 	if (include_next) {
-		entry = input.path ? input.path->next : searchpath;
+		entry = input.path != NULL ? input.path->next
+		      : system_include ? bracket_searchpath.first
+			                   : quote_searchpath.first;
 	} else {
 		if (!system_include) {
 			/* put dirname of current input on obstack */
@@ -1967,9 +1976,10 @@ static bool do_include(bool const system_include, bool const include_next, char 
 				switch_pp_input(file, full_name, NULL);
 				return true;
 			}
+			entry = quote_searchpath.first;
+		} else {
+			entry = bracket_searchpath.first;
 		}
-
-		entry = searchpath;
 	}
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
@@ -2503,24 +2513,20 @@ restart:
 	}
 }
 
-
-static void prepend_include_path(const char *path)
+void append_include_path(searchpath_t *paths, const char *path)
 {
 	searchpath_entry_t *entry = OALLOCZ(&config_obstack, searchpath_entry_t);
 	entry->path = path;
-	entry->next = searchpath;
-	searchpath  = entry;
+
+	*paths->anchor = entry;
+	paths->anchor  = &entry->next;
 }
 
-static void setup_include_path(void)
+static void append_env_paths(searchpath_t *paths, const char *envvar)
 {
-	/* built-in paths */
-	prepend_include_path("/usr/include");
-
-	/* parse environment variable */
-	const char *cpath = getenv("CPATH");
-	if (cpath != NULL && *cpath != '\0') {
-		const char *begin = cpath;
+	const char *val = getenv(envvar);
+	if (val != NULL && *val != '\0') {
+		const char *begin = val;
 		const char *c;
 		do {
 			c = begin;
@@ -2529,12 +2535,12 @@ static void setup_include_path(void)
 
 			size_t len = c-begin;
 			if (len == 0) {
-				/* for gcc compatibility (Matze: I would expect that
+				/* use "." for gcc compatibility (Matze: I would expect that
 				 * nothing happens for an empty entry...) */
-				prepend_include_path(".");
+				append_include_path(paths, ".");
 			} else {
 				char *const string = obstack_copy0(&config_obstack, begin, len);
-				prepend_include_path(string);
+				append_include_path(paths, string);
 			}
 
 			begin = c+1;
@@ -2545,6 +2551,26 @@ static void setup_include_path(void)
 	}
 }
 
+static void append_searchpath(searchpath_t *path, const searchpath_t *append)
+{
+	*path->anchor = append->first;
+}
+
+static void setup_include_path(void)
+{
+	/* built-in paths */
+	append_include_path(&system_searchpath, "/usr/include");
+
+	/* parse environment variable */
+	append_env_paths(&bracket_searchpath, "CPATH");
+	append_env_paths(&system_searchpath,
+	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
+
+	/* append system search path to bracket searchpath */
+	append_searchpath(&bracket_searchpath, &system_searchpath);
+	append_searchpath(&quote_searchpath, &bracket_searchpath);
+}
+
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
 {
 	source_position_t pos = pp_token.base.source_position;
@@ -2553,11 +2579,15 @@ static void input_error(unsigned const delta_lines, unsigned const delta_cols, c
 	errorf(&pos, "%s", message);
 }
 
+void init_include_paths(void)
+{
+	obstack_init(&config_obstack);
+}
+
 void init_preprocessor(void)
 {
 	init_symbols();
 
-	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
@@ -2580,6 +2610,7 @@ int pptest_main(int argc, char **argv);
 int pptest_main(int argc, char **argv)
 {
 	init_symbol_table();
+	init_include_paths();
 	init_preprocessor();
 	init_tokens();
 
@@ -2592,7 +2623,7 @@ int pptest_main(int argc, char **argv)
 	for (int i = 1; i < argc; ++i) {
 		const char *opt = argv[i];
 		if (streq(opt, "-I")) {
-			prepend_include_path(argv[++i]);
+			append_include_path(&bracket_searchpath, argv[++i]);
 			continue;
 		} else if (streq(opt, "-E")) {
 			/* ignore */

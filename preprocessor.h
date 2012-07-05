@@ -25,4 +25,13 @@ void set_preprocessor_output(FILE *output);
 void emit_pp_token(void);
 void check_unclosed_conditionals(void);
 
+typedef struct searchpath_t searchpath_t;
+extern searchpath_t bracket_searchpath; /**< paths for < > includes */
+extern searchpath_t quote_searchpath;   /**< paths for " " includes */
+extern searchpath_t system_searchpath;  /**< system searchpath (appended to
+                                             quote searchpath) */
+
+void init_include_paths(void);
+void append_include_path(searchpath_t *searchpath, const char *path);
+
 #endif

@@ -1434,6 +1434,7 @@ int main(int argc, char **argv)
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
+	init_include_paths();
 
 #define GET_ARG_AFTER(def, args)                                             \
 	do {                                                                     \
@@ -1507,6 +1508,7 @@ int main(int argc, char **argv)
 				const char *opt;
 				GET_ARG_AFTER(opt, "-I");
 				add_flag(&cppflags_obst, "-I%s", opt);
+				append_include_path(&bracket_searchpath, opt);
 			} else if (option[0] == 'D') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-D");
@@ -1563,6 +1565,13 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-isystem");
 				add_flag(&cppflags_obst, "-isystem");
 				add_flag(&cppflags_obst, "%s", opt);
+				append_include_path(&system_searchpath, opt);
+			} else if (streq(option, "iquote")) {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-iquote");
+				add_flag(&cppflags_obst, "-iquote");
+				add_flag(&cppflags_obst, "%s", opt);
+				append_include_path(&quote_searchpath, opt);
 			} else if (streq(option, "pthread")) {
 				/* set flags for the preprocessor */
 				add_flag(&cppflags_obst, "-D_REENTRANT");
