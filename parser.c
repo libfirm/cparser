@@ -1954,6 +1954,8 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		return create_empty_initializer();
 	}
 
+	initializer_t *result = NULL;
+
 	type_t *orig_type = path->top_type;
 	type_t *type      = NULL;
 
@@ -2057,14 +2059,14 @@ finish_designator:
 
 			/* handle { "string" } special case */
 			if (expression->kind == EXPR_STRING_LITERAL && outer_type != NULL) {
-				sub = initializer_from_expression(outer_type, expression);
-				if (sub != NULL) {
+				result = initializer_from_expression(outer_type, expression);
+				if (result != NULL) {
 					next_if(',');
 					if (token.kind != '}') {
 						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", outer_type);
 					}
 					/* TODO: eat , ... */
-					return sub;
+					goto out;
 				}
 			}
 
@@ -2128,22 +2130,19 @@ error_parse_next:
 
 	size_t len  = ARR_LEN(initializers);
 	size_t size = sizeof(initializer_list_t) + len * sizeof(initializers[0]);
-	initializer_t *result = allocate_ast_zero(size);
-	result->kind          = INITIALIZER_LIST;
-	result->list.len      = len;
+	result = allocate_ast_zero(size);
+	result->kind     = INITIALIZER_LIST;
+	result->list.len = len;
 	memcpy(&result->list.initializers, initializers,
 	       len * sizeof(initializers[0]));
-
-	DEL_ARR_F(initializers);
-	ascend_to(path, top_path_level+1);
-
-	return result;
+	goto out;
 
 end_error:
 	skip_initializers();
+out:
 	DEL_ARR_F(initializers);
 	ascend_to(path, top_path_level+1);
-	return NULL;
+	return result;
 }
 
 static expression_t *make_size_literal(size_t value)
