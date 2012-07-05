@@ -19,4 +19,8 @@ string_t make_string(char const *string);
 extern bool    allow_dollar_in_symbol;
 extern token_t pp_token;
 
+void set_preprocessor_output(FILE *output);
+void emit_pp_token(void);
+void check_unclosed_conditionals(void);
+
 #endif

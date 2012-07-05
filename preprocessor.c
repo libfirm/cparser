@@ -1410,7 +1410,19 @@ static bool emit_newlines(void)
 	return true;
 }
 
-static void emit_pp_token(void)
+void set_preprocessor_output(FILE *output)
+{
+	out = output;
+	if (out != NULL) {
+		error_on_unknown_chars   = false;
+		resolve_escape_sequences = false;
+	} else {
+		error_on_unknown_chars   = true;
+		resolve_escape_sequences = true;
+	}
+}
+
+void emit_pp_token(void)
 {
 	if (!emit_newlines() &&
 	    (info.had_whitespace || tokens_would_paste(last_token, pp_token.kind)))
@@ -1856,7 +1868,7 @@ static void pop_conditional(void)
 	conditional_stack = conditional_stack->parent;
 }
 
-static void check_unclosed_conditionals(void)
+void check_unclosed_conditionals(void)
 {
 	while (conditional_stack != NULL) {
 		pp_conditional_t *conditional = conditional_stack;
