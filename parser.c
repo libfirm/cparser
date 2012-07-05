@@ -2107,12 +2107,8 @@ finish_designator:
 		ARR_APP1(initializer_t*, initializers, sub);
 
 error_parse_next:
-		if (token.kind == '}') {
+		if (!next_if(','))
 			break;
-		}
-		add_anchor_token('}');
-		expect(',');
-		rem_anchor_token('}');
 		if (token.kind == '}') {
 			break;
 		}
