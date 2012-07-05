@@ -74,6 +74,7 @@
 #include "driver/firm_machine.h"
 #include "adt/error.h"
 #include "adt/strutil.h"
+#include "adt/array.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 #include "revision.h"
@@ -107,6 +108,11 @@ unsigned            architecture_modulo_shift = 0;
 
 static bool               char_is_signed      = true;
 static atomic_type_kind_t wchar_atomic_kind   = ATOMIC_TYPE_INT;
+static unsigned           features_on         = 0;
+static unsigned           features_off        = 0;
+static const char        *dumpfunction        = NULL;
+static struct obstack     file_obst;
+static const char        *external_preprocessor = PREPROCESSOR;
 
 static machine_triple_t *target_machine;
 static const char       *target_triple;
@@ -131,28 +137,34 @@ typedef enum lang_standard_t {
 	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
 } lang_standard_t;
 
-typedef struct file_list_entry_t file_list_entry_t;
+typedef enum compilation_unit_type_t {
+	COMPILATION_UNIT_AUTODETECT,
+	COMPILATION_UNIT_C,
+	COMPILATION_UNIT_PREPROCESSED_C,
+	COMPILATION_UNIT_CXX,
+	COMPILATION_UNIT_PREPROCESSED_CXX,
+	COMPILATION_UNIT_AST,
+	COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
+	COMPILATION_UNIT_ASSEMBLER,
+	COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
+	COMPILATION_UNIT_OBJECT,
+	COMPILATION_UNIT_IR,
+	COMPILATION_UNIT_UNKNOWN
+} compilation_unit_type_t;
 
-typedef enum filetype_t {
-	FILETYPE_AUTODETECT,
-	FILETYPE_C,
-	FILETYPE_PREPROCESSED_C,
-	FILETYPE_CXX,
-	FILETYPE_PREPROCESSED_CXX,
-	FILETYPE_ASSEMBLER,
-	FILETYPE_PREPROCESSED_ASSEMBLER,
-	FILETYPE_OBJECT,
-	FILETYPE_IR,
-	FILETYPE_UNKNOWN
-} filetype_t;
-
-struct file_list_entry_t {
-	const char  *name; /**< filename or NULL for stdin */
-	filetype_t   type;
-	file_list_entry_t *next;
+typedef struct compilation_unit_t compilation_unit_t;
+struct compilation_unit_t {
+	const char             *name;  /**< filename or "-" for stdin */
+	FILE                   *input; /**< input (NULL if not opened yet) */
+	bool                    input_is_pipe;
+	compilation_unit_type_t type;
+	lang_standard_t         standard;
+	translation_unit_t     *ast;
+	bool                    parse_errors;
+	compilation_unit_t     *next;
 };
 
-static file_list_entry_t *temp_files;
+static char **temp_files;
 
 static void get_output_name(char *buf, size_t buflen, const char *inputname,
                             const char *newext)
@@ -177,27 +189,55 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 		panic("filename too long");
 }
 
-static translation_unit_t *do_parsing(FILE *const in, const char *const input_name)
+static bool close_input(compilation_unit_t *unit)
 {
-	start_parsing();
+	if (unit->input == NULL || unit->input == stdin)
+		return true;
 
-	switch_input(in, input_name);
-	parse();
-	translation_unit_t *unit = finish_parsing();
-	close_input();
-
-	return unit;
+	if (unit->input_is_pipe) {
+		int res = pclose(unit->input);
+		if (res != EXIT_SUCCESS)
+			return false;
+	} else {
+		fclose(unit->input);
+	}
+	unit->input = NULL;
+	unit->name  = NULL;
+	return true;
 }
 
-static void lextest(FILE *in, const char *fname)
+static void print_error_summary(void)
 {
-	switch_input(in, fname);
-	do {
-		next_preprocessing_token();
-		print_token(stdout, &pp_token);
-		putchar('\n');
-	} while (pp_token.kind != T_EOF);
-	close_input();
+	if (error_count > 0) {
+		/* parsing failed because of errors */
+		fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
+				warning_count);
+	} else if (warning_count > 0) {
+		fprintf(stderr, "%u warning(s)\n", warning_count);
+	}
+}
+
+static void do_parsing(compilation_unit_t *unit)
+{
+	ir_timer_t *t_parsing = ir_timer_new();
+	timer_register(t_parsing, "Frontend: Parsing");
+	timer_push(t_parsing);
+
+	start_parsing();
+
+	switch_pp_input(unit->input, unit->name);
+	parse();
+	translation_unit_t *ast = finish_parsing();
+	unit->ast = ast;
+	check_unclosed_conditionals();
+	close_pp_input();
+	bool res = close_input(unit);
+
+	print_error_summary();
+
+	unit->type         = COMPILATION_UNIT_AST;
+	unit->parse_errors = error_count > 0 || !res;
+	timer_pop(t_parsing);
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -269,8 +309,7 @@ static char const* str_lang_standard(lang_standard_t const standard)
 	panic("invalid standard");
 }
 
-static FILE *preprocess(const char *fname, filetype_t filetype,
-                        lang_standard_t standard)
+static bool run_external_preprocessor(compilation_unit_t *unit)
 {
 	static const char *common_flags = NULL;
 
@@ -311,20 +350,20 @@ static FILE *preprocess(const char *fname, filetype_t filetype,
 	} else {
 		if (target_triple != NULL)
 			obstack_printf(&cppflags_obst, "%s-", target_triple);
-		obstack_printf(&cppflags_obst, PREPROCESSOR);
+		obstack_printf(&cppflags_obst, "%s", external_preprocessor);
 	}
 
 	char const *lang;
-	switch (filetype) {
-	case FILETYPE_C:         lang = "c";                  break;
-	case FILETYPE_CXX:       lang = "c++";                break;
-	case FILETYPE_ASSEMBLER: lang = "assembler-with-cpp"; break;
-	default:                 lang = NULL;                 break;
+	switch (unit->type) {
+	case COMPILATION_UNIT_C:         lang = "c";                  break;
+	case COMPILATION_UNIT_CXX:       lang = "c++";                break;
+	case COMPILATION_UNIT_ASSEMBLER: lang = "assembler-with-cpp"; break;
+	default:                         lang = NULL;                 break;
 	}
 	if (lang)
 		add_flag(&cppflags_obst, "-x%s", lang);
 
-	add_flag(&cppflags_obst, "-std=%s", str_lang_standard(standard));
+	add_flag(&cppflags_obst, "-std=%s", str_lang_standard(unit->standard));
 
 	obstack_printf(&cppflags_obst, "%s", common_flags);
 
@@ -337,7 +376,8 @@ static FILE *preprocess(const char *fname, filetype_t filetype,
 			add_flag(&cppflags_obst, outname);
 		}
 	}
-	add_flag(&cppflags_obst, fname);
+	assert(unit->input == NULL);
+	add_flag(&cppflags_obst, unit->name);
 	obstack_1grow(&cppflags_obst, '\0');
 
 	char *commandline = obstack_finish(&cppflags_obst);
@@ -347,12 +387,29 @@ static FILE *preprocess(const char *fname, filetype_t filetype,
 	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
 		fprintf(stderr, "invoking preprocessor failed\n");
-		exit(EXIT_FAILURE);
+		return false;
 	}
 	/* we do not really need that anymore */
 	obstack_free(&cppflags_obst, commandline);
 
-	return f;
+	unit->input         = f;
+	unit->input_is_pipe = true;
+	switch (unit->type) {
+	case COMPILATION_UNIT_ASSEMBLER:
+		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+		break;
+	case COMPILATION_UNIT_C:
+		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
+		break;
+	case COMPILATION_UNIT_CXX:
+		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
+		break;
+	default:
+		unit->type = COMPILATION_UNIT_UNKNOWN;
+		break;
+	}
+
+	return true;
 }
 
 static void assemble(const char *out, const char *in)
@@ -469,52 +526,43 @@ static int mkstemp(char *templ)
 #endif
 
 /**
- * an own version of tmpnam, which: writes in a buffer, emits no warnings
+ * custom version of tmpnam, which: writes to an obstack, emits no warnings
  * during linking (like glibc/gnu ld do for tmpnam)...
  */
-static FILE *make_temp_file(char *buffer, size_t buflen, const char *prefix)
+static FILE *make_temp_file(const char *prefix, const char **name_result)
 {
 	const char *tempdir = get_tempdir();
+	assert(obstack_object_size(&file_obst) == 0);
+	obstack_printf(&file_obst, "%s/%sXXXXXX", tempdir, prefix);
+	obstack_1grow(&file_obst, '\0');
 
-	snprintf(buffer, buflen, "%s/%sXXXXXX", tempdir, prefix);
-
-	int fd = mkstemp(buffer);
+	char *name = obstack_finish(&file_obst);
+	int fd = mkstemp(name);
 	if (fd == -1) {
 		fprintf(stderr, "could not create temporary file: %s\n",
 		        strerror(errno));
-		exit(EXIT_FAILURE);
+		return NULL;
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
-		fprintf(stderr, "could not create temporary file FILE*\n");
-		exit(EXIT_FAILURE);
+		fprintf(stderr, "could not open temporary file as FILE*\n");
+		return NULL;
 	}
 
-	file_list_entry_t *entry = xmalloc(sizeof(*entry));
-	memset(entry, 0, sizeof(*entry));
-
-	size_t  name_len = strlen(buffer) + 1;
-	char   *name     = malloc(name_len);
-	memcpy(name, buffer, name_len);
-	entry->name      = name;
-
-	entry->next = temp_files;
-	temp_files  = entry;
-
+	ARR_APP1(char*, temp_files, name);
+	*name_result = name;
 	return out;
 }
 
 static void free_temp_files(void)
 {
-	file_list_entry_t *entry = temp_files;
-	file_list_entry_t *next;
-	for ( ; entry != NULL; entry = next) {
-		next = entry->next;
-
-		unlink(entry->name);
-		free((char*) entry->name);
-		free(entry);
+	size_t n_temp_files = ARR_LEN(temp_files);
+	size_t i;
+	for (i = 0; i < n_temp_files; ++i) {
+		char *file = temp_files[i];
+		unlink(file);
 	}
+	DEL_ARR_F(temp_files);
 	temp_files = NULL;
 }
 
@@ -527,7 +575,6 @@ typedef enum compile_mode_t {
 	CompileExportIR,
 	CompileAssemble,
 	CompileAssembleLink,
-	LexTest,
 	PrintAst,
 	PrintFluffy,
 	PrintJna
@@ -719,7 +766,6 @@ static void print_help_linker(void)
 
 static void print_help_debug(void)
 {
-	put_help("--lextest",                "Preprocess and tokenize only");
 	put_help("--print-ast",              "Preprocess, parse and print AST");
 	put_help("--print-implicit-cast",    "");
 	put_help("--print-parenthesis",      "");
@@ -782,48 +828,20 @@ static void set_be_option(const char *arg)
 	assert(res);
 }
 
-static void copy_file(FILE *dest, FILE *input)
-{
-	char buf[16384];
-
-	while (!feof(input) && !ferror(dest)) {
-		size_t read = fread(buf, 1, sizeof(buf), input);
-		if (fwrite(buf, 1, read, dest) != read) {
-			perror("could not write output");
-		}
-	}
-}
-
-static FILE *open_file(const char *filename)
-{
-	if (streq(filename, "-")) {
-		return stdin;
-	}
-
-	FILE *in = fopen(filename, "r");
-	if (in == NULL) {
-		fprintf(stderr, "Could not open '%s': %s\n", filename,
-				strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	return in;
-}
-
-static filetype_t get_filetype_from_string(const char *string)
+static compilation_unit_type_t get_unit_type_from_string(const char *string)
 {
 	if (streq(string, "c") || streq(string, "c-header"))
-		return FILETYPE_C;
+		return COMPILATION_UNIT_C;
 	if (streq(string, "c++") || streq(string, "c++-header"))
-		return FILETYPE_CXX;
+		return COMPILATION_UNIT_CXX;
 	if (streq(string, "assembler"))
-		return FILETYPE_PREPROCESSED_ASSEMBLER;
+		return COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
 	if (streq(string, "assembler-with-cpp"))
-		return FILETYPE_ASSEMBLER;
+		return COMPILATION_UNIT_ASSEMBLER;
 	if (streq(string, "none"))
-		return FILETYPE_AUTODETECT;
+		return COMPILATION_UNIT_AUTODETECT;
 
-	return FILETYPE_UNKNOWN;
+	return COMPILATION_UNIT_UNKNOWN;
 }
 
 static bool init_os_support(void)
@@ -1041,29 +1059,382 @@ static void init_types_and_adjust(void)
 	}
 }
 
+static void setup_cmode(const compilation_unit_t *unit)
+{
+	compilation_unit_type_t type     = unit->type;
+	lang_standard_t         standard = unit->standard;
+	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C) {
+		switch (standard) {
+		case STANDARD_C89:     c_mode = _C89;                break;
+							   /* TODO determine difference between these two */
+		case STANDARD_C89AMD1: c_mode = _C89;                break;
+		case STANDARD_C99:     c_mode = _C89 | _C99;         break;
+		case STANDARD_GNU89:   c_mode = _C89 |        _GNUC; break;
+
+		case STANDARD_ANSI:
+		case STANDARD_CXX98:
+		case STANDARD_GNUXX98:
+		case STANDARD_DEFAULT:
+			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(standard));
+			/* FALLTHROUGH */
+		case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
+		}
+	} else if (type == COMPILATION_UNIT_PREPROCESSED_CXX
+	           || type == COMPILATION_UNIT_CXX) {
+		switch (standard) {
+		case STANDARD_CXX98: c_mode = _CXX; break;
+
+		case STANDARD_ANSI:
+		case STANDARD_C89:
+		case STANDARD_C89AMD1:
+		case STANDARD_C99:
+		case STANDARD_GNU89:
+		case STANDARD_GNU99:
+		case STANDARD_DEFAULT:
+			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
+			/* FALLTHROUGH */
+		case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
+		}
+	}
+
+	c_mode |= features_on;
+	c_mode &= ~features_off;
+}
+
+static void determine_unit_standard(compilation_unit_t *unit,
+                                    lang_standard_t standard)
+{
+	unit->standard = standard;
+	switch (standard) {
+	case STANDARD_ANSI:
+		switch (unit->type) {
+		case COMPILATION_UNIT_C:
+		case COMPILATION_UNIT_PREPROCESSED_C:
+			unit->standard = STANDARD_C89;
+			break;
+		case COMPILATION_UNIT_CXX:
+		case COMPILATION_UNIT_PREPROCESSED_CXX:
+			unit->standard = STANDARD_CXX98;
+			break;
+		default:
+			break;
+		}
+		break;
+
+	case STANDARD_DEFAULT:
+		switch (unit->type) {
+		case COMPILATION_UNIT_C:
+		case COMPILATION_UNIT_PREPROCESSED_C:
+			unit->standard = STANDARD_GNU99;
+			break;
+		case COMPILATION_UNIT_CXX:
+		case COMPILATION_UNIT_PREPROCESSED_CXX:
+			unit->standard = STANDARD_GNUXX98;
+			break;
+		default:
+			break;
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
+{
+	/* just here for gcc compatibility */
+	fprintf(out, "# 1 \"%s\"\n", unit->name);
+	fprintf(out, "# 1 \"<built-in>\"\n");
+	fprintf(out, "# 1 \"<command-line>\"\n");
+
+	set_preprocessor_output(out);
+	switch_pp_input(unit->input, unit->name);
+
+	for (;;) {
+		next_preprocessing_token();
+		if (pp_token.kind == T_EOF)
+			break;
+		emit_pp_token();
+	}
+
+	fputc('\n', out);
+	check_unclosed_conditionals();
+	close_pp_input();
+	print_error_summary();
+	set_preprocessor_output(NULL);
+	if (unit->input != stdin) {
+		fclose(unit->input);
+		unit->input = NULL;
+		unit->name  = NULL;
+	}
+
+	if (unit->type == COMPILATION_UNIT_C) {
+		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
+	} else if (unit->type == COMPILATION_UNIT_CXX) {
+		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
+	}
+	bool res = close_input(unit);
+	return res && error_count == 0;
+}
+
+static bool open_input(compilation_unit_t *unit)
+{
+	/* input already available as FILE? */
+	if (unit->input != NULL)
+		return true;
+
+	const char *const inputname = unit->name;
+	unit->input_is_pipe = false;
+	if (streq(inputname, "-")) {
+		unit->input   = stdin;
+	} else {
+		unit->input = fopen(inputname, "r");
+		if (unit->input == NULL) {
+			fprintf(stderr, "Could not open '%s': %s\n", inputname,
+					strerror(errno));
+			return false;
+		}
+	}
+	return true;
+}
+
+static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
+							lang_standard_t standard, FILE *out)
+{
+	int  result                   = EXIT_SUCCESS;
+	bool already_constructed_firm = false;
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
+		const char *const inputname = unit->name;
+
+		determine_unit_standard(unit, standard);
+		setup_cmode(unit);
+
+again:
+		switch (unit->type) {
+		case COMPILATION_UNIT_IR: {
+			bool res = open_input(unit);
+			if (!res) {
+				result = EXIT_FAILURE;
+				continue;
+			}
+			res = !ir_import_file(unit->input, unit->name);
+			if (!res) {
+				fprintf(stderr, "Import of firm graph from '%s' failed\n",
+				        inputname);
+				result = EXIT_FAILURE;
+				continue;
+			}
+			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
+			goto again;
+		}
+		case COMPILATION_UNIT_ASSEMBLER:
+			panic("TODO: preprocess for assembler");
+		case COMPILATION_UNIT_C:
+		case COMPILATION_UNIT_CXX:
+			if (external_preprocessor != NULL) {
+				bool res = run_external_preprocessor(unit);
+				if (!res) {
+					result = EXIT_FAILURE;
+					continue;
+				}
+				goto again;
+			}
+			/* FALLTHROUGH */
+
+		case COMPILATION_UNIT_PREPROCESSED_C:
+		case COMPILATION_UNIT_PREPROCESSED_CXX: {
+			bool res = open_input(unit);
+			if (!res) {
+				result = EXIT_FAILURE;
+				continue;
+			}
+			init_tokens();
+
+			if (mode == PreprocessOnly) {
+				bool res = output_preprocessor_tokens(unit, out);
+				if (!res) {
+					result = EXIT_FAILURE;
+					continue;
+				}
+				continue;
+			}
+
+			/* do the actual parsing */
+			do_parsing(unit);
+			goto again;
+		}
+		case COMPILATION_UNIT_AST:
+			/* prints the AST even if errors occurred */
+			if (mode == PrintAst) {
+				print_to_file(out);
+				print_ast(unit->ast);
+			}
+			if (unit->parse_errors) {
+				result = EXIT_FAILURE;
+				break;
+			}
+
+			if (mode == BenchmarkParser) {
+				break;
+			} else if (mode == PrintFluffy) {
+				write_fluffy_decls(out, unit->ast);
+				break;
+			} else if (mode == PrintJna) {
+				write_jna_decls(out, unit->ast);
+				break;
+			}
+
+			/* build the firm graph */
+			ir_timer_t *t_construct = ir_timer_new();
+			timer_register(t_construct, "Frontend: Graph construction");
+			timer_push(t_construct);
+			if (already_constructed_firm) {
+				panic("compiling multiple files/translation units not possible");
+			}
+			init_implicit_optimizations();
+			translation_unit_to_firm(unit->ast);
+			already_constructed_firm = true;
+			timer_pop(t_construct);
+			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
+			goto again;
+
+		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
+			if (mode == CompileDump) {
+				/* find irg */
+				ident    *id     = new_id_from_str(dumpfunction);
+				ir_graph *irg    = NULL;
+				int       n_irgs = get_irp_n_irgs();
+				for (int i = 0; i < n_irgs; ++i) {
+					ir_graph *tirg   = get_irp_irg(i);
+					ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
+					if (irg_id == id) {
+						irg = tirg;
+						break;
+					}
+				}
+
+				if (irg == NULL) {
+					fprintf(stderr, "No graph for function '%s' found\n",
+					        dumpfunction);
+					return EXIT_FAILURE;
+				}
+
+				dump_ir_graph_file(out, irg);
+				fclose(out);
+				return EXIT_SUCCESS;
+			}
+
+			if (mode == CompileExportIR) {
+				ir_export_file(out);
+				if (ferror(out) != 0) {
+					fprintf(stderr, "Error while writing to output\n");
+					return EXIT_FAILURE;
+				}
+				return EXIT_SUCCESS;
+			}
+
+			FILE *asm_out;
+			if (mode == Compile) {
+				asm_out = out;
+			} else {
+				asm_out = make_temp_file("ccs", &unit->name);
+			}
+			generate_code(asm_out, inputname);
+			if (asm_out != out) {
+				fclose(asm_out);
+			}
+			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+			goto again;
+		case COMPILATION_UNIT_PREPROCESSED_ASSEMBLER:
+			if (mode != CompileAssemble && mode != CompileAssembleLink)
+				break;
+
+			/* assemble */
+			const char *input = unit->name;
+			if (mode == CompileAssemble) {
+				fclose(out);
+				unit->name = outname;
+			} else {
+				FILE *tempf = make_temp_file("cco", &unit->name);
+				/* hackish... */
+				fclose(tempf);
+			}
+
+			assemble(unit->name, input);
+
+			unit->type = COMPILATION_UNIT_OBJECT;
+			goto again;
+		case COMPILATION_UNIT_UNKNOWN:
+		case COMPILATION_UNIT_AUTODETECT:
+		case COMPILATION_UNIT_OBJECT:
+			break;
+		}
+	}
+	return result;
+}
+
+static int link_program(compilation_unit_t *units)
+{
+	obstack_1grow(&ldflags_obst, '\0');
+	const char *flags = obstack_finish(&ldflags_obst);
+
+	/* construct commandline */
+	const char *linker = getenv("CPARSER_LINK");
+	if (linker != NULL) {
+		obstack_printf(&file_obst, "%s ", linker);
+	} else {
+		if (target_triple != NULL)
+			obstack_printf(&file_obst, "%s-", target_triple);
+		obstack_printf(&file_obst, "%s ", LINKER);
+	}
+
+	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
+		if (unit->type != COMPILATION_UNIT_OBJECT)
+			continue;
+
+		add_flag(&file_obst, "%s", unit->name);
+	}
+
+	add_flag(&file_obst, "-o");
+	add_flag(&file_obst, outname);
+	obstack_printf(&file_obst, "%s", flags);
+	obstack_1grow(&file_obst, '\0');
+
+	char *commandline = obstack_finish(&file_obst);
+
+	if (verbose) {
+		puts(commandline);
+	}
+	int err = system(commandline);
+	if (err != EXIT_SUCCESS) {
+		fprintf(stderr, "linker reported an error\n");
+		return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
+}
+
 int main(int argc, char **argv)
 {
-	const char        *dumpfunction         = NULL;
-	const char        *print_file_name_file = NULL;
-	compile_mode_t     mode                 = CompileAssembleLink;
-	int                opt_level            = 1;
-	int                result               = EXIT_SUCCESS;
-	char               cpu_arch[16]         = "ia32";
-	file_list_entry_t *files                = NULL;
-	file_list_entry_t *last_file            = NULL;
-	bool               construct_dep_target = false;
-	bool               do_timing            = false;
-	bool               profile_generate     = false;
-	bool               profile_use          = false;
-	struct obstack     file_obst;
-
-	atexit(free_temp_files);
+	const char         *print_file_name_file = NULL;
+	compile_mode_t      mode                 = CompileAssembleLink;
+	int                 opt_level            = 1;
+	char                cpu_arch[16]         = "ia32";
+	compilation_unit_t *units                = NULL;
+	compilation_unit_t *last_unit            = NULL;
+	bool                construct_dep_target = false;
+	bool                do_timing            = false;
+	bool                profile_generate     = false;
+	bool                profile_use          = false;
 
 	/* hack for now... */
 	if (strstr(argv[0], "pptest") != NULL) {
 		extern int pptest_main(int argc, char **argv);
 		return pptest_main(argc, argv);
 	}
+
+	temp_files = NEW_ARR_F(char*, 0);
+	atexit(free_temp_files);
 
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
@@ -1113,12 +1484,10 @@ int main(int argc, char **argv)
 	setup_target_machine();
 
 	/* parse rest of options */
-	lang_standard_t standard        = STANDARD_DEFAULT;
-	unsigned        features_on     = 0;
-	unsigned        features_off    = 0;
-	filetype_t      forced_filetype = FILETYPE_AUTODETECT;
-	help_sections_t help            = HELP_NONE;
-	bool            argument_errors = false;
+	lang_standard_t         standard        = STANDARD_DEFAULT;
+	compilation_unit_type_t forced_unittype = COMPILATION_UNIT_AUTODETECT;
+	help_sections_t         help            = HELP_NONE;
+	bool                    argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
@@ -1168,8 +1537,8 @@ int main(int argc, char **argv)
 			} else if (option[0] == 'x') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-x");
-				forced_filetype = get_filetype_from_string(opt);
-				if (forced_filetype == FILETYPE_UNKNOWN) {
+				forced_unittype = get_unit_type_from_string(opt);
+				if (forced_unittype == COMPILATION_UNIT_UNKNOWN) {
 					fprintf(stderr, "Unknown language '%s'\n", opt);
 					argument_errors = true;
 				}
@@ -1507,8 +1876,6 @@ int main(int argc, char **argv)
 					features_off |=  _MS;
 				} else if (streq(option, "strict")) {
 					strict_mode = true;
-				} else if (streq(option, "lextest")) {
-					mode = LexTest;
 				} else if (streq(option, "benchmark")) {
 					mode = BenchmarkParser;
 				} else if (streq(option, "print-ast")) {
@@ -1539,6 +1906,15 @@ int main(int argc, char **argv)
 						break;
 					}
 					jna_set_libname(argv[i]);
+				} else if (streq(option, "external-pp")) {
+					if (i+1 < argc && argv[i+1][0] != '-') {
+						++i;
+						external_preprocessor = argv[i+1];
+					} else {
+						external_preprocessor = PREPROCESSOR;
+					}
+				} else if (streq(option, "no-external-pp")) {
+					external_preprocessor = NULL;
 				} else if (streq(option, "time")) {
 					do_timing = true;
 				} else if (streq(option, "version")) {
@@ -1587,51 +1963,49 @@ int main(int argc, char **argv)
 				argument_errors = true;
 			}
 		} else {
-			filetype_t type = forced_filetype;
-			if (type == FILETYPE_AUTODETECT) {
+			compilation_unit_type_t type = forced_unittype;
+			if (type == COMPILATION_UNIT_AUTODETECT) {
 				if (streq(arg, "-")) {
 					/* - implicitly means C source file */
-					type = FILETYPE_C;
+					type = COMPILATION_UNIT_C;
 				} else {
 					const char *suffix = strrchr(arg, '.');
 					/* Ensure there is at least one char before the suffix */
 					if (suffix != NULL && suffix != arg) {
 						++suffix;
 						type =
-							streq(suffix, "S")   ? FILETYPE_ASSEMBLER              :
-							streq(suffix, "a")   ? FILETYPE_OBJECT                 :
-							streq(suffix, "c")   ? FILETYPE_C                      :
-							streq(suffix, "i")   ? FILETYPE_PREPROCESSED_C         :
-							streq(suffix, "C")   ? FILETYPE_CXX                    :
-							streq(suffix, "cc")  ? FILETYPE_CXX                    :
-							streq(suffix, "cp")  ? FILETYPE_CXX                    :
-							streq(suffix, "cpp") ? FILETYPE_CXX                    :
-							streq(suffix, "CPP") ? FILETYPE_CXX                    :
-							streq(suffix, "cxx") ? FILETYPE_CXX                    :
-							streq(suffix, "c++") ? FILETYPE_CXX                    :
-							streq(suffix, "ii")  ? FILETYPE_PREPROCESSED_CXX       :
-							streq(suffix, "h")   ? FILETYPE_C                      :
-							streq(suffix, "ir")  ? FILETYPE_IR                     :
-							streq(suffix, "o")   ? FILETYPE_OBJECT                 :
-							streq(suffix, "s")   ? FILETYPE_PREPROCESSED_ASSEMBLER :
-							streq(suffix, "so")  ? FILETYPE_OBJECT                 :
-							FILETYPE_OBJECT; /* gcc behavior: unknown file extension means object file */
+							streq(suffix, "S")   ? COMPILATION_UNIT_ASSEMBLER              :
+							streq(suffix, "a")   ? COMPILATION_UNIT_OBJECT                 :
+							streq(suffix, "c")   ? COMPILATION_UNIT_C                      :
+							streq(suffix, "i")   ? COMPILATION_UNIT_PREPROCESSED_C         :
+							streq(suffix, "C")   ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "cc")  ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "cp")  ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "cpp") ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "CPP") ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "cxx") ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "c++") ? COMPILATION_UNIT_CXX                    :
+							streq(suffix, "ii")  ? COMPILATION_UNIT_PREPROCESSED_CXX       :
+							streq(suffix, "h")   ? COMPILATION_UNIT_C                      :
+							streq(suffix, "ir")  ? COMPILATION_UNIT_IR                     :
+							streq(suffix, "o")   ? COMPILATION_UNIT_OBJECT                 :
+							streq(suffix, "s")   ? COMPILATION_UNIT_PREPROCESSED_ASSEMBLER :
+							streq(suffix, "so")  ? COMPILATION_UNIT_OBJECT                 :
+							COMPILATION_UNIT_OBJECT; /* gcc behavior: unknown file extension means object file */
 					}
 				}
 			}
 
-			file_list_entry_t *entry
-				= obstack_alloc(&file_obst, sizeof(entry[0]));
-			memset(entry, 0, sizeof(entry[0]));
+			compilation_unit_t *entry = OALLOCZ(&file_obst, compilation_unit_t);
 			entry->name = arg;
 			entry->type = type;
 
-			if (last_file != NULL) {
-				last_file->next = entry;
+			if (last_unit != NULL) {
+				last_unit->next = entry;
 			} else {
-				files = entry;
+				units = entry;
 			}
-			last_file = entry;
+			last_unit = entry;
 		}
 	}
 
@@ -1644,7 +2018,7 @@ int main(int argc, char **argv)
 		print_file_name(print_file_name_file);
 		return EXIT_SUCCESS;
 	}
-	if (files == NULL) {
+	if (units == NULL) {
 		fprintf(stderr, "error: no input files specified\n");
 		argument_errors = true;
 	}
@@ -1687,7 +2061,7 @@ int main(int argc, char **argv)
 		if (outname != 0 && strlen(outname) >= 2) {
 			get_output_name(dep_target, sizeof(dep_target), outname, ".d");
 		} else {
-			get_output_name(dep_target, sizeof(dep_target), files->name, ".d");
+			get_output_name(dep_target, sizeof(dep_target), units->name, ".d");
 		}
 	} else {
 		dep_target[0] = '\0';
@@ -1695,14 +2069,13 @@ int main(int argc, char **argv)
 
 	char outnamebuf[4096];
 	if (outname == NULL) {
-		const char *filename = files->name;
+		const char *filename = units->name;
 
 		switch(mode) {
 		case BenchmarkParser:
 		case PrintAst:
 		case PrintFluffy:
 		case PrintJna:
-		case LexTest:
 		case PreprocessOnly:
 		case ParseOnly:
 			outname = "-";
@@ -1748,290 +2121,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	file_list_entry_t *file;
-	bool               already_constructed_firm = false;
-	for (file = files; file != NULL; file = file->next) {
-		char            asm_tempfile[1024];
-		const char     *filename = file->name;
-		filetype_t      filetype = file->type;
-		lang_standard_t file_standard = standard;
-
-		if (filetype == FILETYPE_OBJECT)
-			continue;
-		switch (file_standard) {
-		case STANDARD_ANSI:
-			switch (filetype) {
-			case FILETYPE_C:
-			case FILETYPE_PREPROCESSED_C:   file_standard = STANDARD_C89;   break;
-			case FILETYPE_CXX:
-			case FILETYPE_PREPROCESSED_CXX: file_standard = STANDARD_CXX98; break;
-			default:                        break;
-			}
-			break;
-
-		case STANDARD_DEFAULT:
-			switch (filetype) {
-			case FILETYPE_C:
-			case FILETYPE_PREPROCESSED_C:   file_standard = STANDARD_GNU99;   break;
-			case FILETYPE_CXX:
-			case FILETYPE_PREPROCESSED_CXX: file_standard = STANDARD_GNUXX98; break;
-			default:                        break;
-			}
-			break;
-
-		default: break;
-		}
-
-		FILE *in = NULL;
-		if (mode == LexTest) {
-			if (in == NULL)
-				in = open_file(filename);
-			lextest(in, filename);
-			fclose(in);
-			return EXIT_SUCCESS;
-		}
-
-		FILE *preprocessed_in = NULL;
-		filetype_t next_filetype = filetype;
-		switch (filetype) {
-			case FILETYPE_C:
-				next_filetype = FILETYPE_PREPROCESSED_C;
-				goto preprocess;
-			case FILETYPE_CXX:
-				next_filetype = FILETYPE_PREPROCESSED_CXX;
-				goto preprocess;
-			case FILETYPE_ASSEMBLER:
-				next_filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
-				goto preprocess;
-preprocess:
-				/* no support for input on FILE* yet */
-				if (in != NULL)
-					panic("internal compiler error: in for preprocessor != NULL");
-
-				preprocessed_in = preprocess(filename, filetype,
-				                             file_standard);
-				if (mode == PreprocessOnly) {
-					copy_file(out, preprocessed_in);
-					int pp_result = pclose(preprocessed_in);
-					fclose(out);
-					/* remove output file in case of error */
-					if (out != stdout && pp_result != EXIT_SUCCESS) {
-						unlink(outname);
-					}
-					return pp_result;
-				}
-
-				in = preprocessed_in;
-				filetype = next_filetype;
-				break;
-
-			default:
-				break;
-		}
-
-		FILE *asm_out;
-		if (mode == Compile) {
-			asm_out = out;
-		} else {
-			asm_out = make_temp_file(asm_tempfile, sizeof(asm_tempfile), "ccs");
-		}
-
-		if (in == NULL)
-			in = open_file(filename);
-
-		/* preprocess and compile */
-		if (filetype == FILETYPE_PREPROCESSED_C) {
-			switch (file_standard) {
-			case STANDARD_C89:     c_mode = _C89;                break;
-			/* TODO determine difference between these two */
-			case STANDARD_C89AMD1: c_mode = _C89;                break;
-			case STANDARD_C99:     c_mode = _C89 | _C99;         break;
-			case STANDARD_GNU89:   c_mode = _C89 |        _GNUC; break;
-
-			case STANDARD_ANSI:
-			case STANDARD_CXX98:
-			case STANDARD_GNUXX98:
-			case STANDARD_DEFAULT:
-				fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C\n", str_lang_standard(file_standard));
-				/* FALLTHROUGH */
-			case STANDARD_GNU99:   c_mode = _C89 | _C99 | _GNUC; break;
-			}
-			goto do_parsing;
-		} else if (filetype == FILETYPE_PREPROCESSED_CXX) {
-			switch (file_standard) {
-			case STANDARD_CXX98: c_mode = _CXX; break;
-
-			case STANDARD_ANSI:
-			case STANDARD_C89:
-			case STANDARD_C89AMD1:
-			case STANDARD_C99:
-			case STANDARD_GNU89:
-			case STANDARD_GNU99:
-			case STANDARD_DEFAULT:
-				fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(file_standard));
-				/* FALLTHROUGH */
-			case STANDARD_GNUXX98: c_mode = _CXX | _GNUC; break;
-			}
-
-do_parsing:
-			c_mode |= features_on;
-			c_mode &= ~features_off;
-
-			/* do the actual parsing */
-			ir_timer_t *t_parsing = ir_timer_new();
-			timer_register(t_parsing, "Frontend: Parsing");
-			timer_push(t_parsing);
-			init_tokens();
-			translation_unit_t *const unit = do_parsing(in, filename);
-			timer_pop(t_parsing);
-
-			/* prints the AST even if errors occurred */
-			if (mode == PrintAst) {
-				print_to_file(out);
-				print_ast(unit);
-			}
-
-			if (error_count > 0) {
-				/* parsing failed because of errors */
-				fprintf(stderr, "%u error(s), %u warning(s)\n", error_count,
-				        warning_count);
-				result = EXIT_FAILURE;
-				continue;
-			} else if (warning_count > 0) {
-				fprintf(stderr, "%u warning(s)\n", warning_count);
-			}
-
-			if (in == preprocessed_in) {
-				int pp_result = pclose(preprocessed_in);
-				if (pp_result != EXIT_SUCCESS) {
-					/* remove output file */
-					if (out != stdout)
-						unlink(outname);
-					return EXIT_FAILURE;
-				}
-			}
-
-			if (mode == BenchmarkParser) {
-				return result;
-			} else if (mode == PrintFluffy) {
-				write_fluffy_decls(out, unit);
-				continue;
-			} else if (mode == PrintJna) {
-				write_jna_decls(out, unit);
-				continue;
-			}
-
-			/* build the firm graph */
-			ir_timer_t *t_construct = ir_timer_new();
-			timer_register(t_construct, "Frontend: Graph construction");
-			timer_push(t_construct);
-			if (already_constructed_firm) {
-				panic("compiling multiple files/translation units not possible");
-			}
-			init_implicit_optimizations();
-			translation_unit_to_firm(unit);
-			already_constructed_firm = true;
-			timer_pop(t_construct);
-
-graph_built:
-			if (mode == ParseOnly) {
-				continue;
-			}
-
-			if (mode == CompileDump) {
-				/* find irg */
-				ident    *id     = new_id_from_str(dumpfunction);
-				ir_graph *irg    = NULL;
-				int       n_irgs = get_irp_n_irgs();
-				for (int i = 0; i < n_irgs; ++i) {
-					ir_graph *tirg   = get_irp_irg(i);
-					ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
-					if (irg_id == id) {
-						irg = tirg;
-						break;
-					}
-				}
-
-				if (irg == NULL) {
-					fprintf(stderr, "No graph for function '%s' found\n",
-					        dumpfunction);
-					return EXIT_FAILURE;
-				}
-
-				dump_ir_graph_file(out, irg);
-				fclose(out);
-				return EXIT_SUCCESS;
-			}
-
-			if (mode == CompileExportIR) {
-				ir_export_file(out);
-				if (ferror(out) != 0) {
-					fprintf(stderr, "Error while writing to output\n");
-					return EXIT_FAILURE;
-				}
-				return EXIT_SUCCESS;
-			}
-
-			generate_code(asm_out, filename);
-			if (asm_out != out) {
-				fclose(asm_out);
-			}
-		} else if (filetype == FILETYPE_IR) {
-			fclose(in);
-			int res = ir_import(filename);
-			if (res != 0) {
-				fprintf(stderr, "Firm-Program import failed\n");
-				return EXIT_FAILURE;
-			}
-			goto graph_built;
-		} else if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
-			copy_file(asm_out, in);
-			if (in == preprocessed_in) {
-				int pp_result = pclose(preprocessed_in);
-				if (pp_result != EXIT_SUCCESS) {
-					/* remove output in error case */
-					if (out != stdout)
-						unlink(outname);
-					return pp_result;
-				}
-			}
-			if (asm_out != out) {
-				fclose(asm_out);
-			}
-		}
-
-		if (mode == Compile)
-			continue;
-
-		/* if we're here then we have preprocessed assembly */
-		filename = asm_tempfile;
-		filetype = FILETYPE_PREPROCESSED_ASSEMBLER;
-
-		/* assemble */
-		if (filetype == FILETYPE_PREPROCESSED_ASSEMBLER) {
-			char        temp[1024];
-			const char *filename_o;
-			if (mode == CompileAssemble) {
-				fclose(out);
-				filename_o = outname;
-			} else {
-				FILE *tempf = make_temp_file(temp, sizeof(temp), "cco");
-				fclose(tempf);
-				filename_o = temp;
-			}
-
-			assemble(filename_o, filename);
-
-			size_t len = strlen(filename_o) + 1;
-			filename = obstack_copy(&file_obst, filename_o, len);
-			filetype = FILETYPE_OBJECT;
-		}
-
-		/* ok we're done here, process next file */
-		file->name = filename;
-		file->type = filetype;
-	}
-
+	int result = compilation_loop(mode, units, standard, out);
 	if (result != EXIT_SUCCESS) {
 		if (out != stdout)
 			unlink(outname);
@@ -2040,41 +2130,11 @@ graph_built:
 
 	/* link program file */
 	if (mode == CompileAssembleLink) {
-		obstack_1grow(&ldflags_obst, '\0');
-		const char *flags = obstack_finish(&ldflags_obst);
-
-		/* construct commandline */
-		const char *linker = getenv("CPARSER_LINK");
-		if (linker != NULL) {
-			obstack_printf(&file_obst, "%s ", linker);
-		} else {
-			if (target_triple != NULL)
-				obstack_printf(&file_obst, "%s-", target_triple);
-			obstack_printf(&file_obst, "%s ", LINKER);
-		}
-
-		for (file_list_entry_t *entry = files; entry != NULL;
-				entry = entry->next) {
-			if (entry->type != FILETYPE_OBJECT)
-				continue;
-
-			add_flag(&file_obst, "%s", entry->name);
-		}
-
-		add_flag(&file_obst, "-o");
-		add_flag(&file_obst, outname);
-		obstack_printf(&file_obst, "%s", flags);
-		obstack_1grow(&file_obst, '\0');
-
-		char *commandline = obstack_finish(&file_obst);
-
-		if (verbose) {
-			puts(commandline);
-		}
-		int err = system(commandline);
-		if (err != EXIT_SUCCESS) {
-			fprintf(stderr, "linker reported an error\n");
-			return EXIT_FAILURE;
+		int result = link_program(units);
+		if (result != EXIT_SUCCESS) {
+			if (out != stdout)
+				unlink(outname);
+			return result;
 		}
 	}
 

@@ -136,7 +136,7 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-void switch_input(FILE *const file, char const *const filename)
+void switch_pp_input(FILE *const file, char const *const filename)
 {
 	input.file                = file;
 	input.input               = input_from_stream(file, NULL);
@@ -154,7 +154,7 @@ void switch_input(FILE *const file, char const *const filename)
 	input.c               = '\n';
 }
 
-FILE* close_input(void)
+FILE *close_pp_input(void)
 {
 	input_free(input.input);
 
@@ -1297,7 +1297,7 @@ digraph_percentcolon:
 
 	case EOF:
 		if (input_stack != NULL) {
-			fclose(close_input());
+			fclose(close_pp_input());
 			pop_restore_input();
 			fputc('\n', out);
 			if (input.c == (utf32)EOF)
@@ -1774,7 +1774,7 @@ static bool do_include(bool system_include, const char *headername)
 
 		FILE *file = fopen(headername, "r");
 		if (file != NULL) {
-			switch_input(file, headername);
+			switch_pp_input(file, headername);
 			return true;
 		}
 	}
@@ -1794,7 +1794,7 @@ static bool do_include(bool system_include, const char *headername)
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
-			switch_input(file, filename);
+			switch_pp_input(file, filename);
 			return true;
 		} else {
 			obstack_free(&symbol_obstack, complete_path);
@@ -2372,7 +2372,7 @@ int pptest_main(int argc, char **argv)
 		fprintf(stderr, "Couldn't open input '%s'\n", filename);
 		return 1;
 	}
-	switch_input(file, filename);
+	switch_pp_input(file, filename);
 
 	for (;;) {
 		next_preprocessing_token();
@@ -2383,7 +2383,7 @@ int pptest_main(int argc, char **argv)
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	fclose(close_input());
+	fclose(close_pp_input());
 	if (out != stdout)
 		fclose(out);
 

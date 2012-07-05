@@ -8,9 +8,9 @@ void init_preprocessor(void);
 void exit_preprocessor(void);
 
 /** Switch input to another file. The current token is not changed. */
-void switch_input(FILE *file, char const *filename);
+void switch_pp_input(FILE *file, char const *filename);
 
-FILE* close_input(void);
+FILE *close_pp_input(void);
 
 void next_preprocessing_token(void);
 

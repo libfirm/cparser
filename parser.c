@@ -10209,8 +10209,6 @@ void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
-	error_count       = 0;
-	warning_count     = 0;
 
 	print_to_file(stderr);
 
