@@ -1757,24 +1757,27 @@ finish_error:
 	pp_token.literal.string       = string;
 }
 
-static bool do_include(bool system_include, const char *headername)
+static bool do_include(bool system_include, char const *const headername)
 {
 	size_t headername_len = strlen(headername);
 	if (!system_include) {
 		/* put dirname of current input on obstack */
 		const char *filename   = input.position.input_name;
 		const char *last_slash = strrchr(filename, '/');
+		const char *full_name;
 		if (last_slash != NULL) {
 			size_t len = last_slash - filename;
 			obstack_grow(&symbol_obstack, filename, len + 1);
 			obstack_grow0(&symbol_obstack, headername, headername_len);
 			char *complete_path = obstack_finish(&symbol_obstack);
-			headername = identify_string(complete_path);
+			full_name = identify_string(complete_path);
+		} else {
+			full_name = headername;
 		}
 
-		FILE *file = fopen(headername, "r");
+		FILE *file = fopen(full_name, "r");
 		if (file != NULL) {
-			switch_pp_input(file, headername);
+			switch_pp_input(file, full_name);
 			return true;
 		}
 	}
