@@ -191,19 +191,19 @@ static void get_output_name(char *buf, size_t buflen, const char *inputname,
 
 static bool close_input(compilation_unit_t *unit)
 {
-	if (unit->input == NULL || unit->input == stdin)
-		return true;
-
-	if (unit->input_is_pipe) {
-		int res = pclose(unit->input);
-		if (res != EXIT_SUCCESS)
-			return false;
+	assert(unit->input);
+	bool res;
+	if (unit->input == stdin) {
+		res = true;
+	} else if (unit->input_is_pipe) {
+		res = pclose(unit->input) == EXIT_SUCCESS;
 	} else {
 		fclose(unit->input);
+		res = true;
 	}
 	unit->input = NULL;
 	unit->name  = NULL;
-	return true;
+	return res;
 }
 
 static void print_error_summary(void)
