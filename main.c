@@ -1163,11 +1163,6 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 	close_pp_input();
 	print_error_summary();
 	set_preprocessor_output(NULL);
-	if (unit->input != stdin) {
-		fclose(unit->input);
-		unit->input = NULL;
-		unit->name  = NULL;
-	}
 
 	if (unit->type == COMPILATION_UNIT_C) {
 		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
