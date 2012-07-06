@@ -227,8 +227,7 @@ static void do_parsing(compilation_unit_t *unit)
 
 	switch_pp_input(unit->input, unit->name);
 	parse();
-	translation_unit_t *ast = finish_parsing();
-	unit->ast = ast;
+	unit->ast = finish_parsing();
 	check_unclosed_conditionals();
 	close_pp_input();
 	bool res = close_input(unit);
