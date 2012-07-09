@@ -131,8 +131,10 @@ typedef enum lang_standard_t {
 	STANDARD_C89,     /* ISO C90 (sic) */
 	STANDARD_C89AMD1, /* ISO C90 as modified in amendment 1 */
 	STANDARD_C99,     /* ISO C99 */
+	STANDARD_C11,     /* ISO C11 */
 	STANDARD_GNU89,   /* ISO C90 plus GNU extensions (including some C99) */
 	STANDARD_GNU99,   /* ISO C99 plus GNU extensions */
+	STANDARD_GNU11,   /* ISO C11 plus GNU extensions */
 	STANDARD_CXX98,   /* ISO C++ 1998 plus amendments */
 	STANDARD_GNUXX98  /* ISO C++ 1998 plus amendments and GNU extensions */
 } lang_standard_t;
@@ -298,8 +300,10 @@ static char const* str_lang_standard(lang_standard_t const standard)
 	case STANDARD_C89:     return "c89";
 	case STANDARD_C89AMD1: return "iso9899:199409";
 	case STANDARD_C99:     return "c99";
+	case STANDARD_C11:     return "c11";
 	case STANDARD_GNU89:   return "gnu89";
 	case STANDARD_GNU99:   return "gnu99";
+	case STANDARD_GNU11:   return "gnu11";
 	case STANDARD_CXX98:   return "c++98";
 	case STANDARD_GNUXX98: return "gnu++98";
 	case STANDARD_ANSI:    break;
@@ -676,11 +680,13 @@ static void print_help_parser(void)
 	put_choice("c99",                    "ISO C99 standard");
 	put_choice("c89",                    "ISO C89 standard");
 	put_choice("c90",                    "Same as -std=c89");
+	put_choice("c11",                    "ISO C11 standard");
 	put_choice("c9x",                    "Deprecated");
 	put_choice("c++",                    "ISO C++ 98");
 	put_choice("c++98",                  "ISO C++ 98");
 	put_choice("gnu99",                  "ISO C99 + GNU extensions (default)");
 	put_choice("gnu89",                  "ISO C89 + GNU extensions");
+	put_choice("gnu11",                  "ISO C11 + GNU extensions");
 	put_choice("gnu9x",                  "Deprecated");
 	put_choice("iso9899:1990",           "ISO C89");
 	put_choice("iso9899:199409",         "ISO C90");
@@ -1064,11 +1070,13 @@ static void setup_cmode(const compilation_unit_t *unit)
 	lang_standard_t         standard = unit->standard;
 	if (type == COMPILATION_UNIT_PREPROCESSED_C || type == COMPILATION_UNIT_C) {
 		switch (standard) {
-		case STANDARD_C89:     c_mode = _C89;                break;
+		case STANDARD_C89:     c_mode = _C89;                       break;
 							   /* TODO determine difference between these two */
-		case STANDARD_C89AMD1: c_mode = _C89;                break;
-		case STANDARD_C99:     c_mode = _C89 | _C99;         break;
-		case STANDARD_GNU89:   c_mode = _C89 |        _GNUC; break;
+		case STANDARD_C89AMD1: c_mode = _C89;                       break;
+		case STANDARD_C99:     c_mode = _C89 | _C99;                break;
+		case STANDARD_C11:     c_mode = _C89 | _C99 | _C11;         break;
+		case STANDARD_GNU89:   c_mode = _C89 |               _GNUC; break;
+		case STANDARD_GNU11:   c_mode = _C89 | _C99 | _C11 | _GNUC; break;
 
 		case STANDARD_ANSI:
 		case STANDARD_CXX98:
@@ -1087,8 +1095,10 @@ static void setup_cmode(const compilation_unit_t *unit)
 		case STANDARD_C89:
 		case STANDARD_C89AMD1:
 		case STANDARD_C99:
+		case STANDARD_C11:
 		case STANDARD_GNU89:
 		case STANDARD_GNU99:
+		case STANDARD_GNU11:
 		case STANDARD_DEFAULT:
 			fprintf(stderr, "warning: command line option \"-std=%s\" is not valid for C++\n", str_lang_standard(standard));
 			/* FALLTHROUGH */
@@ -1846,11 +1856,15 @@ int main(int argc, char **argv)
 				standard =
 					streq(o, "c++")            ? STANDARD_CXX98   :
 					streq(o, "c++98")          ? STANDARD_CXX98   :
+					streq(o, "c11")            ? STANDARD_C11     :
+					streq(o, "c1x")            ? STANDARD_C11     : // deprecated
 					streq(o, "c89")            ? STANDARD_C89     :
 					streq(o, "c90")            ? STANDARD_C89     :
 					streq(o, "c99")            ? STANDARD_C99     :
 					streq(o, "c9x")            ? STANDARD_C99     : // deprecated
 					streq(o, "gnu++98")        ? STANDARD_GNUXX98 :
+					streq(o, "gnu11")          ? STANDARD_GNU11   :
+					streq(o, "gnu1x")          ? STANDARD_GNU11   : // deprecated
 					streq(o, "gnu89")          ? STANDARD_GNU89   :
 					streq(o, "gnu99")          ? STANDARD_GNU99   :
 					streq(o, "gnu9x")          ? STANDARD_GNU99   : // deprecated
@@ -1858,6 +1872,7 @@ int main(int argc, char **argv)
 					streq(o, "iso9899:199409") ? STANDARD_C89AMD1 :
 					streq(o, "iso9899:1999")   ? STANDARD_C99     :
 					streq(o, "iso9899:199x")   ? STANDARD_C99     : // deprecated
+					streq(o, "iso9899:2011")   ? STANDARD_C11     :
 					(fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg), standard);
 			} else if (streq(option, "version")) {
 				print_cparser_version();

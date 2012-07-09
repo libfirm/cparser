@@ -448,8 +448,8 @@ static void print_array_expression(const array_access_expression_t *expression)
 static void print_typeprop_expression(const typeprop_expression_t *expression)
 {
 	switch (expression->base.kind) {
-	case EXPR_SIZEOF:  print_string("sizeof");      break;
-	case EXPR_ALIGNOF: print_string("__alignof__"); break;
+	case EXPR_SIZEOF:  print_string("sizeof");                                   break;
+	case EXPR_ALIGNOF: print_string(c_mode & _C11 ? "_Alignof" : "__alignof__"); break;
 	default:           panic("invalid typeprop kind");
 	}
 	if (expression->tp_expression != NULL) {
@@ -1363,7 +1363,7 @@ void print_declaration(const entity_t *entity)
 
 		case ENTITY_VARIABLE:
 			if (entity->variable.thread_local)
-				print_string("__thread ");
+				print_string(c_mode & _C11 ? "_Thread_local " : "__thread ");
 			print_type_ext(declaration->type, declaration->base.symbol, NULL);
 			if (entity->variable.initializer != NULL) {
 				print_string(" = ");
