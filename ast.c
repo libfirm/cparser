@@ -1761,21 +1761,45 @@ static expression_classification_t is_object_with_constant_address(const express
 expression_classification_t is_constant_expression(const expression_t *expression)
 {
 	switch (expression->kind) {
-	case EXPR_LITERAL_CASES:
 	case EXPR_LITERAL_CHARACTER:
-	case EXPR_CLASSIFY_TYPE:
-	case EXPR_OFFSETOF:
-	case EXPR_ALIGNOF:
-	case EXPR_BUILTIN_CONSTANT_P:
 	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
 	case EXPR_ENUM_CONSTANT:
+	case EXPR_LITERAL_BOOLEAN:
+	case EXPR_LITERAL_MS_NOOP:
 		return EXPR_CLASS_CONSTANT;
 
-	case EXPR_SIZEOF: {
-		type_t *const type = skip_typeref(expression->typeprop.type);
-		return
-			!is_type_array(type) || !type->array.is_vla ? EXPR_CLASS_CONSTANT :
-			EXPR_CLASS_VARIABLE;
+	{
+		type_t *type;
+	case EXPR_ALIGNOF:
+		type = skip_typeref(expression->typeprop.type);
+		goto check_type;
+
+	case EXPR_CLASSIFY_TYPE:
+		type = skip_typeref(expression->classify_type.type_expression->base.type);
+		goto check_type;
+
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_FLOATINGPOINT:
+		type = skip_typeref(expression->base.type);
+		goto check_type;
+
+	case EXPR_OFFSETOF:
+		type = skip_typeref(expression->offsetofe.type);
+		goto check_type;
+
+	case EXPR_SIZEOF:
+		type = skip_typeref(expression->typeprop.type);
+		if (is_type_array(type) && type->array.is_vla)
+			return EXPR_CLASS_VARIABLE;
+		goto check_type;
+
+check_type:
+		return is_type_valid(type) ? EXPR_CLASS_CONSTANT : EXPR_CLASS_ERROR;
+	}
+
+	case EXPR_BUILTIN_CONSTANT_P: {
+		expression_classification_t const c = is_constant_expression(expression->builtin_constant.value);
+		return c != EXPR_CLASS_ERROR ? EXPR_CLASS_CONSTANT : EXPR_CLASS_ERROR;
 	}
 
 	case EXPR_STRING_LITERAL:
