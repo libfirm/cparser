@@ -120,6 +120,7 @@ struct searchpath_t {
 searchpath_t bracket_searchpath = { NULL, &bracket_searchpath.first, false };
 searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first,   false };
 searchpath_t system_searchpath  = { NULL, &system_searchpath.first,  true  };
+searchpath_t after_searchpath   = { NULL, &after_searchpath.first,   true  };
 
 static whitespace_info_t next_info; /* valid if had_whitespace is true */
 static whitespace_info_t info;
@@ -2571,6 +2572,7 @@ static void setup_include_path(void)
 	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
 
 	/* append system search path to bracket searchpath */
+	append_searchpath(&system_searchpath,  &after_searchpath);
 	append_searchpath(&bracket_searchpath, &system_searchpath);
 	append_searchpath(&quote_searchpath, &bracket_searchpath);
 }

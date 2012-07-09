@@ -1560,6 +1560,12 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-include");
 				add_flag(&cppflags_obst, "-include");
 				add_flag(&cppflags_obst, "%s", opt);
+			} else if (streq(option, "idirafter")) {
+				const char *opt;
+				GET_ARG_AFTER(opt, "-idirafter");
+				add_flag(&cppflags_obst, "-idirafter");
+				add_flag(&cppflags_obst, "%s", opt);
+				append_include_path(&after_searchpath, opt);
 			} else if (streq(option, "isystem")) {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-isystem");

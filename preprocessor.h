@@ -30,6 +30,7 @@ extern searchpath_t bracket_searchpath; /**< paths for < > includes */
 extern searchpath_t quote_searchpath;   /**< paths for " " includes */
 extern searchpath_t system_searchpath;  /**< system searchpath (appended to
                                              quote searchpath) */
+extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also system paths) */
 
 void init_include_paths(void);
 void append_include_path(searchpath_t *searchpath, const char *path);
