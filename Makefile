@@ -33,6 +33,7 @@ LFLAGS += $(FIRM_LIBS)
 SOURCES := \
 	adt/strset.c \
 	adt/strutil.c \
+	adt/pset_new.c \
 	attribute.c \
 	parser.c \
 	ast.c \
