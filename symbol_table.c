@@ -39,7 +39,6 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 }
 
 #define HashSet                    symbol_table_t
-#define HashSetIterator            symbol_table_iterator_t
 #define HashSetEntry               symbol_table_hash_entry_t
 #define ValueType                  symbol_t*
 #define NullValue                  NULL
@@ -53,16 +52,12 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(symbol_table_hash_entry_t))
 #define SCALAR_RETURN
 
+void _symbol_table_init(symbol_table_t *symbol_table);
 #define hashset_init            _symbol_table_init
-#define hashset_init_size       _symbol_table_init_size
+void _symbol_table_destroy(symbol_table_t *symbol_table);
 #define hashset_destroy         _symbol_table_destroy
+symbol_t *_symbol_table_insert(symbol_table_t *symbol_table, const char *key);
 #define hashset_insert          _symbol_table_insert
-#define hashset_remove          _symbol_table_remove
-#define hashset_find            _symbol_table_find
-#define hashset_size            _symbol_table_size
-#define hashset_iterator_init   _symbol_table_iterator_init
-#define hashset_iterator_next   _symbol_table_iterator_next
-#define hashset_remove_iterator _symbol_table_remove_iterator
 
 #include "adt/hashset.c"
 

@@ -29,13 +29,11 @@ typedef struct entitymap_entry_t {
 } entitymap_entry_t;
 
 #define HashSet          entitymap_t
-#define HashSetIterator  entitymap_iterator_t
 #define ValueType        entitymap_entry_t
 #define DO_REHASH
 #include "adt/hashset.h"
 #undef DO_REHASH
 #undef HashSetEntry
-#undef HashSetIterator
 #undef HashSet
 
 typedef struct entitymap_iterator_t  entitymap_iterator_t;

@@ -32,7 +32,7 @@
 #include "printer.h"
 #include "adt/error.h"
 #include "adt/xmalloc.h"
-#include <libfirm/adt/pset_new.h>
+#include "adt/pset_new.h"
 
 typedef struct output_limit {
 	const char          *filename;

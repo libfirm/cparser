@@ -29,11 +29,9 @@
 #include <assert.h>
 
 #define HashSet         type_hash_t
-#define HashSetIterator type_hash_iterator_t
 #define ValueType       type_t*
 #include "adt/hashset.h"
 #undef ValueType
-#undef HashSetIterator
 #undef HashSet
 
 typedef struct type_hash_iterator_t  type_hash_iterator_t;
@@ -292,7 +290,6 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 }
 
 #define HashSet                    type_hash_t
-#define HashSetIterator            type_hash_iterator_t
 #define ValueType                  type_t*
 #define NullValue                  NULL
 #define DeletedValue               ((type_t*)-1)
@@ -300,16 +297,12 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 #define KeysEqual(this,key1,key2)  types_equal(key1, key2)
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(*(ptr)))
 
+void _typehash_init(type_hash_t *hash);
 #define hashset_init             _typehash_init
-#define hashset_init_size        _typehash_init_size
+void _typehash_destroy(type_hash_t *hash);
 #define hashset_destroy          _typehash_destroy
+type_t *_typehash_insert(type_hash_t *hash, type_t *type);
 #define hashset_insert           _typehash_insert
-#define hashset_remove           typehash_remove
-#define hashset_find             typehash_find
-#define hashset_size             typehash_size
-#define hashset_iterator_init    typehash_iterator_init
-#define hashset_iterator_next    typehash_iterator_next
-#define hashset_remove_iterator  typehash_remove_iterator
 #define SCALAR_RETURN
 
 #include "adt/hashset.c"

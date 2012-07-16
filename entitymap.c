@@ -31,7 +31,6 @@ static unsigned hash_ptr(const void *ptr)
 
 #define DO_REHASH
 #define HashSet                   entitymap_t
-#define HashSetIterator           entitymap_iterator_t
 #define ValueType                 entitymap_entry_t
 #define NullValue                 null_entitymap_entry
 #define KeyType                   symbol_t*
@@ -47,15 +46,11 @@ static unsigned hash_ptr(const void *ptr)
 #define EntryIsDeleted(value)     ((value).symbol == (symbol_t*)-1)
 
 #define hashset_init            entitymap_init
-#define hashset_init_size       _entitymap_init_size
 #define hashset_destroy         entitymap_destroy
+entitymap_entry_t *_entitymap_insert(entitymap_t *map, symbol_t *symbol);
 #define hashset_insert          _entitymap_insert
-#define hashset_remove          entitymap_remove
+entitymap_entry_t *_entitymap_find(const entitymap_t *map, const symbol_t *symbol);
 #define hashset_find            _entitymap_find
-#define hashset_size            _entitymap_size
-#define hashset_iterator_init   _entitymap_iterator_init
-#define hashset_iterator_next   _entitymap_iterator_next
-#define hashset_remove_iterator _entitymap_remove_iterator
 
 #include "adt/hashset.c"
 
