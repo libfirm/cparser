@@ -52,7 +52,7 @@ entitymap_entry_t *_entitymap_insert(entitymap_t *map, symbol_t *symbol);
 entitymap_entry_t *_entitymap_find(const entitymap_t *map, const symbol_t *symbol);
 #define hashset_find            _entitymap_find
 
-#include "adt/hashset.c"
+#include "adt/hashset.c.inl"
 
 ir_entity *entitymap_get(const entitymap_t *map, symbol_t *symbol)
 {

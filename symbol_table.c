@@ -59,7 +59,7 @@ void _symbol_table_destroy(symbol_table_t *symbol_table);
 symbol_t *_symbol_table_insert(symbol_table_t *symbol_table, const char *key);
 #define hashset_insert          _symbol_table_insert
 
-#include "adt/hashset.c"
+#include "adt/hashset.c.inl"
 
 static symbol_table_t  symbol_table;
 
