@@ -28,10 +28,8 @@
 
 typedef enum token_kind_tag_t {
 	T_NULL  =  0,
-#define T(mode,x,str,val) T_##x val,
-#define TS(x,str,val) T_##x val,
+#define T(mode,x,str,val) x val,
 #include "tokens.inc"
-#undef TS
 #undef T
 	T_LAST_TOKEN
 } token_kind_tag_t;

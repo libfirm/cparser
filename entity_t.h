@@ -221,7 +221,7 @@ struct compound_member_t {
 
 struct variable_t {
 	declaration_t     base;
-	bool              thread_local   : 1;  /**< GCC __thread */
+	bool              thread_local   : 1;
 	bool              restricta      : 1;
 	bool              deprecated     : 1;
 	bool              noalias        : 1;

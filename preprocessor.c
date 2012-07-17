@@ -67,21 +67,22 @@ struct pp_conditional_t {
 
 typedef struct pp_input_t pp_input_t;
 struct pp_input_t {
-	FILE              *file;
-	input_t           *input;
-	utf32              c;
-	utf32              buf[1024+MAX_PUTBACK];
-	const utf32       *bufend;
-	const utf32       *bufpos;
-	source_position_t  position;
-	pp_input_t        *parent;
-	unsigned           output_line;
+	FILE               *file;
+	input_t            *input;
+	utf32               c;
+	utf32               buf[1024+MAX_PUTBACK];
+	const utf32        *bufend;
+	const utf32        *bufpos;
+	source_position_t   position;
+	pp_input_t         *parent;
+	unsigned            output_line;
+	searchpath_entry_t *path;
 };
 
-typedef struct searchpath_entry_t searchpath_entry_t;
 struct searchpath_entry_t {
 	const char         *path;
 	searchpath_entry_t *next;
+	bool                is_system_path;
 };
 
 static pp_input_t      input;
@@ -110,7 +111,16 @@ static unsigned          argument_brace_count;
 static strset_t          stringset;
 static token_kind_t      last_token;
 
-static searchpath_entry_t *searchpath;
+struct searchpath_t {
+	searchpath_entry_t  *first;
+	searchpath_entry_t **anchor;
+	bool                 is_system_path;
+};
+
+searchpath_t bracket_searchpath = { NULL, &bracket_searchpath.first, false };
+searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first,   false };
+searchpath_t system_searchpath  = { NULL, &system_searchpath.first,  true  };
+searchpath_t after_searchpath   = { NULL, &after_searchpath.first,   true  };
 
 static whitespace_info_t next_info; /* valid if had_whitespace is true */
 static whitespace_info_t info;
@@ -136,15 +146,17 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-void switch_input(FILE *const file, char const *const filename)
+void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path, bool const is_system_header)
 {
-	input.file                = file;
-	input.input               = input_from_stream(file, NULL);
-	input.bufend              = NULL;
-	input.bufpos              = NULL;
-	input.output_line         = 0;
-	input.position.input_name = filename;
-	input.position.lineno     = 1;
+	input.file                      = file;
+	input.input                     = input_from_stream(file, NULL);
+	input.bufend                    = NULL;
+	input.bufpos                    = NULL;
+	input.output_line               = 0;
+	input.position.input_name       = filename;
+	input.position.lineno           = 1;
+	input.position.is_system_header = is_system_header;
+	input.path                      = path;
 
 	/* indicate that we're at a new input */
 	print_line_directive(&input.position, input_stack != NULL ? "1" : NULL);
@@ -154,7 +166,7 @@ void switch_input(FILE *const file, char const *const filename)
 	input.c               = '\n';
 }
 
-FILE* close_input(void)
+FILE *close_pp_input(void)
 {
 	input_free(input.input);
 
@@ -172,10 +184,7 @@ FILE* close_input(void)
 
 static void push_input(void)
 {
-	pp_input_t *saved_input
-		= obstack_alloc(&input_obstack, sizeof(*saved_input));
-
-	memcpy(saved_input, &input, sizeof(*saved_input));
+	pp_input_t *const saved_input = obstack_copy(&input_obstack, &input, sizeof(input));
 
 	/* adjust buffer positions */
 	if (input.bufpos != NULL)
@@ -450,7 +459,82 @@ static utf32 parse_universal_char(unsigned const n_digits)
 	return v;
 }
 
-static bool is_universal_char_valid_identifier(utf32 const v)
+static bool is_universal_char_valid_identifier_c99(utf32 const v)
+{
+	static const utf32 single_chars[] = {
+		0x00AA, 0x00BA, 0x0386, 0x038C, 0x03DA, 0x03DC, 0x03DE, 0x03E0,
+		0x1F59, 0x1F5B, 0x1F5D, 0x05BF, 0x09B2, 0x0A02, 0x0A5E, 0x0A74,
+		0x0A8D, 0x0AD0, 0x0AE0, 0x0B9C, 0x0CDE, 0x0E84, 0x0E8A, 0x0E8D,
+		0x0EA5, 0x0EA7, 0x0EC6, 0x0F00, 0x0F35, 0x0F37, 0x0F39, 0x0F97,
+		0x0FB9, 0x00B5, 0x00B7, 0x02BB, 0x037A, 0x0559, 0x093D, 0x0B3D,
+		0x1FBE, 0x2102, 0x2107, 0x2115, 0x2124, 0x2126, 0x2128
+	};
+
+	static const utf32 ranges[][2] = {
+		{0x00C0, 0x00D6}, {0x00D8, 0x00F6}, {0x00F8, 0x01F5}, {0x01FA, 0x0217},
+		{0x0250, 0x02A8}, {0x1E00, 0x1E9B}, {0x1EA0, 0x1EF9}, {0x0388, 0x038A},
+		{0x038E, 0x03A1}, {0x03A3, 0x03CE}, {0x03D0, 0x03D6}, {0x03E2, 0x03F3},
+		{0x1F00, 0x1F15}, {0x1F18, 0x1F1D}, {0x1F20, 0x1F45}, {0x1F48, 0x1F4D},
+		{0x1F50, 0x1F57}, {0x1F5F, 0x1F7D}, {0x1F80, 0x1FB4}, {0x1FB6, 0x1FBC},
+		{0x1FC2, 0x1FC4}, {0x1FC6, 0x1FCC}, {0x1FD0, 0x1FD3}, {0x1FD6, 0x1FDB},
+		{0x1FE0, 0x1FEC}, {0x1FF2, 0x1FF4}, {0x1FF6, 0x1FFC}, {0x0401, 0x040C},
+		{0x040E, 0x044F}, {0x0451, 0x045C}, {0x045E, 0x0481}, {0x0490, 0x04C4},
+		{0x04C7, 0x04C8}, {0x04CB, 0x04CC}, {0x04D0, 0x04EB}, {0x04EE, 0x04F5},
+		{0x04F8, 0x04F9}, {0x0531, 0x0556}, {0x0561, 0x0587}, {0x05B0, 0x05B9},
+		{0x05BB, 0x05BD}, {0x05C1, 0x05C2}, {0x05D0, 0x05EA}, {0x05F0, 0x05F2},
+		{0x0621, 0x063A}, {0x0640, 0x0652}, {0x0670, 0x06B7}, {0x06BA, 0x06BE},
+		{0x06C0, 0x06CE}, {0x06D0, 0x06DC}, {0x06E5, 0x06E8}, {0x06EA, 0x06ED},
+		{0x0901, 0x0903}, {0x0905, 0x0939}, {0x093E, 0x094D}, {0x0950, 0x0952},
+		{0x0958, 0x0963}, {0x0981, 0x0983}, {0x0985, 0x098C}, {0x098F, 0x0990},
+		{0x0993, 0x09A8}, {0x09AA, 0x09B0}, {0x09B6, 0x09B9}, {0x09BE, 0x09C4},
+		{0x09C7, 0x09C8}, {0x09CB, 0x09CD}, {0x09DC, 0x09DD}, {0x09DF, 0x09E3},
+		{0x09F0, 0x09F1}, {0x0A05, 0x0A0A}, {0x0A0F, 0x0A10}, {0x0A13, 0x0A28},
+		{0x0A2A, 0x0A30}, {0x0A32, 0x0A33}, {0x0A35, 0x0A36}, {0x0A38, 0x0A39},
+		{0x0A3E, 0x0A42}, {0x0A47, 0x0A48}, {0x0A4B, 0x0A4D}, {0x0A59, 0x0A5C},
+		{0x0A81, 0x0A83}, {0x0A85, 0x0A8B}, {0x0A8F, 0x0A91}, {0x0A93, 0x0AA8},
+		{0x0AAA, 0x0AB0}, {0x0AB2, 0x0AB3}, {0x0AB5, 0x0AB9}, {0x0ABD, 0x0AC5},
+		{0x0AC7, 0x0AC9}, {0x0ACB, 0x0ACD}, {0x0B01, 0x0B03}, {0x0B05, 0x0B0C},
+		{0x0B0F, 0x0B10}, {0x0B13, 0x0B28}, {0x0B2A, 0x0B30}, {0x0B32, 0x0B33},
+		{0x0B36, 0x0B39}, {0x0B3E, 0x0B43}, {0x0B47, 0x0B48}, {0x0B4B, 0x0B4D},
+		{0x0B5C, 0x0B5D}, {0x0B5F, 0x0B61}, {0x0B82, 0x0B83}, {0x0B85, 0x0B8A},
+		{0x0B8E, 0x0B90}, {0x0B92, 0x0B95}, {0x0B99, 0x0B9A}, {0x0B9E, 0x0B9F},
+		{0x0BA3, 0x0BA4}, {0x0BA8, 0x0BAA}, {0x0BAE, 0x0BB5}, {0x0BB7, 0x0BB9},
+		{0x0BBE, 0x0BC2}, {0x0BC6, 0x0BC8}, {0x0BCA, 0x0BCD}, {0x0C01, 0x0C03},
+		{0x0C05, 0x0C0C}, {0x0C0E, 0x0C10}, {0x0C12, 0x0C28}, {0x0C2A, 0x0C33},
+		{0x0C35, 0x0C39}, {0x0C3E, 0x0C44}, {0x0C46, 0x0C48}, {0x0C4A, 0x0C4D},
+		{0x0C60, 0x0C61}, {0x0C82, 0x0C83}, {0x0C85, 0x0C8C}, {0x0C8E, 0x0C90},
+		{0x0C92, 0x0CA8}, {0x0CAA, 0x0CB3}, {0x0CB5, 0x0CB9}, {0x0CBE, 0x0CC4},
+		{0x0CC6, 0x0CC8}, {0x0CCA, 0x0CCD}, {0x0CE0, 0x0CE1}, {0x0D02, 0x0D03},
+		{0x0D05, 0x0D0C}, {0x0D0E, 0x0D10}, {0x0D12, 0x0D28}, {0x0D2A, 0x0D39},
+		{0x0D3E, 0x0D43}, {0x0D46, 0x0D48}, {0x0D4A, 0x0D4D}, {0x0D60, 0x0D61},
+		{0x0E01, 0x0E3A}, {0x0E40, 0x0E5B}, {0x0E81, 0x0E82}, {0x0E87, 0x0E88},
+		{0x0E94, 0x0E97}, {0x0E99, 0x0E9F}, {0x0EA1, 0x0EA3}, {0x0EAA, 0x0EAB},
+		{0x0EAD, 0x0EAE}, {0x0EB0, 0x0EB9}, {0x0EBB, 0x0EBD}, {0x0EC0, 0x0EC4},
+		{0x0EC8, 0x0ECD}, {0x0EDC, 0x0EDD}, {0x0F18, 0x0F19}, {0x0F3E, 0x0F47},
+		{0x0F49, 0x0F69}, {0x0F71, 0x0F84}, {0x0F86, 0x0F8B}, {0x0F90, 0x0F95},
+		{0x0F99, 0x0FAD}, {0x0FB1, 0x0FB7}, {0x10A0, 0x10C5}, {0x10D0, 0x10F6},
+		{0x3041, 0x3093}, {0x309B, 0x309C}, {0x30A1, 0x30F6}, {0x30FB, 0x30FC},
+		{0x3105, 0x312C}, {0x4E00, 0x9FA5}, {0xAC00, 0xD7A3}, {0x0660, 0x0669},
+		{0x06F0, 0x06F9}, {0x0966, 0x096F}, {0x09E6, 0x09EF}, {0x0A66, 0x0A6F},
+		{0x0AE6, 0x0AEF}, {0x0B66, 0x0B6F}, {0x0BE7, 0x0BEF}, {0x0C66, 0x0C6F},
+		{0x0CE6, 0x0CEF}, {0x0D66, 0x0D6F}, {0x0E50, 0x0E59}, {0x0ED0, 0x0ED9},
+		{0x0F20, 0x0F33}, {0x02B0, 0x02B8}, {0x02BD, 0x02C1}, {0x02D0, 0x02D1},
+		{0x02E0, 0x02E4}, {0x203F, 0x2040}, {0x210A, 0x2113}, {0x2118, 0x211D},
+		{0x212A, 0x2131}, {0x2133, 0x2138}, {0x2160, 0x2182}, {0x3005, 0x3007},
+		{0x3021, 0x3029},
+	};
+	for (size_t i = 0; i < sizeof(ranges)/sizeof(ranges[0]); ++i) {
+		if (ranges[i][0] <= v && v <= ranges[i][1])
+			return true;
+	}
+	for (size_t i = 0; i < sizeof(single_chars)/sizeof(single_chars[0]); ++i) {
+		if (v == single_chars[i])
+			return true;
+	}
+	return false;
+}
+
+static bool is_universal_char_valid_identifier_c11(utf32 const v)
 {
 	/* C11 Annex D.1 */
 	if (                v == 0x000A8) return true;
@@ -501,14 +585,24 @@ static bool is_universal_char_valid_identifier(utf32 const v)
 	return false;
 }
 
-static bool is_universal_char_valid_identifier_start(utf32 const v)
+static bool is_universal_char_valid_identifier(utf32 const v)
 {
+	if (c_mode & _C11)
+		return is_universal_char_valid_identifier_c11(v);
+	return is_universal_char_valid_identifier_c99(v);
+}
+
+static bool is_universal_char_invalid_identifier_start(utf32 const v)
+{
+	if (! (c_mode & _C11))
+		return false;
+
 	/* C11 Annex D.2 */
-	if (0x0300 <= v && v <= 0x036F) return false;
-	if (0x1DC0 <= v && v <= 0x1DFF) return false;
-	if (0x20D0 <= v && v <= 0x20FF) return false;
-	if (0xFE20 <= v && v <= 0xFE2F) return false;
-	return true;
+	if (0x0300 <= v && v <= 0x036F) return true;
+	if (0x1DC0 <= v && v <= 0x1DFF) return true;
+	if (0x20D0 <= v && v <= 0x20FF) return true;
+	if (0xFE20 <= v && v <= 0xFE2F) return true;
+	return false;
 }
 
 /**
@@ -761,6 +855,67 @@ static void finished_expanding(pp_definition_t *definition)
 	current_expansion = parent;
 }
 
+static void grow_string_escaped(struct obstack *obst, const string_t *string, char const *delimiter)
+{
+	char const *prefix = get_string_encoding_prefix(string->encoding);
+	obstack_printf(obst, "%s%s", prefix, delimiter);
+	size_t      size = string->size;
+	const char *str  = string->begin;
+	if (resolve_escape_sequences) {
+		obstack_grow(obst, str, size);
+	} else {
+		for (size_t i = 0; i < size; ++i) {
+			const char c = str[i];
+			if (c == '\\' || c == '"')
+				obstack_1grow(obst, '\\');
+			obstack_1grow(obst, c);
+		}
+	}
+	obstack_printf(obst, "%s", delimiter);
+}
+
+static void grow_token(struct obstack *obst, const token_t *token)
+{
+	switch (token->kind) {
+	case T_NUMBER:
+		obstack_grow(obst, token->literal.string.begin, token->literal.string.size);
+		break;
+
+	case T_STRING_LITERAL: {
+		char const *const delimiter = resolve_escape_sequences ? "\"" : "\\\"";
+		grow_string_escaped(obst, &token->literal.string, delimiter);
+		break;
+	}
+
+	case T_CHARACTER_CONSTANT:
+		grow_string_escaped(obst, &token->literal.string, "'");
+		break;
+
+	case T_IDENTIFIER:
+	default: {
+		const char *str = token->base.symbol->string;
+		size_t      len = strlen(str);
+		obstack_grow(obst, str, len);
+		break;
+	}
+	}
+}
+
+static void stringify(const pp_definition_t *definition)
+{
+	assert(obstack_object_size(&symbol_obstack) == 0);
+
+	size_t list_len = definition->list_len;
+	for (size_t p = 0; p < list_len; ++p) {
+		const saved_token_t *saved = &definition->token_list[p];
+		if (p > 0 && saved->had_whitespace)
+			obstack_1grow(&symbol_obstack, ' ');
+		grow_token(&symbol_obstack, &saved->token);
+	}
+	pp_token.kind           = T_STRING_LITERAL;
+	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+}
+
 static inline void set_punctuator(token_kind_t const kind)
 {
 	pp_token.kind        = kind;
@@ -793,11 +948,22 @@ restart:;
 	}
 	const saved_token_t *saved = &current_expansion->token_list[pos++];
 	pp_token = saved->token;
+	if (pp_token.kind == '#') {
+		if (pos < current_expansion->list_len) {
+			const saved_token_t *next = &current_expansion->token_list[pos];
+			if (next->token.kind == T_MACRO_PARAMETER) {
+				pp_definition_t *def = next->token.macro_parameter.def;
+				assert(def != NULL && def->is_parameter);
+				stringify(def);
+				++pos;
+			}
+		}
+	}
 
 	if (current_expansion->expand_pos > 0)
 		info.had_whitespace = saved->had_whitespace;
+	current_expansion->expand_pos = pos;
 	pp_token.base.source_position = expansion_pos;
-	++current_expansion->expand_pos;
 
 	return true;
 }
@@ -808,13 +974,11 @@ restart:;
  */
 static token_kind_t peek_expansion(void)
 {
-	pp_definition_t *expansion = current_expansion;
-	while (expansion != NULL && expansion->expand_pos >= expansion->list_len) {
-		expansion = expansion->parent_expansion;
+	for (pp_definition_t *e = current_expansion; e; e = e->parent_expansion) {
+		if (e->expand_pos < e->list_len)
+			return e->token_list[e->expand_pos].token.kind;
 	}
-	if (expansion == NULL)
-		return T_EOF;
-	return expansion->token_list[expansion->expand_pos].token.kind;
+	return T_EOF;
 }
 
 static void skip_line_comment(void)
@@ -1000,7 +1164,7 @@ universal:
 							   "universal character \\%c%0*X is not valid in an identifier",
 							   n == 4 ? 'u' : 'U', (int)n, v);
 					}
-				} else if (obstack_object_size(&symbol_obstack) == 0 && !is_universal_char_valid_identifier_start(v)) {
+				} else if (obstack_object_size(&symbol_obstack) == 0 && is_universal_char_invalid_identifier_start(v)) {
 					errorf(&input.position,
 						   "universal character \\%c%0*X is not valid as start of an identifier",
 						   n == 4 ? 'u' : 'U', (int)n, v);
@@ -1105,10 +1269,9 @@ end_number:
 #define ELSE_CODE(code) \
 	default: \
 		code \
-		return; \
 	}
 
-#define ELSE(kind) ELSE_CODE(set_punctuator(kind);)
+#define ELSE(kind) ELSE_CODE(set_punctuator(kind); return;)
 
 /** identifies and returns the next preprocessing token contained in the
  * input stream. No macro expansion is performed. */
@@ -1179,6 +1342,7 @@ restart:
 					put_back(input.c);
 					input.c = '.';
 					set_punctuator('.');
+					return;
 				)
 		ELSE('.')
 	case '&':
@@ -1234,6 +1398,7 @@ restart:
 			ELSE_CODE(
 digraph_percentcolon:
 				set_digraph('#', symbol_percentcolon);
+				return;
 			)
 		ELSE('%')
 	case '<':
@@ -1299,9 +1464,10 @@ digraph_percentcolon:
 
 	case EOF:
 		if (input_stack != NULL) {
-			fclose(close_input());
+			fclose(close_pp_input());
 			pop_restore_input();
-			fputc('\n', out);
+			if (out)
+				fputc('\n', out);
 			if (input.c == (utf32)EOF)
 				--input.position.lineno;
 			print_line_directive(&input.position, "2");
@@ -1384,6 +1550,9 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 		fputc(' ', out);
 		fputs(add, out);
 	}
+	if (pos->is_system_header) {
+		fputs(" 3", out);
+	}
 
 	printed_input_name = pos->input_name;
 	input.output_line  = pos->lineno-1;
@@ -1391,6 +1560,9 @@ static void print_line_directive(const source_position_t *pos, const char *add)
 
 static bool emit_newlines(void)
 {
+	if (!out)
+		return true;
+
 	unsigned delta = pp_token.base.source_position.lineno - input.output_line;
 	if (delta == 0)
 		return false;
@@ -1406,13 +1578,30 @@ static bool emit_newlines(void)
 	}
 	input.output_line = pp_token.base.source_position.lineno;
 
-	for (unsigned i = 0; i < info.whitespace_at_line_begin; ++i)
+	unsigned whitespace = info.whitespace_at_line_begin;
+	/* make sure there is at least 1 whitespace before a (macro-expanded)
+	 * '#' at line begin. I'm not sure why this is good, but gcc does it. */
+	if (pp_token.kind == '#' && whitespace == 0)
+		++whitespace;
+	for (unsigned i = 0; i < whitespace; ++i)
 		fputc(' ', out);
 
 	return true;
 }
 
-static void emit_pp_token(void)
+void set_preprocessor_output(FILE *output)
+{
+	out = output;
+	if (out != NULL) {
+		error_on_unknown_chars   = false;
+		resolve_escape_sequences = false;
+	} else {
+		error_on_unknown_chars   = true;
+		resolve_escape_sequences = true;
+	}
+}
+
+void emit_pp_token(void)
 {
 	if (!emit_newlines() &&
 	    (info.had_whitespace || tokens_would_paste(last_token, pp_token.kind)))
@@ -1501,8 +1690,51 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
 		if (!pp_tokens_equal(&t1->token, &t2->token))
 			return false;
+		if (t1->had_whitespace != t2->had_whitespace)
+			return false;
 	}
 	return true;
+}
+
+static void missing_macro_param_error(void)
+{
+	errorf(&pp_token.base.source_position,
+	       "'#' is not followed by a macro parameter");
+}
+
+static bool is_defineable_token(char const *const context)
+{
+	if (info.at_line_begin) {
+		errorf(&pp_token.base.source_position, "unexpected end of line after %s", context);
+	}
+
+	symbol_t *const symbol = pp_token.base.symbol;
+	if (!symbol)
+		goto no_ident;
+
+	if (pp_token.kind != T_IDENTIFIER) {
+		switch (symbol->string[0]) {
+		case SYMBOL_CASES:
+dollar_sign:
+			break;
+
+		default:
+no_ident:
+			errorf(&pp_token.base.source_position, "expected identifier after %s, got %K", context, &pp_token);
+			return false;
+		}
+	}
+
+	/* TODO turn this into a flag in pp_def. */
+	switch (symbol->pp_ID) {
+	/* §6.10.8:4 */
+	case TP_defined:
+		errorf(&pp_token.base.source_position, "%K cannot be used as macro name in %s", &pp_token, context);
+		return false;
+
+	default:
+		return true;
+	}
 }
 
 static void parse_define_directive(void)
@@ -1515,11 +1747,8 @@ static void parse_define_directive(void)
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
-		errorf(&pp_token.base.source_position,
-		       "expected identifier after #define, got %K", &pp_token);
+	if (!is_defineable_token("#define"))
 		goto error_out;
-	}
 	symbol_t *const symbol = pp_token.base.symbol;
 
 	pp_definition_t *new_definition
@@ -1532,7 +1761,7 @@ static void parse_define_directive(void)
 	 * lexer (except for the fact that they separate tokens). #define b(x)
 	 * is something else than #define b (x) */
 	if (input.c == '(') {
-		eat_token(T_IDENTIFIER);
+		next_input_token();
 		eat_token('(');
 
 		while (true) {
@@ -1604,11 +1833,12 @@ static void parse_define_directive(void)
 			symbol->pp_definition      = param;
 		}
 	} else {
-		eat_token(T_IDENTIFIER);
+		next_input_token();
 	}
 
 	/* construct token list */
 	assert(obstack_object_size(&pp_obstack) == 0);
+	bool next_must_be_param = false;
 	while (!info.at_line_begin) {
 		if (pp_token.kind == T_IDENTIFIER) {
 			const symbol_t  *symbol     = pp_token.base.symbol;
@@ -1619,12 +1849,19 @@ static void parse_define_directive(void)
 			    pp_token.macro_parameter.def = definition;
 			}
 		}
+		if (next_must_be_param && pp_token.kind != T_MACRO_PARAMETER) {
+			missing_macro_param_error();
+		}
 		saved_token_t saved_token;
 		saved_token.token = pp_token;
 		saved_token.had_whitespace = info.had_whitespace;
 		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+		next_must_be_param
+			= new_definition->has_parameters && pp_token.kind == '#';
 		next_input_token();
 	}
+	if (next_must_be_param)
+		missing_macro_param_error();
 
 	new_definition->list_len   = obstack_object_size(&pp_obstack)
 		/ sizeof(new_definition->token_list[0]);
@@ -1673,15 +1910,13 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	if (pp_token.kind != T_IDENTIFIER) {
-		errorf(&input.position,
-		       "expected identifier after #undef, got %K", &pp_token);
+	if (!is_defineable_token("#undef")) {
 		eat_pp_directive();
 		return;
 	}
 
 	pp_token.base.symbol->pp_definition = NULL;
-	eat_token(T_IDENTIFIER);
+	next_input_token();
 
 	if (!info.at_line_begin) {
 		warningf(WARN_OTHER, &input.position, "extra tokens at end of #undef directive");
@@ -1693,36 +1928,39 @@ static void parse_undef_directive(void)
  * They're only allowed behind an #include so they're not recognized
  * by the normal next_preprocessing_token. We handle them as a special
  * exception here */
-static void parse_headername(void)
+static const char *parse_headername(bool *system_include)
 {
-	const source_position_t start_position = input.position;
-	string_t                string         = { NULL, 0, STRING_ENCODING_CHAR };
-	assert(obstack_object_size(&symbol_obstack) == 0);
-
 	if (info.at_line_begin) {
 		parse_error("expected headername after #include");
-		goto finish_error;
+		return NULL;
 	}
 
 	/* check wether we have a "... or <... headername */
+	source_position_t position = input.position;
 	switch (input.c) {
 	{
 		utf32 delimiter;
-	case '<': delimiter = '>'; goto parse_name;
-	case '"': delimiter = '"'; goto parse_name;
+	case '<': delimiter = '>'; *system_include = true;  goto parse_name;
+	case '"': delimiter = '"'; *system_include = false; goto parse_name;
 parse_name:
+		assert(obstack_object_size(&symbol_obstack) == 0);
 		next_char();
 		while (true) {
 			switch (input.c) {
 			case NEWLINE:
 			case EOF:
-				errorf(&pp_token.base.source_position, "header name without closing '%c'", (char)delimiter);
-				goto finish_error;
+				{
+					char *dummy = obstack_finish(&symbol_obstack);
+					obstack_free(&symbol_obstack, dummy);
+				}
+				errorf(&pp_token.base.source_position,
+				       "header name without closing '%c'", (char)delimiter);
+				return NULL;
 
 			default:
 				if (input.c == delimiter) {
 					next_char();
-					goto finished_headername;
+					goto finish_headername;
 				} else {
 					obstack_1grow(&symbol_obstack, (char)input.c);
 					next_char();
@@ -1734,45 +1972,108 @@ parse_name:
 	}
 
 	default:
-		/* TODO: do normal pp_token parsing and concatenate results */
-		panic("pp_token concat include not implemented yet");
+		next_preprocessing_token();
+		if (info.at_line_begin) {
+			/* TODO: if we are already in the new line then we parsed more than
+			 * wanted. We reuse the token, but could produce following errors
+			 * misbehaviours... */
+			goto error_invalid_input;
+		}
+		if (pp_token.kind == T_STRING_LITERAL) {
+			*system_include = false;
+			return pp_token.literal.string.begin;
+		} else if (pp_token.kind == '<') {
+			*system_include = true;
+			assert(obstack_object_size(&pp_obstack) == 0);
+			while (true) {
+				next_preprocessing_token();
+				if (info.at_line_begin) {
+					/* TODO: we shouldn't have parsed/expanded something on the
+					 * next line yet... */
+					char *dummy = obstack_finish(&pp_obstack);
+					obstack_free(&pp_obstack, dummy);
+					goto error_invalid_input;
+				}
+				if (pp_token.kind == '>')
+					break;
+
+				saved_token_t saved;
+				saved.token          = pp_token;
+				saved.had_whitespace = info.had_whitespace;
+				obstack_grow(&pp_obstack, &saved, sizeof(saved));
+			}
+			size_t size = obstack_object_size(&pp_obstack);
+			assert(size % sizeof(saved_token_t) == 0);
+			size_t n_tokens = size / sizeof(saved_token_t);
+			saved_token_t *tokens = obstack_finish(&pp_obstack);
+			assert(obstack_object_size(&symbol_obstack) == 0);
+			for (size_t i = 0; i < n_tokens; ++i) {
+				const saved_token_t *saved = &tokens[i];
+				if (i > 0 && saved->had_whitespace)
+					obstack_1grow(&symbol_obstack, ' ');
+				grow_token(&symbol_obstack, &saved->token);
+			}
+			obstack_free(&pp_obstack, tokens);
+			goto finish_headername;
+		} else {
+error_invalid_input:
+			{
+				char *dummy = obstack_finish(&symbol_obstack);
+				obstack_free(&symbol_obstack, dummy);
+			}
+
+			errorf(&pp_token.base.source_position,
+			       "expected \"FILENAME\" or <FILENAME> after #include");
+			return NULL;
+		}
 	}
 
-finished_headername:
-	string = sym_make_string(STRING_ENCODING_CHAR);
-
-finish_error:
-	pp_token.base.source_position = start_position;
-	pp_token.kind                 = T_HEADERNAME;
-	pp_token.literal.string       = string;
+finish_headername:
+	obstack_1grow(&symbol_obstack, '\0');
+	char *const  headername = obstack_finish(&symbol_obstack);
+	const char  *identified = identify_string(headername);
+	pp_token.base.source_position = position;
+	return identified;
 }
 
-static bool do_include(bool system_include, const char *headername)
+static bool do_include(bool const bracket_include, bool const include_next, char const *const headername)
 {
-	size_t headername_len = strlen(headername);
-	if (!system_include) {
-		/* put dirname of current input on obstack */
-		const char *filename   = input.position.input_name;
-		const char *last_slash = strrchr(filename, '/');
-		if (last_slash != NULL) {
-			size_t len = last_slash - filename;
-			obstack_grow(&symbol_obstack, filename, len + 1);
-			obstack_grow0(&symbol_obstack, headername, headername_len);
-			char *complete_path = obstack_finish(&symbol_obstack);
-			headername = identify_string(complete_path);
-		}
+	size_t const        headername_len = strlen(headername);
+	searchpath_entry_t *entry;
+	if (include_next) {
+		entry = input.path      ? input.path->next
+		      : bracket_include ? bracket_searchpath.first
+		      : quote_searchpath.first;
+	} else {
+		if (!bracket_include) {
+			/* put dirname of current input on obstack */
+			const char *filename   = input.position.input_name;
+			const char *last_slash = strrchr(filename, '/');
+			const char *full_name;
+			if (last_slash != NULL) {
+				size_t len = last_slash - filename;
+				obstack_grow(&symbol_obstack, filename, len + 1);
+				obstack_grow0(&symbol_obstack, headername, headername_len);
+				char *complete_path = obstack_finish(&symbol_obstack);
+				full_name = identify_string(complete_path);
+			} else {
+				full_name = headername;
+			}
 
-		FILE *file = fopen(headername, "r");
-		if (file != NULL) {
-			switch_input(file, headername);
-			return true;
+			FILE *file = fopen(full_name, "r");
+			if (file != NULL) {
+				switch_pp_input(file, full_name, NULL, false);
+				return true;
+			}
+			entry = quote_searchpath.first;
+		} else {
+			entry = bracket_searchpath.first;
 		}
 	}
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
-	for (searchpath_entry_t *entry = searchpath; entry != NULL;
-	     entry = entry->next) {
+	for (; entry; entry = entry->next) {
 	    const char *path = entry->path;
 	    size_t      len  = strlen(path);
 		obstack_grow(&symbol_obstack, path, len);
@@ -1784,7 +2085,7 @@ static bool do_include(bool system_include, const char *headername)
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
-			switch_input(file, filename);
+			switch_pp_input(file, filename, entry, entry->is_system_path);
 			return true;
 		} else {
 			obstack_free(&symbol_obstack, complete_path);
@@ -1794,27 +2095,26 @@ static bool do_include(bool system_include, const char *headername)
 	return false;
 }
 
-static void parse_include_directive(void)
+static void parse_include_directive(bool const include_next)
 {
 	if (skip_mode) {
 		eat_pp_directive();
 		return;
 	}
 
-	/* don't eat the TP_include here!
-	 * we need an alternative parsing for the next token */
+	/* do not eat the TP_include, since it would already parse the next token
+	 * which needs special handling here. */
 	skip_till_newline(true);
-	bool system_include = input.c == '<';
-	parse_headername();
-	string_t headername = pp_token.literal.string;
-	if (headername.begin == NULL) {
+	bool system_include;
+	const char *headername = parse_headername(&system_include);
+	if (headername == NULL) {
 		eat_pp_directive();
 		return;
 	}
 
 	bool had_nonwhitespace = skip_till_newline(false);
 	if (had_nonwhitespace) {
-		warningf(WARN_OTHER, &pp_token.base.source_position,
+		warningf(WARN_OTHER, &input.position,
 		         "extra tokens at end of #include directive");
 	}
 
@@ -1831,11 +2131,11 @@ static void parse_include_directive(void)
 	info.at_line_begin            = true;
 	emit_newlines();
 	push_input();
-	bool res = do_include(system_include, pp_token.literal.string.begin);
+	bool res = do_include(system_include, include_next, headername);
 	if (res) {
 		next_input_token();
 	} else {
-		errorf(&pp_token.base.source_position, "failed including '%S': %s", &pp_token.literal.string, strerror(errno));
+		errorf(&pp_token.base.source_position, "failed including '%s': %s", headername, strerror(errno));
 		pop_restore_input();
 	}
 }
@@ -1858,7 +2158,7 @@ static void pop_conditional(void)
 	conditional_stack = conditional_stack->parent;
 }
 
-static void check_unclosed_conditionals(void)
+void check_unclosed_conditionals(void)
 {
 	while (conditional_stack != NULL) {
 		pp_conditional_t *conditional = conditional_stack;
@@ -1987,6 +2287,10 @@ typedef enum stdc_pragma_value_kind_t {
 static void parse_pragma_directive(void)
 {
 	eat_pp(TP_pragma);
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
 
 	if (pp_token.kind != T_IDENTIFIER) {
 		warningf(WARN_UNKNOWN_PRAGMAS, &pp_token.base.source_position,
@@ -2048,6 +2352,8 @@ static void parse_line_directive(void)
 			}
 		}
 		next_input_token();
+		if (info.at_line_begin)
+			return;
 	}
 	if (pp_token.kind == T_STRING_LITERAL
 	    && pp_token.literal.string.encoding == STRING_ENCODING_CHAR) {
@@ -2056,7 +2362,7 @@ static void parse_line_directive(void)
 		next_input_token();
 
 		/* attempt to parse numeric flags as outputted by gcc preprocessor */
-		while (pp_token.kind == T_NUMBER) {
+		while (!info.at_line_begin && pp_token.kind == T_NUMBER) {
 			/* flags:
 			 * 1 - indicates start of a new file
 			 * 2 - indicates return from a file
@@ -2075,6 +2381,57 @@ static void parse_line_directive(void)
 	eat_pp_directive();
 }
 
+static void parse_error_directive(void)
+{
+	if (skip_mode) {
+		eat_pp_directive();
+		return;
+	}
+
+	bool const old_resolve_escape_sequences = resolve_escape_sequences;
+	resolve_escape_sequences = false;
+
+	source_position_t const pos = pp_token.base.source_position;
+	do {
+		if (info.had_whitespace && obstack_object_size(&pp_obstack) != 0)
+			obstack_1grow(&pp_obstack, ' ');
+
+		switch (pp_token.kind) {
+		case T_NUMBER: {
+			string_t const *const str = &pp_token.literal.string;
+			obstack_grow(&pp_obstack, str->begin, str->size);
+			break;
+		}
+
+		{
+			char delim;
+		case T_STRING_LITERAL:     delim =  '"'; goto string;
+		case T_CHARACTER_CONSTANT: delim = '\''; goto string;
+string:;
+			string_t const *const str = &pp_token.literal.string;
+			char     const *const enc = get_string_encoding_prefix(str->encoding);
+			obstack_printf(&pp_obstack, "%s%c%s%c", enc, delim, str->begin, delim);
+			break;
+		}
+
+		default: {
+			char const *const str = pp_token.base.symbol->string;
+			obstack_grow(&pp_obstack, str, strlen(str));
+			break;
+		}
+		}
+
+		next_input_token();
+	} while (!info.at_line_begin);
+
+	resolve_escape_sequences = old_resolve_escape_sequences;
+
+	obstack_1grow(&pp_obstack, '\0');
+	char *const str = obstack_finish(&pp_obstack);
+	errorf(&pos, "#%s", str);
+	obstack_free(&pp_obstack, str);
+}
+
 static void parse_preprocessing_directive(void)
 {
 	eat_token('#');
@@ -2086,16 +2443,18 @@ static void parse_preprocessing_directive(void)
 
 	if (pp_token.base.symbol) {
 		switch (pp_token.base.symbol->pp_ID) {
-		case TP_define:  parse_define_directive();            break;
-		case TP_else:    parse_else_directive();              break;
-		case TP_endif:   parse_endif_directive();             break;
-		case TP_ifdef:   parse_ifdef_ifndef_directive(true);  break;
-		case TP_ifndef:  parse_ifdef_ifndef_directive(false); break;
-		case TP_include: parse_include_directive();           break;
-		case TP_line:    next_input_token(); goto line_directive;
-		case TP_pragma:  parse_pragma_directive();            break;
-		case TP_undef:   parse_undef_directive();             break;
-		default:         goto skip;
+		case TP_define:       parse_define_directive();            break;
+		case TP_else:         parse_else_directive();              break;
+		case TP_endif:        parse_endif_directive();             break;
+		case TP_error:        parse_error_directive();             break;
+		case TP_ifdef:        parse_ifdef_ifndef_directive(true);  break;
+		case TP_ifndef:       parse_ifdef_ifndef_directive(false); break;
+		case TP_include:      parse_include_directive(false);      break;
+		case TP_include_next: parse_include_directive(true);       break;
+		case TP_line:         next_input_token(); goto line_directive;
+		case TP_pragma:       parse_pragma_directive();            break;
+		case TP_undef:        parse_undef_directive();             break;
+		default:              goto skip;
 		}
 	} else if (pp_token.kind == T_NUMBER) {
 line_directive:
@@ -2134,8 +2493,14 @@ restart:
 
 	const token_kind_t kind = pp_token.kind;
 	if (current_call == NULL || argument_expanding != NULL) {
-		if (kind == T_IDENTIFIER) {
-			symbol_t        *const symbol        = pp_token.base.symbol;
+		symbol_t *const symbol = pp_token.base.symbol;
+		if (symbol) {
+			if (kind == T_MACRO_PARAMETER) {
+				assert(current_expansion != NULL);
+				start_expanding(pp_token.macro_parameter.def);
+				goto restart;
+			}
+
 			pp_definition_t *const pp_definition = symbol->pp_definition;
 			if (pp_definition != NULL && !pp_definition->is_expanding) {
 				if (pp_definition->has_parameters) {
@@ -2181,10 +2546,6 @@ restart:
 					goto restart;
 				}
 			}
-		} else if (kind == T_MACRO_PARAMETER) {
-			assert(current_expansion != NULL);
-			start_expanding(pp_token.macro_parameter.def);
-			goto restart;
 		}
 	}
 
@@ -2241,24 +2602,21 @@ restart:
 	}
 }
 
-
-static void prepend_include_path(const char *path)
+void append_include_path(searchpath_t *paths, const char *path)
 {
 	searchpath_entry_t *entry = OALLOCZ(&config_obstack, searchpath_entry_t);
-	entry->path = path;
-	entry->next = searchpath;
-	searchpath  = entry;
+	entry->path           = path;
+	entry->is_system_path = paths->is_system_path;
+
+	*paths->anchor = entry;
+	paths->anchor  = &entry->next;
 }
 
-static void setup_include_path(void)
+static void append_env_paths(searchpath_t *paths, const char *envvar)
 {
-	/* built-in paths */
-	prepend_include_path("/usr/include");
-
-	/* parse environment variable */
-	const char *cpath = getenv("CPATH");
-	if (cpath != NULL && *cpath != '\0') {
-		const char *begin = cpath;
+	const char *val = getenv(envvar);
+	if (val != NULL && *val != '\0') {
+		const char *begin = val;
 		const char *c;
 		do {
 			c = begin;
@@ -2267,15 +2625,12 @@ static void setup_include_path(void)
 
 			size_t len = c-begin;
 			if (len == 0) {
-				/* for gcc compatibility (Matze: I would expect that
+				/* use "." for gcc compatibility (Matze: I would expect that
 				 * nothing happens for an empty entry...) */
-				prepend_include_path(".");
+				append_include_path(paths, ".");
 			} else {
-				char *string = obstack_alloc(&config_obstack, len+1);
-				memcpy(string, begin, len);
-				string[len] = '\0';
-
-				prepend_include_path(string);
+				char *const string = obstack_copy0(&config_obstack, begin, len);
+				append_include_path(paths, string);
 			}
 
 			begin = c+1;
@@ -2286,16 +2641,51 @@ static void setup_include_path(void)
 	}
 }
 
+static void append_searchpath(searchpath_t *path, const searchpath_t *append)
+{
+	*path->anchor = append->first;
+}
+
+static void setup_include_path(void)
+{
+	/* built-in paths */
+	append_include_path(&system_searchpath, "/usr/include");
+
+	/* parse environment variable */
+	append_env_paths(&bracket_searchpath, "CPATH");
+	append_env_paths(&system_searchpath,
+	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
+
+	/* append system search path to bracket searchpath */
+	append_searchpath(&system_searchpath,  &after_searchpath);
+	append_searchpath(&bracket_searchpath, &system_searchpath);
+	append_searchpath(&quote_searchpath, &bracket_searchpath);
+}
+
+static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
+{
+	source_position_t pos = pp_token.base.source_position;
+	pos.lineno += delta_lines;
+	pos.colno  += delta_cols;
+	errorf(&pos, "%s", message);
+}
+
+void init_include_paths(void)
+{
+	obstack_init(&config_obstack);
+}
+
 void init_preprocessor(void)
 {
 	init_symbols();
 
-	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
 
 	setup_include_path();
+
+	set_input_error_callback(input_error);
 }
 
 void exit_preprocessor(void)
@@ -2311,6 +2701,7 @@ int pptest_main(int argc, char **argv);
 int pptest_main(int argc, char **argv)
 {
 	init_symbol_table();
+	init_include_paths();
 	init_preprocessor();
 	init_tokens();
 
@@ -2323,7 +2714,7 @@ int pptest_main(int argc, char **argv)
 	for (int i = 1; i < argc; ++i) {
 		const char *opt = argv[i];
 		if (streq(opt, "-I")) {
-			prepend_include_path(argv[++i]);
+			append_include_path(&bracket_searchpath, argv[++i]);
 			continue;
 		} else if (streq(opt, "-E")) {
 			/* ignore */
@@ -2363,7 +2754,7 @@ int pptest_main(int argc, char **argv)
 		fprintf(stderr, "Couldn't open input '%s'\n", filename);
 		return 1;
 	}
-	switch_input(file, filename);
+	switch_pp_input(file, filename, NULL, false);
 
 	for (;;) {
 		next_preprocessing_token();
@@ -2374,7 +2765,7 @@ int pptest_main(int argc, char **argv)
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	fclose(close_input());
+	fclose(close_pp_input());
 	if (out != stdout)
 		fclose(out);
 

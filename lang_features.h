@@ -26,8 +26,8 @@
 
 typedef enum lang_features_t {
 	_C89  = 1U << 0,
-	_ANSI = 1U << 1,
-	_C99  = 1U << 2,
+	_C99  = 1U << 1,
+	_C11  = 1U << 2,
 	_CXX  = 1U << 3,
 	_GNUC = 1U << 4,
 	_MS   = 1U << 5,

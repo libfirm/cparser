@@ -31,9 +31,9 @@ CFLAGS += $(CFLAGS_$(variant))
 LFLAGS += $(FIRM_LIBS)
 
 SOURCES := \
-	adt/hashset.c \
 	adt/strset.c \
 	adt/strutil.c \
+	adt/pset_new.c \
 	attribute.c \
 	parser.c \
 	ast.c \

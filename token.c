@@ -69,10 +69,8 @@ void init_tokens(void)
 {
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
-#define T(mode,x,str,val)  register_token(mode, T_##x, str);
-#define TS(x,str,val)      intern_register_token(T_##x, str);
+#define T(mode,x,str,val)  register_token(mode, x, str);
 #include "tokens.inc"
-#undef TS
 #undef T
 
 #define T(token) register_pp_token(TP_##token, #token);
@@ -115,7 +113,6 @@ void print_token(FILE *f, const token_t *token)
 		val = token->base.symbol->string;
 		break;
 
-	case T_HEADERNAME:
 	case T_STRING_LITERAL:
 		delim = '"';
 		/* FALLTHROUGH */

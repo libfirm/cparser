@@ -60,7 +60,7 @@ struct declaration_specifiers_t {
 	storage_class_t    storage_class;
 	unsigned char      alignment;         /**< Alignment, 0 if not set. */
 	bool               is_inline    : 1;
-	bool               thread_local : 1;  /**< GCC __thread */
+	bool               thread_local : 1;
 	attribute_t       *attributes;        /**< list of attributes */
 	type_t            *type;
 };
@@ -183,7 +183,7 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_static:          \
 	case T_auto:            \
 	case T_register:        \
-	case T___thread:
+	case T__Thread_local:
 
 #define TYPE_QUALIFIERS     \
 	case T_const:           \
@@ -249,10 +249,10 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_MINUSMINUS:                \
 	case T_PLUSPLUS:                  \
 	case T_STRING_LITERAL:            \
+	case T__Alignof:                  \
 	case T___FUNCDNAME__:             \
 	case T___FUNCSIG__:               \
 	case T___PRETTY_FUNCTION__:       \
-	case T___alignof__:               \
 	case T___builtin_classify_type:   \
 	case T___builtin_constant_p:      \
 	case T___builtin_isgreater:       \
@@ -1954,6 +1954,8 @@ static initializer_t *parse_sub_initializer(type_path_t *path,
 		return create_empty_initializer();
 	}
 
+	initializer_t *result = NULL;
+
 	type_t *orig_type = path->top_type;
 	type_t *type      = NULL;
 
@@ -2057,14 +2059,14 @@ finish_designator:
 
 			/* handle { "string" } special case */
 			if (expression->kind == EXPR_STRING_LITERAL && outer_type != NULL) {
-				sub = initializer_from_expression(outer_type, expression);
-				if (sub != NULL) {
+				result = initializer_from_expression(outer_type, expression);
+				if (result != NULL) {
 					next_if(',');
 					if (token.kind != '}') {
-						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", orig_type);
+						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", outer_type);
 					}
 					/* TODO: eat , ... */
-					return sub;
+					goto out;
 				}
 			}
 
@@ -2105,12 +2107,8 @@ finish_designator:
 		ARR_APP1(initializer_t*, initializers, sub);
 
 error_parse_next:
-		if (token.kind == '}') {
+		if (!next_if(','))
 			break;
-		}
-		add_anchor_token('}');
-		expect(',');
-		rem_anchor_token('}');
 		if (token.kind == '}') {
 			break;
 		}
@@ -2128,22 +2126,19 @@ error_parse_next:
 
 	size_t len  = ARR_LEN(initializers);
 	size_t size = sizeof(initializer_list_t) + len * sizeof(initializers[0]);
-	initializer_t *result = allocate_ast_zero(size);
-	result->kind          = INITIALIZER_LIST;
-	result->list.len      = len;
+	result = allocate_ast_zero(size);
+	result->kind     = INITIALIZER_LIST;
+	result->list.len = len;
 	memcpy(&result->list.initializers, initializers,
 	       len * sizeof(initializers[0]));
-
-	DEL_ARR_F(initializers);
-	ascend_to(path, top_path_level+1);
-
-	return result;
+	goto out;
 
 end_error:
 	skip_initializers();
+out:
 	DEL_ARR_F(initializers);
 	ascend_to(path, top_path_level+1);
-	return NULL;
+	return result;
 }
 
 static expression_t *make_size_literal(size_t value)
@@ -2655,9 +2650,9 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 				= parse_microsoft_extended_decl_modifier(specifiers->attributes);
 			break;
 
-		case T___thread:
+		case T__Thread_local:
 			if (specifiers->thread_local) {
-				errorf(HERE, "duplicate '__thread'");
+				errorf(HERE, "duplicate %K", &token);
 			} else {
 				specifiers->thread_local = true;
 check_thread_storage_class:
@@ -2672,7 +2667,7 @@ check_thread_storage_class:
 					case STORAGE_CLASS_REGISTER: wrong = "register"; goto wrong_thread_storage_class;
 					case STORAGE_CLASS_TYPEDEF:  wrong = "typedef";  goto wrong_thread_storage_class;
 wrong_thread_storage_class:
-						errorf(HERE, "'__thread' used with '%s'", wrong);
+						errorf(HERE, "%K used with '%s'", &token, wrong);
 						break;
 				}
 			}
@@ -6839,7 +6834,7 @@ static expression_t *parse_typeprop(expression_kind_t const kind)
 	expression_t  *tp_expression = allocate_expression_zero(kind);
 	tp_expression->base.type     = type_size_t;
 
-	eat(kind == EXPR_SIZEOF ? T_sizeof : T___alignof__);
+	eat(kind == EXPR_SIZEOF ? T_sizeof : T__Alignof);
 
 	type_t       *orig_type;
 	expression_t *expression;
@@ -8649,7 +8644,7 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT, T_PLUSPLUS);
 	register_expression_parser(parse_EXPR_UNARY_PREFIX_DECREMENT, T_MINUSMINUS);
 	register_expression_parser(parse_sizeof,                      T_sizeof);
-	register_expression_parser(parse_alignof,                     T___alignof__);
+	register_expression_parser(parse_alignof,                     T__Alignof);
 	register_expression_parser(parse_extension,                   T___extension__);
 	register_expression_parser(parse_builtin_classify_type,       T___builtin_classify_type);
 	register_expression_parser(parse_delete,                      T_delete);
@@ -9816,11 +9811,12 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T_NUMBER);
 	add_anchor_token(T_PLUSPLUS);
 	add_anchor_token(T_STRING_LITERAL);
+	add_anchor_token(T__Alignof);
 	add_anchor_token(T__Bool);
 	add_anchor_token(T__Complex);
 	add_anchor_token(T__Imaginary);
+	add_anchor_token(T__Thread_local);
 	add_anchor_token(T___PRETTY_FUNCTION__);
-	add_anchor_token(T___alignof__);
 	add_anchor_token(T___attribute__);
 	add_anchor_token(T___builtin_va_start);
 	add_anchor_token(T___extension__);
@@ -9828,7 +9824,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	add_anchor_token(T___imag__);
 	add_anchor_token(T___label__);
 	add_anchor_token(T___real__);
-	add_anchor_token(T___thread);
 	add_anchor_token(T_asm);
 	add_anchor_token(T_auto);
 	add_anchor_token(T_bool);
@@ -9976,7 +9971,6 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T_bool);
 	rem_anchor_token(T_auto);
 	rem_anchor_token(T_asm);
-	rem_anchor_token(T___thread);
 	rem_anchor_token(T___real__);
 	rem_anchor_token(T___label__);
 	rem_anchor_token(T___imag__);
@@ -9984,11 +9978,12 @@ static statement_t *parse_compound_statement(bool inside_expression_statement)
 	rem_anchor_token(T___extension__);
 	rem_anchor_token(T___builtin_va_start);
 	rem_anchor_token(T___attribute__);
-	rem_anchor_token(T___alignof__);
 	rem_anchor_token(T___PRETTY_FUNCTION__);
+	rem_anchor_token(T__Thread_local);
 	rem_anchor_token(T__Imaginary);
 	rem_anchor_token(T__Complex);
 	rem_anchor_token(T__Bool);
+	rem_anchor_token(T__Alignof);
 	rem_anchor_token(T_STRING_LITERAL);
 	rem_anchor_token(T_PLUSPLUS);
 	rem_anchor_token(T_NUMBER);
@@ -10214,8 +10209,6 @@ void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
-	error_count       = 0;
-	warning_count     = 0;
 
 	print_to_file(stderr);
 

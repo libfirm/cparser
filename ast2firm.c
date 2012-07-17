@@ -3047,11 +3047,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_ATOMIC: {
 				const atomic_type_t *const atomic_type = &type->atomic;
 				switch (atomic_type->akind) {
-					/* should not be reached */
-					case ATOMIC_TYPE_INVALID:
-						tc = no_type_class;
-						goto make_const;
-
 					/* gcc cannot do that */
 					case ATOMIC_TYPE_VOID:
 						tc = void_type_class;
@@ -5586,8 +5581,9 @@ static void global_asm_to_firm(statement_t *s)
 static const char *get_cwd(void)
 {
 	static char buf[1024];
-	if (buf[0] == '\0')
-		getcwd(buf, sizeof(buf));
+	if (buf[0] == '\0') {
+		return getcwd(buf, sizeof(buf));
+	}
 	return buf;
 }
 
@@ -5602,7 +5598,10 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	} else {
 		be_dwarf_set_source_language(DW_LANG_C);
 	}
-	be_dwarf_set_compilation_directory(get_cwd());
+	const char *cwd = get_cwd();
+	if (cwd != NULL) {
+		be_dwarf_set_compilation_directory(cwd);
+	}
 
 	/* initialize firm arithmetic */
 	tarval_set_integer_overflow_mode(TV_OVERFLOW_WRAP);

@@ -1,24 +1,21 @@
-#ifndef TS
-#define TS(x,str,val)
-#endif
-
 /* These must go first. Some set explicit values. */
-#define ALTERNATE(name, val)          T(_CXX, name, #name,  val)
-#define PUNCTUATOR(name, string, val) T(_ALL, name, string, val)
+#define ALTERNATE(name, val)          T(_CXX, T_##name, #name,  val)
+#define PUNCTUATOR(name, string, val) T(_ALL, T_##name, string, val)
 #include "tokens_punctuator.inc"
 #undef PUNCTUATOR
 #undef ALTERNATE
 
-TS(EOF,                "end of input",)
-TS(IDENTIFIER,         "identifier",)
-TS(NUMBER,             "number constant",)
-TS(CHARACTER_CONSTANT, "character constant",)
-TS(STRING_LITERAL,     "string literal",)
-TS(HEADERNAME,         "headername",)
-TS(MACRO_PARAMETER,    "macro parameter",)
-TS(UNKNOWN_CHAR,       "unknown character",)
+#define S(name, description) T(_ALL, T_##name, description,)
+S(EOF,                "end of input")
+S(IDENTIFIER,         "identifier")
+S(NUMBER,             "number constant")
+S(CHARACTER_CONSTANT, "character constant")
+S(STRING_LITERAL,     "string literal")
+S(MACRO_PARAMETER,    "macro parameter")
+S(UNKNOWN_CHAR,       "unknown character")
+#undef S
 
-#define S(mode,x)   T(mode,x,#x,)
+#define S(mode,x)   T(mode,T_##x,#x,)
 S(_ALL, auto)
 S(_ALL, break)
 S(_ALL, case)
@@ -50,9 +47,7 @@ S(_ALL, void)
 S(_ALL, while)
 
 /* C++ keywords */
-#undef bool
 S(_CXX, bool)
-#define bool _Bool
 S(_CXX, catch)
 S(_CXX, class)
 S(_CXX, const_cast)
@@ -60,9 +55,7 @@ S(_CXX, delete)
 S(_CXX, dynamic_cast)
 S(_CXX, explicit)
 S(_CXX, export)
-#undef false
 S(_CXX, false)
-#define false 0
 S(_CXX, friend)
 S(_CXX, mutable)
 S(_CXX, namespace)
@@ -76,9 +69,7 @@ S(_CXX, static_cast)
 S(_CXX, template)
 S(_CXX, this)
 S(_CXX, throw)
-#undef true
 S(_CXX, true)
-#define true 1
 S(_CXX, try)
 S(_CXX, typeid)
 S(_CXX, typename)
@@ -87,7 +78,13 @@ S(_CXX, virtual)
 S(_CXX, wchar_t)
 
 S(_C99|_GNUC, _Bool)
-S(_ALL, __thread)
+
+S(_C11, _Alignas)
+S(_C11, _Atomic)
+S(_C11, _Generic)
+S(_C11, _Noreturn)
+S(_C11, _Static_assert)
+
 S(_ALL, __extension__)
 S(_ALL, __builtin_classify_type)
 S(_ALL, __builtin_va_list)
@@ -108,32 +105,12 @@ S(_MS, __FUNCSIG__)
 S(_MS, __FUNCDNAME__)
 #undef S
 
-/* needed on Windows */
-#undef __w64
-#undef __ptr32
-#undef __ptr64
-
-/* needed on MinGW */
-#undef __int8
-#undef __int16
-#undef __int32
-#undef __int64
-
-/* needed on MinGW and Cygwin */
-#undef __cdecl
-#undef __stdcall
-#undef __fastcall
-
-/* needed on Darwin... */
-#undef __signed
-#undef __volatile
-#undef __const
-#undef __restrict
-
-#define S(mode, x, val) T(mode, x, #x, val)
+#define S(mode, x, val) T(mode, T_##x, #x, val)
 S(_C99,            __func__,)
 S(_ALL,            __FUNCTION__,           = T___func__)
-S(_ANSI|_C99|_CXX,   signed,               )
+S(_C11,             _Thread_local,         )
+S(_ALL,            __thread,               = T__Thread_local)
+S(_ALL,              signed,               )
 S(_ALL,            __signed,               = T_signed)
 S(_ALL,            __signed__,             = T_signed)
 S(_C99|_GNUC,       _Complex,              )
@@ -144,10 +121,11 @@ S(_ALL,            __real__,               )
 S(_ALL,            __real,                 = T___real__)
 S(_ALL,            __imag__,               )
 S(_ALL,            __imag,                 = T___imag__)
-S(_ALL,            __alignof__,            )
-S(_ALL,            __alignof,              = T___alignof__)
-S(_MS,              _alignof,              = T___alignof__)
-S(_ANSI|_C99|_CXX,   const,                )
+S(_C11,             _Alignof,              )
+S(_ALL,            __alignof__,            = T__Alignof)
+S(_ALL,            __alignof,              = T__Alignof)
+S(_MS,              _alignof,              = T__Alignof)
+S(_ALL,              const,                )
 S(_ALL,            __const,                = T_const)
 S(_ALL,            __const__,              = T_const)
 S(_C99,              restrict,             )
@@ -158,7 +136,7 @@ S(_ALL,              asm,                  )
 S(_ALL,            __asm__,                = T_asm)
 S(_MS,              _asm,                  = T_asm)
 S(_ALL,            __asm,                  = T_asm)
-S(_ANSI|_C99|_CXX,   volatile,             )
+S(_ALL,              volatile,             )
 S(_ALL,            __volatile,             = T_volatile)
 S(_ALL,            __volatile__,           = T_volatile)
 S(_C99|_CXX|_GNUC,   inline,               )

@@ -1,5 +1,5 @@
 .\" Please adjust this date whenever revising the manpage.
-.Dd June 21, 2011
+.Dd July 9, 2012
 .Dt CPARSER 1
 .Sh NAME
 .Nm cparser
@@ -9,6 +9,7 @@
 .Op Fl c | S | E | -print-ast
 .Op Fl -print-implicit-cast
 .Op Fl -print-parenthesis
+.Op Fl ansi
 .Op Fl std= Ns Ar standard
 .Op Fl - Ns Oo Cm no- Oc Ns Cm gcc
 .Op Fl - Ns Oo Cm no- Oc Ns Cm ms
@@ -56,11 +57,14 @@ show casts, which are inserted by the semantic checks.
 When using
 .Fl -print-ast ,
 show all expressions fully parenthesized.
+.It Fl ansi
+Same as -std=c90 (for C) or -std=c++98 (for C++).
 .It Fl std= Ns Ar standard
 Select the language standard.
 Supported values are:
 .Bl -tag -compact -width "iso9899:1990"
 .It Cm c89
+.It Cm c90
 .It Cm iso9899:1990
 ISO C90
 .It Cm gnu89
@@ -70,6 +74,11 @@ ISO C90 with GCC extensions
 ISO C99
 .It Cm gnu99
 ISO C99 with GCC extensions
+.It Cm c11
+.It Cm iso9899:2011
+ISO C11
+.It Cm gnu11
+ISO C11 with GCC extensions
 .It Cm c++98
 ISO C++ 1998.
 Not supported yet.

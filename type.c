@@ -257,7 +257,6 @@ void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparato
 const char *get_atomic_kind_name(atomic_type_kind_t kind)
 {
 	switch(kind) {
-	case ATOMIC_TYPE_INVALID: break;
 	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
 	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
@@ -706,8 +705,7 @@ type_t *duplicate_type(const type_t *type)
 {
 	size_t size = get_type_struct_size(type->kind);
 
-	type_t *const copy = obstack_alloc(&type_obst, size);
-	memcpy(copy, type, size);
+	type_t *const copy = obstack_copy(&type_obst, type, size);
 	copy->base.firm_type = NULL;
 
 	return copy;
@@ -1237,7 +1235,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if (kind == ATOMIC_TYPE_INVALID) {
+	if (kind == (atomic_type_kind_t)0) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_SCHAR,
 			ATOMIC_TYPE_SHORT,
@@ -1265,7 +1263,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
 
 	assert(size < 32);
 	atomic_type_kind_t kind = kinds[size];
-	if (kind == ATOMIC_TYPE_INVALID) {
+	if (kind == (atomic_type_kind_t)0) {
 		static const atomic_type_kind_t possible_kinds[] = {
 			ATOMIC_TYPE_UCHAR,
 			ATOMIC_TYPE_USHORT,
