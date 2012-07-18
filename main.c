@@ -1304,6 +1304,9 @@ again:
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
+			if (mode == ParseOnly)
+				continue;
+
 			if (mode == CompileDump) {
 				/* find irg */
 				ident    *id     = new_id_from_str(dumpfunction);
