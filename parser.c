@@ -1176,6 +1176,12 @@ static attribute_t *parse_attribute_gnu_single(void)
 	char const *const name = symbol->string;
 	for (kind = ATTRIBUTE_GNU_FIRST;; ++kind) {
 		if (kind > ATTRIBUTE_GNU_LAST) {
+			/* special case for "__const" */
+			if (token.kind == T_const) {
+				kind = ATTRIBUTE_GNU_CONST;
+				break;
+			}
+
 			warningf(WARN_ATTRIBUTE, HERE, "unknown attribute '%s' ignored", name);
 			/* TODO: we should still save the attribute in the list... */
 			kind = ATTRIBUTE_UNKNOWN;
