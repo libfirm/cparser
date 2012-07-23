@@ -4871,14 +4871,9 @@ static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const sta
 
 static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 {
-	bool needs_memory = false;
-
-	if (statement->is_volatile) {
-		needs_memory = true;
-	}
-
-	size_t         n_clobbers = 0;
-	asm_clobber_t *clobber    = statement->clobbers;
+	bool           needs_memory = statement->is_volatile;
+	size_t         n_clobbers   = 0;
+	asm_clobber_t *clobber      = statement->clobbers;
 	for ( ; clobber != NULL; clobber = clobber->next) {
 		const char *clobber_str = clobber->clobber.begin;
 
@@ -4987,7 +4982,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			constraint.mode             = mode_M;
 			tmp_in_constraints[in_size] = constraint;
 
-			ins[in_size]          = expression_to_addr(expr);
+			ins[in_size] = expression_to_addr(expr);
 			++in_size;
 			continue;
 		} else {
@@ -5064,16 +5059,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		ins[in_size++] = input;
 	}
 
-	if (needs_memory) {
-		ir_asm_constraint constraint;
-		constraint.pos        = next_pos++;
-		constraint.constraint = new_id_from_str("");
-		constraint.mode       = mode_M;
-
-		obstack_grow(&asm_obst, &constraint, sizeof(constraint));
-		ins[in_size++] = get_store();
-	}
-
+	ir_node *mem = needs_memory ? get_store() : new_NoMem();
 	assert(obstack_object_size(&asm_obst)
 			== in_size * sizeof(ir_asm_constraint));
 	ir_asm_constraint *input_constraints = obstack_finish(&asm_obst);
@@ -5083,7 +5069,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	ident *asm_text = new_id_from_str(statement->asm_text.begin);
 
-	ir_node *node = new_d_ASM(dbgi, in_size, ins, input_constraints,
+	ir_node *node = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
 	                          out_size, output_constraints,
 	                          n_clobbers, clobbers, asm_text);
 
