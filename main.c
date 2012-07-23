@@ -559,6 +559,9 @@ static FILE *make_temp_file(const char *prefix, const char **name_result)
 
 static void free_temp_files(void)
 {
+	if (temp_files == NULL)
+		return;
+
 	size_t n_temp_files = ARR_LEN(temp_files);
 	size_t i;
 	for (i = 0; i < n_temp_files; ++i) {
@@ -2168,6 +2171,7 @@ int main(int argc, char **argv)
 	if (do_timing)
 		timer_term(stderr);
 
+	free_temp_files();
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
 	obstack_free(&asflags_obst, NULL);
