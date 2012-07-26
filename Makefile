@@ -61,7 +61,8 @@ SOURCES := \
 	warning.c \
 	walk.c \
 	wrappergen/write_fluffy.c \
-	wrappergen/write_jna.c
+	wrappergen/write_jna.c \
+	wrappergen/write_compoundsizes.c
 
 OBJECTS = $(SOURCES:%.c=$(BUILDDIR)/%.o)
 DEPENDS = $(OBJECTS:%.o=%.d)

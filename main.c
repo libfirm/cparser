@@ -77,6 +77,7 @@
 #include "adt/array.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
+#include "wrappergen/write_compoundsizes.h"
 #include "revision.h"
 #include "warning.h"
 #include "help.h"
@@ -583,7 +584,8 @@ typedef enum compile_mode_t {
 	CompileAssembleLink,
 	PrintAst,
 	PrintFluffy,
-	PrintJna
+	PrintJna,
+	PrintCompoundSizes,
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -1290,6 +1292,9 @@ again:
 			} else if (mode == PrintJna) {
 				write_jna_decls(out, unit->ast);
 				break;
+			} else if (mode == PrintCompoundSizes) {
+				write_compoundsizes(out, unit->ast);
+				break;
 			}
 
 			/* build the firm graph */
@@ -1916,6 +1921,8 @@ int main(int argc, char **argv)
 					print_parenthesis = true;
 				} else if (streq(option, "print-fluffy")) {
 					mode = PrintFluffy;
+				} else if (streq(option, "print-compound-sizes")) {
+					mode = PrintCompoundSizes;
 				} else if (streq(option, "print-jna")) {
 					mode = PrintJna;
 				} else if (streq(option, "jna-limit")) {
@@ -2106,6 +2113,7 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case PrintJna:
+		case PrintCompoundSizes:
 		case PreprocessOnly:
 		case ParseOnly:
 			outname = "-";
