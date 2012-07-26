@@ -303,15 +303,19 @@ static void write_binary_expression(const binary_expression_t *expression)
 	fputs(")", out);
 }
 
+static void write_integer(const literal_expression_t *literal)
+{
+	for (const char *c = literal->value.begin; c != literal->suffix; ++c) {
+		fputc(*c, out);
+	}
+}
+
 static void write_expression(const expression_t *expression)
 {
 	/* TODO */
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
-		for (const char *c = expression->literal.value.begin;
-			 (*c >= '0' && *c <= '9') || *c == '+'; ++c) {
-			fputc(*c, out);
-		}
+		write_integer(&expression->literal);
 		break;
 
 	case EXPR_ENUM_CONSTANT: {
