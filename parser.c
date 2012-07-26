@@ -2308,6 +2308,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 	}
 
 	if (attributes != NULL) {
+		entity->compound.attributes = attributes;
 		handle_entity_attributes(attributes, entity);
 	}
 
