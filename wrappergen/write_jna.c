@@ -308,7 +308,10 @@ static void write_expression(const expression_t *expression)
 	/* TODO */
 	switch(expression->kind) {
 	case EXPR_LITERAL_INTEGER:
-		fprintf(out, "%s", expression->literal.value.begin);
+		for (const char *c = expression->literal.value.begin;
+			 (*c >= '0' && *c <= '9') || *c == '+'; ++c) {
+			fputc(*c, out);
+		}
 		break;
 
 	case EXPR_ENUM_CONSTANT: {
