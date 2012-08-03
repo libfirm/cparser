@@ -77,6 +77,7 @@
 #include "adt/array.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
+#include "wrappergen/write_compoundsizes.h"
 #include "revision.h"
 #include "warning.h"
 #include "help.h"
@@ -559,6 +560,9 @@ static FILE *make_temp_file(const char *prefix, const char **name_result)
 
 static void free_temp_files(void)
 {
+	if (temp_files == NULL)
+		return;
+
 	size_t n_temp_files = ARR_LEN(temp_files);
 	size_t i;
 	for (i = 0; i < n_temp_files; ++i) {
@@ -580,7 +584,8 @@ typedef enum compile_mode_t {
 	CompileAssembleLink,
 	PrintAst,
 	PrintFluffy,
-	PrintJna
+	PrintJna,
+	PrintCompoundSizes,
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -1293,6 +1298,9 @@ again:
 			} else if (mode == PrintJna) {
 				write_jna_decls(out, unit->ast);
 				break;
+			} else if (mode == PrintCompoundSizes) {
+				write_compoundsizes(out, unit->ast);
+				break;
 			}
 
 			/* build the firm graph */
@@ -1310,6 +1318,9 @@ again:
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
+			if (mode == ParseOnly)
+				continue;
+
 			if (mode == CompileDump) {
 				/* find irg */
 				ident    *id     = new_id_from_str(dumpfunction);
@@ -1916,6 +1927,8 @@ int main(int argc, char **argv)
 					print_parenthesis = true;
 				} else if (streq(option, "print-fluffy")) {
 					mode = PrintFluffy;
+				} else if (streq(option, "print-compound-sizes")) {
+					mode = PrintCompoundSizes;
 				} else if (streq(option, "print-jna")) {
 					mode = PrintJna;
 				} else if (streq(option, "jna-limit")) {
@@ -2106,6 +2119,7 @@ int main(int argc, char **argv)
 		case PrintAst:
 		case PrintFluffy:
 		case PrintJna:
+		case PrintCompoundSizes:
 		case PreprocessOnly:
 		case ParseOnly:
 			outname = "-";
@@ -2171,6 +2185,7 @@ int main(int argc, char **argv)
 	if (do_timing)
 		timer_term(stderr);
 
+	free_temp_files();
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
 	obstack_free(&asflags_obst, NULL);
