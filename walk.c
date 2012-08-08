@@ -335,11 +335,6 @@ static void walk_statement(statement_t *const stmt, const walk_env_t *const env)
 		walk_statement(stmt->case_label.statement, env);
 		return;
 
-	case STATEMENT_WHILE:
-		walk_expression(stmt->whiles.condition, env);
-		walk_statement(stmt->whiles.body, env);
-		return;
-
 	case STATEMENT_DO_WHILE:
 		walk_statement(stmt->do_while.body, env);
 		walk_expression(stmt->do_while.condition, env);

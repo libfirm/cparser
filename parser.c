@@ -296,7 +296,6 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_GOTO]          = sizeof(goto_statement_t),
 		[STATEMENT_LABEL]         = sizeof(label_statement_t),
 		[STATEMENT_CASE_LABEL]    = sizeof(case_label_statement_t),
-		[STATEMENT_WHILE]         = sizeof(while_statement_t),
 		[STATEMENT_DO_WHILE]      = sizeof(do_while_statement_t),
 		[STATEMENT_FOR]           = sizeof(for_statement_t),
 		[STATEMENT_ASM]           = sizeof(asm_statement_t),
@@ -4843,7 +4842,6 @@ static void check_reachable(statement_t *const stmt)
 
 				next = parent;
 				switch (parent->kind) {
-					case STATEMENT_WHILE:    goto continue_while;
 					case STATEMENT_DO_WHILE: goto continue_do_while;
 					case STATEMENT_FOR:      goto continue_for;
 
@@ -4859,7 +4857,6 @@ static void check_reachable(statement_t *const stmt)
 
 				switch (parent->kind) {
 					case STATEMENT_SWITCH:
-					case STATEMENT_WHILE:
 					case STATEMENT_DO_WHILE:
 					case STATEMENT_FOR:
 						last = parent;
@@ -4896,25 +4893,6 @@ found_break_parent:
 		case STATEMENT_CASE_LABEL:
 			next = stmt->case_label.statement;
 			break;
-
-		case STATEMENT_WHILE: {
-			while_statement_t const *const whiles = &stmt->whiles;
-			expression_t      const *const cond   = whiles->condition;
-
-			if (!expression_returns(cond))
-				return;
-
-			int const val = determine_truth(cond);
-
-			if (val >= 0)
-				check_reachable(whiles->body);
-
-			if (val > 0)
-				return;
-
-			next = stmt->base.next;
-			break;
-		}
 
 		case STATEMENT_DO_WHILE:
 			next = stmt->do_while.body;
@@ -5019,31 +4997,6 @@ found_break_parent:
 				last = next;
 				next = next->base.next;
 				break;
-
-			case STATEMENT_WHILE: {
-continue_while:
-				if (next->base.reachable)
-					return;
-				next->base.reachable = true;
-
-				while_statement_t const *const whiles = &next->whiles;
-				expression_t      const *const cond   = whiles->condition;
-
-				if (!expression_returns(cond))
-					return;
-
-				int const val = determine_truth(cond);
-
-				if (val >= 0)
-					check_reachable(whiles->body);
-
-				if (val > 0)
-					return;
-
-				last = next;
-				next = next->base.next;
-				break;
-			}
 
 			case STATEMENT_DO_WHILE: {
 continue_do_while:
@@ -9209,20 +9162,20 @@ static statement_t *parse_loop_body(statement_t *const loop)
  */
 static statement_t *parse_while(void)
 {
-	statement_t *statement = allocate_statement_zero(STATEMENT_WHILE);
+	statement_t *statement = allocate_statement_zero(STATEMENT_FOR);
 
 	eat(T_while);
 
 	PUSH_PARENT(statement);
-	PUSH_SCOPE_STATEMENT(&statement->whiles.scope);
+	PUSH_SCOPE_STATEMENT(&statement->fors.scope);
 
 	expression_t *const cond = parse_condition();
-	statement->whiles.condition = cond;
+	statement->fors.condition = cond;
 	/* §6.8.5:2    The controlling expression of an iteration statement shall
 	 *             have scalar type. */
 	semantic_condition(cond, "condition of 'while'-statement");
 
-	statement->whiles.body = parse_loop_body(statement);
+	statement->fors.body = parse_loop_body(statement);
 
 	POP_SCOPE();
 	POP_PARENT();

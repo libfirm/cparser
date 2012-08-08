@@ -948,19 +948,6 @@ static void print_declaration_statement(
 }
 
 /**
- * Print a while statement.
- *
- * @param statement   the statement
- */
-static void print_while_statement(const while_statement_t *statement)
-{
-	print_string("while (");
-	print_expression(statement->condition);
-	print_char(')');
-	print_inner_statement(statement->body);
-}
-
-/**
  * Print a do-while statement.
  *
  * @param statement   the statement
@@ -982,27 +969,32 @@ static void print_do_while_statement(const do_while_statement_t *statement)
  */
 static void print_for_statement(const for_statement_t *statement)
 {
-	print_string("for (");
-	if (statement->initialisation != NULL) {
-		print_expression(statement->initialisation);
-		print_char(';');
-	} else {
-		entity_t const *entity = statement->scope.entities;
-		for (; entity != NULL; entity = entity->base.next) {
-			if (is_generated_entity(entity))
-				continue;
-			/* FIXME display of multiple declarations is wrong */
-			print_declaration(entity);
+	if (statement->initialisation || statement->scope.entities || !statement->condition || statement->step) {
+		print_string("for (");
+		if (statement->initialisation != NULL) {
+			print_expression(statement->initialisation);
+			print_char(';');
+		} else {
+			entity_t const *entity = statement->scope.entities;
+			for (; entity != NULL; entity = entity->base.next) {
+				if (is_generated_entity(entity))
+					continue;
+				/* FIXME display of multiple declarations is wrong */
+				print_declaration(entity);
+			}
 		}
-	}
-	if (statement->condition != NULL) {
-		print_char(' ');
+		if (statement->condition != NULL) {
+			print_char(' ');
+			print_expression(statement->condition);
+		}
+		print_char(';');
+		if (statement->step != NULL) {
+			print_char(' ');
+			print_expression(statement->step);
+		}
+	} else {
+		print_string("while (");
 		print_expression(statement->condition);
-	}
-	print_char(';');
-	if (statement->step != NULL) {
-		print_char(' ');
-		print_expression(statement->step);
 	}
 	print_char(')');
 	print_inner_statement(statement->body);
@@ -1139,7 +1131,6 @@ void print_statement(statement_t const *const stmt)
 	case STATEMENT_MS_TRY:        print_ms_try_statement(       &stmt->ms_try);        break;
 	case STATEMENT_RETURN:        print_return_statement(       &stmt->returns);       break;
 	case STATEMENT_SWITCH:        print_switch_statement(       &stmt->switchs);       break;
-	case STATEMENT_WHILE:         print_while_statement(        &stmt->whiles);        break;
 	}
 }
 

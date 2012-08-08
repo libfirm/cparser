@@ -4514,59 +4514,6 @@ static void jump_if_reachable(ir_node *const target_block)
 		add_immBlock_pred(target_block, new_Jmp());
 }
 
-static ir_node *while_statement_to_firm(while_statement_t *statement)
-{
-	create_local_declarations(statement->scope.entities);
-
-	/* Create the header block */
-	ir_node *const header_block = new_immBlock();
-	jump_to(header_block);
-
-	/* Create the condition. */
-	ir_node      *      body_block;
-	ir_node      *      false_block;
-	expression_t *const cond = statement->condition;
-	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT &&
-			fold_constant_to_bool(cond)) {
-		/* Shortcut for while (true). */
-		body_block  = header_block;
-		false_block = NULL;
-
-		keep_alive(header_block);
-		keep_all_memory(header_block);
-	} else {
-		body_block  = new_immBlock();
-		false_block = new_immBlock();
-
-		set_cur_block(header_block);
-		create_condition_evaluation(cond, body_block, false_block);
-		mature_immBlock(body_block);
-	}
-
-	ir_node *const old_continue_label = continue_label;
-	ir_node *const old_break_label    = break_label;
-	continue_label = header_block;
-	break_label    = false_block;
-
-	/* Create the loop body. */
-	set_cur_block(body_block);
-	statement_to_firm(statement->body);
-	jump_if_reachable(header_block);
-
-	mature_immBlock(header_block);
-	assert(false_block == NULL || false_block == break_label);
-	false_block = break_label;
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
-	set_cur_block(false_block);
-
-	assert(continue_label == header_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
-	return NULL;
-}
-
 static ir_node *get_break_label(void)
 {
 	if (break_label == NULL) {
@@ -4636,14 +4583,15 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	jump_to(header_block);
 
 	/* Create the condition. */
-	ir_node *body_block;
-	ir_node *false_block;
-	if (statement->condition != NULL) {
+	ir_node            *body_block;
+	ir_node            *false_block;
+	expression_t *const cond = statement->condition;
+	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
 		body_block  = new_immBlock();
 		false_block = new_immBlock();
 
 		set_cur_block(header_block);
-		create_condition_evaluation(statement->condition, body_block, false_block);
+		create_condition_evaluation(cond, body_block, false_block);
 		mature_immBlock(body_block);
 	} else {
 		/* for-ever. */
@@ -5106,7 +5054,6 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_MS_TRY:        return ms_try_statement_to_firm(     &stmt->ms_try);
 	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
 	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
-	case STATEMENT_WHILE:         return while_statement_to_firm(      &stmt->whiles);
 
 	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
 	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);

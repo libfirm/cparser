@@ -72,7 +72,6 @@ typedef struct computed_goto_statement_t             computed_goto_statement_t;
 typedef struct goto_statement_t                      goto_statement_t;
 typedef struct label_statement_t                     label_statement_t;
 typedef struct case_label_statement_t                case_label_statement_t;
-typedef struct while_statement_t                     while_statement_t;
 typedef struct do_while_statement_t                  do_while_statement_t;
 typedef struct for_statement_t                       for_statement_t;
 typedef struct asm_argument_t                        asm_argument_t;
