@@ -1698,7 +1698,6 @@ int main(int argc, char **argv)
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
 					           streq(opt, "align-functions")         ||
-					           streq(opt, "unroll-loops")            ||
 					           streq(opt, "PIC")                     ||
 					           streq(opt, "stack-protector")         ||
 					           streq(opt, "stack-protector-all")) {
