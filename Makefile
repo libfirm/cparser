@@ -162,4 +162,4 @@ $(BUILDDIR)/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf $(BUILDDIR)/ $(GOAL)
+	$(Q)rm -rf $(OBJECTS) $(GOAL)
