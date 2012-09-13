@@ -86,7 +86,7 @@
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
-#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__"
+#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__ -U__BLOCKS__"
 #else
 #define PREPROCESSOR "cpp -U__STRICT_ANSI__"
 #endif
