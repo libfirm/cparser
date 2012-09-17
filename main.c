@@ -985,7 +985,7 @@ static void init_types_and_adjust(void)
 
 	/* operating system ABI specifics */
 	if (firm_is_darwin_os(target_machine)) {
-		if (machine_size == 32) {
+		if (is_ia32_cpu(target_machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
@@ -994,7 +994,11 @@ static void init_types_and_adjust(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
 	} else if (firm_is_windows_os(target_machine)) {
-		if (machine_size == 64) {
+		if (is_ia32_cpu(target_machine->cpu_type)) {
+			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
+			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
+			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
+		} else if (machine_size == 64) {
 			/* to ease porting of old c-code microsoft decided to use 32bits
 			 * even for long */
 			props[ATOMIC_TYPE_LONG]  = props[ATOMIC_TYPE_INT];
