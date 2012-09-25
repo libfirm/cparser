@@ -899,12 +899,19 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	decl_modifiers_t modifiers = entity->declaration.modifiers;
 
 	if (is_method_entity(irentity)) {
-		if (modifiers & DM_PURE) {
-			set_entity_additional_properties(irentity, mtp_property_pure);
-		}
-		if (modifiers & DM_CONST) {
+		if (modifiers & DM_PURE)
+			add_entity_additional_properties(irentity, mtp_property_pure);
+		if (modifiers & DM_CONST)
 			add_entity_additional_properties(irentity, mtp_property_const);
-		}
+		if (modifiers & DM_NOINLINE)
+			add_entity_additional_properties(irentity, mtp_property_noinline);
+		if (modifiers & DM_FORCEINLINE)
+			add_entity_additional_properties(irentity, mtp_property_always_inline);
+		if (modifiers & DM_NAKED)
+			add_entity_additional_properties(irentity, mtp_property_naked);
+		if (entity->kind == ENTITY_FUNCTION && entity->function.is_inline)
+			add_entity_additional_properties(irentity,
+											 mtp_property_inline_recommended);
 	}
 	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
@@ -5176,32 +5183,6 @@ static void initialize_function_parameters(entity_t *entity)
 	}
 }
 
-/**
- * Handle additional decl modifiers for IR-graphs
- *
- * @param irg            the IR-graph
- * @param dec_modifiers  additional modifiers
- */
-static void handle_decl_modifier_irg(ir_graph *irg,
-                                     decl_modifiers_t decl_modifiers)
-{
-	if (decl_modifiers & DM_NAKED) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(naked) specifier. */
-		add_irg_additional_properties(irg, mtp_property_naked);
-	}
-	if (decl_modifiers & DM_FORCEINLINE) {
-		/* TRUE if the declaration includes the
-		   Microsoft __forceinline specifier. */
-		set_irg_inline_property(irg, irg_inline_forced);
-	}
-	if (decl_modifiers & DM_NOINLINE) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(noinline) specifier. */
-		set_irg_inline_property(irg, irg_inline_forbidden);
-	}
-}
-
 static void add_function_pointer(ir_type *segment, ir_entity *method,
                                  const char *unique_template)
 {
@@ -5283,11 +5264,6 @@ static void create_function(entity_t *entity)
 	tarval_enable_fp_ops(1);
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
-
-	/* set inline flags */
-	if (entity->function.is_inline)
-		set_irg_inline_property(irg, irg_inline_recomended);
-	handle_decl_modifier_irg(irg, entity->declaration.modifiers);
 
 	next_value_number_function = 0;
 	initialize_function_parameters(entity);
