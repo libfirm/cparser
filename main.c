@@ -86,7 +86,7 @@
 
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
-#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__"
+#define PREPROCESSOR "gcc -E -U__STRICT_ANSI__ -U__BLOCKS__"
 #else
 #define PREPROCESSOR "cpp -U__STRICT_ANSI__"
 #endif
@@ -1704,7 +1704,6 @@ int main(int argc, char **argv)
 					           streq(opt, "align-loops")             ||
 					           streq(opt, "align-jumps")             ||
 					           streq(opt, "align-functions")         ||
-					           streq(opt, "unroll-loops")            ||
 					           streq(opt, "PIC")                     ||
 					           streq(opt, "stack-protector")         ||
 					           streq(opt, "stack-protector-all")) {

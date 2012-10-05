@@ -239,15 +239,15 @@ void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparato
 {
 	size_t sep = q & QUAL_SEP_START ? 0 : 1;
 	if (qualifiers & TYPE_QUALIFIER_CONST) {
-		print_string(" const" + sep);
+		print_string(&" const"[sep]);
 		sep = 0;
 	}
 	if (qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		print_string(" volatile" + sep);
+		print_string(&" volatile"[sep]);
 		sep = 0;
 	}
 	if (qualifiers & TYPE_QUALIFIER_RESTRICT) {
-		print_string(" restrict" + sep);
+		print_string(&" restrict"[sep]);
 		sep = 0;
 	}
 	if (sep == 0 && q & QUAL_SEP_END)

@@ -1420,32 +1420,6 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 }
 
 /**
- * Creates a strict Conv (to the node's mode) if necessary.
- *
- * @param dbgi  debug info
- * @param node  the node to strict conv
- */
-static ir_node *do_strict_conv(dbg_info *dbgi, ir_node *node)
-{
-	ir_mode *mode = get_irn_mode(node);
-
-	if (!(get_irg_fp_model(current_ir_graph) & fp_explicit_rounding))
-		return node;
-	if (!mode_is_float(mode))
-		return node;
-
-	/* check if there is already a Conv */
-	if (is_Conv(node)) {
-		/* convert it into a strict Conv */
-		set_Conv_strict(node, 1);
-		return node;
-	}
-
-	/* otherwise create a new one */
-	return new_d_strictConv(dbgi, node, mode);
-}
-
-/**
  * Returns the correct base address depending on whether it is a parameter or a
  * normal local variable.
  */
@@ -1758,7 +1732,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		if (!is_type_compound(arg_type)) {
 			ir_mode *const mode = get_ir_mode_storage(arg_type);
 			arg_node = create_conv(dbgi, arg_node, mode);
-			arg_node = do_strict_conv(dbgi, arg_node);
 		}
 
 		in[n] = arg_node;
@@ -1833,7 +1806,6 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 	if (!is_type_compound(type)) {
 		ir_mode *mode = get_ir_mode_storage(type);
 		value         = create_conv(dbgi, value, mode);
-		value         = do_strict_conv(dbgi, value);
 	}
 
 	ir_node *memory = get_store();
@@ -1998,7 +1970,6 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 	if (!is_type_compound(type)) {
 		ir_mode  *mode = get_ir_mode_storage(type);
 		value          = create_conv(dbgi, value, mode);
-		value          = do_strict_conv(dbgi, value);
 	}
 
 	if (expression->kind == EXPR_REFERENCE) {
@@ -2289,7 +2260,6 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 
 	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
 	ir_node *node       = create_conv(dbgi, value_node, mode);
-	node                = do_strict_conv(dbgi, node);
 	node                = create_conv(dbgi, node, mode_arith);
 
 	return node;
@@ -2554,7 +2524,6 @@ static ir_node *create_assign_binop(const binary_expression_t *expression)
 	ir_node            *result    = create_op(dbgi, expression, left, right);
 
 	result = create_cast(dbgi, result, expression->right->base.type, type);
-	result = do_strict_conv(dbgi, result);
 
 	result = set_value_for_expression_addr(left_expr, result, left_addr);
 
@@ -4120,7 +4089,6 @@ static void create_variable_initializer(entity_t *entity)
 		dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
 		ir_mode  *const mode = get_ir_mode_storage(init_type);
 		node = create_conv(dbgi, node, mode);
-		node = do_strict_conv(dbgi, node);
 
 		if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(entity->variable.v.value_number, node);
@@ -4279,7 +4247,6 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 		ir_mode *const mode = get_ir_mode_storage(type);
 		if (res) {
 			res = create_conv(dbgi, res, mode);
-			res = do_strict_conv(dbgi, res);
 		} else {
 			res = new_Unknown(mode);
 		}
@@ -4547,59 +4514,6 @@ static void jump_if_reachable(ir_node *const target_block)
 		add_immBlock_pred(target_block, new_Jmp());
 }
 
-static ir_node *while_statement_to_firm(while_statement_t *statement)
-{
-	create_local_declarations(statement->scope.entities);
-
-	/* Create the header block */
-	ir_node *const header_block = new_immBlock();
-	jump_to(header_block);
-
-	/* Create the condition. */
-	ir_node      *      body_block;
-	ir_node      *      false_block;
-	expression_t *const cond = statement->condition;
-	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT &&
-			fold_constant_to_bool(cond)) {
-		/* Shortcut for while (true). */
-		body_block  = header_block;
-		false_block = NULL;
-
-		keep_alive(header_block);
-		keep_all_memory(header_block);
-	} else {
-		body_block  = new_immBlock();
-		false_block = new_immBlock();
-
-		set_cur_block(header_block);
-		create_condition_evaluation(cond, body_block, false_block);
-		mature_immBlock(body_block);
-	}
-
-	ir_node *const old_continue_label = continue_label;
-	ir_node *const old_break_label    = break_label;
-	continue_label = header_block;
-	break_label    = false_block;
-
-	/* Create the loop body. */
-	set_cur_block(body_block);
-	statement_to_firm(statement->body);
-	jump_if_reachable(header_block);
-
-	mature_immBlock(header_block);
-	assert(false_block == NULL || false_block == break_label);
-	false_block = break_label;
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
-	set_cur_block(false_block);
-
-	assert(continue_label == header_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
-	return NULL;
-}
-
 static ir_node *get_break_label(void)
 {
 	if (break_label == NULL) {
@@ -4669,14 +4583,15 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	jump_to(header_block);
 
 	/* Create the condition. */
-	ir_node *body_block;
-	ir_node *false_block;
-	if (statement->condition != NULL) {
+	ir_node            *body_block;
+	ir_node            *false_block;
+	expression_t *const cond = statement->condition;
+	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
 		body_block  = new_immBlock();
 		false_block = new_immBlock();
 
 		set_cur_block(header_block);
-		create_condition_evaluation(statement->condition, body_block, false_block);
+		create_condition_evaluation(cond, body_block, false_block);
 		mature_immBlock(body_block);
 	} else {
 		/* for-ever. */
@@ -5139,7 +5054,6 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_MS_TRY:        return ms_try_statement_to_firm(     &stmt->ms_try);
 	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
 	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
-	case STATEMENT_WHILE:         return while_statement_to_firm(      &stmt->whiles);
 
 	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
 	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);
@@ -5253,7 +5167,6 @@ static void initialize_function_parameters(entity_t *entity)
 
 		ir_mode *mode = get_ir_mode_storage(type);
 		value = create_conv(NULL, value, mode);
-		value = do_strict_conv(NULL, value);
 
 		parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
 		parameter->variable.v.value_number = next_value_number_function;

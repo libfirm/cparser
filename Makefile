@@ -104,12 +104,14 @@ $(GOAL): $(LIBFIRM_FILE) $(OBJECTS)
 	$(Q)$(CC) $(OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LFLAGS)
 
 ifneq ("$(LIBFIRM_FILE)", "")
+ifneq ("$(MAKECMDGOALS)", "clean")
 $(LIBFIRM_FILE): libfirm_subdir
 # Re-evaluate Makefile after libfirm_subdir has been executed
 Makefile: libfirm_subdir
 # Build libfirm in subdirectory
 libfirm_subdir:
 	$(Q)$(MAKE) -C $(FIRM_HOME) $(LIBFIRM_FILE_BASE)
+endif
 endif
 
 splint: $(SPLINTS)
@@ -160,4 +162,4 @@ $(BUILDDIR)/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf $(BUILDDIR)/ $(GOAL)
+	$(Q)rm -rf $(OBJECTS) $(GOAL)

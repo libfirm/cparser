@@ -479,7 +479,6 @@ typedef enum statement_kind_t {
 	STATEMENT_GOTO,
 	STATEMENT_LABEL,
 	STATEMENT_CASE_LABEL,
-	STATEMENT_WHILE,
 	STATEMENT_DO_WHILE,
 	STATEMENT_FOR,
 	STATEMENT_ASM,
@@ -572,13 +571,6 @@ struct expression_statement_t {
 	expression_t     *expression;
 };
 
-struct while_statement_t {
-	statement_base_t  base;
-	scope_t           scope;
-	expression_t     *condition;
-	statement_t      *body;
-};
-
 struct do_while_statement_t {
 	statement_base_t  base;
 	scope_t           scope;
@@ -642,7 +634,6 @@ union statement_t {
 	case_label_statement_t    case_label;
 	label_statement_t         label;
 	expression_statement_t    expression;
-	while_statement_t         whiles;
 	do_while_statement_t      do_while;
 	for_statement_t           fors;
 	asm_statement_t           asms;
