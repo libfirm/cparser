@@ -440,8 +440,6 @@ static void write_function(const entity_t *entity)
 	if(function_type->variadic) {
 		if(!first) {
 			fprintf(out, ", ");
-		} else {
-			first = 0;
 		}
 		fputs("Object ... args", out);
 	}

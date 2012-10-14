@@ -7021,7 +7021,6 @@ static void handle_builtin_argument_restrictions(call_expression_t *call)
 						   "third argument of '%Y' must be a constant expression",
 						   call->function->reference.entity->base.symbol);
 				}
-				locality = rw->next;
 			}
 			break;
 		default:
