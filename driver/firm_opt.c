@@ -381,6 +381,8 @@ static opt_config_t opts[] = {
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
+	IRP("local-const",       local_opts_const_code,    "local optimisation of constant initializers",
+	                            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("target-lowering",   be_lower_for_target,      "lowering necessary for target architecture",            OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_ESSENTIAL),
 	IRP("opt-func-call",     optimize_funccalls,       "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
@@ -491,6 +493,7 @@ static void enable_safe_defaults(void)
 	set_opt_enabled("control-flow", true);
 	set_opt_enabled("local", true);
 	set_opt_enabled("lower-const", true);
+	set_opt_enabled("local-const", true);
 	set_opt_enabled("scalar-replace", true);
 	set_opt_enabled("place", true);
 	set_opt_enabled("gcse", true);
@@ -698,6 +701,7 @@ static void do_firm_lowering(const char *input_filename)
 		do_irg_opt(irg, "parallelize-mem");
 		do_irg_opt(irg, "frame");
 	}
+	do_irp_opt("local-const");
 	do_irp_opt("remove-unused");
 	do_irp_opt("opt-cc");
 	timer_stop(t_all_opt);
