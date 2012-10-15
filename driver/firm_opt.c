@@ -130,8 +130,6 @@ static const struct params {
   { X("verify-off"),             &firm_opt.verify,           FIRM_VERIFICATION_OFF,    "disable node verification" },
   { X("verify-on"),              &firm_opt.verify,           FIRM_VERIFICATION_ON,     "enable node verification" },
   { X("verify-report"),          &firm_opt.verify,           FIRM_VERIFICATION_REPORT, "node verification, report only" },
-  { X("check-all"),              &firm_opt.check_all,        1, "enable checking all Firm phases" },
-  { X("no-check-all"),           &firm_opt.check_all,        0, "disable checking all Firm phases" },
 
   /* dumping */
   { X("dump-ir"),                &firm_dump.ir_graph,        1, "dump IR graph" },
@@ -281,42 +279,6 @@ static void rts_map(void)
 
 static int *irg_dump_no;
 
-static void do_stred(ir_graph *irg)
-{
-	opt_osr(irg, osr_flag_default | osr_flag_keep_reg_pressure | osr_flag_ignore_x86_shift);
-}
-
-static void after_inline_opt(ir_graph *irg)
-{
-	do_irg_opt(irg, "scalar-replace");
-	do_irg_opt(irg, "local");
-	do_irg_opt(irg, "control-flow");
-	do_irg_opt(irg, "combo");
-}
-
-static void do_inline(void)
-{
-	inline_functions(firm_opt.inline_maxsize, firm_opt.inline_threshold,
-	                 after_inline_opt);
-}
-
-static void do_cloning(void)
-{
-	proc_cloning((float) firm_opt.clone_threshold);
-}
-
-static void do_lower_mux(ir_graph *irg)
-{
-	lower_mux(irg, NULL);
-}
-
-static void do_gcse(ir_graph *irg)
-{
-	set_opt_global_cse(1);
-	optimize_graph_df(irg);
-	set_opt_global_cse(0);
-}
-
 typedef enum opt_target {
 	OPT_TARGET_IRG, /**< optimization function works on a single graph */
 	OPT_TARGET_IRP  /**< optimization function works on the complete program */
@@ -347,6 +309,49 @@ typedef struct {
 	opt_flags_t   flags;
 	ir_timer_t   *timer;
 } opt_config_t;
+
+static opt_config_t *get_opt(const char *name);
+
+static void do_stred(ir_graph *irg)
+{
+	opt_osr(irg, osr_flag_default | osr_flag_keep_reg_pressure | osr_flag_ignore_x86_shift);
+}
+
+static void after_inline_opt(ir_graph *irg)
+{
+	opt_config_t *const config = get_opt("inline");
+	timer_stop(config->timer);
+
+	do_irg_opt(irg, "scalar-replace");
+	do_irg_opt(irg, "local");
+	do_irg_opt(irg, "control-flow");
+	do_irg_opt(irg, "combo");
+
+	timer_start(config->timer);
+}
+
+static void do_inline(void)
+{
+	inline_functions(firm_opt.inline_maxsize, firm_opt.inline_threshold,
+	                 after_inline_opt);
+}
+
+static void do_cloning(void)
+{
+	proc_cloning((float) firm_opt.clone_threshold);
+}
+
+static void do_lower_mux(ir_graph *irg)
+{
+	lower_mux(irg, NULL);
+}
+
+static void do_gcse(ir_graph *irg)
+{
+	set_opt_global_cse(1);
+	optimize_graph_df(irg);
+	set_opt_global_cse(0);
+}
 
 static opt_config_t opts[] = {
 #define IRG(a, b, c, d) { OPT_TARGET_IRG, a, .u.transform_irg = (transform_irg_func)b, c, d }
@@ -434,15 +439,15 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 	ir_graph *const old_irg = current_ir_graph;
 	current_ir_graph = irg;
 
-	timer_push(config->timer);
+	timer_start(config->timer);
 	config->u.transform_irg(irg);
-	timer_pop(config->timer);
+	timer_stop(config->timer);
 
 	if (firm_dump.all_phases && firm_dump.ir_graph) {
 		dump_ir_graph(irg, name);
 	}
 
-	if (firm_opt.check_all) {
+	if (firm_opt.verify) {
 		timer_push(t_verify);
 		irg_verify(irg, VERIFY_ENFORCE_SSA);
 		timer_pop(t_verify);
@@ -459,9 +464,9 @@ static void do_irp_opt(const char *name)
 	if (! (config->flags & OPT_FLAG_ENABLED))
 		return;
 
-	timer_push(config->timer);
+	timer_start(config->timer);
 	config->u.transform_irp();
-	timer_pop(config->timer);
+	timer_stop(config->timer);
 
 	if (firm_dump.ir_graph && firm_dump.all_phases) {
 		int i;
@@ -471,7 +476,7 @@ static void do_irp_opt(const char *name)
 		}
 	}
 
-	if (firm_opt.check_all) {
+	if (firm_opt.verify) {
 		int i;
 		timer_push(t_verify);
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
@@ -541,8 +546,6 @@ static void do_firm_optimizations(const char *input_filename)
 	/* osr supersedes remove_phi_cycles */
 	if (get_opt_enabled("ivopts"))
 		set_opt_enabled("remove-phi-cycles", false);
-
-	timer_start(t_all_opt);
 
 	do_irp_opt("rts");
 
@@ -640,8 +643,6 @@ static void do_firm_optimizations(const char *input_filename)
 
 	if (firm_dump.statistic & STAT_AFTER_OPT)
 		stat_dump_snapshot(input_filename, "opt");
-
-	timer_stop(t_all_opt);
 }
 
 /**
@@ -668,8 +669,6 @@ static void do_firm_lowering(const char *input_filename)
 
 	if (firm_dump.statistic & STAT_AFTER_LOWER)
 		stat_dump_snapshot(input_filename, "low");
-
-	timer_start(t_all_opt);
 
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
 		ir_graph *irg = get_irp_irg(i);
@@ -704,7 +703,6 @@ static void do_firm_lowering(const char *input_filename)
 	do_irp_opt("local-const");
 	do_irp_opt("remove-unused");
 	do_irp_opt("opt-cc");
-	timer_stop(t_all_opt);
 	dump_all("low-opt");
 
 	if (firm_dump.statistic & STAT_FINAL) {
@@ -777,18 +775,21 @@ void generate_code(FILE *out, const char *input_filename)
 	/* FIXME: cloning might ADD new graphs. */
 	irg_dump_no = calloc(get_irp_last_idx(), sizeof(*irg_dump_no));
 
+	ir_timer_init_parent(t_verify);
+	ir_timer_init_parent(t_vcg_dump);
+	timer_start(t_all_opt);
+
 	if (firm_dump.all_types) {
 		dump_ir_prog_ext(dump_typegraph, "types.vcg");
 	}
 
 	dump_all("");
 
-	timer_push(t_verify);
-	tr_verify();
-	timer_pop(t_verify);
-
-	/* all graphs are finalized, set the irp phase to high */
-	set_irp_phase_state(phase_high);
+	if (firm_opt.verify) {
+		timer_push(t_verify);
+		tr_verify();
+		timer_pop(t_verify);
+	}
 
 	/* BEWARE: kill unreachable code before doing compound lowering */
 	for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
@@ -803,9 +804,7 @@ void generate_code(FILE *out, const char *input_filename)
 	do_firm_optimizations(input_filename);
 	do_firm_lowering(input_filename);
 
-	/* set the phase to low */
-	for (i = get_irp_n_irgs() - 1; i >= 0; --i)
-		set_irg_phase_state(get_irp_irg(i), phase_low);
+	timer_stop(t_all_opt);
 
 	if (firm_dump.statistic & STAT_FINAL_IR)
 		stat_dump_snapshot(input_filename, "final-ir");

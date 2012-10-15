@@ -224,7 +224,7 @@ static void do_parsing(compilation_unit_t *unit)
 {
 	ir_timer_t *t_parsing = ir_timer_new();
 	timer_register(t_parsing, "Frontend: Parsing");
-	timer_push(t_parsing);
+	timer_start(t_parsing);
 
 	start_parsing();
 
@@ -239,7 +239,7 @@ static void do_parsing(compilation_unit_t *unit)
 
 	unit->type         = COMPILATION_UNIT_AST;
 	unit->parse_errors = error_count > 0 || !res;
-	timer_pop(t_parsing);
+	timer_stop(t_parsing);
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -1304,14 +1304,14 @@ again:
 			/* build the firm graph */
 			ir_timer_t *t_construct = ir_timer_new();
 			timer_register(t_construct, "Frontend: Graph construction");
-			timer_push(t_construct);
+			timer_start(t_construct);
 			if (already_constructed_firm) {
 				panic("compiling multiple files/translation units not possible");
 			}
 			init_implicit_optimizations();
 			translation_unit_to_firm(unit->ast);
 			already_constructed_firm = true;
-			timer_pop(t_construct);
+			timer_stop(t_construct);
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
 
@@ -1359,7 +1359,11 @@ again:
 			} else {
 				asm_out = make_temp_file("ccs", &unit->name);
 			}
+			ir_timer_t *t_opt_codegen = ir_timer_new();
+			timer_register(t_opt_codegen, "Optimization and Codegeneration");
+			timer_start(t_opt_codegen);
 			generate_code(asm_out, inputname);
+			timer_stop(t_opt_codegen);
 			if (asm_out != out) {
 				fclose(asm_out);
 			}

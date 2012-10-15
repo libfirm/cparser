@@ -45,9 +45,11 @@ void timer_term(FILE *f)
 
 	for (info = infos; info != NULL; info = next) {
 		ir_timer_t *timer = info->timer;
-		double      val         = (double)ir_timer_elapsed_usec(timer) / 1000.0;
-		const char *description = info->description;
-		fprintf(f, "%-45s %8.3f msec\n", description, val);
+		if (f != NULL) {
+			double      val         = (double)ir_timer_elapsed_usec(timer) / 1000.0;
+			const char *description = info->description;
+			fprintf(f, "%-45s %8.3f msec\n", description, val);
+		}
 
 		ir_timer_free(timer);
 		xfree(info->description);
@@ -68,9 +70,8 @@ void timer_push(ir_timer_t *timer)
 
 void timer_pop(ir_timer_t *timer)
 {
-	(void) timer;
 	if (timers_inited)
-		ir_timer_pop();
+		ir_timer_pop(timer);
 }
 
 void timer_start(ir_timer_t *timer)
