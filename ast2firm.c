@@ -5151,11 +5151,12 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(!is_type_array(type));
 		bool const needs_entity = parameter->variable.address_taken || is_type_compound(type);
 
-		ir_type *param_irtype = get_method_param_type(function_irtype, n);
+		dbg_info *const dbgi         = get_dbg_info(&parameter->base.source_position);
+		ir_type  *const param_irtype = get_method_param_type(function_irtype, n);
 		if (needs_entity) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
-				= new_parameter_entity(frame_type, n, param_irtype);
+				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
 			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
 			parameter->variable.v.entity = param;
 			continue;
@@ -5163,7 +5164,7 @@ static void initialize_function_parameters(entity_t *entity)
 
 		ir_mode *param_mode = get_type_mode(param_irtype);
 		long     pn         = n;
-		ir_node *value      = new_r_Proj(args, param_mode, pn);
+		ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
 
 		ir_mode *mode = get_ir_mode_storage(type);
 		value = create_conv(NULL, value, mode);
