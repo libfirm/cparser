@@ -852,7 +852,7 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_VARIABLE:
 		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
 	case ENTITY_FUNCTION:
-		return entity->function.statement != NULL;
+		return entity->function.body != NULL;
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 		return false;
@@ -938,7 +938,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 	/* already an entity defined? */
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
-	bool const has_body = entity->function.statement != NULL;
+	bool const has_body = entity->function.body != NULL;
 	if (irentity != NULL) {
 		goto entity_created;
 	}
@@ -4351,7 +4351,7 @@ static void create_local_declaration(entity_t *entity)
 		return;
 	case STORAGE_CLASS_EXTERN:
 		if (entity->kind == ENTITY_FUNCTION) {
-			assert(entity->function.statement == NULL);
+			assert(entity->function.body == NULL);
 			(void)get_function_entity(entity, NULL);
 		} else {
 			create_global_variable(entity);
@@ -4362,7 +4362,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
 		if (entity->kind == ENTITY_FUNCTION) {
-			if (entity->function.statement != NULL) {
+			if (entity->function.body != NULL) {
 				ir_type *owner = get_irg_frame_type(current_ir_graph);
 				(void)get_function_entity(entity, owner);
 				entity->declaration.kind = DECLARATION_KIND_INNER_FUNCTION;
@@ -5110,7 +5110,7 @@ static int get_function_n_local_vars(entity_t *entity)
 	count += count_local_variables(function->parameters.entities, NULL);
 
 	/* count local variables declared in body */
-	walk_statements(function->statement, count_local_variables_in_stmt, &count);
+	walk_statements(function->body, count_local_variables_in_stmt, &count);
 	return count;
 }
 
@@ -5245,7 +5245,7 @@ static void create_function(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	ir_entity *function_entity = get_function_entity(entity, current_outer_frame);
 
-	if (entity->function.statement == NULL)
+	if (entity->function.body == NULL)
 		return;
 
 	inner_functions     = NULL;
@@ -5292,7 +5292,7 @@ static void create_function(entity_t *entity)
 	initialize_function_parameters(entity);
 	current_static_link = entity->function.static_link;
 
-	statement_to_firm(entity->function.statement);
+	statement_to_firm(entity->function.body);
 
 	ir_node *end_block = get_irg_end_block(irg);
 

@@ -4571,8 +4571,7 @@ static void check_declarations(void)
 		warn_unused_entity(WARN_UNUSED_PARAMETER, scope->entities, NULL);
 	}
 	if (is_warn_on(WARN_UNUSED_VARIABLE)) {
-		walk_statements(current_function->statement, check_unused_variables,
-		                NULL);
+		walk_statements(current_function->body, check_unused_variables, NULL);
 	}
 }
 
@@ -5267,7 +5266,7 @@ static void parse_external_declaration(void)
 		environment_push(parameter);
 	}
 
-	if (function->statement != NULL) {
+	if (function->body != NULL) {
 		parser_error_multiple_definition(entity, HERE);
 		eat_block();
 	} else {
@@ -5284,7 +5283,7 @@ static void parse_external_declaration(void)
 		label_anchor = &label_first;
 
 		statement_t *const body = parse_compound_statement(false);
-		function->statement = body;
+		function->body = body;
 		first_err = true;
 		check_labels();
 		check_declarations();
@@ -9995,7 +9994,7 @@ static void check_unused_globals(void)
 				continue;
 
 			why = WARN_UNUSED_FUNCTION;
-			s   = entity->function.statement != NULL ? "defined" : "declared";
+			s   = entity->function.body != NULL ? "defined" : "declared";
 		} else {
 			why = WARN_UNUSED_VARIABLE;
 			s   = "defined";
@@ -10231,7 +10230,7 @@ static void complete_incomplete_arrays(void)
 
 static void prepare_main_collect2(entity_t *const entity)
 {
-	PUSH_SCOPE(&entity->function.statement->compound.scope);
+	PUSH_SCOPE(&entity->function.body->compound.scope);
 
 	// create call to __main
 	symbol_t *symbol         = symbol_table_insert("__main");
@@ -10253,9 +10252,9 @@ static void prepare_main_collect2(entity_t *const entity)
 	expr_statement->base.source_position  = builtin_source_position;
 	expr_statement->expression.expression = call;
 
-	statement_t *statement = entity->function.statement;
-	assert(statement->kind == STATEMENT_COMPOUND);
-	compound_statement_t *compounds = &statement->compound;
+	statement_t *const body = entity->function.body;
+	assert(body->kind == STATEMENT_COMPOUND);
+	compound_statement_t *compounds = &body->compound;
 
 	expr_statement->base.next = compounds->statements;
 	compounds->statements     = expr_statement;

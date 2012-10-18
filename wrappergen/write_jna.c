@@ -404,7 +404,7 @@ static void write_variable(const entity_t *entity)
 
 static void write_function(const entity_t *entity)
 {
-	if (entity->function.statement != NULL) {
+	if (entity->function.body != NULL) {
 		fprintf(stderr, "Warning: can't convert function bodies (at %s)\n",
 		        entity->base.symbol->string);
 		return;

@@ -243,8 +243,8 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 		return;
 	case ENTITY_FUNCTION:
 		walk_type(entity->declaration.type, env);
-		if (entity->function.statement != NULL)
-			walk_statement(entity->function.statement, env);
+		if (entity->function.body != NULL)
+			walk_statement(entity->function.body, env);
 		return;
 	case ENTITY_COMPOUND_MEMBER:
 	case ENTITY_PARAMETER:

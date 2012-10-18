@@ -1344,9 +1344,9 @@ void print_declaration(const entity_t *entity)
 			print_type_ext(entity->declaration.type, entity->base.symbol,
 					&entity->function.parameters);
 
-			if (entity->function.statement != NULL) {
+			if (entity->function.body != NULL) {
 				print_char('\n');
-				print_indented_statement(entity->function.statement);
+				print_indented_statement(entity->function.body);
 				print_char('\n');
 				return;
 			}
