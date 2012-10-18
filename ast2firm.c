@@ -4542,30 +4542,36 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 	/* create the header block */
 	ir_node *header_block = new_immBlock();
 
-	/* the loop body */
-	ir_node *body_block = new_immBlock();
-	jump_to(body_block);
-
 	PUSH_BREAK(NULL);
 	PUSH_CONTINUE(header_block);
 
+	/* The loop body. */
+	ir_node            *body_block = NULL;
+	expression_t *const cond       = statement->condition;
+	/* Avoid an explicit body block in case of do ... while (0);. */
+	if (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || fold_constant_to_bool(cond)) {
+		/* Not do ... while (0);. */
+		body_block = new_immBlock();
+		jump_to(body_block);
+	}
 	statement_to_firm(statement->body);
+
+	/* create the condition */
+	jump_if_reachable(header_block);
+	mature_immBlock(header_block);
+	set_cur_block(header_block);
 	ir_node *const false_block = get_break_label();
+	if (body_block) {
+		create_condition_evaluation(statement->condition, body_block, false_block);
+		mature_immBlock(body_block);
+	} else {
+		jump_if_reachable(false_block);
+	}
+	mature_immBlock(false_block);
+	set_cur_block(false_block);
 
 	POP_CONTINUE();
 	POP_BREAK();
-
-	jump_if_reachable(header_block);
-
-	/* create the condition */
-	mature_immBlock(header_block);
-	set_cur_block(header_block);
-
-	create_condition_evaluation(statement->condition, body_block, false_block);
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-
-	set_cur_block(false_block);
 	return NULL;
 }
 
