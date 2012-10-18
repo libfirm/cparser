@@ -4155,6 +4155,14 @@ static void allocate_variable_length_array(entity_t *entity)
 	entity->variable.v.vla_base = addr;
 }
 
+static bool var_needs_entity(variable_t const *const var)
+{
+	if (var->address_taken)
+		return true;
+	type_t *const type = skip_typeref(var->base.type);
+	return !is_type_scalar(type) || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+}
+
 /**
  * Creates a Firm local variable from a declaration.
  */
@@ -4163,31 +4171,23 @@ static void create_local_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
-	bool needs_entity = entity->variable.address_taken;
-	type_t *type = skip_typeref(entity->declaration.type);
+	if (!var_needs_entity(&entity->variable)) {
+		entity->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
+		entity->variable.v.value_number = next_value_number_function;
+		set_irg_loc_description(current_ir_graph, next_value_number_function, entity);
+		++next_value_number_function;
+		return;
+	}
 
 	/* is it a variable length array? */
+	type_t *const type = skip_typeref(entity->declaration.type);
 	if (is_type_array(type) && !type->array.size_constant) {
 		create_variable_length_array(entity);
 		return;
-	} else if (is_type_array(type) || is_type_compound(type)) {
-		needs_entity = true;
-	} else if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		needs_entity = true;
 	}
 
-	if (needs_entity) {
-		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
-		create_variable_entity(entity,
-		                       DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
-		                       frame_type);
-	} else {
-		entity->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
-		entity->variable.v.value_number = next_value_number_function;
-		set_irg_loc_description(current_ir_graph, next_value_number_function,
-		                        entity);
-		++next_value_number_function;
-	}
+	ir_type *const frame_type = get_irg_frame_type(current_ir_graph);
+	create_variable_entity(entity, DECLARATION_KIND_LOCAL_VARIABLE_ENTITY, frame_type);
 }
 
 static void create_local_static_variable(entity_t *entity)
@@ -5071,8 +5071,7 @@ static int count_local_variables(const entity_t *entity,
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
 		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
-		    !entity->variable.address_taken                                       &&
-		    is_type_scalar(skip_typeref(entity->declaration.type)))
+		    !var_needs_entity(&entity->variable))
 			++count;
 	}
 	return count;
@@ -5148,12 +5147,9 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		assert(!is_type_array(type));
-		bool const needs_entity = parameter->variable.address_taken || is_type_compound(type);
-
 		dbg_info *const dbgi         = get_dbg_info(&parameter->base.source_position);
 		ir_type  *const param_irtype = get_method_param_type(function_irtype, n);
-		if (needs_entity) {
+		if (var_needs_entity(&parameter->variable)) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
 				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
