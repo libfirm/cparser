@@ -4501,6 +4501,7 @@ static void jump_to(ir_node *const target_block)
 {
 	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
 	add_immBlock_pred(target_block, pred);
+	set_cur_block(target_block);
 }
 
 /**
@@ -4538,7 +4539,6 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 	continue_label              = header_block;
 	break_label                 = NULL;
 
-	set_cur_block(body_block);
 	statement_to_firm(statement->body);
 	ir_node *const false_block = get_break_label();
 
@@ -4583,19 +4583,17 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	jump_to(header_block);
 
 	/* Create the condition. */
-	ir_node            *body_block;
 	ir_node            *false_block;
 	expression_t *const cond = statement->condition;
 	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
-		body_block  = new_immBlock();
 		false_block = new_immBlock();
 
-		set_cur_block(header_block);
+		ir_node *const body_block = new_immBlock();
 		create_condition_evaluation(cond, body_block, false_block);
 		mature_immBlock(body_block);
+		set_cur_block(body_block);
 	} else {
 		/* for-ever. */
-		body_block  = header_block;
 		false_block = NULL;
 
 		keep_alive(header_block);
@@ -4615,7 +4613,6 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	break_label    = false_block;
 
 	/* Create the loop body. */
-	set_cur_block(body_block);
 	statement_to_firm(statement->body);
 	jump_if_reachable(step_block);
 
@@ -4761,7 +4758,6 @@ static ir_node *label_to_firm(const label_statement_t *statement)
 	ir_node *block = get_label_block(statement->label);
 	jump_to(block);
 
-	set_cur_block(block);
 	keep_alive(block);
 	keep_all_memory(block);
 
