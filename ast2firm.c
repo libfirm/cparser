@@ -81,6 +81,18 @@ static entity_t **inner_functions;
 static ir_node   *ijmp_list;
 static bool       constant_folding;
 
+#define PUSH_BREAK(val) \
+	ir_node *const old_break_label = break_label; \
+	((void)(break_label = (val)))
+#define POP_BREAK() \
+	((void)(break_label = old_break_label))
+
+#define PUSH_CONTINUE(val) \
+	ir_node *const old_continue_label = continue_label; \
+	((void)(continue_label = (val)))
+#define POP_CONTINUE() \
+	((void)(continue_label = old_continue_label))
+
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
@@ -4534,17 +4546,14 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 	ir_node *body_block = new_immBlock();
 	jump_to(body_block);
 
-	ir_node *old_continue_label = continue_label;
-	ir_node *old_break_label    = break_label;
-	continue_label              = header_block;
-	break_label                 = NULL;
+	PUSH_BREAK(NULL);
+	PUSH_CONTINUE(header_block);
 
 	statement_to_firm(statement->body);
 	ir_node *const false_block = get_break_label();
 
-	assert(continue_label == header_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
+	POP_CONTINUE();
+	POP_BREAK();
 
 	jump_if_reachable(header_block);
 
@@ -4607,10 +4616,8 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 		step_block = new_immBlock();
 	}
 
-	ir_node *const old_continue_label = continue_label;
-	ir_node *const old_break_label    = break_label;
-	continue_label = step_block;
-	break_label    = false_block;
+	PUSH_BREAK(false_block);
+	PUSH_CONTINUE(step_block);
 
 	/* Create the loop body. */
 	statement_to_firm(statement->body);
@@ -4632,9 +4639,8 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	}
 	set_cur_block(false_block);
 
-	assert(continue_label == step_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
+	POP_CONTINUE();
+	POP_BREAK();
 	return NULL;
 }
 
@@ -4701,12 +4707,11 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 	set_unreachable_now();
 
+	PUSH_BREAK(NULL);
 	ir_node *const old_switch            = current_switch;
-	ir_node *const old_break_label       = break_label;
 	const bool     old_saw_default_label = saw_default_label;
 	saw_default_label                    = false;
 	current_switch                       = switch_node;
-	break_label                          = NULL;
 
 	statement_to_firm(statement->body);
 
@@ -4726,8 +4731,8 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 	assert(current_switch == switch_node);
 	current_switch    = old_switch;
-	break_label       = old_break_label;
 	saw_default_label = old_saw_default_label;
+	POP_BREAK();
 	return NULL;
 }
 
