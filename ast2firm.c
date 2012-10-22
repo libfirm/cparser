@@ -93,6 +93,14 @@ static bool       constant_folding;
 #define POP_CONTINUE() \
 	((void)(continue_label = old_continue_label))
 
+#define PUSH_IRG(val) \
+	ir_graph *const old_irg = current_ir_graph; \
+	ir_graph *const new_irg = (val); \
+	((void)(current_ir_graph = new_irg))
+
+#define POP_IRG() \
+	(assert(current_ir_graph == new_irg), (void)(current_ir_graph = old_irg))
+
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
 static ir_node            *current_funcsig;
@@ -2710,13 +2718,9 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
                                             type_t *type)
 {
 	/* create the ir_initializer */
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
+	POP_IRG();
 
 	ident     *const id          = id_unique("initializer.%u");
 	ir_type   *const irtype      = get_ir_type(type);
@@ -2845,12 +2849,10 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	init_ir_types();
 
-	ir_graph *old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	ir_node *const cnst = _expression_to_firm(expression);
+	POP_IRG();
 
-	current_ir_graph = old_current_ir_graph;
 	set_optimize(old_optimize);
 	set_opt_constant_folding(old_constant_folding);
 
@@ -3232,16 +3234,13 @@ static ir_node *get_label_block(label_t *label)
 
 	/* beware: might be called from create initializer with current_ir_graph
 	 * set to const_code_irg. */
-	ir_graph *rem    = current_ir_graph;
-	current_ir_graph = current_function;
-
+	PUSH_IRG(current_function);
 	ir_node *block = new_immBlock();
+	POP_IRG();
 
 	label->block = block;
 
 	ARR_APP1(label_t *, all_labels, label);
-
-	current_ir_graph = rem;
 	return block;
 }
 
@@ -4234,13 +4233,9 @@ static void create_local_static_variable(entity_t *entity)
 		set_entity_initializer(irentity, null_init);
 	}
 
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	create_variable_initializer(entity);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
+	POP_IRG();
 }
 
 
