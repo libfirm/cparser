@@ -3232,12 +3232,7 @@ static ir_node *get_label_block(label_t *label)
 	if (label->block != NULL)
 		return label->block;
 
-	/* beware: might be called from create initializer with current_ir_graph
-	 * set to const_code_irg. */
-	PUSH_IRG(current_function);
 	ir_node *block = new_immBlock();
-	POP_IRG();
-
 	label->block = block;
 
 	ARR_APP1(label_t *, all_labels, label);
@@ -3250,9 +3245,13 @@ static ir_node *get_label_block(label_t *label)
  */
 static ir_node *label_address_to_firm(const label_address_expression_t *label)
 {
+	/* Beware: Might be called from create initializer with current_ir_graph
+	 * set to const_code_irg. */
+	PUSH_IRG(current_function);
 	dbg_info  *dbgi   = get_dbg_info(&label->base.source_position);
 	ir_node   *block  = get_label_block(label->label);
 	ir_entity *entity = create_Block_entity(block);
+	POP_IRG();
 
 	symconst_symbol value;
 	value.entity_p = entity;
