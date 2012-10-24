@@ -8971,6 +8971,7 @@ static statement_t *parse_label_statement(void)
 	} else {
 		label->base.source_position = *pos;
 		label->statement            = statement;
+		label->n_users             += 1;
 	}
 
 	eat(':');
@@ -9307,6 +9308,7 @@ static statement_t *parse_goto(void)
 
 		label_t *const label = get_label("while parsing goto");
 		if (label) {
+			label->n_users        += 1;
 			label->used            = true;
 			statement->gotos.label = label;
 

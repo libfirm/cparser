@@ -172,6 +172,7 @@ struct label_t {
 	entity_base_t  base;
 	bool           used : 1;
 	bool           address_taken : 1;
+	unsigned       n_users; /* Reference counter to mature the label block as early as possible. */
 	statement_t   *statement;
 
 	/* ast2firm info */

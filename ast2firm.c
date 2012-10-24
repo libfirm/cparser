@@ -76,9 +76,9 @@ static ir_node   *continue_label;
 static ir_node   *break_label;
 static ir_node   *current_switch;
 static bool       saw_default_label;
-static label_t  **all_labels;
 static entity_t **inner_functions;
 static ir_node   *ijmp_list;
+static ir_node  **ijmp_blocks;
 static bool       constant_folding;
 
 #define PUSH_BREAK(val) \
@@ -3241,8 +3241,8 @@ static ir_node *get_label_block(label_t *label)
 
 	ir_node *block = new_immBlock();
 	label->block = block;
-
-	ARR_APP1(label_t *, all_labels, label);
+	if (label->address_taken)
+		ARR_APP1(ir_node*, ijmp_blocks, block);
 	return block;
 }
 
@@ -4762,15 +4762,32 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 	return statement_to_firm(statement->statement);
 }
 
+static void try_mature_label(label_t *const label)
+{
+	if (--label->n_users == 0 && !label->address_taken)
+		mature_immBlock(label->block);
+}
+
 static ir_node *label_to_firm(const label_statement_t *statement)
 {
-	ir_node *block = get_label_block(statement->label);
+	label_t *const label = statement->label;
+	ir_node *const block = get_label_block(label);
 	jump_to(block);
 
 	keep_alive(block);
 	keep_all_memory(block);
 
+	try_mature_label(label);
+
 	return statement_to_firm(statement->statement);
+}
+
+static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
+{
+	label_t *const label = stmt->label;
+	create_jump_statement((statement_t*)stmt, get_label_block(label));
+	try_mature_label(label);
+	return NULL;
 }
 
 static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
@@ -5053,6 +5070,7 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_EMPTY:         return NULL; /* nothing */
 	case STATEMENT_EXPRESSION:    return expression_statement_to_firm( &stmt->expression);
 	case STATEMENT_FOR:           return for_statement_to_firm(        &stmt->fors);
+	case STATEMENT_GOTO:          return goto_statement_to_firm(       &stmt->gotos);
 	case STATEMENT_IF:            return if_statement_to_firm(         &stmt->ifs);
 	case STATEMENT_LABEL:         return label_to_firm(                &stmt->label);
 	case STATEMENT_LEAVE:         return leave_statement_to_firm(      &stmt->leave);
@@ -5062,7 +5080,6 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 
 	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
 	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);
-	case STATEMENT_GOTO:          return create_jump_statement(stmt, get_label_block(stmt->gotos.label));
 
 	case STATEMENT_ERROR: panic("error statement found");
 	}
@@ -5243,9 +5260,9 @@ static void create_function(entity_t *entity)
 	current_function_name   = NULL;
 	current_funcsig         = NULL;
 
-	assert(all_labels == NULL);
-	all_labels = NEW_ARR_F(label_t *, 0);
-	ijmp_list  = NULL;
+	assert(ijmp_blocks == NULL);
+	ijmp_blocks = NEW_ARR_F(ir_node*, 0);
+	ijmp_list   = NULL;
 
 	int       n_local_vars = get_function_n_local_vars(entity);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
@@ -5294,16 +5311,14 @@ static void create_function(entity_t *entity)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	for (int i = ARR_LEN(all_labels) - 1; i >= 0; --i) {
-		label_t *label = all_labels[i];
-		if (label->address_taken) {
-			gen_ijmp_branches(label->block);
-		}
-		mature_immBlock(label->block);
+	for (size_t i = ARR_LEN(ijmp_blocks); i-- != 0;) {
+		ir_node *const block = ijmp_blocks[i];
+		gen_ijmp_branches(block);
+		mature_immBlock(block);
 	}
 
-	DEL_ARR_F(all_labels);
-	all_labels = NULL;
+	DEL_ARR_F(ijmp_blocks);
+	ijmp_blocks = NULL;
 
 	irg_finalize_cons(irg);
 
