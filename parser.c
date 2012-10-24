@@ -322,6 +322,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 		[EXPR_LITERAL_INTEGER]            = sizeof(literal_expression_t),
 		[EXPR_LITERAL_FLOATINGPOINT]      = sizeof(literal_expression_t),
 		[EXPR_LITERAL_CHARACTER]          = sizeof(string_literal_expression_t),
+		[EXPR_LITERAL_MS_NOOP]            = sizeof(literal_expression_t),
 		[EXPR_STRING_LITERAL]             = sizeof(string_literal_expression_t),
 		[EXPR_COMPOUND_LITERAL]           = sizeof(compound_literal_expression_t),
 		[EXPR_CALL]                       = sizeof(call_expression_t),
