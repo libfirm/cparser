@@ -41,6 +41,7 @@
 #include "walk.h"
 #include "warning.h"
 #include "printer.h"
+#include "ast2firm.h"
 #include "adt/bitfiddle.h"
 #include "adt/error.h"
 #include "adt/array.h"
@@ -4789,7 +4790,7 @@ static void check_reachable(statement_t *const stmt)
 				return;
 
 			if (is_constant_expression(expr) == EXPR_CLASS_CONSTANT) {
-				long                    const val      = fold_constant_to_int(expr);
+				ir_tarval              *const val      = fold_constant_to_tarval(expr);
 				case_label_statement_t *      defaults = NULL;
 				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
 					if (i->expression == NULL) {
@@ -4797,7 +4798,9 @@ static void check_reachable(statement_t *const stmt)
 						continue;
 					}
 
-					if (i->first_case <= val && val <= i->last_case) {
+					if (i->first_case == val || i->last_case == val ||
+						((tarval_cmp(i->first_case, val) & ir_relation_less_equal)
+					    && (tarval_cmp(val, i->last_case) & ir_relation_less_equal))) {
 						check_reachable((statement_t*)i);
 						return;
 					}
@@ -8839,7 +8842,7 @@ static statement_t *parse_case_statement(void)
 		}
 		statement->case_label.is_bad = true;
 	} else {
-		long const val = fold_constant_to_int(expression);
+		ir_tarval *val = fold_constant_to_tarval(expression);
 		statement->case_label.first_case = val;
 		statement->case_label.last_case  = val;
 	}
@@ -8863,10 +8866,11 @@ static statement_t *parse_case_statement(void)
 				}
 				statement->case_label.is_bad = true;
 			} else {
-				long const val = fold_constant_to_int(end_range);
+				ir_tarval *val = fold_constant_to_tarval(end_range);
 				statement->case_label.last_case = val;
 
-				if (val < statement->case_label.first_case) {
+				if (tarval_cmp(val, statement->case_label.first_case)
+				    == ir_relation_less) {
 					statement->case_label.is_empty_range = true;
 					warningf(WARN_OTHER, pos, "empty range specified");
 				}
@@ -9071,28 +9075,32 @@ static void check_enum_cases(const switch_statement_t *statement)
 {
 	if (!is_warn_on(WARN_SWITCH_ENUM))
 		return;
-	const type_t *type = skip_typeref(statement->expression->base.type);
+	type_t *type = skip_typeref(statement->expression->base.type);
 	if (! is_type_enum(type))
 		return;
-	const enum_type_t *enumt = &type->enumt;
+	enum_type_t *enumt = &type->enumt;
 
 	/* if we have a default, no warnings */
 	if (statement->default_label != NULL)
 		return;
 
+	determine_enum_values(enumt);
+
 	/* FIXME: calculation of value should be done while parsing */
 	/* TODO: quadratic algorithm here. Change to an n log n one */
-	long            last_value = -1;
-	const entity_t *entry      = enumt->enume->base.next;
+	const entity_t *entry = enumt->enume->base.next;
 	for (; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	     entry = entry->base.next) {
-		const expression_t *expression = entry->enum_value.value;
-		long                value      = expression != NULL ? fold_constant_to_int(expression) : last_value + 1;
-		bool                found      = false;
-		for (const case_label_statement_t *l = statement->first_case; l != NULL; l = l->next) {
+		ir_tarval *value = entry->enum_value.tv;
+		bool       found = false;
+		for (const case_label_statement_t *l = statement->first_case; l != NULL;
+		     l = l->next) {
 			if (l->expression == NULL)
 				continue;
-			if (l->first_case <= value && value <= l->last_case) {
+			if (l->first_case == l->last_case && l->first_case != value)
+				continue;
+			if ((tarval_cmp(l->first_case, value) & ir_relation_less_equal)
+			 && (tarval_cmp(value, l->last_case) & ir_relation_less_equal)) {
 				found = true;
 				break;
 			}
@@ -9101,7 +9109,6 @@ static void check_enum_cases(const switch_statement_t *statement)
 			source_position_t const *const pos = &statement->base.source_position;
 			warningf(WARN_SWITCH_ENUM, pos, "'%N' not handled in switch", entry);
 		}
-		last_value = value;
 	}
 }
 

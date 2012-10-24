@@ -625,9 +625,7 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 	return irtype;
 }
 
-static ir_tarval *fold_constant_to_tarval(expression_t const *);
-
-static void determine_enum_values(enum_type_t *const type)
+void determine_enum_values(enum_type_t *const type)
 {
 	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
@@ -2843,7 +2841,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 
 static void init_ir_types(void);
 
-static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
+ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 {
 	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
@@ -4688,11 +4686,9 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 		}
 		if (l->is_empty_range)
 			continue;
-		ir_tarval *min = fold_constant_to_tarval(l->expression);
-		ir_tarval *max = min;
+		ir_tarval *min = l->first_case;
+		ir_tarval *max = l->last_case;
 		long       pn  = (long) i+1;
-		if (l->end_range != NULL)
-			max = fold_constant_to_tarval(l->end_range);
 		ir_switch_table_set(res, i++, min, max, pn);
 		l->pn = pn;
 	}
