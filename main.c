@@ -59,6 +59,7 @@
 
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
+#include <libfirm/statev.h>
 
 #include "preprocessor.h"
 #include "token_t.h"
@@ -240,6 +241,9 @@ static void do_parsing(compilation_unit_t *unit)
 	unit->type         = COMPILATION_UNIT_AST;
 	unit->parse_errors = error_count > 0 || !res;
 	timer_stop(t_parsing);
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
+	}
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -781,6 +785,8 @@ static void print_help_debug(void)
 	put_help("--print-parenthesis",      "");
 	put_help("--benchmark",              "Preprocess and parse, produces no output");
 	put_help("--time",                   "Measure time of compiler passes");
+	put_help("--statev",                 "Produce statev output");
+	put_help("--filtev=filter",          "Set statev filter regex");
 	put_help("--dump-function func",     "Preprocess, parse and output vcg graph of func");
 	put_help("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
 }
@@ -1009,8 +1015,6 @@ static void init_types_and_adjust(void)
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	} else if (firm_is_unixish_os(target_machine)) {
 		if (is_ia32_cpu(target_machine->cpu_type)) {
-			/* System V has a broken alignment for double so we have to add
-			 * a hack here */
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
@@ -1212,6 +1216,25 @@ static bool open_input(compilation_unit_t *unit)
 	return true;
 }
 
+static void node_counter(ir_node *node, void *env)
+{
+	(void)node;
+	unsigned long long *count = (unsigned long long*)env;
+	++(*count);
+}
+
+static unsigned long long count_firm_nodes(void)
+{
+	unsigned long long count = 0;
+
+	int n_irgs = get_irp_n_irgs();
+	for (int i = 0; i < n_irgs; ++i) {
+		ir_graph *irg = get_irp_irg(i);
+		irg_walk_graph(irg, node_counter, NULL, &count);
+	}
+	return count;
+}
+
 static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 							lang_standard_t standard, FILE *out)
 {
@@ -1223,20 +1246,22 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 		determine_unit_standard(unit, standard);
 		setup_cmode(unit);
 
+		stat_ev_ctx_push_str("compilation_unit", inputname);
+
 again:
 		switch (unit->type) {
 		case COMPILATION_UNIT_IR: {
 			bool res = open_input(unit);
 			if (!res) {
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			res = !ir_import_file(unit->input, unit->name);
 			if (!res) {
 				fprintf(stderr, "Import of firm graph from '%s' failed\n",
 				        inputname);
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
@@ -1249,7 +1274,7 @@ again:
 				bool res = run_external_preprocessor(unit);
 				if (!res) {
 					result = EXIT_FAILURE;
-					continue;
+					break;
 				}
 				goto again;
 			}
@@ -1260,7 +1285,7 @@ again:
 			bool res = open_input(unit);
 			if (!res) {
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			init_tokens();
 
@@ -1268,9 +1293,9 @@ again:
 				bool res = output_preprocessor_tokens(unit, out);
 				if (!res) {
 					result = EXIT_FAILURE;
-					continue;
+					break;
 				}
-				continue;
+				break;
 			}
 
 			/* do the actual parsing */
@@ -1312,12 +1337,16 @@ again:
 			translation_unit_to_firm(unit->ast);
 			already_constructed_firm = true;
 			timer_stop(t_construct);
+			if (stat_ev_enabled) {
+				stat_ev_dbl("time_graph_construction", ir_timer_elapsed_sec(t_construct));
+				stat_ev_int("size_graph_construction", count_firm_nodes());
+			}
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
 			if (mode == ParseOnly)
-				continue;
+				break;
 
 			if (mode == CompileDump) {
 				/* find irg */
@@ -1364,6 +1393,9 @@ again:
 			timer_start(t_opt_codegen);
 			generate_code(asm_out, inputname);
 			timer_stop(t_opt_codegen);
+			if (stat_ev_enabled) {
+				stat_ev_dbl("time_opt_codegen", ir_timer_elapsed_sec(t_opt_codegen));
+			}
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
@@ -1393,6 +1425,8 @@ again:
 		case COMPILATION_UNIT_OBJECT:
 			break;
 		}
+
+		stat_ev_ctx_pop("compilation_unit");
 	}
 	return result;
 }
@@ -1446,9 +1480,12 @@ int main(int argc, char **argv)
 	compilation_unit_t *units                = NULL;
 	compilation_unit_t *last_unit            = NULL;
 	bool                construct_dep_target = false;
-	bool                do_timing            = false;
+	bool                produce_statev       = false;
+	const char         *filtev               = NULL;
 	bool                profile_generate     = false;
 	bool                profile_use          = false;
+	bool                do_timing            = false;
+	bool                print_timing         = false;
 
 	/* hack for now... */
 	if (strstr(argv[0], "pptest") != NULL) {
@@ -1960,7 +1997,13 @@ int main(int argc, char **argv)
 				} else if (streq(option, "no-external-pp")) {
 					external_preprocessor = NULL;
 				} else if (streq(option, "time")) {
-					do_timing = true;
+					do_timing    = true;
+					print_timing = true;
+				} else if (streq(option, "statev")) {
+					do_timing      = true;
+					produce_statev = true;
+				} else if (strstart(option, "filtev=")) {
+					GET_ARG_AFTER(filtev, "--filtev=");
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					return EXIT_SUCCESS;
@@ -2166,7 +2209,25 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (produce_statev && units != NULL) {
+		/* attempt to guess a good name for the file */
+		const char *first_cup = units->name;
+		if (first_cup != NULL) {
+			const char *dot = strrchr(first_cup, '.');
+			const char *pos = dot ? dot : first_cup + strlen(first_cup);
+			char        buf[pos-first_cup+1];
+			strncpy(buf, first_cup, pos-first_cup);
+			buf[pos-first_cup] = '\0';
+
+			stat_ev_begin(buf, filtev);
+		}
+	}
+
 	int result = compilation_loop(mode, units, standard, out);
+	if (stat_ev_enabled) {
+		stat_ev_end();
+	}
+
 	if (result != EXIT_SUCCESS) {
 		if (out != stdout)
 			unlink(outname);
@@ -2184,7 +2245,7 @@ int main(int argc, char **argv)
 	}
 
 	if (do_timing)
-		timer_term(stderr);
+		timer_term(print_timing ? stderr : NULL);
 
 	free_temp_files();
 	obstack_free(&cppflags_obst, NULL);
