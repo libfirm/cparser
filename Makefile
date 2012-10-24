@@ -22,7 +22,7 @@ endif
 CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99
 CFLAGS_debug = -O0 -g
 CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG
 CFLAGS_profile = -pg -O3 -fno-inline
