@@ -4745,10 +4745,7 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
-	if (statement->is_empty_range)
-		return NULL;
-
-	if (current_switch != NULL) {
+	if (current_switch != NULL && !statement->is_empty_range) {
 		ir_node *block = new_immBlock();
 		/* Fallthrough from previous case */
 		jump_if_reachable(block);
