@@ -3247,20 +3247,14 @@ static ir_node *builtin_types_compatible_to_firm(
 	return create_Const_from_bool(mode, value);
 }
 
-static ir_node *get_label_block(label_t *label)
+static void prepare_label_target(label_t *const label)
 {
-	if (label->block != NULL)
-		return label->block;
-
-	ir_node *block = new_immBlock();
-	label->block = block;
-	if (label->address_taken) {
+	if (label->address_taken && !label->indirect_block) {
 		ir_node *const iblock = new_immBlock();
 		label->indirect_block = iblock;
-		add_immBlock_pred(block, new_r_Jmp(iblock));
 		ARR_APP1(ir_node*, ijmp_blocks, iblock);
+		jump_from_block_to_target(&label->target, iblock);
 	}
-	return block;
 }
 
 /**
@@ -3272,7 +3266,7 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	/* Beware: Might be called from create initializer with current_ir_graph
 	 * set to const_code_irg. */
 	PUSH_IRG(current_function);
-	get_label_block(label->label);
+	prepare_label_target(label->label);
 	POP_IRG();
 
 	symconst_symbol value;
@@ -4497,18 +4491,6 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	return NULL;
 }
 
-/**
- * Add an unconditional jump to the target block.  If the source block is not
- * reachable, then a Bad predecessor is created to prevent Phi-less unreachable
- * loops.  This is necessary if the jump potentially enters a loop.
- */
-static void jump_to(ir_node *const target_block)
-{
-	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
-	add_immBlock_pred(target_block, pred);
-	set_cur_block(target_block);
-}
-
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	create_local_declarations(statement->scope.entities);
@@ -4598,19 +4580,6 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 
 	POP_CONTINUE();
 	POP_BREAK();
-	return NULL;
-}
-
-static ir_node *create_jump_statement(const statement_t *statement, ir_node *target_block)
-{
-	if (!currently_reachable())
-		return NULL;
-
-	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-	ir_node  *jump = new_d_Jmp(dbgi);
-	add_immBlock_pred(target_block, jump);
-
-	set_unreachable_now();
 	return NULL;
 }
 
@@ -4705,22 +4674,18 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 	return statement_to_firm(statement->statement);
 }
 
-static void try_mature_label(label_t *const label)
-{
-	if (--label->n_users == 0)
-		mature_immBlock(label->block);
-}
-
 static ir_node *label_to_firm(const label_statement_t *statement)
 {
 	label_t *const label = statement->label;
-	ir_node *const block = get_label_block(label);
-	jump_to(block);
-
-	keep_alive(block);
-	keep_all_memory(block);
-
-	try_mature_label(label);
+	prepare_label_target(label);
+	jump_to_target(&label->target);
+	if (--label->n_users == 0) {
+		enter_jump_target(&label->target);
+	} else {
+		enter_immature_jump_target(&label->target);
+		keep_alive(label->target.block);
+		keep_all_memory(label->target.block);
+	}
 
 	return statement_to_firm(statement->statement);
 }
@@ -4728,8 +4693,11 @@ static ir_node *label_to_firm(const label_statement_t *statement)
 static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
 {
 	label_t *const label = stmt->label;
-	create_jump_statement((statement_t*)stmt, get_label_block(label));
-	try_mature_label(label);
+	prepare_label_target(label);
+	jump_to_target(&label->target);
+	if (--label->n_users == 0)
+		enter_jump_target(&label->target);
+	set_unreachable_now();
 	return NULL;
 }
 

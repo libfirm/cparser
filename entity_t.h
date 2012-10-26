@@ -25,6 +25,7 @@
 #include "attribute.h"
 #include <libfirm/firm_types.h>
 #include "builtins.h"
+#include "jump_target.h"
 #include "token_t.h"
 
 typedef enum {
@@ -176,7 +177,7 @@ struct label_t {
 	statement_t   *statement;
 
 	/* ast2firm info */
-	ir_node       *block;
+	jump_target    target;
 	ir_node       *indirect_block;
 };
 
