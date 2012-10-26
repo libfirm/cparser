@@ -78,7 +78,8 @@ static jump_target break_target;
 static ir_node    *current_switch;
 static bool        saw_default_label;
 static entity_t  **inner_functions;
-static ir_node    *ijmp_list;
+static jump_target ijmp_target;
+static ir_node   **ijmp_ops;
 static ir_node   **ijmp_blocks;
 static bool        constant_folding;
 
@@ -4703,17 +4704,12 @@ static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
 
 static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
 {
-	if (!currently_reachable())
-		return NULL;
-
-	ir_node  *const irn  = expression_to_firm(statement->expression);
-	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
-	ir_node  *const ijmp = new_d_IJmp(dbgi, irn);
-
-	set_irn_link(ijmp, ijmp_list);
-	ijmp_list = ijmp;
-
-	set_unreachable_now();
+	if (currently_reachable()) {
+		ir_node *const op = expression_to_firm(statement->expression);
+		ARR_APP1(ir_node*, ijmp_ops, op);
+		jump_to_target(&ijmp_target);
+		set_unreachable_now();
+	}
 	return NULL;
 }
 
@@ -5139,17 +5135,6 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 }
 
 /**
- * Generate possible IJmp branches to a given label block.
- */
-static void gen_ijmp_branches(ir_node *block)
-{
-	ir_node *ijmp;
-	for (ijmp = ijmp_list; ijmp != NULL; ijmp = get_irn_link(ijmp)) {
-		add_immBlock_pred(block, ijmp);
-	}
-}
-
-/**
  * Create code for a function and all inner functions.
  *
  * @param entity  the function entity
@@ -5178,9 +5163,11 @@ static void create_function(entity_t *entity)
 	current_function_name   = NULL;
 	current_funcsig         = NULL;
 
-	assert(ijmp_blocks == NULL);
+	assert(!ijmp_ops);
+	assert(!ijmp_blocks);
+	init_jump_target(&ijmp_target, NULL);
+	ijmp_ops    = NEW_ARR_F(ir_node*, 0);
 	ijmp_blocks = NEW_ARR_F(ir_node*, 0);
-	ijmp_list   = NULL;
 
 	int       n_local_vars = get_function_n_local_vars(entity);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
@@ -5229,13 +5216,20 @@ static void create_function(entity_t *entity)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	for (size_t i = ARR_LEN(ijmp_blocks); i-- != 0;) {
-		ir_node *const block = ijmp_blocks[i];
-		gen_ijmp_branches(block);
-		mature_immBlock(block);
+	if (enter_jump_target(&ijmp_target)) {
+		size_t   const n    = ARR_LEN(ijmp_ops);
+		ir_node *const op   = n == 1 ? ijmp_ops[0] : new_Phi(n, ijmp_ops, get_irn_mode(ijmp_ops[0]));
+		ir_node *const ijmp = new_IJmp(op);
+		for (size_t i = ARR_LEN(ijmp_blocks); i-- != 0;) {
+			ir_node *const block = ijmp_blocks[i];
+			add_immBlock_pred(block, ijmp);
+			mature_immBlock(block);
+		}
 	}
 
+	DEL_ARR_F(ijmp_ops);
 	DEL_ARR_F(ijmp_blocks);
+	ijmp_ops    = NULL;
 	ijmp_blocks = NULL;
 
 	irg_finalize_cons(irg);
