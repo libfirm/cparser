@@ -601,12 +601,18 @@ struct asm_clobber_t {
 	asm_clobber_t *next;
 };
 
+struct asm_label_t {
+	label_t     *label;
+	asm_label_t *next;
+};
+
 struct asm_statement_t {
 	statement_base_t base;
 	string_t         asm_text;
 	asm_argument_t  *inputs;
 	asm_argument_t  *outputs;
 	asm_clobber_t   *clobbers;
+	asm_label_t     *labels;
 	bool             is_volatile;
 };
 

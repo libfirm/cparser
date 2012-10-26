@@ -8747,6 +8747,24 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 	}
 }
 
+static void parse_asm_labels(asm_label_t **anchor)
+{
+	if (token.kind == T_IDENTIFIER) {
+		add_anchor_token(',');
+		do {
+			label_t *const label = get_label("while parsing 'asm goto' labels");
+			if (label) {
+				asm_label_t *const asm_label = allocate_ast_zero(sizeof(*asm_label));
+				asm_label->label = label;
+
+				*anchor = asm_label;
+				anchor  = &asm_label->next;
+			}
+		} while (accept(','));
+		rem_anchor_token(',');
+	}
+}
+
 /**
  * Parse an asm statement.
  */
@@ -8763,14 +8781,27 @@ static statement_t *parse_asm_statement(void)
 	if (accept(T_volatile))
 		asm_statement->is_volatile = true;
 
+	bool const asm_goto = accept(T_goto);
+
 	expect('(');
 	rem_anchor_token(T_STRING_LITERAL);
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
 	if (accept(':')) parse_asm_arguments(&asm_statement->outputs, true);
 	if (accept(':')) parse_asm_arguments(&asm_statement->inputs, false);
-	rem_anchor_token(':');
 	if (accept(':')) parse_asm_clobbers( &asm_statement->clobbers);
+
+	rem_anchor_token(':');
+	if (accept(':')) {
+		if (!asm_goto)
+			warningf(WARN_OTHER, &statement->base.source_position, "assembler statement with labels should be 'asm goto'");
+		parse_asm_labels(&asm_statement->labels);
+		if (asm_statement->labels)
+			errorf(&statement->base.source_position, "'asm goto' not supported");
+	} else {
+		if (asm_goto)
+			warningf(WARN_OTHER, &statement->base.source_position, "'asm goto' without labels");
+	}
 
 	rem_anchor_token(')');
 	expect(')');

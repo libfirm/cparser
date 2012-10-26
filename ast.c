@@ -1035,6 +1035,16 @@ static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 	}
 }
 
+static void print_asm_labels(asm_label_t const *const labels)
+{
+	print_string(" :");
+	separator_t sep = { " ", ", " };
+	for (asm_label_t const *i = labels; i; i = i->next) {
+		print_string(sep_next(&sep));
+		print_string(i->label->base.symbol->string);
+	}
+}
+
 /**
  * Print an assembler statement.
  *
@@ -1044,10 +1054,12 @@ static void print_asm_statement(asm_statement_t const *const stmt)
 {
 	print_string("asm");
 	if (stmt->is_volatile) print_string(" volatile");
+	if (stmt->labels)      print_string(" goto");
 	print_char('(');
 	print_quoted_string(&stmt->asm_text, '"');
 
 	unsigned const n =
+		stmt->labels   ? 4 :
 		stmt->clobbers ? 3 :
 		stmt->inputs   ? 2 :
 		stmt->outputs  ? 1 :
@@ -1055,6 +1067,7 @@ static void print_asm_statement(asm_statement_t const *const stmt)
 	if (n >= 1) print_asm_arguments(stmt->outputs);
 	if (n >= 2) print_asm_arguments(stmt->inputs);
 	if (n >= 3) print_asm_clobbers( stmt->clobbers);
+	if (n >= 4) print_asm_labels(   stmt->labels);
 
 	print_string(");");
 }
