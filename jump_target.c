@@ -46,15 +46,20 @@ ir_node *enter_jump_target(jump_target *const tgt)
 	return block;
 }
 
-ir_node *get_target_block(jump_target *const tgt)
+void enter_immature_jump_target(jump_target *const tgt)
 {
-	if (!tgt->block) {
-		tgt->block = new_immBlock();
+	ir_node *jmp;
+	ir_node *block = tgt->block;
+	if (!block) {
+		/* Avoid unreachable loops by adding a Bad entry. */
+		jmp = new_Bad(mode_X);
+		goto new_block;
 	} else if (tgt->first) {
-		ir_node *const jmp = new_r_Jmp(tgt->block);
-		tgt->block = new_immBlock();
 		tgt->first = false;
-		add_immBlock_pred(tgt->block, jmp);
+		jmp = new_r_Jmp(block);
+new_block:
+		tgt->block = block = new_immBlock();
+		add_immBlock_pred(block, jmp);
 	}
-	return tgt->block;
+	set_cur_block(block);
 }

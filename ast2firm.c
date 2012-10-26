@@ -1822,9 +1822,7 @@ static ir_node *statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
-static ir_node *create_condition_evaluation(const expression_t *expression,
-                                            ir_node *true_block,
-                                            ir_node *false_block);
+static ir_node *create_condition_evaluation(expression_t const *expression, jump_target *true_target, jump_target *false_target);
 
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
@@ -2360,23 +2358,36 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 static ir_node *produce_condition_result(const expression_t *expression,
                                          ir_mode *mode, dbg_info *dbgi)
 {
-	ir_node *const one_block  = new_immBlock();
-	ir_node *const zero_block = new_immBlock();
-	create_condition_evaluation(expression, one_block, zero_block);
-	mature_immBlock(one_block);
-	mature_immBlock(zero_block);
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	create_condition_evaluation(expression, &true_target, &false_target);
 
-	ir_node *const jmp_one  = new_rd_Jmp(dbgi, one_block);
-	ir_node *const jmp_zero = new_rd_Jmp(dbgi, zero_block);
-	ir_node *const in_cf[2] = { jmp_one, jmp_zero };
-	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
-	set_cur_block(block);
+	ir_node    *val = NULL;
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
 
-	ir_node *const one   = new_Const(get_mode_one(mode));
-	ir_node *const zero  = new_Const(get_mode_null(mode));
-	ir_node *const in[2] = { one, zero };
-	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
+	if (enter_jump_target(&true_target)) {
+		val = new_Const(get_mode_one(mode));
+		jump_to_target(&exit_target);
+	}
 
+	if (enter_jump_target(&false_target)) {
+		ir_node *const zero = new_Const(get_mode_null(mode));
+		jump_to_target(&exit_target);
+		if (val) {
+			ir_node *const in[] = { val, zero };
+			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, mode);
+		} else {
+			val = zero;
+		}
+	}
+
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		val = new_Unknown(mode);
+	}
 	return val;
 }
 
@@ -2913,43 +2924,46 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		}
 	}
 
-	ir_node *const true_block  = new_immBlock();
-	ir_node *const false_block = new_immBlock();
-	ir_node *const cond_expr   = create_condition_evaluation(expression->condition, true_block, false_block);
-	mature_immBlock(true_block);
-	mature_immBlock(false_block);
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	ir_node *const cond_expr = create_condition_evaluation(expression->condition, &true_target, &false_target);
 
-	set_cur_block(true_block);
-	ir_node *true_val;
-	if (expression->true_expression != NULL) {
-		true_val = expression_to_firm(expression->true_expression);
-	} else if (cond_expr != NULL && get_irn_mode(cond_expr) != mode_b) {
-		true_val = cond_expr;
-	} else {
-		/* Condition ended with a short circuit (&&, ||, !) operation or a
-		 * comparison.  Generate a "1" as value for the true branch. */
-		true_val = new_Const(get_mode_one(mode_Is));
+	ir_node    *val = NULL;
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
+
+	if (enter_jump_target(&true_target)) {
+		if (expression->true_expression) {
+			val = expression_to_firm(expression->true_expression);
+		} else if (cond_expr && get_irn_mode(cond_expr) != mode_b) {
+			val = cond_expr;
+		} else {
+			/* Condition ended with a short circuit (&&, ||, !) operation or a
+			 * comparison.  Generate a "1" as value for the true branch. */
+			val = new_Const(get_mode_one(mode_Is));
+		}
+		jump_to_target(&exit_target);
 	}
-	ir_node *const true_jmp = new_d_Jmp(dbgi);
 
-	set_cur_block(false_block);
-	ir_node *const false_val = expression_to_firm(expression->false_expression);
-	ir_node *const false_jmp = new_d_Jmp(dbgi);
+	if (enter_jump_target(&false_target)) {
+		ir_node *const false_val = expression_to_firm(expression->false_expression);
+		jump_to_target(&exit_target);
+		if (val) {
+			ir_node *const in[] = { val, false_val };
+			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
+		} else {
+			val = false_val;
+		}
+	}
 
-	/* create the common block */
-	ir_node *const in_cf[2] = { true_jmp, false_jmp };
-	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
-	set_cur_block(block);
-
-	/* TODO improve static semantics, so either both or no values are NULL */
-	if (true_val == NULL || false_val == NULL)
-		return NULL;
-
-	ir_node *const in[2] = { true_val, false_val };
-	type_t  *const type  = skip_typeref(expression->base.type);
-	ir_mode *const mode  = get_ir_mode_arithmetic(type);
-	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
-
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		type_t *const type = skip_typeref(expression->base.type);
+		if (!is_type_void(type))
+			val = new_Unknown(get_ir_mode_arithmetic(type));
+	}
 	return val;
 }
 
@@ -3383,39 +3397,28 @@ static ir_node *expression_to_firm(const expression_t *expression)
  * create a short-circuit expression evaluation that tries to construct
  * efficient control flow structures for &&, || and ! expressions
  */
-static ir_node *create_condition_evaluation(const expression_t *expression,
-                                            ir_node *true_block,
-                                            ir_node *false_block)
+static ir_node *create_condition_evaluation(expression_t const *const expression, jump_target *const true_target, jump_target *const false_target)
 {
 	switch(expression->kind) {
 	case EXPR_UNARY_NOT: {
 		const unary_expression_t *unary_expression = &expression->unary;
-		create_condition_evaluation(unary_expression->value, false_block,
-		                            true_block);
+		create_condition_evaluation(unary_expression->value, false_target, true_target);
 		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_AND: {
-		const binary_expression_t *binary_expression = &expression->binary;
-
-		ir_node *extra_block = new_immBlock();
-		create_condition_evaluation(binary_expression->left, extra_block,
-		                            false_block);
-		mature_immBlock(extra_block);
-		set_cur_block(extra_block);
-		create_condition_evaluation(binary_expression->right, true_block,
-		                            false_block);
+		jump_target extra_target;
+		init_jump_target(&extra_target, NULL);
+		create_condition_evaluation(expression->binary.left, &extra_target, false_target);
+		if (enter_jump_target(&extra_target))
+			create_condition_evaluation(expression->binary.right, true_target, false_target);
 		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_OR: {
-		const binary_expression_t *binary_expression = &expression->binary;
-
-		ir_node *extra_block = new_immBlock();
-		create_condition_evaluation(binary_expression->left, true_block,
-		                            extra_block);
-		mature_immBlock(extra_block);
-		set_cur_block(extra_block);
-		create_condition_evaluation(binary_expression->right, true_block,
-		                            false_block);
+		jump_target extra_target;
+		init_jump_target(&extra_target, NULL);
+		create_condition_evaluation(expression->binary.left, true_target, &extra_target);
+		if (enter_jump_target(&extra_target))
+			create_condition_evaluation(expression->binary.right, true_target, false_target);
 		return NULL;
 	}
 	default:
@@ -3439,8 +3442,8 @@ static ir_node *create_condition_evaluation(const expression_t *expression,
 		}
 	}
 
-	add_immBlock_pred(true_block, true_proj);
-	add_immBlock_pred(false_block, false_proj);
+	add_pred_to_jump_target(true_target,  true_proj);
+	add_pred_to_jump_target(false_target, false_proj);
 
 	set_unreachable_now();
 	return cond_expr;
@@ -4466,29 +4469,25 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	create_local_declarations(statement->scope.entities);
 
 	/* Create the condition. */
-	ir_node *true_block  = NULL;
-	ir_node *false_block = NULL;
-	if (currently_reachable()) {
-		true_block  = new_immBlock();
-		false_block = new_immBlock();
-		create_condition_evaluation(statement->condition, true_block, false_block);
-		mature_immBlock(true_block);
-		mature_immBlock(false_block);
-	}
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	if (currently_reachable())
+		create_condition_evaluation(statement->condition, &true_target, &false_target);
 
 	jump_target exit_target;
 	init_jump_target(&exit_target, NULL);
 
 	/* Create the true statement. */
-	set_cur_block(true_block);
+	enter_jump_target(&true_target);
 	statement_to_firm(statement->true_statement);
 	jump_to_target(&exit_target);
 
 	/* Create the false statement. */
-	set_cur_block(false_block);
-	if (statement->false_statement != NULL) {
+	enter_jump_target(&false_target);
+	if (statement->false_statement)
 		statement_to_firm(statement->false_statement);
-	}
 	jump_to_target(&exit_target);
 
 	enter_jump_target(&exit_target);
@@ -4534,13 +4533,15 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 		enter_jump_target(&continue_target);
 		jump_to_target(&break_target);
 	} else {
-		ir_node *const body_block = new_immBlock();
-		jump_to(body_block);
+		jump_target body_target;
+		init_jump_target(&body_target, NULL);
+		jump_to_target(&body_target);
+		enter_immature_jump_target(&body_target);
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
 		if (enter_jump_target(&continue_target))
-			create_condition_evaluation(statement->condition, body_block, get_target_block(&break_target));
-		mature_immBlock(body_block);
+			create_condition_evaluation(statement->condition, &body_target, &break_target);
+		enter_jump_target(&body_target);
 	}
 	enter_jump_target(&break_target);
 
@@ -4578,10 +4579,10 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	/* Create the condition. */
 	expression_t *const cond = statement->condition;
 	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
-		ir_node *const body_block = new_immBlock();
-		create_condition_evaluation(cond, body_block, get_target_block(&break_target));
-		mature_immBlock(body_block);
-		set_cur_block(body_block);
+		jump_target body_target;
+		init_jump_target(&body_target, NULL);
+		create_condition_evaluation(cond, &body_target, &break_target);
+		enter_jump_target(&body_target);
 	} else {
 		/* for-ever. */
 		keep_alive(header_block);
