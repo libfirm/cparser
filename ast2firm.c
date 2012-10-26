@@ -4506,17 +4506,6 @@ static void jump_to(ir_node *const target_block)
 	set_cur_block(target_block);
 }
 
-/**
- * Add an unconditional jump to the target block, if the current block is
- * reachable and do nothing otherwise.  This is only valid if the jump does not
- * enter a loop (a back edge is ok).
- */
-static void jump_if_reachable(ir_node *const target_block)
-{
-	if (currently_reachable())
-		add_immBlock_pred(target_block, new_Jmp());
-}
-
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	create_local_declarations(statement->scope.entities);
@@ -4569,12 +4558,14 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	}
 
 	/* Create the header block */
-	ir_node *const header_block = new_immBlock();
-	jump_to(header_block);
+	jump_target header_target;
+	init_jump_target(&header_target, NULL);
+	jump_to_target(&header_target);
+	enter_immature_jump_target(&header_target);
 
 	expression_t *const step = statement->step;
 	PUSH_BREAK(NULL);
-	PUSH_CONTINUE(step ? NULL : header_block);
+	PUSH_CONTINUE(step ? NULL : header_target.block);
 
 	/* Create the condition. */
 	expression_t *const cond = statement->condition;
@@ -4585,8 +4576,8 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 		enter_jump_target(&body_target);
 	} else {
 		/* for-ever. */
-		keep_alive(header_block);
-		keep_all_memory(header_block);
+		keep_alive(header_target.block);
+		keep_all_memory(header_target.block);
 	}
 
 	/* Create the loop body. */
@@ -4596,10 +4587,10 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	/* Create the step code. */
 	if (step && enter_jump_target(&continue_target)) {
 		expression_to_firm(step);
-		jump_if_reachable(header_block);
+		jump_to_target(&header_target);
 	}
 
-	mature_immBlock(header_block);
+	enter_jump_target(&header_target);
 	enter_jump_target(&break_target);
 
 	POP_CONTINUE();
@@ -4694,17 +4685,18 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
 	if (current_switch != NULL && !statement->is_empty_range) {
-		ir_node *block = new_immBlock();
-		/* Fallthrough from previous case */
-		jump_if_reachable(block);
+		jump_target case_target;
+		init_jump_target(&case_target, NULL);
 
-		ir_node  *const proj = new_Proj(current_switch, mode_X, statement->pn);
-		add_immBlock_pred(block, proj);
+		/* Fallthrough from previous case */
+		jump_to_target(&case_target);
+
+		ir_node *const proj = new_Proj(current_switch, mode_X, statement->pn);
+		add_pred_to_jump_target(&case_target, proj);
 		if (statement->expression == NULL)
 			saw_default_label = true;
 
-		mature_immBlock(block);
-		set_cur_block(block);
+		enter_jump_target(&case_target);
 	}
 
 	return statement_to_firm(statement->statement);
