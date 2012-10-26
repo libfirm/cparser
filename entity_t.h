@@ -177,6 +177,7 @@ struct label_t {
 
 	/* ast2firm info */
 	ir_node       *block;
+	ir_node       *indirect_block;
 };
 
 struct namespace_t {

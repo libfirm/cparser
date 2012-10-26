@@ -3254,8 +3254,12 @@ static ir_node *get_label_block(label_t *label)
 
 	ir_node *block = new_immBlock();
 	label->block = block;
-	if (label->address_taken)
-		ARR_APP1(ir_node*, ijmp_blocks, block);
+	if (label->address_taken) {
+		ir_node *const iblock = new_immBlock();
+		label->indirect_block = iblock;
+		add_immBlock_pred(block, new_r_Jmp(iblock));
+		ARR_APP1(ir_node*, ijmp_blocks, iblock);
+	}
 	return block;
 }
 
@@ -3268,13 +3272,12 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	/* Beware: Might be called from create initializer with current_ir_graph
 	 * set to const_code_irg. */
 	PUSH_IRG(current_function);
-	dbg_info  *dbgi   = get_dbg_info(&label->base.source_position);
-	ir_node   *block  = get_label_block(label->label);
-	ir_entity *entity = create_Block_entity(block);
+	get_label_block(label->label);
 	POP_IRG();
 
 	symconst_symbol value;
-	value.entity_p = entity;
+	value.entity_p = create_Block_entity(label->label->indirect_block);
+	dbg_info *const dbgi = get_dbg_info(&label->base.source_position);
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
@@ -4704,7 +4707,7 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 
 static void try_mature_label(label_t *const label)
 {
-	if (--label->n_users == 0 && !label->address_taken)
+	if (--label->n_users == 0)
 		mature_immBlock(label->block);
 }
 
