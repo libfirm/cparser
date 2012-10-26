@@ -47,6 +47,7 @@ SOURCES := \
 	entitymap.c \
 	format_check.c \
 	input.c \
+	jump_target.c \
 	main.c \
 	mangle.c \
 	preprocessor.c \
