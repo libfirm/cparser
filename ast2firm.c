@@ -35,6 +35,7 @@
 #include "adt/array.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
+#include "jump_target.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "type_t.h"
@@ -4475,31 +4476,22 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 		mature_immBlock(false_block);
 	}
 
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
+
 	/* Create the true statement. */
 	set_cur_block(true_block);
 	statement_to_firm(statement->true_statement);
-	ir_node *fallthrough_block = get_cur_block();
+	jump_to_target(&exit_target);
 
 	/* Create the false statement. */
 	set_cur_block(false_block);
 	if (statement->false_statement != NULL) {
 		statement_to_firm(statement->false_statement);
 	}
+	jump_to_target(&exit_target);
 
-	/* Handle the block after the if-statement.  Minor simplification and
-	 * optimisation: Reuse the false/true block as fallthrough block, if the
-	 * true/false statement does not pass control to the fallthrough block, e.g.
-	 * in the typical if (x) return; pattern. */
-	if (fallthrough_block) {
-		if (currently_reachable()) {
-			ir_node *const t_jump = new_r_Jmp(fallthrough_block);
-			ir_node *const f_jump = new_Jmp();
-			ir_node *const in[]   = { t_jump, f_jump };
-			fallthrough_block = new_Block(2, in);
-		}
-		set_cur_block(fallthrough_block);
-	}
-
+	enter_jump_target(&exit_target);
 	return NULL;
 }
 
