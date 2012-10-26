@@ -23,4 +23,6 @@ void add_pred_to_jump_target(jump_target *tgt, ir_node *pred);
 
 ir_node *enter_jump_target(jump_target *tgt);
 
+ir_node *get_target_block(jump_target *tgt);
+
 #endif

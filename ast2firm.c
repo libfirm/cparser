@@ -74,7 +74,7 @@ static unsigned stack_param_align;
 
 static int         next_value_number_function;
 static jump_target continue_target;
-static ir_node    *break_label;
+static jump_target break_target;
 static ir_node    *current_switch;
 static bool        saw_default_label;
 static entity_t  **inner_functions;
@@ -83,10 +83,10 @@ static ir_node   **ijmp_blocks;
 static bool        constant_folding;
 
 #define PUSH_BREAK(val) \
-	ir_node *const old_break_label = break_label; \
-	((void)(break_label = (val)))
+	jump_target const old_break_target = break_target; \
+	(init_jump_target(&break_target, (val)))
 #define POP_BREAK() \
-	((void)(break_label = old_break_label))
+	((void)(break_target = old_break_target))
 
 #define PUSH_CONTINUE(val) \
 	jump_target const old_continue_target = continue_target; \
@@ -4518,14 +4518,6 @@ static void jump_if_reachable(ir_node *const target_block)
 		add_immBlock_pred(target_block, new_Jmp());
 }
 
-static ir_node *get_break_label(void)
-{
-	if (break_label == NULL) {
-		break_label = new_immBlock();
-	}
-	return break_label;
-}
-
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	create_local_declarations(statement->scope.entities);
@@ -4533,26 +4525,24 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 	PUSH_BREAK(NULL);
 	PUSH_CONTINUE(NULL);
 
-	ir_node      *const false_block = get_break_label();
-	expression_t *const cond        = statement->condition;
+	expression_t *const cond = statement->condition;
 	/* Avoid an explicit body block in case of do ... while (0);. */
 	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT && !fold_constant_to_bool(cond)) {
 		/* do ... while (0);. */
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
 		enter_jump_target(&continue_target);
-		jump_if_reachable(false_block);
+		jump_to_target(&break_target);
 	} else {
 		ir_node *const body_block = new_immBlock();
 		jump_to(body_block);
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
 		if (enter_jump_target(&continue_target))
-			create_condition_evaluation(statement->condition, body_block, false_block);
+			create_condition_evaluation(statement->condition, body_block, get_target_block(&break_target));
 		mature_immBlock(body_block);
 	}
-	mature_immBlock(false_block);
-	set_cur_block(false_block);
+	enter_jump_target(&break_target);
 
 	POP_CONTINUE();
 	POP_BREAK();
@@ -4581,27 +4571,22 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	ir_node *const header_block = new_immBlock();
 	jump_to(header_block);
 
+	expression_t *const step = statement->step;
+	PUSH_BREAK(NULL);
+	PUSH_CONTINUE(step ? NULL : header_block);
+
 	/* Create the condition. */
-	ir_node            *false_block;
 	expression_t *const cond = statement->condition;
 	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
-		false_block = new_immBlock();
-
 		ir_node *const body_block = new_immBlock();
-		create_condition_evaluation(cond, body_block, false_block);
+		create_condition_evaluation(cond, body_block, get_target_block(&break_target));
 		mature_immBlock(body_block);
 		set_cur_block(body_block);
 	} else {
 		/* for-ever. */
-		false_block = NULL;
-
 		keep_alive(header_block);
 		keep_all_memory(header_block);
 	}
-
-	expression_t *const step = statement->step;
-	PUSH_BREAK(false_block);
-	PUSH_CONTINUE(step ? NULL : header_block);
 
 	/* Create the loop body. */
 	statement_to_firm(statement->body);
@@ -4614,12 +4599,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	}
 
 	mature_immBlock(header_block);
-	assert(false_block == NULL || false_block == break_label);
-	false_block = break_label;
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
-	set_cur_block(false_block);
+	enter_jump_target(&break_target);
 
 	POP_CONTINUE();
 	POP_BREAK();
@@ -4694,20 +4674,14 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 	current_switch                       = switch_node;
 
 	statement_to_firm(statement->body);
-
-	if (currently_reachable()) {
-		add_immBlock_pred(get_break_label(), new_Jmp());
-	}
+	jump_to_target(&break_target);
 
 	if (!saw_default_label && switch_node) {
 		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
-		add_immBlock_pred(get_break_label(), proj);
+		add_pred_to_jump_target(&break_target, proj);
 	}
 
-	if (break_label != NULL) {
-		mature_immBlock(break_label);
-	}
-	set_cur_block(break_label);
+	enter_jump_target(&break_target);
 
 	assert(current_switch == switch_node);
 	current_switch    = old_switch;
@@ -5053,7 +5027,7 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 
 	{
 		jump_target *tgt;
-	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
+	case STATEMENT_BREAK:    tgt = &break_target;    goto jump;
 	case STATEMENT_CONTINUE: tgt = &continue_target; goto jump;
 jump:
 		jump_to_target(tgt);
@@ -5473,8 +5447,8 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	ir_set_uninitialized_local_variable_func(uninitialized_local_var);
 
 	/* just to be sure */
+	init_jump_target(&break_target,    NULL);
 	init_jump_target(&continue_target, NULL);
-	break_label              = NULL;
 	current_switch           = NULL;
 	current_translation_unit = unit;
 
