@@ -884,7 +884,7 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_LOCAL_LABEL:
 		break;
 	}
-	panic("declaration_is_definition called on non-declaration");
+	panic("entity is not a declaration");
 }
 
 /**
@@ -1270,7 +1270,7 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		break;
 
 	default:
-		panic("Invalid literal kind found");
+		panic("invalid literal kind");
 	}
 
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
@@ -1320,7 +1320,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 	}
 
 	default:
-		panic("Invalid literal kind found");
+		panic("invalid literal kind");
 	}
 
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
@@ -1554,7 +1554,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		panic("not implemented reference type");
 	}
 
-	panic("reference to declaration with unknown type found");
+	panic("reference to declaration with unknown type");
 }
 
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
@@ -1668,7 +1668,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case BUILTIN_LIBC_CHECK:
 		panic("builtin did not produce an entity");
 	}
-	panic("invalid builtin found");
+	panic("invalid builtin");
 }
 
 /**
@@ -2118,7 +2118,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		store_value = result;
 		break;
 	default:
-		panic("no incdec expr in create_incdec");
+		panic("no incdec expr");
 	}
 
 	set_value_for_expression_addr(value_expr, store_value, addr);
@@ -2350,7 +2350,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	default:
 		break;
 	}
-	panic("invalid UNEXPR type found");
+	panic("invalid unary expression type");
 }
 
 /**
@@ -3078,7 +3078,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 						tc = real_type_class;
 						goto make_const;
 				}
-				panic("Unexpected atomic type in classify_type_to_firm().");
+				panic("Unexpected atomic type.");
 			}
 
 			case TYPE_COMPLEX:         tc = complex_type_class; goto make_const;
@@ -3101,7 +3101,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_ERROR:
 				break;
 		}
-		panic("unexpected TYPE classify_type_to_firm().");
+		panic("unexpected type.");
 	}
 
 make_const:;
@@ -3319,7 +3319,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 
 	case EXPR_ERROR: break;
 	}
-	panic("invalid expression found");
+	panic("invalid expression");
 }
 
 /**
@@ -3684,7 +3684,7 @@ static void advance_current_object(type_path_t *path)
 {
 	if (path->invalid) {
 		/* TODO: handle this... */
-		panic("invalid initializer in ast2firm (excessive elements)");
+		panic("invalid initializer (excessive elements)");
 	}
 
 	type_path_entry_t *top = get_type_path_top(path);
@@ -3861,7 +3861,7 @@ static ir_initializer_t *create_ir_initializer(
 			return create_ir_initializer_value(&initializer->value);
 
 		case INITIALIZER_DESIGNATOR:
-			panic("unexpected designator initializer found");
+			panic("unexpected designator initializer");
 	}
 	panic("unknown initializer");
 }
@@ -4010,7 +4010,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	}
 	}
 
-	panic("invalid IR_INITIALIZER found");
+	panic("invalid ir_initializer");
 }
 
 static void create_dynamic_initializer(ir_initializer_t *initializer,
@@ -4390,7 +4390,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_TYPEDEF:
 		break;
 	}
-	panic("invalid storage class found");
+	panic("invalid storage class");
 }
 
 static void create_local_declarations(entity_t *e)
@@ -4995,7 +4995,7 @@ jump:
 		return NULL;
 	}
 
-	case STATEMENT_ERROR: panic("error statement found");
+	case STATEMENT_ERROR: panic("error statement");
 	}
 	panic("statement not implemented");
 }

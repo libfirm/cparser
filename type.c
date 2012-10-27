@@ -872,10 +872,10 @@ bool is_type_incomplete(const type_t *type)
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
-		panic("is_type_incomplete called without typerefs skipped");
+		panic("typedef not skipped");
 	}
 
-	panic("invalid type found");
+	panic("invalid type");
 }
 
 bool is_type_object(const type_t *type)
@@ -1001,7 +1001,7 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 			return true;
 		case TYPE_TYPEDEF:
 		case TYPE_TYPEOF:
-			panic("typerefs not skipped in compatible types?!?");
+			panic("typeref not skipped");
 		}
 	}
 
@@ -1092,7 +1092,7 @@ unsigned get_type_size(type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_size(type->typeoft.typeof_type);
 	}
-	panic("invalid type in get_type_size");
+	panic("invalid type");
 }
 
 unsigned get_type_alignment(type_t *type)
@@ -1130,7 +1130,7 @@ unsigned get_type_alignment(type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_alignment(type->typeoft.typeof_type);
 	}
-	panic("invalid type in get_type_alignment");
+	panic("invalid type");
 }
 
 /**
@@ -1172,7 +1172,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_modifiers(type->typeoft.typeof_type);
 	}
-	panic("invalid type found in get_type_modifiers");
+	panic("invalid type");
 }
 
 type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)

@@ -1918,7 +1918,7 @@ check_type:
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
 	}
-	panic("invalid expression found (is constant expression)");
+	panic("invalid expression");
 }
 
 void init_ast(void)

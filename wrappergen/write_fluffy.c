@@ -214,7 +214,7 @@ static void write_unary_expression(const unary_expression_t *expression)
 		fputc('!', out);
 		break;
 	default:
-		panic("unimeplemented unary expression found");
+		panic("unimplemented unary expression");
 	}
 	write_expression(expression->value);
 }

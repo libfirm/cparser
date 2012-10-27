@@ -513,7 +513,7 @@ static bool attribute_argument_equal(const attribute_argument_t *arg1,
 		/* TODO */
 		return false;
 	}
-	panic("Unknown argument type found");
+	panic("unknown argument type");
 }
 
 static bool attribute_arguments_equal(const attribute_argument_t *args1,

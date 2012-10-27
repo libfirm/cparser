@@ -226,7 +226,7 @@ static void write_type(type_t *type)
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
-		panic("invalid type found");
+		panic("invalid type");
 	case TYPE_ARRAY:
 	case TYPE_REFERENCE:
 	case TYPE_FUNCTION:
@@ -275,7 +275,7 @@ static void write_unary_expression(const unary_expression_t *expression)
 		write_expression(expression->value);
 		return;
 	default:
-		panic("unimeplemented unary expression found");
+		panic("unimplemented unary expression");
 	}
 	write_expression(expression->value);
 }

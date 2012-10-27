@@ -83,7 +83,7 @@ static void walk_type(type_t *const type, const walk_env_t *const env)
 		walk_entity((entity_t*)type->enumt.enume, env);
 		return;
 	}
-	panic("invalid type found");
+	panic("invalid type");
 }
 
 static void walk_expression(expression_t *const expr,
@@ -269,7 +269,7 @@ static void walk_entity(entity_t *entity, const walk_env_t *const env)
 	case ENTITY_LOCAL_LABEL:
 		return;
 	}
-	panic("invalid entity found");
+	panic("invalid entity");
 }
 
 static void walk_declarations(entity_t*            entity,
