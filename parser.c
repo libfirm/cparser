@@ -1060,8 +1060,13 @@ static string_t concat_string_literals(void)
 		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects string constant concatenation");
 		string_encoding_t enc = token.literal.string.encoding;
 		do {
-			if (token.literal.string.encoding != STRING_ENCODING_CHAR) {
-				enc = token.literal.string.encoding;
+			string_encoding_t const new_enc = token.literal.string.encoding;
+			if (new_enc != enc && new_enc != STRING_ENCODING_CHAR) {
+				if (enc == STRING_ENCODING_CHAR) {
+					enc = new_enc;
+				} else {
+					errorf(HERE, "concatenating string literals with encodings %s and %s", get_string_encoding_prefix(enc), get_string_encoding_prefix(new_enc));
+				}
 			}
 			append_string(&token.literal.string);
 			eat(T_STRING_LITERAL);
@@ -1084,7 +1089,7 @@ static string_t parse_string_literals(char const *const context)
 	string_t          const res = concat_string_literals();
 
 	if (res.encoding != STRING_ENCODING_CHAR) {
-		errorf(&pos, "expected plain string literal, got wide string literal");
+		errorf(&pos, "expected plain string literal, got %s string literal", get_string_encoding_prefix(res.encoding));
 	}
 
 	return res;
@@ -1565,7 +1570,8 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 		array_type_t *const array_type   = &type->array;
 		type_t       *const element_type = skip_typeref(array_type->element_type);
 		switch (expression->string_literal.value.encoding) {
-		case STRING_ENCODING_CHAR: {
+		case STRING_ENCODING_CHAR:
+		case STRING_ENCODING_UTF8: {
 			if (is_type_atomic(element_type, ATOMIC_TYPE_CHAR)  ||
 			    is_type_atomic(element_type, ATOMIC_TYPE_SCHAR) ||
 			    is_type_atomic(element_type, ATOMIC_TYPE_UCHAR)) {
@@ -1574,9 +1580,12 @@ static initializer_t *initializer_from_expression(type_t *orig_type,
 			break;
 		}
 
+		case STRING_ENCODING_CHAR16:
+		case STRING_ENCODING_CHAR32:
 		case STRING_ENCODING_WIDE: {
-			type_t *bare_wchar_type = skip_typeref(type_wchar_t);
-			if (get_unqualified_type(element_type) == bare_wchar_type) {
+			assert(is_type_pointer(expression->base.type));
+			type_t *const init_type = get_unqualified_type(expression->base.type->pointer.points_to);
+			if (types_compatible(get_unqualified_type(element_type), init_type)) {
 make_string_init:;
 				initializer_t *const init = allocate_initializer_zero(INITIALIZER_STRING);
 				init->value.value = expression;
@@ -5633,8 +5642,11 @@ static type_t *get_string_type(string_encoding_t const enc)
 {
 	bool const warn = is_warn_on(WARN_WRITE_STRINGS);
 	switch (enc) {
-	case STRING_ENCODING_CHAR: return warn ? type_const_char_ptr    : type_char_ptr;
-	case STRING_ENCODING_WIDE: return warn ? type_const_wchar_t_ptr : type_wchar_t_ptr;
+	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:   return warn ? type_const_char_ptr     : type_char_ptr;
+	case STRING_ENCODING_CHAR16: return warn ? type_char16_t_const_ptr : type_char16_t_ptr;
+	case STRING_ENCODING_CHAR32: return warn ? type_char32_t_const_ptr : type_char32_t_ptr;
+	case STRING_ENCODING_WIDE:   return warn ? type_const_wchar_t_ptr  : type_wchar_t_ptr;
 	}
 	panic("invalid string encoding");
 }
@@ -5875,6 +5887,7 @@ static expression_t *parse_character_constant(void)
 	size_t const size = get_string_len(&token.literal.string);
 	switch (token.literal.string.encoding) {
 	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:
 		literal->base.type = c_mode & _CXX ? type_char : type_int;
 		if (size > 1) {
 			if (!GNU_MODE && !(c_mode & _C99)) {
@@ -5886,8 +5899,10 @@ static expression_t *parse_character_constant(void)
 		}
 		break;
 
-	case STRING_ENCODING_WIDE:
-		literal->base.type = type_int;
+	case STRING_ENCODING_CHAR16: literal->base.type = type_char16_t; goto warn_multi;
+	case STRING_ENCODING_CHAR32: literal->base.type = type_char32_t; goto warn_multi;
+	case STRING_ENCODING_WIDE:   literal->base.type = type_wchar_t;  goto warn_multi;
+warn_multi:
 		if (size > 1) {
 			warningf(WARN_MULTICHAR, HERE, "multi-character character constant");
 		}

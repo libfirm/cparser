@@ -25,6 +25,9 @@
 
 enum string_encoding_t {
 	STRING_ENCODING_CHAR,
+	STRING_ENCODING_CHAR16,
+	STRING_ENCODING_CHAR32,
+	STRING_ENCODING_UTF8,
 	STRING_ENCODING_WIDE
 };
 typedef enum string_encoding_t string_encoding_t;

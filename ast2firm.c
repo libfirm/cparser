@@ -64,7 +64,6 @@ fp_model_t firm_fp_model = fp_model_precise;
 static const backend_params *be_params;
 
 static ir_type *ir_type_char;
-static ir_type *ir_type_wchar_t;
 
 /* architecture specific floating point arithmetic mode (if any) */
 static ir_mode *mode_float_arithmetic;
@@ -1134,7 +1133,8 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 	ir_initializer_t *const initializer = create_initializer_compound(slen);
 	ir_type          *      elem_type;
 	switch (value->encoding) {
-	case STRING_ENCODING_CHAR: {
+	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8: {
 		elem_type = ir_type_char;
 
 		ir_mode *const mode = get_type_mode(elem_type);
@@ -1147,8 +1147,13 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 		goto finish;
 	}
 
-	case STRING_ENCODING_WIDE: {
-		elem_type = ir_type_wchar_t;
+	{
+		type_t *type;
+	case STRING_ENCODING_CHAR16: type = type_char16_t; goto init_wide;
+	case STRING_ENCODING_CHAR32: type = type_char32_t; goto init_wide;
+	case STRING_ENCODING_WIDE:   type = type_wchar_t;  goto init_wide;
+init_wide:;
+		elem_type = get_ir_type(type);
 
 		ir_mode *const mode = get_type_mode(elem_type);
 		char const    *p    = value->begin;
@@ -3826,6 +3831,7 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 	char const       *      p       = str->value.begin;
 	switch (str->value.encoding) {
 	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:
 		for (size_t i = 0; i != arr_len; ++i) {
 			char              const c      = i < str_len ? *p++ : 0;
 			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
@@ -3834,6 +3840,8 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 		}
 		break;
 
+	case STRING_ENCODING_CHAR16:
+	case STRING_ENCODING_CHAR32:
 	case STRING_ENCODING_WIDE:
 		for (size_t i = 0; i != arr_len; ++i) {
 			utf32             const c      = i < str_len ? read_utf8_char(&p) : 0;
@@ -5348,8 +5356,7 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	ir_type_char    = get_ir_type(type_char);
-	ir_type_wchar_t = get_ir_type(type_wchar_t);
+	ir_type_char = get_ir_type(type_char);
 
 	be_params             = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
