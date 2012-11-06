@@ -1468,16 +1468,13 @@ static ir_node *get_local_frame(ir_entity *const ent)
 }
 
 /**
- * Keep all memory edges of the given block.
+ * Keep the current block and memory.
+ * This is necessary for all loops, because they could become infinite.
  */
-static void keep_all_memory(ir_node *block)
+static void keep_loop(void)
 {
-	ir_node *old = get_cur_block();
-
-	set_cur_block(block);
+	keep_alive(get_cur_block());
 	keep_alive(get_store());
-	/* TODO: keep all memory edges from restricted pointers */
-	set_cur_block(old);
 }
 
 static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
@@ -4520,6 +4517,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 		init_jump_target(&body_target, NULL);
 		jump_to_target(&body_target);
 		enter_immature_jump_target(&body_target);
+		keep_loop();
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
 		if (enter_jump_target(&continue_target))
@@ -4556,6 +4554,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	init_jump_target(&header_target, NULL);
 	jump_to_target(&header_target);
 	enter_immature_jump_target(&header_target);
+	keep_loop();
 
 	expression_t *const step = statement->step;
 	PUSH_BREAK(NULL);
@@ -4568,10 +4567,6 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 		init_jump_target(&body_target, NULL);
 		create_condition_evaluation(cond, &body_target, &break_target);
 		enter_jump_target(&body_target);
-	} else {
-		/* for-ever. */
-		keep_alive(header_target.block);
-		keep_all_memory(header_target.block);
 	}
 
 	/* Create the loop body. */
@@ -4692,8 +4687,7 @@ static ir_node *label_to_firm(const label_statement_t *statement)
 		enter_jump_target(&label->target);
 	} else {
 		enter_immature_jump_target(&label->target);
-		keep_alive(label->target.block);
-		keep_all_memory(label->target.block);
+		keep_loop();
 	}
 
 	return statement_to_firm(statement->statement);
