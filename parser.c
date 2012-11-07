@@ -133,7 +133,7 @@ static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
 #define PUSH_EXTENSION() \
 	(void)0; \
 	bool const old_gcc_extension = in_gcc_extension; \
-	while (next_if(T___extension__)) { \
+	while (accept(T___extension__)) { \
 		in_gcc_extension = true; \
 	} \
 	do {} while (0)
@@ -486,7 +486,13 @@ static inline void eat(token_kind_t const kind)
 	next_token();
 }
 
-static inline bool next_if(token_kind_t const kind)
+/**
+ * Consume the current token, if it is of the expected kind.
+ *
+ * @param  kind  The kind of token to consume.
+ * @return Whether the token was consumed.
+ */
+static inline bool accept(token_kind_t const kind)
 {
 	if (token.kind == kind) {
 		eat(kind);
@@ -597,7 +603,7 @@ static void eat_until_anchor(void)
 static void eat_block(void)
 {
 	eat_until_matching_token('{');
-	next_if('}');
+	accept('}');
 }
 
 /**
@@ -1155,7 +1161,7 @@ static attribute_argument_t *parse_attribute_arguments(void)
 		/* append argument */
 		*anchor = argument;
 		anchor  = &argument->next;
-	} while (next_if(','));
+	} while (accept(','));
 	expect(')');
 	return first;
 }
@@ -1203,7 +1209,7 @@ static attribute_t *parse_attribute_gnu_single(void)
 	next_token();
 
 	/* parse arguments */
-	if (next_if('('))
+	if (accept('('))
 		attribute->a.arguments = parse_attribute_arguments();
 
 	return attribute;
@@ -1226,7 +1232,7 @@ static attribute_t *parse_attribute_gnu(void)
 			*anchor = attribute;
 			anchor  = &attribute->next;
 		}
-	} while (next_if(','));
+	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(')');
 
@@ -1646,7 +1652,7 @@ static initializer_t *parse_scalar_initializer(type_t *type,
 
 	bool additional_warning_displayed = false;
 	while (braces > 0) {
-		next_if(',');
+		accept(',');
 		if (token.kind != '}') {
 			if (!additional_warning_displayed) {
 				warningf(WARN_OTHER, HERE, "additional elements in scalar initializer");
@@ -1938,7 +1944,7 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
  */
 static void skip_initializers(void)
 {
-	next_if('{');
+	accept('{');
 
 	while (token.kind != '}') {
 		if (token.kind == T_EOF)
@@ -2077,7 +2083,7 @@ finish_designator:
 			if (expression->kind == EXPR_STRING_LITERAL && outer_type != NULL) {
 				result = initializer_from_expression(outer_type, expression);
 				if (result != NULL) {
-					next_if(',');
+					accept(',');
 					if (token.kind != '}') {
 						warningf(WARN_OTHER, HERE, "excessive elements in initializer for type '%T'", outer_type);
 					}
@@ -2123,7 +2129,7 @@ finish_designator:
 		ARR_APP1(initializer_t*, initializers, sub);
 
 error_parse_next:
-		if (!next_if(','))
+		if (!accept(','))
 			break;
 		if (token.kind == '}') {
 			break;
@@ -2345,7 +2351,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		entity->enum_value.enum_type = enum_type;
 		rem_anchor_token('=');
 
-		if (next_if('=')) {
+		if (accept('=')) {
 			expression_t *value = parse_constant_expression();
 
 			value = create_implicit_cast(value, enum_type);
@@ -2355,7 +2361,7 @@ static void parse_enum_entries(type_t *const enum_type)
 		}
 
 		record_entity(entity, false);
-	} while (next_if(',') && token.kind != '}');
+	} while (accept(',') && token.kind != '}');
 	rem_anchor_token(',');
 	rem_anchor_token('}');
 
@@ -2540,7 +2546,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 		symbol_t *const sym = expect_identifier("while parsing property declspec", NULL);
 		if (prop != NULL)
 			*prop = sym ? sym : sym_anonymous;
-	} while (next_if(','));
+	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(')');
 
@@ -2553,7 +2559,7 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 {
 	attribute_kind_t kind = ATTRIBUTE_UNKNOWN;
-	if (next_if(T_restrict)) {
+	if (accept(T_restrict)) {
 		kind = ATTRIBUTE_MS_RESTRICT;
 	} else if (token.kind == T_IDENTIFIER) {
 		char const *const name = token.base.symbol->string;
@@ -2582,7 +2588,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 	}
 
 	/* parse arguments */
-	if (next_if('('))
+	if (accept('('))
 		attribute->a.arguments = parse_attribute_arguments();
 
 	return attribute;
@@ -2607,7 +2613,7 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 
 			*anchor = attribute;
 			anchor  = &attribute->next;
-		} while (next_if(','));
+		} while (accept(','));
 	}
 	rem_anchor_token(')');
 	expect(')');
@@ -3081,7 +3087,7 @@ static void parse_identifier_list(scope_t *scope)
 
 		if (scope != NULL)
 			append_entity(scope, entity);
-	} while (next_if(',') && token.kind == T_IDENTIFIER);
+	} while (accept(',') && token.kind == T_IDENTIFIER);
 }
 
 static entity_t *parse_parameter(void)
@@ -3194,7 +3200,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 			default:
 				goto parameters_finished;
 			}
-		} while (next_if(','));
+		} while (accept(','));
 parameters_finished:
 		rem_anchor_token(',');
 	}
@@ -3291,12 +3297,12 @@ static construct_type_t *parse_array_declarator(void)
 	eat('[');
 	add_anchor_token(']');
 
-	bool is_static = next_if(T_static);
+	bool is_static = accept(T_static);
 
 	type_qualifiers_t type_qualifiers = parse_type_qualifiers();
 
 	if (!is_static)
-		is_static = next_if(T_static);
+		is_static = accept(T_static);
 
 	array->type_qualifiers = type_qualifiers;
 	array->is_static       = is_static;
@@ -4292,7 +4298,7 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 
 		check_variable_type_complete(entity);
 
-		if (!next_if(','))
+		if (!accept(','))
 			break;
 
 		add_anchor_token('=');
@@ -5570,7 +5576,7 @@ static void parse_compound_declarators(compound_t *compound,
 				append_entity(&compound->members, entity);
 			}
 		}
-	} while (next_if(','));
+	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(';');
 	expect(';');
@@ -6042,7 +6048,7 @@ static entity_t *parse_qualified_identifier(void)
 	source_position_t  pos;
 	const scope_t     *lookup_scope = NULL;
 
-	if (next_if(T_COLONCOLON))
+	if (accept(T_COLONCOLON))
 		lookup_scope = &unit->scope;
 
 	entity_t *entity;
@@ -6054,7 +6060,7 @@ static entity_t *parse_qualified_identifier(void)
 		/* lookup entity */
 		entity = lookup_entity(lookup_scope, symbol, NAMESPACE_NORMAL);
 
-		if (!next_if(T_COLONCOLON))
+		if (!accept(T_COLONCOLON))
 			break;
 
 		switch (entity->kind) {
@@ -6071,7 +6077,7 @@ static entity_t *parse_qualified_identifier(void)
 			       symbol, get_entity_kind_name(entity->kind));
 
 			/* skip further qualifications */
-			while (next_if(T_IDENTIFIER) && next_if(T_COLONCOLON)) {}
+			while (accept(T_IDENTIFIER) && accept(T_COLONCOLON)) {}
 
 			return create_error_entity(sym_anonymous, ENTITY_VARIABLE);
 		}
@@ -6320,7 +6326,7 @@ static designator_t *parse_designator(void)
 
 	designator_t *last_designator = result;
 	while (true) {
-		if (next_if('.')) {
+		if (accept('.')) {
 			designator_t *const designator = allocate_ast_zero(sizeof(result[0]));
 			designator->symbol = expect_identifier("while parsing member designator", &designator->source_position);
 			if (!designator->symbol)
@@ -6330,7 +6336,7 @@ static designator_t *parse_designator(void)
 			last_designator       = designator;
 			continue;
 		}
-		if (next_if('[')) {
+		if (accept('[')) {
 			add_anchor_token(']');
 			designator_t *designator    = allocate_ast_zero(sizeof(result[0]));
 			designator->source_position = *HERE;
@@ -6674,7 +6680,7 @@ static expression_t *parse_noop_expression(void)
 
 		if (token.kind != ')') do {
 			(void)parse_assignment_expression();
-		} while (next_if(','));
+		} while (accept(','));
 
 		rem_anchor_token(',');
 		rem_anchor_token(')');
@@ -7106,7 +7112,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 
 			*anchor = argument;
 			anchor  = &argument->next;
-		} while (next_if(','));
+		} while (accept(','));
 	}
 	rem_anchor_token(',');
 	rem_anchor_token(')');
@@ -7389,7 +7395,7 @@ static expression_t *parse_delete(void)
 
 	eat(T_delete);
 
-	if (next_if('[')) {
+	if (accept('[')) {
 		result->kind = EXPR_UNARY_DELETE_ARRAY;
 		expect(']');
 	}
@@ -8640,7 +8646,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 	while (token.kind == T_STRING_LITERAL || token.kind == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
-		if (next_if('[')) {
+		if (accept('[')) {
 			add_anchor_token(']');
 			argument->symbol = expect_identifier("while parsing asm argument", NULL);
 			rem_anchor_token(']');
@@ -8719,7 +8725,7 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		*anchor = argument;
 		anchor  = &argument->next;
 
-		if (!next_if(','))
+		if (!accept(','))
 			break;
 	}
 
@@ -8741,7 +8747,7 @@ static asm_clobber_t *parse_asm_clobbers(void)
 		*anchor = clobber;
 		anchor  = &clobber->next;
 
-		if (!next_if(','))
+		if (!accept(','))
 			break;
 	}
 
@@ -8761,21 +8767,21 @@ static statement_t *parse_asm_statement(void)
 	add_anchor_token(':');
 	add_anchor_token(T_STRING_LITERAL);
 
-	if (next_if(T_volatile))
+	if (accept(T_volatile))
 		asm_statement->is_volatile = true;
 
 	expect('(');
 	rem_anchor_token(T_STRING_LITERAL);
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
-	if (next_if(':'))
+	if (accept(':'))
 		asm_statement->outputs = parse_asm_arguments(true);
 
-	if (next_if(':'))
+	if (accept(':'))
 		asm_statement->inputs = parse_asm_arguments(false);
 
 	rem_anchor_token(':');
-	if (next_if(':'))
+	if (accept(':'))
 		asm_statement->clobbers = parse_asm_clobbers();
 
 	rem_anchor_token(')');
@@ -8864,7 +8870,7 @@ static statement_t *parse_case_statement(void)
 	}
 
 	if (GNU_MODE) {
-		if (next_if(T_DOTDOTDOT)) {
+		if (accept(T_DOTDOTDOT)) {
 			expression_t *end_range = parse_expression();
 			expression_type = expression->base.type;
 			skipped         = skip_typeref(expression_type);
@@ -9064,7 +9070,7 @@ static statement_t *parse_if(void)
 		        "suggest braces around empty body in an ‘if’ statement");
 	}
 
-	if (next_if(T_else)) {
+	if (accept(T_else)) {
 		statement->ifs.false_statement = parse_inner_statement();
 
 		if (statement->ifs.false_statement->kind == STATEMENT_EMPTY) {
@@ -9251,7 +9257,7 @@ static statement_t *parse_for(void)
 
 	PUSH_EXTENSION();
 
-	if (next_if(';')) {
+	if (accept(';')) {
 	} else if (is_declaration_specifier(&token)) {
 		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	} else {
@@ -9549,7 +9555,7 @@ static statement_t *parse_ms_try_statment(void)
 
 	POP_PARENT();
 
-	if (next_if(T___except)) {
+	if (accept(T___except)) {
 		expression_t *const expr = parse_condition();
 		type_t       *      type = skip_typeref(expr->base.type);
 		if (is_type_integer(type)) {
@@ -9560,7 +9566,7 @@ static statement_t *parse_ms_try_statment(void)
 			type = type_error_type;
 		}
 		statement->ms_try.except_expression = create_implicit_cast(expr, type);
-	} else if (!next_if(T__finally)) {
+	} else if (!accept(T__finally)) {
 		parse_error_expected("while parsing __try statement", T___except, T___finally, NULL);
 	}
 	statement->ms_try.final_statement = parse_compound_statement(false);
@@ -9605,7 +9611,7 @@ static statement_t *parse_local_label_declaration(void)
 				environment_push(entity);
 			}
 		}
-	} while (next_if(','));
+	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(';');
 	expect(';');
@@ -10069,7 +10075,7 @@ static void parse_linkage_specification(void)
 	}
 	current_linkage = new_linkage;
 
-	if (next_if('{')) {
+	if (accept('{')) {
 		parse_externals();
 		expect('}');
 	} else {
