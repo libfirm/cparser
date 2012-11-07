@@ -2912,8 +2912,6 @@ bool fold_constant_to_bool(const expression_t *expression)
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
-	dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
-
 	/* first try to fold a constant condition */
 	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
 		bool val = fold_constant_to_bool(expression->condition);
@@ -2954,7 +2952,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		ir_node *const false_val = expression_to_firm(expression->false_expression);
 		jump_to_target(&exit_target);
 		if (val) {
-			ir_node *const in[] = { val, false_val };
+			ir_node  *const in[] = { val, false_val };
+			dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
 			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
 		} else {
 			val = false_val;
