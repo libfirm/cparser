@@ -3424,26 +3424,33 @@ static ir_node *create_condition_evaluation(expression_t const *const expression
 		break;
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
-	ir_node  *cond_expr  = _expression_to_firm(expression);
-	ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
-	ir_node  *cond       = new_d_Cond(dbgi, condition);
-	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
-
-	/* set branch prediction info based on __builtin_expect */
-	if (is_builtin_expect(expression) && is_Cond(cond)) {
-		call_argument_t *argument = expression->call.arguments->next;
-		if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
-			bool               const cnst = fold_constant_to_bool(argument->expression);
-			cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
-			set_Cond_jmp_pred(cond, pred);
+	ir_node *cond_expr = _expression_to_firm(expression);
+	if (is_Const(cond_expr)) {
+		if (tarval_is_null(get_Const_tarval(cond_expr))) {
+			jump_to_target(false_target);
+		} else {
+			jump_to_target(true_target);
 		}
+	} else {
+		dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
+		ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
+		ir_node  *cond       = new_d_Cond(dbgi, condition);
+		ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+		ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+		/* set branch prediction info based on __builtin_expect */
+		if (is_builtin_expect(expression) && is_Cond(cond)) {
+			call_argument_t *argument = expression->call.arguments->next;
+			if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
+				bool               const cnst = fold_constant_to_bool(argument->expression);
+				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
+				set_Cond_jmp_pred(cond, pred);
+			}
+		}
+
+		add_pred_to_jump_target(true_target,  true_proj);
+		add_pred_to_jump_target(false_target, false_proj);
 	}
-
-	add_pred_to_jump_target(true_target,  true_proj);
-	add_pred_to_jump_target(false_target, false_proj);
-
 	set_unreachable_now();
 	return cond_expr;
 }
