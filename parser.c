@@ -8640,88 +8640,85 @@ static void init_expression_parsers(void)
  */
 static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 {
-	while (token.kind == T_STRING_LITERAL || token.kind == '[') {
-		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
+	if (token.kind == T_STRING_LITERAL || token.kind == '[') {
+		do {
+			asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
-		if (accept('[')) {
-			add_anchor_token(']');
-			argument->symbol = expect_identifier("while parsing asm argument", NULL);
-			rem_anchor_token(']');
-			expect(']');
-		}
+			if (accept('[')) {
+				add_anchor_token(']');
+				argument->symbol = expect_identifier("while parsing asm argument", NULL);
+				rem_anchor_token(']');
+				expect(']');
+			}
 
-		argument->constraints = parse_string_literals("asm argument");
-		add_anchor_token(')');
-		expect('(');
-		expression_t *expression = parse_expression();
-		rem_anchor_token(')');
-		if (is_out) {
-			/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
-			 * change size or type representation (e.g. int -> long is ok, but
-			 * int -> float is not) */
-			if (expression->kind == EXPR_UNARY_CAST) {
-				type_t      *const type = expression->base.type;
-				type_kind_t  const kind = type->kind;
-				if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
-					unsigned flags;
-					unsigned size;
-					if (kind == TYPE_ATOMIC) {
-						atomic_type_kind_t const akind = type->atomic.akind;
-						flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
-						size  = get_atomic_type_size(akind);
-					} else {
-						flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
-						size  = get_type_size(type_void_ptr);
-					}
-
-					do {
-						expression_t *const value      = expression->unary.value;
-						type_t       *const value_type = value->base.type;
-						type_kind_t   const value_kind = value_type->kind;
-
-						unsigned value_flags;
-						unsigned value_size;
-						if (value_kind == TYPE_ATOMIC) {
-							atomic_type_kind_t const value_akind = value_type->atomic.akind;
-							value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
-							value_size  = get_atomic_type_size(value_akind);
-						} else if (value_kind == TYPE_POINTER) {
-							value_flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
-							value_size  = get_type_size(type_void_ptr);
+			argument->constraints = parse_string_literals("asm argument");
+			add_anchor_token(')');
+			expect('(');
+			expression_t *expression = parse_expression();
+			rem_anchor_token(')');
+			if (is_out) {
+				/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
+				 * change size or type representation (e.g. int -> long is ok, but
+				 * int -> float is not) */
+				if (expression->kind == EXPR_UNARY_CAST) {
+					type_t      *const type = expression->base.type;
+					type_kind_t  const kind = type->kind;
+					if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
+						unsigned flags;
+						unsigned size;
+						if (kind == TYPE_ATOMIC) {
+							atomic_type_kind_t const akind = type->atomic.akind;
+							flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+							size  = get_atomic_type_size(akind);
 						} else {
-							break;
+							flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+							size  = get_type_size(type_void_ptr);
 						}
 
-						if (value_flags != flags || value_size != size)
-							break;
+						do {
+							expression_t *const value      = expression->unary.value;
+							type_t       *const value_type = value->base.type;
+							type_kind_t   const value_kind = value_type->kind;
 
-						expression = value;
-					} while (expression->kind == EXPR_UNARY_CAST);
+							unsigned value_flags;
+							unsigned value_size;
+							if (value_kind == TYPE_ATOMIC) {
+								atomic_type_kind_t const value_akind = value_type->atomic.akind;
+								value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+								value_size  = get_atomic_type_size(value_akind);
+							} else if (value_kind == TYPE_POINTER) {
+								value_flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+								value_size  = get_type_size(type_void_ptr);
+							} else {
+								break;
+							}
+
+							if (value_flags != flags || value_size != size)
+								break;
+
+							expression = value;
+						} while (expression->kind == EXPR_UNARY_CAST);
+					}
 				}
-			}
 
-			if (!is_lvalue(expression)) {
-				errorf(&expression->base.source_position,
-				       "asm output argument is not an lvalue");
-			}
+				if (!is_lvalue(expression))
+					errorf(&expression->base.source_position, "asm output argument is not an lvalue");
 
-			if (argument->constraints.begin[0] == '=')
-				determine_lhs_ent(expression, NULL);
-			else
+				if (argument->constraints.begin[0] == '=')
+					determine_lhs_ent(expression, NULL);
+				else
+					mark_vars_read(expression, NULL);
+			} else {
 				mark_vars_read(expression, NULL);
-		} else {
-			mark_vars_read(expression, NULL);
-		}
-		argument->expression = expression;
-		expect(')');
+			}
+			argument->expression = expression;
+			expect(')');
 
-		set_address_taken(expression, true);
+			set_address_taken(expression, true);
 
-		*anchor = argument;
-		anchor  = &argument->next;
-
-		if (!accept(','))
-			break;
+			*anchor = argument;
+			anchor  = &argument->next;
+		} while (accept(','));
 	}
 }
 
@@ -8730,15 +8727,14 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
  */
 static void parse_asm_clobbers(asm_clobber_t **anchor)
 {
-	while (token.kind == T_STRING_LITERAL) {
-		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
-		clobber->clobber       = parse_string_literals(NULL);
+	if (token.kind == T_STRING_LITERAL) {
+		do {
+			asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
+			clobber->clobber       = parse_string_literals(NULL);
 
-		*anchor = clobber;
-		anchor  = &clobber->next;
-
-		if (!accept(','))
-			break;
+			*anchor = clobber;
+			anchor  = &clobber->next;
+		} while (accept(','));
 	}
 }
 
