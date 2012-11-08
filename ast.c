@@ -1005,18 +1005,17 @@ static void print_for_statement(const for_statement_t *statement)
  *
  * @param arguments   the arguments
  */
-static void print_asm_arguments(asm_argument_t *arguments)
+static void print_asm_arguments(asm_argument_t const *const arguments)
 {
-	separator_t     sep      = { "", ", " };
-	asm_argument_t *argument = arguments;
-	for (; argument != NULL; argument = argument->next) {
+	print_string(" : ");
+	separator_t sep = { "", ", " };
+	for (asm_argument_t const *i = arguments; i; i = i->next) {
 		print_string(sep_next(&sep));
-		if (argument->symbol) {
-			print_format("[%s] ", argument->symbol->string);
-		}
-		print_quoted_string(&argument->constraints, '"');
+		if (i->symbol)
+			print_format("[%s] ", i->symbol->string);
+		print_quoted_string(&i->constraints, '"');
 		print_string(" (");
-		print_expression(argument->expression);
+		print_expression(i->expression);
 		print_char(')');
 	}
 }
@@ -1026,48 +1025,37 @@ static void print_asm_arguments(asm_argument_t *arguments)
  *
  * @param clobbers   the clobbers
  */
-static void print_asm_clobbers(asm_clobber_t *clobbers)
+static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 {
-	separator_t    sep     = { "", ", " };
-	asm_clobber_t *clobber = clobbers;
-	for (; clobber != NULL; clobber = clobber->next) {
+	print_string(" : ");
+	separator_t sep = { "", ", " };
+	for (asm_clobber_t const *i = clobbers; i; i = i->next) {
 		print_string(sep_next(&sep));
-		print_quoted_string(&clobber->clobber, '"');
+		print_quoted_string(&i->clobber, '"');
 	}
 }
 
 /**
  * Print an assembler statement.
  *
- * @param statement   the statement
+ * @param stmt   the statement
  */
-static void print_asm_statement(const asm_statement_t *statement)
+static void print_asm_statement(asm_statement_t const *const stmt)
 {
 	print_string("asm ");
-	if (statement->is_volatile) {
-		print_string("volatile ");
-	}
+	if (stmt->is_volatile) print_string("volatile ");
 	print_char('(');
-	print_quoted_string(&statement->asm_text, '"');
-	if (statement->outputs  == NULL &&
-	    statement->inputs   == NULL &&
-	    statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
+	print_quoted_string(&stmt->asm_text, '"');
 
-	print_string(" : ");
-	print_asm_arguments(statement->outputs);
-	if (statement->inputs == NULL && statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
+	unsigned const n =
+		stmt->clobbers ? 3 :
+		stmt->inputs   ? 2 :
+		stmt->outputs  ? 1 :
+		0;
+	if (n >= 1) print_asm_arguments(stmt->outputs);
+	if (n >= 2) print_asm_arguments(stmt->inputs);
+	if (n >= 3) print_asm_clobbers( stmt->clobbers);
 
-	print_string(" : ");
-	print_asm_arguments(statement->inputs);
-	if (statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
-
-	print_string(" : ");
-	print_asm_clobbers(statement->clobbers);
-
-end_of_print_asm_statement:
 	print_string(");");
 }
 
