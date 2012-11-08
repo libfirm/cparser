@@ -8638,11 +8638,8 @@ static void init_expression_parsers(void)
 /**
  * Parse a asm statement arguments specification.
  */
-static asm_argument_t *parse_asm_arguments(bool is_out)
+static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 {
-	asm_argument_t  *result = NULL;
-	asm_argument_t **anchor = &result;
-
 	while (token.kind == T_STRING_LITERAL || token.kind == '[') {
 		asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
 
@@ -8726,18 +8723,13 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 		if (!accept(','))
 			break;
 	}
-
-	return result;
 }
 
 /**
  * Parse a asm statement clobber specification.
  */
-static asm_clobber_t *parse_asm_clobbers(void)
+static void parse_asm_clobbers(asm_clobber_t **anchor)
 {
-	asm_clobber_t *result  = NULL;
-	asm_clobber_t **anchor = &result;
-
 	while (token.kind == T_STRING_LITERAL) {
 		asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 		clobber->clobber       = parse_string_literals(NULL);
@@ -8748,8 +8740,6 @@ static asm_clobber_t *parse_asm_clobbers(void)
 		if (!accept(','))
 			break;
 	}
-
-	return result;
 }
 
 /**
@@ -8772,15 +8762,10 @@ static statement_t *parse_asm_statement(void)
 	rem_anchor_token(T_STRING_LITERAL);
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
-	if (accept(':'))
-		asm_statement->outputs = parse_asm_arguments(true);
-
-	if (accept(':'))
-		asm_statement->inputs = parse_asm_arguments(false);
-
+	if (accept(':')) parse_asm_arguments(&asm_statement->outputs, true);
+	if (accept(':')) parse_asm_arguments(&asm_statement->inputs, false);
 	rem_anchor_token(':');
-	if (accept(':'))
-		asm_statement->clobbers = parse_asm_clobbers();
+	if (accept(':')) parse_asm_clobbers( &asm_statement->clobbers);
 
 	rem_anchor_token(')');
 	expect(')');
