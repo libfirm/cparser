@@ -6778,7 +6778,8 @@ static expression_t *parse_array_expression(expression_t *left)
 check_idx:
 		res_type = automatic_type_conversion(res_type);
 		if (!is_type_integer(idx_type)) {
-			errorf(&idx->base.source_position, "array subscript must have integer type");
+			if (is_type_valid(idx_type))
+				errorf(&idx->base.source_position, "array subscript must have integer type");
 		} else if (is_type_atomic(idx_type, ATOMIC_TYPE_CHAR)) {
 			source_position_t const *const pos = &idx->base.source_position;
 			warningf(WARN_CHAR_SUBSCRIPTS, pos, "array subscript has char type");
