@@ -8651,8 +8651,6 @@ static asm_argument_t *parse_asm_arguments(bool is_out)
 			argument->symbol = expect_identifier("while parsing asm argument", NULL);
 			rem_anchor_token(']');
 			expect(']');
-			if (!argument->symbol)
-				return NULL;
 		}
 
 		argument->constraints = parse_string_literals("asm argument");
