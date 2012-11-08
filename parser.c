@@ -8641,8 +8641,13 @@ static void init_expression_parsers(void)
 static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 {
 	if (token.kind == T_STRING_LITERAL || token.kind == '[') {
+		add_anchor_token(',');
 		do {
 			asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
+
+			add_anchor_token(')');
+			add_anchor_token('(');
+			add_anchor_token(T_STRING_LITERAL);
 
 			if (accept('[')) {
 				add_anchor_token(']');
@@ -8651,11 +8656,11 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 				expect(']');
 			}
 
+			rem_anchor_token(T_STRING_LITERAL);
 			argument->constraints = parse_string_literals("asm argument");
-			add_anchor_token(')');
+			rem_anchor_token('(');
 			expect('(');
 			expression_t *expression = parse_expression();
-			rem_anchor_token(')');
 			if (is_out) {
 				/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
 				 * change size or type representation (e.g. int -> long is ok, but
@@ -8712,6 +8717,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 				mark_vars_read(expression, NULL);
 			}
 			argument->expression = expression;
+			rem_anchor_token(')');
 			expect(')');
 
 			set_address_taken(expression, true);
@@ -8719,6 +8725,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 			*anchor = argument;
 			anchor  = &argument->next;
 		} while (accept(','));
+		rem_anchor_token(',');
 	}
 }
 
@@ -8728,6 +8735,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 static void parse_asm_clobbers(asm_clobber_t **anchor)
 {
 	if (token.kind == T_STRING_LITERAL) {
+		add_anchor_token(',');
 		do {
 			asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
 			clobber->clobber       = parse_string_literals(NULL);
@@ -8735,6 +8743,7 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 			*anchor = clobber;
 			anchor  = &clobber->next;
 		} while (accept(','));
+		rem_anchor_token(',');
 	}
 }
 
