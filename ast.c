@@ -1007,8 +1007,8 @@ static void print_for_statement(const for_statement_t *statement)
  */
 static void print_asm_arguments(asm_argument_t const *const arguments)
 {
-	print_string(" : ");
-	separator_t sep = { "", ", " };
+	print_string(" :");
+	separator_t sep = { " ", ", " };
 	for (asm_argument_t const *i = arguments; i; i = i->next) {
 		print_string(sep_next(&sep));
 		if (i->symbol)
@@ -1027,8 +1027,8 @@ static void print_asm_arguments(asm_argument_t const *const arguments)
  */
 static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 {
-	print_string(" : ");
-	separator_t sep = { "", ", " };
+	print_string(" :");
+	separator_t sep = { " ", ", " };
 	for (asm_clobber_t const *i = clobbers; i; i = i->next) {
 		print_string(sep_next(&sep));
 		print_quoted_string(&i->clobber, '"');
@@ -1042,8 +1042,8 @@ static void print_asm_clobbers(asm_clobber_t const *const clobbers)
  */
 static void print_asm_statement(asm_statement_t const *const stmt)
 {
-	print_string("asm ");
-	if (stmt->is_volatile) print_string("volatile ");
+	print_string("asm");
+	if (stmt->is_volatile) print_string(" volatile");
 	print_char('(');
 	print_quoted_string(&stmt->asm_text, '"');
 
