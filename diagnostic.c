@@ -243,10 +243,16 @@ void diagnosticf(const char *const fmt, ...)
 static void diagnosticposvf(source_position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
 {
 	FILE *const out = stderr;
-	fprintf(out, "%s:%u:", pos->input_name, pos->lineno);
-	if (show_column)
-		fprintf(out, "%u:", (unsigned)pos->colno);
-	fprintf(out, " %s: ", kind);
+	if (pos) {
+		fprintf(out, "%s:", pos->input_name);
+		if (pos->lineno != 0) {
+			fprintf(out, "%u:", pos->lineno);
+			if (show_column)
+				fprintf(out, "%u:", (unsigned)pos->colno);
+		}
+		fputc(' ', out);
+	}
+	fprintf(out, "%s: ", kind);
 	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 }
