@@ -188,15 +188,11 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 
 	if (!is_po2(alignment)) {
-		errorf(&attribute->source_position,
-			   "alignment must be a power of 2 but is %d\n",
-			   alignment);
+		errorf(&attribute->source_position, "alignment must be a power of 2 but is %d", alignment);
 		return;
 	}
 	if (alignment <= 0) {
-		errorf(&attribute->source_position,
-			   "alignment must be bigger than 0 but is %d\n",
-			   alignment);
+		errorf(&attribute->source_position, "alignment must be bigger than 0 but is %d", alignment);
 		return;
 	}
 

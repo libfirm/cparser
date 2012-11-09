@@ -1532,8 +1532,7 @@ digraph_percentcolon:
 	default:
 dollar_sign:
 		if (error_on_unknown_chars) {
-			errorf(&pp_token.base.source_position,
-			       "unknown character '%lc' found\n", input.c);
+			errorf(&pp_token.base.source_position, "unknown character '%lc' found", input.c);
 			next_char();
 			goto restart;
 		} else {
