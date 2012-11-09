@@ -394,7 +394,8 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 	}
 	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
-		fprintf(stderr, "invoking preprocessor failed\n");
+		source_position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos, "invoking preprocessor failed");
 		return false;
 	}
 	/* we do not really need that anymore */
@@ -445,7 +446,8 @@ static void assemble(const char *out, const char *in)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "assembler reported an error\n");
+		source_position_t const pos = { in, 0, 0, 0 };
+		errorf(&pos, "assembler reported an error");
 		exit(EXIT_FAILURE);
 	}
 	obstack_free(&asflags_obst, commandline);
@@ -477,7 +479,8 @@ static void print_file_name(const char *file)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "linker reported an error\n");
+		source_position_t const pos = { file, 0, 0, 0 };
+		errorf(&pos, "linker reported an error");
 		exit(EXIT_FAILURE);
 	}
 	obstack_free(&ldflags_obst, commandline);
@@ -547,13 +550,14 @@ static FILE *make_temp_file(const char *prefix, const char **name_result)
 	char *name = obstack_finish(&file_obst);
 	int fd = mkstemp(name);
 	if (fd == -1) {
-		fprintf(stderr, "could not create temporary file: %s\n",
-		        strerror(errno));
+		source_position_t const pos = { name, 0, 0, 0 };
+		errorf(&pos, "could not create temporary file: %s", strerror(errno));
 		return NULL;
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
-		fprintf(stderr, "could not open temporary file as FILE*\n");
+		source_position_t const pos = { name, 0, 0, 0 };
+		errorf(&pos, "could not open temporary file as FILE*");
 		return NULL;
 	}
 
@@ -886,7 +890,7 @@ static bool parse_target_triple(const char *arg)
 {
 	machine_triple_t *triple = firm_parse_machine_triple(arg);
 	if (triple == NULL) {
-		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
+		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
 		return false;
 	}
 	target_machine = triple;
@@ -924,7 +928,7 @@ static const char *setup_isa_from_tripel(const machine_triple_t *machine)
 	} else if (streq(cpu, "arm")) {
 		return "arm";
 	} else {
-		fprintf(stderr, "Unknown cpu '%s' in target-triple\n", cpu);
+		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		return NULL;
 	}
 }
@@ -1208,8 +1212,8 @@ static bool open_input(compilation_unit_t *unit)
 	} else {
 		unit->input = fopen(inputname, "r");
 		if (unit->input == NULL) {
-			fprintf(stderr, "Could not open '%s': %s\n", inputname,
-					strerror(errno));
+			source_position_t const pos = { inputname, 0, 0, 0 };
+			errorf(&pos, "could not open: %s", strerror(errno));
 			return false;
 		}
 	}
@@ -1258,8 +1262,8 @@ again:
 			}
 			res = !ir_import_file(unit->input, unit->name);
 			if (!res) {
-				fprintf(stderr, "Import of firm graph from '%s' failed\n",
-				        inputname);
+				source_position_t const pos = { inputname, 0, 0, 0 };
+				errorf(&pos, "import of firm graph failed");
 				result = EXIT_FAILURE;
 				break;
 			}
@@ -1363,8 +1367,7 @@ again:
 				}
 
 				if (irg == NULL) {
-					fprintf(stderr, "No graph for function '%s' found\n",
-					        dumpfunction);
+					errorf(NULL, "no graph for function '%s' found", dumpfunction);
 					return EXIT_FAILURE;
 				}
 
@@ -1376,7 +1379,7 @@ again:
 			if (mode == CompileExportIR) {
 				ir_export_file(out);
 				if (ferror(out) != 0) {
-					fprintf(stderr, "Error while writing to output\n");
+					errorf(NULL, "writing to output failed");
 					return EXIT_FAILURE;
 				}
 				return EXIT_SUCCESS;
@@ -1465,7 +1468,7 @@ static int link_program(compilation_unit_t *units)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "linker reported an error\n");
+		errorf(NULL, "linker reported an error");
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
@@ -1508,13 +1511,13 @@ int main(int argc, char **argv)
 	if (def[0] == '\0') {                                                    \
 		++i;                                                                 \
 		if (i >= argc) {                                                     \
-			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			errorf(NULL, "expected argument after '" args "'"); \
 			argument_errors = true;                                          \
 			break;                                                           \
 		}                                                                    \
 		def = argv[i];                                                       \
 		if (def[0] == '-' && def[1] != '\0') {                               \
-			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			errorf(NULL, "expected argument after '" args "'"); \
 			argument_errors = true;                                          \
 			continue;                                                        \
 		}                                                                    \
@@ -1601,7 +1604,7 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-x");
 				forced_unittype = get_unit_type_from_string(opt);
 				if (forced_unittype == COMPILATION_UNIT_UNKNOWN) {
-					fprintf(stderr, "Unknown language '%s'\n", opt);
+					errorf(NULL, "unknown language '%s'", opt);
 					argument_errors = true;
 				}
 			} else if (streq(option, "M")) {
@@ -1675,8 +1678,7 @@ int main(int argc, char **argv)
 					elf_visibility_tag_t visibility
 						= get_elf_visibility_from_string(val);
 					if (visibility == ELF_VISIBILITY_ERROR) {
-						fprintf(stderr, "invalid visibility '%s' specified\n",
-						        val);
+						errorf(NULL, "invalid visibility '%s' specified", val);
 						argument_errors = true;
 					} else {
 						set_default_visibility(visibility);
@@ -1750,8 +1752,7 @@ int main(int argc, char **argv)
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
-							fprintf(stderr, "error: unknown Firm option '-f%s'\n",
-							        orig_opt);
+							errorf(NULL, "unknown Firm option '-f%s'", orig_opt);
 							argument_errors = true;
 							continue;
 						}
@@ -1767,8 +1768,7 @@ int main(int argc, char **argv)
 				} else {
 					int res = be_parse_arg(opt);
 					if (res == 0) {
-						fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
-								opt);
+						errorf(NULL, "unknown Firm backend option '-b %s'", opt);
 						argument_errors = true;
 					} else if (strstart(opt, "isa=")) {
 						strncpy(cpu_arch, opt, sizeof(cpu_arch));
@@ -1832,7 +1832,7 @@ int main(int argc, char **argv)
 					res &= be_parse_arg(arch_opt);
 
 					if (res == 0) {
-						fprintf(stderr, "Unknown architecture '%s'\n", arch_opt);
+						errorf(NULL, "unknown architecture '%s'", arch_opt);
 						argument_errors = true;
 					}
 				} else if (strstart(opt, "tune=")) {
@@ -1854,7 +1854,7 @@ int main(int argc, char **argv)
 					else if (streq(opt, "sse"))
 						opt = "sse2";
 					else {
-						fprintf(stderr, "error: option -mfpmath supports only 387 or sse\n");
+						errorf(NULL, "option -mfpmath supports only 387 or sse");
 						argument_errors = true;
 					}
 					if (!argument_errors) {
@@ -1872,7 +1872,7 @@ int main(int argc, char **argv)
 				} else if (streq(opt, "rtd")) {
 					default_calling_convention = CC_STDCALL;
 				} else if (strstart(opt, "regparm=")) {
-					fprintf(stderr, "error: regparm convention not supported yet\n");
+					errorf(NULL, "regparm convention not supported yet");
 					argument_errors = true;
 				} else if (streq(opt, "soft-float")) {
 					add_flag(&ldflags_obst, "-msoft-float");
@@ -1886,10 +1886,10 @@ int main(int argc, char **argv)
 				} else {
 					long int value = strtol(opt, NULL, 10);
 					if (value == 0) {
-						fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
+						errorf(NULL, "wrong option '-m %s'",  opt);
 						argument_errors = true;
 					} else if (value != 16 && value != 32 && value != 64) {
-						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
+						errorf(NULL, "option -m supports only 16, 32 or 64");
 						argument_errors = true;
 					} else {
 						unsigned machine_size = (unsigned)value;
@@ -1972,8 +1972,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "jna-limit")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--jna-limit'\n");
+						errorf(NULL, "expected argument after '--jna-limit'");
 						argument_errors = true;
 						break;
 					}
@@ -1981,8 +1980,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "jna-libname")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--jna-libname'\n");
+						errorf(NULL, "expected argument after '--jna-libname'");
 						argument_errors = true;
 						break;
 					}
@@ -2030,8 +2028,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "dump-function")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--dump-function'\n");
+						errorf(NULL, "expected argument after '--dump-function'");
 						argument_errors = true;
 						break;
 					}
@@ -2042,11 +2039,11 @@ int main(int argc, char **argv)
 				} else if (streq(option, "unroll-loops")) {
 					/* ignore (gcc compatibility) */
 				} else {
-					fprintf(stderr, "error: unknown argument '%s'\n", arg);
+					errorf(NULL, "unknown argument '%s'", arg);
 					argument_errors = true;
 				}
 			} else {
-				fprintf(stderr, "error: unknown argument '%s'\n", arg);
+				errorf(NULL, "unknown argument '%s'", arg);
 				argument_errors = true;
 			}
 		} else {
@@ -2106,7 +2103,7 @@ int main(int argc, char **argv)
 		return EXIT_SUCCESS;
 	}
 	if (units == NULL) {
-		fprintf(stderr, "error: no input files specified\n");
+		errorf(NULL, "no input files specified");
 		argument_errors = true;
 	}
 
@@ -2203,8 +2200,8 @@ int main(int argc, char **argv)
 	} else {
 		out = fopen(outname, "w");
 		if (out == NULL) {
-			fprintf(stderr, "Could not open '%s' for writing: %s\n", outname,
-					strerror(errno));
+			source_position_t const pos = { outname, 0, 0, 0 };
+			errorf(&pos, "could not open for writing: %s", strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}

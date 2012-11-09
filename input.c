@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include "diagnostic.h"
 #include "input.h"
 
 #include <ctype.h>
@@ -301,7 +302,7 @@ static void choose_decoder(input_t *result, const char *encoding)
 			result->decode = i->decoder;
 			return;
 		}
-		fprintf(stderr, "error: input encoding \"%s\" not supported\n", encoding);
+		errorf(NULL, "input encoding \"%s\" not supported", encoding);
 	}
 	result->decode = decode_utf8;
 }
