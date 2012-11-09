@@ -289,6 +289,8 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 			diagnosticposvf(pos, kind, fmt, ap);
 			if (diagnostics_show_option)
 				fprintf(stderr, " [-W%s]\n", s->name);
+			else
+				fputc('\n', stderr);
 			break;
 
 		default:
