@@ -1477,12 +1477,6 @@ int main(int argc, char **argv)
 	bool                do_timing            = false;
 	bool                print_timing         = false;
 
-	/* hack for now... */
-	if (strstr(argv[0], "pptest") != NULL) {
-		extern int pptest_main(int argc, char **argv);
-		return pptest_main(argc, argv);
-	}
-
 	temp_files = NEW_ARR_F(char*, 0);
 	atexit(free_temp_files);
 
