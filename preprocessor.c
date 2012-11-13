@@ -164,8 +164,8 @@ void switch_pp_input(FILE *const file, char const *const filename, searchpath_en
 {
 	input.file                 = file;
 	input.input                = input_from_stream(file, NULL);
-	input.bufend               = NULL;
-	input.bufpos               = NULL;
+	input.bufend               = input.buf + MAX_PUTBACK;
+	input.bufpos               = input.bufend;
 	input.output_line          = 0;
 	input.pos.input_name       = filename;
 	input.pos.lineno           = 1;
