@@ -123,6 +123,7 @@ bool                         allow_dollar_in_symbol   = true;
 static bool                  resolve_escape_sequences = true;
 static bool                  error_on_unknown_chars   = true;
 static bool                  skip_mode;
+static bool                  stop_at_newline;
 static FILE                 *out;
 static struct obstack        pp_obstack;
 static struct obstack        config_obstack;
@@ -1587,6 +1588,12 @@ static void skip_whitespace(void)
 			info.at_line_begin  = true;
 			info.had_whitespace = true;
 			info.whitespace_at_line_begin = 0;
+			if (stop_at_newline) {
+				--input.pos.lineno;
+				put_back(input.c);
+				input.c = '\n';
+				return;
+			}
 			continue;
 
 		case '/':
@@ -1797,6 +1804,13 @@ restart:
 		info.at_line_begin            = true;
 		info.had_whitespace           = true;
 		info.whitespace_at_line_begin = 0;
+		if (stop_at_newline) {
+			--input.pos.lineno;
+			set_punctuator(T_NEWLINE);
+			put_back(input.c);
+			input.c = '\n';
+			return;
+		}
 		goto restart;
 
 	case SYMBOL_CASES:
@@ -1948,6 +1962,11 @@ digraph_percentcolon:
 		return;
 
 	case EOF:
+		if (stop_at_newline) {
+			set_punctuator(T_NEWLINE);
+			return;
+		}
+
 		if (input_stack != NULL) {
 			fclose(close_pp_input());
 			pop_restore_input();
@@ -2123,7 +2142,7 @@ void emit_pp_token(void)
 
 static void eat_pp_directive(void)
 {
-	while (!info.at_line_begin) {
+	while (pp_token.kind != '\n' && pp_token.kind != T_EOF) {
 		next_input_token();
 	}
 }
@@ -2264,7 +2283,7 @@ static void error_missing_macro_param(void)
 
 static bool is_defineable_token(char const *const context)
 {
-	if (info.at_line_begin) {
+	if (pp_token.kind == T_EOF) {
 		errorf(&pp_token.base.pos, "unexpected end of line after %s", context);
 		return false;
 	}
@@ -2387,7 +2406,7 @@ static void parse_define_directive(void)
 	/* construct token list */
 	assert(obstack_object_size(&pp_obstack) == 0);
 	bool next_must_be_param = false;
-	while (!info.at_line_begin) {
+	while (pp_token.kind != '\n') {
 		if (pp_token.kind == T_IDENTIFIER) {
 			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
 			if (definition != NULL
@@ -2489,8 +2508,9 @@ static void parse_undef_directive(void)
 	pp_token.base.symbol->pp_definition = NULL;
 	next_input_token();
 
-	if (!info.at_line_begin) {
-		warningf(WARN_OTHER, &input.pos, "extra tokens at end of #undef directive");
+	if (pp_token.kind != '\n') {
+		warningf(WARN_OTHER, &input.pos,
+		         "extra tokens at end of #undef directive");
 	}
 	eat_pp_directive();
 }
@@ -2501,7 +2521,7 @@ static void parse_undef_directive(void)
  * exception here */
 static const char *parse_headername(bool *system_include)
 {
-	if (info.at_line_begin) {
+	if (input.c == '\n' || input.c == '\r') {
 		parse_error("expected headername after #include");
 		return NULL;
 	}
@@ -2543,12 +2563,6 @@ parse_name:
 
 	default:
 		next_preprocessing_token();
-		if (info.at_line_begin) {
-			/* TODO: if we are already in the new line then we parsed more than
-			 * wanted. We reuse the token, but could produce following errors
-			 * misbehaviours... */
-			goto error_invalid_input;
-		}
 		if (pp_token.kind == T_STRING_LITERAL) {
 			*system_include = false;
 			return pp_token.literal.string.begin;
@@ -2557,9 +2571,7 @@ parse_name:
 			assert(obstack_object_size(&pp_obstack) == 0);
 			while (true) {
 				next_preprocessing_token();
-				if (info.at_line_begin) {
-					/* TODO: we shouldn't have parsed/expanded something on the
-					 * next line yet... */
+				if (pp_token.kind == T_EOF) {
 					char *dummy = obstack_finish(&pp_obstack);
 					obstack_free(&pp_obstack, dummy);
 					goto error_invalid_input;
@@ -2751,11 +2763,6 @@ static ir_tarval *parse_pp_expression(precedence_t prec);
 
 static ir_tarval *parse_pp_operand(void)
 {
-	if (info.at_line_begin) {
-		errorf(&pp_token.base.pos, "unexpected end of preprocessor condition");
-		return tarval_bad;
-	}
-
 	token_kind_t const kind = pp_token.kind;
 	switch (kind) {
 	case T_CHARACTER_CONSTANT: {
@@ -2826,9 +2833,7 @@ error:
 	case '(': {
 		next_condition_token();
 		ir_tarval *const res = parse_pp_expression(PREC_BOTTOM);
-		if (info.at_line_begin) {
-			errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ')'");
-		} else if (pp_token.kind == ')') {
+		if (pp_token.kind == ')') {
 			next_condition_token();
 		} else {
 			errorf(&pp_token.base.pos, "missing ')' in preprocessor condition");
@@ -2864,7 +2869,7 @@ error:
 
 			if (!expand_next()) {
 				next_input_token();
-				if (info.at_line_begin) {
+				if (pp_token.kind == '\n') {
 					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected '(' or identifier");
 					return tarval_bad;
 				}
@@ -2877,7 +2882,7 @@ error:
 				if (!expand_next()) {
 has_paren:
 					next_input_token();
-					if (info.at_line_begin) {
+					if (pp_token.kind == '\n') {
 						errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected identifier");
 						return tarval_bad;
 					}
@@ -2900,7 +2905,7 @@ restart:
 							if (!expand_next()) {
 read_input:
 								next_input_token();
-								if (info.at_line_begin) {
+								if (pp_token.kind == '\n') {
 									errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected identifier");
 									return tarval_bad;
 								}
@@ -2912,13 +2917,7 @@ read_input:
 					goto restart;
 				}
 			}
-next:
-
-			if (info.at_line_begin) {
-				errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected '(' or identifier");
-				return tarval_bad;
-			}
-
+next:;
 			ir_tarval *res;
 			if (is_identifierlike_token(&pp_token)) {
 				res = pp_token.base.symbol->pp_definition ? pp_one : pp_null;
@@ -2929,7 +2928,7 @@ next:
 			}
 
 			if (has_paren) {
-				if (info.at_line_begin) {
+				if (pp_token.kind == '\n') {
 					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ')'");
 				} else if (pp_token.kind == ')') {
 					next_condition_token();
@@ -2951,9 +2950,6 @@ static ir_tarval *parse_pp_expression(precedence_t const prev_prec)
 {
 	ir_tarval *res = parse_pp_operand();
 	for (;;) {
-		if (info.at_line_begin)
-			return res;
-
 		precedence_t       prec;
 		token_kind_t const kind = pp_token.kind;
 		switch (kind) {
@@ -2985,7 +2981,7 @@ static ir_tarval *parse_pp_expression(precedence_t const prev_prec)
 			return res;
 
 		next_condition_token();
-		if (info.at_line_begin) {
+		if (pp_token.kind == '\n') {
 			errorf(&pp_token.base.pos, "unexpected end of preprocessor condition");
 			return pp_null;
 		}
@@ -3039,10 +3035,7 @@ cmp:
 
 			case '?': {
 				ir_tarval *t = right;
-				if (info.at_line_begin) {
-					errorf(&pp_token.base.pos, "unexpected end of preprocessor condition, expected ':'");
-					return pp_null;
-				} else if (pp_token.kind != ':') {
+				if (pp_token.kind != ':') {
 					errorf(&pp_token.base.pos, "unexpected %K in preprocessor condition, expected ':'", &pp_token);
 				} else {
 					next_condition_token();
@@ -3082,7 +3075,7 @@ static bool parse_pp_condition(void)
 
 	next_condition_token();
 	bool const res = !tarval_is_null(parse_pp_expression(PREC_BOTTOM));
-	if (!info.at_line_begin) {
+	if (pp_token.kind != '\n') {
 		errorf(&pp_token.base.pos, "extra tokens at end of condition");
 		eat_pp_directive();
 	}
@@ -3160,7 +3153,7 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 		condition = (bool)pp_token.base.symbol->pp_definition == is_ifdef;
 		next_input_token();
 
-		if (!info.at_line_begin) {
+		if (pp_token.kind != T_NEWLINE) {
 			errorf(&pp_token.base.pos, "extra tokens at end of %s", ctx);
 			eat_pp_directive();
 		}
@@ -3179,7 +3172,7 @@ static void parse_else_directive(void)
 {
 	eat_pp(TP_else);
 
-	if (!info.at_line_begin) {
+	if (pp_token.kind != '\n') {
 		if (!skip_mode) {
 			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #else");
 		}
@@ -3211,7 +3204,7 @@ static void parse_endif_directive(void)
 {
 	eat_pp(TP_endif);
 
-	if (!info.at_line_begin) {
+	if (pp_token.kind != '\n') {
 		if (!skip_mode) {
 			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #endif");
 		}
@@ -3312,7 +3305,7 @@ static void parse_line_directive(void)
 			}
 		}
 		next_input_token();
-		if (info.at_line_begin)
+		if (pp_token.kind == '\n')
 			return;
 	}
 	if (pp_token.kind == T_STRING_LITERAL
@@ -3322,7 +3315,7 @@ static void parse_line_directive(void)
 		next_input_token();
 
 		/* attempt to parse numeric flags as outputted by gcc preprocessor */
-		while (!info.at_line_begin && pp_token.kind == T_NUMBER) {
+		while (pp_token.kind == T_NUMBER) {
 			/* flags:
 			 * 1 - indicates start of a new file
 			 * 2 - indicates return from a file
@@ -3382,7 +3375,7 @@ string:;
 		}
 
 		next_input_token();
-	} while (!info.at_line_begin);
+	} while (pp_token.kind != '\n');
 
 	resolve_escape_sequences = old_resolve_escape_sequences;
 
@@ -3394,14 +3387,13 @@ string:;
 
 static void parse_preprocessing_directive(void)
 {
+	assert(stop_at_newline == false);
+	stop_at_newline = true;
 	eat_token('#');
 
-	if (info.at_line_begin) {
+	if (pp_token.kind == '\n') {
 		/* empty directive */
-		return;
-	}
-
-	if (pp_token.base.symbol) {
+	} else if (pp_token.base.symbol) {
 		switch (pp_token.base.symbol->pp_ID) {
 		case TP_define:       parse_define_directive();            break;
 		case TP_elif:         parse_elif_directive();              break;
@@ -3429,7 +3421,8 @@ skip:
 		eat_pp_directive();
 	}
 
-	assert(info.at_line_begin);
+	stop_at_newline = false;
+	eat_token('\n');
 }
 
 static void finish_current_argument(void)

@@ -32,6 +32,7 @@ PUNCTUATOR(SEMICOLON,       ";", = ';')
 PUNCTUATOR(EQUAL,           "=", = '=')
 PUNCTUATOR(COMMA,           ",", = ',')
 PUNCTUATOR(HASH,            "#", = '#')
+PUNCTUATOR(NEWLINE,         "newline", = '\n')
 
 /* Start after extended ASCII. */
 PUNCTUATOR(MINUSGREATER,             "->", = 256)
