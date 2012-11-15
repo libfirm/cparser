@@ -122,10 +122,10 @@ static int               verbose;
 static struct obstack    cppflags_obst;
 static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
-static char              dep_target[1024];
 static const char       *outname;
 static bool              define_intmax_types;
 static const char       *input_encoding;
+static bool              construct_dep_target;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -319,38 +319,8 @@ static char const* str_lang_standard(lang_standard_t const standard)
 
 static bool run_external_preprocessor(compilation_unit_t *unit)
 {
-	static const char *common_flags = NULL;
-
-	if (common_flags == NULL) {
-		obstack_1grow(&cppflags_obst, '\0');
-		const char *flags = obstack_finish(&cppflags_obst);
-
-		/* setup default defines */
-		add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
-		add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
-		add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
-		add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
-
-		add_flag(&cppflags_obst, "-U__VERSION__");
-		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
-
-		if (define_intmax_types) {
-			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
-			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
-			add_flag(&cppflags_obst, "-U__UINTMAX_TYPE__");
-			add_flag(&cppflags_obst, "-D__UINTMAX_TYPE__=%s", type_to_string(type_uintmax_t));
-		}
-
-		if (flags[0] != '\0') {
-			size_t len = strlen(flags);
-			obstack_1grow(&cppflags_obst, ' ');
-			obstack_grow(&cppflags_obst, flags, len);
-		}
-		obstack_1grow(&cppflags_obst, '\0');
-		common_flags = obstack_finish(&cppflags_obst);
-	}
-
-	assert(obstack_object_size(&cppflags_obst) == 0);
+	obstack_1grow(&cppflags_obst, '\0');
+	const char *flags = obstack_finish(&cppflags_obst);
 
 	const char *preprocessor = getenv("CPARSER_PP");
 	if (preprocessor != NULL) {
@@ -371,18 +341,56 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 	if (lang)
 		add_flag(&cppflags_obst, "-x%s", lang);
 
-	add_flag(&cppflags_obst, "-std=%s", str_lang_standard(unit->standard));
+	if (unit->type == COMPILATION_UNIT_C
+	 || unit->type == COMPILATION_UNIT_CXX) {
+		add_flag(&cppflags_obst, "-std=%s", str_lang_standard(unit->standard));
 
-	obstack_printf(&cppflags_obst, "%s", common_flags);
+		/* setup default defines */
+		add_flag(&cppflags_obst, "-U__WCHAR_TYPE__");
+		add_flag(&cppflags_obst, "-D__WCHAR_TYPE__=%s", type_to_string(type_wchar_t));
+		add_flag(&cppflags_obst, "-U__SIZE_TYPE__");
+		add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
+
+		add_flag(&cppflags_obst, "-U__VERSION__");
+		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
+
+		if (define_intmax_types) {
+			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
+			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
+			add_flag(&cppflags_obst, "-U__UINTMAX_TYPE__");
+			add_flag(&cppflags_obst, "-D__UINTMAX_TYPE__=%s", type_to_string(type_uintmax_t));
+		}
+	}
+	if (flags[0] != '\0') {
+		size_t len = strlen(flags);
+		obstack_1grow(&cppflags_obst, ' ');
+		obstack_grow(&cppflags_obst, flags, len);
+	}
 
 	/* handle dependency generation */
-	if (dep_target[0] != '\0') {
+	if (construct_dep_target) {
+		static char dep_target[4096];
+		if (outname != 0) {
+			size_t len = strlen(outname);
+			if (len > sizeof(dep_target)-4) /* leave room for .d extension */
+				len = sizeof(dep_target)-4;
+			memcpy(dep_target, outname, len);
+			/* replace extension with .d if found */
+			char *dot = &dep_target[len-1];
+			for ( ; dot >= dep_target && *dot != '/'; --dot) {
+				if (*dot == '.') {
+					dot[1] = 'd';
+					len = (dot-dep_target)+2;
+					break;
+				}
+			}
+			dep_target[len] = '\0';
+		} else {
+			get_output_name(dep_target, sizeof(dep_target), unit->name, ".d");
+		}
+
 		add_flag(&cppflags_obst, "-MF");
 		add_flag(&cppflags_obst, dep_target);
-		if (outname != NULL) {
-			add_flag(&cppflags_obst, "-MQ");
-			add_flag(&cppflags_obst, outname);
-		}
 	}
 	assert(unit->input == NULL);
 	add_flag(&cppflags_obst, unit->name);
@@ -1199,6 +1207,18 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 	return res && error_count == 0;
 }
 
+static void copy_file(FILE *dest, FILE *input)
+{
+	char buf[16384];
+
+	while (!feof(input) && !ferror(dest)) {
+		size_t read = fread(buf, 1, sizeof(buf), input);
+		if (fwrite(buf, 1, read, dest) != read) {
+			perror("could not write output");
+		}
+	}
+}
+
 static bool open_input(compilation_unit_t *unit)
 {
 	/* input already available as FILE? */
@@ -1270,8 +1290,30 @@ again:
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
 		}
-		case COMPILATION_UNIT_ASSEMBLER:
-			panic("TODO: preprocess for assembler");
+		case COMPILATION_UNIT_ASSEMBLER: {
+			if (external_preprocessor == NULL) {
+				panic("preprocessed assembler not possible with internal preprocessor yet");
+			}
+			bool res = run_external_preprocessor(unit);
+			if (!res) {
+				result = EXIT_FAILURE;
+				break;
+			}
+			/* write file to output... */
+			FILE *asm_out;
+			if (mode == PreprocessOnly) {
+				asm_out = out;
+			} else {
+				asm_out = make_temp_file("ccs", &unit->name);
+			}
+			assert(unit->input != NULL);
+			assert(unit->input_is_pipe);
+			copy_file(asm_out, unit->input);
+			if (asm_out != out)
+				fclose(asm_out);
+			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+			goto again;
+		}
 		case COMPILATION_UNIT_C:
 		case COMPILATION_UNIT_CXX:
 			if (external_preprocessor != NULL) {
@@ -1482,7 +1524,6 @@ int main(int argc, char **argv)
 	char                cpu_arch[16]         = "ia32";
 	compilation_unit_t *units                = NULL;
 	compilation_unit_t *last_unit            = NULL;
-	bool                construct_dep_target = false;
 	bool                produce_statev       = false;
 	const char         *filtev               = NULL;
 	bool                profile_generate     = false;
@@ -2140,16 +2181,6 @@ int main(int argc, char **argv)
 
 	if (do_timing)
 		timer_init();
-
-	if (construct_dep_target) {
-		if (outname != 0 && strlen(outname) >= 2) {
-			get_output_name(dep_target, sizeof(dep_target), outname, ".d");
-		} else {
-			get_output_name(dep_target, sizeof(dep_target), units->name, ".d");
-		}
-	} else {
-		dep_target[0] = '\0';
-	}
 
 	char outnamebuf[4096];
 	if (outname == NULL) {
