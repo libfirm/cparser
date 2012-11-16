@@ -1,3 +1,15 @@
+cparser 0.9.14 (2012-11-21)
+---------------------------
+
+* Adapt to libfirm-1.21.0
+* Improved error recovery
+* Improved firm graph generation (faster/smaller graphs)
+* Implement U,u and u8 strings
+* Preliminary preprocessor (we still use system cpp by default, as some macro
+  expansion corner cases are still buggy and prevent us from compiling glibc
+  headers)
+* More gcc extensions: binary constants, __leaf__ attribute
+
 cparser 0.9.13 (2011-12-07)
 ---------------------------
 

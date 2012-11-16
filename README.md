@@ -17,7 +17,7 @@ Requirements:
 
 * A C99 compiler (gcc and icc are known to work).
 * pkg-config (recommended)
-* libFirm-1.20 or later
+* libFirm-1.21 or later
 
 Make sure you have installed libFirm and pkg-config can find the libfirm.pc
 files ("pkg-config --modversion libfirm" should work). Use (GNU)-make to build
