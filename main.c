@@ -630,6 +630,7 @@ static void print_help_basic(const char *argv0)
 	puts("");
 	put_help("--help",                   "Display this information");
 	put_help("--version",                "Display compiler version");
+	put_help("--help-preprocessor",      "Display information about preprocessor options");
 	put_help("--help-parser",            "Display information about parser options");
 	put_help("--help-warnings",          "Display information about warning options");
 	put_help("--help-codegen",           "Display information about code-generation options");
@@ -655,6 +656,7 @@ static void print_help_basic(const char *argv0)
 
 static void print_help_preprocessor(void)
 {
+	put_help("--external-pp",            "Use an external preprocessor (default)");
 	put_help("-nostdinc",                "Do not search standard system include directories");
 	put_help("-trigraphs",               "Support ISO C trigraphs");
 	put_help("-isystem",                 "");
@@ -2388,6 +2390,8 @@ int main(int argc, char **argv)
 					return EXIT_SUCCESS;
 				} else if (streq(option, "help")) {
 					help |= HELP_BASIC;
+				} else if (streq(option, "help-preprocessor")) {
+					help |= HELP_PREPROCESSOR;
 				} else if (streq(option, "help-parser")) {
 					help |= HELP_PARSER;
 				} else if (streq(option, "help-warnings")) {
