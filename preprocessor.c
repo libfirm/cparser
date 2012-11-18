@@ -1036,7 +1036,7 @@ static void grow_token(struct obstack *obst, const token_t *token)
 	}
 }
 
-static void stringify(const pp_definition_t *definition)
+static token_t stringify(const pp_definition_t *definition)
 {
 	assert(obstack_object_size(&symbol_obstack) == 0);
 
@@ -1047,8 +1047,16 @@ static void stringify(const pp_definition_t *definition)
 			obstack_1grow(&symbol_obstack, ' ');
 		grow_token(&symbol_obstack, &saved->token);
 	}
-	pp_token.kind           = T_STRING_LITERAL;
-	pp_token.literal.string = sym_make_string(STRING_ENCODING_CHAR);
+	return (token_t) {
+		.literal = {
+			.base = {
+				.kind   = T_STRING_LITERAL,
+				.pos    = definition->pos,
+				.symbol = NULL
+			},
+			.string = sym_make_string(STRING_ENCODING_CHAR)
+		}
+	};
 }
 
 static string_encoding_t identify_encoding_prefix(symbol_t *const sym)
@@ -1447,17 +1455,31 @@ more_concat:
 		token_kind_t         next_kind = next->token.kind;
 		if (next_kind == T_HASHHASH && pos+1 < current_expansion->list_len
 		    && !current_expansion->definition->is_parameter) {
-			const saved_token_t *next_but_one
-				= &current_expansion->token_list[pos+1];
-			if (concat_tokens(&next->token.base.pos,
-			                  &pp_token, &next_but_one->token)) {
-				pos += 2;
+			const token_t *next_but_one
+				= &current_expansion->token_list[pos+1].token;
+			size_t  advance = 2;
+			token_t tmp;
+			if (next_but_one->kind == '#'
+			    && pos+2 < current_expansion->list_len) {
+				const token_t *next_next_but_one
+					= &current_expansion->token_list[pos+2].token;
+				if (next_next_but_one->kind == T_MACRO_PARAMETER) {
+					pp_definition_t *def
+						= next_next_but_one->macro_parameter.def;
+					assert(def != NULL && def->is_parameter);
+					tmp = stringify(def);
+					next_but_one = &tmp;
+					advance = 3;
+				}
+			}
+			if (concat_tokens(&next->token.base.pos, &pp_token, next_but_one)) {
+				pos += advance;
 				goto more_concat;
 			}
 		} else if (pp_token.kind == '#' && next_kind == T_MACRO_PARAMETER) {
 			pp_definition_t *def = next->token.macro_parameter.def;
 			assert(def != NULL && def->is_parameter);
-			stringify(def);
+			pp_token = stringify(def);
 			++pos;
 		}
 	}
@@ -3546,14 +3568,15 @@ static bool next_expansion_token(void)
 void next_preprocessing_token(void)
 {
 	do {
-		if (!expand_next()) {
-			do {
-				next_input_token();
-				while (pp_token.kind == '#' && info.at_line_begin) {
-					parse_preprocessing_directive();
-				}
-			} while (skip_mode && pp_token.kind != T_EOF);
-		}
+		if (expand_next())
+			continue;
+
+		do {
+			next_input_token();
+			while (pp_token.kind == '#' && info.at_line_begin) {
+				parse_preprocessing_directive();
+			}
+		} while (skip_mode && pp_token.kind != T_EOF);
 	} while (!next_expansion_token());
 }
 
