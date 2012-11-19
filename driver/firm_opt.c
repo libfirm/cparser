@@ -700,7 +700,12 @@ static void do_firm_lowering(const char *input_filename)
 		do_irg_opt(irg, "parallelize-mem");
 		do_irg_opt(irg, "frame");
 	}
+	/* hack so we get global initializers constant folded even at -O0 */
+	set_opt_constant_folding(1);
+	set_opt_algebraic_simplification(1);
 	do_irp_opt("local-const");
+	set_opt_constant_folding(firm_opt.const_folding);
+	set_opt_algebraic_simplification(firm_opt.const_folding);
 	do_irp_opt("remove-unused");
 	do_irp_opt("opt-cc");
 	dump_all("low-opt");
