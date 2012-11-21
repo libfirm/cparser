@@ -95,8 +95,11 @@ void print_token_kind(FILE *f, token_kind_t token_kind)
 char const *get_string_encoding_prefix(string_encoding_t const enc)
 {
 	switch (enc) {
-	case STRING_ENCODING_CHAR: return "";
-	case STRING_ENCODING_WIDE: return "L";
+	case STRING_ENCODING_CHAR:   return "";
+	case STRING_ENCODING_CHAR16: return "u";
+	case STRING_ENCODING_CHAR32: return "U";
+	case STRING_ENCODING_UTF8:   return "u8";
+	case STRING_ENCODING_WIDE:   return "L";
 	}
 	panic("invalid string encoding");
 }

@@ -60,6 +60,10 @@ extern type_t *type_const_void_ptr_restrict;
 
 extern type_t *type_char_ptr_ptr;
 
+extern type_t *type_char16_t;
+extern type_t *type_char32_t;
+extern type_t *type_char16_t_const;
+extern type_t *type_char32_t_const;
 extern type_t *type_intmax_t;
 extern type_t *type_ptrdiff_t;
 extern type_t *type_size_t;
@@ -73,6 +77,10 @@ extern type_t *type_wint_t;
 extern type_t *type_int32_t;
 extern type_t *type_int64_t;
 
+extern type_t *type_char16_t_ptr;
+extern type_t *type_char32_t_ptr;
+extern type_t *type_char16_t_const_ptr;
+extern type_t *type_char32_t_const_ptr;
 extern type_t *type_intmax_t_ptr;
 extern type_t *type_ptrdiff_t_ptr;
 extern type_t *type_ssize_t_ptr;

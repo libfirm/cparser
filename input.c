@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include "diagnostic.h"
 #include "input.h"
 
 #include <ctype.h>
@@ -294,21 +295,16 @@ static int my_strcasecmp(const char *s1, const char *s2)
 
 static void choose_decoder(input_t *result, const char *encoding)
 {
-	if (encoding == NULL) {
-		result->decode = decode_utf8;
-	} else {
+	if (encoding) {
 		for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
 			if (my_strcasecmp(encoding, i->name) != 0)
 				continue;
 			result->decode = i->decoder;
-			break;
+			return;
 		}
-		if (result->decode == NULL) {
-			fprintf(stderr, "error: input encoding \"%s\" not supported\n",
-					encoding);
-			result->decode = decode_utf8;
-		}
+		errorf(NULL, "input encoding \"%s\" not supported", encoding);
 	}
+	result->decode = decode_utf8;
 }
 
 input_t *input_from_stream(FILE *file, const char *encoding)

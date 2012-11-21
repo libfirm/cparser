@@ -56,7 +56,7 @@ static char get_atomic_type_mangle(atomic_type_kind_t kind)
 	case ATOMIC_TYPE_FLOAT:       return 'f';
 	case ATOMIC_TYPE_DOUBLE:      return 'd';
 	}
-	panic("invalid atomic type in mangler");
+	panic("invalid atomic type");
 }
 
 static void mangle_atomic_type(const atomic_type_t *type)

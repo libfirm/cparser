@@ -35,6 +35,7 @@
 #include "adt/array.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
+#include "jump_target.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "type_t.h"
@@ -63,7 +64,6 @@ fp_model_t firm_fp_model = fp_model_precise;
 static const backend_params *be_params;
 
 static ir_type *ir_type_char;
-static ir_type *ir_type_wchar_t;
 
 /* architecture specific floating point arithmetic mode (if any) */
 static ir_mode *mode_float_arithmetic;
@@ -71,15 +71,36 @@ static ir_mode *mode_float_arithmetic;
 /* alignment of stack parameters */
 static unsigned stack_param_align;
 
-static int        next_value_number_function;
-static ir_node   *continue_label;
-static ir_node   *break_label;
-static ir_node   *current_switch;
-static bool       saw_default_label;
-static label_t  **all_labels;
-static entity_t **inner_functions;
-static ir_node   *ijmp_list;
-static bool       constant_folding;
+static int         next_value_number_function;
+static jump_target continue_target;
+static jump_target break_target;
+static ir_node    *current_switch;
+static bool        saw_default_label;
+static entity_t  **inner_functions;
+static jump_target ijmp_target;
+static ir_node   **ijmp_ops;
+static ir_node   **ijmp_blocks;
+static bool        constant_folding;
+
+#define PUSH_BREAK(val) \
+	jump_target const old_break_target = break_target; \
+	(init_jump_target(&break_target, (val)))
+#define POP_BREAK() \
+	((void)(break_target = old_break_target))
+
+#define PUSH_CONTINUE(val) \
+	jump_target const old_continue_target = continue_target; \
+	(init_jump_target(&continue_target, (val)))
+#define POP_CONTINUE() \
+	((void)(continue_target = old_continue_target))
+
+#define PUSH_IRG(val) \
+	ir_graph *const old_irg = current_ir_graph; \
+	ir_graph *const new_irg = (val); \
+	((void)(current_ir_graph = new_irg))
+
+#define POP_IRG() \
+	(assert(current_ir_graph == new_irg), (void)(current_ir_graph = old_irg))
 
 static const entity_t     *current_function_entity;
 static ir_node            *current_function_name;
@@ -605,9 +626,7 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 	return irtype;
 }
 
-static ir_tarval *fold_constant_to_tarval(expression_t const *);
-
-static void determine_enum_values(enum_type_t *const type)
+void determine_enum_values(enum_type_t *const type)
 {
 	ir_mode   *const mode    = atomic_modes[type->base.akind];
 	ir_tarval *const one     = get_mode_one(mode);
@@ -852,7 +871,7 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_VARIABLE:
 		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
 	case ENTITY_FUNCTION:
-		return entity->function.statement != NULL;
+		return entity->function.body != NULL;
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 		return false;
@@ -864,7 +883,7 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_LOCAL_LABEL:
 		break;
 	}
-	panic("declaration_is_definition called on non-declaration");
+	panic("entity is not a declaration");
 }
 
 /**
@@ -879,12 +898,19 @@ static void handle_decl_modifiers(ir_entity *irentity, entity_t *entity)
 	decl_modifiers_t modifiers = entity->declaration.modifiers;
 
 	if (is_method_entity(irentity)) {
-		if (modifiers & DM_PURE) {
-			set_entity_additional_properties(irentity, mtp_property_pure);
-		}
-		if (modifiers & DM_CONST) {
+		if (modifiers & DM_PURE)
+			add_entity_additional_properties(irentity, mtp_property_pure);
+		if (modifiers & DM_CONST)
 			add_entity_additional_properties(irentity, mtp_property_const);
-		}
+		if (modifiers & DM_NOINLINE)
+			add_entity_additional_properties(irentity, mtp_property_noinline);
+		if (modifiers & DM_FORCEINLINE)
+			add_entity_additional_properties(irentity, mtp_property_always_inline);
+		if (modifiers & DM_NAKED)
+			add_entity_additional_properties(irentity, mtp_property_naked);
+		if (entity->kind == ENTITY_FUNCTION && entity->function.is_inline)
+			add_entity_additional_properties(irentity,
+											 mtp_property_inline_recommended);
 	}
 	if ((modifiers & DM_USED) && declaration_is_definition(entity)) {
 		add_entity_linkage(irentity, IR_LINKAGE_HIDDEN_USER);
@@ -938,7 +964,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 	/* already an entity defined? */
 	ir_entity *irentity = entitymap_get(&entitymap, symbol);
-	bool const has_body = entity->function.statement != NULL;
+	bool const has_body = entity->function.body != NULL;
 	if (irentity != NULL) {
 		goto entity_created;
 	}
@@ -1107,7 +1133,8 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 	ir_initializer_t *const initializer = create_initializer_compound(slen);
 	ir_type          *      elem_type;
 	switch (value->encoding) {
-	case STRING_ENCODING_CHAR: {
+	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8: {
 		elem_type = ir_type_char;
 
 		ir_mode *const mode = get_type_mode(elem_type);
@@ -1120,8 +1147,13 @@ static ir_node *string_to_firm(source_position_t const *const src_pos, char cons
 		goto finish;
 	}
 
-	case STRING_ENCODING_WIDE: {
-		elem_type = ir_type_wchar_t;
+	{
+		type_t *type;
+	case STRING_ENCODING_CHAR16: type = type_char16_t; goto init_wide;
+	case STRING_ENCODING_CHAR32: type = type_char32_t; goto init_wide;
+	case STRING_ENCODING_WIDE:   type = type_wchar_t;  goto init_wide;
+init_wide:;
+		elem_type = get_ir_type(type);
 
 		ir_mode *const mode = get_type_mode(elem_type);
 		char const    *p    = value->begin;
@@ -1243,7 +1275,7 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		break;
 
 	default:
-		panic("Invalid literal kind found");
+		panic("invalid literal kind");
 	}
 
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
@@ -1293,7 +1325,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 	}
 
 	default:
-		panic("Invalid literal kind found");
+		panic("invalid literal kind");
 	}
 
 	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
@@ -1436,16 +1468,13 @@ static ir_node *get_local_frame(ir_entity *const ent)
 }
 
 /**
- * Keep all memory edges of the given block.
+ * Keep the current block and memory.
+ * This is necessary for all loops, because they could become infinite.
  */
-static void keep_all_memory(ir_node *block)
+static void keep_loop(void)
 {
-	ir_node *old = get_cur_block();
-
-	set_cur_block(block);
+	keep_alive(get_cur_block());
 	keep_alive(get_store());
-	/* TODO: keep all memory edges from restricted pointers */
-	set_cur_block(old);
 }
 
 static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
@@ -1527,7 +1556,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		panic("not implemented reference type");
 	}
 
-	panic("reference to declaration with unknown type found");
+	panic("reference to declaration with unknown type");
 }
 
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
@@ -1641,7 +1670,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case BUILTIN_LIBC_CHECK:
 		panic("builtin did not produce an entity");
 	}
-	panic("invalid builtin found");
+	panic("invalid builtin");
 }
 
 /**
@@ -1796,9 +1825,7 @@ static ir_node *statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
 
 static ir_node *expression_to_addr(const expression_t *expression);
-static ir_node *create_condition_evaluation(const expression_t *expression,
-                                            ir_node *true_block,
-                                            ir_node *false_block);
+static ir_node *create_condition_evaluation(expression_t const *expression, jump_target *true_target, jump_target *false_target);
 
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
@@ -2093,7 +2120,7 @@ static ir_node *create_incdec(const unary_expression_t *expression)
 		store_value = result;
 		break;
 	default:
-		panic("no incdec expr in create_incdec");
+		panic("no incdec expr");
 	}
 
 	set_value_for_expression_addr(value_expr, store_value, addr);
@@ -2325,7 +2352,7 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 	default:
 		break;
 	}
-	panic("invalid UNEXPR type found");
+	panic("invalid unary expression type");
 }
 
 /**
@@ -2334,23 +2361,36 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 static ir_node *produce_condition_result(const expression_t *expression,
                                          ir_mode *mode, dbg_info *dbgi)
 {
-	ir_node *const one_block  = new_immBlock();
-	ir_node *const zero_block = new_immBlock();
-	create_condition_evaluation(expression, one_block, zero_block);
-	mature_immBlock(one_block);
-	mature_immBlock(zero_block);
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	create_condition_evaluation(expression, &true_target, &false_target);
 
-	ir_node *const jmp_one  = new_rd_Jmp(dbgi, one_block);
-	ir_node *const jmp_zero = new_rd_Jmp(dbgi, zero_block);
-	ir_node *const in_cf[2] = { jmp_one, jmp_zero };
-	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
-	set_cur_block(block);
+	ir_node    *val = NULL;
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
 
-	ir_node *const one   = new_Const(get_mode_one(mode));
-	ir_node *const zero  = new_Const(get_mode_null(mode));
-	ir_node *const in[2] = { one, zero };
-	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
+	if (enter_jump_target(&true_target)) {
+		val = new_Const(get_mode_one(mode));
+		jump_to_target(&exit_target);
+	}
 
+	if (enter_jump_target(&false_target)) {
+		ir_node *const zero = new_Const(get_mode_null(mode));
+		jump_to_target(&exit_target);
+		if (val) {
+			ir_node *const in[] = { val, zero };
+			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, mode);
+		} else {
+			val = zero;
+		}
+	}
+
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		val = new_Unknown(mode);
+	}
 	return val;
 }
 
@@ -2698,13 +2738,9 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
                                             type_t *type)
 {
 	/* create the ir_initializer */
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	ir_initializer_t *irinitializer = create_ir_initializer(initializer, type);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
+	POP_IRG();
 
 	ident     *const id          = id_unique("initializer.%u");
 	ir_type   *const irtype      = get_ir_type(type);
@@ -2820,7 +2856,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 
 static void init_ir_types(void);
 
-static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
+ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 {
 	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
 
@@ -2833,12 +2869,10 @@ static ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	init_ir_types();
 
-	ir_graph *old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	ir_node *const cnst = _expression_to_firm(expression);
+	POP_IRG();
 
-	current_ir_graph = old_current_ir_graph;
 	set_optimize(old_optimize);
 	set_opt_constant_folding(old_constant_folding);
 
@@ -2878,8 +2912,6 @@ bool fold_constant_to_bool(const expression_t *expression)
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
-	dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
-
 	/* first try to fold a constant condition */
 	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
 		bool val = fold_constant_to_bool(expression->condition);
@@ -2893,43 +2925,47 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		}
 	}
 
-	ir_node *const true_block  = new_immBlock();
-	ir_node *const false_block = new_immBlock();
-	ir_node *const cond_expr   = create_condition_evaluation(expression->condition, true_block, false_block);
-	mature_immBlock(true_block);
-	mature_immBlock(false_block);
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	ir_node *const cond_expr = create_condition_evaluation(expression->condition, &true_target, &false_target);
 
-	set_cur_block(true_block);
-	ir_node *true_val;
-	if (expression->true_expression != NULL) {
-		true_val = expression_to_firm(expression->true_expression);
-	} else if (cond_expr != NULL && get_irn_mode(cond_expr) != mode_b) {
-		true_val = cond_expr;
-	} else {
-		/* Condition ended with a short circuit (&&, ||, !) operation or a
-		 * comparison.  Generate a "1" as value for the true branch. */
-		true_val = new_Const(get_mode_one(mode_Is));
+	ir_node    *val = NULL;
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
+
+	if (enter_jump_target(&true_target)) {
+		if (expression->true_expression) {
+			val = expression_to_firm(expression->true_expression);
+		} else if (cond_expr && get_irn_mode(cond_expr) != mode_b) {
+			val = cond_expr;
+		} else {
+			/* Condition ended with a short circuit (&&, ||, !) operation or a
+			 * comparison.  Generate a "1" as value for the true branch. */
+			val = new_Const(get_mode_one(mode_Is));
+		}
+		jump_to_target(&exit_target);
 	}
-	ir_node *const true_jmp = new_d_Jmp(dbgi);
 
-	set_cur_block(false_block);
-	ir_node *const false_val = expression_to_firm(expression->false_expression);
-	ir_node *const false_jmp = new_d_Jmp(dbgi);
+	if (enter_jump_target(&false_target)) {
+		ir_node *const false_val = expression_to_firm(expression->false_expression);
+		jump_to_target(&exit_target);
+		if (val) {
+			ir_node  *const in[] = { val, false_val };
+			dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
+			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
+		} else {
+			val = false_val;
+		}
+	}
 
-	/* create the common block */
-	ir_node *const in_cf[2] = { true_jmp, false_jmp };
-	ir_node *const block    = new_Block(lengthof(in_cf), in_cf);
-	set_cur_block(block);
-
-	/* TODO improve static semantics, so either both or no values are NULL */
-	if (true_val == NULL || false_val == NULL)
-		return NULL;
-
-	ir_node *const in[2] = { true_val, false_val };
-	type_t  *const type  = skip_typeref(expression->base.type);
-	ir_mode *const mode  = get_ir_mode_arithmetic(type);
-	ir_node *const val   = new_d_Phi(dbgi, lengthof(in), in, mode);
-
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		type_t *const type = skip_typeref(expression->base.type);
+		if (!is_type_void(type))
+			val = new_Unknown(get_ir_mode_arithmetic(type));
+	}
 	return val;
 }
 
@@ -3043,7 +3079,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 						tc = real_type_class;
 						goto make_const;
 				}
-				panic("Unexpected atomic type in classify_type_to_firm().");
+				panic("Unexpected atomic type.");
 			}
 
 			case TYPE_COMPLEX:         tc = complex_type_class; goto make_const;
@@ -3066,7 +3102,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_ERROR:
 				break;
 		}
-		panic("unexpected TYPE classify_type_to_firm().");
+		panic("unexpected type.");
 	}
 
 make_const:;
@@ -3213,24 +3249,14 @@ static ir_node *builtin_types_compatible_to_firm(
 	return create_Const_from_bool(mode, value);
 }
 
-static ir_node *get_label_block(label_t *label)
+static void prepare_label_target(label_t *const label)
 {
-	if (label->block != NULL)
-		return label->block;
-
-	/* beware: might be called from create initializer with current_ir_graph
-	 * set to const_code_irg. */
-	ir_graph *rem    = current_ir_graph;
-	current_ir_graph = current_function;
-
-	ir_node *block = new_immBlock();
-
-	label->block = block;
-
-	ARR_APP1(label_t *, all_labels, label);
-
-	current_ir_graph = rem;
-	return block;
+	if (label->address_taken && !label->indirect_block) {
+		ir_node *const iblock = new_immBlock();
+		label->indirect_block = iblock;
+		ARR_APP1(ir_node*, ijmp_blocks, iblock);
+		jump_from_block_to_target(&label->target, iblock);
+	}
 }
 
 /**
@@ -3239,12 +3265,15 @@ static ir_node *get_label_block(label_t *label)
  */
 static ir_node *label_address_to_firm(const label_address_expression_t *label)
 {
-	dbg_info  *dbgi   = get_dbg_info(&label->base.source_position);
-	ir_node   *block  = get_label_block(label->label);
-	ir_entity *entity = create_Block_entity(block);
+	/* Beware: Might be called from create initializer with current_ir_graph
+	 * set to const_code_irg. */
+	PUSH_IRG(current_function);
+	prepare_label_target(label->label);
+	POP_IRG();
 
 	symconst_symbol value;
-	value.entity_p = entity;
+	value.entity_p = create_Block_entity(label->label->indirect_block);
+	dbg_info *const dbgi = get_dbg_info(&label->base.source_position);
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
@@ -3291,7 +3320,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 
 	case EXPR_ERROR: break;
 	}
-	panic("invalid expression found");
+	panic("invalid expression");
 }
 
 /**
@@ -3367,65 +3396,61 @@ static ir_node *expression_to_firm(const expression_t *expression)
  * create a short-circuit expression evaluation that tries to construct
  * efficient control flow structures for &&, || and ! expressions
  */
-static ir_node *create_condition_evaluation(const expression_t *expression,
-                                            ir_node *true_block,
-                                            ir_node *false_block)
+static ir_node *create_condition_evaluation(expression_t const *const expression, jump_target *const true_target, jump_target *const false_target)
 {
 	switch(expression->kind) {
 	case EXPR_UNARY_NOT: {
 		const unary_expression_t *unary_expression = &expression->unary;
-		create_condition_evaluation(unary_expression->value, false_block,
-		                            true_block);
+		create_condition_evaluation(unary_expression->value, false_target, true_target);
 		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_AND: {
-		const binary_expression_t *binary_expression = &expression->binary;
-
-		ir_node *extra_block = new_immBlock();
-		create_condition_evaluation(binary_expression->left, extra_block,
-		                            false_block);
-		mature_immBlock(extra_block);
-		set_cur_block(extra_block);
-		create_condition_evaluation(binary_expression->right, true_block,
-		                            false_block);
+		jump_target extra_target;
+		init_jump_target(&extra_target, NULL);
+		create_condition_evaluation(expression->binary.left, &extra_target, false_target);
+		if (enter_jump_target(&extra_target))
+			create_condition_evaluation(expression->binary.right, true_target, false_target);
 		return NULL;
 	}
 	case EXPR_BINARY_LOGICAL_OR: {
-		const binary_expression_t *binary_expression = &expression->binary;
-
-		ir_node *extra_block = new_immBlock();
-		create_condition_evaluation(binary_expression->left, true_block,
-		                            extra_block);
-		mature_immBlock(extra_block);
-		set_cur_block(extra_block);
-		create_condition_evaluation(binary_expression->right, true_block,
-		                            false_block);
+		jump_target extra_target;
+		init_jump_target(&extra_target, NULL);
+		create_condition_evaluation(expression->binary.left, true_target, &extra_target);
+		if (enter_jump_target(&extra_target))
+			create_condition_evaluation(expression->binary.right, true_target, false_target);
 		return NULL;
 	}
 	default:
 		break;
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
-	ir_node  *cond_expr  = _expression_to_firm(expression);
-	ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
-	ir_node  *cond       = new_d_Cond(dbgi, condition);
-	ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-	ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
-
-	/* set branch prediction info based on __builtin_expect */
-	if (is_builtin_expect(expression) && is_Cond(cond)) {
-		call_argument_t *argument = expression->call.arguments->next;
-		if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
-			bool               const cnst = fold_constant_to_bool(argument->expression);
-			cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
-			set_Cond_jmp_pred(cond, pred);
+	ir_node *cond_expr = _expression_to_firm(expression);
+	if (is_Const(cond_expr)) {
+		if (tarval_is_null(get_Const_tarval(cond_expr))) {
+			jump_to_target(false_target);
+		} else {
+			jump_to_target(true_target);
 		}
+	} else {
+		dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
+		ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
+		ir_node  *cond       = new_d_Cond(dbgi, condition);
+		ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+		ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+		/* set branch prediction info based on __builtin_expect */
+		if (is_builtin_expect(expression) && is_Cond(cond)) {
+			call_argument_t *argument = expression->call.arguments->next;
+			if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
+				bool               const cnst = fold_constant_to_bool(argument->expression);
+				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
+				set_Cond_jmp_pred(cond, pred);
+			}
+		}
+
+		add_pred_to_jump_target(true_target,  true_proj);
+		add_pred_to_jump_target(false_target, false_proj);
 	}
-
-	add_immBlock_pred(true_block, true_proj);
-	add_immBlock_pred(false_block, false_proj);
-
 	set_unreachable_now();
 	return cond_expr;
 }
@@ -3667,7 +3692,7 @@ static void advance_current_object(type_path_t *path)
 {
 	if (path->invalid) {
 		/* TODO: handle this... */
-		panic("invalid initializer in ast2firm (excessive elements)");
+		panic("invalid initializer (excessive elements)");
 	}
 
 	type_path_entry_t *top = get_type_path_top(path);
@@ -3809,6 +3834,7 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 	char const       *      p       = str->value.begin;
 	switch (str->value.encoding) {
 	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:
 		for (size_t i = 0; i != arr_len; ++i) {
 			char              const c      = i < str_len ? *p++ : 0;
 			ir_tarval        *const tv     = new_tarval_from_long(c, mode);
@@ -3817,6 +3843,8 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 		}
 		break;
 
+	case STRING_ENCODING_CHAR16:
+	case STRING_ENCODING_CHAR32:
 	case STRING_ENCODING_WIDE:
 		for (size_t i = 0; i != arr_len; ++i) {
 			utf32             const c      = i < str_len ? read_utf8_char(&p) : 0;
@@ -3844,7 +3872,7 @@ static ir_initializer_t *create_ir_initializer(
 			return create_ir_initializer_value(&initializer->value);
 
 		case INITIALIZER_DESIGNATOR:
-			panic("unexpected designator initializer found");
+			panic("unexpected designator initializer");
 	}
 	panic("unknown initializer");
 }
@@ -3993,7 +4021,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 	}
 	}
 
-	panic("invalid IR_INITIALIZER found");
+	panic("invalid ir_initializer");
 }
 
 static void create_dynamic_initializer(ir_initializer_t *initializer,
@@ -4155,6 +4183,14 @@ static void allocate_variable_length_array(entity_t *entity)
 	entity->variable.v.vla_base = addr;
 }
 
+static bool var_needs_entity(variable_t const *const var)
+{
+	if (var->address_taken)
+		return true;
+	type_t *const type = skip_typeref(var->base.type);
+	return !is_type_scalar(type) || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+}
+
 /**
  * Creates a Firm local variable from a declaration.
  */
@@ -4163,31 +4199,23 @@ static void create_local_variable(entity_t *entity)
 	assert(entity->kind == ENTITY_VARIABLE);
 	assert(entity->declaration.kind == DECLARATION_KIND_UNKNOWN);
 
-	bool needs_entity = entity->variable.address_taken;
-	type_t *type = skip_typeref(entity->declaration.type);
+	if (!var_needs_entity(&entity->variable)) {
+		entity->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
+		entity->variable.v.value_number = next_value_number_function;
+		set_irg_loc_description(current_ir_graph, next_value_number_function, entity);
+		++next_value_number_function;
+		return;
+	}
 
 	/* is it a variable length array? */
+	type_t *const type = skip_typeref(entity->declaration.type);
 	if (is_type_array(type) && !type->array.size_constant) {
 		create_variable_length_array(entity);
 		return;
-	} else if (is_type_array(type) || is_type_compound(type)) {
-		needs_entity = true;
-	} else if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
-		needs_entity = true;
 	}
 
-	if (needs_entity) {
-		ir_type *frame_type = get_irg_frame_type(current_ir_graph);
-		create_variable_entity(entity,
-		                       DECLARATION_KIND_LOCAL_VARIABLE_ENTITY,
-		                       frame_type);
-	} else {
-		entity->declaration.kind        = DECLARATION_KIND_LOCAL_VARIABLE;
-		entity->variable.v.value_number = next_value_number_function;
-		set_irg_loc_description(current_ir_graph, next_value_number_function,
-		                        entity);
-		++next_value_number_function;
-	}
+	ir_type *const frame_type = get_irg_frame_type(current_ir_graph);
+	create_variable_entity(entity, DECLARATION_KIND_LOCAL_VARIABLE_ENTITY, frame_type);
 }
 
 static void create_local_static_variable(entity_t *entity)
@@ -4222,13 +4250,9 @@ static void create_local_static_variable(entity_t *entity)
 		set_entity_initializer(irentity, null_init);
 	}
 
-	ir_graph *const old_current_ir_graph = current_ir_graph;
-	current_ir_graph = get_const_code_irg();
-
+	PUSH_IRG(get_const_code_irg());
 	create_variable_initializer(entity);
-
-	assert(current_ir_graph == get_const_code_irg());
-	current_ir_graph = old_current_ir_graph;
+	POP_IRG();
 }
 
 
@@ -4351,7 +4375,7 @@ static void create_local_declaration(entity_t *entity)
 		return;
 	case STORAGE_CLASS_EXTERN:
 		if (entity->kind == ENTITY_FUNCTION) {
-			assert(entity->function.statement == NULL);
+			assert(entity->function.body == NULL);
 			(void)get_function_entity(entity, NULL);
 		} else {
 			create_global_variable(entity);
@@ -4362,7 +4386,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_AUTO:
 	case STORAGE_CLASS_REGISTER:
 		if (entity->kind == ENTITY_FUNCTION) {
-			if (entity->function.statement != NULL) {
+			if (entity->function.body != NULL) {
 				ir_type *owner = get_irg_frame_type(current_ir_graph);
 				(void)get_function_entity(entity, owner);
 				entity->declaration.kind = DECLARATION_KIND_INNER_FUNCTION;
@@ -4377,7 +4401,7 @@ static void create_local_declaration(entity_t *entity)
 	case STORAGE_CLASS_TYPEDEF:
 		break;
 	}
-	panic("invalid storage class found");
+	panic("invalid storage class");
 }
 
 static void create_local_declarations(entity_t *e)
@@ -4454,109 +4478,62 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	create_local_declarations(statement->scope.entities);
 
 	/* Create the condition. */
-	ir_node *true_block  = NULL;
-	ir_node *false_block = NULL;
-	if (currently_reachable()) {
-		true_block  = new_immBlock();
-		false_block = new_immBlock();
-		create_condition_evaluation(statement->condition, true_block, false_block);
-		mature_immBlock(true_block);
-		mature_immBlock(false_block);
-	}
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	if (currently_reachable())
+		create_condition_evaluation(statement->condition, &true_target, &false_target);
+
+	jump_target exit_target;
+	init_jump_target(&exit_target, NULL);
 
 	/* Create the true statement. */
-	set_cur_block(true_block);
+	enter_jump_target(&true_target);
 	statement_to_firm(statement->true_statement);
-	ir_node *fallthrough_block = get_cur_block();
+	jump_to_target(&exit_target);
 
 	/* Create the false statement. */
-	set_cur_block(false_block);
-	if (statement->false_statement != NULL) {
+	enter_jump_target(&false_target);
+	if (statement->false_statement)
 		statement_to_firm(statement->false_statement);
-	}
+	jump_to_target(&exit_target);
 
-	/* Handle the block after the if-statement.  Minor simplification and
-	 * optimisation: Reuse the false/true block as fallthrough block, if the
-	 * true/false statement does not pass control to the fallthrough block, e.g.
-	 * in the typical if (x) return; pattern. */
-	if (fallthrough_block) {
-		if (currently_reachable()) {
-			ir_node *const t_jump = new_r_Jmp(fallthrough_block);
-			ir_node *const f_jump = new_Jmp();
-			ir_node *const in[]   = { t_jump, f_jump };
-			fallthrough_block = new_Block(2, in);
-		}
-		set_cur_block(fallthrough_block);
-	}
-
+	enter_jump_target(&exit_target);
 	return NULL;
-}
-
-/**
- * Add an unconditional jump to the target block.  If the source block is not
- * reachable, then a Bad predecessor is created to prevent Phi-less unreachable
- * loops.  This is necessary if the jump potentially enters a loop.
- */
-static void jump_to(ir_node *const target_block)
-{
-	ir_node *const pred = currently_reachable() ? new_Jmp() : new_Bad(mode_X);
-	add_immBlock_pred(target_block, pred);
-}
-
-/**
- * Add an unconditional jump to the target block, if the current block is
- * reachable and do nothing otherwise.  This is only valid if the jump does not
- * enter a loop (a back edge is ok).
- */
-static void jump_if_reachable(ir_node *const target_block)
-{
-	if (currently_reachable())
-		add_immBlock_pred(target_block, new_Jmp());
-}
-
-static ir_node *get_break_label(void)
-{
-	if (break_label == NULL) {
-		break_label = new_immBlock();
-	}
-	return break_label;
 }
 
 static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 {
 	create_local_declarations(statement->scope.entities);
 
-	/* create the header block */
-	ir_node *header_block = new_immBlock();
+	PUSH_BREAK(NULL);
+	PUSH_CONTINUE(NULL);
 
-	/* the loop body */
-	ir_node *body_block = new_immBlock();
-	jump_to(body_block);
+	expression_t *const cond = statement->condition;
+	/* Avoid an explicit body block in case of do ... while (0);. */
+	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT && !fold_constant_to_bool(cond)) {
+		/* do ... while (0);. */
+		statement_to_firm(statement->body);
+		jump_to_target(&continue_target);
+		enter_jump_target(&continue_target);
+		jump_to_target(&break_target);
+	} else {
+		jump_target body_target;
+		init_jump_target(&body_target, NULL);
+		jump_to_target(&body_target);
+		enter_immature_jump_target(&body_target);
+		keep_loop();
+		statement_to_firm(statement->body);
+		jump_to_target(&continue_target);
+		if (enter_jump_target(&continue_target))
+			create_condition_evaluation(statement->condition, &body_target, &break_target);
+		enter_jump_target(&body_target);
+	}
+	enter_jump_target(&break_target);
 
-	ir_node *old_continue_label = continue_label;
-	ir_node *old_break_label    = break_label;
-	continue_label              = header_block;
-	break_label                 = NULL;
-
-	set_cur_block(body_block);
-	statement_to_firm(statement->body);
-	ir_node *const false_block = get_break_label();
-
-	assert(continue_label == header_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
-
-	jump_if_reachable(header_block);
-
-	/* create the condition */
-	mature_immBlock(header_block);
-	set_cur_block(header_block);
-
-	create_condition_evaluation(statement->condition, body_block, false_block);
-	mature_immBlock(body_block);
-	mature_immBlock(false_block);
-
-	set_cur_block(false_block);
+	POP_CONTINUE();
+	POP_BREAK();
 	return NULL;
 }
 
@@ -4579,78 +4556,40 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	}
 
 	/* Create the header block */
-	ir_node *const header_block = new_immBlock();
-	jump_to(header_block);
+	jump_target header_target;
+	init_jump_target(&header_target, NULL);
+	jump_to_target(&header_target);
+	enter_immature_jump_target(&header_target);
+	keep_loop();
+
+	expression_t *const step = statement->step;
+	PUSH_BREAK(NULL);
+	PUSH_CONTINUE(step ? NULL : header_target.block);
 
 	/* Create the condition. */
-	ir_node            *body_block;
-	ir_node            *false_block;
 	expression_t *const cond = statement->condition;
 	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
-		body_block  = new_immBlock();
-		false_block = new_immBlock();
-
-		set_cur_block(header_block);
-		create_condition_evaluation(cond, body_block, false_block);
-		mature_immBlock(body_block);
-	} else {
-		/* for-ever. */
-		body_block  = header_block;
-		false_block = NULL;
-
-		keep_alive(header_block);
-		keep_all_memory(header_block);
+		jump_target body_target;
+		init_jump_target(&body_target, NULL);
+		create_condition_evaluation(cond, &body_target, &break_target);
+		enter_jump_target(&body_target);
 	}
-
-	/* Create the step block, if necessary. */
-	ir_node      *      step_block = header_block;
-	expression_t *const step       = statement->step;
-	if (step != NULL) {
-		step_block = new_immBlock();
-	}
-
-	ir_node *const old_continue_label = continue_label;
-	ir_node *const old_break_label    = break_label;
-	continue_label = step_block;
-	break_label    = false_block;
 
 	/* Create the loop body. */
-	set_cur_block(body_block);
 	statement_to_firm(statement->body);
-	jump_if_reachable(step_block);
+	jump_to_target(&continue_target);
 
 	/* Create the step code. */
-	if (step != NULL) {
-		mature_immBlock(step_block);
-		set_cur_block(step_block);
+	if (step && enter_jump_target(&continue_target)) {
 		expression_to_firm(step);
-		jump_if_reachable(header_block);
+		jump_to_target(&header_target);
 	}
 
-	mature_immBlock(header_block);
-	assert(false_block == NULL || false_block == break_label);
-	false_block = break_label;
-	if (false_block != NULL) {
-		mature_immBlock(false_block);
-	}
-	set_cur_block(false_block);
+	enter_jump_target(&header_target);
+	enter_jump_target(&break_target);
 
-	assert(continue_label == step_block);
-	continue_label = old_continue_label;
-	break_label    = old_break_label;
-	return NULL;
-}
-
-static ir_node *create_jump_statement(const statement_t *statement, ir_node *target_block)
-{
-	if (!currently_reachable())
-		return NULL;
-
-	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
-	ir_node  *jump = new_d_Jmp(dbgi);
-	add_immBlock_pred(target_block, jump);
-
-	set_unreachable_now();
+	POP_CONTINUE();
+	POP_BREAK();
 	return NULL;
 }
 
@@ -4678,11 +4617,9 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 		}
 		if (l->is_empty_range)
 			continue;
-		ir_tarval *min = fold_constant_to_tarval(l->expression);
-		ir_tarval *max = min;
+		ir_tarval *min = l->first_case;
+		ir_tarval *max = l->last_case;
 		long       pn  = (long) i+1;
-		if (l->end_range != NULL)
-			max = fold_constant_to_tarval(l->end_range);
 		ir_switch_table_set(res, i++, min, max, pn);
 		l->pn = pn;
 	}
@@ -4704,53 +4641,44 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 
 	set_unreachable_now();
 
+	PUSH_BREAK(NULL);
 	ir_node *const old_switch            = current_switch;
-	ir_node *const old_break_label       = break_label;
 	const bool     old_saw_default_label = saw_default_label;
 	saw_default_label                    = false;
 	current_switch                       = switch_node;
-	break_label                          = NULL;
 
 	statement_to_firm(statement->body);
-
-	if (currently_reachable()) {
-		add_immBlock_pred(get_break_label(), new_Jmp());
-	}
+	jump_to_target(&break_target);
 
 	if (!saw_default_label && switch_node) {
 		ir_node *proj = new_d_Proj(dbgi, switch_node, mode_X, pn_Switch_default);
-		add_immBlock_pred(get_break_label(), proj);
+		add_pred_to_jump_target(&break_target, proj);
 	}
 
-	if (break_label != NULL) {
-		mature_immBlock(break_label);
-	}
-	set_cur_block(break_label);
+	enter_jump_target(&break_target);
 
 	assert(current_switch == switch_node);
 	current_switch    = old_switch;
-	break_label       = old_break_label;
 	saw_default_label = old_saw_default_label;
+	POP_BREAK();
 	return NULL;
 }
 
 static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 {
-	if (statement->is_empty_range)
-		return NULL;
+	if (current_switch != NULL && !statement->is_empty_range) {
+		jump_target case_target;
+		init_jump_target(&case_target, NULL);
 
-	if (current_switch != NULL) {
-		ir_node *block = new_immBlock();
 		/* Fallthrough from previous case */
-		jump_if_reachable(block);
+		jump_to_target(&case_target);
 
-		ir_node  *const proj = new_Proj(current_switch, mode_X, statement->pn);
-		add_immBlock_pred(block, proj);
+		ir_node *const proj = new_Proj(current_switch, mode_X, statement->pn);
+		add_pred_to_jump_target(&case_target, proj);
 		if (statement->expression == NULL)
 			saw_default_label = true;
 
-		mature_immBlock(block);
-		set_cur_block(block);
+		enter_jump_target(&case_target);
 	}
 
 	return statement_to_firm(statement->statement);
@@ -4758,29 +4686,38 @@ static ir_node *case_label_to_firm(const case_label_statement_t *statement)
 
 static ir_node *label_to_firm(const label_statement_t *statement)
 {
-	ir_node *block = get_label_block(statement->label);
-	jump_to(block);
-
-	set_cur_block(block);
-	keep_alive(block);
-	keep_all_memory(block);
+	label_t *const label = statement->label;
+	prepare_label_target(label);
+	jump_to_target(&label->target);
+	if (--label->n_users == 0) {
+		enter_jump_target(&label->target);
+	} else {
+		enter_immature_jump_target(&label->target);
+		keep_loop();
+	}
 
 	return statement_to_firm(statement->statement);
 }
 
+static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
+{
+	label_t *const label = stmt->label;
+	prepare_label_target(label);
+	jump_to_target(&label->target);
+	if (--label->n_users == 0)
+		enter_jump_target(&label->target);
+	set_unreachable_now();
+	return NULL;
+}
+
 static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
 {
-	if (!currently_reachable())
-		return NULL;
-
-	ir_node  *const irn  = expression_to_firm(statement->expression);
-	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
-	ir_node  *const ijmp = new_d_IJmp(dbgi, irn);
-
-	set_irn_link(ijmp, ijmp_list);
-	ijmp_list = ijmp;
-
-	set_unreachable_now();
+	if (currently_reachable()) {
+		ir_node *const op = expression_to_firm(statement->expression);
+		ARR_APP1(ir_node*, ijmp_ops, op);
+		jump_to_target(&ijmp_target);
+		set_unreachable_now();
+	}
 	return NULL;
 }
 
@@ -5048,6 +4985,7 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_EMPTY:         return NULL; /* nothing */
 	case STATEMENT_EXPRESSION:    return expression_statement_to_firm( &stmt->expression);
 	case STATEMENT_FOR:           return for_statement_to_firm(        &stmt->fors);
+	case STATEMENT_GOTO:          return goto_statement_to_firm(       &stmt->gotos);
 	case STATEMENT_IF:            return if_statement_to_firm(         &stmt->ifs);
 	case STATEMENT_LABEL:         return label_to_firm(                &stmt->label);
 	case STATEMENT_LEAVE:         return leave_statement_to_firm(      &stmt->leave);
@@ -5055,11 +4993,17 @@ static ir_node *statement_to_firm(statement_t *const stmt)
 	case STATEMENT_RETURN:        return return_statement_to_firm(     &stmt->returns);
 	case STATEMENT_SWITCH:        return switch_statement_to_firm(     &stmt->switchs);
 
-	case STATEMENT_BREAK:         return create_jump_statement(stmt, get_break_label());
-	case STATEMENT_CONTINUE:      return create_jump_statement(stmt, continue_label);
-	case STATEMENT_GOTO:          return create_jump_statement(stmt, get_label_block(stmt->gotos.label));
+	{
+		jump_target *tgt;
+	case STATEMENT_BREAK:    tgt = &break_target;    goto jump;
+	case STATEMENT_CONTINUE: tgt = &continue_target; goto jump;
+jump:
+		jump_to_target(tgt);
+		set_unreachable_now();
+		return NULL;
+	}
 
-	case STATEMENT_ERROR: panic("error statement found");
+	case STATEMENT_ERROR: panic("error statement");
 	}
 	panic("statement not implemented");
 }
@@ -5071,8 +5015,7 @@ static int count_local_variables(const entity_t *entity,
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
 		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
-		    !entity->variable.address_taken                                       &&
-		    is_type_scalar(skip_typeref(entity->declaration.type)))
+		    !var_needs_entity(&entity->variable))
 			++count;
 	}
 	return count;
@@ -5111,7 +5054,7 @@ static int get_function_n_local_vars(entity_t *entity)
 	count += count_local_variables(function->parameters.entities, NULL);
 
 	/* count local variables declared in body */
-	walk_statements(function->statement, count_local_variables_in_stmt, &count);
+	walk_statements(function->body, count_local_variables_in_stmt, &count);
 	return count;
 }
 
@@ -5148,14 +5091,12 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		assert(!is_type_array(type));
-		bool const needs_entity = parameter->variable.address_taken || is_type_compound(type);
-
-		ir_type *param_irtype = get_method_param_type(function_irtype, n);
-		if (needs_entity) {
+		dbg_info *const dbgi         = get_dbg_info(&parameter->base.source_position);
+		ir_type  *const param_irtype = get_method_param_type(function_irtype, n);
+		if (var_needs_entity(&parameter->variable)) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
-				= new_parameter_entity(frame_type, n, param_irtype);
+				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
 			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
 			parameter->variable.v.entity = param;
 			continue;
@@ -5163,7 +5104,7 @@ static void initialize_function_parameters(entity_t *entity)
 
 		ir_mode *param_mode = get_type_mode(param_irtype);
 		long     pn         = n;
-		ir_node *value      = new_r_Proj(args, param_mode, pn);
+		ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
 
 		ir_mode *mode = get_ir_mode_storage(type);
 		value = create_conv(NULL, value, mode);
@@ -5175,32 +5116,6 @@ static void initialize_function_parameters(entity_t *entity)
 		++next_value_number_function;
 
 		set_value(parameter->variable.v.value_number, value);
-	}
-}
-
-/**
- * Handle additional decl modifiers for IR-graphs
- *
- * @param irg            the IR-graph
- * @param dec_modifiers  additional modifiers
- */
-static void handle_decl_modifier_irg(ir_graph *irg,
-                                     decl_modifiers_t decl_modifiers)
-{
-	if (decl_modifiers & DM_NAKED) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(naked) specifier. */
-		add_irg_additional_properties(irg, mtp_property_naked);
-	}
-	if (decl_modifiers & DM_FORCEINLINE) {
-		/* TRUE if the declaration includes the
-		   Microsoft __forceinline specifier. */
-		set_irg_inline_property(irg, irg_inline_forced);
-	}
-	if (decl_modifiers & DM_NOINLINE) {
-		/* TRUE if the declaration includes the Microsoft
-		   __declspec(noinline) specifier. */
-		set_irg_inline_property(irg, irg_inline_forbidden);
 	}
 }
 
@@ -5228,17 +5143,6 @@ static void add_function_pointer(ir_type *segment, ir_entity *method,
 }
 
 /**
- * Generate possible IJmp branches to a given label block.
- */
-static void gen_ijmp_branches(ir_node *block)
-{
-	ir_node *ijmp;
-	for (ijmp = ijmp_list; ijmp != NULL; ijmp = get_irn_link(ijmp)) {
-		add_immBlock_pred(block, ijmp);
-	}
-}
-
-/**
  * Create code for a function and all inner functions.
  *
  * @param entity  the function entity
@@ -5248,7 +5152,7 @@ static void create_function(entity_t *entity)
 	assert(entity->kind == ENTITY_FUNCTION);
 	ir_entity *function_entity = get_function_entity(entity, current_outer_frame);
 
-	if (entity->function.statement == NULL)
+	if (entity->function.body == NULL)
 		return;
 
 	inner_functions     = NULL;
@@ -5267,9 +5171,11 @@ static void create_function(entity_t *entity)
 	current_function_name   = NULL;
 	current_funcsig         = NULL;
 
-	assert(all_labels == NULL);
-	all_labels = NEW_ARR_F(label_t *, 0);
-	ijmp_list  = NULL;
+	assert(!ijmp_ops);
+	assert(!ijmp_blocks);
+	init_jump_target(&ijmp_target, NULL);
+	ijmp_ops    = NEW_ARR_F(ir_node*, 0);
+	ijmp_blocks = NEW_ARR_F(ir_node*, 0);
 
 	int       n_local_vars = get_function_n_local_vars(entity);
 	ir_graph *irg          = new_ir_graph(function_entity, n_local_vars);
@@ -5286,16 +5192,11 @@ static void create_function(entity_t *entity)
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
-	/* set inline flags */
-	if (entity->function.is_inline)
-		set_irg_inline_property(irg, irg_inline_recomended);
-	handle_decl_modifier_irg(irg, entity->declaration.modifiers);
-
 	next_value_number_function = 0;
 	initialize_function_parameters(entity);
 	current_static_link = entity->function.static_link;
 
-	statement_to_firm(entity->function.statement);
+	statement_to_firm(entity->function.body);
 
 	ir_node *end_block = get_irg_end_block(irg);
 
@@ -5323,16 +5224,21 @@ static void create_function(entity_t *entity)
 		add_immBlock_pred(end_block, ret);
 	}
 
-	for (int i = ARR_LEN(all_labels) - 1; i >= 0; --i) {
-		label_t *label = all_labels[i];
-		if (label->address_taken) {
-			gen_ijmp_branches(label->block);
+	if (enter_jump_target(&ijmp_target)) {
+		size_t   const n    = ARR_LEN(ijmp_ops);
+		ir_node *const op   = n == 1 ? ijmp_ops[0] : new_Phi(n, ijmp_ops, get_irn_mode(ijmp_ops[0]));
+		ir_node *const ijmp = new_IJmp(op);
+		for (size_t i = ARR_LEN(ijmp_blocks); i-- != 0;) {
+			ir_node *const block = ijmp_blocks[i];
+			add_immBlock_pred(block, ijmp);
+			mature_immBlock(block);
 		}
-		mature_immBlock(label->block);
 	}
 
-	DEL_ARR_F(all_labels);
-	all_labels = NULL;
+	DEL_ARR_F(ijmp_ops);
+	DEL_ARR_F(ijmp_blocks);
+	ijmp_ops    = NULL;
+	ijmp_blocks = NULL;
 
 	irg_finalize_cons(irg);
 
@@ -5450,8 +5356,7 @@ static void init_ir_types(void)
 		return;
 	ir_types_initialized = 1;
 
-	ir_type_char    = get_ir_type(type_char);
-	ir_type_wchar_t = get_ir_type(type_wchar_t);
+	ir_type_char = get_ir_type(type_char);
 
 	be_params             = be_get_backend_param();
 	mode_float_arithmetic = be_params->mode_float_arithmetic;
@@ -5507,8 +5412,8 @@ void translation_unit_to_firm(translation_unit_t *unit)
 	ir_set_uninitialized_local_variable_func(uninitialized_local_var);
 
 	/* just to be sure */
-	continue_label           = NULL;
-	break_label              = NULL;
+	init_jump_target(&break_target,    NULL);
+	init_jump_target(&continue_target, NULL);
 	current_switch           = NULL;
 	current_translation_unit = unit;
 

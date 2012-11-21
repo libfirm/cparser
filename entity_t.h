@@ -25,6 +25,7 @@
 #include "attribute.h"
 #include <libfirm/firm_types.h>
 #include "builtins.h"
+#include "jump_target.h"
 #include "token_t.h"
 
 typedef enum {
@@ -172,10 +173,12 @@ struct label_t {
 	entity_base_t  base;
 	bool           used : 1;
 	bool           address_taken : 1;
+	unsigned       n_users; /* Reference counter to mature the label block as early as possible. */
 	statement_t   *statement;
 
 	/* ast2firm info */
-	ir_node       *block;
+	jump_target    target;
+	ir_node       *indirect_block;
 };
 
 struct namespace_t {
@@ -212,9 +215,6 @@ struct compound_member_t {
 	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
 	unsigned char  bit_size;   /**< bitsize for bitfield members */
 	bool           bitfield      : 1;  /**< member is (part of) a bitfield */
-	bool           read          : 1;
-	bool           address_taken : 1;  /**< Set if the address of this
-	                                        declaration was taken. */
 
 	/* ast2firm info */
 	ir_entity *entity;
@@ -223,9 +223,6 @@ struct compound_member_t {
 struct variable_t {
 	declaration_t     base;
 	bool              thread_local   : 1;
-	bool              restricta      : 1;
-	bool              deprecated     : 1;
-	bool              noalias        : 1;
 
 	bool              address_taken  : 1;  /**< Set if the address of this declaration was taken. */
 	bool              read           : 1;
@@ -251,7 +248,7 @@ struct function_t {
 
 	builtin_kind_t btk;
 	scope_t        parameters;
-	statement_t   *statement;
+	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
 
 	/* ast2firm info */

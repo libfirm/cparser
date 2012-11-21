@@ -61,6 +61,10 @@ type_t *type_const_void_ptr_restrict;
 
 type_t *type_char_ptr_ptr;
 
+type_t *type_char16_t;
+type_t *type_char32_t;
+type_t *type_char16_t_const;
+type_t *type_char32_t_const;
 type_t *type_intmax_t;
 type_t *type_ptrdiff_t;
 type_t *type_size_t;
@@ -73,6 +77,10 @@ type_t *type_wint_t;
 type_t *type_int32_t;
 type_t *type_int64_t;
 
+type_t *type_char16_t_ptr;
+type_t *type_char32_t_ptr;
+type_t *type_char16_t_const_ptr;
+type_t *type_char32_t_const_ptr;
 type_t *type_intmax_t_ptr;
 type_t *type_ptrdiff_t_ptr;
 type_t *type_ssize_t_ptr;
@@ -198,4 +206,16 @@ void init_wchar_types(atomic_type_kind_t akind)
 	type_wchar_t_ptr   = make_pointer_type(type_wchar_t, TYPE_QUALIFIER_NONE);
 	type_const_wchar_t_ptr
 		= make_pointer_type(type_const_wchar_t, TYPE_QUALIFIER_NONE);
+
+	atomic_type_kind_t const u2 = find_unsigned_int_atomic_type_kind_for_size(2);
+	type_char16_t           = make_atomic_type(u2, TYPE_QUALIFIER_NONE);
+	type_char16_t_const     = make_atomic_type(u2, TYPE_QUALIFIER_CONST);
+	type_char16_t_ptr       = make_pointer_type(type_char16_t,       TYPE_QUALIFIER_NONE);
+	type_char16_t_const_ptr = make_pointer_type(type_char16_t_const, TYPE_QUALIFIER_NONE);
+
+	atomic_type_kind_t const u4 = find_unsigned_int_atomic_type_kind_for_size(4);
+	type_char32_t           = make_atomic_type(u4, TYPE_QUALIFIER_NONE);
+	type_char32_t_const     = make_atomic_type(u4, TYPE_QUALIFIER_CONST);
+	type_char32_t_ptr       = make_pointer_type(type_char32_t,       TYPE_QUALIFIER_NONE);
+	type_char32_t_const_ptr = make_pointer_type(type_char32_t_const, TYPE_QUALIFIER_NONE);
 }

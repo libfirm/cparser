@@ -59,6 +59,7 @@
 
 #include <libfirm/firm.h>
 #include <libfirm/be.h>
+#include <libfirm/statev.h>
 
 #include "preprocessor.h"
 #include "token_t.h"
@@ -224,7 +225,7 @@ static void do_parsing(compilation_unit_t *unit)
 {
 	ir_timer_t *t_parsing = ir_timer_new();
 	timer_register(t_parsing, "Frontend: Parsing");
-	timer_push(t_parsing);
+	timer_start(t_parsing);
 
 	start_parsing();
 
@@ -239,7 +240,10 @@ static void do_parsing(compilation_unit_t *unit)
 
 	unit->type         = COMPILATION_UNIT_AST;
 	unit->parse_errors = error_count > 0 || !res;
-	timer_pop(t_parsing);
+	timer_stop(t_parsing);
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
+	}
 }
 
 static void add_flag(struct obstack *obst, const char *format, ...)
@@ -390,7 +394,8 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 	}
 	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
-		fprintf(stderr, "invoking preprocessor failed\n");
+		source_position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos, "invoking preprocessor failed");
 		return false;
 	}
 	/* we do not really need that anymore */
@@ -441,7 +446,8 @@ static void assemble(const char *out, const char *in)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "assembler reported an error\n");
+		source_position_t const pos = { in, 0, 0, 0 };
+		errorf(&pos, "assembler reported an error");
 		exit(EXIT_FAILURE);
 	}
 	obstack_free(&asflags_obst, commandline);
@@ -473,7 +479,8 @@ static void print_file_name(const char *file)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "linker reported an error\n");
+		source_position_t const pos = { file, 0, 0, 0 };
+		errorf(&pos, "linker reported an error");
 		exit(EXIT_FAILURE);
 	}
 	obstack_free(&ldflags_obst, commandline);
@@ -543,13 +550,14 @@ static FILE *make_temp_file(const char *prefix, const char **name_result)
 	char *name = obstack_finish(&file_obst);
 	int fd = mkstemp(name);
 	if (fd == -1) {
-		fprintf(stderr, "could not create temporary file: %s\n",
-		        strerror(errno));
+		source_position_t const pos = { name, 0, 0, 0 };
+		errorf(&pos, "could not create temporary file: %s", strerror(errno));
 		return NULL;
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
-		fprintf(stderr, "could not open temporary file as FILE*\n");
+		source_position_t const pos = { name, 0, 0, 0 };
+		errorf(&pos, "could not open temporary file as FILE*");
 		return NULL;
 	}
 
@@ -781,6 +789,8 @@ static void print_help_debug(void)
 	put_help("--print-parenthesis",      "");
 	put_help("--benchmark",              "Preprocess and parse, produces no output");
 	put_help("--time",                   "Measure time of compiler passes");
+	put_help("--statev",                 "Produce statev output");
+	put_help("--filtev=filter",          "Set statev filter regex");
 	put_help("--dump-function func",     "Preprocess, parse and output vcg graph of func");
 	put_help("--export-ir",              "Preprocess, parse and output compiler intermediate representation");
 }
@@ -880,7 +890,7 @@ static bool parse_target_triple(const char *arg)
 {
 	machine_triple_t *triple = firm_parse_machine_triple(arg);
 	if (triple == NULL) {
-		fprintf(stderr, "Target-triple is not in the form 'cpu_type-manufacturer-operating_system'\n");
+		errorf(NULL, "target-triple '%s' is not in the form 'cpu_type-manufacturer-operating_system'", arg);
 		return false;
 	}
 	target_machine = triple;
@@ -924,7 +934,7 @@ static const char *setup_isa_from_tripel(const machine_triple_t *machine)
 	} else if (streq(cpu, "arm")) {
 		return "arm";
 	} else {
-		fprintf(stderr, "Unknown cpu '%s' in target-triple\n", cpu);
+		errorf(NULL, "unknown cpu '%s' in target-triple", cpu);
 		return NULL;
 	}
 }
@@ -991,7 +1001,7 @@ static void init_types_and_adjust(void)
 
 	/* operating system ABI specifics */
 	if (firm_is_darwin_os(target_machine)) {
-		if (machine_size == 32) {
+		if (is_ia32_cpu(target_machine->cpu_type)) {
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  4;
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  4;
@@ -1000,7 +1010,11 @@ static void init_types_and_adjust(void)
 			props[ATOMIC_TYPE_LONG_DOUBLE].struct_alignment = 16;
 		}
 	} else if (firm_is_windows_os(target_machine)) {
-		if (machine_size == 64) {
+		if (is_ia32_cpu(target_machine->cpu_type)) {
+			props[ATOMIC_TYPE_LONGLONG].struct_alignment    =  8;
+			props[ATOMIC_TYPE_ULONGLONG].struct_alignment   =  8;
+			props[ATOMIC_TYPE_DOUBLE].struct_alignment      =  8;
+		} else if (machine_size == 64) {
 			/* to ease porting of old c-code microsoft decided to use 32bits
 			 * even for long */
 			props[ATOMIC_TYPE_LONG]  = props[ATOMIC_TYPE_INT];
@@ -1011,8 +1025,6 @@ static void init_types_and_adjust(void)
 		props[ATOMIC_TYPE_LONG_DOUBLE] = props[ATOMIC_TYPE_DOUBLE];
 	} else if (firm_is_unixish_os(target_machine)) {
 		if (is_ia32_cpu(target_machine->cpu_type)) {
-			/* System V has a broken alignment for double so we have to add
-			 * a hack here */
 			props[ATOMIC_TYPE_DOUBLE].struct_alignment    = 4;
 			props[ATOMIC_TYPE_LONGLONG].struct_alignment  = 4;
 			props[ATOMIC_TYPE_ULONGLONG].struct_alignment = 4;
@@ -1206,12 +1218,31 @@ static bool open_input(compilation_unit_t *unit)
 	} else {
 		unit->input = fopen(inputname, "r");
 		if (unit->input == NULL) {
-			fprintf(stderr, "Could not open '%s': %s\n", inputname,
-					strerror(errno));
+			source_position_t const pos = { inputname, 0, 0, 0 };
+			errorf(&pos, "could not open: %s", strerror(errno));
 			return false;
 		}
 	}
 	return true;
+}
+
+static void node_counter(ir_node *node, void *env)
+{
+	(void)node;
+	unsigned long long *count = (unsigned long long*)env;
+	++(*count);
+}
+
+static unsigned long long count_firm_nodes(void)
+{
+	unsigned long long count = 0;
+
+	int n_irgs = get_irp_n_irgs();
+	for (int i = 0; i < n_irgs; ++i) {
+		ir_graph *irg = get_irp_irg(i);
+		irg_walk_graph(irg, node_counter, NULL, &count);
+	}
+	return count;
 }
 
 static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
@@ -1225,20 +1256,22 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 		determine_unit_standard(unit, standard);
 		setup_cmode(unit);
 
+		stat_ev_ctx_push_str("compilation_unit", inputname);
+
 again:
 		switch (unit->type) {
 		case COMPILATION_UNIT_IR: {
 			bool res = open_input(unit);
 			if (!res) {
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			res = !ir_import_file(unit->input, unit->name);
 			if (!res) {
-				fprintf(stderr, "Import of firm graph from '%s' failed\n",
-				        inputname);
+				source_position_t const pos = { inputname, 0, 0, 0 };
+				errorf(&pos, "import of firm graph failed");
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
@@ -1251,7 +1284,7 @@ again:
 				bool res = run_external_preprocessor(unit);
 				if (!res) {
 					result = EXIT_FAILURE;
-					continue;
+					break;
 				}
 				goto again;
 			}
@@ -1262,7 +1295,7 @@ again:
 			bool res = open_input(unit);
 			if (!res) {
 				result = EXIT_FAILURE;
-				continue;
+				break;
 			}
 			init_tokens();
 
@@ -1270,9 +1303,9 @@ again:
 				bool res = output_preprocessor_tokens(unit, out);
 				if (!res) {
 					result = EXIT_FAILURE;
-					continue;
+					break;
 				}
-				continue;
+				break;
 			}
 
 			/* do the actual parsing */
@@ -1306,20 +1339,24 @@ again:
 			/* build the firm graph */
 			ir_timer_t *t_construct = ir_timer_new();
 			timer_register(t_construct, "Frontend: Graph construction");
-			timer_push(t_construct);
+			timer_start(t_construct);
 			if (already_constructed_firm) {
 				panic("compiling multiple files/translation units not possible");
 			}
 			init_implicit_optimizations();
 			translation_unit_to_firm(unit->ast);
 			already_constructed_firm = true;
-			timer_pop(t_construct);
+			timer_stop(t_construct);
+			if (stat_ev_enabled) {
+				stat_ev_dbl("time_graph_construction", ir_timer_elapsed_sec(t_construct));
+				stat_ev_int("size_graph_construction", count_firm_nodes());
+			}
 			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
 			if (mode == ParseOnly)
-				continue;
+				break;
 
 			if (mode == CompileDump) {
 				/* find irg */
@@ -1336,8 +1373,7 @@ again:
 				}
 
 				if (irg == NULL) {
-					fprintf(stderr, "No graph for function '%s' found\n",
-					        dumpfunction);
+					errorf(NULL, "no graph for function '%s' found", dumpfunction);
 					return EXIT_FAILURE;
 				}
 
@@ -1349,7 +1385,7 @@ again:
 			if (mode == CompileExportIR) {
 				ir_export_file(out);
 				if (ferror(out) != 0) {
-					fprintf(stderr, "Error while writing to output\n");
+					errorf(NULL, "writing to output failed");
 					return EXIT_FAILURE;
 				}
 				return EXIT_SUCCESS;
@@ -1361,7 +1397,14 @@ again:
 			} else {
 				asm_out = make_temp_file("ccs", &unit->name);
 			}
+			ir_timer_t *t_opt_codegen = ir_timer_new();
+			timer_register(t_opt_codegen, "Optimization and Codegeneration");
+			timer_start(t_opt_codegen);
 			generate_code(asm_out, inputname);
+			timer_stop(t_opt_codegen);
+			if (stat_ev_enabled) {
+				stat_ev_dbl("time_opt_codegen", ir_timer_elapsed_sec(t_opt_codegen));
+			}
 			if (asm_out != out) {
 				fclose(asm_out);
 			}
@@ -1391,6 +1434,8 @@ again:
 		case COMPILATION_UNIT_OBJECT:
 			break;
 		}
+
+		stat_ev_ctx_pop("compilation_unit");
 	}
 	return result;
 }
@@ -1429,7 +1474,7 @@ static int link_program(compilation_unit_t *units)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		fprintf(stderr, "linker reported an error\n");
+		errorf(NULL, "linker reported an error");
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
@@ -1444,9 +1489,12 @@ int main(int argc, char **argv)
 	compilation_unit_t *units                = NULL;
 	compilation_unit_t *last_unit            = NULL;
 	bool                construct_dep_target = false;
-	bool                do_timing            = false;
+	bool                produce_statev       = false;
+	const char         *filtev               = NULL;
 	bool                profile_generate     = false;
 	bool                profile_use          = false;
+	bool                do_timing            = false;
+	bool                print_timing         = false;
 
 	/* hack for now... */
 	if (strstr(argv[0], "pptest") != NULL) {
@@ -1469,13 +1517,13 @@ int main(int argc, char **argv)
 	if (def[0] == '\0') {                                                    \
 		++i;                                                                 \
 		if (i >= argc) {                                                     \
-			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			errorf(NULL, "expected argument after '" args "'"); \
 			argument_errors = true;                                          \
 			break;                                                           \
 		}                                                                    \
 		def = argv[i];                                                       \
 		if (def[0] == '-' && def[1] != '\0') {                               \
-			fprintf(stderr, "error: expected argument after '" args "'\n");  \
+			errorf(NULL, "expected argument after '" args "'"); \
 			argument_errors = true;                                          \
 			continue;                                                        \
 		}                                                                    \
@@ -1562,7 +1610,7 @@ int main(int argc, char **argv)
 				GET_ARG_AFTER(opt, "-x");
 				forced_unittype = get_unit_type_from_string(opt);
 				if (forced_unittype == COMPILATION_UNIT_UNKNOWN) {
-					fprintf(stderr, "Unknown language '%s'\n", opt);
+					errorf(NULL, "unknown language '%s'", opt);
 					argument_errors = true;
 				}
 			} else if (streq(option, "M")) {
@@ -1636,8 +1684,7 @@ int main(int argc, char **argv)
 					elf_visibility_tag_t visibility
 						= get_elf_visibility_from_string(val);
 					if (visibility == ELF_VISIBILITY_ERROR) {
-						fprintf(stderr, "invalid visibility '%s' specified\n",
-						        val);
+						errorf(NULL, "invalid visibility '%s' specified", val);
 						argument_errors = true;
 					} else {
 						set_default_visibility(visibility);
@@ -1711,8 +1758,7 @@ int main(int argc, char **argv)
 					} else {
 						int res = firm_option(orig_opt);
 						if (res == 0) {
-							fprintf(stderr, "error: unknown Firm option '-f%s'\n",
-							        orig_opt);
+							errorf(NULL, "unknown Firm option '-f%s'", orig_opt);
 							argument_errors = true;
 							continue;
 						}
@@ -1728,8 +1774,7 @@ int main(int argc, char **argv)
 				} else {
 					int res = be_parse_arg(opt);
 					if (res == 0) {
-						fprintf(stderr, "error: unknown Firm backend option '-b %s'\n",
-								opt);
+						errorf(NULL, "unknown Firm backend option '-b %s'", opt);
 						argument_errors = true;
 					} else if (strstart(opt, "isa=")) {
 						strncpy(cpu_arch, opt, sizeof(cpu_arch));
@@ -1793,7 +1838,7 @@ int main(int argc, char **argv)
 					res &= be_parse_arg(arch_opt);
 
 					if (res == 0) {
-						fprintf(stderr, "Unknown architecture '%s'\n", arch_opt);
+						errorf(NULL, "unknown architecture '%s'", arch_opt);
 						argument_errors = true;
 					}
 				} else if (strstart(opt, "tune=")) {
@@ -1815,7 +1860,7 @@ int main(int argc, char **argv)
 					else if (streq(opt, "sse"))
 						opt = "sse2";
 					else {
-						fprintf(stderr, "error: option -mfpmath supports only 387 or sse\n");
+						errorf(NULL, "option -mfpmath supports only 387 or sse");
 						argument_errors = true;
 					}
 					if (!argument_errors) {
@@ -1833,7 +1878,7 @@ int main(int argc, char **argv)
 				} else if (streq(opt, "rtd")) {
 					default_calling_convention = CC_STDCALL;
 				} else if (strstart(opt, "regparm=")) {
-					fprintf(stderr, "error: regparm convention not supported yet\n");
+					errorf(NULL, "regparm convention not supported yet");
 					argument_errors = true;
 				} else if (streq(opt, "soft-float")) {
 					add_flag(&ldflags_obst, "-msoft-float");
@@ -1847,10 +1892,10 @@ int main(int argc, char **argv)
 				} else {
 					long int value = strtol(opt, NULL, 10);
 					if (value == 0) {
-						fprintf(stderr, "error: wrong option '-m %s'\n",  opt);
+						errorf(NULL, "wrong option '-m %s'",  opt);
 						argument_errors = true;
 					} else if (value != 16 && value != 32 && value != 64) {
-						fprintf(stderr, "error: option -m supports only 16, 32 or 64\n");
+						errorf(NULL, "option -m supports only 16, 32 or 64");
 						argument_errors = true;
 					} else {
 						unsigned machine_size = (unsigned)value;
@@ -1933,8 +1978,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "jna-limit")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--jna-limit'\n");
+						errorf(NULL, "expected argument after '--jna-limit'");
 						argument_errors = true;
 						break;
 					}
@@ -1942,8 +1986,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "jna-libname")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--jna-libname'\n");
+						errorf(NULL, "expected argument after '--jna-libname'");
 						argument_errors = true;
 						break;
 					}
@@ -1958,7 +2001,13 @@ int main(int argc, char **argv)
 				} else if (streq(option, "no-external-pp")) {
 					external_preprocessor = NULL;
 				} else if (streq(option, "time")) {
-					do_timing = true;
+					do_timing    = true;
+					print_timing = true;
+				} else if (streq(option, "statev")) {
+					do_timing      = true;
+					produce_statev = true;
+				} else if (strstart(option, "filtev=")) {
+					GET_ARG_AFTER(filtev, "--filtev=");
 				} else if (streq(option, "version")) {
 					print_cparser_version();
 					return EXIT_SUCCESS;
@@ -1985,8 +2034,7 @@ int main(int argc, char **argv)
 				} else if (streq(option, "dump-function")) {
 					++i;
 					if (i >= argc) {
-						fprintf(stderr, "error: "
-						        "expected argument after '--dump-function'\n");
+						errorf(NULL, "expected argument after '--dump-function'");
 						argument_errors = true;
 						break;
 					}
@@ -1997,11 +2045,11 @@ int main(int argc, char **argv)
 				} else if (streq(option, "unroll-loops")) {
 					/* ignore (gcc compatibility) */
 				} else {
-					fprintf(stderr, "error: unknown argument '%s'\n", arg);
+					errorf(NULL, "unknown argument '%s'", arg);
 					argument_errors = true;
 				}
 			} else {
-				fprintf(stderr, "error: unknown argument '%s'\n", arg);
+				errorf(NULL, "unknown argument '%s'", arg);
 				argument_errors = true;
 			}
 		} else {
@@ -2061,7 +2109,7 @@ int main(int argc, char **argv)
 		return EXIT_SUCCESS;
 	}
 	if (units == NULL) {
-		fprintf(stderr, "error: no input files specified\n");
+		errorf(NULL, "no input files specified");
 		argument_errors = true;
 	}
 
@@ -2158,13 +2206,31 @@ int main(int argc, char **argv)
 	} else {
 		out = fopen(outname, "w");
 		if (out == NULL) {
-			fprintf(stderr, "Could not open '%s' for writing: %s\n", outname,
-					strerror(errno));
+			source_position_t const pos = { outname, 0, 0, 0 };
+			errorf(&pos, "could not open for writing: %s", strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
 
+	if (produce_statev && units != NULL) {
+		/* attempt to guess a good name for the file */
+		const char *first_cup = units->name;
+		if (first_cup != NULL) {
+			const char *dot = strrchr(first_cup, '.');
+			const char *pos = dot ? dot : first_cup + strlen(first_cup);
+			char        buf[pos-first_cup+1];
+			strncpy(buf, first_cup, pos-first_cup);
+			buf[pos-first_cup] = '\0';
+
+			stat_ev_begin(buf, filtev);
+		}
+	}
+
 	int result = compilation_loop(mode, units, standard, out);
+	if (stat_ev_enabled) {
+		stat_ev_end();
+	}
+
 	if (result != EXIT_SUCCESS) {
 		if (out != stdout)
 			unlink(outname);
@@ -2182,7 +2248,7 @@ int main(int argc, char **argv)
 	}
 
 	if (do_timing)
-		timer_term(stderr);
+		timer_term(print_timing ? stderr : NULL);
 
 	free_temp_files();
 	obstack_free(&cppflags_obst, NULL);

@@ -26,6 +26,7 @@
 #include "lang_features.h"
 #include "entity_t.h"
 #include "printer.h"
+#include "separator_t.h"
 #include "types.h"
 
 #include <assert.h>
@@ -288,10 +289,9 @@ static void print_call_expression(const call_expression_t *call)
 {
 	print_expression_prec(call->function, PREC_POSTFIX);
 	print_char('(');
-	char const *sep = "";
+	separator_t sep = { "", ", " };
 	for (call_argument_t const *arg = call->arguments; arg; arg = arg->next) {
-		print_string(sep);
-		sep = ", ";
+		print_string(sep_next(&sep));
 		print_assignment_expression(arg->expression);
 	}
 	print_char(')');
@@ -1005,19 +1005,17 @@ static void print_for_statement(const for_statement_t *statement)
  *
  * @param arguments   the arguments
  */
-static void print_asm_arguments(asm_argument_t *arguments)
+static void print_asm_arguments(asm_argument_t const *const arguments)
 {
-	asm_argument_t *argument = arguments;
-	for (; argument != NULL; argument = argument->next) {
-		if (argument != arguments)
-			print_string(", ");
-
-		if (argument->symbol) {
-			print_format("[%s] ", argument->symbol->string);
-		}
-		print_quoted_string(&argument->constraints, '"');
+	print_string(" :");
+	separator_t sep = { " ", ", " };
+	for (asm_argument_t const *i = arguments; i; i = i->next) {
+		print_string(sep_next(&sep));
+		if (i->symbol)
+			print_format("[%s] ", i->symbol->string);
+		print_quoted_string(&i->constraints, '"');
 		print_string(" (");
-		print_expression(argument->expression);
+		print_expression(i->expression);
 		print_char(')');
 	}
 }
@@ -1027,49 +1025,50 @@ static void print_asm_arguments(asm_argument_t *arguments)
  *
  * @param clobbers   the clobbers
  */
-static void print_asm_clobbers(asm_clobber_t *clobbers)
+static void print_asm_clobbers(asm_clobber_t const *const clobbers)
 {
-	asm_clobber_t *clobber = clobbers;
-	for (; clobber != NULL; clobber = clobber->next) {
-		if (clobber != clobbers)
-			print_string(", ");
+	print_string(" :");
+	separator_t sep = { " ", ", " };
+	for (asm_clobber_t const *i = clobbers; i; i = i->next) {
+		print_string(sep_next(&sep));
+		print_quoted_string(&i->clobber, '"');
+	}
+}
 
-		print_quoted_string(&clobber->clobber, '"');
+static void print_asm_labels(asm_label_t const *const labels)
+{
+	print_string(" :");
+	separator_t sep = { " ", ", " };
+	for (asm_label_t const *i = labels; i; i = i->next) {
+		print_string(sep_next(&sep));
+		print_string(i->label->base.symbol->string);
 	}
 }
 
 /**
  * Print an assembler statement.
  *
- * @param statement   the statement
+ * @param stmt   the statement
  */
-static void print_asm_statement(const asm_statement_t *statement)
+static void print_asm_statement(asm_statement_t const *const stmt)
 {
-	print_string("asm ");
-	if (statement->is_volatile) {
-		print_string("volatile ");
-	}
+	print_string("asm");
+	if (stmt->is_volatile) print_string(" volatile");
+	if (stmt->labels)      print_string(" goto");
 	print_char('(');
-	print_quoted_string(&statement->asm_text, '"');
-	if (statement->outputs  == NULL &&
-	    statement->inputs   == NULL &&
-	    statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
+	print_quoted_string(&stmt->asm_text, '"');
 
-	print_string(" : ");
-	print_asm_arguments(statement->outputs);
-	if (statement->inputs == NULL && statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
+	unsigned const n =
+		stmt->labels   ? 4 :
+		stmt->clobbers ? 3 :
+		stmt->inputs   ? 2 :
+		stmt->outputs  ? 1 :
+		0;
+	if (n >= 1) print_asm_arguments(stmt->outputs);
+	if (n >= 2) print_asm_arguments(stmt->inputs);
+	if (n >= 3) print_asm_clobbers( stmt->clobbers);
+	if (n >= 4) print_asm_labels(   stmt->labels);
 
-	print_string(" : ");
-	print_asm_arguments(statement->inputs);
-	if (statement->clobbers == NULL)
-		goto end_of_print_asm_statement;
-
-	print_string(" : ");
-	print_asm_clobbers(statement->clobbers);
-
-end_of_print_asm_statement:
 	print_string(");");
 }
 
@@ -1206,26 +1205,20 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 	decl_modifiers_t modifiers = declaration->modifiers;
 
-	bool        ds_shown = false;
-	const char *next     = "(";
+	separator_t sep = { "__declspec(", ", " };
 
 	if (declaration->base.kind == ENTITY_VARIABLE) {
 		variable_t *variable = (variable_t*)declaration;
 		if (variable->alignment != 0
 				|| variable->get_property_sym != NULL
 				|| variable->put_property_sym != NULL) {
-			if (!ds_shown) {
-				print_string("__declspec");
-				ds_shown = true;
-			}
-
 			if (variable->alignment != 0) {
-				print_string(next); next = ", "; print_format("align(%u)", variable->alignment);
+				print_format("%salign(%u)", sep_next(&sep), variable->alignment);
 			}
 			if (variable->get_property_sym != NULL
 					|| variable->put_property_sym != NULL) {
 				char *comma = "";
-				print_string(next); next = ", "; print_string("property(");
+				print_format("%sproperty(", sep_next(&sep));
 				if (variable->get_property_sym != NULL) {
 					print_format("get=%s", variable->get_property_sym->string);
 					comma = ", ";
@@ -1239,52 +1232,48 @@ static void print_ms_modifiers(const declaration_t *declaration)
 
 	/* DM_FORCEINLINE handled outside. */
 	if ((modifiers & ~DM_FORCEINLINE) != 0) {
-		if (!ds_shown) {
-			print_string("__declspec");
-			ds_shown = true;
-		}
 		if (modifiers & DM_DLLIMPORT) {
-			print_string(next); next = ", "; print_string("dllimport");
+			print_format("%sdllimport", sep_next(&sep));
 		}
 		if (modifiers & DM_DLLEXPORT) {
-			print_string(next); next = ", "; print_string("dllexport");
+			print_format("%sdllexport", sep_next(&sep));
 		}
 		if (modifiers & DM_THREAD) {
-			print_string(next); next = ", "; print_string("thread");
+			print_format("%sthread", sep_next(&sep));
 		}
 		if (modifiers & DM_NAKED) {
-			print_string(next); next = ", "; print_string("naked");
+			print_format("%snaked", sep_next(&sep));
 		}
 		if (modifiers & DM_THREAD) {
-			print_string(next); next = ", "; print_string("thread");
+			print_format("%sthread", sep_next(&sep));
 		}
 		if (modifiers & DM_SELECTANY) {
-			print_string(next); next = ", "; print_string("selectany");
+			print_format("%sselectany", sep_next(&sep));
 		}
 		if (modifiers & DM_NOTHROW) {
-			print_string(next); next = ", "; print_string("nothrow");
+			print_format("%snothrow", sep_next(&sep));
 		}
 		if (modifiers & DM_NORETURN) {
-			print_string(next); next = ", "; print_string("noreturn");
+			print_format("%snoreturn", sep_next(&sep));
 		}
 		if (modifiers & DM_NOINLINE) {
-			print_string(next); next = ", "; print_string("noinline");
+			print_format("%snoinline", sep_next(&sep));
 		}
 		if (modifiers & DM_DEPRECATED) {
-			print_string(next); next = ", "; print_string("deprecated");
+			print_format("%sdeprecated", sep_next(&sep));
 			if (declaration->deprecated_string != NULL)
 				print_format("(\"%s\")",
 				        declaration->deprecated_string);
 		}
 		if (modifiers & DM_RESTRICT) {
-			print_string(next); next = ", "; print_string("restrict");
+			print_format("%srestrict", sep_next(&sep));
 		}
 		if (modifiers & DM_NOALIAS) {
-			print_string(next); next = ", "; print_string("noalias");
+			print_format("%snoalias", sep_next(&sep));
 		}
 	}
 
-	if (ds_shown)
+	if (!sep_at_first(&sep))
 		print_string(") ");
 }
 #endif
@@ -1344,9 +1333,9 @@ void print_declaration(const entity_t *entity)
 			print_type_ext(entity->declaration.type, entity->base.symbol,
 					&entity->function.parameters);
 
-			if (entity->function.statement != NULL) {
+			if (entity->function.body != NULL) {
 				print_char('\n');
-				print_indented_statement(entity->function.statement);
+				print_indented_statement(entity->function.body);
 				print_char('\n');
 				return;
 			}
@@ -1918,7 +1907,7 @@ check_type:
 	case EXPR_ERROR:
 		return EXPR_CLASS_ERROR;
 	}
-	panic("invalid expression found (is constant expression)");
+	panic("invalid expression");
 }
 
 void init_ast(void)

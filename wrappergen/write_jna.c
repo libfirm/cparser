@@ -33,6 +33,7 @@
 #include "adt/error.h"
 #include "adt/xmalloc.h"
 #include "adt/pset_new.h"
+#include "separator_t.h"
 
 typedef struct output_limit {
 	const char          *filename;
@@ -226,7 +227,7 @@ static void write_type(type_t *type)
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
-		panic("invalid type found");
+		panic("invalid type");
 	case TYPE_ARRAY:
 	case TYPE_REFERENCE:
 	case TYPE_FUNCTION:
@@ -275,7 +276,7 @@ static void write_unary_expression(const unary_expression_t *expression)
 		write_expression(expression->value);
 		return;
 	default:
-		panic("unimeplemented unary expression found");
+		panic("unimplemented unary expression");
 	}
 	write_expression(expression->value);
 }
@@ -404,7 +405,7 @@ static void write_variable(const entity_t *entity)
 
 static void write_function(const entity_t *entity)
 {
-	if (entity->function.statement != NULL) {
+	if (entity->function.body != NULL) {
 		fprintf(stderr, "Warning: can't convert function bodies (at %s)\n",
 		        entity->base.symbol->string);
 		return;
@@ -420,16 +421,12 @@ static void write_function(const entity_t *entity)
 	write_type(return_type);
 	fprintf(out, " %s(", entity->base.symbol->string);
 
-	entity_t *parameter = entity->function.parameters.entities;
-	int       first     = 1;
-	int       n         = 0;
+	entity_t   *parameter = entity->function.parameters.entities;
+	separator_t sep       = { "", ", " };
+	int         n         = 0;
 	for ( ; parameter != NULL; parameter = parameter->base.next) {
 		assert(parameter->kind == ENTITY_PARAMETER);
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
+		fputs(sep_next(&sep), out);
 		write_type(parameter->declaration.type);
 		if(parameter->base.symbol != NULL) {
 			fprintf(out, " %s", fix_builtin_names(parameter->base.symbol->string));
@@ -438,11 +435,7 @@ static void write_function(const entity_t *entity)
 		}
 	}
 	if(function_type->variadic) {
-		if(!first) {
-			fprintf(out, ", ");
-		} else {
-			first = 0;
-		}
+		fputs(sep_next(&sep), out);
 		fputs("Object ... args", out);
 	}
 	fprintf(out, ");\n");

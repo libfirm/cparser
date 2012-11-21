@@ -23,6 +23,7 @@
 #include "diagnostic.h"
 #include "adt/error.h"
 #include "entity_t.h"
+#include "separator_t.h"
 #include "symbol_t.h"
 #include "token_t.h"
 #include "ast.h"
@@ -185,18 +186,13 @@ done_flags:;
 
 		case 'k': {
 			if (extended) {
-				bool              first     = true;
-				va_list*          toks      = va_arg(ap, va_list*);
-				const char* const delimiter = va_arg(ap, const char*);
+				va_list* const toks = va_arg(ap, va_list*);
+				separator_t    sep  = { "", va_arg(ap, const char*) };
 				for (;;) {
 					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
 					if (tok == 0)
 						break;
-					if (first) {
-						first = false;
-					} else {
-						fputs(delimiter, stderr);
-					}
+					fputs(sep_next(&sep), stderr);
 					print_token_kind(stderr, tok);
 				}
 			} else {
@@ -247,10 +243,16 @@ void diagnosticf(const char *const fmt, ...)
 static void diagnosticposvf(source_position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
 {
 	FILE *const out = stderr;
-	fprintf(out, "%s:%u:", pos->input_name, pos->lineno);
-	if (show_column)
-		fprintf(out, "%u:", (unsigned)pos->colno);
-	fprintf(out, " %s: ", kind);
+	if (pos) {
+		fprintf(out, "%s:", pos->input_name);
+		if (pos->lineno != 0) {
+			fprintf(out, "%u:", pos->lineno);
+			if (show_column)
+				fprintf(out, "%u:", (unsigned)pos->colno);
+		}
+		fputc(' ', out);
+	}
+	fprintf(out, "%s: ", kind);
 	curr_pos = pos;
 	diagnosticvf(fmt, ap);
 }
@@ -293,6 +295,8 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 			diagnosticposvf(pos, kind, fmt, ap);
 			if (diagnostics_show_option)
 				fprintf(stderr, " [-W%s]\n", s->name);
+			else
+				fputc('\n', stderr);
 			break;
 
 		default:

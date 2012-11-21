@@ -188,15 +188,11 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 
 	if (!is_po2(alignment)) {
-		errorf(&attribute->source_position,
-			   "alignment must be a power of 2 but is %d\n",
-			   alignment);
+		errorf(&attribute->source_position, "alignment must be a power of 2 but is %d", alignment);
 		return;
 	}
 	if (alignment <= 0) {
-		errorf(&attribute->source_position,
-			   "alignment must be bigger than 0 but is %d\n",
-			   alignment);
+		errorf(&attribute->source_position, "alignment must be bigger than 0 but is %d", alignment);
 		return;
 	}
 
@@ -513,7 +509,7 @@ static bool attribute_argument_equal(const attribute_argument_t *arg1,
 		/* TODO */
 		return false;
 	}
-	panic("Unknown argument type found");
+	panic("unknown argument type");
 }
 
 static bool attribute_arguments_equal(const attribute_argument_t *args1,

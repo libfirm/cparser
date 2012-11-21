@@ -1,10 +1,14 @@
-GOAL = $(BUILDDIR)/cparser
-
 # include user-defined makefile settings
 -include config.mak
 
-BUILDDIR ?= build
-variant  ?= debug# Different libfirm variants (debug, optimize, profile)
+top_srcdir   ?=
+top_builddir ?= build
+
+variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverage)
+srcdir   ?= $(top_srcdir)
+builddir ?= $(top_builddir)/$(variant)
+
+#VPATH = $(srcdir)
 
 # Use libfirm subdir if it exists, otherwise use pkg-config
 ifneq ("$(wildcard libfirm)", "")
@@ -22,15 +26,18 @@ endif
 CPPFLAGS  = -I.
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
-CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
-CFLAGS_debug = -O0 -g
+CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99
+CFLAGS_debug    = -O0 -g
 CFLAGS_optimize = -O3 -fomit-frame-pointer -DNDEBUG
-CFLAGS_profile = -pg -O3 -fno-inline
+CFLAGS_profile  = -pg -O3 -fno-inline
+CFLAGS_coverage = --coverage -O0
 CFLAGS += $(CFLAGS_$(variant))
 
-LFLAGS += $(FIRM_LIBS)
+LINKFLAGS_profile  = -pg
+LINKFLAGS_coverage = --coverage
+LINKFLAGS += $(LINKFLAGS_$(variant)) $(FIRM_LIBS)
 
-SOURCES := \
+cparser_SOURCES = \
 	adt/strset.c \
 	adt/strutil.c \
 	adt/pset_new.c \
@@ -47,6 +54,7 @@ SOURCES := \
 	entitymap.c \
 	format_check.c \
 	input.c \
+	jump_target.c \
 	main.c \
 	mangle.c \
 	preprocessor.c \
@@ -63,25 +71,28 @@ SOURCES := \
 	wrappergen/write_fluffy.c \
 	wrappergen/write_jna.c \
 	wrappergen/write_compoundsizes.c
+cparser_OBJECTS = $(cparser_SOURCES:%.c=$(builddir)/%.o)
+cparser_DEPS    = $(cparser_OBJECTS:%.o=%.d)
 
-OBJECTS = $(SOURCES:%.c=$(BUILDDIR)/%.o)
-DEPENDS = $(OBJECTS:%.o=%.d)
-
-SPLINTS = $(addsuffix .splint, $(SOURCES))
-CPARSERS = $(addsuffix .cparser, $(SOURCES))
-CPARSEROS = $(SOURCES:%.c=$(BUILDDIR)/cpb/%.o)
-CPARSEROS_E = $(SOURCES:%.c=$(BUILDDIR)/cpbe/%.o)
-CPARSEROS2 = $(SOURCES:%.c=$(BUILDDIR)/cpb2/%.o)
+SPLINTS = $(addsuffix .splint, $(cparser_SOURCES))
+CPARSERS = $(addsuffix .cparser, $(cparser_SOURCES))
+CPARSEROS = $(cparser_SOURCES:%.c=$(builddir)/cpb/%.o)
+CPARSEROS_E = $(cparser_SOURCES:%.c=$(builddir)/cpbe/%.o)
+CPARSEROS2 = $(cparser_SOURCES:%.c=$(builddir)/cpb2/%.o)
 
 Q = @
 
+GOAL = $(builddir)/cparser
 all: $(GOAL)
+
+# disable make builtin suffix rules
+.SUFFIXES:
+
+-include $(cparser_DEPS)
 
 .PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint libfirm_subdir
 
--include $(DEPENDS)
-
-$(SOURCES): config.h
+$(cparser_SOURCES): config.h
 config.h:
 	cp config.h.in $@
 
@@ -96,12 +107,12 @@ UNUSED := $(shell \
 	echo "$$REV" | cmp -s - revision.h 2> /dev/null || echo "$$REV" > revision.h \
 )
 
-DIRS   := $(sort $(dir $(OBJECTS)))
-UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpb2/%) $(DIRS:$(BUILDDIR)/%=$(BUILDDIR)/cpbe/%))
+DIRS   := $(sort $(dir $(cparser_OBJECTS)))
+UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
 
-$(GOAL): $(LIBFIRM_FILE) $(OBJECTS)
+$(GOAL): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo "===> LD $@"
-	$(Q)$(CC) $(OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LFLAGS)
+	$(Q)$(CC) $(cparser_OBJECTS) $(LIBFIRM_FILE) -o $(GOAL) $(LINKFLAGS)
 
 ifneq ("$(LIBFIRM_FILE)", "")
 ifneq ("$(MAKECMDGOALS)", "clean")
@@ -132,34 +143,34 @@ bootstrap2: cparser.bootstrap2
 	@echo '===> CPARSER $<'
 	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
 
-$(BUILDDIR)/cpb/%.o: %.c $(BUILDDIR)/cparser
+$(builddir)/cpb/%.o: %.c $(builddir)/cparser
 	@echo '===> CPARSER $<'
-	$(Q)./$(BUILDDIR)/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
+	$(Q)./$(builddir)/cparser $(CPPFLAGS) -std=c99 -Wall -g3 -c $< -o $@
 
-$(BUILDDIR)/cpbe/%.o: %.c
-	@echo '===> ECCP $<'
+$(builddir)/cpbe/%.o: %.c
+	@echo '===> ECCP $@'
 	$(Q)eccp $(CPPFLAGS) -std=c99 -Wall -c $< -o $@
 
-$(BUILDDIR)/cpb2/%.o: %.c cparser.bootstrap
+$(builddir)/cpb2/%.o: %.c cparser.bootstrap
 	@echo '===> CPARSER.BOOTSTRAP $<'
 	$(Q)./cparser.bootstrap $(CPPFLAGS) -Wall -g -c $< -o $@
 
 cparser.bootstrap: $(CPARSEROS)
 	@echo "===> LD $@"
-	$(Q)./$(BUILDDIR)/cparser $(CPARSEROS) $(LFLAGS) -o $@
+	$(Q)./$(builddir)/cparser $(CPARSEROS) $(LINKFLAGS) -o $@
 
 cparser.bootstrape: $(CPARSEROS_E)
 	@echo "===> LD $@"
-	$(Q)gcc $(CPARSEROS_E) $(LFLAGS) -o $@
+	$(Q)gcc $(CPARSEROS_E) $(LINKFLAGS) -o $@
 
 cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 	@echo "===> LD $@"
-	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LFLAGS) -o $@
+	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LINKFLAGS) -o $@
 
-$(BUILDDIR)/%.o: %.c
-	@echo '===> CC $<'
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
+$(builddir)/%.o: %.c
+	@echo '===> CC $@'
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c -o $@ $<
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf $(OBJECTS) $(GOAL)
+	$(Q)rm -rf $(cparser_OBJECTS) $(GOAL)

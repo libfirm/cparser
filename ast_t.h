@@ -552,8 +552,8 @@ struct case_label_statement_t {
 	expression_t           *end_range;     /**< For GNUC case a .. b: the end range expression, NULL else. */
 	case_label_statement_t *next;          /**< link to the next case label in switch */
 	statement_t            *statement;
-	long                   first_case;     /**< The folded value of expression. */
-	long                   last_case;      /**< The folded value of end_range. */
+	ir_tarval              *first_case;
+	ir_tarval              *last_case;
 	bool                   is_bad;         /**< If set marked as bad to suppress warnings. */
 	bool                   is_empty_range; /**< If set marked this as an empty range. */
 	long                   pn;
@@ -601,12 +601,18 @@ struct asm_clobber_t {
 	asm_clobber_t *next;
 };
 
+struct asm_label_t {
+	label_t     *label;
+	asm_label_t *next;
+};
+
 struct asm_statement_t {
 	statement_base_t base;
 	string_t         asm_text;
 	asm_argument_t  *inputs;
 	asm_argument_t  *outputs;
 	asm_clobber_t   *clobbers;
+	asm_label_t     *labels;
 	bool             is_volatile;
 };
 

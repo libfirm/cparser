@@ -136,6 +136,11 @@ static symbol_t *symbol_percentcolon;
 static symbol_t *symbol_percentcolonpercentcolon;
 static symbol_t *symbol_percentgreater;
 
+static symbol_t *symbol_L;
+static symbol_t *symbol_U;
+static symbol_t *symbol_u;
+static symbol_t *symbol_u8;
+
 static void init_symbols(void)
 {
 	symbol_colongreater             = symbol_table_insert(":>");
@@ -144,6 +149,11 @@ static void init_symbols(void)
 	symbol_percentcolon             = symbol_table_insert("%:");
 	symbol_percentcolonpercentcolon = symbol_table_insert("%:%:");
 	symbol_percentgreater           = symbol_table_insert("%>");
+
+	symbol_L  = symbol_table_insert("L");
+	symbol_U  = symbol_table_insert("U");
+	symbol_u  = symbol_table_insert("u");
+	symbol_u8 = symbol_table_insert("u8");
 }
 
 void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path, bool const is_system_header)
@@ -684,6 +694,18 @@ string_t make_string(char const *const string)
 	return sym_make_string(STRING_ENCODING_CHAR);
 }
 
+static utf32 get_string_encoding_limit(string_encoding_t const enc)
+{
+	switch (enc) {
+	case STRING_ENCODING_CHAR:   return 0xFF;
+	case STRING_ENCODING_CHAR16: return 0xFFFF;
+	case STRING_ENCODING_CHAR32: return 0xFFFFFFFF;
+	case STRING_ENCODING_UTF8:   return 0xFFFFFFFF;
+	case STRING_ENCODING_WIDE:   return 0xFFFFFFFF; // FIXME depends on settings
+	}
+	panic("invalid string encoding");
+}
+
 static void parse_string(utf32 const delimiter, token_kind_t const kind,
                          string_encoding_t const enc,
                          char const *const context)
@@ -692,15 +714,16 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 
 	eat(delimiter);
 
+	utf32 const limit = get_string_encoding_limit(enc);
 	while (true) {
 		switch (input.c) {
 		case '\\': {
 			if (resolve_escape_sequences) {
 				utf32 const tc = parse_escape_sequence();
+				if (tc > limit) {
+					warningf(WARN_OTHER, &pp_token.base.source_position, "escape sequence out of range");
+				}
 				if (enc == STRING_ENCODING_CHAR) {
-					if (tc >= 0x100) {
-						warningf(WARN_OTHER, &pp_token.base.source_position, "escape sequence out of range");
-					}
 					obstack_1grow(&symbol_obstack, tc);
 				} else {
 					obstack_grow_utf8(&symbol_obstack, tc);
@@ -1133,6 +1156,17 @@ static inline void eat_token(token_kind_t const kind)
 	next_input_token();
 }
 
+static string_encoding_t identify_encoding_prefix(symbol_t *const sym)
+{
+	if (sym == symbol_L) return STRING_ENCODING_WIDE;
+	if (c_mode & _C11) {
+		if (sym == symbol_U)  return STRING_ENCODING_CHAR32;
+		if (sym == symbol_u)  return STRING_ENCODING_CHAR16;
+		if (sym == symbol_u8) return STRING_ENCODING_UTF8;
+	}
+	return STRING_ENCODING_CHAR;
+}
+
 static void parse_symbol(void)
 {
 	assert(obstack_object_size(&symbol_obstack) == 0);
@@ -1190,18 +1224,25 @@ end_symbol:
 	obstack_1grow(&symbol_obstack, '\0');
 	char *string = obstack_finish(&symbol_obstack);
 
-	/* might be a wide string or character constant ( L"string"/L'c' ) */
-	if (input.c == '"' && string[0] == 'L' && string[1] == '\0') {
-		obstack_free(&symbol_obstack, string);
-		parse_string_literal(STRING_ENCODING_WIDE);
-		return;
-	} else if (input.c == '\'' && string[0] == 'L' && string[1] == '\0') {
-		obstack_free(&symbol_obstack, string);
-		parse_character_constant(STRING_ENCODING_WIDE);
-		return;
-	}
-
 	symbol_t *symbol = symbol_table_insert(string);
+
+	/* Might be a prefixed string or character constant: L/U/u/u8"string". */
+	if (input.c == '"') {
+		string_encoding_t const enc = identify_encoding_prefix(symbol);
+		if (enc != STRING_ENCODING_CHAR) {
+			parse_string_literal(enc);
+			return;
+		}
+	} else if (input.c == '\'') {
+		string_encoding_t const enc = identify_encoding_prefix(symbol);
+		if (enc != STRING_ENCODING_CHAR) {
+			if (enc == STRING_ENCODING_UTF8) {
+				errorf(&pp_token.base.source_position, "'u8' is not a valid encoding for a chracter constant");
+			}
+			parse_character_constant(enc);
+			return;
+		}
+	}
 
 	pp_token.kind        = symbol->ID;
 	pp_token.base.symbol = symbol;
@@ -1491,8 +1532,7 @@ digraph_percentcolon:
 	default:
 dollar_sign:
 		if (error_on_unknown_chars) {
-			errorf(&pp_token.base.source_position,
-			       "unknown character '%lc' found\n", input.c);
+			errorf(&pp_token.base.source_position, "unknown character '%lc' found", input.c);
 			next_char();
 			goto restart;
 		} else {

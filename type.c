@@ -33,6 +33,7 @@
 #include "warning.h"
 #include "diagnostic.h"
 #include "printer.h"
+#include "separator_t.h"
 
 /** The default calling convention. */
 cc_kind_t default_calling_convention = CC_CDECL;
@@ -373,15 +374,11 @@ static void print_function_type_post(const function_type_t *type,
                                      const scope_t *parameters)
 {
 	print_char('(');
-	bool first = true;
+	separator_t sep = { "", ", " };
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
 		for( ; parameter != NULL; parameter = parameter->next) {
-			if (first) {
-				first = false;
-			} else {
-				print_string(", ");
-			}
+			print_string(sep_next(&sep));
 			print_type(parameter->type);
 		}
 	} else {
@@ -390,11 +387,7 @@ static void print_function_type_post(const function_type_t *type,
 			if (parameter->kind != ENTITY_PARAMETER)
 				continue;
 
-			if (first) {
-				first = false;
-			} else {
-				print_string(", ");
-			}
+			print_string(sep_next(&sep));
 			const type_t *const param_type = parameter->declaration.type;
 			if (param_type == NULL) {
 				print_string(parameter->base.symbol->string);
@@ -404,14 +397,10 @@ static void print_function_type_post(const function_type_t *type,
 		}
 	}
 	if (type->variadic) {
-		if (first) {
-			first = false;
-		} else {
-			print_string(", ");
-		}
+		print_string(sep_next(&sep));
 		print_string("...");
 	}
-	if (first && !type->unspecified_parameters) {
+	if (sep_at_first(&sep) && !type->unspecified_parameters) {
 		print_string("void");
 	}
 	print_char(')');
@@ -872,10 +861,10 @@ bool is_type_incomplete(const type_t *type)
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
-		panic("is_type_incomplete called without typerefs skipped");
+		panic("typedef not skipped");
 	}
 
-	panic("invalid type found");
+	panic("invalid type");
 }
 
 bool is_type_object(const type_t *type)
@@ -1001,7 +990,7 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 			return true;
 		case TYPE_TYPEDEF:
 		case TYPE_TYPEOF:
-			panic("typerefs not skipped in compatible types?!?");
+			panic("typeref not skipped");
 		}
 	}
 
@@ -1092,7 +1081,7 @@ unsigned get_type_size(type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_size(type->typeoft.typeof_type);
 	}
-	panic("invalid type in get_type_size");
+	panic("invalid type");
 }
 
 unsigned get_type_alignment(type_t *type)
@@ -1130,7 +1119,7 @@ unsigned get_type_alignment(type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_alignment(type->typeoft.typeof_type);
 	}
-	panic("invalid type in get_type_alignment");
+	panic("invalid type");
 }
 
 /**
@@ -1172,7 +1161,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 	case TYPE_TYPEOF:
 		return get_type_modifiers(type->typeoft.typeof_type);
 	}
-	panic("invalid type found in get_type_modifiers");
+	panic("invalid type");
 }
 
 type_qualifiers_t get_type_qualifier(const type_t *type, bool skip_array_type)

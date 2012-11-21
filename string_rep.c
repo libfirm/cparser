@@ -16,8 +16,11 @@ static inline size_t wstrlen(const string_t *string)
 size_t get_string_len(string_t const *const str)
 {
 	switch (str->encoding) {
-	case STRING_ENCODING_CHAR: return str->size;
-	case STRING_ENCODING_WIDE: return wstrlen(str);
+	case STRING_ENCODING_CHAR:
+	case STRING_ENCODING_UTF8:   return str->size;
+	case STRING_ENCODING_CHAR16:
+	case STRING_ENCODING_CHAR32:
+	case STRING_ENCODING_WIDE:   return wstrlen(str);
 	}
 	panic("invalid string encoding");
 }
