@@ -5225,6 +5225,7 @@ static void create_function(entity_t *entity)
 	}
 
 	if (enter_jump_target(&ijmp_target)) {
+		keep_loop();
 		size_t   const n    = ARR_LEN(ijmp_ops);
 		ir_node *const op   = n == 1 ? ijmp_ops[0] : new_Phi(n, ijmp_ops, get_irn_mode(ijmp_ops[0]));
 		ir_node *const ijmp = new_IJmp(op);
