@@ -157,7 +157,7 @@ $(builddir)/cpb2/%.o: %.c cparser.bootstrap
 
 cparser.bootstrap: $(CPARSEROS)
 	@echo "===> LD $@"
-	$(Q)./$(builddir)/cparser $(CPARSEROS) $(LINKFLAGS) -o $@
+	$(Q)./$(builddir)/cparser $(CPARSEROS) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
 
 cparser.bootstrape: $(CPARSEROS_E)
 	@echo "===> LD $@"
@@ -165,7 +165,7 @@ cparser.bootstrape: $(CPARSEROS_E)
 
 cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 	@echo "===> LD $@"
-	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LINKFLAGS) -o $@
+	$(Q)./cparser.bootstrap $(CPARSEROS2) $(LIBFIRM_FILE) $(LINKFLAGS) -o $@
 
 $(builddir)/%.o: %.c
 	@echo '===> CC $@'
