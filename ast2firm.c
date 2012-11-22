@@ -3737,11 +3737,20 @@ static void advance_current_object(type_path_t *path)
 static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
 {
-	if (is_type_compound(initializer->value->base.type)) {
-		panic("initializer creation for compounds not implemented yet");
-	}
-	type_t       *type = initializer->value->base.type;
 	expression_t *expr = initializer->value;
+	type_t       *type = expr->base.type;
+
+	if (is_type_compound(type)) {
+		if (expr->kind == EXPR_UNARY_CAST) {
+			expr = expr->unary.value;
+			type = expr->base.type;
+		}
+		/* must be a compound literal... */
+		if (expr->kind != EXPR_COMPOUND_LITERAL)
+			panic("initializer creation for compounds needs compound literals");
+		return create_ir_initializer(expr->compound_literal.initializer, type);
+	}
+
 	ir_node *value = expression_to_firm(expr);
 	ir_mode *mode  = get_ir_mode_storage(type);
 	value          = create_conv(NULL, value, mode);
@@ -3777,13 +3786,14 @@ static ir_initializer_t *create_ir_initializer_list(
 		}
 
 		if (sub_initializer->kind == INITIALIZER_VALUE) {
-			/* we might have to descend into types until we're at a scalar
-			 * type */
+			const expression_t *expr      = sub_initializer->value.value;
+			const type_t       *expr_type = skip_typeref(expr->base.type);
+			/* we might have to descend into types until the types match */
 			while(true) {
 				type_t *orig_top_type = path.top_type;
 				type_t *top_type      = skip_typeref(orig_top_type);
 
-				if (is_type_scalar(top_type))
+				if (types_compatible(top_type, expr_type))
 					break;
 				descend_into_subtype(&path);
 			}
