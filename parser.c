@@ -7543,9 +7543,8 @@ static void semantic_unexpr_arithmetic(unary_expression_t *expression)
 	type_t *const type      = skip_typeref(orig_type);
 	if (!is_type_arithmetic(type)) {
 		if (is_type_valid(type)) {
-			/* TODO: improve error message */
-			errorf(&expression->base.source_position,
-				"operation needs an arithmetic type");
+			source_position_t const *const pos = &expression->base.source_position;
+			errorf(pos, "operand of unary expression must have arithmetic type, but is '%T'", orig_type);
 		}
 		return;
 	} else if (is_type_integer(type)) {
@@ -7780,10 +7779,9 @@ static void semantic_binexpr_arithmetic(binary_expression_t *expression)
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	if (!is_type_arithmetic(type_left) || !is_type_arithmetic(type_right)) {
-		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(&expression->base.source_position,
-			       "operation needs arithmetic types");
+			source_position_t const *const pos = &expression->base.source_position;
+			errorf(pos, "operands of binary expression must have arithmetic types, but are '%T' and '%T'", orig_type_left, orig_type_right);
 		}
 		return;
 	}
@@ -7804,10 +7802,9 @@ static void semantic_binexpr_integer(binary_expression_t *const expression)
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
 	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
-		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(&expression->base.source_position,
-			       "operation needs integer types");
+			source_position_t const *const pos = &expression->base.source_position;
+			errorf(pos, "operands of binary expression must have integer types, but are '%T' and '%T'", orig_type_left, orig_type_right);
 		}
 		return;
 	}
@@ -7877,10 +7874,9 @@ static bool semantic_shift(binary_expression_t *expression)
 	type_t       *      type_right      = skip_typeref(orig_type_right);
 
 	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
-		/* TODO: improve error message */
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
-			errorf(&expression->base.source_position,
-			       "operands of shift operation must have integer types");
+			source_position_t const *const pos = &expression->base.source_position;
+			errorf(pos, "operands of shift expression must have integer types, but are '%T' and '%T'", orig_type_left, orig_type_right);
 		}
 		return false;
 	}
