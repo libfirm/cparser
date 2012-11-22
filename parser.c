@@ -7834,11 +7834,20 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 }
 
 /**
- * Check the semantic restrictions for a div/mod expression.
+ * Check the semantic restrictions for a div expression.
  */
-static void semantic_divmod_arithmetic(binary_expression_t *expression)
+static void semantic_div(binary_expression_t *expression)
 {
 	semantic_binexpr_arithmetic(expression);
+	warn_div_by_zero(expression);
+}
+
+/**
+ * Check the semantic restrictions for a mod expression.
+ */
+static void semantic_mod(binary_expression_t *expression)
+{
+	semantic_binexpr_integer(expression);
 	warn_div_by_zero(expression);
 }
 
@@ -8475,8 +8484,8 @@ static expression_t *parse_##binexpression_type(expression_t *left)          \
 }
 
 CREATE_BINEXPR_PARSER('*',                    EXPR_BINARY_MUL,                PREC_CAST,           semantic_binexpr_arithmetic)
-CREATE_BINEXPR_PARSER('/',                    EXPR_BINARY_DIV,                PREC_CAST,           semantic_divmod_arithmetic)
-CREATE_BINEXPR_PARSER('%',                    EXPR_BINARY_MOD,                PREC_CAST,           semantic_divmod_arithmetic)
+CREATE_BINEXPR_PARSER('/',                    EXPR_BINARY_DIV,                PREC_CAST,           semantic_div)
+CREATE_BINEXPR_PARSER('%',                    EXPR_BINARY_MOD,                PREC_CAST,           semantic_mod)
 CREATE_BINEXPR_PARSER('+',                    EXPR_BINARY_ADD,                PREC_MULTIPLICATIVE, semantic_add)
 CREATE_BINEXPR_PARSER('-',                    EXPR_BINARY_SUB,                PREC_MULTIPLICATIVE, semantic_sub)
 CREATE_BINEXPR_PARSER(T_LESSLESS,             EXPR_BINARY_SHIFTLEFT,          PREC_ADDITIVE,       semantic_shift_op)
