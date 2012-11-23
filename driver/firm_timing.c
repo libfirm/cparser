@@ -48,7 +48,7 @@ void timer_term(FILE *f)
 		if (f != NULL) {
 			double      val         = (double)ir_timer_elapsed_usec(timer) / 1000.0;
 			const char *description = info->description;
-			fprintf(f, "%-45s %8.3f msec\n", description, val);
+			fprintf(f, "%-60s %10.3f msec\n", description, val);
 		}
 
 		ir_timer_free(timer);
