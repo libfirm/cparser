@@ -6305,7 +6305,7 @@ static expression_t *parse_parenthesized_expression(void)
 static expression_t *parse_function_keyword(funcname_kind_t const kind)
 {
 	if (current_function == NULL) {
-		errorf(HERE, "'%K' used outside of a function", &token);
+		errorf(HERE, "%K used outside of a function", &token);
 	}
 
 	expression_t *expression  = allocate_expression_zero(EXPR_FUNCNAME);
