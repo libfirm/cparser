@@ -3738,22 +3738,25 @@ static ir_initializer_t *create_ir_initializer_value(
 		const initializer_value_t *initializer)
 {
 	expression_t *expr = initializer->value;
-	type_t       *type = expr->base.type;
+	type_t       *type = skip_typeref(expr->base.type);
 
 	if (is_type_compound(type)) {
 		if (expr->kind == EXPR_UNARY_CAST) {
 			expr = expr->unary.value;
-			type = expr->base.type;
+			type = skip_typeref(expr->base.type);
 		}
 		/* must be a compound literal... */
-		if (expr->kind != EXPR_COMPOUND_LITERAL)
-			panic("initializer creation for compounds needs compound literals");
-		return create_ir_initializer(expr->compound_literal.initializer, type);
+		if (expr->kind == EXPR_COMPOUND_LITERAL) {
+			return create_ir_initializer(expr->compound_literal.initializer,
+			                             type);
+		}
 	}
 
 	ir_node *value = expression_to_firm(expr);
-	ir_mode *mode  = get_ir_mode_storage(type);
-	value          = create_conv(NULL, value, mode);
+	if (!is_type_compound(type)) {
+		ir_mode *mode = get_ir_mode_storage(type);
+		value         = create_conv(NULL, value, mode);
+	}
 	return create_initializer_const(value);
 }
 
@@ -3961,11 +3964,17 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 			return;
 		}
 
-		assert(get_type_mode(type) == get_irn_mode(node));
-		ir_node *mem    = get_store();
-		ir_node *store  = new_d_Store(dbgi, mem, base_addr, node, cons_none);
-		ir_node *proj_m = new_Proj(store, mode_M, pn_Store_M);
-		set_store(proj_m);
+		ir_node *mem = get_store();
+		ir_node *new_mem;
+		if (is_compound_type(ent_type)) {
+			ir_node *copyb = new_d_CopyB(dbgi, mem, base_addr, node, ent_type);
+			new_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
+		} else {
+			assert(get_type_mode(type) == get_irn_mode(node));
+			ir_node *store = new_d_Store(dbgi, mem, base_addr, node, cons_none);
+			new_mem = new_Proj(store, mode_M, pn_Store_M);
+		}
+		set_store(new_mem);
 		return;
 	}
 	case IR_INITIALIZER_TARVAL: {
