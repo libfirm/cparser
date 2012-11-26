@@ -54,8 +54,6 @@ struct a_firm_dump {
 	bool ir_graph;      /**< dump all graphs */
 	bool all_phases;    /**< dump the IR graph after all phases */
 	bool statistic;     /**< Firm statistic setting */
-	bool stat_pattern;  /**< enable Firm statistic pattern */
-	bool stat_dag;      /**< enable Firm DAG statistic */
 };
 
 struct a_firm_be_opt {
@@ -88,8 +86,6 @@ static struct a_firm_dump firm_dump = {
 	.ir_graph     = false,
 	.all_phases   = false,
 	.statistic    = STAT_NONE,
-	.stat_pattern = 0,
-	.stat_dag     = 0,
 };
 
 #define X(a)  a, sizeof(a)-1
@@ -143,8 +139,6 @@ static const struct params {
   { X("stat-after-lower"),       &firm_dump.statistic,       STAT_AFTER_LOWER, "Firm statistic output after lowering" },
   { X("stat-final-ir"),          &firm_dump.statistic,       STAT_FINAL_IR,    "Firm statistic after final optimization" },
   { X("stat-final"),             &firm_dump.statistic,       STAT_FINAL,       "Firm statistic after code generation" },
-  { X("stat-pattern"),           &firm_dump.stat_pattern,    1, "Firm statistic calculates most used pattern" },
-  { X("stat-dag"),               &firm_dump.stat_dag,        1, "Firm calculates DAG statistics" },
 };
 
 #undef X
@@ -737,21 +731,6 @@ void gen_firm_init(void)
 	timer_register(t_backend, "Firm: backend");
 }
 
-static void init_statistics(void)
-{
-	unsigned pattern = 0;
-
-	if (firm_dump.stat_pattern)
-		pattern |= FIRMSTAT_PATTERN_ENABLED;
-
-	if (firm_dump.stat_dag)
-		pattern |= FIRMSTAT_COUNT_DAG;
-
-	firm_init_stat(firm_dump.statistic == STAT_NONE ?
-			0 : FIRMSTAT_ENABLED | FIRMSTAT_COUNT_STRONG_OP
-			| FIRMSTAT_COUNT_CONSTS | pattern);
-}
-
 /**
  * Called, after the Firm generation is completed,
  * do all optimizations and backend call here.
@@ -766,7 +745,7 @@ void generate_code(FILE *out, const char *input_filename)
 	/* initialize implicit opts, just to be sure because really the frontend
 	 * should have called it already before starting graph construction */
 	init_implicit_optimizations();
-	init_statistics();
+	firm_init_stat();
 
 	do_node_verification((firm_verification_t) firm_opt.verify);
 
