@@ -675,6 +675,7 @@ static void print_help_preprocessor(void)
 	put_help("-D SYMBOL[=value]",        "");
 	put_help("-U SYMBOL",                "");
 	put_help("-Wp,OPTION",               "Pass option directly to preprocessor");
+	put_help("-Xpreprocessor OPTION",    "Pass option directly to preprocessor");
 	put_help("-M",                       "");
 	put_help("-MD",                      "");
 	put_help("-MMD",                     "");
@@ -787,7 +788,10 @@ static void print_help_linker(void)
 	put_help("-s",                       "Do not produce symbol table and relocation information");
 	put_help("-shared",                  "Produce a shared library");
 	put_help("-static",                  "Produce statically linked binary");
+	put_help("-Wa,OPTION",               "Pass option directly to assembler");
+	put_help("-Xassembler OPTION",       "Pass option directly to assembler");
 	put_help("-Wl,OPTION",               "Pass option directly to linker");
+	put_help("-Xlinker OPTION",          "Pass option directly to linker");
 }
 
 static void print_help_debug(void)
@@ -1816,7 +1820,11 @@ int main(int argc, char **argv)
 					}
 				}
 			} else if (option[0] == 'W') {
-				if (strstart(option + 1, "p,")) {
+				if (strstart(option + 1, "a,")) {
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Wa,");
+					add_flag(&asflags_obst, "-Wa,%s", opt);
+				} else if (strstart(option + 1, "p,")) {
 					// pass options directly to the preprocessor
 					const char *opt;
 					GET_ARG_AFTER(opt, "-Wp,");
@@ -1939,6 +1947,23 @@ int main(int argc, char **argv)
 						add_flag(&asflags_obst, "-m%u", machine_size);
 						add_flag(&ldflags_obst, "-m%u", machine_size);
 					}
+				}
+			} else if (option[0] == 'X') {
+				if (streq(option + 1, "assembler")) {
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Xassembler");
+					add_flag(&asflags_obst, "-Xassembler");
+					add_flag(&asflags_obst, opt);
+				} else if (streq(option + 1, "preprocessor")) {
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Xpreprocessor");
+					add_flag(&cppflags_obst, "-Xpreprocessor");
+					add_flag(&cppflags_obst, opt);
+				} else if (streq(option + 1, "linker")) {
+					const char *opt;
+					GET_ARG_AFTER(opt, "-Xlinker");
+					add_flag(&ldflags_obst, "-Xlinker");
+					add_flag(&ldflags_obst, opt);
 				}
 			} else if (streq(option, "pg")) {
 				set_be_option("gprof");
