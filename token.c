@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "symbol.h"
 #include "lang_features.h"
@@ -67,6 +68,11 @@ static void register_pp_token(pp_token_kind_t const id, char const *const string
 
 void init_tokens(void)
 {
+	static bool tokens_initialized = false;
+	if (tokens_initialized)
+		return;
+	tokens_initialized = true;
+
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
 #define T(mode,x,str,val)  register_token(mode, x, str);
