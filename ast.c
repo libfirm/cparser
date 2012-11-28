@@ -1498,6 +1498,14 @@ static expression_classification_t is_object_with_linker_constant_address(
 	case EXPR_UNARY_DEREFERENCE:
 		return is_linker_constant(expression->unary.value);
 
+	case EXPR_COMPOUND_LITERAL: {
+		const compound_literal_expression_t *literal
+			= &expression->compound_literal;
+		return literal->global_scope ||
+		       ((literal->type->base.qualifiers & TYPE_QUALIFIER_CONST)
+		        && is_constant_initializer(literal->initializer));
+	}
+
 	case EXPR_SELECT: {
 		type_t *base_type = skip_typeref(expression->select.compound->base.type);
 		if (is_type_pointer(base_type)) {

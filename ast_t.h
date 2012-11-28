@@ -277,6 +277,7 @@ struct compound_literal_expression_t {
 	expression_base_t  base;
 	type_t            *type;
 	initializer_t     *initializer;
+	bool               global_scope;
 };
 
 struct builtin_constant_expression_t {

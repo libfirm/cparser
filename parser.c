@@ -6187,21 +6187,24 @@ static bool semantic_cast(expression_t *cast)
 	return true;
 }
 
-static expression_t *parse_compound_literal(source_position_t const *const pos, type_t *type)
+static expression_t *parse_compound_literal(source_position_t const *const pos,
+                                            type_t *type)
 {
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 	expression->base.source_position = *pos;
+	bool global_scope = current_scope == file_scope;
 
 	parse_initializer_env_t env;
 	env.type             = type;
 	env.entity           = NULL;
-	env.must_be_constant = false;
+	env.must_be_constant = global_scope;
 	initializer_t *initializer = parse_initializer(&env);
 	type = env.type;
 
-	expression->compound_literal.initializer = initializer;
-	expression->compound_literal.type        = type;
-	expression->base.type                    = automatic_type_conversion(type);
+	expression->base.type                     = automatic_type_conversion(type);
+	expression->compound_literal.initializer  = initializer;
+	expression->compound_literal.type         = type;
+	expression->compound_literal.global_scope = global_scope;
 
 	return expression;
 }

@@ -2759,7 +2759,9 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	type_t        *type        = expression->type;
 	initializer_t *initializer = expression->initializer;
 
-	if (is_constant_initializer(initializer) == EXPR_CLASS_CONSTANT) {
+	if (expression->global_scope ||
+		((type->base.qualifiers & TYPE_QUALIFIER_CONST)
+	    && is_constant_initializer(initializer) == EXPR_CLASS_CONSTANT)) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
 		return create_symconst(dbgi, entity);
 	} else {
