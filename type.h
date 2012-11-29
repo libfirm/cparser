@@ -59,7 +59,6 @@ typedef enum atomic_type_flag_t {
 	ATOMIC_TYPE_FLAG_INTEGER    = 1 << 1,
 	ATOMIC_TYPE_FLAG_FLOAT      = 1 << 2,
 	ATOMIC_TYPE_FLAG_ARITHMETIC = 1 << 3,
-	ATOMIC_TYPE_FLAG_COMPLEX    = 1 << 4,
 } atomic_type_flag_t;
 
 typedef enum type_qualifier_t {
@@ -78,8 +77,6 @@ typedef unsigned short type_qualifiers_t;
 
 typedef struct type_base_t           type_base_t;
 typedef struct atomic_type_t         atomic_type_t;
-typedef struct complex_type_t        complex_type_t;
-typedef struct imaginary_type_t      imaginary_type_t;
 typedef struct pointer_type_t        pointer_type_t;
 typedef struct reference_type_t      reference_type_t;
 typedef struct function_parameter_t  function_parameter_t;

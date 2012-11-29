@@ -53,6 +53,8 @@ static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
 		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
+		[TYPE_IMAGINARY]       = sizeof(atomic_type_t),
+		[TYPE_COMPLEX]         = sizeof(atomic_type_t),
 		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
 		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
 		[TYPE_ENUM]            = sizeof(enum_type_t),
@@ -776,16 +778,6 @@ bool is_type_float(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_FLOAT);
 }
 
-bool is_type_complex(const type_t *type)
-{
-	assert(!is_typeref(type));
-
-	if (type->kind != TYPE_ATOMIC)
-		return false;
-
-	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_COMPLEX);
-}
-
 bool is_type_signed(const type_t *type)
 {
 	assert(!is_typeref(type));
@@ -825,10 +817,16 @@ bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	if (type->kind == TYPE_POINTER)
+	switch(type->kind) {
+	case TYPE_POINTER:
+	case TYPE_ENUM:
 		return true;
-
-	return is_type_arithmetic(type);
+	case TYPE_ATOMIC:
+	case TYPE_IMAGINARY:
+		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	default:
+		return false;
+	}
 }
 
 bool is_type_incomplete(const type_t *type)

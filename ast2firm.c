@@ -209,8 +209,7 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
 {
 	unsigned flags = get_atomic_type_flags(kind);
 	unsigned size  = get_atomic_type_size(kind);
-	if ((flags & ATOMIC_TYPE_FLAG_FLOAT)
-	    && !(flags & ATOMIC_TYPE_FLAG_COMPLEX)) {
+	if (flags & ATOMIC_TYPE_FLAG_FLOAT) {
 		switch (size) {
 		case 4:  return get_modeF();
 		case 8:  return get_modeD();
@@ -271,35 +270,50 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
-/**
- * Creates a Firm type for an atomic type
- */
-static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
+static ir_type *create_primitive_irtype(atomic_type_kind_t akind,
+                                        type_dbg_info *dbgi)
 {
 	ir_mode        *mode      = atomic_modes[akind];
-	type_dbg_info  *dbgi      = get_type_dbg_info_(type);
 	ir_type        *irtype    = new_d_type_primitive(mode, dbgi);
-	il_alignment_t  alignment = get_atomic_type_alignment(akind);
+	unsigned        alignment = get_atomic_type_alignment(akind);
+	unsigned        size      = get_atomic_type_size(akind);
 
-	set_type_size_bytes(irtype, get_atomic_type_size(akind));
+	set_type_size_bytes(irtype, size);
 	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
 }
 
 /**
+ * Creates a Firm type for an atomic type
+ */
+static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
+{
+	type_dbg_info *dbgi = get_type_dbg_info_(type);
+	return create_primitive_irtype(akind, dbgi);
+}
+
+/**
  * Creates a Firm type for a complex type
  */
-static ir_type *create_complex_type(const atomic_type_t *type)
+static ir_type *create_complex_type(atomic_type_kind_t akind,
+                                    const type_t *type)
 {
-	atomic_type_kind_t  kind = type->akind;
-	ir_mode            *mode = atomic_modes[kind];
-	ident              *id   = get_mode_ident(mode);
+	type_dbg_info *dbgi   = get_type_dbg_info_(type);
+	ir_type       *etype  = create_primitive_irtype(akind, NULL);
+	ir_type       *irtype = new_d_type_array(1, etype, dbgi);
 
-	(void) id;
+	int align = get_type_alignment_bytes(etype);
+	set_type_alignment_bytes(irtype, align);
+	unsigned n_elements = 2;
+	set_array_bounds_int(irtype, 0, 0, n_elements);
+	size_t elemsize = get_type_size_bytes(etype);
+	if (elemsize % align > 0) {
+		elemsize += align - (elemsize % align);
+	}
+	set_type_size_bytes(irtype, n_elements * elemsize);
 
-	/* FIXME: finish the array */
-	return NULL;
+	return irtype;
 }
 
 /**
@@ -682,7 +696,7 @@ ir_type *get_ir_type(type_t *type)
 		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
 	case TYPE_COMPLEX:
-		firm_type = create_complex_type(&type->atomic);
+		firm_type = create_complex_type(type->atomic.akind, type);
 		break;
 	case TYPE_IMAGINARY:
 		firm_type = create_imaginary_type(&type->atomic);
@@ -1830,7 +1844,7 @@ static ir_node *create_condition_evaluation(expression_t const *expression, jump
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
 {
-	if (!is_type_compound(type)) {
+	if (is_type_scalar(type)) {
 		ir_mode *mode = get_ir_mode_storage(type);
 		value         = create_conv(dbgi, value, mode);
 	}
