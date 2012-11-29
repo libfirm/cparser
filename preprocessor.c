@@ -710,8 +710,6 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
                          string_encoding_t const enc,
                          char const *const context)
 {
-	const unsigned start_linenr = input.position.lineno;
-
 	eat(delimiter);
 
 	utf32 const limit = get_string_encoding_limit(enc);
@@ -741,13 +739,9 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 			errorf(&pp_token.base.source_position, "newline while parsing %s", context);
 			break;
 
-		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = pp_token.base.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "EOF while parsing %s", context);
+		case EOF:
+			errorf(&pp_token.base.source_position, "EOF while parsing %s", context);
 			goto end_of_string;
-		}
 
 		default:
 			if (input.c == delimiter) {
@@ -1027,7 +1021,7 @@ static void skip_multiline_comment(void)
 {
 	info.had_whitespace = true;
 
-	unsigned start_linenr = input.position.lineno;
+	source_position_t const start_pos = input.position;
 	while (true) {
 		switch (input.c) {
 		case '/':
@@ -1049,13 +1043,9 @@ static void skip_multiline_comment(void)
 		case NEWLINE:
 			break;
 
-		case EOF: {
-			source_position_t source_position;
-			source_position.input_name = pp_token.base.source_position.input_name;
-			source_position.lineno     = start_linenr;
-			errorf(&source_position, "at end of file while looking for comment end");
+		case EOF:
+			errorf(&start_pos, "at end of file while looking for comment end");
 			return;
-		}
 
 		default:
 			next_char();
