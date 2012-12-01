@@ -133,9 +133,9 @@ struct attribute_property_argument_t {
 };
 
 struct attribute_t {
-	source_position_t     source_position;
-	attribute_t          *next;
-	attribute_kind_t      kind;         /**< The kind of the GNU attribute. */
+	position_t        pos;
+	attribute_t      *next;
+	attribute_kind_t  kind;         /**< The kind of the GNU attribute. */
 	union {
 		attribute_argument_t          *arguments;
 		attribute_property_argument_t *property;

@@ -37,12 +37,12 @@ unsigned warning_count           = 0;
 bool     show_column             = true;
 bool     diagnostics_show_option = true;
 
-static const source_position_t *curr_pos = NULL;
+static const position_t *curr_pos = NULL;
 
 /**
  * prints an additional source position
  */
-static void print_source_position(FILE *out, const source_position_t *pos)
+static void print_position(FILE *out, const position_t *pos)
 {
 	fprintf(out, "at line %u", pos->lineno);
 	if (show_column)
@@ -219,8 +219,8 @@ done_flags:;
 		}
 
 		case 'P': {
-			const source_position_t *pos = va_arg(ap, const source_position_t *);
-			print_source_position(stderr, pos);
+			const position_t *pos = va_arg(ap, const position_t *);
+			print_position(stderr, pos);
 			break;
 		}
 
@@ -240,7 +240,7 @@ void diagnosticf(const char *const fmt, ...)
 	va_end(ap);
 }
 
-static void diagnosticposvf(source_position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
+static void diagnosticposvf(position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
 {
 	FILE *const out = stderr;
 	if (pos) {
@@ -257,7 +257,7 @@ static void diagnosticposvf(source_position_t const *const pos, char const *cons
 	diagnosticvf(fmt, ap);
 }
 
-static void errorvf(const source_position_t *pos,
+static void errorvf(const position_t *pos,
                     const char *const fmt, va_list ap)
 {
 	++error_count;
@@ -267,7 +267,7 @@ static void errorvf(const source_position_t *pos,
 		exit(EXIT_FAILURE);
 }
 
-void errorf(const source_position_t *pos, const char *const fmt, ...)
+void errorf(const position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
@@ -275,7 +275,7 @@ void errorf(const source_position_t *pos, const char *const fmt, ...)
 	va_end(ap);
 }
 
-void warningf(warning_t const warn, source_position_t const* pos, char const *const fmt, ...)
+void warningf(warning_t const warn, position_t const* pos, char const *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
@@ -305,14 +305,14 @@ void warningf(warning_t const warn, source_position_t const* pos, char const *co
 	va_end(ap);
 }
 
-static void internal_errorvf(const source_position_t *pos,
+static void internal_errorvf(const position_t *pos,
                     const char *const fmt, va_list ap)
 {
 	diagnosticposvf(pos, "internal error", fmt, ap);
 	fputc('\n', stderr);
 }
 
-void internal_errorf(const source_position_t *pos, const char *const fmt, ...)
+void internal_errorf(const position_t *pos, const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);

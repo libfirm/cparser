@@ -402,7 +402,7 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 	}
 	FILE *f = popen(commandline, "r");
 	if (f == NULL) {
-		source_position_t const pos = { unit->name, 0, 0, 0 };
+		position_t const pos = { unit->name, 0, 0, 0 };
 		errorf(&pos, "invoking preprocessor failed");
 		return false;
 	}
@@ -454,7 +454,7 @@ static void assemble(const char *out, const char *in)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		source_position_t const pos = { in, 0, 0, 0 };
+		position_t const pos = { in, 0, 0, 0 };
 		errorf(&pos, "assembler reported an error");
 		exit(EXIT_FAILURE);
 	}
@@ -487,7 +487,7 @@ static void print_file_name(const char *file)
 	}
 	int err = system(commandline);
 	if (err != EXIT_SUCCESS) {
-		source_position_t const pos = { file, 0, 0, 0 };
+		position_t const pos = { file, 0, 0, 0 };
 		errorf(&pos, "linker reported an error");
 		exit(EXIT_FAILURE);
 	}
@@ -558,13 +558,13 @@ static FILE *make_temp_file(const char *prefix, const char **name_result)
 	char *name = obstack_finish(&file_obst);
 	int fd = mkstemp(name);
 	if (fd == -1) {
-		source_position_t const pos = { name, 0, 0, 0 };
+		position_t const pos = { name, 0, 0, 0 };
 		errorf(&pos, "could not create temporary file: %s", strerror(errno));
 		return NULL;
 	}
 	FILE *out = fdopen(fd, "w");
 	if (out == NULL) {
-		source_position_t const pos = { name, 0, 0, 0 };
+		position_t const pos = { name, 0, 0, 0 };
 		errorf(&pos, "could not open temporary file as FILE*");
 		return NULL;
 	}
@@ -1236,7 +1236,7 @@ static bool open_input(compilation_unit_t *unit)
 	} else {
 		unit->input = fopen(inputname, "r");
 		if (unit->input == NULL) {
-			source_position_t const pos = { inputname, 0, 0, 0 };
+			position_t const pos = { inputname, 0, 0, 0 };
 			errorf(&pos, "could not open: %s", strerror(errno));
 			return false;
 		}
@@ -1286,7 +1286,7 @@ again:
 			}
 			res = !ir_import_file(unit->input, unit->name);
 			if (!res) {
-				source_position_t const pos = { inputname, 0, 0, 0 };
+				position_t const pos = { inputname, 0, 0, 0 };
 				errorf(&pos, "import of firm graph failed");
 				result = EXIT_FAILURE;
 				break;
@@ -2256,7 +2256,7 @@ int main(int argc, char **argv)
 	} else {
 		out = fopen(outname, "w");
 		if (out == NULL) {
-			source_position_t const pos = { outname, 0, 0, 0 };
+			position_t const pos = { outname, 0, 0, 0 };
 			errorf(&pos, "could not open for writing: %s", strerror(errno));
 			return EXIT_FAILURE;
 		}

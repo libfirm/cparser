@@ -94,7 +94,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 	return names[mod];
 }
 
-static void warn_invalid_length_modifier(const source_position_t *pos,
+static void warn_invalid_length_modifier(const position_t *pos,
                                          const format_length_modifier_t mod,
                                          const utf32 conversion)
 {
@@ -134,7 +134,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 	size_t      size   = fmt_expr->string_literal.value.size;
 	const char *c      = string;
 
-	const source_position_t *pos = &fmt_expr->base.source_position;
+	const position_t *pos = &fmt_expr->base.pos;
 	unsigned num_fmt  = 0;
 	unsigned num_args = 0;
 	char     fmt;
@@ -532,8 +532,8 @@ too_few_args:
 				}
 			}
 			if (is_type_valid(arg_skip)) {
-				source_position_t const *const apos = &arg->expression->base.source_position;
-				char              const *const mod  = get_length_modifier_name(fmt_mod);
+				position_t const *const apos = &arg->expression->base.pos;
+				char       const *const mod  = get_length_modifier_name(fmt_mod);
 				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}
@@ -575,7 +575,7 @@ static void check_printf_format(call_argument_t const *arg,
 	for (; arg != NULL; arg = arg->next)
 		++num_args;
 	if (num_args > (size_t)num_fmt) {
-		source_position_t const *const pos = &fmt_expr->base.source_position;
+		position_t const *const pos = &fmt_expr->base.pos;
 		warningf(WARN_FORMAT, pos, "%u argument%s but only %u format specifier%s", num_args, num_args != 1 ? "s" : "", num_fmt,  num_fmt  != 1 ? "s" : "");
 	}
 }
@@ -610,7 +610,7 @@ static void check_scanf_format(const call_argument_t *arg,
 	for (; idx < spec->arg_idx && arg != NULL; ++idx)
 		arg = arg->next;
 
-	const source_position_t *pos = &fmt_expr->base.source_position;
+	const position_t *pos = &fmt_expr->base.pos;
 	unsigned num_fmt = 0;
 	char     fmt;
 	for (fmt = *c; fmt != '\0'; fmt = *(++c)) {
@@ -912,8 +912,8 @@ too_few_args:
 			}
 error_arg_type:
 			if (is_type_valid(arg_skip)) {
-				source_position_t const *const apos = &arg->expression->base.source_position;
-				char              const *const mod  = get_length_modifier_name(fmt_mod);
+				position_t const *const apos = &arg->expression->base.pos;
+				char       const *const mod  = get_length_modifier_name(fmt_mod);
 				warningf(WARN_FORMAT, apos, "conversion '%%%s%c' at position %u specifies type '%T*' but the argument has type '%T'", mod, (char)fmt, num_fmt, expected_type, arg_type);
 			}
 		}

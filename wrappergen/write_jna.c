@@ -50,7 +50,7 @@ static bool is_system_header(const char *fname)
 {
 	if (strstart(fname, "/usr/include"))
 		return true;
-	if (fname == builtin_source_position.input_name)
+	if (fname == builtin_position.input_name)
 		return true;
 	return false;
 }
@@ -528,7 +528,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;
-		const char *input_name = entity->base.source_position.input_name;
+		const char *input_name = entity->base.pos.input_name;
 		if (is_system_header(input_name))
 			continue;
 		if (entity->function.elf_visibility != ELF_VISIBILITY_DEFAULT)

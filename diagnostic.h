@@ -51,7 +51,7 @@
  *  %#k  va_list*, char const*
  *  %N   entity_t const*
  *  %#N  entity_t const*
- *  %P   source_position_t const*
+ *  %P   position_t const*
  *  %Q   unsigned (qualifier)
  *  %S   string_t const*
  *  %T   type_t const*
@@ -59,9 +59,9 @@
  *  %Y   symbol_t const*
  */
 void diagnosticf(const char *fmt, ...);
-void errorf(const source_position_t *pos, const char *fmt, ...);
-void warningf(warning_t, const source_position_t *pos, const char *fmt, ...);
-NORETURN internal_errorf(const source_position_t *pos, const char *fmt, ...);
+void errorf(const position_t *pos, const char *fmt, ...);
+void warningf(warning_t, const position_t *pos, const char *fmt, ...);
+NORETURN internal_errorf(const position_t *pos, const char *fmt, ...);
 
 extern unsigned error_count;
 extern unsigned warning_count;

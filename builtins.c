@@ -32,7 +32,7 @@
 static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
                                          type_t *function_type)
 {
-	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol, &builtin_source_position);
+	entity_t *const entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, symbol, &builtin_position);
 	entity->declaration.storage_class          = STORAGE_CLASS_EXTERN;
 	entity->declaration.declared_storage_class = STORAGE_CLASS_EXTERN;
 	entity->declaration.type                   = function_type;

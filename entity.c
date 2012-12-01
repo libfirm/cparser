@@ -80,14 +80,14 @@ static size_t get_entity_struct_size(entity_kind_t kind)
  *
  * @param kind   the kind of the entity to allocate
  */
-entity_t *allocate_entity_zero(entity_kind_t const kind, entity_namespace_t const namespc, symbol_t *const symbol, source_position_t const *const pos)
+entity_t *allocate_entity_zero(entity_kind_t const kind, entity_namespace_t const namespc, symbol_t *const symbol, position_t const *const pos)
 {
 	size_t    const size   = get_entity_struct_size(kind);
 	entity_t *const entity = allocate_ast_zero(size);
-	entity->kind                 = kind;
-	entity->base.namespc         = namespc;
-	entity->base.symbol          = symbol;
-	entity->base.source_position = *pos;
+	entity->kind           = kind;
+	entity->base.namespc   = namespc;
+	entity->base.symbol    = symbol;
+	entity->base.pos       = *pos;
 	return entity;
 }
 

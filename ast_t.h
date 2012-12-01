@@ -234,18 +234,16 @@ typedef enum funcname_kind_t {
  * The base class of every expression.
  */
 struct expression_base_t {
-	expression_kind_t   kind;            /**< The expression kind. */
-	type_t             *type;            /**< The type of the expression. */
-	source_position_t   source_position; /**< The source position of this expression. */
-	bool                parenthesized : 1;
+	expression_kind_t kind;     /**< The expression kind. */
+	type_t           *type;     /**< The type of the expression. */
+	position_t        pos;      /**< The source position of this expression. */
+	bool              parenthesized : 1;
 #ifndef NDEBUG
-	bool                transformed : 1;     /**< Set if this expression was transformed. */
+	bool              transformed : 1; /**< Set if this expression was transformed. */
 #endif
-	bool                implicit : 1;    /**< compiler generated expression.
-	                                          Examples:
-	                                             select into anonymous structs
-	                                             implicit casts
-	                                      */
+	bool              implicit : 1;  /**< compiler generated expression.
+	                                    Examples: select into anonymous structs,
+	                                    implicit casts */
 };
 
 /**
@@ -343,10 +341,10 @@ struct typeprop_expression_t {
 };
 
 struct designator_t {
-	source_position_t  source_position;
-	symbol_t          *symbol;      /**< the symbol if any */
-	expression_t      *array_index; /**< the array index if any */
-	designator_t      *next;
+	position_t    pos;
+	symbol_t     *symbol;      /**< the symbol if any */
+	expression_t *array_index; /**< the array index if any */
+	designator_t *next;
 };
 
 struct offsetof_expression_t {
@@ -491,13 +489,13 @@ typedef enum statement_kind_t {
  * The base class of every statement.
  */
 struct statement_base_t {
-	statement_kind_t   kind;
-	statement_t       *next;         /**< Point to the next statement in a compound statement. */
-	source_position_t  source_position;
-	statement_t       *parent;       /**< The Parent statement that controls the execution. */
-	bool               reachable;    /**< True, if this statement is reachable. */
+	statement_kind_t kind;
+	statement_t     *next;      /**< Point to the next statement in a compound statement. */
+	position_t       pos;
+	statement_t     *parent;    /**< The Parent statement that controls the execution. */
+	bool             reachable; /**< True, if this statement is reachable. */
 #ifndef NDEBUG
-	bool               transformed;
+	bool             transformed;
 #endif
 };
 

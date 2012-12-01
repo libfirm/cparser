@@ -1506,7 +1506,7 @@ next:
 		}
 	}
 
-	source_position_t const *const pos = &compound->base.source_position;
+	position_t const *const pos = &compound->base.pos;
 	if (need_pad) {
 		warningf(WARN_PADDED, pos, "'%T' needs padding", type);
 	} else if (compound->packed) {

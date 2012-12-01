@@ -44,8 +44,8 @@ typedef enum pp_token_kind_tag_t {
 } pp_token_kind_tag_t;
 typedef unsigned short pp_token_kind_t;
 
-typedef struct source_position_t source_position_t;
-struct source_position_t {
+typedef struct position_t position_t;
+struct position_t {
 	const char *input_name;
 	unsigned    lineno;
 	unsigned    colno            : 31;
@@ -55,7 +55,7 @@ struct source_position_t {
 extern symbol_t *token_symbols[];
 
 /* position used for "builtin" declarations/types */
-extern const source_position_t builtin_source_position;
+extern const position_t builtin_position;
 
 typedef struct token_base_t      token_base_t;
 typedef struct literal_t         literal_t;
@@ -63,9 +63,9 @@ typedef struct macro_parameter_t macro_parameter_t;
 typedef union  token_t           token_t;
 
 struct token_base_t {
-	token_kind_t      kind;
-	source_position_t source_position;
-	symbol_t         *symbol;
+	token_kind_t kind;
+	position_t   pos;
+	symbol_t    *symbol;
 };
 
 struct literal_t {

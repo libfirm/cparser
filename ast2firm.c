@@ -143,7 +143,7 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 	const entity_t *entity = get_irg_loc_description(irg, pos);
 
 	if (entity != NULL) {
-		source_position_t const *const pos = &entity->base.source_position;
+		position_t const *const pos = &entity->base.pos;
 		warningf(WARN_UNINITIALIZED, pos, "'%N' might be used uninitialized", entity);
 	}
 	return new_r_Unknown(irg, mode);
@@ -151,7 +151,7 @@ static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 
 static src_loc_t dbg_retrieve(const dbg_info *dbg)
 {
-	source_position_t const *const pos = (source_position_t const*)dbg;
+	position_t const *const pos = (position_t const*)dbg;
 	if (pos) {
 		return (src_loc_t){ pos->input_name, pos->lineno, pos->colno };
 	} else {
@@ -159,7 +159,7 @@ static src_loc_t dbg_retrieve(const dbg_info *dbg)
 	}
 }
 
-static dbg_info *get_dbg_info(const source_position_t *pos)
+static dbg_info *get_dbg_info(const position_t *pos)
 {
 	return (dbg_info*) pos;
 }
@@ -600,7 +600,7 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 			ident = new_id_from_str(symbol->string);
 		}
 
-		dbg_info *dbgi       = get_dbg_info(&entry->base.source_position);
+		dbg_info *dbgi = get_dbg_info(&entry->base.pos);
 
 		ir_type *entry_irtype;
 		if (entry->compound_member.bitfield) {
@@ -981,7 +981,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	else
 		nested_function = true;
 
-	dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 	irentity = new_d_entity(owner_type, id, ir_type_method, dbgi);
 
 	ident *ld_id;
@@ -1127,7 +1127,7 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
  * @param id_prefix  a prefix for the name of the generated string constant
  * @param value      the value of the string constant
  */
-static ir_node *string_to_firm(source_position_t const *const src_pos, char const *const id_prefix, string_t const *const value)
+static ir_node *string_to_firm(position_t const *const src_pos, char const *const id_prefix, string_t const *const value)
 {
 	size_t            const slen        = get_string_len(value) + 1;
 	ir_initializer_t *const initializer = create_initializer_compound(slen);
@@ -1278,7 +1278,7 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		panic("invalid literal kind");
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
+	dbg_info *dbgi       = get_dbg_info(&literal->base.pos);
 	ir_node  *res        = new_d_Const(dbgi, tv);
 	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
 	return create_conv(dbgi, res, mode_arith);
@@ -1328,7 +1328,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 		panic("invalid literal kind");
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&literal->base.source_position);
+	dbg_info *dbgi       = get_dbg_info(&literal->base.pos);
 	ir_node  *res        = new_d_Const(dbgi, tv);
 	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
 	return create_conv(dbgi, res, mode_arith);
@@ -1491,7 +1491,7 @@ static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
 
 static ir_node *reference_addr(const reference_expression_t *ref)
 {
-	dbg_info *dbgi   = get_dbg_info(&ref->base.source_position);
+	dbg_info *dbgi   = get_dbg_info(&ref->base.pos);
 	entity_t *entity = ref->entity;
 	assert(is_declaration(entity));
 
@@ -1501,7 +1501,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		/* for gcc compatibility we have to produce (dummy) addresses for some
 		 * builtins which don't have entities */
 		if (irentity == NULL) {
-			source_position_t const *const pos = &ref->base.source_position;
+			position_t const *const pos = &ref->base.pos;
 			warningf(WARN_OTHER, pos, "taking address of builtin '%N'", ref->entity);
 
 			/* simply create a NULL pointer */
@@ -1561,7 +1561,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 
 static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 {
-	dbg_info *const dbgi   = get_dbg_info(&ref->base.source_position);
+	dbg_info *const dbgi   = get_dbg_info(&ref->base.pos);
 	entity_t *const entity = ref->entity;
 	assert(is_declaration(entity));
 
@@ -1586,7 +1586,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
  */
 static ir_node *process_builtin_call(const call_expression_t *call)
 {
-	dbg_info *dbgi = get_dbg_info(&call->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&call->base.pos);
 
 	assert(call->function->kind == EXPR_REFERENCE);
 	reference_expression_t *builtin = &call->function->reference;
@@ -1682,7 +1682,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
  */
 static ir_node *call_expression_to_firm(const call_expression_t *const call)
 {
-	dbg_info *const dbgi = get_dbg_info(&call->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&call->base.pos);
 	assert(currently_reachable());
 
 	expression_t   *function = call->function;
@@ -1932,7 +1932,7 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
                                          ir_node *addr)
 {
-	dbg_info *dbgi      = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi      = get_dbg_info(&expression->base.pos);
 	entity_t *entity    = expression->compound_entry;
 	type_t   *base_type = entity->declaration.type;
 	ir_mode  *mode      = get_ir_mode_storage(base_type);
@@ -1991,7 +1991,7 @@ static void construct_select_compound(const select_expression_t *expression)
 static ir_node *set_value_for_expression_addr(const expression_t *expression,
                                               ir_node *value, ir_node *addr)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	type_t   *type = skip_typeref(expression->base.type);
 
 	if (!is_type_compound(type)) {
@@ -2066,7 +2066,7 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 	}
 
 	assert(addr != NULL);
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 
 	ir_node *value;
 	if (expression->kind == EXPR_SELECT &&
@@ -2083,7 +2083,7 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 
 static ir_node *create_incdec(const unary_expression_t *expression)
 {
-	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *const     dbgi = get_dbg_info(&expression->base.pos);
 	const expression_t *value_expr = expression->value;
 	ir_node            *addr       = expression_to_addr(value_expr);
 	ir_node            *value      = get_value_from_lvalue(value_expr, addr);
@@ -2294,7 +2294,7 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 
 static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	type_t   *type = skip_typeref(expression->base.type);
 
 	const expression_t *value = expression->value;
@@ -2520,7 +2520,7 @@ normal_node:
 
 static ir_node *create_lazy_op(const binary_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	type_t   *type = skip_typeref(expression->base.type);
 	ir_mode  *mode = get_ir_mode_arithmetic(type);
 
@@ -2555,7 +2555,7 @@ typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
 
 static ir_node *create_assign_binop(const binary_expression_t *expression)
 {
-	dbg_info *const     dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *const     dbgi = get_dbg_info(&expression->base.pos);
 	const expression_t *left_expr = expression->left;
 	type_t             *type      = skip_typeref(left_expr->base.type);
 	ir_node            *right     = expression_to_firm(expression->right);
@@ -2591,7 +2591,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_ISLESSEQUAL:
 	case EXPR_BINARY_ISLESSGREATER:
 	case EXPR_BINARY_ISUNORDERED: {
-		dbg_info   *dbgi     = get_dbg_info(&expression->base.source_position);
+		dbg_info   *dbgi     = get_dbg_info(&expression->base.pos);
 		ir_node    *left     = expression_to_firm(expression->left);
 		ir_node    *right    = expression_to_firm(expression->right);
 		ir_relation relation = get_relation(kind);
@@ -2622,7 +2622,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTRIGHT:
 	{
-		dbg_info *dbgi  = get_dbg_info(&expression->base.source_position);
+		dbg_info *dbgi  = get_dbg_info(&expression->base.pos);
 		ir_node  *left  = expression_to_firm(expression->left);
 		ir_node  *right = expression_to_firm(expression->right);
 		return create_op(dbgi, expression, left, right);
@@ -2653,7 +2653,7 @@ static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
 
 static ir_node *array_access_addr(const array_access_expression_t *expression)
 {
-	dbg_info *dbgi        = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi        = get_dbg_info(&expression->base.pos);
 	ir_node  *base_addr   = expression_to_firm(expression->array_ref);
 	ir_node  *offset      = expression_to_firm(expression->index);
 	type_t   *ref_type    = skip_typeref(expression->array_ref->base.type);
@@ -2666,7 +2666,7 @@ static ir_node *array_access_addr(const array_access_expression_t *expression)
 static ir_node *array_access_to_firm(
 		const array_access_expression_t *expression)
 {
-	dbg_info *dbgi   = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi   = get_dbg_info(&expression->base.pos);
 	ir_node  *addr   = array_access_addr(expression);
 	type_t   *type   = revert_automatic_type_conversion(
 			(const expression_t*) expression);
@@ -2723,7 +2723,7 @@ static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 	ir_mode   *mode   = get_ir_mode_arithmetic(expression->base.type);
 	long       offset = get_offsetof_offset(expression);
 	ir_tarval *tv     = new_tarval_from_long(offset, mode);
-	dbg_info  *dbgi   = get_dbg_info(&expression->base.source_position);
+	dbg_info  *dbgi   = get_dbg_info(&expression->base.pos);
 
 	return new_d_Const(dbgi, tv);
 }
@@ -2755,7 +2755,7 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 
 static ir_node *compound_literal_addr(compound_literal_expression_t const *const expression)
 {
-	dbg_info      *dbgi        = get_dbg_info(&expression->base.source_position);
+	dbg_info      *dbgi        = get_dbg_info(&expression->base.pos);
 	type_t        *type        = expression->type;
 	initializer_t *initializer = expression->initializer;
 
@@ -2785,7 +2785,7 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 
 static ir_node *compound_literal_to_firm(compound_literal_expression_t const* const expr)
 {
-	dbg_info *const dbgi = get_dbg_info(&expr->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
 	type_t   *const type = expr->type;
 	ir_node  *const addr = compound_literal_addr(expr);
 	return deref_address(dbgi, type, addr);
@@ -2850,7 +2850,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 		alignment = get_type_alignment(type);
 	}
 
-	dbg_info  *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info  *dbgi = get_dbg_info(&expression->base.pos);
 	ir_mode   *mode = get_ir_mode_arithmetic(expression->base.type);
 	ir_tarval *tv   = new_tarval_from_long(alignment, mode);
 	return new_d_Const(dbgi, tv);
@@ -2955,7 +2955,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		jump_to_target(&exit_target);
 		if (val) {
 			ir_node  *const in[] = { val, false_val };
-			dbg_info *const dbgi = get_dbg_info(&expression->base.source_position);
+			dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
 			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
 		} else {
 			val = false_val;
@@ -2976,7 +2976,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
  */
 static ir_node *select_addr(const select_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 
 	construct_select_compound(expression);
 
@@ -3000,7 +3000,7 @@ static ir_node *select_addr(const select_expression_t *expression)
 
 static ir_node *select_to_firm(const select_expression_t *expression)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	ir_node  *addr = select_addr(expression);
 	type_t   *type = revert_automatic_type_conversion(
 			(const expression_t*) expression);
@@ -3108,7 +3108,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	}
 
 make_const:;
-	dbg_info  *const dbgi = get_dbg_info(&expr->base.source_position);
+	dbg_info  *const dbgi = get_dbg_info(&expr->base.pos);
 	ir_mode   *const mode = atomic_modes[ATOMIC_TYPE_INT];
 	ir_tarval *const tv   = new_tarval_from_long(tc, mode);
 	return new_d_Const(dbgi, tv);
@@ -3122,18 +3122,18 @@ static ir_node *function_name_to_firm(
 	case FUNCNAME_PRETTY_FUNCTION:
 	case FUNCNAME_FUNCDNAME:
 		if (current_function_name == NULL) {
-			source_position_t const *const src_pos = &expr->base.source_position;
-			char              const *const name    = current_function_entity->base.symbol->string;
-			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
+			position_t const *const src_pos = &expr->base.pos;
+			char       const *const name    = current_function_entity->base.symbol->string;
+			string_t          const string  = { name, strlen(name), STRING_ENCODING_CHAR };
 			current_function_name = string_to_firm(src_pos, "__func__.%u", &string);
 		}
 		return current_function_name;
 	case FUNCNAME_FUNCSIG:
 		if (current_funcsig == NULL) {
-			source_position_t const *const src_pos = &expr->base.source_position;
-			ir_entity               *const ent     = get_irg_entity(current_ir_graph);
-			char              const *const name    = get_entity_ld_name(ent);
-			string_t                 const string  = { name, strlen(name), STRING_ENCODING_CHAR };
+			position_t const *const src_pos = &expr->base.pos;
+			ir_entity        *const ent     = get_irg_entity(current_ir_graph);
+			char       const *const name    = get_entity_ld_name(ent);
+			string_t          const string  = { name, strlen(name), STRING_ENCODING_CHAR };
 			current_funcsig = string_to_firm(src_pos, "__FUNCSIG__.%u", &string);
 		}
 		return current_funcsig;
@@ -3162,7 +3162,7 @@ static ir_node *va_start_expression_to_firm(
 	}
 
 	ir_node  *const frame   = get_irg_frame(current_ir_graph);
-	dbg_info *const dbgi    = get_dbg_info(&expr->base.source_position);
+	dbg_info *const dbgi    = get_dbg_info(&expr->base.pos);
 	ir_node  *const no_mem  = new_NoMem();
 	ir_node  *const arg_sel = new_d_simpleSel(dbgi, no_mem, frame, param_ent);
 
@@ -3177,7 +3177,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 	expression_t *const ap_expr = expr->ap;
 	ir_node      *const ap_addr = expression_to_addr(ap_expr);
 	ir_node      *const ap      = get_value_from_lvalue(ap_expr, ap_addr);
-	dbg_info     *const dbgi    = get_dbg_info(&expr->base.source_position);
+	dbg_info     *const dbgi    = get_dbg_info(&expr->base.pos);
 	ir_node      *const res     = deref_address(dbgi, type, ap);
 
 	ir_node      *const cnst    = get_type_size_node(expr->base.type);
@@ -3275,7 +3275,7 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 
 	symconst_symbol value;
 	value.entity_p = create_Block_entity(label->label->indirect_block);
-	dbg_info *const dbgi = get_dbg_info(&label->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&label->base.pos);
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
@@ -3318,7 +3318,7 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
 	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
 
-	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.source_position, "str.%u", &expr->string_literal.value);
+	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.pos, "str.%u", &expr->string_literal.value);
 
 	case EXPR_ERROR: break;
 	}
@@ -3389,7 +3389,7 @@ static ir_node *expression_to_firm(const expression_t *expression)
 	}
 
 	/* we have to produce a 0/1 from the mode_b expression */
-	dbg_info *dbgi = get_dbg_info(&expression->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	ir_mode  *mode = get_ir_mode_arithmetic(expression->base.type);
 	return produce_condition_result(expression, mode, dbgi);
 }
@@ -3434,7 +3434,7 @@ static ir_node *create_condition_evaluation(expression_t const *const expression
 			jump_to_target(true_target);
 		}
 	} else {
-		dbg_info *dbgi       = get_dbg_info(&expression->base.source_position);
+		dbg_info *dbgi       = get_dbg_info(&expression->base.pos);
 		ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
 		ir_node  *cond       = new_d_Cond(dbgi, condition);
 		ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
@@ -3466,7 +3466,7 @@ static void create_variable_entity(entity_t *variable,
 
 	ident     *const id        = new_id_from_str(variable->base.symbol->string);
 	ir_type   *const irtype    = get_ir_type(type);
-	dbg_info  *const dbgi      = get_dbg_info(&variable->base.source_position);
+	dbg_info  *const dbgi      = get_dbg_info(&variable->base.pos);
 	ir_entity *const irentity  = new_d_entity(parent_type, id, irtype, dbgi);
 	unsigned         alignment = variable->declaration.alignment;
 
@@ -4095,7 +4095,7 @@ static void create_initializer_local_variable_entity(entity_t *entity)
 {
 	assert(entity->kind == ENTITY_VARIABLE);
 	initializer_t *initializer = entity->variable.initializer;
-	dbg_info      *dbgi        = get_dbg_info(&entity->base.source_position);
+	dbg_info      *dbgi        = get_dbg_info(&entity->base.pos);
 	ir_entity     *irentity    = entity->variable.v.entity;
 	type_t        *type        = entity->declaration.type;
 
@@ -4135,7 +4135,7 @@ static void create_variable_initializer(entity_t *entity)
 		}
 
 		ir_node  *      node = expression_to_firm(value);
-		dbg_info *const dbgi = get_dbg_info(&entity->base.source_position);
+		dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 		ir_mode  *const mode = get_ir_mode_storage(init_type);
 		node = create_conv(dbgi, node, mode);
 
@@ -4186,7 +4186,7 @@ static void allocate_variable_length_array(entity_t *entity)
 	assert(entity->variable.initializer == NULL);
 	assert(currently_reachable());
 
-	dbg_info *dbgi      = get_dbg_info(&entity->base.source_position);
+	dbg_info *dbgi      = get_dbg_info(&entity->base.pos);
 	type_t   *type      = entity->declaration.type;
 	ir_type  *el_type   = get_ir_type(type->array.element_type);
 
@@ -4248,7 +4248,7 @@ static void create_local_static_variable(entity_t *entity)
 	ir_type  *const var_type = entity->variable.thread_local ?
 		get_tls_type() : get_glob_type();
 	ir_type  *const irtype   = get_ir_type(type);
-	dbg_info *const dbgi     = get_dbg_info(&entity->base.source_position);
+	dbg_info *const dbgi     = get_dbg_info(&entity->base.pos);
 
 	size_t l = strlen(entity->base.symbol->string);
 	char   buf[l + sizeof(".%u")];
@@ -4283,7 +4283,7 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 	if (!currently_reachable())
 		return NULL;
 
-	dbg_info *const dbgi = get_dbg_info(&statement->base.source_position);
+	dbg_info *const dbgi = get_dbg_info(&statement->base.pos);
 	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
 	ir_node  *      res  = statement->value ? expression_to_firm(statement->value) : NULL;
 
@@ -4649,7 +4649,7 @@ static ir_switch_table *create_switch_table(const switch_statement_t *statement)
 
 static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 {
-	dbg_info *dbgi        = get_dbg_info(&statement->base.source_position);
+	dbg_info *dbgi        = get_dbg_info(&statement->base.pos);
 	ir_node  *switch_node = NULL;
 
 	if (currently_reachable()) {
@@ -4751,7 +4751,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		const char *clobber_str = clobber->clobber.begin;
 
 		if (!be_is_valid_clobber(clobber_str)) {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 				   "invalid clobber '%s' specified", clobber->clobber);
 			continue;
 		}
@@ -4798,7 +4798,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			= be_parse_asm_constraints(constraints);
 
 		{
-			source_position_t const *const pos = &statement->base.source_position;
+			position_t const *const pos = &statement->base.pos;
 			if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
 				warningf(WARN_OTHER, pos, "some constraints in '%s' are not supported", constraints);
 			}
@@ -4859,7 +4859,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			++in_size;
 			continue;
 		} else {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 			       "only modifiers but no place set in constraints '%s'",
 			       constraints);
 			continue;
@@ -4887,17 +4887,17 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			= be_parse_asm_constraints(constraints);
 
 		if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 			       "some constraints in '%s' are not supported", constraints);
 			continue;
 		}
 		if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 			       "some constraints in '%s' are invalid", constraints);
 			continue;
 		}
 		if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 			       "write flag specified for input constraints '%s'",
 			       constraints);
 			continue;
@@ -4917,7 +4917,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			needs_memory = true;
 			input = expression_to_addr(argument->expression);
 		} else {
-			errorf(&statement->base.source_position,
+			errorf(&statement->base.pos,
 			       "only modifiers but no place set in constraints '%s'",
 			       constraints);
 			continue;
@@ -4938,7 +4938,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_asm_constraint *input_constraints = obstack_finish(&asm_obst);
 
 	/* create asm node */
-	dbg_info *dbgi = get_dbg_info(&statement->base.source_position);
+	dbg_info *dbgi = get_dbg_info(&statement->base.pos);
 
 	ident *asm_text = new_id_from_str(statement->asm_text.begin);
 
@@ -4975,14 +4975,14 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 static ir_node *ms_try_statement_to_firm(ms_try_statement_t *statement)
 {
 	statement_to_firm(statement->try_statement);
-	source_position_t const *const pos = &statement->base.source_position;
+	position_t const *const pos = &statement->base.pos;
 	warningf(WARN_OTHER, pos, "structured exception handling ignored");
 	return NULL;
 }
 
 static ir_node *leave_statement_to_firm(leave_statement_t *statement)
 {
-	errorf(&statement->base.source_position, "__leave not supported yet");
+	errorf(&statement->base.pos, "__leave not supported yet");
 	return NULL;
 }
 
@@ -5112,7 +5112,7 @@ static void initialize_function_parameters(entity_t *entity)
 		assert(parameter->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		type_t *type = skip_typeref(parameter->declaration.type);
 
-		dbg_info *const dbgi         = get_dbg_info(&parameter->base.source_position);
+		dbg_info *const dbgi         = get_dbg_info(&parameter->base.pos);
 		ir_type  *const param_irtype = get_method_param_type(function_irtype, n);
 		if (var_needs_entity(&parameter->variable)) {
 			ir_type   *frame_type = get_irg_frame_type(irg);

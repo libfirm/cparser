@@ -132,8 +132,7 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 	 * specific modes (according to gcc philosophy that is...) */
 	attribute_argument_t *arg = attribute->a.arguments;
 	if (arg == NULL) {
-		errorf(&attribute->source_position,
-		       "__attribute__((mode(X))) misses argument");
+		errorf(&attribute->pos, "__attribute__((mode(X))) misses argument");
 		return orig_type;
 	}
 
@@ -152,8 +151,8 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 	} else if (streq_underscore("DI", symbol_str)) {
 		akind = sign ? ATOMIC_TYPE_LONGLONG : ATOMIC_TYPE_ULONGLONG;
 	} else {
-		source_position_t const *const pos = &attribute->source_position;
-		warningf(WARN_OTHER, pos, "ignoring unknown mode '%s'", symbol_str);
+		warningf(WARN_OTHER, &attribute->pos, "ignoring unknown mode '%s'",
+		         symbol_str);
 		return orig_type;
 	}
 
@@ -162,12 +161,11 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 		copy->atomic.akind = akind;
 		return identify_new_type(copy);
 	} else if (is_type_pointer(type)) {
-		source_position_t const *const pos = &attribute->source_position;
-		warningf(WARN_OTHER, pos, "__attribute__((mode)) on pointers not implemented yet (ignored)");
+		warningf(WARN_OTHER, &attribute->pos, "__attribute__((mode)) on pointers not implemented yet (ignored)");
 		return type;
 	}
 
-	errorf(&attribute->source_position,
+	errorf(&attribute->pos,
 	       "__attribute__((mode)) only allowed on integer, enum or pointer type");
 	return orig_type;
 }
@@ -188,11 +186,11 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 
 	if (!is_po2(alignment)) {
-		errorf(&attribute->source_position, "alignment must be a power of 2 but is %d", alignment);
+		errorf(&attribute->pos, "alignment must be a power of 2 but is %d", alignment);
 		return;
 	}
 	if (alignment <= 0) {
-		errorf(&attribute->source_position, "alignment must be bigger than 0 but is %d", alignment);
+		errorf(&attribute->pos, "alignment must be bigger than 0 but is %d", alignment);
 		return;
 	}
 
@@ -210,7 +208,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 		break;
 
 	default:
-		warningf(WARN_OTHER, &attribute->source_position, "alignment attribute specification on '%N' ignored", entity);
+		warningf(WARN_OTHER, &attribute->pos, "alignment attribute specification on '%N' ignored", entity);
 		break;
 	}
 }
@@ -234,19 +232,19 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 	 * specific modes (according to gcc philosophy that is...) */
 	attribute_argument_t *arg = attribute->a.arguments;
 	if (arg == NULL) {
-		errorf(&attribute->source_position,
+		errorf(&attribute->pos,
 		       "__attribute__((visibility(X))) misses argument");
 		return;
 	}
 	const char *string = get_argument_string(arg);
 	if (string == NULL) {
-		errorf(&attribute->source_position,
+		errorf(&attribute->pos,
 		       "__attribute__((visibility(X))) argument is not a string");
 		return;
 	}
 	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string);
 	if (visibility == ELF_VISIBILITY_ERROR) {
-		errorf(&attribute->source_position,
+		errorf(&attribute->pos,
 		       "unknown visibility type '%s'", string);
 		return;
 	}
@@ -260,7 +258,7 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 		break;
 
 	default:
-		warningf(WARN_OTHER, &attribute->source_position, "visibility attribute specification on '%N' ignored", entity);
+		warningf(WARN_OTHER, &attribute->pos, "visibility attribute specification on '%N' ignored", entity);
 		break;
 	}
 }
@@ -270,8 +268,8 @@ static void warn_arguments(const attribute_t *attribute)
 	if (attribute->a.arguments == NULL)
 		return;
 
-	source_position_t const *const pos  = &attribute->source_position;
-	char              const *const what = get_attribute_name(attribute->kind);
+	position_t const *const pos  = &attribute->pos;
+	char       const *const what = get_attribute_name(attribute->kind);
 	warningf(WARN_OTHER, pos, "attribute '%s' needs no arguments", what);
 }
 
@@ -280,7 +278,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 {
 #if 0
 	if (entity->kind != ENTITY_STRUCT) {
-		warningf(WARN_OTHER, &attribute->source_position, "packed attribute on '%N' ignored", entity);
+		warningf(WARN_OTHER, &attribute->pos, "packed attribute on '%N' ignored", entity);
 		return;
 	}
 #endif
@@ -292,7 +290,7 @@ static void handle_attribute_packed_e(const attribute_t *attribute,
 static void handle_attribute_packed(const attribute_t *attribute, type_t *type)
 {
 	if (type->kind != TYPE_COMPOUND_STRUCT) {
-		source_position_t const *const pos  = &attribute->source_position;
+		position_t const *const pos  = &attribute->pos;
 		warningf(WARN_OTHER, pos, "packed attribute on type '%T' ignored", type);
 		return;
 	}
@@ -307,8 +305,7 @@ static void handle_attribute_asm(const attribute_t *attribute,
 	assert (argument->kind == ATTRIBUTE_ARGUMENT_EXPRESSION);
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
-		errorf(&attribute->source_position,
-		       "Invalid asm attribute expression");
+		errorf(&attribute->pos, "Invalid asm attribute expression");
 	symbol_t *sym = symbol_table_insert(expression->string_literal.value.begin);
 	entity->function.actual_name = sym;
 	assert(argument->next == NULL);

@@ -34,7 +34,7 @@
 
 symbol_t *token_symbols[T_LAST_TOKEN];
 
-const source_position_t builtin_source_position = { "<built-in>", 0, 0, true };
+const position_t builtin_position = { "<built-in>", 0, 0, true };
 
 static token_kind_t last_id;
 

@@ -121,7 +121,7 @@ struct entity_base_t {
 	entity_kind_t       kind;
 	entity_namespace_t  namespc;
 	symbol_t           *symbol;
-	source_position_t   source_position;
+	position_t          pos;
 	scope_t            *parent_scope;    /**< The scope where this entity
 										      is contained in */
 	entity_t           *parent_entity;
@@ -294,7 +294,7 @@ static inline bool is_declaration(const entity_t *entity)
 
 const char *get_entity_kind_name(entity_kind_t kind);
 
-entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*, source_position_t const*);
+entity_t *allocate_entity_zero(entity_kind_t, entity_namespace_t, symbol_t*, position_t const*);
 
 elf_visibility_tag_t get_elf_visibility_from_string(const char *string);
 
