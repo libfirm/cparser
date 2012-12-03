@@ -207,7 +207,7 @@ bool is_type_scalar(const type_t *type);
  * Check if a given type is incomplete.
  *
  * @param type  The type to check.
- * @return True if the given type is incomplete (ie. just forward).
+ * @return True if the given type is incomplete (i.e. just forward).
  */
 bool is_type_incomplete(const type_t *type);
 

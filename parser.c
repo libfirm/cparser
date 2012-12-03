@@ -1721,7 +1721,7 @@ static __attribute__((unused)) void debug_print_type_path(
 }
 
 /**
- * Return the top type path entry, ie. in a path
+ * Return the top type path entry, i.e. in a path
  * (type).a.b returns the b.
  */
 static type_path_entry_t *get_type_path_top(const type_path_t *path)
@@ -1774,7 +1774,7 @@ static void descend_into_subtype(type_path_t *path)
 }
 
 /**
- * Pop an entry from the given type path, ie. returning from
+ * Pop an entry from the given type path, i.e. returning from
  * (type).a.b to (type).a
  */
 static void ascend_from_subtype(type_path_t *path)
@@ -3882,7 +3882,7 @@ static bool contains_attribute(const attribute_t *list, const attribute_t *attr)
 }
 
 /**
- * test wether new_list contains any attributes not included in old_list
+ * Tests whether new_list contains any attributes not included in old_list
  */
 static bool has_new_attributes(const attribute_t *old_list,
                                const attribute_t *new_list)
@@ -7069,7 +7069,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *call)
 }
 
 /**
- * Parse a call expression, ie. expression '( ... )'.
+ * Parse a call expression, i.e. expression '( ... )'.
  *
  * @param expression  the function address
  */
@@ -7241,7 +7241,7 @@ static void semantic_condition(expression_t const *const expr,
 }
 
 /**
- * Parse a conditional expression, ie. 'expression ? ... : ...'.
+ * Parse a conditional expression, i.e. 'expression ? ... : ...'.
  *
  * @param expression  the conditional expression
  */
@@ -9547,7 +9547,7 @@ static statement_t *parse_declaration_statement(void)
 }
 
 /**
- * Parse an expression statement, ie. expr ';'.
+ * Parse an expression statement, i.e. expr ';'.
  */
 static statement_t *parse_expression_statement(void)
 {

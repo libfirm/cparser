@@ -3762,7 +3762,7 @@ static ir_initializer_t *create_ir_initializer_value(
 	return create_initializer_const(value);
 }
 
-/** test wether type can be initialized by a string constant */
+/** Tests whether type can be initialized by a string constant */
 static bool is_string_type(type_t *type)
 {
 	if (!is_type_array(type))

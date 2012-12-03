@@ -1969,7 +1969,7 @@ static const char *parse_headername(bool *system_include)
 		return NULL;
 	}
 
-	/* check wether we have a "... or <... headername */
+	/* check whether we have a "... or <... headername */
 	position_t pos = input.pos;
 	switch (input.c) {
 	{
@@ -2227,7 +2227,7 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 		/* just take the true case in the hope to avoid further errors */
 		condition = true;
 	} else {
-		/* evaluate wether we are in true or false case */
+		/* evaluate whether we are in true or false case */
 		condition = (bool)pp_token.base.symbol->pp_definition == is_ifdef;
 		eat_token(T_IDENTIFIER);
 
