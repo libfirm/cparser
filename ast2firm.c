@@ -5223,7 +5223,6 @@ static void create_function(entity_t *entity)
 	current_vararg_entity = NULL;
 
 	set_irg_fp_model(irg, firm_fp_model);
-	tarval_enable_fp_ops(1);
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
