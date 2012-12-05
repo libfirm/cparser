@@ -6230,8 +6230,8 @@ static expression_t *parse_cast(void)
 	cast->base.type   = type;
 	cast->unary.value = value;
 
-	if (! semantic_cast(cast)) {
-		/* TODO: record the error in the AST. else it is impossible to detect it */
+	if (!semantic_cast(cast)) {
+		cast->base.type = type_error_type;
 	}
 
 	return cast;
