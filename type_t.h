@@ -222,7 +222,7 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_kind_t atype)
 {
 	assert(!is_typeref(type));
 
-	if(type->kind != TYPE_ATOMIC)
+	if (type->kind != TYPE_ATOMIC)
 		return false;
 	const atomic_type_t *atomic_type = &type->atomic;
 

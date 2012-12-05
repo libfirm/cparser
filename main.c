@@ -266,7 +266,7 @@ static void add_flag(struct obstack *obst, const char *format, ...)
 #else
 	/* escape stuff... */
 	for (char *c = buf; *c != '\0'; ++c) {
-		switch(*c) {
+		switch (*c) {
 		case ' ':
 		case '"':
 		case '$':
@@ -2211,7 +2211,7 @@ int main(int argc, char **argv)
 	if (outname == NULL) {
 		const char *filename = units->name;
 
-		switch(mode) {
+		switch (mode) {
 		case BenchmarkParser:
 		case PrintAst:
 		case PrintFluffy:

@@ -1488,7 +1488,7 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 		}
 	}
 
-	switch((declaration_kind_t) entity->declaration.kind) {
+	switch ((declaration_kind_t) entity->declaration.kind) {
 	case DECLARATION_KIND_UNKNOWN:
 		break;
 	case DECLARATION_KIND_PARAMETER:
@@ -2067,7 +2067,7 @@ static bool is_local_variable(expression_t *expression)
 
 static ir_relation get_relation(const expression_kind_t kind)
 {
-	switch(kind) {
+	switch (kind) {
 	case EXPR_BINARY_EQUAL:         return ir_relation_equal;
 	case EXPR_BINARY_ISLESSGREATER: return ir_relation_less_greater;
 	case EXPR_BINARY_NOTEQUAL:      return ir_relation_unordered_less_greater;
@@ -2652,7 +2652,7 @@ static entity_t *get_expression_entity(const expression_t *expression)
 
 static unsigned get_cparser_entity_alignment(const entity_t *entity)
 {
-	switch(entity->kind) {
+	switch (entity->kind) {
 	case DECLARATION_KIND_CASES:
 		return entity->declaration.alignment;
 	case ENTITY_STRUCT:
@@ -2940,7 +2940,7 @@ make_const:;
 static ir_node *function_name_to_firm(
 		const funcname_expression_t *const expr)
 {
-	switch(expr->kind) {
+	switch (expr->kind) {
 	case FUNCNAME_FUNCTION:
 	case FUNCNAME_PRETTY_FUNCTION:
 	case FUNCNAME_FUNCDNAME:
@@ -3037,7 +3037,7 @@ static ir_node *dereference_addr(const unary_expression_t *const expression)
  */
 static ir_node *expression_to_addr(const expression_t *expression)
 {
-	switch(expression->kind) {
+	switch (expression->kind) {
 	case EXPR_ARRAY_ACCESS:
 		return array_access_addr(&expression->array_access);
 	case EXPR_COMPOUND_LITERAL:
@@ -3627,7 +3627,7 @@ static ir_initializer_t *create_ir_initializer_list(
 			const expression_t *expr      = sub_initializer->value.value;
 			const type_t       *expr_type = skip_typeref(expr->base.type);
 			/* we might have to descend into types until the types match */
-			while(true) {
+			while (true) {
 				type_t *orig_top_type = path.top_type;
 				type_t *top_type      = skip_typeref(orig_top_type);
 
@@ -3709,7 +3709,7 @@ static ir_initializer_t *create_ir_initializer_string(initializer_t const *const
 static ir_initializer_t *create_ir_initializer(
 		const initializer_t *initializer, type_t *type)
 {
-	switch(initializer->kind) {
+	switch (initializer->kind) {
 		case INITIALIZER_STRING:
 			return create_ir_initializer_string(initializer, type);
 
@@ -3784,7 +3784,7 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_entity *entity, ir_type *type, dbg_info *dbgi, ir_node *base_addr)
 {
-	switch(get_initializer_kind(initializer)) {
+	switch (get_initializer_kind(initializer)) {
 	case IR_INITIALIZER_NULL:
 		create_dynamic_null_initializer(entity, dbgi, base_addr);
 		return;

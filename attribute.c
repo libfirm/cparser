@@ -327,7 +327,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 	decl_modifiers_t modifiers = 0;
 	const attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
-		switch(attribute->kind) {
+		switch (attribute->kind) {
 		case ATTRIBUTE_GNU_CONST:         modifiers |= DM_CONST; break;
 		case ATTRIBUTE_GNU_DEPRECATED:    modifiers |= DM_DEPRECATED; break;
 		case ATTRIBUTE_GNU_NOINLINE:      modifiers |= DM_NOINLINE; break;
@@ -376,7 +376,7 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 	}
 
 	if (modifiers != 0) {
-		switch(entity->kind) {
+		switch (entity->kind) {
 		case ENTITY_TYPEDEF:
 			entity->typedefe.modifiers |= modifiers;
 			break;
@@ -428,7 +428,7 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 {
 	const attribute_t *attribute = attributes;
 	for ( ; attribute != NULL; attribute = attribute->next) {
-		switch(attribute->kind) {
+		switch (attribute->kind) {
 		case ATTRIBUTE_GNU_PACKED:
 			handle_attribute_packed(attribute, type);
 			break;

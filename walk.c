@@ -201,7 +201,7 @@ static void walk_designator(const designator_t *designator,
 static void walk_initializer(const initializer_t  *initializer,
                              const walk_env_t *const env)
 {
-	switch(initializer->kind) {
+	switch (initializer->kind) {
 	case INITIALIZER_VALUE:
 		walk_expression(initializer->value.value, env);
 		return;

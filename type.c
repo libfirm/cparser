@@ -259,7 +259,7 @@ void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparato
 
 const char *get_atomic_kind_name(atomic_type_kind_t kind)
 {
-	switch(kind) {
+	switch (kind) {
 	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
 	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
@@ -379,7 +379,7 @@ static void print_function_type_post(const function_type_t *type,
 	separator_t sep = { "", ", " };
 	if (parameters == NULL) {
 		function_parameter_t *parameter = type->parameters;
-		for( ; parameter != NULL; parameter = parameter->next) {
+		for ( ; parameter != NULL; parameter = parameter->next) {
 			print_string(sep_next(&sep));
 			print_type(parameter->type);
 		}
@@ -508,7 +508,7 @@ void print_enum_definition(const enum_t *enume)
 	change_indent(1);
 
 	entity_t *entry = enume->base.next;
-	for( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
+	for ( ; entry != NULL && entry->kind == ENTITY_ENUM_VALUE;
 	       entry = entry->base.next) {
 
 		print_indent();
@@ -550,7 +550,7 @@ void print_compound_definition(const compound_t *compound)
 	change_indent(1);
 
 	entity_t *entity = compound->members.entities;
-	for( ; entity != NULL; entity = entity->base.next) {
+	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_COMPOUND_MEMBER)
 			continue;
 
@@ -621,7 +621,7 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
  */
 static void intern_print_type_pre(const type_t *const type)
 {
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_ARRAY:           print_array_type_pre(          &type->array);     return;
 	case TYPE_ATOMIC:          print_atomic_type(             &type->atomic);    return;
 	case TYPE_COMPLEX:         print_complex_type(            &type->atomic);    return;
@@ -646,7 +646,7 @@ static void intern_print_type_pre(const type_t *const type)
  */
 static void intern_print_type_post(const type_t *const type)
 {
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_FUNCTION:
 		print_function_type_post(&type->function, NULL);
 		return;
@@ -795,7 +795,7 @@ bool is_type_arithmetic(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_ENUM:
 		return true;
 	case TYPE_ATOMIC:
@@ -817,7 +817,7 @@ bool is_type_scalar(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_POINTER:
 	case TYPE_ENUM:
 		return true;
@@ -833,7 +833,7 @@ bool is_type_incomplete(const type_t *type)
 {
 	assert(!is_typeref(type));
 
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION: {
 		const compound_type_t *compound_type = &type->compound;
@@ -1135,7 +1135,7 @@ static unsigned get_type_alignment_compound(type_t *const type)
 
 decl_modifiers_t get_type_modifiers(const type_t *type)
 {
-	switch(type->kind) {
+	switch (type->kind) {
 	case TYPE_ERROR:
 		break;
 	case TYPE_COMPOUND_STRUCT:

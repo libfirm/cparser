@@ -2669,7 +2669,7 @@ static void append_env_paths(searchpath_t *paths, const char *envvar)
 			/* skip : */
 			if (*begin == ':')
 				++begin;
-		} while(*c != '\0');
+		} while (*c != '\0');
 	}
 }
 

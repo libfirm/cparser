@@ -284,7 +284,7 @@ union entity_t {
 
 static inline bool is_declaration(const entity_t *entity)
 {
-	switch(entity->kind) {
+	switch (entity->kind) {
 	case DECLARATION_KIND_CASES:
 		return true;
 	default:
