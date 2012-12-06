@@ -1607,7 +1607,7 @@ int main(int argc, char **argv)
 			} else if (option[0] == 'g') {
 				/* TODO: parse -gX with 0<=x<=3... */
 				set_be_option("debug=frameinfo");
-				set_be_option("ia32-nooptcc=yes");
+				set_be_option("ia32-optcc=false");
 			} else if (SINGLE_OPTION('c')) {
 				mode = CompileAssemble;
 			} else if (SINGLE_OPTION('E')) {
