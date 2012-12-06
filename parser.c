@@ -1439,7 +1439,7 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 
 		case EXPR_UNARY_NEGATE:
 		case EXPR_UNARY_PLUS:
-		case EXPR_UNARY_BITWISE_NEGATE:
+		case EXPR_UNARY_COMPLEMENT:
 		case EXPR_UNARY_NOT:
 		case EXPR_UNARY_TAKE_ADDRESS:
 		case EXPR_UNARY_POSTFIX_INCREMENT:
@@ -7568,7 +7568,7 @@ static void semantic_not(unary_expression_t *expression)
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
 }
 
-static void semantic_unexpr_integer(unary_expression_t *expression)
+static void semantic_complement(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
@@ -7673,8 +7673,8 @@ CREATE_UNARY_EXPRESSION_PARSER('*', EXPR_UNARY_DEREFERENCE,
                                semantic_dereference)
 CREATE_UNARY_EXPRESSION_PARSER('&', EXPR_UNARY_TAKE_ADDRESS,
                                semantic_take_addr)
-CREATE_UNARY_EXPRESSION_PARSER('~', EXPR_UNARY_BITWISE_NEGATE,
-                               semantic_unexpr_integer)
+CREATE_UNARY_EXPRESSION_PARSER('~', EXPR_UNARY_COMPLEMENT,
+                               semantic_complement)
 CREATE_UNARY_EXPRESSION_PARSER(T_PLUSPLUS,   EXPR_UNARY_PREFIX_INCREMENT,
                                semantic_incdec)
 CREATE_UNARY_EXPRESSION_PARSER(T_MINUSMINUS, EXPR_UNARY_PREFIX_DECREMENT,
@@ -8378,7 +8378,7 @@ static bool expression_has_effect(const expression_t *const expr)
 
 		case EXPR_UNARY_NEGATE:               return false;
 		case EXPR_UNARY_PLUS:                 return false;
-		case EXPR_UNARY_BITWISE_NEGATE:       return false;
+		case EXPR_UNARY_COMPLEMENT:           return false;
 		case EXPR_UNARY_NOT:                  return false;
 		case EXPR_UNARY_DEREFERENCE:          return false;
 		case EXPR_UNARY_TAKE_ADDRESS:         return false;
@@ -8624,7 +8624,7 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_EXPR_UNARY_NEGATE,           '-');
 	register_expression_parser(parse_EXPR_UNARY_PLUS,             '+');
 	register_expression_parser(parse_EXPR_UNARY_NOT,              '!');
-	register_expression_parser(parse_EXPR_UNARY_BITWISE_NEGATE,   '~');
+	register_expression_parser(parse_EXPR_UNARY_COMPLEMENT,       '~');
 	register_expression_parser(parse_EXPR_UNARY_DEREFERENCE,      '*');
 	register_expression_parser(parse_EXPR_UNARY_TAKE_ADDRESS,     '&');
 	register_expression_parser(parse_EXPR_UNARY_PREFIX_INCREMENT, T_PLUSPLUS);

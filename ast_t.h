@@ -93,7 +93,7 @@ typedef enum expression_kind_t {
 	EXPR_UNARY_FIRST,
 	EXPR_UNARY_NEGATE = EXPR_UNARY_FIRST,
 	EXPR_UNARY_PLUS,
-	EXPR_UNARY_BITWISE_NEGATE,
+	EXPR_UNARY_COMPLEMENT,
 	EXPR_UNARY_NOT,
 	EXPR_UNARY_DEREFERENCE,
 	EXPR_UNARY_TAKE_ADDRESS,
@@ -201,7 +201,7 @@ typedef enum funcname_kind_t {
 #define EXPR_UNARY_CASES_MANDATORY   \
 	     EXPR_UNARY_NEGATE:            \
 	case EXPR_UNARY_PLUS:              \
-	case EXPR_UNARY_BITWISE_NEGATE:    \
+	case EXPR_UNARY_COMPLEMENT:        \
 	case EXPR_UNARY_NOT:               \
 	case EXPR_UNARY_DEREFERENCE:       \
 	case EXPR_UNARY_TAKE_ADDRESS:      \

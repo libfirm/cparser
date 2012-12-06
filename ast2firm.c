@@ -3194,7 +3194,7 @@ incdec:
 	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
 	case EXPR_STRING_LITERAL:             return string_to_firm(                  &expr->base.pos, "str.%u", &expr->string_literal.value);
 	case EXPR_UNARY_ASSUME:               return handle_assume(                    expr->unary.value);
-	case EXPR_UNARY_BITWISE_NEGATE:       return complement_to_firm(              &expr->unary);
+	case EXPR_UNARY_COMPLEMENT:           return complement_to_firm(              &expr->unary);
 	case EXPR_UNARY_DEREFERENCE:          return dereference_to_firm(             &expr->unary);
 	case EXPR_UNARY_NEGATE:               return negate_to_firm(                  &expr->unary);
 	case EXPR_UNARY_PLUS:                 return expression_to_value(              expr->unary.value);

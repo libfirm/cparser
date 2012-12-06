@@ -124,7 +124,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 
 		[EXPR_UNARY_NEGATE]               = PREC_UNARY,
 		[EXPR_UNARY_PLUS]                 = PREC_UNARY,
-		[EXPR_UNARY_BITWISE_NEGATE]       = PREC_UNARY,
+		[EXPR_UNARY_COMPLEMENT]           = PREC_UNARY,
 		[EXPR_UNARY_NOT]                  = PREC_UNARY,
 		[EXPR_UNARY_DEREFERENCE]          = PREC_UNARY,
 		[EXPR_UNARY_TAKE_ADDRESS]         = PREC_UNARY,
@@ -359,7 +359,7 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 	case EXPR_UNARY_NEGATE:           print_char  ('-' ); break;
 	case EXPR_UNARY_PLUS:             print_char  ('+' ); break;
 	case EXPR_UNARY_NOT:              print_char  ('!' ); break;
-	case EXPR_UNARY_BITWISE_NEGATE:   print_char  ('~' ); break;
+	case EXPR_UNARY_COMPLEMENT:       print_char  ('~' ); break;
 	case EXPR_UNARY_PREFIX_INCREMENT: print_string("++"); break;
 	case EXPR_UNARY_PREFIX_DECREMENT: print_string("--"); break;
 	case EXPR_UNARY_DEREFERENCE:      print_char  ('*' ); break;
@@ -1835,7 +1835,7 @@ check_type:
 
 	case EXPR_UNARY_NEGATE:
 	case EXPR_UNARY_PLUS:
-	case EXPR_UNARY_BITWISE_NEGATE:
+	case EXPR_UNARY_COMPLEMENT:
 	case EXPR_UNARY_NOT:
 		return is_constant_expression(expression->unary.value);
 
