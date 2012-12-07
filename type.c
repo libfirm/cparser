@@ -311,7 +311,7 @@ static void print_atomic_type(const atomic_type_t *type)
 static void print_complex_type(const atomic_type_t *type)
 {
 	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
-	print_string("_Complex");
+	print_string("_Complex ");
 	print_atomic_kinds(type->akind);
 }
 
