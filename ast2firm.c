@@ -2564,9 +2564,6 @@ static ir_node *create_lazy_op(const binary_expression_t *expression)
 	                                dbgi);
 }
 
-typedef ir_node * (*create_arithmetic_func)(dbg_info *dbgi, ir_node *left,
-                                            ir_node *right, ir_mode *mode);
-
 static ir_node *create_assign_binop(const binary_expression_t *expression)
 {
 	dbg_info *const     dbgi = get_dbg_info(&expression->base.pos);
