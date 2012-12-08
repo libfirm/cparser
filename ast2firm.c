@@ -1134,6 +1134,12 @@ static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 	return new_d_Conv(dbgi, value, dest_mode);
 }
 
+static ir_node *conv_to_storage_type(dbg_info *const dbgi, ir_node *const val, type_t *const type)
+{
+	ir_mode *const mode = get_ir_mode_storage(type);
+	return create_conv(dbgi, val, mode);
+}
+
 /**
  * Creates a SymConst node representing a string constant.
  *
@@ -1770,14 +1776,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	for (int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
 		ir_node      *arg_node   = expression_to_firm(expression);
-
-		type_t *arg_type = skip_typeref(expression->base.type);
-		if (!is_type_compound(arg_type)) {
-			ir_mode *const mode = get_ir_mode_storage(arg_type);
-			arg_node = create_conv(dbgi, arg_node, mode);
-		}
-
-		in[n] = arg_node;
+		type_t       *arg_type   = skip_typeref(expression->base.type);
+		in[n] = conv_to_storage_type(dbgi, arg_node, arg_type);
 
 		argument = argument->next;
 	}
@@ -1844,10 +1844,7 @@ static ir_node *create_condition_evaluation(expression_t const *expression, jump
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
 {
-	if (is_type_scalar(type)) {
-		ir_mode *mode = get_ir_mode_storage(type);
-		value         = create_conv(dbgi, value, mode);
-	}
+	value = conv_to_storage_type(dbgi, value, type);
 
 	ir_node *memory = get_store();
 
@@ -2007,11 +2004,7 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 {
 	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
 	type_t   *type = skip_typeref(expression->base.type);
-
-	if (!is_type_compound(type)) {
-		ir_mode  *mode = get_ir_mode_storage(type);
-		value          = create_conv(dbgi, value, mode);
-	}
+	value = conv_to_storage_type(dbgi, value, type);
 
 	if (expression->kind == EXPR_REFERENCE) {
 		const reference_expression_t *ref = &expression->reference;
@@ -3766,10 +3759,7 @@ static ir_initializer_t *create_ir_initializer_value(
 	}
 
 	ir_node *value = expression_to_firm(expr);
-	if (!is_type_compound(type)) {
-		ir_mode *mode = get_ir_mode_storage(type);
-		value         = create_conv(NULL, value, mode);
-	}
+	value = conv_to_storage_type(NULL, value, type);
 	return create_initializer_const(value);
 }
 
@@ -4147,8 +4137,7 @@ static void create_variable_initializer(entity_t *entity)
 
 		ir_node  *      node = expression_to_firm(value);
 		dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
-		ir_mode  *const mode = get_ir_mode_storage(init_type);
-		node = create_conv(dbgi, node, mode);
+		node = conv_to_storage_type(dbgi, node, init_type);
 
 		if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
 			set_value(entity->variable.v.value_number, node);
@@ -4300,11 +4289,10 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 
 	int in_len;
 	if (!is_type_void(type)) {
-		ir_mode *const mode = get_ir_mode_storage(type);
 		if (res) {
-			res = create_conv(dbgi, res, mode);
+			res = conv_to_storage_type(dbgi, res, type);
 		} else {
-			res = new_Unknown(mode);
+			res = new_Unknown(get_ir_mode_storage(type));
 		}
 		in_len = 1;
 	} else {
@@ -5137,9 +5125,7 @@ static void initialize_function_parameters(entity_t *entity)
 		ir_mode *param_mode = get_type_mode(param_irtype);
 		long     pn         = n;
 		ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
-
-		ir_mode *mode = get_ir_mode_storage(type);
-		value = create_conv(NULL, value, mode);
+		value = conv_to_storage_type(dbgi, value, type);
 
 		parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
 		parameter->variable.v.value_number = next_value_number_function;
