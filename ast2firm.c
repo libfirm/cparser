@@ -2087,52 +2087,29 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 	return value;
 }
 
-
-static ir_node *create_incdec(const unary_expression_t *expression)
+static ir_node *create_incdec(unary_expression_t const *const expr, bool const inc, bool const pre)
 {
-	dbg_info *const     dbgi = get_dbg_info(&expression->base.pos);
-	const expression_t *value_expr = expression->value;
-	ir_node            *addr       = expression_to_addr(value_expr);
-	ir_node            *value      = get_value_from_lvalue(value_expr, addr);
-
-	type_t  *type = skip_typeref(expression->base.type);
-	ir_mode *mode = get_ir_mode_arithmetic(expression->base.type);
+	type_t  *const type = skip_typeref(expr->base.type);
+	ir_mode *const mode = get_ir_mode_arithmetic(type);
 
 	ir_node *offset;
 	if (is_type_pointer(type)) {
-		pointer_type_t *pointer_type = &type->pointer;
-		offset = get_type_size_node(pointer_type->points_to);
+		offset = get_type_size_node(type->pointer.points_to);
 	} else {
 		assert(is_type_arithmetic(type));
 		offset = new_Const(get_mode_one(mode));
 	}
 
-	ir_node *result;
-	ir_node *store_value;
-	switch(expression->base.kind) {
-	case EXPR_UNARY_POSTFIX_INCREMENT:
-		result      = value;
-		store_value = new_d_Add(dbgi, value, offset, mode);
-		break;
-	case EXPR_UNARY_POSTFIX_DECREMENT:
-		result      = value;
-		store_value = new_d_Sub(dbgi, value, offset, mode);
-		break;
-	case EXPR_UNARY_PREFIX_INCREMENT:
-		result      = new_d_Add(dbgi, value, offset, mode);
-		store_value = result;
-		break;
-	case EXPR_UNARY_PREFIX_DECREMENT:
-		result      = new_d_Sub(dbgi, value, offset, mode);
-		store_value = result;
-		break;
-	default:
-		panic("no incdec expr");
-	}
+	dbg_info           *const dbgi       = get_dbg_info(&expr->base.pos);
+	expression_t const *const value_expr = expr->value;
+	ir_node            *const addr       = expression_to_addr(value_expr);
+	ir_node            *const value      = get_value_from_lvalue(value_expr, addr);
+	ir_node            *const new_value  = inc
+		? new_d_Add(dbgi, value, offset, mode)
+		: new_d_Sub(dbgi, value, offset, mode);
 
-	set_value_for_expression_addr(value_expr, store_value, addr);
-
-	return result;
+	set_value_for_expression_addr(value_expr, new_value, addr);
+	return pre ? new_value : value;
 }
 
 static bool is_local_variable(expression_t *expression)
@@ -2343,11 +2320,18 @@ static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
 		type_t  *points_to  = value_type->pointer.points_to;
 		return deref_address(dbgi, points_to, value_node);
 	}
-	case EXPR_UNARY_POSTFIX_INCREMENT:
-	case EXPR_UNARY_POSTFIX_DECREMENT:
-	case EXPR_UNARY_PREFIX_INCREMENT:
-	case EXPR_UNARY_PREFIX_DECREMENT:
-		return create_incdec(expression);
+
+	{
+		bool inc;
+		bool pre;
+	case EXPR_UNARY_POSTFIX_DECREMENT: inc = false; pre = false; goto incdec;
+	case EXPR_UNARY_POSTFIX_INCREMENT: inc = true;  pre = false; goto incdec;
+	case EXPR_UNARY_PREFIX_DECREMENT:  inc = false; pre = true;  goto incdec;
+	case EXPR_UNARY_PREFIX_INCREMENT:  inc = true;  pre = true;  goto incdec;
+incdec:
+		return create_incdec(expression, inc, pre);
+	}
+
 	case EXPR_UNARY_CAST: {
 		ir_node *value_node = expression_to_firm(value);
 		type_t  *from_type  = value->base.type;
