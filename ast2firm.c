@@ -2108,8 +2108,8 @@ static ir_node *create_incdec(unary_expression_t const *const expr, bool const i
 		? new_d_Add(dbgi, value, offset, mode)
 		: new_d_Sub(dbgi, value, offset, mode);
 
-	set_value_for_expression_addr(value_expr, new_value, addr);
-	return pre ? new_value : value;
+	ir_node *const store_value = set_value_for_expression_addr(value_expr, new_value, addr);
+	return pre ? store_value : value;
 }
 
 static bool is_local_variable(expression_t *expression)
