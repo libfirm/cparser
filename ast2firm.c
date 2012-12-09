@@ -2044,12 +2044,6 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 	return value;
 }
 
-static void set_value_for_expression(const expression_t *expression,
-                                     ir_node *value)
-{
-	set_value_for_expression_addr(expression, value, NULL);
-}
-
 static ir_node *get_value_from_lvalue(const expression_t *expression,
                                       ir_node *addr)
 {
@@ -3154,7 +3148,7 @@ static ir_node *va_start_expression_to_firm(
 	ir_node  *const no_mem  = new_NoMem();
 	ir_node  *const arg_sel = new_d_simpleSel(dbgi, no_mem, frame, param_ent);
 
-	set_value_for_expression(expr->ap, arg_sel);
+	set_value_for_expression_addr(expr->ap, arg_sel, NULL);
 
 	return NULL;
 }
@@ -3187,7 +3181,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
 static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const expr)
 {
 	ir_node *const src = expression_to_firm(expr->src);
-	set_value_for_expression(expr->dst, src);
+	set_value_for_expression_addr(expr->dst, src, NULL);
 	return NULL;
 }
 
