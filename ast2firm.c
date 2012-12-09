@@ -768,8 +768,7 @@ static ir_mode *get_ir_mode_arithmetic(type_t *type)
  */
 static ir_node *get_type_size_node(type_t *type)
 {
-	unsigned size;
-	ir_mode *mode = get_ir_mode_arithmetic(type_size_t);
+	ir_mode *const mode = get_ir_mode_storage(type_size_t);
 	type = skip_typeref(type);
 
 	if (is_type_array(type) && type->array.is_vla) {
@@ -779,7 +778,7 @@ static ir_node *get_type_size_node(type_t *type)
 		return real_size;
 	}
 
-	size = get_type_size(type);
+	unsigned const size = get_type_size(type);
 	return new_Const_long(mode, size);
 }
 
@@ -1263,10 +1262,8 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 		panic("invalid literal kind");
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&literal->base.pos);
-	ir_node  *res        = new_d_Const(dbgi, tv);
-	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
-	return create_conv(dbgi, res, mode_arith);
+	dbg_info *const dbgi = get_dbg_info(&literal->base.pos);
+	return new_d_Const(dbgi, tv);
 }
 
 /**
@@ -1313,10 +1310,8 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 		panic("invalid literal kind");
 	}
 
-	dbg_info *dbgi       = get_dbg_info(&literal->base.pos);
-	ir_node  *res        = new_d_Const(dbgi, tv);
-	ir_mode  *mode_arith = get_ir_mode_arithmetic(type);
-	return create_conv(dbgi, res, mode_arith);
+	dbg_info *const dbgi = get_dbg_info(&literal->base.pos);
+	return new_d_Const(dbgi, tv);
 }
 
 /*
@@ -1431,9 +1426,7 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	ir_node *const load_res = new_d_Proj(dbgi, load, mode,   pn_Load_res);
 
 	set_store(load_mem);
-
-	ir_mode *const mode_arithmetic = get_ir_mode_arithmetic(skipped);
-	return create_conv(dbgi, load_res, mode_arithmetic);
+	return load_res;
 }
 
 /**
@@ -1490,10 +1483,8 @@ static ir_node *reference_addr(const reference_expression_t *ref)
 			warningf(WARN_OTHER, pos, "taking address of builtin '%N'", ref->entity);
 
 			/* simply create a NULL pointer */
-			ir_mode  *mode = get_ir_mode_arithmetic(type_void_ptr);
-			ir_node  *res  = new_Const(get_mode_null(mode));
-
-			return res;
+			ir_mode *const mode = get_ir_mode_storage(type_void_ptr);
+			return new_Const(get_mode_null(mode));
 		}
 	}
 
@@ -1555,8 +1546,7 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	case DECLARATION_KIND_PARAMETER: {
 		type_t  *const type  = skip_typeref(entity->declaration.type);
 		ir_mode *const mode  = get_ir_mode_storage(type);
-		ir_node *const value = get_value(entity->variable.v.value_number, mode);
-		return create_conv(dbgi, value, get_ir_mode_arithmetic(type));
+		return get_value(entity->variable.v.value_number, mode);
 	}
 
 	default: {
@@ -1599,7 +1589,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case BUILTIN_INF: {
 		type_t    *type = function_type->function.return_type;
-		ir_mode   *mode = get_ir_mode_arithmetic(type);
+		ir_mode   *mode = get_ir_mode_storage(type);
 		ir_tarval *tv   = get_mode_infinite(mode);
 		ir_node   *res  = new_d_Const(dbgi, tv);
 		return res;
@@ -1608,7 +1598,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		/* Ignore string for now... */
 		assert(is_type_function(function_type));
 		type_t    *type = function_type->function.return_type;
-		ir_mode   *mode = get_ir_mode_arithmetic(type);
+		ir_mode   *mode = get_ir_mode_storage(type);
 		ir_tarval *tv   = get_mode_NAN(mode);
 		ir_node   *res  = new_d_Const(dbgi, tv);
 		return res;
@@ -1626,7 +1616,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		expression_t *type_expression = call->arguments->next->expression;
 		long          type_val        = fold_constant_to_int(type_expression);
 		type_t       *type            = function_type->function.return_type;
-		ir_mode      *mode            = get_ir_mode_arithmetic(type);
+		ir_mode      *mode            = get_ir_mode_storage(type);
 		/* just produce a "I don't know" result */
 		ir_tarval    *result          = type_val & 2 ? get_mode_null(mode) :
 		                                get_mode_minus_one(mode);
@@ -1769,8 +1759,6 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 			assert(is_type_scalar(return_type));
 			ir_mode *mode = get_ir_mode_storage(return_type);
 			result = new_Proj(node, mode, pn_Builtin_max+1);
-			ir_mode *mode_arith = get_ir_mode_arithmetic(return_type);
-			result              = create_conv(NULL, result, mode_arith);
 		}
 	} else {
 		node = new_d_Call(dbgi, store, callee, n_parameters, in, ir_method_type);
@@ -1780,11 +1768,9 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		}
 
 		if (!is_type_void(return_type)) {
-			ir_node *const resproj    = new_Proj(node, mode_T, pn_Call_T_result);
-			ir_mode *const mode       = get_ir_mode_storage(return_type);
-			result                    = new_Proj(resproj, mode, 0);
-			ir_mode *const mode_arith = get_ir_mode_arithmetic(return_type);
-			result                    = create_conv(NULL, result, mode_arith);
+			ir_node *const resproj = new_Proj(node, mode_T, pn_Call_T_result);
+			ir_mode *const mode    = get_ir_mode_storage(return_type);
+			result = new_Proj(resproj, mode, 0);
 		}
 	}
 
@@ -1947,9 +1933,7 @@ static ir_node *bitfield_extract_to_firm(const select_expression_t *expression,
 		shiftr = new_d_Shr(dbgi, shiftl, countr, amode);
 	}
 
-	type_t  *type    = expression->base.type;
-	ir_mode *resmode = get_ir_mode_arithmetic(type);
-	return create_conv(dbgi, shiftr, resmode);
+	return conv_to_storage_type(dbgi, shiftr, expression->base.type);
 }
 
 /* make sure the selected compound type is constructed */
@@ -2024,8 +2008,7 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 			assert(addr == NULL);
 			type_t  *type = skip_typeref(expression->base.type);
 			ir_mode *mode = get_ir_mode_storage(type);
-			ir_node *res  = get_value(value_number, mode);
-			return create_conv(NULL, res, get_ir_mode_arithmetic(type));
+			return get_value(value_number, mode);
 		}
 	}
 
@@ -2057,13 +2040,14 @@ static ir_node *incdec_to_firm(unary_expression_t const *const expr, bool const 
 		offset = new_Const(get_mode_one(mode));
 	}
 
-	dbg_info           *const dbgi       = get_dbg_info(&expr->base.pos);
-	expression_t const *const value_expr = expr->value;
-	ir_node            *const addr       = expression_to_addr(value_expr);
-	ir_node            *const value      = get_value_from_lvalue(value_expr, addr);
-	ir_node            *const new_value  = inc
-		? new_d_Add(dbgi, value, offset, mode)
-		: new_d_Sub(dbgi, value, offset, mode);
+	dbg_info           *const dbgi        = get_dbg_info(&expr->base.pos);
+	expression_t const *const value_expr  = expr->value;
+	ir_node            *const addr        = expression_to_addr(value_expr);
+	ir_node            *const value       = get_value_from_lvalue(value_expr, addr);
+	ir_node            *const value_arith = create_conv(dbgi, value, mode);
+	ir_node            *const new_value   = inc
+		? new_d_Add(dbgi, value_arith, offset, mode)
+		: new_d_Sub(dbgi, value_arith, offset, mode);
 
 	ir_node *const store_value = set_value_for_expression_addr(value_expr, new_value, addr);
 	return pre ? store_value : value;
@@ -2216,18 +2200,15 @@ static ir_node *create_cast(unary_expression_t const *const expr)
 		}
 	}
 
-	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-	ir_node *node       = create_conv(dbgi, value, mode);
-	node                = create_conv(dbgi, node, mode_arith);
-	return node;
+	return create_conv(dbgi, value, mode);
 }
 
 static ir_node *complement_to_firm(unary_expression_t const *const expr)
 {
 	dbg_info *const dbgi  = get_dbg_info(&expr->base.pos);
-	ir_node  *const value = expression_to_value(expr->value);
 	type_t   *const type  = skip_typeref(expr->base.type);
 	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
+	ir_node  *const value = create_conv(dbgi, expression_to_value(expr->value), mode);
 	return new_d_Not(dbgi, value, mode);
 }
 
@@ -2252,16 +2233,16 @@ static ir_node *dereference_to_firm(unary_expression_t const *const expr)
 static ir_node *negate_to_firm(unary_expression_t const *const expr)
 {
 	dbg_info *const dbgi  = get_dbg_info(&expr->base.pos);
-	ir_node  *const value = expression_to_value(expr->value);
 	type_t   *const type  = skip_typeref(expr->base.type);
 	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
+	ir_node  *const value = create_conv(dbgi, expression_to_value(expr->value), mode);
 	return new_d_Minus(dbgi, value, mode);
 }
 
 static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 		ir_node *value, type_t *type)
 {
-	ir_mode        *const mode         = get_ir_mode_arithmetic(type_ptrdiff_t);
+	ir_mode        *const mode         = get_ir_mode_storage(type_ptrdiff_t);
 	assert(is_type_pointer(type));
 	pointer_type_t *const pointer_type = &type->pointer;
 	type_t         *const points_to    = skip_typeref(pointer_type->points_to);
@@ -2285,6 +2266,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 		mode  = get_ir_mode_arithmetic(expr->base.type);
+		left  = create_conv(dbgi, left,  mode);
 		right = create_conv(dbgi, right, atomic_modes[ATOMIC_TYPE_UINT]);
 		break;
 
@@ -2292,7 +2274,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 		if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 			const pointer_type_t *const ptr_type = &type_left->pointer;
 
-			mode = get_ir_mode_arithmetic(expr->base.type);
+			mode = get_ir_mode_storage(expr->base.type);
 			ir_node *const elem_size = get_type_size_node(ptr_type->points_to);
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
@@ -2305,7 +2287,7 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 	case EXPR_BINARY_SUB_ASSIGN:
 		if (is_type_pointer(type_left)) {
 			right = adjust_for_pointer_arithmetic(dbgi, right, type_left);
-			mode  = get_ir_mode_arithmetic(type_left);
+			mode  = get_ir_mode_storage(type_left);
 			break;
 		}
 		goto normal_node;
@@ -2314,19 +2296,20 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 	case EXPR_BINARY_ADD_ASSIGN:
 		if (is_type_pointer(type_left)) {
 			right = adjust_for_pointer_arithmetic(dbgi, right, type_left);
-			mode  = get_ir_mode_arithmetic(type_left);
+			mode  = get_ir_mode_storage(type_left);
 			break;
 		} else if (is_type_pointer(type_right)) {
 			left  = adjust_for_pointer_arithmetic(dbgi, left, type_right);
-			mode  = get_ir_mode_arithmetic(type_right);
+			mode  = get_ir_mode_storage(type_right);
 			break;
 		}
 		goto normal_node;
 
 	default:
 normal_node:
-		mode = get_ir_mode_arithmetic(type_right);
-		left = create_conv(dbgi, left, mode);
+		mode  = get_ir_mode_arithmetic(type_right);
+		left  = create_conv(dbgi, left,  mode);
+		right = create_conv(dbgi, right, mode);
 		break;
 	}
 
@@ -2441,7 +2424,7 @@ static ir_node *control_flow_to_1_0(expression_t const *const expr, jump_target 
 {
 	ir_node        *val  = NULL;
 	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-	ir_mode  *const mode = get_ir_mode_arithmetic(expr->base.type);
+	ir_mode  *const mode = get_ir_mode_storage(expr->base.type);
 	jump_target     exit_target;
 	init_jump_target(&exit_target, NULL);
 
@@ -2488,27 +2471,14 @@ static ir_node *binop_assign_to_firm(binary_expression_t const *const expr)
 		result = control_flow_to_1_0((expression_t const*)expr, &true_target, &false_target);
 	}
 
-	result = set_value_for_expression_addr(left_expr, result, addr);
-
-	if (!is_type_compound(type)) {
-		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-		ir_mode  *const mode = get_ir_mode_arithmetic(type);
-		result = create_conv(dbgi, result, mode);
-	}
-	return result;
+	return set_value_for_expression_addr(left_expr, result, addr);
 }
 
 static ir_node *assign_expression_to_firm(binary_expression_t const *const expr)
 {
 	ir_node *const addr  = expression_to_addr(expr->left);
 	ir_node *const right = expression_to_value(expr->right);
-	ir_node       *res   = set_value_for_expression_addr(expr->left, right, addr);
-	type_t  *const type  = skip_typeref(expr->base.type);
-	if (!is_type_compound(type)) {
-		ir_mode *const mode_arithmetic = get_ir_mode_arithmetic(type);
-		res = create_conv(NULL, res, mode_arithmetic);
-	}
-	return res;
+	return set_value_for_expression_addr(expr->left, right, addr);
 }
 
 static ir_node *comma_expression_to_firm(binary_expression_t const *const expr)
@@ -2586,7 +2556,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 
 static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
 {
-	ir_mode   *mode   = get_ir_mode_arithmetic(expression->base.type);
+	ir_mode   *mode   = get_ir_mode_storage(expression->base.type);
 	long       offset = get_offsetof_offset(expression);
 	ir_tarval *tv     = new_tarval_from_long(offset, mode);
 	dbg_info  *dbgi   = get_dbg_info(&expression->base.pos);
@@ -2717,7 +2687,7 @@ static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 	}
 
 	dbg_info  *dbgi = get_dbg_info(&expression->base.pos);
-	ir_mode   *mode = get_ir_mode_arithmetic(expression->base.type);
+	ir_mode   *mode = get_ir_mode_storage(expression->base.type);
 	ir_tarval *tv   = new_tarval_from_long(alignment, mode);
 	return new_d_Const(dbgi, tv);
 }
@@ -2781,7 +2751,10 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	init_jump_target(&false_target, NULL);
 	ir_node *const cond_expr = expression_to_control_flow(expression->condition, &true_target, &false_target);
 
-	ir_node    *val = NULL;
+	ir_node        *val  = NULL;
+	dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
+	type_t   *const type = skip_typeref(expression->base.type);
+	ir_mode  *const mode = get_ir_mode_arithmetic(type);
 	jump_target exit_target;
 	init_jump_target(&exit_target, NULL);
 
@@ -2793,17 +2766,20 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		} else {
 			/* Condition ended with a short circuit (&&, ||, !) operation or a
 			 * comparison.  Generate a "1" as value for the true branch. */
-			val = new_Const(get_mode_one(mode_Is));
+			val = new_Const(get_mode_one(mode));
 		}
+		if (val)
+			val = create_conv(dbgi, val, mode);
 		jump_to_target(&exit_target);
 	}
 
 	if (enter_jump_target(&false_target)) {
-		ir_node *const false_val = expression_to_value(expression->false_expression);
+		ir_node *false_val = expression_to_value(expression->false_expression);
+		if (false_val)
+			false_val = create_conv(dbgi, false_val, mode);
 		jump_to_target(&exit_target);
 		if (val) {
-			ir_node  *const in[] = { val, false_val };
-			dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
+			ir_node *const in[] = { val, false_val };
 			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
 		} else {
 			val = false_val;
@@ -2812,9 +2788,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	if (!enter_jump_target(&exit_target)) {
 		set_cur_block(new_Block(0, NULL));
-		type_t *const type = skip_typeref(expression->base.type);
 		if (!is_type_void(type))
-			val = new_Unknown(get_ir_mode_arithmetic(type));
+			val = new_Unknown(mode);
 	}
 	return val;
 }
@@ -3082,7 +3057,7 @@ static ir_node *expression_to_addr(const expression_t *expression)
 static ir_node *builtin_constant_to_firm(
 		const builtin_constant_expression_t *expression)
 {
-	ir_mode *const mode = get_ir_mode_arithmetic(expression->base.type);
+	ir_mode *const mode = get_ir_mode_storage(expression->base.type);
 	bool     const v    = is_constant_expression(expression->value) == EXPR_CLASS_CONSTANT;
 	return create_Const_from_bool(mode, v);
 }
@@ -3093,7 +3068,7 @@ static ir_node *builtin_types_compatible_to_firm(
 	type_t  *const left  = get_unqualified_type(skip_typeref(expression->left));
 	type_t  *const right = get_unqualified_type(skip_typeref(expression->right));
 	bool     const value = types_compatible(left, right);
-	ir_mode *const mode  = get_ir_mode_arithmetic(expression->base.type);
+	ir_mode *const mode  = get_ir_mode_storage(expression->base.type);
 	return create_Const_from_bool(mode, value);
 }
 
@@ -3287,20 +3262,27 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 	case EXPR_BINARY_ISUNORDERED:
 	case EXPR_BINARY_LESS:
 	case EXPR_BINARY_LESSEQUAL:
-	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_NOTEQUAL: {
+		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+		type_t   *const type = skip_typeref(expr->binary.left->base.type);
+		ir_mode  *const mode = get_ir_mode_arithmetic(type);
 		val      = NULL;
-		left     = expression_to_value(expr->binary.left);
-		right    = expression_to_value(expr->binary.right);
+		left     = create_conv(dbgi, expression_to_value(expr->binary.left),  mode);
+		right    = create_conv(dbgi, expression_to_value(expr->binary.right), mode);
 		relation = get_relation(expr->kind);
 		goto make_cmp;
+	}
 
 	case EXPR_UNARY_CAST:
 		if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL)) {
 			expression_to_control_flow(expr->unary.value, true_target, false_target);
 			return NULL;
 		} else {
-	default:
-			val      = expression_to_value(expr);
+	default:;
+			dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+			type_t   *const type = skip_typeref(expr->base.type);
+			ir_mode  *const mode = get_ir_mode_arithmetic(type);
+			val      = create_conv(dbgi, expression_to_value(expr), mode);
 			left     = val;
 			right    = new_Const(get_mode_null(get_irn_mode(val)));
 			relation = ir_relation_unordered_less_greater;
