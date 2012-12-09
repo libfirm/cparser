@@ -193,8 +193,8 @@ static void set_unreachable_now(void)
 
 ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
-static ir_node *_expression_to_firm(const expression_t *expression);
-static ir_node *expression_to_firm(const expression_t *expression);
+static ir_node *expression_to_control_flow(expression_t const *expr, jump_target *true_target, jump_target *false_target);
+static ir_node *expression_to_value(expression_t const *expr);
 
 static unsigned decide_modulo_shift(unsigned type_size)
 {
@@ -252,7 +252,7 @@ static ir_node *get_vla_size(array_type_t *const type)
 {
 	ir_node *size_node = type->size_node;
 	if (size_node == NULL) {
-		size_node = expression_to_firm(type->size_expression);
+		size_node = expression_to_value(type->size_expression);
 		type->size_node = size_node;
 	}
 	return size_node;
@@ -1089,47 +1089,12 @@ static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
 	return new_Const((v ? get_mode_one : get_mode_null)(mode));
 }
 
-static ir_node *create_conv_from_b(dbg_info *dbgi, ir_node *value,
-                                   ir_mode *dest_mode)
-{
-	if (is_Const(value)) {
-		return create_Const_from_bool(dest_mode, !is_Const_null(value));
-	}
-
-	ir_node *cond       = new_d_Cond(dbgi, value);
-	ir_node *proj_true  = new_Proj(cond, mode_X, pn_Cond_true);
-	ir_node *proj_false = new_Proj(cond, mode_X, pn_Cond_false);
-	ir_node *tblock     = new_Block(1, &proj_true);
-	ir_node *fblock     = new_Block(1, &proj_false);
-	set_cur_block(tblock);
-	ir_node *const1 = new_Const(get_mode_one(dest_mode));
-	ir_node *tjump  = new_Jmp();
-	set_cur_block(fblock);
-	ir_node *const0 = new_Const(get_mode_null(dest_mode));
-	ir_node *fjump  = new_Jmp();
-
-	ir_node *in[2]      = { tjump, fjump };
-	ir_node *mergeblock = new_Block(2, in);
-	set_cur_block(mergeblock);
-	ir_node *phi_in[2]  = { const1, const0 };
-	ir_node *phi        = new_Phi(2, phi_in, dest_mode);
-	return phi;
-}
-
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
 {
 	ir_mode *value_mode = get_irn_mode(value);
 
 	if (value_mode == dest_mode)
 		return value;
-
-	if (dest_mode == mode_b) {
-		ir_node *zero = new_Const(get_mode_null(value_mode));
-		ir_node *cmp  = new_d_Cmp(dbgi, value, zero, ir_relation_unordered_less_greater);
-		return cmp;
-	} else if (value_mode == mode_b) {
-		return create_conv_from_b(dbgi, value, dest_mode);
-	}
 
 	return new_d_Conv(dbgi, value, dest_mode);
 }
@@ -1621,7 +1586,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		break;
 	case BUILTIN_ALLOCA: {
 		expression_t *argument = call->arguments->expression;
-		ir_node      *size     = expression_to_firm(argument);
+		ir_node      *size     = expression_to_value(argument);
 
 		ir_node *store  = get_store();
 		ir_node *alloca = new_d_Alloc(dbgi, store, size, get_unknown_type(),
@@ -1650,11 +1615,11 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	}
 	case BUILTIN_EXPECT: {
 		expression_t *argument = call->arguments->expression;
-		return _expression_to_firm(argument);
+		return expression_to_value(argument);
 	}
 	case BUILTIN_VA_END:
 		/* evaluate the argument of va_end for its side effects */
-		_expression_to_firm(call->arguments->expression);
+		expression_to_value(call->arguments->expression);
 		return NULL;
 	case BUILTIN_OBJECT_SIZE: {
 		/* determine value of "type" */
@@ -1669,15 +1634,15 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return new_d_Const(dbgi, result);
 	}
 	case BUILTIN_ROTL: {
-		ir_node *val  = expression_to_firm(call->arguments->expression);
-		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
+		ir_node *val  = expression_to_value(call->arguments->expression);
+		ir_node *shf  = expression_to_value(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
 		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
 	}
 	case BUILTIN_ROTR: {
-		ir_node *val  = expression_to_firm(call->arguments->expression);
-		ir_node *shf  = expression_to_firm(call->arguments->next->expression);
+		ir_node *val  = expression_to_value(call->arguments->expression);
+		ir_node *shf  = expression_to_value(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
 		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
@@ -1725,7 +1690,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		}
 	}
 	if (!firm_builtin)
-		callee = expression_to_firm(function);
+		callee = expression_to_value(function);
 
 	type_t *type = skip_typeref(function->base.type);
 	assert(is_type_pointer(type));
@@ -1775,7 +1740,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	const call_argument_t *argument = call->arguments;
 	for (int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
-		ir_node      *arg_node   = expression_to_firm(expression);
+		ir_node      *arg_node   = expression_to_value(expression);
 		type_t       *arg_type   = skip_typeref(expression->base.type);
 		in[n] = conv_to_storage_type(dbgi, arg_node, arg_type);
 
@@ -1837,9 +1802,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 
 static ir_node *statement_to_firm(statement_t *statement);
 static ir_node *compound_statement_to_firm(compound_statement_t *compound);
-
 static ir_node *expression_to_addr(const expression_t *expression);
-static ir_node *create_condition_evaluation(expression_t const *expression, jump_target *true_target, jump_target *false_target);
 
 static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
                          ir_node *value)
@@ -2081,7 +2044,7 @@ static ir_node *get_value_from_lvalue(const expression_t *expression,
 	return value;
 }
 
-static ir_node *create_incdec(unary_expression_t const *const expr, bool const inc, bool const pre)
+static ir_node *incdec_to_firm(unary_expression_t const *const expr, bool const inc, bool const pre)
 {
 	type_t  *const type = skip_typeref(expr->base.type);
 	ir_mode *const mode = get_ir_mode_arithmetic(type);
@@ -2195,7 +2158,7 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 		ir_mode *const mode = get_ir_mode_storage(type);
 
 		res = get_value(var->variable.v.value_number, mode);
-		res = new_d_Confirm(dbi, res, expression_to_firm(con), relation);
+		res = new_d_Confirm(dbi, res, expression_to_value(con), relation);
 		set_value(var->variable.v.value_number, res);
 	}
 	return res;
@@ -2207,30 +2170,34 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
  * @param dbi    debug info
  * @param expr   the IL assume expression
  */
-static ir_node *handle_assume(dbg_info *dbi, const expression_t *expression)
+static ir_node *handle_assume(expression_t const *const expr)
 {
-	switch(expression->kind) {
+	switch (expr->kind) {
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_BINARY_LESS:
 	case EXPR_BINARY_LESSEQUAL:
 	case EXPR_BINARY_GREATER:
-	case EXPR_BINARY_GREATEREQUAL:
-		return handle_assume_compare(dbi, &expression->binary);
+	case EXPR_BINARY_GREATEREQUAL: {
+		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+		return handle_assume_compare(dbgi, &expr->binary);
+	}
+
 	default:
 		return NULL;
 	}
 }
 
-static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
-                            type_t *from_type, type_t *type)
+static ir_node *create_cast(unary_expression_t const *const expr)
 {
-	type = skip_typeref(type);
+	type_t *const type = skip_typeref(expr->base.type);
 	if (is_type_void(type))
 		return NULL;
 
-	from_type     = skip_typeref(from_type);
-	ir_mode *mode = get_ir_mode_storage(type);
+	ir_node        *value     = expression_to_value(expr->value);
+	dbg_info *const dbgi      = get_dbg_info(&expr->base.pos);
+	type_t   *const from_type = skip_typeref(expr->value->base.type);
+	ir_mode  *const mode      = get_ir_mode_storage(type);
 	/* check for conversion from / to __based types */
 	if (is_type_pointer(type) && is_type_pointer(from_type)) {
 		const variable_t *from_var = from_type->pointer.base_variable;
@@ -2239,136 +2206,56 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 			if (from_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, from_var->v.entity);
 				ir_node *const base = deref_address(dbgi, from_var->base.type, addr);
-				value_node = new_d_Add(dbgi, value_node, base, mode);
+				value = new_d_Add(dbgi, value, base, mode);
 			}
 			if (to_var != NULL) {
 				ir_node *const addr = create_symconst(dbgi, to_var->v.entity);
 				ir_node *const base = deref_address(dbgi, to_var->base.type, addr);
-				value_node = new_d_Sub(dbgi, value_node, base, mode);
+				value = new_d_Sub(dbgi, value, base, mode);
 			}
 		}
 	}
 
-	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
-		/* bool adjustments (we save a mode_Bu, but have to temporarily
-		 * convert to mode_b so we only get a 0/1 value */
-		value_node = create_conv(dbgi, value_node, mode_b);
-	}
-
 	ir_mode *mode_arith = get_ir_mode_arithmetic(type);
-	ir_node *node       = create_conv(dbgi, value_node, mode);
+	ir_node *node       = create_conv(dbgi, value, mode);
 	node                = create_conv(dbgi, node, mode_arith);
-
 	return node;
 }
 
-static ir_node *unary_expression_to_firm(const unary_expression_t *expression)
+static ir_node *complement_to_firm(unary_expression_t const *const expr)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
-	type_t   *type = skip_typeref(expression->base.type);
-
-	const expression_t *value = expression->value;
-
-	switch(expression->base.kind) {
-	case EXPR_UNARY_TAKE_ADDRESS:
-		return expression_to_addr(value);
-
-	case EXPR_UNARY_NEGATE: {
-		ir_node *value_node = expression_to_firm(value);
-		ir_mode *mode       = get_ir_mode_arithmetic(type);
-		return new_d_Minus(dbgi, value_node, mode);
-	}
-	case EXPR_UNARY_PLUS:
-		return expression_to_firm(value);
-	case EXPR_UNARY_BITWISE_NEGATE: {
-		ir_node *value_node = expression_to_firm(value);
-		ir_mode *mode       = get_ir_mode_arithmetic(type);
-		return new_d_Not(dbgi, value_node, mode);
-	}
-	case EXPR_UNARY_NOT: {
-		ir_node *value_node = _expression_to_firm(value);
-		value_node          = create_conv(dbgi, value_node, mode_b);
-		ir_node *res        = new_d_Not(dbgi, value_node, mode_b);
-		return res;
-	}
-	case EXPR_UNARY_DEREFERENCE: {
-		ir_node *value_node = expression_to_firm(value);
-		type_t  *value_type = skip_typeref(value->base.type);
-		assert(is_type_pointer(value_type));
-
-		/* check for __based */
-		const variable_t *const base_var = value_type->pointer.base_variable;
-		if (base_var != NULL) {
-			ir_node *const addr = create_symconst(dbgi, base_var->v.entity);
-			ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
-			value_node = new_d_Add(dbgi, value_node, base, get_ir_mode_storage(value_type));
-		}
-		type_t  *points_to  = value_type->pointer.points_to;
-		return deref_address(dbgi, points_to, value_node);
-	}
-
-	{
-		bool inc;
-		bool pre;
-	case EXPR_UNARY_POSTFIX_DECREMENT: inc = false; pre = false; goto incdec;
-	case EXPR_UNARY_POSTFIX_INCREMENT: inc = true;  pre = false; goto incdec;
-	case EXPR_UNARY_PREFIX_DECREMENT:  inc = false; pre = true;  goto incdec;
-	case EXPR_UNARY_PREFIX_INCREMENT:  inc = true;  pre = true;  goto incdec;
-incdec:
-		return create_incdec(expression, inc, pre);
-	}
-
-	case EXPR_UNARY_CAST: {
-		ir_node *value_node = expression_to_firm(value);
-		type_t  *from_type  = value->base.type;
-		return create_cast(dbgi, value_node, from_type, type);
-	}
-	case EXPR_UNARY_ASSUME:
-		return handle_assume(dbgi, value);
-
-	default:
-		break;
-	}
-	panic("invalid unary expression type");
+	dbg_info *const dbgi  = get_dbg_info(&expr->base.pos);
+	ir_node  *const value = expression_to_value(expr->value);
+	type_t   *const type  = skip_typeref(expr->base.type);
+	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
+	return new_d_Not(dbgi, value, mode);
 }
 
-/**
- * produces a 0/1 depending of the value of a mode_b node
- */
-static ir_node *produce_condition_result(const expression_t *expression,
-                                         ir_mode *mode, dbg_info *dbgi)
+static ir_node *dereference_to_firm(unary_expression_t const *const expr)
 {
-	jump_target true_target;
-	jump_target false_target;
-	init_jump_target(&true_target,  NULL);
-	init_jump_target(&false_target, NULL);
-	create_condition_evaluation(expression, &true_target, &false_target);
+	dbg_info *const dbgi       = get_dbg_info(&expr->base.pos);
+	ir_node        *value      = expression_to_value(expr->value);
+	type_t   *const value_type = skip_typeref(expr->value->base.type);
+	assert(is_type_pointer(value_type));
 
-	ir_node    *val = NULL;
-	jump_target exit_target;
-	init_jump_target(&exit_target, NULL);
-
-	if (enter_jump_target(&true_target)) {
-		val = new_Const(get_mode_one(mode));
-		jump_to_target(&exit_target);
+	/* check for __based */
+	variable_t const *const base_var = value_type->pointer.base_variable;
+	if (base_var) {
+		ir_node *const addr = create_symconst(dbgi, base_var->v.entity);
+		ir_node *const base = deref_address(dbgi, base_var->base.type, addr);
+		value = new_d_Add(dbgi, value, base, get_ir_mode_storage(value_type));
 	}
+	type_t *const points_to = value_type->pointer.points_to;
+	return deref_address(dbgi, points_to, value);
+}
 
-	if (enter_jump_target(&false_target)) {
-		ir_node *const zero = new_Const(get_mode_null(mode));
-		jump_to_target(&exit_target);
-		if (val) {
-			ir_node *const in[] = { val, zero };
-			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, mode);
-		} else {
-			val = zero;
-		}
-	}
-
-	if (!enter_jump_target(&exit_target)) {
-		set_cur_block(new_Block(0, NULL));
-		val = new_Unknown(mode);
-	}
-	return val;
+static ir_node *negate_to_firm(unary_expression_t const *const expr)
+{
+	dbg_info *const dbgi  = get_dbg_info(&expr->base.pos);
+	ir_node  *const value = expression_to_value(expr->value);
+	type_t   *const type  = skip_typeref(expr->base.type);
+	ir_mode  *const mode  = get_ir_mode_arithmetic(type);
+	return new_d_Minus(dbgi, value, mode);
 }
 
 static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
@@ -2385,21 +2272,19 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	return mul;
 }
 
-static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
-                          ir_node *left, ir_node *right)
+static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, ir_node *right)
 {
-	ir_mode  *mode;
-	type_t   *type_left  = skip_typeref(expression->left->base.type);
-	type_t   *type_right = skip_typeref(expression->right->base.type);
-
-	expression_kind_t kind = expression->base.kind;
-
+	ir_mode                *mode;
+	dbg_info         *const dbgi       = get_dbg_info(&expr->base.pos);
+	type_t           *const type_left  = skip_typeref(expr->left->base.type);
+	type_t           *const type_right = skip_typeref(expr->right->base.type);
+	expression_kind_t const kind       = expr->base.kind;
 	switch (kind) {
 	case EXPR_BINARY_SHIFTLEFT:
 	case EXPR_BINARY_SHIFTRIGHT:
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-		mode  = get_ir_mode_arithmetic(expression->base.type);
+		mode  = get_ir_mode_arithmetic(expr->base.type);
 		right = create_conv(dbgi, right, atomic_modes[ATOMIC_TYPE_UINT]);
 		break;
 
@@ -2407,7 +2292,7 @@ static ir_node *create_op(dbg_info *dbgi, const binary_expression_t *expression,
 		if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 			const pointer_type_t *const ptr_type = &type_left->pointer;
 
-			mode = get_ir_mode_arithmetic(expression->base.type);
+			mode = get_ir_mode_arithmetic(expr->base.type);
 			ir_node *const elem_size = get_type_size_node(ptr_type->points_to);
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
@@ -2495,141 +2380,148 @@ normal_node:
 	}
 }
 
-static ir_node *create_lazy_op(const binary_expression_t *expression)
+static ir_node *binop_to_firm(binary_expression_t const *const expr)
 {
-	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
-	type_t   *type = skip_typeref(expression->base.type);
-	ir_mode  *mode = get_ir_mode_arithmetic(type);
-
-	if (is_constant_expression(expression->left) == EXPR_CLASS_CONSTANT) {
-		bool val = fold_constant_to_bool(expression->left);
-		expression_kind_t ekind = expression->base.kind;
-		assert(ekind == EXPR_BINARY_LOGICAL_AND || ekind == EXPR_BINARY_LOGICAL_OR);
-		if (ekind == EXPR_BINARY_LOGICAL_AND) {
-			if (!val) {
-				return new_Const(get_mode_null(mode));
-			}
-		} else {
-			if (val) {
-				return new_Const(get_mode_one(mode));
-			}
-		}
-
-		if (is_constant_expression(expression->right) == EXPR_CLASS_CONSTANT) {
-			bool valr = fold_constant_to_bool(expression->right);
-			return create_Const_from_bool(mode, valr);
-		}
-
-		return produce_condition_result(expression->right, mode, dbgi);
-	}
-
-	return produce_condition_result((const expression_t*) expression, mode,
-	                                dbgi);
+	ir_node *const left  = expression_to_value(expr->left);
+	ir_node *const right = expression_to_value(expr->right);
+	return create_op(expr, left, right);
 }
 
-static ir_node *create_assign_binop(const binary_expression_t *expression)
+/**
+ * Check if a given expression is a GNU __builtin_expect() call.
+ */
+static bool is_builtin_expect(const expression_t *expression)
 {
-	dbg_info *const     dbgi = get_dbg_info(&expression->base.pos);
-	const expression_t *left_expr = expression->left;
-	type_t             *type      = skip_typeref(left_expr->base.type);
-	ir_node            *right     = expression_to_firm(expression->right);
-	ir_node            *left_addr = expression_to_addr(left_expr);
-	ir_node            *left      = get_value_from_lvalue(left_expr, left_addr);
-	ir_node            *result    = create_op(dbgi, expression, left, right);
+	if (expression->kind != EXPR_CALL)
+		return false;
 
-	result = create_cast(dbgi, result, expression->right->base.type, type);
+	expression_t *function = expression->call.function;
+	if (function->kind != EXPR_REFERENCE)
+		return false;
+	reference_expression_t *ref = &function->reference;
+	if (ref->entity->kind         != ENTITY_FUNCTION ||
+	    ref->entity->function.btk != BUILTIN_EXPECT)
+		return false;
 
-	result = set_value_for_expression_addr(left_expr, result, left_addr);
+	return true;
+}
+
+static void compare_to_control_flow(expression_t const *const expr, ir_node *const left, ir_node *const right, ir_relation const relation, jump_target *const true_target, jump_target *const false_target)
+{
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+	ir_node  *const cmp  = new_d_Cmp(dbgi, left, right, relation);
+	if (is_Const(cmp)) {
+		if (tarval_is_null(get_Const_tarval(cmp))) {
+			jump_to_target(false_target);
+		} else {
+			jump_to_target(true_target);
+		}
+	} else {
+		ir_node *const cond       = new_d_Cond(dbgi, cmp);
+		ir_node *const true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
+		ir_node *const false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
+
+		/* set branch prediction info based on __builtin_expect */
+		if (is_builtin_expect(expr) && is_Cond(cond)) {
+			call_argument_t *const argument = expr->call.arguments->next;
+			if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
+				bool               const cnst = fold_constant_to_bool(argument->expression);
+				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
+				set_Cond_jmp_pred(cond, pred);
+			}
+		}
+
+		add_pred_to_jump_target(true_target,  true_proj);
+		add_pred_to_jump_target(false_target, false_proj);
+	}
+	set_unreachable_now();
+}
+
+static ir_node *control_flow_to_1_0(expression_t const *const expr, jump_target *const true_target, jump_target *const false_target)
+{
+	ir_node        *val  = NULL;
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+	ir_mode  *const mode = get_ir_mode_arithmetic(expr->base.type);
+	jump_target     exit_target;
+	init_jump_target(&exit_target, NULL);
+
+	if (enter_jump_target(true_target)) {
+		jump_to_target(&exit_target);
+		val = new_d_Const(dbgi, get_mode_one(mode));
+	}
+
+	if (enter_jump_target(false_target)) {
+		jump_to_target(&exit_target);
+		ir_node *const zero = new_d_Const(dbgi, get_mode_null(mode));
+		if (val) {
+			ir_node *const in[] = { val, zero };
+			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, mode);
+		} else {
+			val = zero;
+		}
+	}
+
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		val = new_d_Bad(dbgi, mode);
+	}
+	return val;
+}
+
+static ir_node *binop_assign_to_firm(binary_expression_t const *const expr)
+{
+	ir_node            *const right     = expression_to_value(expr->right);
+	expression_t const *const left_expr = expr->left;
+	ir_node            *const addr      = expression_to_addr(left_expr);
+	ir_node            *const left      = get_value_from_lvalue(left_expr, addr);
+	ir_node                  *result    = create_op(expr, left, right);
+
+	type_t *const type = skip_typeref(expr->base.type);
+	if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
+		jump_target true_target;
+		jump_target false_target;
+		init_jump_target(&true_target,  NULL);
+		init_jump_target(&false_target, NULL);
+		ir_mode *const mode = get_irn_mode(result);
+		ir_node *const zero = new_Const(get_mode_null(mode));
+		compare_to_control_flow((expression_t const*)expr, result, zero, ir_relation_unordered_less_greater, &true_target, &false_target);
+		result = control_flow_to_1_0((expression_t const*)expr, &true_target, &false_target);
+	}
+
+	result = set_value_for_expression_addr(left_expr, result, addr);
 
 	if (!is_type_compound(type)) {
-		ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
-		result = create_conv(dbgi, result, mode_arithmetic);
+		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+		ir_mode  *const mode = get_ir_mode_arithmetic(type);
+		result = create_conv(dbgi, result, mode);
 	}
 	return result;
 }
 
-static ir_node *binary_expression_to_firm(const binary_expression_t *expression)
+static ir_node *assign_expression_to_firm(binary_expression_t const *const expr)
 {
-	expression_kind_t kind = expression->base.kind;
+	ir_node *const addr  = expression_to_addr(expr->left);
+	ir_node *const right = expression_to_value(expr->right);
+	ir_node       *res   = set_value_for_expression_addr(expr->left, right, addr);
+	type_t  *const type  = skip_typeref(expr->base.type);
+	if (!is_type_compound(type)) {
+		ir_mode *const mode_arithmetic = get_ir_mode_arithmetic(type);
+		res = create_conv(NULL, res, mode_arithmetic);
+	}
+	return res;
+}
 
-	switch(kind) {
-	case EXPR_BINARY_EQUAL:
-	case EXPR_BINARY_NOTEQUAL:
-	case EXPR_BINARY_LESS:
-	case EXPR_BINARY_LESSEQUAL:
-	case EXPR_BINARY_GREATER:
-	case EXPR_BINARY_GREATEREQUAL:
-	case EXPR_BINARY_ISGREATER:
-	case EXPR_BINARY_ISGREATEREQUAL:
-	case EXPR_BINARY_ISLESS:
-	case EXPR_BINARY_ISLESSEQUAL:
-	case EXPR_BINARY_ISLESSGREATER:
-	case EXPR_BINARY_ISUNORDERED: {
-		dbg_info   *dbgi     = get_dbg_info(&expression->base.pos);
-		ir_node    *left     = expression_to_firm(expression->left);
-		ir_node    *right    = expression_to_firm(expression->right);
-		ir_relation relation = get_relation(kind);
-		ir_node    *cmp      = new_d_Cmp(dbgi, left, right, relation);
-		return cmp;
-	}
-	case EXPR_BINARY_ASSIGN: {
-		ir_node *addr  = expression_to_addr(expression->left);
-		ir_node *right = expression_to_firm(expression->right);
-		ir_node *res
-			= set_value_for_expression_addr(expression->left, right, addr);
-
-		type_t  *type            = skip_typeref(expression->base.type);
-		if (!is_type_compound(type)) {
-			ir_mode *mode_arithmetic = get_ir_mode_arithmetic(type);
-			res                      = create_conv(NULL, res, mode_arithmetic);
-		}
-		return res;
-	}
-	case EXPR_BINARY_ADD:
-	case EXPR_BINARY_SUB:
-	case EXPR_BINARY_MUL:
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_MOD:
-	case EXPR_BINARY_BITWISE_AND:
-	case EXPR_BINARY_BITWISE_OR:
-	case EXPR_BINARY_BITWISE_XOR:
-	case EXPR_BINARY_SHIFTLEFT:
-	case EXPR_BINARY_SHIFTRIGHT:
-	{
-		dbg_info *dbgi  = get_dbg_info(&expression->base.pos);
-		ir_node  *left  = expression_to_firm(expression->left);
-		ir_node  *right = expression_to_firm(expression->right);
-		return create_op(dbgi, expression, left, right);
-	}
-	case EXPR_BINARY_LOGICAL_AND:
-	case EXPR_BINARY_LOGICAL_OR:
-		return create_lazy_op(expression);
-	case EXPR_BINARY_COMMA:
-		/* create side effects of left side */
-		(void) expression_to_firm(expression->left);
-		return _expression_to_firm(expression->right);
-
-	case EXPR_BINARY_ADD_ASSIGN:
-	case EXPR_BINARY_SUB_ASSIGN:
-	case EXPR_BINARY_MUL_ASSIGN:
-	case EXPR_BINARY_MOD_ASSIGN:
-	case EXPR_BINARY_DIV_ASSIGN:
-	case EXPR_BINARY_BITWISE_AND_ASSIGN:
-	case EXPR_BINARY_BITWISE_OR_ASSIGN:
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
-		return create_assign_binop(expression);
-	default:
-		panic("invalid binexpr type");
-	}
+static ir_node *comma_expression_to_firm(binary_expression_t const *const expr)
+{
+	expression_to_value(expr->left);
+	return expression_to_value(expr->right);
 }
 
 static ir_node *array_access_addr(const array_access_expression_t *expression)
 {
 	dbg_info *dbgi        = get_dbg_info(&expression->base.pos);
-	ir_node  *base_addr   = expression_to_firm(expression->array_ref);
-	ir_node  *offset      = expression_to_firm(expression->index);
+	ir_node  *base_addr   = expression_to_value(expression->array_ref);
+	ir_node  *offset      = expression_to_value(expression->index);
 	type_t   *ref_type    = skip_typeref(expression->array_ref->base.type);
 	ir_node  *real_offset = adjust_for_pointer_arithmetic(dbgi, offset, ref_type);
 	ir_node  *result      = new_d_Add(dbgi, base_addr, real_offset, mode_P_data);
@@ -2774,7 +2666,7 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	/* §6.5.3.4:2 if the type is a VLA, evaluate the expression. */
 	if (is_type_array(type) && type->array.is_vla
 			&& expression->tp_expression != NULL) {
-		expression_to_firm(expression->tp_expression);
+		expression_to_value(expression->tp_expression);
 	}
 
 	return get_type_size_node(type);
@@ -2846,7 +2738,7 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	init_ir_types();
 
 	PUSH_IRG(get_const_code_irg());
-	ir_node *const cnst = expression_to_firm(expression);
+	ir_node *const cnst = expression_to_value(expression);
 	POP_IRG();
 
 	set_optimize(old_optimize);
@@ -2887,7 +2779,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	jump_target false_target;
 	init_jump_target(&true_target,  NULL);
 	init_jump_target(&false_target, NULL);
-	ir_node *const cond_expr = create_condition_evaluation(expression->condition, &true_target, &false_target);
+	ir_node *const cond_expr = expression_to_control_flow(expression->condition, &true_target, &false_target);
 
 	ir_node    *val = NULL;
 	jump_target exit_target;
@@ -2895,8 +2787,8 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 
 	if (enter_jump_target(&true_target)) {
 		if (expression->true_expression) {
-			val = expression_to_firm(expression->true_expression);
-		} else if (cond_expr && get_irn_mode(cond_expr) != mode_b) {
+			val = expression_to_value(expression->true_expression);
+		} else if (cond_expr) {
 			val = cond_expr;
 		} else {
 			/* Condition ended with a short circuit (&&, ||, !) operation or a
@@ -2907,7 +2799,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	}
 
 	if (enter_jump_target(&false_target)) {
-		ir_node *const false_val = expression_to_firm(expression->false_expression);
+		ir_node *const false_val = expression_to_value(expression->false_expression);
 		jump_to_target(&exit_target);
 		if (val) {
 			ir_node  *const in[] = { val, false_val };
@@ -2936,7 +2828,7 @@ static ir_node *select_addr(const select_expression_t *expression)
 
 	construct_select_compound(expression);
 
-	ir_node *compound_addr = expression_to_firm(expression->compound);
+	ir_node *compound_addr = expression_to_value(expression->compound);
 
 	entity_t *entry = expression->compound_entry;
 	assert(entry->kind == ENTITY_COMPOUND_MEMBER);
@@ -3154,7 +3046,7 @@ static ir_node *va_arg_expression_to_firm(const va_arg_expression_t *const expr)
  */
 static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const expr)
 {
-	ir_node *const src = expression_to_firm(expr->src);
+	ir_node *const src = expression_to_value(expr->src);
 	set_value_for_expression_addr(expr->dst, src, NULL);
 	return NULL;
 }
@@ -3162,7 +3054,7 @@ static ir_node *va_copy_expression_to_firm(const va_copy_expression_t *const exp
 static ir_node *dereference_addr(const unary_expression_t *const expression)
 {
 	assert(expression->base.kind == EXPR_UNARY_DEREFERENCE);
-	return expression_to_firm(expression->value);
+	return expression_to_value(expression->value);
 }
 
 /**
@@ -3233,12 +3125,7 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 	return new_d_SymConst(dbgi, mode_P_code, value, symconst_addr_ent);
 }
 
-/**
- * creates firm nodes for an expression. The difference between this function
- * and expression_to_firm is, that this version might produce mode_b nodes
- * instead of mode_Is.
- */
-static ir_node *_expression_to_firm(expression_t const *const expr)
+static ir_node *expression_to_value(expression_t const *const expr)
 {
 #ifndef NDEBUG
 	if (!constant_folding) {
@@ -3248,63 +3135,9 @@ static ir_node *_expression_to_firm(expression_t const *const expr)
 #endif
 
 	switch (expr->kind) {
-	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
-	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
-	case EXPR_BINARY_CASES:               return binary_expression_to_firm(       &expr->binary);
-	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_firm(        &expr->builtin_constant);
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_firm(&expr->builtin_types_compatible);
-	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
-	case EXPR_CLASSIFY_TYPE:              return classify_type_to_firm(           &expr->classify_type);
-	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
-	case EXPR_CONDITIONAL:                return conditional_to_firm(             &expr->conditional);
-	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
-	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
-	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
-	case EXPR_LITERAL_CHARACTER:          return char_literal_to_firm(            &expr->string_literal);
-	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
-	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
-	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
-	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
-	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
-	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
-	case EXPR_UNARY_CASES:                return unary_expression_to_firm(        &expr->unary);
-	case EXPR_VA_ARG:                     return va_arg_expression_to_firm(       &expr->va_arge);
-	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
-	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
-
-	case EXPR_STRING_LITERAL: return string_to_firm(&expr->base.pos, "str.%u", &expr->string_literal.value);
-
-	case EXPR_ERROR: break;
-	}
-	panic("invalid expression");
-}
-
-/**
- * Check if a given expression is a GNU __builtin_expect() call.
- */
-static bool is_builtin_expect(const expression_t *expression)
-{
-	if (expression->kind != EXPR_CALL)
-		return false;
-
-	expression_t *function = expression->call.function;
-	if (function->kind != EXPR_REFERENCE)
-		return false;
-	reference_expression_t *ref = &function->reference;
-	if (ref->entity->kind         != ENTITY_FUNCTION ||
-	    ref->entity->function.btk != BUILTIN_EXPECT)
-		return false;
-
-	return true;
-}
-
-static bool produces_mode_b(const expression_t *expression)
-{
-	switch (expression->kind) {
+	case EXPR_UNARY_CAST:
+		if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL)) {
 	case EXPR_BINARY_EQUAL:
-	case EXPR_BINARY_NOTEQUAL:
-	case EXPR_BINARY_LESS:
-	case EXPR_BINARY_LESSEQUAL:
 	case EXPR_BINARY_GREATER:
 	case EXPR_BINARY_GREATEREQUAL:
 	case EXPR_BINARY_ISGREATER:
@@ -3313,98 +3146,169 @@ static bool produces_mode_b(const expression_t *expression)
 	case EXPR_BINARY_ISLESSEQUAL:
 	case EXPR_BINARY_ISLESSGREATER:
 	case EXPR_BINARY_ISUNORDERED:
-	case EXPR_UNARY_NOT:
-		return true;
-
-	case EXPR_CALL:
-		if (is_builtin_expect(expression)) {
-			expression_t *argument = expression->call.arguments->expression;
-			return produces_mode_b(argument);
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_LOGICAL_AND:
+	case EXPR_BINARY_LOGICAL_OR:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_UNARY_NOT:;
+			jump_target true_target;
+			jump_target false_target;
+			init_jump_target(&true_target,  NULL);
+			init_jump_target(&false_target, NULL);
+			expression_to_control_flow(expr, &true_target, &false_target);
+			return control_flow_to_1_0(expr, &true_target, &false_target);
+		} else {
+			return create_cast(&expr->unary);
 		}
-		return false;
-	case EXPR_BINARY_COMMA:
-		return produces_mode_b(expression->binary.right);
 
-	default:
-		return false;
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_MUL:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+	case EXPR_BINARY_SUB:
+		return binop_to_firm(&expr->binary);
+
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+	case EXPR_BINARY_DIV_ASSIGN:
+	case EXPR_BINARY_MOD_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
+		return binop_assign_to_firm(&expr->binary);
+
+	{
+		bool inc;
+		bool pre;
+	case EXPR_UNARY_POSTFIX_DECREMENT: inc = false; pre = false; goto incdec;
+	case EXPR_UNARY_POSTFIX_INCREMENT: inc = true;  pre = false; goto incdec;
+	case EXPR_UNARY_PREFIX_DECREMENT:  inc = false; pre = true;  goto incdec;
+	case EXPR_UNARY_PREFIX_INCREMENT:  inc = true;  pre = true;  goto incdec;
+incdec:
+		return incdec_to_firm(&expr->unary, inc, pre);
 	}
-}
 
-static ir_node *expression_to_firm(const expression_t *expression)
-{
-	if (!produces_mode_b(expression)) {
-		ir_node *res = _expression_to_firm(expression);
-		assert(res == NULL || get_irn_mode(res) != mode_b);
-		return res;
+	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
+	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
+	case EXPR_BINARY_ASSIGN:              return assign_expression_to_firm(       &expr->binary);
+	case EXPR_BINARY_COMMA:               return comma_expression_to_firm(        &expr->binary);
+	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_firm(        &expr->builtin_constant);
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_firm(&expr->builtin_types_compatible);
+	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
+	case EXPR_CLASSIFY_TYPE:              return classify_type_to_firm(           &expr->classify_type);
+	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
+	case EXPR_CONDITIONAL:                return conditional_to_firm(             &expr->conditional);
+	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
+	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
+	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
+	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
+	case EXPR_LITERAL_CHARACTER:          return char_literal_to_firm(            &expr->string_literal);
+	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
+	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
+	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
+	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
+	case EXPR_STATEMENT:                  return statement_expression_to_firm(    &expr->statement);
+	case EXPR_STRING_LITERAL:             return string_to_firm(                  &expr->base.pos, "str.%u", &expr->string_literal.value);
+	case EXPR_UNARY_ASSUME:               return handle_assume(                    expr->unary.value);
+	case EXPR_UNARY_BITWISE_NEGATE:       return complement_to_firm(              &expr->unary);
+	case EXPR_UNARY_DEREFERENCE:          return dereference_to_firm(             &expr->unary);
+	case EXPR_UNARY_NEGATE:               return negate_to_firm(                  &expr->unary);
+	case EXPR_UNARY_PLUS:                 return expression_to_value(              expr->unary.value);
+	case EXPR_UNARY_TAKE_ADDRESS:         return expression_to_addr(               expr->unary.value);
+	case EXPR_VA_ARG:                     return va_arg_expression_to_firm(       &expr->va_arge);
+	case EXPR_VA_COPY:                    return va_copy_expression_to_firm(      &expr->va_copye);
+	case EXPR_VA_START:                   return va_start_expression_to_firm(     &expr->va_starte);
+
+	case EXPR_UNARY_DELETE:
+	case EXPR_UNARY_DELETE_ARRAY:
+	case EXPR_UNARY_THROW:
+		panic("expression not implemented");
+
+	case EXPR_ERROR:
+		break;
 	}
-
-	/* we have to produce a 0/1 from the mode_b expression */
-	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
-	ir_mode  *mode = get_ir_mode_arithmetic(expression->base.type);
-	return produce_condition_result(expression, mode, dbgi);
+	panic("invalid expression");
 }
 
 /**
  * create a short-circuit expression evaluation that tries to construct
  * efficient control flow structures for &&, || and ! expressions
  */
-static ir_node *create_condition_evaluation(expression_t const *const expression, jump_target *const true_target, jump_target *const false_target)
+static ir_node *expression_to_control_flow(expression_t const *const expr, jump_target *const true_target, jump_target *const false_target)
 {
-	switch(expression->kind) {
-	case EXPR_UNARY_NOT: {
-		const unary_expression_t *unary_expression = &expression->unary;
-		create_condition_evaluation(unary_expression->value, false_target, true_target);
+	switch (expr->kind) {
+	case EXPR_UNARY_NOT:
+		expression_to_control_flow(expr->unary.value, false_target, true_target);
 		return NULL;
-	}
+
 	case EXPR_BINARY_LOGICAL_AND: {
 		jump_target extra_target;
 		init_jump_target(&extra_target, NULL);
-		create_condition_evaluation(expression->binary.left, &extra_target, false_target);
+		expression_to_control_flow(expr->binary.left, &extra_target, false_target);
 		if (enter_jump_target(&extra_target))
-			create_condition_evaluation(expression->binary.right, true_target, false_target);
+			expression_to_control_flow(expr->binary.right, true_target, false_target);
 		return NULL;
 	}
+
 	case EXPR_BINARY_LOGICAL_OR: {
 		jump_target extra_target;
 		init_jump_target(&extra_target, NULL);
-		create_condition_evaluation(expression->binary.left, true_target, &extra_target);
+		expression_to_control_flow(expr->binary.left, true_target, &extra_target);
 		if (enter_jump_target(&extra_target))
-			create_condition_evaluation(expression->binary.right, true_target, false_target);
+			expression_to_control_flow(expr->binary.right, true_target, false_target);
 		return NULL;
 	}
-	default:
-		break;
-	}
 
-	ir_node *cond_expr = _expression_to_firm(expression);
-	if (is_Const(cond_expr)) {
-		if (tarval_is_null(get_Const_tarval(cond_expr))) {
-			jump_to_target(false_target);
+	case EXPR_BINARY_COMMA:
+		expression_to_value(expr->binary.left);
+		return expression_to_control_flow(expr->binary.right, true_target, false_target);
+
+		ir_node    *val;
+		ir_node    *left;
+		ir_node    *right;
+		ir_relation relation;
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+		val      = NULL;
+		left     = expression_to_value(expr->binary.left);
+		right    = expression_to_value(expr->binary.right);
+		relation = get_relation(expr->kind);
+		goto make_cmp;
+
+	case EXPR_UNARY_CAST:
+		if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL)) {
+			expression_to_control_flow(expr->unary.value, true_target, false_target);
+			return NULL;
 		} else {
-			jump_to_target(true_target);
+	default:
+			val      = expression_to_value(expr);
+			left     = val;
+			right    = new_Const(get_mode_null(get_irn_mode(val)));
+			relation = ir_relation_unordered_less_greater;
+make_cmp:
+			compare_to_control_flow(expr, left, right, relation, true_target, false_target);
+			return val;
 		}
-	} else {
-		dbg_info *dbgi       = get_dbg_info(&expression->base.pos);
-		ir_node  *condition  = create_conv(dbgi, cond_expr, mode_b);
-		ir_node  *cond       = new_d_Cond(dbgi, condition);
-		ir_node  *true_proj  = new_d_Proj(dbgi, cond, mode_X, pn_Cond_true);
-		ir_node  *false_proj = new_d_Proj(dbgi, cond, mode_X, pn_Cond_false);
-
-		/* set branch prediction info based on __builtin_expect */
-		if (is_builtin_expect(expression) && is_Cond(cond)) {
-			call_argument_t *argument = expression->call.arguments->next;
-			if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
-				bool               const cnst = fold_constant_to_bool(argument->expression);
-				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
-				set_Cond_jmp_pred(cond, pred);
-			}
-		}
-
-		add_pred_to_jump_target(true_target,  true_proj);
-		add_pred_to_jump_target(false_target, false_proj);
 	}
-	set_unreachable_now();
-	return cond_expr;
 }
 
 static void create_variable_entity(entity_t *variable,
@@ -3704,7 +3608,7 @@ static ir_initializer_t *create_ir_initializer_value(
 		}
 	}
 
-	ir_node *value = expression_to_firm(expr);
+	ir_node *value = expression_to_value(expr);
 	value = conv_to_storage_type(NULL, value, type);
 	return create_initializer_const(value);
 }
@@ -4013,7 +3917,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	if (initializer->kind == INITIALIZER_VALUE) {
 		initializer_value_t *initializer_value = &initializer->value;
 
-		ir_node *value = expression_to_firm(initializer_value->value);
+		ir_node *value = expression_to_value(initializer_value->value);
 		type = skip_typeref(type);
 		assign_value(dbgi, addr, type, value);
 		return;
@@ -4077,7 +3981,7 @@ static void create_variable_initializer(entity_t *entity)
 			goto have_initializer;
 		}
 
-		ir_node  *      node = expression_to_firm(value);
+		ir_node  *      node = expression_to_value(value);
 		dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 		node = conv_to_storage_type(dbgi, node, init_type);
 
@@ -4227,7 +4131,7 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 
 	dbg_info *const dbgi = get_dbg_info(&statement->base.pos);
 	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
-	ir_node  *      res  = statement->value ? expression_to_firm(statement->value) : NULL;
+	ir_node  *      res  = statement->value ? expression_to_value(statement->value) : NULL;
 
 	int in_len;
 	if (!is_type_void(type)) {
@@ -4257,7 +4161,7 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 	if (!currently_reachable())
 		return NULL;
 
-	return expression_to_firm(statement->expression);
+	return expression_to_value(statement->expression);
 }
 
 static void create_local_declarations(entity_t*);
@@ -4445,7 +4349,7 @@ static ir_node *if_statement_to_firm(if_statement_t *statement)
 	init_jump_target(&true_target,  NULL);
 	init_jump_target(&false_target, NULL);
 	if (currently_reachable())
-		create_condition_evaluation(statement->condition, &true_target, &false_target);
+		expression_to_control_flow(statement->condition, &true_target, &false_target);
 
 	jump_target exit_target;
 	init_jump_target(&exit_target, NULL);
@@ -4489,7 +4393,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
 		if (enter_jump_target(&continue_target))
-			create_condition_evaluation(statement->condition, &body_target, &break_target);
+			expression_to_control_flow(statement->condition, &body_target, &break_target);
 		enter_jump_target(&body_target);
 	}
 	enter_jump_target(&break_target);
@@ -4513,7 +4417,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 		}
 
 		if (statement->initialisation != NULL) {
-			expression_to_firm(statement->initialisation);
+			expression_to_value(statement->initialisation);
 		}
 	}
 
@@ -4533,7 +4437,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
 		jump_target body_target;
 		init_jump_target(&body_target, NULL);
-		create_condition_evaluation(cond, &body_target, &break_target);
+		expression_to_control_flow(cond, &body_target, &break_target);
 		enter_jump_target(&body_target);
 	}
 
@@ -4543,7 +4447,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the step code. */
 	if (step && enter_jump_target(&continue_target)) {
-		expression_to_firm(step);
+		expression_to_value(step);
 		jump_to_target(&header_target);
 	}
 
@@ -4594,7 +4498,7 @@ static ir_node *switch_statement_to_firm(switch_statement_t *statement)
 	ir_node  *switch_node = NULL;
 
 	if (currently_reachable()) {
-		ir_node *expression = expression_to_firm(statement->expression);
+		ir_node *expression = expression_to_value(statement->expression);
 		ir_switch_table *table = create_switch_table(statement);
 		unsigned n_outs = (unsigned)ir_switch_table_get_n_entries(table) + 1;
 
@@ -4675,7 +4579,7 @@ static ir_node *goto_statement_to_firm(goto_statement_t *const stmt)
 static ir_node *computed_goto_to_firm(computed_goto_statement_t const *const statement)
 {
 	if (currently_reachable()) {
-		ir_node *const op = expression_to_firm(statement->expression);
+		ir_node *const op = expression_to_value(statement->expression);
 		ARR_APP1(ir_node*, ijmp_ops, op);
 		jump_to_target(&ijmp_target);
 		set_unreachable_now();
@@ -4848,7 +4752,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 		if ( (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE)
 				|| (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER) ) {
 			/* we can treat this as "normal" input */
-			input = expression_to_firm(argument->expression);
+			input = expression_to_value(argument->expression);
 		} else if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
 			/* pure memory ops need no input (but we have to make sure we
 			 * attach to the memory) */
