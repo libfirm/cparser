@@ -2854,21 +2854,16 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	init_ir_types();
 
 	PUSH_IRG(get_const_code_irg());
-	ir_node *const cnst = _expression_to_firm(expression);
+	ir_node *const cnst = expression_to_firm(expression);
 	POP_IRG();
 
 	set_optimize(old_optimize);
 	set_opt_constant_folding(old_constant_folding);
-
-	if (!is_Const(cnst)) {
-		panic("couldn't fold constant");
-	}
-
 	constant_folding = constant_folding_old;
 
-	ir_tarval *const tv   = get_Const_tarval(cnst);
-	ir_mode   *const mode = get_ir_mode_arithmetic(skip_typeref(expression->base.type));
-	return tarval_convert_to(tv, mode);
+	if (!is_Const(cnst))
+		panic("couldn't fold constant");
+	return get_Const_tarval(cnst);
 }
 
 /* this function is only used in parser.c, but it relies on libfirm functionality */
@@ -2896,19 +2891,6 @@ bool fold_constant_to_bool(const expression_t *expression)
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 {
-	/* first try to fold a constant condition */
-	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
-		bool val = fold_constant_to_bool(expression->condition);
-		if (val) {
-			expression_t *true_expression = expression->true_expression;
-			if (true_expression == NULL)
-				true_expression = expression->condition;
-			return expression_to_firm(true_expression);
-		} else {
-			return expression_to_firm(expression->false_expression);
-		}
-	}
-
 	jump_target true_target;
 	jump_target false_target;
 	init_jump_target(&true_target,  NULL);
@@ -3362,10 +3344,6 @@ static ir_node *expression_to_firm(const expression_t *expression)
 		ir_node *res = _expression_to_firm(expression);
 		assert(res == NULL || get_irn_mode(res) != mode_b);
 		return res;
-	}
-
-	if (is_constant_expression(expression) == EXPR_CLASS_CONSTANT) {
-		return new_Const(fold_constant_to_tarval(expression));
 	}
 
 	/* we have to produce a 0/1 from the mode_b expression */
