@@ -2231,11 +2231,6 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
 		(void) get_ir_type(type);
 		return NULL;
 	}
-	if (!is_type_scalar(type)) {
-		/* make sure firm type is constructed */
-		(void) get_ir_type(type);
-		return value_node;
-	}
 
 	from_type     = skip_typeref(from_type);
 	ir_mode *mode = get_ir_mode_storage(type);
@@ -4079,10 +4074,6 @@ static void create_variable_initializer(entity_t *entity)
 		type_t       *const init_type = skip_typeref(value->base.type);
 
 		if (!is_type_scalar(init_type)) {
-			/* skip convs */
-			while (value->kind == EXPR_UNARY_CAST)
-				value = value->unary.value;
-
 			if (value->kind != EXPR_COMPOUND_LITERAL)
 				panic("expected non-scalar initializer to be a compound literal");
 			initializer = value->compound_literal.initializer;

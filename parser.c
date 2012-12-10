@@ -897,9 +897,8 @@ static bool is_null_pointer_constant(const expression_t *expression)
 static expression_t *create_implicit_cast(expression_t *expression,
                                           type_t *dest_type)
 {
-	type_t *const source_type = expression->base.type;
-
-	if (source_type == dest_type)
+	type_t *const source_type = skip_typeref(expression->base.type);
+	if (source_type == skip_typeref(dest_type))
 		return expression;
 
 	expression_t *cast = allocate_expression_zero(EXPR_UNARY_CAST);
@@ -7821,7 +7820,7 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 
 	expression_t const *const right = expression->right;
 	/* The type of the right operand can be different for /= */
-	if (is_type_integer(right->base.type)                    &&
+	if (is_type_integer(skip_typeref(right->base.type))      &&
 	    is_constant_expression(right) == EXPR_CLASS_CONSTANT &&
 	    !fold_constant_to_bool(right)) {
 		position_t const *const pos = &expression->base.pos;
@@ -8874,7 +8873,7 @@ static statement_t *parse_case_statement(void)
 	type_t *type = expression_type;
 	if (current_switch != NULL) {
 		type_t *switch_type = current_switch->expression->base.type;
-		if (is_type_valid(switch_type)) {
+		if (is_type_valid(skip_typeref(switch_type))) {
 			expression = create_implicit_cast(expression, switch_type);
 		}
 	}
