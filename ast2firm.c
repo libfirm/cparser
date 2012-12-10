@@ -2789,7 +2789,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 	if (!enter_jump_target(&exit_target)) {
 		set_cur_block(new_Block(0, NULL));
 		if (!is_type_void(type))
-			val = new_Unknown(mode);
+			val = new_Bad(mode);
 	}
 	return val;
 }
