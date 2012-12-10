@@ -7907,7 +7907,8 @@ static void semantic_binexpr_integer(binary_expression_t *const expression)
 	type_t       *const type_left       = skip_typeref(orig_type_left);
 	type_t       *const type_right      = skip_typeref(orig_type_right);
 
-	if (!is_type_integer(type_left) || !is_type_integer(type_right)) {
+	if (!is_type_integer(type_left) || !is_type_integer(type_right)
+	  || is_type_complex(type_left) || is_type_complex(type_right)) {
 		if (is_type_valid(type_left) && is_type_valid(type_right)) {
 			position_t const *const pos = &expression->base.pos;
 			errorf(pos, "operands of binary expression must have integer types, but are '%T' and '%T'", orig_type_left, orig_type_right);
