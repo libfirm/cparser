@@ -106,7 +106,9 @@ typedef enum expression_kind_t {
 	EXPR_UNARY_DELETE,
 	EXPR_UNARY_DELETE_ARRAY,
 	EXPR_UNARY_THROW,
-	EXPR_UNARY_LAST = EXPR_UNARY_THROW,
+	EXPR_UNARY_REAL,
+	EXPR_UNARY_IMAG,
+	EXPR_UNARY_LAST = EXPR_UNARY_IMAG,
 
 	EXPR_BINARY_FIRST,
 	EXPR_BINARY_ADD = EXPR_BINARY_FIRST,
@@ -212,7 +214,9 @@ typedef enum funcname_kind_t {
 	case EXPR_UNARY_CAST:              \
 	case EXPR_UNARY_ASSUME:            \
 	case EXPR_UNARY_DELETE:            \
-	case EXPR_UNARY_DELETE_ARRAY
+	case EXPR_UNARY_DELETE_ARRAY:      \
+	case EXPR_UNARY_IMAG:              \
+	case EXPR_UNARY_REAL
 
 /**
  * unary expression with optional operand

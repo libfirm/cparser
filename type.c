@@ -753,12 +753,8 @@ static bool test_atomic_type_flag(atomic_type_kind_t kind,
 bool is_type_integer(const type_t *type)
 {
 	assert(!is_typeref(type));
-
-	if (type->kind == TYPE_ENUM)
-		return true;
-	if (type->kind != TYPE_ATOMIC)
+	if (!is_type_arithmetic(type))
 		return false;
-
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_INTEGER);
 }
 
@@ -778,16 +774,17 @@ bool is_type_float(const type_t *type)
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_FLOAT);
 }
 
+bool is_type_complex(const type_t *type)
+{
+	assert(!is_typeref(type));
+	return type->kind == TYPE_COMPLEX;
+}
+
 bool is_type_signed(const type_t *type)
 {
 	assert(!is_typeref(type));
-
-	/* enum types are int for now */
-	if (type->kind == TYPE_ENUM)
-		return true;
-	if (type->kind != TYPE_ATOMIC)
+	if (!is_type_arithmetic(type))
 		return false;
-
 	return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_SIGNED);
 }
 
@@ -822,6 +819,7 @@ bool is_type_scalar(const type_t *type)
 	case TYPE_ENUM:
 		return true;
 	case TYPE_ATOMIC:
+	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:
 		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
 	default:

@@ -56,7 +56,7 @@ struct type_base_t {
 };
 
 /**
- * used for atomic types, complex and imaginary
+ * used for atomic types, complex and imaginary and as base for enum
  */
 struct atomic_type_t {
 	type_base_t         base;
@@ -289,6 +289,19 @@ static inline bool is_type_valid(const type_t *type)
 static inline unsigned get_akind_rank(atomic_type_kind_t akind)
 {
 	return atomic_type_properties[akind].rank;
+}
+
+static inline bool is_akind_signed(atomic_type_kind_t akind)
+{
+	return atomic_type_properties[akind].flags & ATOMIC_TYPE_FLAG_SIGNED;
+}
+
+static inline atomic_type_kind_t get_arithmetic_akind(const type_t *type)
+{
+	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX
+	       || type->kind == TYPE_IMAGINARY || type->kind == TYPE_ENUM);
+	/* note that atomic, complex and enum share atomic_type_t base */
+	return type->atomic.akind;
 }
 
 /**

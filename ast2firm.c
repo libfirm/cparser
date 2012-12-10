@@ -59,6 +59,16 @@ struct trampoline_region {
 	ir_entity        *region;      /**< created region for the trampoline */
 };
 
+typedef struct complex_value {
+	ir_node *real;
+	ir_node *imag;
+} complex_value;
+
+typedef struct complex_constant {
+	ir_tarval *real;
+	ir_tarval *imag;
+} complex_constant;
+
 fp_model_t firm_fp_model = fp_model_precise;
 
 static const backend_params *be_params;
@@ -195,6 +205,7 @@ ir_mode *atomic_modes[ATOMIC_TYPE_LAST+1];
 
 static ir_node *expression_to_control_flow(expression_t const *expr, jump_target *true_target, jump_target *false_target);
 static ir_node *expression_to_value(expression_t const *expr);
+static complex_value expression_to_complex(const expression_t *expression);
 
 static unsigned decide_modulo_shift(unsigned type_size)
 {
@@ -312,6 +323,7 @@ static ir_type *create_complex_type(atomic_type_kind_t akind,
 		elemsize += align - (elemsize % align);
 	}
 	set_type_size_bytes(irtype, n_elements * elemsize);
+	set_type_state(irtype, layout_fixed);
 
 	return irtype;
 }
@@ -738,13 +750,22 @@ static ir_mode *get_ir_mode_storage(type_t *type)
 	type = skip_typeref(type);
 
 	/* Firm doesn't report a mode for arrays and structs/unions. */
-	if (!is_type_scalar(type)) {
+	if (!is_type_scalar(type) || is_type_complex(type)) {
 		return mode_P_data;
 	}
 
 	ir_type *const irtype = get_ir_type(type);
 	ir_mode *const mode   = get_type_mode(irtype);
 	assert(mode != NULL);
+	return mode;
+}
+
+static ir_mode *get_complex_mode_storage(type_t *type)
+{
+	assert(is_type_complex(skip_typeref(type)));
+	ir_type *const irtype = get_ir_type(type);
+	ir_type *const etype  = get_array_element_type(irtype);
+	ir_mode *const mode   = get_type_mode(etype);
 	return mode;
 }
 
@@ -756,6 +777,16 @@ static ir_mode *get_ir_mode_storage(type_t *type)
 static ir_mode *get_ir_mode_arithmetic(type_t *type)
 {
 	ir_mode *mode = get_ir_mode_storage(type);
+	if (mode_is_float(mode) && mode_float_arithmetic != NULL) {
+		return mode_float_arithmetic;
+	}
+
+	return mode;
+}
+
+static ir_mode *get_complex_mode_arithmetic(type_t *type)
+{
+	ir_mode *mode = get_complex_mode_storage(type);
 	if (mode_is_float(mode) && mode_float_arithmetic != NULL) {
 		return mode_float_arithmetic;
 	}
@@ -1173,7 +1204,7 @@ finish:;
 
 static bool try_create_integer(literal_expression_t *literal, type_t *type)
 {
-	assert(type->kind == TYPE_ATOMIC);
+	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX);
 	atomic_type_kind_t akind = type->atomic.akind;
 
 	ir_mode    *const mode = atomic_modes[akind];
@@ -1230,10 +1261,9 @@ finished:
 /**
  * Creates a Const node representing a constant.
  */
-static ir_node *literal_to_firm(const literal_expression_t *literal)
+static ir_node *literal_to_firm_(const literal_expression_t *literal,
+                                 ir_mode *mode)
 {
-	type_t     *type   = skip_typeref(literal->base.type);
-	ir_mode    *mode   = get_ir_mode_storage(type);
 	const char *string = literal->value.begin;
 	size_t      size   = literal->value.size;
 	ir_tarval  *tv;
@@ -1264,6 +1294,13 @@ static ir_node *literal_to_firm(const literal_expression_t *literal)
 
 	dbg_info *const dbgi = get_dbg_info(&literal->base.pos);
 	return new_d_Const(dbgi, tv);
+}
+
+static ir_node *literal_to_firm(const literal_expression_t *literal)
+{
+	type_t  *type         = skip_typeref(literal->base.type);
+	ir_mode *mode_storage = get_ir_mode_storage(type);
+	return literal_to_firm_(literal, mode_storage);
 }
 
 /**
@@ -1648,6 +1685,9 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	panic("invalid builtin");
 }
 
+static ir_node *complex_to_memory(dbg_info *dbgi, type_t *type,
+                                  complex_value value);
+
 /**
  * Transform a call expression.
  * Handles some special cases, like alloca() calls, which must be resolved
@@ -1730,9 +1770,20 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	const call_argument_t *argument = call->arguments;
 	for (int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
-		ir_node      *arg_node   = expression_to_value(expression);
 		type_t       *arg_type   = skip_typeref(expression->base.type);
-		in[n] = conv_to_storage_type(dbgi, arg_node, arg_type);
+		ir_node      *arg_node;
+		if (is_type_complex(arg_type)) {
+			complex_value value = expression_to_complex(expression);
+			arg_node = complex_to_memory(dbgi, arg_type, value);
+		} else {
+			arg_node = expression_to_value(expression);
+			if (!is_type_compound(arg_type)) {
+				ir_mode *const mode = get_ir_mode_storage(arg_type);
+				arg_node = create_conv(dbgi, arg_node, mode);
+			}
+		}
+
+		in[n] = arg_node;
 
 		argument = argument->next;
 	}
@@ -1770,7 +1821,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		if (!is_type_void(return_type)) {
 			ir_node *const resproj = new_Proj(node, mode_T, pn_Call_T_result);
 			ir_mode *const mode    = get_ir_mode_storage(return_type);
-			result = new_Proj(resproj, mode, 0);
+			result                 = new_Proj(resproj, mode, 0);
 		}
 	}
 
@@ -1797,7 +1848,7 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 
 	ir_node *memory = get_store();
 
-	if (is_type_scalar(type)) {
+	if (is_type_scalar(type) && !is_type_complex(type)) {
 		ir_cons_flags flags = type->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 		                      ? cons_volatile : cons_none;
 		ir_node  *store     = new_d_Store(dbgi, memory, addr, value, flags);
@@ -2253,6 +2304,15 @@ static ir_node *adjust_for_pointer_arithmetic(dbg_info *dbgi,
 	return mul;
 }
 
+static ir_node *create_div(dbg_info *dbgi, ir_node *left, ir_node *right,
+                           ir_mode *mode)
+{
+	ir_node *pin = new_Pin(new_NoMem());
+	ir_node *op  = new_d_Div(dbgi, pin, left, right, mode,
+	                         op_pin_state_floats);
+	return new_d_Proj(dbgi, op, mode, pn_Div_res);
+}
+
 static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, ir_node *right)
 {
 	ir_mode                *mode;
@@ -2323,6 +2383,9 @@ normal_node:
 	case EXPR_BINARY_MUL_ASSIGN:
 	case EXPR_BINARY_MUL:
 		return new_d_Mul(dbgi, left, right, mode);
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_DIV_ASSIGN:
+		return create_div(dbgi, left, right, mode);
 	case EXPR_BINARY_BITWISE_AND:
 	case EXPR_BINARY_BITWISE_AND_ASSIGN:
 		return new_d_And(dbgi, left, right, mode);
@@ -2342,14 +2405,6 @@ normal_node:
 		} else {
 			return new_d_Shr(dbgi, left, right, mode);
 		}
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_DIV_ASSIGN: {
-		ir_node *pin = new_Pin(new_NoMem());
-		ir_node *op  = new_d_Div(dbgi, pin, left, right, mode,
-		                         op_pin_state_floats);
-		ir_node *res = new_d_Proj(dbgi, op, mode, pn_Div_res);
-		return res;
-	}
 	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_MOD_ASSIGN: {
 		ir_node *pin = new_Pin(new_NoMem());
@@ -2481,9 +2536,21 @@ static ir_node *assign_expression_to_firm(binary_expression_t const *const expr)
 	return set_value_for_expression_addr(expr->left, right, addr);
 }
 
+/** evaluate an expression and discard the result, but still produce the
+ * side-effects. */
+static void evaluate_expression_discard_result(const expression_t *expression)
+{
+	type_t *type = skip_typeref(expression->base.type);
+	if (is_type_complex(type)) {
+		expression_to_complex(expression);
+	} else {
+		expression_to_value(expression);
+	}
+}
+
 static ir_node *comma_expression_to_firm(binary_expression_t const *const expr)
 {
-	expression_to_value(expr->left);
+	evaluate_expression_discard_result(expr->left);
 	return expression_to_value(expr->right);
 }
 
@@ -2720,6 +2787,38 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	return get_Const_tarval(cnst);
 }
 
+static complex_constant fold_complex_constant(const expression_t *expression)
+{
+	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
+
+	bool constant_folding_old = constant_folding;
+	constant_folding = true;
+	int old_optimize         = get_optimize();
+	int old_constant_folding = get_opt_constant_folding();
+	set_optimize(1);
+	set_opt_constant_folding(1);
+
+	init_ir_types();
+
+	PUSH_IRG(get_const_code_irg());
+	complex_value value = expression_to_complex(expression);
+	POP_IRG();
+
+	set_optimize(old_optimize);
+	set_opt_constant_folding(old_constant_folding);
+
+	if (!is_Const(value.real) || !is_Const(value.imag)) {
+		panic("couldn't fold constant");
+	}
+
+	constant_folding = constant_folding_old;
+
+	return (complex_constant) {
+		get_Const_tarval(value.real),
+		get_Const_tarval(value.imag)
+	};
+}
+
 /* this function is only used in parser.c, but it relies on libfirm functionality */
 bool constant_is_negative(const expression_t *expression)
 {
@@ -2739,8 +2838,14 @@ long fold_constant_to_int(const expression_t *expression)
 
 bool fold_constant_to_bool(const expression_t *expression)
 {
-	ir_tarval *tv = fold_constant_to_tarval(expression);
-	return !tarval_is_null(tv);
+	type_t *type = skip_typeref(expression->base.type);
+	if (is_type_complex(type)) {
+		complex_constant tvs = fold_complex_constant(expression);
+		return !tarval_is_null(tvs.real) || !tarval_is_null(tvs.imag);
+	} else {
+		ir_tarval *tv = fold_constant_to_tarval(expression);
+		return !tarval_is_null(tv);
+	}
 }
 
 static ir_node *conditional_to_firm(const conditional_expression_t *expression)
@@ -3107,6 +3212,7 @@ static ir_node *expression_to_value(expression_t const *const expr)
 		assert(!expr->base.transformed);
 		((expression_t*)expr)->base.transformed = true;
 	}
+	assert(!is_type_complex(skip_typeref(expr->base.type)));
 #endif
 
 	switch (expr->kind) {
@@ -3172,6 +3278,15 @@ incdec:
 		return incdec_to_firm(&expr->unary, inc, pre);
 	}
 
+	case EXPR_UNARY_IMAG: {
+		complex_value irvalue = expression_to_complex(expr->unary.value);
+		return irvalue.imag;
+	}
+	case EXPR_UNARY_REAL: {
+		complex_value irvalue = expression_to_complex(expr->unary.value);
+		return irvalue.real;
+	}
+
 	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
 	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
 	case EXPR_BINARY_ASSIGN:              return assign_expression_to_firm(       &expr->binary);
@@ -3214,6 +3329,14 @@ incdec:
 	panic("invalid expression");
 }
 
+static void complex_equality_evaluation(const binary_expression_t *binexpr,
+	jump_target *const true_target, jump_target *const false_target,
+	ir_relation relation);
+
+static complex_value create_complex_condition_evaluation(
+	const expression_t *const expression, jump_target *const true_target,
+	jump_target *const false_target);
+
 /**
  * create a short-circuit expression evaluation that tries to construct
  * efficient control flow structures for &&, || and ! expressions
@@ -3244,13 +3367,14 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 	}
 
 	case EXPR_BINARY_COMMA:
-		expression_to_value(expr->binary.left);
+		evaluate_expression_discard_result(expr->binary.left);
 		return expression_to_control_flow(expr->binary.right, true_target, false_target);
 
 		ir_node    *val;
 		ir_node    *left;
 		ir_node    *right;
 		ir_relation relation;
+
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_GREATER:
 	case EXPR_BINARY_GREATEREQUAL:
@@ -3263,13 +3387,20 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 	case EXPR_BINARY_LESS:
 	case EXPR_BINARY_LESSEQUAL:
 	case EXPR_BINARY_NOTEQUAL: {
+		type_t *const type = skip_typeref(expr->binary.left->base.type);
+		relation = get_relation(expr->kind);
+		if (is_type_complex(type)) {
+			complex_equality_evaluation(&expr->binary, true_target,
+			                            false_target, relation);
+			/* TODO return something sensible */
+			return NULL;
+		}
+
 		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-		type_t   *const type = skip_typeref(expr->binary.left->base.type);
 		ir_mode  *const mode = get_ir_mode_arithmetic(type);
 		val      = NULL;
 		left     = create_conv(dbgi, expression_to_value(expr->binary.left),  mode);
 		right    = create_conv(dbgi, expression_to_value(expr->binary.right), mode);
-		relation = get_relation(expr->kind);
 		goto make_cmp;
 	}
 
@@ -3279,8 +3410,13 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 			return NULL;
 		} else {
 	default:;
+			type_t *const type = skip_typeref(expr->base.type);
+			if (is_type_complex(type)) {
+				create_complex_condition_evaluation(expr, true_target, false_target);
+				return NULL;
+			}
+
 			dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-			type_t   *const type = skip_typeref(expr->base.type);
 			ir_mode  *const mode = get_ir_mode_arithmetic(type);
 			val      = create_conv(dbgi, expression_to_value(expr), mode);
 			left     = val;
@@ -3292,6 +3428,606 @@ make_cmp:
 		}
 	}
 }
+
+static complex_value complex_conv(dbg_info *dbgi, complex_value value,
+                                  ir_mode *mode)
+{
+	return (complex_value) {
+		create_conv(dbgi, value.real, mode),
+		create_conv(dbgi, value.imag, mode)
+	};
+}
+
+static complex_value complex_conv_to_storage(dbg_info *const dbgi,
+	complex_value const value, type_t *const type)
+{
+	ir_mode *const mode = get_complex_mode_storage(type);
+	return complex_conv(dbgi, value, mode);
+}
+
+static void store_complex(dbg_info *dbgi, ir_node *addr, type_t *type,
+                          complex_value value)
+{
+	value = complex_conv_to_storage(dbgi, value, type);
+	ir_graph  *irg       = current_ir_graph;
+	ir_type   *irtype    = get_ir_type(type);
+	ir_node   *mem       = get_store();
+	ir_node   *nomem     = get_irg_no_mem(irg);
+	ir_mode   *mode      = get_complex_mode_storage(type);
+	ir_node   *real      = create_conv(dbgi, value.real, mode);
+	ir_node   *imag      = create_conv(dbgi, value.imag, mode);
+	ir_node   *storer    = new_d_Store(dbgi, mem, addr, real, cons_floats);
+	ir_node   *memr      = new_Proj(storer, mode_M, pn_Store_M);
+	set_store(memr);
+	ir_node   *mem2      = get_store();
+	ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
+	ir_node   *one       = new_Const(get_mode_one(mode_uint));
+	ir_node   *in[1]     = { one };
+	ir_entity *arrent    = get_array_element_entity(irtype);
+	ir_node   *addri     = new_d_Sel(dbgi, nomem, addr, 1, in, arrent);
+	ir_node   *storei    = new_d_Store(dbgi, mem2, addri, imag, cons_floats);
+	ir_node   *memi      = new_Proj(storei, mode_M, pn_Store_M);
+	set_store(memi);
+}
+
+static ir_node *complex_to_memory(dbg_info *dbgi, type_t *type,
+                                  complex_value value)
+{
+	ir_graph  *irg         = current_ir_graph;
+	ir_type   *frame_type  = get_irg_frame_type(irg);
+	ident     *id          = id_unique("cmplex_tmp.%u");
+	ir_type   *irtype      = get_ir_type(type);
+	ir_entity *tmp_storage = new_entity(frame_type, id, irtype);
+	set_entity_compiler_generated(tmp_storage, 1);
+	ir_node   *frame       = get_irg_frame(irg);
+	ir_node   *nomem       = get_irg_no_mem(irg);
+	ir_node   *addr        = new_simpleSel(nomem, frame, tmp_storage);
+	store_complex(dbgi, addr, type, value);
+	return addr;
+}
+
+static complex_value read_localvar_complex(dbg_info *dbgi, entity_t *const entity)
+{
+	assert(entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE
+	    || entity->declaration.kind == DECLARATION_KIND_PARAMETER);
+	type_t  *const type = skip_typeref(entity->declaration.type);
+	ir_mode *const mode = get_complex_mode_storage(type);
+	ir_node *const real = get_value(entity->variable.v.value_number, mode);
+	ir_node *const imag = get_value(entity->variable.v.value_number+1, mode);
+	ir_mode *const mode_arithmetic = get_complex_mode_arithmetic(type);
+	return (complex_value) {
+		create_conv(dbgi, real, mode_arithmetic),
+		create_conv(dbgi, imag, mode_arithmetic)
+	};
+}
+
+static complex_value complex_deref_address(dbg_info *const dbgi,
+                                           type_t *type, ir_node *const addr,
+                                           ir_cons_flags flags)
+{
+	type = skip_typeref(type);
+	assert(is_type_complex(type));
+
+	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE)
+		flags |= cons_volatile;
+	ir_mode *const mode     = get_complex_mode_storage(type);
+	ir_node *const memory   = get_store();
+	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
+	ir_node *const load_mem = new_Proj(load, mode_M, pn_Load_M);
+	ir_node *const load_res = new_Proj(load, mode,   pn_Load_res);
+	set_store(load_mem);
+
+	ir_type   *const irtype    = get_ir_type(type);
+	ir_mode   *const mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
+	ir_node   *const in[1]     = { new_Const(get_mode_one(mode_uint)) };
+	ir_entity *const entity    = get_array_element_entity(irtype);
+	ir_node   *const nomem     = get_irg_no_mem(current_ir_graph);
+	ir_node   *const addr2     = new_Sel(nomem, addr, 1, in, entity);
+	ir_node   *const mem2      = get_store();
+	ir_node   *const load2     = new_d_Load(dbgi, mem2, addr2, mode, flags);
+	ir_node   *const load_mem2 = new_Proj(load2, mode_M, pn_Load_M);
+	ir_node   *const load_res2 = new_Proj(load2, mode, pn_Load_res);
+	set_store(load_mem2);
+
+	return (complex_value) { load_res, load_res2 };
+}
+
+static complex_value complex_reference_to_firm(const reference_expression_t *ref)
+{
+	dbg_info *const dbgi   = get_dbg_info(&ref->base.pos);
+	entity_t *const entity = ref->entity;
+	assert(is_declaration(entity));
+
+	switch ((declaration_kind_t)entity->declaration.kind) {
+	case DECLARATION_KIND_LOCAL_VARIABLE:
+	case DECLARATION_KIND_PARAMETER:
+		return read_localvar_complex(dbgi, entity);
+	default: {
+		ir_node *const addr = reference_addr(ref);
+		return complex_deref_address(dbgi, entity->declaration.type, addr, cons_none);
+	}
+	}
+}
+
+static complex_value complex_select_to_firm(const select_expression_t *select)
+{
+	dbg_info *dbgi = get_dbg_info(&select->base.pos);
+	ir_node  *addr = select_addr(select);
+	type_t   *type = skip_typeref(select->base.type);
+	assert(is_type_complex(type));
+	return complex_deref_address(dbgi, type, addr, cons_none);
+}
+
+static complex_value complex_array_access_to_firm(
+	const array_access_expression_t *expression)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
+	ir_node  *addr = array_access_addr(expression);
+	type_t   *type = skip_typeref(expression->base.type);
+	assert(is_type_complex(type));
+	return complex_deref_address(dbgi, type, addr, cons_none);
+}
+
+static complex_value get_complex_from_lvalue(const expression_t *expression,
+                                             ir_node *addr)
+{
+	dbg_info *dbgi = get_dbg_info(&expression->base.pos);
+
+	if (expression->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &expression->reference;
+
+		entity_t *entity = ref->entity;
+		assert(entity->kind == ENTITY_VARIABLE
+		    || entity->kind == ENTITY_PARAMETER);
+		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
+		    return read_localvar_complex(dbgi, entity);
+		}
+	}
+
+	assert(addr != NULL);
+	return complex_deref_address(dbgi, expression->base.type, addr, cons_none);
+}
+
+static complex_value complex_cast_to_firm(const unary_expression_t *expression)
+{
+	const expression_t *value     = expression->value;
+	dbg_info           *dbgi      = get_dbg_info(&expression->base.pos);
+	type_t             *from_type = skip_typeref(value->base.type);
+	type_t             *to_type   = skip_typeref(expression->base.type);
+	ir_mode            *mode      = get_complex_mode_storage(to_type);
+
+	assert(is_type_complex(to_type));
+
+	if (is_type_complex(from_type)) {
+		complex_value cvalue = expression_to_complex(value);
+		return complex_conv(dbgi, cvalue, mode);
+	} else {
+		ir_node *value_node = expression_to_value(value);
+		ir_node *zero       = new_Const(get_mode_null(mode));
+		ir_node *casted     = create_conv(dbgi, value_node, mode);
+		return (complex_value) { casted, zero };
+	}
+}
+
+static complex_value complex_literal_to_firm(const literal_expression_t *literal)
+{
+	type_t  *type     = skip_typeref(literal->base.type);
+	ir_mode *mode     = get_complex_mode_storage(type);
+	ir_node *litvalue = literal_to_firm_(literal, mode);
+	ir_node *zero     = new_Const(get_mode_null(mode));
+	return (complex_value) { zero, litvalue };
+}
+
+typedef complex_value (*new_complex_binop)(dbg_info *dbgi, complex_value left,
+                                           complex_value right, ir_mode *mode);
+
+static complex_value new_complex_add(dbg_info *dbgi, complex_value left,
+                                     complex_value right, ir_mode *mode)
+{
+	return (complex_value) {
+		new_d_Add(dbgi, left.real, right.real, mode),
+		new_d_Add(dbgi, left.imag, right.imag, mode)
+	};
+}
+
+static complex_value new_complex_sub(dbg_info *dbgi, complex_value left,
+                                     complex_value right, ir_mode *mode)
+{
+	return (complex_value) {
+		new_d_Sub(dbgi, left.real, right.real, mode),
+		new_d_Sub(dbgi, left.imag, right.imag, mode)
+	};
+}
+
+static complex_value new_complex_mul(dbg_info *dbgi, complex_value left,
+                                     complex_value right, ir_mode *mode)
+{
+	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real, mode);
+	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag, mode);
+	ir_node *const op3 = new_d_Mul(dbgi, left.real, right.imag, mode);
+	ir_node *const op4 = new_d_Mul(dbgi, left.imag, right.real, mode);
+	return (complex_value) {
+		new_d_Sub(dbgi, op1, op2, mode),
+		new_d_Add(dbgi, op3, op4, mode)
+	};
+}
+
+static complex_value new_complex_div(dbg_info *dbgi, complex_value left,
+                                     complex_value right, ir_mode *mode)
+{
+	ir_node *const op1 = new_d_Mul(dbgi, left.real, right.real, mode);
+	ir_node *const op2 = new_d_Mul(dbgi, left.imag, right.imag, mode);
+	ir_node *const op3 = new_d_Mul(dbgi, left.imag, right.real, mode);
+	ir_node *const op4 = new_d_Mul(dbgi, left.real, right.imag, mode);
+	ir_node *const op5 = new_d_Mul(dbgi, right.real, right.real, mode);
+	ir_node *const op6 = new_d_Mul(dbgi, right.imag, right.imag, mode);
+	ir_node *const real_dividend = new_d_Add(dbgi, op1, op2, mode);
+	ir_node *const real_divisor  = new_d_Add(dbgi, op5, op6, mode);
+	ir_node *const imag_dividend = new_d_Sub(dbgi, op3, op4, mode);
+	ir_node *const imag_divisor  = new_d_Add(dbgi, op5, op6, mode);
+	return (complex_value) {
+		create_div(dbgi, real_dividend, real_divisor, mode),
+		create_div(dbgi, imag_dividend, imag_divisor, mode)
+	};
+}
+
+typedef complex_value (*new_complex_unop)(dbg_info *dbgi, complex_value value,
+                                          ir_mode *mode);
+
+static complex_value new_complex_increment(dbg_info *dbgi, complex_value value,
+                                           ir_mode *mode)
+{
+	ir_node *one = new_Const(get_mode_one(mode));
+	return (complex_value) {
+		new_d_Add(dbgi, value.real, one, mode),
+		value.imag
+	};
+}
+
+static complex_value new_complex_decrement(dbg_info *dbgi, complex_value value,
+                                           ir_mode *mode)
+{
+	ir_node *one = new_Const(get_mode_one(mode));
+	return (complex_value) {
+		new_d_Sub(dbgi, value.real, one, mode),
+		value.imag
+	};
+}
+
+static void set_complex_value_for_expression(dbg_info *dbgi,
+											 const expression_t *expression,
+                                             complex_value value,
+                                             ir_node *addr)
+{
+	type_t *type = skip_typeref(expression->base.type);
+	assert(is_type_complex(type));
+
+	ir_mode  *mode = get_complex_mode_storage(type);
+	ir_node  *real = create_conv(dbgi, value.real, mode);
+	ir_node  *imag = create_conv(dbgi, value.imag, mode);
+
+	if (expression->kind == EXPR_REFERENCE) {
+		const reference_expression_t *ref = &expression->reference;
+
+		entity_t *entity = ref->entity;
+		assert(is_declaration(entity));
+		assert(entity->declaration.kind != DECLARATION_KIND_UNKNOWN);
+		if (entity->declaration.kind == DECLARATION_KIND_LOCAL_VARIABLE ||
+		    entity->declaration.kind == DECLARATION_KIND_PARAMETER) {
+			set_value(entity->variable.v.value_number, real);
+			set_value(entity->variable.v.value_number+1, imag);
+			return;
+		}
+	}
+
+	if (addr == NULL)
+		addr = expression_to_addr(expression);
+	assert(addr != NULL);
+	store_complex(dbgi, addr, type, value);
+}
+
+static complex_value create_complex_assign_unop(const unary_expression_t *unop,
+                                                new_complex_unop constructor,
+                                                bool return_old)
+{
+	dbg_info *const     dbgi       = get_dbg_info(&unop->base.pos);
+	const expression_t *value_expr = unop->value;
+	ir_node            *addr       = expression_to_addr(value_expr);
+	complex_value       value      = get_complex_from_lvalue(value_expr, addr);
+	type_t             *type       = skip_typeref(unop->base.type);
+	ir_mode            *mode       = get_complex_mode_arithmetic(type);
+	value = complex_conv(dbgi, value, mode);
+	complex_value       new_value  = constructor(dbgi, value, mode);
+	set_complex_value_for_expression(dbgi, value_expr, new_value, addr);
+	return return_old ? value : new_value;
+}
+
+static complex_value complex_negate_to_firm(const unary_expression_t *expr)
+{
+	complex_value cvalue = expression_to_complex(expr->value);
+	dbg_info     *dbgi   = get_dbg_info(&expr->base.pos);
+	ir_mode      *mode   = get_complex_mode_arithmetic(expr->base.type);
+	cvalue = complex_conv(dbgi, cvalue, mode);
+	return (complex_value) {
+		new_d_Minus(dbgi, cvalue.real, mode),
+		new_d_Minus(dbgi, cvalue.imag, mode)
+	};
+}
+
+static complex_value complex_complement_to_firm(const unary_expression_t *expr)
+{
+	complex_value cvalue = expression_to_complex(expr->value);
+	dbg_info     *dbgi   = get_dbg_info(&expr->base.pos);
+	ir_mode      *mode   = get_complex_mode_arithmetic(expr->base.type);
+	cvalue = complex_conv(dbgi, cvalue, mode);
+	return (complex_value) {
+		cvalue.real,
+		new_d_Minus(dbgi, cvalue.imag, mode)
+	};
+}
+
+static complex_value create_complex_binop(const binary_expression_t *binexpr,
+                                          new_complex_binop constructor)
+{
+	dbg_info     *dbgi  = get_dbg_info(&binexpr->base.pos);
+	ir_mode      *mode  = get_complex_mode_arithmetic(binexpr->base.type);
+	complex_value left  = expression_to_complex(binexpr->left);
+	complex_value right = expression_to_complex(binexpr->right);
+	left  = complex_conv(dbgi, left, mode);
+	right = complex_conv(dbgi, right, mode);
+	return constructor(dbgi, left, right, mode);
+}
+
+static complex_value create_complex_assign_binop(const binary_expression_t *binexpr,
+                                                 new_complex_binop constructor)
+{
+	dbg_info      *dbgi   = get_dbg_info(&binexpr->base.pos);
+	expression_t  *lefte  = binexpr->left;
+	expression_t  *righte = binexpr->right;
+	ir_mode       *mode   = get_complex_mode_arithmetic(righte->base.type);
+	ir_node       *addr   = expression_to_addr(lefte);
+	complex_value  left   = get_complex_from_lvalue(lefte, addr);
+	complex_value  right  = expression_to_complex(righte);
+	left  = complex_conv(dbgi, left, mode);
+	right = complex_conv(dbgi, right, mode);
+	complex_value  new_value = constructor(dbgi, left, right, mode);
+	type_t        *res_type  = skip_typeref(binexpr->base.type);
+	set_complex_value_for_expression(dbgi, lefte, new_value, addr);
+	return complex_conv_to_storage(dbgi, new_value, res_type);
+}
+
+static complex_value complex_call_to_firm(const call_expression_t *call)
+{
+	ir_node         *result        = call_expression_to_firm(call);
+	expression_t    *function      = call->function;
+	type_t          *type          = skip_typeref(function->base.type);
+	assert(is_type_pointer(type));
+	pointer_type_t  *pointer_type  = &type->pointer;
+	type_t          *points_to     = skip_typeref(pointer_type->points_to);
+	assert(is_type_function(points_to));
+	function_type_t *function_type = &points_to->function;
+	type_t          *return_type   = skip_typeref(function_type->return_type);
+	assert(is_type_complex(return_type));
+	dbg_info        *dbgi          = get_dbg_info(&call->base.pos);
+	return complex_deref_address(dbgi, return_type, result, cons_floats);
+}
+
+static void complex_equality_evaluation(const binary_expression_t *binexpr,
+	jump_target *const true_target, jump_target *const false_target,
+	ir_relation relation)
+{
+	jump_target extra_target;
+	init_jump_target(&extra_target, NULL);
+
+	complex_value left  = expression_to_complex(binexpr->left);
+	complex_value right = expression_to_complex(binexpr->right);
+	dbg_info     *dbgi  = get_dbg_info(&binexpr->base.pos);
+	ir_mode      *mode  = get_complex_mode_arithmetic(binexpr->left->base.type);
+	left  = complex_conv(dbgi, left, mode);
+	right = complex_conv(dbgi, right, mode);
+
+	ir_node  *cmp_real   = new_d_Cmp(dbgi, left.real, right.real, relation);
+	ir_node  *cond       = new_d_Cond(dbgi, cmp_real);
+	ir_node  *true_proj  = new_Proj(cond, mode_X, pn_Cond_true);
+	ir_node  *false_proj = new_Proj(cond, mode_X, pn_Cond_false);
+	add_pred_to_jump_target(&extra_target, true_proj);
+	add_pred_to_jump_target(false_target, false_proj);
+	if (!enter_jump_target(&extra_target))
+		return;
+
+	ir_node *cmp_imag     = new_d_Cmp(dbgi, left.imag, right.imag, relation);
+	ir_node *condi        = new_d_Cond(dbgi, cmp_imag);
+	ir_node *true_proj_i  = new_Proj(condi, mode_X, pn_Cond_true);
+	ir_node *false_proj_i = new_Proj(condi, mode_X, pn_Cond_false);
+	add_pred_to_jump_target(true_target, true_proj_i);
+	add_pred_to_jump_target(false_target, false_proj_i);
+	set_unreachable_now();
+}
+
+static complex_value create_complex_condition_evaluation(
+	const expression_t *const expression, jump_target *const true_target,
+	jump_target *const false_target)
+{
+	jump_target extra_target;
+	init_jump_target(&extra_target, NULL);
+	complex_value       value      = expression_to_complex(expression);
+	dbg_info     *const dbgi       = get_dbg_info(&expression->base.pos);
+	type_t       *const type       = expression->base.type;
+	ir_mode      *const mode       = get_complex_mode_arithmetic(type);
+	value = complex_conv(dbgi, value, mode);
+	ir_node      *const zero       = new_Const(get_mode_null(mode));
+	ir_node      *const cmp_real   =
+		new_d_Cmp(dbgi, value.real, zero, ir_relation_unordered_less_greater);
+	ir_node      *const cond_real  = new_d_Cond(dbgi, cmp_real);
+	ir_node      *const true_real  = new_Proj(cond_real, mode_X, pn_Cond_true);
+	ir_node      *const false_real = new_Proj(cond_real, mode_X, pn_Cond_false);
+	add_pred_to_jump_target(true_target, true_real);
+	add_pred_to_jump_target(&extra_target, false_real);
+	if (!enter_jump_target(&extra_target))
+		return value;
+
+	ir_node      *const cmp_imag   =
+		new_d_Cmp(dbgi, value.imag, zero, ir_relation_unordered_less_greater);
+	ir_node      *const cond_imag  = new_d_Cond(dbgi, cmp_imag);
+	ir_node      *const true_imag  = new_Proj(cond_imag, mode_X, pn_Cond_true);
+	ir_node      *const false_imag = new_Proj(cond_imag, mode_X, pn_Cond_false);
+	add_pred_to_jump_target(true_target, true_imag);
+	add_pred_to_jump_target(false_target, false_imag);
+	set_unreachable_now();
+
+	return value;
+}
+
+static complex_value complex_conditional_to_firm(
+	const conditional_expression_t *const expression)
+{
+	/* first try to fold a constant condition */
+	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
+		bool val = fold_constant_to_bool(expression->condition);
+		if (val) {
+			expression_t *true_expression = expression->true_expression;
+			if (true_expression == NULL) {
+				/* we will evaluate true_expression a second time here, but in
+				 * this case it is harmless since constant expression have no
+				 * side effects */
+				true_expression = expression->condition;
+			}
+			return expression_to_complex(true_expression);
+		} else {
+			return expression_to_complex(expression->false_expression);
+		}
+	}
+
+	jump_target true_target;
+	jump_target false_target;
+	init_jump_target(&true_target,  NULL);
+	init_jump_target(&false_target, NULL);
+	complex_value cond_val;
+	memset(&cond_val, 0, sizeof(cond_val));
+	if (expression->true_expression == NULL) {
+		assert(is_type_complex(skip_typeref(expression->condition->base.type)));
+		cond_val
+			= create_complex_condition_evaluation(expression->condition,
+			                                      &true_target, &false_target);
+	} else {
+		expression_to_control_flow(expression->condition, &true_target, &false_target);
+	}
+
+	complex_value val;
+	memset(&val, 0, sizeof(val));
+	jump_target   exit_target;
+	init_jump_target(&exit_target, NULL);
+
+	if (enter_jump_target(&true_target)) {
+		if (expression->true_expression) {
+			val = expression_to_complex(expression->true_expression);
+		} else {
+			assert(cond_val.real != NULL);
+			val = cond_val;
+		}
+		jump_to_target(&exit_target);
+	}
+
+	type_t *const type = skip_typeref(expression->base.type);
+	if (enter_jump_target(&false_target)) {
+		complex_value false_val
+			= expression_to_complex(expression->false_expression);
+		jump_to_target(&exit_target);
+		if (val.real != NULL) {
+			ir_node  *const inr[] = { val.real, false_val.real };
+			ir_node  *const ini[] = { val.imag, false_val.imag };
+			dbg_info *const dbgi  = get_dbg_info(&expression->base.pos);
+			ir_mode  *const mode  = get_complex_mode_arithmetic(type);
+			ir_node  *const block = exit_target.block;
+			val.real = new_rd_Phi(dbgi, block, lengthof(inr), inr, mode);
+			val.imag = new_rd_Phi(dbgi, block, lengthof(ini), ini, mode);
+		} else {
+			val = false_val;
+		}
+	}
+
+	if (!enter_jump_target(&exit_target)) {
+		set_cur_block(new_Block(0, NULL));
+		assert(!is_type_void(type));
+		ir_mode *mode = get_complex_mode_arithmetic(type);
+		val.real = new_Unknown(mode);
+		val.imag = val.real;
+	}
+	return val;
+}
+
+static complex_value expression_to_complex(const expression_t *expression)
+{
+	switch (expression->kind) {
+	case EXPR_REFERENCE:
+		return complex_reference_to_firm(&expression->reference);
+	case EXPR_SELECT:
+		return complex_select_to_firm(&expression->select);
+	case EXPR_ARRAY_ACCESS:
+		return complex_array_access_to_firm(&expression->array_access);
+	case EXPR_UNARY_CAST:
+		return complex_cast_to_firm(&expression->unary);
+	case EXPR_BINARY_COMMA:
+		evaluate_expression_discard_result(expression->binary.left);
+		return expression_to_complex(expression->binary.right);
+	case EXPR_BINARY_ADD:
+		return create_complex_binop(&expression->binary, new_complex_add);
+	case EXPR_BINARY_ADD_ASSIGN:
+		return create_complex_assign_binop(&expression->binary, new_complex_add);
+	case EXPR_BINARY_SUB:
+		return create_complex_binop(&expression->binary, new_complex_sub);
+	case EXPR_BINARY_SUB_ASSIGN:
+		return create_complex_assign_binop(&expression->binary, new_complex_sub);
+	case EXPR_BINARY_MUL:
+		return create_complex_binop(&expression->binary, new_complex_mul);
+	case EXPR_BINARY_MUL_ASSIGN:
+		return create_complex_assign_binop(&expression->binary, new_complex_mul);
+	case EXPR_BINARY_DIV:
+		return create_complex_binop(&expression->binary, new_complex_div);
+	case EXPR_BINARY_DIV_ASSIGN:
+		return create_complex_assign_binop(&expression->binary, new_complex_div);
+	case EXPR_UNARY_PLUS:
+		return expression_to_complex(expression->unary.value);
+	case EXPR_UNARY_PREFIX_INCREMENT:
+		return create_complex_assign_unop(&expression->unary,
+		                                  new_complex_increment, false);
+	case EXPR_UNARY_PREFIX_DECREMENT:
+		return create_complex_assign_unop(&expression->unary,
+		                                  new_complex_decrement, false);
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+		return create_complex_assign_unop(&expression->unary,
+		                                  new_complex_increment, true);
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+		return create_complex_assign_unop(&expression->unary,
+		                                  new_complex_decrement, true);
+	case EXPR_UNARY_NEGATE:
+		return complex_negate_to_firm(&expression->unary);
+	case EXPR_UNARY_COMPLEMENT:
+		return complex_complement_to_firm(&expression->unary);
+	case EXPR_BINARY_ASSIGN: {
+		const binary_expression_t *binexpr = &expression->binary;
+		dbg_info                  *dbgi   = get_dbg_info(&binexpr->base.pos);
+		complex_value value = expression_to_complex(binexpr->right);
+		ir_node      *addr  = expression_to_addr(binexpr->left);
+		set_complex_value_for_expression(dbgi, binexpr->left, value, addr);
+		return value;
+	}
+	case EXPR_LITERAL_CASES:
+		return complex_literal_to_firm(&expression->literal);
+	case EXPR_CALL:
+		return complex_call_to_firm(&expression->call);
+	case EXPR_CONDITIONAL:
+		return complex_conditional_to_firm(&expression->conditional);
+
+	default:
+		break;
+	}
+	panic("complex expression not implemented yet");
+}
+
+
 
 static void create_variable_entity(entity_t *variable,
                                    declaration_kind_t declaration_kind,
@@ -3588,6 +4324,17 @@ static ir_initializer_t *create_ir_initializer_value(
 			return create_ir_initializer(expr->compound_literal.initializer,
 			                             type);
 		}
+	} else if (is_type_complex(type)) {
+		complex_value     const value     = expression_to_complex(expr);
+		ir_mode          *const mode      = get_complex_mode_storage(type);
+		ir_node          *const real      = create_conv(NULL, value.real, mode);
+		ir_node          *const imag      = create_conv(NULL, value.imag, mode);
+		ir_initializer_t *const res       = create_initializer_compound(2);
+		ir_initializer_t *const init_real = create_initializer_const(real);
+		ir_initializer_t *const init_imag = create_initializer_const(imag);
+		set_initializer_compound_value(res, 0, init_real);
+		set_initializer_compound_value(res, 1, init_imag);
+		return res;
 	}
 
 	ir_node *value = expression_to_value(expr);
@@ -3956,7 +4703,31 @@ static void create_variable_initializer(entity_t *entity)
 		expression_t *      value     = initializer->value.value;
 		type_t       *const init_type = skip_typeref(value->base.type);
 
-		if (!is_type_scalar(init_type)) {
+		if (is_type_complex(init_type)) {
+			complex_value nodes = expression_to_complex(value);
+			dbg_info     *dbgi  = get_dbg_info(&entity->base.pos);
+			ir_mode      *mode  = get_complex_mode_storage(init_type);
+			ir_node      *real  = create_conv(dbgi, nodes.real, mode);
+			ir_node      *imag  = create_conv(dbgi, nodes.imag, mode);
+			if (declaration_kind == DECLARATION_KIND_LOCAL_VARIABLE) {
+				set_value(entity->variable.v.value_number, real);
+				set_value(entity->variable.v.value_number+1, imag);
+			} else {
+				assert(declaration_kind == DECLARATION_KIND_GLOBAL_VARIABLE);
+				ir_entity *irentity = entity->variable.v.entity;
+				if (tq & TYPE_QUALIFIER_CONST
+						&& get_entity_owner(irentity) != get_tls_type()) {
+					add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
+				}
+				ir_initializer_t *initializer = create_initializer_compound(2);
+				ir_initializer_t *reali = create_initializer_const(real);
+				set_initializer_compound_value(initializer, 0, reali);
+				ir_initializer_t *imagi = create_initializer_const(imag);
+				set_initializer_compound_value(initializer, 1, imagi);
+				set_entity_initializer(irentity, initializer);
+			}
+			return;
+		} else if (!is_type_scalar(init_type)) {
 			if (value->kind != EXPR_COMPOUND_LITERAL)
 				panic("expected non-scalar initializer to be a compound literal");
 			initializer = value->compound_literal.initializer;
@@ -4037,7 +4808,8 @@ static bool var_needs_entity(variable_t const *const var)
 	if (var->address_taken)
 		return true;
 	type_t *const type = skip_typeref(var->base.type);
-	return !is_type_scalar(type) || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+	return (!is_type_scalar(type) && !is_type_complex(type))
+	     || type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
 }
 
 /**
@@ -4053,6 +4825,8 @@ static void create_local_variable(entity_t *entity)
 		entity->variable.v.value_number = next_value_number_function;
 		set_irg_loc_description(current_ir_graph, next_value_number_function, entity);
 		++next_value_number_function;
+		if (is_type_complex(skip_typeref(entity->declaration.type)))
+			++next_value_number_function;
 		return;
 	}
 
@@ -4104,8 +4878,6 @@ static void create_local_static_variable(entity_t *entity)
 	POP_IRG();
 }
 
-
-
 static ir_node *return_statement_to_firm(return_statement_t *statement)
 {
 	if (!currently_reachable())
@@ -4113,21 +4885,35 @@ static ir_node *return_statement_to_firm(return_statement_t *statement)
 
 	dbg_info *const dbgi = get_dbg_info(&statement->base.pos);
 	type_t   *const type = skip_typeref(current_function_entity->declaration.type->function.return_type);
-	ir_node  *      res  = statement->value ? expression_to_value(statement->value) : NULL;
 
+	ir_node *in[1];
 	int in_len;
-	if (!is_type_void(type)) {
-		if (res) {
-			res = conv_to_storage_type(dbgi, res, type);
+	if (is_type_void(type)) {
+		/* just create the side effects, don't return anything */
+		if (statement->value)
+			evaluate_expression_discard_result(statement->value);
+		in[0]  = NULL;
+		in_len = 0;
+	} else if (is_type_complex(type)) {
+		if (statement->value) {
+			complex_value value = expression_to_complex(statement->value);
+			in[0] = complex_to_memory(dbgi, type, value);
 		} else {
-			res = new_Unknown(get_ir_mode_storage(type));
+			in[0] = new_Unknown(mode_P_data);
 		}
 		in_len = 1;
 	} else {
-		in_len = 0;
+		ir_mode *const mode = get_ir_mode_storage(type);
+		if (statement->value) {
+			ir_node *value = expression_to_value(statement->value);
+			value = conv_to_storage_type(dbgi, value, type);
+			in[0] = create_conv(dbgi, value, mode);
+		} else {
+			in[0] = new_Unknown(mode);
+		}
+		in_len = 1;
 	}
 
-	ir_node *const in[1] = { res };
 	ir_node *const store = get_store();
 	ir_node *const ret   = new_d_Return(dbgi, store, in_len, in);
 
@@ -4143,7 +4929,14 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 	if (!currently_reachable())
 		return NULL;
 
-	return expression_to_value(statement->expression);
+	expression_t *expression = statement->expression;
+	type_t       *type       = skip_typeref(expression->base.type);
+	if (is_type_complex(type)) {
+		expression_to_complex(expression);
+		return NULL; /* TODO */
+	} else {
+		return expression_to_value(statement->expression);
+	}
 }
 
 static void create_local_declarations(entity_t*);
@@ -4863,8 +5656,11 @@ static int count_local_variables(const entity_t *entity,
 	entity_t const *const end = last != NULL ? last->base.next : NULL;
 	for (; entity != end; entity = entity->base.next) {
 		if ((entity->kind == ENTITY_VARIABLE || entity->kind == ENTITY_PARAMETER) &&
-		    !var_needs_entity(&entity->variable))
+		    !var_needs_entity(&entity->variable)) {
 			++count;
+			if (is_type_complex(skip_typeref(entity->declaration.type)))
+				++count;
+		}
 	}
 	return count;
 }
@@ -4929,8 +5725,6 @@ static void initialize_function_parameters(entity_t *entity)
 		function_irtype = get_ir_type(entity->declaration.type);
 	}
 
-
-
 	entity_t *parameter = entity->function.parameters.entities;
 	for ( ; parameter != NULL; parameter = parameter->base.next, ++n) {
 		if (parameter->kind != ENTITY_PARAMETER)
@@ -4947,21 +5741,38 @@ static void initialize_function_parameters(entity_t *entity)
 				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
 			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
 			parameter->variable.v.entity = param;
-			continue;
+		} else if (is_type_complex(type)) {
+			ir_type   *frame_type = get_irg_frame_type(irg);
+			ir_entity *param
+				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
+			ir_node   *nomem = get_irg_no_mem(irg);
+			ir_node   *frame = get_irg_frame(irg);
+			ir_node   *addr  = new_simpleSel(nomem, frame, param);
+			complex_value value = complex_deref_address(NULL, type, addr, cons_floats);
+
+			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
+			parameter->variable.v.value_number = next_value_number_function;
+			set_irg_loc_description(irg, next_value_number_function,
+									parameter);
+			set_irg_loc_description(irg, next_value_number_function+1,
+									parameter);
+			set_value(next_value_number_function, value.real);
+			set_value(next_value_number_function+1, value.imag);
+			next_value_number_function += 2;
+		} else {
+			ir_mode *param_mode = get_type_mode(param_irtype);
+			long     pn         = n;
+			ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
+			value = conv_to_storage_type(dbgi, value, type);
+
+			parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
+			parameter->variable.v.value_number = next_value_number_function;
+			set_irg_loc_description(irg, next_value_number_function,
+									parameter);
+			++next_value_number_function;
+
+			set_value(parameter->variable.v.value_number, value);
 		}
-
-		ir_mode *param_mode = get_type_mode(param_irtype);
-		long     pn         = n;
-		ir_node *value      = new_rd_Proj(dbgi, args, param_mode, pn);
-		value = conv_to_storage_type(dbgi, value, type);
-
-		parameter->declaration.kind        = DECLARATION_KIND_PARAMETER;
-		parameter->variable.v.value_number = next_value_number_function;
-		set_irg_loc_description(current_ir_graph, next_value_number_function,
-		                        parameter);
-		++next_value_number_function;
-
-		set_value(parameter->variable.v.value_number, value);
 	}
 }
 

@@ -137,6 +137,8 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_UNARY_DELETE]               = PREC_UNARY,
 		[EXPR_UNARY_DELETE_ARRAY]         = PREC_UNARY,
 		[EXPR_UNARY_THROW]                = PREC_ASSIGNMENT,
+		[EXPR_UNARY_IMAG]                 = PREC_UNARY,
+		[EXPR_UNARY_REAL]                 = PREC_UNARY,
 
 		[EXPR_BINARY_ADD]                 = PREC_ADDITIVE,
 		[EXPR_BINARY_SUB]                 = PREC_ADDITIVE,
@@ -356,16 +358,18 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 {
 	unsigned prec = get_expression_precedence(unexpr->base.kind);
 	switch (unexpr->base.kind) {
-	case EXPR_UNARY_NEGATE:           print_char  ('-' ); break;
-	case EXPR_UNARY_PLUS:             print_char  ('+' ); break;
-	case EXPR_UNARY_NOT:              print_char  ('!' ); break;
-	case EXPR_UNARY_COMPLEMENT:       print_char  ('~' ); break;
-	case EXPR_UNARY_PREFIX_INCREMENT: print_string("++"); break;
-	case EXPR_UNARY_PREFIX_DECREMENT: print_string("--"); break;
-	case EXPR_UNARY_DEREFERENCE:      print_char  ('*' ); break;
-	case EXPR_UNARY_TAKE_ADDRESS:     print_char  ('&' ); break;
-	case EXPR_UNARY_DELETE:           print_string("delete "); break;
+	case EXPR_UNARY_NEGATE:           print_char  ('-' );         break;
+	case EXPR_UNARY_PLUS:             print_char  ('+' );         break;
+	case EXPR_UNARY_NOT:              print_char  ('!' );         break;
+	case EXPR_UNARY_COMPLEMENT:       print_char  ('~' );         break;
+	case EXPR_UNARY_PREFIX_INCREMENT: print_string("++");         break;
+	case EXPR_UNARY_PREFIX_DECREMENT: print_string("--");         break;
+	case EXPR_UNARY_DEREFERENCE:      print_char  ('*' );         break;
+	case EXPR_UNARY_TAKE_ADDRESS:     print_char  ('&' );         break;
+	case EXPR_UNARY_DELETE:           print_string("delete ");    break;
 	case EXPR_UNARY_DELETE_ARRAY:     print_string("delete [] "); break;
+	case EXPR_UNARY_REAL:             print_string("__real__ ");  break;
+	case EXPR_UNARY_IMAG:             print_string("__imag__ ");  break;
 
 	case EXPR_UNARY_POSTFIX_INCREMENT:
 		print_expression_prec(unexpr->value, prec);
@@ -385,7 +389,6 @@ static void print_unary_expression(const unary_expression_t *unexpr)
 		print_assignment_expression(unexpr->value);
 		print_char(')');
 		return;
-
 	case EXPR_UNARY_THROW:
 		if (unexpr->value == NULL) {
 			print_string("throw");
@@ -1839,9 +1842,18 @@ check_type:
 	case EXPR_UNARY_NOT:
 		return is_constant_expression(expression->unary.value);
 
+	case EXPR_UNARY_IMAG:
+	case EXPR_UNARY_REAL: {
+		type_t *type = skip_typeref(expression->base.type);
+		if (!is_type_valid(type))
+			return EXPR_CLASS_ERROR;
+		return is_constant_expression(expression->unary.value);
+	}
+
+
 	case EXPR_UNARY_CAST: {
 		type_t *const type = skip_typeref(expression->base.type);
-		if (is_type_scalar(type))
+		if (is_type_scalar(type) || is_type_complex(type))
 			return is_constant_expression(expression->unary.value);
 		if (!is_type_valid(type))
 			return EXPR_CLASS_ERROR;

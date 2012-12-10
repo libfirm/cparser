@@ -273,7 +273,9 @@ static void semantic_comparison(binary_expression_t *expression);
 	case T_false:                     \
 	case T_sizeof:                    \
 	case T_throw:                     \
-	case T_true:
+	case T_true:                      \
+	case T___imag__:                  \
+	case T___real__:
 
 /**
  * Returns the size of a statement node.
@@ -843,13 +845,6 @@ static void label_pop_to(size_t new_top)
 	stack_pop_to(&label_stack, new_top);
 }
 
-static atomic_type_kind_t get_akind(const type_t *type)
-{
-	assert(type->kind == TYPE_ATOMIC || type->kind == TYPE_COMPLEX
-	       || type->kind == TYPE_IMAGINARY || type->kind == TYPE_ENUM);
-	return type->atomic.akind;
-}
-
 /**
  * §6.3.1.1:2  Do integer promotion for a given type.
  *
@@ -858,7 +853,8 @@ static atomic_type_kind_t get_akind(const type_t *type)
  */
 static type_t *promote_integer(type_t *type)
 {
-	if (get_akind_rank(get_akind(type)) < get_akind_rank(ATOMIC_TYPE_INT))
+	atomic_type_kind_t akind = get_arithmetic_akind(type);
+	if (get_akind_rank(akind) < get_akind_rank(ATOMIC_TYPE_INT))
 		type = type_int;
 
 	return type;
@@ -1447,6 +1443,8 @@ static void mark_vars_read(expression_t *const expr, entity_t *lhs_ent)
 		case EXPR_UNARY_PREFIX_INCREMENT:
 		case EXPR_UNARY_PREFIX_DECREMENT:
 		case EXPR_UNARY_ASSUME:
+		case EXPR_UNARY_IMAG:
+		case EXPR_UNARY_REAL:
 unary:
 			mark_vars_read(expr->unary.value, lhs_ent);
 			return;
@@ -2861,11 +2859,19 @@ finish_specifiers:
 	specifiers->attributes = parse_attributes(specifiers->attributes);
 
 	if (type == NULL || (saw_error && type_specifiers != 0)) {
+		position_t const* const pos = &specifiers->pos;
 		atomic_type_kind_t atomic_type;
 
 		/* match valid basic types */
-		switch (type_specifiers) {
+		switch (type_specifiers & ~(SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY)) {
 		case SPECIFIER_VOID:
+			if (type_specifiers & (SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY)) {
+				if (type_specifiers & SPECIFIER_COMPLEX)
+					errorf(pos, "_Complex specifier is invalid for void");
+				if (type_specifiers & SPECIFIER_IMAGINARY)
+					errorf(pos, "_Imaginary specifier is invalid for void");
+				type_specifiers &= ~(SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY);
+			}
 			atomic_type = ATOMIC_TYPE_VOID;
 			break;
 		case SPECIFIER_WCHAR_T:
@@ -2981,23 +2987,17 @@ warn_about_long_long:
 			atomic_type = ATOMIC_TYPE_LONG_DOUBLE;
 			break;
 		case SPECIFIER_BOOL:
+			if (type_specifiers & (SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY)) {
+				if (type_specifiers & SPECIFIER_COMPLEX)
+					errorf(pos, "_Complex specifier is invalid for _Bool");
+				if (type_specifiers & SPECIFIER_IMAGINARY)
+					errorf(pos, "_Imaginary specifier is invalid for _Bool");
+				type_specifiers &= ~(SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY);
+			}
 			atomic_type = ATOMIC_TYPE_BOOL;
-			break;
-		case SPECIFIER_FLOAT | SPECIFIER_COMPLEX:
-		case SPECIFIER_FLOAT | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_FLOAT;
-			break;
-		case SPECIFIER_DOUBLE | SPECIFIER_COMPLEX:
-		case SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_DOUBLE;
-			break;
-		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_COMPLEX:
-		case SPECIFIER_LONG | SPECIFIER_DOUBLE | SPECIFIER_IMAGINARY:
-			atomic_type = ATOMIC_TYPE_LONG_DOUBLE;
 			break;
 		default: {
 			/* invalid specifier combination, give an error message */
-			position_t const* const pos = &specifiers->pos;
 			if (type_specifiers == 0) {
 				if (!saw_error) {
 					/* ISO/IEC 14882:1998(E) §C.1.5:4 */
@@ -5686,18 +5686,32 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 {
 	unsigned     spec = SPECIFIER_NONE;
 	char const  *c    = suffix;
-	for (;;) {
+	while (*c != '\0') {
 		specifiers_t add;
-		if (*c == 'L' || *c == 'l') {
+		switch (*c) {
+		case 'L':
+		case 'l':
 			add = SPECIFIER_LONG;
 			if (*c == c[1]) {
 				add |= SPECIFIER_LONG_LONG;
 				++c;
 			}
-		} else if (*c == 'U' || *c == 'u') {
-			add = SPECIFIER_UNSIGNED;
-		} else {
 			break;
+		case 'u':
+		case 'U':
+			add = SPECIFIER_UNSIGNED;
+			break;
+		case 'i':
+		case 'I':
+		case 'j':
+		case 'J':
+			if (!GNU_MODE)
+				goto error;
+			add = SPECIFIER_COMPLEX;
+			break;
+
+		default:
+			goto error;
 		}
 		++c;
 		if (spec & add)
@@ -5707,7 +5721,7 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 
 	if (*c == '\0') {
 		type_t *type;
-		switch (spec) {
+		switch (spec & ~SPECIFIER_COMPLEX) {
 		case SPECIFIER_NONE:                                            type = type_int;                break;
 		case                      SPECIFIER_LONG:                       type = type_long;               break;
 		case                      SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_long_long;          break;
@@ -5718,6 +5732,10 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 		}
 		if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG) {
 			warn_traditional_suffix(suffix);
+		}
+		if (spec & SPECIFIER_COMPLEX) {
+			assert(type->kind == TYPE_ATOMIC);
+			type = make_complex_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
 		}
 		expr->base.type = type;
 		/* Integer type depends on the size of the number and the size
@@ -5733,16 +5751,32 @@ error:
 static void check_floatingpoint_suffix(expression_t *const expr, char const *const suffix)
 {
 	type_t     *type;
-	char const *c    = suffix;
+	char const *c          = suffix;
+	bool        is_complex = false;
+next:
 	switch (*c) {
 	case 'F':
 	case 'f': type = type_float;       ++c; break;
 	case 'L':
 	case 'l': type = type_long_double; ++c; break;
+	case 'i':
+	case 'I':
+	case 'j':
+	case 'J':
+		if (!GNU_MODE)
+			break;
+		is_complex = true;
+		++c;
+		goto next;
 	default:  type = type_double;           break;
 	}
 
 	if (*c == '\0') {
+		if (is_complex) {
+			assert(type->kind == TYPE_ATOMIC);
+			type = make_complex_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
+		}
+
 		expr->base.type = type;
 		if (suffix[0] != '\0') {
 			warn_traditional_suffix(suffix);
@@ -6147,7 +6181,8 @@ static bool semantic_cast(expression_t *cast)
 	type_t     const *src_type        = skip_typeref(orig_type_right);
 	position_t const *pos             = &cast->base.pos;
 
-	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation than for utility. */
+	/* §6.5.4 A (void) cast is explicitly permitted, more for documentation
+	 * than for utility. */
 	if (is_type_void(dst_type))
 		return true;
 
@@ -6180,6 +6215,34 @@ static bool semantic_cast(expression_t *cast)
 		}
 	}
 	return true;
+}
+
+static void semantic_complex_extract(unary_expression_t *extract)
+{
+	type_t *orig_value_type = extract->value->base.type;
+	type_t *value_type      = skip_typeref(orig_value_type);
+	if (!is_type_valid(value_type)) {
+		extract->base.type = type_error_type;
+		return;
+	}
+
+	type_t *type = value_type;
+	if (!is_type_complex(type)) {
+		if (!is_type_arithmetic(type)) {
+			errorf(&extract->base.pos,
+				   "%s requires an argument with complex or arithmetic type, got '%T'",
+				   extract->base.kind == EXPR_UNARY_IMAG ? "__imag__" : "__real__",
+				   orig_value_type);
+			extract->base.type = type_error_type;
+			return;
+		}
+		atomic_type_kind_t const akind = get_arithmetic_akind(type);
+		type = make_complex_type(akind, TYPE_QUALIFIER_NONE);
+		extract->value = create_implicit_cast(extract->value, type);
+	}
+	assert(type->kind == TYPE_COMPLEX);
+	type = make_atomic_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
+	extract->base.type = type;
 }
 
 static expression_t *parse_compound_literal(position_t const *const pos,
@@ -6235,6 +6298,24 @@ static expression_t *parse_cast(void)
 	}
 
 	return cast;
+}
+
+static expression_t *parse_complex_extract_expression(void)
+{
+	expression_kind_t kind;
+	if (token.kind == T___imag__) {
+		kind = EXPR_UNARY_IMAG;
+	} else {
+		assert(token.kind == T___real__);
+		kind = EXPR_UNARY_REAL;
+	}
+	expression_t *extract = allocate_expression_zero(kind);
+	extract->base.pos = *HERE;
+	next_token();
+
+	extract->unary.value = parse_subexpression(PREC_CAST);
+	semantic_complex_extract(&extract->unary);
+	return extract;
 }
 
 /**
@@ -6723,6 +6804,8 @@ static expression_t *parse_primary_expression(void)
 
 	case '(':                            return parse_parenthesized_expression();
 	case T___noop:                       return parse_noop_expression();
+	case T___real__:
+	case T___imag__:                     return parse_complex_extract_expression();
 
 	/* Gracefully handle type names while parsing expressions. */
 	case T_COLONCOLON:
@@ -7511,17 +7594,18 @@ static bool is_lvalue(const expression_t *expression)
 
 static void semantic_incdec(unary_expression_t *expression)
 {
-	type_t *const orig_type = expression->value->base.type;
-	type_t *const type      = skip_typeref(orig_type);
+	type_t *orig_type = expression->value->base.type;
+	type_t *type      = skip_typeref(orig_type);
 	if (is_type_pointer(type)) {
 		if (!check_pointer_arithmetic(&expression->base.pos, type, orig_type)) {
 			return;
 		}
-	} else if (!is_type_real(type) && is_type_valid(type)) {
+	} else if (!is_type_real(type) &&
+	           (!GNU_MODE || !is_type_complex(type)) && is_type_valid(type)) {
 		/* TODO: improve error message */
 		errorf(&expression->base.pos,
 		       "operation needs an arithmetic or pointer type");
-		return;
+		orig_type = type = type_error_type;
 	}
 	if (!is_lvalue(expression->value)) {
 		/* TODO: improve error message */
@@ -7532,7 +7616,16 @@ static void semantic_incdec(unary_expression_t *expression)
 
 static void promote_unary_int_expr(unary_expression_t *const expr, type_t *const type)
 {
-	type_t *const res_type = promote_integer(type);
+	atomic_type_kind_t akind = get_arithmetic_akind(type);
+	type_t *res_type;
+	if (get_akind_rank(akind) < get_akind_rank(ATOMIC_TYPE_INT)) {
+		if (type->kind == TYPE_COMPLEX)
+			res_type = make_complex_type(ATOMIC_TYPE_INT, TYPE_QUALIFIER_NONE);
+		else
+			res_type = type_int;
+	} else {
+		res_type = type;
+	}
 	expr->base.type = res_type;
 	expr->value     = create_implicit_cast(expr->value, res_type);
 }
@@ -7572,14 +7665,18 @@ static void semantic_complement(unary_expression_t *expression)
 {
 	type_t *const orig_type = expression->value->base.type;
 	type_t *const type      = skip_typeref(orig_type);
-	if (!is_type_integer(type)) {
+	if (!is_type_integer(type) && (!GNU_MODE || !is_type_complex(type))) {
 		if (is_type_valid(type)) {
 			errorf(&expression->base.pos, "operand of ~ must be of integer type");
 		}
 		return;
 	}
 
-	promote_unary_int_expr(expression, type);
+	if (is_type_integer(type)) {
+		promote_unary_int_expr(expression, type);
+	} else {
+		expression->base.type = orig_type;
+	}
 }
 
 static void semantic_dereference(unary_expression_t *expression)
@@ -7701,67 +7798,78 @@ CREATE_UNARY_POSTFIX_EXPRESSION_PARSER(T_MINUSMINUS,
                                        EXPR_UNARY_POSTFIX_DECREMENT,
                                        semantic_incdec)
 
-static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
+static atomic_type_kind_t semantic_arithmetic_(atomic_type_kind_t kind_left,
+                                               atomic_type_kind_t kind_right)
 {
-	/* TODO: handle complex + imaginary types */
-
-	type_left  = get_unqualified_type(type_left);
-	type_right = get_unqualified_type(type_right);
-
 	/* §6.3.1.8 Usual arithmetic conversions */
-	if (type_left == type_long_double || type_right == type_long_double) {
-		return type_long_double;
-	} else if (type_left == type_double || type_right == type_double) {
-		return type_double;
-	} else if (type_left == type_float || type_right == type_float) {
-		return type_float;
+	if (kind_left == ATOMIC_TYPE_LONG_DOUBLE
+	 || kind_right == ATOMIC_TYPE_LONG_DOUBLE) {
+		return ATOMIC_TYPE_LONG_DOUBLE;
+	} else if (kind_left == ATOMIC_TYPE_DOUBLE
+	        || kind_right == ATOMIC_TYPE_DOUBLE) {
+	    return ATOMIC_TYPE_DOUBLE;
+	} else if (kind_left == ATOMIC_TYPE_FLOAT
+	        || kind_right == ATOMIC_TYPE_FLOAT) {
+		return ATOMIC_TYPE_FLOAT;
 	}
 
-	type_left  = promote_integer(type_left);
-	type_right = promote_integer(type_right);
+	unsigned       rank_left  = get_akind_rank(kind_left);
+	unsigned       rank_right = get_akind_rank(kind_right);
+	unsigned const rank_int   = get_akind_rank(ATOMIC_TYPE_INT);
+	if (rank_left < rank_int) {
+		kind_left = ATOMIC_TYPE_INT;
+		rank_left = rank_int;
+	}
+	if (rank_right < rank_int) {
+		kind_right = ATOMIC_TYPE_INT;
+		rank_right = rank_int;
+	}
+	if (kind_left == kind_right)
+		return kind_left;
 
-	if (type_left == type_right)
-		return type_left;
-
-	bool     const signed_left  = is_type_signed(type_left);
-	bool     const signed_right = is_type_signed(type_right);
-	unsigned const rank_left    = get_akind_rank(get_akind(type_left));
-	unsigned const rank_right   = get_akind_rank(get_akind(type_right));
-
+	bool const signed_left  = is_akind_signed(kind_left);
+	bool const signed_right = is_akind_signed(kind_right);
 	if (signed_left == signed_right)
-		return rank_left >= rank_right ? type_left : type_right;
+		return rank_left >= rank_right ? kind_left : kind_right;
 
 	unsigned           s_rank;
 	unsigned           u_rank;
-	atomic_type_kind_t s_akind;
-	atomic_type_kind_t u_akind;
-	type_t *s_type;
-	type_t *u_type;
+	atomic_type_kind_t s_kind;
+	atomic_type_kind_t u_kind;
 	if (signed_left) {
-		s_type = type_left;
-		u_type = type_right;
+		s_kind = kind_left;
+		s_rank = rank_left;
+		u_kind = kind_right;
+		u_rank = rank_right;
 	} else {
-		s_type = type_right;
-		u_type = type_left;
+		s_kind = kind_right;
+		s_rank = rank_right;
+		u_kind = kind_left;
+		u_rank = rank_left;
 	}
-	s_akind = get_akind(s_type);
-	u_akind = get_akind(u_type);
-	s_rank  = get_akind_rank(s_akind);
-	u_rank  = get_akind_rank(u_akind);
-
 	if (u_rank >= s_rank)
-		return u_type;
+		return u_kind;
+	if (get_atomic_type_size(s_kind) > get_atomic_type_size(u_kind))
+		return s_kind;
 
-	if (get_atomic_type_size(s_akind) > get_atomic_type_size(u_akind))
-		return s_type;
-
-	switch (s_akind) {
-	case ATOMIC_TYPE_INT:      return type_unsigned_int;
-	case ATOMIC_TYPE_LONG:     return type_unsigned_long;
-	case ATOMIC_TYPE_LONGLONG: return type_unsigned_long_long;
-
+	switch (s_kind) {
+	case ATOMIC_TYPE_INT:      return ATOMIC_TYPE_UINT;
+	case ATOMIC_TYPE_LONG:     return ATOMIC_TYPE_ULONG;
+	case ATOMIC_TYPE_LONGLONG: return ATOMIC_TYPE_ULONGLONG;
 	default: panic("invalid atomic type");
 	}
+}
+
+static type_t *semantic_arithmetic(type_t *type_left, type_t *type_right)
+{
+	atomic_type_kind_t kind_left  = get_arithmetic_akind(type_left);
+	atomic_type_kind_t kind_right = get_arithmetic_akind(type_right);
+	atomic_type_kind_t kind_res   = semantic_arithmetic_(kind_left, kind_right);
+
+	if (type_left->kind == TYPE_COMPLEX || type_right->kind == TYPE_COMPLEX) {
+		return make_complex_type(kind_res, TYPE_QUALIFIER_NONE);
+	}
+	return make_atomic_type(kind_res, TYPE_QUALIFIER_NONE);
 }
 
 /**
@@ -8382,6 +8490,8 @@ static bool expression_has_effect(const expression_t *const expr)
 		case EXPR_UNARY_NOT:                  return false;
 		case EXPR_UNARY_DEREFERENCE:          return false;
 		case EXPR_UNARY_TAKE_ADDRESS:         return false;
+		case EXPR_UNARY_REAL:                 return false;
+		case EXPR_UNARY_IMAG:                 return false;
 		case EXPR_UNARY_POSTFIX_INCREMENT:    return true;
 		case EXPR_UNARY_POSTFIX_DECREMENT:    return true;
 		case EXPR_UNARY_PREFIX_INCREMENT:     return true;
@@ -9172,7 +9282,7 @@ static statement_t *parse_switch(void)
 	type_t       *      type = skip_typeref(expr->base.type);
 	if (is_type_integer(type)) {
 		type = promote_integer(type);
-		if (get_akind_rank(get_akind(type)) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
+		if (get_akind_rank(get_arithmetic_akind(type)) >= get_akind_rank(ATOMIC_TYPE_LONG)) {
 			warningf(WARN_TRADITIONAL, &expr->base.pos,
 			         "'%T' switch expression not converted to '%T' in ISO C",
 			         type, type_int);
