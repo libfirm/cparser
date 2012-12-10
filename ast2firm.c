@@ -2226,11 +2226,8 @@ static ir_node *create_cast(dbg_info *dbgi, ir_node *value_node,
                             type_t *from_type, type_t *type)
 {
 	type = skip_typeref(type);
-	if (is_type_void(type)) {
-		/* make sure firm type is constructed */
-		(void) get_ir_type(type);
+	if (is_type_void(type))
 		return NULL;
-	}
 
 	from_type     = skip_typeref(from_type);
 	ir_mode *mode = get_ir_mode_storage(type);
