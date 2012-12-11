@@ -173,7 +173,8 @@ typedef enum declarator_flags_t {
 static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
                                   declarator_flags_t flags);
 
-static void semantic_comparison(binary_expression_t *expression);
+static void semantic_comparison(binary_expression_t *expression,
+                                bool is_relational);
 
 #define STORAGE_CLASSES       \
 	STORAGE_CLASSES_NO_EXTERN \
@@ -6666,7 +6667,7 @@ static expression_t *parse_compare_builtin(void)
 				&expression->base.pos, orig_type_left, orig_type_right);
 		}
 	} else {
-		semantic_comparison(&expression->binary);
+		semantic_comparison(&expression->binary, true);
 	}
 
 	return expression;
@@ -8155,10 +8156,9 @@ static void warn_comparison(position_t const *const pos, expression_t const *con
 
 /**
  * Check the semantics of comparison expressions.
- *
- * @param expression   The expression to check.
  */
-static void semantic_comparison(binary_expression_t *expression)
+static void semantic_comparison(binary_expression_t *expression,
+                                bool is_relational)
 {
 	position_t const *const pos   = &expression->base.pos;
 	expression_t     *const left  = expression->left;
@@ -8190,13 +8190,16 @@ static void semantic_comparison(binary_expression_t *expression)
 			}
 		}
 
-		expression->left        = create_implicit_cast(left, arithmetic_type);
-		expression->right       = create_implicit_cast(right, arithmetic_type);
-		expression->base.type   = arithmetic_type;
-		if ((expression->base.kind == EXPR_BINARY_EQUAL ||
-		     expression->base.kind == EXPR_BINARY_NOTEQUAL) &&
-		    is_type_float(arithmetic_type)) {
+		expression->left      = create_implicit_cast(left, arithmetic_type);
+		expression->right     = create_implicit_cast(right, arithmetic_type);
+		expression->base.type = arithmetic_type;
+		if (!is_relational && is_type_float(arithmetic_type)) {
 			warningf(WARN_FLOAT_EQUAL, pos, "comparing floating point with == or != is unsafe");
+		}
+		/* for relational ops we need real types, not just arithmetic */
+		if (is_relational
+		    && (!is_type_real(type_left) || !is_type_real(type_right))) {
+			type_error_incompatible("invalid operands for relational operator", pos, type_left, type_right);
 		}
 	} else if (is_type_pointer(type_left) && is_type_pointer(type_right)) {
 		/* TODO check compatibility */
@@ -8208,6 +8211,16 @@ static void semantic_comparison(binary_expression_t *expression)
 		type_error_incompatible("invalid operands in comparison", pos, type_left, type_right);
 	}
 	expression->base.type = c_mode & _CXX ? type_bool : type_int;
+}
+
+static void semantic_relational(binary_expression_t *expression)
+{
+	semantic_comparison(expression, true);
+}
+
+static void semantic_equality(binary_expression_t *expression)
+{
+	semantic_comparison(expression, false);
 }
 
 /**
@@ -8599,12 +8612,12 @@ CREATE_BINEXPR_PARSER('+',                    EXPR_BINARY_ADD,                PR
 CREATE_BINEXPR_PARSER('-',                    EXPR_BINARY_SUB,                PREC_MULTIPLICATIVE, semantic_sub)
 CREATE_BINEXPR_PARSER(T_LESSLESS,             EXPR_BINARY_SHIFTLEFT,          PREC_ADDITIVE,       semantic_shift_op)
 CREATE_BINEXPR_PARSER(T_GREATERGREATER,       EXPR_BINARY_SHIFTRIGHT,         PREC_ADDITIVE,       semantic_shift_op)
-CREATE_BINEXPR_PARSER('<',                    EXPR_BINARY_LESS,               PREC_SHIFT,          semantic_comparison)
-CREATE_BINEXPR_PARSER('>',                    EXPR_BINARY_GREATER,            PREC_SHIFT,          semantic_comparison)
-CREATE_BINEXPR_PARSER(T_LESSEQUAL,            EXPR_BINARY_LESSEQUAL,          PREC_SHIFT,          semantic_comparison)
-CREATE_BINEXPR_PARSER(T_GREATEREQUAL,         EXPR_BINARY_GREATEREQUAL,       PREC_SHIFT,          semantic_comparison)
-CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, EXPR_BINARY_NOTEQUAL,           PREC_RELATIONAL,     semantic_comparison)
-CREATE_BINEXPR_PARSER(T_EQUALEQUAL,           EXPR_BINARY_EQUAL,              PREC_RELATIONAL,     semantic_comparison)
+CREATE_BINEXPR_PARSER('<',                    EXPR_BINARY_LESS,               PREC_SHIFT,          semantic_relational)
+CREATE_BINEXPR_PARSER('>',                    EXPR_BINARY_GREATER,            PREC_SHIFT,          semantic_relational)
+CREATE_BINEXPR_PARSER(T_LESSEQUAL,            EXPR_BINARY_LESSEQUAL,          PREC_SHIFT,          semantic_relational)
+CREATE_BINEXPR_PARSER(T_GREATEREQUAL,         EXPR_BINARY_GREATEREQUAL,       PREC_SHIFT,          semantic_relational)
+CREATE_BINEXPR_PARSER(T_EXCLAMATIONMARKEQUAL, EXPR_BINARY_NOTEQUAL,           PREC_RELATIONAL,     semantic_equality)
+CREATE_BINEXPR_PARSER(T_EQUALEQUAL,           EXPR_BINARY_EQUAL,              PREC_RELATIONAL,     semantic_equality)
 CREATE_BINEXPR_PARSER('&',                    EXPR_BINARY_BITWISE_AND,        PREC_EQUALITY,       semantic_binexpr_integer)
 CREATE_BINEXPR_PARSER('^',                    EXPR_BINARY_BITWISE_XOR,        PREC_AND,            semantic_binexpr_integer)
 CREATE_BINEXPR_PARSER('|',                    EXPR_BINARY_BITWISE_OR,         PREC_XOR,            semantic_binexpr_integer)
