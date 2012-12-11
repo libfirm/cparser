@@ -4130,10 +4130,11 @@ error_redeclaration:
 		}
 	} else if (entity->kind == ENTITY_VARIABLE) {
 		if (current_scope                     == file_scope &&
-				entity->declaration.storage_class == STORAGE_CLASS_NONE &&
-				!entity->declaration.implicit) {
+		    entity->declaration.storage_class == STORAGE_CLASS_NONE &&
+		    !entity->declaration.implicit) {
 warn_missing_declaration:
-			warningf(WARN_MISSING_DECLARATIONS, pos, "no previous declaration for '%#N'", entity);
+			if (is_type_valid(skip_typeref(entity->declaration.type)))
+				warningf(WARN_MISSING_DECLARATIONS, pos, "no previous declaration for '%#N'", entity);
 		}
 	}
 
