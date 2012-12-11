@@ -3958,6 +3958,44 @@ static complex_value complex_conditional_to_firm(
 	return val;
 }
 
+static void create_local_declarations(entity_t*);
+
+static complex_value compound_statement_to_firm_complex(
+	compound_statement_t *compound)
+{
+	create_local_declarations(compound->scope.entities);
+
+	complex_value result    = { NULL, NULL };
+	statement_t  *statement = compound->statements;
+	statement_t  *next;
+	for ( ; statement != NULL; statement = next) {
+		next = statement->base.next;
+		/* last statement is the return value */
+		if (next == NULL) {
+			/* it must be an expression, otherwise we wouldn't be in the
+			 * complex variant of compound_statement_to_firm */
+			if (statement->kind != STATEMENT_EXPRESSION)
+				panic("last member of complex statement expression not an expression statement");
+			expression_t *expression = statement->expression.expression;
+			assert(is_type_complex(skip_typeref(expression->base.type)));
+			result = expression_to_complex(expression);
+		} else {
+			statement_to_firm(statement);
+		}
+	}
+
+	return result;
+}
+
+static complex_value complex_statement_expression_to_firm(
+	const statement_expression_t *const expr)
+{
+	statement_t *statement = expr->statement;
+	assert(statement->kind == STATEMENT_COMPOUND);
+
+	return compound_statement_to_firm_complex(&statement->compound);
+}
+
 static complex_value expression_to_complex(const expression_t *expression)
 {
 	switch (expression->kind) {
@@ -4020,6 +4058,8 @@ static complex_value expression_to_complex(const expression_t *expression)
 		return complex_call_to_firm(&expression->call);
 	case EXPR_CONDITIONAL:
 		return complex_conditional_to_firm(&expression->conditional);
+	case EXPR_STATEMENT:
+		return complex_statement_expression_to_firm(&expression->statement);
 
 	default:
 		break;
@@ -4938,8 +4978,6 @@ static ir_node *expression_statement_to_firm(expression_statement_t *statement)
 		return expression_to_value(statement->expression);
 	}
 }
-
-static void create_local_declarations(entity_t*);
 
 static ir_node *compound_statement_to_firm(compound_statement_t *compound)
 {
