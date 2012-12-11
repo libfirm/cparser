@@ -3009,6 +3009,10 @@ warn_about_long_long:
 						errorf(pos, "no type specifiers given in declaration");
 					}
 				}
+			} else if (type_specifiers == SPECIFIER_COMPLEX) {
+				warningf(WARN_OTHER, pos, "_Complex requires a type specifier; assuming '_Complex double'");
+				atomic_type = ATOMIC_TYPE_DOUBLE;
+				break;
 			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
 			          (type_specifiers & SPECIFIER_UNSIGNED)) {
 				errorf(pos, "signed and unsigned specifiers given");
