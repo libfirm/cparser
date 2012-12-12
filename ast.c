@@ -1850,10 +1850,9 @@ check_type:
 		return is_constant_expression(expression->unary.value);
 	}
 
-
 	case EXPR_UNARY_CAST: {
 		type_t *const type = skip_typeref(expression->base.type);
-		if (is_type_scalar(type) || is_type_complex(type))
+		if (is_type_scalar(type))
 			return is_constant_expression(expression->unary.value);
 		if (!is_type_valid(type))
 			return EXPR_CLASS_ERROR;
