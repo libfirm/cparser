@@ -6306,15 +6306,8 @@ static expression_t *parse_cast(void)
 	return cast;
 }
 
-static expression_t *parse_complex_extract_expression(void)
+static expression_t *parse_complex_extract_expression(expression_kind_t const kind)
 {
-	expression_kind_t kind;
-	if (token.kind == T___imag__) {
-		kind = EXPR_UNARY_IMAG;
-	} else {
-		assert(token.kind == T___real__);
-		kind = EXPR_UNARY_REAL;
-	}
 	expression_t *extract = allocate_expression_zero(kind);
 	next_token();
 
@@ -6806,8 +6799,8 @@ static expression_t *parse_primary_expression(void)
 
 	case '(':                            return parse_parenthesized_expression();
 	case T___noop:                       return parse_noop_expression();
-	case T___real__:
-	case T___imag__:                     return parse_complex_extract_expression();
+	case T___imag__:                     return parse_complex_extract_expression(EXPR_UNARY_IMAG);
+	case T___real__:                     return parse_complex_extract_expression(EXPR_UNARY_REAL);
 
 	/* Gracefully handle type names while parsing expressions. */
 	case T_COLONCOLON:
