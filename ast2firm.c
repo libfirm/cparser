@@ -1770,20 +1770,13 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	const call_argument_t *argument = call->arguments;
 	for (int n = 0; n < n_parameters; ++n) {
 		expression_t *expression = argument->expression;
-		type_t       *arg_type   = skip_typeref(expression->base.type);
-		ir_node      *arg_node;
+		type_t *const arg_type = skip_typeref(expression->base.type);
 		if (is_type_complex(arg_type)) {
 			complex_value value = expression_to_complex(expression);
-			arg_node = complex_to_memory(dbgi, arg_type, value);
+			in[n] = complex_to_memory(dbgi, arg_type, value);
 		} else {
-			arg_node = expression_to_value(expression);
-			if (!is_type_compound(arg_type)) {
-				ir_mode *const mode = get_ir_mode_storage(arg_type);
-				arg_node = create_conv(dbgi, arg_node, mode);
-			}
+			in[n] = conv_to_storage_type(dbgi, expression_to_value(expression), arg_type);
 		}
-
-		in[n] = arg_node;
 
 		argument = argument->next;
 	}
