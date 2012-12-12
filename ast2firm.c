@@ -3451,14 +3451,12 @@ static void store_complex(dbg_info *dbgi, ir_node *addr, type_t *type,
 	ir_node   *imag      = create_conv(dbgi, value.imag, mode);
 	ir_node   *storer    = new_d_Store(dbgi, mem, addr, real, cons_floats);
 	ir_node   *memr      = new_Proj(storer, mode_M, pn_Store_M);
-	set_store(memr);
-	ir_node   *mem2      = get_store();
 	ir_mode   *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 	ir_node   *one       = new_Const(get_mode_one(mode_uint));
 	ir_node   *in[1]     = { one };
 	ir_entity *arrent    = get_array_element_entity(irtype);
 	ir_node   *addri     = new_d_Sel(dbgi, nomem, addr, 1, in, arrent);
-	ir_node   *storei    = new_d_Store(dbgi, mem2, addri, imag, cons_floats);
+	ir_node   *storei    = new_d_Store(dbgi, memr, addri, imag, cons_floats);
 	ir_node   *memi      = new_Proj(storei, mode_M, pn_Store_M);
 	set_store(memi);
 }
@@ -3508,7 +3506,6 @@ static complex_value complex_deref_address(dbg_info *const dbgi,
 	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
 	ir_node *const load_mem = new_Proj(load, mode_M, pn_Load_M);
 	ir_node *const load_res = new_Proj(load, mode,   pn_Load_res);
-	set_store(load_mem);
 
 	ir_type   *const irtype    = get_ir_type(type);
 	ir_mode   *const mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
@@ -3516,8 +3513,7 @@ static complex_value complex_deref_address(dbg_info *const dbgi,
 	ir_entity *const entity    = get_array_element_entity(irtype);
 	ir_node   *const nomem     = get_irg_no_mem(current_ir_graph);
 	ir_node   *const addr2     = new_Sel(nomem, addr, 1, in, entity);
-	ir_node   *const mem2      = get_store();
-	ir_node   *const load2     = new_d_Load(dbgi, mem2, addr2, mode, flags);
+	ir_node   *const load2     = new_d_Load(dbgi, load_mem, addr2, mode, flags);
 	ir_node   *const load_mem2 = new_Proj(load2, mode_M, pn_Load_M);
 	ir_node   *const load_res2 = new_Proj(load2, mode, pn_Load_res);
 	set_store(load_mem2);
