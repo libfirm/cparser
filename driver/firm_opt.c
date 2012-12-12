@@ -1,5 +1,9 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Michael Beck <mm.beck@gmx.net>
+ */
+
 /**
- * (C) 2005-2010
  * @file
  * @author Michael Beck, Matthias Braun
  * @brief Firm-generating back end optimizations.

@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
 T(CX_LIMITED_RANGE)
 T(DEFAULT)
 T(FENV_ACCESS)

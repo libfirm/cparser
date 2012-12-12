@@ -1,5 +1,8 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Christoph Mallon <christoph.mallon@gmx.de>
+ */
 #include "strutil.h"
-
 
 bool streq_underscore(const char *const s1, const char *const s2)
 {

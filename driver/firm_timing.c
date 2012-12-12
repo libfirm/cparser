@@ -1,7 +1,11 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Michael Beck <mm.beck@gmx.net>
+ */
+
 /**
- * @file firm_timing.c -- timing for the Firm compiler
- *
- * (C) 2006-2009  Michael Beck   beck@ipd.info.uni-karlsruhe.de
+ * @file
+ * @brief timing for the Firm compiler
  */
 #include "firm_timing.h"
 

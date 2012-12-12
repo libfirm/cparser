@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
 #ifndef WALK_STATEMENTS_H
 #define WALK_STATEMENTS_H
 

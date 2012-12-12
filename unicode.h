@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
 #ifndef UNICODE_H
 #define UNICODE_H
 

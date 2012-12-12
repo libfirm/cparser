@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Michael Beck <mm.beck@gmx.net>
+ */
 #ifndef FIRM_OPT_H
 #define FIRM_OPT_H
 

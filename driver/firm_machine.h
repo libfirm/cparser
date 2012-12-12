@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
 #ifndef FIRM_OS_H
 #define FIRM_OS_H
 

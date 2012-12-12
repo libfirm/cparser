@@ -1,3 +1,8 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
+
 /* These must go first. Some set explicit values. */
 #define ALTERNATE(name, val)          T(_CXX, T_##name, #name,  val)
 #define PUNCTUATOR(name, string, val) T(_ALL, T_##name, string, val)

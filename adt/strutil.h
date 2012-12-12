@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Christoph Mallon <christoph.mallon@gmx.de>
+ */
 #ifndef STRUTIL_H
 #define STRUTIL_H
 

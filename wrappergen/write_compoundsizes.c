@@ -1,3 +1,7 @@
+/*
+ * This file is part of cparser.
+ * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
+ */
 #include "type_t.h"
 #include "ast_t.h"
 #include "entity_t.h"
