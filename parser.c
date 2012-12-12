@@ -6428,9 +6428,6 @@ static designator_t *parse_designator(void)
 			designator->array_index  = parse_expression();
 			rem_anchor_token(']');
 			expect(']');
-			if (designator->array_index == NULL) {
-				return NULL;
-			}
 
 			last_designator->next = designator;
 			last_designator       = designator;
