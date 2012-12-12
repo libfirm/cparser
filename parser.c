@@ -6316,7 +6316,6 @@ static expression_t *parse_complex_extract_expression(void)
 		kind = EXPR_UNARY_REAL;
 	}
 	expression_t *extract = allocate_expression_zero(kind);
-	extract->base.pos = *HERE;
 	next_token();
 
 	extract->unary.value = parse_subexpression(PREC_CAST);
