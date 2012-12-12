@@ -6586,7 +6586,7 @@ static expression_t *parse_builtin_constant(void)
 
 	add_anchor_token(')');
 	expect('(');
-	expression->builtin_constant.value = parse_assignment_expression();
+	expression->builtin_constant.value = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
 	expression->base.type = type_int;
@@ -6673,7 +6673,7 @@ static expression_t *parse_assume(void)
 
 	add_anchor_token(')');
 	expect('(');
-	expression->unary.value = parse_assignment_expression();
+	expression->unary.value = parse_expression();
 	rem_anchor_token(')');
 	expect(')');
 
