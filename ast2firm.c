@@ -3326,9 +3326,9 @@ static void complex_equality_evaluation(const binary_expression_t *binexpr,
 	jump_target *const true_target, jump_target *const false_target,
 	ir_relation relation);
 
-static complex_value create_complex_condition_evaluation(
-	const expression_t *const expression, jump_target *const true_target,
-	jump_target *const false_target);
+static complex_value complex_to_control_flow(const expression_t *expression,
+                                             jump_target *true_target,
+                                             jump_target *false_target);
 
 /**
  * create a short-circuit expression evaluation that tries to construct
@@ -3399,7 +3399,7 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 	default:;
 			type_t *const type = skip_typeref(expr->base.type);
 			if (is_type_complex(type)) {
-				create_complex_condition_evaluation(expr, true_target, false_target);
+				complex_to_control_flow(expr, true_target, false_target);
 				return NULL;
 			}
 
@@ -3823,13 +3823,25 @@ static void complex_equality_evaluation(const binary_expression_t *binexpr,
 	set_unreachable_now();
 }
 
-static complex_value create_complex_condition_evaluation(
+static complex_value complex_to_control_flow(
 	const expression_t *const expression, jump_target *const true_target,
 	jump_target *const false_target)
 {
 	jump_target extra_target;
 	init_jump_target(&extra_target, NULL);
 	complex_value       value      = expression_to_complex(expression);
+	if (is_Const(value.real) && is_Const(value.imag)) {
+		ir_tarval *tv_real = get_Const_tarval(value.real);
+		ir_tarval *tv_imag = get_Const_tarval(value.imag);
+		if (tarval_is_null(tv_real) && tarval_is_null(tv_imag)) {
+			jump_to_target(false_target);
+		} else {
+			jump_to_target(true_target);
+		}
+		set_unreachable_now();
+		return value;
+	}
+
 	dbg_info     *const dbgi       = get_dbg_info(&expression->base.pos);
 	type_t       *const type       = expression->base.type;
 	ir_mode      *const mode       = get_complex_mode_arithmetic(type);
@@ -3860,23 +3872,6 @@ static complex_value create_complex_condition_evaluation(
 static complex_value complex_conditional_to_firm(
 	const conditional_expression_t *const expression)
 {
-	/* first try to fold a constant condition */
-	if (is_constant_expression(expression->condition) == EXPR_CLASS_CONSTANT) {
-		bool val = fold_constant_to_bool(expression->condition);
-		if (val) {
-			expression_t *true_expression = expression->true_expression;
-			if (true_expression == NULL) {
-				/* we will evaluate true_expression a second time here, but in
-				 * this case it is harmless since constant expression have no
-				 * side effects */
-				true_expression = expression->condition;
-			}
-			return expression_to_complex(true_expression);
-		} else {
-			return expression_to_complex(expression->false_expression);
-		}
-	}
-
 	jump_target true_target;
 	jump_target false_target;
 	init_jump_target(&true_target,  NULL);
@@ -3885,17 +3880,19 @@ static complex_value complex_conditional_to_firm(
 	memset(&cond_val, 0, sizeof(cond_val));
 	if (expression->true_expression == NULL) {
 		assert(is_type_complex(skip_typeref(expression->condition->base.type)));
-		cond_val
-			= create_complex_condition_evaluation(expression->condition,
-			                                      &true_target, &false_target);
+		cond_val = complex_to_control_flow(expression->condition,
+		                                   &true_target, &false_target);
 	} else {
 		expression_to_control_flow(expression->condition, &true_target, &false_target);
 	}
 
-	complex_value val;
+	complex_value  val;
 	memset(&val, 0, sizeof(val));
-	jump_target   exit_target;
+	jump_target    exit_target;
 	init_jump_target(&exit_target, NULL);
+	type_t   *const type = skip_typeref(expression->base.type);
+	ir_mode  *const mode = get_complex_mode_arithmetic(type);
+	dbg_info *const dbgi = get_dbg_info(&expression->base.pos);
 
 	if (enter_jump_target(&true_target)) {
 		if (expression->true_expression) {
@@ -3904,19 +3901,18 @@ static complex_value complex_conditional_to_firm(
 			assert(cond_val.real != NULL);
 			val = cond_val;
 		}
+		val = complex_conv(dbgi, val, mode);
 		jump_to_target(&exit_target);
 	}
 
-	type_t *const type = skip_typeref(expression->base.type);
 	if (enter_jump_target(&false_target)) {
 		complex_value false_val
 			= expression_to_complex(expression->false_expression);
+		false_val = complex_conv(dbgi, false_val, mode);
 		jump_to_target(&exit_target);
 		if (val.real != NULL) {
 			ir_node  *const inr[] = { val.real, false_val.real };
 			ir_node  *const ini[] = { val.imag, false_val.imag };
-			dbg_info *const dbgi  = get_dbg_info(&expression->base.pos);
-			ir_mode  *const mode  = get_complex_mode_arithmetic(type);
 			ir_node  *const block = exit_target.block;
 			val.real = new_rd_Phi(dbgi, block, lengthof(inr), inr, mode);
 			val.imag = new_rd_Phi(dbgi, block, lengthof(ini), ini, mode);
@@ -3928,9 +3924,7 @@ static complex_value complex_conditional_to_firm(
 	if (!enter_jump_target(&exit_target)) {
 		set_cur_block(new_Block(0, NULL));
 		assert(!is_type_void(type));
-		ir_mode *mode = get_complex_mode_arithmetic(type);
-		val.real = new_Unknown(mode);
-		val.imag = val.real;
+		val.real = val.imag = new_Bad(mode);
 	}
 	return val;
 }
