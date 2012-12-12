@@ -3363,11 +3363,6 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 		evaluate_expression_discard_result(expr->binary.left);
 		return expression_to_control_flow(expr->binary.right, true_target, false_target);
 
-		ir_node    *val;
-		ir_node    *left;
-		ir_node    *right;
-		ir_relation relation;
-
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_GREATER:
 	case EXPR_BINARY_GREATEREQUAL:
@@ -3380,21 +3375,20 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 	case EXPR_BINARY_LESS:
 	case EXPR_BINARY_LESSEQUAL:
 	case EXPR_BINARY_NOTEQUAL: {
-		type_t *const type = skip_typeref(expr->binary.left->base.type);
-		relation = get_relation(expr->kind);
+		type_t     *const type     = skip_typeref(expr->binary.left->base.type);
+		ir_relation const relation = get_relation(expr->kind);
 		if (is_type_complex(type)) {
 			complex_equality_evaluation(&expr->binary, true_target,
 			                            false_target, relation);
-			/* TODO return something sensible */
 			return NULL;
 		}
 
-		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-		ir_mode  *const mode = get_ir_mode_arithmetic(type);
-		val      = NULL;
-		left     = create_conv(dbgi, expression_to_value(expr->binary.left),  mode);
-		right    = create_conv(dbgi, expression_to_value(expr->binary.right), mode);
-		goto make_cmp;
+		dbg_info *const dbgi  = get_dbg_info(&expr->base.pos);
+		ir_mode  *const mode  = get_ir_mode_arithmetic(type);
+		ir_node  *const left  = create_conv(dbgi, expression_to_value(expr->binary.left),  mode);
+		ir_node  *const right = create_conv(dbgi, expression_to_value(expr->binary.right), mode);
+		compare_to_control_flow(expr, left, right, relation, true_target, false_target);
+		return NULL;
 	}
 
 	case EXPR_UNARY_CAST:
@@ -3409,13 +3403,12 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 				return NULL;
 			}
 
-			dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-			ir_mode  *const mode = get_ir_mode_arithmetic(type);
-			val      = create_conv(dbgi, expression_to_value(expr), mode);
-			left     = val;
-			right    = new_Const(get_mode_null(get_irn_mode(val)));
-			relation = ir_relation_unordered_less_greater;
-make_cmp:
+			dbg_info   *const dbgi  = get_dbg_info(&expr->base.pos);
+			ir_mode    *const mode  = get_ir_mode_arithmetic(type);
+			ir_node    *const val   = create_conv(dbgi, expression_to_value(expr), mode);
+			ir_node    *const left  = val;
+			ir_node    *const right = new_Const(get_mode_null(get_irn_mode(val)));
+			ir_relation const relation = ir_relation_unordered_less_greater;
 			compare_to_control_flow(expr, left, right, relation, true_target, false_target);
 			return val;
 		}
