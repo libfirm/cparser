@@ -3964,6 +3964,15 @@ static complex_value compound_statement_to_firm_complex(
 	return result;
 }
 
+static complex_value complex_assign_to_firm(const binary_expression_t *expr)
+{
+	dbg_info     *const dbgi  = get_dbg_info(&expr->base.pos);
+	complex_value const value = expression_to_complex(expr->right);
+	ir_node      *const addr  = expression_to_addr(expr->left);
+	set_complex_value_for_expression(dbgi, expr->left, value, addr);
+	return value;
+}
+
 static complex_value complex_statement_expression_to_firm(
 	const statement_expression_t *const expr)
 {
@@ -4021,14 +4030,8 @@ static complex_value expression_to_complex(const expression_t *expression)
 		return complex_negate_to_firm(&expression->unary);
 	case EXPR_UNARY_COMPLEMENT:
 		return complex_complement_to_firm(&expression->unary);
-	case EXPR_BINARY_ASSIGN: {
-		const binary_expression_t *binexpr = &expression->binary;
-		dbg_info                  *dbgi   = get_dbg_info(&binexpr->base.pos);
-		complex_value value = expression_to_complex(binexpr->right);
-		ir_node      *addr  = expression_to_addr(binexpr->left);
-		set_complex_value_for_expression(dbgi, binexpr->left, value, addr);
-		return value;
-	}
+	case EXPR_BINARY_ASSIGN:
+		return complex_assign_to_firm(&expression->binary);
 	case EXPR_LITERAL_CASES:
 		return complex_literal_to_firm(&expression->literal);
 	case EXPR_CALL:
