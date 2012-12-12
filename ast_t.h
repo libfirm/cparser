@@ -348,6 +348,7 @@ struct designator_t {
 	position_t    pos;
 	symbol_t     *symbol;      /**< the symbol if any */
 	expression_t *array_index; /**< the array index if any */
+	expression_t *range_last;  /**< last index of a range initializer, if any */
 	designator_t *next;
 };
 

@@ -599,6 +599,10 @@ static void print_designator(const designator_t *designator)
 		if (designator->symbol == NULL) {
 			print_char('[');
 			print_expression(designator->array_index);
+			if (designator->range_last) {
+				print_string(" ... ");
+				print_expression(designator->range_last);
+			}
 			print_char(']');
 		} else {
 			print_char('.');

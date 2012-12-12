@@ -1535,7 +1535,13 @@ static designator_t *parse_designation(void)
 			designator->pos = *HERE;
 			eat('[');
 			add_anchor_token(']');
+			add_anchor_token(T_DOTDOTDOT);
 			designator->array_index = parse_constant_expression();
+			if (accept(T_DOTDOTDOT)) {
+				designator->range_last = parse_constant_expression();
+				errorf(&designator->pos, "range initializer not supported");
+			}
+			rem_anchor_token(T_DOTDOTDOT);
 			rem_anchor_token(']');
 			expect(']');
 			break;
