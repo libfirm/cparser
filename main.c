@@ -1631,7 +1631,7 @@ int main(int argc, char **argv)
 					errorf(NULL, "unknown language '%s'", opt);
 					argument_errors = true;
 				}
-			} else if (streq(option, "M")) {
+			} else if (SINGLE_OPTION('M')) {
 				mode = PreprocessOnly;
 				add_flag(&cppflags_obst, "-M");
 			} else if (streq(option, "MMD") ||
