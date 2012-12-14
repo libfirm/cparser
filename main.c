@@ -1636,7 +1636,7 @@ int main(int argc, char **argv)
 				add_flag(&cppflags_obst, "-M");
 			} else if (streq(option, "MMD") ||
 			           streq(option, "MD")) {
-			    construct_dep_target = true;
+				construct_dep_target = true;
 				add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MM")  ||
 			           streq(option, "MP")) {
@@ -1822,7 +1822,7 @@ int main(int argc, char **argv)
 				           || streq(option+1, "format-security")
 				           || streq(option+1, "old-style-declaration")
 				           || streq(option+1, "type-limits")) {
-				    /* ignore (gcc compatibility) */
+					/* ignore (gcc compatibility) */
 				} else {
 					set_warning_opt(&option[1]);
 				}
