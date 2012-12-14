@@ -1584,7 +1584,7 @@ int main(int argc, char **argv)
 			if (option[0] == 'o') {
 				GET_ARG_AFTER(outname, "-o");
 			} else if (option[0] == 'g') {
-				/* TODO: parse -gX with 0<=x<=3... */
+				/* TODO: parse -gX with 0<=X<=3... */
 				set_be_option("debug=frameinfo");
 				set_be_option("ia32-optcc=false");
 			} else if (SINGLE_OPTION('c')) {
