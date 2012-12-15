@@ -5386,6 +5386,7 @@ static expression_t *create_select(const position_t *pos, expression_t *addr,
 	check_deprecated(pos, entry);
 
 	expression_t *select          = allocate_expression_zero(EXPR_SELECT);
+	select->base.pos              = *pos;
 	select->select.compound       = addr;
 	select->select.compound_entry = entry;
 
@@ -5436,7 +5437,6 @@ static expression_t *find_create_select(const position_t *pos,
 				continue;
 
 			expression_t *sub_addr = create_select(pos, addr, qualifiers, iter);
-			sub_addr->base.pos      = *pos;
 			sub_addr->base.implicit = true;
 			return find_create_select(pos, sub_addr, qualifiers, sub_compound,
 			                          symbol);
