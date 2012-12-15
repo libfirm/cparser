@@ -265,8 +265,6 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 	if (pos->is_system_header && !is_warn_on(WARN_SYSTEM))
 		return;
 
-	va_list ap;
-	va_start(ap, fmt);
 	warning_switch_t const *const s = get_warn_switch(warn);
 	switch ((unsigned) s->state) {
 			char const* kind;
@@ -280,7 +278,10 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 				++warning_count;
 				kind = "warning";
 			}
+			va_list ap;
+			va_start(ap, fmt);
 			diagnosticposvf(pos, kind, fmt, ap);
+			va_end(ap);
 			if (diagnostics_show_option)
 				fprintf(stderr, " [-W%s]\n", s->name);
 			else
@@ -290,7 +291,6 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 		default:
 			break;
 	}
-	va_end(ap);
 }
 
 static void internal_errorvf(const position_t *pos,
