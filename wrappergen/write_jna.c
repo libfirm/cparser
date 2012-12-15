@@ -33,20 +33,15 @@ static const char    *libname;
 
 static const char *fix_builtin_names(const char *name)
 {
-	if (streq(name, "class")) {
-		return "_class";
-	} else if (streq(name, "this")) {
-		return "_this";
-	} else if (streq(name, "public")) {
-		return "_public";
-	} else if (streq(name, "protected")) {
-		return "_protected";
-	} else if (streq(name, "private")) {
-		return "_private";
-	} else if (streq(name, "final")) {
-		return "_final";
-	}
+#define FIX(x) if (streq(name, x)) return "_" x
+	FIX("class");
+	FIX("final");
+	FIX("private");
+	FIX("protected");
+	FIX("public");
+	FIX("this");
 	/* TODO put all reserved names here */
+#undef FIX
 	return name;
 }
 
