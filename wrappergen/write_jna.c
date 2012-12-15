@@ -31,15 +31,6 @@ static pset_new_t     avoid_symbols;
 static output_limit  *output_limits;
 static const char    *libname;
 
-static bool is_system_header(const char *fname)
-{
-	if (strstart(fname, "/usr/include"))
-		return true;
-	if (fname == builtin_position.input_name)
-		return true;
-	return false;
-}
-
 static const char *fix_builtin_names(const char *name)
 {
 	if (streq(name, "class")) {
@@ -513,13 +504,13 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	for ( ; entity != NULL; entity = entity->base.next) {
 		if (entity->kind != ENTITY_FUNCTION)
 			continue;
-		const char *input_name = entity->base.pos.input_name;
-		if (is_system_header(input_name))
+		if (entity->base.pos.is_system_header)
 			continue;
 		if (entity->function.elf_visibility != ELF_VISIBILITY_DEFAULT)
 			continue;
 		if (output_limits != NULL) {
-			bool in_limits = false;
+			bool              in_limits  = false;
+			char const *const input_name = entity->base.pos.input_name;
 			for (output_limit *limit = output_limits; limit != NULL;
 			     limit = limit->next) {
 			    if (streq(limit->filename, input_name)) {
