@@ -86,6 +86,7 @@ typedef enum warning_t {
 	WARN_STRICT_PROTOTYPES,             /**< Warn if a function declaration has an unspecified parameter list */
 	WARN_SWITCH_DEFAULT,                /**< Warn whenever a 'switch' statement does not have a 'default' case */
 	WARN_SWITCH_ENUM,                   /**< Warn about 'switch' statements with an enum as index type and missing case labels or case labels outside the enum range TODO has an alias -Wswitch? */
+	WARN_SYSTEM,                        /**< Show warnings in system headers. */
 	WARN_TRADITIONAL,                   /**< Warn about certain constructs that behave differently in traditional and ISO C */
 #if 0 // TODO
 	WARN_UNDEF,                         /**< Warn if an undefined identifier is evaluated in an '#if' directive */

@@ -4071,9 +4071,7 @@ warn_redundant_declaration: ;
 						                     decl->attributes);
 					if (has_new_attrs) {
 						merge_in_attributes(decl, prev_decl->attributes);
-					} else if (!is_definition        &&
-							is_type_valid(prev_type) &&
-							!pos->is_system_header) {
+					} else if (!is_definition && is_type_valid(prev_type)) {
 						warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%N' (declared %P)", entity, ppos);
 					}
 				} else if (current_function == NULL) {

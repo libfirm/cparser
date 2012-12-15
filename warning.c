@@ -54,6 +54,7 @@ static warning_switch_t warning[] = {
 	[WARN_STRICT_PROTOTYPES]             = { WARN_STATE_ON,   "strict-prototypes"             },
 	[WARN_SWITCH_DEFAULT]                = { WARN_STATE_NONE, "switch-default",               },
 	[WARN_SWITCH_ENUM]                   = { WARN_STATE_NONE, "switch-enum",                  },
+	[WARN_SYSTEM]                        = { WARN_STATE_NONE, "system",                       },
 	[WARN_TRADITIONAL]                   = { WARN_STATE_NONE, "traditional"                   },
 	[WARN_UNINITIALIZED]                 = { WARN_STATE_ON,   "uninitialized",                },
 	[WARN_UNKNOWN_PRAGMAS]               = { WARN_STATE_ON,   "unknown-pragmas",              },

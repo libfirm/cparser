@@ -262,6 +262,9 @@ void errorf(const position_t *pos, const char *const fmt, ...)
 
 void warningf(warning_t const warn, position_t const* pos, char const *const fmt, ...)
 {
+	if (pos->is_system_header && !is_warn_on(WARN_SYSTEM))
+		return;
+
 	va_list ap;
 	va_start(ap, fmt);
 	warning_switch_t const *const s = get_warn_switch(warn);
