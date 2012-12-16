@@ -2482,6 +2482,7 @@ static void parse_define_directive(void)
 	/* construct token list */
 	assert(obstack_object_size(&pp_obstack) == 0);
 	bool next_must_be_param = false;
+	bool first              = true;
 	while (pp_token.kind != '\n') {
 		if (pp_token.kind == T_IDENTIFIER) {
 			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
@@ -2496,11 +2497,12 @@ static void parse_define_directive(void)
 		}
 		saved_token_t saved_token;
 		saved_token.token = pp_token;
-		saved_token.had_whitespace = info.had_whitespace;
+		saved_token.had_whitespace = !first && info.had_whitespace;
 		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
 		next_must_be_param
 			= new_definition->has_parameters && pp_token.kind == '#';
 		next_input_token();
+		first = false;
 	}
 	if (next_must_be_param)
 		error_missing_macro_param();
