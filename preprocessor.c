@@ -71,7 +71,9 @@ typedef struct pp_expansion_state_t {
 
 	size_t             pos;
 	whitespace_info_t  expand_info;
-	unsigned           argument_brace_count;
+	/** the obstack level at the beginning of a macro call with parameters.
+	 * We can free the obstack until this level after expanding the call */
+	void              *obstack_level;
 } pp_expansion_state_t;
 
 typedef struct pp_argument_t {
@@ -110,6 +112,15 @@ struct searchpath_entry_t {
 	bool                is_system_path;
 };
 
+typedef struct macro_call_t {
+	pp_definition_t *macro;
+	pp_definition_t *parameter;
+	unsigned         parameter_idx;
+	saved_token_t   *argument_tokens;
+	unsigned         argument_brace_count;
+	void            *obstack_level;
+} macro_call_t;
+
 static pp_input_t      input;
 
 static pp_input_t     *input_stack;
@@ -130,16 +141,14 @@ static struct obstack        config_obstack;
 static const char           *printed_input_name = NULL;
 static position_t            expansion_pos;
 static pp_expansion_state_t *current_expansion  = NULL;
-static pp_definition_t      *current_call       = NULL;
-static unsigned              call_arg           = 0;
+static macro_call_t          current_call;
 static whitespace_info_t     call_whitespace_info;
-static pp_definition_t      *current_argument   = NULL;
 static pp_definition_t      *argument_expanding = NULL;
-static unsigned              argument_brace_count;
 static strset_t              stringset;
 static token_kind_t          last_token;
 static pp_expansion_state_t *expansion_stack;
 static pp_argument_t        *argument_stack;
+static macro_call_t         *macro_call_stack;
 
 struct searchpath_t {
 	searchpath_entry_t  *first;
@@ -927,6 +936,7 @@ static bool pop_expansion(void)
 	pp_expansion_state_t *expansion  = current_expansion;
 	pp_definition_t      *definition = expansion->definition;
 	if (definition->n_parameters > 0) {
+		obstack_free(&pp_obstack, expansion->obstack_level);
 		pop_function_expansion(definition);
 	}
 	assert(definition->is_expanding);
@@ -957,22 +967,67 @@ static bool pop_expansion(void)
 	return true;
 }
 
+static void push_macro_call(void)
+{
+	if (current_call.macro == NULL)
+		return;
+	ARR_APP1(macro_call_t, macro_call_stack, current_call);
+	memset(&current_call, 0, sizeof(current_call));
+}
+
+static void pop_macro_call(void)
+{
+	size_t top = ARR_LEN(macro_call_stack);
+	if (top == 0) {
+		memset(&current_call, 0, sizeof(current_call));
+	} else {
+		current_call = macro_call_stack[top-1];
+		ARR_SHRINKLEN(macro_call_stack, top-1);
+	}
+}
+
+static void start_argument(pp_definition_t *parameter)
+{
+	current_call.parameter = parameter;
+	current_call.argument_tokens = NEW_ARR_F(saved_token_t, 0);
+}
+
+static void finish_argument(void)
+{
+	pp_definition_t *parameter = current_call.parameter;
+	if (parameter == NULL)
+		return;
+	saved_token_t *tokens = current_call.argument_tokens;
+	size_t len = ARR_LEN(tokens);
+	parameter->list_len   = len;
+	parameter->token_list = obstack_copy(&pp_obstack, tokens, len*sizeof(tokens[0]));
+	parameter->is_expanding = false;
+	DEL_ARR_F(tokens);
+}
+
 static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo)
 {
-	current_call = definition;
+	assert(current_call.macro == NULL && current_call.parameter == NULL);
+	current_call.macro = definition;
 	call_whitespace_info = wsinfo;
 	if (definition->n_parameters > 0) {
-		current_argument = &definition->parameters[0];
+		start_argument(&definition->parameters[0]);
 		push_function_expansion(definition);
 	}
-	assert(argument_brace_count == 0);
-	call_arg = 0;
+	/* fields of current_call should be clear from push_macro_call() */
+	assert(current_call.argument_brace_count == 0);
+	assert(current_call.parameter_idx == 0);
+	assert(obstack_object_size(&pp_obstack) == 0);
+	current_call.obstack_level = obstack_alloc(&pp_obstack, 0);
 }
 
 static void start_expanding(pp_definition_t *definition)
 {
 	push_expansion(definition);
 	definition->is_expanding = true;
+	if (definition->n_parameters > 0) {
+		current_expansion->obstack_level = current_call.obstack_level;
+	}
 
 	if (definition->list_len > 0) {
 		definition->token_list[0].had_whitespace = info.had_whitespace;
@@ -1199,7 +1254,7 @@ static bool concat_macro_parameters(const position_t *pos,
                                     const token_t *token0,
                                     const token_t *token1)
 {
-	assert(current_call == NULL);
+	assert(current_call.macro == NULL);
 	assert(obstack_object_size(&pp_obstack) == 0);
 	pp_definition_t *newdef = obstack_alloc(&pp_obstack, sizeof(*newdef));
 	memset(newdef, 0, sizeof(*newdef));
@@ -2589,12 +2644,11 @@ parse_name:
 			return pp_token.literal.string.begin;
 		} else if (pp_token.kind == '<') {
 			*system_include = true;
-			assert(obstack_object_size(&pp_obstack) == 0);
+			saved_token_t *tokens = NEW_ARR_F(saved_token_t, 0);
 			while (true) {
 				next_preprocessing_token();
 				if (pp_token.kind == T_EOF) {
-					char *dummy = obstack_finish(&pp_obstack);
-					obstack_free(&pp_obstack, dummy);
+					DEL_ARR_F(tokens);
 					goto error_invalid_input;
 				}
 				if (pp_token.kind == '>')
@@ -2603,12 +2657,9 @@ parse_name:
 				saved_token_t saved;
 				saved.token          = pp_token;
 				saved.had_whitespace = info.had_whitespace;
-				obstack_grow(&pp_obstack, &saved, sizeof(saved));
+				ARR_APP1(saved_token_t, tokens, saved);
 			}
-			size_t size = obstack_object_size(&pp_obstack);
-			assert(size % sizeof(saved_token_t) == 0);
-			size_t n_tokens = size / sizeof(saved_token_t);
-			saved_token_t *tokens = obstack_finish(&pp_obstack);
+			size_t n_tokens = ARR_LEN(tokens);
 			assert(obstack_object_size(&symbol_obstack) == 0);
 			for (size_t i = 0; i < n_tokens; ++i) {
 				const saved_token_t *saved = &tokens[i];
@@ -2616,7 +2667,7 @@ parse_name:
 					obstack_1grow(&symbol_obstack, ' ');
 				grow_token(&symbol_obstack, &saved->token);
 			}
-			obstack_free(&pp_obstack, tokens);
+			DEL_ARR_F(tokens);
 			goto finish_headername;
 		} else {
 error_invalid_input:
@@ -3446,20 +3497,10 @@ skip:
 	eat_token('\n');
 }
 
-static void finish_current_argument(void)
-{
-	if (current_argument == NULL)
-		return;
-	size_t size = obstack_object_size(&pp_obstack);
-	current_argument->list_len   = size/sizeof(current_argument->token_list[0]);
-	current_argument->token_list = obstack_finish(&pp_obstack);
-	current_argument->is_expanding = false;
-}
-
 static bool next_expansion_token(void)
 {
 	const token_kind_t kind = pp_token.kind;
-	if (current_call == NULL || argument_expanding != NULL) {
+	if (current_call.macro == NULL || argument_expanding != NULL) {
 		symbol_t *const symbol = pp_token.base.symbol;
 		if (symbol) {
 			if (kind == T_MACRO_PARAMETER) {
@@ -3489,6 +3530,7 @@ static bool next_expansion_token(void)
 					if (next_token == '(') {
 						if (current_expansion == NULL)
 							expansion_pos = pp_token.base.pos;
+						push_macro_call();
 						next_preprocessing_token();
 						assert(pp_token.kind == '(');
 
@@ -3511,31 +3553,30 @@ static bool next_expansion_token(void)
 		}
 	}
 
-	if (current_call != NULL) {
+	if (current_call.macro != NULL) {
 		if (kind == '(') {
-			++argument_brace_count;
+			++current_call.argument_brace_count;
 		} else if (kind == ')') {
-			if (argument_brace_count > 0) {
-				--argument_brace_count;
+			if (current_call.argument_brace_count > 0) {
+				--current_call.argument_brace_count;
 			} else {
-				finish_current_argument();
+				finish_argument();
 				assert(kind == ')');
-				start_expanding(current_call);
+				start_expanding(current_call.macro);
+				pop_macro_call();
 				info = call_whitespace_info;
-				current_call     = NULL;
-				current_argument = NULL;
 				return false;
 			}
-		} else if (kind == ',' && argument_brace_count == 0) {
-			finish_current_argument();
-			call_arg++;
-			if (call_arg >= current_call->n_parameters) {
+		} else if (kind == ',' && current_call.argument_brace_count == 0) {
+			finish_argument();
+			current_call.parameter_idx++;
+			if (current_call.parameter_idx >= current_call.macro->n_parameters) {
 				errorf(&pp_token.base.pos,
-					   "too many arguments passed for macro '%Y'",
-					   current_call->symbol);
-				current_argument = NULL;
+				       "too many arguments passed for macro '%Y'",
+				       current_call.macro->symbol);
+				current_call.parameter = NULL;
 			} else {
-				current_argument = &current_call->parameters[call_arg];
+				start_argument(&current_call.macro->parameters[current_call.parameter_idx]);
 			}
 			return false;
 		} else if (kind == T_MACRO_PARAMETER) {
@@ -3548,14 +3589,14 @@ static bool next_expansion_token(void)
 		} else if (kind == T_EOF) {
 			errorf(&expansion_pos,
 			       "reached end of file while parsing arguments for '%Y'",
-			       current_call->symbol);
+			       current_call.macro->symbol);
 			return true;
 		}
-		if (current_argument != NULL) {
+		if (current_call.parameter != NULL) {
 			saved_token_t saved;
-			saved.token = pp_token;
+			saved.token          = pp_token;
 			saved.had_whitespace = info.had_whitespace;
-			obstack_grow(&pp_obstack, &saved, sizeof(saved));
+			ARR_APP1(saved_token_t, current_call.argument_tokens, saved);
 		}
 		return false;
 	}
@@ -3666,8 +3707,9 @@ void init_preprocessor(void)
 	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
 	strset_init(&stringset);
-	expansion_stack = NEW_ARR_F(pp_expansion_state_t, 0);
-	argument_stack  = NEW_ARR_F(pp_argument_t, 0);
+	expansion_stack      = NEW_ARR_F(pp_expansion_state_t, 0);
+	argument_stack       = NEW_ARR_F(pp_argument_t, 0);
+	macro_call_stack     = NEW_ARR_F(macro_call_t, 0);
 
 	setup_include_path();
 
@@ -3679,6 +3721,7 @@ void init_preprocessor(void)
 
 void exit_preprocessor(void)
 {
+	DEL_ARR_F(macro_call_stack);
 	DEL_ARR_F(argument_stack);
 	DEL_ARR_F(expansion_stack);
 	obstack_free(&input_obstack, NULL);
