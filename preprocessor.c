@@ -883,7 +883,7 @@ static pp_expansion_state_t *push_expansion(pp_definition_t *definition)
 	result->list_len   = definition->list_len;
 	result->token_list = definition->token_list;
 	result->pos        = 0;
-	current_expansion = result;
+	current_expansion  = result;
 	return result;
 }
 
@@ -975,8 +975,7 @@ static void start_expanding(pp_definition_t *definition)
 	definition->is_expanding = true;
 
 	if (definition->list_len > 0) {
-		definition->token_list[0].had_whitespace
-			= info.had_whitespace;
+		definition->token_list[0].had_whitespace = info.had_whitespace;
 	}
 	if (definition->is_parameter) {
 		definition->function_definition->may_recurse = true;
@@ -3513,7 +3512,6 @@ static bool next_expansion_token(void)
 	}
 
 	if (current_call != NULL) {
-		/* current_call != NULL */
 		if (kind == '(') {
 			++argument_brace_count;
 		} else if (kind == ')') {
