@@ -2207,10 +2207,13 @@ static ir_node *create_cast(unary_expression_t const *const expr)
 	if (is_type_void(type))
 		return NULL;
 
-	ir_node        *value     = expression_to_value(expr->value);
-	dbg_info *const dbgi      = get_dbg_info(&expr->base.pos);
-	type_t   *const from_type = skip_typeref(expr->value->base.type);
-	ir_mode  *const mode      = get_ir_mode_storage(type);
+	type_t  *const from_type = skip_typeref(expr->value->base.type);
+	ir_node       *value     = is_type_complex(from_type)
+		? expression_to_complex(expr->value).real
+		: expression_to_value(expr->value);
+
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+	ir_mode  *const mode = get_ir_mode_storage(type);
 	/* check for conversion from / to __based types */
 	if (is_type_pointer(type) && is_type_pointer(from_type)) {
 		const variable_t *from_var = from_type->pointer.base_variable;
