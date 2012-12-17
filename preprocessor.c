@@ -1577,6 +1577,8 @@ static bool emit_newlines(void)
 	if (!out)
 		return true;
 
+	if (!info.at_line_begin)
+		return false;
 	unsigned delta = pp_token.base.pos.lineno - input.output_line;
 	if (delta == 0)
 		return false;
