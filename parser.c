@@ -5679,27 +5679,24 @@ static void warn_traditional_suffix(char const *const suffix)
 
 static void check_integer_suffix(expression_t *const expr, char const *const suffix)
 {
-	unsigned     spec = SPECIFIER_NONE;
-	char const  *c    = suffix;
-	while (*c != '\0') {
+	unsigned spec = SPECIFIER_NONE;
+	for (char const *c = suffix; *c != '\0'; ++c) {
 		specifiers_t add;
 		switch (*c) {
-		case 'L':
-		case 'l':
+		case 'L': case 'l':
 			add = SPECIFIER_LONG;
 			if (*c == c[1]) {
 				add |= SPECIFIER_LONG_LONG;
 				++c;
 			}
 			break;
-		case 'u':
-		case 'U':
+
+		case 'U': case 'u':
 			add = SPECIFIER_UNSIGNED;
 			break;
-		case 'i':
-		case 'I':
-		case 'j':
-		case 'J':
+
+		case 'I': case 'i':
+		case 'J': case 'j':
 			if (!GNU_MODE)
 				goto error;
 			add = SPECIFIER_COMPLEX;
@@ -5708,39 +5705,37 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 		default:
 			goto error;
 		}
-		++c;
 		if (spec & add)
 			goto error;
 		spec |= add;
 	}
 
-	if (*c == '\0') {
-		type_t *type;
-		switch (spec & ~SPECIFIER_COMPLEX) {
-		case SPECIFIER_NONE:                                            type = type_int;                break;
-		case                      SPECIFIER_LONG:                       type = type_long;               break;
-		case                      SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_long_long;          break;
-		case SPECIFIER_UNSIGNED:                                        type = type_unsigned_int;       break;
-		case SPECIFIER_UNSIGNED | SPECIFIER_LONG:                       type = type_unsigned_long;      break;
-		case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_unsigned_long_long; break;
-		default: panic("inconsistent suffix");
-		}
-		if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG) {
-			warn_traditional_suffix(suffix);
-		}
-		if (spec & SPECIFIER_COMPLEX) {
-			assert(type->kind == TYPE_ATOMIC);
-			type = make_complex_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
-		}
-		expr->base.type = type;
-		/* Integer type depends on the size of the number and the size
-		 * representable by the types. The backend/codegeneration has to
-		 * determine that. */
-		determine_literal_type(&expr->literal);
-	} else {
+	type_t *type;
+	switch (spec & ~SPECIFIER_COMPLEX) {
+	case SPECIFIER_NONE:                                            type = type_int;                break;
+	case                      SPECIFIER_LONG:                       type = type_long;               break;
+	case                      SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_long_long;          break;
+	case SPECIFIER_UNSIGNED:                                        type = type_unsigned_int;       break;
+	case SPECIFIER_UNSIGNED | SPECIFIER_LONG:                       type = type_unsigned_long;      break;
+	case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_unsigned_long_long; break;
+
+	default:
 error:
 		errorf(HERE, "invalid suffix '%s' on integer constant", suffix);
+		return;
 	}
+
+	if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG)
+		warn_traditional_suffix(suffix);
+
+	if (spec & SPECIFIER_COMPLEX)
+		type = make_complex_type(get_arithmetic_akind(type), TYPE_QUALIFIER_NONE);
+
+	expr->base.type = type;
+	/* Integer type depends on the size of the number and the size
+	 * representable by the types. The backend/codegeneration has to
+	 * determine that. */
+	determine_literal_type(&expr->literal);
 }
 
 static void check_floatingpoint_suffix(expression_t *const expr, char const *const suffix)
