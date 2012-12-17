@@ -126,9 +126,9 @@ done_flags:;
 		}
 
 		case 'X': {
-			unsigned int const val = va_arg(ap, unsigned int);
-			char const  *const fmt = flag_zero ? "%0*X" : "%*X";
-			fprintf(stderr, fmt, field_width, val);
+			unsigned int const val  = va_arg(ap, unsigned int);
+			char  const *const xfmt = flag_zero ? "%0*X" : "%*X";
+			fprintf(stderr, xfmt, field_width, val);
 			break;
 		}
 

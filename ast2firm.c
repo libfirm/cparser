@@ -136,11 +136,8 @@ static void enqueue_inner_function(entity_t *entity)
 static ir_node *uninitialized_local_var(ir_graph *irg, ir_mode *mode, int pos)
 {
 	const entity_t *entity = get_irg_loc_description(irg, pos);
-
-	if (entity != NULL) {
-		position_t const *const pos = &entity->base.pos;
-		warningf(WARN_UNINITIALIZED, pos, "'%N' might be used uninitialized", entity);
-	}
+	if (entity)
+		warningf(WARN_UNINITIALIZED, &entity->base.pos, "'%N' might be used uninitialized", entity);
 	return new_r_Unknown(irg, mode);
 }
 
@@ -604,15 +601,15 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 
 		symbol_t *symbol     = entry->base.symbol;
 		type_t   *entry_type = entry->declaration.type;
-		ident    *ident;
+		ident    *member_id;
 		if (symbol == NULL) {
 			/* anonymous bitfield member, skip */
 			if (entry->compound_member.bitfield)
 				continue;
 			assert(is_type_compound(entry_type));
-			ident = id_unique("anon.%u");
+			member_id = id_unique("anon.%u");
 		} else {
-			ident = new_id_from_str(symbol->string);
+			member_id = new_id_from_str(symbol->string);
 		}
 
 		dbg_info *dbgi = get_dbg_info(&entry->base.pos);
@@ -623,7 +620,7 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 		} else {
 			entry_irtype = get_ir_type(entry_type);
 		}
-		ir_entity *entity = new_d_entity(irtype, ident, entry_irtype, dbgi);
+		ir_entity *entity = new_d_entity(irtype, member_id, entry_irtype, dbgi);
 
 		set_entity_offset(entity, entry->compound_member.offset);
 		set_entity_offset_bits_remainder(entity,
@@ -4723,12 +4720,12 @@ static void create_variable_initializer(entity_t *entity)
 						&& get_entity_owner(irentity) != get_tls_type()) {
 					add_entity_linkage(irentity, IR_LINKAGE_CONSTANT);
 				}
-				ir_initializer_t *initializer = create_initializer_compound(2);
+				ir_initializer_t *complex_init = create_initializer_compound(2);
 				ir_initializer_t *reali = create_initializer_const(real);
-				set_initializer_compound_value(initializer, 0, reali);
+				set_initializer_compound_value(complex_init, 0, reali);
 				ir_initializer_t *imagi = create_initializer_const(imag);
-				set_initializer_compound_value(initializer, 1, imagi);
-				set_entity_initializer(irentity, initializer);
+				set_initializer_compound_value(complex_init, 1, imagi);
+				set_entity_initializer(irentity, complex_init);
 			}
 			return;
 		} else if (!is_type_scalar(init_type)) {

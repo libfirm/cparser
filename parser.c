@@ -4145,13 +4145,13 @@ static void parser_error_multiple_definition(entity_t *entity,
 	errorf(pos, "redefinition of '%N' (declared %P)", entity, &entity->base.pos);
 }
 
-static bool is_declaration_specifier(const token_t *token)
+static bool is_declaration_specifier(token_t const *const tk)
 {
-	switch (token->kind) {
+	switch (tk->kind) {
 		DECLARATION_START
 			return true;
 		case T_IDENTIFIER:
-			return is_typedef_symbol(token->base.symbol);
+			return is_typedef_symbol(tk->base.symbol);
 
 		default:
 			return false;
@@ -5213,42 +5213,42 @@ static void parse_external_declaration(void)
 		return;
 	}
 
-	assert(is_declaration(ndeclaration));
-	type_t *const orig_type = ndeclaration->declaration.type;
-	type_t *      type      = skip_typeref(orig_type);
+	{
+		assert(is_declaration(ndeclaration));
+		type_t *const orig_type = ndeclaration->declaration.type;
+		type_t *const type      = skip_typeref(orig_type);
 
-	if (!is_type_function(type)) {
-		if (is_type_valid(type)) {
-			errorf(HERE, "declarator '%#N' has a body but is not a function type", ndeclaration);
+		if (!is_type_function(type)) {
+			if (is_type_valid(type)) {
+				errorf(HERE, "declarator '%#N' has a body but is not a function type", ndeclaration);
+			}
+			eat_block();
+			return;
 		}
-		eat_block();
-		return;
-	}
 
-	position_t const *const pos = &ndeclaration->base.pos;
-	if (is_typeref(orig_type)) {
-		/* §6.9.1:2 */
-		errorf(pos, "type of function definition '%#N' is a typedef", ndeclaration);
-	}
+		position_t const *const pos = &ndeclaration->base.pos;
+		if (is_typeref(orig_type)) {
+			/* §6.9.1:2 */
+			errorf(pos, "type of function definition '%#N' is a typedef", ndeclaration);
+		}
 
-	if (is_type_compound(skip_typeref(type->function.return_type))) {
-		warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate", ndeclaration);
-	}
-	if (type->function.unspecified_parameters) {
-		warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of '%N'", ndeclaration);
-	} else {
-		warningf(WARN_TRADITIONAL, pos, "traditional C rejects ISO C style definition of '%N'", ndeclaration);
-	}
+		if (is_type_compound(skip_typeref(type->function.return_type))) {
+			warningf(WARN_AGGREGATE_RETURN, pos, "'%N' returns an aggregate", ndeclaration);
+		}
+		if (type->function.unspecified_parameters) {
+			warningf(WARN_OLD_STYLE_DEFINITION, pos, "old-style definition of '%N'", ndeclaration);
+		} else {
+			warningf(WARN_TRADITIONAL, pos, "traditional C rejects ISO C style definition of '%N'", ndeclaration);
+		}
 
-	/* §6.7.5.3:14 a function definition with () means no
-	 * parameters (and not unspecified parameters) */
-	if (type->function.unspecified_parameters &&
-			type->function.parameters == NULL) {
-		type_t *copy                          = duplicate_type(type);
-		copy->function.unspecified_parameters = false;
-		type                                  = identify_new_type(copy);
-
-		ndeclaration->declaration.type = type;
+		/* §6.7.5.3:14 a function definition with () means no
+		 * parameters (and not unspecified parameters) */
+		if (type->function.unspecified_parameters &&
+				type->function.parameters == NULL) {
+			type_t *copy                          = duplicate_type(type);
+			copy->function.unspecified_parameters = false;
+			ndeclaration->declaration.type = identify_new_type(copy);
+		}
 	}
 
 	entity_t *const entity = record_entity(ndeclaration, true);
@@ -5307,8 +5307,7 @@ static void parse_external_declaration(void)
 				walk_statements(body, check_unreachable, NULL);
 			if (noreturn_candidate &&
 			    !(function->base.modifiers & DM_NORETURN)) {
-				position_t const *const pos = &body->base.pos;
-				warningf(WARN_MISSING_NORETURN, pos, "function '%#N' is candidate for attribute 'noreturn'", entity);
+				warningf(WARN_MISSING_NORETURN, &body->base.pos, "function '%#N' is candidate for attribute 'noreturn'", entity);
 			}
 		}
 
@@ -5500,11 +5499,10 @@ static void parse_compound_declarators(compound_t *compound,
 	add_anchor_token(',');
 	do {
 		entity_t *entity;
-
 		if (token.kind == ':') {
 			/* anonymous bitfield */
 			type_t *type = specifiers->type;
-			entity_t *const entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, NULL, HERE);
+			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, NULL, HERE);
 			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
 			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
 			entity->declaration.type                   = type;
@@ -5520,52 +5518,50 @@ static void parse_compound_declarators(compound_t *compound,
 				handle_entity_attributes(attributes, entity);
 			}
 			entity->declaration.attributes = attributes;
-
-			append_entity(&compound->members, entity);
 		} else {
-			entity = parse_declarator(specifiers,
-					DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
+			entity = parse_declarator(specifiers, DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
 			position_t const *const pos = &entity->base.pos;
 			if (entity->kind == ENTITY_TYPEDEF) {
 				errorf(pos, "typedef not allowed as compound member");
+				continue;
+			}
+
+			assert(entity->kind == ENTITY_COMPOUND_MEMBER);
+
+			/* make sure we don't define a symbol multiple times */
+			symbol_t *symbol = entity->base.symbol;
+			if (symbol != NULL) {
+				entity_t *prev = find_compound_entry(compound, symbol);
+				if (prev != NULL) {
+					position_t const *const ppos = &prev->base.pos;
+					errorf(pos, "multiple declarations of '%N' (declared %P)", entity, ppos);
+				}
+			}
+
+			if (token.kind == ':') {
+				parse_bitfield_member(entity);
+
+				attribute_t *attributes = parse_attributes(NULL);
+				handle_entity_attributes(attributes, entity);
 			} else {
-				assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-
-				/* make sure we don't define a symbol multiple times */
-				symbol_t *symbol = entity->base.symbol;
-				if (symbol != NULL) {
-					entity_t *prev = find_compound_entry(compound, symbol);
-					if (prev != NULL) {
-						position_t const *const ppos = &prev->base.pos;
-						errorf(pos, "multiple declarations of '%N' (declared %P)", entity, ppos);
+				type_t *orig_type = entity->declaration.type;
+				type_t *type      = skip_typeref(orig_type);
+				if (is_type_function(type)) {
+					errorf(pos, "'%N' must not have function type '%T'", entity, orig_type);
+				} else if (is_type_incomplete(type)) {
+					/* §6.7.2.1:16 flexible array member */
+					if (!is_type_array(type)       ||
+							token.kind          != ';' ||
+							look_ahead(1)->kind != '}') {
+						errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
+					} else if (compound->members.entities == NULL) {
+						errorf(pos, "flexible array member in otherwise empty struct");
 					}
 				}
-
-				if (token.kind == ':') {
-					parse_bitfield_member(entity);
-
-					attribute_t *attributes = parse_attributes(NULL);
-					handle_entity_attributes(attributes, entity);
-				} else {
-					type_t *orig_type = entity->declaration.type;
-					type_t *type      = skip_typeref(orig_type);
-					if (is_type_function(type)) {
-						errorf(pos, "'%N' must not have function type '%T'", entity, orig_type);
-					} else if (is_type_incomplete(type)) {
-						/* §6.7.2.1:16 flexible array member */
-						if (!is_type_array(type)       ||
-								token.kind          != ';' ||
-								look_ahead(1)->kind != '}') {
-							errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
-						} else if (compound->members.entities == NULL) {
-							errorf(pos, "flexible array member in otherwise empty struct");
-						}
-					}
-				}
-
-				append_entity(&compound->members, entity);
 			}
 		}
+
+		append_entity(&compound->members, entity);
 	} while (accept(','));
 	rem_anchor_token(',');
 	rem_anchor_token(';');

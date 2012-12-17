@@ -1855,18 +1855,18 @@ static void parse_define_directive(void)
 			= size / sizeof(new_definition->parameters[0]);
 		new_definition->parameters = obstack_finish(&pp_obstack);
 		for (size_t i = 0; i < new_definition->n_parameters; ++i) {
-			pp_definition_t *param    = &new_definition->parameters[i];
-			symbol_t        *symbol   = param->symbol;
-			pp_definition_t *previous = symbol->pp_definition;
+			pp_definition_t *const param     = &new_definition->parameters[i];
+			symbol_t        *const param_sym = param->symbol;
+			pp_definition_t *const previous  = param_sym->pp_definition;
 			if (previous != NULL
 			    && previous->function_definition == new_definition) {
-				errorf(&param->pos, "duplicate macro parameter '%Y'", symbol);
+				errorf(&param->pos, "duplicate macro parameter '%Y'", param_sym);
 				param->symbol = sym_anonymous;
 				continue;
 			}
 			param->parent_expansion    = previous;
 			param->function_definition = new_definition;
-			symbol->pp_definition      = param;
+			param_sym->pp_definition   = param;
 		}
 	} else {
 		next_input_token();
@@ -1877,8 +1877,7 @@ static void parse_define_directive(void)
 	bool next_must_be_param = false;
 	while (!info.at_line_begin) {
 		if (pp_token.kind == T_IDENTIFIER) {
-			const symbol_t  *symbol     = pp_token.base.symbol;
-			pp_definition_t *definition = symbol->pp_definition;
+			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
 			if (definition != NULL
 			    && definition->function_definition == new_definition) {
 			    pp_token.kind                = T_MACRO_PARAMETER;
@@ -1905,14 +1904,14 @@ static void parse_define_directive(void)
 
 	if (new_definition->has_parameters) {
 		for (size_t i = 0; i < new_definition->n_parameters; ++i) {
-			pp_definition_t *param      = &new_definition->parameters[i];
-			symbol_t        *symbol     = param->symbol;
-			if (symbol == sym_anonymous)
+			pp_definition_t *const param     = &new_definition->parameters[i];
+			symbol_t        *const param_sym = param->symbol;
+			if (param_sym == sym_anonymous)
 				continue;
-			assert(symbol->pp_definition == param);
+			assert(param_sym->pp_definition == param);
 			assert(param->function_definition == new_definition);
-			symbol->pp_definition   = param->parent_expansion;
-			param->parent_expansion = NULL;
+			param_sym->pp_definition = param->parent_expansion;
+			param->parent_expansion  = NULL;
 		}
 	}
 

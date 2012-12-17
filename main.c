@@ -976,19 +976,19 @@ static void init_types_and_adjust(void)
 	atomic_type_properties_t *props = atomic_type_properties;
 
 	/* adjust types as requested by target architecture */
-	ir_type *type_long_double = be_params->type_long_double;
-	if (type_long_double != NULL) {
-		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_long_double);
-		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_long_double);
+	ir_type *const type_ld = be_params->type_long_double;
+	if (type_ld) {
+		set_typeprops_type(&props[ATOMIC_TYPE_LONG_DOUBLE], type_ld);
+		atomic_modes[ATOMIC_TYPE_LONG_DOUBLE] = get_type_mode(type_ld);
 	}
 
-	ir_type *type_long_long = be_params->type_long_long;
-	if (type_long_long != NULL)
-		set_typeprops_type(&props[ATOMIC_TYPE_LONGLONG], type_long_long);
+	ir_type *const type_ll = be_params->type_long_long;
+	if (type_ll)
+		set_typeprops_type(&props[ATOMIC_TYPE_LONGLONG], type_ll);
 
-	ir_type *type_unsigned_long_long = be_params->type_unsigned_long_long;
-	if (type_unsigned_long_long != NULL)
-		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_unsigned_long_long);
+	ir_type *const type_ull = be_params->type_unsigned_long_long;
+	if (type_ull)
+		set_typeprops_type(&props[ATOMIC_TYPE_ULONGLONG], type_ull);
 
 	/* operating system ABI specifics */
 	if (firm_is_darwin_os(target_machine)) {
@@ -1033,14 +1033,14 @@ static void init_types_and_adjust(void)
 	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
-	if (type_long_long == NULL) {
+	if (!type_ll) {
 		copy_typeprops(&props[ATOMIC_TYPE_LONGLONG], &props[ATOMIC_TYPE_LONG]);
 	}
-	if (type_unsigned_long_long == NULL) {
+	if (!type_ull) {
 		copy_typeprops(&props[ATOMIC_TYPE_ULONGLONG],
 		               &props[ATOMIC_TYPE_ULONG]);
 	}
-	if (type_long_double == NULL) {
+	if (!type_ld) {
 		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
 		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
@@ -1264,13 +1264,11 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 again:
 		switch (unit->type) {
 		case COMPILATION_UNIT_IR: {
-			bool res = open_input(unit);
-			if (!res) {
+			if (!open_input(unit)) {
 				result = EXIT_FAILURE;
 				break;
 			}
-			res = !ir_import_file(unit->input, unit->name);
-			if (!res) {
+			if (ir_import_file(unit->input, unit->name)) {
 				position_t const pos = { inputname, 0, 0, 0 };
 				errorf(&pos, "import of firm graph failed");
 				result = EXIT_FAILURE;
@@ -1283,8 +1281,7 @@ again:
 			if (external_preprocessor == NULL) {
 				panic("preprocessed assembler not possible with internal preprocessor yet");
 			}
-			bool res = run_external_preprocessor(unit);
-			if (!res) {
+			if (!run_external_preprocessor(unit)) {
 				result = EXIT_FAILURE;
 				break;
 			}
@@ -1306,8 +1303,7 @@ again:
 		case COMPILATION_UNIT_C:
 		case COMPILATION_UNIT_CXX:
 			if (external_preprocessor != NULL) {
-				bool res = run_external_preprocessor(unit);
-				if (!res) {
+				if (!run_external_preprocessor(unit)) {
 					result = EXIT_FAILURE;
 					break;
 				}
@@ -1317,16 +1313,14 @@ again:
 
 		case COMPILATION_UNIT_PREPROCESSED_C:
 		case COMPILATION_UNIT_PREPROCESSED_CXX: {
-			bool res = open_input(unit);
-			if (!res) {
+			if (!open_input(unit)) {
 				result = EXIT_FAILURE;
 				break;
 			}
 			init_tokens();
 
 			if (mode == PreprocessOnly) {
-				bool res = output_preprocessor_tokens(unit, out);
-				if (!res) {
+				if (!output_preprocessor_tokens(unit, out)) {
 					result = EXIT_FAILURE;
 					break;
 				}
@@ -1780,8 +1774,7 @@ int main(int argc, char **argv)
 					           streq(opt, "stack-protector-all")) {
 						fprintf(stderr, "ignoring gcc option '-f%s'\n", orig_opt);
 					} else {
-						int res = firm_option(orig_opt);
-						if (res == 0) {
+						if (firm_option(orig_opt) == 0) {
 							errorf(NULL, "unknown Firm option '-f%s'", orig_opt);
 							argument_errors = true;
 							continue;
@@ -1796,8 +1789,7 @@ int main(int argc, char **argv)
 					fprintf(stderr, "warning: -bhelp is deprecated (use --help-firm)\n");
 					help |= HELP_FIRM;
 				} else {
-					int res = be_parse_arg(opt);
-					if (res == 0) {
+					if (be_parse_arg(opt) == 0) {
 						errorf(NULL, "unknown Firm backend option '-b %s'", opt);
 						argument_errors = true;
 					} else if (strstart(opt, "isa=")) {
@@ -1872,14 +1864,12 @@ int main(int argc, char **argv)
 				} else if (strstart(opt, "tune=")) {
 					GET_ARG_AFTER(opt, "-mtune=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-					int res = be_parse_arg(arch_opt);
-					if (res == 0)
+					if (be_parse_arg(arch_opt) == 0)
 						argument_errors = true;
 				} else if (strstart(opt, "cpu=")) {
 					GET_ARG_AFTER(opt, "-mcpu=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
-					int res = be_parse_arg(arch_opt);
-					if (res == 0)
+					if (be_parse_arg(arch_opt) == 0)
 						argument_errors = true;
 				} else if (strstart(opt, "fpmath=")) {
 					GET_ARG_AFTER(opt, "-mfpmath=");
@@ -1893,15 +1883,13 @@ int main(int argc, char **argv)
 					}
 					if (!argument_errors) {
 						snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
-						int res = be_parse_arg(arch_opt);
-						if (res == 0)
+						if (be_parse_arg(arch_opt) == 0)
 							argument_errors = true;
 					}
 				} else if (strstart(opt, "preferred-stack-boundary=")) {
 					GET_ARG_AFTER(opt, "-mpreferred-stack-boundary=");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-stackalign=%s", cpu_arch, opt);
-					int res = be_parse_arg(arch_opt);
-					if (res == 0)
+					if (be_parse_arg(arch_opt) == 0)
 						argument_errors = true;
 				} else if (streq(opt, "rtd")) {
 					default_calling_convention = CC_STDCALL;
@@ -1911,8 +1899,7 @@ int main(int argc, char **argv)
 				} else if (streq(opt, "soft-float")) {
 					add_flag(&ldflags_obst, "-msoft-float");
 					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=softfloat", cpu_arch);
-					int res = be_parse_arg(arch_opt);
-					if (res == 0)
+					if (be_parse_arg(arch_opt) == 0)
 						argument_errors = true;
 				} else if (streq(opt, "sse2")) {
 					/* ignore for now, our x86 backend always uses sse when
@@ -2274,11 +2261,11 @@ int main(int argc, char **argv)
 
 	/* link program file */
 	if (mode == CompileAssembleLink) {
-		int result = link_program(units);
-		if (result != EXIT_SUCCESS) {
+		int const link_result = link_program(units);
+		if (link_result != EXIT_SUCCESS) {
 			if (out != stdout)
 				unlink(outname);
-			return result;
+			return link_result;
 		}
 	}
 
