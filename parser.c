@@ -5672,20 +5672,19 @@ static expression_t *parse_boolean_literal(bool value)
 	return literal;
 }
 
-static void warn_traditional_suffix(char const *const suffix)
-{
-	warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%s' suffix", suffix);
-}
-
-static void check_integer_suffix(expression_t *const expr, char const *const suffix)
+static void check_number_suffix(expression_t *const expr, char const *const suffix, bool const is_float)
 {
 	unsigned spec = SPECIFIER_NONE;
 	for (char const *c = suffix; *c != '\0'; ++c) {
 		specifiers_t add;
 		switch (*c) {
+		case 'F': case 'f':
+			add = SPECIFIER_FLOAT;
+			break;
+
 		case 'L': case 'l':
 			add = SPECIFIER_LONG;
-			if (*c == c[1]) {
+			if (*c == c[1] && !is_float) {
 				add |= SPECIFIER_LONG_LONG;
 				++c;
 			}
@@ -5710,6 +5709,12 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 		spec |= add;
 	}
 
+	if (!(spec & SPECIFIER_FLOAT) && is_float)
+		spec |= SPECIFIER_DOUBLE;
+
+	if (!(spec & (SPECIFIER_FLOAT | SPECIFIER_DOUBLE)) == is_float)
+		goto error;
+
 	type_t *type;
 	switch (spec & ~SPECIFIER_COMPLEX) {
 	case SPECIFIER_NONE:                                            type = type_int;                break;
@@ -5718,61 +5723,28 @@ static void check_integer_suffix(expression_t *const expr, char const *const suf
 	case SPECIFIER_UNSIGNED:                                        type = type_unsigned_int;       break;
 	case SPECIFIER_UNSIGNED | SPECIFIER_LONG:                       type = type_unsigned_long;      break;
 	case SPECIFIER_UNSIGNED | SPECIFIER_LONG | SPECIFIER_LONG_LONG: type = type_unsigned_long_long; break;
+	case SPECIFIER_FLOAT:                                           type = type_float;              break;
+	case SPECIFIER_DOUBLE:                                          type = type_double;             break;
+	case SPECIFIER_DOUBLE   | SPECIFIER_LONG:                       type = type_long_double;        break;
 
 	default:
 error:
-		errorf(HERE, "invalid suffix '%s' on integer constant", suffix);
+		errorf(HERE, "invalid suffix '%s' on %s constant", suffix, is_float ? "floatingpoint" : "integer");
 		return;
 	}
 
-	if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG)
-		warn_traditional_suffix(suffix);
+	if (spec != SPECIFIER_NONE && spec != SPECIFIER_LONG && spec != SPECIFIER_DOUBLE)
+		warningf(WARN_TRADITIONAL, HERE, "traditional C rejects the '%s' suffix", suffix);
 
 	if (spec & SPECIFIER_COMPLEX)
 		type = make_complex_type(get_arithmetic_akind(type), TYPE_QUALIFIER_NONE);
 
 	expr->base.type = type;
-	/* Integer type depends on the size of the number and the size
-	 * representable by the types. The backend/codegeneration has to
-	 * determine that. */
-	determine_literal_type(&expr->literal);
-}
-
-static void check_floatingpoint_suffix(expression_t *const expr, char const *const suffix)
-{
-	type_t     *type;
-	char const *c          = suffix;
-	bool        is_complex = false;
-next:
-	switch (*c) {
-	case 'F':
-	case 'f': type = type_float;       ++c; break;
-	case 'L':
-	case 'l': type = type_long_double; ++c; break;
-	case 'i':
-	case 'I':
-	case 'j':
-	case 'J':
-		if (!GNU_MODE)
-			break;
-		is_complex = true;
-		++c;
-		goto next;
-	default:  type = type_double;           break;
-	}
-
-	if (*c == '\0') {
-		if (is_complex) {
-			assert(type->kind == TYPE_ATOMIC);
-			type = make_complex_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
-		}
-
-		expr->base.type = type;
-		if (suffix[0] != '\0') {
-			warn_traditional_suffix(suffix);
-		}
-	} else {
-		errorf(HERE, "invalid suffix '%s' on floatingpoint constant", suffix);
+	if (!is_float) {
+		/* Integer type depends on the size of the number and the size
+		 * representable by the types. The backend/codegeneration has to
+		 * determine that. */
+		determine_literal_type(&expr->literal);
 	}
 }
 
@@ -5889,11 +5861,7 @@ done:;
 			errorf(HERE, "invalid digit in %K", &token);
 		} else {
 			expr->literal.suffix = i;
-			if (is_float) {
-				check_floatingpoint_suffix(expr, i);
-			} else {
-				check_integer_suffix(expr, i);
-			}
+			check_number_suffix(expr, i, is_float);
 		}
 	}
 
