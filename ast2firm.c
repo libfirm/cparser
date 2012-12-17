@@ -485,10 +485,12 @@ static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
 
 	mode = s_modes[size];
 	if (mode == NULL) {
-		char name[32];
+		ir_mode *base_mode    = get_type_mode(base_tp);
+		unsigned modulo_shift = get_mode_modulo_shift(base_mode);
 
+		char name[32];
 		snprintf(name, sizeof(name), "bf_I%u", size);
-		mode = new_int_mode(name, irma_twos_complement, size, 1, 0);
+		mode = new_int_mode(name, irma_twos_complement, size, 1, modulo_shift);
 		s_modes[size] = mode;
 	}
 
@@ -517,10 +519,12 @@ static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
 
 	mode = u_modes[size];
 	if (mode == NULL) {
-		char name[32];
+		ir_mode *base_mode    = get_type_mode(base_tp);
+		unsigned modulo_shift = get_mode_modulo_shift(base_mode);
 
+		char name[32];
 		snprintf(name, sizeof(name), "bf_U%u", size);
-		mode = new_int_mode(name, irma_twos_complement, size, 0, 0);
+		mode = new_int_mode(name, irma_twos_complement, size, 0, modulo_shift);
 		u_modes[size] = mode;
 	}
 
