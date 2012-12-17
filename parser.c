@@ -5696,8 +5696,6 @@ static void check_number_suffix(expression_t *const expr, char const *const suff
 
 		case 'I': case 'i':
 		case 'J': case 'j':
-			if (!GNU_MODE)
-				goto error;
 			add = SPECIFIER_COMPLEX;
 			break;
 
