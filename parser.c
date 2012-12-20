@@ -860,14 +860,13 @@ static bool is_null_pointer_constant(const expression_t *expression)
 			expression = expression->unary.value;
 	}
 
-	type_t *const type = skip_typeref(expression->base.type);
-	if (!is_type_integer(type))
-		return false;
 	switch (is_constant_expression(expression)) {
-		case EXPR_CLASS_ERROR:    return true;
-		case EXPR_CLASS_CONSTANT: return !fold_constant_to_bool(expression);
-		default:                  return false;
+		case EXPR_CLASS_VARIABLE:         return false;
+		case EXPR_CLASS_ERROR:            return true;
+		case EXPR_CLASS_CONSTANT:         return false;
+		case EXPR_CLASS_INTEGER_CONSTANT: return !fold_constant_to_bool(expression);
 	}
+	panic("invalid expression classification");
 }
 
 /**
@@ -1838,7 +1837,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			}
 		} else {
 			expression_t *array_index = designator->array_index;
-			if (is_constant_expression(array_index) != EXPR_CLASS_CONSTANT)
+			if (is_constant_expression(array_index) < EXPR_CLASS_CONSTANT)
 				return true;
 
 			if (!is_type_array(type)) {
@@ -3558,7 +3557,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 			if (size_expression != NULL) {
 				switch (is_constant_expression(size_expression)) {
-				case EXPR_CLASS_CONSTANT: {
+				case EXPR_CLASS_INTEGER_CONSTANT: {
 					long const size = fold_constant_to_int(size_expression);
 					array_type->array.size          = size;
 					array_type->array.size_constant = true;
@@ -3574,6 +3573,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 					break;
 				}
 
+				case EXPR_CLASS_CONSTANT:
 				case EXPR_CLASS_VARIABLE:
 					array_type->array.is_vla = true;
 					break;
@@ -4587,8 +4587,8 @@ static void check_declarations(void)
 static int determine_truth(expression_t const* const cond)
 {
 	return
-		is_constant_expression(cond) != EXPR_CLASS_CONSTANT ? 0 :
-		fold_constant_to_bool(cond)                         ? 1 :
+		is_constant_expression(cond) < EXPR_CLASS_CONSTANT ? 0 :
+		fold_constant_to_bool(cond)                        ? 1 :
 		-1;
 }
 
@@ -4796,7 +4796,7 @@ static void check_reachable(statement_t *const stmt)
 			if (!expression_returns(expr))
 				return;
 
-			if (is_constant_expression(expr) == EXPR_CLASS_CONSTANT) {
+			if (is_constant_expression(expr) >= EXPR_CLASS_CONSTANT) {
 				ir_tarval              *const val      = fold_constant_to_tarval(expr);
 				case_label_statement_t *      defaults = NULL;
 				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
@@ -5463,7 +5463,7 @@ static void parse_bitfield_member(entity_t *entity)
 			   type);
 	}
 
-	if (is_constant_expression(size) != EXPR_CLASS_CONSTANT) {
+	if (is_constant_expression(size) < EXPR_CLASS_CONSTANT) {
 		/* error already reported by parse_constant_expression */
 		size_long = get_type_size(type) * 8;
 	} else {
@@ -7871,7 +7871,7 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 	expression_t const *const right = expression->right;
 	/* The type of the right operand can be different for /= */
 	if (is_type_integer(skip_typeref(right->base.type))      &&
-	    is_constant_expression(right) == EXPR_CLASS_CONSTANT &&
+	    is_constant_expression(right) >= EXPR_CLASS_CONSTANT &&
 	    !fold_constant_to_bool(right)) {
 		position_t const *const pos = &expression->base.pos;
 		warningf(WARN_DIV_BY_ZERO, pos, "division by zero");
@@ -7931,7 +7931,7 @@ static bool semantic_shift(binary_expression_t *expression)
 
 	type_left = promote_integer(type_left);
 
-	if (is_constant_expression(right) == EXPR_CLASS_CONSTANT) {
+	if (is_constant_expression(right) >= EXPR_CLASS_CONSTANT) {
 		position_t const *const pos   = &right->base.pos;
 		long              const count = fold_constant_to_int(right);
 		if (count < 0) {
@@ -8057,10 +8057,12 @@ static void warn_string_literal_address(expression_t const* expr)
 static bool maybe_negative(expression_t const *const expr)
 {
 	switch (is_constant_expression(expr)) {
-		case EXPR_CLASS_ERROR:    return false;
-		case EXPR_CLASS_CONSTANT: return constant_is_negative(expr);
-		default:                  return true;
+		case EXPR_CLASS_VARIABLE:         return true;
+		case EXPR_CLASS_ERROR:            return false;
+		case EXPR_CLASS_CONSTANT:
+		case EXPR_CLASS_INTEGER_CONSTANT: return constant_is_negative(expr);
 	}
+	panic("invalid expression classification");
 }
 
 static void warn_comparison(position_t const *const pos, expression_t const *const expr, expression_t const *const other)
@@ -8944,7 +8946,7 @@ static statement_t *parse_case_statement(void)
 
 	statement->case_label.expression = expression;
 	expression_classification_t const expr_class = is_constant_expression(expression);
-	if (expr_class != EXPR_CLASS_CONSTANT) {
+	if (expr_class < EXPR_CLASS_CONSTANT) {
 		if (expr_class != EXPR_CLASS_ERROR) {
 			errorf(pos, "case label does not reduce to an integer constant");
 		}
@@ -8968,7 +8970,7 @@ static statement_t *parse_case_statement(void)
 			end_range = create_implicit_cast(end_range, type);
 			statement->case_label.end_range = end_range;
 			expression_classification_t const end_class = is_constant_expression(end_range);
-			if (end_class != EXPR_CLASS_CONSTANT) {
+			if (end_class < EXPR_CLASS_CONSTANT) {
 				if (end_class != EXPR_CLASS_ERROR) {
 					errorf(pos, "case range does not reduce to an integer constant");
 				}

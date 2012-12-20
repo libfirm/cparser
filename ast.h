@@ -85,7 +85,8 @@ void change_indent(int delta);
 typedef enum expression_classification_t {
 	EXPR_CLASS_VARIABLE,
 	EXPR_CLASS_ERROR,
-	EXPR_CLASS_CONSTANT
+	EXPR_CLASS_CONSTANT,
+	EXPR_CLASS_INTEGER_CONSTANT
 } expression_classification_t;
 
 /**

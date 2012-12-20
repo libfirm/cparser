@@ -1630,7 +1630,7 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 	case EXPR_CONDITIONAL: {
 		expression_t *const c = expression->conditional.condition;
 		expression_classification_t const cclass = is_constant_expression(c);
-		if (cclass != EXPR_CLASS_CONSTANT)
+		if (cclass < EXPR_CLASS_CONSTANT)
 			return cclass;
 
 		if (fold_constant_to_bool(c)) {
@@ -1720,7 +1720,7 @@ static expression_classification_t is_object_with_constant_address(const express
 		array_access_expression_t const* const array_access =
 			&expression->array_access;
 		expression_classification_t const idx_class = is_constant_expression(array_access->index);
-		if (idx_class != EXPR_CLASS_CONSTANT)
+		if (idx_class < EXPR_CLASS_CONSTANT)
 			return idx_class;
 		expression_classification_t const ref_addr = is_object_with_constant_address(array_access->array_ref);
 		expression_classification_t const ref_ptr  = is_constant_pointer(array_access->array_ref);
@@ -1746,7 +1746,7 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 	case EXPR_ENUM_CONSTANT:
 	case EXPR_LITERAL_BOOLEAN:
 	case EXPR_LITERAL_MS_NOOP:
-		return EXPR_CLASS_CONSTANT;
+		return EXPR_CLASS_INTEGER_CONSTANT;
 
 	{
 		type_t *type;
@@ -1759,7 +1759,6 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		goto check_type;
 
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_FLOATINGPOINT:
 		type = skip_typeref(expression->base.type);
 		goto check_type;
 
@@ -1774,12 +1773,17 @@ expression_classification_t is_constant_expression(const expression_t *expressio
 		goto check_type;
 
 check_type:
+		return is_type_valid(type) ? EXPR_CLASS_INTEGER_CONSTANT : EXPR_CLASS_ERROR;
+	}
+
+	case EXPR_LITERAL_FLOATINGPOINT: {
+		type_t *const type = skip_typeref(expression->base.type);
 		return is_type_valid(type) ? EXPR_CLASS_CONSTANT : EXPR_CLASS_ERROR;
 	}
 
 	case EXPR_BUILTIN_CONSTANT_P: {
 		expression_classification_t const c = is_constant_expression(expression->builtin_constant.value);
-		return c != EXPR_CLASS_ERROR ? EXPR_CLASS_CONSTANT : EXPR_CLASS_ERROR;
+		return c != EXPR_CLASS_ERROR ? EXPR_CLASS_INTEGER_CONSTANT : EXPR_CLASS_ERROR;
 	}
 
 	case EXPR_STRING_LITERAL:
@@ -1841,6 +1845,14 @@ check_type:
 
 	case EXPR_UNARY_CAST: {
 		type_t *const type = skip_typeref(expression->base.type);
+		if (is_type_integer(type)) {
+			expression_t *const val = expression->unary.value;
+			if (is_type_arithmetic(skip_typeref(val->base.type))) {
+				return val->kind == EXPR_LITERAL_FLOATINGPOINT
+					? EXPR_CLASS_INTEGER_CONSTANT
+					: is_constant_expression(val);
+			}
+		}
 		if (is_type_scalar(type))
 			return is_constant_expression(expression->unary.value);
 		if (!is_type_valid(type))
@@ -1876,40 +1888,48 @@ check_type:
 	}
 
 	case EXPR_BINARY_LOGICAL_AND: {
-		expression_t const         *const left   = expression->binary.left;
-		expression_classification_t const lclass = is_constant_expression(left);
-		if (lclass != EXPR_CLASS_CONSTANT)
-			return lclass;
+		expression_t const         *const left = expression->binary.left;
+		expression_classification_t const lcls = is_constant_expression(left);
+		if (lcls < EXPR_CLASS_CONSTANT)
+			return lcls;
+		expression_classification_t const rcls = is_constant_expression(expression->binary.right);
+		if (lcls == EXPR_CLASS_INTEGER_CONSTANT && rcls == EXPR_CLASS_INTEGER_CONSTANT)
+			return EXPR_CLASS_INTEGER_CONSTANT;
 		if (!fold_constant_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
-		return is_constant_expression(expression->binary.right);
+		return rcls < EXPR_CLASS_CONSTANT ? rcls : EXPR_CLASS_CONSTANT;
 	}
 
 	case EXPR_BINARY_LOGICAL_OR: {
-		expression_t const         *const left   = expression->binary.left;
-		expression_classification_t const lclass = is_constant_expression(left);
-		if (lclass != EXPR_CLASS_CONSTANT)
-			return lclass;
+		expression_t const         *const left = expression->binary.left;
+		expression_classification_t const lcls = is_constant_expression(left);
+		if (lcls < EXPR_CLASS_CONSTANT)
+			return lcls;
+		expression_classification_t const rcls = is_constant_expression(expression->binary.right);
+		if (lcls == EXPR_CLASS_INTEGER_CONSTANT && rcls == EXPR_CLASS_INTEGER_CONSTANT)
+			return EXPR_CLASS_INTEGER_CONSTANT;
 		if (fold_constant_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
-		return is_constant_expression(expression->binary.right);
+		return rcls < EXPR_CLASS_CONSTANT ? rcls : EXPR_CLASS_CONSTANT;
 	}
 
 	case EXPR_COMPOUND_LITERAL:
 		return is_constant_initializer(expression->compound_literal.initializer);
 
 	case EXPR_CONDITIONAL: {
-		expression_t               *const condition = expression->conditional.condition;
-		expression_classification_t const cclass    = is_constant_expression(condition);
-		if (cclass != EXPR_CLASS_CONSTANT)
-			return cclass;
-
-		if (fold_constant_to_bool(condition)) {
-			expression_t const *const t = expression->conditional.true_expression;
-			return t == NULL ? EXPR_CLASS_CONSTANT : is_constant_expression(t);
-		} else {
-			return is_constant_expression(expression->conditional.false_expression);
-		}
+		expression_t               *const cond = expression->conditional.condition;
+		expression_classification_t const ccls = is_constant_expression(cond);
+		if (ccls < EXPR_CLASS_CONSTANT)
+			return ccls;
+		expression_t         const *const t    = expression->conditional.true_expression;
+		expression_classification_t const tcls = t == NULL ? ccls : is_constant_expression(t);
+		expression_classification_t const fcls = is_constant_expression(expression->conditional.false_expression);
+		if (ccls == EXPR_CLASS_INTEGER_CONSTANT &&
+		    tcls == EXPR_CLASS_INTEGER_CONSTANT &&
+		    fcls == EXPR_CLASS_INTEGER_CONSTANT)
+			return EXPR_CLASS_INTEGER_CONSTANT;
+		expression_classification_t const cls = fold_constant_to_bool(cond) ? tcls : fcls;
+		return cls < EXPR_CLASS_CONSTANT ? cls : EXPR_CLASS_CONSTANT;
 	}
 
 	case EXPR_ERROR:

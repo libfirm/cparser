@@ -2158,10 +2158,10 @@ static ir_node *handle_assume_compare(dbg_info *dbi,
 	}
 
 	expression_t *con = NULL;
-	if (is_local_variable(op1) && is_constant_expression(op2) == EXPR_CLASS_CONSTANT) {
+	if (is_local_variable(op1) && is_constant_expression(op2) != EXPR_CLASS_VARIABLE) {
 		var = op1->reference.entity;
 		con = op2;
-	} else if (is_constant_expression(op1) == EXPR_CLASS_CONSTANT && is_local_variable(op2)) {
+	} else if (is_constant_expression(op1) != EXPR_CLASS_VARIABLE && is_local_variable(op2)) {
 		relation = get_inversed_relation(relation);
 		var = op2->reference.entity;
 		con = op1;
@@ -2444,7 +2444,7 @@ static void compare_to_control_flow(expression_t const *const expr, ir_node *con
 		/* set branch prediction info based on __builtin_expect */
 		if (is_builtin_expect(expr) && is_Cond(cond)) {
 			call_argument_t *const argument = expr->call.arguments->next;
-			if (is_constant_expression(argument->expression) == EXPR_CLASS_CONSTANT) {
+			if (is_constant_expression(argument->expression) != EXPR_CLASS_VARIABLE) {
 				bool               const cnst = fold_constant_to_bool(argument->expression);
 				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
 				set_Cond_jmp_pred(cond, pred);
@@ -2644,9 +2644,10 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	type_t        *type        = expression->type;
 	initializer_t *initializer = expression->initializer;
 
-	if (expression->global_scope ||
-		((type->base.qualifiers & TYPE_QUALIFIER_CONST)
-	    && is_constant_initializer(initializer) == EXPR_CLASS_CONSTANT)) {
+	if (expression->global_scope || (
+	      type->base.qualifiers & TYPE_QUALIFIER_CONST &&
+	      is_constant_initializer(initializer) != EXPR_CLASS_VARIABLE
+	    )) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
 		return create_symconst(dbgi, entity);
 	} else {
@@ -2745,7 +2746,7 @@ static void init_ir_types(void);
 
 ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 {
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
+	assert(is_constant_expression(expression) >= EXPR_CLASS_CONSTANT);
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
@@ -2771,7 +2772,7 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 static complex_constant fold_complex_constant(const expression_t *expression)
 {
-	assert(is_constant_expression(expression) == EXPR_CLASS_CONSTANT);
+	assert(is_constant_expression(expression) >= EXPR_CLASS_CONSTANT);
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
@@ -3145,7 +3146,7 @@ static ir_node *builtin_constant_to_firm(
 		const builtin_constant_expression_t *expression)
 {
 	ir_mode *const mode = get_ir_mode_storage(expression->base.type);
-	bool     const v    = is_constant_expression(expression->value) == EXPR_CLASS_CONSTANT;
+	bool     const v    = is_constant_expression(expression->value) != EXPR_CLASS_VARIABLE;
 	return create_Const_from_bool(mode, v);
 }
 
@@ -5152,7 +5153,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 
 	expression_t *const cond = statement->condition;
 	/* Avoid an explicit body block in case of do ... while (0);. */
-	if (is_constant_expression(cond) == EXPR_CLASS_CONSTANT && !fold_constant_to_bool(cond)) {
+	if (is_constant_expression(cond) != EXPR_CLASS_VARIABLE && !fold_constant_to_bool(cond)) {
 		/* do ... while (0);. */
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
@@ -5208,7 +5209,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the condition. */
 	expression_t *const cond = statement->condition;
-	if (cond && (is_constant_expression(cond) != EXPR_CLASS_CONSTANT || !fold_constant_to_bool(cond))) {
+	if (cond && (is_constant_expression(cond) == EXPR_CLASS_VARIABLE || !fold_constant_to_bool(cond))) {
 		jump_target body_target;
 		init_jump_target(&body_target, NULL);
 		expression_to_control_flow(cond, &body_target, &break_target);
