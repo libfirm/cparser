@@ -3200,7 +3200,9 @@ static ir_node *expression_to_value(expression_t const *const expr)
 
 	switch (expr->kind) {
 	case EXPR_UNARY_CAST:
-		if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL)) {
+		if (!is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL))
+			return create_cast(&expr->unary);
+		/* FALLTHROUGH */
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_GREATER:
 	case EXPR_BINARY_GREATEREQUAL:
@@ -3215,16 +3217,14 @@ static ir_node *expression_to_value(expression_t const *const expr)
 	case EXPR_BINARY_LOGICAL_AND:
 	case EXPR_BINARY_LOGICAL_OR:
 	case EXPR_BINARY_NOTEQUAL:
-	case EXPR_UNARY_NOT:;
-			jump_target true_target;
-			jump_target false_target;
-			init_jump_target(&true_target,  NULL);
-			init_jump_target(&false_target, NULL);
-			expression_to_control_flow(expr, &true_target, &false_target);
-			return control_flow_to_1_0(expr, &true_target, &false_target);
-		} else {
-			return create_cast(&expr->unary);
-		}
+	case EXPR_UNARY_NOT: {
+		jump_target true_target;
+		jump_target false_target;
+		init_jump_target(&true_target,  NULL);
+		init_jump_target(&false_target, NULL);
+		expression_to_control_flow(expr, &true_target, &false_target);
+		return control_flow_to_1_0(expr, &true_target, &false_target);
+	}
 
 	case EXPR_BINARY_ADD:
 	case EXPR_BINARY_BITWISE_AND:
@@ -3385,23 +3385,24 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 		if (is_type_atomic(skip_typeref(expr->base.type), ATOMIC_TYPE_BOOL)) {
 			expression_to_control_flow(expr->unary.value, true_target, false_target);
 			return NULL;
-		} else {
-	default:;
-			type_t *const type = skip_typeref(expr->base.type);
-			if (is_type_complex(type)) {
-				complex_to_control_flow(expr, true_target, false_target);
-				return NULL;
-			}
-
-			dbg_info   *const dbgi  = get_dbg_info(&expr->base.pos);
-			ir_mode    *const mode  = get_ir_mode_arithmetic(type);
-			ir_node    *const val   = create_conv(dbgi, expression_to_value(expr), mode);
-			ir_node    *const left  = val;
-			ir_node    *const right = new_Const(get_mode_null(get_irn_mode(val)));
-			ir_relation const relation = ir_relation_unordered_less_greater;
-			compare_to_control_flow(expr, left, right, relation, true_target, false_target);
-			return val;
 		}
+		/* FALLTHROUGH */
+	default: {
+		type_t *const type = skip_typeref(expr->base.type);
+		if (is_type_complex(type)) {
+			complex_to_control_flow(expr, true_target, false_target);
+			return NULL;
+		}
+
+		dbg_info   *const dbgi  = get_dbg_info(&expr->base.pos);
+		ir_mode    *const mode  = get_ir_mode_arithmetic(type);
+		ir_node    *const val   = create_conv(dbgi, expression_to_value(expr), mode);
+		ir_node    *const left  = val;
+		ir_node    *const right = new_Const(get_mode_null(get_irn_mode(val)));
+		ir_relation const relation = ir_relation_unordered_less_greater;
+		compare_to_control_flow(expr, left, right, relation, true_target, false_target);
+		return val;
+	}
 	}
 }
 
