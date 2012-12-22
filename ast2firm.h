@@ -14,7 +14,6 @@ void translation_unit_to_firm(translation_unit_t *unit);
 void init_ast2firm(void);
 void exit_ast2firm(void);
 
-ir_mode *get_atomic_mode(atomic_type_kind_t kind);
 ir_type *get_ir_type(type_t *type);
 
 typedef ident* (*create_ld_ident_func)(entity_t *entity);

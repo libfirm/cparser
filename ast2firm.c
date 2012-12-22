@@ -235,12 +235,6 @@ static void init_atomic_modes(void)
 	}
 }
 
-ir_mode *get_atomic_mode(atomic_type_kind_t kind)
-{
-	assert(kind <= ATOMIC_TYPE_LAST);
-	return atomic_modes[kind];
-}
-
 static ir_node *get_vla_size(array_type_t *const type)
 {
 	ir_node *size_node = type->size_node;
