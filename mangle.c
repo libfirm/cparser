@@ -12,7 +12,6 @@
 #include "symbol_t.h"
 #include "mangle.h"
 #include "diagnostic.h"
-#include "ast2firm.h"
 #include "lang_features.h"
 #include "adt/error.h"
 
@@ -292,10 +291,9 @@ ident *create_name_win32(entity_t *entity)
 
 		case CC_STDCALL:
 		case CC_FASTCALL: {
-			ir_type  *irtype = get_ir_type(entity->declaration.type);
-			unsigned size    = 0;
-			for (int i = get_method_n_params(irtype) - 1; i >= 0; --i) {
-				size += get_type_size_bytes(get_method_param_type(irtype, i));
+			unsigned size = 0;
+			for (function_parameter_t const* i = type->function.parameters; i; i = i->next) {
+				size += get_type_size(i->type);
 			}
 			obstack_printf(o, "@%u", size);
 			break;
