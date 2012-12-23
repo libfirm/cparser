@@ -272,10 +272,10 @@ static ir_type *create_primitive_irtype(atomic_type_kind_t akind,
 /**
  * Creates a Firm type for an atomic type
  */
-static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
+static ir_type *create_atomic_type(type_t const *const type)
 {
 	type_dbg_info *dbgi = get_type_dbg_info_(type);
-	return create_primitive_irtype(akind, dbgi);
+	return create_primitive_irtype(type->atomic.akind, dbgi);
 }
 
 static ir_type *get_ir_type(type_t *type);
@@ -300,14 +300,6 @@ static ir_type *create_complex_type(type_t const *const type)
 	set_type_state(irtype, layout_fixed);
 
 	return irtype;
-}
-
-/**
- * Creates a Firm type for an imaginary type
- */
-static ir_type *create_imaginary_type(const atomic_type_t *type)
-{
-	return create_atomic_type(type->akind, (const type_t*)type);
 }
 
 /**
@@ -640,11 +632,6 @@ void determine_enum_values(enum_type_t *const type)
 	}
 }
 
-static ir_type *create_enum_type(enum_type_t *const type)
-{
-	return create_atomic_type(type->base.akind, (const type_t*) type);
-}
-
 static ir_type *get_ir_type_incomplete(type_t *type)
 {
 	type = skip_typeref(type);
@@ -671,13 +658,12 @@ static ir_type *get_ir_type(type_t *type)
 	ir_type *firm_type = NULL;
 	switch (type->kind) {
 	case TYPE_ATOMIC:
-		firm_type = create_atomic_type(type->atomic.akind, type);
+	case TYPE_ENUM:
+	case TYPE_IMAGINARY:
+		firm_type = create_atomic_type(type);
 		break;
 	case TYPE_COMPLEX:
 		firm_type = create_complex_type(type);
-		break;
-	case TYPE_IMAGINARY:
-		firm_type = create_imaginary_type(&type->atomic);
 		break;
 	case TYPE_FUNCTION:
 		firm_type = create_method_type(&type->function, false);
@@ -694,9 +680,6 @@ static ir_type *get_ir_type(type_t *type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
 		firm_type = create_compound_type(&type->compound, false);
-		break;
-	case TYPE_ENUM:
-		firm_type = create_enum_type(&type->enumt);
 		break;
 
 	case TYPE_ERROR:
