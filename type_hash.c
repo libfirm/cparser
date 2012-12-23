@@ -246,8 +246,7 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 
 	switch (type1->kind) {
 	case TYPE_ERROR:
-		/* Hmm, the error type is never equal */
-		return false;
+		return true;
 	case TYPE_ATOMIC:
 	case TYPE_IMAGINARY:
 	case TYPE_COMPLEX:
