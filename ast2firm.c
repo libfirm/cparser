@@ -647,51 +647,36 @@ static ir_type *get_ir_type_incomplete(type_t *type)
 	}
 }
 
-static ir_type *get_ir_type(type_t *type)
+static ir_type *create_ir_type(type_t *const type)
 {
-	type = skip_typeref(type);
-
-	if (type->base.firm_type != NULL) {
-		return type->base.firm_type;
-	}
-
-	ir_type *firm_type = NULL;
 	switch (type->kind) {
+	case TYPE_ARRAY:           return create_array_type(type);
 	case TYPE_ATOMIC:
 	case TYPE_ENUM:
-	case TYPE_IMAGINARY:
-		firm_type = create_atomic_type(type);
-		break;
-	case TYPE_COMPLEX:
-		firm_type = create_complex_type(type);
-		break;
-	case TYPE_FUNCTION:
-		firm_type = create_method_type(&type->function, false);
-		break;
-	case TYPE_POINTER:
-		firm_type = create_pointer_type(&type->pointer);
-		break;
-	case TYPE_REFERENCE:
-		firm_type = create_reference_type(&type->reference);
-		break;
-	case TYPE_ARRAY:
-		firm_type = create_array_type(type);
-		break;
+	case TYPE_IMAGINARY:       return create_atomic_type(type);
+	case TYPE_COMPLEX:         return create_complex_type(type);
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:
-		firm_type = create_compound_type(&type->compound, false);
-		break;
+	case TYPE_COMPOUND_UNION:  return create_compound_type(&type->compound, false);
+	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
+	case TYPE_POINTER:         return create_pointer_type(&type->pointer);
+	case TYPE_REFERENCE:       return create_reference_type(&type->reference);
 
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 		break;
 	}
-	if (firm_type == NULL)
-		panic("unknown type found");
+	panic("invalid type");
+}
 
-	type->base.firm_type = firm_type;
-	return firm_type;
+static ir_type *get_ir_type(type_t *type)
+{
+	type = skip_typeref(type);
+
+	ir_type **const irtype = &type->base.firm_type;
+	if (!*irtype)
+		*irtype = create_ir_type(type);
+	return *irtype;
 }
 
 static ir_mode *get_ir_mode_storage(type_t *type)
