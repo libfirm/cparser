@@ -400,22 +400,11 @@ is_cdecl:
 	return irtype;
 }
 
-static ir_type *create_pointer_type(pointer_type_t *type)
+static ir_type *create_pointer_type(type_t const *const type, type_t *const points_to)
 {
-	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
-	type_t        *points_to    = type->points_to;
 	ir_type       *ir_points_to = get_ir_type_incomplete(points_to);
+	type_dbg_info *dbgi         = get_type_dbg_info_(type);
 	ir_type       *irtype       = new_d_type_pointer(ir_points_to, dbgi);
-
-	return irtype;
-}
-
-static ir_type *create_reference_type(reference_type_t *type)
-{
-	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) type);
-	type_t        *refers_to    = type->refers_to;
-	ir_type       *ir_refers_to = get_ir_type_incomplete(refers_to);
-	ir_type       *irtype       = new_d_type_pointer(ir_refers_to, dbgi);
 
 	return irtype;
 }
@@ -658,8 +647,8 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:  return create_compound_type(&type->compound, false);
 	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
-	case TYPE_POINTER:         return create_pointer_type(&type->pointer);
-	case TYPE_REFERENCE:       return create_reference_type(&type->reference);
+	case TYPE_POINTER:         return create_pointer_type(type, type->pointer.points_to);
+	case TYPE_REFERENCE:       return create_pointer_type(type, type->reference.refers_to);
 
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
