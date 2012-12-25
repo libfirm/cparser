@@ -2299,6 +2299,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 
 	if (token.kind == '{') {
 		parse_compound_type_entries(&entity->compound);
+		attributes = parse_attributes(attributes);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
