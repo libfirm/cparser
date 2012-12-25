@@ -5,6 +5,8 @@
 #include <config.h>
 
 #include <assert.h>
+
+#include "adt/bitfiddle.h"
 #include "adt/strutil.h"
 #include "ast_t.h"
 #include "diagnostic.h"
@@ -156,11 +158,6 @@ type_t *handle_attribute_mode(const attribute_t *attribute, type_t *orig_type)
 	errorf(&attribute->pos,
 	       "__attribute__((mode)) only allowed on integer, enum or pointer type");
 	return orig_type;
-}
-
-static inline bool is_po2(unsigned x)
-{
-	return (x & (x-1)) == 0;
 }
 
 static void handle_attribute_aligned(const attribute_t *attribute,

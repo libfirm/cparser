@@ -178,11 +178,6 @@ atomic_type_properties_t pointer_properties = {
 	.flags     = ATOMIC_TYPE_FLAG_NONE,
 };
 
-static inline bool is_po2(unsigned x)
-{
-	return (x & (x-1)) == 0;
-}
-
 void init_types(unsigned machine_size)
 {
 	obstack_init(&type_obst);
