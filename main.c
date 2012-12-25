@@ -360,8 +360,7 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 		static char dep_target[4096];
 		if (outname != 0) {
 			size_t len = strlen(outname);
-			if (len > sizeof(dep_target)-4) /* leave room for .d extension */
-				len = sizeof(dep_target)-4;
+			len = MIN(len, sizeof(dep_target) - 4); /* leave room for .d extension */
 			memcpy(dep_target, outname, len);
 			/* replace extension with .d if found */
 			char *dot = &dep_target[len-1];

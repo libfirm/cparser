@@ -4,6 +4,7 @@
  */
 #include "config.h"
 
+#include "adt/util.h"
 #include "printer.h"
 
 #include <stdio.h>
@@ -85,7 +86,7 @@ static void print_vformat_buffer(const char *format, va_list ap)
 {
 	size_t size    = buffer_end - buffer_pos;
 	size_t written = (size_t) vsnprintf(buffer_pos, size, format, ap);
-	buffer_pos    += written < size ? written : size;
+	buffer_pos    += MIN(written, size);
 }
 
 void print_to_buffer(char *buffer, size_t buffer_size)

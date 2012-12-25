@@ -4,6 +4,7 @@
  */
 #include "config.h"
 
+#include "adt/util.h"
 #include "diagnostic.h"
 #include "input.h"
 
@@ -54,8 +55,7 @@ static size_t read_block(input_t *input, unsigned char *const read_buf,
 	} else {
 		assert(input->kind == INPUT_STRING);
 		size_t len = strlen(input->in.string);
-		if (len > n)
-			len = n;
+		len = MIN(len, n);
 		memcpy(read_buf, input->in.string, len);
 		input->in.string += len;
 		return len;
