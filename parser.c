@@ -2301,16 +2301,16 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		parse_compound_type_entries(&entity->compound);
 		attributes = parse_attributes(attributes);
 
+		if (attributes != NULL) {
+			entity->compound.attributes = attributes;
+			handle_entity_attributes(attributes, entity);
+		}
+
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
 			assert(anonymous_entity == NULL);
 			anonymous_entity = entity;
 		}
-	}
-
-	if (attributes != NULL) {
-		entity->compound.attributes = attributes;
-		handle_entity_attributes(attributes, entity);
 	}
 
 	return &entity->compound;
