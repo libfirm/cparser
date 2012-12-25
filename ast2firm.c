@@ -124,8 +124,6 @@ typedef enum declaration_kind_t {
 	DECLARATION_KIND_INNER_FUNCTION
 } declaration_kind_t;
 
-static ir_type *get_ir_type_incomplete(type_t *type);
-
 static void enqueue_inner_function(entity_t *entity)
 {
 	if (inner_functions == NULL)
@@ -402,11 +400,14 @@ is_cdecl:
 
 static ir_type *create_pointer_type(type_t const *const type, type_t *const points_to)
 {
-	ir_type       *ir_points_to = get_ir_type_incomplete(points_to);
-	type_dbg_info *dbgi         = get_type_dbg_info_(type);
-	ir_type       *irtype       = new_d_type_pointer(ir_points_to, dbgi);
+	ir_type *const ir_points_to = get_ir_type(points_to);
+	/* Break a potential cycle: Getting a struct type might in turn trigger
+	 * creating this pointer type. */
+	if (type->base.firm_type)
+		return type->base.firm_type;
 
-	return irtype;
+	type_dbg_info *const dbgi = get_type_dbg_info_(type);
+	return new_d_type_pointer(ir_points_to, dbgi);
 }
 
 static ir_type *create_array_type(type_t const *const type)
@@ -518,13 +519,12 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 /**
  * Construct firm type from ast struct type.
  */
-static ir_type *create_compound_type(compound_type_t *const type, bool const incomplete)
+static ir_type *create_compound_type(compound_type_t *const type)
 {
 	compound_t *compound = type->compound;
 
-	if (compound->irtype != NULL && (compound->irtype_complete || incomplete)) {
+	if (compound->irtype)
 		return compound->irtype;
-	}
 
 	bool const is_union = type->base.kind == TYPE_COMPOUND_UNION;
 
@@ -546,14 +546,10 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 	} else {
 		irtype = new_type_struct(id);
 	}
+	/* Set firm type right away, to break potential cycles. */
+	type->base.firm_type = irtype;
 
-	compound->irtype_complete = false;
-	compound->irtype          = irtype;
-
-	if (incomplete)
-		return irtype;
-
-	compound->irtype_complete = true;
+	compound->irtype = irtype;
 
 	entity_t *entry = compound->members.entities;
 	for ( ; entry != NULL; entry = entry->base.next) {
@@ -621,21 +617,6 @@ void determine_enum_values(enum_type_t *const type)
 	}
 }
 
-static ir_type *get_ir_type_incomplete(type_t *type)
-{
-	type = skip_typeref(type);
-
-	if (type->base.firm_type != NULL) {
-		return type->base.firm_type;
-	}
-
-	if (is_type_compound(type)) {
-		return create_compound_type(&type->compound, true);
-	} else {
-		return get_ir_type(type);
-	}
-}
-
 static ir_type *create_ir_type(type_t *const type)
 {
 	switch (type->kind) {
@@ -645,7 +626,7 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_IMAGINARY:       return create_atomic_type(type);
 	case TYPE_COMPLEX:         return create_complex_type(type);
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  return create_compound_type(&type->compound, false);
+	case TYPE_COMPOUND_UNION:  return create_compound_type(&type->compound);
 	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
 	case TYPE_POINTER:         return create_pointer_type(type, type->pointer.points_to);
 	case TYPE_REFERENCE:       return create_pointer_type(type, type->reference.refers_to);

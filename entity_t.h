@@ -133,7 +133,6 @@ struct compound_t {
 
 	/* ast2firm info */
 	ir_type          *irtype;
-	bool              irtype_complete : 1;
 };
 
 struct enum_t {
