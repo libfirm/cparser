@@ -1024,7 +1024,7 @@ type_t *skip_typeref(type_t *type)
 	return type;
 }
 
-unsigned get_type_size(type_t *type)
+unsigned get_type_size(type_t const *const type)
 {
 	switch (type->kind) {
 	case TYPE_ERROR:
@@ -1035,11 +1035,8 @@ unsigned get_type_size(type_t *type)
 		return get_atomic_type_size(type->atomic.akind);
 	case TYPE_COMPLEX:
 		return get_atomic_type_size(type->atomic.akind) * 2;
-	case TYPE_COMPOUND_UNION:
-		layout_union_type(&type->compound);
-		return type->compound.compound->size;
 	case TYPE_COMPOUND_STRUCT:
-		layout_struct_type(&type->compound);
+	case TYPE_COMPOUND_UNION:
 		return type->compound.compound->size;
 	case TYPE_FUNCTION:
 		return 1; /* strange GNU extensions: sizeof(function) == 1 */
@@ -1059,7 +1056,7 @@ unsigned get_type_size(type_t *type)
 	panic("invalid type");
 }
 
-unsigned get_type_alignment(type_t *type)
+unsigned get_type_alignment(type_t const *const type)
 {
 	switch (type->kind) {
 	case TYPE_ERROR:
@@ -1069,11 +1066,8 @@ unsigned get_type_alignment(type_t *type)
 	case TYPE_COMPLEX:
 	case TYPE_ENUM:
 		return get_atomic_type_alignment(type->atomic.akind);
-	case TYPE_COMPOUND_UNION:
-		layout_union_type(&type->compound);
-		return type->compound.compound->alignment;
 	case TYPE_COMPOUND_STRUCT:
-		layout_struct_type(&type->compound);
+	case TYPE_COMPOUND_UNION:
 		return type->compound.compound->alignment;
 	case TYPE_FUNCTION:
 		/* gcc says 1 here... */
@@ -1418,17 +1412,8 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 	return member;
 }
 
-void layout_struct_type(compound_type_t *type)
+void layout_struct(compound_t *const compound)
 {
-	assert(type->compound != NULL);
-
-	compound_t *compound = type->compound;
-	if (!compound->complete)
-		return;
-	if (type->compound->layouted)
-		return;
-	compound->layouted = true;
-
 	il_size_t      offset    = 0;
 	il_alignment_t alignment = compound->alignment;
 	bool           need_pad  = false;
@@ -1476,26 +1461,17 @@ next:
 
 	position_t const *const pos = &compound->base.pos;
 	if (need_pad) {
-		warningf(WARN_PADDED, pos, "'%T' needs padding", type);
+		warningf(WARN_PADDED, pos, "'%N' needs padding", compound);
 	} else if (compound->packed) {
-		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%T'", type);
+		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'", compound);
 	}
 
 	compound->size      = offset;
 	compound->alignment = alignment;
 }
 
-void layout_union_type(compound_type_t *type)
+void layout_union(compound_t *const compound)
 {
-	assert(type->compound != NULL);
-
-	compound_t *compound = type->compound;
-	if (! compound->complete)
-		return;
-	if (compound->layouted)
-		return;
-	compound->layouted = true;
-
 	il_size_t      size      = 0;
 	il_alignment_t alignment = compound->alignment;
 

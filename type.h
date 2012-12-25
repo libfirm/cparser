@@ -228,8 +228,10 @@ unsigned get_atomic_type_size(atomic_type_kind_t kind);
  */
 unsigned get_atomic_type_alignment(atomic_type_kind_t kind);
 
-unsigned         get_type_alignment(type_t *type);
-unsigned         get_type_size(type_t *type);
+unsigned get_type_alignment(type_t const *type);
+
+unsigned get_type_size(type_t const *type);
+
 decl_modifiers_t get_type_modifiers(const type_t *type);
 
 /**
@@ -250,15 +252,14 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size);
 const char *get_atomic_kind_name(atomic_type_kind_t kind);
 
 /**
- * Finish the construction of a struct type by calculating its size, offsets,
+ * Finish the construction of a struct by calculating its size, offsets,
  * alignment.
  */
-void layout_struct_type(compound_type_t *type);
+void layout_struct(compound_t *compound);
 
 /**
- * Finish the construction of an union type by calculating
- * its size and alignment.
+ * Finish the construction of an union by calculating its size and alignment.
  */
-void layout_union_type(compound_type_t *type);
+void layout_union(compound_t *compound);
 
 #endif

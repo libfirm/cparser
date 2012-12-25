@@ -124,7 +124,6 @@ struct compound_t {
 	scope_t           members;
 	decl_modifiers_t  modifiers;
 	attribute_t      *attributes;
-	bool              layouted          : 1;
 	bool              complete          : 1;
 	bool              transparent_union : 1;
 	bool              packed            : 1;

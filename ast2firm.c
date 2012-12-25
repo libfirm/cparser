@@ -580,12 +580,6 @@ static ir_type *create_compound_type(compound_type_t *const type, bool const inc
 	if (incomplete)
 		return irtype;
 
-	if (is_union) {
-		layout_union_type(type);
-	} else {
-		layout_struct_type(type);
-	}
-
 	compound->irtype_complete = true;
 
 	entity_t *entry = compound->members.entities;
