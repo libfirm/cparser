@@ -130,9 +130,6 @@ struct compound_t {
 
 	il_alignment_t    alignment;
 	il_size_t         size;
-
-	/* ast2firm info */
-	ir_type          *irtype;
 };
 
 struct enum_t {

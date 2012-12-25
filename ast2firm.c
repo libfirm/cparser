@@ -521,12 +521,8 @@ static ir_type *create_bitfield_type(const entity_t *entity)
  */
 static ir_type *create_compound_type(compound_type_t *const type)
 {
-	compound_t *compound = type->compound;
-
-	if (compound->irtype)
-		return compound->irtype;
-
-	bool const is_union = type->base.kind == TYPE_COMPOUND_UNION;
+	bool        const is_union = type->base.kind == TYPE_COMPOUND_UNION;
+	compound_t *const compound = type->compound;
 
 	symbol_t *type_symbol = compound->base.symbol;
 	ident    *id;
@@ -548,8 +544,6 @@ static ir_type *create_compound_type(compound_type_t *const type)
 	}
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
-
-	compound->irtype = irtype;
 
 	entity_t *entry = compound->members.entities;
 	for ( ; entry != NULL; entry = entry->base.next) {
@@ -644,8 +638,13 @@ static ir_type *get_ir_type(type_t *type)
 	type = skip_typeref(type);
 
 	ir_type **const irtype = &type->base.firm_type;
-	if (!*irtype)
-		*irtype = create_ir_type(type);
+	if (!*irtype) {
+		type_t   *const utype   = get_unqualified_type(type);
+		ir_type **const irutype = &utype->base.firm_type;
+		if (!*irutype)
+			*irutype = create_ir_type(utype);
+		*irtype = *irutype;
+	}
 	return *irtype;
 }
 
