@@ -453,7 +453,7 @@ void write_jna_decls(FILE *output, const translation_unit_t *unit)
 	/* read the avoid list */
 	FILE *avoid = fopen("avoid.config", "r");
 	if (avoid != NULL) {
-		while (!feof(avoid)) {
+		for (;;) {
 			char buf[1024];
 			char *res = fgets(buf, sizeof(buf), avoid);
 			if (res == NULL)

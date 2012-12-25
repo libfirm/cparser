@@ -1202,8 +1202,10 @@ static void copy_file(FILE *dest, FILE *input)
 {
 	char buf[16384];
 
-	while (!feof(input) && !ferror(dest)) {
+	for (;;) {
 		size_t read = fread(buf, 1, sizeof(buf), input);
+		if (read == 0)
+			break;
 		if (fwrite(buf, 1, read, dest) != read) {
 			perror("could not write output");
 		}
