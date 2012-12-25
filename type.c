@@ -50,8 +50,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
 	};
-	assert(lengthof(sizes) == (int)TYPE_TYPEOF + 1);
-	assert(kind <= TYPE_TYPEOF);
+	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
