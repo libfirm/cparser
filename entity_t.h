@@ -140,9 +140,6 @@ struct enum_t {
 	entity_base_t  base;
 	entity_t      *alias; /* used for name mangling of anonymous types */
 	bool           complete : 1;
-
-	/* ast2firm info */
-	ir_type       *irtype;
 };
 
 struct enum_value_t {
