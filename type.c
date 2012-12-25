@@ -1412,14 +1412,13 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 	return member;
 }
 
-void layout_struct(compound_t *const compound)
+void layout_compound(compound_t *const compound)
 {
-	il_size_t      offset    = 0;
+	bool     const is_union  = compound->base.kind == ENTITY_UNION;
 	il_alignment_t alignment = compound->alignment;
+	il_size_t      size      = 0;
 	bool           need_pad  = false;
-
-	entity_t *entry = compound->members.entities;
-	while (entry != NULL) {
+	for (entity_t *entry = compound->members.entities; entry;) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
 			goto next;
 
@@ -1427,35 +1426,39 @@ void layout_struct(compound_t *const compound)
 		if (!is_type_valid(m_type))
 			goto next;
 
-		if (entry->compound_member.bitfield) {
-			entry = pack_bitfield_members(&offset, &alignment,
-			                              compound->packed, entry);
+		if (!is_union && entry->compound_member.bitfield) {
+			entry = pack_bitfield_members(&size, &alignment, compound->packed, entry);
 			continue;
 		}
 
 		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
 		alignment = MAX(alignment, m_alignment);
 
-		if (!compound->packed) {
-			il_size_t const new_offset = round_up2(offset, m_alignment);
-			if (new_offset > offset) {
-				need_pad = true;
-				offset   = new_offset;
+		unsigned const m_size = get_type_size(m_type);
+		if (is_union) {
+			size = MAX(size, m_size);
+		} else {
+			if (!compound->packed) {
+				il_size_t const new_size = round_up2(size, m_alignment);
+				if (new_size > size) {
+					need_pad = true;
+					size     = new_size;
+				}
 			}
-		}
 
-		entry->compound_member.offset = offset;
-		offset += get_type_size(m_type);
+			entry->compound_member.offset = size;
+			size += m_size;
+		}
 
 next:
 		entry = entry->base.next;
 	}
 
 	if (!compound->packed) {
-		il_size_t const new_offset = round_up2(offset, alignment);
-		if (new_offset > offset) {
+		il_size_t const new_size = round_up2(size, alignment);
+		if (new_size > size) {
 			need_pad = true;
-			offset   = new_offset;
+			size     = new_size;
 		}
 	}
 
@@ -1465,32 +1468,6 @@ next:
 	} else if (compound->packed) {
 		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'", compound);
 	}
-
-	compound->size      = offset;
-	compound->alignment = alignment;
-}
-
-void layout_union(compound_t *const compound)
-{
-	il_size_t      size      = 0;
-	il_alignment_t alignment = compound->alignment;
-
-	entity_t *entry = compound->members.entities;
-	for (; entry != NULL; entry = entry->base.next) {
-		if (entry->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-
-		type_t *m_type = skip_typeref(entry->declaration.type);
-		if (! is_type_valid(skip_typeref(m_type)))
-			continue;
-
-		entry->compound_member.offset = 0;
-		il_size_t m_size = get_type_size(m_type);
-		size = MAX(size, m_size);
-		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
-		alignment = MAX(alignment, m_alignment);
-	}
-	size = round_up2(size, alignment);
 
 	compound->size      = size;
 	compound->alignment = alignment;

@@ -2306,11 +2306,7 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 			handle_entity_attributes(attributes, entity);
 		}
 
-		if (is_struct) {
-			layout_struct(&entity->compound);
-		} else {
-			layout_union(&entity->compound);
-		}
+		layout_compound(&entity->compound);
 
 		/* ISO/IEC 14882:1998(E) §7.1.3:5 */
 		if (symbol == NULL) {
