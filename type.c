@@ -1084,12 +1084,8 @@ unsigned get_type_alignment(type_t *type)
 	case TYPE_ARRAY:
 		return get_type_alignment(type->array.element_type);
 	case TYPE_TYPEDEF: {
-		il_alignment_t alignment
-			= get_type_alignment(type->typedeft.typedefe->type);
-		if (type->typedeft.typedefe->alignment > alignment)
-			alignment = type->typedeft.typedefe->alignment;
-
-		return alignment;
+		il_alignment_t const alignment = get_type_alignment(type->typedeft.typedefe->type);
+		return MAX(alignment, type->typedeft.typedefe->alignment);
 	}
 	case TYPE_TYPEOF:
 		return get_type_alignment(type->typeoft.typeof_type);
@@ -1385,8 +1381,7 @@ static entity_t *pack_bitfield_members(il_size_t *struct_offset,
 		type_t *const base_type = skip_typeref(member->declaration.type);
 		il_alignment_t base_alignment = get_type_alignment_compound(base_type);
 		il_alignment_t alignment_mask = base_alignment-1;
-		if (base_alignment > alignment)
-			alignment = base_alignment;
+		alignment = MAX(alignment, base_alignment);
 
 		size_t bit_size = member->compound_member.bit_size;
 		if (!packed) {
@@ -1454,8 +1449,7 @@ void layout_struct_type(compound_type_t *type)
 		}
 
 		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
-		if (m_alignment > alignment)
-			alignment = m_alignment;
+		alignment = MAX(alignment, m_alignment);
 
 		if (!compound->packed) {
 			il_size_t const new_offset = round_up2(offset, m_alignment);
@@ -1516,11 +1510,9 @@ void layout_union_type(compound_type_t *type)
 
 		entry->compound_member.offset = 0;
 		il_size_t m_size = get_type_size(m_type);
-		if (m_size > size)
-			size = m_size;
+		size = MAX(size, m_size);
 		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
-		if (m_alignment > alignment)
-			alignment = m_alignment;
+		alignment = MAX(alignment, m_alignment);
 	}
 	size = round_up2(size, alignment);
 

@@ -384,9 +384,7 @@ static inline void maybe_shrink(HashSet *self)
 		return;
 
 	resize_to = ceil_po2(size);
-
-	if (resize_to < 4)
-		resize_to = 4;
+	resize_to = MAX(resize_to, 4);
 
 	resize(self, resize_to);
 }
@@ -502,8 +500,7 @@ void hashset_remove(HashSet *self, ConstKeyType key)
  */
 static inline void init_size(HashSet *self, size_t initial_size)
 {
-	if (initial_size < 4)
-		initial_size = 4;
+	initial_size = MAX(initial_size, 4);
 
 	self->entries         = Alloc(initial_size);
 	SetRangeEmpty(self->entries, initial_size);

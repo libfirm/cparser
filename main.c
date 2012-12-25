@@ -46,6 +46,7 @@
 #include <libfirm/be.h>
 #include <libfirm/statev.h>
 
+#include "adt/util.h"
 #include "ast_t.h"
 #include "preprocessor.h"
 #include "token_t.h"
@@ -900,9 +901,7 @@ static unsigned decide_modulo_shift(unsigned type_size)
 {
 	if (architecture_modulo_shift == 0)
 		return 0;
-	if (type_size < architecture_modulo_shift)
-		return architecture_modulo_shift;
-	return type_size;
+	return MAX(type_size, architecture_modulo_shift);
 }
 
 static bool is_ia32_cpu(const char *architecture)

@@ -109,7 +109,7 @@ static int internal_check_printf_format(const expression_t *fmt_expr,
 			t = c->condition;
 		int const nt = internal_check_printf_format(t,                   arg, spec);
 		int const nf = internal_check_printf_format(c->false_expression, arg, spec);
-		return nt > nf ? nt : nf;
+		return MAX(nt, nf);
 	}
 
 	if (fmt_expr->kind != EXPR_STRING_LITERAL)

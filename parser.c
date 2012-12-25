@@ -2106,9 +2106,7 @@ finish_designator:
 		type_t                  *first_type = first->type;
 		first_type                          = skip_typeref(first_type);
 		if (is_type_array(first_type)) {
-			size_t index = first->v.index;
-			if (index > path->max_index)
-				path->max_index = index;
+			path->max_index = MAX(path->max_index, first->v.index);
 		}
 
 		/* append to initializers list */

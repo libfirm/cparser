@@ -38,4 +38,7 @@
 
 #define endof(x) ((x) + lengthof(x))
 
+#undef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #endif

@@ -1712,7 +1712,7 @@ static expression_classification_t is_object_with_constant_address(const express
 			return idx_class;
 		expression_classification_t const ref_addr = is_object_with_constant_address(array_access->array_ref);
 		expression_classification_t const ref_ptr  = is_constant_pointer(array_access->array_ref);
-		return ref_addr > ref_ptr ? ref_addr : ref_ptr;
+		return MAX(ref_addr, ref_ptr);
 	}
 
 	case EXPR_UNARY_DEREFERENCE:

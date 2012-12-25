@@ -193,9 +193,7 @@ static unsigned decide_modulo_shift(unsigned type_size)
 {
 	if (architecture_modulo_shift == 0)
 		return 0;
-	if (type_size < architecture_modulo_shift)
-		return architecture_modulo_shift;
-	return type_size;
+	return MAX(type_size, architecture_modulo_shift);
 }
 
 static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
