@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 
+#include "adt/bitfiddle.h"
 #include "type_t.h"
 #include "types.h"
 #include "entity_t.h"
@@ -1457,8 +1458,7 @@ void layout_struct_type(compound_type_t *type)
 			alignment = m_alignment;
 
 		if (!compound->packed) {
-			il_size_t new_offset = (offset + m_alignment-1) & -m_alignment;
-
+			il_size_t const new_offset = round_up2(offset, m_alignment);
 			if (new_offset > offset) {
 				need_pad = true;
 				offset   = new_offset;
@@ -1473,7 +1473,7 @@ next:
 	}
 
 	if (!compound->packed) {
-		il_size_t new_offset = (offset + alignment-1) & -alignment;
+		il_size_t const new_offset = round_up2(offset, alignment);
 		if (new_offset > offset) {
 			need_pad = true;
 			offset   = new_offset;
@@ -1522,7 +1522,7 @@ void layout_union_type(compound_type_t *type)
 		if (m_alignment > alignment)
 			alignment = m_alignment;
 	}
-	size = (size + alignment - 1) & -alignment;
+	size = round_up2(size, alignment);
 
 	compound->size      = size;
 	compound->alignment = alignment;
