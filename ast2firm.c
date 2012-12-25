@@ -5895,32 +5895,6 @@ static void create_function(entity_t *entity)
 
 	irg_finalize_cons(irg);
 
-	/* finalize the frame type */
-	ir_type *frame_type = get_irg_frame_type(irg);
-	int      n          = get_compound_n_members(frame_type);
-	int      align_all  = 4;
-	int      offset     = 0;
-	for (int i = 0; i < n; ++i) {
-		ir_entity *member      = get_compound_member(frame_type, i);
-		ir_type   *entity_type = get_entity_type(member);
-
-		int align = get_type_alignment_bytes(entity_type);
-		if (align > align_all)
-			align_all = align;
-		int misalign = 0;
-		if (align > 0) {
-			misalign  = offset % align;
-			if (misalign > 0) {
-				offset += align - misalign;
-			}
-		}
-
-		set_entity_offset(member, offset);
-		offset += get_type_size_bytes(entity_type);
-	}
-	set_type_size_bytes(frame_type, offset);
-	set_type_alignment_bytes(frame_type, align_all);
-
 	irg_verify(irg, VERIFY_ENFORCE_SSA);
 	current_vararg_entity = old_current_vararg_entity;
 	current_function      = old_current_function;
