@@ -7,7 +7,8 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include "ast.h"
+
+#include "entity.h"
 #include "symbol.h"
 
 /** Type used to express sizes. */

@@ -10,10 +10,9 @@
 #include "entity_t.h"
 #include "separator_t.h"
 #include "symbol_t.h"
-#include "token_t.h"
 #include "ast.h"
 #include "type.h"
-#include "warning.h"
+#include "unicode.h"
 
 /** Number of occurred errors. */
 unsigned error_count             = 0;

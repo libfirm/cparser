@@ -5,6 +5,7 @@
 #ifndef ENTITY_T_H
 #define ENTITY_T_H
 
+#include "ast.h"
 #include "symbol.h"
 #include "entity.h"
 #include "attribute.h"

@@ -7,8 +7,6 @@
 #include <stdbool.h>
 
 #include "type_hash.h"
-
-#include "adt/error.h"
 #include "type_t.h"
 
 #include <assert.h>

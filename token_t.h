@@ -5,11 +5,11 @@
 #ifndef TOKEN_T_H
 #define TOKEN_T_H
 
+#include <stdbool.h>
 #include <stdio.h>
+
 #include "string_rep.h"
 #include "symbol.h"
-#include "symbol_table.h"
-#include "type.h"
 
 typedef enum token_kind_tag_t {
 	T_NULL  =  0,

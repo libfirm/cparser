@@ -8,11 +8,11 @@
 #include "type_t.h"
 #include "types.h"
 #include "entity_t.h"
-#include "ast_t.h"
 #include "symbol_t.h"
 #include "parser.h"
 #include "builtins.h"
 #include "lang_features.h"
+#include "symbol_table.h"
 
 static entity_t *create_builtin_function(builtin_kind_t kind, symbol_t *symbol,
                                          type_t *function_type)

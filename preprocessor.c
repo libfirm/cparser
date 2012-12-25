@@ -11,7 +11,6 @@
 #include <ctype.h>
 
 #include "preprocessor.h"
-#include "token_t.h"
 #include "symbol_t.h"
 #include "adt/util.h"
 #include "adt/error.h"
@@ -21,6 +20,7 @@
 #include "diagnostic.h"
 #include "string_rep.h"
 #include "input.h"
+#include "symbol_table.h"
 
 #define MAX_PUTBACK 3
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */

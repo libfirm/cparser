@@ -5,8 +5,6 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
-#include <stdbool.h>
-
 typedef enum {
 	BUILTIN_NONE,
 	BUILTIN_ALLOCA,

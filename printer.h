@@ -12,10 +12,9 @@
 #define PRINTER_H
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
+
 #include "adt/obst.h"
-#include "string_rep.h"
 
 /** print a string into current output */
 extern void (*print_string)(const char *str);

@@ -4,9 +4,6 @@
  */
 #include <config.h>
 
-#include <errno.h>
-#include <string.h>
-
 #include "write_fluffy.h"
 #include "separator_t.h"
 #include "symbol_t.h"

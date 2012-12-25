@@ -8,7 +8,6 @@
 #include "attribute.h"
 #include "ast.h"
 #include "symbol.h"
-#include "type.h"
 
 /**
  * GNU attributes.

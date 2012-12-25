@@ -5,7 +5,6 @@
 #include <config.h>
 
 #include <stdio.h>
-#include <assert.h>
 
 #include "type_t.h"
 #include "types.h"

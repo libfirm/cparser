@@ -4,7 +4,6 @@
  */
 #include <config.h>
 
-#include <errno.h>
 #include <string.h>
 
 #include "adt/strutil.h"
@@ -19,6 +18,7 @@
 #include "adt/xmalloc.h"
 #include "adt/pset_new.h"
 #include "separator_t.h"
+#include "symbol_table.h"
 
 typedef struct output_limit {
 	const char          *filename;

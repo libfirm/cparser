@@ -46,6 +46,7 @@
 #include <libfirm/be.h>
 #include <libfirm/statev.h>
 
+#include "ast_t.h"
 #include "preprocessor.h"
 #include "token_t.h"
 #include "types.h"
@@ -61,6 +62,7 @@
 #include "adt/error.h"
 #include "adt/strutil.h"
 #include "adt/array.h"
+#include "symbol_table.h"
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 #include "wrappergen/write_compoundsizes.h"

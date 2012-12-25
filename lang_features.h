@@ -5,7 +5,7 @@
 #ifndef LANG_FEATURES_H
 #define LANG_FEATURES_H
 
-#include "type.h"
+#include <stdbool.h>
 
 #define BITS_PER_BYTE    8
 

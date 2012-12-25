@@ -5,7 +5,6 @@
 #ifndef SYMBOL_T_H
 #define SYMBOL_T_H
 
-#include <stdbool.h>
 #include "symbol.h"
 #include "entity.h"
 #include "token_t.h"

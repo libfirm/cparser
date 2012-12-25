@@ -5,7 +5,6 @@
 #include "type_t.h"
 #include "types.h"
 #include "lang_features.h"
-#include "entity_t.h"
 
 /** The error type. */
 type_t *type_error_type;

@@ -81,7 +81,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 
 static void warn_invalid_length_modifier(const position_t *pos,
                                          const format_length_modifier_t mod,
-                                         const utf32 conversion)
+                                         const char conversion)
 {
 	char const *const lmod = get_length_modifier_name(mod);
 	warningf(WARN_FORMAT, pos, "invalid length modifier '%s' for conversion specifier '%%%c'", lmod, conversion);

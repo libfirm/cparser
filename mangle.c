@@ -7,11 +7,11 @@
 #include <libfirm/firm.h>
 #include <string.h>
 
+#include "adt/obst.h"
 #include "entity_t.h"
 #include "type_t.h"
 #include "symbol_t.h"
 #include "mangle.h"
-#include "diagnostic.h"
 #include "lang_features.h"
 #include "adt/error.h"
 

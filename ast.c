@@ -9,14 +9,10 @@
 #include "type_t.h"
 #include "parser.h"
 #include "lang_features.h"
-#include "entity_t.h"
 #include "printer.h"
 #include "separator_t.h"
 #include "types.h"
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <ctype.h>
 
 #include "adt/error.h"

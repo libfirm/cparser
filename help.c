@@ -3,7 +3,7 @@
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
 #include <stdio.h>
-#include <string.h>
+
 #include "help.h"
 
 void put_help(const char *option, const char *explanation)

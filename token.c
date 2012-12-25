@@ -8,14 +8,12 @@
 #include "symbol_t.h"
 
 #include <assert.h>
-#include <stdio.h>
-#include <stdbool.h>
 
-#include "symbol.h"
 #include "lang_features.h"
 #include "adt/array.h"
 #include "adt/error.h"
 #include "adt/util.h"
+#include "symbol_table.h"
 
 symbol_t *token_symbols[T_LAST_TOKEN];
 

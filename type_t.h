@@ -10,11 +10,8 @@
 
 #include <libfirm/firm_types.h>
 
+#include "ast.h"
 #include "type.h"
-#include "symbol.h"
-#include "token_t.h"
-#include "ast_t.h"
-#include "adt/obst.h"
 
 typedef enum type_kind_t {
 	TYPE_ERROR = 1,

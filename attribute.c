@@ -6,11 +6,14 @@
 
 #include <assert.h>
 #include "adt/strutil.h"
+#include "ast_t.h"
 #include "diagnostic.h"
 #include "warning.h"
 #include "attribute_t.h"
 #include "symbol_t.h"
 #include "adt/error.h"
+#include "entity_t.h"
+#include "symbol_table.h"
 #include "type_t.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {

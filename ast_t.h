@@ -10,7 +10,6 @@
 
 #include "ast.h"
 #include "symbol.h"
-#include "token_t.h"
 #include "type.h"
 #include "entity_t.h"
 #include "adt/obst.h"

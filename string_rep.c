@@ -4,6 +4,7 @@
  */
 #include "adt/error.h"
 #include "string_rep.h"
+#include "unicode.h"
 
 static inline size_t wstrlen(const string_t *string)
 {

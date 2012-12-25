@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <limits.h>
 
 #include <libfirm/firm.h>
 #include <libfirm/adt/obst.h>
@@ -22,6 +21,7 @@
 #include "adt/util.h"
 #include "jump_target.h"
 #include "symbol_t.h"
+#include "symbol_table.h"
 #include "token_t.h"
 #include "type_t.h"
 #include "ast_t.h"
@@ -30,8 +30,8 @@
 #include "diagnostic.h"
 #include "lang_features.h"
 #include "types.h"
-#include "type_hash.h"
 #include "mangle.h"
+#include "unicode.h"
 #include "walk.h"
 #include "warning.h"
 #include "printer.h"

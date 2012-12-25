@@ -5,8 +5,7 @@
 #ifndef STRING_REP_H
 #define STRING_REP_H
 
-#include <stdlib.h>
-#include "unicode.h"
+#include <stddef.h>
 
 enum string_encoding_t {
 	STRING_ENCODING_CHAR,
