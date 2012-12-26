@@ -1382,7 +1382,7 @@ void layout_compound(compound_t *const compound)
 		if (!is_type_valid(m_type))
 			continue;
 
-		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
+		il_alignment_t const m_alignment = member->base.alignment;
 		alignment = MAX(alignment, m_alignment);
 
 		unsigned const m_size = get_type_size(m_type);
