@@ -44,7 +44,6 @@ typedef struct declaration_specifiers_t  declaration_specifiers_t;
 struct declaration_specifiers_t {
 	position_t      pos;
 	storage_class_t storage_class;
-	unsigned char   alignment;         /**< Alignment, 0 if not set. */
 	bool            is_inline    : 1;
 	bool            thread_local : 1;
 	attribute_t    *attributes;        /**< list of attributes */
