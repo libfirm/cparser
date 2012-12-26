@@ -288,15 +288,13 @@ static ir_type *create_complex_type(atomic_type_kind_t akind,
 	ir_type       *etype  = create_primitive_irtype(akind, NULL);
 	ir_type       *irtype = new_d_type_array(1, etype, dbgi);
 
-	int align = get_type_alignment_bytes(etype);
+	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
-	unsigned n_elements = 2;
-	set_array_bounds_int(irtype, 0, 0, n_elements);
-	size_t elemsize = get_type_size_bytes(etype);
-	if (elemsize % align > 0) {
-		elemsize += align - (elemsize % align);
-	}
-	set_type_size_bytes(irtype, n_elements * elemsize);
+
+	unsigned const size = get_type_size(type);
+	set_type_size_bytes(irtype, size);
+
+	set_array_bounds_int(irtype, 0, 0, 2);
 	set_type_state(irtype, layout_fixed);
 
 	return irtype;
@@ -430,26 +428,20 @@ static ir_type *create_reference_type(reference_type_t *type)
 	return irtype;
 }
 
-static ir_type *create_array_type(array_type_t *type)
+static ir_type *create_array_type(type_t const *const type)
 {
-	type_dbg_info *dbgi            = get_type_dbg_info_((const type_t*) type);
-	type_t        *element_type    = type->element_type;
-	ir_type       *ir_element_type = get_ir_type(element_type);
-	ir_type       *irtype          = new_d_type_array(1, ir_element_type, dbgi);
+	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
+	ir_type       *const iretype = get_ir_type(type->array.element_type);
+	ir_type       *const irtype  = new_d_type_array(1, iretype, dbgi);
 
-	const int align = get_type_alignment_bytes(ir_element_type);
+	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
 
-	if (type->size_constant) {
-		int n_elements = type->size;
+	if (type->array.size_constant) {
+		set_array_bounds_int(irtype, 0, 0, type->array.size);
 
-		set_array_bounds_int(irtype, 0, 0, n_elements);
-
-		size_t elemsize = get_type_size_bytes(ir_element_type);
-		if (elemsize % align > 0) {
-			elemsize += align - (elemsize % align);
-		}
-		set_type_size_bytes(irtype, n_elements * elemsize);
+		unsigned const size = get_type_size(type);
+		set_type_size_bytes(irtype, size);
 	} else {
 		set_array_lower_bound_int(irtype, 0, 0);
 	}
@@ -697,7 +689,7 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_reference_type(&type->reference);
 		break;
 	case TYPE_ARRAY:
-		firm_type = create_array_type(&type->array);
+		firm_type = create_array_type(type);
 		break;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
