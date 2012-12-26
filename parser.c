@@ -3693,58 +3693,63 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 					errorf(&env.pos, "'%N' must have no storage class", entity);
 				}
 			}
-		} else if (flags & DECL_IS_PARAMETER) {
-			entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
-			orig_type = semantic_parameter(&env.pos, orig_type, specifiers, entity);
-		} else if (is_type_function(type)) {
-			entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
-			entity->function.is_inline      = specifiers->is_inline;
-			entity->function.elf_visibility = default_visibility;
-			entity->function.parameters     = env.parameters;
 
-			if (env.symbol != NULL) {
-				/* this needs fixes for C++ */
-				bool in_function_scope = current_function != NULL;
-
-				if (specifiers->thread_local || (
-							specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-							specifiers->storage_class != STORAGE_CLASS_NONE   &&
-							(in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
-						)) {
-					errorf(&env.pos, "invalid storage class for '%N'", entity);
-				}
-			}
+			entity->declaration.alignment = get_type_alignment_compound(orig_type);
 		} else {
-			entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
-			entity->variable.elf_visibility = default_visibility;
-			entity->variable.thread_local   = specifiers->thread_local;
+			if (flags & DECL_IS_PARAMETER) {
+				entity    = allocate_entity_zero(ENTITY_PARAMETER, NAMESPACE_NORMAL, env.symbol, pos);
+				orig_type = semantic_parameter(&env.pos, orig_type, specifiers, entity);
+			} else if (is_type_function(type)) {
+				entity = allocate_entity_zero(ENTITY_FUNCTION, NAMESPACE_NORMAL, env.symbol, pos);
+				entity->function.is_inline      = specifiers->is_inline;
+				entity->function.elf_visibility = default_visibility;
+				entity->function.parameters     = env.parameters;
 
-			if (env.symbol != NULL) {
-				if (specifiers->is_inline && is_type_valid(type)) {
-					errorf(&env.pos, "'%N' declared 'inline'", entity);
-				}
+				if (env.symbol != NULL) {
+					/* this needs fixes for C++ */
+					bool in_function_scope = current_function != NULL;
 
-				bool invalid_storage_class = false;
-				if (current_scope == file_scope) {
-					if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
-							specifiers->storage_class != STORAGE_CLASS_NONE   &&
-							specifiers->storage_class != STORAGE_CLASS_STATIC) {
-						invalid_storage_class = true;
-					}
-				} else {
-					if (specifiers->thread_local &&
-							specifiers->storage_class == STORAGE_CLASS_NONE) {
-						invalid_storage_class = true;
+					if (specifiers->thread_local || (
+					      specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+					      specifiers->storage_class != STORAGE_CLASS_NONE   &&
+					      (in_function_scope || specifiers->storage_class != STORAGE_CLASS_STATIC)
+					    )) {
+						errorf(&env.pos, "invalid storage class for '%N'", entity);
 					}
 				}
-				if (invalid_storage_class) {
-					errorf(&env.pos, "invalid storage class for '%N'", entity);
+			} else {
+				entity = allocate_entity_zero(ENTITY_VARIABLE, NAMESPACE_NORMAL, env.symbol, pos);
+				entity->variable.elf_visibility = default_visibility;
+				entity->variable.thread_local   = specifiers->thread_local;
+
+				if (env.symbol != NULL) {
+					if (specifiers->is_inline && is_type_valid(type)) {
+						errorf(&env.pos, "'%N' declared 'inline'", entity);
+					}
+
+					bool invalid_storage_class = false;
+					if (current_scope == file_scope) {
+						if (specifiers->storage_class != STORAGE_CLASS_EXTERN &&
+								specifiers->storage_class != STORAGE_CLASS_NONE   &&
+								specifiers->storage_class != STORAGE_CLASS_STATIC) {
+							invalid_storage_class = true;
+						}
+					} else {
+						if (specifiers->thread_local &&
+								specifiers->storage_class == STORAGE_CLASS_NONE) {
+							invalid_storage_class = true;
+						}
+					}
+					if (invalid_storage_class) {
+						errorf(&env.pos, "invalid storage class for '%N'", entity);
+					}
 				}
 			}
+
+			entity->declaration.alignment = get_type_alignment(orig_type);
 		}
 
 		entity->declaration.type       = orig_type;
-		entity->declaration.alignment  = get_type_alignment(orig_type);
 		entity->declaration.modifiers  = env.modifiers;
 		entity->declaration.attributes = attributes;
 
