@@ -2688,28 +2688,31 @@ static ir_node *sizeof_to_firm(const typeprop_expression_t *expression)
 	return get_type_size_node(type);
 }
 
-static entity_t *get_expression_entity(const expression_t *expression)
-{
-	if (expression->kind != EXPR_REFERENCE)
-		return NULL;
+static unsigned get_object_alignment(expression_t const *expr);
 
-	return expression->reference.entity;
+static unsigned get_address_alignment(expression_t const *const expr)
+{
+	if (expr->kind == EXPR_UNARY_TAKE_ADDRESS) {
+		return get_object_alignment(expr->unary.value);
+	} else {
+		type_t *const type = skip_typeref(expr->base.type);
+		assert(is_type_pointer(type));
+		return get_type_alignment(type->pointer.points_to);
+	}
 }
 
-static unsigned get_cparser_entity_alignment(const entity_t *entity)
+static unsigned get_object_alignment(expression_t const *const expr)
 {
-	switch (entity->kind) {
-	case DECLARATION_KIND_CASES:
-		return entity->declaration.alignment;
-	case ENTITY_STRUCT:
-	case ENTITY_UNION:
-		return entity->compound.alignment;
-	case ENTITY_TYPEDEF:
-		return entity->typedefe.alignment;
-	default:
-		break;
+	entity_t *ent;
+	switch (expr->kind) {
+	case EXPR_ARRAY_ACCESS:      return get_address_alignment(expr->array_access.array_ref);
+	case EXPR_UNARY_DEREFERENCE: return get_address_alignment(expr->unary.value);
+	case EXPR_REFERENCE:         ent = expr->reference.entity;      break;
+	case EXPR_SELECT:            ent = expr->select.compound_entry; break;
+	default:                     return get_type_alignment(expr->base.type);
 	}
-	return 0;
+	assert(is_declaration(ent));
+	return ent->declaration.alignment;
 }
 
 /**
@@ -2717,20 +2720,9 @@ static unsigned get_cparser_entity_alignment(const entity_t *entity)
  */
 static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
 {
-	unsigned alignment = 0;
-
-	const expression_t *tp_expression = expression->tp_expression;
-	if (tp_expression != NULL) {
-		entity_t *entity = get_expression_entity(tp_expression);
-		if (entity != NULL) {
-			alignment = get_cparser_entity_alignment(entity);
-		}
-	}
-
-	if (alignment == 0) {
-		type_t *type = expression->type;
-		alignment = get_type_alignment(type);
-	}
+	unsigned const alignment = expression->tp_expression
+		? get_object_alignment(expression->tp_expression)
+		: get_type_alignment(expression->type);
 
 	dbg_info  *dbgi = get_dbg_info(&expression->base.pos);
 	ir_mode   *mode = get_ir_mode_storage(expression->base.type);
