@@ -1366,79 +1366,21 @@ type_t *make_array_type(type_t *element_type, size_t size,
 	return identify_new_type(type);
 }
 
-static entity_t *pack_bitfield_members(il_size_t *struct_offset,
-                                       il_alignment_t *struct_alignment,
-									   bool packed, entity_t *first)
-{
-	il_size_t      offset     = *struct_offset;
-	il_alignment_t alignment  = *struct_alignment;
-	size_t         bit_offset = 0;
-
-	entity_t *member;
-	for (member = first; member != NULL; member = member->base.next) {
-		if (member->kind != ENTITY_COMPOUND_MEMBER)
-			continue;
-		if (!member->compound_member.bitfield)
-			break;
-
-		type_t *const base_type = skip_typeref(member->declaration.type);
-		il_alignment_t base_alignment = get_type_alignment_compound(base_type);
-		il_alignment_t alignment_mask = base_alignment-1;
-		alignment = MAX(alignment, base_alignment);
-
-		size_t bit_size = member->compound_member.bit_size;
-		if (!packed) {
-			bit_offset += (offset & alignment_mask) * BITS_PER_BYTE;
-			offset     &= ~alignment_mask;
-			size_t base_size = get_type_size(base_type) * BITS_PER_BYTE;
-
-			if (bit_offset + bit_size > base_size || bit_size == 0) {
-				offset    += (bit_offset+BITS_PER_BYTE-1) / BITS_PER_BYTE;
-				offset     = (offset + base_alignment-1) & ~alignment_mask;
-				bit_offset = 0;
-			}
-		}
-
-		if (byte_order_big_endian) {
-			size_t base_size = get_type_size(base_type) * BITS_PER_BYTE;
-			member->compound_member.offset     = offset & ~alignment_mask;
-			member->compound_member.bit_offset = base_size - bit_offset - bit_size;
-		} else {
-			member->compound_member.offset     = offset;
-			member->compound_member.bit_offset = bit_offset;
-		}
-
-		bit_offset += bit_size;
-		offset     += bit_offset / BITS_PER_BYTE;
-		bit_offset %= BITS_PER_BYTE;
-	}
-
-	if (bit_offset > 0)
-		offset += 1;
-
-	*struct_offset    = offset;
-	*struct_alignment = alignment;
-	return member;
-}
-
 void layout_compound(compound_t *const compound)
 {
-	bool     const is_union  = compound->base.kind == ENTITY_UNION;
-	il_alignment_t alignment = compound->alignment;
-	il_size_t      size      = 0;
-	bool           need_pad  = false;
-	for (entity_t *entry = compound->members.entities; entry;) {
+	bool     const is_union   = compound->base.kind == ENTITY_UNION;
+	il_alignment_t alignment  = compound->alignment;
+	size_t         bit_offset = 0;
+	il_size_t      size       = 0;
+	bool           need_pad   = false;
+	for (entity_t *entry = compound->members.entities; entry; entry = entry->base.next) {
 		if (entry->kind != ENTITY_COMPOUND_MEMBER)
-			goto next;
-
-		type_t *const m_type = skip_typeref(entry->declaration.type);
-		if (!is_type_valid(m_type))
-			goto next;
-
-		if (!is_union && entry->compound_member.bitfield) {
-			entry = pack_bitfield_members(&size, &alignment, compound->packed, entry);
 			continue;
-		}
+
+		compound_member_t *const member = &entry->compound_member;
+		type_t            *const m_type = skip_typeref(member->base.type);
+		if (!is_type_valid(m_type))
+			continue;
 
 		il_alignment_t m_alignment = get_type_alignment_compound(m_type);
 		alignment = MAX(alignment, m_alignment);
@@ -1446,7 +1388,38 @@ void layout_compound(compound_t *const compound)
 		unsigned const m_size = get_type_size(m_type);
 		if (is_union) {
 			size = MAX(size, m_size);
+		} else if (member->bitfield) {
+			il_alignment_t const alignment_mask = m_alignment - 1;
+			size_t         const base_size      = m_size * BITS_PER_BYTE;
+			size_t         const bit_size       = member->bit_size;
+			if (!compound->packed) {
+				bit_offset += (size & alignment_mask) * BITS_PER_BYTE;
+				size       &= ~alignment_mask;
+
+				if (bit_offset + bit_size > base_size || bit_size == 0) {
+					size      += (bit_offset + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
+					size       = round_up2(size, m_alignment);
+					bit_offset = 0;
+				}
+			}
+
+			if (byte_order_big_endian) {
+				member->offset     = size & ~alignment_mask;
+				member->bit_offset = base_size - bit_offset - bit_size;
+			} else {
+				member->offset     = size;
+				member->bit_offset = bit_offset;
+			}
+
+			bit_offset += bit_size;
+			size       += bit_offset / BITS_PER_BYTE;
+			bit_offset %= BITS_PER_BYTE;
 		} else {
+			if (bit_offset != 0) {
+				bit_offset = 0;
+				size      += 1;
+			}
+
 			if (!compound->packed) {
 				il_size_t const new_size = round_up2(size, m_alignment);
 				if (new_size > size) {
@@ -1455,13 +1428,13 @@ void layout_compound(compound_t *const compound)
 				}
 			}
 
-			entry->compound_member.offset = size;
-			size += m_size;
+			member->offset = size;
+			size          += m_size;
 		}
-
-next:
-		entry = entry->base.next;
 	}
+
+	if (bit_offset != 0)
+		size += 1;
 
 	if (!compound->packed) {
 		il_size_t const new_size = round_up2(size, alignment);
