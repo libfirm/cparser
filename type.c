@@ -1369,6 +1369,7 @@ type_t *make_array_type(type_t *element_type, size_t size,
 void layout_compound(compound_t *const compound)
 {
 	bool     const is_union   = compound->base.kind == ENTITY_UNION;
+	bool     const is_packed  = compound->packed;
 	il_alignment_t alignment  = compound->alignment;
 	size_t         bit_offset = 0;
 	il_size_t      size       = 0;
@@ -1382,6 +1383,13 @@ void layout_compound(compound_t *const compound)
 		if (!is_type_valid(m_type))
 			continue;
 
+		if (is_packed) {
+			/* GCC: Specifying this attribute for `struct' and `union' types is
+			 * equivalent to specifying the `packed' attribute on each of the
+			 * structure or union members. */
+			member->base.alignment = 1;
+		}
+
 		il_alignment_t const m_alignment = member->base.alignment;
 		alignment = MAX(alignment, m_alignment);
 
@@ -1392,7 +1400,7 @@ void layout_compound(compound_t *const compound)
 			il_alignment_t const alignment_mask = m_alignment - 1;
 			size_t         const base_size      = m_size * BITS_PER_BYTE;
 			size_t         const bit_size       = member->bit_size;
-			if (!compound->packed) {
+			if (!is_packed) {
 				bit_offset += (size & alignment_mask) * BITS_PER_BYTE;
 				size       &= ~alignment_mask;
 
@@ -1420,12 +1428,10 @@ void layout_compound(compound_t *const compound)
 				size      += 1;
 			}
 
-			if (!compound->packed) {
-				il_size_t const new_size = round_up2(size, m_alignment);
-				if (new_size > size) {
-					need_pad = true;
-					size     = new_size;
-				}
+			il_size_t const new_size = round_up2(size, m_alignment);
+			if (new_size > size) {
+				need_pad = true;
+				size     = new_size;
 			}
 
 			member->offset = size;
@@ -1436,18 +1442,16 @@ void layout_compound(compound_t *const compound)
 	if (bit_offset != 0)
 		size += 1;
 
-	if (!compound->packed) {
-		il_size_t const new_size = round_up2(size, alignment);
-		if (new_size > size) {
-			need_pad = true;
-			size     = new_size;
-		}
+	il_size_t const new_size = round_up2(size, alignment);
+	if (new_size > size) {
+		need_pad = true;
+		size     = new_size;
 	}
 
 	position_t const *const pos = &compound->base.pos;
 	if (need_pad) {
 		warningf(WARN_PADDED, pos, "'%N' needs padding", compound);
-	} else if (compound->packed) {
+	} else if (is_packed) {
 		warningf(WARN_PACKED, pos, "superfluous packed attribute on '%N'", compound);
 	}
 
