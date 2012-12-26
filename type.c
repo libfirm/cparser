@@ -1094,10 +1094,24 @@ unsigned get_type_alignment(type_t const *const type)
  */
 static unsigned get_type_alignment_compound(type_t *const type)
 {
-	assert(!is_typeref(type));
-	if (type->kind == TYPE_ATOMIC)
+	switch (type->kind) {
+	case TYPE_ATOMIC:
+	case TYPE_COMPLEX:
+	case TYPE_IMAGINARY:
+	case TYPE_ENUM:
 		return atomic_type_properties[type->atomic.akind].struct_alignment;
-	return get_type_alignment(type);
+
+	case TYPE_TYPEDEF: {
+		il_alignment_t const alignment = get_type_alignment_compound(type->typedeft.typedefe->type);
+		return MAX(type->typedeft.typedefe->alignment, alignment);
+	}
+
+	case TYPE_TYPEOF:
+		return get_type_alignment_compound(type->typeoft.typeof_type);
+
+	default:
+		return get_type_alignment(type);
+	}
 }
 
 decl_modifiers_t get_type_modifiers(const type_t *type)
