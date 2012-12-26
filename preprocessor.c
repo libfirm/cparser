@@ -1008,7 +1008,7 @@ static void finish_argument(void)
 static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo)
 {
 	assert(current_call.macro == NULL && current_call.parameter == NULL);
-	current_call.macro = definition;
+	current_call.macro   = definition;
 	call_whitespace_info = wsinfo;
 	if (definition->n_parameters > 0) {
 		start_argument(&definition->parameters[0]);
@@ -1562,7 +1562,6 @@ static token_kind_t peek_expansion(void)
 
 static void skip_line_comment(void)
 {
-	info.had_whitespace = true;
 	while (true) {
 		switch (input.c) {
 		case EOF:
@@ -1576,10 +1575,8 @@ static void skip_line_comment(void)
 	}
 }
 
-static void skip_multiline_comment(void)
+static unsigned skip_multiline_comment(void)
 {
-	info.had_whitespace = true;
-
 	position_t const start_pos = input.pos;
 	while (true) {
 		switch (input.c) {
@@ -1592,10 +1589,10 @@ static void skip_multiline_comment(void)
 		case '*':
 			eat('*');
 			if (input.c == '/') {
-				if (input.pos.lineno != input.output_line)
-					info.whitespace_at_line_begin = input.pos.colno;
+				unsigned const whitespace_at_line_begin =
+					input.pos.lineno != input.output_line ? input.pos.colno : 0;
 				eat('/');
-				return;
+				return whitespace_at_line_begin;
 			}
 			break;
 
@@ -1604,7 +1601,7 @@ static void skip_multiline_comment(void)
 
 		case EOF:
 			errorf(&start_pos, "unterminated comment");
-			return;
+			return 0;
 
 		default:
 			next_char();
@@ -1627,10 +1624,12 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			if (input.c == '/') {
 				eat('/');
 				skip_line_comment();
+				info.had_whitespace = true;
 				continue;
 			} else if (input.c == '*') {
 				eat('*');
-				skip_multiline_comment();
+				info.had_whitespace           = true;
+				info.whitespace_at_line_begin = skip_multiline_comment();
 				continue;
 			} else {
 				put_back('/');
@@ -1650,8 +1649,11 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 	}
 }
 
-static void skip_whitespace(void)
+static whitespace_info_t skip_whitespace(void)
 {
+	whitespace_info_t info;
+	memset(&info, 0, sizeof(info));
+
 	while (true) {
 		switch (input.c) {
 		case WHITESPACE:
@@ -1668,7 +1670,7 @@ static void skip_whitespace(void)
 				--input.pos.lineno;
 				put_back(input.c);
 				input.c = '\n';
-				return;
+				return info;
 			}
 			continue;
 
@@ -1677,18 +1679,20 @@ static void skip_whitespace(void)
 			if (input.c == '/') {
 				eat('/');
 				skip_line_comment();
+				info.had_whitespace = true;
 				continue;
 			} else if (input.c == '*') {
 				eat('*');
-				skip_multiline_comment();
+				info.had_whitespace           = true;
+				info.whitespace_at_line_begin = skip_multiline_comment();
 				continue;
 			} else {
 				put_back('/');
 			}
-			return;
+			return info;
 
 		default:
-			return;
+			return info;
 		}
 	}
 }
@@ -1950,11 +1954,13 @@ restart:
 		MAYBE('=', T_SLASHEQUAL)
 		case '*':
 			eat('*');
-			skip_multiline_comment();
+			info.had_whitespace           = true;
+			info.whitespace_at_line_begin = skip_multiline_comment();
 			goto restart;
 		case '/':
 			eat('/');
 			skip_line_comment();
+			info.had_whitespace = true;
 			goto restart;
 		ELSE('/')
 	case '%':
@@ -3518,33 +3524,28 @@ static bool next_expansion_token(void)
 				if (pp_definition->has_parameters) {
 
 					/* check if next token is a '(' */
-					whitespace_info_t old_info   = info;
-					token_kind_t      next_token = peek_expansion();
+					token_kind_t next_token = peek_expansion();
 					if (next_token == T_EOF) {
-						info.at_line_begin  = false;
-						info.had_whitespace = false;
-						skip_whitespace();
+						whitespace_info_t skipinfo = skip_whitespace();
 						if (input.c == '(') {
 							next_token = '(';
+						} else {
+							next_info = skipinfo;
+							return true;
 						}
-					}
-
-					if (next_token == '(') {
-						if (current_expansion == NULL)
-							expansion_pos = pp_token.base.pos;
-						push_macro_call();
-						next_preprocessing_token();
-						assert(pp_token.kind == '(');
-
-						start_call(pp_definition, old_info);
-						return false;
-					} else {
-						/* skip_whitespaces() skipped newlines and whitespace,
-						 * remember results for next token */
-						next_info = info;
-						info      = old_info;
+					} else if (next_token != '(') {
 						return true;
 					}
+
+					if (current_expansion == NULL)
+						expansion_pos = pp_token.base.pos;
+					push_macro_call();
+					whitespace_info_t oldinfo = info;
+					next_preprocessing_token();
+					assert(pp_token.kind == '(');
+
+					start_call(pp_definition, oldinfo);
+					return false;
 				} else {
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
