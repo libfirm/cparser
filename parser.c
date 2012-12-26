@@ -5498,65 +5498,43 @@ static void parse_compound_declarators(compound_t *compound,
 	add_anchor_token(';');
 	add_anchor_token(',');
 	do {
-		entity_t *entity;
-		if (token.kind == ':') {
-			/* anonymous bitfield */
-			type_t *type = specifiers->type;
-			entity = allocate_entity_zero(ENTITY_COMPOUND_MEMBER, NAMESPACE_NORMAL, NULL, HERE);
-			entity->declaration.declared_storage_class = STORAGE_CLASS_NONE;
-			entity->declaration.storage_class          = STORAGE_CLASS_NONE;
-			entity->declaration.type                   = type;
+		entity_t         *const entity = parse_declarator(specifiers, DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
+		position_t const *const pos    = &entity->base.pos;
+		if (entity->kind == ENTITY_TYPEDEF) {
+			errorf(pos, "typedef not allowed as compound member");
+			continue;
+		}
 
+		assert(entity->kind == ENTITY_COMPOUND_MEMBER);
+
+		/* make sure we don't define a symbol multiple times */
+		symbol_t *symbol = entity->base.symbol;
+		if (symbol != NULL) {
+			entity_t *prev = find_compound_entry(compound, symbol);
+			if (prev != NULL) {
+				position_t const *const ppos = &prev->base.pos;
+				errorf(pos, "multiple declarations of '%N' (declared %P)", entity, ppos);
+			}
+		}
+
+		if (token.kind == ':') {
 			parse_bitfield_member(entity);
 
-			attribute_t  *attributes = parse_attributes(NULL);
-			attribute_t **anchor     = &attributes;
-			while (*anchor != NULL)
-				anchor = &(*anchor)->next;
-			*anchor = specifiers->attributes;
-			if (attributes != NULL) {
-				handle_entity_attributes(attributes, entity);
-			}
-			entity->declaration.attributes = attributes;
+			attribute_t *attributes = parse_attributes(NULL);
+			handle_entity_attributes(attributes, entity);
 		} else {
-			entity = parse_declarator(specifiers, DECL_MAY_BE_ABSTRACT | DECL_CREATE_COMPOUND_MEMBER);
-			position_t const *const pos = &entity->base.pos;
-			if (entity->kind == ENTITY_TYPEDEF) {
-				errorf(pos, "typedef not allowed as compound member");
-				continue;
-			}
-
-			assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-
-			/* make sure we don't define a symbol multiple times */
-			symbol_t *symbol = entity->base.symbol;
-			if (symbol != NULL) {
-				entity_t *prev = find_compound_entry(compound, symbol);
-				if (prev != NULL) {
-					position_t const *const ppos = &prev->base.pos;
-					errorf(pos, "multiple declarations of '%N' (declared %P)", entity, ppos);
-				}
-			}
-
-			if (token.kind == ':') {
-				parse_bitfield_member(entity);
-
-				attribute_t *attributes = parse_attributes(NULL);
-				handle_entity_attributes(attributes, entity);
-			} else {
-				type_t *orig_type = entity->declaration.type;
-				type_t *type      = skip_typeref(orig_type);
-				if (is_type_function(type)) {
-					errorf(pos, "'%N' must not have function type '%T'", entity, orig_type);
-				} else if (is_type_incomplete(type)) {
-					/* §6.7.2.1:16 flexible array member */
-					if (!is_type_array(type)       ||
-							token.kind          != ';' ||
-							look_ahead(1)->kind != '}') {
-						errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
-					} else if (compound->members.entities == NULL) {
-						errorf(pos, "flexible array member in otherwise empty struct");
-					}
+			type_t *orig_type = entity->declaration.type;
+			type_t *type      = skip_typeref(orig_type);
+			if (is_type_function(type)) {
+				errorf(pos, "'%N' must not have function type '%T'", entity, orig_type);
+			} else if (is_type_incomplete(type)) {
+				/* §6.7.2.1:16 flexible array member */
+				if (!is_type_array(type)       ||
+						token.kind          != ';' ||
+						look_ahead(1)->kind != '}') {
+					errorf(pos, "'%N' has incomplete type '%T'", entity, orig_type);
+				} else if (compound->members.entities == NULL) {
+					errorf(pos, "flexible array member in otherwise empty struct");
 				}
 			}
 		}
