@@ -2204,14 +2204,14 @@ static ir_node *handle_assume(expression_t const *const expr)
 
 static ir_node *create_cast(unary_expression_t const *const expr)
 {
-	type_t *const type = skip_typeref(expr->base.type);
-	if (is_type_void(type))
-		return NULL;
-
 	type_t  *const from_type = skip_typeref(expr->value->base.type);
 	ir_node       *value     = is_type_complex(from_type)
 		? expression_to_complex(expr->value).real
 		: expression_to_value(expr->value);
+
+	type_t *const type = skip_typeref(expr->base.type);
+	if (is_type_void(type))
+		return NULL;
 
 	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
 	ir_mode  *const mode = get_ir_mode_storage(type);
