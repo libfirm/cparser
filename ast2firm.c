@@ -519,10 +519,10 @@ static ir_type *create_bitfield_type(const entity_t *entity)
 /**
  * Construct firm type from ast struct type.
  */
-static ir_type *create_compound_type(compound_type_t *const type)
+static ir_type *create_compound_type(type_t *const type)
 {
 	bool        const is_union = type->base.kind == TYPE_COMPOUND_UNION;
-	compound_t *const compound = type->compound;
+	compound_t *const compound = type->compound.compound;
 
 	symbol_t *type_symbol = compound->base.symbol;
 	ident    *id;
@@ -536,12 +536,11 @@ static ir_type *create_compound_type(compound_type_t *const type)
 		}
 	}
 
-	ir_type *irtype;
-	if (is_union) {
-		irtype = new_type_union(id);
-	} else {
-		irtype = new_type_struct(id);
-	}
+	type_dbg_info *const dbgi   = get_type_dbg_info_(type);
+	ir_type       *const irtype = is_union
+		? new_d_type_union( id, dbgi)
+		: new_d_type_struct(id, dbgi);
+
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
 
@@ -620,7 +619,7 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_IMAGINARY:       return create_atomic_type(type);
 	case TYPE_COMPLEX:         return create_complex_type(type);
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION:  return create_compound_type(&type->compound);
+	case TYPE_COMPOUND_UNION:  return create_compound_type(type);
 	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
 	case TYPE_POINTER:         return create_pointer_type(type, type->pointer.points_to);
 	case TYPE_REFERENCE:       return create_pointer_type(type, type->reference.refers_to);
