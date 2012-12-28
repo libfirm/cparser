@@ -278,15 +278,17 @@ static ir_type *create_atomic_type(atomic_type_kind_t akind, const type_t *type)
 	return create_primitive_irtype(akind, dbgi);
 }
 
+static ir_type *get_ir_type(type_t *type);
+
 /**
  * Creates a Firm type for a complex type
  */
-static ir_type *create_complex_type(atomic_type_kind_t akind,
-                                    const type_t *type)
+static ir_type *create_complex_type(type_t const *const type)
 {
-	type_dbg_info *dbgi   = get_type_dbg_info_(type);
-	ir_type       *etype  = create_primitive_irtype(akind, NULL);
-	ir_type       *irtype = new_d_type_array(1, etype, dbgi);
+	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
+	type_t        *const etype   = make_atomic_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
+	ir_type       *const iretype = get_ir_type(etype);
+	ir_type       *const irtype  = new_d_type_array(1, iretype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
@@ -323,8 +325,6 @@ static type_t *get_parameter_type(type_t *orig_type)
 
 	return type;
 }
-
-static ir_type *get_ir_type(type_t *type);
 
 static ir_type *create_method_type(const function_type_t *function_type, bool for_closure)
 {
@@ -674,7 +674,7 @@ static ir_type *get_ir_type(type_t *type)
 		firm_type = create_atomic_type(type->atomic.akind, type);
 		break;
 	case TYPE_COMPLEX:
-		firm_type = create_complex_type(type->atomic.akind, type);
+		firm_type = create_complex_type(type);
 		break;
 	case TYPE_IMAGINARY:
 		firm_type = create_imaginary_type(&type->atomic);
