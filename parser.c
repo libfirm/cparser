@@ -207,7 +207,6 @@ static void semantic_comparison(binary_expression_t *expression,
 	case T__int16:            \
 	case T__int32:            \
 	case T__int64:            \
-	case T__int128:           \
 	COMPLEX_SPECIFIERS        \
 	IMAGINARY_SPECIFIERS
 
@@ -2488,9 +2487,8 @@ typedef enum specifiers_t {
 	SPECIFIER_INT16     = 1 << 13,
 	SPECIFIER_INT32     = 1 << 14,
 	SPECIFIER_INT64     = 1 << 15,
-	SPECIFIER_INT128    = 1 << 16,
-	SPECIFIER_COMPLEX   = 1 << 17,
-	SPECIFIER_IMAGINARY = 1 << 18,
+	SPECIFIER_COMPLEX   = 1 << 16,
+	SPECIFIER_IMAGINARY = 1 << 17,
 } specifiers_t;
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -2718,7 +2716,6 @@ wrong_thread_storage_class:
 		MATCH_SPECIFIER(T__Bool,      SPECIFIER_BOOL,      "_Bool");
 		MATCH_SPECIFIER(T__Complex,   SPECIFIER_COMPLEX,   "_Complex");
 		MATCH_SPECIFIER(T__Imaginary, SPECIFIER_IMAGINARY, "_Imaginary");
-		MATCH_SPECIFIER(T__int128,    SPECIFIER_INT128,    "_int128");
 		MATCH_SPECIFIER(T__int16,     SPECIFIER_INT16,     "_int16");
 		MATCH_SPECIFIER(T__int32,     SPECIFIER_INT32,     "_int32");
 		MATCH_SPECIFIER(T__int64,     SPECIFIER_INT64,     "_int64");
@@ -2944,10 +2941,6 @@ warn_about_long_long:
 			atomic_type = unsigned_int64_type_kind;
 			break;
 
-		case SPECIFIER_UNSIGNED | SPECIFIER_INT128:
-			atomic_type = unsigned_int128_type_kind;
-			break;
-
 		case SPECIFIER_INT8:
 		case SPECIFIER_SIGNED | SPECIFIER_INT8:
 			atomic_type = int8_type_kind;
@@ -2966,11 +2959,6 @@ warn_about_long_long:
 		case SPECIFIER_INT64:
 		case SPECIFIER_SIGNED | SPECIFIER_INT64:
 			atomic_type = int64_type_kind;
-			break;
-
-		case SPECIFIER_INT128:
-		case SPECIFIER_SIGNED | SPECIFIER_INT128:
-			atomic_type = int128_type_kind;
 			break;
 
 		case SPECIFIER_FLOAT:

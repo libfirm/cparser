@@ -79,24 +79,20 @@ extern atomic_type_kind_t int8_type_kind;
 extern atomic_type_kind_t int16_type_kind;
 extern atomic_type_kind_t int32_type_kind;
 extern atomic_type_kind_t int64_type_kind;
-extern atomic_type_kind_t int128_type_kind;
 extern atomic_type_kind_t unsigned_int8_type_kind;
 extern atomic_type_kind_t unsigned_int16_type_kind;
 extern atomic_type_kind_t unsigned_int32_type_kind;
 extern atomic_type_kind_t unsigned_int64_type_kind;
-extern atomic_type_kind_t unsigned_int128_type_kind;
 
 extern type_t *type_int8;
 extern type_t *type_int16;
 extern type_t *type_int32;
 extern type_t *type_int64;
 extern type_t *type_int64_ptr;
-extern type_t *type_int128;
 extern type_t *type_unsigned_int8;
 extern type_t *type_unsigned_int16;
 extern type_t *type_unsigned_int32;
 extern type_t *type_unsigned_int64;
-extern type_t *type_unsigned_int128;
 
 void init_basic_types(void);
 void init_wchar_types(atomic_type_kind_t wchar_akind);

@@ -201,8 +201,6 @@ S(_MS,              _int32,                )
 S(_MS,             __int32,                = T__int32)
 S(_MS,              _int64,                )
 S(_MS,             __int64,                = T__int64)
-S(_MS,              _int128,               )
-S(_MS,             __int128,               = T__int128)
 #undef S
 
 /* Redefine required macros for MinGW headers */
