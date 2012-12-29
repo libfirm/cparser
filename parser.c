@@ -2432,28 +2432,30 @@ static bool is_typedef_symbol(symbol_t *symbol)
 	return entity != NULL && entity->kind == ENTITY_TYPEDEF;
 }
 
+static bool is_declaration_specifier(token_t const *const tk)
+{
+	switch (tk->kind) {
+		DECLARATION_START  return true;
+		case T_IDENTIFIER: return is_typedef_symbol(tk->base.symbol);
+		default:           return false;
+	}
+}
+
 static type_t *parse_typeof(void)
 {
 	eat(T___typeof__);
 
-	type_t *type;
-
 	add_anchor_token(')');
 	expect('(');
 
-	expression_t *expression  = NULL;
-
-	switch (token.kind) {
-	case T_IDENTIFIER:
-		if (is_typedef_symbol(token.base.symbol)) {
-	DECLARATION_START
-			type = parse_typename();
-		} else {
-	default:
-			expression = parse_expression();
-			type       = revert_automatic_type_conversion(expression);
-		}
-		break;
+	expression_t *expression;
+	type_t       *type;
+	if (is_declaration_specifier(&token)) {
+		expression = NULL;
+		type       = parse_typename();
+	} else {
+		expression = parse_expression();
+		type       = revert_automatic_type_conversion(expression);
 	}
 
 	rem_anchor_token(')');
@@ -4148,19 +4150,6 @@ static void parser_error_multiple_definition(entity_t *entity,
                                              const position_t *pos)
 {
 	errorf(pos, "redefinition of '%N' (declared %P)", entity, &entity->base.pos);
-}
-
-static bool is_declaration_specifier(token_t const *const tk)
-{
-	switch (tk->kind) {
-		DECLARATION_START
-			return true;
-		case T_IDENTIFIER:
-			return is_typedef_symbol(tk->base.symbol);
-
-		default:
-			return false;
-	}
 }
 
 static void parse_init_declarator_rest(entity_t *entity)
@@ -6286,26 +6275,20 @@ static expression_t *parse_statement_expression(void)
 static expression_t *parse_parenthesized_expression(void)
 {
 	token_t const* const la1 = look_ahead(1);
-	switch (la1->kind) {
-	case '{':
+	if (is_declaration_specifier(la1)) {
+		return parse_cast();
+	} else if (la1->kind == '{') {
 		/* gcc extension: a statement expression */
 		return parse_statement_expression();
-
-	case T_IDENTIFIER:
-		if (is_typedef_symbol(la1->base.symbol)) {
-	DECLARATION_START
-			return parse_cast();
-		}
+	} else {
+		eat('(');
+		add_anchor_token(')');
+		expression_t *result = parse_expression();
+		result->base.parenthesized = true;
+		rem_anchor_token(')');
+		expect(')');
+		return result;
 	}
-
-	eat('(');
-	add_anchor_token(')');
-	expression_t *result = parse_expression();
-	result->base.parenthesized = true;
-	rem_anchor_token(')');
-	expect(')');
-
-	return result;
 }
 
 static expression_t *parse_function_keyword(funcname_kind_t const kind)
