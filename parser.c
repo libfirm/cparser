@@ -2245,7 +2245,7 @@ static void append_entity(scope_t *scope, entity_t *entity)
 }
 
 
-static compound_t *parse_compound_type_specifier(bool is_struct)
+static type_t *parse_compound_type_specifier(bool const is_struct)
 {
 	position_t const pos = *HERE;
 	eat(is_struct ? T_struct : T_union);
@@ -2315,7 +2315,9 @@ static compound_t *parse_compound_type_specifier(bool is_struct)
 		}
 	}
 
-	return &entity->compound;
+	type_t *const type = allocate_type_zero(is_struct ? TYPE_COMPOUND_STRUCT : TYPE_COMPOUND_UNION);
+	type->compound.compound = &entity->compound;
+	return type;
 }
 
 static void parse_enum_entries(type_t *const enum_type)
@@ -2760,14 +2762,13 @@ wrong_thread_storage_class:
 
 		case T_struct:
 			CHECK_DOUBLE_TYPE();
-			type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
-
-			type->compound.compound = parse_compound_type_specifier(true);
+			newtype = true;
+			type    = parse_compound_type_specifier(true);
 			break;
 		case T_union:
 			CHECK_DOUBLE_TYPE();
-			type = allocate_type_zero(TYPE_COMPOUND_UNION);
-			type->compound.compound = parse_compound_type_specifier(false);
+			newtype = true;
+			type    = parse_compound_type_specifier(false);
 			break;
 		case T_enum:
 			CHECK_DOUBLE_TYPE();
@@ -2775,11 +2776,13 @@ wrong_thread_storage_class:
 			break;
 		case T___typeof__:
 			CHECK_DOUBLE_TYPE();
-			type = parse_typeof();
+			newtype = true;
+			type    = parse_typeof();
 			break;
 		case T___builtin_va_list:
 			CHECK_DOUBLE_TYPE();
-			type = duplicate_type(type_valist);
+			newtype = false;
+			type    = type_valist;
 			eat(T___builtin_va_list);
 			break;
 
@@ -2809,8 +2812,9 @@ wrong_thread_storage_class:
 				}
 			}
 
-			type_t *const typedef_type = get_typedef_type(token.base.symbol);
-			if (typedef_type == NULL) {
+			newtype = true;
+			type    = get_typedef_type(token.base.symbol);
+			if (!type) {
 				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
 				 * errors later on. */
@@ -2838,7 +2842,6 @@ wrong_thread_storage_class:
 			}
 
 			eat(T_IDENTIFIER);
-			type = typedef_type;
 			break;
 		}
 
@@ -3032,14 +3035,16 @@ warn_about_long_long:
 		errorf(&specifiers->pos, "multiple datatypes in declaration");
 	}
 
-	/* FIXME: check type qualifiers here */
-	type->base.qualifiers = qualifiers;
-
-	if (newtype) {
-		type = identify_new_type(type);
-	} else {
-		type = typehash_insert(type);
+	if (qualifiers != TYPE_QUALIFIER_NONE) {
+		if (!newtype) {
+			type    = duplicate_type(type);
+			newtype = true;
+		}
+		/* FIXME: check type qualifiers here */
+		type->base.qualifiers = qualifiers;
 	}
+	if (newtype)
+		type = identify_new_type(type);
 
 	if (specifiers->attributes != NULL)
 		type = handle_type_attributes(specifiers->attributes, type);
