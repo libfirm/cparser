@@ -6715,10 +6715,9 @@ static expression_t *parse_primary_expression(void)
 	case T___real__:                     return parse_complex_extract_expression(EXPR_UNARY_REAL);
 
 	/* Gracefully handle type names while parsing expressions. */
-	case T_COLONCOLON:
-		return parse_reference();
 	case T_IDENTIFIER:
 		if (!is_typedef_symbol(token.base.symbol)) {
+	case T_COLONCOLON:
 			return parse_reference();
 		}
 		/* FALLTHROUGH */
@@ -9735,6 +9734,7 @@ static statement_t *intern_parse_statement(void)
 		if (la1_type == ':') {
 			statement = parse_label_statement();
 		} else if (is_typedef_symbol(token.base.symbol)) {
+	DECLARATION_START
 			statement = parse_declaration_statement();
 		} else {
 			/* it's an identifier, the grammar says this must be an
@@ -9766,10 +9766,6 @@ static statement_t *intern_parse_statement(void)
 		POP_EXTENSION();
 		break;
 	}
-
-	DECLARATION_START
-		statement = parse_declaration_statement();
-		break;
 
 	case T___label__:
 		statement = parse_local_label_declaration();
