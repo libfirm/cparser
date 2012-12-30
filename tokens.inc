@@ -202,10 +202,3 @@ S(_MS,             __int32,                = T__int32)
 S(_MS,              _int64,                )
 S(_MS,             __int64,                = T__int64)
 #undef S
-
-/* Redefine required macros for MinGW headers */
-#if defined(__MINGW32__) || defined(__CYGWIN__)
-#define __stdcall __attribute__((__stdcall__))
-#define __fastcall __attribute__((__fastcall__))
-#define __cdecl __attribute__((__cdecl__))
-#endif
