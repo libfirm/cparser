@@ -2859,10 +2859,10 @@ finish_specifiers:
 		if (!type) {
 			/* ISO/IEC 14882:1998(E) §C.1.5:4 */
 			if (c_mode & _CXX || strict_mode) {
-				errorf(pos, "no type specifiers given in declaration");
+				errorf(pos, "type specifier missing");
 				goto error_type;
 			}
-			warningf(WARN_IMPLICIT_INT, pos, "no type specifiers in declaration, using 'int'");
+			warningf(WARN_IMPLICIT_INT, pos, "type specifier missing; assuming 'int'");
 			newtype = false;
 			type    = type_int;
 		}
@@ -2996,7 +2996,7 @@ warn_about_long_long:
 			} else if (type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
 				errorf(pos, "only integer types can be signed or unsigned");
 			} else {
-				errorf(pos, "multiple datatypes in declaration");
+				errorf(pos, "invalid type specifier");
 			}
 			goto error_type;
 		}
@@ -3017,7 +3017,7 @@ error_type:
 		type->atomic.akind = atomic_type;
 		newtype = true;
 	} else {
-		errorf(&specifiers->pos, "multiple datatypes in declaration");
+		errorf(&specifiers->pos, "multiple types specified");
 	}
 
 	if (qualifiers != TYPE_QUALIFIER_NONE) {
