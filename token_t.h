@@ -64,7 +64,7 @@ struct macro_parameter_t {
 };
 
 union token_t {
-	unsigned          kind;
+	token_kind_t      kind;
 	token_base_t      base;
 	literal_t         literal;
 	macro_parameter_t macro_parameter;
