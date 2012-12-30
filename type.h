@@ -185,12 +185,12 @@ bool is_type_arithmetic(const type_t *type);
 bool is_type_scalar(const type_t *type);
 
 /**
- * Check if a given type is incomplete.
+ * Check if a given type is complete.
  *
  * @param type  The type to check.
- * @return True if the given type is incomplete (i.e. just forward).
+ * @return True if the given type is complete.
  */
-bool is_type_incomplete(const type_t *type);
+bool is_type_complete(type_t const *type);
 
 bool is_type_object(const type_t *type);
 

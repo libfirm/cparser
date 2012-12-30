@@ -3084,7 +3084,7 @@ static entity_t *parse_parameter(void)
 	return entity;
 }
 
-static void semantic_parameter_incomplete(const entity_t *entity)
+static void semantic_parameter_complete(const entity_t *entity)
 {
 	assert(entity->kind == ENTITY_PARAMETER);
 
@@ -3093,7 +3093,7 @@ static void semantic_parameter_incomplete(const entity_t *entity)
 	 *             definition of that function shall not have
 	 *             incomplete type. */
 	type_t *type = skip_typeref(entity->declaration.type);
-	if (is_type_incomplete(type)) {
+	if (!is_type_complete(type)) {
 		errorf(&entity->base.pos, "'%N' has incomplete type", entity);
 	}
 }
@@ -3166,7 +3166,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 				}
 				assert(is_declaration(entity));
 
-				semantic_parameter_incomplete(entity);
+				semantic_parameter_complete(entity);
 
 				function_parameter_t *const parameter =
 					allocate_parameter(entity->declaration.type);
@@ -3575,7 +3575,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 
 			type_t *skipped_type = skip_typeref(type);
 			/* §6.7.5.2:1 */
-			if (is_type_incomplete(skipped_type)) {
+			if (!is_type_complete(skipped_type)) {
 				errorf(pos, "array of incomplete type '%T' is not allowed", type);
 			} else if (is_type_function(skipped_type)) {
 				errorf(pos, "array of functions is not allowed");
@@ -4053,7 +4053,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 						default:
 							break;
 					}
-				} else if (is_type_incomplete(prev_type)) {
+				} else if (!is_type_complete(prev_type)) {
 					prev_decl->type = type;
 				}
 
@@ -4233,7 +4233,7 @@ static void check_variable_type_complete(entity_t *ent)
 		return;
 
 	type_t *const type = skip_typeref(decl->type);
-	if (!is_type_incomplete(type))
+	if (is_type_complete(type))
 		return;
 
 	/* §6.9.2:2 and §6.9.2:5: At the end of the translation incomplete arrays
@@ -4424,7 +4424,7 @@ decl_list_end:
 			parameter->declaration.type = parameter_type;
 		}
 
-		semantic_parameter_incomplete(parameter);
+		semantic_parameter_complete(parameter);
 
 		/* we need the default promoted types for the function type */
 		type_t *not_promoted = parameter_type;
@@ -5509,7 +5509,7 @@ static void parse_compound_declarators(compound_t *compound,
 			type_t *type      = skip_typeref(orig_type);
 			if (is_type_function(type)) {
 				errorf(pos, "'%N' must not have function type '%T'", entity, orig_type);
-			} else if (is_type_incomplete(type)) {
+			} else if (!is_type_complete(type)) {
 				/* §6.7.2.1:16 flexible array member */
 				if (!is_type_array(type)       ||
 						token.kind          != ';' ||
@@ -6831,7 +6831,7 @@ typeprop_expression:
 	tp_expression->typeprop.type   = orig_type;
 	type_t const* const type       = skip_typeref(orig_type);
 	char   const*       wrong_type = NULL;
-	if (is_type_incomplete(type)) {
+	if (!is_type_complete(type)) {
 		if (!is_type_void(type) || !GNU_MODE)
 			wrong_type = "incomplete";
 	} else if (type->kind == TYPE_FUNCTION) {
@@ -7411,12 +7411,12 @@ static expression_t *parse_throw(void)
 			/* ISO/IEC 14882:1998(E) §15.1:3 */
 			type_t *const orig_type = value->base.type;
 			type_t *const type      = skip_typeref(orig_type);
-			if (is_type_incomplete(type)) {
+			if (!is_type_complete(type)) {
 				errorf(&value->base.pos,
 						"cannot throw object of incomplete type '%T'", orig_type);
 			} else if (is_type_pointer(type)) {
 				type_t *const points_to = skip_typeref(type->pointer.points_to);
-				if (is_type_incomplete(points_to) && !is_type_void(points_to)) {
+				if (!is_type_complete(points_to) && !is_type_void(points_to)) {
 					errorf(&value->base.pos,
 							"cannot throw pointer to incomplete type '%T'", orig_type);
 				}
@@ -7438,7 +7438,7 @@ static bool check_pointer_arithmetic(const position_t *pos,
 	type_t *points_to = pointer_type->pointer.points_to;
 	points_to = skip_typeref(points_to);
 
-	if (is_type_incomplete(points_to)) {
+	if (!is_type_complete(points_to)) {
 		if (!GNU_MODE || !is_type_void(points_to)) {
 			errorf(pos,
 			       "arithmetic with pointer to incomplete type '%T' not allowed",
@@ -8160,7 +8160,7 @@ static bool is_valid_assignment_lhs(expression_t const* const left)
 		       orig_type_left);
 		return false;
 	}
-	if (is_type_incomplete(type_left)) {
+	if (!is_type_complete(type_left)) {
 		errorf(&left->base.pos, "left-hand side '%E' of assignment has incomplete type '%T'",
 		       left, orig_type_left);
 		return false;
@@ -10283,7 +10283,7 @@ static void complete_incomplete_arrays(void)
 		declaration_t *const decl = incomplete_arrays[i];
 		type_t        *const type = skip_typeref(decl->type);
 
-		if (!is_type_incomplete(type))
+		if (is_type_complete(type))
 			continue;
 
 		position_t const *const pos = &decl->base.pos;

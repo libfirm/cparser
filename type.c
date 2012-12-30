@@ -806,20 +806,17 @@ bool is_type_scalar(const type_t *type)
 	}
 }
 
-bool is_type_incomplete(const type_t *type)
+bool is_type_complete(type_t const *const type)
 {
 	assert(!is_typeref(type));
 
 	switch (type->kind) {
 	case TYPE_COMPOUND_STRUCT:
-	case TYPE_COMPOUND_UNION: {
-		const compound_type_t *compound_type = &type->compound;
-		return !compound_type->compound->complete;
-	}
+	case TYPE_COMPOUND_UNION:
+		return type->compound.compound->complete;
 
 	case TYPE_ARRAY:
-		return type->array.size_expression == NULL
-			&& !type->array.size_constant;
+		return type->array.size_expression || type->array.size_constant;
 
 	case TYPE_ATOMIC:
 	case TYPE_ENUM:
@@ -829,10 +826,10 @@ bool is_type_incomplete(const type_t *type)
 	case TYPE_POINTER:
 	case TYPE_REFERENCE:
 	case TYPE_ERROR:
-		return false;
+		return true;
 
 	case TYPE_VOID:
-		return true;
+		return false;
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
@@ -844,7 +841,7 @@ bool is_type_incomplete(const type_t *type)
 
 bool is_type_object(const type_t *type)
 {
-	return !is_type_function(type) && !is_type_incomplete(type);
+	return !is_type_function(type) && is_type_complete(type);
 }
 
 /**
