@@ -1344,19 +1344,17 @@ static ir_node *create_trampoline(dbg_info *dbgi, ir_mode *mode,
 static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 		                      ir_node *const addr)
 {
-	type_t *skipped = skip_typeref(type);
-	if (is_type_incomplete(skipped))
-		return addr;
-
-	ir_type *irtype = get_ir_type(skipped);
-	if (is_compound_type(irtype)
-	    || is_Method_type(irtype)
-	    || is_Array_type(irtype)) {
+	type_t *const skipped = skip_typeref(type);
+	if (is_type_compound(skipped) ||
+	    is_type_function(skipped) ||
+	    is_type_array(skipped)    ||
+	    is_type_incomplete(skipped)) {
 		return addr;
 	}
 
 	ir_cons_flags  flags    = skipped->base.qualifiers & TYPE_QUALIFIER_VOLATILE
 	                          ? cons_volatile : cons_none;
+	ir_type *const irtype   = get_ir_type(skipped);
 	ir_mode *const mode     = get_type_mode(irtype);
 	ir_node *const memory   = get_store();
 	ir_node *const load     = new_d_Load(dbgi, memory, addr, mode, flags);
