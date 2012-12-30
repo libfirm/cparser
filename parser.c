@@ -7117,9 +7117,8 @@ static expression_t *parse_call_expression(expression_t *expression)
 	/* do default promotion for other arguments */
 	for (; argument != NULL; argument = argument->next) {
 		type_t *argument_type = argument->expression->base.type;
-		if (!is_type_object(skip_typeref(argument_type))) {
-			errorf(&argument->expression->base.pos,
-			       "call argument '%E' must not be void", argument->expression);
+		if (!is_type_complete(skip_typeref(argument_type))) {
+			errorf(&argument->expression->base.pos, "call argument '%E' has an incomplete type", argument->expression);
 		}
 
 		argument_type = get_default_promoted_type(argument_type);
@@ -7977,13 +7976,14 @@ static void semantic_sub(binary_expression_t *expression)
 			errorf(pos,
 			       "subtracting pointers to incompatible types '%T' and '%T'",
 			       orig_type_left, orig_type_right);
-		} else if (!is_type_object(unqual_left)) {
-			if (!is_type_void(unqual_left)) {
-				errorf(pos, "subtracting pointers to non-object types '%T'",
-				       orig_type_left);
+		} else if (!is_type_complete(unqual_left)) {
+			if (is_type_void(unqual_left)) {
+				warningf(WARN_OTHER, pos, "pointer of type 'void*' used in subtraction");
 			} else {
-				warningf(WARN_OTHER, pos, "subtracting pointers to void");
+				errorf(pos, "arithmetic on pointer to an incomplete type");
 			}
+		} else if (is_type_function(unqual_left)) {
+			warningf(WARN_OTHER, pos, "pointer to a function used in subtraction");
 		}
 		expression->base.type = type_ptrdiff_t;
 	} else if (is_type_valid(type_left) && is_type_valid(type_right)) {
