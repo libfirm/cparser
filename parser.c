@@ -3000,18 +3000,22 @@ warn_about_long_long:
 			} else {
 				errorf(pos, "multiple datatypes in declaration");
 			}
-			specifiers->type = type_error_type;
-			return;
+			goto error_type;
 		}
 		}
 
-		if (type_specifiers & SPECIFIER_COMPLEX) {
-			type = allocate_type_zero(TYPE_COMPLEX);
-		} else if (type_specifiers & SPECIFIER_IMAGINARY) {
-			type = allocate_type_zero(TYPE_IMAGINARY);
-		} else {
-			type = allocate_type_zero(TYPE_ATOMIC);
+		switch (type_specifiers & (SPECIFIER_COMPLEX | SPECIFIER_IMAGINARY)) {
+		case SPECIFIER_COMPLEX:   type = allocate_type_zero(TYPE_COMPLEX);   break;
+		case SPECIFIER_IMAGINARY: type = allocate_type_zero(TYPE_IMAGINARY); break;
+		case SPECIFIER_NONE:      type = allocate_type_zero(TYPE_ATOMIC);    break;
+
+		default:
+			errorf(pos, "type cannot be both complex and imaginary");
+error_type:
+			specifiers->type = type_error_type;
+			return;
 		}
+
 		type->atomic.akind = atomic_type;
 		newtype = true;
 	} else if (type_specifiers != 0) {
