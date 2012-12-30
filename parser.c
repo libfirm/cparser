@@ -2815,7 +2815,7 @@ wrong_thread_storage_class:
 				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
 				 * declaration, so it doesn't generate 'implicit int' followed by more
 				 * errors later on. */
-				token_kind_t const la1_type = (token_kind_t)look_ahead(1)->kind;
+				token_kind_t const la1_type = look_ahead(1)->kind;
 				switch (la1_type) {
 					DECLARATION_START
 					case T_IDENTIFIER:
@@ -9723,7 +9723,7 @@ static statement_t *intern_parse_statement(void)
 	statement_t *statement;
 	switch (token.kind) {
 	case T_IDENTIFIER: {
-		token_kind_t la1_type = (token_kind_t)look_ahead(1)->kind;
+		token_kind_t const la1_type = look_ahead(1)->kind;
 		if (la1_type == ':') {
 			statement = parse_label_statement();
 		} else if (is_typedef_symbol(token.base.symbol)) {
