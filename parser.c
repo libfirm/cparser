@@ -2984,14 +2984,15 @@ warn_about_long_long:
 			}
 			atomic_type = ATOMIC_TYPE_BOOL;
 			break;
-		default: {
+
+		case SPECIFIER_NONE:
+			warningf(WARN_OTHER, pos, "plain complex type requires a type specifier; assuming 'double'");
+			atomic_type = ATOMIC_TYPE_DOUBLE;
+			break;
+
+		default:
 			/* invalid specifier combination, give an error message */
-			if (type_specifiers == SPECIFIER_COMPLEX) {
-				warningf(WARN_OTHER, pos, "_Complex requires a type specifier; assuming '_Complex double'");
-				atomic_type = ATOMIC_TYPE_DOUBLE;
-				break;
-			} else if ((type_specifiers & SPECIFIER_SIGNED) &&
-			          (type_specifiers & SPECIFIER_UNSIGNED)) {
+			if (type_specifiers & SPECIFIER_SIGNED && type_specifiers & SPECIFIER_UNSIGNED) {
 				errorf(pos, "signed and unsigned specifiers given");
 			} else if (type_specifiers & (SPECIFIER_SIGNED | SPECIFIER_UNSIGNED)) {
 				errorf(pos, "only integer types can be signed or unsigned");
@@ -2999,7 +3000,6 @@ warn_about_long_long:
 				errorf(pos, "invalid type specifier");
 			}
 			goto error_type;
-		}
 		}
 
 		switch (type_specifiers & (SPECIFIER_COMPLEX | SPECIFIER_IMAGINARY)) {
