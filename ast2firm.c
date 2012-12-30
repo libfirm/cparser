@@ -1348,7 +1348,9 @@ static ir_node *deref_address(dbg_info *const dbgi, type_t *const type,
 	if (is_type_compound(skipped) ||
 	    is_type_function(skipped) ||
 	    is_type_array(skipped)    ||
-	    is_type_incomplete(skipped)) {
+	    /* Exotic case of an unused reference expression of an extern void
+	     * variable. */
+	    is_type_void(skipped)) {
 		return addr;
 	}
 
