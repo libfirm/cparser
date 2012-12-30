@@ -22,7 +22,6 @@ static void write_type(const type_t *type);
 static const char *get_atomic_type_string(const atomic_type_kind_t type)
 {
 	switch(type) {
-	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_CHAR:        return "byte";
 	case ATOMIC_TYPE_SCHAR:       return "byte";
 	case ATOMIC_TYPE_UCHAR:       return "unsigned byte";
@@ -151,6 +150,9 @@ static void write_type(const type_t *type)
 		return;
 	case TYPE_FUNCTION:
 		write_function_type(&type->function);
+		return;
+	case TYPE_VOID:
+		fputs("void", out);
 		return;
 	case TYPE_COMPLEX:
 	case TYPE_IMAGINARY:

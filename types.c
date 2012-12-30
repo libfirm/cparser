@@ -114,8 +114,9 @@ void init_basic_types(void)
 	type_double             = make_atomic_type(ATOMIC_TYPE_DOUBLE,      TYPE_QUALIFIER_NONE);
 	type_float              = make_atomic_type(ATOMIC_TYPE_FLOAT,       TYPE_QUALIFIER_NONE);
 	type_char               = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_NONE);
-	type_void               = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_NONE);
-	type_const_void         = make_atomic_type(ATOMIC_TYPE_VOID,        TYPE_QUALIFIER_CONST);
+
+	type_void       = make_void_type(TYPE_QUALIFIER_NONE);
+	type_const_void = make_void_type(TYPE_QUALIFIER_CONST);
 
 	int8_type_kind  = find_signed_int_atomic_type_kind_for_size(1);
 	int16_type_kind = find_signed_int_atomic_type_kind_for_size(2);

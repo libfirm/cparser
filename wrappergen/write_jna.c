@@ -48,7 +48,6 @@ static const char *fix_builtin_names(const char *name)
 static const char *get_atomic_type_string(const atomic_type_kind_t type)
 {
 	switch(type) {
-	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_CHAR:        return "byte";
 	case ATOMIC_TYPE_SCHAR:       return "byte";
 	case ATOMIC_TYPE_UCHAR:       return "byte";
@@ -194,6 +193,9 @@ static void write_type(type_t *type)
 		return;
 	case TYPE_ENUM:
 		write_enum_type(&type->enumt);
+		return;
+	case TYPE_VOID:
+		fputs("void", out);
 		return;
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:

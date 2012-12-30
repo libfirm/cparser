@@ -49,6 +49,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_ARRAY]           = sizeof(array_type_t),
 		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
+		[TYPE_VOID]            = sizeof(type_base_t),
 	};
 	assert((size_t)kind < lengthof(sizes));
 	assert(sizes[kind] != 0);
@@ -69,12 +70,6 @@ type_t *allocate_type_zero(type_kind_t kind)
  * Properties of atomic types.
  */
 atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
-	[ATOMIC_TYPE_VOID] = {
-		.size      = 1,
-		.alignment = 1,
-		.flags     = ATOMIC_TYPE_FLAG_NONE,
-		.rank      = 0,
-	},
 	[ATOMIC_TYPE_BOOL] = {
 		.size       = 1,
 		.alignment  = 1,
@@ -239,7 +234,6 @@ void print_type_qualifiers(type_qualifiers_t const qualifiers, QualifierSeparato
 const char *get_atomic_kind_name(atomic_type_kind_t kind)
 {
 	switch (kind) {
-	case ATOMIC_TYPE_VOID:        return "void";
 	case ATOMIC_TYPE_WCHAR_T:     return "wchar_t";
 	case ATOMIC_TYPE_BOOL:        return c_mode & _CXX ? "bool" : "_Bool";
 	case ATOMIC_TYPE_CHAR:        return "char";
@@ -594,6 +588,17 @@ static void print_typeof_type_pre(const typeof_type_t *const type)
 }
 
 /**
+ * Prints the name of a void type.
+ *
+ * @param type  The type.
+ */
+static void print_void_type_pre(type_t const *const type)
+{
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
+	print_string("void");
+}
+
+/**
  * Prints the prefix part of a type.
  *
  * @param type   The type.
@@ -614,6 +619,7 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_REFERENCE:       print_reference_type_pre(      &type->reference); return;
 	case TYPE_TYPEDEF:         print_typedef_type_pre(        &type->typedeft);  return;
 	case TYPE_TYPEOF:          print_typeof_type_pre(         &type->typeoft);   return;
+	case TYPE_VOID:            print_void_type_pre(            type);            return;
 	}
 	print_string("unknown");
 }
@@ -647,6 +653,7 @@ static void intern_print_type_post(const type_t *const type)
 	case TYPE_COMPOUND_UNION:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
+	case TYPE_VOID:
 		break;
 	}
 }
@@ -816,23 +823,23 @@ bool is_type_incomplete(const type_t *type)
 		const compound_type_t *compound_type = &type->compound;
 		return !compound_type->compound->complete;
 	}
-	case TYPE_ENUM:
-		return false;
 
 	case TYPE_ARRAY:
 		return type->array.size_expression == NULL
 			&& !type->array.size_constant;
 
 	case TYPE_ATOMIC:
-	case TYPE_IMAGINARY:
+	case TYPE_ENUM:
 	case TYPE_COMPLEX:
-		return type->atomic.akind == ATOMIC_TYPE_VOID;
-
+	case TYPE_IMAGINARY:
 	case TYPE_FUNCTION:
 	case TYPE_POINTER:
 	case TYPE_REFERENCE:
 	case TYPE_ERROR:
 		return false;
+
+	case TYPE_VOID:
+		return true;
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
@@ -961,8 +968,9 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 			break;
 
 		case TYPE_ERROR:
-			/* Hmm, the error type should be compatible to all other types */
+		case TYPE_VOID:
 			return true;
+
 		case TYPE_TYPEDEF:
 		case TYPE_TYPEOF:
 			panic("typeref not skipped");
@@ -1039,7 +1047,8 @@ unsigned get_type_size(type_t const *const type)
 	case TYPE_COMPOUND_UNION:
 		return type->compound.compound->size;
 	case TYPE_FUNCTION:
-		return 1; /* strange GNU extensions: sizeof(function) == 1 */
+	case TYPE_VOID:
+		return 1; /* GCC extension. */
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
 		return pointer_properties.size;
@@ -1070,8 +1079,8 @@ unsigned get_type_alignment(type_t const *const type)
 	case TYPE_COMPOUND_UNION:
 		return type->compound.compound->alignment;
 	case TYPE_FUNCTION:
-		/* gcc says 1 here... */
-		return 1;
+	case TYPE_VOID:
+		return 1; /* GCC extension. */
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
 		return pointer_properties.alignment;
@@ -1126,6 +1135,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 	case TYPE_REFERENCE:
 	case TYPE_POINTER:
 	case TYPE_ARRAY:
+	case TYPE_VOID:
 		return 0;
 	case TYPE_TYPEDEF: {
 		decl_modifiers_t modifiers = type->typedeft.typedefe->modifiers;
@@ -1363,6 +1373,13 @@ type_t *make_array_type(type_t *element_type, size_t size,
 	type->array.size          = size;
 	type->array.size_constant = true;
 
+	return identify_new_type(type);
+}
+
+type_t *make_void_type(type_qualifiers_t const qualifiers)
+{
+	type_t *const type = allocate_type_zero(TYPE_VOID);
+	type->base.qualifiers = qualifiers;
 	return identify_new_type(type);
 }
 

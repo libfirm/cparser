@@ -223,7 +223,6 @@ static ir_mode *init_atomic_ir_mode(atomic_type_kind_t kind)
  */
 static void init_atomic_modes(void)
 {
-	atomic_modes[ATOMIC_TYPE_VOID] = mode_ANY;
 	for (int i = 0; i <= ATOMIC_TYPE_LAST; ++i) {
 		if (atomic_modes[i] != NULL)
 			continue;
@@ -253,16 +252,16 @@ static unsigned count_parameters(const function_type_t *function_type)
 	return count;
 }
 
-static ir_type *create_primitive_irtype(atomic_type_kind_t akind,
-                                        type_dbg_info *dbgi)
+static ir_type *create_primitive_irtype(type_t const *const type, ir_mode *const mode)
 {
-	ir_mode        *mode      = atomic_modes[akind];
-	ir_type        *irtype    = new_d_type_primitive(mode, dbgi);
-	unsigned        alignment = get_atomic_type_alignment(akind);
-	unsigned        size      = get_atomic_type_size(akind);
+	type_dbg_info *const dbgi   = get_type_dbg_info_(type);
+	ir_type       *const irtype = new_d_type_primitive(mode, dbgi);
 
+	unsigned const align = get_type_alignment(type);
+	set_type_alignment_bytes(irtype, align);
+
+	unsigned const size = get_type_size(type);
 	set_type_size_bytes(irtype, size);
-	set_type_alignment_bytes(irtype, alignment);
 
 	return irtype;
 }
@@ -272,8 +271,7 @@ static ir_type *create_primitive_irtype(atomic_type_kind_t akind,
  */
 static ir_type *create_atomic_type(type_t const *const type)
 {
-	type_dbg_info *dbgi = get_type_dbg_info_(type);
-	return create_primitive_irtype(type->atomic.akind, dbgi);
+	return create_primitive_irtype(type, atomic_modes[type->atomic.akind]);
 }
 
 static ir_type *get_ir_type(type_t *type);
@@ -623,6 +621,7 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_FUNCTION:        return create_method_type(&type->function, false);
 	case TYPE_POINTER:         return create_pointer_type(type, type->pointer.points_to);
 	case TYPE_REFERENCE:       return create_pointer_type(type, type->reference.refers_to);
+	case TYPE_VOID:            return create_primitive_irtype(type, mode_ANY);
 
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
@@ -2873,11 +2872,6 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_ATOMIC: {
 				const atomic_type_t *const atomic_type = &type->atomic;
 				switch (atomic_type->akind) {
-					/* gcc cannot do that */
-					case ATOMIC_TYPE_VOID:
-						tc = void_type_class;
-						goto make_const;
-
 					case ATOMIC_TYPE_WCHAR_T:   /* gcc handles this as integer */
 					case ATOMIC_TYPE_CHAR:      /* gcc handles this as integer */
 					case ATOMIC_TYPE_SCHAR:     /* gcc handles this as integer */
@@ -2910,9 +2904,10 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_POINTER:         tc = pointer_type_class; goto make_const;
 			case TYPE_COMPOUND_STRUCT: tc = record_type_class;  goto make_const;
 			case TYPE_COMPOUND_UNION:  tc = union_type_class;   goto make_const;
-
 			/* gcc handles this as integer */
 			case TYPE_ENUM:            tc = integer_type_class; goto make_const;
+			/* gcc cannot do that */
+			case TYPE_VOID:            tc = void_type_class;    goto make_const;
 
 			/* gcc classifies the referenced type */
 			case TYPE_REFERENCE: type = type->reference.refers_to; continue;

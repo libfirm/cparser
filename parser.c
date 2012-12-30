@@ -2482,13 +2482,12 @@ typedef enum specifiers_t {
 	SPECIFIER_LONG_LONG = 1 << 8,
 	SPECIFIER_FLOAT     = 1 << 9,
 	SPECIFIER_BOOL      = 1 << 10,
-	SPECIFIER_VOID      = 1 << 11,
-	SPECIFIER_INT8      = 1 << 12,
-	SPECIFIER_INT16     = 1 << 13,
-	SPECIFIER_INT32     = 1 << 14,
-	SPECIFIER_INT64     = 1 << 15,
-	SPECIFIER_COMPLEX   = 1 << 16,
-	SPECIFIER_IMAGINARY = 1 << 17,
+	SPECIFIER_INT8      = 1 << 11,
+	SPECIFIER_INT16     = 1 << 12,
+	SPECIFIER_INT32     = 1 << 13,
+	SPECIFIER_INT64     = 1 << 14,
+	SPECIFIER_COMPLEX   = 1 << 15,
+	SPECIFIER_IMAGINARY = 1 << 16,
 } specifiers_t;
 
 static type_t *get_typedef_type(symbol_t *symbol)
@@ -2728,7 +2727,6 @@ wrong_thread_storage_class:
 		MATCH_SPECIFIER(T_short,      SPECIFIER_SHORT,     "short");
 		MATCH_SPECIFIER(T_signed,     SPECIFIER_SIGNED,    "signed");
 		MATCH_SPECIFIER(T_unsigned,   SPECIFIER_UNSIGNED,  "unsigned");
-		MATCH_SPECIFIER(T_void,       SPECIFIER_VOID,      "void");
 		MATCH_SPECIFIER(T_wchar_t,    SPECIFIER_WCHAR_T,   "wchar_t");
 
 		case T_inline:
@@ -2781,6 +2779,13 @@ wrong_thread_storage_class:
 			newtype = false;
 			type    = type_valist;
 			eat(T___builtin_va_list);
+			break;
+
+		case T_void:
+			CHECK_DOUBLE_TYPE();
+			eat(T_void);
+			newtype = false;
+			type    = type_void;
 			break;
 
 		case T_IDENTIFIER: {
@@ -2857,16 +2862,6 @@ finish_specifiers:
 
 		/* match valid basic types */
 		switch (type_specifiers & ~(SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY)) {
-		case SPECIFIER_VOID:
-			if (type_specifiers & (SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY)) {
-				if (type_specifiers & SPECIFIER_COMPLEX)
-					errorf(pos, "_Complex specifier is invalid for void");
-				if (type_specifiers & SPECIFIER_IMAGINARY)
-					errorf(pos, "_Imaginary specifier is invalid for void");
-				type_specifiers &= ~(SPECIFIER_COMPLEX|SPECIFIER_IMAGINARY);
-			}
-			atomic_type = ATOMIC_TYPE_VOID;
-			break;
 		case SPECIFIER_WCHAR_T:
 			atomic_type = ATOMIC_TYPE_WCHAR_T;
 			break;

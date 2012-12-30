@@ -123,6 +123,8 @@ static unsigned hash_type(const type_t *type)
 	case TYPE_TYPEOF:
 		hash = hash_typeof_type(&type->typeoft);
 		break;
+	case TYPE_VOID:
+		break;
 	}
 
 	unsigned some_prime = 99991;
@@ -244,6 +246,7 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 
 	switch (type1->kind) {
 	case TYPE_ERROR:
+	case TYPE_VOID:
 		return true;
 	case TYPE_ATOMIC:
 	case TYPE_IMAGINARY:

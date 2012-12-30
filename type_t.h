@@ -27,6 +27,7 @@ typedef enum type_kind_t {
 	TYPE_ARRAY,
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
+	TYPE_VOID,
 } type_kind_t;
 
 struct type_base_t {
@@ -181,6 +182,14 @@ type_t *make_based_pointer_type(type_t *points_to,
 								type_qualifiers_t qualifiers, variable_t *variable);
 type_t *make_array_type(type_t *element_type, size_t size,
                         type_qualifiers_t qualifiers);
+
+/**
+ * Creates a new void type.
+ *
+ * @param qualifiers  Type qualifiers for the new type.
+ */
+type_t *make_void_type(type_qualifiers_t qualifiers);
+
 function_parameter_t *allocate_parameter(type_t*);
 
 /**
@@ -213,7 +222,8 @@ static inline bool is_type_atomic(const type_t *type, atomic_type_kind_t atype)
 
 static inline bool is_type_void(type_t const *const type)
 {
-	return is_type_atomic(type, ATOMIC_TYPE_VOID);
+	assert(!is_typeref(type));
+	return type->kind == TYPE_VOID;
 }
 
 static inline bool is_type_pointer(const type_t *type)
