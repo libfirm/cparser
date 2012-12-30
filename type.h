@@ -43,7 +43,6 @@ typedef enum atomic_type_flag_t {
 	ATOMIC_TYPE_FLAG_SIGNED     = 1 << 0,
 	ATOMIC_TYPE_FLAG_INTEGER    = 1 << 1,
 	ATOMIC_TYPE_FLAG_FLOAT      = 1 << 2,
-	ATOMIC_TYPE_FLAG_ARITHMETIC = 1 << 3,
 } atomic_type_flag_t;
 
 typedef enum type_qualifier_t {

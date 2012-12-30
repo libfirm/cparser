@@ -8697,7 +8697,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 							flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
 							size  = get_atomic_type_size(akind);
 						} else {
-							flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+							flags = ATOMIC_TYPE_FLAG_INTEGER;
 							size  = get_type_size(type_void_ptr);
 						}
 
@@ -8713,7 +8713,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 								value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
 								value_size  = get_atomic_type_size(value_akind);
 							} else if (value_kind == TYPE_POINTER) {
-								value_flags = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC;
+								value_flags = ATOMIC_TYPE_FLAG_INTEGER;
 								value_size  = get_type_size(type_void_ptr);
 							} else {
 								break;

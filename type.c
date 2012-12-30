@@ -73,98 +73,91 @@ atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1] = {
 	[ATOMIC_TYPE_BOOL] = {
 		.size       = 1,
 		.alignment  = 1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank       = 1,
 	},
 	[ATOMIC_TYPE_CHAR] = {
 		.size      = 1,
 		.alignment = 1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank      = 2,
 	},
 	[ATOMIC_TYPE_SCHAR] = {
 		.size      = 1,
 		.alignment = 1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		           | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank      = 2,
 	},
 	[ATOMIC_TYPE_UCHAR] = {
 		.size      = 1,
 		.alignment = 1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank      = 2,
 	},
 	[ATOMIC_TYPE_SHORT] = {
 		.size       = 2,
 		.alignment  = 2,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 3,
 	},
 	[ATOMIC_TYPE_USHORT] = {
 		.size       = 2,
 		.alignment  = 2,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank       = 3,
 	},
 	[ATOMIC_TYPE_INT] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 4,
 	},
 	[ATOMIC_TYPE_UINT] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank       = 4,
 	},
 	[ATOMIC_TYPE_LONG] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 5,
 	},
 	[ATOMIC_TYPE_ULONG] = {
 		.size       = (unsigned) -1,
 		.alignment  = (unsigned) -1,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank       = 5,
 	},
 	[ATOMIC_TYPE_LONGLONG] = {
 		.size       = 8,
 		.alignment  = 8,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 6,
 	},
 	[ATOMIC_TYPE_ULONGLONG] = {
 		.size       = 8,
 		.alignment  = 8,
-		.flags      = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags      = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank       = 6,
 	},
 	[ATOMIC_TYPE_FLOAT] = {
 		.size       = 4,
 		.alignment  = 4,
-		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 0,
 	},
 	[ATOMIC_TYPE_DOUBLE] = {
 		.size       = 8,
 		.alignment  = 8,
-		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_ARITHMETIC
-		              | ATOMIC_TYPE_FLAG_SIGNED,
+		.flags      = ATOMIC_TYPE_FLAG_FLOAT | ATOMIC_TYPE_FLAG_SIGNED,
 		.rank       = 0,
 	},
 	[ATOMIC_TYPE_WCHAR_T] = {
 		.size      = (unsigned)-1,
 		.alignment = (unsigned)-1,
-		.flags     = ATOMIC_TYPE_FLAG_INTEGER | ATOMIC_TYPE_FLAG_ARITHMETIC,
+		.flags     = ATOMIC_TYPE_FLAG_INTEGER,
 		.rank      = (unsigned)-1,
 	},
 };
@@ -779,12 +772,12 @@ bool is_type_arithmetic(const type_t *type)
 	assert(!is_typeref(type));
 
 	switch (type->kind) {
-	case TYPE_ENUM:
-		return true;
 	case TYPE_ATOMIC:
 	case TYPE_COMPLEX:
+	case TYPE_ENUM:
 	case TYPE_IMAGINARY:
-		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+		return true;
+
 	default:
 		return false;
 	}
@@ -801,13 +794,13 @@ bool is_type_scalar(const type_t *type)
 	assert(!is_typeref(type));
 
 	switch (type->kind) {
-	case TYPE_POINTER:
-	case TYPE_ENUM:
-		return true;
 	case TYPE_ATOMIC:
 	case TYPE_COMPLEX:
+	case TYPE_ENUM:
 	case TYPE_IMAGINARY:
-		return test_atomic_type_flag(type->atomic.akind, ATOMIC_TYPE_FLAG_ARITHMETIC);
+	case TYPE_POINTER:
+		return true;
+
 	default:
 		return false;
 	}
