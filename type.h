@@ -192,8 +192,6 @@ bool is_type_scalar(const type_t *type);
  */
 bool is_type_complete(type_t const *type);
 
-bool is_type_object(const type_t *type);
-
 /**
  * Check if two types are compatible.
  */

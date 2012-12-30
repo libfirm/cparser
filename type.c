@@ -839,11 +839,6 @@ bool is_type_complete(type_t const *const type)
 	panic("invalid type");
 }
 
-bool is_type_object(const type_t *type)
-{
-	return !is_type_function(type) && is_type_complete(type);
-}
-
 /**
  * Check if two function types are compatible.
  */
