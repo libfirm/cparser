@@ -2523,16 +2523,46 @@ static type_t *parse_typedef_name(void)
 		DECLARATION_START
 	case T_IDENTIFIER:
 	case '&':
-	case '*': {
+	case '*':
+		break;
+
+	default:
+		return NULL;
+	}
+
+	/* Error handling: Look in the tag namespace if no typedef name was found. */
+	entity_t *const tagent = get_entity(symbol, NAMESPACE_TAG);
+	if (tagent) {
+		errorf(HERE, "%Y does not name a type; assuming '%N'", symbol, tagent);
+		switch ((entity_kind_tag_t)tagent->kind) {
+		case ENTITY_ENUM: {
+			type_t *const type = allocate_type_zero(TYPE_ENUM);
+			type->enumt.enume      = &tagent->enume;
+			type->enumt.base.akind = ATOMIC_TYPE_INT;
+			return type;
+		}
+
+		case ENTITY_STRUCT: {
+			type_t *const type = allocate_type_zero(TYPE_COMPOUND_STRUCT);
+			type->compound.compound = &tagent->compound;
+			return type;
+		}
+
+		case ENTITY_UNION: {
+			type_t *const type = allocate_type_zero(TYPE_COMPOUND_UNION);
+			type->compound.compound = &tagent->compound;
+			return type;
+		}
+
+		default:
+			panic("invalid entity kind");
+		}
+	} else {
 		errorf(HERE, "%Y does not name a type", symbol);
 		entity_t *const errent = create_error_entity(symbol, ENTITY_TYPEDEF);
 		type_t   *const type   = allocate_type_zero(TYPE_TYPEDEF);
 		type->typedeft.typedefe = &errent->typedefe;
 		return type;
-	}
-
-	default:
-		return NULL;
 	}
 }
 
