@@ -2490,16 +2490,50 @@ typedef enum specifiers_t {
 	SPECIFIER_IMAGINARY = 1 << 16,
 } specifiers_t;
 
-static type_t *get_typedef_type(symbol_t *symbol)
+static entity_t *create_error_entity(symbol_t *const symbol, entity_kind_tag_t const kind)
 {
-	entity_t *entity = get_entity(symbol, NAMESPACE_NORMAL);
-	if (entity == NULL || entity->kind != ENTITY_TYPEDEF)
+	entity_t *const entity = allocate_entity_zero(kind, NAMESPACE_NORMAL, symbol, HERE);
+	if (is_declaration(entity)) {
+		entity->declaration.type     = type_error_type;
+		entity->declaration.implicit = true;
+	} else if (kind == ENTITY_TYPEDEF) {
+		entity->typedefe.type    = type_error_type;
+		entity->typedefe.builtin = true;
+	}
+	if (kind != ENTITY_COMPOUND_MEMBER)
+		record_entity(entity, false);
+	return entity;
+}
+
+static type_t *parse_typedef_name(void)
+{
+	symbol_t *const symbol = token.base.symbol;
+	entity_t *const entity = get_entity(symbol, NAMESPACE_NORMAL);
+	if (entity && entity->kind == ENTITY_TYPEDEF) {
+		type_t *type            = allocate_type_zero(TYPE_TYPEDEF);
+		type->typedeft.typedefe = &entity->typedefe;
+		return type;
+	}
+
+	/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
+	 * declaration, so it doesn't generate 'implicit int' followed by more
+	 * errors later on. */
+	token_kind_t const la1_type = look_ahead(1)->kind;
+	switch (la1_type) {
+		DECLARATION_START
+	case T_IDENTIFIER:
+	case '&':
+	case '*': {
+		errorf(HERE, "%Y does not name a type", symbol);
+		entity_t *const errent = create_error_entity(symbol, ENTITY_TYPEDEF);
+		type_t   *const type   = allocate_type_zero(TYPE_TYPEDEF);
+		type->typedeft.typedefe = &errent->typedefe;
+		return type;
+	}
+
+	default:
 		return NULL;
-
-	type_t *type            = allocate_type_zero(TYPE_TYPEDEF);
-	type->typedeft.typedefe = &entity->typedefe;
-
-	return type;
+	}
 }
 
 static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
@@ -2606,21 +2640,6 @@ static attribute_t *parse_microsoft_extended_decl_modifier(attribute_t *first)
 	rem_anchor_token(')');
 	expect(')');
 	return first;
-}
-
-static entity_t *create_error_entity(symbol_t *symbol, entity_kind_tag_t kind)
-{
-	entity_t *const entity = allocate_entity_zero(kind, NAMESPACE_NORMAL, symbol, HERE);
-	if (is_declaration(entity)) {
-		entity->declaration.type     = type_error_type;
-		entity->declaration.implicit = true;
-	} else if (kind == ENTITY_TYPEDEF) {
-		entity->typedefe.type    = type_error_type;
-		entity->typedefe.builtin = true;
-	}
-	if (kind != ENTITY_COMPOUND_MEMBER)
-		record_entity(entity, false);
-	return entity;
 }
 
 static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
@@ -2814,32 +2833,9 @@ wrong_thread_storage_class:
 			}
 
 			newtype = true;
-			type    = get_typedef_type(token.base.symbol);
-			if (!type) {
-				/* Be somewhat resilient to typos like 'vodi f()' at the beginning of a
-				 * declaration, so it doesn't generate 'implicit int' followed by more
-				 * errors later on. */
-				token_kind_t const la1_type = look_ahead(1)->kind;
-				switch (la1_type) {
-					DECLARATION_START
-					case T_IDENTIFIER:
-					case '&':
-					case '*': {
-						errorf(HERE, "%K does not name a type", &token);
-
-						entity_t *const entity = create_error_entity(token.base.symbol, ENTITY_TYPEDEF);
-
-						type = allocate_type_zero(TYPE_TYPEDEF);
-						type->typedeft.typedefe = &entity->typedefe;
-
-						eat(T_IDENTIFIER);
-						continue;
-					}
-
-					default:
-						goto finish_specifiers;
-				}
-			}
+			type    = parse_typedef_name();
+			if (!type)
+				goto finish_specifiers;
 
 			eat(T_IDENTIFIER);
 			break;
