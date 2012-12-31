@@ -2629,7 +2629,6 @@ static void parse_declaration_specifiers(declaration_specifiers_t *specifiers)
 	type_qualifiers_t  qualifiers      = TYPE_QUALIFIER_NONE;
 	unsigned           type_specifiers = 0;
 	bool               newtype         = false;
-	bool               saw_error       = false;
 
 	memset(specifiers, 0, sizeof(*specifiers));
 	specifiers->pos = *HERE;
@@ -2834,7 +2833,6 @@ wrong_thread_storage_class:
 						type->typedeft.typedefe = &entity->typedefe;
 
 						eat(T_IDENTIFIER);
-						saw_error = true;
 						continue;
 					}
 
@@ -2856,8 +2854,19 @@ wrong_thread_storage_class:
 finish_specifiers:
 	specifiers->attributes = parse_attributes(specifiers->attributes);
 
-	if (type == NULL || (saw_error && type_specifiers != 0)) {
-		position_t const* const pos = &specifiers->pos;
+	position_t const* const pos = &specifiers->pos;
+	if (type_specifiers == SPECIFIER_NONE) {
+		if (!type) {
+			/* ISO/IEC 14882:1998(E) §C.1.5:4 */
+			if (c_mode & _CXX || strict_mode) {
+				errorf(pos, "no type specifiers given in declaration");
+				goto error_type;
+			}
+			warningf(WARN_IMPLICIT_INT, pos, "no type specifiers in declaration, using 'int'");
+			newtype = false;
+			type    = type_int;
+		}
+	} else if (!type || !is_type_valid(skip_typeref(type))) {
 		atomic_type_kind_t atomic_type;
 
 		/* match valid basic types */
@@ -2917,7 +2926,7 @@ finish_specifiers:
 			| SPECIFIER_INT:
 			atomic_type = ATOMIC_TYPE_ULONGLONG;
 warn_about_long_long:
-			warningf(WARN_LONG_LONG, &specifiers->pos, "ISO C90 does not support 'long long'");
+			warningf(WARN_LONG_LONG, pos, "ISO C90 does not support 'long long'");
 			break;
 
 		case SPECIFIER_UNSIGNED | SPECIFIER_INT8:
@@ -2977,18 +2986,7 @@ warn_about_long_long:
 			break;
 		default: {
 			/* invalid specifier combination, give an error message */
-			if (type_specifiers == 0) {
-				if (!saw_error) {
-					/* ISO/IEC 14882:1998(E) §C.1.5:4 */
-					if (!(c_mode & _CXX) && !strict_mode) {
-						warningf(WARN_IMPLICIT_INT, pos, "no type specifiers in declaration, using 'int'");
-						atomic_type = ATOMIC_TYPE_INT;
-						break;
-					} else {
-						errorf(pos, "no type specifiers given in declaration");
-					}
-				}
-			} else if (type_specifiers == SPECIFIER_COMPLEX) {
+			if (type_specifiers == SPECIFIER_COMPLEX) {
 				warningf(WARN_OTHER, pos, "_Complex requires a type specifier; assuming '_Complex double'");
 				atomic_type = ATOMIC_TYPE_DOUBLE;
 				break;
@@ -3018,7 +3016,7 @@ error_type:
 
 		type->atomic.akind = atomic_type;
 		newtype = true;
-	} else if (type_specifiers != 0) {
+	} else {
 		errorf(&specifiers->pos, "multiple datatypes in declaration");
 	}
 
