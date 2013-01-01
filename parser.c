@@ -160,32 +160,27 @@ static entity_t *parse_declarator(const declaration_specifiers_t *specifiers,
 static void semantic_comparison(binary_expression_t *expression,
                                 bool is_relational);
 
-#define STORAGE_CLASSES       \
-	STORAGE_CLASSES_NO_EXTERN \
-	case T_extern:
+#define STORAGE_CLASSES \
+	     STORAGE_CLASSES_NO_EXTERN: \
+	case T_extern
 
 #define STORAGE_CLASSES_NO_EXTERN \
-	case T_typedef:         \
+	     T_typedef:         \
 	case T_static:          \
 	case T_auto:            \
 	case T_register:        \
-	case T__Thread_local:
+	case T__Thread_local
 
 #define TYPE_QUALIFIERS     \
-	case T_const:           \
+	     T_const:           \
 	case T_restrict:        \
 	case T_volatile:        \
 	case T_inline:          \
 	case T__forceinline:    \
-	case T___attribute__:
-
-#define COMPLEX_SPECIFIERS  \
-	case T__Complex:
-#define IMAGINARY_SPECIFIERS \
-	case T__Imaginary:
+	case T___attribute__
 
 #define TYPE_SPECIFIERS       \
-	case T__Bool:             \
+	     T__Bool:             \
 	case T___builtin_va_list: \
 	case T___typeof__:        \
 	case T__declspec:         \
@@ -207,21 +202,21 @@ static void semantic_comparison(binary_expression_t *expression,
 	case T__int16:            \
 	case T__int32:            \
 	case T__int64:            \
-	COMPLEX_SPECIFIERS        \
-	IMAGINARY_SPECIFIERS
+	case T__Complex:          \
+	case T__Imaginary
 
-#define DECLARATION_START   \
-	STORAGE_CLASSES         \
-	TYPE_QUALIFIERS         \
-	TYPE_SPECIFIERS
+#define DECLARATION_START \
+	     STORAGE_CLASSES: \
+	case TYPE_QUALIFIERS: \
+	case TYPE_SPECIFIERS
 
 #define DECLARATION_START_NO_EXTERN \
-	STORAGE_CLASSES_NO_EXTERN       \
-	TYPE_QUALIFIERS                 \
-	TYPE_SPECIFIERS
+	     STORAGE_CLASSES_NO_EXTERN: \
+	case TYPE_QUALIFIERS: \
+	case TYPE_SPECIFIERS
 
 #define EXPRESSION_START              \
-	case '!':                         \
+	     '!':                         \
 	case '&':                         \
 	case '(':                         \
 	case '*':                         \
@@ -259,7 +254,7 @@ static void semantic_comparison(binary_expression_t *expression,
 	case T_throw:                     \
 	case T_true:                      \
 	case T___imag__:                  \
-	case T___real__:
+	case T___real__
 
 /**
  * Returns the size of a statement node.
@@ -2436,9 +2431,9 @@ static bool is_typedef_symbol(symbol_t *symbol)
 static bool is_declaration_specifier(token_t const *const tk)
 {
 	switch (tk->kind) {
-		DECLARATION_START  return true;
-		case T_IDENTIFIER: return is_typedef_symbol(tk->base.symbol);
-		default:           return false;
+		case DECLARATION_START: return true;
+		case T_IDENTIFIER:      return is_typedef_symbol(tk->base.symbol);
+		default:                return false;
 	}
 }
 
@@ -2520,7 +2515,7 @@ static type_t *parse_typedef_name(void)
 	 * errors later on. */
 	token_kind_t const la1_type = look_ahead(1)->kind;
 	switch (la1_type) {
-		DECLARATION_START
+	case DECLARATION_START:
 	case T_IDENTIFIER:
 	case '&':
 	case '*':
@@ -2843,8 +2838,8 @@ wrong_thread_storage_class:
 				 * declaration, so it doesn't generate errors about expecting '(' or
 				 * '{' later on. */
 				switch (look_ahead(1)->kind) {
-					STORAGE_CLASSES
-					TYPE_SPECIFIERS
+					case STORAGE_CLASSES:
+					case TYPE_SPECIFIERS:
 					case T_const:
 					case T_restrict:
 					case T_volatile:
@@ -3184,8 +3179,7 @@ static void parse_parameters(function_type_t *type, scope_t *scope)
 				goto parameters_finished;
 
 			case T_IDENTIFIER:
-			DECLARATION_START
-			{
+			case DECLARATION_START: {
 				entity_t *entity = parse_parameter();
 				if (entity->kind == ENTITY_TYPEDEF) {
 					errorf(&entity->base.pos,
@@ -4391,7 +4385,7 @@ static void parse_kr_declaration_list(entity_t *entity)
 	/* parse declaration list */
 	for (;;) {
 		switch (token.kind) {
-			DECLARATION_START
+			case DECLARATION_START:
 			/* This covers symbols, which are no type, too, and results in
 			 * better error messages.  The typical cases are misspelled type
 			 * names and missing includes. */
@@ -5565,7 +5559,7 @@ static void parse_compound_type_entries(compound_t *compound)
 
 	for (;;) {
 		switch (token.kind) {
-			DECLARATION_START
+			case DECLARATION_START:
 			case T___extension__:
 			case T_IDENTIFIER: {
 				PUSH_EXTENSION();
@@ -6737,7 +6731,7 @@ static expression_t *parse_primary_expression(void)
 			return parse_reference();
 		}
 		/* FALLTHROUGH */
-	DECLARATION_START {
+	case DECLARATION_START: {
 		position_t const pos = *HERE;
 		declaration_specifiers_t specifiers;
 		parse_declaration_specifiers(&specifiers);
@@ -7433,7 +7427,7 @@ static expression_t *parse_throw(void)
 
 	expression_t *value = NULL;
 	switch (token.kind) {
-		EXPRESSION_START {
+		case EXPRESSION_START: {
 			value = parse_assignment_expression();
 			/* ISO/IEC 14882:1998(E) §15.1:3 */
 			type_t *const orig_type = value->base.type;
@@ -9750,7 +9744,7 @@ static statement_t *intern_parse_statement(void)
 		if (la1_type == ':') {
 			statement = parse_label_statement();
 		} else if (is_typedef_symbol(token.base.symbol)) {
-	DECLARATION_START
+	case DECLARATION_START:
 			statement = parse_declaration_statement();
 		} else {
 			/* it's an identifier, the grammar says this must be an
@@ -9764,7 +9758,7 @@ static statement_t *intern_parse_statement(void)
 			default:
 					statement = parse_expression_statement();
 				} else {
-			DECLARATION_START
+			case DECLARATION_START:
 			case T_IDENTIFIER:
 					statement = parse_declaration_statement();
 				}
@@ -9804,7 +9798,7 @@ static statement_t *intern_parse_statement(void)
 	case T_switch:    statement = parse_switch();                  break;
 	case T_while:     statement = parse_while();                   break;
 
-	EXPRESSION_START
+	case EXPRESSION_START:
 		statement = parse_expression_statement();
 		break;
 
@@ -10162,7 +10156,7 @@ static void parse_external(void)
 			if (look_ahead(1)->kind == T_STRING_LITERAL) {
 				parse_linkage_specification();
 			} else {
-		DECLARATION_START_NO_EXTERN
+		case DECLARATION_START_NO_EXTERN:
 		case T_IDENTIFIER:
 		case T___extension__:
 		/* tokens below are for implicit int */
