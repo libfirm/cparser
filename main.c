@@ -1033,13 +1033,6 @@ static void init_types_and_adjust(void)
 	props[ATOMIC_TYPE_WCHAR_T] = props[wchar_atomic_kind];
 
 	/* initialize defaults for unsupported types */
-	if (!type_ll) {
-		copy_typeprops(&props[ATOMIC_TYPE_LONGLONG], &props[ATOMIC_TYPE_LONG]);
-	}
-	if (!type_ull) {
-		copy_typeprops(&props[ATOMIC_TYPE_ULONGLONG],
-		               &props[ATOMIC_TYPE_ULONG]);
-	}
 	if (!type_ld) {
 		copy_typeprops(&props[ATOMIC_TYPE_LONG_DOUBLE],
 		               &props[ATOMIC_TYPE_DOUBLE]);
