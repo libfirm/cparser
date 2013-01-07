@@ -1189,27 +1189,19 @@ unsigned get_atomic_type_flags(atomic_type_kind_t kind)
  */
 atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
 {
-	static atomic_type_kind_t kinds[32];
-
-	assert(size < 32);
-	atomic_type_kind_t kind = kinds[size];
-	if (kind == (atomic_type_kind_t)0) {
-		static const atomic_type_kind_t possible_kinds[] = {
-			ATOMIC_TYPE_SCHAR,
-			ATOMIC_TYPE_SHORT,
-			ATOMIC_TYPE_INT,
-			ATOMIC_TYPE_LONG,
-			ATOMIC_TYPE_LONGLONG
-		};
-		for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
-			if (get_atomic_type_size(possible_kinds[i]) == size) {
-				kind = possible_kinds[i];
-				break;
-			}
+	static const atomic_type_kind_t possible_kinds[] = {
+		ATOMIC_TYPE_SCHAR,
+		ATOMIC_TYPE_SHORT,
+		ATOMIC_TYPE_INT,
+		ATOMIC_TYPE_LONG,
+		ATOMIC_TYPE_LONGLONG
+	};
+	for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
+		if (get_atomic_type_size(possible_kinds[i]) == size) {
+			return possible_kinds[i];
 		}
-		kinds[size] = kind;
 	}
-	return kind;
+	panic("couldn't find atomic type");
 }
 
 /**
@@ -1217,27 +1209,19 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
  */
 atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
 {
-	static atomic_type_kind_t kinds[32];
-
-	assert(size < 32);
-	atomic_type_kind_t kind = kinds[size];
-	if (kind == (atomic_type_kind_t)0) {
-		static const atomic_type_kind_t possible_kinds[] = {
-			ATOMIC_TYPE_UCHAR,
-			ATOMIC_TYPE_USHORT,
-			ATOMIC_TYPE_UINT,
-			ATOMIC_TYPE_ULONG,
-			ATOMIC_TYPE_ULONGLONG
-		};
-		for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
-			if (get_atomic_type_size(possible_kinds[i]) == size) {
-				kind = possible_kinds[i];
-				break;
-			}
+	static const atomic_type_kind_t possible_kinds[] = {
+		ATOMIC_TYPE_UCHAR,
+		ATOMIC_TYPE_USHORT,
+		ATOMIC_TYPE_UINT,
+		ATOMIC_TYPE_ULONG,
+		ATOMIC_TYPE_ULONGLONG
+	};
+	for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
+		if (get_atomic_type_size(possible_kinds[i]) == size) {
+			return possible_kinds[i];
 		}
-		kinds[size] = kind;
 	}
-	return kind;
+	panic("couldn't find atomic type");
 }
 
 /**
