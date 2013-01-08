@@ -2810,7 +2810,8 @@ wrong_thread_storage_class:
 			break;
 		case T_enum:
 			CHECK_DOUBLE_TYPE();
-			type = parse_enum_specifier();
+			newtype = true;
+			type    = parse_enum_specifier();
 			break;
 		case T___typeof__:
 			CHECK_DOUBLE_TYPE();
