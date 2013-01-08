@@ -1224,9 +1224,66 @@ static bool open_input(compilation_unit_t *unit)
 	return true;
 }
 
+#if 0
+static bool is_immediate_like(const ir_node *node)
+{
+	if (is_Const(node) || is_SymConst(node))
+		return true;
+	if (is_Conv(node) || is_Add(node) || is_Sub(node) || is_Mul(node)
+	  || is_Minus(node)) {
+		bool maybe_immediate = true;
+		for (int i = 0, arity = get_irn_arity(node); i < arity; ++i) {
+			ir_node *pred = get_irn_n(node, i);
+			if (is_immediate_like(pred)) {
+				maybe_immediate = false;
+				break;
+			}
+		}
+		return maybe_immediate;
+	}
+	return false;
+}
+#endif
+
+static bool should_count_node(const ir_node *node)
+{
+	switch (get_irn_opcode(node)) {
+	case iro_Bad:
+	case iro_Const:
+	case iro_Dummy:
+	case iro_End:
+	case iro_NoMem:
+	case iro_Pin:
+	case iro_Proj:
+	case iro_Start:
+	case iro_SymConst:
+	case iro_Sync:
+	case iro_Unknown:
+	case iro_Block:
+		return false;
+	case iro_Phi:
+		return get_irn_mode(node) != mode_M;
+#if 0
+	case iro_Add:
+	case iro_Minus:
+	case iro_Mul:
+	case iro_Sub:
+		return !is_immediate_like(node);
+#endif
+	case iro_Conv:;
+		ir_mode *new_mode  = get_irn_mode(node);
+		ir_mode *pred_mode = get_irn_mode(get_Conv_op(node));
+		return get_mode_size_bits(new_mode) != get_mode_size_bits(pred_mode)
+		    || get_mode_arithmetic(new_mode) != get_mode_arithmetic(pred_mode);
+	default:
+		return true;
+	}
+}
+
 static void node_counter(ir_node *node, void *env)
 {
-	(void)node;
+	if (!should_count_node(node))
+		return;
 	unsigned long long *count = (unsigned long long*)env;
 	++(*count);
 }
