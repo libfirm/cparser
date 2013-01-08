@@ -1369,41 +1369,9 @@ again:
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
-			if (mode == ParseOnly)
+			if (mode == ParseOnly || mode == CompileDump
+			 || mode == CompileExportIR)
 				break;
-
-			if (mode == CompileDump) {
-				/* find irg */
-				ident    *id     = new_id_from_str(dumpfunction);
-				ir_graph *irg    = NULL;
-				int       n_irgs = get_irp_n_irgs();
-				for (int i = 0; i < n_irgs; ++i) {
-					ir_graph *tirg   = get_irp_irg(i);
-					ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
-					if (irg_id == id) {
-						irg = tirg;
-						break;
-					}
-				}
-
-				if (irg == NULL) {
-					errorf(NULL, "no graph for function '%s' found", dumpfunction);
-					return EXIT_FAILURE;
-				}
-
-				dump_ir_graph_file(out, irg);
-				fclose(out);
-				return EXIT_SUCCESS;
-			}
-
-			if (mode == CompileExportIR) {
-				ir_export_file(out);
-				if (ferror(out) != 0) {
-					errorf(NULL, "writing to output failed");
-					return EXIT_FAILURE;
-				}
-				return EXIT_SUCCESS;
-			}
 
 			FILE *asm_out;
 			if (mode == Compile) {
@@ -2255,7 +2223,36 @@ int main(int argc, char **argv)
 	}
 
 	/* link program file */
-	if (mode == CompileAssembleLink) {
+	if (mode == CompileDump) {
+		/* find irg */
+		ident    *id     = new_id_from_str(dumpfunction);
+		ir_graph *irg    = NULL;
+		int       n_irgs = get_irp_n_irgs();
+		for (int i = 0; i < n_irgs; ++i) {
+			ir_graph *tirg   = get_irp_irg(i);
+			ident    *irg_id = get_entity_ident(get_irg_entity(tirg));
+			if (irg_id == id) {
+				irg = tirg;
+				break;
+			}
+		}
+
+		if (irg == NULL) {
+			errorf(NULL, "no graph for function '%s' found", dumpfunction);
+			return EXIT_FAILURE;
+		}
+
+		dump_ir_graph_file(out, irg);
+		fclose(out);
+		return EXIT_SUCCESS;
+	} else if (mode == CompileExportIR) {
+		ir_export_file(out);
+		if (ferror(out) != 0) {
+			errorf(NULL, "writing to output failed");
+			return EXIT_FAILURE;
+		}
+		return EXIT_SUCCESS;
+	} else if (mode == CompileAssembleLink) {
 		int const link_result = link_program(units);
 		if (link_result != EXIT_SUCCESS) {
 			if (out != stdout)
