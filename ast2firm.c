@@ -2657,8 +2657,10 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
-	int old_optimize         = get_optimize();
-	int old_constant_folding = get_opt_constant_folding();
+
+	/* make sure values are folded even for -O0 */
+	optimization_state_t state;
+	save_optimization_state(&state);
 	set_optimize(1);
 	set_opt_constant_folding(1);
 
@@ -2668,8 +2670,8 @@ ir_tarval *fold_constant_to_tarval(const expression_t *expression)
 	ir_node *const cnst = expression_to_value(expression);
 	POP_IRG();
 
-	set_optimize(old_optimize);
-	set_opt_constant_folding(old_constant_folding);
+	restore_optimization_state(&state);
+
 	constant_folding = constant_folding_old;
 
 	if (!is_Const(cnst))
@@ -2683,8 +2685,9 @@ static complex_constant fold_complex_constant(const expression_t *expression)
 
 	bool constant_folding_old = constant_folding;
 	constant_folding = true;
-	int old_optimize         = get_optimize();
-	int old_constant_folding = get_opt_constant_folding();
+
+	optimization_state_t state;
+	save_optimization_state(&state);
 	set_optimize(1);
 	set_opt_constant_folding(1);
 
@@ -2694,8 +2697,7 @@ static complex_constant fold_complex_constant(const expression_t *expression)
 	complex_value value = expression_to_complex(expression);
 	POP_IRG();
 
-	set_optimize(old_optimize);
-	set_opt_constant_folding(old_constant_folding);
+	restore_optimization_state(&state);
 
 	if (!is_Const(value.real) || !is_Const(value.imag)) {
 		panic("couldn't fold constant");
@@ -4602,6 +4604,12 @@ static void create_variable_initializer(entity_t *entity)
 		return;
 	}
 
+	/* make sure values are folded even for -O0 */
+	optimization_state_t state;
+	save_optimization_state(&state);
+	set_optimize(1);
+	set_opt_constant_folding(1);
+
 	type_t            *type = entity->declaration.type;
 	type_qualifiers_t  tq   = get_type_qualifier(type, true);
 
@@ -4632,6 +4640,7 @@ static void create_variable_initializer(entity_t *entity)
 				set_initializer_compound_value(complex_init, 1, imagi);
 				set_entity_initializer(irentity, complex_init);
 			}
+			restore_optimization_state(&state);
 			return;
 		} else if (!is_type_scalar(init_type)) {
 			if (value->kind != EXPR_COMPOUND_LITERAL)
@@ -4671,6 +4680,8 @@ have_initializer:
 		}
 		set_entity_initializer(irentity, irinitializer);
 	}
+
+	restore_optimization_state(&state);
 }
 
 static void create_variable_length_array(entity_t *entity)
