@@ -1415,6 +1415,15 @@ again:
 				panic("compiling multiple files/translation units not possible");
 			}
 			init_implicit_optimizations();
+			/* HACK HACK HACK REMOVE ME
+			 * this is only here for the ssaconstr paper it disables on-the-fly
+			 * optimizations during graph constructions (but still enables them
+			 * during the later compilation phases) */
+			set_optimize(0);
+			set_opt_constant_folding(0);
+			set_opt_algebraic_simplification(0);
+			set_opt_cse(0);
+
 			translation_unit_to_firm(unit->ast);
 			already_constructed_firm = true;
 			timer_stop(t_construct);
