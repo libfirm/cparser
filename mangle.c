@@ -347,20 +347,22 @@ ident *create_name_linux_elf(entity_t *entity)
  */
 ident *create_name_macho(entity_t *entity)
 {
-	if (entity->kind == ENTITY_FUNCTION) {
-		type_t *type = skip_typeref(entity->declaration.type);
-		assert(is_type_function(type));
-
-		switch (type->function.linkage) {
-			default:
-				if (entity->function.actual_name != NULL)
-					return new_id_from_str(entity->function.actual_name->string);
-				break;
-		}
+	const char *name;
+	if (entity->kind == ENTITY_FUNCTION
+	 && entity->function.actual_name != NULL) {
+		name = entity->function.actual_name->string;
+		if (entity->function.btk == BUILTIN_LIBC ||
+			entity->function.btk == BUILTIN_LIBC_CHECK)
+			goto mangle;
+		goto nomangle;
 	}
 
-	obstack_printf(&obst, "_%s", entity->base.symbol->string);
+	name = entity->base.symbol->string;
+mangle:
+	obstack_printf(&obst, "_%s", name);
 	return make_id_from_obst();
+nomangle:
+	return new_id_from_str(name);
 }
 
 void init_mangle(void)
