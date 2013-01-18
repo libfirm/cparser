@@ -18,15 +18,16 @@ static void set_be_option(const char *arg)
 	assert(res);
 }
 
-static ir_entity *underscore_compilerlib_entity_creator(ident *id, ir_type *mt)
+static ident *compilerlib_name_mangle_default(ident *id, ir_type *mt)
 {
-	ir_entity *entity = new_entity(get_glob_type(), id, mt);
-	ident     *ldname = id_mangle3("_", id, "");
+	(void)mt;
+	return id;
+}
 
-	set_entity_visibility(entity, ir_visibility_external);
-	set_entity_ld_ident(entity, ldname);
-
-	return entity;
+static ident *compilerlib_name_mangle_underscore(ident *id, ir_type *mt)
+{
+	(void)mt;
+	return id_mangle3("_", id, "");
 }
 
 bool firm_is_unixish_os(const machine_triple_t *machine)
@@ -56,14 +57,15 @@ static bool setup_os_support(const machine_triple_t *machine)
 {
 	if (firm_is_unixish_os(machine)) {
 		set_be_option("ia32-gasmode=elf");
+		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (firm_is_darwin_os(machine)) {
 		set_be_option("ia32-gasmode=macho");
 		set_be_option("ia32-stackalign=4");
 		set_be_option("pic=true");
-		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
+		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else if (firm_is_windows_os(machine)) {
 		set_be_option("ia32-gasmode=mingw");
-		set_compilerlib_entity_creator(underscore_compilerlib_entity_creator);
+		set_compilerlib_name_mangle(compilerlib_name_mangle_underscore);
 	} else {
 		return false;
 	}
