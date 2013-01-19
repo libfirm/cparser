@@ -259,15 +259,17 @@ static inline void next_real_char(void)
 }
 
 /**
- * Put a character back into the buffer.
+ * Put the current input character back into the buffer and set the current
+ * input character to @p c.
  *
- * @param pc  the character to put back
+ * @param c  the character to set the input character to
  */
-static inline void put_back(utf32 const pc)
+static inline void put_back(utf32 const c)
 {
 	assert(input.bufpos > input.buf);
-	*(--input.bufpos - input.buf + input.buf) = (char) pc;
+	*(--input.bufpos - input.buf + input.buf) = input.c;
 	--input.pos.colno;
+	input.c = c;
 }
 
 #define NEWLINE \
@@ -297,8 +299,7 @@ static void maybe_concat_lines(void)
 		break;
 	}
 
-	put_back(input.c);
-	input.c = '\\';
+	put_back('\\');
 }
 
 /**
@@ -320,8 +321,7 @@ static inline void next_char(void)
 
 	next_real_char();
 	if (LIKELY(input.c != '?')) {
-		put_back(input.c);
-		input.c = '?';
+		put_back('?');
 		goto end_of_next_char;
 	}
 
@@ -337,9 +337,8 @@ static inline void next_char(void)
 	case '>': input.c = '}'; break;
 	case '-': input.c = '~'; break;
 	default:
-		put_back(input.c);
 		put_back('?');
-		input.c = '?';
+		put_back('?');
 		break;
 	}
 
@@ -1080,8 +1079,7 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 				skip_multiline_comment();
 				continue;
 			} else {
-				put_back(input.c);
-				input.c = '/';
+				put_back('/');
 			}
 			return true;
 
@@ -1126,8 +1124,7 @@ static void skip_whitespace(void)
 				skip_multiline_comment();
 				continue;
 			} else {
-				put_back(input.c);
-				input.c = '/';
+				put_back('/');
 			}
 			return;
 
@@ -1204,8 +1201,7 @@ universal:
 			}
 
 			default:
-				put_back(input.c);
-				input.c = '\\';
+				put_back('\\');
 				goto end_symbol;
 			}
 
@@ -1367,8 +1363,7 @@ restart:
 			case '7':
 			case '8':
 			case '9':
-				put_back(input.c);
-				input.c = '.';
+				put_back('.');
 				parse_number();
 				return;
 
@@ -1376,8 +1371,7 @@ restart:
 				MAYBE_PROLOG
 				MAYBE('.', T_DOTDOTDOT)
 				ELSE_CODE(
-					put_back(input.c);
-					input.c = '.';
+					put_back('.');
 					set_punctuator('.');
 					return;
 				)
@@ -1428,8 +1422,7 @@ restart:
 				MAYBE_PROLOG
 				MAYBE_DIGRAPH(':', T_HASHHASH, symbol_percentcolonpercentcolon)
 				ELSE_CODE(
-					put_back(input.c);
-					input.c = '%';
+					put_back('%');
 					goto digraph_percentcolon;
 				)
 			ELSE_CODE(
@@ -1518,8 +1511,7 @@ digraph_percentcolon:
 	case '\\':
 		next_char();
 		int next_c = input.c;
-		put_back(input.c);
-		input.c = '\\';
+		put_back('\\');
 		if (next_c == 'U' || next_c == 'u') {
 			parse_symbol();
 			return;
