@@ -61,6 +61,8 @@ typedef struct pp_expansion_state_t {
 	pp_definition_t   *definition;
 	size_t             list_len;
 	token_t           *token_list;
+	bool               previous_is_expanding;
+	bool               previous_may_recurse;
 
 	size_t             pos;
 	whitespace_info_t  expand_info;
@@ -112,6 +114,8 @@ typedef struct macro_call_t {
 	token_t         *argument_tokens;
 	unsigned         argument_brace_count;
 	void            *obstack_level;
+	bool             previous_is_expanding : 1;
+	bool             previous_may_recurse  : 1;
 } macro_call_t;
 
 static pp_input_t      input;
@@ -881,7 +885,7 @@ static void parse_character_constant(string_encoding_t const enc)
 static pp_expansion_state_t *push_expansion(pp_definition_t *definition)
 {
 	ARR_EXTEND(pp_expansion_state_t, expansion_stack, 1);
-	size_t len = ARR_LEN(expansion_stack);
+	size_t          const len    = ARR_LEN(expansion_stack);
 	pp_expansion_state_t *result = &expansion_stack[len-1];
 	memset(result, 0, sizeof(*result));
 	result->definition = definition;
@@ -922,8 +926,6 @@ static void pop_function_expansion(pp_definition_t *function)
 		parameter->is_expanding = arg->is_expanding;
 	}
 	ARR_SHRINKLEN(argument_stack, argument_stack_top);
-
-	function->is_expanding = true;
 }
 
 static bool pop_expansion(void)
@@ -935,8 +937,8 @@ static bool pop_expansion(void)
 		obstack_free(&pp_obstack, expansion->obstack_level);
 		pop_function_expansion(definition);
 	}
-	assert(definition->is_expanding);
-	definition->is_expanding = false;
+	definition->is_expanding = expansion->previous_is_expanding;
+	definition->may_recurse  = expansion->previous_may_recurse;
 
 	if (definition->is_parameter) {
 		pp_definition_t *function = definition->function_definition;
@@ -958,8 +960,6 @@ static bool pop_expansion(void)
 	}
 
 	current_expansion = &expansion_stack[top-2];
-
-
 	return true;
 }
 
@@ -1005,7 +1005,9 @@ static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo,
                        bool space_before)
 {
 	assert(current_call.macro == NULL && current_call.parameter == NULL);
-	current_call.macro   = definition;
+	current_call.macro                 = definition;
+	current_call.previous_is_expanding = definition->is_expanding;
+	current_call.previous_may_recurse  = definition->may_recurse;
 	call_whitespace_info = wsinfo;
 	call_space_before    = space_before;
 	if (definition->n_parameters > 0) {
@@ -1019,21 +1021,39 @@ static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo,
 	current_call.obstack_level = obstack_alloc(&pp_obstack, 0);
 }
 
-static void start_expanding(pp_definition_t *definition)
+static pp_expansion_state_t *start_expanding(pp_definition_t *definition)
 {
-	push_expansion(definition);
-	definition->is_expanding = true;
-	if (definition->n_parameters > 0) {
-		current_expansion->obstack_level = current_call.obstack_level;
-	}
-
+	pp_expansion_state_t *expansion = push_expansion(definition);
 	if (definition->list_len > 0) {
 		token_t *token = &definition->token_list[0];
 		token->base.space_before = pp_token.base.space_before;
 	}
+	return expansion;
+}
+
+static void start_function_macro_expansion(const macro_call_t *call)
+{
+	pp_definition_t      *macro      = call->macro;
+	pp_expansion_state_t *expansion  = start_expanding(call->macro);
+	expansion->previous_is_expanding = call->previous_is_expanding;
+	expansion->previous_may_recurse  = call->previous_may_recurse;
+	macro->is_expanding              = true;
+	if (macro->n_parameters > 0) {
+		expansion->obstack_level = call->obstack_level;
+	}
+	current_expansion = expansion;
+}
+
+static void start_object_macro_expansion(pp_definition_t *definition)
+{
+	pp_expansion_state_t *expansion  = start_expanding(definition);
+	expansion->previous_is_expanding = definition->is_expanding;
+	expansion->previous_may_recurse  = definition->may_recurse;
+	definition->is_expanding         = true;
 	if (definition->is_parameter) {
 		definition->function_definition->may_recurse = true;
 	}
+	current_expansion = expansion;
 }
 
 static void grow_escaped(struct obstack *obst, const char *string, size_t size)
@@ -2955,7 +2975,7 @@ has_paren:
 			}
 
 			if (pp_token.kind == T_MACRO_PARAMETER) {
-				start_expanding(pp_token.macro_parameter.def);
+				start_object_macro_expansion(pp_token.macro_parameter.def);
 				pp_expansion_state_t *const expansion_before = current_expansion;
 restart:
 				do {
@@ -3498,7 +3518,7 @@ static bool next_expansion_token(void)
 			if (kind == T_MACRO_PARAMETER) {
 				pp_definition_t *def = pp_token.macro_parameter.def;
 				assert(current_expansion != NULL);
-				start_expanding(def);
+				start_object_macro_expansion(def);
 				return false;
 			}
 
@@ -3537,7 +3557,7 @@ static bool next_expansion_token(void)
 				} else {
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
-					start_expanding(pp_definition);
+					start_object_macro_expansion(pp_definition);
 					return false;
 				}
 			}
@@ -3553,7 +3573,7 @@ static bool next_expansion_token(void)
 			} else {
 				finish_argument();
 				assert(kind == ')');
-				start_expanding(current_call.macro);
+				start_function_macro_expansion(&current_call);
 				pop_macro_call();
 				info = call_whitespace_info;
 				pp_token.base.space_before = call_space_before;
@@ -3576,7 +3596,7 @@ static bool next_expansion_token(void)
 			 * parameters for another macro-call */
 			pp_definition_t *argument = pp_token.macro_parameter.def;
 			argument_expanding = argument;
-			start_expanding(argument);
+			start_object_macro_expansion(argument);
 			return false;
 		} else if (kind == T_EOF) {
 			errorf(&expansion_pos,
