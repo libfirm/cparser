@@ -848,6 +848,12 @@ static void parse_character_constant(string_encoding_t const enc)
 	case '8':  \
 	case '9'
 
+#define WHITESPACE \
+	     ' ': \
+	case '\f': \
+	case '\t': \
+	case '\v'
+
 static void start_expanding(pp_definition_t *definition)
 {
 	definition->parent_expansion = current_expansion;
@@ -1063,8 +1069,7 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 	bool res = false;
 	while (true) {
 		switch (input.c) {
-		case ' ':
-		case '\t':
+		case WHITESPACE:
 			next_char();
 			continue;
 
@@ -1100,8 +1105,7 @@ static void skip_whitespace(void)
 {
 	while (true) {
 		switch (input.c) {
-		case ' ':
-		case '\t':
+		case WHITESPACE:
 			++info.whitespace_at_line_begin;
 			info.had_whitespace = true;
 			next_char();
@@ -1322,8 +1326,7 @@ restart:
 	pp_token.base.symbol = NULL;
 
 	switch (input.c) {
-	case ' ':
-	case '\t':
+	case WHITESPACE:
 		info.whitespace_at_line_begin++;
 		info.had_whitespace = true;
 		next_char();
