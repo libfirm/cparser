@@ -1048,7 +1048,7 @@ static void skip_multiline_comment(void)
 			break;
 
 		case EOF:
-			errorf(&start_pos, "at end of file while looking for comment end");
+			errorf(&start_pos, "unterminated comment");
 			return;
 
 		default:
