@@ -1567,12 +1567,14 @@ more_concat:
  * Returns the next token kind found when continuing the current expansions
  * without starting new sub-expansions.
  */
-static token_kind_t peek_expansion(void)
+static token_kind_t peek_expansion(bool may_pop)
 {
 	for (size_t i = ARR_LEN(expansion_stack); i-- > 0; ) {
 		pp_expansion_state_t *e = &expansion_stack[i];
-	    if (e->pos < e->list_len)
+		if (e->pos < e->list_len)
 			return e->token_list[e->pos].kind;
+		if (!may_pop)
+			return T_EOF;
 	}
 	return T_EOF;
 }
@@ -1883,6 +1885,7 @@ static void next_input_token(void)
 		info.at_line_begin         = false;
 		pp_token.base.space_before = false;
 	}
+	pp_token.base.expansion_forbidden = false;
 
 restart:
 	pp_token.base.pos            = input.pos;
@@ -3523,27 +3526,33 @@ static bool next_expansion_token(void)
 			}
 
 			pp_definition_t *const pp_definition = symbol->pp_definition;
-			if (pp_definition != NULL &&
-			    (!pp_definition->is_expanding || pp_definition->may_recurse)) {
-				if (pp_definition->has_parameters) {
+			if (pp_definition != NULL && !pp_token.base.expansion_forbidden) {
+				if (pp_definition->is_expanding)
+					pp_token.base.expansion_forbidden = true;
 
+				if (pp_definition->is_expanding && !pp_definition->may_recurse) {
+					pp_token.base.expansion_forbidden = true;
+				} else if (pp_definition->has_parameters) {
 					/* check if next token is a '(' */
-					token_kind_t next_token = peek_expansion();
-					if (next_token == T_EOF) {
+					if (current_expansion != NULL) {
+						bool         may_pop    = !pp_token.base.expansion_forbidden;
+						token_kind_t next_token = peek_expansion(may_pop);
+						if (next_token != '(') {
+							if (may_pop)
+								goto try_input;
+							return true;
+						}
+					} else {
+try_input:;
 						whitespace_info_t skipinfo = skip_whitespace();
-						if (input.c == '(') {
-							next_token = '(';
-						} else {
+						if (input.c != '(') {
 							next_info         = skipinfo;
 							next_space_before = pp_token.base.space_before
 								| (skipinfo.whitespace_at_line_begin > 0);
 							next_info_valid     = true;
 							return true;
 						}
-					} else if (next_token != '(') {
-						return true;
 					}
-
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
 					push_macro_call();
