@@ -49,6 +49,8 @@ typedef union  token_t           token_t;
 
 struct token_base_t {
 	token_kind_t kind;
+	/** there was whitespace before the token */
+	bool         space_before : 1;
 	position_t   pos;
 	symbol_t    *symbol;
 };

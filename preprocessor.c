@@ -30,14 +30,7 @@
 #define MAX_PUTBACK 3
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */
 
-typedef struct saved_token_t {
-	token_t token;
-	bool    had_whitespace;
-} saved_token_t;
-
 typedef struct whitespace_info_t {
-	/** current token had whitespace in front of it */
-	bool     had_whitespace;
 	/** current token is at the beginning of a line.
 	 * => a "#" at line begin starts a preprocessing directive. */
 	bool     at_line_begin;
@@ -61,13 +54,13 @@ struct pp_definition_t {
 
 	/* replacement */
 	size_t           list_len;
-	saved_token_t   *token_list;
+	token_t         *token_list;
 };
 
 typedef struct pp_expansion_state_t {
 	pp_definition_t   *definition;
 	size_t             list_len;
-	saved_token_t     *token_list;
+	token_t           *token_list;
 
 	size_t             pos;
 	whitespace_info_t  expand_info;
@@ -77,9 +70,9 @@ typedef struct pp_expansion_state_t {
 } pp_expansion_state_t;
 
 typedef struct pp_argument_t {
-	size_t         list_len;
-	saved_token_t *token_list;
-	bool           is_expanding;
+	size_t   list_len;
+	token_t *token_list;
+	bool     is_expanding;
 } pp_argument_t;
 
 typedef struct pp_conditional_t pp_conditional_t;
@@ -116,7 +109,7 @@ typedef struct macro_call_t {
 	pp_definition_t *macro;
 	pp_definition_t *parameter;
 	unsigned         parameter_idx;
-	saved_token_t   *argument_tokens;
+	token_t         *argument_tokens;
 	unsigned         argument_brace_count;
 	void            *obstack_level;
 } macro_call_t;
@@ -143,6 +136,7 @@ static position_t            expansion_pos;
 static pp_expansion_state_t *current_expansion  = NULL;
 static macro_call_t          current_call;
 static whitespace_info_t     call_whitespace_info;
+static bool                  call_space_before;
 static pp_definition_t      *argument_expanding = NULL;
 static strset_t              stringset;
 static token_kind_t          last_token;
@@ -161,7 +155,9 @@ searchpath_t quote_searchpath   = { NULL, &quote_searchpath.first,   false };
 searchpath_t system_searchpath  = { NULL, &system_searchpath.first,  true  };
 searchpath_t after_searchpath   = { NULL, &after_searchpath.first,   true  };
 
-static whitespace_info_t next_info; /* valid if had_whitespace is true */
+static bool              next_info_valid;
+static whitespace_info_t next_info;
+static bool              next_space_before;
 static whitespace_info_t info;
 
 static inline void next_char(void);
@@ -989,7 +985,7 @@ static void pop_macro_call(void)
 static void start_argument(pp_definition_t *parameter)
 {
 	current_call.parameter = parameter;
-	current_call.argument_tokens = NEW_ARR_F(saved_token_t, 0);
+	current_call.argument_tokens = NEW_ARR_F(token_t, 0);
 }
 
 static void finish_argument(void)
@@ -997,19 +993,21 @@ static void finish_argument(void)
 	pp_definition_t *parameter = current_call.parameter;
 	if (parameter == NULL)
 		return;
-	saved_token_t *tokens = current_call.argument_tokens;
-	size_t len = ARR_LEN(tokens);
+	token_t *tokens = current_call.argument_tokens;
+	size_t   len    = ARR_LEN(tokens);
 	parameter->list_len   = len;
 	parameter->token_list = obstack_copy(&pp_obstack, tokens, len*sizeof(tokens[0]));
 	parameter->is_expanding = false;
 	DEL_ARR_F(tokens);
 }
 
-static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo)
+static void start_call(pp_definition_t *definition, whitespace_info_t wsinfo,
+                       bool space_before)
 {
 	assert(current_call.macro == NULL && current_call.parameter == NULL);
 	current_call.macro   = definition;
 	call_whitespace_info = wsinfo;
+	call_space_before    = space_before;
 	if (definition->n_parameters > 0) {
 		start_argument(&definition->parameters[0]);
 		push_function_expansion(definition);
@@ -1030,7 +1028,8 @@ static void start_expanding(pp_definition_t *definition)
 	}
 
 	if (definition->list_len > 0) {
-		definition->token_list[0].had_whitespace = info.had_whitespace;
+		token_t *token = &definition->token_list[0];
+		token->base.space_before = pp_token.base.space_before;
 	}
 	if (definition->is_parameter) {
 		definition->function_definition->may_recurse = true;
@@ -1090,23 +1089,24 @@ static void grow_token(struct obstack *obst, const token_t *token)
 	}
 }
 
-static token_t stringify(const pp_definition_t *definition)
+static token_t stringify(const pp_definition_t *definition, bool space_before)
 {
 	assert(obstack_object_size(&symbol_obstack) == 0);
 
 	size_t list_len = definition->list_len;
 	for (size_t p = 0; p < list_len; ++p) {
-		const saved_token_t *saved = &definition->token_list[p];
-		if (p > 0 && saved->had_whitespace)
+		const token_t *saved = &definition->token_list[p];
+		if (p > 0 && saved->base.space_before)
 			obstack_1grow(&symbol_obstack, ' ');
-		grow_token(&symbol_obstack, &saved->token);
+		grow_token(&symbol_obstack, saved);
 	}
 	return (token_t) {
 		.literal = {
 			.base = {
-				.kind   = T_STRING_LITERAL,
-				.pos    = definition->pos,
-				.symbol = NULL
+				.kind         = T_STRING_LITERAL,
+				.space_before = space_before,
+				.pos          = definition->pos,
+				.symbol       = NULL
 			},
 			.string = sym_make_string(STRING_ENCODING_CHAR)
 		}
@@ -1261,36 +1261,32 @@ static bool concat_macro_parameters(const position_t *pos,
 	newdef->symbol       = sym_anonymous;
 	newdef->is_parameter = true;
 
-	bool whitespace = info.had_whitespace;
 	if (token0->kind == T_MACRO_PARAMETER) {
 		pp_definition_t *def0 = token0->macro_parameter.def;
 		size_t           len0 = def0->list_len;
 		assert(len0 > 0);
 		obstack_grow(&pp_obstack, def0->token_list,
 		             (len0 - 1) * sizeof(def0->token_list[0]));
-		const saved_token_t *saved = &def0->token_list[len0 - 1];
-		token0     = &saved->token;
-		whitespace = saved->had_whitespace;
+		token0     = &def0->token_list[len0-1];
 		newdef->function_definition = def0->function_definition;
 	}
 	pp_definition_t *def1 = NULL;
 	if (token1->kind == T_MACRO_PARAMETER) {
 		def1 = token1->macro_parameter.def;
 		assert(def1->list_len > 0);
-		token1 = &def1->token_list[0].token;
+		token1 = &def1->token_list[0];
 		assert(newdef->function_definition == NULL
 		       || newdef->function_definition == def1->function_definition);
 		newdef->function_definition = def1->function_definition;
 	}
+	bool space_before = token0->base.space_before;
 	if (!concat_tokens(pos, token0, token1)) {
 		char *dummy = obstack_finish(&pp_obstack);
 		obstack_free(&pp_obstack, dummy);
 		return false;
 	}
-	saved_token_t saved;
-	saved.token          = pp_token;
-	saved.had_whitespace = whitespace;
-	obstack_grow(&pp_obstack, &saved, sizeof(saved));
+	pp_token.base.space_before = space_before;
+	obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 	if (def1 != NULL) {
 		size_t len1 = def1->list_len;
 		obstack_grow(&pp_obstack, &def1->token_list[1],
@@ -1300,11 +1296,12 @@ static bool concat_macro_parameters(const position_t *pos,
 	size_t size = obstack_object_size(&pp_obstack);
 	assert(size % sizeof(newdef->token_list[0]) == 0);
 	size_t len = size / sizeof(newdef->token_list[0]);
-	saved_token_t *list = (saved_token_t*)obstack_finish(&pp_obstack);
+	token_t *list = (token_t*)obstack_finish(&pp_obstack);
 	newdef->list_len   = len;
 	newdef->token_list = list;
 
 	pp_token.kind                = T_MACRO_PARAMETER;
+	pp_token.base.space_before   = false;
 	pp_token.macro_parameter.def = newdef;
 	return true;
 }
@@ -1341,7 +1338,7 @@ static bool concat_tokens(const position_t *pos,
 			return true;
 		}
 		if (list_len == 1) {
-			token0 = &def0->token_list[0].token;
+			token0 = &def0->token_list[0];
 		}
 	}
 	if (token1->kind == T_MACRO_PARAMETER) {
@@ -1352,7 +1349,7 @@ static bool concat_tokens(const position_t *pos,
 			return true;
 		}
 		if (list_len == 1) {
-			token1 = &def1->token_list[0].token;
+			token1 = &def1->token_list[0];
 		}
 	}
 
@@ -1499,47 +1496,47 @@ static bool expand_next(void)
 		pos = current_expansion->pos;
 	}
 
-	const saved_token_t *saved = &current_expansion->token_list[pos++];
-	pp_token = saved->token;
-	if (current_expansion->pos > 0)
-		info.had_whitespace = saved->had_whitespace;
+	bool old_space_before = pp_token.base.space_before;
+	pp_token = current_expansion->token_list[pos++];
+	if (current_expansion->pos == 0)
+		pp_token.base.space_before = old_space_before;
+
 more_concat:
 	if (pos < current_expansion->list_len) {
-		const saved_token_t *next = &current_expansion->token_list[pos];
-		token_kind_t         next_kind = next->token.kind;
+		const token_t *next      = &current_expansion->token_list[pos];
+		token_kind_t   next_kind = next->kind;
 		if (next_kind == T_HASHHASH && pos+1 < current_expansion->list_len
 		    && !current_expansion->definition->is_parameter) {
-			const token_t *next_but_one
-				= &current_expansion->token_list[pos+1].token;
-			size_t  advance = 2;
-			token_t tmp;
+			const token_t *next_but_one = &current_expansion->token_list[pos+1];
+			size_t         advance      = 2;
+			token_t        tmp;
 			if (next_but_one->kind == '#'
 			    && pos+2 < current_expansion->list_len) {
 				const token_t *next_next_but_one
-					= &current_expansion->token_list[pos+2].token;
+					= &current_expansion->token_list[pos+2];
 				if (next_next_but_one->kind == T_MACRO_PARAMETER) {
 					pp_definition_t *def
 						= next_next_but_one->macro_parameter.def;
 					assert(def != NULL && def->is_parameter);
-					tmp = stringify(def);
+					tmp          = stringify(def, next_next_but_one->base.space_before);
 					next_but_one = &tmp;
-					advance = 3;
+					advance      = 3;
 				}
 			}
-			if (concat_tokens(&next->token.base.pos, &pp_token, next_but_one)) {
+			bool space_before = pp_token.base.space_before;
+			if (concat_tokens(&next->base.pos, &pp_token, next_but_one)) {
+				pp_token.base.space_before = space_before;
 				pos += advance;
 				goto more_concat;
 			}
 		} else if (pp_token.kind == '#' && next_kind == T_MACRO_PARAMETER) {
-			pp_definition_t *def = next->token.macro_parameter.def;
+			pp_definition_t *def = next->macro_parameter.def;
 			assert(def != NULL && def->is_parameter);
-			pp_token = stringify(def);
+			pp_token = stringify(def, pp_token.base.space_before);
 			++pos;
 		}
 	}
 
-	if (current_expansion->pos > 0)
-		info.had_whitespace = saved->had_whitespace;
 	current_expansion->pos = pos;
 	pp_token.base.pos      = expansion_pos;
 
@@ -1555,7 +1552,7 @@ static token_kind_t peek_expansion(void)
 	for (size_t i = ARR_LEN(expansion_stack); i-- > 0; ) {
 		pp_expansion_state_t *e = &expansion_stack[i];
 	    if (e->pos < e->list_len)
-			return e->token_list[e->pos].token.kind;
+			return e->token_list[e->pos].kind;
 	}
 	return T_EOF;
 }
@@ -1624,11 +1621,11 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			if (input.c == '/') {
 				eat('/');
 				skip_line_comment();
-				info.had_whitespace = true;
+				pp_token.base.space_before = true;
 				continue;
 			} else if (input.c == '*') {
 				eat('*');
-				info.had_whitespace           = true;
+				pp_token.base.space_before    = true;
 				info.whitespace_at_line_begin = skip_multiline_comment();
 				continue;
 			} else {
@@ -1658,13 +1655,11 @@ static whitespace_info_t skip_whitespace(void)
 		switch (input.c) {
 		case WHITESPACE:
 			++info.whitespace_at_line_begin;
-			info.had_whitespace = true;
 			next_char();
 			continue;
 
 		case EAT_NEWLINE:
-			info.at_line_begin  = true;
-			info.had_whitespace = true;
+			info.at_line_begin            = true;
 			info.whitespace_at_line_begin = 0;
 			if (stop_at_newline) {
 				--input.pos.lineno;
@@ -1679,11 +1674,9 @@ static whitespace_info_t skip_whitespace(void)
 			if (input.c == '/') {
 				eat('/');
 				skip_line_comment();
-				info.had_whitespace = true;
 				continue;
 			} else if (input.c == '*') {
 				eat('*');
-				info.had_whitespace           = true;
 				info.whitespace_at_line_begin = skip_multiline_comment();
 				continue;
 			} else {
@@ -1862,27 +1855,29 @@ end_number:
  * input stream. No macro expansion is performed. */
 static void next_input_token(void)
 {
-	if (next_info.had_whitespace) {
-		info = next_info;
-		next_info.had_whitespace = false;
+	if (next_info_valid) {
+		info                       = next_info;
+		pp_token.base.space_before = next_space_before;
+		next_info_valid = false;
 	} else {
-		info.at_line_begin  = false;
-		info.had_whitespace = false;
+		info.at_line_begin         = false;
+		pp_token.base.space_before = false;
 	}
+
 restart:
-	pp_token.base.pos    = input.pos;
-	pp_token.base.symbol = NULL;
+	pp_token.base.pos            = input.pos;
+	pp_token.base.symbol         = NULL;
 
 	switch (input.c) {
 	case WHITESPACE:
 		info.whitespace_at_line_begin++;
-		info.had_whitespace = true;
+		pp_token.base.space_before = true;
 		next_char();
 		goto restart;
 
 	case EAT_NEWLINE:
 		info.at_line_begin            = true;
-		info.had_whitespace           = true;
+		pp_token.base.space_before    = true;
 		info.whitespace_at_line_begin = 0;
 		if (stop_at_newline) {
 			--input.pos.lineno;
@@ -1954,13 +1949,13 @@ restart:
 		MAYBE('=', T_SLASHEQUAL)
 		case '*':
 			eat('*');
-			info.had_whitespace           = true;
 			info.whitespace_at_line_begin = skip_multiline_comment();
+			pp_token.base.space_before    = true;
 			goto restart;
 		case '/':
 			eat('/');
 			skip_line_comment();
-			info.had_whitespace = true;
+			pp_token.base.space_before = true;
 			goto restart;
 		ELSE('/')
 	case '%':
@@ -2189,8 +2184,8 @@ void set_preprocessor_output(FILE *output)
 
 void emit_pp_token(void)
 {
-	if (!emit_newlines() &&
-	    (info.had_whitespace || tokens_would_paste(last_token, pp_token.kind)))
+	if (!emit_newlines() && ((pp_token.base.space_before)
+	    || tokens_would_paste(last_token, pp_token.kind)))
 		fputc(' ', out);
 
 	switch (pp_token.kind) {
@@ -2270,13 +2265,13 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	if (definition1->list_len != definition2->list_len)
 		return false;
 
-	size_t               len = definition1->list_len;
-	const saved_token_t *t1  = definition1->token_list;
-	const saved_token_t *t2  = definition2->token_list;
+	size_t         len = definition1->list_len;
+	const token_t *t1  = definition1->token_list;
+	const token_t *t2  = definition2->token_list;
 	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
-		if (!pp_tokens_equal(&t1->token, &t2->token))
+		if (!pp_tokens_equal(t1, t2))
 			return false;
-		if (t1->had_whitespace != t2->had_whitespace)
+		if (t1->base.space_before != t2->base.space_before)
 			return false;
 	}
 	return true;
@@ -2322,10 +2317,7 @@ void add_define(char const *const name, char const *const val,
 		if (pp_token.kind == T_EOF)
 			break;
 
-		saved_token_t saved_token;
-		saved_token.token          = pp_token;
-		saved_token.had_whitespace = info.had_whitespace;
-		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 	}
 
 	input_free(input.input);
@@ -2345,15 +2337,12 @@ void add_define_string(char const *const name, char const *const val,
 	grow_escaped(&symbol_obstack, string, val_len);
 
 	token_t stringtok;
+	memset(&stringtok, 0, sizeof(stringtok));
 	stringtok.kind           = T_STRING_LITERAL;
 	stringtok.literal.string = sym_make_string(STRING_ENCODING_CHAR);
 
-	saved_token_t saved_token;
-	saved_token.token          = stringtok;
-	saved_token.had_whitespace = false;
-
 	assert(obstack_object_size(&pp_obstack) == 0);
-	obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+	obstack_grow(&pp_obstack, &stringtok, sizeof(stringtok));
 	def->list_len   = 1;
 	def->token_list = obstack_finish(&pp_obstack);
 }
@@ -2501,10 +2490,9 @@ static void parse_define_directive(void)
 		if (next_must_be_param && pp_token.kind != T_MACRO_PARAMETER) {
 			error_missing_macro_param();
 		}
-		saved_token_t saved_token;
-		saved_token.token = pp_token;
-		saved_token.had_whitespace = !first && info.had_whitespace;
-		obstack_grow(&pp_obstack, &saved_token, sizeof(saved_token));
+		if (first)
+			pp_token.base.space_before = false;
+		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 		next_must_be_param
 			= new_definition->has_parameters && pp_token.kind == '#';
 		next_input_token();
@@ -2519,8 +2507,8 @@ static void parse_define_directive(void)
 	new_definition->token_list = obstack_finish(&pp_obstack);
 
 	if (list_len > 0) {
-		const token_t *first = &new_definition->token_list[0].token;
-		const token_t *last  = &new_definition->token_list[list_len-1].token;
+		const token_t *first = &new_definition->token_list[0];
+		const token_t *last  = &new_definition->token_list[list_len-1];
 		if (first->kind == T_HASHHASH) {
 			errorf(&first->base.pos, "no token before '##'");
 		}
@@ -2652,7 +2640,7 @@ parse_name:
 			return pp_token.literal.string.begin;
 		} else if (pp_token.kind == '<') {
 			*system_include = true;
-			saved_token_t *tokens = NEW_ARR_F(saved_token_t, 0);
+			token_t *tokens = NEW_ARR_F(token_t, 0);
 			while (true) {
 				next_preprocessing_token();
 				if (pp_token.kind == T_EOF) {
@@ -2662,18 +2650,15 @@ parse_name:
 				if (pp_token.kind == '>')
 					break;
 
-				saved_token_t saved;
-				saved.token          = pp_token;
-				saved.had_whitespace = info.had_whitespace;
-				ARR_APP1(saved_token_t, tokens, saved);
+				ARR_APP1(token_t, tokens, pp_token);
 			}
 			size_t n_tokens = ARR_LEN(tokens);
 			assert(obstack_object_size(&symbol_obstack) == 0);
 			for (size_t i = 0; i < n_tokens; ++i) {
-				const saved_token_t *saved = &tokens[i];
-				if (i > 0 && saved->had_whitespace)
+				const token_t *token = &tokens[i];
+				if (i > 0 && token->base.space_before)
 					obstack_1grow(&symbol_obstack, ' ');
-				grow_token(&symbol_obstack, &saved->token);
+				grow_token(&symbol_obstack, token);
 			}
 			DEL_ARR_F(tokens);
 			goto finish_headername;
@@ -2789,7 +2774,6 @@ static void parse_include_directive(bool const include_next)
 
 	/* switch inputs */
 	info.whitespace_at_line_begin = 0;
-	info.had_whitespace           = false;
 	info.at_line_begin            = true;
 	emit_newlines();
 	push_input();
@@ -3426,7 +3410,7 @@ static void parse_error_directive(void)
 
 	position_t const pos = pp_token.base.pos;
 	do {
-		if (info.had_whitespace && obstack_object_size(&pp_obstack) != 0)
+		if (pp_token.base.space_before && obstack_object_size(&pp_obstack)!=0)
 			obstack_1grow(&pp_obstack, ' ');
 
 		switch (pp_token.kind) {
@@ -3530,7 +3514,10 @@ static bool next_expansion_token(void)
 						if (input.c == '(') {
 							next_token = '(';
 						} else {
-							next_info = skipinfo;
+							next_info         = skipinfo;
+							next_space_before = pp_token.base.space_before
+								| (skipinfo.whitespace_at_line_begin > 0);
+							next_info_valid     = true;
 							return true;
 						}
 					} else if (next_token != '(') {
@@ -3540,11 +3527,12 @@ static bool next_expansion_token(void)
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
 					push_macro_call();
-					whitespace_info_t oldinfo = info;
+					whitespace_info_t oldinfo      = info;
+					bool              space_before = pp_token.base.space_before;
 					next_preprocessing_token();
 					assert(pp_token.kind == '(');
 
-					start_call(pp_definition, oldinfo);
+					start_call(pp_definition, oldinfo, space_before);
 					return false;
 				} else {
 					if (current_expansion == NULL)
@@ -3568,6 +3556,7 @@ static bool next_expansion_token(void)
 				start_expanding(current_call.macro);
 				pop_macro_call();
 				info = call_whitespace_info;
+				pp_token.base.space_before = call_space_before;
 				return false;
 			}
 		} else if (kind == ',' && current_call.argument_brace_count == 0) {
@@ -3596,10 +3585,7 @@ static bool next_expansion_token(void)
 			return true;
 		}
 		if (current_call.parameter != NULL) {
-			saved_token_t saved;
-			saved.token          = pp_token;
-			saved.had_whitespace = info.had_whitespace;
-			ARR_APP1(saved_token_t, current_call.argument_tokens, saved);
+			ARR_APP1(token_t, current_call.argument_tokens, pp_token);
 		}
 		return false;
 	}
