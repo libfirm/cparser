@@ -272,19 +272,19 @@ static inline void put_back(utf32 const c)
 	input.c = c;
 }
 
+#define eat(c_type) (assert(input.c == c_type), next_char())
+
 #define NEWLINE \
 	'\r': \
-		next_char(); \
+		eat('\r'); \
 		if (input.c == '\n') { \
 	case '\n': \
-			next_char(); \
+			eat('\n'); \
 		} \
 		++input.pos.lineno; \
 		input.pos.colno = 1; \
 		goto newline; \
 		newline // Let it look like an ordinary case label.
-
-#define eat(c_type) (assert(input.c == c_type), next_char())
 
 static void maybe_concat_lines(void)
 {
@@ -749,7 +749,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 
 		default:
 			if (input.c == delimiter) {
-				next_char();
+				eat(delimiter);
 				goto end_of_string;
 			} else {
 				obstack_grow_utf8(&symbol_obstack, input.c);
@@ -1029,17 +1029,17 @@ static void skip_multiline_comment(void)
 	while (true) {
 		switch (input.c) {
 		case '/':
-			next_char();
+			eat('/');
 			if (input.c == '*') {
 				/* TODO: nested comment, warn here */
 			}
 			break;
 		case '*':
-			next_char();
+			eat('*');
 			if (input.c == '/') {
 				if (input.pos.lineno != input.output_line)
 					info.whitespace_at_line_begin = input.pos.colno;
-				next_char();
+				eat('/');
 				return;
 			}
 			break;
@@ -1069,13 +1069,13 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			continue;
 
 		case '/':
-			next_char();
+			eat('/');
 			if (input.c == '/') {
-				next_char();
+				eat('/');
 				skip_line_comment();
 				continue;
 			} else if (input.c == '*') {
-				next_char();
+				eat('*');
 				skip_multiline_comment();
 				continue;
 			} else {
@@ -1114,13 +1114,13 @@ static void skip_whitespace(void)
 			continue;
 
 		case '/':
-			next_char();
+			eat('/');
 			if (input.c == '/') {
-				next_char();
+				eat('/');
 				skip_line_comment();
 				continue;
 			} else if (input.c == '*') {
-				next_char();
+				eat('*');
 				skip_multiline_comment();
 				continue;
 			} else {
@@ -1171,7 +1171,7 @@ static void parse_symbol(void)
 			break;
 
 		case '\\':
-			next_char();
+			eat('\\');
 			switch (input.c) {
 			{
 				unsigned n;
@@ -1289,13 +1289,13 @@ end_number:
 
 #define MAYBE(ch, kind) \
 	case ch: \
-		next_char(); \
+		eat(ch); \
 		set_punctuator(kind); \
 		return;
 
 #define MAYBE_DIGRAPH(ch, kind, symbol) \
 	case ch: \
-		next_char(); \
+		eat(ch); \
 		set_digraph(kind, symbol); \
 		return;
 
@@ -1404,11 +1404,11 @@ restart:
 		MAYBE_PROLOG
 		MAYBE('=', T_SLASHEQUAL)
 		case '*':
-			next_char();
+			eat('*');
 			skip_multiline_comment();
 			goto restart;
 		case '/':
-			next_char();
+			eat('/');
 			skip_line_comment();
 			goto restart;
 		ELSE('/')
@@ -1463,7 +1463,7 @@ digraph_percentcolon:
 		MAYBE_DIGRAPH('>', ']', symbol_colongreater)
 		case ':':
 			if (c_mode & _CXX) {
-				next_char();
+				eat(':');
 				set_punctuator(T_COLONCOLON);
 				return;
 			}
@@ -1509,7 +1509,7 @@ digraph_percentcolon:
 		return;
 
 	case '\\':
-		next_char();
+		eat('\\');
 		int next_c = input.c;
 		put_back('\\');
 		if (next_c == 'U' || next_c == 'u') {
@@ -1988,7 +1988,7 @@ parse_name:
 
 			default:
 				if (input.c == delimiter) {
-					next_char();
+					eat(delimiter);
 					goto finish_headername;
 				} else {
 					obstack_1grow(&symbol_obstack, (char)input.c);
