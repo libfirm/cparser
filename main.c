@@ -113,7 +113,6 @@ static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
 static const char       *outname;
 static bool              define_intmax_types;
-static const char       *input_encoding;
 static bool              construct_dep_target;
 
 typedef enum lang_standard_t {
@@ -218,11 +217,13 @@ static void do_parsing(compilation_unit_t *unit)
 
 	start_parsing();
 
-	switch_pp_input(unit->input, unit->name, NULL, false);
+	input_t *decoder = input_from_stream(unit->input, input_encoding);
+	switch_pp_input(decoder, unit->name, NULL, false);
 	parse();
 	unit->ast = finish_parsing();
 	check_unclosed_conditionals();
 	close_pp_input();
+	input_free(decoder);
 	bool res = close_input(unit);
 
 	print_error_summary();
@@ -1554,7 +1555,8 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 	fprintf(out, "# 1 \"<command-line>\"\n");
 
 	set_preprocessor_output(out);
-	switch_pp_input(unit->input, unit->name, NULL, false);
+	input_t *decoder = input_from_stream(unit->input, input_encoding);
+	switch_pp_input(decoder, unit->name, NULL, false);
 
 	for (;;) {
 		next_preprocessing_token();
@@ -1565,8 +1567,9 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 
 	fputc('\n', out);
 	check_unclosed_conditionals();
-	close_pp_input();
 	print_error_summary();
+	close_pp_input();
+	input_free(decoder);
 	set_preprocessor_output(NULL);
 
 	if (unit->type == COMPILATION_UNIT_C) {

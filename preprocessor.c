@@ -28,6 +28,7 @@
 #include "symbol_table.h"
 
 #define MAX_PUTBACK 3
+#define BUFSIZE     1024
 #define INCLUDE_LIMIT 199  /* 199 is for gcc "compatibility" */
 
 typedef struct whitespace_info_t {
@@ -92,7 +93,7 @@ struct pp_input_t {
 	FILE               *file;
 	input_t            *input;
 	utf32               c;
-	utf32               buf[1024+MAX_PUTBACK];
+	utf32              *buf;
 	const utf32        *bufend;
 	const utf32        *bufpos;
 	position_t          pos;
@@ -127,6 +128,7 @@ static struct obstack  input_obstack;
 static pp_conditional_t *conditional_stack;
 
 token_t                      pp_token;
+const char                  *input_encoding;
 bool                         allow_dollar_in_symbol   = true;
 static bool                  resolve_escape_sequences = true;
 static bool                  error_on_unknown_chars   = true;
@@ -185,14 +187,17 @@ static void init_symbols(void)
 	symbol_percentgreater           = symbol_table_insert("%>");
 }
 
-void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path, bool const is_system_header)
+void switch_pp_input(input_t *const decoder, char const *const input_name,
+                     searchpath_entry_t *const path,
+                     bool const is_system_header)
 {
-	input.file                 = file;
-	input.input                = input_from_stream(file, NULL);
+	memset(&input, 0, sizeof(input));
+	input.input                = decoder;
+	input.buf                  = XMALLOCN(utf32, BUFSIZE + MAX_PUTBACK);
 	input.bufend               = input.buf + MAX_PUTBACK;
 	input.bufpos               = input.bufend;
 	input.output_line          = 0;
-	input.pos.input_name       = filename;
+	input.pos.input_name       = input_name;
 	input.pos.lineno           = 1;
 	input.pos.is_system_header = is_system_header;
 	input.path                 = path;
@@ -205,31 +210,30 @@ void switch_pp_input(FILE *const file, char const *const filename, searchpath_en
 	input.c          = '\n';
 }
 
-FILE *close_pp_input(void)
+static void switch_pp_input_file(FILE *file, char const *const filename,
+                                 searchpath_entry_t *const path,
+                                 bool const is_system_header)
 {
+	input_t *decoder = input_from_stream(file, input_encoding);
+	switch_pp_input(decoder, filename, path, is_system_header);
+	input.file = file;
+}
+
+void close_pp_input(void)
+{
+	free(input.buf);
+}
+
+static void close_pp_input_file(void)
+{
+	close_pp_input();
+	fclose(input.file);
 	input_free(input.input);
-
-	FILE* const file = input.file;
-	assert(file);
-
-	input.input  = NULL;
-	input.file   = NULL;
-	input.bufend = NULL;
-	input.bufpos = NULL;
-	input.c      = EOF;
-
-	return file;
 }
 
 static void push_input(void)
 {
 	pp_input_t *const saved_input = obstack_copy(&input_obstack, &input, sizeof(input));
-
-	/* adjust buffer positions */
-	if (input.bufpos != NULL)
-		saved_input->bufpos = saved_input->buf + (input.bufpos - input.buf);
-	if (input.bufend != NULL)
-		saved_input->bufend = saved_input->buf + (input.bufend - input.buf);
 
 	saved_input->parent = input_stack;
 	input_stack         = saved_input;
@@ -245,12 +249,6 @@ static void pop_restore_input(void)
 
 	memcpy(&input, saved_input, sizeof(input));
 	input.parent = NULL;
-
-	/* adjust buffer positions */
-	if (saved_input->bufpos != NULL)
-		input.bufpos = input.buf + (saved_input->bufpos - saved_input->buf);
-	if (saved_input->bufend != NULL)
-		input.bufend = input.buf + (saved_input->bufend - saved_input->buf);
 
 	input_stack = saved_input->parent;
 	obstack_free(&input_obstack, saved_input);
@@ -271,7 +269,7 @@ static inline void next_real_char(void)
 {
 	assert(input.bufpos <= input.bufend);
 	if (input.bufpos >= input.bufend) {
-		size_t const n = decode(input.input, input.buf + MAX_PUTBACK, lengthof(input.buf) - MAX_PUTBACK);
+		size_t const n = decode(input.input, input.buf + MAX_PUTBACK, BUFSIZE);
 		if (n == 0) {
 			input.c = EOF;
 			return;
@@ -2068,7 +2066,7 @@ digraph_percentcolon:
 		}
 
 		if (input_stack != NULL) {
-			fclose(close_pp_input());
+			close_pp_input_file();
 			pop_restore_input();
 			if (out)
 				fputc('\n', out);
@@ -2324,15 +2322,8 @@ void add_define(char const *const name, char const *const val,
 {
 	pp_definition_t *const def = add_define_(name, standard_define);
 
-	input.file        = 0;
-	input.input       = input_from_string(val, NULL);
-	input.bufend      = NULL;
-	input.bufpos      = NULL;
-	input.output_line = 0;
-	input.pos         = builtin_position;
-	input.pos.lineno  = 0;
-	/* place a virtual '\n' so we realize we're at line begin */
-	input.c           = '\n';
+	input_t *decoder = input_from_string(val, NULL);
+	switch_pp_input(decoder, builtin_position.input_name, NULL, true);
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 	for (;;) {
@@ -2343,7 +2334,8 @@ void add_define(char const *const name, char const *const val,
 		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
 	}
 
-	input_free(input.input);
+	close_pp_input();
+	input_free(decoder);
 
 	def->list_len   = obstack_object_size(&pp_obstack) / sizeof(def->token_list[0]);
 	def->token_list = obstack_finish(&pp_obstack);
@@ -2732,7 +2724,7 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 
 			FILE *file = fopen(full_name, "r");
 			if (file != NULL) {
-				switch_pp_input(file, full_name, NULL, false);
+				switch_pp_input_file(file, full_name, NULL, false);
 				return true;
 			}
 			entry = quote_searchpath.first;
@@ -2755,7 +2747,7 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 		FILE *file          = fopen(complete_path, "r");
 		if (file != NULL) {
 			const char *filename = identify_string(complete_path);
-			switch_pp_input(file, filename, entry, entry->is_system_path);
+			switch_pp_input_file(file, filename, entry, entry->is_system_path);
 			return true;
 		} else {
 			obstack_free(&symbol_obstack, complete_path);
