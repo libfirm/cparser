@@ -30,7 +30,8 @@ static symbol_t *intern_register_token(token_kind_t id, const char *string)
 	return symbol;
 }
 
-static void register_token(unsigned mode, token_kind_t id, const char *string)
+static void register_token(unsigned mode, token_kind_t id, const char *string,
+                           bool is_keyword)
 {
 	if (id > 255) {
 		assert(id >= last_id);
@@ -38,7 +39,8 @@ static void register_token(unsigned mode, token_kind_t id, const char *string)
 	}
 	if (c_mode & mode) {
 		symbol_t *symbol = intern_register_token(id, string);
-		symbol->ID = id;
+		if (is_keyword)
+			symbol->ID = id;
 	}
 }
 
@@ -58,7 +60,7 @@ void init_tokens(void)
 
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
-#define T(mode,x,str,val)  register_token(mode, x, str);
+#define T(mode, x, str, val, is_keyword) register_token(mode, x, str, is_keyword);
 #include "tokens.inc"
 #undef T
 

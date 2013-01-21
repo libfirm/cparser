@@ -13,7 +13,7 @@
 
 typedef enum token_kind_tag_t {
 	T_NULL  =  0,
-#define T(mode,x,str,val) x val,
+#define T(mode, x, str, val, is_keyword) x val,
 #include "tokens.inc"
 #undef T
 	T_LAST_TOKEN
