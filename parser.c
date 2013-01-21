@@ -1842,23 +1842,23 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				return false;
 			}
 
-			long index = fold_constant_to_int(array_index);
+			long index_long = fold_constant_to_int(array_index);
 			if (!used_in_offsetof) {
-				if (index < 0) {
+				if (index_long < 0) {
 					errorf(&designator->pos,
 					       "array index [%E] must be positive", array_index);
 				} else if (type->array.size_constant) {
 					long array_size = type->array.size;
-					if (index >= array_size) {
+					if (index_long >= array_size) {
 						errorf(&designator->pos,
 						       "designator [%E] (%d) exceeds array size %d",
-						       array_index, index, array_size);
+						       array_index, index_long, array_size);
 					}
 				}
 			}
 
 			top->type    = orig_type;
-			top->v.index = (size_t) index;
+			top->v.index = (size_t) index_long;
 			orig_type    = type->array.element_type;
 		}
 		path->top_type = orig_type;
@@ -5389,10 +5389,10 @@ static expression_t *create_select(const position_t *pos, expression_t *addr,
 
 	check_deprecated(pos, entry);
 
-	expression_t *select          = allocate_expression_zero(EXPR_SELECT);
-	select->base.pos              = *pos;
-	select->select.compound       = addr;
-	select->select.compound_entry = entry;
+	expression_t *selecte          = allocate_expression_zero(EXPR_SELECT);
+	selecte->base.pos              = *pos;
+	selecte->select.compound       = addr;
+	selecte->select.compound_entry = entry;
 
 	type_t *entry_type = entry->declaration.type;
 	type_t *res_type   = get_qualified_type(entry_type, qualifiers);
@@ -5408,10 +5408,8 @@ static expression_t *create_select(const position_t *pos, expression_t *addr,
 
 	/* we always do the auto-type conversions; the & and sizeof parser contains
 	 * code to revert this! */
-	select->base.type = automatic_type_conversion(res_type);
-
-
-	return select;
+	selecte->base.type = automatic_type_conversion(res_type);
+	return selecte;
 }
 
 /**

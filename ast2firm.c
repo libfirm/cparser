@@ -534,10 +534,10 @@ static ir_type *create_compound_type(type_t *const type)
 		}
 	}
 
-	type_dbg_info *const dbgi   = get_type_dbg_info_(type);
+	type_dbg_info *const tdbgi  = get_type_dbg_info_(type);
 	ir_type       *const irtype = is_union
-		? new_d_type_union( id, dbgi)
-		: new_d_type_struct(id, dbgi);
+		? new_d_type_union( id, tdbgi)
+		: new_d_type_struct(id, tdbgi);
 
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
@@ -560,14 +560,13 @@ static ir_type *create_compound_type(type_t *const type)
 			member_id = new_id_from_str(symbol->string);
 		}
 
-		dbg_info *dbgi = get_dbg_info(&entry->base.pos);
-
 		ir_type *entry_irtype;
 		if (entry->compound_member.bitfield) {
 			entry_irtype = create_bitfield_type(entry);
 		} else {
 			entry_irtype = get_ir_type(entry_type);
 		}
+		dbg_info  *dbgi   = get_dbg_info(&entry->base.pos);
 		ir_entity *entity = new_d_entity(irtype, member_id, entry_irtype, dbgi);
 
 		set_entity_offset(entity, entry->compound_member.offset);
@@ -1516,12 +1515,12 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		expression_t *argument = call->arguments->expression;
 		ir_node      *size     = expression_to_value(argument);
 
-		ir_node *store  = get_store();
-		ir_node *alloca = new_d_Alloc(dbgi, store, size, get_unknown_type(),
+		ir_node *store   = get_store();
+		ir_node *allocan = new_d_Alloc(dbgi, store, size, get_unknown_type(),
 		                              stack_alloc);
-		ir_node *proj_m = new_Proj(alloca, mode_M, pn_Alloc_M);
+		ir_node *proj_m  = new_Proj(allocan, mode_M, pn_Alloc_M);
 		set_store(proj_m);
-		ir_node *res    = new_Proj(alloca, mode_P_data, pn_Alloc_res);
+		ir_node *res     = new_Proj(allocan, mode_P_data, pn_Alloc_res);
 
 		return res;
 	}
@@ -1916,16 +1915,16 @@ static ir_node *set_value_for_expression_addr(const expression_t *expression,
 	assert(addr != NULL);
 
 	if (expression->kind == EXPR_SELECT) {
-		const select_expression_t *select = &expression->select;
+		const select_expression_t *selecte = &expression->select;
 
-		construct_select_compound(select);
+		construct_select_compound(selecte);
 
-		entity_t *entity = select->compound_entry;
+		entity_t *entity = selecte->compound_entry;
 		assert(entity->kind == ENTITY_COMPOUND_MEMBER);
 		if (entity->compound_member.bitfield) {
 			ir_entity *irentity = entity->compound_member.entity;
 			bool       set_volatile
-				= select->base.type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
+				= selecte->base.type->base.qualifiers & TYPE_QUALIFIER_VOLATILE;
 			value = bitfield_store_to_firm(dbgi, irentity, addr, value,
 			                               set_volatile, true);
 			return value;
@@ -2236,9 +2235,9 @@ static ir_node *create_op(binary_expression_t const *const expr, ir_node *left, 
 			ir_node *const conv_size = new_d_Conv(dbgi, elem_size, mode);
 			ir_node *const sub       = new_d_Sub(dbgi, left, right, mode);
 			ir_node *const no_mem    = new_NoMem();
-			ir_node *const div       = new_d_DivRL(dbgi, no_mem, sub, conv_size,
+			ir_node *const divn      = new_d_DivRL(dbgi, no_mem, sub, conv_size,
 												   mode, op_pin_state_floats);
-			return new_d_Proj(dbgi, div, mode, pn_Div_res);
+			return new_d_Proj(dbgi, divn, mode, pn_Div_res);
 		}
 		/* fallthrough */
 	case EXPR_BINARY_SUB_ASSIGN:
@@ -2504,12 +2503,12 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
-			long index         = fold_constant_to_int(array_index);
+			long index_long    = fold_constant_to_int(array_index);
 			ir_type *arr_type  = get_ir_type(type);
 			ir_type *elem_type = get_array_element_type(arr_type);
 			long     elem_size = get_type_size_bytes(elem_type);
 
-			offset += index * elem_size;
+			offset += index_long * elem_size;
 
 			orig_type = type->array.element_type;
 		}
@@ -4116,12 +4115,12 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 		if (designator->symbol != NULL) {
 			assert(is_type_compound(type));
-			size_t    index  = 0;
-			symbol_t *symbol = designator->symbol;
+			size_t    index_int = 0;
+			symbol_t *symbol    = designator->symbol;
 
 			compound_t *compound = type->compound.compound;
 			entity_t   *iter     = compound->members.entities;
-			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index) {}
+			for (; iter->base.symbol != symbol; iter = iter->base.next, ++index_int) {}
 			assert(iter->kind == ENTITY_COMPOUND_MEMBER);
 
 			/* revert previous initialisations of other union elements */
@@ -4131,7 +4130,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 					&& get_initializer_kind(initializer) == IR_INITIALIZER_COMPOUND) {
 					/* are we writing to a new element? */
 					ir_initializer_t *oldi
-						= get_initializer_compound_value(initializer, index);
+						= get_initializer_compound_value(initializer, index_int);
 					if (get_initializer_kind(oldi) == IR_INITIALIZER_NULL) {
 						/* clear initializer */
 						size_t len
@@ -4147,17 +4146,17 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 
 			top->type           = orig_type;
 			top->compound_entry = iter;
-			top->index          = index;
+			top->index          = index_int;
 			orig_type           = iter->declaration.type;
 		} else {
 			expression_t *array_index = designator->array_index;
 			assert(is_type_array(type));
 
-			long index = fold_constant_to_int(array_index);
-			assert(0 <= index && (!type->array.size_constant || (size_t)index < type->array.size));
+			long index_long = fold_constant_to_int(array_index);
+			assert(0 <= index_long && (!type->array.size_constant || (size_t)index_long < type->array.size));
 
 			top->type  = orig_type;
-			top->index = (size_t) index;
+			top->index = (size_t) index_long;
 			orig_type  = type->array.element_type;
 		}
 		path->top_type = orig_type;
