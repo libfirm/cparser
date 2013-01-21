@@ -1906,7 +1906,7 @@ int main(int argc, char **argv)
 			} else if (streq(option, "ansi")) {
 				standard = STANDARD_ANSI;
 			} else if (streq(option, "pedantic")) {
-				fprintf(stderr, "warning: ignoring gcc option '%s'\n", arg);
+				strict_mode = true;
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
 				standard =
@@ -1954,8 +1954,6 @@ int main(int argc, char **argv)
 				} else if (streq(option, "no-ms")) {
 					features_on  &= ~_MS;
 					features_off |=  _MS;
-				} else if (streq(option, "strict")) {
-					strict_mode = true;
 				} else if (streq(option, "benchmark")) {
 					mode = BenchmarkParser;
 				} else if (streq(option, "print-ast")) {
