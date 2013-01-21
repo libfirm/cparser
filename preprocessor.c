@@ -145,7 +145,7 @@ static whitespace_info_t     call_whitespace_info;
 static bool                  call_space_before;
 static pp_definition_t      *argument_expanding = NULL;
 static strset_t              stringset;
-static token_kind_t          last_token;
+static token_kind_t          previous_token;
 static pp_expansion_state_t *expansion_stack;
 static pp_argument_t        *argument_stack;
 static macro_call_t         *macro_call_stack;
@@ -1668,24 +1668,24 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 
 static whitespace_info_t skip_whitespace(void)
 {
-	whitespace_info_t info;
-	memset(&info, 0, sizeof(info));
+	whitespace_info_t wsinfo;
+	memset(&wsinfo, 0, sizeof(wsinfo));
 
 	while (true) {
 		switch (input.c) {
 		case WHITESPACE:
-			++info.whitespace_at_line_begin;
+			++wsinfo.whitespace_at_line_begin;
 			next_char();
 			continue;
 
 		case EAT_NEWLINE:
-			info.at_line_begin            = true;
-			info.whitespace_at_line_begin = 0;
+			wsinfo.at_line_begin            = true;
+			wsinfo.whitespace_at_line_begin = 0;
 			if (stop_at_newline) {
 				--input.pos.lineno;
 				put_back(input.c);
 				input.c = '\n';
-				return info;
+				return wsinfo;
 			}
 			continue;
 
@@ -1697,15 +1697,15 @@ static whitespace_info_t skip_whitespace(void)
 				continue;
 			} else if (input.c == '*') {
 				eat('*');
-				info.whitespace_at_line_begin = skip_multiline_comment();
+				wsinfo.whitespace_at_line_begin = skip_multiline_comment();
 				continue;
 			} else {
 				put_back('/');
 			}
-			return info;
+			return wsinfo;
 
 		default:
-			return info;
+			return wsinfo;
 		}
 	}
 }
@@ -2206,7 +2206,7 @@ void set_preprocessor_output(FILE *output)
 void emit_pp_token(void)
 {
 	if (!emit_newlines() && ((pp_token.base.space_before)
-	    || tokens_would_paste(last_token, pp_token.kind)))
+	    || tokens_would_paste(previous_token, pp_token.kind)))
 		fputc(' ', out);
 
 	switch (pp_token.kind) {
@@ -2235,7 +2235,7 @@ void emit_pp_token(void)
 		fputs(pp_token.base.symbol->string, out);
 		break;
 	}
-	last_token = pp_token.kind;
+	previous_token = pp_token.kind;
 }
 
 static void eat_pp_directive(void)
@@ -2522,13 +2522,13 @@ static void parse_define_directive(void)
 	new_definition->token_list = obstack_finish(&pp_obstack);
 
 	if (list_len > 0) {
-		const token_t *first = &new_definition->token_list[0];
-		const token_t *last  = &new_definition->token_list[list_len-1];
-		if (first->kind == T_HASHHASH) {
-			errorf(&first->base.pos, "no token before '##'");
+		const token_t *first_token = &new_definition->token_list[0];
+		const token_t *last_token  = &new_definition->token_list[list_len-1];
+		if (first_token->kind == T_HASHHASH) {
+			errorf(&first_token->base.pos, "no token before '##'");
 		}
-		if (list_len > 1 && last->kind == T_HASHHASH) {
-			errorf(&last->base.pos, "no token after '##'");
+		if (list_len > 1 && last_token->kind == T_HASHHASH) {
+			errorf(&last_token->base.pos, "no token after '##'");
 		}
 	}
 
