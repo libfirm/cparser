@@ -1547,6 +1547,38 @@ static void determine_unit_standard(compilation_unit_t *unit,
 	}
 }
 
+static void append_default_include_paths(void)
+{
+#ifdef CPARSER_INCLUDE_DIR
+	append_include_path(&system_searchpath, CPARSER_INCLUDE_DIR);
+#endif
+#ifdef LOCAL_INCLUDE_DIR
+	append_include_path(&system_searchpath, LOCAL_INCLUDE_DIR);
+#endif
+#ifdef STANDARD_INCLUDE_DIR
+	/* some guessing to find the "gcc-multilib" include dir */
+	assert(obstack_object_size(&file_obst) == 0);
+	if (target_triple != NULL) {
+		obstack_printf(&file_obst, "%s/%s", STANDARD_INCLUDE_DIR, target_triple);
+		goto path_from_obst;
+	} else if (is_ia32_cpu(target_machine->cpu_type)
+	        && firm_is_unixish_os(target_machine)) {
+		obstack_printf(&file_obst, "%s/i386-linux-gnu", STANDARD_INCLUDE_DIR);
+path_from_obst:;
+		obstack_1grow(&file_obst, '\0');
+		char *path = obstack_finish(&file_obst);
+		append_include_path(&system_searchpath, path);
+	}
+
+	append_include_path(&system_searchpath, STANDARD_INCLUDE_DIR);
+#endif
+
+	/* parse environment variable */
+	append_env_paths(&bracket_searchpath, "CPATH");
+	append_env_paths(&system_searchpath,
+	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
+}
+
 static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 {
 	/* just here for gcc compatibility */
@@ -2520,11 +2552,16 @@ int main(int argc, char **argv)
 	} else {
 		init_wchar_types(wchar_atomic_kind);
 	}
+	append_default_include_paths();
 	init_preprocessor();
 	init_ast();
 	init_parser();
 	init_ast2firm();
 	init_mangle();
+
+	if (verbose) {
+		print_include_paths();
+	}
 
 	if (do_timing)
 		timer_init();

@@ -1,7 +1,7 @@
 # include user-defined makefile settings
 -include config.mak
 
-top_srcdir   ?=
+top_srcdir   ?= .
 top_builddir ?= build
 
 variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverage)
@@ -23,7 +23,11 @@ FIRM_LIBS     ?= `pkg-config --libs libfirm`
 LIBFIRM_FILE =
 endif
 
-CPPFLAGS  = -I.
+STANDARD_INCLUDE_DIR ?= -DSTANDARD_INCLUDE_DIR=\"/usr/include\"
+LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
+CPARSER_INCLUDE_DIR  ?= -DCPARSER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
+
+CPPFLAGS  = -I. $(STANDARD_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(CPARSER_INCLUDE_DIR)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic

@@ -3647,7 +3647,7 @@ void append_include_path(searchpath_t *paths, const char *path)
 	paths->anchor  = &entry->next;
 }
 
-static void append_env_paths(searchpath_t *paths, const char *envvar)
+void append_env_paths(searchpath_t *paths, const char *envvar)
 {
 	const char *val = getenv(envvar);
 	if (val != NULL && *val != '\0') {
@@ -3683,18 +3683,25 @@ static void append_searchpath(searchpath_t *path, const searchpath_t *append)
 
 static void setup_include_path(void)
 {
-	/* built-in paths */
-	append_include_path(&system_searchpath, "/usr/include");
-
-	/* parse environment variable */
-	append_env_paths(&bracket_searchpath, "CPATH");
-	append_env_paths(&system_searchpath,
-	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
-
 	/* append system search path to bracket searchpath */
 	append_searchpath(&system_searchpath,  &after_searchpath);
 	append_searchpath(&bracket_searchpath, &system_searchpath);
 	append_searchpath(&quote_searchpath, &bracket_searchpath);
+}
+
+void print_include_paths(void)
+{
+	fprintf(stderr, "#include \"...\" search starts here:\n");
+	for (searchpath_entry_t *entry = quote_searchpath.first;
+		 entry != bracket_searchpath.first; entry = entry->next) {
+		fprintf(stderr, " %s\n", entry->path);
+	}
+	fprintf(stderr, "#include <...> search starts here:\n");
+	for (searchpath_entry_t *entry = bracket_searchpath.first;
+		 entry != NULL; entry = entry->next) {
+		fprintf(stderr, " %s\n", entry->path);
+	}
+	fprintf(stderr, "End of search list.\n");
 }
 
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
