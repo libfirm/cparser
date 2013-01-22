@@ -173,4 +173,4 @@ $(builddir)/%.o: %.c
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -rf $(cparser_OBJECTS) $(GOAL)
+	$(Q)rm -rf $(builddir)
