@@ -1651,17 +1651,17 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			} else {
 				put_back('/');
 			}
-			return true;
-
-		case EAT_NEWLINE:
-			return res;
-
+			/* FALLTHROUGH */
 		default:
 			if (stop_at_non_whitespace)
 				return false;
 			res = true;
 			next_char();
 			continue;
+
+		case EOF:
+		case NEWLINE:
+			return res;
 		}
 	}
 }
@@ -1871,6 +1871,17 @@ end_number:
 
 #define ELSE(kind) ELSE_CODE(set_punctuator(kind); return;)
 
+static void maybe_skip_newline(void)
+{
+	switch (input.c) {
+	case EAT_NEWLINE:
+		info.at_line_begin            = true;
+		pp_token.base.space_before    = true;
+		info.whitespace_at_line_begin = 0;
+		break;
+	}
+}
+
 /** identifies and returns the next preprocessing token contained in the
  * input stream. No macro expansion is performed. */
 static void next_input_token(void)
@@ -2070,8 +2081,7 @@ digraph_percentcolon:
 			pop_restore_input();
 			if (out)
 				fputc('\n', out);
-			if (input.c == (utf32)EOF)
-				--input.pos.lineno;
+			maybe_skip_newline();
 			print_line_directive(&input.pos, "2");
 			goto restart;
 		} else {
@@ -2240,9 +2250,14 @@ void emit_pp_token(void)
 
 static void eat_pp_directive(void)
 {
+	bool const old_error_on_unknown_char = error_on_unknown_chars;
+	error_on_unknown_chars = false;
+
 	while (pp_token.kind != '\n' && pp_token.kind != T_EOF) {
 		next_input_token();
 	}
+
+	error_on_unknown_chars = old_error_on_unknown_char;
 }
 
 static bool strings_equal(const string_t *string1, const string_t *string2)
@@ -2760,6 +2775,9 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 static void parse_include_directive(bool const include_next)
 {
 	if (skip_mode) {
+exit_skip:
+		/* do not attempt to interpret headernames as tokens */
+		skip_till_newline(false);
 		eat_pp_directive();
 		return;
 	}
@@ -2770,21 +2788,15 @@ static void parse_include_directive(bool const include_next)
 	bool system_include;
 	const char *headername = parse_headername(&system_include);
 	if (headername == NULL) {
-		eat_pp_directive();
-		return;
+		goto exit_skip;
 	}
-
 	bool had_nonwhitespace = skip_till_newline(false);
 	if (had_nonwhitespace) {
-		warningf(WARN_OTHER, &input.pos,
-		         "extra tokens at end of #include directive");
+		warningf(WARN_OTHER, &input.pos, "extra tokens at end of #include");
 	}
-
 	if (n_inputs > INCLUDE_LIMIT) {
 		errorf(&pp_token.base.pos, "#include nested too deeply");
-		/* eat \n or EOF */
-		next_input_token();
-		return;
+		goto exit_skip;
 	}
 
 	/* switch inputs */
@@ -3501,7 +3513,7 @@ skip:
 	}
 
 	stop_at_newline = false;
-	eat_token('\n');
+	eat_token(T_NEWLINE);
 }
 
 static bool next_expansion_token(void)
