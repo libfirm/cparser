@@ -2218,9 +2218,8 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 		return;
 	}
 
-	if (pp_token.kind != T_IDENTIFIER || info.at_line_begin) {
-		errorf(&pp_token.base.pos, "expected identifier after #%s, got %K",
-		       is_ifdef ? "ifdef" : "ifndef", &pp_token);
+	char const *const ctx = is_ifdef ? "#ifdef" : "#ifndef";
+	if (!is_defineable_token(ctx)) {
 		eat_pp_directive();
 
 		/* just take the true case in the hope to avoid further errors */
@@ -2228,11 +2227,10 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 	} else {
 		/* evaluate whether we are in true or false case */
 		condition = (bool)pp_token.base.symbol->pp_definition == is_ifdef;
-		eat_token(T_IDENTIFIER);
+		next_input_token();
 
 		if (!info.at_line_begin) {
-			errorf(&pp_token.base.pos, "extra tokens at end of #%s",
-			       is_ifdef ? "ifdef" : "ifndef");
+			errorf(&pp_token.base.pos, "extra tokens at end of %s", ctx);
 			eat_pp_directive();
 		}
 	}
