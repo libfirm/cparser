@@ -1736,7 +1736,6 @@ again:
 				result = EXIT_FAILURE;
 				break;
 			}
-			init_tokens();
 			add_standard_defines();
 
 			if (mode == PreprocessOnly) {
@@ -1909,7 +1908,9 @@ int main(int argc, char **argv)
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
 	obstack_init(&file_obst);
-	init_include_paths();
+	init_symbol_table();
+	init_tokens();
+	preprocessor_early_init();
 
 #define GET_ARG_AFTER(def, args)                                             \
 	do {                                                                     \
@@ -1988,10 +1989,12 @@ int main(int argc, char **argv)
 				const char *opt;
 				GET_ARG_AFTER(opt, "-D");
 				add_flag(&cppflags_obst, "-D%s", opt);
+				parse_define(opt);
 			} else if (option[0] == 'U') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-U");
 				add_flag(&cppflags_obst, "-U%s", opt);
+				undefine(opt);
 			} else if (option[0] == 'l') {
 				const char *opt;
 				GET_ARG_AFTER(opt, "-l");
@@ -2543,7 +2546,6 @@ int main(int argc, char **argv)
 		set_be_option("profileuse");
 	}
 
-	init_symbol_table();
 	init_types_and_adjust();
 	init_typehash();
 	init_basic_types();

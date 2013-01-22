@@ -8,6 +8,10 @@
 #include "token_t.h"
 #include "input.h"
 
+/** initialize just enough so we can use add_define(),add_define_string(),
+ * undefine(), append_include_path(), append_env_paths() for commandline
+ * parsing */
+void preprocessor_early_init(void);
 void init_preprocessor(void);
 
 void exit_preprocessor(void);
@@ -29,6 +33,8 @@ void next_preprocessing_token(void);
  */
 void add_define(char const *name, char const *val, bool standard_define);
 void add_define_string(char const *name, char const *val, bool standard_define);
+void parse_define(char const *string);
+void undefine(char const *name);
 
 string_t make_string(char const *string);
 
@@ -47,7 +53,6 @@ extern searchpath_t system_searchpath;  /**< system searchpath (appended to
                                              quote searchpath) */
 extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also system paths) */
 
-void init_include_paths(void);
 void append_include_path(searchpath_t *searchpath, const char *path);
 void append_env_paths(searchpath_t *paths, const char *envvar);
 void print_include_paths(void);

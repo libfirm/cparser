@@ -2377,6 +2377,38 @@ void add_define_string(char const *const name, char const *const val,
 	def->token_list = obstack_finish(&pp_obstack);
 }
 
+static void add_define_one(char const *const name)
+{
+	pp_definition_t *const def = add_define_(name, false);
+
+	token_t onetok;
+	memset(&onetok, 0, sizeof(onetok));
+	onetok.literal.base.kind = T_NUMBER;
+	onetok.literal.string    = make_string("1");
+
+	assert(obstack_object_size(&pp_obstack) == 0);
+	obstack_grow(&pp_obstack, &onetok, sizeof(onetok));
+	def->list_len   = 1;
+	def->token_list = obstack_finish(&pp_obstack);
+}
+
+void parse_define(char const *opt)
+{
+	assert(obstack_object_size(&config_obstack) == 0);
+	char const *p;
+	for (p = opt; *p != '\0' && *p != '='; ++p) {
+		obstack_1grow(&config_obstack, *p);
+	}
+	obstack_1grow(&config_obstack, '\0');
+	char *name = obstack_finish(&config_obstack);
+	if (*p == '\0') {
+		add_define_one(name);
+	} else {
+		add_define(name, p+1, false);
+	}
+	obstack_free(&config_obstack, name);
+}
+
 static void error_missing_macro_param(void)
 {
 	errorf(&pp_token.base.pos, "'#' is not followed by a macro parameter");
@@ -2587,6 +2619,22 @@ error_out:
 	eat_pp_directive();
 }
 
+static void do_undefine(symbol_t *symbol)
+{
+	pp_definition_t *old = symbol->pp_definition;
+	if (old != NULL && old->standard_define) {
+		warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
+		         "undefining builtin macro '%Y'", symbol);
+	}
+	symbol->pp_definition = NULL;
+}
+
+void undefine(char const *name)
+{
+	symbol_t *symbol = symbol_table_insert(name);
+	do_undefine(symbol);
+}
+
 static void parse_undef_directive(void)
 {
 	eat_pp(TP_undef);
@@ -2600,14 +2648,8 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	symbol_t        *symbol = pp_token.base.symbol;
-	pp_definition_t *old    = symbol->pp_definition;
-	if (old != NULL && old->standard_define) {
-		warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
-		         "undefining builtin macro '%Y'", symbol);
-	}
-
-	pp_token.base.symbol->pp_definition = NULL;
+	symbol_t *symbol = pp_token.base.symbol;
+	do_undefine(symbol);
 	next_input_token();
 
 	if (pp_token.kind != '\n') {
@@ -3724,21 +3766,23 @@ static void input_error(unsigned const delta_lines, unsigned const delta_cols, c
 	errorf(&pos, "%s", message);
 }
 
-void init_include_paths(void)
+void preprocessor_early_init(void)
 {
 	obstack_init(&config_obstack);
+	obstack_init(&pp_obstack);
+	init_symbols();
+	strset_init(&stringset);
+	input.pos.input_name = "<commandline>";
+	input.pos.lineno     = 0;
+	input.pos.colno      = 0;
 }
 
 void init_preprocessor(void)
 {
-	init_symbols();
-
-	obstack_init(&pp_obstack);
 	obstack_init(&input_obstack);
-	strset_init(&stringset);
-	expansion_stack      = NEW_ARR_F(pp_expansion_state_t, 0);
-	argument_stack       = NEW_ARR_F(pp_argument_t, 0);
-	macro_call_stack     = NEW_ARR_F(macro_call_t, 0);
+	expansion_stack  = NEW_ARR_F(pp_expansion_state_t, 0);
+	argument_stack   = NEW_ARR_F(pp_argument_t, 0);
+	macro_call_stack = NEW_ARR_F(macro_call_t, 0);
 
 	setup_include_path();
 
