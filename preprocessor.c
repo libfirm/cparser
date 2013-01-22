@@ -748,7 +748,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 			if (resolve_escape_sequences) {
 				utf32 const tc = parse_escape_sequence();
 				if (tc > limit) {
-					warningf(WARN_OTHER, &pp_token.base.pos,
+					warningf(WARN_OTHER, &input.pos,
 					         "escape sequence out of range");
 				}
 				if (enc == STRING_ENCODING_CHAR) {
