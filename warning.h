@@ -33,9 +33,7 @@ typedef enum warning_t {
 	WARN_DIV_BY_ZERO,                   /**< Warn about compile-time integer division by zero */
 	WARN_EMPTY_BODY,                    /**< Warn about an empty body of an if or else statement */
 	WARN_EMPTY_STATEMENT,               /**< Warn about empty statements, i.e. lone ';'  */
-#if 0 // TODO
 	WARN_ENDIF_LABELS,                  /**< Warn whenever an '#else' or an '#endif' are followed by text */
-#endif
 	WARN_ERROR,                         /**< Treat warnings as errors */
 	WARN_FATAL_ERRORS,                  /**< First error stops the compilation */
 	WARN_FLOAT_EQUAL,                   /**< Warn if floating point values are used in equality comparisons */

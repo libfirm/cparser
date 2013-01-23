@@ -24,6 +24,7 @@ static warning_switch_t warning[] = {
 	[WARN_DIV_BY_ZERO]                   = { WARN_STATE_ON,   "div-by-zero",                  },
 	[WARN_EMPTY_BODY]                    = { WARN_STATE_NONE, "empty-body",                   },
 	[WARN_EMPTY_STATEMENT]               = { WARN_STATE_NONE, "empty-statement",              },
+	[WARN_ENDIF_LABELS]                  = { WARN_STATE_ON,   "endif-labels"                  },
 	[WARN_ERROR]                         = { WARN_STATE_NONE, "error"                         },
 	[WARN_FATAL_ERRORS]                  = { WARN_STATE_NONE, "fatal-errors"                  },
 	[WARN_FLOAT_EQUAL]                   = { WARN_STATE_NONE, "float-equal",                  },

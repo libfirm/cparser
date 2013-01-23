@@ -2250,7 +2250,7 @@ static void parse_else_directive(void)
 
 	if (!info.at_line_begin) {
 		if (!skip_mode) {
-			warningf(WARN_OTHER, &pp_token.base.pos, "extra tokens at end of #else");
+			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #else");
 		}
 		eat_pp_directive();
 	}
@@ -2282,7 +2282,7 @@ static void parse_endif_directive(void)
 
 	if (!info.at_line_begin) {
 		if (!skip_mode) {
-			warningf(WARN_OTHER, &pp_token.base.pos, "extra tokens at end of #endif");
+			warningf(WARN_ENDIF_LABELS, &pp_token.base.pos, "extra tokens at end of #endif");
 		}
 		eat_pp_directive();
 	}
