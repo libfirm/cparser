@@ -678,7 +678,8 @@ static utf32 parse_escape_sequence(void)
 	case '7':
 		return parse_octal_sequence(ec);
 	case EOF:
-		parse_error("reached end of file while parsing escape sequence");
+		warningf(WARN_OTHER, &pp_token.base.pos,
+		         "reached end of file while parsing escape sequence");
 		return EOF;
 	/* \E is not documented, but handled, by GCC.  It is acceptable according
 	 * to §6.11.4, whereas \e is not. */
@@ -695,7 +696,7 @@ static utf32 parse_escape_sequence(void)
 		break;
 	}
 	/* §6.4.4.4:8 footnote 64 */
-	parse_error("unknown escape sequence");
+	warningf(WARN_OTHER, &pp_token.base.pos, "unknown escape sequence");
 	return EOF;
 }
 
@@ -747,7 +748,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 		case '\\': {
 			if (resolve_escape_sequences) {
 				utf32 const tc = parse_escape_sequence();
-				if (tc > limit) {
+				if (tc > limit && tc != (utf32)EOF) {
 					warningf(WARN_OTHER, &input.pos,
 					         "escape sequence out of range");
 				}
