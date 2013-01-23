@@ -741,7 +741,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 
 		case NEWLINE:
 			errorf(&pp_token.base.pos, "newline while parsing %s", context);
-			break;
+			goto end_of_string;
 
 		case EOF:
 			errorf(&pp_token.base.pos, "EOF while parsing %s", context);
