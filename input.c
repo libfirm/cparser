@@ -104,6 +104,33 @@ static size_t decode_iso_8859_15(input_t *input, utf32 *buffer,
 	return s;
 }
 
+static void report_invalid_sequence(utf32 const *const bufstart,
+                                    utf32 const *const pos)
+{
+	unsigned col = 0;
+
+	/* estimate number of linefeeds */
+	unsigned linefeeds = 0;
+	for (utf32 const *c = bufstart; c < pos; ++c) {
+		if (*c == (utf32)'\r') {
+			if (c+1 < pos && *(c+1) == '\n')
+				++c;
+			goto linefeed;
+		} else if (*c == (utf32)'\n') {
+linefeed:
+			++linefeeds;
+			col = 1;
+		} else {
+			++col;
+		}
+	}
+
+	/* report error */
+	input_error(linefeeds, col, "invalid byte sequence in input");
+}
+
+#define UNICODE_REPLACEMENT_CHARACTER  0xFFFD
+
 static size_t decode_utf8(input_t *input, utf32 *buffer, size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
@@ -158,7 +185,8 @@ one_more:
 						(0xD800 <= decoded && decoded < 0xE000) || // high/low surrogates
 						(0xFDD0 <= decoded && decoded < 0xFDF0) || // noncharacters
 						(decoded & 0xFFFE) == 0xFFFE) {            // noncharacters
-					input_error(0, 0, "invalid byte sequence in input");
+					report_invalid_sequence(buffer, dst);
+					decoded = UNICODE_REPLACEMENT_CHARACTER;
 				}
 			} else if ((*src & 0xF0) == 0xE0) {
 				min_code = 0x800;
@@ -194,7 +222,8 @@ three_more:
 				goto two_more;
 			} else {
 invalid_char:
-				input_error(0, 0, "invalid byte sequence in input");
+				report_invalid_sequence(buffer, dst);
+				decoded = UNICODE_REPLACEMENT_CHARACTER;
 realign:
 				do {
 					++src;

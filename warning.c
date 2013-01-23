@@ -33,6 +33,7 @@ static warning_switch_t warning[] = {
 	[WARN_IGNORED_QUALIFIERS]            = { WARN_STATE_ON,   "ignored-qualifiers"            },
 	[WARN_IMPLICIT_FUNCTION_DECLARATION] = { WARN_STATE_ON,   "implicit-function-declaration" },
 	[WARN_IMPLICIT_INT]                  = { WARN_STATE_ON,   "implicit-int"                  },
+	[WARN_INVALID_BYTE_SEQUENCE]         = { WARN_STATE_ON,   "invalid-byte-sequence"         },
 	[WARN_LONG_LONG]                     = { WARN_STATE_NONE, "long-long"                     },
 	[WARN_MAIN]                          = { WARN_STATE_ON,   "main"                          },
 	[WARN_MISSING_DECLARATIONS]          = { WARN_STATE_NONE, "missing-declarations"          },

@@ -3761,9 +3761,13 @@ void print_include_paths(void)
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)
 {
 	position_t pos = pp_token.base.pos;
-	pos.lineno += delta_lines;
-	pos.colno  += delta_cols;
-	errorf(&pos, "%s", message);
+	if (delta_lines > 0) {
+		pos.lineno += delta_lines;
+		pos.colno = delta_cols;
+	} else {
+		pos.colno += delta_cols;
+	}
+	warningf(WARN_INVALID_BYTE_SEQUENCE, &pos, "%s", message);
 }
 
 void preprocessor_early_init(void)

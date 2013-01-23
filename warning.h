@@ -35,6 +35,7 @@ typedef enum warning_t {
 	WARN_IGNORED_QUALIFIERS,            /**< Warn when type qualifiers are meaningless */
 	WARN_IMPLICIT_FUNCTION_DECLARATION, /**< Warn whenever a function is used before being declared */
 	WARN_IMPLICIT_INT,                  /**< Warn when a declaration does not specify a type */
+	WARN_INVALID_BYTE_SEQUENCE,         /**< Warn on invalid byte sequences for chosen input charset */
 	WARN_LONG_LONG,                     /**< Warn if 'long long' type is used */
 	WARN_MAIN,                          /**< Warn if the type of 'main' is suspicious */
 	WARN_MISSING_DECLARATIONS,          /**< Warn if a global function is defined without a previous declaration */
