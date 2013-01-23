@@ -178,7 +178,6 @@ extra:
 	else if (streq(opt /* sic */, "error-implicit-function-declaration")) {
 		/* GCC legacy: This way it only can be activated. */
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
-		return;
 	}
 	else {
 		fprintf(stderr, "warning: ignoring unknown option -W%s\n", opt);
