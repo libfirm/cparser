@@ -192,7 +192,8 @@ static void print_quoted_string(const string_t *const string, char border)
 			/* FALLTHROUGH */
 		default:
 			if ((unsigned)tc < 0x80 && !isprint(tc)) {
-				print_format("\\%03o", (unsigned)tc);
+				int const width = '0' <= c[1] && c[1] < '8' ? 3 : 0;
+				print_format("\\%0*o", width, (unsigned)tc);
 			} else {
 				print_char(tc);
 			}
