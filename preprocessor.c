@@ -1736,6 +1736,7 @@ static bool is_defineable_token(char const *const context)
 {
 	if (info.at_line_begin) {
 		errorf(&pp_token.base.pos, "unexpected end of line after %s", context);
+		return false;
 	}
 
 	symbol_t *const symbol = pp_token.base.symbol;
