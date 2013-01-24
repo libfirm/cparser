@@ -49,7 +49,8 @@ typedef union  token_t           token_t;
 
 struct token_base_t {
 	token_kind_t kind;
-	/** there was whitespace before the token */
+	/** there was whitespace (no newline) before the token. Used for
+	 * saving macro expansion lists */
 	bool         space_before        : 1;
 	/** token mustn't be expanded further */
 	bool         expansion_forbidden : 1;

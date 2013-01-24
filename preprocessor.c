@@ -1880,8 +1880,8 @@ static void maybe_skip_newline(void)
 {
 	switch (input.c) {
 	case EAT_NEWLINE:
+		pp_token.base.space_before    = false;
 		info.at_line_begin            = true;
-		pp_token.base.space_before    = true;
 		info.whitespace_at_line_begin = 0;
 		break;
 	}
@@ -1913,8 +1913,8 @@ restart:
 		goto restart;
 
 	case EAT_NEWLINE:
+		pp_token.base.space_before    = false; /* see space_before decl. */
 		info.at_line_begin            = true;
-		pp_token.base.space_before    = true;
 		info.whitespace_at_line_begin = 0;
 		if (stop_at_newline) {
 			--input.pos.lineno;
@@ -2195,14 +2195,6 @@ static bool emit_newlines(void)
 	}
 	input.output_line = pp_token.base.pos.lineno;
 
-	unsigned whitespace = info.whitespace_at_line_begin;
-	/* make sure there is at least 1 whitespace before a (macro-expanded)
-	 * '#' at line begin. I'm not sure why this is good, but gcc does it. */
-	if (pp_token.kind == '#' && whitespace == 0)
-		++whitespace;
-	for (unsigned i = 0; i < whitespace; ++i)
-		fputc(' ', out);
-
 	return true;
 }
 
@@ -2220,9 +2212,25 @@ void set_preprocessor_output(FILE *output)
 
 void emit_pp_token(void)
 {
-	if (!emit_newlines() && ((pp_token.base.space_before)
-	    || tokens_would_paste(previous_token, pp_token.kind)))
+	bool had_newlines = emit_newlines();
+	/* emit space before tokens */
+	if (had_newlines) {
+		unsigned whitespace = info.whitespace_at_line_begin;
+		/* make sure there is at least 1 whitespace before a (macro-expanded)
+		 * '#' at line begin. I'm not sure why this is good, but gcc does it. */
+		if (pp_token.kind == '#' && whitespace == 0)
+			++whitespace;
+		/* in case of a macro expansion where the first tokens are empty
+		 * arguments/macros we may have a space_before flag,
+		 * with whitespace == 0, which we have to adjust here */
+		if (whitespace == 0 && pp_token.base.space_before)
+			++whitespace;
+		for (unsigned i = 0; i < whitespace; ++i)
+			fputc(' ', out);
+	} else if (pp_token.base.space_before
+	  || tokens_would_paste(previous_token, pp_token.kind)) {
 		fputc(' ', out);
+	}
 
 	switch (pp_token.kind) {
 	case T_NUMBER:
@@ -3499,7 +3507,7 @@ static void parse_error_directive(void)
 
 	position_t const pos = pp_token.base.pos;
 	do {
-		if (pp_token.base.space_before && obstack_object_size(&pp_obstack)!=0)
+		if (pp_token.base.space_before && obstack_object_size(&pp_obstack) !=0 )
 			obstack_1grow(&pp_obstack, ' ');
 
 		switch (pp_token.kind) {
@@ -3682,6 +3690,8 @@ try_input:;
 			return true;
 		}
 		if (current_call.parameter != NULL) {
+			if (current_expansion == NULL)
+				pp_token.base.space_before |= info.at_line_begin;
 			ARR_APP1(token_t, current_call.argument_tokens, pp_token);
 		}
 		return false;
