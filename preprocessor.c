@@ -42,11 +42,11 @@ typedef struct whitespace_info_t {
 struct pp_definition_t {
 	symbol_t        *symbol;
 	position_t       pos;
-	bool             is_variadic     : 1;
 	bool             is_expanding    : 1;
 	bool             may_recurse     : 1;
 	bool             has_parameters  : 1;
 	bool             is_parameter    : 1;
+	bool             is_variadic     : 1;
 	bool             standard_define : 1;
 	pp_definition_t *function_definition;
 	pp_definition_t *previous_definition;
@@ -177,6 +177,8 @@ static symbol_t *symbol_percentcolon;
 static symbol_t *symbol_percentcolonpercentcolon;
 static symbol_t *symbol_percentgreater;
 
+static symbol_t *symbol___VA_ARGS__;
+
 static void init_symbols(void)
 {
 	symbol_colongreater             = symbol_table_insert(":>");
@@ -185,6 +187,8 @@ static void init_symbols(void)
 	symbol_percentcolon             = symbol_table_insert("%:");
 	symbol_percentcolonpercentcolon = symbol_table_insert("%:%:");
 	symbol_percentgreater           = symbol_table_insert("%>");
+
+	symbol___VA_ARGS__ = symbol_table_insert("__VA_ARGS__");
 }
 
 void switch_pp_input(input_t *const decoder, char const *const input_name,
@@ -2451,12 +2455,12 @@ static void parse_define_directive(void)
 
 	if (!is_defineable_token("#define"))
 		goto error_out;
-	symbol_t *const symbol = pp_token.base.symbol;
+	symbol_t *const macro_symbol = pp_token.base.symbol;
 
 	pp_definition_t *new_definition
 		= obstack_alloc(&pp_obstack, sizeof(new_definition[0]));
 	memset(new_definition, 0, sizeof(new_definition[0]));
-	new_definition->symbol = symbol;
+	new_definition->symbol = macro_symbol;
 	new_definition->pos    = input.pos;
 
 	/* this is probably the only place where spaces are significant in the
@@ -2468,26 +2472,43 @@ static void parse_define_directive(void)
 
 		while (true) {
 			switch (pp_token.kind) {
+			symbol_t *symbol;
+			bool      is_variadic;
 			case T_DOTDOTDOT:
-				new_definition->is_variadic = true;
-				eat_token(T_DOTDOTDOT);
-				if (pp_token.kind != ')') {
-					errorf(&input.pos,
-					       "'...' not at end of macro argument list");
+				symbol      = symbol___VA_ARGS__;
+				is_variadic = true;
+				goto create_parameter;
+			default:
+				if (!is_identifierlike_token(&pp_token)) {
+					errorf(&pp_token.base.pos,
+						   "expected identifier, '...' or ')' in #define argument list, got %K",
+						   &pp_token);
 					goto error_out;
 				}
-				break;
-
+				/* FALLTHROUGH */
 			case T_IDENTIFIER: {
+				symbol      = pp_token.base.symbol;
+				is_variadic = false;
+create_parameter:
+				next_input_token();
+				if (pp_token.kind == T_DOTDOTDOT) {
+					eat_token(T_DOTDOTDOT);
+					is_variadic = true;
+				}
+
 				pp_definition_t parameter;
 				memset(&parameter, 0, sizeof(parameter));
 				parameter.pos          = pp_token.base.pos;
-				parameter.symbol       = pp_token.base.symbol;
+				parameter.symbol       = symbol;
 				parameter.is_parameter = true;
+				parameter.is_variadic  = is_variadic;
 				obstack_grow(&pp_obstack, &parameter, sizeof(parameter));
-				eat_token(T_IDENTIFIER);
 
 				if (pp_token.kind == ',') {
+					if (is_variadic) {
+						errorf(&input.pos, "'...' parameter must be last in macro argument list");
+						goto error_out;
+					}
 					eat_token(',');
 					break;
 				}
@@ -2504,12 +2525,6 @@ static void parse_define_directive(void)
 			case ')':
 				eat_token(')');
 				goto finish_argument_list;
-
-			default:
-				errorf(&pp_token.base.pos,
-				       "expected identifier, '...' or ')' in #define argument list, got %K",
-				       &pp_token);
-				goto error_out;
 			}
 		}
 
@@ -2542,12 +2557,16 @@ static void parse_define_directive(void)
 	bool next_must_be_param = false;
 	bool first              = true;
 	while (pp_token.kind != '\n') {
-		if (pp_token.kind == T_IDENTIFIER) {
+		symbol_t *symbol = pp_token.base.symbol;
+		if (symbol != NULL) {
 			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
 			if (definition != NULL
 			    && definition->function_definition == new_definition) {
 				pp_token.kind                = T_MACRO_PARAMETER;
 				pp_token.macro_parameter.def = definition;
+			} else if (symbol == symbol___VA_ARGS__) {
+				warningf(WARN_OTHER, &pp_token.base.pos,
+				         "__VA_ARGS__ must only appear in a C99 variadic macro");
 			}
 		}
 		if (next_must_be_param && pp_token.kind != T_MACRO_PARAMETER) {
@@ -2593,15 +2612,15 @@ static void parse_define_directive(void)
 		}
 	}
 
-	pp_definition_t *old_definition = symbol->pp_definition;
+	pp_definition_t *old_definition = macro_symbol->pp_definition;
 	if (old_definition != NULL) {
 		if (old_definition->standard_define) {
 			warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
-					 "redefining builtin macro '%Y'", symbol);
+					 "redefining builtin macro '%Y'", macro_symbol);
 		} else if (!pp_definitions_equal(old_definition, new_definition)) {
 			warningf(WARN_OTHER, &input.pos,
 			         "multiple definition of macro '%Y' (first defined %P)",
-			         symbol, &old_definition->pos);
+			         macro_symbol, &old_definition->pos);
 		} else {
 			/* reuse the old definition */
 			obstack_free(&pp_obstack, new_definition);
@@ -2609,7 +2628,7 @@ static void parse_define_directive(void)
 		}
 	}
 
-	symbol->pp_definition = new_definition;
+	macro_symbol->pp_definition = new_definition;
 	return;
 
 error_out:
@@ -3635,7 +3654,9 @@ try_input:;
 				pp_token.base.space_before = call_space_before;
 				return false;
 			}
-		} else if (kind == ',' && current_call.argument_brace_count == 0) {
+		} else if (kind == ',' && current_call.argument_brace_count == 0
+		       && (current_call.parameter == NULL
+		           || !current_call.parameter->is_variadic)) {
 			finish_argument();
 			current_call.parameter_idx++;
 			if (current_call.parameter_idx >= current_call.macro->n_parameters) {
