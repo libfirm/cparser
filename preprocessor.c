@@ -2745,6 +2745,7 @@ next:
 
 			return res;
 		} else {
+			warningf(WARN_UNDEF, &pp_token.base.pos, "'%s' is not defined", pp_token.base.symbol->string);
 			next_condition_token();
 			return pp_null;
 		}

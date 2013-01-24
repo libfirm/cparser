@@ -57,6 +57,7 @@ static warning_switch_t warning[] = {
 	[WARN_SWITCH_ENUM]                   = { WARN_STATE_NONE, "switch-enum"                   },
 	[WARN_SYSTEM]                        = { WARN_STATE_NONE, "system"                        },
 	[WARN_TRADITIONAL]                   = { WARN_STATE_NONE, "traditional"                   },
+	[WARN_UNDEF]                         = { WARN_STATE_NONE, "undef"                         },
 	[WARN_UNINITIALIZED]                 = { WARN_STATE_ON,   "uninitialized"                 },
 	[WARN_UNKNOWN_PRAGMAS]               = { WARN_STATE_ON,   "unknown-pragmas"               },
 	[WARN_UNREACHABLE_CODE]              = { WARN_STATE_NONE, "unreachable-code"              },
