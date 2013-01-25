@@ -140,11 +140,6 @@ static symbol_t *symbol_percentcolon;
 static symbol_t *symbol_percentcolonpercentcolon;
 static symbol_t *symbol_percentgreater;
 
-static symbol_t *symbol_L;
-static symbol_t *symbol_U;
-static symbol_t *symbol_u;
-static symbol_t *symbol_u8;
-
 static void init_symbols(void)
 {
 	symbol_colongreater             = symbol_table_insert(":>");
@@ -153,11 +148,6 @@ static void init_symbols(void)
 	symbol_percentcolon             = symbol_table_insert("%:");
 	symbol_percentcolonpercentcolon = symbol_table_insert("%:%:");
 	symbol_percentgreater           = symbol_table_insert("%>");
-
-	symbol_L  = symbol_table_insert("L");
-	symbol_U  = symbol_table_insert("U");
-	symbol_u  = symbol_table_insert("u");
-	symbol_u8 = symbol_table_insert("u8");
 }
 
 void switch_pp_input(FILE *const file, char const *const filename, searchpath_entry_t *const path, bool const is_system_header)
@@ -1154,13 +1144,14 @@ static inline void eat_token(token_kind_t const kind)
 
 static string_encoding_t identify_encoding_prefix(symbol_t *const sym)
 {
-	if (sym == symbol_L) return STRING_ENCODING_WIDE;
-	if (c_mode & _C11) {
-		if (sym == symbol_U)  return STRING_ENCODING_CHAR32;
-		if (sym == symbol_u)  return STRING_ENCODING_CHAR16;
-		if (sym == symbol_u8) return STRING_ENCODING_UTF8;
+	string_encoding_t enc;
+	switch (sym->pp_ID) {
+	case TP_L:  return STRING_ENCODING_WIDE;
+	case TP_U:  enc = STRING_ENCODING_CHAR32; break;
+	case TP_u:  enc = STRING_ENCODING_CHAR16; break;
+	case TP_u8: enc = STRING_ENCODING_UTF8;   break;
 	}
-	return STRING_ENCODING_CHAR;
+	return c_mode & _C11 ? enc : STRING_ENCODING_CHAR;
 }
 
 static void parse_symbol(void)
