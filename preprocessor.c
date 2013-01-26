@@ -4,11 +4,17 @@
  */
 #include <config.h>
 
+#if defined(__unix__) || defined(__MACH__)
+#define _POSIX_SOURCE
+#include <sys/stat.h>
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>
 #include <libfirm/firm_common.h>
 #include <libfirm/irmode.h>
 #include <libfirm/tv.h>
@@ -39,6 +45,9 @@ typedef struct whitespace_info_t {
 	unsigned whitespace_at_line_begin;
 } whitespace_info_t;
 
+/* used to update "dynamic" definitions like __LINE__/__FILE__ */
+typedef void (*update_func)(pp_definition_t *definition);
+
 struct pp_definition_t {
 	symbol_t        *symbol;
 	position_t       pos;
@@ -52,6 +61,7 @@ struct pp_definition_t {
 	pp_definition_t *previous_definition;
 	size_t           n_parameters;
 	pp_definition_t *parameters;
+	update_func      update;
 
 	/* replacement */
 	size_t           list_len;
@@ -124,6 +134,8 @@ static pp_input_t      input;
 static pp_input_t     *input_stack;
 static unsigned        n_inputs;
 static struct obstack  input_obstack;
+static const char     *base_inputname;
+static unsigned        counter; /**< counter for the __COUNTER__ macros */
 
 static pp_conditional_t *conditional_stack;
 
@@ -207,7 +219,16 @@ void switch_pp_input(input_t *const decoder, char const *const input_name,
 	input.path                 = path;
 
 	/* indicate that we're at a new input */
-	print_line_directive(&input.pos, input_stack != NULL ? "1" : NULL);
+	const char *line_flag;
+	if (input_stack == NULL) {
+		/* base file */
+		base_inputname = input_name;
+		counter        = 0;
+		line_flag      = NULL;
+	} else {
+		line_flag = "1";
+	}
+	print_line_directive(&input.pos, line_flag);
 
 	/* place a virtual '\n' so we realize we're at line begin */
 	input.pos.lineno = 0;
@@ -2370,7 +2391,7 @@ void add_define(char const *const name, char const *const val,
 }
 
 void add_define_string(char const *const name, char const *const val,
-                       bool standard_define)
+                       bool const standard_define)
 {
 	pp_definition_t *const def = add_define_(name, standard_define);
 
@@ -2420,6 +2441,172 @@ void parse_define(char const *opt)
 		add_define(name, p+1, false);
 	}
 	obstack_free(&config_obstack, name);
+}
+
+static void add_define_dynamic_string(char const *const name, update_func update)
+{
+	pp_definition_t *const def = add_define_(name, true);
+
+	token_t stringtok;
+	memset(&stringtok, 0, sizeof(stringtok));
+	stringtok.kind           = T_STRING_LITERAL;
+	assert(obstack_object_size(&pp_obstack) == 0);
+	obstack_grow(&pp_obstack, &stringtok, sizeof(stringtok));
+	def->list_len   = 1;
+	def->token_list = obstack_finish(&pp_obstack);
+	def->update     = update;
+}
+
+static void add_define_dynamic_number(char const *const name, update_func update)
+{
+	pp_definition_t *const def = add_define_(name, true);
+
+	token_t numbertok;
+	memset(&numbertok, 0, sizeof(numbertok));
+	numbertok.kind           = T_NUMBER;
+	assert(obstack_object_size(&pp_obstack) == 0);
+	obstack_grow(&pp_obstack, &numbertok, sizeof(numbertok));
+	def->list_len   = 1;
+	def->token_list = obstack_finish(&pp_obstack);
+	def->update     = update;
+}
+
+static void update_definition_string_t(pp_definition_t *const definition, string_t const str)
+{
+	token_t *token = &definition->token_list[0];
+	assert(token->kind == T_STRING_LITERAL || token->kind == T_NUMBER);
+	token->literal.string = str;
+}
+
+static void update_definition_obst(pp_definition_t *const definition)
+{
+	update_definition_string_t(definition, sym_make_string(STRING_ENCODING_CHAR));
+}
+
+static void update_definition_string(pp_definition_t *const definition,
+                                     const char *const value)
+{
+	/* TODO: do we need additional quoting? */
+	assert(obstack_object_size(&symbol_obstack) == 0);
+	obstack_grow(&symbol_obstack, value, strlen(value));
+	update_definition_obst(definition);
+}
+
+static void update_definition_int(pp_definition_t *const definition,
+                                  unsigned value)
+{
+	assert(obstack_object_size(&symbol_obstack) == 0);
+	obstack_printf(&symbol_obstack, "%u", value);
+	update_definition_obst(definition);
+}
+
+static void update_file(pp_definition_t *definition)
+{
+	update_definition_string(definition, pp_token.base.pos.input_name);
+}
+
+static void update_base_file(pp_definition_t *definition)
+{
+	update_definition_string(definition, base_inputname);
+}
+
+static void update_line(pp_definition_t *definition)
+{
+	update_definition_int(definition, pp_token.base.pos.lineno);
+}
+
+static void update_include_level(pp_definition_t *definition)
+{
+	update_definition_int(definition, n_inputs);
+}
+
+static void update_counter(pp_definition_t *definition)
+{
+	update_definition_int(definition, counter);
+	++counter;
+}
+
+static string_t pp_date;
+static string_t pp_time;
+
+static void get_date_time(void)
+{
+	if (pp_date.begin)
+		return;
+
+	time_t const now = time(NULL);
+	if (now == (time_t)-1)
+		goto unknown_time;
+	struct tm *const t = localtime(&now);
+	if (t == NULL)
+		goto unknown_time;
+	char  buf[32];
+	char *str = asctime_r(t, buf);
+	if (str == NULL) {
+unknown_time:
+		str = "??? ??? ?? ??:??:?? ????";
+	}
+
+	assert(obstack_object_size(&symbol_obstack) == 0);
+	obstack_grow(&symbol_obstack, str, 10); /* Extract date part. */
+	pp_date = sym_make_string(STRING_ENCODING_CHAR);
+
+	assert(obstack_object_size(&symbol_obstack) == 0);
+	obstack_grow(&symbol_obstack, str + 11, 8); /* Extract time part. */
+	pp_time = sym_make_string(STRING_ENCODING_CHAR);
+}
+
+static void update_date(pp_definition_t *definition)
+{
+	get_date_time();
+	update_definition_string_t(definition, pp_date);
+}
+
+static void update_time(pp_definition_t *definition)
+{
+	get_date_time();
+	update_definition_string_t(definition, pp_time);
+}
+
+static void update_timestamp(pp_definition_t *definition)
+{
+#if defined(__unix__) || defined(__MACH__)
+	FILE *const file = input_get_file(input.input);
+	if (file == NULL)
+		goto unknown_timestamp;
+	int const fd = fileno(file);
+	struct stat st;
+	if (fstat(fd, &st) != 0)
+		goto unknown_timestamp;
+	struct tm *const t = localtime(&st.st_mtime);
+	if (t == NULL)
+		goto unknown_timestamp;
+	char        buf[32];
+	char *const str = asctime_r(t, buf);
+	if (str == NULL)
+		goto unknown_timestamp;
+	/* remove trailing '\n' */
+	size_t const len = strlen(str);
+	str[len - 1] = '\0';
+	/* update definition */
+	update_definition_string(definition, str);
+	return;
+#endif
+
+unknown_timestamp:
+	update_definition_string(definition, "??? ??? ?? ??:??:?? ????");
+}
+
+static void init_dynamic_macros(void)
+{
+	add_define_dynamic_number("__COUNTER__",       update_counter);
+	add_define_dynamic_number("__INCLUDE_LEVEL__", update_include_level);
+	add_define_dynamic_number("__LINE__",          update_line);
+	add_define_dynamic_string("__BASE_FILE__",     update_base_file);
+	add_define_dynamic_string("__DATE__",          update_date);
+	add_define_dynamic_string("__FILE__",          update_file);
+	add_define_dynamic_string("__TIMESTAMP__",     update_timestamp);
+	add_define_dynamic_string("__TIME__",          update_time);
 }
 
 static void error_missing_macro_param(void)
@@ -3640,6 +3827,8 @@ try_input:;
 				} else {
 					if (current_expansion == NULL)
 						expansion_pos = pp_token.base.pos;
+					if (pp_definition->update != NULL)
+						pp_definition->update(pp_definition);
 					start_object_macro_expansion(pp_definition);
 					return false;
 				}
@@ -3811,6 +4000,8 @@ void preprocessor_early_init(void)
 	input.pos.input_name = "<commandline>";
 	input.pos.lineno     = 0;
 	input.pos.colno      = 0;
+
+	init_dynamic_macros();
 }
 
 void init_preprocessor(void)

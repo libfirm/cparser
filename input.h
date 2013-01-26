@@ -13,6 +13,9 @@ typedef struct input_t input_t;
 input_t *input_from_stream(FILE *stream, const char *encoding);
 input_t *input_from_string(const char *string, const char *encoding);
 
+/** return underlying FILE* of an input if available, else NULL */
+FILE *input_get_file(const input_t *input);
+
 /** Type for a function being called on an input (or encoding) errors. */
 typedef void (*input_error_callback_func)(unsigned delta_lines,
                                           unsigned delta_cols,

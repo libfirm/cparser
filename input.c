@@ -351,6 +351,13 @@ input_t *input_from_stream(FILE *file, const char *encoding)
 	return result;
 }
 
+FILE *input_get_file(const input_t *const input)
+{
+	if (input->kind != INPUT_FILE)
+		return NULL;
+	return input->in.file;
+}
+
 input_t *input_from_string(const char *string, const char *encoding)
 {
 	input_t *result   = XMALLOCZ(input_t);
