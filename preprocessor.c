@@ -1298,12 +1298,33 @@ static bool concat_macro_parameters(const position_t *pos,
                                     const token_t *token0,
                                     const token_t *token1)
 {
+	/* gcc extension: , ## __VA_ARGS__ gives an empty result
+	 * if __VA_ARGS__ is empty, otherwise the tokens get concatenated */
+	bool gcc_ext = token0->kind == ',' && token1->kind == T_MACRO_PARAMETER
+	            && token1->macro_parameter.def->is_variadic;
+	pp_definition_t *def1 = NULL;
+	if (gcc_ext) {
+		def1 = token1->macro_parameter.def;
+	    if (def1->list_len == 0) {
+			pp_token = *token1;
+			return true;
+		}
+	}
+
 	assert(current_call.macro == NULL);
 	assert(obstack_object_size(&pp_obstack) == 0);
 	pp_definition_t *newdef = obstack_alloc(&pp_obstack, sizeof(*newdef));
 	memset(newdef, 0, sizeof(*newdef));
 	newdef->symbol       = sym_anonymous;
 	newdef->is_parameter = true;
+	if (gcc_ext) {
+		obstack_grow(&pp_obstack, token0, sizeof(*token0));
+		size_t len1 = def1->list_len;
+		obstack_grow(&pp_obstack, def1->token_list,
+					 len1*sizeof(def1->token_list[0]));
+		newdef->function_definition = def1->function_definition;
+		goto finish_newdef;
+	}
 
 	if (token0->kind == T_MACRO_PARAMETER) {
 		pp_definition_t *def0 = token0->macro_parameter.def;
@@ -1314,7 +1335,6 @@ static bool concat_macro_parameters(const position_t *pos,
 		token0     = &def0->token_list[len0-1];
 		newdef->function_definition = def0->function_definition;
 	}
-	pp_definition_t *def1 = NULL;
 	if (token1->kind == T_MACRO_PARAMETER) {
 		def1 = token1->macro_parameter.def;
 		assert(def1->list_len > 0);
@@ -1337,6 +1357,7 @@ static bool concat_macro_parameters(const position_t *pos,
 		             (len1-1)*sizeof(def1->token_list[0]));
 	}
 
+finish_newdef:;
 	size_t size = obstack_object_size(&pp_obstack);
 	assert(size % sizeof(newdef->token_list[0]) == 0);
 	size_t len = size / sizeof(newdef->token_list[0]);
@@ -1385,7 +1406,8 @@ static bool concat_tokens(const position_t *pos,
 			token0 = &def0->token_list[0];
 		}
 	}
-	if (token1->kind == T_MACRO_PARAMETER) {
+	if (token1->kind == T_MACRO_PARAMETER && (token0->kind != ','
+	    || !token1->macro_parameter.def->is_variadic)) {
 		pp_definition_t *def1     = token1->macro_parameter.def;
 		size_t           list_len = def1->list_len;
 		if (list_len == 0) {
