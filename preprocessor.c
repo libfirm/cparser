@@ -3823,7 +3823,7 @@ static bool next_expansion_token(void)
 						if (next_token != '(') {
 							if (may_pop)
 								goto try_input;
-							return true;
+							goto have_token;
 						}
 					} else {
 try_input:;
@@ -3833,7 +3833,7 @@ try_input:;
 							next_space_before = pp_token.base.space_before
 								| (skipinfo.whitespace_at_line_begin > 0);
 							next_info_valid     = true;
-							return true;
+							goto have_token;
 						}
 					}
 					if (current_expansion == NULL)
@@ -3858,6 +3858,7 @@ try_input:;
 		}
 	}
 
+have_token:
 	if (current_call.macro != NULL) {
 		if (kind == '(') {
 			++current_call.argument_brace_count;
