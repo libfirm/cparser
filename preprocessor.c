@@ -2363,7 +2363,7 @@ static bool pp_definitions_equal(const pp_definition_t *definition1,
 	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
 		if (!pp_tokens_equal(t1, t2))
 			return false;
-		if (t1->base.space_before != t2->base.space_before)
+		if (i > 0 && t1->base.space_before != t2->base.space_before)
 			return false;
 	}
 	return true;
