@@ -56,9 +56,9 @@ void timer_term(FILE *f)
 		}
 
 		ir_timer_free(timer);
-		xfree(info->description);
+		free(info->description);
 		next = info->next;
-		xfree(info);
+		free(info);
 	}
 	infos = NULL;
 	last_info = NULL;

@@ -340,5 +340,5 @@ size_t decode(input_t *input, utf32 *buffer, size_t buffer_size)
 
 void input_free(input_t *input)
 {
-	xfree(input);
+	free(input);
 }
