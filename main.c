@@ -912,7 +912,7 @@ static bool is_ia32_cpu(const char *architecture)
 	    || streq(architecture, "i786");
 }
 
-static const char *setup_isa_from_tripel(const machine_triple_t *machine)
+static const char *setup_isa_from_triple(const machine_triple_t *machine)
 {
 	const char *cpu = machine->cpu_type;
 
@@ -935,7 +935,7 @@ static const char *setup_target_machine(void)
 	if (!setup_firm_for_machine(target_machine))
 		exit(1);
 
-	const char *isa = setup_isa_from_tripel(target_machine);
+	const char *isa = setup_isa_from_triple(target_machine);
 
 	if (isa == NULL)
 		exit(1);
