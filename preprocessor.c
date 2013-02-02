@@ -57,6 +57,7 @@ struct pp_definition_t {
 	bool             is_parameter    : 1;
 	bool             is_variadic     : 1;
 	bool             standard_define : 1;
+	bool             not_specified   : 1;
 	pp_definition_t *function_definition;
 	pp_definition_t *previous_definition;
 	size_t           n_parameters;
@@ -1057,7 +1058,31 @@ static pp_expansion_state_t *start_expanding(pp_definition_t *definition)
 
 static void start_function_macro_expansion(const macro_call_t *call)
 {
-	pp_definition_t      *macro      = call->macro;
+	pp_definition_t *macro = call->macro;
+	finish_argument();
+	/* check if enough arguments have been specified */
+	unsigned parameter_idx = call->parameter_idx+1;
+	/* variadic parameter may be left out */
+	if (parameter_idx < macro->n_parameters) {
+	    pp_definition_t *parameter = &macro->parameters[parameter_idx];
+	    if (parameter->is_variadic) {
+			parameter->not_specified = true;
+			/* avoid further error */
+			parameter_idx = macro->n_parameters;
+		}
+	}
+	if (parameter_idx < macro->n_parameters) {
+		errorf(&pp_token.base.pos,
+		       "macro '%Y' requires %u arguments, but only %u provided",
+		       macro->symbol, macro->n_parameters, call->parameter_idx+1);
+		/* set remaining arguments to empty replacements */
+		for ( ; parameter_idx < macro->n_parameters; ++parameter_idx) {
+			pp_definition_t *parameter = &macro->parameters[parameter_idx];
+			parameter->list_len      = 0;
+			parameter->not_specified = true;
+		}
+	}
+
 	pp_expansion_state_t *expansion  = start_expanding(call->macro);
 	expansion->previous_is_expanding = call->previous_is_expanding;
 	expansion->previous_may_recurse  = call->previous_may_recurse;
@@ -1305,7 +1330,7 @@ static bool concat_macro_parameters(const position_t *pos,
 	pp_definition_t *def1 = NULL;
 	if (gcc_ext) {
 		def1 = token1->macro_parameter.def;
-	    if (def1->list_len == 0) {
+	    if (def1->list_len == 0 && def1->not_specified) {
 			pp_token = *token1;
 			return true;
 		}
@@ -3867,7 +3892,6 @@ have_token:
 			if (current_call.argument_brace_count > 0) {
 				--current_call.argument_brace_count;
 			} else {
-				finish_argument();
 				assert(kind == ')');
 				start_function_macro_expansion(&current_call);
 				pop_macro_call();
