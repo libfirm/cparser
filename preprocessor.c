@@ -408,28 +408,19 @@ end_of_next_char:;
  *
  * @param char  the character to check
  */
-static inline bool is_octal_digit(int chr)
+static int octal_digit_value(int chr)
 {
-	switch (chr) {
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-		return true;
-	default:
-		return false;
-	}
+	/* note: the c99 spec guarantees '0' to '9' having consecutive codes */
+	if (chr < '0' || chr > '7')
+		return -1;
+	return chr - '0';
 }
 
 /**
  * Returns the value of a digit.
  * The only portable way to do it ...
  */
-static int digit_value(int digit)
+static int hex_digit_value(utf32 digit)
 {
 	switch (digit) {
 	case '0': return 0;
@@ -455,7 +446,7 @@ static int digit_value(int digit)
 	case 'f':
 	case 'F': return 15;
 	default:
-		panic("wrong character given");
+		return -1;
 	}
 }
 
@@ -466,13 +457,18 @@ static int digit_value(int digit)
  */
 static utf32 parse_octal_sequence(const utf32 first_digit)
 {
-	assert(is_octal_digit(first_digit));
-	utf32 value = digit_value(first_digit);
-	if (!is_octal_digit(input.c)) return value;
-	value = 8 * value + digit_value(input.c);
+	int digit_value = octal_digit_value(first_digit);
+	assert(digit_value >= 0);
+	utf32 value = digit_value;
+	digit_value = octal_digit_value(input.c);
+	if (digit_value < 0)
+		return value;
+	value = 8 * value + digit_value;
 	next_char();
-	if (!is_octal_digit(input.c)) return value;
-	value = 8 * value + digit_value(input.c);
+	digit_value = octal_digit_value(input.c);
+	if (digit_value < 0)
+		return value;
+	value = 8 * value + digit_value;
 	next_char();
 	return value;
 }
@@ -483,8 +479,9 @@ static utf32 parse_octal_sequence(const utf32 first_digit)
 static utf32 parse_hex_sequence(void)
 {
 	utf32 value = 0;
-	while (isxdigit(input.c)) {
-		value = 16 * value + digit_value(input.c);
+	int digit_value;
+	while ((digit_value = hex_digit_value(input.c)) >= 0) {
+		value = 16 * value + digit_value;
 		next_char();
 	}
 	return value;
@@ -504,8 +501,9 @@ static utf32 parse_universal_char(unsigned const n_digits)
 {
 	utf32 v = 0;
 	for (unsigned k = n_digits; k != 0; --k) {
-		if (isxdigit(input.c)) {
-			v = 16 * v + digit_value(input.c);
+		int digit_value = hex_digit_value(input.c);
+		if (digit_value >= 0) {
+			v = 16 * v + digit_value;
 			if (!resolve_escape_sequences)
 				obstack_1grow(&symbol_obstack, input.c);
 			next_char();
@@ -2200,16 +2198,16 @@ static void print_quoted_string(const char *const string)
 	fputc('"', out);
 	for (const char *c = string; *c != 0; ++c) {
 		switch (*c) {
-		case '"': fputs("\\\"", out); break;
-		case '\\':  fputs("\\\\", out); break;
-		case '\a':  fputs("\\a", out); break;
-		case '\b':  fputs("\\b", out); break;
-		case '\f':  fputs("\\f", out); break;
-		case '\n':  fputs("\\n", out); break;
-		case '\r':  fputs("\\r", out); break;
-		case '\t':  fputs("\\t", out); break;
-		case '\v':  fputs("\\v", out); break;
-		case '\?':  fputs("\\?", out); break;
+		case '"':  fputs("\\\"", out); break;
+		case '\\': fputs("\\\\", out); break;
+		case '\a': fputs("\\a", out);  break;
+		case '\b': fputs("\\b", out);  break;
+		case '\f': fputs("\\f", out);  break;
+		case '\n': fputs("\\n", out);  break;
+		case '\r': fputs("\\r", out);  break;
+		case '\t': fputs("\\t", out);  break;
+		case '\v': fputs("\\v", out);  break;
+		case '\?': fputs("\\?", out);  break;
 		default:
 			if (!isprint(*c)) {
 				fprintf(out, "\\%03o", (unsigned)*c);
@@ -3198,7 +3196,7 @@ static ir_tarval *parse_pp_operand(void)
 		char const *const str = pp_token.literal.string.begin;
 
 		char const *i = str;
-		while (isxdigit((unsigned char)*i) || *i == 'X' || *i == 'x')
+		while (hex_digit_value(*i) >= 0 || *i == 'X' || *i == 'x')
 			++i;
 
 		char const *const suffix      = i;
