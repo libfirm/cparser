@@ -2679,12 +2679,10 @@ static void parse_define_directive(void)
 	memset(new_definition, 0, sizeof(new_definition[0]));
 	new_definition->symbol = macro_symbol;
 	new_definition->pos    = input.pos;
+	next_input_token();
 
-	/* this is probably the only place where spaces are significant in the
-	 * lexer (except for the fact that they separate tokens). #define b(x)
-	 * is something else than #define b (x) */
-	if (input.c == '(') {
-		next_input_token();
+	/* spaces are significant: #define b(x) is different from #define b (x)*/
+	if (pp_token.kind == '(' && !pp_token.base.space_before) {
 		eat_token('(');
 
 		while (true) {
@@ -2766,14 +2764,17 @@ create_parameter:
 			param_sym->pp_definition   = param;
 		}
 	} else {
-		next_input_token();
+		if (!pp_token.base.space_before && pp_token.kind != T_NEWLINE) {
+			warningf(WARN_OTHER, &pp_token.base.pos,
+					 "missing whitespace after macro name");
+		}
 	}
 
 	/* construct token list */
 	assert(obstack_object_size(&pp_obstack) == 0);
 	bool next_must_be_param = false;
 	bool first              = true;
-	while (pp_token.kind != '\n') {
+	while (pp_token.kind != T_NEWLINE) {
 		symbol_t *symbol = pp_token.base.symbol;
 		if (symbol != NULL) {
 			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
