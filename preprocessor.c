@@ -2376,21 +2376,32 @@ static bool pp_tokens_equal(const token_t *token1, const token_t *token2)
 	}
 }
 
-static bool pp_definitions_equal(const pp_definition_t *definition1,
-                                 const pp_definition_t *definition2)
+static bool pp_definitions_equal(const pp_definition_t *const definition1,
+                                 const pp_definition_t *const definition2)
 {
-	if (definition1->list_len != definition2->list_len)
+	size_t const n_parameters = definition1->n_parameters;
+	if (n_parameters != definition2->n_parameters)
 		return false;
-
-	size_t         len = definition1->list_len;
-	const token_t *t1  = definition1->token_list;
-	const token_t *t2  = definition2->token_list;
-	for (size_t i = 0; i < len; ++i, ++t1, ++t2) {
-		if (!pp_tokens_equal(t1, t2))
-			return false;
-		if (i > 0 && t1->base.space_before != t2->base.space_before)
+	for (size_t p = 0; p < n_parameters; ++p) {
+		const pp_definition_t *param1 = &definition1->parameters[p];
+		const pp_definition_t *param2 = &definition2->parameters[p];
+		if (param1->symbol != param2->symbol
+		 || param1->is_variadic != param2->is_variadic)
 			return false;
 	}
+
+	size_t const len = definition1->list_len;
+	if (len != definition2->list_len)
+		return false;
+	for (size_t t = 0; t < len; ++t) {
+		const token_t *const t1 = &definition1->token_list[t];
+		const token_t *const t2 = &definition2->token_list[t];
+		if (!pp_tokens_equal(t1, t2))
+			return false;
+		if (t > 0 && t1->base.space_before != t2->base.space_before)
+			return false;
+	}
+
 	return true;
 }
 
