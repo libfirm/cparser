@@ -264,6 +264,10 @@ static inline void put_back(utf32 const c)
 
 #define eat(c_type) (assert(input.c == c_type), next_char())
 
+#define NEWLINE \
+	     '\n': \
+	case '\r'
+
 #define EAT_NEWLINE \
 	'\r': \
 		eat('\r'); \
@@ -729,7 +733,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 			break;
 		}
 
-		case EAT_NEWLINE:
+		case NEWLINE:
 			errorf(&pp_token.base.pos, "newline while parsing %s", context);
 			goto end_of_string;
 
@@ -1004,10 +1008,7 @@ static void skip_line_comment(void)
 	while (true) {
 		switch (input.c) {
 		case EOF:
-			return;
-
-		case '\r':
-		case '\n':
+		case NEWLINE:
 			return;
 
 		default:
@@ -1962,15 +1963,14 @@ parse_name:
 		next_char();
 		while (true) {
 			switch (input.c) {
-			case EAT_NEWLINE:
 			case EOF:
-				{
-					char *dummy = obstack_finish(&symbol_obstack);
-					obstack_free(&symbol_obstack, dummy);
-				}
+			case NEWLINE: {
+				char *dummy = obstack_finish(&symbol_obstack);
+				obstack_free(&symbol_obstack, dummy);
 				errorf(&pp_token.base.pos,
 				       "header name without closing '%c'", (char)delimiter);
 				return NULL;
+			}
 
 			default:
 				if (input.c == delimiter) {
