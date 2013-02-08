@@ -264,7 +264,7 @@ static inline void put_back(utf32 const c)
 
 #define eat(c_type) (assert(input.c == c_type), next_char())
 
-#define NEWLINE \
+#define EAT_NEWLINE \
 	'\r': \
 		eat('\r'); \
 		if (input.c == '\n') { \
@@ -281,7 +281,7 @@ static void maybe_concat_lines(void)
 	eat('\\');
 
 	switch (input.c) {
-	case NEWLINE:
+	case EAT_NEWLINE:
 		info.whitespace_at_line_begin = 0;
 		return;
 
@@ -729,7 +729,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 			break;
 		}
 
-		case NEWLINE:
+		case EAT_NEWLINE:
 			errorf(&pp_token.base.pos, "newline while parsing %s", context);
 			goto end_of_string;
 
@@ -1040,7 +1040,7 @@ static void skip_multiline_comment(void)
 			}
 			break;
 
-		case NEWLINE:
+		case EAT_NEWLINE:
 			break;
 
 		case EOF:
@@ -1078,7 +1078,7 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			}
 			return true;
 
-		case NEWLINE:
+		case EAT_NEWLINE:
 			return res;
 
 		default:
@@ -1101,7 +1101,7 @@ static void skip_whitespace(void)
 			next_char();
 			continue;
 
-		case NEWLINE:
+		case EAT_NEWLINE:
 			info.at_line_begin  = true;
 			info.had_whitespace = true;
 			info.whitespace_at_line_begin = 0;
@@ -1323,7 +1323,7 @@ restart:
 		next_char();
 		goto restart;
 
-	case NEWLINE:
+	case EAT_NEWLINE:
 		info.at_line_begin            = true;
 		info.had_whitespace           = true;
 		info.whitespace_at_line_begin = 0;
@@ -1962,7 +1962,7 @@ parse_name:
 		next_char();
 		while (true) {
 			switch (input.c) {
-			case NEWLINE:
+			case EAT_NEWLINE:
 			case EOF:
 				{
 					char *dummy = obstack_finish(&symbol_obstack);
