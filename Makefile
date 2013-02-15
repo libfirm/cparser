@@ -143,9 +143,9 @@ bootstrap2: cparser.bootstrap2
 	@echo '===> SPLINT $<'
 	$(Q)splint $(CPPFLAGS) $<
 
-%.c.cparser: %.c
+%.c.cparser: %.c $(GOAL)
 	@echo '===> CPARSER $<'
-	$(Q)./cparser $(CPPFLAGS) -fsyntax-only $<
+	$(Q)$(GOAL) $(CPPFLAGS) -fsyntax-only $<
 
 $(builddir)/cpb/%.o: %.c $(builddir)/cparser
 	@echo '===> CPARSER $<'
