@@ -2598,8 +2598,8 @@ static void get_date_time(void)
 	struct tm *const t = localtime(&now);
 	if (t == NULL)
 		goto unknown_time;
-	char  buf[32];
-	char *str = asctime_r(t, buf);
+	char        buf[32];
+	char const *str     = asctime_r(t, buf);
 	if (str == NULL) {
 unknown_time:
 		str = "??? ??? ?? ??:??:?? ????";
