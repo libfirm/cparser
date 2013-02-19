@@ -73,8 +73,10 @@ static void write_atomic_type(const atomic_type_t *type)
 
 static void write_pointer_type(const pointer_type_t *type)
 {
-	type_t *points_to = skip_typeref(type->points_to);
-	if (is_type_atomic(points_to, ATOMIC_TYPE_CHAR)) {
+	type_t *orig_points_to = type->points_to;
+	type_t *points_to      = skip_typeref(type->points_to);
+	if (is_type_atomic(points_to, ATOMIC_TYPE_CHAR)
+	    && orig_points_to->kind != TYPE_TYPEDEF) {
 		fputs("String", out);
 		return;
 	}
@@ -185,7 +187,7 @@ static void write_type(type_t *type)
 		write_atomic_type(&type->atomic);
 		return;
 	case TYPE_POINTER:
-		write_pointer_type(&type->pointer);
+	write_pointer_type(&type->pointer);
 		return;
 	case TYPE_COMPOUND_UNION:
 	case TYPE_COMPOUND_STRUCT:
