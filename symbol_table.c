@@ -37,12 +37,15 @@ void init_symbol_table_entry(symbol_t *entry, const char *string)
 #define SetRangeEmpty(ptr,size)    memset(ptr, 0, (size) * sizeof(symbol_table_hash_entry_t))
 #define SCALAR_RETURN
 
-void _symbol_table_init(symbol_table_t *symbol_table);
-#define hashset_init            _symbol_table_init
-void _symbol_table_destroy(symbol_table_t *symbol_table);
-#define hashset_destroy         _symbol_table_destroy
-symbol_t *_symbol_table_insert(symbol_table_t *symbol_table, const char *key);
-#define hashset_insert          _symbol_table_insert
+void symbol_table_init_(symbol_table_t *symbol_table);
+#define hashset_init            symbol_table_init_
+void symbol_table_destroy_(symbol_table_t *symbol_table);
+#define hashset_destroy         symbol_table_destroy_
+symbol_t *symbol_table_insert_(symbol_table_t *symbol_table, const char *key);
+#define hashset_insert          symbol_table_insert_
+void symbol_table_iterator_init_(symbol_table_iterator_t *iterator, const symbol_table_t *table);
+#define hashset_iterator_init   symbol_table_iterator_init_
+#define hashset_iterator_next   symbol_table_iterator_next
 
 #include "adt/hashset.c.inl"
 
@@ -52,18 +55,23 @@ symbol_t *sym_anonymous;
 
 symbol_t *symbol_table_insert(const char *string)
 {
-	return _symbol_table_insert(&symbol_table, string);
+	return symbol_table_insert_(&symbol_table, string);
 }
 
 void init_symbol_table(void)
 {
 	obstack_init(&symbol_obstack);
-	_symbol_table_init(&symbol_table);
+	symbol_table_init_(&symbol_table);
 	sym_anonymous = symbol_table_insert("<anonymous>");
 }
 
 void exit_symbol_table(void)
 {
-	_symbol_table_destroy(&symbol_table);
+	symbol_table_destroy_(&symbol_table);
 	obstack_free(&symbol_obstack, NULL);
+}
+
+void symbol_table_iterator_init(symbol_table_iterator_t *iterator)
+{
+	symbol_table_iterator_init_(iterator, &symbol_table);
 }
