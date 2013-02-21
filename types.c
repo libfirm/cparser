@@ -175,7 +175,7 @@ void init_basic_types(void)
 	type_ptrdiff_t   = type_long;
 	type_uintmax_t   = type_unsigned_long_long;
 	type_uptrdiff_t  = type_unsigned_long;
-	type_wint_t      = type_int;
+	type_wint_t      = type_unsigned_int;
 
 	type_intmax_t_ptr  = make_pointer_type(type_intmax_t,  TYPE_QUALIFIER_NONE);
 	type_ptrdiff_t_ptr = make_pointer_type(type_ptrdiff_t, TYPE_QUALIFIER_NONE);
