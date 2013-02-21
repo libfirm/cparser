@@ -114,6 +114,7 @@ static struct obstack    asflags_obst;
 static const char       *outname;
 static bool              define_intmax_types;
 static bool              construct_dep_target;
+static bool              dump_defines;
 
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
@@ -1743,11 +1744,15 @@ again:
 					result = EXIT_FAILURE;
 					break;
 				}
+				if (dump_defines)
+					print_defines();
 				break;
 			}
 
 			/* do the actual parsing */
 			do_parsing(unit);
+			if (dump_defines)
+				print_defines();
 			goto again;
 		}
 		case COMPILATION_UNIT_AST:
@@ -2361,6 +2366,12 @@ int main(int argc, char **argv)
 				return EXIT_SUCCESS;
 			} else if (strstart(option, "print-file-name=")) {
 				GET_ARG_AFTER(print_file_name_file, "-print-file-name=");
+			} else if (option[0] == 'd') {
+				/* scan debug flags */
+				for (const char *flag = &option[1]; *flag != '\0'; ++flag) {
+					if (*flag == 'M')
+						dump_defines = true;
+				}
 			} else if (option[0] == '-') {
 				/* double dash option */
 				++option;

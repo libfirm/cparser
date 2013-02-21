@@ -31,7 +31,7 @@
 #include "diagnostic.h"
 #include "string_rep.h"
 #include "input.h"
-#include "symbol_table.h"
+#include "symbol_table_t.h"
 
 #define MAX_PUTBACK 3
 #define BUFSIZE     1024
@@ -2560,7 +2560,10 @@ static void update_definition_int(pp_definition_t *const definition,
 
 static void update_file(pp_definition_t *definition)
 {
-	update_definition_string(definition, pp_token.base.pos.input_name);
+	const char *input_name = pp_token.base.pos.input_name;
+	if (input_name == NULL)
+		input_name = "";
+	update_definition_string(definition, input_name);
 }
 
 static void update_base_file(pp_definition_t *definition)
@@ -4036,6 +4039,38 @@ void print_include_paths(void)
 		fprintf(stderr, " %s\n", entry->path);
 	}
 	fprintf(stderr, "End of search list.\n");
+}
+
+void print_defines(void)
+{
+	set_preprocessor_output(stderr);
+	memset(&info, 0, sizeof(info));
+
+	/* scan the symbol table for defines */
+	symbol_table_iterator_t iter;
+	symbol_table_iterator_init(&iter);
+	for (symbol_t *symbol = symbol_table_iterator_next(&iter);
+	     symbol != NULL; symbol = symbol_table_iterator_next(&iter)) {
+	    pp_definition_t *definition = symbol->pp_definition;
+	    if (definition == NULL)
+			continue;
+		if (definition->update != NULL)
+			definition->update(definition);
+		fprintf(stderr, "#define %s", definition->symbol->string);
+		if (definition->has_parameters) {
+			fputs("(...)", stderr);
+		}
+		fputc(' ', stderr);
+		memset(&previous_token, 0, sizeof(previous_token));
+		if (definition->list_len > 0)
+			definition->token_list[0].base.space_before = false;
+		for (size_t t = 0; t < definition->list_len; ++t) {
+			const token_t *token = &definition->token_list[t];
+			pp_token = *token;
+			emit_pp_token();
+		}
+		fputc('\n', stderr);
+	}
 }
 
 static void input_error(unsigned const delta_lines, unsigned const delta_cols, char const *const message)

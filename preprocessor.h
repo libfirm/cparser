@@ -56,5 +56,6 @@ extern searchpath_t after_searchpath;   /**< searchpath for -idirafter (also sys
 void append_include_path(searchpath_t *searchpath, const char *path);
 void append_env_paths(searchpath_t *paths, const char *envvar);
 void print_include_paths(void);
+void print_defines(void);
 
 #endif
