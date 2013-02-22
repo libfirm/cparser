@@ -1598,16 +1598,16 @@ static void append_default_include_paths(void)
 #ifdef STANDARD_INCLUDE_DIR
 	/* some guessing to find the "gcc-multilib" include dir */
 	assert(obstack_object_size(&file_obst) == 0);
-	if (target_triple != NULL) {
-		obstack_printf(&file_obst, "%s/%s", STANDARD_INCLUDE_DIR, target_triple);
-		goto path_from_obst;
-	} else if (is_ia32_cpu(target_machine->cpu_type)
-	        && firm_is_unixish_os(target_machine)) {
+	if (is_ia32_cpu(target_machine->cpu_type)
+	    && firm_is_unixish_os(target_machine)) {
 		obstack_printf(&file_obst, "%s/i386-linux-gnu", STANDARD_INCLUDE_DIR);
 path_from_obst:;
 		obstack_1grow(&file_obst, '\0');
 		char *path = obstack_finish(&file_obst);
 		append_include_path(&system_searchpath, path);
+	} else if (target_triple != NULL) {
+		obstack_printf(&file_obst, "%s/%s", STANDARD_INCLUDE_DIR, target_triple);
+		goto path_from_obst;
 	}
 
 	append_include_path(&system_searchpath, STANDARD_INCLUDE_DIR);
