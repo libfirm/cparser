@@ -3129,6 +3129,7 @@ exit_skip:
 	} else {
 		errorf(&pp_token.base.pos, "failed including '%s': %s", headername, strerror(errno));
 		pop_restore_input();
+		goto exit_skip;
 	}
 }
 
