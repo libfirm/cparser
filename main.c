@@ -89,6 +89,24 @@
 #define ASSEMBLER "gcc -c -xassembler"
 #endif
 
+#ifndef COMPILER_INCLUDE_DIR
+#define COMPILER_INCLUDE_DIR NULL
+#endif
+#ifndef LOCAL_INCLUDE_DIR
+#define LOCAL_INCLUDE_DIR NULL
+#endif
+#ifndef TARGET_INCLUDE_DIR
+#define TARGET_INCLUDE_DIR NULL
+#endif
+#ifndef SYSTEM_INCLUDE_DIR
+#define SYSTEM_INCLUDE_DIR NULL
+#endif
+
+static const char  *compiler_include_dir      = COMPILER_INCLUDE_DIR;
+static const char  *local_include_dir         = LOCAL_INCLUDE_DIR;
+static const char  *target_include_dir        = TARGET_INCLUDE_DIR;
+static const char  *system_include_dir        = SYSTEM_INCLUDE_DIR;
+
 unsigned int        c_mode                    = _C89 | _C99 | _GNUC;
 bool                byte_order_big_endian     = false;
 bool                strict_mode               = false;
@@ -1587,33 +1605,35 @@ static void determine_unit_standard(compilation_unit_t *unit,
 	}
 }
 
-static void append_default_include_paths(void)
+static void append_standard_include_paths(void)
 {
-#ifdef CPARSER_INCLUDE_DIR
-	append_include_path(&system_searchpath, CPARSER_INCLUDE_DIR);
-#endif
-#ifdef LOCAL_INCLUDE_DIR
-	append_include_path(&system_searchpath, LOCAL_INCLUDE_DIR);
-#endif
-#ifdef STANDARD_INCLUDE_DIR
-	/* some guessing to find the "gcc-multilib" include dir */
-	assert(obstack_object_size(&file_obst) == 0);
-	if (is_ia32_cpu(target_machine->cpu_type)
-	    && firm_is_unixish_os(target_machine)) {
-		obstack_printf(&file_obst, "%s/i386-linux-gnu", STANDARD_INCLUDE_DIR);
-path_from_obst:;
-		obstack_1grow(&file_obst, '\0');
-		char *path = obstack_finish(&file_obst);
-		append_include_path(&system_searchpath, path);
-	} else if (target_triple != NULL) {
-		obstack_printf(&file_obst, "%s/%s", STANDARD_INCLUDE_DIR, target_triple);
-		goto path_from_obst;
+	if (compiler_include_dir != NULL)
+		append_include_path(&system_searchpath, compiler_include_dir);
+	if (local_include_dir != NULL)
+		append_include_path(&system_searchpath, local_include_dir);
+	if (target_include_dir != NULL)
+		append_include_path(&system_searchpath, target_include_dir);
+	else if (target_include_dir == NULL && system_include_dir != NULL) {
+		/* some guessing to find the "gcc-multilib" include dir */
+		assert(obstack_object_size(&file_obst) == 0);
+		if (is_ia32_cpu(target_machine->cpu_type)
+			&& firm_is_unixish_os(target_machine)) {
+			obstack_printf(&file_obst, "%s/i386-linux-gnu", system_include_dir);
+	path_from_obst:;
+			obstack_1grow(&file_obst, '\0');
+			char *path = obstack_finish(&file_obst);
+			append_include_path(&system_searchpath, path);
+		} else if (target_triple != NULL) {
+			obstack_printf(&file_obst, "%s/%s", system_include_dir, target_triple);
+			goto path_from_obst;
+		}
 	}
+	if (system_include_dir != NULL)
+		append_include_path(&system_searchpath, system_include_dir);
+}
 
-	append_include_path(&system_searchpath, STANDARD_INCLUDE_DIR);
-#endif
-
-	/* parse environment variable */
+static void append_environment_include_paths(void)
+{
 	append_env_paths(&bracket_searchpath, "CPATH");
 	append_env_paths(&system_searchpath,
 	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
@@ -1944,6 +1964,7 @@ int main(int argc, char **argv)
 	bool                profile_use          = false;
 	bool                do_timing            = false;
 	bool                print_timing         = false;
+	bool                stdinc               = true;
 
 	temp_files = NEW_ARR_F(char*, 0);
 	atexit(free_temp_files);
@@ -2100,13 +2121,15 @@ int main(int argc, char **argv)
 				add_flag(&cppflags_obst, "-iquote");
 				add_flag(&cppflags_obst, "%s", opt);
 				append_include_path(&quote_searchpath, opt);
+			} else if (streq(option, "nostdinc")) {
+				stdinc = false;
+				add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pthread")) {
 				/* set flags for the preprocessor */
 				add_flag(&cppflags_obst, "-D_REENTRANT");
 				/* set flags for the linker */
 				add_flag(&ldflags_obst, "-lpthread");
-			} else if (streq(option, "nostdinc")
-					|| streq(option, "trigraphs")) {
+			} else if (streq(option, "trigraphs")) {
 				/* pass these through to the preprocessor */
 				add_flag(&cppflags_obst, "%s", arg);
 			} else if (streq(option, "pipe")) {
@@ -2604,7 +2627,9 @@ int main(int argc, char **argv)
 	} else {
 		init_wchar_types(wchar_atomic_kind);
 	}
-	append_default_include_paths();
+	if (stdinc)
+		append_standard_include_paths();
+	append_environment_include_paths();
 	init_preprocessor();
 	init_ast();
 	init_parser();

@@ -23,11 +23,11 @@ FIRM_LIBS     ?= `pkg-config --libs libfirm`
 LIBFIRM_FILE =
 endif
 
-STANDARD_INCLUDE_DIR ?= -DSTANDARD_INCLUDE_DIR=\"/usr/include\"
+SYSTEM_INCLUDE_DIR   ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
 LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
-CPARSER_INCLUDE_DIR  ?= -DCPARSER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
+COMPILER_INCLUDE_DIR ?= -DCOMPILER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
 
-CPPFLAGS  = -I. $(STANDARD_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(CPARSER_INCLUDE_DIR)
+CPPFLAGS  = -I. $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
