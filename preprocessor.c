@@ -31,6 +31,7 @@
 #include "diagnostic.h"
 #include "string_rep.h"
 #include "input.h"
+#include "separator_t.h"
 #include "symbol_table_t.h"
 
 #define MAX_PUTBACK 3
@@ -2319,9 +2320,6 @@ void emit_pp_token(void)
 		fputc('\'', out);
 		break;
 
-	case T_MACRO_PARAMETER:
-		panic("macro parameter not expanded");
-
 	default:
 		fputs(pp_token.base.symbol->string, out);
 		break;
@@ -4059,7 +4057,20 @@ void print_defines(void)
 			definition->update(definition);
 		fprintf(out, "#define %s", definition->symbol->string);
 		if (definition->has_parameters) {
-			fputs("(...)", out);
+			fputc('(', out);
+			separator_t sep = { "", ", " };
+			for (size_t i = 0; i != definition->n_parameters; ++i) {
+				fputs(sep_next(&sep), out);
+				pp_definition_t *const param = &definition->parameters[i];
+				if (!param->is_variadic) {
+					fprintf(out, "%s", param->symbol->string);
+				} else if (param->symbol == symbol___VA_ARGS__) {
+					fputs("...", out);
+				} else {
+					fprintf(out, "%s...", param->symbol->string);
+				}
+			}
+			fputc(')', out);
 		}
 		fputc(' ', out);
 		memset(&previous_token, 0, sizeof(previous_token));
