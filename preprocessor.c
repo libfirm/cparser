@@ -4044,7 +4044,7 @@ void print_include_paths(void)
 
 void print_defines(void)
 {
-	set_preprocessor_output(stderr);
+	set_preprocessor_output(stdout);
 	memset(&info, 0, sizeof(info));
 
 	/* scan the symbol table for defines */
@@ -4057,11 +4057,11 @@ void print_defines(void)
 			continue;
 		if (definition->update != NULL)
 			definition->update(definition);
-		fprintf(stderr, "#define %s", definition->symbol->string);
+		fprintf(out, "#define %s", definition->symbol->string);
 		if (definition->has_parameters) {
-			fputs("(...)", stderr);
+			fputs("(...)", out);
 		}
-		fputc(' ', stderr);
+		fputc(' ', out);
 		memset(&previous_token, 0, sizeof(previous_token));
 		if (definition->list_len > 0)
 			definition->token_list[0].base.space_before = false;
@@ -4070,7 +4070,7 @@ void print_defines(void)
 			pp_token = *token;
 			emit_pp_token();
 		}
-		fputc('\n', stderr);
+		fputc('\n', out);
 	}
 }
 
