@@ -4048,8 +4048,7 @@ void print_defines(void)
 	/* scan the symbol table for defines */
 	symbol_table_iterator_t iter;
 	symbol_table_iterator_init(&iter);
-	for (symbol_t *symbol = symbol_table_iterator_next(&iter);
-	     symbol != NULL; symbol = symbol_table_iterator_next(&iter)) {
+	for (symbol_t *symbol; (symbol = symbol_table_iterator_next(&iter)) != NULL;) {
 		pp_definition_t *definition = symbol->pp_definition;
 		if (definition == NULL)
 			continue;
