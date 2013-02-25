@@ -1065,8 +1065,8 @@ static void start_function_macro_expansion(const macro_call_t *call)
 	unsigned parameter_idx = call->parameter_idx+1;
 	/* variadic parameter may be left out */
 	if (parameter_idx < macro->n_parameters) {
-	    pp_definition_t *parameter = &macro->parameters[parameter_idx];
-	    if (parameter->is_variadic) {
+		pp_definition_t *parameter = &macro->parameters[parameter_idx];
+		if (parameter->is_variadic) {
 			parameter->not_specified = true;
 			/* avoid further error */
 			parameter_idx = macro->n_parameters;
@@ -1331,7 +1331,7 @@ static bool concat_macro_parameters(const position_t *pos,
 	pp_definition_t *def1 = NULL;
 	if (gcc_ext) {
 		def1 = token1->macro_parameter.def;
-	    if (def1->list_len == 0 && def1->not_specified) {
+		if (def1->list_len == 0 && def1->not_specified) {
 			pp_token = *token1;
 			return true;
 		}
@@ -2724,8 +2724,8 @@ static void parse_define_directive(void)
 
 		while (true) {
 			switch (pp_token.kind) {
-			symbol_t *symbol;
-			bool      is_variadic;
+				symbol_t *symbol;
+				bool      is_variadic;
 			case T_DOTDOTDOT:
 				symbol      = symbol___VA_ARGS__;
 				is_variadic = true;
@@ -2780,7 +2780,7 @@ create_parameter:
 			}
 		}
 
-	finish_argument_list:
+finish_argument_list:
 		new_definition->has_parameters = true;
 		size_t size = obstack_object_size(&pp_obstack);
 		new_definition->n_parameters
@@ -3068,8 +3068,8 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 	assert(obstack_object_size(&symbol_obstack) == 0);
 	/* check searchpath */
 	for (; entry; entry = entry->next) {
-	    const char *path = entry->path;
-	    size_t      len  = strlen(path);
+		const char *path = entry->path;
+		size_t      len  = strlen(path);
 		obstack_grow(&symbol_obstack, path, len);
 		if (path[len-1] != '/')
 			obstack_1grow(&symbol_obstack, '/');
@@ -4050,8 +4050,8 @@ void print_defines(void)
 	symbol_table_iterator_init(&iter);
 	for (symbol_t *symbol = symbol_table_iterator_next(&iter);
 	     symbol != NULL; symbol = symbol_table_iterator_next(&iter)) {
-	    pp_definition_t *definition = symbol->pp_definition;
-	    if (definition == NULL)
+		pp_definition_t *definition = symbol->pp_definition;
+		if (definition == NULL)
 			continue;
 		if (definition->update != NULL)
 			definition->update(definition);
