@@ -46,6 +46,7 @@
 #include <libfirm/be.h>
 #include <libfirm/statev.h>
 
+#include <revision.h>
 #include "adt/util.h"
 #include "ast_t.h"
 #include "preprocessor.h"
@@ -67,7 +68,6 @@
 #include "wrappergen/write_fluffy.h"
 #include "wrappergen/write_jna.h"
 #include "wrappergen/write_compoundsizes.h"
-#include "revision.h"
 #include "warning.h"
 #include "help.h"
 #include "mangle.h"

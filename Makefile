@@ -27,7 +27,7 @@ SYSTEM_INCLUDE_DIR   ?= -DSYSTEM_INCLUDE_DIR=\"/usr/include\"
 LOCAL_INCLUDE_DIR    ?= -DLOCAL_INCLUDE_DIR=\"/usr/local/include\"
 COMPILER_INCLUDE_DIR ?= -DCOMPILER_INCLUDE_DIR=\"$(abspath $(srcdir))/include\"
 
-CPPFLAGS  = -I. $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR)
+CPPFLAGS  = -I$(top_srcdir) -I$(builddir) $(SYSTEM_INCLUDE_DIR) $(LOCAL_INCLUDE_DIR) $(COMPILER_INCLUDE_DIR)
 CPPFLAGS += $(FIRM_CPPFLAGS)
 
 CFLAGS += -Wall -W -Wstrict-prototypes -Wmissing-prototypes -std=c99 -pedantic
@@ -96,19 +96,22 @@ all: $(GOAL)
 
 .PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint libfirm_subdir
 
-$(cparser_SOURCES): config.h
-config.h:
-	cp config.h.in $@
+# rules for generating config.h (an empty config.h is enough on posix)
+CONFIGH = $(builddir)/config.h
+$(cparser_SOURCES): $(CONFIGH)
+$(CONFIGH):
+	echo "" > $@
 
 %.h:
 	@true
 
+REVISIONH = $(builddir)/revision.h
 REVISION ?= $(shell git describe --abbrev=40 --always --dirty --match '')
 
 # Update revision.h if necessary
 UNUSED := $(shell \
 	REV="\#define cparser_REVISION \"$(REVISION)\""; \
-	echo "$$REV" | cmp -s - revision.h 2> /dev/null || echo "$$REV" > revision.h \
+	echo "$$REV" | cmp -s - $(REVISIONH) 2> /dev/null || echo "$$REV" > $(REVISIONH) \
 )
 
 DIRS   := $(sort $(dir $(cparser_OBJECTS)))
