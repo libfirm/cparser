@@ -19,7 +19,6 @@
 
 #include "firm_opt.h"
 #include "firm_timing.h"
-#include "ast2firm.h"
 #include "adt/strutil.h"
 #include "adt/util.h"
 
