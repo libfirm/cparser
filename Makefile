@@ -96,6 +96,9 @@ all: $(GOAL)
 
 .PHONY: all bootstrap bootstrap2 bootstrape clean selfcheck splint libfirm_subdir
 
+DIRS   := $(sort $(dir $(cparser_OBJECTS)))
+UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
+
 # rules for generating config.h (an empty config.h is enough on posix)
 CONFIGH = $(builddir)/config.h
 $(cparser_SOURCES): $(CONFIGH)
@@ -113,9 +116,6 @@ UNUSED := $(shell \
 	REV="\#define cparser_REVISION \"$(REVISION)\""; \
 	echo "$$REV" | cmp -s - $(REVISIONH) 2> /dev/null || echo "$$REV" > $(REVISIONH) \
 )
-
-DIRS   := $(sort $(dir $(cparser_OBJECTS)))
-UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
 
 $(GOAL): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo "===> LD $@"
