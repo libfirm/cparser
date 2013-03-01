@@ -2,7 +2,7 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "config.h"
+#include <config.h>
 
 #include "adt/strutil.h"
 #include "type_t.h"

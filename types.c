@@ -2,6 +2,8 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+#include <config.h>
+
 #include "type_t.h"
 #include "types.h"
 #include "lang_features.h"
