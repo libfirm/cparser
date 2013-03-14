@@ -73,6 +73,11 @@
 #include "mangle.h"
 #include "printer.h"
 
+#define CPARSER_MAJOR      "0"
+#define CPARSER_MINOR      "9"
+#define CPARSER_PATCHLEVEL "14"
+#define CPARSER_VERSION   CPARSER_MAJOR "." CPARSER_MINOR "." CPARSER_PATCHLEVEL
+
 #ifndef PREPROCESSOR
 #ifndef __WIN32__
 #define PREPROCESSOR "gcc -E -U__STRICT_ANSI__ -U__BLOCKS__"
@@ -361,7 +366,10 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 		add_flag(&cppflags_obst, "-D__SIZE_TYPE__=%s", type_to_string(type_size_t));
 
 		add_flag(&cppflags_obst, "-U__VERSION__");
-		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", cparser_REVISION);
+		add_flag(&cppflags_obst, "-D__VERSION__=\"%s\"", CPARSER_VERSION);
+		add_flag(&cppflags_obst, "-D__CPARSER_MAJOR__=\"%s\"", CPARSER_MAJOR);
+		add_flag(&cppflags_obst, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
+		add_flag(&cppflags_obst, "-D__CPARSER_PATCHLEVEL__=\"%s\"", CPARSER_PATCHLEVEL);
 
 		if (define_intmax_types) {
 			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
@@ -619,24 +627,21 @@ static void usage(const char *argv0)
 
 static void print_cparser_version(void)
 {
-	printf("cparser (%s) using libFirm (%u.%u",
-	       cparser_REVISION, ir_get_version_major(),
-	       ir_get_version_minor());
+	printf("cparser %s.%s.%s",
+	       CPARSER_MAJOR, CPARSER_MINOR, CPARSER_PATCHLEVEL);
+	if (cparser_REVISION[0] != '\0') {
+		printf("(%s)", cparser_REVISION);
+	}
+	printf(" using libFirm %u.%u",
+	       ir_get_version_major(), ir_get_version_minor());
 
 	const char *revision = ir_get_version_revision();
 	if (revision[0] != 0) {
-		putchar('-');
-		fputs(revision, stdout);
+		printf("(%s)", revision);
 	}
-
-	const char *build = ir_get_version_build();
-	if (build[0] != 0) {
-		putchar(' ');
-		fputs(build, stdout);
-	}
-	puts(")");
-	puts("This is free software; see the source for copying conditions.  There is NO\n"
-	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
+	putchar('\n');
+	fputs("This is free software; see the source for copying conditions.  There is NO\n"
+	     "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n", stdout);
 }
 
 static void print_cparser_version_short(void)
@@ -1301,7 +1306,12 @@ static void add_standard_defines(void)
 	if (! (c_mode & (_GNUC | _MS | _CXX)))
 		add_define("__STRICT_ANSI__", "1", false);
 
-	add_define_string("__VERSION__", cparser_REVISION, false);
+	add_define_string("__VERSION__", CPARSER_VERSION, false);
+
+	/* we are cparser */
+	add_define("__CPARSER__",            CPARSER_MAJOR, false);
+	add_define("__CPARSER_MINOR__",      CPARSER_MINOR, false);
+	add_define("__CPARSER_PATCHLEVEL__", CPARSER_PATCHLEVEL, false);
 
 	/* let's pretend we are a GCC compiler */
 	add_define("__GNUC__",            "4", false);
