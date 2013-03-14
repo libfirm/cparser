@@ -28,8 +28,6 @@ mkdir -p "$FULLRELEASEDIR"
 for dir in $SOURCEDIRS; do
 	mkdir -p "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.sh "$FULLRELEASEDIR/$dir"
-	cp -p "$dir/"*.def "$FULLRELEASEDIR/$dir"
-	cp -p "$dir/"*.inc "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.[ch] "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.[ch].* "$FULLRELEASEDIR/$dir"
 done

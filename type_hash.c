@@ -290,7 +290,7 @@ type_t *_typehash_insert(type_hash_t *hash, type_t *type);
 #define hashset_insert           _typehash_insert
 #define SCALAR_RETURN
 
-#include "adt/hashset.c.inl"
+#include "adt/hashset.c.h"
 
 static type_hash_t typehash;
 

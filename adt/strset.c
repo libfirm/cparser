@@ -31,4 +31,4 @@
 #define hashset_iterator_next   strset_iterator_next
 #define hashset_remove_iterator strset_remove_iterator
 
-#include "hashset.c.inl"
+#include "hashset.c.h"

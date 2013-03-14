@@ -61,11 +61,11 @@ void init_tokens(void)
 	memset(token_symbols, 0, T_LAST_TOKEN * sizeof(token_symbols[0]));
 
 #define T(mode, x, str, val, is_keyword) register_token(mode, x, str, is_keyword);
-#include "tokens.inc"
+#include "tokens.h"
 #undef T
 
 #define T(token) register_pp_token(TP_##token, #token);
-#include "tokens_preprocessor.inc"
+#include "tokens_preprocessor.h"
 #undef T
 }
 

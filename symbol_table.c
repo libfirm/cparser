@@ -47,7 +47,7 @@ void symbol_table_iterator_init_(symbol_table_iterator_t *iterator, const symbol
 #define hashset_iterator_init   symbol_table_iterator_init_
 #define hashset_iterator_next   symbol_table_iterator_next
 
-#include "adt/hashset.c.inl"
+#include "adt/hashset.c.h"
 
 static symbol_table_t  symbol_table;
 
