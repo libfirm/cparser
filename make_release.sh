@@ -10,7 +10,7 @@ VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}"
 RELEASEDIR="cparser-$VERSION"
 FULLRELEASEDIR="$WORKDIR/$RELEASEDIR"
 RELEASEFILE="cparser-$VERSION.tar.bz2"
-SOURCEDIRS="adt builtins driver win32 wrappergen ."
+SOURCEDIRS="adt driver win32 wrappergen ."
 ADDFILES="README.md NEWS.md AUTHOR COPYING cparser.1"
 
 # test if versions match
@@ -27,9 +27,7 @@ mkdir -p "$FULLRELEASEDIR"
 
 for dir in $SOURCEDIRS; do
 	mkdir -p "$FULLRELEASEDIR/$dir"
-	cp -p "$dir/"*.sh "$FULLRELEASEDIR/$dir"
 	cp -p "$dir/"*.[ch] "$FULLRELEASEDIR/$dir"
-	cp -p "$dir/"*.[ch].* "$FULLRELEASEDIR/$dir"
 done
 cp $ADDFILES "$FULLRELEASEDIR"
 rm -f "$FULLRELEASEDIR/revision.h"
