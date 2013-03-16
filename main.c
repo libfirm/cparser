@@ -379,6 +379,9 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 		add_flag(&cppflags_obst, "-D__CPARSER_MINOR__=\"%s\"", CPARSER_MINOR);
 		add_flag(&cppflags_obst, "-D__CPARSER_PATCHLEVEL__=\"%s\"", CPARSER_PATCHLEVEL);
 
+		add_flag(&cppflags_obst, "-U_FORTIFY_SOURCE");
+		add_flag(&cppflags_obst, "-D_FORTIFY_SOURCE=0");
+
 		if (define_intmax_types) {
 			add_flag(&cppflags_obst, "-U__INTMAX_TYPE__");
 			add_flag(&cppflags_obst, "-D__INTMAX_TYPE__=%s", type_to_string(type_intmax_t));
@@ -1325,6 +1328,9 @@ static void add_standard_defines(void)
 	} else {
 		add_define("__GNUC_GNU_INLINE__", "1", false);
 	}
+
+	/* no support for the XXX_chk functions in cparser yet */
+	add_define("_FORTIFY_SOURCE", "0", false);
 
 	if (firm_is_unixish_os(target_machine)) {
 		if (c_mode & _GNUC)
