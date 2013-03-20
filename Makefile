@@ -116,6 +116,9 @@ UNUSED := $(shell \
 	REV="\#define cparser_REVISION \"$(REVISION)\""; \
 	echo "$$REV" | cmp -s - $(REVISIONH) 2> /dev/null || echo "$$REV" > $(REVISIONH) \
 )
+# determine if we can use "cparser-beta" as quickcheck
+QUICKCHECK ?= $(shell which cparser-beta || echo true) -fsyntax-only
+QUICKCHECK_FLAGS ?= -Wno-shadow
 
 $(GOAL): $(LIBFIRM_FILE) $(cparser_OBJECTS)
 	@echo "===> LD $@"
@@ -176,6 +179,7 @@ cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 
 $(builddir)/%.o: %.c
 	@echo '===> CC $@'
+	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(QUICKCHECK_FLAGS) $<
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c -o $@ $<
 
 clean:
