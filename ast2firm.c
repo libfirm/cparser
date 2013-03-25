@@ -5306,13 +5306,15 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	}
 
 	size_t n_inputs  = 0;
-	asm_argument_t *argument = statement->inputs;
-	for ( ; argument != NULL; argument = argument->next)
+	for (const asm_argument_t *argument = statement->inputs; argument != NULL;
+	     argument = argument->next) {
 		n_inputs++;
+	}
 	size_t n_outputs = 0;
-	argument = statement->outputs;
-	for ( ; argument != NULL; argument = argument->next)
+	for (const asm_argument_t *argument = statement->outputs; argument != NULL;
+	     argument = argument->next) {
 		n_outputs++;
+	}
 
 	unsigned next_pos = 0;
 
@@ -5325,44 +5327,25 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_node            *out_addrs[n_outputs];
 	size_t              out_size = 0;
 
-	argument = statement->outputs;
-	for ( ; argument != NULL; argument = argument->next) {
-		const char *constraints = argument->constraints.begin;
-		asm_constraint_flags_t asm_flags
-			= be_parse_asm_constraints(constraints);
-
-		{
-			position_t const *const pos = &statement->base.pos;
-			if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-				warningf(WARN_OTHER, pos, "some constraints in '%s' are not supported", constraints);
-			}
-			if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-				errorf(pos, "some constraints in '%s' are invalid", constraints);
-				continue;
-			}
-			if (! (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE)) {
-				errorf(pos, "no write flag specified for output constraints '%s'", constraints);
-				continue;
-			}
-		}
-
-		unsigned pos = next_pos++;
-		if ( (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE)
-				|| (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER) ) {
-			expression_t *expr = argument->expression;
-			ir_node      *addr = expression_to_addr(expr);
+	for (const asm_argument_t *argument = statement->outputs; argument != NULL;
+	     argument = argument->next) {
+		unsigned pos         = next_pos++;
+		ident   *constraints = new_id_from_str(argument->constraints.begin);
+		if (argument->direct_write) {
+			expression_t *expr   = argument->expression;
+			ir_node      *addr   = expression_to_addr(expr);
 			/* in+output, construct an artifical same_as constraint on the
 			 * input */
-			if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_READ) {
-				char     buf[64];
+			if (argument->direct_read) {
 				ir_node *value = get_value_from_lvalue(expr, addr);
 
+				char buf[64];
 				snprintf(buf, sizeof(buf), "%u", (unsigned) out_size);
 
 				ir_asm_constraint constraint;
-				constraint.pos              = pos;
-				constraint.constraint       = new_id_from_str(buf);
-				constraint.mode             = get_ir_mode_storage(expr->base.type);
+				constraint.pos        = pos;
+				constraint.constraint = new_id_from_str(buf);
+				constraint.mode       = get_ir_mode_storage(expr->base.type);
 				tmp_in_constraints[in_size] = constraint;
 				ins[in_size] = value;
 
@@ -5372,94 +5355,52 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 			out_exprs[out_size] = expr;
 			out_addrs[out_size] = addr;
 			++out_size;
-		} else if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
-			/* pure memory ops need no input (but we have to make sure we
-			 * attach to the memory) */
-			assert(! (asm_flags &
-						(ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE
-						 | ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER)));
-			needs_memory = true;
 
-			/* we need to attach the address to the inputs */
-			expression_t *expr = argument->expression;
+			ir_asm_constraint constraint;
+			constraint.pos        = pos;
+			constraint.constraint = constraints;
+			constraint.mode       = get_ir_mode_storage(expr->base.type);
+
+			obstack_grow(&asm_obst, &constraint, sizeof(constraint));
+		} else {
+			/* the only case where an argument doesn't "write" is when it is
+			 * a memor operand (so we really write to the pointed memory instead
+			 * of the operand itself). So for the firm ASM node the operand
+			 * (or rather its address) becomes an input. */
+			assert(argument->indirect_write);
+			needs_memory = true;
 
 			ir_asm_constraint constraint;
 			constraint.pos              = pos;
-			constraint.constraint       = new_id_from_str(constraints);
+			constraint.constraint       = constraints;
 			constraint.mode             = mode_M;
 			tmp_in_constraints[in_size] = constraint;
 
-			ins[in_size] = expression_to_addr(expr);
+			ins[in_size] = expression_to_addr(argument->expression);
 			++in_size;
-			continue;
-		} else {
-			errorf(&statement->base.pos,
-			       "only modifiers but no place set in constraints '%s'",
-			       constraints);
-			continue;
 		}
-
-		ir_asm_constraint constraint;
-		constraint.pos        = pos;
-		constraint.constraint = new_id_from_str(constraints);
-		constraint.mode       = get_ir_mode_storage(argument->expression->base.type);
-
-		obstack_grow(&asm_obst, &constraint, sizeof(constraint));
 	}
 	assert(obstack_object_size(&asm_obst)
 			== out_size * sizeof(ir_asm_constraint));
 	ir_asm_constraint *output_constraints = obstack_finish(&asm_obst);
 
-
 	obstack_grow(&asm_obst, tmp_in_constraints,
 	             in_size * sizeof(tmp_in_constraints[0]));
-	/* find and count input and output arguments */
-	argument = statement->inputs;
-	for ( ; argument != NULL; argument = argument->next) {
-		const char *constraints = argument->constraints.begin;
-		asm_constraint_flags_t asm_flags
-			= be_parse_asm_constraints(constraints);
-
-		if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-			errorf(&statement->base.pos,
-			       "some constraints in '%s' are not supported", constraints);
-			continue;
-		}
-		if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-			errorf(&statement->base.pos,
-			       "some constraints in '%s' are invalid", constraints);
-			continue;
-		}
-		if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
-			errorf(&statement->base.pos,
-			       "write flag specified for input constraints '%s'",
-			       constraints);
-			continue;
-		}
-
+	for (const asm_argument_t *argument = statement->inputs; argument != NULL;
+	     argument = argument->next) {
 		ir_node *input;
-		if ( (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE)
-				|| (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER) ) {
+		if (argument->direct_read) {
 			/* we can treat this as "normal" input */
 			input = expression_to_value(argument->expression);
-		} else if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
-			/* pure memory ops need no input (but we have to make sure we
-			 * attach to the memory) */
-			assert(! (asm_flags &
-						(ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE
-						 | ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER)));
-			needs_memory = true;
-			input = expression_to_addr(argument->expression);
 		} else {
-			errorf(&statement->base.pos,
-			       "only modifiers but no place set in constraints '%s'",
-			       constraints);
-			continue;
+			assert(argument->indirect_read);
+			needs_memory = true;
+			input        = expression_to_addr(argument->expression);
 		}
 
 		ir_asm_constraint constraint;
 		constraint.pos        = next_pos++;
-		constraint.constraint = new_id_from_str(constraints);
+		constraint.constraint = new_id_from_str(argument->constraints.begin);
 		constraint.mode       = get_irn_mode(input);
 
 		obstack_grow(&asm_obst, &constraint, sizeof(constraint));
@@ -5472,13 +5413,11 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_asm_constraint *input_constraints = obstack_finish(&asm_obst);
 
 	/* create asm node */
-	dbg_info *dbgi = get_dbg_info(&statement->base.pos);
-
-	ident *asm_text = new_id_from_str(statement->asm_text.begin);
-
-	ir_node *node = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
-	                          out_size, output_constraints,
-	                          n_clobbers, clobbers, asm_text);
+	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
+	ident    *asm_text = new_id_from_str(statement->asm_text.begin);
+	ir_node  *node     = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
+	                               out_size, output_constraints,
+	                               n_clobbers, clobbers, asm_text);
 
 	if (statement->is_volatile) {
 		set_irn_pinned(node, op_pin_state_pinned);

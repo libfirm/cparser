@@ -7614,7 +7614,7 @@ static void semantic_dereference(unary_expression_t *expression)
  * Record that an address is taken (expression represents an lvalue).
  *
  * @param expression       the expression
- * @param may_be_register  if true, the expression might be an register
+ * @param may_be_register  if true, the expression might be a register
  */
 static void set_address_taken(expression_t *expression, bool may_be_register)
 {
@@ -8677,6 +8677,122 @@ static void init_expression_parsers(void)
 	register_expression_parser(parse_throw,                       T_throw);
 }
 
+static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
+{
+	expression_t *expression = argument->expression;
+	type_t       *type       = skip_typeref(expression->base.type);
+	if (!is_type_valid(type))
+		return;
+
+	const char *constraints = argument->constraints.begin;
+	asm_constraint_flags_t asm_flags = be_parse_asm_constraints(constraints);
+	if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
+		errorf(&argument->pos, "some constraints in '%s' are invalid",
+		       constraints);
+		return;
+	}
+	if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
+		errorf(&argument->pos,
+		       "some constraints in '%s' are not supported on target",
+		       constraints);
+		return;
+	}
+
+	if (is_out) {
+		if ((asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) == 0) {
+			errorf(&argument->pos,
+				   "constraints '%s' for output operand do not indicate write",
+				   constraints);
+		}
+
+		/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do
+		 * not change size or type representation (e.g. int -> long is
+		 * ok, but int -> float is not) */
+		if (expression->kind == EXPR_UNARY_CAST) {
+			type_t      *const type = expression->base.type;
+			type_kind_t  const kind = type->kind;
+			if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
+				unsigned flags;
+				unsigned size;
+				if (kind == TYPE_ATOMIC) {
+					atomic_type_kind_t const akind = type->atomic.akind;
+					flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+					size  = get_atomic_type_size(akind);
+				} else {
+					flags = ATOMIC_TYPE_FLAG_INTEGER;
+					size  = get_type_size(type_void_ptr);
+				}
+
+				do {
+					expression_t *const value      = expression->unary.value;
+					type_t       *const value_type = value->base.type;
+					type_kind_t   const value_kind = value_type->kind;
+
+					unsigned value_flags;
+					unsigned value_size;
+					if (value_kind == TYPE_ATOMIC) {
+						atomic_type_kind_t const value_akind = value_type->atomic.akind;
+						value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
+						value_size  = get_atomic_type_size(value_akind);
+					} else if (value_kind == TYPE_POINTER) {
+						value_flags = ATOMIC_TYPE_FLAG_INTEGER;
+						value_size  = get_type_size(type_void_ptr);
+					} else {
+						break;
+					}
+
+					if (value_flags != flags || value_size != size)
+						break;
+
+					expression = value;
+				} while (expression->kind == EXPR_UNARY_CAST);
+				argument->expression = expression;
+			}
+		}
+
+		if (!is_lvalue(expression)) {
+			errorf(&expression->base.pos,
+			       "asm output argument is not an lvalue");
+		}
+	} else {
+		if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
+			errorf(&argument->pos,
+				   "constraints '%s' for input operand indicate write",
+				   constraints);
+		}
+	}
+
+	if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
+		if (asm_flags & (ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER|ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE)) {
+			determine_lhs_ent(expression, NULL);
+			argument->direct_write = true;
+		} else {
+			mark_vars_read(expression, NULL);
+		}
+		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
+			argument->indirect_write = true;
+		}
+	}
+	if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_READ) {
+		mark_vars_read(expression, NULL);
+		if (asm_flags & (ASM_CONSTRAINT_FLAG_SUPPORTS_REGISTER|ASM_CONSTRAINT_FLAG_SUPPORTS_IMMEDIATE)) {
+			determine_lhs_ent(expression, NULL);
+			argument->direct_read = true;
+		} else {
+			mark_vars_read(expression, NULL);
+		}
+		if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP) {
+			argument->indirect_read = true;
+		}
+	}
+	/* in case of only indirect accesses we are forced to use an address
+	 * as argument, and therefore must mark the value as address taken */
+	if (asm_flags & ASM_CONSTRAINT_FLAG_SUPPORTS_MEMOP
+	    && (argument->direct_write | argument->direct_read) == 0) {
+		set_address_taken(expression, true);
+	}
+}
+
 /**
  * Parse a asm statement arguments specification.
  */
@@ -8686,6 +8802,7 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 		add_anchor_token(',');
 		do {
 			asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
+			argument->pos = *HERE;
 
 			add_anchor_token(')');
 			add_anchor_token('(');
@@ -8702,68 +8819,11 @@ static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
 			argument->constraints = parse_string_literals("asm argument");
 			rem_anchor_token('(');
 			expect('(');
-			expression_t *expression = parse_expression();
-			if (is_out) {
-				/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do not
-				 * change size or type representation (e.g. int -> long is ok, but
-				 * int -> float is not) */
-				if (expression->kind == EXPR_UNARY_CAST) {
-					type_t      *const type = expression->base.type;
-					type_kind_t  const kind = type->kind;
-					if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
-						unsigned flags;
-						unsigned size;
-						if (kind == TYPE_ATOMIC) {
-							atomic_type_kind_t const akind = type->atomic.akind;
-							flags = get_atomic_type_flags(akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
-							size  = get_atomic_type_size(akind);
-						} else {
-							flags = ATOMIC_TYPE_FLAG_INTEGER;
-							size  = get_type_size(type_void_ptr);
-						}
-
-						do {
-							expression_t *const value      = expression->unary.value;
-							type_t       *const value_type = value->base.type;
-							type_kind_t   const value_kind = value_type->kind;
-
-							unsigned value_flags;
-							unsigned value_size;
-							if (value_kind == TYPE_ATOMIC) {
-								atomic_type_kind_t const value_akind = value_type->atomic.akind;
-								value_flags = get_atomic_type_flags(value_akind) & ~ATOMIC_TYPE_FLAG_SIGNED;
-								value_size  = get_atomic_type_size(value_akind);
-							} else if (value_kind == TYPE_POINTER) {
-								value_flags = ATOMIC_TYPE_FLAG_INTEGER;
-								value_size  = get_type_size(type_void_ptr);
-							} else {
-								break;
-							}
-
-							if (value_flags != flags || value_size != size)
-								break;
-
-							expression = value;
-						} while (expression->kind == EXPR_UNARY_CAST);
-					}
-				}
-
-				if (!is_lvalue(expression))
-					errorf(&expression->base.pos,
-					       "asm output argument is not an lvalue");
-
-				if (argument->constraints.begin[0] == '=')
-					determine_lhs_ent(expression, NULL);
-				else
-					mark_vars_read(expression, NULL);
-			} else {
-				mark_vars_read(expression, NULL);
-			}
-			argument->expression = expression;
+			argument->expression = parse_expression();
 			rem_anchor_token(')');
 			expect(')');
 
-			set_address_taken(expression, true);
+			semantic_asm_argument(argument, is_out);
 
 			*anchor = argument;
 			anchor  = &argument->next;
@@ -8830,9 +8890,15 @@ static statement_t *parse_asm_statement(void)
 	rem_anchor_token(T_STRING_LITERAL);
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
-	if (accept(':')) parse_asm_arguments(&asm_statement->outputs, true);
-	if (accept(':')) parse_asm_arguments(&asm_statement->inputs, false);
-	if (accept(':')) parse_asm_clobbers( &asm_statement->clobbers);
+	if (accept(':')) {
+		parse_asm_arguments(&asm_statement->outputs, true);
+	}
+	if (accept(':')) {
+		parse_asm_arguments(&asm_statement->inputs, false);
+	}
+	if (accept(':')) {
+		parse_asm_clobbers( &asm_statement->clobbers);
+	}
 
 	rem_anchor_token(':');
 	if (accept(':')) {

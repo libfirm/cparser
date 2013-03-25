@@ -578,10 +578,15 @@ struct for_statement_t {
 };
 
 struct asm_argument_t {
+	position_t      pos;
 	string_t        constraints;
 	expression_t   *expression;
 	symbol_t       *symbol;
 	asm_argument_t *next;
+	bool            direct_read:1;    /**< argument value is read */
+	bool            direct_write:1;   /**< argument is lvalue and written to */
+	bool            indirect_read:1;  /**< argument is address which is read */
+	bool            indirect_write:1; /**< argument is address which is written */
 };
 
 struct asm_clobber_t {
