@@ -55,7 +55,8 @@ bool firm_is_windows_os(const machine_triple_t *machine)
  */
 static bool setup_os_support(const machine_triple_t *machine)
 {
-	if (firm_is_unixish_os(machine)) {
+	if (firm_is_unixish_os(machine)
+	    || streq(machine->operating_system, "elf")) {
 		set_be_option("ia32-gasmode=elf");
 		set_compilerlib_name_mangle(compilerlib_name_mangle_default);
 	} else if (firm_is_darwin_os(machine)) {

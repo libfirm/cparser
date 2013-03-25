@@ -1378,8 +1378,9 @@ static void add_standard_defines(void)
 		add_define("__LP64__", "1", false);
 	}
 
-	const char *cpu = target_machine->cpu_type;
-	const char *os  = target_machine->operating_system;
+	const char *cpu          = target_machine->cpu_type;
+	const char *manufacturer = target_machine->manufacturer;
+	const char *os           = target_machine->operating_system;
 	if (is_ia32_cpu(cpu)) {
 		if (c_mode & _GNUC)
 			add_define("i386",     "1", false);
@@ -1410,6 +1411,11 @@ static void add_standard_defines(void)
 		add_define("sparc",     "1", false);
 		add_define("__sparc",   "1", false);
 		add_define("__sparc__", "1", false);
+		/* we always produce sparc V8 code at the moment */
+		add_define("__sparc_v8__", "1", false);
+		if (strstr(manufacturer, "leon") != NULL) {
+			add_define("__leon__", "1", false);
+		}
 	} else if (streq(cpu, "arm")) {
 		/* TODO: test, what about
 		 * ARM_FEATURE_UNALIGNED, ARMEL, ARM_ARCH_7A, ARM_FEATURE_DSP, ... */
