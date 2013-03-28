@@ -144,10 +144,9 @@ machine_triple_t *firm_parse_machine_triple(const char *triple_string)
 	manufacturer += 1;
 
 	const char *os = strchr(manufacturer, '-');
-	if (os == NULL) {
-		return false;
+	if (os != NULL) {
+		os += 1;
 	}
-	os += 1;
 
 	/* Note: Triples are more or less defined by what the config.guess and
 	 * config.sub scripts from GNU autoconf emit. We have to lookup there what
@@ -164,9 +163,10 @@ machine_triple_t *firm_parse_machine_triple(const char *triple_string)
 
 	/* process manufacturer, alot of people incorrectly leave out the
 	 * manufacturer instead of using unknown- */
-	if (strstart(manufacturer, "linux")) {
+	if (strstart(manufacturer, "linux") || streq(manufacturer, "elf")
+	    || os == NULL) {
 		triple->manufacturer = xstrdup("unknown");
-		os = manufacturer;
+		os                   = manufacturer;
 	} else {
 		size_t manufacturer_len = os-manufacturer;
 		triple->manufacturer = XMALLOCN(char, manufacturer_len);
