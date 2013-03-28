@@ -5306,13 +5306,13 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	}
 
 	size_t n_inputs  = 0;
-	for (const asm_argument_t *argument = statement->inputs; argument != NULL;
-	     argument = argument->next) {
+	for (const entity_t *argument = statement->inputs; argument != NULL;
+	     argument = argument->base.next) {
 		n_inputs++;
 	}
 	size_t n_outputs = 0;
-	for (const asm_argument_t *argument = statement->outputs; argument != NULL;
-	     argument = argument->next) {
+	for (const entity_t *argument = statement->outputs; argument != NULL;
+	     argument = argument->base.next) {
 		n_outputs++;
 	}
 
@@ -5327,8 +5327,9 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	ir_node            *out_addrs[n_outputs];
 	size_t              out_size = 0;
 
-	for (const asm_argument_t *argument = statement->outputs; argument != NULL;
-	     argument = argument->next) {
+	for (const entity_t *entity = statement->outputs; entity != NULL;
+	     entity = entity->base.next) {
+	    const asm_argument_t *argument = &entity->asm_argument;
 		unsigned pos         = next_pos++;
 		ident   *constraints = new_id_from_str(argument->constraints.begin);
 		if (argument->direct_write) {
@@ -5386,8 +5387,9 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	obstack_grow(&asm_obst, tmp_in_constraints,
 	             in_size * sizeof(tmp_in_constraints[0]));
-	for (const asm_argument_t *argument = statement->inputs; argument != NULL;
-	     argument = argument->next) {
+	for (const entity_t *entity = statement->inputs; entity != NULL;
+	     entity = entity->base.next) {
+		const asm_argument_t *argument = &entity->asm_argument;
 		ir_node *input;
 		if (argument->direct_read) {
 			/* we can treat this as "normal" input */
@@ -5414,7 +5416,7 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 
 	/* create asm node */
 	dbg_info *dbgi     = get_dbg_info(&statement->base.pos);
-	ident    *asm_text = new_id_from_str(statement->asm_text.begin);
+	ident    *asm_text = new_id_from_str(statement->normalized_text.begin);
 	ir_node  *node     = new_d_ASM(dbgi, mem, in_size, ins, input_constraints,
 	                               out_size, output_constraints,
 	                               n_clobbers, clobbers, asm_text);

@@ -28,6 +28,7 @@ const char *get_entity_kind_name(entity_kind_t kind)
 	case ENTITY_LOCAL_LABEL:     return "local label";
 	case ENTITY_TYPEDEF:         return "typedef";
 	case ENTITY_NAMESPACE:       return "namespace";
+	case ENTITY_ASM_ARGUMENT:    return "asm argument";
 	}
 
 	panic("invalid entity kind");
@@ -52,7 +53,8 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_ENUM_VALUE]      = sizeof(enum_value_t),
 		[ENTITY_LABEL]           = sizeof(label_t),
 		[ENTITY_LOCAL_LABEL]     = sizeof(label_t),
-		[ENTITY_NAMESPACE]       = sizeof(namespace_t)
+		[ENTITY_NAMESPACE]       = sizeof(namespace_t),
+		[ENTITY_ASM_ARGUMENT]    = sizeof(asm_argument_t),
 	};
 	assert(kind < lengthof(sizes));
 	assert(sizes[kind] != 0);

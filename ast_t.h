@@ -577,18 +577,6 @@ struct for_statement_t {
 	bool              step_reachable:1;
 };
 
-struct asm_argument_t {
-	position_t      pos;
-	string_t        constraints;
-	expression_t   *expression;
-	symbol_t       *symbol;
-	asm_argument_t *next;
-	bool            direct_read:1;    /**< argument value is read */
-	bool            direct_write:1;   /**< argument is lvalue and written to */
-	bool            indirect_read:1;  /**< argument is address which is read */
-	bool            indirect_write:1; /**< argument is address which is written */
-};
-
 struct asm_clobber_t {
 	string_t       clobber;
 	asm_clobber_t *next;
@@ -601,9 +589,12 @@ struct asm_label_t {
 
 struct asm_statement_t {
 	statement_base_t base;
+	position_t       textpos;
 	string_t         asm_text;
-	asm_argument_t  *inputs;
-	asm_argument_t  *outputs;
+	string_t         normalized_text; /**< asm_text with %[symbol] references
+	                                       replaced by %XX number references */
+	entity_t        *inputs;  /**< list of asm_argument_t entities */
+	entity_t        *outputs; /**< list of asm_argument_t entities */
 	asm_clobber_t   *clobbers;
 	asm_label_t     *labels;
 	bool             is_volatile;

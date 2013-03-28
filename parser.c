@@ -687,6 +687,44 @@ static entity_t *get_entity(const symbol_t *const symbol,
 	return NULL;
 }
 
+static entity_t *set_entity(entity_t *entity)
+{
+	symbol_t           *symbol  = entity->base.symbol;
+	entity_namespace_t  namespc = entity->base.namespc;
+
+	entity_t **anchor;
+	entity_t  *iter;
+	for (anchor = &symbol->entity; ; anchor = &iter->base.symbol_next) {
+		iter = *anchor;
+		if (iter == NULL)
+			break;
+
+		/* replace an entry? */
+		if (iter->base.namespc == namespc) {
+			entity->base.symbol_next = iter->base.symbol_next;
+			break;
+		}
+	}
+	*anchor = entity;
+	return iter;
+}
+
+static void reset_symbol(symbol_t *symbol, entity_namespace_t namespc)
+{
+	/* replace with old_entity/remove */
+	entity_t **anchor;
+	entity_t  *iter;
+	for (anchor = &symbol->entity; ; anchor = &iter->base.symbol_next) {
+		iter = *anchor;
+		if (iter == NULL)
+			return;
+		/* replace an entry? */
+		if (iter->base.namespc == namespc)
+			break;
+	}
+	*anchor = iter->base.symbol_next;
+}
+
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
  * possible. */
 static entity_t *get_tag(symbol_t const *const symbol,
@@ -713,25 +751,12 @@ static void stack_push(stack_entry_t **stack_ptr, entity_t *entity)
 	assert(namespc != 0);
 
 	/* replace/add entity into entity list of the symbol */
-	entity_t **anchor;
-	entity_t  *iter;
-	for (anchor = &symbol->entity; ; anchor = &iter->base.symbol_next) {
-		iter = *anchor;
-		if (iter == NULL)
-			break;
-
-		/* replace an entry? */
-		if (iter->base.namespc == namespc) {
-			entity->base.symbol_next = iter->base.symbol_next;
-			break;
-		}
-	}
-	*anchor = entity;
+	entity_t *old_entity = set_entity(entity);
 
 	/* remember old declaration */
 	stack_entry_t entry;
 	entry.symbol     = symbol;
-	entry.old_entity = iter;
+	entry.old_entity = old_entity;
 	entry.namespc    = namespc;
 	ARR_APP1(stack_entry_t, *stack_ptr, entry);
 }
@@ -779,23 +804,10 @@ static void stack_pop_to(stack_entry_t **stack_ptr, size_t new_top)
 		entity_namespace_t  namespc    = entry->namespc;
 
 		/* replace with old_entity/remove */
-		entity_t **anchor;
-		entity_t  *iter;
-		for (anchor = &symbol->entity; ; anchor = &iter->base.symbol_next) {
-			iter = *anchor;
-			assert(iter != NULL);
-			/* replace an entry? */
-			if (iter->base.namespc == namespc)
-				break;
-		}
-
-		/* restore definition from outer scopes (if there was one) */
 		if (old_entity != NULL) {
-			old_entity->base.symbol_next = iter->base.symbol_next;
-			*anchor                      = old_entity;
+			set_entity(old_entity);
 		} else {
-			/* remove entry from list */
-			*anchor = iter->base.symbol_next;
+			reset_symbol(symbol, namespc);
 		}
 	}
 
@@ -8687,12 +8699,12 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 	const char *constraints = argument->constraints.begin;
 	asm_constraint_flags_t asm_flags = be_parse_asm_constraints(constraints);
 	if (asm_flags & ASM_CONSTRAINT_FLAG_INVALID) {
-		errorf(&argument->pos, "some constraints in '%s' are invalid",
+		errorf(&argument->base.pos, "some constraints in '%s' are invalid",
 		       constraints);
 		return;
 	}
 	if (asm_flags & ASM_CONSTRAINT_FLAG_NO_SUPPORT) {
-		errorf(&argument->pos,
+		errorf(&argument->base.pos,
 		       "some constraints in '%s' are not supported on target",
 		       constraints);
 		return;
@@ -8700,9 +8712,9 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 
 	if (is_out) {
 		if ((asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) == 0) {
-			errorf(&argument->pos,
-				   "constraints '%s' for output operand do not indicate write",
-				   constraints);
+			errorf(&argument->base.pos,
+			       "constraints '%s' for output operand do not indicate write",
+			       constraints);
 		}
 
 		/* Ugly GCC stuff: Allow lvalue casts.  Skip casts, when they do
@@ -8756,7 +8768,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 		}
 	} else {
 		if (asm_flags & ASM_CONSTRAINT_FLAG_MODIFIER_WRITE) {
-			errorf(&argument->pos,
+			errorf(&argument->base.pos,
 				   "constraints '%s' for input operand indicate write",
 				   constraints);
 		}
@@ -8796,40 +8808,47 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 /**
  * Parse a asm statement arguments specification.
  */
-static void parse_asm_arguments(asm_argument_t **anchor, bool const is_out)
+static entity_t *parse_asm_arguments(bool const is_out)
 {
+	entity_t  *result = NULL;
+	entity_t **anchor = &result;
 	if (token.kind == T_STRING_LITERAL || token.kind == '[') {
 		add_anchor_token(',');
 		do {
-			asm_argument_t *argument = allocate_ast_zero(sizeof(argument[0]));
-			argument->pos = *HERE;
+			position_t pos = *HERE;
 
 			add_anchor_token(')');
 			add_anchor_token('(');
 			add_anchor_token(T_STRING_LITERAL);
 
+			symbol_t *symbol = NULL;
 			if (accept('[')) {
 				add_anchor_token(']');
-				argument->symbol = expect_identifier("while parsing asm argument", NULL);
+				symbol = expect_identifier("while parsing asm argument", NULL);
 				rem_anchor_token(']');
 				expect(']');
 			}
 
+			entity_t *argument
+				= allocate_entity_zero(ENTITY_ASM_ARGUMENT,
+				                       NAMESPACE_ASM_ARGUMENT, symbol, &pos);
+
 			rem_anchor_token(T_STRING_LITERAL);
-			argument->constraints = parse_string_literals("asm argument");
+			argument->asm_argument.constraints = parse_string_literals("asm argument");
 			rem_anchor_token('(');
 			expect('(');
-			argument->expression = parse_expression();
+			argument->asm_argument.expression = parse_expression();
 			rem_anchor_token(')');
 			expect(')');
 
-			semantic_asm_argument(argument, is_out);
+			semantic_asm_argument(&argument->asm_argument, is_out);
 
 			*anchor = argument;
-			anchor  = &argument->next;
+			anchor  = &argument->base.next;
 		} while (accept(','));
 		rem_anchor_token(',');
 	}
+	return result;
 }
 
 /**
@@ -8868,6 +8887,100 @@ static void parse_asm_labels(asm_label_t **anchor)
 	}
 }
 
+static void normalize_asm_text(asm_statement_t *asm_statement)
+{
+	/* normalize asm text if necessary */
+	bool need_normalization = false;
+	for (entity_t *input = asm_statement->inputs; input != NULL;
+	     input = input->base.next) {
+		symbol_t *symbol = input->base.symbol;
+		if (symbol != NULL) {
+			need_normalization = true;
+			entity_t *old = set_entity(input);
+			if (old != NULL) {
+				errorf(&input->base.pos,
+				       "multiple declarations of '%N' (declared %P)",
+				       input, &old->base.pos);
+			}
+		}
+	}
+	for (entity_t *output = asm_statement->outputs; output != NULL;
+	     output = output->base.next) {
+		symbol_t *symbol = output->base.symbol;
+		if (symbol != NULL) {
+			need_normalization = true;
+			entity_t *old = set_entity(output);
+			if (old != NULL) {
+				errorf(&output->base.pos,
+				       "multiple declarations of '%N' (declared %P)",
+				       output, &old->base.pos);
+			}
+		}
+	}
+	if (!need_normalization) {
+		asm_statement->normalized_text = asm_statement->asm_text;
+		return;
+	}
+
+	assert(obstack_object_size(&ast_obstack) == 0);
+	for (const char *c = asm_statement->asm_text.begin; *c != '\0'; ++c) {
+		if (*c == '%') {
+			/* scan forward to see if we can find a [] */
+			const char *b = c+1;
+			while (*b != '\0' && *b != '%' && *b != '[' && (*b < '0' || *b > '9')) {
+				++b;
+			}
+			if (*b == '[') {
+				/* parse identifier */
+				assert(obstack_object_size(&symbol_obstack) == 0);
+				const char *e = b+1;
+				while (*e != '\0' && *e != ']') {
+					obstack_1grow(&symbol_obstack, *e);
+					++e;
+				}
+				obstack_1grow(&symbol_obstack, '\0');
+				char *identifier = obstack_finish(&symbol_obstack);
+				if (*e == ']') {
+					symbol_t *symbol   = symbol_table_insert(identifier);
+					entity_t *argument = get_entity(symbol, NAMESPACE_ASM_ARGUMENT);
+					if (argument == NULL) {
+						position_t errorpos = asm_statement->textpos;
+						errorpos.colno += b + 1 - asm_statement->asm_text.begin;
+						errorf(&errorpos, "undefined assembler operand '%Y'",
+						       symbol);
+					} else {
+						for ( ; c < b; ++c) {
+							obstack_1grow(&ast_obstack, *c);
+						}
+						obstack_printf(&ast_obstack, "%u",
+						               argument->asm_argument.pos);
+						c = e;
+						continue;
+					}
+				}
+			}
+		}
+		obstack_1grow(&ast_obstack, *c);
+	}
+	asm_statement->normalized_text
+		= finish_string(asm_statement->asm_text.encoding);
+
+	for (entity_t *input = asm_statement->inputs; input != NULL;
+	     input = input->base.next) {
+		symbol_t *symbol = input->base.symbol;
+		if (symbol != NULL) {
+			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
+		}
+	}
+	for (entity_t *output = asm_statement->outputs; output != NULL;
+	     output = output->base.next) {
+		symbol_t *symbol = output->base.symbol;
+		if (symbol != NULL) {
+			reset_symbol(symbol, NAMESPACE_ASM_ARGUMENT);
+		}
+	}
+}
+
 /**
  * Parse an asm statement.
  */
@@ -8888,13 +9001,14 @@ static statement_t *parse_asm_statement(void)
 
 	expect('(');
 	rem_anchor_token(T_STRING_LITERAL);
+	asm_statement->textpos  = *HERE;
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
 	if (accept(':')) {
-		parse_asm_arguments(&asm_statement->outputs, true);
+		asm_statement->outputs = parse_asm_arguments(true);
 	}
 	if (accept(':')) {
-		parse_asm_arguments(&asm_statement->inputs, false);
+		asm_statement->inputs = parse_asm_arguments(false);
 	}
 	if (accept(':')) {
 		parse_asm_clobbers( &asm_statement->clobbers);
@@ -8921,6 +9035,8 @@ static statement_t *parse_asm_statement(void)
 		 * identically to a volatile 'asm' instruction. */
 		asm_statement->is_volatile = true;
 	}
+
+	normalize_asm_text(asm_statement);
 
 	return statement;
 }

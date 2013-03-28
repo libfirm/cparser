@@ -986,17 +986,23 @@ static void print_for_statement(const for_statement_t *statement)
  *
  * @param arguments   the arguments
  */
-static void print_asm_arguments(asm_argument_t const *const arguments)
+static void print_asm_arguments(entity_t const *const arguments)
 {
 	print_string(" :");
 	separator_t sep = { " ", ", " };
-	for (asm_argument_t const *i = arguments; i; i = i->next) {
+	for (entity_t const *i = arguments; i; i = i->base.next) {
+		if (i->kind != ENTITY_ASM_ARGUMENT) {
+			print_string("invalid");
+			continue;
+		}
+
 		print_string(sep_next(&sep));
-		if (i->symbol)
-			print_format("[%s] ", i->symbol->string);
-		print_quoted_string(&i->constraints, '"');
+		symbol_t *symbol = i->base.symbol;
+		if (symbol != NULL)
+			print_format("[%s] ", symbol->string);
+		print_quoted_string(&i->asm_argument.constraints, '"');
 		print_string(" (");
-		print_expression(i->expression);
+		print_expression(i->asm_argument.expression);
 		print_char(')');
 	}
 }
@@ -1409,6 +1415,9 @@ print_compound:
 		print_string("__label__ ");
 		print_string(entity->base.symbol->string);
 		print_char(';');
+		return;
+	case ENTITY_ASM_ARGUMENT:
+		print_string(entity->base.symbol->string);
 		return;
 	case ENTITY_LABEL:
 	case ENTITY_ENUM_VALUE:
