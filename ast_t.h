@@ -597,7 +597,8 @@ struct asm_statement_t {
 	entity_t        *outputs; /**< list of asm_argument_t entities */
 	asm_clobber_t   *clobbers;
 	asm_label_t     *labels;
-	bool             is_volatile;
+	bool             has_arguments:1;
+	bool             is_volatile:1;
 };
 
 struct ms_try_statement_t {

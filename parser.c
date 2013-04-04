@@ -8889,6 +8889,19 @@ static void parse_asm_labels(asm_label_t **anchor)
 
 static void normalize_asm_text(asm_statement_t *asm_statement)
 {
+	if (!asm_statement->has_arguments) {
+		/* escape % signs */
+		assert(obstack_object_size(&ast_obstack) == 0);
+		for (const char *c = asm_statement->asm_text.begin; *c != '\0'; ++c) {
+			if (*c == '%')
+				obstack_1grow(&ast_obstack, '%');
+			obstack_1grow(&ast_obstack, *c);
+		}
+		asm_statement->normalized_text
+			= finish_string(asm_statement->asm_text.encoding);
+		return;
+	}
+
 	/* normalize asm text if necessary */
 	bool need_normalization = false;
 	for (entity_t *input = asm_statement->inputs; input != NULL;
@@ -9005,6 +9018,7 @@ static statement_t *parse_asm_statement(void)
 	asm_statement->asm_text = parse_string_literals("asm statement");
 
 	if (accept(':')) {
+		asm_statement->has_arguments = true;
 		asm_statement->outputs = parse_asm_arguments(true);
 	}
 	if (accept(':')) {

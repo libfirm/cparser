@@ -1051,7 +1051,8 @@ static void print_asm_statement(asm_statement_t const *const stmt)
 		stmt->inputs   ? 2 :
 		stmt->outputs  ? 1 :
 		0;
-	if (n >= 1) print_asm_arguments(stmt->outputs);
+	if (stmt->has_arguments)
+		print_asm_arguments(stmt->outputs);
 	if (n >= 2) print_asm_arguments(stmt->inputs);
 	if (n >= 3) print_asm_clobbers( stmt->clobbers);
 	if (n >= 4) print_asm_labels(   stmt->labels);
