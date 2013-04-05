@@ -8903,22 +8903,11 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 	}
 
 	/* normalize asm text if necessary */
-	bool need_normalization = false;
-	for (entity_t *input = asm_statement->inputs; input != NULL;
-	     input = input->base.next) {
-		symbol_t *symbol = input->base.symbol;
-		if (symbol != NULL) {
-			need_normalization = true;
-			entity_t *old = set_entity(input);
-			if (old != NULL) {
-				errorf(&input->base.pos,
-				       "multiple declarations of '%N' (declared %P)",
-				       input, &old->base.pos);
-			}
-		}
-	}
+	unsigned pos                = 0;
+	bool     need_normalization = false;
 	for (entity_t *output = asm_statement->outputs; output != NULL;
 	     output = output->base.next) {
+	    output->asm_argument.pos = pos++;
 		symbol_t *symbol = output->base.symbol;
 		if (symbol != NULL) {
 			need_normalization = true;
@@ -8927,6 +8916,20 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 				errorf(&output->base.pos,
 				       "multiple declarations of '%N' (declared %P)",
 				       output, &old->base.pos);
+			}
+		}
+	}
+	for (entity_t *input = asm_statement->inputs; input != NULL;
+	     input = input->base.next) {
+	    input->asm_argument.pos = pos++;
+		symbol_t *symbol = input->base.symbol;
+		if (symbol != NULL) {
+			need_normalization = true;
+			entity_t *old = set_entity(input);
+			if (old != NULL) {
+				errorf(&input->base.pos,
+				       "multiple declarations of '%N' (declared %P)",
+				       input, &old->base.pos);
 			}
 		}
 	}
