@@ -4,8 +4,9 @@
  */
 #include <config.h>
 
+#define _POSIX_C_SOURCE 199506
+
 #if defined(__unix__) || defined(__MACH__)
-#define _POSIX_SOURCE
 #include <sys/stat.h>
 #endif
 
