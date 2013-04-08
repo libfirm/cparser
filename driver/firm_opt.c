@@ -360,6 +360,7 @@ static opt_config_t opts[] = {
 	IRG("dead",              dead_node_elimination,    "dead node elimination",                                 OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
 	IRG("deconv",            conv_opt,                 "conv node elimination",                                 OPT_FLAG_NONE),
 	IRG("fp-vrp",            fixpoint_vrp,             "fixpoint value range propagation",                      OPT_FLAG_NONE),
+	IRG("occults",           occult_consts,            "occult constant folding",                               OPT_FLAG_NONE),
 	IRG("frame",             opt_frame_irg,            "remove unused frame entities",                          OPT_FLAG_NONE),
 	IRG("gvn-pre",           do_gvn_pre,               "global value numbering partial redundancy elimination", OPT_FLAG_NONE),
 	IRG("if-conversion",     opt_if_conv,              "if-conversion",                                         OPT_FLAG_NONE),
@@ -590,6 +591,7 @@ static void do_firm_optimizations(const char *input_filename)
 		do_irg_opt(irg, "fp-vrp");
 		do_irg_opt(irg, "lower");
 		do_irg_opt(irg, "deconv");
+		do_irg_opt(irg, "occults");
 		do_irg_opt(irg, "thread-jumps");
 		do_irg_opt(irg, "remove-confirms");
 		do_irg_opt(irg, "gvn-pre");
@@ -948,6 +950,7 @@ void choose_optimization_pack(int level)
 		set_option("strict-aliasing");
 		set_option("inline");
 		set_option("fp-vrp");
+		set_option("occults");
 		set_option("deconv");
 		set_be_option("omitfp");
 		break;
