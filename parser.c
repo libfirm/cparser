@@ -7016,9 +7016,9 @@ static void check_call_argument(type_t          *expected_type,
 /**
  * Handle the semantic restrictions of builtin calls
  */
-static void handle_builtin_argument_restrictions(call_expression_t *call)
+static void handle_builtin_argument_restrictions(call_expression_t *const call,
+                                                 entity_t *const entity)
 {
-	entity_t *entity = call->function->reference.entity;
 	switch (entity->function.btk) {
 	case BUILTIN_FIRM:
 		switch (entity->function.b.firm_builtin_kind) {
@@ -7077,19 +7077,13 @@ static void handle_builtin_argument_restrictions(call_expression_t *call)
 	}
 }
 
-/**
- * Parse a call expression, i.e. expression '( ... )'.
- *
- * @param expression  the function address
- */
-static expression_t *parse_call_expression(expression_t *expression)
+static void semantic_call(call_expression_t *call)
 {
-	expression_t      *result = allocate_expression_zero(EXPR_CALL);
-	call_expression_t *call   = &result->call;
-	call->function            = expression;
-
-	type_t *const orig_type = expression->base.type;
-	type_t *const type      = skip_typeref(orig_type);
+	expression_t *const function  = call->function;
+	type_t       *const orig_type = function->base.type;
+	type_t       *const type      = skip_typeref(orig_type);
+	if (!is_type_valid(type))
+		return;
 
 	function_type_t *function_type = NULL;
 	if (is_type_pointer(type)) {
@@ -7101,11 +7095,76 @@ static expression_t *parse_call_expression(expression_t *expression)
 		}
 	}
 
-	if (function_type == NULL && is_type_valid(type)) {
+	if (function_type == NULL) {
 		errorf(HERE,
 		       "called object '%E' (type '%T') is not a pointer to a function",
-		       expression, orig_type);
+		       function, orig_type);
+		return;
 	}
+
+	entity_t *builtin_entity = NULL;
+	if (function->kind == EXPR_REFERENCE) {
+		entity_t *ref_entity = function->reference.entity;
+		if (ref_entity->kind == ENTITY_FUNCTION &&
+		    ref_entity->function.btk != BUILTIN_NONE) {
+		    builtin_entity = ref_entity;
+		}
+	}
+
+	/* check type and count of call arguments */
+	function_parameter_t *parameter = function_type->parameters;
+	call_argument_t      *argument  = call->arguments;
+	if (!function_type->unspecified_parameters) {
+		for (unsigned pos = 0; parameter != NULL && argument != NULL;
+		     parameter = parameter->next, argument = argument->next) {
+			check_call_argument(parameter->type, argument, ++pos);
+		}
+
+		if (parameter != NULL) {
+			errorf(&call->base.pos, "too few arguments to function '%E'",
+			       function);
+		} else if (argument != NULL && !function_type->variadic) {
+			errorf(&argument->expression->base.pos,
+			       "too many arguments to function '%E'", function);
+		}
+	}
+
+	/* do default promotion for other arguments */
+	for (; argument != NULL; argument = argument->next) {
+		type_t *argument_type = argument->expression->base.type;
+		if (!is_type_complete(skip_typeref(argument_type))) {
+			errorf(&argument->expression->base.pos,
+			       "call argument '%E' has an incomplete type",
+			       argument->expression);
+		}
+
+		argument_type = get_default_promoted_type(argument_type);
+
+		argument->expression
+			= create_implicit_cast(argument->expression, argument_type);
+	}
+
+	check_format(call);
+
+	if (is_type_compound(skip_typeref(function_type->return_type))) {
+		warningf(WARN_AGGREGATE_RETURN, &call->base.pos,
+		         "function call has aggregate value");
+	}
+
+	if (builtin_entity != NULL)
+		handle_builtin_argument_restrictions(call, builtin_entity);
+}
+
+/**
+ * Parse a call expression, i.e. expression '( ... )'.
+ *
+ * @param expression  the function address
+ */
+static expression_t *parse_call_expression(expression_t *expression)
+{
+	expression_t      *result = allocate_expression_zero(EXPR_CALL);
+	call_expression_t *call   = &result->call;
+	call->function            = expression;
 
 	/* parse arguments */
 	eat('(');
@@ -7126,53 +7185,7 @@ static expression_t *parse_call_expression(expression_t *expression)
 	rem_anchor_token(')');
 	expect(')');
 
-	if (function_type == NULL)
-		return result;
-
-	/* check type and count of call arguments */
-	function_parameter_t *parameter = function_type->parameters;
-	call_argument_t      *argument  = call->arguments;
-	if (!function_type->unspecified_parameters) {
-		for (unsigned pos = 0; parameter != NULL && argument != NULL;
-				parameter = parameter->next, argument = argument->next) {
-			check_call_argument(parameter->type, argument, ++pos);
-		}
-
-		if (parameter != NULL) {
-			errorf(&expression->base.pos, "too few arguments to function '%E'",
-			       expression);
-		} else if (argument != NULL && !function_type->variadic) {
-			errorf(&argument->expression->base.pos,
-			       "too many arguments to function '%E'", expression);
-		}
-	}
-
-	/* do default promotion for other arguments */
-	for (; argument != NULL; argument = argument->next) {
-		type_t *argument_type = argument->expression->base.type;
-		if (!is_type_complete(skip_typeref(argument_type))) {
-			errorf(&argument->expression->base.pos, "call argument '%E' has an incomplete type", argument->expression);
-		}
-
-		argument_type = get_default_promoted_type(argument_type);
-
-		argument->expression
-			= create_implicit_cast(argument->expression, argument_type);
-	}
-
-	check_format(call);
-
-	if (is_type_compound(skip_typeref(function_type->return_type))) {
-		position_t const *const pos = &expression->base.pos;
-		warningf(WARN_AGGREGATE_RETURN, pos, "function call has aggregate value");
-	}
-
-	if (expression->kind == EXPR_REFERENCE) {
-		reference_expression_t *reference = &expression->reference;
-		if (reference->entity->kind == ENTITY_FUNCTION &&
-		    reference->entity->function.btk != BUILTIN_NONE)
-			handle_builtin_argument_restrictions(call);
-	}
+	semantic_call(call);
 
 	return result;
 }
