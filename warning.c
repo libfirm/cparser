@@ -36,7 +36,7 @@ static warning_switch_t warning[] = {
 	[WARN_INVALID_BYTE_SEQUENCE]         = { WARN_STATE_ON,   "invalid-byte-sequence"         },
 	[WARN_LONG_LONG]                     = { WARN_STATE_NONE, "long-long"                     },
 	[WARN_MAIN]                          = { WARN_STATE_ON,   "main"                          },
-	[WARN_MISSING_DECLARATIONS]          = { WARN_STATE_NONE, "missing-declarations"          },
+	[WARN_MISSING_VARIABLE_DECLARATIONS] = { WARN_STATE_NONE, "missing-variable-declarations" },
 	[WARN_MISSING_NORETURN]              = { WARN_STATE_NONE, "missing-noreturn"              },
 	[WARN_MISSING_PROTOTYPES]            = { WARN_STATE_NONE, "missing-prototypes"            },
 	[WARN_MULTICHAR]                     = { WARN_STATE_ON,   "multichar"                     },
@@ -134,7 +134,8 @@ void set_warning_opt(const char *const opt)
 		SET(WARN_IMPLICIT_FUNCTION_DECLARATION);
 		SET(WARN_IMPLICIT_INT);
 		SET(WARN_MAIN);
-		SET(WARN_MISSING_DECLARATIONS);
+		SET(WARN_MISSING_PROTOTYPES);
+		SET(WARN_MISSING_VARIABLE_DECLARATIONS);
 		SET(WARN_NONNULL);
 		SET(WARN_OTHER);
 		SET(WARN_PARENTHESES);

@@ -4088,21 +4088,14 @@ static void warn_missing_declaration(const entity_t *entity, bool is_definition)
 		if (is_definition
 		    && entity->declaration.storage_class != STORAGE_CLASS_STATIC
 		    && !is_main(entity)) {
-			if (is_warn_on(WARN_MISSING_PROTOTYPES)) {
-				warningf(WARN_MISSING_PROTOTYPES, &entity->base.pos,
-				         "no previous prototype for '%#N'", entity);
-			} else {
-				goto warn_missing_declaration;
-			}
+			warningf(WARN_MISSING_PROTOTYPES, &entity->base.pos, "no previous prototype for '%#N'", entity);
 		}
 	} else if (entity->kind                      == ENTITY_VARIABLE
 	        && current_scope                     == file_scope
 	        && entity->declaration.storage_class == STORAGE_CLASS_NONE
 	        && !entity->declaration.implicit) {
-warn_missing_declaration:
 		if (is_type_valid(skip_typeref(entity->declaration.type)))
-			warningf(WARN_MISSING_DECLARATIONS, &entity->base.pos,
-					 "no previous declaration for '%#N'", entity);
+			warningf(WARN_MISSING_VARIABLE_DECLARATIONS, &entity->base.pos, "no previous declaration for '%#N'", entity);
 	}
 }
 

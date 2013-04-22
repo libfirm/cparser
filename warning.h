@@ -38,7 +38,7 @@ typedef enum warning_t {
 	WARN_INVALID_BYTE_SEQUENCE,         /**< Warn on invalid byte sequences for chosen input charset */
 	WARN_LONG_LONG,                     /**< Warn if 'long long' type is used */
 	WARN_MAIN,                          /**< Warn if the type of 'main' is suspicious */
-	WARN_MISSING_DECLARATIONS,          /**< Warn if a global function is defined without a previous declaration */
+	WARN_MISSING_VARIABLE_DECLARATIONS, /**< Warn if a global variable is defined without a previous declaration */
 	WARN_MISSING_NORETURN,              /**< Warn about functions which might be candidates for attribute 'noreturn' */
 	WARN_MISSING_PROTOTYPES,            /**< Warn if a global function is defined without a previous prototype declaration */
 	WARN_MULTICHAR,                     /**< Warn if a multicharacter constant ('FOOF') is used. */
