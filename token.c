@@ -75,7 +75,7 @@ void exit_tokens(void)
 
 void print_token_kind(FILE *f, token_kind_t token_kind)
 {
-	if (token_kind >= lengthof(token_symbols)) {
+	if (token_kind >= ARRAY_SIZE(token_symbols)) {
 		fputs("invalid token", f);
 		return;
 	}

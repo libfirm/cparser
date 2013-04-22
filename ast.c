@@ -151,7 +151,7 @@ static unsigned get_expression_precedence(expression_kind_t kind)
 		[EXPR_BINARY_ISLESSGREATER]       = PREC_PRIMARY,
 		[EXPR_BINARY_ISUNORDERED]         = PREC_PRIMARY
 	};
-	assert((size_t)kind < lengthof(prec));
+	assert((size_t)kind < ARRAY_SIZE(prec));
 	unsigned res = prec[kind];
 
 	assert(res != PREC_BOTTOM);

@@ -51,7 +51,7 @@ static size_t get_type_struct_size(type_kind_t kind)
 		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
 		[TYPE_VOID]            = sizeof(type_base_t),
 	};
-	assert((size_t)kind < lengthof(sizes));
+	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -195,7 +195,7 @@ void init_types(unsigned machine_size)
 	props[ATOMIC_TYPE_WCHAR_T]     = props[ATOMIC_TYPE_INT];
 
 	/* set struct alignments to the same value as alignment */
-	for (size_t i = 0; i != lengthof(atomic_type_properties); ++i) {
+	for (size_t i = 0; i != ARRAY_SIZE(atomic_type_properties); ++i) {
 		props[i].struct_alignment = props[i].alignment;
 	}
 }
@@ -1196,7 +1196,7 @@ atomic_type_kind_t find_signed_int_atomic_type_kind_for_size(unsigned size)
 		ATOMIC_TYPE_LONG,
 		ATOMIC_TYPE_LONGLONG
 	};
-	for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
+	for (size_t i = 0; i < ARRAY_SIZE(possible_kinds); ++i) {
 		if (get_atomic_type_size(possible_kinds[i]) == size) {
 			return possible_kinds[i];
 		}
@@ -1216,7 +1216,7 @@ atomic_type_kind_t find_unsigned_int_atomic_type_kind_for_size(unsigned size)
 		ATOMIC_TYPE_ULONG,
 		ATOMIC_TYPE_ULONGLONG
 	};
-	for (size_t i = 0; i < lengthof(possible_kinds); ++i) {
+	for (size_t i = 0; i < ARRAY_SIZE(possible_kinds); ++i) {
 		if (get_atomic_type_size(possible_kinds[i]) == size) {
 			return possible_kinds[i];
 		}

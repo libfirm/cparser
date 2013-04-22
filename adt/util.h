@@ -13,6 +13,14 @@
 #define _FIRM_UTIL_H_
 
 /**
+ * Returns size of a static array. Warning: This returns invalid values for
+ * dynamically allocated arrays.
+ *
+ * @param a    static array
+ */
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+
+/**
  * Asserts that the constant expression x is not zero at compiletime. name has
  * to be a unique identifier.
  *
@@ -34,9 +42,7 @@
  */
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
-#define lengthof(x) (sizeof(x) / sizeof(*(x)))
-
-#define endof(x) ((x) + lengthof(x))
+#define endof(x) ((x) + ARRAY_SIZE(x))
 
 #undef MAX
 #undef MIN

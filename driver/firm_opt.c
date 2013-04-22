@@ -256,10 +256,10 @@ static void rts_map(void)
 		{ &rts_entities[rts_memset],  i_mapper_memset },
 		{ &rts_entities[rts_memcmp],  i_mapper_memcmp }
 	};
-	i_record rec[lengthof(mapper)];
+	i_record rec[ARRAY_SIZE(mapper)];
 	size_t   n_map = 0;
 
-	for (size_t i = 0; i != lengthof(mapper); ++i) {
+	for (size_t i = 0; i != ARRAY_SIZE(mapper); ++i) {
 		if (*mapper[i].ent != NULL) {
 			rec[n_map].i_call.kind     = INTRINSIC_CALL;
 			rec[n_map].i_call.i_ent    = *mapper[i].ent;
@@ -864,7 +864,7 @@ void firm_option_help(print_option_help_func print_option_help)
 		print_option_help(buf, buf2);
 	}
 
-	for (size_t k = 0; k != lengthof(firm_options); ++k) {
+	for (size_t k = 0; k != ARRAY_SIZE(firm_options); ++k) {
 		char buf[1024];
 		char buf2[1024];
 		snprintf(buf, sizeof(buf), "-f%s", firm_options[k].option);
@@ -894,7 +894,7 @@ int firm_option(const char *const opt)
 	}
 
 	size_t const len = strlen(opt);
-	for (size_t i = lengthof(firm_options); i != 0;) {
+	for (size_t i = ARRAY_SIZE(firm_options); i != 0;) {
 		struct params const* const o = &firm_options[--i];
 		if (len == o->opt_len && memcmp(opt, o->option, len) == 0) {
 			/* statistic options do accumulate */

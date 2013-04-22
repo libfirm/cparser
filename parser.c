@@ -284,7 +284,7 @@ static size_t get_statement_struct_size(statement_kind_t kind)
 		[STATEMENT_MS_TRY]        = sizeof(ms_try_statement_t),
 		[STATEMENT_LEAVE]         = sizeof(leave_statement_t)
 	};
-	assert((size_t)kind < lengthof(sizes));
+	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -332,7 +332,7 @@ static size_t get_expression_struct_size(expression_kind_t kind)
 	if (kind >= EXPR_BINARY_FIRST && kind <= EXPR_BINARY_LAST) {
 		return sizes[EXPR_BINARY_FIRST];
 	}
-	assert((size_t)kind < lengthof(sizes));
+	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }
@@ -410,7 +410,7 @@ static size_t get_initializer_size(initializer_kind_t kind)
 		[INITIALIZER_LIST]        = sizeof(initializer_list_t),
 		[INITIALIZER_DESIGNATOR]  = sizeof(initializer_designator_t)
 	};
-	assert((size_t)kind < lengthof(sizes));
+	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }

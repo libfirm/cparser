@@ -56,7 +56,7 @@ static size_t get_entity_struct_size(entity_kind_t kind)
 		[ENTITY_NAMESPACE]       = sizeof(namespace_t),
 		[ENTITY_ASM_ARGUMENT]    = sizeof(asm_argument_t),
 	};
-	assert(kind < lengthof(sizes));
+	assert(kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
 	return sizes[kind];
 }

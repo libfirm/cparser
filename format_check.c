@@ -75,7 +75,7 @@ static const char* get_length_modifier_name(const format_length_modifier_t mod)
 		[FMT_MOD_I32]  = "I32",
 		[FMT_MOD_I64]  = "I64"
 	};
-	assert((size_t)mod < lengthof(names));
+	assert((size_t)mod < ARRAY_SIZE(names));
 	return names[mod];
 }
 
@@ -986,7 +986,7 @@ void check_format(const call_expression_t *const call)
 	 * header included.
 	 */
 	const char *const name = entity->base.symbol->string;
-	for (size_t i = 0; i < lengthof(builtin_table); ++i) {
+	for (size_t i = 0; i < ARRAY_SIZE(builtin_table); ++i) {
 		if (streq(name, builtin_table[i].name)) {
 			switch (builtin_table[i].fmt_kind) {
 			case FORMAT_PRINTF:

@@ -800,7 +800,7 @@ static const struct {
 	{ rts_memcmp,     1, "memcmp",       3, _C89 },
 };
 
-static ident *rts_idents[lengthof(rts_data)];
+static ident *rts_idents[ARRAY_SIZE(rts_data)];
 
 static create_ld_ident_func create_ld_ident = create_name_linux_elf;
 
@@ -963,7 +963,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	   this is not needed. */
 	if (!freestanding && !has_body) {
 		/* check for a known runtime function */
-		for (size_t i = 0; i < lengthof(rts_data); ++i) {
+		for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 			if (id != rts_idents[i])
 				continue;
 
@@ -2389,7 +2389,7 @@ static ir_node *control_flow_to_1_0(expression_t const *const expr, jump_target 
 		ir_node *const zero = new_d_Const(dbgi, get_mode_null(mode));
 		if (val) {
 			ir_node *const in[] = { val, zero };
-			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, mode);
+			val = new_rd_Phi(dbgi, exit_target.block, ARRAY_SIZE(in), in, mode);
 		} else {
 			val = zero;
 		}
@@ -2776,7 +2776,7 @@ static ir_node *conditional_to_firm(const conditional_expression_t *expression)
 		jump_to_target(&exit_target);
 		if (val) {
 			ir_node *const in[] = { val, false_val };
-			val = new_rd_Phi(dbgi, exit_target.block, lengthof(in), in, get_irn_mode(val));
+			val = new_rd_Phi(dbgi, exit_target.block, ARRAY_SIZE(in), in, get_irn_mode(val));
 		} else {
 			val = false_val;
 		}
@@ -3809,8 +3809,8 @@ static complex_value complex_conditional_to_firm(
 			ir_node  *const inr[] = { val.real, false_val.real };
 			ir_node  *const ini[] = { val.imag, false_val.imag };
 			ir_node  *const block = exit_target.block;
-			val.real = new_rd_Phi(dbgi, block, lengthof(inr), inr, mode);
-			val.imag = new_rd_Phi(dbgi, block, lengthof(ini), ini, mode);
+			val.real = new_rd_Phi(dbgi, block, ARRAY_SIZE(inr), inr, mode);
+			val.imag = new_rd_Phi(dbgi, block, ARRAY_SIZE(ini), ini, mode);
 		} else {
 			val = false_val;
 		}
@@ -5827,7 +5827,7 @@ void init_ast2firm(void)
 	ir_set_type_debug_retrieve(dbg_print_type_dbg_info);
 
 	/* create idents for all known runtime functions */
-	for (size_t i = 0; i < lengthof(rts_data); ++i) {
+	for (size_t i = 0; i < ARRAY_SIZE(rts_data); ++i) {
 		rts_idents[i] = new_id_from_str(rts_data[i].name);
 	}
 

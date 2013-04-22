@@ -75,7 +75,7 @@ static warning_switch_t warning[] = {
 
 warning_switch_t const *get_warn_switch(warning_t const w)
 {
-	assert((size_t)w < lengthof(warning));
+	assert((size_t)w < ARRAY_SIZE(warning));
 	assert(warning[w].name);
 	return &warning[w];
 }
