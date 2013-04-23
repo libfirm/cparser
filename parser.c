@@ -8963,8 +8963,15 @@ static void parse_asm_clobbers(asm_clobber_t **anchor)
 	if (token.kind == T_STRING_LITERAL) {
 		add_anchor_token(',');
 		do {
-			asm_clobber_t *clobber = allocate_ast_zero(sizeof(clobber[0]));
-			clobber->clobber       = parse_string_literals(NULL);
+			asm_clobber_t   *clobber = allocate_ast_zero(sizeof(clobber[0]));
+			position_t const pos     = *HERE;
+			clobber->clobber         = parse_string_literals(NULL);
+
+			const char *const clobber_string = clobber->clobber.begin;
+			if (!be_is_valid_clobber(clobber_string)) {
+				errorf(&pos, "invalid register '%s' specified in clobbers",
+				       clobber_string);
+			}
 
 			*anchor = clobber;
 			anchor  = &clobber->next;

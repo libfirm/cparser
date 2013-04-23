@@ -5289,12 +5289,6 @@ static ir_node *asm_statement_to_firm(const asm_statement_t *statement)
 	for ( ; clobber != NULL; clobber = clobber->next) {
 		const char *clobber_str = clobber->clobber.begin;
 
-		if (!be_is_valid_clobber(clobber_str)) {
-			errorf(&statement->base.pos,
-				   "invalid clobber '%s' specified", clobber->clobber);
-			continue;
-		}
-
 		if (streq(clobber_str, "memory")) {
 			needs_memory = true;
 			continue;
