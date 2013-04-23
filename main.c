@@ -134,6 +134,7 @@ static int               verbose;
 static struct obstack    cppflags_obst;
 static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
+static struct obstack    codegenflags_obst;
 static const char       *outname;
 static bool              define_intmax_types;
 static bool              construct_dep_target;
@@ -178,6 +179,13 @@ struct compilation_unit_t {
 	translation_unit_t     *ast;
 	bool                    parse_errors;
 	compilation_unit_t     *next;
+};
+
+typedef struct codegen_option_t codegen_option_t;
+
+struct codegen_option_t {
+	codegen_option_t *next;
+	char              option[];
 };
 
 static char **temp_files;
@@ -772,16 +780,6 @@ static void print_help_codegeneration(void)
 	put_help("-pthread",                 "Use pthread threading library");
 	put_help("-mtarget=TARGET",          "Specify target architecture as CPU-manufacturer-OS triple");
 	put_help("-mtriple=TARGET",          "Alias for -mtarget (clang compatibility)");
-	put_help("-march=ARCH",              "");
-	put_help("-mtune=ARCH",              "");
-	put_help("-mcpu=CPU",                "");
-	put_help("-mfpmath=",                "");
-	put_help("-mpreferred-stack-boundary=", "");
-	put_help("-mrtd",                    "");
-	put_help("-mregparm=",               "Not supported yet");
-	put_help("-msoft-float",             "Not supported yet");
-	put_help("-m32",                     "Generate 32bit code");
-	put_help("-m64",                     "Generate 64bit code");
 	put_help("-fverbose-asm",            "Ignored (gcc compatibility)");
 	put_help("-fjump-tables",            "Ignored (gcc compatibility)");
 	put_help("-fcommon",                 "Ignored (gcc compatibility)");
@@ -1968,23 +1966,26 @@ static int link_program(compilation_unit_t *units)
 
 int main(int argc, char **argv)
 {
-	const char         *print_file_name_file = NULL;
-	compile_mode_t      mode                 = CompileAssembleLink;
-	int                 opt_level            = 1;
-	char                cpu_arch[16]         = "ia32";
-	compilation_unit_t *units                = NULL;
-	compilation_unit_t *last_unit            = NULL;
-	bool                produce_statev       = false;
-	const char         *filtev               = NULL;
-	bool                profile_generate     = false;
-	bool                profile_use          = false;
-	bool                do_timing            = false;
-	bool                print_timing         = false;
-	bool                stdinc               = true;
+	const char         *print_file_name_file   = NULL;
+	compile_mode_t      mode                   = CompileAssembleLink;
+	int                 opt_level              = 1;
+	char                firm_be[16]            = "ia32";
+	compilation_unit_t *units                  = NULL;
+	compilation_unit_t *last_unit              = NULL;
+	bool                produce_statev         = false;
+	const char         *filtev                 = NULL;
+	bool                profile_generate       = false;
+	bool                profile_use            = false;
+	bool                do_timing              = false;
+	bool                print_timing           = false;
+	bool                stdinc                 = true;
+	codegen_option_t   *codegen_options        = NULL;
+	codegen_option_t  **codegen_options_anchor = &codegen_options;
 
 	temp_files = NEW_ARR_F(char*, 0);
 	atexit(free_temp_files);
 
+	obstack_init(&codegenflags_obst);
 	obstack_init(&cppflags_obst);
 	obstack_init(&ldflags_obst);
 	obstack_init(&asflags_obst);
@@ -2258,10 +2259,11 @@ int main(int argc, char **argv)
 					help |= HELP_FIRM;
 				} else {
 					if (be_parse_arg(opt) == 0) {
-						errorf(NULL, "unknown Firm backend option '-b %s'", opt);
+						errorf(NULL, "unknown Firm backend option '-b%s'", opt);
 						argument_errors = true;
 					} else if (strstart(opt, "isa=")) {
-						strncpy(cpu_arch, opt, sizeof(cpu_arch));
+						GET_ARG_AFTER(opt, "-bisa=");
+						snprintf(firm_be, sizeof(firm_be), "%s", opt);
 					}
 				}
 			} else if (option[0] == 'W') {
@@ -2297,96 +2299,29 @@ int main(int argc, char **argv)
 			} else if (option[0] == 'm') {
 				/* -m options */
 				const char *opt;
-				char arch_opt[64];
 
 				GET_ARG_AFTER(opt, "-m");
-				if (strstart(opt, "target=")) {
+				if (strstart(opt, "target=") || strstart(opt, "triple=")) {
 					GET_ARG_AFTER(opt, "-mtarget=");
 					if (!parse_target_triple(opt)) {
 						argument_errors = true;
 					} else {
 						const char *isa = setup_target_machine();
-						strncpy(cpu_arch, isa, sizeof(cpu_arch));
+						snprintf(firm_be, sizeof(firm_be), "%s", isa);
 						target_triple = opt;
 					}
-				} else if (strstart(opt, "triple=")) {
-					GET_ARG_AFTER(opt, "-mtriple=");
-					if (!parse_target_triple(opt)) {
-						argument_errors = true;
-					} else {
-						const char *isa = setup_target_machine();
-						strncpy(cpu_arch, isa, sizeof(cpu_arch));
-						target_triple = opt;
-					}
-				} else if (strstart(opt, "arch=")) {
-					GET_ARG_AFTER(opt, "-march=");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
-					int res = be_parse_arg(arch_opt);
-					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-					res &= be_parse_arg(arch_opt);
-
-					if (res == 0) {
-						errorf(NULL, "unknown architecture '%s'", arch_opt);
-						argument_errors = true;
-					}
-				} else if (strstart(opt, "tune=")) {
-					GET_ARG_AFTER(opt, "-mtune=");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-opt=%s", cpu_arch, opt);
-					if (be_parse_arg(arch_opt) == 0)
-						argument_errors = true;
-				} else if (strstart(opt, "cpu=")) {
-					GET_ARG_AFTER(opt, "-mcpu=");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-arch=%s", cpu_arch, opt);
-					if (be_parse_arg(arch_opt) == 0)
-						argument_errors = true;
-				} else if (strstart(opt, "fpmath=")) {
-					GET_ARG_AFTER(opt, "-mfpmath=");
-					if (streq(opt, "387"))
-						opt = "x87";
-					else if (streq(opt, "sse"))
-						opt = "sse2";
-					else {
-						errorf(NULL, "option -mfpmath supports only 387 or sse");
-						argument_errors = true;
-					}
-					if (!argument_errors) {
-						snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=%s", cpu_arch, opt);
-						if (be_parse_arg(arch_opt) == 0)
-							argument_errors = true;
-					}
-				} else if (strstart(opt, "preferred-stack-boundary=")) {
-					GET_ARG_AFTER(opt, "-mpreferred-stack-boundary=");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-stackalign=%s", cpu_arch, opt);
-					if (be_parse_arg(arch_opt) == 0)
-						argument_errors = true;
-				} else if (streq(opt, "rtd")) {
-					default_calling_convention = CC_STDCALL;
-				} else if (strstart(opt, "regparm=")) {
-					errorf(NULL, "regparm convention not supported yet");
-					argument_errors = true;
-				} else if (streq(opt, "soft-float")) {
-					add_flag(&ldflags_obst, "-msoft-float");
-					snprintf(arch_opt, sizeof(arch_opt), "%s-fpunit=softfloat", cpu_arch);
-					if (be_parse_arg(arch_opt) == 0)
-						argument_errors = true;
-				} else if (streq(opt, "sse2")) {
-					/* ignore for now, our x86 backend always uses sse when
-					 * sse is requested */
 				} else {
-					long int value = strtol(opt, NULL, 10);
-					if (value == 0) {
-						errorf(NULL, "wrong option '-m %s'",  opt);
-						argument_errors = true;
-					} else if (value != 16 && value != 32 && value != 64) {
-						errorf(NULL, "option -m supports only 16, 32 or 64");
-						argument_errors = true;
-					} else {
-						unsigned machine_size = (unsigned)value;
-						/* TODO: choose/change backend based on this */
-						add_flag(&cppflags_obst, "-m%u", machine_size);
-						add_flag(&asflags_obst, "-m%u", machine_size);
-						add_flag(&ldflags_obst, "-m%u", machine_size);
-					}
+					/* remember option for backend */
+					assert(obstack_object_size(&codegenflags_obst) == 0);
+					obstack_blank(&codegenflags_obst, sizeof(codegen_option_t));
+					size_t len = strlen(opt);
+					obstack_grow0(&codegenflags_obst, opt, len);
+					codegen_option_t *option
+						= obstack_finish(&codegenflags_obst);
+					option->next            = NULL;
+
+					*codegen_options_anchor = option;
+					codegen_options_anchor  = &option->next;
 				}
 			} else if (option[0] == 'X') {
 				if (streq(option + 1, "assembler")) {
@@ -2614,6 +2549,39 @@ int main(int argc, char **argv)
 		print_file_name(print_file_name_file);
 		return EXIT_SUCCESS;
 	}
+
+	/* pass options to firm backend (this happens delayed because we first
+	 * had to decide which backend is actually used) */
+	for (codegen_option_t *option = codegen_options; option != NULL;
+	     option = option->next) {
+		char        buf[256];
+	    const char *opt = option->option;
+	    /* pass option along to firm backend (except the -m32, -m64 stuff) */
+	    if (opt[0] < '0' || opt[0] > '9') {
+			snprintf(buf, sizeof(buf), "%s-%s", firm_be, opt);
+			if (be_parse_arg(buf) == 0) {
+				errorf(NULL, "Unknown codegen option '-m%s'", opt);
+				argument_errors = true;
+				continue;
+			}
+		}
+
+		/* hack to emulate the behaviour of some gcc spec files which filter
+		 * flags to pass to cpp/ld/as */
+		static const char *pass_to_cpp_and_ld[] = {
+			"soft-float", "32", "64", "16"
+		};
+		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
+			if (streq(pass_to_cpp_and_ld[i], option->option)) {
+				snprintf(buf, sizeof(buf), "-m%s", option->option);
+				add_flag(&cppflags_obst, buf);
+				add_flag(&asflags_obst, buf);
+				add_flag(&ldflags_obst, buf);
+				break;
+			}
+		}
+	}
+
 	if (units == NULL) {
 		errorf(NULL, "no input files specified");
 		argument_errors = true;
@@ -2785,6 +2753,7 @@ int main(int argc, char **argv)
 	obstack_free(&cppflags_obst, NULL);
 	obstack_free(&ldflags_obst, NULL);
 	obstack_free(&asflags_obst, NULL);
+	obstack_free(&codegenflags_obst, NULL);
 	obstack_free(&file_obst, NULL);
 
 	gen_firm_finish();
