@@ -202,6 +202,7 @@ static void write_type(type_t *type)
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
+	case TYPE_BUILTIN_TEMPLATE:
 		panic("invalid type");
 	case TYPE_ARRAY:
 	case TYPE_REFERENCE:

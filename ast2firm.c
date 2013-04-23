@@ -625,6 +625,7 @@ static ir_type *create_ir_type(type_t *const type)
 	case TYPE_ERROR:
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
+	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}
 	panic("invalid type");
@@ -1622,12 +1623,15 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	if (!firm_builtin)
 		callee = expression_to_value(function);
 
-	type_t *type = skip_typeref(function->base.type);
-	assert(is_type_pointer(type));
-	pointer_type_t *pointer_type = &type->pointer;
-	type_t         *points_to    = skip_typeref(pointer_type->points_to);
-	assert(is_type_function(points_to));
-	function_type_t *function_type = &points_to->function;
+	function_type_t *function_type = call->concrete_type;
+	if (function_type == NULL) {
+		type_t *type = skip_typeref(function->base.type);
+		assert(is_type_pointer(type));
+		pointer_type_t *pointer_type = &type->pointer;
+		type_t         *points_to    = skip_typeref(pointer_type->points_to);
+		assert(is_type_function(points_to));
+		function_type = &points_to->function;
+	}
 
 	int      n_parameters    = 0;
 	ir_type *ir_method_type  = get_ir_type((type_t*) function_type);
@@ -2917,6 +2921,7 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 			case TYPE_TYPEDEF:
 			case TYPE_TYPEOF:
 			case TYPE_ERROR:
+			case TYPE_BUILTIN_TEMPLATE:
 				break;
 		}
 		panic("unexpected type.");

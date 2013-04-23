@@ -26,6 +26,7 @@ extern type_t *type_unsigned_int;
 extern type_t *type_unsigned_long_long;
 extern type_t *type_unsigned_long;
 extern type_t *type_void;
+extern type_t *type_builtin_template;
 
 extern type_t *type_char_ptr;
 extern type_t *type_char_ptr_restrict;
@@ -42,6 +43,7 @@ extern type_t *type_const_void;
 extern type_t *type_const_void_ptr;
 extern type_t *type_void_ptr_restrict;
 extern type_t *type_const_void_ptr_restrict;
+extern type_t *type_builtin_template_ptr;
 
 extern type_t *type_char_ptr_ptr;
 

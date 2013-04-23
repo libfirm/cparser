@@ -295,6 +295,8 @@ struct call_expression_t {
 	expression_base_t  base;
 	expression_t      *function;  /**< The address of the function to call. */
 	call_argument_t   *arguments; /**< List of arguments of this call. */
+	function_type_t   *concrete_type; /**< concrete type in case of a generic
+	                                       builtin function */
 };
 
 

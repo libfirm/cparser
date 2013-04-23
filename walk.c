@@ -39,6 +39,7 @@ static void walk_type(type_t *const type, const walk_env_t *const env)
 	case TYPE_REFERENCE:
 	case TYPE_ERROR:
 	case TYPE_VOID:
+	case TYPE_BUILTIN_TEMPLATE:
 		return;
 	case TYPE_POINTER:
 		walk_type(type->pointer.points_to, env);

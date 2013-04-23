@@ -28,6 +28,7 @@ type_t *type_unsigned_int;
 type_t *type_unsigned_long_long;
 type_t *type_unsigned_long;
 type_t *type_void;
+type_t *type_builtin_template;
 
 type_t *type_char_ptr;
 type_t *type_char_ptr_restrict;
@@ -44,6 +45,7 @@ type_t *type_const_void;
 type_t *type_const_void_ptr;
 type_t *type_void_ptr_restrict;
 type_t *type_const_void_ptr_restrict;
+type_t *type_builtin_template_ptr;
 
 type_t *type_char_ptr_ptr;
 
@@ -120,6 +122,9 @@ void init_basic_types(void)
 	type_void       = make_void_type(TYPE_QUALIFIER_NONE);
 	type_const_void = make_void_type(TYPE_QUALIFIER_CONST);
 
+	type_builtin_template = allocate_type_zero(TYPE_BUILTIN_TEMPLATE);
+	type_builtin_template = identify_new_type(type_builtin_template);
+
 	int8_type_kind  = find_signed_int_atomic_type_kind_for_size(1);
 	int16_type_kind = find_signed_int_atomic_type_kind_for_size(2);
 	int32_type_kind = find_signed_int_atomic_type_kind_for_size(4);
@@ -164,6 +169,9 @@ void init_basic_types(void)
 
 	type_char_ptr_ptr       = make_pointer_type(type_char_ptr,          TYPE_QUALIFIER_NONE);
 	type_valist             = type_void_ptr;
+
+	type_builtin_template_ptr
+	                        = make_pointer_type(type_builtin_template,  TYPE_QUALIFIER_NONE);
 
 	/* const character types */
 	type_const_char         = make_atomic_type(ATOMIC_TYPE_CHAR,        TYPE_QUALIFIER_CONST);

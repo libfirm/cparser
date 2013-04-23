@@ -57,6 +57,15 @@ static entity_t *create_gnu_builtin_firm(ir_builtin_kind kind, const char *name,
 	return entity;
 }
 
+static entity_t *create_builtin_firm(ir_builtin_kind kind, const char *name,
+                                     type_t *type)
+{
+	symbol_t *symbol = symbol_table_insert(name);
+	entity_t *entity = create_builtin_function(BUILTIN_FIRM, symbol, type);
+	entity->function.b.firm_builtin_kind = kind;
+	return entity;
+}
+
 static entity_t *create_gnu_builtin_libc(const char *name, type_t *type)
 {
 	obstack_printf(&symbol_obstack, "__builtin_%s", name);
@@ -117,6 +126,11 @@ void create_gnu_builtins(void)
 	f(ir_bk_prefetch,       "prefetch",       make_function_1_type_variadic(type_float, type_void_ptr, DM_NONE));
 	f(ir_bk_return_address, "return_address", make_function_1_type(type_void_ptr, type_unsigned_int, DM_NONE));
 	f(ir_bk_trap,           "trap",           make_function_type(type_void, 0, NULL, DM_NORETURN));
+
+	entity_t *(*s)(ir_builtin_kind,const char*,type_t*) = create_builtin_firm;
+	type_t *template     = type_builtin_template;
+	type_t *template_ptr = type_builtin_template_ptr;
+	s(ir_bk_compare_swap, "__sync_val_compare_and_swap", make_function_type(template, 3, (type_t*[]) { template_ptr, template, template }, DM_NONE));
 
 	entity_t *(*l)(const char*,type_t*) = create_gnu_builtin_libc;
 	l("abort",   make_function_type(type_void, 0, NULL, DM_NORETURN));

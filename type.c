@@ -37,19 +37,20 @@ static void intern_print_type_post(const type_t *type);
 static size_t get_type_struct_size(type_kind_t kind)
 {
 	static const size_t sizes[] = {
-		[TYPE_ATOMIC]          = sizeof(atomic_type_t),
-		[TYPE_IMAGINARY]       = sizeof(atomic_type_t),
-		[TYPE_COMPLEX]         = sizeof(atomic_type_t),
-		[TYPE_COMPOUND_STRUCT] = sizeof(compound_type_t),
-		[TYPE_COMPOUND_UNION]  = sizeof(compound_type_t),
-		[TYPE_ENUM]            = sizeof(enum_type_t),
-		[TYPE_FUNCTION]        = sizeof(function_type_t),
-		[TYPE_POINTER]         = sizeof(pointer_type_t),
-		[TYPE_REFERENCE]       = sizeof(reference_type_t),
-		[TYPE_ARRAY]           = sizeof(array_type_t),
-		[TYPE_TYPEDEF]         = sizeof(typedef_type_t),
-		[TYPE_TYPEOF]          = sizeof(typeof_type_t),
-		[TYPE_VOID]            = sizeof(type_base_t),
+		[TYPE_ATOMIC]           = sizeof(atomic_type_t),
+		[TYPE_IMAGINARY]        = sizeof(atomic_type_t),
+		[TYPE_COMPLEX]          = sizeof(atomic_type_t),
+		[TYPE_COMPOUND_STRUCT]  = sizeof(compound_type_t),
+		[TYPE_COMPOUND_UNION]   = sizeof(compound_type_t),
+		[TYPE_ENUM]             = sizeof(enum_type_t),
+		[TYPE_FUNCTION]         = sizeof(function_type_t),
+		[TYPE_POINTER]          = sizeof(pointer_type_t),
+		[TYPE_REFERENCE]        = sizeof(reference_type_t),
+		[TYPE_ARRAY]            = sizeof(array_type_t),
+		[TYPE_TYPEDEF]          = sizeof(typedef_type_t),
+		[TYPE_TYPEOF]           = sizeof(typeof_type_t),
+		[TYPE_VOID]             = sizeof(type_base_t),
+		[TYPE_BUILTIN_TEMPLATE] = sizeof(type_base_t),
 	};
 	assert((size_t)kind < ARRAY_SIZE(sizes));
 	assert(sizes[kind] != 0);
@@ -591,6 +592,12 @@ static void print_void_type_pre(type_t const *const type)
 	print_string("void");
 }
 
+static void print_template_type_pre(type_t const *const type)
+{
+	print_type_qualifiers(type->base.qualifiers, QUAL_SEP_END);
+	print_string("$T$");
+}
+
 /**
  * Prints the prefix part of a type.
  *
@@ -613,6 +620,7 @@ static void intern_print_type_pre(const type_t *const type)
 	case TYPE_TYPEDEF:         print_typedef_type_pre(        &type->typedeft);  return;
 	case TYPE_TYPEOF:          print_typeof_type_pre(         &type->typeoft);   return;
 	case TYPE_VOID:            print_void_type_pre(            type);            return;
+	case TYPE_BUILTIN_TEMPLATE: print_template_type_pre(       type);            return;
 	}
 	print_string("unknown");
 }
@@ -647,6 +655,7 @@ static void intern_print_type_post(const type_t *const type)
 	case TYPE_TYPEOF:
 	case TYPE_TYPEDEF:
 	case TYPE_VOID:
+	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}
 }
@@ -834,6 +843,8 @@ bool is_type_complete(type_t const *const type)
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
 		panic("typedef not skipped");
+	case TYPE_BUILTIN_TEMPLATE:
+		break;
 	}
 
 	panic("invalid type");
@@ -959,6 +970,8 @@ bool types_compatible(const type_t *type1, const type_t *type2)
 		case TYPE_TYPEDEF:
 		case TYPE_TYPEOF:
 			panic("typeref not skipped");
+		case TYPE_BUILTIN_TEMPLATE:
+			panic("unexpected type");
 		}
 	}
 
@@ -1046,6 +1059,8 @@ unsigned get_type_size(type_t const *const type)
 		return get_type_size(type->typedeft.typedefe->type);
 	case TYPE_TYPEOF:
 		return get_type_size(type->typeoft.typeof_type);
+	case TYPE_BUILTIN_TEMPLATE:
+		break;
 	}
 	panic("invalid type");
 }
@@ -1077,6 +1092,8 @@ unsigned get_type_alignment(type_t const *const type)
 	}
 	case TYPE_TYPEOF:
 		return get_type_alignment(type->typeoft.typeof_type);
+	case TYPE_BUILTIN_TEMPLATE:
+		break;
 	}
 	panic("invalid type");
 }
@@ -1107,6 +1124,7 @@ decl_modifiers_t get_type_modifiers(const type_t *type)
 {
 	switch (type->kind) {
 	case TYPE_ERROR:
+	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	case TYPE_COMPOUND_STRUCT:
 	case TYPE_COMPOUND_UNION:
@@ -1510,6 +1528,17 @@ type_t *make_function_0_type(type_t *return_type, decl_modifiers_t modifiers)
 	return identify_new_type(type);
 }
 
+static bool is_generic_type(type_t *const type)
+{
+	/* currently we only allow plain template types and pointers to them.
+	 * They can't be part of a struct/class, typeof, typedef, ... */
+	if (type->kind == TYPE_POINTER) {
+		return is_generic_type(type->pointer.points_to);
+	}
+
+	return type->kind == TYPE_BUILTIN_TEMPLATE;
+}
+
 type_t *make_function_type(type_t *return_type, int n_types,
                            type_t *const *argument_types,
 						   decl_modifiers_t modifiers)
@@ -1519,13 +1548,18 @@ type_t *make_function_type(type_t *return_type, int n_types,
 	type->function.modifiers  |= modifiers;
 	type->function.linkage     = LINKAGE_C;
 
-	function_parameter_t **anchor = &type->function.parameters;
+	bool                  typegeneric = is_generic_type(return_type);
+	function_parameter_t **anchor     = &type->function.parameters;
 	for (int i = 0; i < n_types; ++i) {
-		function_parameter_t *parameter = allocate_parameter(argument_types[i]);
+		type_t *type = argument_types[i];
+		typegeneric = typegeneric || is_generic_type(type);
+
+		function_parameter_t *parameter = allocate_parameter(type);
 		*anchor = parameter;
 		anchor  = &parameter->next;
 	}
 
+	type->function.typegeneric = typegeneric;
 	return identify_new_type(type);
 }
 

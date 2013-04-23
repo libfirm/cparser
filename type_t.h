@@ -28,6 +28,8 @@ typedef enum type_kind_t {
 	TYPE_TYPEDEF,
 	TYPE_TYPEOF,
 	TYPE_VOID,
+	/** type used for some type-generic builtins */
+	TYPE_BUILTIN_TEMPLATE,
 } type_kind_t;
 
 struct type_base_t {
@@ -108,6 +110,7 @@ struct function_type_t {
 	bool                  variadic : 1;
 	bool                  unspecified_parameters : 1;
 	bool                  kr_style_parameters : 1;
+	bool                  typegeneric : 1; /**< type generic builtin */
 };
 
 struct compound_type_t {

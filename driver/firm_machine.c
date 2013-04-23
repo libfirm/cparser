@@ -97,6 +97,9 @@ bool setup_firm_for_machine(const machine_triple_t *machine)
 		set_be_option("isa=amd64");
 	} else if (streq(cpu, "sparc")) {
 		set_be_option("isa=sparc");
+		const char *manufacturer = machine->manufacturer;
+		if (streq(manufacturer, "leon") || streq(manufacturer, "invasic"))
+			set_be_option("sparc-cpu=leon");
 	} else if (streq(cpu, "arm")) {
 		set_be_option("isa=arm");
 	} else {

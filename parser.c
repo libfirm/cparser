@@ -7060,6 +7060,7 @@ static void handle_builtin_argument_restrictions(call_expression_t *const call,
 		default:
 			break;
 		}
+		break;
 
 	case BUILTIN_OBJECT_SIZE:
 		if (call->arguments == NULL)
@@ -7077,13 +7078,96 @@ static void handle_builtin_argument_restrictions(call_expression_t *const call,
 	}
 }
 
+static type_t *check_generic_parameter(type_t **const replacement_ref,
+                                       type_t *const parameter_type,
+                                       type_t *const argument_type)
+{
+	if (parameter_type->kind == TYPE_BUILTIN_TEMPLATE) {
+		type_t *replacement = *replacement_ref;
+		if (replacement == NULL) {
+			if (argument_type == NULL)
+				return NULL;
+			replacement = skip_typeref(argument_type);
+			*replacement_ref = replacement;
+		}
+		return replacement;
+	} else if (parameter_type->kind == TYPE_POINTER) {
+		type_t *argument_points_to = NULL;
+		if (argument_type != NULL) {
+			type_t *skipped = skip_typeref(argument_type);
+			if (argument_type->kind != TYPE_POINTER) {
+				/* TODO: error message */
+				return NULL;
+			}
+			argument_points_to = skipped->pointer.points_to;
+		}
+		type_t *old_points_to = parameter_type->pointer.points_to;
+		type_t *new_points_to = check_generic_parameter(replacement_ref,
+			old_points_to, argument_points_to);
+		if (old_points_to != new_points_to) {
+			return make_pointer_type(new_points_to,
+			                         parameter_type->base.qualifiers);
+		}
+	}
+
+	return parameter_type;
+}
+
+static function_type_t *handle_builtin_overload(call_expression_t *const call,
+		function_type_t *const function_type,
+		expression_t *const function)
+{
+	if (!function_type->typegeneric)
+		return function_type;
+
+	/* construct an ad-hoc call type... */
+	type_t *new_function_type = allocate_type_zero(TYPE_FUNCTION);
+	new_function_type->function.linkage   = function_type->linkage;
+	new_function_type->function.modifiers = function_type->modifiers;
+
+	function_parameter_t  *parameter = function_type->parameters;
+	call_argument_t       *argument  = call->arguments;
+	function_parameter_t **anchor    = &new_function_type->function.parameters;
+	type_t                *template_replacement = NULL;
+	for ( ; parameter != NULL && argument != NULL;
+		 parameter = parameter->next, argument = argument->next) {
+		type_t *parameter_type = parameter->type;
+		type_t *new_type
+			= check_generic_parameter(&template_replacement,
+			                          parameter_type,
+			                          argument->expression->base.type);
+		if (new_type == NULL)
+			return NULL;
+		function_parameter_t *parameter = allocate_parameter(new_type);
+		*anchor = parameter;
+		anchor  = &parameter->next;
+	}
+	new_function_type->function.return_type
+		= check_generic_parameter(&template_replacement,
+		                          function_type->return_type, NULL);
+
+	if (parameter != NULL) {
+		errorf(&call->base.pos, "too few arguments to function '%E'",
+			   function);
+		return NULL;
+	} else if (argument != NULL && !function_type->variadic) {
+		errorf(&argument->expression->base.pos,
+			   "too many arguments to function '%E'", function);
+		return NULL;
+	}
+
+	type_t *identified = identify_new_type(new_function_type);
+	assert(identified->kind == TYPE_FUNCTION);
+	return &identified->function;
+}
+
 static void semantic_call(call_expression_t *call)
 {
 	expression_t *const function  = call->function;
 	type_t       *const orig_type = function->base.type;
 	type_t       *const type      = skip_typeref(orig_type);
 	if (!is_type_valid(type))
-		return;
+		goto error;
 
 	function_type_t *function_type = NULL;
 	if (is_type_pointer(type)) {
@@ -7099,17 +7183,16 @@ static void semantic_call(call_expression_t *call)
 		errorf(HERE,
 		       "called object '%E' (type '%T') is not a pointer to a function",
 		       function, orig_type);
-		return;
+		goto error;
 	}
 
-	entity_t *builtin_entity = NULL;
-	if (function->kind == EXPR_REFERENCE) {
-		entity_t *ref_entity = function->reference.entity;
-		if (ref_entity->kind == ENTITY_FUNCTION &&
-		    ref_entity->function.btk != BUILTIN_NONE) {
-		    builtin_entity = ref_entity;
-		}
+	if (function_type->typegeneric) {
+		function_type = handle_builtin_overload(call, function_type, function);
+		if (function_type == NULL)
+			goto error;
+		call->concrete_type = function_type;
 	}
+	call->base.type = function_type->return_type;
 
 	/* check type and count of call arguments */
 	function_parameter_t *parameter = function_type->parameters;
@@ -7151,8 +7234,16 @@ static void semantic_call(call_expression_t *call)
 		         "function call has aggregate value");
 	}
 
-	if (builtin_entity != NULL)
-		handle_builtin_argument_restrictions(call, builtin_entity);
+	if (function->kind == EXPR_REFERENCE) {
+		entity_t *entity = function->reference.entity;
+		if (entity->kind == ENTITY_FUNCTION &&
+		    entity->function.btk != BUILTIN_NONE) {
+			handle_builtin_argument_restrictions(call, entity);
+		}
+	}
+	return;
+error:
+	call->base.type = type_error_type;
 }
 
 /**

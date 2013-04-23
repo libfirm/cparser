@@ -124,6 +124,7 @@ static unsigned hash_type(const type_t *type)
 		hash = hash_typeof_type(&type->typeoft);
 		break;
 	case TYPE_VOID:
+	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}
 
@@ -247,6 +248,7 @@ static bool types_equal(const type_t *type1, const type_t *type2)
 	switch (type1->kind) {
 	case TYPE_ERROR:
 	case TYPE_VOID:
+	case TYPE_BUILTIN_TEMPLATE:
 		return true;
 	case TYPE_ATOMIC:
 	case TYPE_IMAGINARY:
