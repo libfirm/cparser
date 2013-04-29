@@ -343,7 +343,7 @@ static inline void put_back(utf32 const c)
 
 static void maybe_concat_lines(void)
 {
-	eat('\\');
+	next_real_char();
 
 	switch (input.c) {
 	case EAT_NEWLINE:
