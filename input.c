@@ -2,10 +2,13 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include "adt/util.h"
 #include "input.h"
 
 #include <ctype.h>
+#include <assert.h>
+#include <string.h>
+#include "adt/util.h"
+#include "adt/xmalloc.h"
 
 typedef size_t (*decode_func)(input_t *input, utf32 *buffer, size_t buffer_size);
 

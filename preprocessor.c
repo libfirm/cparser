@@ -30,6 +30,7 @@
 #include "diagnostic.h"
 #include "string_rep.h"
 #include "input.h"
+#include "unicode.h"
 #include "separator_t.h"
 #include "symbol_table_t.h"
 
