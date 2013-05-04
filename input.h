@@ -9,6 +9,7 @@
 
 typedef unsigned int utf32;
 #define UTF32_PRINTF_FORMAT "%u"
+#define UTF32_EOF           ((utf32)-1)
 
 typedef struct input_t input_t;
 typedef size_t (input_decoder_t)(input_t *input, utf32 *buffer, size_t buffer_size);

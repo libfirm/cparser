@@ -298,7 +298,7 @@ static inline void next_real_char(void)
 	if (input.bufpos >= input.bufend) {
 		size_t const n = decode(input.input, input.buf + MAX_PUTBACK, BUFSIZE);
 		if (n == 0) {
-			input.c = EOF;
+			input.c = UTF32_EOF;
 			return;
 		}
 		input.bufpos = input.buf + MAX_PUTBACK;
@@ -702,10 +702,10 @@ static utf32 parse_escape_sequence(void)
 	case '6':
 	case '7':
 		return parse_octal_sequence(ec);
-	case EOF:
+	case UTF32_EOF:
 		warningf(WARN_OTHER, &pp_token.base.pos,
 		         "reached end of file while parsing escape sequence");
-		return EOF;
+		return UTF32_EOF;
 	/* \E is not documented, but handled, by GCC.  It is acceptable according
 	 * to §6.11.4, whereas \e is not. */
 	case 'E':
@@ -722,7 +722,7 @@ static utf32 parse_escape_sequence(void)
 	}
 	/* §6.4.4.4:8 footnote 64 */
 	warningf(WARN_OTHER, &pp_token.base.pos, "unknown escape sequence");
-	return EOF;
+	return UTF32_EOF;
 }
 
 static const char *identify_string(char *string)
@@ -773,7 +773,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 		case '\\': {
 			if (resolve_escape_sequences) {
 				utf32 const tc = parse_escape_sequence();
-				if (tc > limit && tc != (utf32)EOF) {
+				if (tc > limit && tc != UTF32_EOF) {
 					warningf(WARN_OTHER, &input.pos,
 					         "escape sequence out of range");
 				}
@@ -796,7 +796,7 @@ static void parse_string(utf32 const delimiter, token_kind_t const kind,
 			         "newline while parsing %s", context);
 			goto end_of_string;
 
-		case EOF:
+		case UTF32_EOF:
 			warningf(WARN_OTHER, &pp_token.base.pos,
 			         "EOF while parsing %s", context);
 			goto end_of_string;
@@ -1655,7 +1655,7 @@ static void skip_line_comment(void)
 {
 	while (true) {
 		switch (input.c) {
-		case EOF:
+		case UTF32_EOF:
 		case NEWLINE:
 			return;
 
@@ -1690,7 +1690,7 @@ static unsigned skip_multiline_comment(void)
 		case EAT_NEWLINE:
 			break;
 
-		case EOF:
+		case UTF32_EOF:
 			errorf(&start_pos, "unterminated comment");
 			return 0;
 
@@ -1733,7 +1733,7 @@ static bool skip_till_newline(bool stop_at_non_whitespace)
 			next_char();
 			continue;
 
-		case EOF:
+		case UTF32_EOF:
 		case NEWLINE:
 			return res;
 		}
@@ -2144,7 +2144,7 @@ digraph_percentcolon:
 		next_char();
 		return;
 
-	case EOF:
+	case UTF32_EOF:
 		if (stop_at_newline) {
 			set_punctuator(T_NEWLINE);
 			return;
@@ -2957,7 +2957,7 @@ parse_name:
 		next_char();
 		while (true) {
 			switch (input.c) {
-			case EOF:
+			case UTF32_EOF:
 			case NEWLINE: {
 				char *dummy = obstack_finish(&symbol_obstack);
 				obstack_free(&symbol_obstack, dummy);
