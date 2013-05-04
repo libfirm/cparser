@@ -2,8 +2,6 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <config.h>
-
 #define _POSIX_C_SOURCE 199506
 
 #if defined(__unix__) || defined(__MACH__)

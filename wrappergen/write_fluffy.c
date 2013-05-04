@@ -2,8 +2,6 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <config.h>
-
 #include "write_fluffy.h"
 #include "separator_t.h"
 #include "symbol_t.h"

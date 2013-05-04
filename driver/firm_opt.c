@@ -8,8 +8,6 @@
  * @author Michael Beck, Matthias Braun
  * @brief Firm-generating back end optimizations.
  */
-#include <config.h>
-
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>

@@ -2,7 +2,6 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Michael Beck <mm.beck@gmx.net>
  */
-#include <config.h>
 
 /**
  * @file

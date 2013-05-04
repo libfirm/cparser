@@ -2,8 +2,6 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
-#include <config.h>
-
 #include "entitymap_t.h"
 
 static entitymap_entry_t null_entitymap_entry = { NULL, NULL };

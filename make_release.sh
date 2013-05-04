@@ -31,7 +31,6 @@ for dir in $SOURCEDIRS; do
 done
 cp $ADDFILES "$FULLRELEASEDIR"
 rm -f "$FULLRELEASEDIR/revision.h"
-rm -f "$FULLRELEASEDIR/config.h"
 echo "REVISION = \"\"" > "$FULLRELEASEDIR/Makefile"
 cat Makefile >> "$FULLRELEASEDIR/Makefile"
 

@@ -7,7 +7,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "config.h"
 
 static inline __attribute__((noreturn)) void panic(char const *const file, int const line, char const *const func, char const *const msg)
 {

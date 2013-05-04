@@ -99,12 +99,6 @@ all: $(GOAL)
 DIRS   := $(sort $(dir $(cparser_OBJECTS)))
 UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
 
-# rules for generating config.h (an empty config.h is enough on posix)
-CONFIGH = $(builddir)/config.h
-$(cparser_SOURCES): $(CONFIGH)
-$(CONFIGH):
-	echo "" > $@
-
 %.h:
 	@true
 
