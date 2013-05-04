@@ -3,7 +3,6 @@
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
 #include "adt/util.h"
-#include "diagnostic.h"
 #include "input.h"
 
 #include <ctype.h>
@@ -21,7 +20,7 @@ struct input_t {
 		FILE *file;
 		const char *string;
 	} in;
-	decode_func decode;
+	input_decoder_t *decoder;
 
 	/* state for utf-8 decoder */
 	utf32  utf8_part_decoded_min_code;
@@ -129,7 +128,7 @@ linefeed:
 
 #define UNICODE_REPLACEMENT_CHARACTER  0xFFFD
 
-static size_t decode_utf8(input_t *input, utf32 *buffer, size_t buffer_size)
+size_t input_decode_utf8(input_t *input, utf32 *buffer, size_t buffer_size)
 {
 	unsigned char read_buf[buffer_size];
 
@@ -288,8 +287,8 @@ static size_t decode_windows_1252(input_t *input, utf32 *buffer,
 }
 
 typedef struct named_decoder_t {
-	char const *name;
-	decode_func decoder;
+	char const       *name;
+	input_decoder_t  *decoder;
 } named_decoder_t;
 
 static named_decoder_t const decoders[] = {
@@ -303,7 +302,7 @@ static named_decoder_t const decoders[] = {
 	{ "ISO_8859-15",     decode_iso_8859_15  }, // official alias
 	{ "ISO_8859-1:1987", decode_iso_8859_1   }, // official name
 	{ "Latin-9",         decode_iso_8859_15  }, // official alias
-	{ "UTF-8",           decode_utf8         }, // official name
+	{ "UTF-8",           input_decode_utf8   }, // official name
 	{ "csISOLatin1",     decode_iso_8859_1   }, // official alias
 	{ "cp1252",          decode_windows_1252 },
 	{ "iso-ir-100",      decode_iso_8859_1   }, // official alias
@@ -324,28 +323,21 @@ static int my_strcasecmp(const char *s1, const char *s2)
 	return (unsigned char)*s1 - (unsigned char)*s2;
 }
 
-static void choose_decoder(input_t *result, const char *encoding)
+input_decoder_t *input_get_decoder(const char *encoding)
 {
-	if (encoding) {
-		for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
-			if (my_strcasecmp(encoding, i->name) != 0)
-				continue;
-			result->decode = i->decoder;
-			return;
-		}
-		errorf(NULL, "input encoding \"%s\" not supported", encoding);
+	for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
+		if (my_strcasecmp(encoding, i->name) == 0)
+			return i->decoder;
 	}
-	result->decode = decode_utf8;
+	return NULL;
 }
 
-input_t *input_from_stream(FILE *file, const char *encoding)
+input_t *input_from_stream(FILE *file, input_decoder_t *decoder)
 {
 	input_t *result = XMALLOCZ(input_t);
 	result->kind    = INPUT_FILE;
 	result->in.file = file;
-
-	choose_decoder(result, encoding);
-
+	result->decoder = decoder;
 	return result;
 }
 
@@ -356,20 +348,18 @@ FILE *input_get_file(const input_t *const input)
 	return input->in.file;
 }
 
-input_t *input_from_string(const char *string, const char *encoding)
+input_t *input_from_string(const char *string, input_decoder_t *decoder)
 {
 	input_t *result   = XMALLOCZ(input_t);
 	result->kind      = INPUT_STRING;
 	result->in.string = string;
-
-	choose_decoder(result, encoding);
-
+	result->decoder   = decoder;
 	return result;
 }
 
 size_t decode(input_t *input, utf32 *buffer, size_t buffer_size)
 {
-	return input->decode(input, buffer, buffer_size);
+	return input->decoder(input, buffer, buffer_size);
 }
 
 void input_free(input_t *input)

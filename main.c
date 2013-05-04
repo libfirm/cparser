@@ -247,7 +247,7 @@ static void do_parsing(compilation_unit_t *unit)
 
 	start_parsing();
 
-	input_t *decoder = input_from_stream(unit->input, input_encoding);
+	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
 	parse();
 	unit->ast = finish_parsing();
@@ -1665,7 +1665,7 @@ static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
 	fprintf(out, "# 1 \"<command-line>\"\n");
 
 	set_preprocessor_output(out);
-	input_t *decoder = input_from_stream(unit->input, input_encoding);
+	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
 
 	for (;;) {
@@ -2165,7 +2165,11 @@ int main(int argc, char **argv)
 
 				if (strstart(orig_opt, "input-charset=")) {
 					char const* const encoding = strchr(orig_opt, '=') + 1;
-					input_encoding = encoding;
+					input_decoder = input_get_decoder(encoding);
+					if (input_decoder == NULL) {
+						errorf(NULL, "input encoding \"%s\" not supported",
+						       encoding);
+					}
 				} else if (strstart(orig_opt, "align-loops=") ||
 				           strstart(orig_opt, "align-jumps=") ||
 				           strstart(orig_opt, "align-functions=")) {

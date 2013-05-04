@@ -9,9 +9,14 @@
 #include "unicode.h"
 
 typedef struct input_t input_t;
+typedef size_t (input_decoder_t)(input_t *input, utf32 *buffer, size_t buffer_size);
 
-input_t *input_from_stream(FILE *stream, const char *encoding);
-input_t *input_from_string(const char *string, const char *encoding);
+input_decoder_t *input_get_decoder(const char *encoding);
+
+input_t *input_from_stream(FILE *stream, input_decoder_t *decoder);
+input_t *input_from_string(const char *string, input_decoder_t *decoder);
+
+input_decoder_t input_decode_utf8;
 
 /** return underlying FILE* of an input if available, else NULL */
 FILE *input_get_file(const input_t *input);

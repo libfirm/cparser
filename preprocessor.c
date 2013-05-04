@@ -141,7 +141,7 @@ static unsigned        counter; /**< counter for the __COUNTER__ macros */
 static pp_conditional_t *conditional_stack;
 
 token_t                      pp_token;
-const char                  *input_encoding;
+input_decoder_t             *input_decoder = &input_decode_utf8;
 bool                         allow_dollar_in_symbol   = true;
 static bool                  resolve_escape_sequences = true;
 static bool                  error_on_unknown_chars   = true;
@@ -240,7 +240,7 @@ static void switch_pp_input_file(FILE *file, char const *const filename,
                                  searchpath_entry_t *const path,
                                  bool const is_system_header)
 {
-	input_t *decoder = input_from_stream(file, input_encoding);
+	input_t *decoder = input_from_stream(file, input_decoder);
 	switch_pp_input(decoder, filename, path, is_system_header);
 	input.file = file;
 }
@@ -2426,7 +2426,7 @@ void add_define(char const *const name, char const *const val,
 {
 	pp_definition_t *const def = add_define_(name, standard_define);
 
-	input_t *decoder = input_from_string(val, NULL);
+	input_t *decoder = input_from_string(val, input_decode_utf8);
 	switch_pp_input(decoder, builtin_position.input_name, NULL, true);
 
 	assert(obstack_object_size(&pp_obstack) == 0);

@@ -38,9 +38,9 @@ void undefine(char const *name);
 
 string_t make_string(char const *string);
 
-extern bool        allow_dollar_in_symbol;
-extern token_t     pp_token;
-extern const char *input_encoding;
+extern bool             allow_dollar_in_symbol;
+extern token_t          pp_token;
+extern input_decoder_t *input_decoder;
 
 void set_preprocessor_output(FILE *output);
 void emit_pp_token(void);
