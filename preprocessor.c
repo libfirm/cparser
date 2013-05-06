@@ -158,7 +158,6 @@ static macro_call_t          current_call;
 static whitespace_info_t     call_whitespace_info;
 static bool                  call_space_before;
 static pp_definition_t      *argument_expanding = NULL;
-static strset_t              stringset;
 static token_kind_t          previous_token;
 static pp_expansion_state_t *expansion_stack;
 static pp_argument_t        *argument_stack;
@@ -727,11 +726,8 @@ static utf32 parse_escape_sequence(void)
 
 static const char *identify_string(char *string)
 {
-	const char *result = strset_insert(&stringset, string);
-	if (result != string) {
-		obstack_free(&symbol_obstack, string);
-	}
-	return result;
+	/* TODO: put strings into a set to reuse memory */
+	return string;
 }
 
 static string_t sym_make_string(string_encoding_t const enc)
@@ -4101,7 +4097,6 @@ void preprocessor_early_init(void)
 	obstack_init(&config_obstack);
 	obstack_init(&pp_obstack);
 	init_symbols();
-	strset_init(&stringset);
 	input.pos.input_name = "<commandline>";
 	input.pos.lineno     = 0;
 	input.pos.colno      = 0;
@@ -4132,6 +4127,4 @@ void exit_preprocessor(void)
 	obstack_free(&input_obstack, NULL);
 	obstack_free(&pp_obstack, NULL);
 	obstack_free(&config_obstack, NULL);
-
-	strset_destroy(&stringset);
 }
