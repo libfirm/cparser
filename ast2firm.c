@@ -1515,8 +1515,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		ir_node      *size     = expression_to_value(argument);
 
 		ir_node *store   = get_store();
-		ir_node *allocan = new_d_Alloc(dbgi, store, size, get_unknown_type(),
-		                              stack_alloc);
+		ir_node *allocan = new_d_Alloc(dbgi, store, size, 1);
 		ir_node *proj_m  = new_Proj(allocan, mode_M, pn_Alloc_M);
 		set_store(proj_m);
 		ir_node *res     = new_Proj(allocan, mode_P_data, pn_Alloc_res);
@@ -4704,15 +4703,15 @@ static void allocate_variable_length_array(entity_t *entity)
 	assert(entity->variable.initializer == NULL);
 	assert(currently_reachable());
 
-	dbg_info *dbgi      = get_dbg_info(&entity->base.pos);
-	type_t   *type      = entity->declaration.type;
-	ir_type  *el_type   = get_ir_type(type->array.element_type);
+	dbg_info *dbgi    = get_dbg_info(&entity->base.pos);
+	type_t   *type    = entity->declaration.type;
+	type_t   *el_type = type->array.element_type;
 
 	/* make sure size_node is calculated */
-	get_type_size_node(type);
-	ir_node  *elems = type->array.size_node;
+	ir_node  *size  = get_type_size_node(type);
 	ir_node  *mem   = get_store();
-	ir_node  *alloc = new_d_Alloc(dbgi, mem, elems, el_type, stack_alloc);
+	unsigned  align = get_type_alignment(el_type);
+	ir_node  *alloc = new_d_Alloc(dbgi, mem, size, align);
 
 	ir_node  *proj_m = new_d_Proj(dbgi, alloc, mode_M, pn_Alloc_M);
 	ir_node  *addr   = new_d_Proj(dbgi, alloc, mode_P_data, pn_Alloc_res);
