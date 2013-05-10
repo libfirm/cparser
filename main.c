@@ -926,13 +926,6 @@ static bool parse_target_triple(const char *arg)
 	return true;
 }
 
-static unsigned decide_modulo_shift(unsigned type_size)
-{
-	if (architecture_modulo_shift == 0)
-		return 0;
-	return MAX(type_size, architecture_modulo_shift);
-}
-
 static bool is_ia32_cpu(const char *architecture)
 {
 	return streq(architecture, "i386")
@@ -1068,10 +1061,17 @@ static void init_types_and_adjust(void)
 		               &props[ATOMIC_TYPE_DOUBLE]);
 	}
 
+	byte_order_big_endian = be_params->byte_order_big_endian;
+	if (be_params->modulo_shift_efficient) {
+		architecture_modulo_shift = machine_size;
+	} else {
+		architecture_modulo_shift = 0;
+	}
+
 	/* initialize firm pointer modes */
-	char               name[64];
-	unsigned           bit_size     = machine_size;
-	unsigned           modulo_shift = decide_modulo_shift(bit_size);
+	char     name[64];
+	unsigned bit_size     = machine_size;
+	unsigned modulo_shift = architecture_modulo_shift;
 
 	snprintf(name, sizeof(name), "p%u", machine_size);
 	ir_mode *ptr_mode = new_reference_mode(name, irma_twos_complement, bit_size, modulo_shift);
@@ -1092,13 +1092,6 @@ static void init_types_and_adjust(void)
 	/* Hmm, pointers should be machine size */
 	set_modeP_data(ptr_mode);
 	set_modeP_code(ptr_mode);
-
-	byte_order_big_endian = be_params->byte_order_big_endian;
-	if (be_params->modulo_shift_efficient) {
-		architecture_modulo_shift = machine_size;
-	} else {
-		architecture_modulo_shift = 0;
-	}
 }
 
 static void add_define_prop_fmt(const char *name_template, const char *name,
