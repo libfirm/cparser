@@ -52,8 +52,6 @@ typedef struct complex_constant {
 	ir_tarval *imag;
 } complex_constant;
 
-fp_model_t firm_fp_model = fp_model_precise;
-
 static const backend_params *be_params;
 
 static ir_type *ir_type_char;
@@ -5694,7 +5692,6 @@ static void create_function(entity_t *entity)
 	ir_entity *const old_current_vararg_entity = current_vararg_entity;
 	current_vararg_entity = NULL;
 
-	set_irg_fp_model(irg, firm_fp_model);
 	set_irn_dbg_info(get_irg_start_block(irg),
 	                 get_entity_dbg_info(function_entity));
 
