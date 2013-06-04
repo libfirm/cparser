@@ -71,7 +71,6 @@ static entity_t  **inner_functions;
 static jump_target ijmp_target;
 static ir_node   **ijmp_ops;
 static ir_node   **ijmp_blocks;
-static bool        constant_folding;
 
 #define PUSH_BREAK(val) \
 	jump_target const old_break_target = break_target; \
@@ -595,7 +594,7 @@ void determine_enum_values(enum_type_t *const type)
 
 		expression_t *const init = entry->enum_value.value;
 		if (init != NULL) {
-			tv_next = fold_constant_to_tarval(init);
+			tv_next = fold_expression(init);
 		}
 		assert(entry->enum_value.tv == NULL || entry->enum_value.tv == tv_next);
 		entry->enum_value.tv = tv_next;
@@ -1011,9 +1010,9 @@ static ir_node *create_symconst(dbg_info *dbgi, ir_entity *entity)
 	return new_d_SymConst(dbgi, mode_P, sym, symconst_addr_ent);
 }
 
-static ir_node *create_Const_from_bool(ir_mode *const mode, bool const v)
+static ir_tarval *create_tarval_from_bool(ir_mode *const mode, bool const v)
 {
-	return new_Const((v ? get_mode_one : get_mode_null)(mode));
+	return (v ? get_mode_one : get_mode_null)(mode);
 }
 
 static ir_node *create_conv(dbg_info *dbgi, ir_node *value, ir_mode *dest_mode)
@@ -1155,61 +1154,45 @@ finished:
 	tarval_set_integer_overflow_mode(old_mode);
 }
 
-/**
- * Creates a Const node representing a constant.
- */
-static ir_node *literal_to_firm_(const literal_expression_t *literal,
-                                 ir_mode *mode)
+static ir_tarval *literal_to_tarval_(const literal_expression_t *literal,
+                                    ir_mode *mode)
 {
-	const char *string = literal->value.begin;
-	size_t      size   = literal->value.size;
-	ir_tarval  *tv;
-
 	switch (literal->base.kind) {
 	case EXPR_LITERAL_INTEGER:
 		assert(literal->target_value != NULL);
-		tv = literal->target_value;
-		break;
+		return literal->target_value;
 
 	case EXPR_LITERAL_FLOATINGPOINT:
-		tv = new_tarval_from_str(string, size, mode);
-		break;
+		return new_tarval_from_str(literal->value.begin,
+		                           literal->value.size, mode);
 
 	case EXPR_LITERAL_BOOLEAN:
-		if (string[0] == 't') {
-			tv = get_mode_one(mode);
+		if (literal->value.begin[0] == 't') {
+			return get_mode_one(mode);
 		} else {
-			assert(string[0] == 'f');
+			assert(literal->value.begin[0] == 'f');
 	case EXPR_LITERAL_MS_NOOP:
-			tv = get_mode_null(mode);
+			return get_mode_null(mode);
 		}
-		break;
 
 	default:
 		panic("invalid literal kind");
 	}
-
-	dbg_info *const dbgi = get_dbg_info(&literal->base.pos);
-	return new_d_Const(dbgi, tv);
 }
 
-static ir_node *literal_to_firm(const literal_expression_t *literal)
+static ir_tarval *literal_to_tarval(const literal_expression_t *literal)
 {
-	type_t  *type         = skip_typeref(literal->base.type);
-	ir_mode *mode_storage = get_ir_mode_storage(type);
-	return literal_to_firm_(literal, mode_storage);
+	type_t  *const type = skip_typeref(literal->base.type);
+	ir_mode *const mode = get_ir_mode_storage(type);
+	return literal_to_tarval_(literal, mode);
 }
 
-/**
- * Creates a Const node representing a character constant.
- */
-static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
+static ir_tarval *char_literal_to_tarval(string_literal_expression_t const *literal)
 {
 	type_t     *type   = skip_typeref(literal->base.type);
 	ir_mode    *mode   = get_ir_mode_storage(type);
 	const char *string = literal->value.begin;
 	size_t      size   = literal->value.size;
-	ir_tarval  *tv;
 
 	switch (literal->value.encoding) {
 	case STRING_ENCODING_WIDE: {
@@ -1217,8 +1200,7 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 		char   buf[128];
 		size_t len = snprintf(buf, sizeof(buf), UTF32_PRINTF_FORMAT, v);
 
-		tv = new_tarval_from_str(buf, len, mode);
-		break;
+		return new_tarval_from_str(buf, len, mode);
 	}
 
 	case STRING_ENCODING_CHAR: {
@@ -1236,16 +1218,12 @@ static ir_node *char_literal_to_firm(string_literal_expression_t const *literal)
 		char   buf[128];
 		size_t len = snprintf(buf, sizeof(buf), "%lld", v);
 
-		tv = new_tarval_from_str(buf, len, mode);
-		break;
+		return new_tarval_from_str(buf, len, mode);
 	}
 
 	default:
 		panic("invalid literal kind");
 	}
-
-	dbg_info *const dbgi = get_dbg_info(&literal->base.pos);
-	return new_d_Const(dbgi, tv);
 }
 
 /*
@@ -1389,7 +1367,7 @@ static void keep_loop(void)
 	keep_alive(get_store());
 }
 
-static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
+static ir_tarval *enum_constant_to_tarval(reference_expression_t const *const ref)
 {
 	entity_t *entity = ref->entity;
 	if (entity->enum_value.tv == NULL) {
@@ -1398,7 +1376,7 @@ static ir_node *enum_constant_to_firm(reference_expression_t const *const ref)
 		determine_enum_values(&type->enumt);
 	}
 
-	return new_Const(entity->enum_value.tv);
+	return entity->enum_value.tv;
 }
 
 static ir_node *reference_addr(const reference_expression_t *ref)
@@ -1547,7 +1525,7 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 	case BUILTIN_OBJECT_SIZE: {
 		/* determine value of "type" */
 		expression_t *type_expression = call->arguments->next->expression;
-		long          type_val        = fold_constant_to_int(type_expression);
+		long          type_val        = fold_expression_to_int(type_expression);
 		type_t       *type            = function_type->function.return_type;
 		ir_mode      *mode            = get_ir_mode_storage(type);
 		/* just produce a "I don't know" result */
@@ -2358,7 +2336,7 @@ static void compare_to_control_flow(expression_t const *const expr, ir_node *con
 		if (is_builtin_expect(expr) && is_Cond(cond)) {
 			call_argument_t *const argument = expr->call.arguments->next;
 			if (is_constant_expression(argument->expression) != EXPR_CLASS_VARIABLE) {
-				bool               const cnst = fold_constant_to_bool(argument->expression);
+				bool               const cnst = fold_expression_to_bool(argument->expression);
 				cond_jmp_predicate const pred = cnst ? COND_JMP_PRED_TRUE : COND_JMP_PRED_FALSE;
 				set_Cond_jmp_pred(cond, pred);
 			}
@@ -2502,7 +2480,7 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 			assert(designator->array_index != NULL);
 			assert(is_type_array(type));
 
-			long index_long    = fold_constant_to_int(array_index);
+			long index_long    = fold_expression_to_int(array_index);
 			ir_type *arr_type  = get_ir_type(type);
 			ir_type *elem_type = get_array_element_type(arr_type);
 			long     elem_size = get_type_size_bytes(elem_type);
@@ -2516,14 +2494,11 @@ static long get_offsetof_offset(const offsetof_expression_t *expression)
 	return offset;
 }
 
-static ir_node *offsetof_to_firm(const offsetof_expression_t *expression)
+static ir_tarval *offsetof_to_tarval(offsetof_expression_t const *const expression)
 {
-	ir_mode   *mode   = get_ir_mode_storage(expression->base.type);
-	long       offset = get_offsetof_offset(expression);
-	ir_tarval *tv     = new_tarval_from_long(offset, mode);
-	dbg_info  *dbgi   = get_dbg_info(&expression->base.pos);
-
-	return new_d_Const(dbgi, tv);
+	ir_mode *const mode   = get_ir_mode_storage(expression->base.type);
+	long     const offset = get_offsetof_offset(expression);
+	return new_tarval_from_long(offset, mode);
 }
 
 static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
@@ -2635,90 +2610,26 @@ static unsigned get_object_alignment(expression_t const *const expr)
 /**
  * Transform an alignof expression into Firm code.
  */
-static ir_node *alignof_to_firm(const typeprop_expression_t *expression)
+static ir_tarval *alignof_to_tarval(const typeprop_expression_t *expression)
 {
 	unsigned const alignment = expression->tp_expression
 		? get_object_alignment(expression->tp_expression)
 		: get_type_alignment(expression->type);
-
-	dbg_info  *dbgi = get_dbg_info(&expression->base.pos);
-	ir_mode   *mode = get_ir_mode_storage(expression->base.type);
-	ir_tarval *tv   = new_tarval_from_long(alignment, mode);
-	return new_d_Const(dbgi, tv);
+	ir_mode *const mode = get_ir_mode_storage(expression->base.type);
+	return new_tarval_from_long(alignment, mode);
 }
 
-static void init_ir_types(void);
+static complex_constant fold_complex(const expression_t *expression);
 
-ir_tarval *fold_constant_to_tarval(const expression_t *expression)
+bool folded_expression_is_negative(const expression_t *expression)
 {
-	assert(is_constant_expression(expression) >= EXPR_CLASS_CONSTANT);
-
-	bool constant_folding_old = constant_folding;
-	constant_folding = true;
-
-	/* make sure values are folded even for -O0 */
-	optimization_state_t state;
-	save_optimization_state(&state);
-	set_optimize(1);
-	set_opt_constant_folding(1);
-
-	init_ir_types();
-
-	PUSH_IRG(get_const_code_irg());
-	ir_node *const cnst = expression_to_value(expression);
-	POP_IRG();
-
-	restore_optimization_state(&state);
-
-	constant_folding = constant_folding_old;
-
-	if (!is_Const(cnst))
-		panic("couldn't fold constant");
-	return get_Const_tarval(cnst);
-}
-
-static complex_constant fold_complex_constant(const expression_t *expression)
-{
-	assert(is_constant_expression(expression) >= EXPR_CLASS_CONSTANT);
-
-	bool constant_folding_old = constant_folding;
-	constant_folding = true;
-
-	optimization_state_t state;
-	save_optimization_state(&state);
-	set_optimize(1);
-	set_opt_constant_folding(1);
-
-	init_ir_types();
-
-	PUSH_IRG(get_const_code_irg());
-	complex_value value = expression_to_complex(expression);
-	POP_IRG();
-
-	restore_optimization_state(&state);
-
-	if (!is_Const(value.real) || !is_Const(value.imag)) {
-		panic("couldn't fold constant");
-	}
-
-	constant_folding = constant_folding_old;
-
-	return (complex_constant) {
-		get_Const_tarval(value.real),
-		get_Const_tarval(value.imag)
-	};
-}
-
-/* this function is only used in parser.c, but it relies on libfirm functionality */
-bool constant_is_negative(const expression_t *expression)
-{
-	ir_tarval *tv = fold_constant_to_tarval(expression);
+	ir_tarval *tv = fold_expression(expression);
 	return tarval_is_negative(tv);
 }
 
-long fold_constant_to_int(const expression_t *expression)
+long fold_expression_to_int(const expression_t *expression)
 {
-	ir_tarval *tv = fold_constant_to_tarval(expression);
+	ir_tarval *tv = fold_expression(expression);
 	if (!tarval_is_long(tv)) {
 		panic("result of constant folding is not integer");
 	}
@@ -2726,14 +2637,14 @@ long fold_constant_to_int(const expression_t *expression)
 	return get_tarval_long(tv);
 }
 
-bool fold_constant_to_bool(const expression_t *expression)
+bool fold_expression_to_bool(const expression_t *expression)
 {
 	type_t *type = skip_typeref(expression->base.type);
 	if (is_type_complex(type)) {
-		complex_constant tvs = fold_complex_constant(expression);
+		complex_constant tvs = fold_complex(expression);
 		return !tarval_is_null(tvs.real) || !tarval_is_null(tvs.imag);
 	} else {
-		ir_tarval *tv = fold_constant_to_tarval(expression);
+		ir_tarval *tv = fold_expression(expression);
 		return !tarval_is_null(tv);
 	}
 }
@@ -2804,16 +2715,9 @@ static ir_node *select_addr(const select_expression_t *expression)
 	assert(entry->kind == ENTITY_COMPOUND_MEMBER);
 	assert(entry->declaration.kind == DECLARATION_KIND_COMPOUND_MEMBER);
 
-	if (constant_folding) {
-		ir_mode *mode      = get_irn_mode(compound_addr);
-		ir_mode *mode_uint = get_reference_mode_unsigned_eq(mode);
-		ir_node *ofs       = new_Const_long(mode_uint, entry->compound_member.offset);
-		return new_d_Add(dbgi, compound_addr, ofs, mode);
-	} else {
-		ir_entity *irentity = entry->compound_member.entity;
-		assert(irentity != NULL);
-		return new_d_simpleSel(dbgi, new_NoMem(), compound_addr, irentity);
-	}
+	ir_entity *irentity = entry->compound_member.entity;
+	assert(irentity != NULL);
+	return new_d_simpleSel(dbgi, new_NoMem(), compound_addr, irentity);
 }
 
 static ir_node *select_to_firm(const select_expression_t *expression)
@@ -2859,7 +2763,7 @@ typedef enum gcc_type_class
 	lang_type_class
 } gcc_type_class;
 
-static ir_node *classify_type_to_firm(const classify_type_expression_t *const expr)
+static ir_tarval *classify_type_to_tarval(const classify_type_expression_t *const expr)
 {
 	type_t *type = expr->type_expression->base.type;
 
@@ -2923,10 +2827,8 @@ static ir_node *classify_type_to_firm(const classify_type_expression_t *const ex
 	}
 
 make_const:;
-	dbg_info  *const dbgi = get_dbg_info(&expr->base.pos);
-	ir_mode   *const mode = atomic_modes[ATOMIC_TYPE_INT];
-	ir_tarval *const tv   = new_tarval_from_long(tc, mode);
-	return new_d_Const(dbgi, tv);
+	ir_mode *const mode = atomic_modes[ATOMIC_TYPE_INT];
+	return new_tarval_from_long(tc, mode);
 }
 
 static ir_node *function_name_to_firm(
@@ -3046,22 +2948,22 @@ static ir_node *expression_to_addr(const expression_t *expression)
 	panic("trying to get address of non-lvalue");
 }
 
-static ir_node *builtin_constant_to_firm(
-		const builtin_constant_expression_t *expression)
+static ir_tarval *builtin_constant_to_tarval(
+		builtin_constant_expression_t const *const expression)
 {
 	ir_mode *const mode = get_ir_mode_storage(expression->base.type);
 	bool     const v    = is_constant_expression(expression->value) != EXPR_CLASS_VARIABLE;
-	return create_Const_from_bool(mode, v);
+	return create_tarval_from_bool(mode, v);
 }
 
-static ir_node *builtin_types_compatible_to_firm(
-		const builtin_types_compatible_expression_t *expression)
+static ir_tarval *builtin_types_compatible_to_tarval(
+		builtin_types_compatible_expression_t const *const expression)
 {
 	type_t  *const left  = get_unqualified_type(skip_typeref(expression->left));
 	type_t  *const right = get_unqualified_type(skip_typeref(expression->right));
 	bool     const value = types_compatible(left, right);
 	ir_mode *const mode  = get_ir_mode_storage(expression->base.type);
-	return create_Const_from_bool(mode, value);
+	return create_tarval_from_bool(mode, value);
 }
 
 static void prepare_label_target(label_t *const label)
@@ -3095,10 +2997,8 @@ static ir_node *label_address_to_firm(const label_address_expression_t *label)
 static ir_node *expression_to_value(expression_t const *const expr)
 {
 #ifndef NDEBUG
-	if (!constant_folding) {
-		assert(!expr->base.transformed);
-		((expression_t*)expr)->base.transformed = true;
-	}
+	assert(!expr->base.transformed);
+	((expression_t*)expr)->base.transformed = true;
 	assert(!is_type_complex(skip_typeref(expr->base.type)));
 #endif
 
@@ -3174,22 +3074,14 @@ incdec:
 		return irvalue.real;
 	}
 
-	case EXPR_ALIGNOF:                    return alignof_to_firm(                 &expr->typeprop);
 	case EXPR_ARRAY_ACCESS:               return array_access_to_firm(            &expr->array_access);
 	case EXPR_BINARY_ASSIGN:              return assign_expression_to_firm(       &expr->binary);
 	case EXPR_BINARY_COMMA:               return comma_expression_to_firm(        &expr->binary);
-	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_firm(        &expr->builtin_constant);
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_firm(&expr->builtin_types_compatible);
 	case EXPR_CALL:                       return call_expression_to_firm(         &expr->call);
-	case EXPR_CLASSIFY_TYPE:              return classify_type_to_firm(           &expr->classify_type);
 	case EXPR_COMPOUND_LITERAL:           return compound_literal_to_firm(        &expr->compound_literal);
 	case EXPR_CONDITIONAL:                return conditional_to_firm(             &expr->conditional);
-	case EXPR_ENUM_CONSTANT:              return enum_constant_to_firm(           &expr->reference);
 	case EXPR_FUNCNAME:                   return function_name_to_firm(           &expr->funcname);
 	case EXPR_LABEL_ADDRESS:              return label_address_to_firm(           &expr->label_address);
-	case EXPR_LITERAL_CASES:              return literal_to_firm(                 &expr->literal);
-	case EXPR_LITERAL_CHARACTER:          return char_literal_to_firm(            &expr->string_literal);
-	case EXPR_OFFSETOF:                   return offsetof_to_firm(                &expr->offsetofe);
 	case EXPR_REFERENCE:                  return reference_expression_to_firm(    &expr->reference);
 	case EXPR_SELECT:                     return select_to_firm(                  &expr->select);
 	case EXPR_SIZEOF:                     return sizeof_to_firm(                  &expr->typeprop);
@@ -3210,8 +3102,38 @@ incdec:
 	case EXPR_UNARY_THROW:
 		panic("expression not implemented");
 
-	case EXPR_ERROR:
-		break;
+	{
+		ir_tarval *tv;
+	case EXPR_ALIGNOF:
+		tv = alignof_to_tarval(&expr->typeprop);
+		goto make_const;
+	case EXPR_BUILTIN_CONSTANT_P:
+		tv = builtin_constant_to_tarval(&expr->builtin_constant);
+		goto make_const;
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P:
+		tv = builtin_types_compatible_to_tarval(&expr->builtin_types_compatible);
+		goto make_const;
+	case EXPR_CLASSIFY_TYPE:
+		tv = classify_type_to_tarval(&expr->classify_type);
+		goto make_const;
+	case EXPR_ENUM_CONSTANT:
+		tv = enum_constant_to_tarval(&expr->reference);
+		goto make_const;
+	case EXPR_LITERAL_CASES:;
+		tv = literal_to_tarval(&expr->literal);
+		goto make_const;
+	case EXPR_LITERAL_CHARACTER:
+		tv = char_literal_to_tarval(&expr->string_literal);
+		goto make_const;
+	case EXPR_OFFSETOF:
+		tv = offsetof_to_tarval(&expr->offsetofe);
+		goto make_const;
+make_const:;
+		dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+		return new_d_Const(dbgi, tv);
+	}
+
+	case EXPR_ERROR: break;
 	}
 	panic("invalid expression");
 }
@@ -3308,6 +3230,259 @@ static ir_node *expression_to_control_flow(expression_t const *const expr, jump_
 		return val;
 	}
 	}
+}
+
+/** list of expression kinds that never return a complex result */
+#define NEVER_COMPLEX_CASES  \
+	     EXPR_ALIGNOF:                    \
+	case EXPR_BINARY_BITWISE_AND:         \
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:  \
+	case EXPR_BINARY_BITWISE_OR:          \
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:   \
+	case EXPR_BINARY_BITWISE_XOR:         \
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:  \
+	case EXPR_BINARY_EQUAL:               \
+	case EXPR_BINARY_GREATER:             \
+	case EXPR_BINARY_GREATEREQUAL:        \
+	case EXPR_BINARY_ISGREATER:           \
+	case EXPR_BINARY_ISGREATEREQUAL:      \
+	case EXPR_BINARY_ISLESS:              \
+	case EXPR_BINARY_ISLESSEQUAL:         \
+	case EXPR_BINARY_ISLESSGREATER:       \
+	case EXPR_BINARY_ISUNORDERED:         \
+	case EXPR_BINARY_LESS:                \
+	case EXPR_BINARY_LESSEQUAL:           \
+	case EXPR_BINARY_LOGICAL_AND:         \
+	case EXPR_BINARY_LOGICAL_OR:          \
+	case EXPR_BINARY_MOD:                 \
+	case EXPR_BINARY_MOD_ASSIGN:          \
+	case EXPR_BINARY_NOTEQUAL:            \
+	case EXPR_BINARY_SHIFTLEFT:           \
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:    \
+	case EXPR_BINARY_SHIFTRIGHT:          \
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:   \
+	case EXPR_BUILTIN_CONSTANT_P:         \
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: \
+	case EXPR_CLASSIFY_TYPE:              \
+	case EXPR_COMPOUND_LITERAL:           \
+	case EXPR_ENUM_CONSTANT:              \
+	case EXPR_ERROR:                      \
+	case EXPR_FUNCNAME:                   \
+	case EXPR_LABEL_ADDRESS:              \
+	case EXPR_LITERAL_BOOLEAN:            \
+	case EXPR_LITERAL_CHARACTER:          \
+	case EXPR_LITERAL_MS_NOOP:            \
+	case EXPR_OFFSETOF:                   \
+	case EXPR_SIZEOF:                     \
+	case EXPR_STRING_LITERAL:             \
+	case EXPR_UNARY_ASSUME:               \
+	case EXPR_UNARY_DELETE:               \
+	case EXPR_UNARY_DELETE_ARRAY:         \
+	case EXPR_UNARY_IMAG:                 \
+	case EXPR_UNARY_NOT:                  \
+	case EXPR_UNARY_REAL:                 \
+	case EXPR_UNARY_TAKE_ADDRESS:         \
+	case EXPR_UNARY_THROW:                \
+	case EXPR_VA_ARG:                     \
+	case EXPR_VA_COPY:                    \
+	case EXPR_VA_START                    \
+
+typedef complex_constant (*fold_complex_binop_func)(complex_constant left,
+                                                    complex_constant right);
+
+static complex_constant fold_complex_add(complex_constant const left,
+                                         complex_constant const right)
+{
+	return (complex_constant) {
+		tarval_add(left.real, right.real),
+		tarval_add(left.imag, right.imag)
+	};
+}
+
+static complex_constant fold_complex_sub(complex_constant const left,
+                                         complex_constant const right)
+{
+	return (complex_constant) {
+		tarval_sub(left.real, right.real, NULL),
+		tarval_sub(left.imag, right.imag, NULL)
+	};
+}
+
+static complex_constant fold_complex_mul(complex_constant const left,
+                                         complex_constant const right)
+{
+	ir_tarval *const op1 = tarval_mul(left.real, right.real);
+	ir_tarval *const op2 = tarval_mul(left.imag, right.imag);
+	ir_tarval *const op3 = tarval_mul(left.real, right.imag);
+	ir_tarval *const op4 = tarval_mul(left.imag, right.real);
+	return (complex_constant) {
+		tarval_sub(op1, op2, NULL),
+		tarval_add(op3, op4)
+	};
+}
+
+static complex_constant fold_complex_div(complex_constant const left,
+                                         complex_constant const right)
+{
+	ir_tarval *const op1 = tarval_mul(left.real, right.real);
+	ir_tarval *const op2 = tarval_mul(left.imag, right.imag);
+	ir_tarval *const op3 = tarval_mul(left.imag, right.real);
+	ir_tarval *const op4 = tarval_mul(left.real, right.imag);
+	ir_tarval *const op5 = tarval_mul(right.real, right.real);
+	ir_tarval *const op6 = tarval_mul(right.imag, right.imag);
+	ir_tarval *const real_dividend = tarval_add(op1, op2);
+	ir_tarval *const real_divisor  = tarval_add(op5, op6);
+	ir_tarval *const imag_dividend = tarval_sub(op3, op4, NULL);
+	ir_tarval *const imag_divisor  = tarval_add(op5, op6);
+	return (complex_constant) {
+		tarval_div(real_dividend, real_divisor),
+		tarval_div(imag_dividend, imag_divisor)
+	};
+}
+
+static complex_constant convert_complex_constant(const complex_constant cnst,
+                                                 ir_mode *mode)
+{
+	if (get_tarval_mode(cnst.real) == mode)
+		return cnst;
+	return (complex_constant) {
+		tarval_convert_to(cnst.real, mode),
+		tarval_convert_to(cnst.imag, mode)
+	};
+}
+
+static complex_constant fold_complex_binop(
+		binary_expression_t const *const binexpr, fold_complex_binop_func fold)
+{
+	complex_constant left  = fold_complex(binexpr->left);
+	complex_constant right = fold_complex(binexpr->right);
+	ir_mode *mode = get_complex_mode_arithmetic(binexpr->base.type);
+	left  = convert_complex_constant(left, mode);
+	right = convert_complex_constant(right, mode);
+	return fold(left, right);
+}
+
+static complex_constant fold_complex_negate(
+		unary_expression_t const *const expr)
+{
+	complex_constant value = fold_complex(expr->value);
+	ir_mode         *mode  = get_complex_mode_arithmetic(expr->base.type);
+	value = convert_complex_constant(value, mode);
+	return (complex_constant) {
+		tarval_neg(value.real),
+		tarval_neg(value.imag)
+	};
+}
+
+static complex_constant fold_complex_complement(
+		unary_expression_t const *const expr)
+{
+	complex_constant value = fold_complex(expr->value);
+	ir_mode         *mode  = get_complex_mode_arithmetic(expr->base.type);
+	value = convert_complex_constant(value, mode);
+	return (complex_constant) {
+		value.real,
+		tarval_neg(value.imag)
+	};
+}
+
+static complex_constant fold_complex_literal(
+		literal_expression_t const *const literal)
+{
+	type_t    *type     = skip_typeref(literal->base.type);
+	ir_mode   *mode     = get_complex_mode_storage(type);
+	ir_tarval *litvalue = literal_to_tarval_(literal, mode);
+	ir_tarval *zero     = get_mode_null(mode);
+	return (complex_constant) {
+		zero,
+		litvalue
+	};
+}
+
+static complex_constant fold_complex_conditional(
+		conditional_expression_t const *const cond)
+{
+	type_t const *const condition_type
+		= skip_typeref(cond->condition->base.type);
+	if (!is_type_complex(condition_type)) {
+		bool condval = fold_expression_to_bool(cond->condition);
+		expression_t *to_fold = condval ? cond->true_expression
+										: cond->false_expression;
+		return fold_complex(to_fold);
+	}
+	complex_constant const val = fold_complex(cond->condition);
+	return
+		tarval_is_null(val.real) && tarval_is_null(val.imag)
+		? fold_complex(cond->false_expression)
+		: cond->true_expression
+			? fold_complex(cond->true_expression) : val;
+}
+
+static complex_constant fold_complex_cast(const unary_expression_t *expression)
+{
+	const expression_t *const value     = expression->value;
+	type_t             *const from_type = skip_typeref(value->base.type);
+	type_t             *const to_type   = skip_typeref(expression->base.type);
+	ir_mode            *const mode      = get_complex_mode_storage(to_type);
+
+	if (is_type_complex(from_type)) {
+		complex_constant const folded = fold_complex(value);
+		return convert_complex_constant(folded, mode);
+	} else {
+		ir_tarval *const folded = fold_expression(value);
+		ir_tarval *const casted = tarval_convert_to(folded, mode);
+		ir_tarval *const zero   = get_mode_null(mode);
+		return (complex_constant) { casted, zero };
+	}
+}
+
+static complex_constant fold_complex(const expression_t *expression)
+{
+	assert(is_constant_expression(expression) >= EXPR_CLASS_CONSTANT);
+	switch (expression->kind) {
+	case EXPR_BINARY_ADD:
+		return fold_complex_binop(&expression->binary, fold_complex_add);
+	case EXPR_BINARY_SUB:
+		return fold_complex_binop(&expression->binary, fold_complex_sub);
+	case EXPR_BINARY_MUL:
+		return fold_complex_binop(&expression->binary, fold_complex_mul);
+	case EXPR_BINARY_DIV:
+		return fold_complex_binop(&expression->binary, fold_complex_div);
+	case EXPR_UNARY_PLUS:
+		return fold_complex(expression->unary.value);
+	case EXPR_UNARY_NEGATE:
+		return fold_complex_negate(&expression->unary);
+	case EXPR_UNARY_COMPLEMENT:
+		return fold_complex_complement(&expression->unary);
+	case EXPR_LITERAL_INTEGER:
+	case EXPR_LITERAL_FLOATINGPOINT:
+		return fold_complex_literal(&expression->literal);
+	case EXPR_CONDITIONAL:
+		return fold_complex_conditional(&expression->conditional);
+	case EXPR_UNARY_CAST:
+		return fold_complex_cast(&expression->unary);
+	case EXPR_ARRAY_ACCESS:
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_ASSIGN:
+	case EXPR_BINARY_COMMA:
+	case EXPR_BINARY_DIV_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
+	case EXPR_CALL:
+	case EXPR_REFERENCE:
+	case EXPR_SELECT:
+	case EXPR_STATEMENT:
+	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+		panic("invalid expression kind for constant folding");
+
+	case NEVER_COMPLEX_CASES:
+		break;
+	}
+	panic("internal error: non-complex expression in fold_complex");
 }
 
 static complex_value complex_conv(dbg_info *dbgi, complex_value value,
@@ -3483,15 +3658,6 @@ static complex_value complex_cast_to_firm(const unary_expression_t *expression)
 		ir_node *const casted     = create_conv(dbgi, value_node, mode);
 		return (complex_value) { casted, zero };
 	}
-}
-
-static complex_value complex_literal_to_firm(const literal_expression_t *literal)
-{
-	type_t  *type     = skip_typeref(literal->base.type);
-	ir_mode *mode     = get_complex_mode_storage(type);
-	ir_node *litvalue = literal_to_firm_(literal, mode);
-	ir_node *zero     = new_Const(get_mode_null(mode));
-	return (complex_value) { zero, litvalue };
 }
 
 typedef complex_value (*new_complex_binop)(dbg_info *dbgi, complex_value left,
@@ -3871,61 +4037,6 @@ static complex_value complex_statement_expression_to_firm(
 	return compound_statement_to_firm_complex(&statement->compound);
 }
 
-/** list of expression kinds that never return a complex result */
-#define NEVER_COMPLEX_CASES  \
-	     EXPR_ALIGNOF:                    \
-	case EXPR_BINARY_BITWISE_AND:         \
-	case EXPR_BINARY_BITWISE_AND_ASSIGN:  \
-	case EXPR_BINARY_BITWISE_OR:          \
-	case EXPR_BINARY_BITWISE_OR_ASSIGN:   \
-	case EXPR_BINARY_BITWISE_XOR:         \
-	case EXPR_BINARY_BITWISE_XOR_ASSIGN:  \
-	case EXPR_BINARY_EQUAL:               \
-	case EXPR_BINARY_GREATER:             \
-	case EXPR_BINARY_GREATEREQUAL:        \
-	case EXPR_BINARY_ISGREATER:           \
-	case EXPR_BINARY_ISGREATEREQUAL:      \
-	case EXPR_BINARY_ISLESS:              \
-	case EXPR_BINARY_ISLESSEQUAL:         \
-	case EXPR_BINARY_ISLESSGREATER:       \
-	case EXPR_BINARY_ISUNORDERED:         \
-	case EXPR_BINARY_LESS:                \
-	case EXPR_BINARY_LESSEQUAL:           \
-	case EXPR_BINARY_LOGICAL_AND:         \
-	case EXPR_BINARY_LOGICAL_OR:          \
-	case EXPR_BINARY_MOD:                 \
-	case EXPR_BINARY_MOD_ASSIGN:          \
-	case EXPR_BINARY_NOTEQUAL:            \
-	case EXPR_BINARY_SHIFTLEFT:           \
-	case EXPR_BINARY_SHIFTLEFT_ASSIGN:    \
-	case EXPR_BINARY_SHIFTRIGHT:          \
-	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:   \
-	case EXPR_BUILTIN_CONSTANT_P:         \
-	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: \
-	case EXPR_CLASSIFY_TYPE:              \
-	case EXPR_COMPOUND_LITERAL:           \
-	case EXPR_ENUM_CONSTANT:              \
-	case EXPR_ERROR:                      \
-	case EXPR_FUNCNAME:                   \
-	case EXPR_LABEL_ADDRESS:              \
-	case EXPR_LITERAL_BOOLEAN:            \
-	case EXPR_LITERAL_MS_NOOP:            \
-	case EXPR_LITERAL_CHARACTER:          \
-	case EXPR_OFFSETOF:                   \
-	case EXPR_SIZEOF:                     \
-	case EXPR_STRING_LITERAL:             \
-	case EXPR_UNARY_ASSUME:               \
-	case EXPR_UNARY_DELETE:               \
-	case EXPR_UNARY_DELETE_ARRAY:         \
-	case EXPR_UNARY_IMAG:                 \
-	case EXPR_UNARY_NOT:                  \
-	case EXPR_UNARY_REAL:                 \
-	case EXPR_UNARY_TAKE_ADDRESS:         \
-	case EXPR_UNARY_THROW:                \
-	case EXPR_VA_ARG:                     \
-	case EXPR_VA_COPY:                    \
-	case EXPR_VA_START                    \
-
 static complex_value expression_to_complex(const expression_t *expression)
 {
 	switch (expression->kind) {
@@ -3977,8 +4088,13 @@ static complex_value expression_to_complex(const expression_t *expression)
 	case EXPR_BINARY_ASSIGN:
 		return complex_assign_to_firm(&expression->binary);
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_FLOATINGPOINT:
-		return complex_literal_to_firm(&expression->literal);
+	case EXPR_LITERAL_FLOATINGPOINT:;
+		complex_constant cnst = fold_complex_literal(&expression->literal);
+		dbg_info        *dbgi = get_dbg_info(&expression->base.pos);
+		return (complex_value) {
+			new_d_Const(dbgi, cnst.real),
+			new_d_Const(dbgi, cnst.imag)
+		};
 	case EXPR_CALL:
 		return complex_call_to_firm(&expression->call);
 	case EXPR_CONDITIONAL:
@@ -3986,11 +4102,272 @@ static complex_value expression_to_complex(const expression_t *expression)
 	case EXPR_STATEMENT:
 		return complex_statement_expression_to_firm(&expression->statement);
 	case NEVER_COMPLEX_CASES:
-		panic("unexpected complex expression");
+		break;
+	}
+	panic("unexpected complex expression");
+}
+
+static ir_tarval *get_type_size_tarval(type_t *const type, ir_mode *const mode)
+{
+	size_t const size = get_type_size(type);
+	return new_tarval_from_long(size, mode);
+}
+
+static ir_tarval *fold_expression_to_address(expression_t const *const expr)
+{
+	switch (expr->kind) {
+	case EXPR_SELECT: {
+		select_expression_t const *const sel = &expr->select;
+		construct_select_compound(sel);
+		type_t    *const type      = skip_typeref(sel->compound->base.type);
+		ir_tarval *const base_addr = is_type_pointer(type) ? fold_expression(sel->compound) : fold_expression_to_address(sel->compound);
+		ir_mode   *const mode      = get_tarval_mode(base_addr);
+		ir_mode   *const mode_uint = get_reference_mode_unsigned_eq(mode);
+		ir_tarval *const offset    = new_tarval_from_long(sel->compound_entry->compound_member.offset, mode_uint);
+		return tarval_add(base_addr, offset);
+	}
+
+	case EXPR_ARRAY_ACCESS: {
+		ir_tarval *const base_addr = fold_expression(expr->array_access.array_ref);
+		ir_tarval *const idx       = fold_expression(expr->array_access.index);
+		type_t    *const elem_type = skip_typeref(expr->array_access.array_ref->base.type);
+		ir_mode   *const mode      = get_ir_mode_arithmetic(type_size_t);
+		ir_tarval *const elem_size = get_type_size_tarval(elem_type, mode);
+		return tarval_add(base_addr, tarval_mul(idx, elem_size));
+	}
+
+	case EXPR_UNARY_DEREFERENCE:
+		return fold_expression(expr->unary.value);
+
+	default:
+		panic("unexpected expression kind");
 	}
 }
 
+static ir_tarval *fold_strict_binary_expression(expression_t const *const expr)
+{
+	ir_tarval *const l = fold_expression(expr->binary.left);
+	ir_tarval *const r = fold_expression(expr->binary.right);
+	switch (expr->kind) {
+	case EXPR_BINARY_ADD: {
+		ir_tarval       *ll    = l;
+		ir_tarval       *rr    = r;
+		type_t    *const typel = skip_typeref(expr->binary.left->base.type);
+		type_t    *const typer = skip_typeref(expr->binary.right->base.type);
+		if (is_type_pointer(typel)) {
+			type_t    *const elem = skip_typeref(typel->pointer.points_to);
+			ir_mode   *const mode = get_ir_mode_arithmetic(typer);
+			ir_tarval *const size = get_type_size_tarval(elem, mode);
+			rr = tarval_mul(rr, size);
+		} else if (is_type_pointer(typer)) {
+			type_t    *const elem = skip_typeref(typer->pointer.points_to);
+			ir_mode   *const mode = get_ir_mode_arithmetic(typel);
+			ir_tarval *const size = get_type_size_tarval(elem, mode);
+			ll = tarval_mul(ll, size);
+		}
+		return tarval_add(ll, rr);
+	}
 
+	case EXPR_BINARY_SUB: {
+		ir_mode *const res_mode = get_ir_mode_arithmetic(skip_typeref(expr->base.type));
+		type_t  *const typel    = skip_typeref(expr->binary.left->base.type);
+		if (is_type_pointer(typel)) {
+			type_t *const elem  = skip_typeref(typel->pointer.points_to);
+			type_t *const typer = skip_typeref(expr->binary.right->base.type);
+			if (is_type_pointer(typer)) {
+				ir_tarval *const size = get_type_size_tarval(elem, res_mode);
+				ir_tarval *const diff = tarval_sub(l, r, res_mode);
+				return tarval_div(diff, size);
+			} else {
+				ir_mode   *const mode = get_tarval_mode(r);
+				ir_tarval *const size = get_type_size_tarval(elem, mode);
+				ir_tarval *const rr   = tarval_mul(r, size);
+				return tarval_sub(l, rr, res_mode);
+			}
+		} else {
+			return tarval_sub(l, r, res_mode);
+		}
+	}
+
+	case EXPR_BINARY_MUL:         return tarval_mul(l, r);
+	case EXPR_BINARY_DIV:         return tarval_div(l, r);
+	case EXPR_BINARY_MOD:         return tarval_mod(l, r);
+	case EXPR_BINARY_BITWISE_AND: return tarval_and(l, r);
+	case EXPR_BINARY_BITWISE_OR:  return tarval_or( l, r);
+	case EXPR_BINARY_BITWISE_XOR: return tarval_eor(l, r);
+	case EXPR_BINARY_SHIFTLEFT:   return tarval_shl(l, r);
+	case EXPR_BINARY_SHIFTRIGHT:  return (is_type_signed(skip_typeref(expr->base.type)) ? tarval_shrs : tarval_shr)(l, r);
+
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED: {
+		type_t  *const type = skip_typeref(expr->base.type);
+		ir_mode *const mode = get_ir_mode_arithmetic(type);
+		return create_tarval_from_bool(mode, tarval_cmp(l, r) & get_relation(expr->kind));
+	}
+
+	default:
+		panic("unexpected binary expression kind");
+	}
+}
+
+ir_tarval *fold_expression(expression_t const *const expr)
+{
+	switch (expr->kind) {
+	case EXPR_CONDITIONAL: {
+		conditional_expression_t const *const cond = &expr->conditional;
+		if (cond->true_expression != NULL) {
+			/* note that we need this if in case of a complex expression as
+			 * condition */
+			bool condval = fold_expression_to_bool(cond->condition);
+			expression_t *res = condval ? cond->true_expression
+			                            : cond->false_expression;
+			return fold_expression(res);
+		}
+		ir_tarval *const val = fold_expression(cond->condition);
+		return
+			tarval_is_null(val)   ? fold_expression(cond->false_expression) :
+			cond->true_expression ? fold_expression(cond->true_expression)  :
+			val;
+	}
+
+	case EXPR_SIZEOF: {
+		type_t  *const type = skip_typeref(expr->typeprop.type);
+		ir_mode *const mode = get_ir_mode_arithmetic(skip_typeref(expr->base.type));
+		return get_type_size_tarval(type, mode);
+	}
+
+	case EXPR_ALIGNOF:                    return alignof_to_tarval(                 &expr->typeprop);
+	case EXPR_BUILTIN_CONSTANT_P:         return builtin_constant_to_tarval(        &expr->builtin_constant);
+	case EXPR_BUILTIN_TYPES_COMPATIBLE_P: return builtin_types_compatible_to_tarval(&expr->builtin_types_compatible);
+	case EXPR_CLASSIFY_TYPE:              return classify_type_to_tarval(           &expr->classify_type);
+	case EXPR_ENUM_CONSTANT:              return enum_constant_to_tarval(           &expr->reference);
+	case EXPR_LITERAL_CASES:              return literal_to_tarval(                 &expr->literal);
+	case EXPR_LITERAL_CHARACTER:          return char_literal_to_tarval(            &expr->string_literal);
+	case EXPR_OFFSETOF:                   return offsetof_to_tarval(                &expr->offsetofe);
+	case EXPR_UNARY_TAKE_ADDRESS:         return fold_expression_to_address(         expr->unary.value);
+
+	case EXPR_UNARY_NEGATE:         return tarval_neg(fold_expression(expr->unary.value));
+	case EXPR_UNARY_PLUS:           return fold_expression(expr->unary.value);
+	case EXPR_UNARY_COMPLEMENT:     return tarval_not(fold_expression(expr->unary.value));
+
+	case EXPR_UNARY_NOT: {
+		type_t    *const type = skip_typeref(expr->base.type);
+		ir_mode   *const mode = get_ir_mode_arithmetic(type);
+		ir_tarval *const val  = fold_expression(expr->unary.value);
+		return create_tarval_from_bool(mode, tarval_is_null(val));
+	}
+
+	case EXPR_UNARY_CAST: {
+		type_t    *const type = skip_typeref(expr->base.type);
+		ir_mode   *const mode = get_ir_mode_arithmetic(type);
+		ir_tarval *const val  = fold_expression(expr->unary.value);
+		if (is_type_atomic(type, ATOMIC_TYPE_BOOL)) {
+			return create_tarval_from_bool(mode, !tarval_is_null(val));
+		} else {
+			return tarval_convert_to(val, mode);
+		}
+	}
+
+	case EXPR_BINARY_ADD:
+	case EXPR_BINARY_SUB:
+	case EXPR_BINARY_MUL:
+	case EXPR_BINARY_DIV:
+	case EXPR_BINARY_MOD:
+	case EXPR_BINARY_EQUAL:
+	case EXPR_BINARY_NOTEQUAL:
+	case EXPR_BINARY_LESS:
+	case EXPR_BINARY_LESSEQUAL:
+	case EXPR_BINARY_GREATER:
+	case EXPR_BINARY_GREATEREQUAL:
+	case EXPR_BINARY_ISGREATER:
+	case EXPR_BINARY_ISGREATEREQUAL:
+	case EXPR_BINARY_ISLESS:
+	case EXPR_BINARY_ISLESSEQUAL:
+	case EXPR_BINARY_ISLESSGREATER:
+	case EXPR_BINARY_ISUNORDERED:
+	case EXPR_BINARY_BITWISE_AND:
+	case EXPR_BINARY_BITWISE_OR:
+	case EXPR_BINARY_BITWISE_XOR:
+	case EXPR_BINARY_SHIFTLEFT:
+	case EXPR_BINARY_SHIFTRIGHT:
+		return fold_strict_binary_expression(expr);
+
+	case EXPR_BINARY_LOGICAL_AND: {
+		bool const c =
+			!tarval_is_null(fold_expression(expr->binary.left)) &&
+			!tarval_is_null(fold_expression(expr->binary.right));
+		type_t  *const type = skip_typeref(expr->base.type);
+		ir_mode *const mode = get_ir_mode_arithmetic(type);
+		return create_tarval_from_bool(mode, c);
+	}
+
+	case EXPR_BINARY_LOGICAL_OR: {
+		bool const c =
+			!tarval_is_null(fold_expression(expr->binary.left)) ||
+			!tarval_is_null(fold_expression(expr->binary.right));
+		type_t  *const type = skip_typeref(expr->base.type);
+		ir_mode *const mode = get_ir_mode_arithmetic(type);
+		return create_tarval_from_bool(mode, c);
+	}
+
+	case EXPR_UNARY_REAL: {
+		complex_constant cnst = fold_complex(expr->unary.value);
+		return cnst.real;
+	}
+	case EXPR_UNARY_IMAG: {
+		complex_constant cnst = fold_complex(expr->unary.value);
+		return cnst.imag;
+	}
+
+	case EXPR_ARRAY_ACCESS:
+	case EXPR_BINARY_ADD_ASSIGN:
+	case EXPR_BINARY_ASSIGN:
+	case EXPR_BINARY_BITWISE_AND_ASSIGN:
+	case EXPR_BINARY_BITWISE_OR_ASSIGN:
+	case EXPR_BINARY_BITWISE_XOR_ASSIGN:
+	case EXPR_BINARY_COMMA:
+	case EXPR_BINARY_DIV_ASSIGN:
+	case EXPR_BINARY_MOD_ASSIGN:
+	case EXPR_BINARY_MUL_ASSIGN:
+	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
+	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
+	case EXPR_BINARY_SUB_ASSIGN:
+	case EXPR_CALL:
+	case EXPR_COMPOUND_LITERAL:
+	case EXPR_ERROR:
+	case EXPR_FUNCNAME:
+	case EXPR_LABEL_ADDRESS:
+	case EXPR_REFERENCE:
+	case EXPR_SELECT:
+	case EXPR_STATEMENT:
+	case EXPR_STRING_LITERAL:
+	case EXPR_UNARY_ASSUME:
+	case EXPR_UNARY_DELETE:
+	case EXPR_UNARY_DELETE_ARRAY:
+	case EXPR_UNARY_DEREFERENCE:
+	case EXPR_UNARY_POSTFIX_DECREMENT:
+	case EXPR_UNARY_POSTFIX_INCREMENT:
+	case EXPR_UNARY_PREFIX_DECREMENT:
+	case EXPR_UNARY_PREFIX_INCREMENT:
+	case EXPR_UNARY_THROW:
+	case EXPR_VA_ARG:
+	case EXPR_VA_COPY:
+	case EXPR_VA_START:
+		panic("invalid expression kind for constant folding");
+	}
+
+	panic("unexpected expression kind for constant folding");
+}
 
 static void create_variable_entity(entity_t *variable,
                                    declaration_kind_t declaration_kind,
@@ -4208,7 +4585,7 @@ static void walk_designator(type_path_t *path, const designator_t *designator)
 			expression_t *array_index = designator->array_index;
 			assert(is_type_array(type));
 
-			long index_long = fold_constant_to_int(array_index);
+			long index_long = fold_expression_to_int(array_index);
 			assert(0 <= index_long && (!type->array.size_constant || (size_t)index_long < type->array.size));
 
 			top->type  = orig_type;
@@ -4300,8 +4677,8 @@ static ir_initializer_t *create_ir_initializer_value(
 		return res;
 	}
 
-	if (is_constant_expression(expr) != EXPR_CLASS_VARIABLE) {
-		ir_tarval *      tv   = fold_constant_to_tarval(expr);
+	if (is_constant_expression(expr) >= EXPR_CLASS_CONSTANT) {
+		ir_tarval *      tv   = fold_expression(expr);
 		ir_mode   *const mode = get_ir_mode_storage(type);
 		tv = tarval_convert_to(tv, mode);
 		return create_initializer_tarval(tv);
@@ -5130,7 +5507,7 @@ static ir_node *do_while_statement_to_firm(do_while_statement_t *statement)
 
 	expression_t *const cond = statement->condition;
 	/* Avoid an explicit body block in case of do ... while (0);. */
-	if (is_constant_expression(cond) != EXPR_CLASS_VARIABLE && !fold_constant_to_bool(cond)) {
+	if (is_constant_expression(cond) != EXPR_CLASS_VARIABLE && !fold_expression_to_bool(cond)) {
 		/* do ... while (0);. */
 		statement_to_firm(statement->body);
 		jump_to_target(&continue_target);
@@ -5186,7 +5563,7 @@ static ir_node *for_statement_to_firm(for_statement_t *statement)
 
 	/* Create the condition. */
 	expression_t *const cond = statement->condition;
-	if (cond && (is_constant_expression(cond) == EXPR_CLASS_VARIABLE || !fold_constant_to_bool(cond))) {
+	if (cond && (is_constant_expression(cond) == EXPR_CLASS_VARIABLE || !fold_expression_to_bool(cond))) {
 		jump_target body_target;
 		init_jump_target(&body_target, NULL);
 		expression_to_control_flow(cond, &body_target, &break_target);

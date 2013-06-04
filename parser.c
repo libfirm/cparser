@@ -867,7 +867,7 @@ static bool is_null_pointer_constant(const expression_t *expression)
 		case EXPR_CLASS_VARIABLE:         return false;
 		case EXPR_CLASS_ERROR:            return true;
 		case EXPR_CLASS_CONSTANT:         return false;
-		case EXPR_CLASS_INTEGER_CONSTANT: return !fold_constant_to_bool(expression);
+		case EXPR_CLASS_INTEGER_CONSTANT: return !fold_expression_to_bool(expression);
 	}
 	panic("invalid expression classification");
 }
@@ -1852,7 +1852,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 				return false;
 			}
 
-			long index_long = fold_constant_to_int(array_index);
+			long index_long = fold_expression_to_int(array_index);
 			if (!used_in_offsetof) {
 				if (index_long < 0) {
 					errorf(&designator->pos,
@@ -3581,7 +3581,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			if (size_expression != NULL) {
 				switch (is_constant_expression(size_expression)) {
 				case EXPR_CLASS_INTEGER_CONSTANT: {
-					long const size = fold_constant_to_int(size_expression);
+					long const size = fold_expression_to_int(size_expression);
 					array_type->array.size          = size;
 					array_type->array.size_constant = true;
 					/* §6.7.5.2:1  If the expression is a constant expression,
@@ -4603,7 +4603,7 @@ static int determine_truth(expression_t const* const cond)
 {
 	return
 		is_constant_expression(cond) < EXPR_CLASS_CONSTANT ? 0 :
-		fold_constant_to_bool(cond)                        ? 1 :
+		fold_expression_to_bool(cond)                      ? 1 :
 		-1;
 }
 
@@ -4812,7 +4812,7 @@ static void check_reachable(statement_t *const stmt)
 				return;
 
 			if (is_constant_expression(expr) >= EXPR_CLASS_CONSTANT) {
-				ir_tarval              *const val      = fold_constant_to_tarval(expr);
+				ir_tarval              *const val      = fold_expression(expr);
 				case_label_statement_t *      defaults = NULL;
 				for (case_label_statement_t *i = switchs->first_case; i != NULL; i = i->next) {
 					if (i->expression == NULL) {
@@ -5480,7 +5480,7 @@ static void parse_bitfield_member(entity_t *entity)
 		/* error already reported by parse_constant_expression */
 		size_long = get_type_size(type) * 8;
 	} else {
-		size_long = fold_constant_to_int(size);
+		size_long = fold_expression_to_int(size);
 
 		const symbol_t *symbol = entity->base.symbol;
 		const symbol_t *user_symbol
@@ -7959,7 +7959,7 @@ static void warn_div_by_zero(binary_expression_t const *const expression)
 	/* The type of the right operand can be different for /= */
 	if (is_type_integer(skip_typeref(right->base.type))      &&
 	    is_constant_expression(right) >= EXPR_CLASS_CONSTANT &&
-	    !fold_constant_to_bool(right)) {
+	    !fold_expression_to_bool(right)) {
 		position_t const *const pos = &expression->base.pos;
 		warningf(WARN_DIV_BY_ZERO, pos, "division by zero");
 	}
@@ -8020,7 +8020,7 @@ static bool semantic_shift(binary_expression_t *expression)
 
 	if (is_constant_expression(right) >= EXPR_CLASS_CONSTANT) {
 		position_t const *const pos   = &right->base.pos;
-		long              const count = fold_constant_to_int(right);
+		long              const count = fold_expression_to_int(right);
 		if (count < 0) {
 			warningf(WARN_OTHER, pos, "shift count must be non-negative");
 		} else if ((unsigned long)count >=
@@ -8148,7 +8148,8 @@ static bool maybe_negative(expression_t const *const expr)
 		case EXPR_CLASS_VARIABLE:         return true;
 		case EXPR_CLASS_ERROR:            return false;
 		case EXPR_CLASS_CONSTANT:
-		case EXPR_CLASS_INTEGER_CONSTANT: return constant_is_negative(expr);
+		case EXPR_CLASS_INTEGER_CONSTANT:
+			return folded_expression_is_negative(expr);
 	}
 	panic("invalid expression classification");
 }
@@ -9234,7 +9235,7 @@ static statement_t *parse_case_statement(void)
 		}
 		statement->case_label.is_bad = true;
 	} else {
-		ir_tarval *val = fold_constant_to_tarval(expression);
+		ir_tarval *val = fold_expression(expression);
 		statement->case_label.first_case = val;
 		statement->case_label.last_case  = val;
 	}
@@ -9258,7 +9259,7 @@ static statement_t *parse_case_statement(void)
 				}
 				statement->case_label.is_bad = true;
 			} else {
-				ir_tarval *val = fold_constant_to_tarval(end_range);
+				ir_tarval *val = fold_expression(end_range);
 				statement->case_label.last_case = val;
 
 				if (tarval_cmp(val, statement->case_label.first_case)

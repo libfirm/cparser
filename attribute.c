@@ -165,7 +165,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 						   target machine */
 	if (attribute->a.arguments) {
 		attribute_argument_t *argument = attribute->a.arguments;
-		alignment = fold_constant_to_int(argument->v.expression);
+		alignment = fold_expression_to_int(argument->v.expression);
 	}
 
 	if (!is_po2(alignment)) {

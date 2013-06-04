@@ -1627,7 +1627,7 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 		if (cclass < EXPR_CLASS_CONSTANT)
 			return cclass;
 
-		if (fold_constant_to_bool(c)) {
+		if (fold_expression_to_bool(c)) {
 			expression_t const *const t = expression->conditional.true_expression;
 			return is_linker_constant(t != NULL ? t : c);
 		} else {
@@ -1889,7 +1889,7 @@ check_type:
 		expression_classification_t const rcls = is_constant_expression(expression->binary.right);
 		if (lcls == EXPR_CLASS_INTEGER_CONSTANT && rcls == EXPR_CLASS_INTEGER_CONSTANT)
 			return EXPR_CLASS_INTEGER_CONSTANT;
-		if (!fold_constant_to_bool(left))
+		if (!fold_expression_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
 		return MIN(rcls, EXPR_CLASS_CONSTANT);
 	}
@@ -1902,7 +1902,7 @@ check_type:
 		expression_classification_t const rcls = is_constant_expression(expression->binary.right);
 		if (lcls == EXPR_CLASS_INTEGER_CONSTANT && rcls == EXPR_CLASS_INTEGER_CONSTANT)
 			return EXPR_CLASS_INTEGER_CONSTANT;
-		if (fold_constant_to_bool(left))
+		if (fold_expression_to_bool(left))
 			return EXPR_CLASS_CONSTANT;
 		return MIN(rcls, EXPR_CLASS_CONSTANT);
 	}
@@ -1922,7 +1922,7 @@ check_type:
 		    tcls == EXPR_CLASS_INTEGER_CONSTANT &&
 		    fcls == EXPR_CLASS_INTEGER_CONSTANT)
 			return EXPR_CLASS_INTEGER_CONSTANT;
-		expression_classification_t const cls = fold_constant_to_bool(cond) ? tcls : fcls;
+		expression_classification_t const cls = fold_expression_to_bool(cond) ? tcls : fcls;
 		return MIN(cls, EXPR_CLASS_CONSTANT);
 	}
 
