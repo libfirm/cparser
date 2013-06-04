@@ -4037,6 +4037,15 @@ static complex_value complex_statement_expression_to_firm(
 	return compound_statement_to_firm_complex(&statement->compound);
 }
 
+static complex_value complex_dereference_to_firm(
+	const unary_expression_t *const expr)
+{
+	ir_node  *const addr = expression_to_value(expr->value);
+	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
+	type_t   *const type = skip_typeref(expr->base.type);
+	return complex_deref_address(dbgi, type, addr, cons_none);
+}
+
 static complex_value expression_to_complex(const expression_t *expression)
 {
 	switch (expression->kind) {
@@ -4085,6 +4094,8 @@ static complex_value expression_to_complex(const expression_t *expression)
 		return complex_negate_to_firm(&expression->unary);
 	case EXPR_UNARY_COMPLEMENT:
 		return complex_complement_to_firm(&expression->unary);
+	case EXPR_UNARY_DEREFERENCE:
+		return complex_dereference_to_firm(&expression->unary);
 	case EXPR_BINARY_ASSIGN:
 		return complex_assign_to_firm(&expression->binary);
 	case EXPR_LITERAL_INTEGER:
