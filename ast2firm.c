@@ -4244,9 +4244,16 @@ static ir_initializer_t *create_ir_initializer_value(
 		return res;
 	}
 
-	ir_node *value = expression_to_value(expr);
-	value = conv_to_storage_type(NULL, value, type);
-	return create_initializer_const(value);
+	if (is_constant_expression(expr) != EXPR_CLASS_VARIABLE) {
+		ir_tarval *      tv   = fold_constant_to_tarval(expr);
+		ir_mode   *const mode = get_ir_mode_storage(type);
+		tv = tarval_convert_to(tv, mode);
+		return create_initializer_tarval(tv);
+	} else {
+		ir_node *value = expression_to_value(expr);
+		value = conv_to_storage_type(NULL, value, type);
+		return create_initializer_const(value);
+	}
 }
 
 /** Tests whether type can be initialized by a string constant */
