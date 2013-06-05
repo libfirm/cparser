@@ -4139,12 +4139,13 @@ static ir_tarval *fold_expression_to_address(expression_t const *const expr)
 	}
 
 	case EXPR_ARRAY_ACCESS: {
-		ir_tarval *const base_addr = fold_expression(expr->array_access.array_ref);
+		ir_tarval *const base_addr = fold_expression_to_address(expr->array_access.array_ref);
 		ir_tarval *const idx       = fold_expression(expr->array_access.index);
-		type_t    *const elem_type = skip_typeref(expr->array_access.array_ref->base.type);
 		ir_mode   *const mode      = get_ir_mode_arithmetic(type_size_t);
+		ir_tarval *const idx_conv  = tarval_convert_to(idx, mode);
+		type_t    *const elem_type = skip_typeref(expr->array_access.array_ref->base.type);
 		ir_tarval *const elem_size = get_type_size_tarval(elem_type, mode);
-		return tarval_add(base_addr, tarval_mul(idx, elem_size));
+		return tarval_add(base_addr, tarval_mul(idx_conv, elem_size));
 	}
 
 	case EXPR_UNARY_DEREFERENCE:
