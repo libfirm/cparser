@@ -4156,80 +4156,89 @@ static ir_tarval *fold_expression_to_address(expression_t const *const expr)
 	}
 }
 
-static ir_tarval *fold_strict_binary_expression(expression_t const *const expr)
+typedef ir_tarval* (*fold_binary_func)(ir_tarval *left, ir_tarval *right);
+
+static ir_tarval *fold_binary_expression_arithmetic(
+		binary_expression_t const *const binexpr, fold_binary_func fold)
 {
-	ir_tarval *const l = fold_expression(expr->binary.left);
-	ir_tarval *const r = fold_expression(expr->binary.right);
-	switch (expr->kind) {
-	case EXPR_BINARY_ADD: {
-		ir_tarval       *ll    = l;
-		ir_tarval       *rr    = r;
-		type_t    *const typel = skip_typeref(expr->binary.left->base.type);
-		type_t    *const typer = skip_typeref(expr->binary.right->base.type);
-		if (is_type_pointer(typel)) {
-			type_t    *const elem = skip_typeref(typel->pointer.points_to);
-			ir_mode   *const mode = get_ir_mode_arithmetic(typer);
-			ir_tarval *const size = get_type_size_tarval(elem, mode);
-			rr = tarval_mul(rr, size);
-		} else if (is_type_pointer(typer)) {
-			type_t    *const elem = skip_typeref(typer->pointer.points_to);
-			ir_mode   *const mode = get_ir_mode_arithmetic(typel);
-			ir_tarval *const size = get_type_size_tarval(elem, mode);
-			ll = tarval_mul(ll, size);
-		}
-		return tarval_add(ll, rr);
-	}
+	ir_tarval *const left   = fold_expression(binexpr->left);
+	ir_tarval *const right  = fold_expression(binexpr->right);
+	type_t    *const type   = skip_typeref(binexpr->base.type);
+	ir_mode   *const mode   = get_ir_mode_arithmetic(type);
+	ir_tarval *const cleft  = tarval_convert_to(left, mode);
+	ir_tarval *const cright = tarval_convert_to(right, mode);
+	return fold(cleft, cright);
+}
 
-	case EXPR_BINARY_SUB: {
-		ir_mode *const res_mode = get_ir_mode_arithmetic(skip_typeref(expr->base.type));
-		type_t  *const typel    = skip_typeref(expr->binary.left->base.type);
-		if (is_type_pointer(typel)) {
-			type_t *const elem  = skip_typeref(typel->pointer.points_to);
-			type_t *const typer = skip_typeref(expr->binary.right->base.type);
-			if (is_type_pointer(typer)) {
-				ir_tarval *const size = get_type_size_tarval(elem, res_mode);
-				ir_tarval *const diff = tarval_sub(l, r, res_mode);
-				return tarval_div(diff, size);
-			} else {
-				ir_mode   *const mode = get_tarval_mode(r);
-				ir_tarval *const size = get_type_size_tarval(elem, mode);
-				ir_tarval *const rr   = tarval_mul(r, size);
-				return tarval_sub(l, rr, res_mode);
-			}
-		} else {
-			return tarval_sub(l, r, res_mode);
-		}
-	}
-
-	case EXPR_BINARY_MUL:         return tarval_mul(l, r);
-	case EXPR_BINARY_DIV:         return tarval_div(l, r);
-	case EXPR_BINARY_MOD:         return tarval_mod(l, r);
-	case EXPR_BINARY_BITWISE_AND: return tarval_and(l, r);
-	case EXPR_BINARY_BITWISE_OR:  return tarval_or( l, r);
-	case EXPR_BINARY_BITWISE_XOR: return tarval_eor(l, r);
-	case EXPR_BINARY_SHIFTLEFT:   return tarval_shl(l, r);
-	case EXPR_BINARY_SHIFTRIGHT:  return (is_type_signed(skip_typeref(expr->base.type)) ? tarval_shrs : tarval_shr)(l, r);
-
-	case EXPR_BINARY_EQUAL:
-	case EXPR_BINARY_NOTEQUAL:
-	case EXPR_BINARY_LESS:
-	case EXPR_BINARY_LESSEQUAL:
-	case EXPR_BINARY_GREATER:
-	case EXPR_BINARY_GREATEREQUAL:
-	case EXPR_BINARY_ISGREATER:
-	case EXPR_BINARY_ISGREATEREQUAL:
-	case EXPR_BINARY_ISLESS:
-	case EXPR_BINARY_ISLESSEQUAL:
-	case EXPR_BINARY_ISLESSGREATER:
-	case EXPR_BINARY_ISUNORDERED: {
-		type_t  *const type = skip_typeref(expr->base.type);
+static ir_tarval *fold_binary_add(binary_expression_t const *const binexpr)
+{
+	ir_tarval *const l     = fold_expression(binexpr->left);
+	ir_tarval *const r     = fold_expression(binexpr->right);
+	ir_tarval       *ll    = l;
+	ir_tarval       *rr    = r;
+	type_t    *const typel = skip_typeref(binexpr->left->base.type);
+	type_t    *const typer = skip_typeref(binexpr->right->base.type);
+	if (is_type_pointer(typel)) {
+		type_t    *const elem = skip_typeref(typel->pointer.points_to);
+		ir_mode   *const mode = get_ir_mode_arithmetic(typer);
+		ir_tarval *const size = get_type_size_tarval(elem, mode);
+		rr = tarval_mul(rr, size);
+	} else if (is_type_pointer(typer)) {
+		type_t    *const elem = skip_typeref(typer->pointer.points_to);
+		ir_mode   *const mode = get_ir_mode_arithmetic(typel);
+		ir_tarval *const size = get_type_size_tarval(elem, mode);
+		ll = tarval_mul(ll, size);
+	} else {
+		type_t  *const type = skip_typeref(binexpr->base.type);
 		ir_mode *const mode = get_ir_mode_arithmetic(type);
-		return create_tarval_from_bool(mode, tarval_cmp(l, r) & get_relation(expr->kind));
+		ll = tarval_convert_to(l, mode);
+		rr = tarval_convert_to(r, mode);
 	}
+	return tarval_add(ll, rr);
+}
 
-	default:
-		panic("unexpected binary expression kind");
+static ir_tarval *fold_binary_sub(binary_expression_t const *const binexpr)
+{
+	ir_tarval *const l        = fold_expression(binexpr->left);
+	ir_tarval *const r        = fold_expression(binexpr->right);
+	type_t    *const type     = skip_typeref(binexpr->base.type);
+	ir_mode   *const res_mode = get_ir_mode_arithmetic(type);
+	type_t    *const typel    = skip_typeref(binexpr->left->base.type);
+	if (is_type_pointer(typel)) {
+		type_t *const elem  = skip_typeref(typel->pointer.points_to);
+		type_t *const typer = skip_typeref(binexpr->right->base.type);
+		if (is_type_pointer(typer)) {
+			ir_tarval *const size = get_type_size_tarval(elem, res_mode);
+			ir_tarval *const diff = tarval_sub(l, r, res_mode);
+			return tarval_div(diff, size);
+		} else {
+			ir_mode   *const mode = get_tarval_mode(r);
+			ir_tarval *const size = get_type_size_tarval(elem, mode);
+			ir_tarval *const rr   = tarval_mul(r, size);
+			return tarval_sub(l, rr, res_mode);
+		}
+	} else {
+		ir_tarval *const conv_l = tarval_convert_to(l, res_mode);
+		ir_tarval *const conv_r = tarval_convert_to(r, res_mode);
+		return tarval_sub(conv_l, conv_r, NULL);
 	}
+}
+
+static ir_tarval *fold_binary_comparison(
+		binary_expression_t const *const binexpr)
+{
+	ir_tarval   *const left   = fold_expression(binexpr->left);
+	ir_tarval   *const right  = fold_expression(binexpr->right);
+	type_t      *const atype  = skip_typeref(binexpr->left->base.type);
+	ir_mode     *const amode  = get_ir_mode_arithmetic(atype);
+	assert(amode == get_ir_mode_arithmetic(skip_typeref(binexpr->right->base.type)));
+	ir_tarval   *const lefta  = tarval_convert_to(left, amode);
+	ir_tarval   *const righta = tarval_convert_to(right, amode);
+
+	type_t      *const type = skip_typeref(binexpr->base.type);
+	ir_mode     *const mode = get_ir_mode_arithmetic(type);
+	ir_relation  const rel  = get_relation(binexpr->base.kind);
+	return create_tarval_from_bool(mode, tarval_cmp(lefta, righta) & rel);
 }
 
 ir_tarval *fold_expression(expression_t const *const expr)
@@ -4290,11 +4299,6 @@ ir_tarval *fold_expression(expression_t const *const expr)
 		}
 	}
 
-	case EXPR_BINARY_ADD:
-	case EXPR_BINARY_SUB:
-	case EXPR_BINARY_MUL:
-	case EXPR_BINARY_DIV:
-	case EXPR_BINARY_MOD:
 	case EXPR_BINARY_EQUAL:
 	case EXPR_BINARY_NOTEQUAL:
 	case EXPR_BINARY_LESS:
@@ -4307,12 +4311,30 @@ ir_tarval *fold_expression(expression_t const *const expr)
 	case EXPR_BINARY_ISLESSEQUAL:
 	case EXPR_BINARY_ISLESSGREATER:
 	case EXPR_BINARY_ISUNORDERED:
-	case EXPR_BINARY_BITWISE_AND:
+		return fold_binary_comparison(&expr->binary);
+	case EXPR_BINARY_ADD:
+		return fold_binary_add(&expr->binary);
+	case EXPR_BINARY_SUB:
+		return fold_binary_sub(&expr->binary);
+	case EXPR_BINARY_MUL:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_mul);
+	case EXPR_BINARY_DIV:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_div);
+	case EXPR_BINARY_MOD:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_mod);
 	case EXPR_BINARY_BITWISE_OR:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_or);
+	case EXPR_BINARY_BITWISE_AND:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_and);
 	case EXPR_BINARY_BITWISE_XOR:
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_eor);
 	case EXPR_BINARY_SHIFTLEFT:
-	case EXPR_BINARY_SHIFTRIGHT:
-		return fold_strict_binary_expression(expr);
+		return fold_binary_expression_arithmetic(&expr->binary, tarval_shl);
+	case EXPR_BINARY_SHIFTRIGHT: {
+		fold_binary_func fold = is_type_signed(skip_typeref(expr->base.type))
+		                      ? tarval_shrs : tarval_shr;
+		return fold_binary_expression_arithmetic(&expr->binary, fold);
+	}
 
 	case EXPR_BINARY_LOGICAL_AND: {
 		bool const c =
