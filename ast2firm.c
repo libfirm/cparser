@@ -1534,21 +1534,20 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 
 		return new_d_Const(dbgi, result);
 	}
+	case BUILTIN_ROTR:
 	case BUILTIN_ROTL: {
-		ir_node *val  = expression_to_value(call->arguments->expression);
-		ir_node *shf  = expression_to_value(call->arguments->next->expression);
-		ir_mode *mode = get_irn_mode(val);
-		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
-		return new_d_Rotl(dbgi, val, create_conv(dbgi, shf, mode_uint), mode);
-	}
-	case BUILTIN_ROTR: {
+		/* firm matches shl/shr patterns for rotl */
 		ir_node *val  = expression_to_value(call->arguments->expression);
 		ir_node *shf  = expression_to_value(call->arguments->next->expression);
 		ir_mode *mode = get_irn_mode(val);
 		ir_mode *mode_uint = atomic_modes[ATOMIC_TYPE_UINT];
 		ir_node *c    = new_Const_long(mode_uint, get_mode_size_bits(mode));
 		ir_node *sub  = new_d_Sub(dbgi, c, create_conv(dbgi, shf, mode_uint), mode_uint);
-		return new_d_Rotl(dbgi, val, sub, mode);
+		ir_node *shlop = builtin->entity->function.btk == BUILTIN_ROTL ? val : sub;
+		ir_node *shrop = builtin->entity->function.btk == BUILTIN_ROTR ? val : sub;
+		ir_node *shl = new_d_Shl(dbgi, shlop, shf, mode);
+		ir_node *shr = new_d_Shr(dbgi, shrop, shf, mode);
+		return new_d_Or(dbgi, shl, shr, mode);
 	}
 	case BUILTIN_FIRM:
 		break;
