@@ -168,11 +168,11 @@ ir_entity *rts_entities[rts_max];
 /**
  * Map runtime functions.
  */
-static void rts_map(void)
+static ir_intrinsics_map *make_rts_map(void)
 {
 	static const struct {
-		ir_entity   **ent; /**< address of the rts entity */
-		i_mapper_func func; /**< mapper function. */
+		ir_entity    **ent; /**< address of the rts entity */
+		i_mapper_func *func; /**< mapper function. */
 	} mapper[] = {
 		/* integer */
 		{ &rts_entities[rts_abs],     i_mapper_abs },
@@ -262,14 +262,20 @@ static void rts_map(void)
 			rec[n_map].i_call.kind     = INTRINSIC_CALL;
 			rec[n_map].i_call.i_ent    = *mapper[i].ent;
 			rec[n_map].i_call.i_mapper = mapper[i].func;
-			rec[n_map].i_call.ctx      = NULL;
-			rec[n_map].i_call.link     = NULL;
 			++n_map;
 		}
 	}
 
-	if (n_map > 0)
-		lower_intrinsics(rec, n_map, /* part_block_used=*/0);
+	return ir_create_intrinsics_map(rec, n_map, false);
+}
+
+static ir_intrinsics_map *rts_intrinsic_map;
+
+static void rts_map(ir_graph *irg)
+{
+	if (rts_intrinsic_map == NULL)
+		rts_intrinsic_map = make_rts_map();
+	ir_lower_intrinsics(irg, rts_intrinsic_map);
 }
 
 static int *irg_dump_no;
@@ -380,6 +386,7 @@ static opt_config_t opts[] = {
 	IRG("thread-jumps",      opt_jumpthreading,        "path-sensitive jumpthreading",                          OPT_FLAG_NONE),
 	IRG("unroll-loops",      do_loop_unrolling,        "loop unrolling",                                        OPT_FLAG_NONE),
 	IRG("vrp",               set_vrp_data,             "value range propagation",                               OPT_FLAG_NONE),
+	IRG("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
 	IRP("inline",            do_inline,                "inlining",                                              OPT_FLAG_NONE),
 	IRP("lower-const",       lower_const_code,         "lowering of constant code",                             OPT_FLAG_HIDE_OPTIONS | OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY | OPT_FLAG_ESSENTIAL),
 	IRP("local-const",       local_opts_const_code,    "local optimisation of constant initializers",
@@ -388,7 +395,6 @@ static opt_config_t opts[] = {
 	IRP("opt-func-call",     optimize_funccalls,       "function call optimization",                            OPT_FLAG_NONE),
 	IRP("opt-proc-clone",    do_cloning,               "procedure cloning",                                     OPT_FLAG_NONE),
 	IRP("remove-unused",     garbage_collect_entities, "removal of unused functions/variables",                 OPT_FLAG_NO_DUMP | OPT_FLAG_NO_VERIFY),
-	IRP("rts",               rts_map,                  "optimization of known library functions",               OPT_FLAG_NONE),
 	IRP("opt-cc",            mark_private_methods,     "calling conventions optimization",                      OPT_FLAG_NONE),
 #undef IRP
 #undef IRG
@@ -543,11 +549,10 @@ static void do_firm_optimizations(const char *input_filename)
 	if (get_opt_enabled("ivopts"))
 		set_opt_enabled("remove-phi-cycles", false);
 
-	do_irp_opt("rts");
-
 	/* first step: kill dead code */
 	for (i = 0; i < get_irp_n_irgs(); i++) {
 		ir_graph *irg = get_irp_irg(i);
+		do_irg_opt(irg, "rts");
 		do_irg_opt(irg, "combo");
 		do_irg_opt(irg, "local");
 		do_irg_opt(irg, "control-flow");
