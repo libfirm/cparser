@@ -169,12 +169,15 @@ static void semantic_comparison(binary_expression_t *expression,
 	case T_register:        \
 	case T__Thread_local
 
-#define TYPE_QUALIFIERS     \
+#define TYPE_QUALIFIERS_NO_ATTRIBUTE \
 	     T_const:           \
 	case T_restrict:        \
 	case T_volatile:        \
 	case T_inline:          \
-	case T__forceinline:    \
+	case T__forceinline
+
+#define TYPE_QUALIFIERS                \
+	     TYPE_QUALIFIERS_NO_ATTRIBUTE: \
 	case T___attribute__
 
 #define TYPE_SPECIFIERS       \
@@ -203,15 +206,26 @@ static void semantic_comparison(binary_expression_t *expression,
 	case T__Complex:          \
 	case T__Imaginary
 
-#define DECLARATION_START \
+#define DECLARATION_SPECIFIERS \
 	     STORAGE_CLASSES: \
 	case TYPE_QUALIFIERS: \
 	case TYPE_SPECIFIERS
 
+#define DECLARATION_START \
+		DECLARATION_SPECIFIERS: \
+	case T__Static_assert
+
 #define DECLARATION_START_NO_EXTERN \
 	     STORAGE_CLASSES_NO_EXTERN: \
 	case TYPE_QUALIFIERS: \
-	case TYPE_SPECIFIERS
+	case TYPE_SPECIFIERS: \
+	case T__Static_assert
+
+#define DECLARATION_START_NO_ATTRIBUTE \
+	     STORAGE_CLASSES:              \
+	case TYPE_QUALIFIERS_NO_ATTRIBUTE: \
+	case TYPE_SPECIFIERS:              \
+	case T__Static_assert
 
 #define EXPRESSION_START              \
 	     '!':                         \
@@ -2441,9 +2455,18 @@ static bool is_typedef_symbol(symbol_t *symbol)
 static bool is_declaration_specifier(token_t const *const tk)
 {
 	switch (tk->kind) {
-		case DECLARATION_START: return true;
-		case T_IDENTIFIER:      return is_typedef_symbol(tk->base.symbol);
-		default:                return false;
+	case DECLARATION_SPECIFIERS: return true;
+	case T_IDENTIFIER:           return is_typedef_symbol(tk->base.symbol);
+	default:                     return false;
+	}
+}
+
+static bool starts_declaration(token_t const *const tk)
+{
+	switch (tk->kind) {
+	case DECLARATION_START: return true;
+	case T_IDENTIFIER:      return is_typedef_symbol(tk->base.symbol);
+	default:                return false;
 	}
 }
 
@@ -2525,7 +2548,7 @@ static type_t *parse_typedef_name(void)
 	 * errors later on. */
 	token_kind_t const la1_type = look_ahead(1)->kind;
 	switch (la1_type) {
-	case DECLARATION_START:
+	case DECLARATION_SPECIFIERS:
 	case T_IDENTIFIER:
 	case '&':
 	case '*':
@@ -2849,13 +2872,7 @@ wrong_thread_storage_class:
 				 * declaration, so it doesn't generate errors about expecting '(' or
 				 * '{' later on. */
 				switch (look_ahead(1)->kind) {
-					case STORAGE_CLASSES:
-					case TYPE_SPECIFIERS:
-					case T_const:
-					case T_restrict:
-					case T_volatile:
-					case T_inline:
-					case T__forceinline: /* ^ DECLARATION_START except for __attribute__ */
+					case DECLARATION_START_NO_ATTRIBUTE:
 					case T_IDENTIFIER:
 					case '&':
 					case '*':
@@ -4341,9 +4358,40 @@ static entity_t *finished_kr_declaration(entity_t *entity, bool is_definition)
 	return record_entity(entity, false);
 }
 
+static void parse_static_assert(void)
+{
+	position_t pos = *HERE;
+	eat(T__Static_assert);
+	add_anchor_token(';');
+	add_anchor_token(')');
+	add_anchor_token(',');
+	expect('(');
+	expression_t *expr = parse_constant_expression();
+	rem_anchor_token(',');
+	expect(',');
+
+	string_t message = parse_string_literals("static assert");
+
+	rem_anchor_token(')');
+	expect(')');
+
+	/* semantic */
+	if (is_constant_expression(expr) && !fold_expression_to_bool(expr)) {
+		errorf(&pos, "assertion '%E' failed: \"%S\"", expr, &message);
+	}
+
+	rem_anchor_token(';');
+	expect(';');
+}
+
 static void parse_declaration(parsed_declaration_func finished_declaration,
                               declarator_flags_t      flags)
 {
+	if (token.kind == T__Static_assert) {
+		parse_static_assert();
+		return;
+	}
+
 	add_anchor_token(';');
 	declaration_specifiers_t specifiers;
 	parse_declaration_specifiers(&specifiers);
@@ -5183,6 +5231,11 @@ static void prepare_main_collect2(entity_t*);
 
 static void parse_external_declaration(void)
 {
+	if (token.kind == T__Static_assert) {
+		parse_static_assert();
+		return;
+	}
+
 	/* function-definitions and declarations both start with declaration
 	 * specifiers */
 	add_anchor_token(';');
@@ -5568,7 +5621,7 @@ static void parse_compound_type_entries(compound_t *compound)
 
 	for (;;) {
 		switch (token.kind) {
-			case DECLARATION_START:
+			case DECLARATION_SPECIFIERS:
 			case T___extension__:
 			case T_IDENTIFIER: {
 				PUSH_EXTENSION();
@@ -5576,6 +5629,11 @@ static void parse_compound_type_entries(compound_t *compound)
 				parse_declaration_specifiers(&specifiers);
 				parse_compound_declarators(compound, &specifiers);
 				POP_EXTENSION();
+				break;
+			}
+
+			case T__Static_assert: {
+				parse_static_assert();
 				break;
 			}
 
@@ -9631,7 +9689,7 @@ static statement_t *parse_for(void)
 	PUSH_EXTENSION();
 
 	if (accept(';')) {
-	} else if (is_declaration_specifier(&token)) {
+	} else if (starts_declaration(&token)) {
 		parse_declaration(record_entity, DECL_FLAGS_NONE);
 	} else {
 		add_anchor_token(';');

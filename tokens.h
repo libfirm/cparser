@@ -145,7 +145,7 @@ ALT(_MS,   _alignof,   T__Alignof)
 KEY(_C11,  _Atomic)
 KEY(_C11,  _Generic)
 KEY(_C11,  _Noreturn)
-KEY(_C11,  _Static_assert)
+KEY(_ALL,  _Static_assert)
 KEY(_C11,  _Thread_local)
 ALT(_ALL, __thread,    T__Thread_local)
 
