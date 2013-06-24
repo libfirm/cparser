@@ -1468,6 +1468,26 @@ static ir_node *reference_expression_to_firm(const reference_expression_t *ref)
 	}
 }
 
+static ir_tarval *fold_builtin_inf(call_expression_t const *const call,
+                                   type_t const *const function_type)
+{
+	/* TODO: interpret string arg if provided */
+	(void)call;
+	type_t  *type = function_type->function.return_type;
+	ir_mode *mode = get_ir_mode_storage(type);
+	return get_mode_infinite(mode);
+}
+
+static ir_tarval *fold_builtin_nan(call_expression_t const *const call,
+                                   type_t const *const function_type)
+{
+	/* TODO: interpret string arg if provided */
+	(void)call;
+	type_t  *type = function_type->function.return_type;
+	ir_mode *mode = get_ir_mode_storage(type);
+	return get_mode_NAN(mode);
+}
+
 /**
  * Transform calls to builtin functions.
  */
@@ -1499,20 +1519,12 @@ static ir_node *process_builtin_call(const call_expression_t *call)
 		return res;
 	}
 	case BUILTIN_INF: {
-		type_t    *type = function_type->function.return_type;
-		ir_mode   *mode = get_ir_mode_storage(type);
-		ir_tarval *tv   = get_mode_infinite(mode);
-		ir_node   *res  = new_d_Const(dbgi, tv);
-		return res;
+		ir_tarval *tv = fold_builtin_inf(call, function_type);
+		return new_d_Const(dbgi, tv);
 	}
 	case BUILTIN_NAN: {
-		/* Ignore string for now... */
-		assert(is_type_function(function_type));
-		type_t    *type = function_type->function.return_type;
-		ir_mode   *mode = get_ir_mode_storage(type);
-		ir_tarval *tv   = get_mode_NAN(mode);
-		ir_node   *res  = new_d_Const(dbgi, tv);
-		return res;
+		ir_tarval *tv = fold_builtin_nan(call, function_type);
+		return new_d_Const(dbgi, tv);
 	}
 	case BUILTIN_EXPECT: {
 		expression_t *argument = call->arguments->expression;
@@ -4240,6 +4252,26 @@ static ir_tarval *fold_binary_comparison(
 	return create_tarval_from_bool(mode, tarval_cmp(lefta, righta) & rel);
 }
 
+static ir_tarval *fold_call_builtin(call_expression_t const *const call)
+{
+	expression_t const *const function = call->function;
+	assert(function->kind == EXPR_REFERENCE);
+	reference_expression_t const *const ref = &function->reference;
+	assert(ref->entity->kind == ENTITY_FUNCTION);
+
+	type_t *expr_type = skip_typeref(ref->base.type);
+	assert(is_type_pointer(expr_type));
+	type_t *function_type = skip_typeref(expr_type->pointer.points_to);
+	assert(is_type_function(function_type));
+
+	switch (ref->entity->function.btk) {
+	case BUILTIN_INF: return fold_builtin_inf(call, function_type);
+	case BUILTIN_NAN: return fold_builtin_nan(call, function_type);
+	default:
+		panic("builtin is no constant");
+	}
+}
+
 ir_tarval *fold_expression(expression_t const *const expr)
 {
 	switch (expr->kind) {
@@ -4361,6 +4393,8 @@ ir_tarval *fold_expression(expression_t const *const expr)
 		complex_constant cnst = fold_complex(expr->unary.value);
 		return cnst.imag;
 	}
+	case EXPR_CALL:
+		return fold_call_builtin(&expr->call);
 
 	case EXPR_ARRAY_ACCESS:
 	case EXPR_BINARY_ADD_ASSIGN:
@@ -4375,7 +4409,6 @@ ir_tarval *fold_expression(expression_t const *const expr)
 	case EXPR_BINARY_SHIFTLEFT_ASSIGN:
 	case EXPR_BINARY_SHIFTRIGHT_ASSIGN:
 	case EXPR_BINARY_SUB_ASSIGN:
-	case EXPR_CALL:
 	case EXPR_COMPOUND_LITERAL:
 	case EXPR_ERROR:
 	case EXPR_FUNCNAME:
