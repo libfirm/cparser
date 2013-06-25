@@ -47,6 +47,7 @@ static warning_switch_t warning[] = {
 	[WARN_PACKED]                        = { WARN_STATE_NONE, "packed"                        },
 	[WARN_PADDED]                        = { WARN_STATE_NONE, "padded"                        },
 	[WARN_PARENTHESES]                   = { WARN_STATE_NONE, "parentheses"                   },
+	[WARN_PEDANTIC]                      = { WARN_STATE_NONE, "pedantic"                      },
 	[WARN_POINTER_ARITH]                 = { WARN_STATE_ON,   "pointer-arith"                 },
 	[WARN_REDUNDANT_DECLS]               = { WARN_STATE_ON,   "redundant-decls"               },
 	[WARN_RETURN_TYPE]                   = { WARN_STATE_ON,   "return-type"                   },

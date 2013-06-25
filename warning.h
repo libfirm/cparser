@@ -49,6 +49,7 @@ typedef enum warning_t {
 	WARN_PACKED,                        /**< Warn if a structure is given the packed attribute, but the packed attribute has no effect on the layout or size of the structure */
 	WARN_PADDED,                        /**< Warn if padding is included in a structure, either to align an element of the structure or to align the whole structure */
 	WARN_PARENTHESES,                   /**< Warn if parentheses are omitted in certain contexts (assignment where truth value is expected, if-else-braces) */
+	WARN_PEDANTIC,                      /**< Warn for cases where the c standard isn't stricly followed (but where we can easily continue) */
 	WARN_POINTER_ARITH,                 /**< Warn about anything that depends on the "size of" a function type or of 'void' */
 	WARN_REDUNDANT_DECLS,               /**< Warn about redundant declarations */
 	WARN_RETURN_TYPE,                   /* TODO not fully implemented */ /**< Warn about function definitions with a return-type that defaults to 'int'.  Also warn about any 'return' statement with no return-value in a function whose return-type is not 'void'. */

@@ -738,7 +738,7 @@ static void print_help_parser(void)
 	put_choice("iso9899:199409",         "ISO C90");
 	put_choice("iso9899:1999",           "ISO C99");
 	put_choice("iso9899:199x",           "Deprecated");
-	put_help("-pedantic",                "Ignored (gcc compatibility)");
+	put_help("-pedantic",                "be pedantic about C standard");
 	put_help("-ansi",                    "-std=c90 (for C) or -std=c++98 (for C++)");
 	put_help("--strict",                 "Enable strict conformance checking");
 }
@@ -2340,6 +2340,7 @@ int main(int argc, char **argv)
 				standard = STANDARD_ANSI;
 			} else if (streq(option, "pedantic")) {
 				strict_mode = true;
+				set_warning_opt("pedantic");
 			} else if (strstart(option, "std=")) {
 				const char *const o = &option[4];
 				standard =
