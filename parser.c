@@ -1020,14 +1020,30 @@ static assign_error_t semantic_assign(type_t *orig_type_left,
 	return ASSIGN_ERROR_INCOMPATIBLE;
 }
 
-static expression_t *parse_constant_expression(void)
+static expression_t *parse_integer_constant_expression(const char *description)
 {
 	expression_t *result = parse_subexpression(PREC_CONDITIONAL);
 
-	if (is_constant_expression(result) == EXPR_CLASS_VARIABLE) {
+	switch (is_constant_expression(result)) {
+	case EXPR_CLASS_VARIABLE:
 		errorf(&result->base.pos, "expression '%E' is not constant", result);
+		result->base.type = type_error_type;
+		break;
+	case EXPR_CLASS_CONSTANT:
+		if (!is_type_integer(skip_typeref(result->base.type))) {
+			errorf(&result->base.pos, "%s '%E' has non-integer type",
+			       description, result);
+			result->base.type = type_error_type;
+		} else {
+			warningf(WARN_PEDANTIC, &result->base.pos,
+			         "%s '%E' is not an integer constant expression",
+			         description, result);
+		}
+		break;
+	case EXPR_CLASS_INTEGER_CONSTANT:
+	case EXPR_CLASS_ERROR:
+		break;
 	}
-
 	return result;
 }
 
@@ -1537,9 +1553,11 @@ static designator_t *parse_designation(void)
 			eat('[');
 			add_anchor_token(']');
 			add_anchor_token(T_DOTDOTDOT);
-			designator->array_index = parse_constant_expression();
+			designator->array_index
+				= parse_integer_constant_expression("array index");
 			if (accept(T_DOTDOTDOT)) {
-				designator->range_last = parse_constant_expression();
+				designator->range_last
+					= parse_integer_constant_expression("array range end");
 				errorf(&designator->pos, "range initializer not supported");
 			}
 			rem_anchor_token(T_DOTDOTDOT);
@@ -1854,7 +1872,7 @@ static bool walk_designator(type_path_t *path, const designator_t *designator,
 			}
 		} else {
 			expression_t *array_index = designator->array_index;
-			if (is_constant_expression(array_index) < EXPR_CLASS_CONSTANT)
+			if (array_index->base.type == type_error_type)
 				return true;
 
 			if (!is_type_array(type)) {
@@ -2359,8 +2377,8 @@ static void parse_enum_entries(type_t *const enum_type)
 		rem_anchor_token('=');
 
 		if (accept('=')) {
-			expression_t *value = parse_constant_expression();
-
+			expression_t *value
+				= parse_integer_constant_expression("enumeration value");
 			value = create_implicit_cast(value, enum_type);
 			entity->enum_value.value = value;
 
@@ -4366,7 +4384,8 @@ static void parse_static_assert(void)
 	add_anchor_token(')');
 	add_anchor_token(',');
 	expect('(');
-	expression_t *expr = parse_constant_expression();
+	expression_t *expr
+		= parse_integer_constant_expression("static assert expression");
 	rem_anchor_token(',');
 	expect(',');
 
@@ -4376,7 +4395,7 @@ static void parse_static_assert(void)
 	expect(')');
 
 	/* semantic */
-	if (is_constant_expression(expr) && !fold_expression_to_bool(expr)) {
+	if (expr->base.type != type_error_type && !fold_expression_to_bool(expr)) {
 		errorf(&pos, "assertion '%E' failed: \"%S\"", expr, &message);
 	}
 
@@ -4867,6 +4886,8 @@ static void check_reachable(statement_t *const stmt)
 						defaults = i;
 						continue;
 					}
+					if (i->is_bad)
+						continue;
 
 					if (i->first_case == val || i->last_case == val ||
 						((tarval_cmp(i->first_case, val) & ir_relation_less_equal)
@@ -5519,7 +5540,7 @@ static void parse_bitfield_member(entity_t *entity)
 {
 	eat(':');
 
-	expression_t *size = parse_constant_expression();
+	expression_t *size = parse_integer_constant_expression("bitfield size");
 	long          size_long;
 
 	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
@@ -5529,8 +5550,8 @@ static void parse_bitfield_member(entity_t *entity)
 			   type);
 	}
 
-	if (is_constant_expression(size) < EXPR_CLASS_CONSTANT) {
-		/* error already reported by parse_constant_expression */
+	if (size->base.type == type_error_type) {
+		/* just a dummy value */
 		size_long = get_type_size(type) * 8;
 	} else {
 		size_long = fold_expression_to_int(size);
@@ -9269,63 +9290,41 @@ static statement_t *parse_case_statement(void)
 	eat(T_case);
 	add_anchor_token(':');
 
-	expression_t *expression = parse_expression();
-	type_t *expression_type = expression->base.type;
-	type_t *skipped         = skip_typeref(expression_type);
-	if (!is_type_integer(skipped) && is_type_valid(skipped)) {
-		errorf(pos, "case expression '%E' must have integer type but has type '%T'",
-		       expression, expression_type);
-	}
-
-	type_t *type = expression_type;
-	if (current_switch != NULL) {
-		type_t *switch_type = current_switch->expression->base.type;
-		if (is_type_valid(skip_typeref(switch_type))) {
-			expression = create_implicit_cast(expression, switch_type);
-		}
-	}
-
-	statement->case_label.expression = expression;
-	expression_classification_t const expr_class = is_constant_expression(expression);
-	if (expr_class < EXPR_CLASS_CONSTANT) {
-		if (expr_class != EXPR_CLASS_ERROR) {
-			errorf(pos, "case label does not reduce to an integer constant");
-		}
+	expression_t *expression = parse_integer_constant_expression("case label");
+	type_t       *type       = expression->base.type;
+	if (expression->base.type == type_error_type) {
 		statement->case_label.is_bad = true;
 	} else {
+		if (current_switch != NULL) {
+			type_t *switch_type = current_switch->expression->base.type;
+			if (is_type_valid(skip_typeref(switch_type))) {
+				expression = create_implicit_cast(expression, switch_type);
+			}
+		}
+
 		ir_tarval *val = fold_expression(expression);
 		statement->case_label.first_case = val;
 		statement->case_label.last_case  = val;
 	}
+	statement->case_label.expression = expression;
 
 	if (GNU_MODE) {
 		if (accept(T_DOTDOTDOT)) {
-			expression_t *end_range = parse_expression();
-			expression_type = expression->base.type;
-			skipped         = skip_typeref(expression_type);
-			if (!is_type_integer(skipped) && is_type_valid(skipped)) {
-				errorf(pos, "case expression '%E' must have integer type but has type '%T'",
-					   expression, expression_type);
-			}
-
-			end_range = create_implicit_cast(end_range, type);
-			statement->case_label.end_range = end_range;
-			expression_classification_t const end_class = is_constant_expression(end_range);
-			if (end_class < EXPR_CLASS_CONSTANT) {
-				if (end_class != EXPR_CLASS_ERROR) {
-					errorf(pos, "case range does not reduce to an integer constant");
-				}
+			expression_t *end_range
+				= parse_integer_constant_expression("case range end");
+			if (end_range->base.type == type_error_type) {
 				statement->case_label.is_bad = true;
 			} else {
+				end_range = create_implicit_cast(end_range, type);
 				ir_tarval *val = fold_expression(end_range);
 				statement->case_label.last_case = val;
-
 				if (tarval_cmp(val, statement->case_label.first_case)
 				    == ir_relation_less) {
 					statement->case_label.is_empty_range = true;
 					warningf(WARN_OTHER, pos, "empty range specified");
 				}
 			}
+			statement->case_label.end_range = end_range;
 		}
 	}
 
