@@ -1736,10 +1736,9 @@ static void assign_value(dbg_info *dbgi, ir_node *addr, type_t *type,
 		ir_node  *store_mem = new_d_Proj(dbgi, store, mode_M, pn_Store_M);
 		set_store(store_mem);
 	} else {
-		ir_type *irtype    = get_ir_type(type);
-		ir_node *copyb     = new_d_CopyB(dbgi, memory, addr, value, irtype);
-		ir_node *copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
-		set_store(copyb_mem);
+		ir_type *irtype = get_ir_type(type);
+		ir_node *copyb  = new_d_CopyB(dbgi, memory, addr, value, irtype);
+		set_store(copyb);
 	}
 }
 
@@ -4962,8 +4961,7 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_node *mem = get_store();
 		ir_node *new_mem;
 		if (is_compound_type(ent_type)) {
-			ir_node *copyb = new_d_CopyB(dbgi, mem, base_addr, node, ent_type);
-			new_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
+			new_mem = new_d_CopyB(dbgi, mem, base_addr, node, ent_type);
 		} else {
 			assert(get_type_mode(type) == get_irn_mode(node));
 			ir_node *store = new_d_Store(dbgi, mem, base_addr, node, cons_none);
@@ -5079,9 +5077,7 @@ static void create_local_initializer(initializer_t *initializer, dbg_info *dbgi,
 	ir_node *const src_addr = create_symconst(dbgi, init_entity);
 	ir_type *const irtype   = get_ir_type(type);
 	ir_node *const copyb    = new_d_CopyB(dbgi, memory, addr, src_addr, irtype);
-
-	ir_node *const copyb_mem = new_Proj(copyb, mode_M, pn_CopyB_M);
-	set_store(copyb_mem);
+	set_store(copyb);
 }
 
 static void create_initializer_local_variable_entity(entity_t *entity)
