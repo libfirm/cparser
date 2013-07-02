@@ -133,6 +133,7 @@ static struct obstack    cppflags_obst;
 static struct obstack    ldflags_obst;
 static struct obstack    asflags_obst;
 static struct obstack    codegenflags_obst;
+static const char       *asflags;
 static const char       *outname;
 static bool              define_intmax_types;
 static bool              construct_dep_target;
@@ -456,8 +457,10 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 
 static void assemble(const char *out, const char *in)
 {
-	obstack_1grow(&asflags_obst, '\0');
-	const char *flags = obstack_finish(&asflags_obst);
+	if (asflags == NULL) {
+		obstack_1grow(&asflags_obst, '\0');
+		asflags = obstack_finish(&asflags_obst);
+	}
 
 	const char *assembler = getenv("CPARSER_AS");
 	if (assembler != NULL) {
@@ -467,8 +470,8 @@ static void assemble(const char *out, const char *in)
 			obstack_printf(&asflags_obst, "%s-", target_triple);
 		obstack_printf(&asflags_obst, "%s", ASSEMBLER);
 	}
-	if (flags[0] != '\0')
-		obstack_printf(&asflags_obst, " %s", flags);
+	if (asflags[0] != '\0')
+		obstack_printf(&asflags_obst, " %s", asflags);
 
 	obstack_printf(&asflags_obst, " %s -o %s", in, out);
 	obstack_1grow(&asflags_obst, '\0');
