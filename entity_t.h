@@ -194,7 +194,7 @@ struct compound_member_t {
 	il_size_t      offset;     /**< the offset of this member in the compound */
 	unsigned char  bit_offset; /**< extra bit offset for bitfield members */
 	unsigned char  bit_size;   /**< bitsize for bitfield members */
-	bool           bitfield      : 1;  /**< member is (part of) a bitfield */
+	bool           bitfield : 1;  /**< member is (part of) a bitfield */
 
 	/* ast2firm info */
 	ir_entity *entity;

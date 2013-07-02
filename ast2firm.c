@@ -426,90 +426,6 @@ static ir_type *create_array_type(type_t const *const type)
 }
 
 /**
- * Return the signed integer type of size bits.
- *
- * @param size   the size
- */
-static ir_type *get_signed_int_type_for_bit_size(ir_type *base_tp,
-                                                 unsigned size,
-												 const type_t *type)
-{
-	static ir_mode *s_modes[64 + 1] = {NULL, };
-	ir_type *res;
-	ir_mode *mode;
-
-	if (size <= 0 || size > 64)
-		return NULL;
-
-	mode = s_modes[size];
-	if (mode == NULL) {
-		ir_mode *base_mode    = get_type_mode(base_tp);
-		unsigned modulo_shift = get_mode_modulo_shift(base_mode);
-
-		char name[32];
-		snprintf(name, sizeof(name), "bf_I%u", size);
-		mode = new_int_mode(name, irma_twos_complement, size, 1, modulo_shift);
-		s_modes[size] = mode;
-	}
-
-	type_dbg_info *dbgi = get_type_dbg_info_(type);
-	res                 = new_d_type_primitive(mode, dbgi);
-	set_primitive_base_type(res, base_tp);
-
-	return res;
-}
-
-/**
- * Return the unsigned integer type of size bits.
- *
- * @param size   the size
- */
-static ir_type *get_unsigned_int_type_for_bit_size(ir_type *base_tp,
-                                                   unsigned size,
-												   const type_t *type)
-{
-	static ir_mode *u_modes[64 + 1] = {NULL, };
-	ir_type *res;
-	ir_mode *mode;
-
-	if (size <= 0 || size > 64)
-		return NULL;
-
-	mode = u_modes[size];
-	if (mode == NULL) {
-		ir_mode *base_mode    = get_type_mode(base_tp);
-		unsigned modulo_shift = get_mode_modulo_shift(base_mode);
-
-		char name[32];
-		snprintf(name, sizeof(name), "bf_U%u", size);
-		mode = new_int_mode(name, irma_twos_complement, size, 0, modulo_shift);
-		u_modes[size] = mode;
-	}
-
-	type_dbg_info *dbgi = get_type_dbg_info_(type);
-	res = new_d_type_primitive(mode, dbgi);
-	set_primitive_base_type(res, base_tp);
-
-	return res;
-}
-
-static ir_type *create_bitfield_type(const entity_t *entity)
-{
-	assert(entity->kind == ENTITY_COMPOUND_MEMBER);
-	type_t *base = skip_typeref(entity->declaration.type);
-	assert(is_type_integer(base));
-	ir_type *irbase = get_ir_type(base);
-
-	unsigned bit_size = entity->compound_member.bit_size;
-
-	if (is_type_signed(base)) {
-		return get_signed_int_type_for_bit_size(irbase, bit_size, base);
-	} else {
-		return get_unsigned_int_type_for_bit_size(irbase, bit_size, base);
-	}
-}
-
-/**
  * Construct firm type from ast struct type.
  */
 static ir_type *create_compound_type(type_t *const type)
@@ -555,18 +471,16 @@ static ir_type *create_compound_type(type_t *const type)
 			member_id = new_id_from_str(symbol->string);
 		}
 
-		ir_type *entry_irtype;
-		if (entry->compound_member.bitfield) {
-			entry_irtype = create_bitfield_type(entry);
-		} else {
-			entry_irtype = get_ir_type(entry_type);
-		}
+		ir_type   *entry_irtype = get_ir_type(entry_type);
 		dbg_info  *dbgi   = get_dbg_info(&entry->base.pos);
 		ir_entity *entity = new_d_entity(irtype, member_id, entry_irtype, dbgi);
 
 		set_entity_offset(entity, entry->compound_member.offset);
-		set_entity_offset_bits_remainder(entity,
-		                                 entry->compound_member.bit_offset);
+		if (entry->compound_member.bitfield) {
+			set_entity_bitfield_offset(entity,
+			                           entry->compound_member.bit_offset);
+			set_entity_bitfield_size(entity, entry->compound_member.bit_size);
+		}
 
 		assert(entry->declaration.kind == DECLARATION_KIND_UNKNOWN);
 		entry->declaration.kind       = DECLARATION_KIND_COMPOUND_MEMBER;
@@ -1769,16 +1683,15 @@ static ir_node *bitfield_store_to_firm(dbg_info *dbgi,
 		ir_entity *entity, ir_node *addr, ir_node *value, bool set_volatile,
 		bool need_return)
 {
-	ir_type *entity_type = get_entity_type(entity);
-	ir_type *base_type   = get_primitive_base_type(entity_type);
+	ir_type *base_type   = get_entity_type(entity);
 	ir_mode *mode        = get_type_mode(base_type);
 	ir_mode *mode_uint   = atomic_modes[ATOMIC_TYPE_UINT];
 
 	value = create_conv(dbgi, value, mode);
 
 	/* kill upper bits of value and shift to right position */
-	unsigned  bitoffset  = get_entity_offset_bits_remainder(entity);
-	unsigned  bitsize    = get_mode_size_bits(get_type_mode(entity_type));
+	unsigned  bitoffset  = get_entity_bitfield_offset(entity);
+	unsigned  bitsize    = get_entity_bitfield_size(entity);
 	unsigned  base_bits  = get_mode_size_bits(mode);
 	unsigned  shiftwidth = base_bits - bitsize;
 
@@ -4520,6 +4433,9 @@ static size_t get_compound_member_count(const compound_type_t *type)
 	size_t      n_members = 0;
 	entity_t   *member    = compound->members.entities;
 	for ( ; member != NULL; member = member->base.next) {
+		/* skip anonymous bitfield members */
+		if (member->compound_member.bitfield && member->base.symbol == NULL)
+		    continue;
 		++n_members;
 	}
 
@@ -4576,7 +4492,7 @@ static void descend_into_subtype(type_path_t *path)
 		len            = top_type->array.size;
 	}
 	if (initializer == NULL
-			|| get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
+	    || get_initializer_kind(initializer) == IR_INITIALIZER_NULL) {
 		initializer = create_initializer_compound(len);
 		/* we have to set the entry at the 2nd latest path entry... */
 		size_t path_len = ARR_LEN(path->path);
@@ -4869,17 +4785,17 @@ static ir_initializer_t *create_ir_initializer(
 		const initializer_t *initializer, type_t *type)
 {
 	switch (initializer->kind) {
-		case INITIALIZER_STRING:
-			return create_ir_initializer_string(initializer, type);
+	case INITIALIZER_STRING:
+		return create_ir_initializer_string(initializer, type);
 
-		case INITIALIZER_LIST:
-			return create_ir_initializer_list(&initializer->list, type);
+	case INITIALIZER_LIST:
+		return create_ir_initializer_list(&initializer->list, type);
 
-		case INITIALIZER_VALUE:
-			return create_ir_initializer_value(&initializer->value);
+	case INITIALIZER_VALUE:
+		return create_ir_initializer_value(&initializer->value);
 
-		case INITIALIZER_DESIGNATOR:
-			panic("unexpected designator initializer");
+	case INITIALIZER_DESIGNATOR:
+		panic("unexpected designator initializer");
 	}
 	panic("unknown initializer");
 }
@@ -4928,8 +4844,8 @@ static void create_dynamic_null_initializer(ir_entity *entity, dbg_info *dbgi,
 	ir_node *node       = new_Const(get_mode_null(value_mode));
 
 	/* is it a bitfield type? */
-	if (is_Primitive_type(ent_type) &&
-			get_primitive_base_type(ent_type) != NULL) {
+	if (is_compound_type(get_entity_owner(entity))
+	    && get_entity_bitfield_size(entity) > 0) {
 		bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 		return;
 	}
@@ -4952,8 +4868,8 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		ir_type *ent_type = get_entity_type(entity);
 
 		/* is it a bitfield type? */
-		if (is_Primitive_type(ent_type) &&
-				get_primitive_base_type(ent_type) != NULL) {
+		if (is_compound_type(get_entity_owner(entity))
+		    && get_entity_bitfield_size(entity) > 0) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, node, false, false);
 			return;
 		}
@@ -4971,13 +4887,12 @@ static void create_dynamic_initializer_sub(ir_initializer_t *initializer,
 		return;
 	}
 	case IR_INITIALIZER_TARVAL: {
-		ir_tarval *tv       = get_initializer_tarval_value(initializer);
-		ir_node   *cnst     = new_d_Const(dbgi, tv);
-		ir_type   *ent_type = get_entity_type(entity);
+		ir_tarval *tv   = get_initializer_tarval_value(initializer);
+		ir_node   *cnst = new_d_Const(dbgi, tv);
 
 		/* is it a bitfield type? */
-		if (is_Primitive_type(ent_type) &&
-				get_primitive_base_type(ent_type) != NULL) {
+		if (is_compound_type(get_entity_owner(entity))
+		    && get_entity_bitfield_size(entity) > 0) {
 			bitfield_store_to_firm(dbgi, entity, base_addr, cnst, false, false);
 			return;
 		}
