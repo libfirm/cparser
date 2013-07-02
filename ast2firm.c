@@ -560,7 +560,8 @@ static ir_mode *get_ir_mode_storage(type_t *type)
 	type = skip_typeref(type);
 
 	/* Firm doesn't report a mode for arrays and structs/unions. */
-	if (!is_type_scalar(type) || is_type_complex(type)) {
+	if (!is_type_scalar(type) || is_type_complex(type)
+	    || is_type_pointer(type) || is_type_reference(type)) {
 		return mode_P_data;
 	}
 
