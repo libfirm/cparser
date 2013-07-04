@@ -73,7 +73,7 @@ static struct a_firm_opt firm_opt = {
 	.alias_analysis   =  true,
 	.strict_alias     =  false,
 	.no_alias         =  false,
-	.verify           =  FIRM_VERIFICATION_ON,
+	.verify           =  true,
 	.check_all        =  true,
 	.clone_threshold  =  DEFAULT_CLONE_THRESHOLD,
 	.inline_maxsize   =  750,
@@ -124,9 +124,8 @@ static const struct params {
   { X("clone-threshold=<value>"),NULL,                       0, "set clone threshold to <value>" },
 
   /* other firm regarding options */
-  { X("verify-off"),             &firm_opt.verify,           FIRM_VERIFICATION_OFF,    "disable node verification" },
-  { X("verify-on"),              &firm_opt.verify,           FIRM_VERIFICATION_ON,     "enable node verification" },
-  { X("verify-report"),          &firm_opt.verify,           FIRM_VERIFICATION_REPORT, "node verification, report only" },
+  { X("verify-off"),             &firm_opt.verify,           0, "disable node verification" },
+  { X("verify-on"),              &firm_opt.verify,           1, "enable node verification" },
 
   /* dumping */
   { X("dump-ir"),                &firm_dump.ir_graph,        1, "dump IR graph" },
@@ -451,7 +450,7 @@ static bool do_irg_opt(ir_graph *irg, const char *name)
 
 	if (firm_opt.verify) {
 		timer_push(t_verify);
-		irg_verify(irg, VERIFY_ENFORCE_SSA);
+		irg_assert_verify(irg);
 		timer_pop(t_verify);
 	}
 
@@ -482,7 +481,7 @@ static void do_irp_opt(const char *name)
 		int i;
 		timer_push(t_verify);
 		for (i = get_irp_n_irgs() - 1; i >= 0; --i) {
-			irg_verify(get_irp_irg(i), VERIFY_ENFORCE_SSA);
+			irg_assert_verify(get_irp_irg(i));
 		}
 		timer_pop(t_verify);
 	}
@@ -754,8 +753,6 @@ void generate_code(FILE *out, const char *input_filename)
 	 * should have called it already before starting graph construction */
 	init_implicit_optimizations();
 	firm_init_stat();
-
-	do_node_verification((firm_verification_t) firm_opt.verify);
 
 	/* the general for dumping option must be set, or the others will not work*/
 	firm_dump.ir_graph = (bool) (firm_dump.ir_graph | firm_dump.all_phases);
