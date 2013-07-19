@@ -1691,6 +1691,8 @@ static expression_classification_t is_constant_pointer(const expression_t *expre
 	switch (expression->kind) {
 	case EXPR_UNARY_CAST:
 		return is_constant_pointer(expression->unary.value);
+	case EXPR_COMPOUND_LITERAL:
+		return EXPR_CLASS_CONSTANT;
 	default:
 		return EXPR_CLASS_VARIABLE;
 	}
@@ -1907,8 +1909,16 @@ check_type:
 		return MIN(rcls, EXPR_CLASS_CONSTANT);
 	}
 
-	case EXPR_COMPOUND_LITERAL:
-		return is_constant_initializer(expression->compound_literal.initializer);
+	case EXPR_COMPOUND_LITERAL: {
+		if (is_type_pointer(expression->base.type)) {
+			/* arrays degrade automatically to pointers to the array contents
+			 * which are not constant (but just linktime constant) */
+			assert(is_type_array(skip_typeref(expression->compound_literal.type)));
+			return EXPR_CLASS_VARIABLE;
+		} else {
+			return is_constant_initializer(expression->compound_literal.initializer);
+		}
+	}
 
 	case EXPR_CONDITIONAL: {
 		expression_t               *const cond = expression->conditional.condition;
