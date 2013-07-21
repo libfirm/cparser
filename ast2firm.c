@@ -2454,10 +2454,11 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 {
 	dbg_info      *dbgi        = get_dbg_info(&expression->base.pos);
 	type_t        *type        = expression->type;
+	type_t        *skipped     = skip_typeref(type);
 	initializer_t *initializer = expression->initializer;
 
 	if (expression->global_scope || (
-	      type->base.qualifiers & TYPE_QUALIFIER_CONST &&
+	      skipped->base.qualifiers & TYPE_QUALIFIER_CONST &&
 	      is_constant_initializer(initializer) != EXPR_CLASS_VARIABLE
 	    )) {
 		ir_entity *entity = create_initializer_entity(dbgi, initializer, type);
@@ -2481,12 +2482,33 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 	}
 }
 
-static ir_node *compound_literal_to_firm(compound_literal_expression_t const* const expr)
+static ir_node *compound_literal_to_firm(
+		compound_literal_expression_t const* const expr)
 {
 	dbg_info *const dbgi = get_dbg_info(&expr->base.pos);
-	type_t   *const type = expr->type;
-	ir_node  *const addr = compound_literal_addr(expr);
-	return deref_address(dbgi, type, addr);
+	type_t   *const type = skip_typeref(expr->type);
+	if (is_type_array(type) || is_type_compound(type)) {
+		ir_node  *const addr = compound_literal_addr(expr);
+		return deref_address(dbgi, type, addr);
+	} else {
+		assert(is_type_scalar(type));
+		const initializer_t *initializer = expr->initializer;
+		switch (initializer->kind) {
+		case INITIALIZER_VALUE:
+			return expression_to_value(initializer->value.value);
+		case INITIALIZER_STRING:
+			return string_to_firm(&expr->base.pos, "str.%u",
+			                      &(get_init_string(initializer)->value));
+		case INITIALIZER_LIST:
+		case INITIALIZER_DESIGNATOR: {
+			/* shouldn't really happen in valid programs, return 0 for
+			 * invalid ones... */
+			ir_mode *mode = get_ir_mode_arithmetic(type);
+			return new_d_Const(dbgi, get_mode_null(mode));
+		}
+		}
+		panic("invalid initializer");
+	}
 }
 
 /**
