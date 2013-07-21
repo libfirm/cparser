@@ -1485,11 +1485,13 @@ static expression_classification_t is_object_with_linker_constant_address(
 		return is_linker_constant(expression->unary.value);
 
 	case EXPR_COMPOUND_LITERAL: {
-		const compound_literal_expression_t *literal
-			= &expression->compound_literal;
+		const compound_literal_expression_t *literal =
+			&expression->compound_literal;
+		type_t *type = skip_typeref(literal->type);
 		return literal->global_scope ||
-		       ((literal->type->base.qualifiers & TYPE_QUALIFIER_CONST)
-		        && is_constant_initializer(literal->initializer));
+		      (type->base.qualifiers & TYPE_QUALIFIER_CONST
+		       && is_constant_initializer(literal->initializer))
+		     ? EXPR_CLASS_CONSTANT : EXPR_CLASS_VARIABLE;
 	}
 
 	case EXPR_SELECT: {
@@ -1546,8 +1548,16 @@ expression_classification_t is_linker_constant(const expression_t *expression)
 	case EXPR_LABEL_ADDRESS:
 		return EXPR_CLASS_CONSTANT;
 
-	case EXPR_COMPOUND_LITERAL:
-		return is_constant_initializer(expression->compound_literal.initializer);
+	case EXPR_COMPOUND_LITERAL: {
+		const compound_literal_expression_t *literal =
+			&expression->compound_literal;
+		type_t *type = skip_typeref(literal->type);
+		return literal->global_scope ||
+		      (type->base.qualifiers & TYPE_QUALIFIER_CONST
+		       && (is_type_compound(type) || is_type_array(type))
+		       && is_constant_initializer(literal->initializer))
+		     ? EXPR_CLASS_CONSTANT : EXPR_CLASS_VARIABLE;
+	}
 
 	case EXPR_UNARY_TAKE_ADDRESS:
 		return is_object_with_linker_constant_address(expression->unary.value);
@@ -1688,14 +1698,9 @@ static expression_classification_t is_constant_pointer(const expression_t *expre
 	if (expr_class != EXPR_CLASS_VARIABLE)
 		return expr_class;
 
-	switch (expression->kind) {
-	case EXPR_UNARY_CAST:
+	if (expression->kind == EXPR_UNARY_CAST)
 		return is_constant_pointer(expression->unary.value);
-	case EXPR_COMPOUND_LITERAL:
-		return EXPR_CLASS_CONSTANT;
-	default:
-		return EXPR_CLASS_VARIABLE;
-	}
+	return EXPR_CLASS_VARIABLE;
 }
 
 static expression_classification_t is_object_with_constant_address(const expression_t *expression)
@@ -1910,13 +1915,14 @@ check_type:
 	}
 
 	case EXPR_COMPOUND_LITERAL: {
-		if (is_type_pointer(expression->base.type)) {
-			/* arrays degrade automatically to pointers to the array contents
-			 * which are not constant (but just linktime constant) */
-			assert(is_type_array(skip_typeref(expression->compound_literal.type)));
-			return EXPR_CLASS_VARIABLE;
-		} else {
+		type_t *skipped = skip_typeref(expression->compound_literal.type);
+		if (is_type_scalar(skipped)) {
 			return is_constant_initializer(expression->compound_literal.initializer);
+		} else {
+			assert(is_type_array(skipped) || is_type_compound(skipped));
+			/* arrays/compounds degrade automatically to pointers to the
+			 * initializer contents (which is only a linktime constant) */
+			return EXPR_CLASS_VARIABLE;
 		}
 	}
 
