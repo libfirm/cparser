@@ -840,7 +840,6 @@ bool is_type_complete(type_t const *const type)
 
 	case TYPE_TYPEDEF:
 	case TYPE_TYPEOF:
-		panic("typedef not skipped");
 	case TYPE_BUILTIN_TEMPLATE:
 		break;
 	}

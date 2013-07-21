@@ -1636,19 +1636,32 @@ make_string_init:;
 	return result;
 }
 
+/** initializers (and compound literals) are allowed for object types
+ * or array types with unknown size (which are not variable initialized) */
+static bool is_initializable_type(const type_t *const type)
+{
+	if (is_type_array(type))
+		return type->array.size_expression == NULL || !type->array.is_vla;
+	return is_type_complete(type) && type->kind != TYPE_FUNCTION;
+}
+
 /**
  * Parses an scalar initializer.
  *
  * §6.7.8.11; eat {} without warning
  */
 static initializer_t *parse_scalar_initializer(type_t *type,
-                                               bool must_be_constant)
+                                               bool must_be_constant,
+                                               bool may_have_braces)
 {
 	/* there might be extra {} hierarchies */
 	int braces = 0;
 	if (token.kind == '{') {
-		warningf(WARN_OTHER, HERE, "extra curly braces around scalar initializer");
 		do {
+			if (braces == (int)may_have_braces && is_initializable_type(type)) {
+				warningf(WARN_OTHER, HERE,
+				         "extra curly braces around scalar initializer");
+			}
 			eat('{');
 			++braces;
 		} while (token.kind == '{');
@@ -1778,7 +1791,9 @@ static void descend_into_subtype(type_path_t *path)
 	type_path_entry_t *top = append_to_type_path(path);
 	top->type              = top_type;
 
-	if (is_type_compound(top_type)) {
+	if (!is_initializable_type(top_type)) {
+		return;
+	} if (is_type_compound(top_type)) {
 		compound_t *const compound = top_type->compound.compound;
 		entity_t   *const entry    = skip_unnamed_bitfields(compound->members.entities);
 
@@ -1788,11 +1803,10 @@ static void descend_into_subtype(type_path_t *path)
 		} else {
 			path->top_type = NULL;
 		}
-	} else if (is_type_array(top_type)) {
+	} else {
+		assert(is_type_array(top_type));
 		top->v.index   = 0;
 		path->top_type = top_type->array.element_type;
-	} else {
-		assert(!is_type_valid(top_type));
 	}
 }
 
@@ -2045,7 +2059,7 @@ finish_designator:
 
 		if (token.kind == '{') {
 			if (type != NULL && is_type_scalar(type)) {
-				sub = parse_scalar_initializer(type, env->must_be_constant);
+				sub = parse_scalar_initializer(type, env->must_be_constant, false);
 			} else {
 				if (type == NULL) {
 					if (env->entity != NULL) {
@@ -2123,7 +2137,7 @@ finish_designator:
 				if (sub != NULL) {
 					break;
 				}
-				if (!is_type_valid(type)) {
+				if (!is_initializable_type(type)) {
 					goto end_error;
 				}
 				if (is_type_scalar(type)) {
@@ -2206,7 +2220,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	initializer_t *result;
 
 	if (is_type_scalar(type)) {
-		result = parse_scalar_initializer(type, env->must_be_constant);
+		result = parse_scalar_initializer(type, env->must_be_constant, true);
 	} else if (token.kind == '{') {
 		eat('{');
 
@@ -2228,7 +2242,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 	} else {
 		/* parse_scalar_initializer() also works in this case: we simply
 		 * have an expression without {} around it */
-		result = parse_scalar_initializer(type, env->must_be_constant);
+		result = parse_scalar_initializer(type, env->must_be_constant, false);
 	}
 
 	/* §6.7.8:22 array initializers for arrays with unknown size determine
@@ -4213,8 +4227,8 @@ static void parse_init_declarator_rest(entity_t *entity)
 	type_t *orig_type = type_error_type;
 
 	if (entity->base.kind == ENTITY_TYPEDEF) {
-		position_t const *const pos = &entity->base.pos;
-		errorf(pos, "'%N' is initialized (use __typeof__ instead)", entity);
+		errorf(&entity->base.pos,
+		       "'%N' is initialized (use __typeof__ instead)", entity);
 	} else {
 		assert(is_declaration(entity));
 		orig_type = entity->declaration.type;
@@ -4236,9 +4250,17 @@ static void parse_init_declarator_rest(entity_t *entity)
 	}
 
 	if (is_type_function(type)) {
-		position_t const *const pos = &entity->base.pos;
-		errorf(pos, "'%N' is initialized like a variable", entity);
-		orig_type = type_error_type;
+		errorf(&entity->base.pos,
+		       "'%N' is initialized like a variable", entity);
+	} else if (is_type_array(type)) {
+		if (type->array.is_vla) {
+			errorf(&entity->base.pos,
+			       "variable sized '%N' may not be initialized", entity);
+		}
+	} else if (!is_type_complete(type)) {
+		errorf(&entity->base.pos,
+		       "'%N' has incomplete type '%T' but is initialized", entity,
+		       orig_type);
 	}
 
 	parse_initializer_env_t env;
@@ -6270,6 +6292,11 @@ static void semantic_complex_extract(unary_expression_t *extract)
 static expression_t *parse_compound_literal(position_t const *const pos,
                                             type_t *type)
 {
+	type_t *skipped = skip_typeref(type);
+	if (!is_initializable_type(skipped)) {
+		errorf(pos, "type '%T' invalid for compound literals", type);
+	}
+
 	expression_t *expression = allocate_expression_zero(EXPR_COMPOUND_LITERAL);
 	expression->base.pos = *pos;
 	bool global_scope = current_scope == file_scope;
