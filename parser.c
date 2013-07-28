@@ -1642,7 +1642,8 @@ static bool is_initializable_type(const type_t *const type)
 {
 	if (is_type_array(type))
 		return type->array.size_expression == NULL || !type->array.is_vla;
-	return is_type_complete(type) && type->kind != TYPE_FUNCTION;
+	return is_type_complete(type) && type->kind != TYPE_FUNCTION
+	    && is_type_valid(type);
 }
 
 /**
@@ -6293,7 +6294,7 @@ static expression_t *parse_compound_literal(position_t const *const pos,
                                             type_t *type)
 {
 	type_t *skipped = skip_typeref(type);
-	if (!is_initializable_type(skipped)) {
+	if (!is_initializable_type(skipped) && is_type_valid(skipped)) {
 		errorf(pos, "type '%T' invalid for compound literals", type);
 	}
 
