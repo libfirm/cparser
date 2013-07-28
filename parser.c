@@ -4083,8 +4083,8 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 			/* can happen for K&R style declarations */
 			if (prev_decl->type       == NULL             &&
-					previous_entity->kind == ENTITY_PARAMETER &&
-					entity->kind          == ENTITY_PARAMETER) {
+			    previous_entity->kind == ENTITY_PARAMETER &&
+			    entity->kind          == ENTITY_PARAMETER) {
 				prev_decl->type                   = decl->type;
 				prev_decl->storage_class          = decl->storage_class;
 				prev_decl->declared_storage_class = decl->declared_storage_class;
@@ -6163,7 +6163,7 @@ static entity_t *parse_qualified_identifier(void)
 			entity = create_implicit_function(symbol, &pos);
 			warningf(WARN_IMPLICIT_FUNCTION_DECLARATION, &pos, "implicit declaration of '%N'", entity);
 		} else {
-			errorf(&pos, "unknown identifier '%Y' found.", symbol);
+			errorf(&pos, "identifier '%Y' is unknown.", symbol);
 			entity = create_error_entity(symbol, ENTITY_VARIABLE);
 		}
 	}
