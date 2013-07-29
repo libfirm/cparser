@@ -440,6 +440,12 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 		case ATTRIBUTE_MS_ALLOCATE:
 			type = add_modifiers(type, DM_MALLOC);
 			break;
+		case ATTRIBUTE_GNU_CONST:
+			type = add_modifiers(type, DM_CONST);
+			break;
+		case ATTRIBUTE_GNU_PURE:
+			type = add_modifiers(type, DM_PURE);
+			break;
 		case ATTRIBUTE_GNU_NOTHROW:
 		case ATTRIBUTE_MS_NOTHROW:
 			type = add_modifiers(type, DM_NOTHROW);
