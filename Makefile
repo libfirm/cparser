@@ -3,16 +3,15 @@
 
 top_srcdir   ?= .
 top_builddir ?= build
+VPATH        ?= $(top_srcdir)
 
 variant  ?= debug# Different libfirm variants (debug, optimize, profile, coverage)
 srcdir   ?= $(top_srcdir)
 builddir ?= $(top_builddir)/$(variant)
 
-#VPATH = $(srcdir)
-
 # Use libfirm subdir if it exists, otherwise use pkg-config
-ifneq ("$(wildcard libfirm)", "")
-FIRM_HOME     ?= libfirm
+ifneq ("$(wildcard $(top_srcdir)/libfirm)", "")
+FIRM_HOME     ?= $(top_srcdir)/libfirm
 FIRM_CPPFLAGS ?= -I$(FIRM_HOME)/include
 FIRM_LIBS     ?= -lm
 LIBFIRM_FILE_BASE ?= build/$(variant)/libfirm.a
@@ -103,7 +102,7 @@ UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIR
 	@true
 
 REVISIONH = $(builddir)/revision.h
-REVISION ?= $(shell git describe --abbrev=40 --always --dirty --match '')
+REVISION ?= $(shell git --git-dir $(top_srcdir)/.git describe --abbrev=40 --always --dirty --match '')
 
 # Update revision.h if necessary
 UNUSED := $(shell \
