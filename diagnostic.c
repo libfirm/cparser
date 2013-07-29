@@ -177,11 +177,15 @@ done_flags:;
 					if (tok == 0)
 						break;
 					fputs(sep_next(&sep), stderr);
+					fputc('\'', stderr);
 					print_token_kind(stderr, tok);
+					fputc('\'', stderr);
 				}
 			} else {
 				const token_kind_t token = (token_kind_t)va_arg(ap, int);
+				fputc('\'', stderr);
 				print_token_kind(stderr, token);
+				fputc('\'', stderr);
 			}
 			break;
 		}
