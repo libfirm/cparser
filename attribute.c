@@ -19,6 +19,7 @@
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",
 	[ATTRIBUTE_GNU_ALIGNED]                = "aligned",
+	[ATTRIBUTE_GNU_ALLOC_SIZE]             = "alloc_size",
 	[ATTRIBUTE_GNU_ALWAYS_INLINE]          = "always_inline",
 	[ATTRIBUTE_GNU_CDECL]                  = "cdecl",
 	[ATTRIBUTE_GNU_COMMON]                 = "common",
