@@ -618,18 +618,18 @@ static void free_temp_files(void)
 }
 
 typedef enum compile_mode_t {
-	BenchmarkParser,
-	PreprocessOnly,
-	ParseOnly,
-	Compile,
-	CompileDump,
-	CompileExportIR,
-	CompileAssemble,
-	CompileAssembleLink,
-	PrintAst,
-	PrintFluffy,
-	PrintJna,
-	PrintCompoundSizes,
+	MODE_BENCHMARK_PARSER,
+	MODE_PREPROCESS_ONLY,
+	MODE_PARSE_ONLY,
+	MODE_COMPILE,
+	MODE_COMPILE_DUMP,
+	MODE_COMPILE_EXPORTIR,
+	MODE_COMPILE_ASSEMBLE,
+	MODE_COMPILE_ASSEMBLE_LINK,
+	MODE_PRINT_AST,
+	MODE_PRINT_FLUFFY,
+	MODE_PRINT_JNA,
+	MODE_PRINT_COMPOUND_SIZE,
 } compile_mode_t;
 
 static void usage(const char *argv0)
@@ -1777,7 +1777,7 @@ again:
 			}
 			/* write file to output... */
 			FILE *asm_out;
-			if (mode == PreprocessOnly) {
+			if (mode == MODE_PREPROCESS_ONLY) {
 				asm_out = out;
 			} else {
 				asm_out = make_temp_file("ccs", &unit->name);
@@ -1809,7 +1809,7 @@ again:
 			}
 			add_standard_defines();
 
-			if (mode == PreprocessOnly) {
+			if (mode == MODE_PREPROCESS_ONLY) {
 				if (!output_preprocessor_tokens(unit, out)) {
 					result = EXIT_FAILURE;
 					break;
@@ -1827,7 +1827,7 @@ again:
 		}
 		case COMPILATION_UNIT_AST:
 			/* prints the AST even if errors occurred */
-			if (mode == PrintAst) {
+			if (mode == MODE_PRINT_AST) {
 				print_to_file(out);
 				print_ast(unit->ast);
 			}
@@ -1836,15 +1836,15 @@ again:
 				break;
 			}
 
-			if (mode == BenchmarkParser) {
+			if (mode == MODE_BENCHMARK_PARSER) {
 				break;
-			} else if (mode == PrintFluffy) {
+			} else if (mode == MODE_PRINT_FLUFFY) {
 				write_fluffy_decls(out, unit->ast);
 				break;
-			} else if (mode == PrintJna) {
+			} else if (mode == MODE_PRINT_JNA) {
 				write_jna_decls(out, unit->ast);
 				break;
-			} else if (mode == PrintCompoundSizes) {
+			} else if (mode == MODE_PRINT_COMPOUND_SIZE) {
 				write_compoundsizes(out, unit->ast);
 				break;
 			}
@@ -1868,12 +1868,12 @@ again:
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
-			if (mode == ParseOnly || mode == CompileDump
-			 || mode == CompileExportIR)
+			if (mode == MODE_PARSE_ONLY || mode == MODE_COMPILE_DUMP
+			 || mode == MODE_COMPILE_EXPORTIR)
 				break;
 
 			FILE *asm_out;
-			if (mode == Compile) {
+			if (mode == MODE_COMPILE) {
 				asm_out = out;
 			} else {
 				asm_out = make_temp_file("ccs", &unit->name);
@@ -1892,12 +1892,13 @@ again:
 			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
 			goto again;
 		case COMPILATION_UNIT_PREPROCESSED_ASSEMBLER:
-			if (mode != CompileAssemble && mode != CompileAssembleLink)
+			if (mode != MODE_COMPILE_ASSEMBLE
+			 && mode != MODE_COMPILE_ASSEMBLE_LINK)
 				break;
 
 			/* assemble */
 			const char *input = unit->name;
-			if (mode == CompileAssemble) {
+			if (mode == MODE_COMPILE_ASSEMBLE) {
 				fclose(out);
 				unit->name = outname;
 			} else {
@@ -1964,7 +1965,7 @@ static int link_program(compilation_unit_t *units)
 int main(int argc, char **argv)
 {
 	const char         *print_file_name_file   = NULL;
-	compile_mode_t      mode                   = CompileAssembleLink;
+	compile_mode_t      mode                   = MODE_COMPILE_ASSEMBLE_LINK;
 	int                 opt_level              = 1;
 	char                firm_be[16]            = "ia32";
 	compilation_unit_t *units                  = NULL;
@@ -2050,13 +2051,13 @@ int main(int argc, char **argv)
 				set_be_option("debug=frameinfo");
 				set_be_option("ia32-optcc=false");
 			} else if (SINGLE_OPTION('c')) {
-				mode = CompileAssemble;
+				mode = MODE_COMPILE_ASSEMBLE;
 			} else if (SINGLE_OPTION('E')) {
-				mode = PreprocessOnly;
+				mode = MODE_PREPROCESS_ONLY;
 			} else if (SINGLE_OPTION('s')) {
 				add_flag(&ldflags_obst, "-s");
 			} else if (SINGLE_OPTION('S')) {
-				mode = Compile;
+				mode = MODE_COMPILE;
 			} else if (option[0] == 'O') {
 				continue;
 			} else if (option[0] == 'I') {
@@ -2096,7 +2097,7 @@ int main(int argc, char **argv)
 					argument_errors = true;
 				}
 			} else if (SINGLE_OPTION('M')) {
-				mode = PreprocessOnly;
+				mode = MODE_PREPROCESS_ONLY;
 				add_flag(&cppflags_obst, "-M");
 			} else if (streq(option, "MMD") ||
 			           streq(option, "MD")) {
@@ -2210,7 +2211,8 @@ int main(int argc, char **argv)
 						/* does nothing, for gcc compatibility (even gcc does
 						 * nothing for this switch anymore) */
 					} else if (streq(opt, "syntax-only")) {
-						mode = truth_value ? ParseOnly : CompileAssembleLink;
+						mode = truth_value ? MODE_PARSE_ONLY
+						                   : MODE_COMPILE_ASSEMBLE_LINK;
 					} else if (streq(opt, "unsigned-char")) {
 						char_is_signed = !truth_value;
 					} else if (streq(opt, "freestanding")) {
@@ -2398,19 +2400,19 @@ int main(int argc, char **argv)
 					features_on  &= ~_MS;
 					features_off |=  _MS;
 				} else if (streq(option, "benchmark")) {
-					mode = BenchmarkParser;
+					mode = MODE_BENCHMARK_PARSER;
 				} else if (streq(option, "print-ast")) {
-					mode = PrintAst;
+					mode = MODE_PRINT_AST;
 				} else if (streq(option, "print-implicit-cast")) {
 					print_implicit_casts = true;
 				} else if (streq(option, "print-parenthesis")) {
 					print_parenthesis = true;
 				} else if (streq(option, "print-fluffy")) {
-					mode = PrintFluffy;
+					mode = MODE_PRINT_FLUFFY;
 				} else if (streq(option, "print-compound-sizes")) {
-					mode = PrintCompoundSizes;
+					mode = MODE_PRINT_COMPOUND_SIZE;
 				} else if (streq(option, "print-jna")) {
-					mode = PrintJna;
+					mode = MODE_PRINT_JNA;
 				} else if (streq(option, "jna-limit")) {
 					++i;
 					if (i >= argc) {
@@ -2477,9 +2479,9 @@ int main(int argc, char **argv)
 						break;
 					}
 					dumpfunction = argv[i];
-					mode         = CompileDump;
+					mode         = MODE_COMPILE_DUMP;
 				} else if (streq(option, "export-ir")) {
-					mode = CompileExportIR;
+					mode = MODE_COMPILE_EXPORTIR;
 				} else if (streq(option, "unroll-loops")) {
 					/* ignore (gcc compatibility) */
 				} else {
@@ -2629,33 +2631,33 @@ int main(int argc, char **argv)
 		const char *filename = units->name;
 
 		switch (mode) {
-		case BenchmarkParser:
-		case PrintAst:
-		case PrintFluffy:
-		case PrintJna:
-		case PrintCompoundSizes:
-		case PreprocessOnly:
-		case ParseOnly:
+		case MODE_BENCHMARK_PARSER:
+		case MODE_PRINT_AST:
+		case MODE_PRINT_FLUFFY:
+		case MODE_PRINT_JNA:
+		case MODE_PRINT_COMPOUND_SIZE:
+		case MODE_PREPROCESS_ONLY:
+		case MODE_PARSE_ONLY:
 			outname = "-";
 			break;
-		case Compile:
+		case MODE_COMPILE:
 			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".s");
 			outname = outnamebuf;
 			break;
-		case CompileAssemble:
+		case MODE_COMPILE_ASSEMBLE:
 			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".o");
 			outname = outnamebuf;
 			break;
-		case CompileDump:
+		case MODE_COMPILE_DUMP:
 			get_output_name(outnamebuf, sizeof(outnamebuf), dumpfunction,
 			                ".vcg");
 			outname = outnamebuf;
 			break;
-		case CompileExportIR:
+		case MODE_COMPILE_EXPORTIR:
 			get_output_name(outnamebuf, sizeof(outnamebuf), filename, ".ir");
 			outname = outnamebuf;
 			break;
-		case CompileAssembleLink:
+		case MODE_COMPILE_ASSEMBLE_LINK:
 			if (firm_is_windows_os(target_machine)) {
 				outname = "a.exe";
 			} else {
@@ -2705,7 +2707,7 @@ int main(int argc, char **argv)
 	}
 
 	/* link program file */
-	if (mode == CompileDump) {
+	if (mode == MODE_COMPILE_DUMP) {
 		/* find irg */
 		ident    *id     = new_id_from_str(dumpfunction);
 		ir_graph *irg    = NULL;
@@ -2727,14 +2729,14 @@ int main(int argc, char **argv)
 		dump_ir_graph_file(out, irg);
 		fclose(out);
 		return EXIT_SUCCESS;
-	} else if (mode == CompileExportIR) {
+	} else if (mode == MODE_COMPILE_EXPORTIR) {
 		ir_export_file(out);
 		if (ferror(out) != 0) {
 			errorf(NULL, "writing to output failed");
 			return EXIT_FAILURE;
 		}
 		return EXIT_SUCCESS;
-	} else if (mode == CompileAssembleLink) {
+	} else if (mode == MODE_COMPILE_ASSEMBLE_LINK) {
 		int const link_result = link_program(units);
 		if (link_result != EXIT_SUCCESS) {
 			if (out != stdout)
