@@ -139,6 +139,22 @@ static bool              define_intmax_types;
 static bool              construct_dep_target;
 static bool              dump_defines;
 
+typedef enum compile_mode_t {
+	MODE_BENCHMARK_PARSER,
+	MODE_PREPROCESS_ONLY,
+	MODE_GENERATE_DEPENDENCIES,
+	MODE_PARSE_ONLY,
+	MODE_COMPILE,
+	MODE_COMPILE_DUMP,
+	MODE_COMPILE_EXPORTIR,
+	MODE_COMPILE_ASSEMBLE,
+	MODE_COMPILE_ASSEMBLE_LINK,
+	MODE_PRINT_AST,
+	MODE_PRINT_FLUFFY,
+	MODE_PRINT_JNA,
+	MODE_PRINT_COMPOUND_SIZE,
+} compile_mode_t;
+
 typedef enum lang_standard_t {
 	STANDARD_DEFAULT, /* gnu99 (for C, GCC does gnu89) or gnu++98 (for C++) */
 	STANDARD_ANSI,    /* ISO C90 (for C) or ISO C++ 1998 (for C++) */
@@ -159,12 +175,16 @@ typedef enum compilation_unit_type_t {
 	COMPILATION_UNIT_PREPROCESSED_C,
 	COMPILATION_UNIT_CXX,
 	COMPILATION_UNIT_PREPROCESSED_CXX,
+	COMPILATION_UNIT_LEXER_TOKENS_C,
+	COMPILATION_UNIT_LEXER_TOKENS_CXX,
+	COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER,
 	COMPILATION_UNIT_AST,
 	COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION,
 	COMPILATION_UNIT_ASSEMBLER,
 	COMPILATION_UNIT_PREPROCESSED_ASSEMBLER,
 	COMPILATION_UNIT_OBJECT,
 	COMPILATION_UNIT_IR,
+	COMPILATION_UNIT_DEPENDENCIES,
 	COMPILATION_UNIT_UNKNOWN
 } compilation_unit_type_t;
 
@@ -172,11 +192,11 @@ typedef struct compilation_unit_t compilation_unit_t;
 struct compilation_unit_t {
 	const char             *name;  /**< filename or "-" for stdin */
 	FILE                   *input; /**< input (NULL if not opened yet) */
+	input_t                *input_decoder;
 	bool                    input_is_pipe;
 	compilation_unit_type_t type;
 	lang_standard_t         standard;
 	translation_unit_t     *ast;
-	bool                    parse_errors;
 	compilation_unit_t     *next;
 };
 
@@ -237,33 +257,6 @@ static void print_error_summary(void)
 				warning_count);
 	} else if (warning_count > 0) {
 		fprintf(stderr, "%u warning(s)\n", warning_count);
-	}
-}
-
-static void do_parsing(compilation_unit_t *unit)
-{
-	ir_timer_t *t_parsing = ir_timer_new();
-	timer_register(t_parsing, "Frontend: Parsing");
-	timer_start(t_parsing);
-
-	start_parsing();
-
-	input_t *decoder = input_from_stream(unit->input, input_decoder);
-	switch_pp_input(decoder, unit->name, NULL, false);
-	parse();
-	unit->ast = finish_parsing();
-	check_unclosed_conditionals();
-	close_pp_input();
-	input_free(decoder);
-	bool res = close_input(unit);
-
-	print_error_summary();
-
-	unit->type         = COMPILATION_UNIT_AST;
-	unit->parse_errors = error_count > 0 || !res;
-	timer_stop(t_parsing);
-	if (stat_ev_enabled) {
-		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
 	}
 }
 
@@ -338,7 +331,22 @@ static char const* str_lang_standard(lang_standard_t const standard)
 	panic("invalid standard");
 }
 
-static bool run_external_preprocessor(compilation_unit_t *unit)
+static void copy_file(FILE *dest, FILE *input)
+{
+	char buf[16384];
+
+	for (;;) {
+		size_t bytes_read = fread(buf, 1, sizeof(buf), input);
+		if (bytes_read == 0)
+			break;
+		if (fwrite(buf, 1, bytes_read, dest) != bytes_read) {
+			perror("could not write output");
+		}
+	}
+}
+
+static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
+                                      compile_mode_t mode)
 {
 	obstack_1grow(&cppflags_obst, '\0');
 	const char *flags = obstack_finish(&cppflags_obst);
@@ -437,25 +445,33 @@ static bool run_external_preprocessor(compilation_unit_t *unit)
 
 	unit->input         = f;
 	unit->input_is_pipe = true;
-	switch (unit->type) {
-	case COMPILATION_UNIT_ASSEMBLER:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-		break;
-	case COMPILATION_UNIT_C:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-		break;
-	case COMPILATION_UNIT_CXX:
-		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-		break;
-	default:
-		unit->type = COMPILATION_UNIT_UNKNOWN;
-		break;
+	if (mode == MODE_GENERATE_DEPENDENCIES) {
+		unit->type = COMPILATION_UNIT_DEPENDENCIES;
+		copy_file(out, unit->input);
+	} else {
+		if (mode == MODE_PREPROCESS_ONLY) {
+			copy_file(out, unit->input);
+		}
+		switch (unit->type) {
+		case COMPILATION_UNIT_ASSEMBLER:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+			break;
+		case COMPILATION_UNIT_C:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_C;
+			break;
+		case COMPILATION_UNIT_CXX:
+			unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
+			break;
+		default:
+			unit->type = COMPILATION_UNIT_UNKNOWN;
+			break;
+		}
 	}
 
 	return true;
 }
 
-static void assemble(const char *out, const char *in)
+static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
 {
 	if (asflags == NULL) {
 		obstack_1grow(&asflags_obst, '\0');
@@ -484,9 +500,11 @@ static void assemble(const char *out, const char *in)
 	if (err != EXIT_SUCCESS) {
 		position_t const pos = { in, 0, 0, 0 };
 		errorf(&pos, "assembler reported an error");
-		exit(EXIT_FAILURE);
+		return false;
 	}
 	obstack_free(&asflags_obst, commandline);
+	unit->type = COMPILATION_UNIT_OBJECT;
+	return true;
 }
 
 static void print_file_name(const char *file)
@@ -616,21 +634,6 @@ static void free_temp_files(void)
 	DEL_ARR_F(temp_files);
 	temp_files = NULL;
 }
-
-typedef enum compile_mode_t {
-	MODE_BENCHMARK_PARSER,
-	MODE_PREPROCESS_ONLY,
-	MODE_PARSE_ONLY,
-	MODE_COMPILE,
-	MODE_COMPILE_DUMP,
-	MODE_COMPILE_EXPORTIR,
-	MODE_COMPILE_ASSEMBLE,
-	MODE_COMPILE_ASSEMBLE_LINK,
-	MODE_PRINT_AST,
-	MODE_PRINT_FLUFFY,
-	MODE_PRINT_JNA,
-	MODE_PRINT_COMPOUND_SIZE,
-} compile_mode_t;
 
 static void usage(const char *argv0)
 {
@@ -1650,54 +1653,6 @@ static void append_environment_include_paths(void)
 	                 c_mode & _CXX ? "CPLUS_INCLUDE_PATH" : "C_INCLUDE_PATH");
 }
 
-static bool output_preprocessor_tokens(compilation_unit_t *unit, FILE *out)
-{
-	/* just here for gcc compatibility */
-	fprintf(out, "# 1 \"%s\"\n", unit->name);
-	fprintf(out, "# 1 \"<built-in>\"\n");
-	fprintf(out, "# 1 \"<command-line>\"\n");
-
-	set_preprocessor_output(out);
-	input_t *decoder = input_from_stream(unit->input, input_decoder);
-	switch_pp_input(decoder, unit->name, NULL, false);
-
-	for (;;) {
-		next_preprocessing_token();
-		if (pp_token.kind == T_EOF)
-			break;
-		emit_pp_token();
-	}
-
-	fputc('\n', out);
-	check_unclosed_conditionals();
-	print_error_summary();
-	close_pp_input();
-	input_free(decoder);
-	set_preprocessor_output(NULL);
-
-	if (unit->type == COMPILATION_UNIT_C) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
-	} else if (unit->type == COMPILATION_UNIT_CXX) {
-		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
-	}
-	bool res = close_input(unit);
-	return res && error_count == 0;
-}
-
-static void copy_file(FILE *dest, FILE *input)
-{
-	char buf[16384];
-
-	for (;;) {
-		size_t bytes_read = fread(buf, 1, sizeof(buf), input);
-		if (bytes_read == 0)
-			break;
-		if (fwrite(buf, 1, bytes_read, dest) != bytes_read) {
-			perror("could not write output");
-		}
-	}
-}
-
 static bool open_input(compilation_unit_t *unit)
 {
 	/* input already available as FILE? */
@@ -1719,6 +1674,105 @@ static bool open_input(compilation_unit_t *unit)
 	return true;
 }
 
+static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
+                                compile_mode_t mode)
+{
+	if (!open_input(unit))
+		return false;
+
+	add_standard_defines();
+	if (mode == MODE_PREPROCESS_ONLY) {
+		set_preprocessor_output(out);
+	}
+	input_t *decoder = input_from_stream(unit->input, input_decoder);
+	switch_pp_input(decoder, unit->name, NULL, false);
+	unit->input_decoder = decoder;
+
+	switch (unit->type) {
+	case COMPILATION_UNIT_C:
+	case COMPILATION_UNIT_PREPROCESSED_C:
+		unit->type = COMPILATION_UNIT_LEXER_TOKENS_C;
+		break;
+	case COMPILATION_UNIT_CXX:
+	case COMPILATION_UNIT_PREPROCESSED_CXX:
+		unit->type = COMPILATION_UNIT_LEXER_TOKENS_CXX;
+		break;
+	case COMPILATION_UNIT_ASSEMBLER:
+		unit->type = COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER;
+		break;
+	default:
+		panic("invalid input for preprocessing");
+	}
+	return true;
+}
+
+static bool finish_preprocessing(compilation_unit_t *unit)
+{
+	close_pp_input();
+	input_free(unit->input_decoder);
+	set_preprocessor_output(NULL);
+	bool res = close_input(unit);
+	if (!res || error_count > 0)
+		return false;
+
+	if (dump_defines)
+		print_defines();
+	return true;
+}
+
+static bool print_preprocessing_tokens(compilation_unit_t *unit, FILE *out)
+{
+	/* just here for gcc compatibility */
+	fprintf(out, "# 1 \"%s\"\n", unit->name);
+	fprintf(out, "# 1 \"<built-in>\"\n");
+	fprintf(out, "# 1 \"<command-line>\"\n");
+
+	for (;;) {
+		next_preprocessing_token();
+		if (pp_token.kind == T_EOF)
+			break;
+		emit_pp_token();
+	}
+
+	fputc('\n', out);
+	check_unclosed_conditionals();
+	bool res = finish_preprocessing(unit);
+	print_error_summary();
+
+	if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C) {
+		unit->type = COMPILATION_UNIT_PREPROCESSED_C;
+	} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
+		unit->type = COMPILATION_UNIT_PREPROCESSED_CXX;
+	} else {
+		assert(unit->type == COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER);
+		unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
+	}
+	return res;
+}
+
+static bool do_parsing(compilation_unit_t *unit, compile_mode_t mode)
+{
+	ir_timer_t *t_parsing = ir_timer_new();
+	timer_register(t_parsing, "Frontend: Parsing");
+	timer_start(t_parsing);
+
+	start_parsing();
+
+	parse();
+	unit->ast = finish_parsing();
+	check_unclosed_conditionals();
+	bool res = finish_preprocessing(unit);
+	print_error_summary();
+
+	unit->type         = COMPILATION_UNIT_AST;
+	timer_stop(t_parsing);
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_parsing", ir_timer_elapsed_sec(t_parsing));
+	}
+
+	return (res && error_count == 0) || mode == MODE_PRINT_AST;
+}
+
 static void node_counter(ir_node *node, void *env)
 {
 	(void)node;
@@ -1738,11 +1792,47 @@ static unsigned long long count_firm_nodes(void)
 	return count;
 }
 
+static bool already_constructed_firm = false;
+
+static bool build_firm_ir(compilation_unit_t *unit)
+{
+	ir_timer_t *t_construct = ir_timer_new();
+	timer_register(t_construct, "Frontend: Graph construction");
+	timer_start(t_construct);
+	if (already_constructed_firm) {
+		panic("compiling multiple files/translation units not possible");
+	}
+	already_constructed_firm = true;
+	init_implicit_optimizations();
+	translation_unit_to_firm(unit->ast);
+	timer_stop(t_construct);
+	if (stat_ev_enabled) {
+		stat_ev_dbl("time_graph_construction",
+					ir_timer_elapsed_sec(t_construct));
+		stat_ev_int("size_graph_construction", count_firm_nodes());
+	}
+	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
+	return true;
+}
+
+static bool read_ir_file(compilation_unit_t *unit)
+{
+	if (!open_input(unit))
+		return false;
+	if (ir_import_file(unit->input, unit->name)) {
+		position_t const pos = { unit->name, 0, 0, 0 };
+		errorf(&pos, "import of firm graph failed");
+		return false;
+	}
+	already_constructed_firm = true;
+	unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
+	return true;
+}
+
 static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 							lang_standard_t standard, FILE *out)
 {
 	int  result                   = EXIT_SUCCESS;
-	bool already_constructed_firm = false;
 	for (compilation_unit_t *unit = units; unit != NULL; unit = unit->next) {
 		const char *const inputname = unit->name;
 
@@ -1753,90 +1843,70 @@ static int compilation_loop(compile_mode_t mode, compilation_unit_t *units,
 
 again:
 		switch (unit->type) {
-		case COMPILATION_UNIT_IR: {
-			if (!open_input(unit)) {
+		case COMPILATION_UNIT_IR:
+			if (!read_ir_file(unit)) {
 				result = EXIT_FAILURE;
 				break;
 			}
-			if (ir_import_file(unit->input, unit->name)) {
-				position_t const pos = { inputname, 0, 0, 0 };
-				errorf(&pos, "import of firm graph failed");
-				result = EXIT_FAILURE;
-				break;
-			}
-			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
-		}
-		case COMPILATION_UNIT_ASSEMBLER: {
-			if (external_preprocessor == NULL) {
-				panic("preprocessed assembler not possible with internal preprocessor yet");
-			}
-			if (!run_external_preprocessor(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			/* write file to output... */
-			FILE *asm_out;
-			if (mode == MODE_PREPROCESS_ONLY) {
-				asm_out = out;
-			} else {
-				asm_out = make_temp_file("ccs", &unit->name);
-			}
-			assert(unit->input != NULL);
-			assert(unit->input_is_pipe);
-			copy_file(asm_out, unit->input);
-			if (asm_out != out)
-				fclose(asm_out);
-			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
-			goto again;
-		}
+
 		case COMPILATION_UNIT_C:
 		case COMPILATION_UNIT_CXX:
+		case COMPILATION_UNIT_ASSEMBLER:
 			if (external_preprocessor != NULL) {
-				if (!run_external_preprocessor(unit)) {
+				if (!run_external_preprocessor(unit, out, mode)) {
 					result = EXIT_FAILURE;
 					break;
 				}
 				goto again;
-			}
-			/* FALLTHROUGH */
-
-		case COMPILATION_UNIT_PREPROCESSED_C:
-		case COMPILATION_UNIT_PREPROCESSED_CXX: {
-			if (!open_input(unit)) {
-				result = EXIT_FAILURE;
-				break;
-			}
-			add_standard_defines();
-
-			if (mode == MODE_PREPROCESS_ONLY) {
-				if (!output_preprocessor_tokens(unit, out)) {
+			} else {
+				if (!start_preprocessing(unit, out, mode)) {
 					result = EXIT_FAILURE;
 					break;
 				}
-				if (dump_defines)
-					print_defines();
-				break;
 			}
-
-			/* do the actual parsing */
-			do_parsing(unit);
-			if (dump_defines)
-				print_defines();
 			goto again;
-		}
-		case COMPILATION_UNIT_AST:
-			/* prints the AST even if errors occurred */
-			if (mode == MODE_PRINT_AST) {
-				print_to_file(out);
-				print_ast(unit->ast);
+
+		case COMPILATION_UNIT_LEXER_TOKENS_C:
+		case COMPILATION_UNIT_LEXER_TOKENS_CXX:
+		case COMPILATION_UNIT_LEXER_TOKENS_ASSEMBLER:
+			if (mode == MODE_PREPROCESS_ONLY) {
+				if (!print_preprocessing_tokens(unit, out)) {
+					result = EXIT_FAILURE;
+					break;
+				}
+			} else if (mode == MODE_GENERATE_DEPENDENCIES) {
+				position_t const pos = { inputname, 0, 0, 0 };
+				errorf(&pos, "builtin preprocessor does not support dependency generation");
+				result = EXIT_FAILURE;
+				break;
+			} else if (unit->type == COMPILATION_UNIT_LEXER_TOKENS_C
+			        || unit->type == COMPILATION_UNIT_LEXER_TOKENS_CXX) {
+				if (!do_parsing(unit, mode)) {
+					result = EXIT_FAILURE;
+					break;
+				}
 			}
-			if (unit->parse_errors) {
+			goto again;
+
+		case COMPILATION_UNIT_PREPROCESSED_C:
+		case COMPILATION_UNIT_PREPROCESSED_CXX:
+			if (mode == MODE_PREPROCESS_ONLY)
+				break;
+			if (!start_preprocessing(unit, out, mode)) {
 				result = EXIT_FAILURE;
 				break;
 			}
+			goto again;
 
-			if (mode == MODE_BENCHMARK_PARSER) {
+		case COMPILATION_UNIT_AST:
+			if (mode == MODE_PRINT_AST) {
+				print_to_file(out);
+				print_ast(unit->ast);
+				if (error_count > 0)
+					result = EXIT_FAILURE;
+				break;
+			} else if (mode == MODE_BENCHMARK_PARSER) {
 				break;
 			} else if (mode == MODE_PRINT_FLUFFY) {
 				write_fluffy_decls(out, unit->ast);
@@ -1849,22 +1919,10 @@ again:
 				break;
 			}
 
-			/* build the firm graph */
-			ir_timer_t *t_construct = ir_timer_new();
-			timer_register(t_construct, "Frontend: Graph construction");
-			timer_start(t_construct);
-			if (already_constructed_firm) {
-				panic("compiling multiple files/translation units not possible");
+			if (!build_firm_ir(unit)) {
+				result = EXIT_FAILURE;
+				break;
 			}
-			init_implicit_optimizations();
-			translation_unit_to_firm(unit->ast);
-			already_constructed_firm = true;
-			timer_stop(t_construct);
-			if (stat_ev_enabled) {
-				stat_ev_dbl("time_graph_construction", ir_timer_elapsed_sec(t_construct));
-				stat_ev_int("size_graph_construction", count_firm_nodes());
-			}
-			unit->type = COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION;
 			goto again;
 
 		case COMPILATION_UNIT_INTERMEDIATE_REPRESENTATION:
@@ -1891,6 +1949,7 @@ again:
 			}
 			unit->type = COMPILATION_UNIT_PREPROCESSED_ASSEMBLER;
 			goto again;
+
 		case COMPILATION_UNIT_PREPROCESSED_ASSEMBLER:
 			if (mode != MODE_COMPILE_ASSEMBLE
 			 && mode != MODE_COMPILE_ASSEMBLE_LINK)
@@ -1907,10 +1966,13 @@ again:
 				fclose(tempf);
 			}
 
-			assemble(unit->name, input);
-
-			unit->type = COMPILATION_UNIT_OBJECT;
+			if (!assemble(unit, unit->name, input)) {
+				result = EXIT_FAILURE;
+				break;
+			}
 			goto again;
+
+		case COMPILATION_UNIT_DEPENDENCIES:
 		case COMPILATION_UNIT_UNKNOWN:
 		case COMPILATION_UNIT_AUTODETECT:
 		case COMPILATION_UNIT_OBJECT:
@@ -2096,15 +2158,15 @@ int main(int argc, char **argv)
 					errorf(NULL, "unknown language '%s'", opt);
 					argument_errors = true;
 				}
-			} else if (SINGLE_OPTION('M')) {
-				mode = MODE_PREPROCESS_ONLY;
-				add_flag(&cppflags_obst, "-M");
+			} else if (SINGLE_OPTION('M')
+			        || streq(option, "MM")) {
+				mode = MODE_GENERATE_DEPENDENCIES;
+				add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MMD") ||
 			           streq(option, "MD")) {
 				construct_dep_target = true;
 				add_flag(&cppflags_obst, "-%s", option);
-			} else if (streq(option, "MM")  ||
-			           streq(option, "MP")) {
+			} else if (streq(option, "MP")) {
 				add_flag(&cppflags_obst, "-%s", option);
 			} else if (streq(option, "MT") ||
 			           streq(option, "MQ") ||
@@ -2637,6 +2699,7 @@ int main(int argc, char **argv)
 		case MODE_PRINT_JNA:
 		case MODE_PRINT_COMPOUND_SIZE:
 		case MODE_PREPROCESS_ONLY:
+		case MODE_GENERATE_DEPENDENCIES:
 		case MODE_PARSE_ONLY:
 			outname = "-";
 			break;
