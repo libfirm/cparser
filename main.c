@@ -1194,6 +1194,20 @@ static void define_sizeof(const char *name, atomic_type_kind_t akind)
 	add_define_prop_fmt("__SIZEOF_%s__", name, "%d", size);
 }
 
+static void define_type_c(const char *name, atomic_type_kind_t akind)
+{
+	char buf[32];
+	const char *suffix = get_literal_suffix(akind);
+	const char *val;
+	if (suffix[0] != '\0') {
+		snprintf(buf, sizeof(buf), "c ## %s", suffix);
+		val = buf;
+	} else {
+		val = "c";
+	}
+	add_define_macro(name, "c", val, false);
+}
+
 static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
                                atomic_type_kind_t signed_kind)
 {
@@ -1202,6 +1216,8 @@ static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
 	assert(size == get_atomic_type_size(signed_kind) * BITS_PER_BYTE);
 	snprintf(buf, sizeof(buf), "INT%u", size);
 	define_type_type_max(buf, signed_kind);
+	snprintf(buf, sizeof(buf), "__INT%u_C", size);
+	define_type_c(buf, signed_kind);
 	snprintf(buf, sizeof(buf), "INT_LEAST%u", size);
 	define_type_type_max(buf, signed_kind);
 	snprintf(buf, sizeof(buf), "INT_FAST%u", size);
@@ -1210,15 +1226,12 @@ static void define_int_n_types(unsigned size, atomic_type_kind_t unsigned_kind,
 	assert(size == get_atomic_type_size(unsigned_kind) * BITS_PER_BYTE);
 	snprintf(buf, sizeof(buf), "UINT%u", size);
 	define_type_type_max(buf, unsigned_kind);
+	snprintf(buf, sizeof(buf), "__UINT%u_C", size);
+	define_type_c(buf, unsigned_kind);
 	snprintf(buf, sizeof(buf), "UINT_LEAST%u", size);
 	define_type_type_max(buf, unsigned_kind);
 	snprintf(buf, sizeof(buf), "UINT_FAST%u", size);
 	define_type_type_max(buf, unsigned_kind);
-
-	/* TODO: need support for macros in add_define
-	snprintf(buf, sizeof(buf), "__%sINT_C(c)", u, size);
-	add_define(buf, "c ## " + literal_suffix, false);
-	*/
 }
 
 static void define_float_properties(const char *prefix,
@@ -1518,7 +1531,9 @@ static void add_standard_defines(void)
 		}
 	}
 	define_type_type_max("UINTMAX", uintmax_kind);
+	define_type_c("__UINTMAX_C", uintmax_kind);
 	define_type_type_max("INTMAX",  intmax_kind);
+	define_type_c("__INTMAX_C", intmax_kind);
 
 	/* TODO: less hardcoding for the following... */
 	define_float_properties("FLT",  ATOMIC_TYPE_FLOAT);

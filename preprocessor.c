@@ -2478,6 +2478,46 @@ static void add_define_one(char const *const name)
 	def->token_list = obstack_finish(&pp_obstack);
 }
 
+void add_define_macro(char const *const name, char const *const macro_arg,
+                      char const *const val, bool const standard_define)
+{
+	pp_definition_t *const def = add_define_(name, standard_define);
+
+	input_t *decoder = input_from_string(val, input_decode_utf8);
+	switch_pp_input(decoder, builtin_position.input_name, NULL, true);
+
+	symbol_t *const parameter_symbol = symbol_table_insert(macro_arg);
+	pp_definition_t *parameter = OALLOCZ(&pp_obstack, pp_definition_t);
+	parameter->pos          = builtin_position;
+	parameter->symbol       = parameter_symbol;
+	parameter->is_parameter = true;
+	parameter->is_variadic  = false;
+
+	assert(obstack_object_size(&pp_obstack) == 0);
+	for (;;) {
+		next_input_token();
+		if (pp_token.kind == T_EOF)
+			break;
+
+		symbol_t *symbol = pp_token.base.symbol;
+		if (symbol == parameter_symbol) {
+			pp_token.kind                = T_MACRO_PARAMETER;
+			pp_token.macro_parameter.def = parameter;
+		}
+		obstack_grow(&pp_obstack, &pp_token, sizeof(pp_token));
+	}
+
+	close_pp_input();
+	input_free(decoder);
+
+	def->has_parameters = true;
+	def->n_parameters   = 1;
+	def->parameters     = parameter;
+	def->list_len
+		= obstack_object_size(&pp_obstack) / sizeof(def->token_list[0]);
+	def->token_list     = obstack_finish(&pp_obstack);
+}
+
 void parse_define(char const *opt)
 {
 	assert(obstack_object_size(&config_obstack) == 0);
@@ -2810,7 +2850,7 @@ finish_argument_list:
 	while (pp_token.kind != T_NEWLINE) {
 		symbol_t *symbol = pp_token.base.symbol;
 		if (symbol != NULL) {
-			pp_definition_t *const definition = pp_token.base.symbol->pp_definition;
+			pp_definition_t *const definition = symbol->pp_definition;
 			if (definition != NULL
 			    && definition->function_definition == new_definition) {
 				pp_token.kind                = T_MACRO_PARAMETER;
