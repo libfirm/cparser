@@ -1311,7 +1311,7 @@ static void add_standard_defines(void)
 	if (c_mode & _CXX) {
 		add_define("__cplusplus", "1", true);
 	}
-	if (! (c_mode & (_GNUC | _MS | _CXX)))
+	if (!(c_mode & (_GNUC | _MS | _CXX)))
 		add_define("__STRICT_ANSI__", "1", false);
 
 	add_define_string("__VERSION__", CPARSER_VERSION, false);
@@ -1515,7 +1515,7 @@ static void add_standard_defines(void)
 	atomic_type_kind_t uintmax_kind = ATOMIC_TYPE_FIRST;
 	for (atomic_type_kind_t i = ATOMIC_TYPE_FIRST; i <= ATOMIC_TYPE_LAST; ++i) {
 		unsigned flags = get_atomic_type_flags(i);
-		if (! (flags & ATOMIC_TYPE_FLAG_INTEGER))
+		if (!(flags & ATOMIC_TYPE_FLAG_INTEGER))
 			continue;
 		unsigned size = get_atomic_type_size(i);
 		if (flags & ATOMIC_TYPE_FLAG_SIGNED) {

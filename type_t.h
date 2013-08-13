@@ -44,8 +44,8 @@ struct type_base_t {
  * used for atomic types, complex and imaginary and as base for enum
  */
 struct atomic_type_t {
-	type_base_t         base;
-	atomic_type_kind_t  akind;
+	type_base_t        base;
+	atomic_type_kind_t akind;
 };
 
 struct pointer_type_t {
@@ -114,19 +114,19 @@ struct function_type_t {
 };
 
 struct compound_type_t {
-	type_base_t     base;
-	bool            packed : 1; /**< Set if packed was specified. */
+	type_base_t  base;
+	bool         packed : 1; /**< Set if packed was specified. */
 	/** the declaration of the compound type, the scope of the declaration
 	 *  contains the compound entries. */
-	compound_t     *compound;
+	compound_t  *compound;
 };
 
 struct enum_type_t {
-	atomic_type_t       base;
+	atomic_type_t base;
 	/** the enum entity. You can find the enum entries by walking the
 	 *  enum->base.next list until you don't find ENTITY_ENUM_VALUE entities
 	 *  anymore */
-	enum_t             *enume;
+	enum_t       *enume;
 };
 
 struct typedef_type_t {
@@ -158,16 +158,16 @@ union type_t {
 
 typedef struct atomic_type_properties_t atomic_type_properties_t;
 struct atomic_type_properties_t {
-	unsigned   size;              /**< type size in bytes */
-	unsigned   alignment;         /**< type alignment in bytes */
+	unsigned size;              /**< type size in bytes */
+	unsigned alignment;         /**< type alignment in bytes */
 	/** some ABIs are broken and require an alignment different from the
 	 * recommended/best alignment inside structs. Fixing ABIs is difficult
 	 * so people rather stick with the wrong values for compatibility.
 	 * (double type on x86 System V ABI)
 	 */
-	unsigned   struct_alignment;
-	unsigned   flags;             /**< type flags from atomic_type_flag_t */
-	unsigned   rank;              /**< integer conversion rank */
+	unsigned struct_alignment;
+	unsigned flags;             /**< type flags from atomic_type_flag_t */
+	unsigned rank;              /**< integer conversion rank */
 };
 
 extern atomic_type_properties_t atomic_type_properties[ATOMIC_TYPE_LAST+1];

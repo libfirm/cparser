@@ -8,8 +8,8 @@
 #include "symbol_table.h"
 #include "symbol.h"
 
-typedef struct symbol_table_iterator_t  symbol_table_iterator_t;
-typedef struct symbol_table_t           symbol_table_t;
+typedef struct symbol_table_iterator_t symbol_table_iterator_t;
+typedef struct symbol_table_t          symbol_table_t;
 
 void symbol_table_iterator_init(symbol_table_iterator_t *iterator);
 symbol_t* symbol_table_iterator_next(symbol_table_iterator_t *iterator);

@@ -201,14 +201,13 @@ struct compound_member_t {
 };
 
 struct variable_t {
-	declaration_t     base;
-	bool              thread_local   : 1;
-
-	bool              address_taken  : 1;  /**< Set if the address of this declaration was taken. */
-	bool              read           : 1;
-	unsigned          elf_visibility : 2;
-
-	initializer_t    *initializer;
+	declaration_t  base;
+	bool           thread_local   : 1;
+	bool           address_taken  : 1;  /**< Set if the address of this
+	                                         declaration was taken. */
+	bool           read           : 1;
+	unsigned       elf_visibility : 2;
+	initializer_t *initializer;
 
 	/* ast2firm info */
 	union {
@@ -221,11 +220,10 @@ struct variable_t {
 struct function_t {
 	declaration_t  base;
 	bool           is_inline      : 1;
-
 	bool           need_closure   : 1;  /**< Inner function needs closure. */
-	bool           goto_to_outer  : 1;  /**< Inner function has goto to outer function. */
+	bool           goto_to_outer  : 1;  /**< Inner function has goto to outer
+	                                         function. */
 	unsigned       elf_visibility : 2;
-
 	builtin_kind_t btk;
 	scope_t        parameters;
 	statement_t   *body;
@@ -253,19 +251,19 @@ struct asm_argument_t {
 };
 
 union entity_t {
-	entity_kind_t      kind;
-	entity_base_t      base;
-	compound_t         compound;
-	enum_t             enume;
-	enum_value_t       enum_value;
-	label_t            label;
-	namespace_t        namespacee;
-	typedef_t          typedefe;
-	declaration_t      declaration;
-	variable_t         variable;
-	function_t         function;
-	compound_member_t  compound_member;
-	asm_argument_t     asm_argument;
+	entity_kind_t     kind;
+	entity_base_t     base;
+	compound_t        compound;
+	enum_t            enume;
+	enum_value_t      enum_value;
+	label_t           label;
+	namespace_t       namespacee;
+	typedef_t         typedefe;
+	declaration_t     declaration;
+	variable_t        variable;
+	function_t        function;
+	compound_member_t compound_member;
+	asm_argument_t    asm_argument;
 };
 
 #define DECLARATION_KIND_CASES \

@@ -40,10 +40,10 @@ typedef enum atomic_type_kind_t {
 } atomic_type_kind_t;
 
 typedef enum atomic_type_flag_t {
-	ATOMIC_TYPE_FLAG_NONE       = 0,
-	ATOMIC_TYPE_FLAG_SIGNED     = 1 << 0,
-	ATOMIC_TYPE_FLAG_INTEGER    = 1 << 1,
-	ATOMIC_TYPE_FLAG_FLOAT      = 1 << 2,
+	ATOMIC_TYPE_FLAG_NONE    = 0,
+	ATOMIC_TYPE_FLAG_SIGNED  = 1 << 0,
+	ATOMIC_TYPE_FLAG_INTEGER = 1 << 1,
+	ATOMIC_TYPE_FLAG_FLOAT   = 1 << 2,
 } atomic_type_flag_t;
 
 typedef enum type_qualifier_t {
@@ -60,20 +60,20 @@ typedef enum type_qualifier_t {
 } type_qualifier_t;
 typedef unsigned short type_qualifiers_t;
 
-typedef struct type_base_t           type_base_t;
-typedef struct atomic_type_t         atomic_type_t;
-typedef struct pointer_type_t        pointer_type_t;
-typedef struct reference_type_t      reference_type_t;
-typedef struct function_parameter_t  function_parameter_t;
-typedef struct function_type_t       function_type_t;
-typedef struct compound_type_t       compound_type_t;
-typedef struct enum_type_t           enum_type_t;
-typedef struct builtin_type_t        builtin_type_t;
-typedef struct array_type_t          array_type_t;
-typedef struct typedef_type_t        typedef_type_t;
-typedef struct bitfield_type_t       bitfield_type_t;
-typedef struct typeof_type_t         typeof_type_t;
-typedef union  type_t                type_t;
+typedef struct type_base_t          type_base_t;
+typedef struct atomic_type_t        atomic_type_t;
+typedef struct pointer_type_t       pointer_type_t;
+typedef struct reference_type_t     reference_type_t;
+typedef struct function_parameter_t function_parameter_t;
+typedef struct function_type_t      function_type_t;
+typedef struct compound_type_t      compound_type_t;
+typedef struct enum_type_t          enum_type_t;
+typedef struct builtin_type_t       builtin_type_t;
+typedef struct array_type_t         array_type_t;
+typedef struct typedef_type_t       typedef_type_t;
+typedef struct bitfield_type_t      bitfield_type_t;
+typedef struct typeof_type_t        typeof_type_t;
+typedef union  type_t               type_t;
 
 /**
  * Initializes the type system. Attempts to set some defaults on the atomic

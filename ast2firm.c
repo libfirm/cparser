@@ -38,8 +38,8 @@
 
 typedef struct trampoline_region trampoline_region;
 struct trampoline_region {
-	ir_entity        *function;    /**< The function that is called by this trampoline */
-	ir_entity        *region;      /**< created region for the trampoline */
+	ir_entity *function; /**< The function that is called by this trampoline */
+	ir_entity *region;   /**< created region for the trampoline */
 };
 
 typedef struct complex_value {
@@ -101,8 +101,7 @@ static trampoline_region  *current_trampolines;
 static ir_type            *current_outer_frame;
 static ir_node            *current_static_link;
 static ir_entity          *current_vararg_entity;
-
-static entitymap_t  entitymap;
+static entitymap_t         entitymap;
 
 static struct obstack asm_obst;
 
@@ -848,7 +847,7 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 
 	handle_decl_modifiers(irentity, entity);
 
-	if (! nested_function) {
+	if (!nested_function) {
 		storage_class_tag_t const storage_class
 			= (storage_class_tag_t) entity->declaration.storage_class;
 		if (storage_class == STORAGE_CLASS_STATIC) {
@@ -1597,7 +1596,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 	if (firm_builtin) {
 		node = new_d_Builtin(dbgi, store, n_parameters, in, firm_builtin_kind,
 		                     ir_method_type);
-		if (! (function_type->modifiers & DM_CONST)) {
+		if (!(function_type->modifiers & DM_CONST)) {
 			ir_node *mem = new_Proj(node, mode_M, pn_Builtin_M);
 			set_store(mem);
 		}
@@ -1609,7 +1608,7 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		}
 	} else {
 		node = new_d_Call(dbgi, store, callee, n_parameters, in, ir_method_type);
-		if (! (function_type->modifiers & DM_CONST)) {
+		if (!(function_type->modifiers & DM_CONST)) {
 			ir_node *mem = new_Proj(node, mode_M, pn_Call_M);
 			set_store(mem);
 		}

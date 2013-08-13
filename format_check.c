@@ -872,7 +872,7 @@ too_few_args:
 			type_t *const arg_skip           = skip_typeref(arg_type);
 			type_t *const expected_type_skip = skip_typeref(expected_type);
 
-			if (! is_type_pointer(arg_skip))
+			if (!is_type_pointer(arg_skip))
 				goto error_arg_type;
 			type_t *const ptr_skip = skip_typeref(arg_skip->pointer.points_to);
 

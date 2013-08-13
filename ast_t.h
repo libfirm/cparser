@@ -63,7 +63,6 @@ typedef enum expression_kind_t {
 	EXPR_SIZEOF,
 	EXPR_CLASSIFY_TYPE,
 	EXPR_ALIGNOF,
-
 	EXPR_FUNCNAME,
 	EXPR_BUILTIN_CONSTANT_P,
 	EXPR_BUILTIN_TYPES_COMPATIBLE_P,
@@ -125,7 +124,6 @@ typedef enum expression_kind_t {
 	EXPR_BINARY_BITWISE_XOR_ASSIGN,
 	EXPR_BINARY_BITWISE_OR_ASSIGN,
 	EXPR_BINARY_COMMA,
-
 	EXPR_BINARY_ISGREATER,
 	EXPR_BINARY_ISGREATEREQUAL,
 	EXPR_BINARY_ISLESS,
@@ -136,14 +134,14 @@ typedef enum expression_kind_t {
 } expression_kind_t;
 
 typedef enum funcname_kind_t {
-	FUNCNAME_FUNCTION,           /**< C99 __func__, older __FUNCTION__ */
-	FUNCNAME_PRETTY_FUNCTION,    /**< GNUC __PRETTY_FUNCTION__ */
-	FUNCNAME_FUNCSIG,            /**< MS __FUNCSIG__ */
-	FUNCNAME_FUNCDNAME           /**< MS __FUNCDNAME__ */
+	FUNCNAME_FUNCTION,         /**< C99 __func__, older __FUNCTION__ */
+	FUNCNAME_PRETTY_FUNCTION,  /**< GNUC __PRETTY_FUNCTION__ */
+	FUNCNAME_FUNCSIG,          /**< MS __FUNCSIG__ */
+	FUNCNAME_FUNCDNAME         /**< MS __FUNCDNAME__ */
 } funcname_kind_t;
 
 /* convenience macros */
-#define EXPR_BINARY_CASES              \
+#define EXPR_BINARY_CASES                \
 	     EXPR_BINARY_ADD:                \
 	case EXPR_BINARY_SUB:                \
 	case EXPR_BINARY_MUL:                \
@@ -184,7 +182,7 @@ typedef enum funcname_kind_t {
 /**
  * unary expression with mandatory operand
  */
-#define EXPR_UNARY_CASES_MANDATORY   \
+#define EXPR_UNARY_CASES_MANDATORY     \
 	     EXPR_UNARY_NEGATE:            \
 	case EXPR_UNARY_PLUS:              \
 	case EXPR_UNARY_COMPLEMENT:        \
@@ -208,11 +206,11 @@ typedef enum funcname_kind_t {
 #define EXPR_UNARY_CASES_OPTIONAL \
 	EXPR_UNARY_THROW
 
-#define EXPR_UNARY_CASES           \
+#define EXPR_UNARY_CASES             \
 	     EXPR_UNARY_CASES_MANDATORY: \
 	case EXPR_UNARY_CASES_OPTIONAL
 
-#define EXPR_LITERAL_CASES                     \
+#define EXPR_LITERAL_CASES                       \
 	     EXPR_LITERAL_BOOLEAN:                   \
 	case EXPR_LITERAL_INTEGER:                   \
 	case EXPR_LITERAL_FLOATINGPOINT:             \
@@ -226,12 +224,13 @@ struct expression_base_t {
 	type_t           *type;     /**< The type of the expression. */
 	position_t        pos;      /**< The source position of this expression. */
 	bool              parenthesized : 1;
-#ifndef NDEBUG
-	bool              transformed : 1; /**< Set if this expression was transformed. */
-#endif
 	bool              implicit : 1;  /**< compiler generated expression.
 	                                    Examples: select into anonymous structs,
 	                                    implicit casts */
+#ifndef NDEBUG
+	bool              transformed : 1; /**< Set if this expression was
+	                                        transformed in ast2firm. */
+#endif
 };
 
 /**
@@ -286,8 +285,8 @@ struct reference_expression_t {
  * An argument of a call.
  */
 struct call_argument_t {
-	expression_t    *expression;  /**< The expression which value is transmitted. */
-	call_argument_t *next;        /**< Links to the next argument of this call. */
+	expression_t    *expression; /**< The expression which value is transmitted */
+	call_argument_t *next;       /**< Links to the next argument of this call. */
 };
 
 
@@ -437,11 +436,11 @@ struct initializer_designator_t {
 };
 
 union initializer_t {
-	initializer_kind_t        kind;
-	initializer_base_t        base;
-	initializer_value_t       value;
-	initializer_list_t        list;
-	initializer_designator_t  designator;
+	initializer_kind_t       kind;
+	initializer_base_t       base;
+	initializer_value_t      value;
+	initializer_list_t       list;
+	initializer_designator_t designator;
 };
 
 static inline string_literal_expression_t const *get_init_string(initializer_t const *const init)

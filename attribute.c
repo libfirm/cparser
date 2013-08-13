@@ -84,7 +84,6 @@ static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_WARN_UNUSED_RESULT]     = "warn_unused_result",
 	[ATTRIBUTE_GNU_WEAKREF]                = "weakref",
 	[ATTRIBUTE_GNU_WEAK]                   = "weak",
-
 	[ATTRIBUTE_MS_ALIGN]                   = "align",
 	[ATTRIBUTE_MS_ALLOCATE]                = "allocate",
 	[ATTRIBUTE_MS_DEPRECATED]              = "deprecated",
@@ -258,13 +257,6 @@ static void warn_arguments(const attribute_t *attribute)
 static void handle_attribute_packed_e(const attribute_t *attribute,
                                       entity_t *entity)
 {
-#if 0
-	if (entity->kind != ENTITY_STRUCT) {
-		warningf(WARN_OTHER, &attribute->pos, "packed attribute on '%N' ignored", entity);
-		return;
-	}
-#endif
-
 	warn_arguments(attribute);
 	entity->compound.packed = true;
 }
@@ -281,10 +273,10 @@ static void handle_attribute_packed(const attribute_t *attribute, type_t *type)
 }
 
 static void handle_attribute_asm(const attribute_t *attribute,
-                                      entity_t *entity)
+                                 entity_t *entity)
 {
 	attribute_argument_t *argument = attribute->a.arguments;
-	assert (argument->kind == ATTRIBUTE_ARGUMENT_EXPRESSION);
+	assert(argument->kind == ATTRIBUTE_ARGUMENT_EXPRESSION);
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		errorf(&attribute->pos, "Invalid asm attribute expression");

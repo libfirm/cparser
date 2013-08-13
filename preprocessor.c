@@ -657,7 +657,7 @@ static bool is_universal_char_valid_identifier(utf32 const v)
 
 static bool is_universal_char_invalid_identifier_start(utf32 const v)
 {
-	if (! (c_mode & _C11))
+	if (!(c_mode & _C11))
 		return false;
 
 	/* C11 Annex D.2 */
@@ -1297,7 +1297,7 @@ static bool concat_number(const token_t *token0, const token_t *token1)
 	} else if (kind1 == T_DOTDOTDOT) {
 		obstack_grow(&symbol_obstack, "...", 3);
 	} else {
-		assert (str0->size > 0);
+		assert(str0->size > 0);
 		char lastn = str0->begin[str0->size-1];
 		if ((lastn == 'e' || lastn == 'E' || lastn == 'p' || lastn == 'P')
 			&& (kind1 == '+' || kind1 == '-')) {
