@@ -2,6 +2,24 @@
  * This file is part of cparser.
  * Copyright (C) 2012 Matthias Braun <matze@braunis.de>
  */
+/**
+ * @file
+ * Some notes about the AST printer:
+ *  - The printing is a pretty printing and prints spaces and newlines
+ *    independently of the ones used in the original program.
+ *  - The printer is used in case of semantic errors, so it must not attempt
+ *    to print or rely on any semantic information in the AST. (ie. print
+ *    the original attribute sequences instead of the parsed declaration
+ *    specifiers)
+ *  - The AST should be printed as much as possible in its original form. So for
+ *    example hex literals should be printed as hex literals, and decimal
+ *    literals, implicit casts added by the semantic checker should not be
+ *    printed.
+ *    Some aspects here are not perfect:
+ *       - String literals appear concatenated.
+ *       - Braces used for precedence are not preserved.
+ *       - Declarations are not preserved when a definitions has been found.
+ */
 #include "ast_t.h"
 #include "symbol_t.h"
 #include "type_t.h"
