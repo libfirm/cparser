@@ -93,7 +93,7 @@ static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
 static elf_visibility_tag_t default_visibility = ELF_VISIBILITY_DEFAULT;
-
+entity_t                  **alias_entities;
 
 #define PUSH_CURRENT_ENTITY(entity) \
 	entity_t *const new_current_entity = (entity); \
@@ -2430,7 +2430,7 @@ static void parse_enum_entries(type_t *const enum_type)
 			/* TODO semantic */
 		}
 
-		record_entity(entity, false);
+		record_entity(entity, true);
 	} while (accept(',') && token.kind != '}');
 	rem_anchor_token(',');
 	rem_anchor_token('}');
@@ -4050,6 +4050,13 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 	}
 }
 
+static void parse_error_multiple_definition(entity_t *previous,
+                                            const position_t *pos)
+{
+	errorf(pos, "redefinition of '%N' (declared %P)", previous,
+	       &previous->base.pos);
+}
+
 static bool is_main(const entity_t *entity)
 {
 	if (entity->base.symbol != symbol_main)
@@ -4059,6 +4066,20 @@ static bool is_main(const entity_t *entity)
 		return false;
 
 	return true;
+}
+
+static bool is_variable_definition(const entity_t *entity)
+{
+	assert(entity->kind == ENTITY_VARIABLE);
+	return entity->variable.initializer != NULL
+	    || entity->variable.alias.symbol != NULL;
+}
+
+static bool is_function_definition(const entity_t *entity)
+{
+	assert(entity->kind == ENTITY_FUNCTION);
+	return entity->function.body != NULL
+	    || entity->function.alias.symbol != NULL;
 }
 
 static void warn_missing_declaration(const entity_t *entity, bool is_definition)
@@ -4082,6 +4103,26 @@ warn_missing_declaration:
 		if (is_type_valid(skip_typeref(entity->declaration.type)))
 			warningf(WARN_MISSING_DECLARATIONS, &entity->base.pos,
 					 "no previous declaration for '%#N'", entity);
+	}
+}
+
+static void merge_into_decl(entity_t *decl, const entity_t *other)
+{
+	assert(decl->kind == other->kind);
+	decl->declaration.modifiers |= other->declaration.modifiers;
+	if (decl->kind == ENTITY_FUNCTION) {
+		decl->function.is_inline |= other->function.is_inline;
+		if (other->function.alias.symbol != NULL) {
+			assert(decl->function.alias.symbol == NULL);
+			decl->function.alias.symbol = other->function.alias.symbol;
+			ARR_APP1(entity_t*, alias_entities, decl);
+		}
+	} else if (decl->kind == ENTITY_VARIABLE) {
+		if (other->variable.alias.symbol != NULL) {
+			assert(decl->variable.alias.symbol == NULL);
+			decl->variable.alias.symbol = other->function.alias.symbol;
+			ARR_APP1(entity_t*, alias_entities, decl);
+		}
 	}
 }
 
@@ -4143,9 +4184,13 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				}
 				goto finish;
 			}
-			if (previous->kind == ENTITY_ENUM_VALUE) {
-				errorf(pos, "redeclaration of '%N' (declared %P)",
-				       entity, ppos);
+			if (is_definition
+			    && (previous->kind == ENTITY_ENUM_VALUE
+			    || (previous->kind == ENTITY_FUNCTION
+			        && is_function_definition(previous))
+			    || (previous->kind == ENTITY_VARIABLE
+			        && is_variable_definition(previous)))) {
+				parse_error_multiple_definition(previous, pos);
 				goto finish;
 			}
 			if (previous->kind == ENTITY_TYPEDEF) {
@@ -4279,12 +4324,8 @@ error_redeclaration:
 				}
 			}
 
-			prev_decl->modifiers |= decl->modifiers;
-			if (entity->kind == ENTITY_FUNCTION) {
-				previous_entity->function.is_inline
-					|= entity->function.is_inline;
-			}
-			return previous_entity;
+			merge_into_decl(previous, entity);
+			return previous;
 		}
 
 		warning_t why;
@@ -4306,18 +4347,11 @@ finish:
 	return entity;
 }
 
-static void parser_error_multiple_definition(entity_t *entity,
-                                             const position_t *pos)
-{
-	errorf(pos, "redefinition of '%N' (declared %P)", entity,
-	       &entity->base.pos);
-}
-
 static void parse_init_declarator_rest(entity_t *entity)
 {
 	type_t *orig_type = type_error_type;
 
-	if (entity->base.kind == ENTITY_TYPEDEF) {
+	if (entity->kind == ENTITY_TYPEDEF) {
 		errorf(&entity->base.pos,
 		       "'%N' is initialized (use __typeof__ instead)", entity);
 	} else {
@@ -4325,12 +4359,14 @@ static void parse_init_declarator_rest(entity_t *entity)
 		orig_type = entity->declaration.type;
 	}
 
-	type_t *type = skip_typeref(orig_type);
-
 	if (entity->kind == ENTITY_VARIABLE
-	    && entity->variable.initializer != NULL) {
-		parser_error_multiple_definition(entity, HERE);
+		&& entity->variable.alias.symbol != NULL) {
+		errorf(&entity->base.pos,
+		       "'%N' has an initializer but is declared as an alias for '%Y'",
+		       entity, entity->variable.alias.symbol);
 	}
+
+	type_t *type = skip_typeref(orig_type);
 	eat('=');
 
 	declaration_t *const declaration = &entity->declaration;
@@ -4428,6 +4464,13 @@ static void check_variable_type_complete(entity_t *ent)
 	errorf(&ent->base.pos, "variable '%#N' has incomplete type", ent);
 }
 
+static bool is_common_variable(const entity_t *entity)
+{
+	return entity->declaration.storage_class == STORAGE_CLASS_NONE
+	    && entity->variable.initializer == NULL
+	    && !entity->variable.thread_local
+	    && (entity->declaration.modifiers & DM_WEAK) == 0;
+}
 
 static void parse_declaration_rest(entity_t *ndeclaration,
 		const declaration_specifiers_t *specifiers,
@@ -4437,7 +4480,13 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 	add_anchor_token(';');
 	add_anchor_token(',');
 	while (true) {
-		entity_t *entity = finished_declaration(ndeclaration, token.kind == '=');
+		bool is_definition
+		   = token.kind == '='
+		  || (ndeclaration->kind == ENTITY_VARIABLE
+		      && ndeclaration->variable.alias.symbol != NULL)
+		  || (ndeclaration->kind == ENTITY_FUNCTION
+			  && ndeclaration->function.alias.symbol != NULL);
+		entity_t *entity = finished_declaration(ndeclaration, is_definition);
 
 		if (token.kind == '=') {
 			parse_init_declarator_rest(entity);
@@ -4449,6 +4498,13 @@ static void parse_declaration_rest(entity_t *ndeclaration,
 			    is_type_reference(skip_typeref(decl->type))) {
 				position_t const *const pos = &entity->base.pos;
 				errorf(pos, "reference '%#N' must be initialized", entity);
+			}
+
+			if (entity->variable.alias.symbol != NULL
+				&& is_common_variable(entity)) {
+				errorf(&entity->base.pos,
+					   "'%N' is a definition but declared as an alias for '%Y'",
+					   entity, entity->variable.alias.symbol);
 			}
 		}
 
@@ -5414,6 +5470,12 @@ static void parse_external_declaration(void)
 		eat_block();
 		return;
 	}
+	symbol_t *const alias = ndeclaration->function.alias.symbol;
+	if (alias != NULL) {
+		errorf(HERE,
+		       "'%#N' has a body but is declared as an alias for '%Y'",
+		       ndeclaration, alias);
+	}
 
 	position_t const *const pos = &ndeclaration->base.pos;
 	if (is_typeref(orig_type)) {
@@ -5470,63 +5532,62 @@ static void parse_external_declaration(void)
 		environment_push(parameter);
 	}
 
-	if (function->body != NULL) {
-		parser_error_multiple_definition(entity, HERE);
-		eat_block();
-	} else {
-		/* parse function body */
-		int         label_stack_top      = label_top();
-		function_t *old_current_function = current_function;
-		current_function                 = function;
-		PUSH_CURRENT_ENTITY(entity);
-		PUSH_PARENT(NULL);
+	/* we have a fresh function. If there was a previous definition
+	 * record_entity() reported the error and returned the fresh one. */
+	assert(function->body == NULL);
 
-		goto_first   = NULL;
-		goto_anchor  = &goto_first;
-		label_first  = NULL;
-		label_anchor = &label_first;
+	/* parse function body */
+	int         label_stack_top      = label_top();
+	function_t *old_current_function = current_function;
+	current_function                 = function;
+	PUSH_CURRENT_ENTITY(entity);
+	PUSH_PARENT(NULL);
 
-		statement_t *const body = parse_compound_statement(false);
-		function->body = body;
-		first_err = true;
-		check_labels();
-		check_declarations();
-		if (is_warn_on(WARN_RETURN_TYPE)      ||
-		    is_warn_on(WARN_UNREACHABLE_CODE) ||
-		    (is_warn_on(WARN_MISSING_NORETURN)
-		     && !(function->base.modifiers & DM_NORETURN))) {
-			noreturn_candidate = true;
-			check_reachable(body);
-			if (is_warn_on(WARN_UNREACHABLE_CODE))
-				walk_statements(body, check_unreachable, NULL);
-			if (noreturn_candidate &&
-			    !(function->base.modifiers & DM_NORETURN)) {
-				warningf(WARN_MISSING_NORETURN, &body->base.pos,
-				         "function '%#N' is candidate for attribute 'noreturn'",
-				         entity);
-			}
+	goto_first   = NULL;
+	goto_anchor  = &goto_first;
+	label_first  = NULL;
+	label_anchor = &label_first;
+
+	statement_t *const body = parse_compound_statement(false);
+	function->body = body;
+	first_err = true;
+	check_labels();
+	check_declarations();
+	if (is_warn_on(WARN_RETURN_TYPE)      ||
+		is_warn_on(WARN_UNREACHABLE_CODE) ||
+		(is_warn_on(WARN_MISSING_NORETURN)
+		 && !(function->base.modifiers & DM_NORETURN))) {
+		noreturn_candidate = true;
+		check_reachable(body);
+		if (is_warn_on(WARN_UNREACHABLE_CODE))
+			walk_statements(body, check_unreachable, NULL);
+		if (noreturn_candidate &&
+			!(function->base.modifiers & DM_NORETURN)) {
+			warningf(WARN_MISSING_NORETURN, &body->base.pos,
+					 "function '%#N' is candidate for attribute 'noreturn'",
+					 entity);
 		}
-
-		if (is_main(entity)) {
-			/* Force main to C linkage. */
-			type_t *const type = entity->declaration.type;
-			assert(is_type_function(type));
-			if (type->function.linkage != LINKAGE_C) {
-				type_t *new_type           = duplicate_type(type);
-				new_type->function.linkage = LINKAGE_C;
-				entity->declaration.type   = identify_new_type(new_type);
-			}
-
-			if (enable_main_collect2_hack)
-				prepare_main_collect2(entity);
-		}
-
-		POP_CURRENT_ENTITY();
-		POP_PARENT();
-		assert(current_function == function);
-		current_function = old_current_function;
-		label_pop_to(label_stack_top);
 	}
+
+	if (is_main(entity)) {
+		/* Force main to C linkage. */
+		type_t *const type = entity->declaration.type;
+		assert(is_type_function(type));
+		if (type->function.linkage != LINKAGE_C) {
+			type_t *new_type           = duplicate_type(type);
+			new_type->function.linkage = LINKAGE_C;
+			entity->declaration.type   = identify_new_type(new_type);
+		}
+
+		if (enable_main_collect2_hack)
+			prepare_main_collect2(entity);
+	}
+
+	POP_CURRENT_ENTITY();
+	POP_PARENT();
+	assert(current_function == function);
+	current_function = old_current_function;
+	label_pop_to(label_stack_top);
 
 	POP_SCOPE();
 }
@@ -10810,6 +10871,31 @@ static void parse_translation_unit(void)
 	}
 }
 
+static void resolve_aliases(void)
+{
+	for (size_t i = 0, n_aliases = ARR_LEN(alias_entities);
+	     i < n_aliases; ++i) {
+		entity_t *entity = alias_entities[i];
+		assert(entity->kind == ENTITY_VARIABLE
+		    || entity->kind == ENTITY_FUNCTION);
+		symbol_t *symbol = entity->kind == ENTITY_VARIABLE
+			? entity->variable.alias.symbol
+			: entity->function.alias.symbol;
+		/* resolve alias if possible and mark the aliased entity as used */
+		entity_t *def = get_entity(symbol, NAMESPACE_NORMAL);
+		if (def == NULL) {
+			errorf(&entity->base.pos, "'%N' aliased to unknown entity '%Y'",
+			       entity, symbol);
+		} else {
+			def->declaration.used = true;
+		}
+		if (entity->kind == ENTITY_VARIABLE)
+			entity->variable.alias.entity = def;
+		else
+			entity->function.alias.entity = def;
+	}
+}
+
 void set_default_visibility(elf_visibility_tag_t visibility)
 {
 	default_visibility = visibility;
@@ -10819,6 +10905,7 @@ void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
 	label_stack       = NEW_ARR_F(stack_entry_t, 0);
+	alias_entities    = NEW_ARR_F(entity_t*, 0);
 
 	print_to_file(stderr);
 
@@ -10840,6 +10927,10 @@ void start_parsing(void)
 
 translation_unit_t *finish_parsing(void)
 {
+	resolve_aliases();
+	DEL_ARR_F(alias_entities);
+	alias_entities = NULL;
+
 	assert(current_scope == &unit->scope);
 	scope_pop(NULL);
 

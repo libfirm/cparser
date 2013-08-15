@@ -12,9 +12,11 @@
 #include "attribute_t.h"
 #include "symbol_t.h"
 #include "adt/error.h"
+#include "adt/array.h"
 #include "entity_t.h"
 #include "symbol_table.h"
 #include "type_t.h"
+#include "parser.h"
 
 static const char *const attribute_names[ATTRIBUTE_LAST+1] = {
 	[ATTRIBUTE_GNU_ALIAS]                  = "alias",
@@ -286,6 +288,31 @@ static void handle_attribute_asm(const attribute_t *attribute,
 	return;
 }
 
+static void handle_attribute_alias(const attribute_t *attribute,
+                                   entity_t *entity)
+{
+	const attribute_argument_t *argument = attribute->a.arguments;
+	const char *string = get_argument_string(argument);
+	if (string == NULL) {
+		errorf(&attribute->pos, "attribute 'alias' requires a string argument");
+		return;
+	}
+	symbol_t *symbol = symbol_table_insert(string);
+	switch (entity->kind) {
+	case ENTITY_VARIABLE:
+		entity->variable.alias.symbol = symbol;
+		break;
+	case ENTITY_FUNCTION:
+		entity->function.alias.symbol = symbol;
+		break;
+	default:
+		warningf(WARN_OTHER, &attribute->pos, "alias attribute on '%N' ignored",
+		         entity);
+		return;
+	}
+	ARR_APP1(entity_t*, alias_entities, entity);
+}
+
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 {
 	if (entity->kind == ENTITY_TYPEDEF) {
@@ -328,6 +355,10 @@ void handle_entity_attributes(const attribute_t *attributes, entity_t *entity)
 		case ATTRIBUTE_MS_DEPRECATED:    modifiers |= DM_DEPRECATED; break;
 		case ATTRIBUTE_MS_RESTRICT:      modifiers |= DM_RESTRICT; break;
 		case ATTRIBUTE_MS_NOALIAS:       modifiers |= DM_NOALIAS; break;
+
+		case ATTRIBUTE_GNU_ALIAS:
+			handle_attribute_alias(attribute, entity);
+			break;
 
 		case ATTRIBUTE_GNU_PACKED:
 			handle_attribute_packed_e(attribute, entity);

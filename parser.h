@@ -52,4 +52,7 @@ entity_t *record_entity(entity_t *entity, bool is_definition);
 /** set default elf visbility */
 void set_default_visibility(elf_visibility_tag_t visibility);
 
+/** array of entities using attribute((alias())) */
+extern entity_t **alias_entities;
+
 #endif

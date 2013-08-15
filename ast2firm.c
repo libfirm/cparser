@@ -732,7 +732,8 @@ static bool declaration_is_definition(const entity_t *entity)
 	case ENTITY_VARIABLE:
 		return entity->declaration.storage_class != STORAGE_CLASS_EXTERN;
 	case ENTITY_FUNCTION:
-		return entity->function.body != NULL;
+		return entity->function.body != NULL
+		    || entity->function.alias.entity != NULL;
 	case ENTITY_PARAMETER:
 	case ENTITY_COMPOUND_MEMBER:
 		return false;
@@ -842,7 +843,13 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	else
 		nested_function = true;
 
-	irentity = new_entity(owner_type, id, ir_type_method);
+	if (entity->function.alias.entity != NULL) {
+		/* create alias entity but do not resolve alias just yet, phase 2 of
+		 * the main loop will do so. */
+		irentity = new_alias_entity(owner_type, id, NULL, ir_type_method);
+	} else {
+		irentity = new_entity(owner_type, id, ir_type_method);
+	}
 	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
 	set_entity_dbg_info(irentity, dbgi);
 
@@ -4391,9 +4398,16 @@ static void create_variable_entity(entity_t *variable,
 	ident     *const id        = new_id_from_str(variable->base.symbol->string);
 	ir_type   *const irtype    = get_ir_type(type);
 	dbg_info  *const dbgi      = get_dbg_info(&variable->base.pos);
-	ir_entity *const irentity  = new_entity(parent_type, id, irtype);
 	unsigned         alignment = variable->declaration.alignment;
 
+	ir_entity *irentity;
+	if (variable->variable.alias.entity != NULL) {
+		/* create alias entity but do not set aliased yet as we can't resolved
+		 * it at this point yet. */
+		irentity = new_alias_entity(parent_type, id, NULL, irtype);
+	} else {
+		irentity = new_entity(parent_type, id, irtype);
+	}
 	set_entity_dbg_info(irentity, dbgi);
 	set_entity_alignment(irentity, alignment);
 
@@ -6226,6 +6240,26 @@ static void create_function(entity_t *entity)
 	}
 }
 
+static ir_entity *get_irentity(entity_t *entity)
+{
+	switch (entity->kind) {
+	case ENTITY_PARAMETER:
+	case ENTITY_VARIABLE:        return entity->variable.v.entity;
+	case ENTITY_FUNCTION:        return entity->function.irentity;
+	case ENTITY_COMPOUND_MEMBER: return entity->compound_member.entity;
+	case ENTITY_TYPEDEF:
+	case ENTITY_CLASS:
+	case ENTITY_STRUCT:
+	case ENTITY_UNION:
+	case ENTITY_ENUM:
+	case ENTITY_ENUM_VALUE:
+	case ENTITY_NAMESPACE:
+	case ENTITY_ASM_ARGUMENT:
+		return NULL;
+	}
+	panic("invalid entity kind");
+}
+
 static void scope_to_firm(scope_t *scope)
 {
 	/* first pass: create declarations */
@@ -6234,16 +6268,20 @@ static void scope_to_firm(scope_t *scope)
 		if (entity->base.symbol == NULL)
 			continue;
 
-		if (entity->kind == ENTITY_FUNCTION) {
+		switch (entity->kind) {
+		case ENTITY_FUNCTION:
 			if (entity->function.btk != BUILTIN_NONE) {
 				/* builtins have no representation */
 				continue;
 			}
 			(void)get_function_entity(entity, NULL);
-		} else if (entity->kind == ENTITY_VARIABLE) {
+			break;
+		case ENTITY_VARIABLE:
 			create_global_variable(entity);
-		} else if (entity->kind == ENTITY_NAMESPACE) {
+			break;
+		case ENTITY_NAMESPACE:
 			scope_to_firm(&entity->namespacee.members);
+			break;
 		}
 	}
 
@@ -6253,17 +6291,35 @@ static void scope_to_firm(scope_t *scope)
 		if (entity->base.symbol == NULL)
 			continue;
 
-		if (entity->kind == ENTITY_FUNCTION) {
+		switch (entity->kind) {
+		case ENTITY_FUNCTION: {
 			if (entity->function.btk != BUILTIN_NONE) {
 				/* builtins have no representation */
 				continue;
 			}
-			create_function(entity);
-		} else if (entity->kind == ENTITY_VARIABLE) {
+
+			entity_t *alias = entity->function.alias.entity;
+			if (alias != NULL) {
+				ir_entity *aliased = get_irentity(alias);
+				set_entity_alias(entity->function.irentity, aliased);
+			} else {
+				create_function(entity);
+			}
+			break;
+		}
+		case ENTITY_VARIABLE: {
 			assert(entity->declaration.kind
 					== DECLARATION_KIND_GLOBAL_VARIABLE);
-			current_ir_graph = get_const_code_irg();
-			create_variable_initializer(entity);
+			entity_t *alias = entity->variable.alias.entity;
+			if (alias != NULL) {
+				ir_entity *aliased = get_irentity(alias);
+				set_entity_alias(entity->variable.v.entity, aliased);
+			} else {
+				current_ir_graph = get_const_code_irg();
+				create_variable_initializer(entity);
+			}
+			break;
+		}
 		}
 	}
 }

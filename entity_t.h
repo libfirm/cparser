@@ -208,6 +208,10 @@ struct variable_t {
 	bool           read           : 1;
 	unsigned       elf_visibility : 2;
 	initializer_t *initializer;
+	union {
+		symbol_t  *symbol;
+		entity_t  *entity;
+	} alias;                            /**< value from attribute((alias())) */
 
 	/* ast2firm info */
 	union {
@@ -228,6 +232,10 @@ struct function_t {
 	scope_t        parameters;
 	statement_t   *body;
 	symbol_t      *actual_name;        /**< gnu extension __REDIRECT */
+	union {
+		symbol_t  *symbol;
+		entity_t  *entity;
+	} alias;                           /**< value from attribute((alias())) */
 
 	/* ast2firm info */
 	union {
