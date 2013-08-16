@@ -249,7 +249,8 @@ static unsigned count_parameters(const function_type_t *function_type)
 static ir_type *create_primitive_irtype(type_t const *const type, ir_mode *const mode)
 {
 	type_dbg_info *const dbgi   = get_type_dbg_info_(type);
-	ir_type       *const irtype = new_d_type_primitive(mode, dbgi);
+	ir_type       *const irtype = new_type_primitive(mode);
+	set_type_dbg_info(irtype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
@@ -278,7 +279,8 @@ static ir_type *create_complex_type(type_t const *const type)
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	type_t        *const etype   = make_atomic_type(type->atomic.akind, TYPE_QUALIFIER_NONE);
 	ir_type       *const iretype = get_ir_type(etype);
-	ir_type       *const irtype  = new_d_type_array(1, iretype, dbgi);
+	ir_type       *const irtype  = new_type_array(1, iretype);
+	set_type_dbg_info(irtype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
@@ -316,7 +318,8 @@ static ir_type *create_method_type(const function_type_t *function_type, bool fo
 	                               + (for_closure ? 1 : 0);
 	int            n_results    = is_type_void(return_type) ? 0 : 1;
 	type_dbg_info *dbgi         = get_type_dbg_info_((const type_t*) function_type);
-	ir_type       *irtype       = new_d_type_method(n_parameters, n_results, dbgi);
+	ir_type       *irtype       = new_type_method(n_parameters, n_results);
+	set_type_dbg_info(irtype, dbgi);
 
 	if (!is_type_void(return_type)) {
 		ir_type *restype = get_ir_type(return_type);
@@ -399,14 +402,17 @@ static ir_type *create_pointer_type(type_t const *const type, type_t *const poin
 		return type->base.firm_type;
 
 	type_dbg_info *const dbgi = get_type_dbg_info_(type);
-	return new_d_type_pointer(ir_points_to, dbgi);
+	ir_type *res = new_type_pointer(ir_points_to);
+	set_type_dbg_info(res, dbgi);
+	return res;
 }
 
 static ir_type *create_array_type(type_t const *const type)
 {
 	type_dbg_info *const dbgi    = get_type_dbg_info_(type);
 	ir_type       *const iretype = get_ir_type(type->array.element_type);
-	ir_type       *const irtype  = new_d_type_array(1, iretype, dbgi);
+	ir_type       *const irtype  = new_type_array(1, iretype);
+	set_type_dbg_info(irtype, dbgi);
 
 	unsigned const align = get_type_alignment(type);
 	set_type_alignment_bytes(irtype, align);
@@ -445,9 +451,9 @@ static ir_type *create_compound_type(type_t *const type)
 	}
 
 	type_dbg_info *const tdbgi  = get_type_dbg_info_(type);
-	ir_type       *const irtype = is_union
-		? new_d_type_union( id, tdbgi)
-		: new_d_type_struct(id, tdbgi);
+	ir_type       *const irtype
+		= is_union ? new_type_union(id) : new_type_struct(id);
+	set_type_dbg_info(irtype, tdbgi);
 
 	/* Set firm type right away, to break potential cycles. */
 	type->base.firm_type = irtype;
@@ -472,7 +478,8 @@ static ir_type *create_compound_type(type_t *const type)
 
 		ir_type   *entry_irtype = get_ir_type(entry_type);
 		dbg_info  *dbgi   = get_dbg_info(&entry->base.pos);
-		ir_entity *entity = new_d_entity(irtype, member_id, entry_irtype, dbgi);
+		ir_entity *entity = new_entity(irtype, member_id, entry_irtype);
+		set_entity_dbg_info(entity, dbgi);
 
 		set_entity_offset(entity, entry->compound_member.offset);
 		if (entry->compound_member.bitfield) {
@@ -835,8 +842,9 @@ static ir_entity *get_function_entity(entity_t *entity, ir_type *owner_type)
 	else
 		nested_function = true;
 
+	irentity = new_entity(owner_type, id, ir_type_method);
 	dbg_info *const dbgi = get_dbg_info(&entity->base.pos);
-	irentity = new_d_entity(owner_type, id, ir_type_method, dbgi);
+	set_entity_dbg_info(irentity, dbgi);
 
 	ident *ld_id;
 	if (nested_function)
@@ -1003,7 +1011,8 @@ finish:;
 	ir_type   *const global_type = get_glob_type();
 	ident     *const id          = id_unique(id_prefix);
 	dbg_info  *const dbgi        = get_dbg_info(src_pos);
-	ir_entity *const entity      = new_d_entity(global_type, id, type, dbgi);
+	ir_entity *const entity      = new_entity(global_type, id, type);
+	set_entity_dbg_info(   entity, dbgi);
 	set_entity_ld_ident(   entity, id);
 	set_entity_visibility( entity, ir_visibility_private);
 	add_entity_linkage(    entity, IR_LINKAGE_CONSTANT);
@@ -1544,7 +1553,8 @@ static ir_node *call_expression_to_firm(const call_expression_t *const call)
 		 * arguments... */
 		type_dbg_info *tdbgi = get_type_dbg_info_((const type_t*) function_type);
 		int n_res       = get_method_n_ress(ir_method_type);
-		new_method_type = new_d_type_method(n_parameters, n_res, tdbgi);
+		new_method_type = new_type_method(n_parameters, n_res);
+		set_type_dbg_info(new_method_type, tdbgi);
 		set_method_calling_convention(new_method_type,
 		               get_method_calling_convention(ir_method_type));
 		set_method_additional_properties(new_method_type,
@@ -2441,7 +2451,8 @@ static ir_entity *create_initializer_entity(dbg_info *dbgi,
 	ident     *const id          = id_unique("initializer.%u");
 	ir_type   *const irtype      = get_ir_type(type);
 	ir_type   *const global_type = get_glob_type();
-	ir_entity *const entity      = new_d_entity(global_type, id, irtype, dbgi);
+	ir_entity *const entity      = new_entity(global_type, id, irtype);
+	set_entity_dbg_info(entity, dbgi);
 	set_entity_ld_ident(entity, id);
 	set_entity_visibility(entity, ir_visibility_private);
 	add_entity_linkage(entity, IR_LINKAGE_CONSTANT);
@@ -2468,7 +2479,8 @@ static ir_node *compound_literal_addr(compound_literal_expression_t const *const
 		ir_type *const irtype = get_ir_type(type);
 		ir_type *frame_type   = get_irg_frame_type(current_ir_graph);
 
-		ir_entity *const entity = new_d_entity(frame_type, id, irtype, dbgi);
+		ir_entity *const entity = new_entity(frame_type, id, irtype);
+		set_entity_dbg_info(entity, dbgi);
 		set_entity_ld_ident(entity, id);
 
 		/* create initialisation code */
@@ -4379,9 +4391,10 @@ static void create_variable_entity(entity_t *variable,
 	ident     *const id        = new_id_from_str(variable->base.symbol->string);
 	ir_type   *const irtype    = get_ir_type(type);
 	dbg_info  *const dbgi      = get_dbg_info(&variable->base.pos);
-	ir_entity *const irentity  = new_d_entity(parent_type, id, irtype, dbgi);
+	ir_entity *const irentity  = new_entity(parent_type, id, irtype);
 	unsigned         alignment = variable->declaration.alignment;
 
+	set_entity_dbg_info(irentity, dbgi);
 	set_entity_alignment(irentity, alignment);
 
 	handle_decl_modifiers(irentity, variable);
@@ -5213,7 +5226,8 @@ static void create_local_static_variable(entity_t *entity)
 	char   buf[l + sizeof(".%u")];
 	snprintf(buf, sizeof(buf), "%s.%%u", entity->base.symbol->string);
 	ident     *const id       = id_unique(buf);
-	ir_entity *const irentity = new_d_entity(var_type, id, irtype, dbgi);
+	ir_entity *const irentity = new_entity(var_type, id, irtype);
+	set_entity_dbg_info(irentity, dbgi);
 
 	if (type->base.qualifiers & TYPE_QUALIFIER_VOLATILE) {
 		set_entity_volatility(irentity, volatility_is_volatile);
@@ -6027,13 +6041,15 @@ static void initialize_function_parameters(entity_t *entity)
 		if (var_needs_entity(&parameter->variable)) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
-				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
+				= new_parameter_entity(frame_type, n, param_irtype);
+			set_entity_dbg_info(param, dbgi);
 			parameter->declaration.kind  = DECLARATION_KIND_PARAMETER_ENTITY;
 			parameter->variable.v.entity = param;
 		} else if (is_type_complex(type)) {
 			ir_type   *frame_type = get_irg_frame_type(irg);
 			ir_entity *param
-				= new_d_parameter_entity(frame_type, n, param_irtype, dbgi);
+				= new_parameter_entity(frame_type, n, param_irtype);
+			set_entity_dbg_info(param, dbgi);
 			ir_node   *nomem = get_irg_no_mem(irg);
 			ir_node   *frame = get_irg_frame(irg);
 			ir_node   *addr  = new_simpleSel(nomem, frame, param);
