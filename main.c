@@ -1683,6 +1683,10 @@ static bool start_preprocessing(compilation_unit_t *unit, FILE *out,
 	add_standard_defines();
 	if (mode == MODE_PREPROCESS_ONLY) {
 		set_preprocessor_output(out);
+		/* just here for gcc compatibility */
+		fprintf(out, "# 1 \"%s\"\n", unit->name);
+		fprintf(out, "# 1 \"<built-in>\"\n");
+		fprintf(out, "# 1 \"<command-line>\"\n");
 	}
 	input_t *decoder = input_from_stream(unit->input, input_decoder);
 	switch_pp_input(decoder, unit->name, NULL, false);
@@ -1722,11 +1726,6 @@ static bool finish_preprocessing(compilation_unit_t *unit)
 
 static bool print_preprocessing_tokens(compilation_unit_t *unit, FILE *out)
 {
-	/* just here for gcc compatibility */
-	fprintf(out, "# 1 \"%s\"\n", unit->name);
-	fprintf(out, "# 1 \"<built-in>\"\n");
-	fprintf(out, "# 1 \"<command-line>\"\n");
-
 	for (;;) {
 		next_preprocessing_token();
 		if (pp_token.kind == T_EOF)
