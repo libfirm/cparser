@@ -4049,10 +4049,6 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 
 static bool is_main(entity_t*);
 
-/**
- * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
- * for various problems that occur for multiple definitions
- */
 entity_t *record_entity(entity_t *entity, const bool is_definition)
 {
 	const symbol_t *const symbol  = entity->base.symbol;
@@ -6136,10 +6132,6 @@ static type_t *automatic_type_conversion(type_t *orig_type)
 	return orig_type;
 }
 
-/**
- * reverts the automatic casts of array to pointer types and function
- * to function-pointer types as defined §6.3.2.1
- */
 type_t *revert_automatic_type_conversion(const expression_t *expression)
 {
 	switch (expression->kind) {
@@ -10829,11 +10821,6 @@ void set_default_visibility(elf_visibility_tag_t visibility)
 	default_visibility = visibility;
 }
 
-/**
- * Parse the input.
- *
- * @return  the translation unit or NULL if errors occurred.
- */
 void start_parsing(void)
 {
 	environment_stack = NEW_ARR_F(stack_entry_t, 0);
@@ -10947,9 +10934,6 @@ void parse(void)
 	incomplete_arrays = NULL;
 }
 
-/**
- * Initialize the parser.
- */
 void init_parser(void)
 {
 	memset(token_anchor_set, 0, sizeof(token_anchor_set));
@@ -10958,9 +10942,6 @@ void init_parser(void)
 	obstack_init(&temp_obst);
 }
 
-/**
- * Terminate the parser.
- */
 void exit_parser(void)
 {
 	obstack_free(&temp_obst, NULL);

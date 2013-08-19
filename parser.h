@@ -15,6 +15,7 @@ typedef struct environment_entry_t environment_entry_t;
  * Initialize parser. Should be called once when the program starts
  */
 void init_parser(void);
+
 /**
  * Frees resources occupied by parser. Should be called once before the program
  * exits.
@@ -36,8 +37,16 @@ void parse(void);
  */
 translation_unit_t *finish_parsing(void);
 
+/**
+ * reverts the automatic casts of array to pointer types and function
+ * to function-pointer types as defined §6.3.2.1
+ */
 type_t *revert_automatic_type_conversion(const expression_t *expression);
 
+/**
+ * record entities for the NAMESPACE_NORMAL, and produce error messages/warnings
+ * for various problems that occur for multiple definitions
+ */
 entity_t *record_entity(entity_t *entity, bool is_definition);
 
 /** set default elf visbility */
