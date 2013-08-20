@@ -98,9 +98,6 @@ all: $(GOAL)
 DIRS   := $(sort $(dir $(cparser_OBJECTS)))
 UNUSED := $(shell mkdir -p $(DIRS) $(DIRS:$(builddir)/%=$(builddir)/cpb/%) $(DIRS:$(builddir)/%=$(builddir)/cpb2/%) $(DIRS:$(builddir)/%=$(builddir)/cpbe/%))
 
-%.h:
-	@true
-
 REVISIONH = $(builddir)/revision.h
 REVISION ?= $(shell git --git-dir $(top_srcdir)/.git describe --abbrev=40 --always --dirty --match '')
 
@@ -174,7 +171,7 @@ cparser.bootstrap2: cparser.bootstrap $(CPARSEROS2)
 $(builddir)/%.o: %.c
 	@echo '===> CC $@'
 	$(Q)$(QUICKCHECK) $(CPPFLAGS) $(QUICKCHECK_FLAGS) $<
-	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -MP -MMD -c -o $@ $<
 
 clean:
 	@echo '===> CLEAN'
