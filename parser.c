@@ -88,6 +88,7 @@ static label_statement_t  **label_anchor      = NULL;
 static translation_unit_t  *unit              = NULL;
 /** true if we are in an __extension__ context. */
 static bool                 in_gcc_extension  = false;
+static symbol_t            *symbol_main;
 static struct obstack       temp_obst;
 static entity_t            *anonymous_entity;
 static declaration_t      **incomplete_arrays;
@@ -5339,12 +5340,7 @@ warn_unreachable:
 
 static bool is_main(entity_t *entity)
 {
-	static symbol_t *sym_main = NULL;
-	if (sym_main == NULL) {
-		sym_main = symbol_table_insert("main");
-	}
-
-	if (entity->base.symbol != sym_main)
+	if (entity->base.symbol != symbol_main)
 		return false;
 	/* must be in outermost scope */
 	if (entity->base.parent_scope != file_scope)
@@ -10840,6 +10836,8 @@ void start_parsing(void)
 	create_gnu_builtins();
 	if (c_mode & _MS)
 		create_microsoft_intrinsics();
+
+	symbol_main = symbol_table_insert("main");
 }
 
 translation_unit_t *finish_parsing(void)
