@@ -3543,6 +3543,8 @@ ptr_operator_end: ;
 		default:
 				/* Function declarator. */
 				if (!env->may_be_abstract) {
+					env->symbol = sym_anonymous;
+					env->pos    = *HERE;
 					errorf(HERE, "function declarator must have a name");
 				}
 			} else {
@@ -4056,10 +4058,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	const namespace_tag_t namespc = (namespace_tag_t)entity->base.namespc;
 	const position_t     *pos     = &entity->base.pos;
 
-	/* can happen in error cases */
-	if (symbol == NULL)
-		return entity;
-
+	assert(symbol != NULL);
 	assert(!entity->base.parent_scope);
 	assert(current_scope);
 	entity->base.parent_scope = current_scope;
