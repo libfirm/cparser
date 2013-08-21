@@ -4063,18 +4063,17 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	assert(current_scope);
 	entity->base.parent_scope = current_scope;
 
-	entity_t *const previous_entity = get_entity(symbol, namespc);
+	entity_t *const previous = get_entity(symbol, namespc);
 	/* pushing the same entity twice will break the stack structure */
-	assert(previous_entity != entity);
+	assert(previous != entity);
 
 	if (entity->kind == ENTITY_FUNCTION) {
 		type_t *const orig_type = entity->declaration.type;
 		type_t *const type      = skip_typeref(orig_type);
 
 		assert(is_type_function(type));
-		if (type->function.unspecified_parameters &&
-		    previous_entity == NULL               &&
-		    !entity->declaration.implicit) {
+		if (type->function.unspecified_parameters && previous == NULL
+		 && !entity->declaration.implicit) {
 			warningf(WARN_STRICT_PROTOTYPES, pos,
 			         "function declaration '%#N' is not a prototype", entity);
 		}
@@ -4092,35 +4091,33 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 		         entity);
 	}
 
-	if (previous_entity != NULL) {
-		position_t const *const ppos = &previous_entity->base.pos;
+	if (previous != NULL) {
+		position_t const *const ppos = &previous->base.pos;
 
-		if (previous_entity->base.parent_scope == &current_function->parameters &&
-		    previous_entity->base.parent_scope->depth+1 == current_scope->depth) {
-			assert(previous_entity->kind == ENTITY_PARAMETER);
+		if (previous->base.parent_scope == &current_function->parameters &&
+		    previous->base.parent_scope->depth+1 == current_scope->depth) {
+			assert(previous->kind == ENTITY_PARAMETER);
 			errorf(pos, "declaration of '%N' redeclares the '%N' (declared %P)",
-			       entity, previous_entity, ppos);
+			       entity, previous, ppos);
 			goto finish;
 		}
 
-		if (previous_entity->base.parent_scope == current_scope) {
-			if (previous_entity->kind != entity->kind) {
-				if (is_entity_valid(previous_entity)
-				    && is_entity_valid(entity)) {
-					error_redefined_as_different_kind(pos, previous_entity,
+		if (previous->base.parent_scope == current_scope) {
+			if (previous->kind != entity->kind) {
+				if (is_entity_valid(previous) && is_entity_valid(entity)) {
+					error_redefined_as_different_kind(pos, previous,
 					                                  entity->kind);
 				}
 				goto finish;
 			}
-			if (previous_entity->kind == ENTITY_ENUM_VALUE) {
+			if (previous->kind == ENTITY_ENUM_VALUE) {
 				errorf(pos, "redeclaration of '%N' (declared %P)",
 				       entity, ppos);
 				goto finish;
 			}
-			if (previous_entity->kind == ENTITY_TYPEDEF) {
-				type_t *const type = skip_typeref(entity->typedefe.type);
-				type_t *const prev_type
-					= skip_typeref(previous_entity->typedefe.type);
+			if (previous->kind == ENTITY_TYPEDEF) {
+				type_t *const type      = skip_typeref(entity->typedefe.type);
+				type_t *const prev_type = skip_typeref(previous->typedefe.type);
 				if (c_mode & _CXX) {
 					/* C++ allows double typedef if they are identical
 					 * (after skipping typedefs) */
@@ -4138,20 +4135,19 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			}
 
 			/* at this point we should have only VARIABLES or FUNCTIONS */
-			assert(is_declaration(previous_entity) && is_declaration(entity));
+			assert(is_declaration(previous) && is_declaration(entity));
 
-			declaration_t *const prev_decl = &previous_entity->declaration;
+			declaration_t *const prev_decl = &previous->declaration;
 			declaration_t *const decl      = &entity->declaration;
 
 			/* can happen for K&R style declarations */
-			if (prev_decl->type       == NULL             &&
-			    previous_entity->kind == ENTITY_PARAMETER &&
-			    entity->kind          == ENTITY_PARAMETER) {
+			if (prev_decl->type == NULL && previous->kind == ENTITY_PARAMETER
+			    && entity->kind == ENTITY_PARAMETER) {
 				prev_decl->type                   = decl->type;
 				prev_decl->storage_class          = decl->storage_class;
 				prev_decl->declared_storage_class = decl->declared_storage_class;
 				prev_decl->modifiers              = decl->modifiers;
-				return previous_entity;
+				return previous;
 			}
 
 			type_t *const type      = skip_typeref(decl->type);
@@ -4159,7 +4155,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 			if (!types_compatible(type, prev_type)) {
 				errorf(pos, "declaration '%#N' is incompatible with '%#N' (declared %P)",
-				       entity, previous_entity, ppos);
+				       entity, previous, ppos);
 			} else {
 				unsigned old_storage_class = prev_decl->storage_class;
 				if (is_definition                     &&
@@ -4168,7 +4164,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				    prev_decl->storage_class == STORAGE_CLASS_STATIC) {
 					warningf(WARN_REDUNDANT_DECLS, ppos,
 					         "unnecessary static forward declaration for '%#N'",
-					         previous_entity);
+					         previous);
 				}
 
 				storage_class_t new_storage_class = decl->storage_class;
@@ -4261,8 +4257,8 @@ error_redeclaration:
 		warning_t why;
 		if (is_warn_on(why = WARN_SHADOW)
 		    || (is_warn_on(why = WARN_SHADOW_LOCAL)
-		    && previous_entity->base.parent_scope != file_scope)) {
-			char const *const what = get_entity_kind_name(previous_entity->kind);
+		    && previous->base.parent_scope != file_scope)) {
+			char const *const what = get_entity_kind_name(previous->kind);
 			warningf(why, pos, "'%N' shadows %s (declared %P)", entity, what,
 			         ppos);
 		}
