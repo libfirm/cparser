@@ -445,12 +445,15 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 
 	unit->input         = f;
 	unit->input_is_pipe = true;
+	bool res            = true;
 	if (mode == MODE_GENERATE_DEPENDENCIES) {
 		unit->type = COMPILATION_UNIT_DEPENDENCIES;
 		copy_file(out, unit->input);
+		res &= close_input(unit);
 	} else {
 		if (mode == MODE_PREPROCESS_ONLY) {
 			copy_file(out, unit->input);
+			res &= close_input(unit);
 		}
 		switch (unit->type) {
 		case COMPILATION_UNIT_ASSEMBLER:
@@ -468,7 +471,7 @@ static bool run_external_preprocessor(compilation_unit_t *unit, FILE *out,
 		}
 	}
 
-	return true;
+	return res;
 }
 
 static bool assemble(compilation_unit_t *unit, const char *out, const char *in)
