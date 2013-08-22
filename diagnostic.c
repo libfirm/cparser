@@ -21,7 +21,7 @@ unsigned warning_count           = 0;
 bool     show_column             = true;
 bool     diagnostics_show_option = true;
 
-static const position_t *curr_pos = NULL;
+static char const *last_input_name = NULL;
 
 /**
  * prints an additional source position
@@ -31,7 +31,7 @@ static void print_position(FILE *out, const position_t *pos)
 	fprintf(out, "at line %u", pos->lineno);
 	if (show_column)
 		fprintf(out, ":%u", (unsigned)pos->colno);
-	if (curr_pos == NULL || curr_pos->input_name != pos->input_name)
+	if (last_input_name != pos->input_name)
 		fprintf(out, " of \"%s\"", pos->input_name);
 }
 
@@ -219,7 +219,7 @@ void diagnosticf(const char *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	curr_pos = NULL;
+	last_input_name = NULL;
 	diagnosticvf(fmt, ap);
 	va_end(ap);
 }
@@ -237,7 +237,7 @@ static void diagnosticposvf(position_t const *const pos, char const *const kind,
 		fputc(' ', out);
 	}
 	fprintf(out, "%s: ", kind);
-	curr_pos = pos;
+	last_input_name = pos ? pos->input_name : NULL;
 	diagnosticvf(fmt, ap);
 }
 
