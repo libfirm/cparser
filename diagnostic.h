@@ -40,7 +40,6 @@
  *  %Q   unsigned (qualifier)
  *  %S   string_t const*
  *  %T   type_t const*
- *  %#T  type_t const*, symbol_t const*
  *  %Y   symbol_t const*
  */
 void diagnosticf(const char *fmt, ...);

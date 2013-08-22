@@ -154,11 +154,7 @@ done_flags:;
 
 		case 'T': {
 			const type_t* const type = va_arg(ap, const type_t*);
-			const symbol_t*     sym  = NULL;
-			if (extended) {
-				sym = va_arg(ap, const symbol_t*);
-			}
-			print_type_ext(type, sym, NULL);
+			print_type_ext(type, NULL, NULL);
 			break;
 		}
 
