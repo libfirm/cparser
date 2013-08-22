@@ -2632,7 +2632,7 @@ invalid_o_option:
 
 	if (help != HELP_NONE) {
 		print_help(argv[0], help);
-		return !argument_errors;
+		return argument_errors ? EXIT_FAILURE : EXIT_SUCCESS;
 	}
 
 	if (print_file_name_file != NULL) {
