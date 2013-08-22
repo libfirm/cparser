@@ -291,19 +291,3 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 			break;
 	}
 }
-
-static void internal_errorvf(const position_t *pos,
-                    const char *const fmt, va_list ap)
-{
-	diagnosticposvf(pos, "internal error", fmt, ap);
-	fputc('\n', stderr);
-}
-
-void internal_errorf(const position_t *pos, const char *const fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	internal_errorvf(pos, fmt, ap);
-	va_end(ap);
-	abort();
-}

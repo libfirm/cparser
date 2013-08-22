@@ -2297,7 +2297,7 @@ static initializer_t *parse_initializer(parse_initializer_env_t *env)
 			break;
 
 		default:
-			internal_errorf(HERE, "invalid initializer type");
+			panic("invalid initializer type");
 		}
 
 		type_t *new_type = duplicate_type(type);
@@ -3720,7 +3720,7 @@ static type_t *construct_declarator_type(construct_type_t *construct_list,
 			continue;
 		}
 		}
-		internal_errorf(pos, "invalid type construction found");
+		panic("invalid type construction found");
 	}
 
 	return type;
@@ -6818,7 +6818,7 @@ static expression_t *parse_compare_builtin(void)
 	case T___builtin_islessequal:    kind = EXPR_BINARY_ISLESSEQUAL;    break;
 	case T___builtin_islessgreater:  kind = EXPR_BINARY_ISLESSGREATER;  break;
 	case T___builtin_isunordered:    kind = EXPR_BINARY_ISUNORDERED;    break;
-	default: internal_errorf(HERE, "invalid compare builtin found");
+	default: panic("invalid compare builtin found");
 	}
 	expression_t *const expression = allocate_expression_zero(kind);
 	next_token();
@@ -8897,7 +8897,7 @@ static bool expression_has_effect(const expression_t *const expr)
 	case EXPR_BINARY_ISUNORDERED:         return false;
 	}
 
-	internal_errorf(HERE, "unexpected expression");
+	panic("unexpected expression");
 }
 
 static void semantic_comma(binary_expression_t *expression)
@@ -10825,13 +10825,12 @@ static void parse_externals(void)
 			unsigned short count = token_anchor_set[i] - token_anchor_copy[i];
 			if (count != 0) {
 				/* the anchor set and its copy differs */
-				internal_errorf(HERE, "Leaked anchor token %k %d times",
-				                i, count);
+				panic("Leaked anchor token");
 			}
 		}
 		if (in_gcc_extension) {
 			/* an gcc extension scope was not closed */
-			internal_errorf(HERE, "Leaked __extension__");
+			panic("Leaked __extension__");
 		}
 #endif
 

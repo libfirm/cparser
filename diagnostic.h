@@ -9,24 +9,6 @@
 #include "token_t.h"
 #include "warning.h"
 
-/* define a NORETURN attribute */
-#ifndef NORETURN
-# if defined(__GNUC__)
-#  if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 70)
-#   define NORETURN void __attribute__ ((noreturn))
-#  endif /* __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 70) */
-# endif /* defined(__GNUC__) */
-
-# if defined(_MSC_VER)
-#  define NORETURN void __declspec(noreturn)
-# endif /* defined(_MSC_VER) */
-
-/* If not set above, use "void" for DOES_NOT_RETURN. */
-# ifndef NORETURN
-# define NORETURN void
-# endif /* ifndef NORETURN */
-#endif /* ifndef NORETURN */
-
 /**
  * Issue a diagnostic message.
  * Format types:
@@ -45,7 +27,6 @@
 void diagnosticf(const char *fmt, ...);
 void errorf(const position_t *pos, const char *fmt, ...);
 void warningf(warning_t, const position_t *pos, const char *fmt, ...);
-NORETURN internal_errorf(const position_t *pos, const char *fmt, ...);
 
 extern unsigned error_count;
 extern unsigned warning_count;
