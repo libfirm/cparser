@@ -4643,7 +4643,7 @@ decl_list_end:
 	POP_SCOPE();
 
 	/* update function type */
-	type_t *new_type = duplicate_type(type);
+	type_t *const new_type = duplicate_type(type);
 
 	function_parameter_t  *parameters = NULL;
 	function_parameter_t **anchor     = &parameters;
@@ -4715,15 +4715,13 @@ decl_list_end:
 	}
 
 	new_type->function.parameters = parameters;
-	new_type = identify_new_type(new_type);
+	entity->declaration.type      = identify_new_type(new_type);
 
 	if (need_incompatible_warning) {
-		symbol_t   const *const sym  = entity->base.symbol;
 		position_t const *const pos  = &entity->base.pos;
 		position_t const *const ppos = &proto_type->base.pos;
-		warningf(WARN_OTHER, pos, "declaration '%#N' is incompatible with '%#T' (declared %P)", proto_type, new_type, sym, ppos);
+		warningf(WARN_OTHER, pos, "declaration '%#N' is incompatible with '%#N' (declared %P)", proto_type, entity, ppos);
 	}
-	entity->declaration.type = new_type;
 
 	rem_anchor_token('{');
 }
