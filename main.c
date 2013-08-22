@@ -2093,6 +2093,7 @@ int main(int argc, char **argv)
 	gen_firm_init();
 
 	/* early options parsing (find out optimization level and OS) */
+	bool argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] != '-')
@@ -2100,7 +2101,19 @@ int main(int argc, char **argv)
 
 		const char *option = &arg[1];
 		if (option[0] == 'O') {
-			sscanf(&option[1], "%d", &opt_level);
+			if (option[2] != '\0')
+				goto invalid_o_option;
+			char opt = option[1];
+			if (opt == 's') {
+				opt_level = 2; /* for now until we have a real -Os */
+			} else if (opt >= '0' && opt <= '9') {
+				opt_level = opt - '0';
+			} else {
+invalid_o_option:
+				errorf(NULL, "invalid optimization option '%s'", arg);
+				argument_errors = true;
+				continue;
+			}
 		}
 	}
 
@@ -2114,7 +2127,6 @@ int main(int argc, char **argv)
 	lang_standard_t         standard        = STANDARD_DEFAULT;
 	compilation_unit_type_t forced_unittype = COMPILATION_UNIT_AUTODETECT;
 	help_sections_t         help            = HELP_NONE;
-	bool                    argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
 		const char *arg = argv[i];
 		if (arg[0] == '-' && arg[1] != '\0') {
