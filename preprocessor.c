@@ -3074,31 +3074,29 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 		entry = input.path      ? input.path->next
 		      : bracket_include ? bracket_searchpath.first
 		      : quote_searchpath.first;
+	} else if (bracket_include) {
+		entry = bracket_searchpath.first;
 	} else {
-		if (!bracket_include) {
-			/* put dirname of current input on obstack */
-			const char *filename   = input.pos.input_name;
-			const char *last_slash = strrchr(filename, '/');
-			const char *full_name;
-			if (last_slash != NULL) {
-				size_t len = last_slash - filename;
-				obstack_grow(&symbol_obstack, filename, len + 1);
-				obstack_grow0(&symbol_obstack, headername, headername_len);
-				char *complete_path = obstack_finish(&symbol_obstack);
-				full_name = identify_string(complete_path);
-			} else {
-				full_name = headername;
-			}
-
-			FILE *file = fopen(full_name, "r");
-			if (file != NULL) {
-				switch_pp_input_file(file, full_name, NULL, false);
-				return true;
-			}
-			entry = quote_searchpath.first;
+		/* put dirname of current input on obstack */
+		const char *filename   = input.pos.input_name;
+		const char *last_slash = strrchr(filename, '/');
+		const char *full_name;
+		if (last_slash != NULL) {
+			size_t len = last_slash - filename;
+			obstack_grow(&symbol_obstack, filename, len + 1);
+			obstack_grow0(&symbol_obstack, headername, headername_len);
+			char *complete_path = obstack_finish(&symbol_obstack);
+			full_name = identify_string(complete_path);
 		} else {
-			entry = bracket_searchpath.first;
+			full_name = headername;
 		}
+
+		FILE *file = fopen(full_name, "r");
+		if (file != NULL) {
+			switch_pp_input_file(file, full_name, NULL, false);
+			return true;
+		}
+		entry = quote_searchpath.first;
 	}
 
 	assert(obstack_object_size(&symbol_obstack) == 0);
@@ -3117,9 +3115,8 @@ static bool do_include(bool const bracket_include, bool const include_next, char
 			const char *filename = identify_string(complete_path);
 			switch_pp_input_file(file, filename, entry, entry->is_system_path);
 			return true;
-		} else {
-			obstack_free(&symbol_obstack, complete_path);
 		}
+		obstack_free(&symbol_obstack, complete_path);
 	}
 
 	return false;
