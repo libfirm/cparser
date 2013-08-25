@@ -4050,7 +4050,16 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 	}
 }
 
-static bool is_main(entity_t*);
+static bool is_main(entity_t *entity)
+{
+	if (entity->base.symbol != symbol_main)
+		return false;
+	/* must be in outermost scope */
+	if (entity->base.parent_scope != file_scope)
+		return false;
+
+	return true;
+}
 
 entity_t *record_entity(entity_t *entity, const bool is_definition)
 {
@@ -5331,17 +5340,6 @@ warn_unreachable:
 		}
 		return;
 	}
-}
-
-static bool is_main(entity_t *entity)
-{
-	if (entity->base.symbol != symbol_main)
-		return false;
-	/* must be in outermost scope */
-	if (entity->base.parent_scope != file_scope)
-		return false;
-
-	return true;
 }
 
 static void prepare_main_collect2(entity_t*);
