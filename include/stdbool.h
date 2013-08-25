@@ -7,13 +7,6 @@
 #define true  1
 #define false 0
 
-#elif defined(__GNUC__) && !defined(__STRICT_ANSI__)
-
-#define _Bool bool
-#define bool  bool
-#define false false
-#define true  true
-
 #endif
 
 #define __bool_true_false_are_defined 1
