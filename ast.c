@@ -5,20 +5,20 @@
 /**
  * @file
  * Some notes about the AST printer:
- *  - The printing is a pretty printing and prints spaces and newlines
- *    independently of the ones used in the original program.
+ *  - This is a pretty printer, which prints spaces and newlines independent of
+ *    the ones used in the original program.
  *  - The printer is used in case of semantic errors, so it must not attempt
- *    to print or rely on any semantic information in the AST. (ie. print
+ *    to print or rely on any semantic information in the AST. (e.g. print
  *    the original attribute sequences instead of the parsed declaration
  *    specifiers)
  *  - The AST should be printed as much as possible in its original form. So for
- *    example hex literals should be printed as hex literals, and decimal
+ *    example, hex literals should be printed as hex literals, not decimal
  *    literals, implicit casts added by the semantic checker should not be
  *    printed.
  *    Some aspects here are not perfect:
  *       - String literals appear concatenated.
  *       - Braces used for precedence are not preserved.
- *       - Declarations are not preserved when a definitions has been found.
+ *       - Declarations are not preserved, when a definition has been found.
  */
 #include "ast_t.h"
 #include "symbol_t.h"
@@ -1379,9 +1379,9 @@ void print_expression(const expression_t *expression)
 }
 
 /**
- * Print a declaration.
+ * Print an entity.
  *
- * @param declaration  the declaration
+ * @param entity  the entity
  */
 void print_entity(const entity_t *entity)
 {
