@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 #include "adt/util.h"
 #include "adt/xmalloc.h"
@@ -317,19 +318,19 @@ static named_decoder_t const decoders[] = {
 };
 
 /** strcasecmp is not part of C99 so we need our own implementation here */
-static int my_strcasecmp(const char *s1, const char *s2)
+static bool strcaseeq(char const *s1, char const *s2)
 {
-	for ( ; *s1 != 0; ++s1, ++s2) {
-		if (tolower(*s1) != tolower(*s2))
-			break;
+	for (; tolower((unsigned char)*s1) == tolower((unsigned char)*s2); ++s1, ++s2) {
+		if (*s1 == '\0')
+			return true;
 	}
-	return (unsigned char)*s1 - (unsigned char)*s2;
+	return false;
 }
 
 input_decoder_t *input_get_decoder(const char *encoding)
 {
 	for (named_decoder_t const *i = decoders; i->name != NULL; ++i) {
-		if (my_strcasecmp(encoding, i->name) == 0)
+		if (strcaseeq(encoding, i->name))
 			return i->decoder;
 	}
 	return NULL;
