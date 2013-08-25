@@ -4050,7 +4050,7 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 	}
 }
 
-static bool is_main(entity_t *entity)
+static bool is_main(const entity_t *entity)
 {
 	if (entity->base.symbol != symbol_main)
 		return false;
@@ -4059,6 +4059,30 @@ static bool is_main(entity_t *entity)
 		return false;
 
 	return true;
+}
+
+static void warn_missing_declaration(const entity_t *entity, bool is_definition)
+{
+	if (entity->kind == ENTITY_FUNCTION) {
+		if (is_definition
+		    && entity->declaration.storage_class != STORAGE_CLASS_STATIC
+		    && !is_main(entity)) {
+			if (is_warn_on(WARN_MISSING_PROTOTYPES)) {
+				warningf(WARN_MISSING_PROTOTYPES, &entity->base.pos,
+				         "no previous prototype for '%#N'", entity);
+			} else {
+				goto warn_missing_declaration;
+			}
+		}
+	} else if (entity->kind                      == ENTITY_VARIABLE
+	        && current_scope                     == file_scope
+	        && entity->declaration.storage_class == STORAGE_CLASS_NONE
+	        && !entity->declaration.implicit) {
+warn_missing_declaration:
+		if (is_type_valid(skip_typeref(entity->declaration.type)))
+			warningf(WARN_MISSING_DECLARATIONS, &entity->base.pos,
+					 "no previous declaration for '%#N'", entity);
+	}
 }
 
 entity_t *record_entity(entity_t *entity, const bool is_definition)
@@ -4273,26 +4297,7 @@ error_redeclaration:
 		}
 	}
 
-	if (entity->kind == ENTITY_FUNCTION) {
-		if (is_definition
-		    && entity->declaration.storage_class != STORAGE_CLASS_STATIC
-		    && !is_main(entity)) {
-			if (is_warn_on(WARN_MISSING_PROTOTYPES)) {
-				warningf(WARN_MISSING_PROTOTYPES, pos,
-				         "no previous prototype for '%#N'", entity);
-			} else {
-				goto warn_missing_declaration;
-			}
-		}
-	} else if (entity->kind                      == ENTITY_VARIABLE
-	        && current_scope                     == file_scope
-	        && entity->declaration.storage_class == STORAGE_CLASS_NONE
-	        && !entity->declaration.implicit) {
-warn_missing_declaration:
-		if (is_type_valid(skip_typeref(entity->declaration.type)))
-			warningf(WARN_MISSING_DECLARATIONS, pos,
-					 "no previous declaration for '%#N'", entity);
-	}
+	warn_missing_declaration(entity, is_definition);
 
 finish:
 	environment_push(entity);
