@@ -1399,17 +1399,10 @@ void print_entity(const entity_t *entity)
 		print_typedef(entity);
 		return;
 	case ENTITY_CLASS:
-		/* TODO */
-		print_string("class ");
-		print_string(entity->base.symbol->string);
-		print_string("; /* TODO */\n");
-		return;
 	case ENTITY_STRUCT:
-		print_string("struct ");
-		goto print_compound;
 	case ENTITY_UNION:
-		print_string("union ");
-print_compound:
+		print_string(get_entity_kind_name(entity->kind));
+		print_char(' ');
 		print_string(entity->base.symbol->string);
 		if (entity->compound.complete) {
 			print_char(' ');
