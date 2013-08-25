@@ -3170,6 +3170,7 @@ static pp_conditional_t *push_conditional(void)
 		= obstack_alloc(&pp_obstack, sizeof(*conditional));
 	memset(conditional, 0, sizeof(*conditional));
 
+	conditional->pos    = pp_token.base.pos;
 	conditional->parent = conditional_stack;
 	conditional_stack   = conditional;
 
@@ -3559,7 +3560,6 @@ static void parse_elif_directive(void)
 static void parse_if_directive(void)
 {
 	pp_conditional_t *const cond = push_conditional();
-	cond->pos = pp_token.base.pos;
 
 	if (skip_mode) {
 		cond->skip = true;
@@ -3579,7 +3579,6 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 	if (skip_mode) {
 		eat_pp_directive();
 		pp_conditional_t *conditional = push_conditional();
-		conditional->pos  = pp_token.base.pos;
 		conditional->skip = true;
 		return;
 	}
@@ -3602,7 +3601,6 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 	}
 
 	pp_conditional_t *conditional = push_conditional();
-	conditional->pos       = pp_token.base.pos;
 	conditional->condition = condition;
 
 	if (!condition) {
