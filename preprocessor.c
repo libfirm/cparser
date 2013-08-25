@@ -3573,12 +3573,12 @@ static void parse_if_directive(void)
 
 static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 {
+	pp_conditional_t *const conditional = push_conditional();
 	bool condition;
 	eat_pp(is_ifdef ? TP_ifdef : TP_ifndef);
 
 	if (skip_mode) {
 		eat_pp_directive();
-		pp_conditional_t *conditional = push_conditional();
 		conditional->skip = true;
 		return;
 	}
@@ -3600,7 +3600,6 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 		}
 	}
 
-	pp_conditional_t *conditional = push_conditional();
 	conditional->condition = condition;
 
 	if (!condition) {
