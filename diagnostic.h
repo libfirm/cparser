@@ -31,7 +31,13 @@ void errorf(const position_t *pos, const char *fmt, ...);
  */
 void notef(position_t const *pos, char const *fmt, ...);
 
-void warningf(warning_t, const position_t *pos, const char *fmt, ...);
+/**
+ * Issue a diagnostic message with the prefix "warning:" and increase the
+ * warning count, if the given warning is activated.
+ *
+ * @return Whether the diagnostic was shown.
+ */
+bool warningf(warning_t, position_t const *pos, char const *fmt, ...);
 
 extern unsigned error_count;
 extern unsigned warning_count;

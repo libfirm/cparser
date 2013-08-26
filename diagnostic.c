@@ -254,10 +254,10 @@ void notef(position_t const *const pos, char const *const fmt, ...)
 	va_end(ap);
 }
 
-void warningf(warning_t const warn, position_t const* pos, char const *const fmt, ...)
+bool warningf(warning_t const warn, position_t const* pos, char const *const fmt, ...)
 {
 	if (pos->is_system_header && !is_warn_on(WARN_SYSTEM))
-		return;
+		return false;
 
 	warning_switch_t const *const s = get_warn_switch(warn);
 	switch ((unsigned) s->state) {
@@ -280,9 +280,9 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 				fprintf(stderr, " [-W%s]\n", s->name);
 			else
 				fputc('\n', stderr);
-			break;
+			return true;
 
 		default:
-			break;
+			return false;
 	}
 }
