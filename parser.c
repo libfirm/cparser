@@ -4134,7 +4134,8 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	/* pushing the same entity twice will break the stack structure */
 	assert(previous != entity);
 
-	if (entity->kind == ENTITY_FUNCTION) {
+	entity_kind_tag_t const kind = (entity_kind_tag_t)entity->kind;
+	if (kind == ENTITY_FUNCTION) {
 		type_t *const orig_type = entity->declaration.type;
 		type_t *const type      = skip_typeref(orig_type);
 
@@ -4163,30 +4164,27 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 
 		if (previous->base.parent_scope == &current_function->parameters &&
 		    previous->base.parent_scope->depth+1 == current_scope->depth) {
-			assert(previous->kind == ENTITY_PARAMETER);
+			assert(kind == ENTITY_PARAMETER);
 			errorf(pos, "declaration of '%N' redeclares the '%N' (declared %P)",
 			       entity, previous, ppos);
 			goto finish;
 		}
 
 		if (previous->base.parent_scope == current_scope) {
-			if (previous->kind != entity->kind) {
+			if (previous->kind != kind) {
 				if (is_entity_valid(previous) && is_entity_valid(entity)) {
-					error_redefined_as_different_kind(pos, previous,
-					                                  entity->kind);
+					error_redefined_as_different_kind(pos, previous, kind);
 				}
 				goto finish;
 			}
 			if (is_definition
-			    && (previous->kind == ENTITY_ENUM_VALUE
-			    || (previous->kind == ENTITY_FUNCTION
-			        && is_function_definition(previous))
-			    || (previous->kind == ENTITY_VARIABLE
-			        && is_variable_definition(previous)))) {
+			    && (kind == ENTITY_ENUM_VALUE
+			    || (kind == ENTITY_FUNCTION && is_function_definition(previous))
+			    || (kind == ENTITY_VARIABLE && is_variable_definition(previous)))) {
 				parse_error_multiple_definition(previous, pos);
 				goto finish;
 			}
-			if (previous->kind == ENTITY_TYPEDEF) {
+			if (kind == ENTITY_TYPEDEF) {
 				type_t *const type      = skip_typeref(entity->typedefe.type);
 				type_t *const prev_type = skip_typeref(previous->typedefe.type);
 				if (c_mode & _CXX) {
@@ -4212,8 +4210,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			declaration_t *const decl      = &entity->declaration;
 
 			/* can happen for K&R style declarations */
-			if (prev_decl->type == NULL && previous->kind == ENTITY_PARAMETER
-			    && entity->kind == ENTITY_PARAMETER) {
+			if (prev_decl->type == NULL && kind == ENTITY_PARAMETER) {
 				prev_decl->type                   = decl->type;
 				prev_decl->storage_class          = decl->storage_class;
 				prev_decl->declared_storage_class = decl->declared_storage_class;
@@ -4243,7 +4240,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 				/* pretend no storage class means extern for function
 				 * declarations (except if the previous declaration is neither
 				 * none nor extern) */
-				if (entity->kind == ENTITY_FUNCTION) {
+				if (kind == ENTITY_FUNCTION) {
 					/* the previous declaration could have unspecified
 					 * parameters or be a typedef, so use the new type */
 					if (prev_type->function.unspecified_parameters
