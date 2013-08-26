@@ -57,10 +57,25 @@ static void fpututf32(utf32 const c, FILE *const out)
 /**
  * Issue a diagnostic message.
  */
-static void diagnosticvf(char const *fmt, va_list ap)
+static void diagnosticvf(position_t const *const pos, char const *const kind, char const *fmt, va_list ap)
 {
+	FILE *const out = stderr;
+
+	if (pos) {
+		last_input_name = pos->input_name;
+
+		char const *const posfmt =
+			pos->colno  != 0 && show_column ? "%s:%u:%u: " :
+			pos->lineno != 0                ? "%s:%u: "    :
+			"%s: ";
+		fprintf(out, posfmt, pos->input_name, pos->lineno, pos->colno);
+	} else {
+		last_input_name = NULL;
+	}
+	fprintf(out, "%s: ", kind);
+
 	for (char const *f; (f = strchr(fmt, '%')); fmt = f) {
-		fwrite(fmt, sizeof(*fmt), f - fmt, stderr); // Print till '%'.
+		fwrite(fmt, sizeof(*fmt), f - fmt, out); // Print till '%'.
 		++f; // Skip '%'.
 
 		bool extended  = false;
@@ -84,59 +99,56 @@ done_flags:;
 
 		switch (*f++) {
 		case '%':
-			fputc('%', stderr);
+			fputc('%', out);
 			break;
 
 		case 'c': {
 			if (flag_long) {
 				const utf32 val = va_arg(ap, utf32);
-				fpututf32(val, stderr);
+				fpututf32(val, out);
 			} else {
 				const unsigned char val = (unsigned char) va_arg(ap, int);
-				fputc(val, stderr);
+				fputc(val, out);
 			}
 			break;
 		}
 
 		case 'd': {
 			const int val = va_arg(ap, int);
-			fprintf(stderr, "%d", val);
+			fprintf(out, "%d", val);
 			break;
 		}
 
 		case 's': {
 			const char* const str = va_arg(ap, const char*);
-			fputs(str, stderr);
+			fputs(str, out);
 			break;
 		}
 
 		case 'S': {
 			const string_t *str = va_arg(ap, const string_t*);
 			for (size_t i = 0; i < str->size; ++i) {
-				fputc(str->begin[i], stderr);
+				fputc(str->begin[i], out);
 			}
 			break;
 		}
 
 		case 'u': {
 			const unsigned int val = va_arg(ap, unsigned int);
-			fprintf(stderr, "%u", val);
+			fprintf(out, "%u", val);
 			break;
 		}
 
 		case 'X': {
 			unsigned int const val  = va_arg(ap, unsigned int);
 			char  const *const xfmt = flag_zero ? "%0*X" : "%*X";
-			fprintf(stderr, xfmt, field_width, val);
+			fprintf(out, xfmt, field_width, val);
 			break;
 		}
 
 		case 'Y': {
 			const symbol_t *const symbol = va_arg(ap, const symbol_t*);
-			if (symbol == NULL)
-				fputs("(null)", stderr);
-			else
-				fputs(symbol->string, stderr);
+			fputs(symbol ? symbol->string : "(null)", out);
 			break;
 		}
 
@@ -160,7 +172,7 @@ done_flags:;
 
 		case 'K': {
 			const token_t* const token = va_arg(ap, const token_t*);
-			print_token(stderr, token);
+			print_token(out, token);
 			break;
 		}
 
@@ -172,16 +184,16 @@ done_flags:;
 					const token_kind_t tok = (token_kind_t)va_arg(*toks, int);
 					if (tok == 0)
 						break;
-					fputs(sep_next(&sep), stderr);
-					fputc('\'', stderr);
-					print_token_kind(stderr, tok);
-					fputc('\'', stderr);
+					fputs(sep_next(&sep), out);
+					fputc('\'', out);
+					print_token_kind(out, tok);
+					fputc('\'', out);
 				}
 			} else {
 				const token_kind_t token = (token_kind_t)va_arg(ap, int);
-				fputc('\'', stderr);
-				print_token_kind(stderr, token);
-				fputc('\'', stderr);
+				fputc('\'', out);
+				print_token_kind(out, token);
+				fputc('\'', out);
 			}
 			break;
 		}
@@ -191,20 +203,20 @@ done_flags:;
 			if (extended && is_declaration(ent)) {
 				print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
 			} else {
-				char     const *const kind = get_entity_kind_name(ent->kind);
-				symbol_t const *const sym  = ent->base.symbol;
+				char     const *const ent_kind = get_entity_kind_name(ent->kind);
+				symbol_t const *const sym      = ent->base.symbol;
 				if (sym) {
-					fprintf(stderr, "%s %s", kind, sym->string);
+					fprintf(out, "%s %s", ent_kind, sym->string);
 				} else {
-					fprintf(stderr, "anonymous %s", kind);
+					fprintf(out, "anonymous %s", ent_kind);
 				}
 			}
 			break;
 		}
 
 		case 'P': {
-			const position_t *pos = va_arg(ap, const position_t *);
-			print_position(stderr, pos);
+			position_t const *const p = va_arg(ap, const position_t *);
+			print_position(out, p);
 			break;
 		}
 
@@ -212,31 +224,14 @@ done_flags:;
 			panic("unknown format specifier");
 		}
 	}
-	fputs(fmt, stderr); // Print rest.
-}
-
-static void diagnosticposvf(position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
-{
-	FILE *const out = stderr;
-	if (pos) {
-		fprintf(out, "%s:", pos->input_name);
-		if (pos->lineno != 0) {
-			fprintf(out, "%u:", pos->lineno);
-			if (show_column)
-				fprintf(out, "%u:", (unsigned)pos->colno);
-		}
-		fputc(' ', out);
-	}
-	fprintf(out, "%s: ", kind);
-	last_input_name = pos ? pos->input_name : NULL;
-	diagnosticvf(fmt, ap);
+	fputs(fmt, out); // Print rest.
 }
 
 static void errorvf(const position_t *pos,
                     const char *const fmt, va_list ap)
 {
 	++error_count;
-	diagnosticposvf(pos, "error", fmt, ap);
+	diagnosticvf(pos, "error", fmt, ap);
 	fputc('\n', stderr);
 	if (is_warn_on(WARN_FATAL_ERRORS))
 		exit(EXIT_FAILURE);
@@ -254,7 +249,7 @@ void notef(position_t const *const pos, char const *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	diagnosticposvf(pos, "note", fmt, ap);
+	diagnosticvf(pos, "note", fmt, ap);
 	fputc('\n', stderr);
 	va_end(ap);
 }
@@ -279,7 +274,7 @@ void warningf(warning_t const warn, position_t const* pos, char const *const fmt
 			}
 			va_list ap;
 			va_start(ap, fmt);
-			diagnosticposvf(pos, kind, fmt, ap);
+			diagnosticvf(pos, kind, fmt, ap);
 			va_end(ap);
 			if (diagnostics_show_option)
 				fprintf(stderr, " [-W%s]\n", s->name);
