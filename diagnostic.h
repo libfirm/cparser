@@ -24,8 +24,13 @@
  *  %T   type_t const*
  *  %Y   symbol_t const*
  */
-void diagnosticf(const char *fmt, ...);
 void errorf(const position_t *pos, const char *fmt, ...);
+
+/**
+ * Issue a diagnostic message with the prefix "note:".
+ */
+void notef(position_t const *pos, char const *fmt, ...);
+
 void warningf(warning_t, const position_t *pos, const char *fmt, ...);
 
 extern unsigned error_count;

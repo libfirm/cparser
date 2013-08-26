@@ -4733,8 +4733,7 @@ static void print_in_function(void)
 {
 	if (first_err) {
 		first_err = false;
-		char const *const file = current_function->base.base.pos.input_name;
-		diagnosticf("%s: In '%N':\n", file, (entity_t const*)current_function);
+		notef(&current_function->base.base.pos, "in '%N'", (entity_t const*)current_function);
 	}
 }
 

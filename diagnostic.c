@@ -215,15 +215,6 @@ done_flags:;
 	fputs(fmt, stderr); // Print rest.
 }
 
-void diagnosticf(const char *const fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	last_input_name = NULL;
-	diagnosticvf(fmt, ap);
-	va_end(ap);
-}
-
 static void diagnosticposvf(position_t const *const pos, char const *const kind, char const *const fmt, va_list ap)
 {
 	FILE *const out = stderr;
@@ -256,6 +247,15 @@ void errorf(const position_t *pos, const char *const fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 	errorvf(pos, fmt, ap);
+	va_end(ap);
+}
+
+void notef(position_t const *const pos, char const *const fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	diagnosticposvf(pos, "note", fmt, ap);
+	fputc('\n', stderr);
 	va_end(ap);
 }
 
