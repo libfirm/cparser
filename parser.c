@@ -748,11 +748,11 @@ static void note_prev_decl(entity_t const *const entity)
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
  * possible. */
 static entity_t *get_tag(symbol_t const *const symbol,
-                         entity_kind_tag_t const kind)
+		entity_kind_tag_t const kind, position_t const *const pos)
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
 	if (entity != NULL && (entity_kind_tag_t)entity->kind != kind) {
-		errorf(HERE, "'%Y' defined as wrong kind of tag", symbol);
+		errorf(pos, "'%Y' defined as wrong kind of tag", symbol);
 		note_prev_decl(entity);
 		entity = NULL;
 	}
@@ -2345,7 +2345,7 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 	if (token.kind == T_IDENTIFIER) {
 		/* the compound has a name, check if we have seen it already */
 		symbol = token.base.symbol;
-		entity = get_tag(symbol, kind);
+		entity = get_tag(symbol, kind, &pos);
 		eat(T_IDENTIFIER);
 
 		if (entity != NULL) {
@@ -2450,7 +2450,7 @@ static type_t *parse_enum_specifier(void)
 	switch (token.kind) {
 	case T_IDENTIFIER:
 		symbol = token.base.symbol;
-		entity = get_tag(symbol, ENTITY_ENUM);
+		entity = get_tag(symbol, ENTITY_ENUM, &pos);
 		eat(T_IDENTIFIER);
 
 		if (entity != NULL) {
