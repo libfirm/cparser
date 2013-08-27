@@ -740,6 +740,11 @@ static void reset_symbol(symbol_t *symbol, entity_namespace_t namespc)
 	*anchor = iter->base.symbol_next;
 }
 
+static void note_prev_decl(entity_t const *const entity)
+{
+	notef(&entity->base.pos, "previous declaration of '%N' was here", entity);
+}
+
 /* §6.2.3:1 24)  There is only one name space for tags even though three are
  * possible. */
 static entity_t *get_tag(symbol_t const *const symbol,
@@ -747,9 +752,8 @@ static entity_t *get_tag(symbol_t const *const symbol,
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
 	if (entity != NULL && (entity_kind_tag_t)entity->kind != kind) {
-		errorf(HERE,
-		       "'%Y' defined as wrong kind of tag (previous definition %P)",
-		       symbol, &entity->base.pos);
+		errorf(HERE, "'%Y' defined as wrong kind of tag", symbol);
+		note_prev_decl(entity);
 		entity = NULL;
 	}
 	return entity;
@@ -2351,10 +2355,8 @@ static type_t *parse_compound_type_specifier(bool const is_struct)
 				 * existing definition in outer scope */
 				entity = NULL;
 			} else if (entity->compound.complete && token.kind == '{') {
-				position_t const *const ppos = &entity->base.pos;
-				errorf(&pos,
-				       "multiple definitions of '%N' (previous definition %P)",
-				       entity, ppos);
+				errorf(&pos, "multiple definitions of '%N'", entity);
+				note_prev_decl(entity);
 				/* clear members in the hope to avoid further errors */
 				entity->compound.members.entities = NULL;
 			}
@@ -2458,10 +2460,8 @@ static type_t *parse_enum_specifier(void)
 				 * existing definition in outer scope */
 				entity = NULL;
 			} else if (entity->enume.complete && token.kind == '{') {
-				position_t const *const ppos = &entity->base.pos;
-				errorf(&pos,
-				       "multiple definitions of '%N' (previous definition %P)",
-				       entity, ppos);
+				errorf(&pos, "multiple definitions of '%N'", entity);
+				note_prev_decl(entity);
 			}
 		}
 		break;
@@ -3994,9 +3994,9 @@ warn_arg_count:
 static void error_redefined_as_different_kind(const position_t *pos,
 		const entity_t *old, entity_kind_t new_kind)
 {
-	char       const *const what = get_entity_kind_name(new_kind);
-	position_t const *const ppos = &old->base.pos;
-	errorf(pos, "redeclaration of '%N' as %s (declared %P)", old, what, ppos);
+	char const *const what = get_entity_kind_name(new_kind);
+	errorf(pos, "redeclaration of '%N' as %s", old, what);
+	note_prev_decl(old);
 }
 
 static bool is_entity_valid(entity_t *const ent)
@@ -4053,8 +4053,8 @@ static void merge_in_attributes(declaration_t *decl, attribute_t *attributes)
 static void parse_error_multiple_definition(entity_t *previous,
                                             const position_t *pos)
 {
-	errorf(pos, "redefinition of '%N' (declared %P)", previous,
-	       &previous->base.pos);
+	errorf(pos, "redefinition of '%N'", previous);
+	note_prev_decl(previous);
 }
 
 static bool is_main(const entity_t *entity)
@@ -4160,13 +4160,11 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	}
 
 	if (previous != NULL) {
-		position_t const *const ppos = &previous->base.pos;
-
 		if (previous->base.parent_scope == &current_function->parameters &&
 		    previous->base.parent_scope->depth+1 == current_scope->depth) {
 			assert(kind == ENTITY_PARAMETER);
-			errorf(pos, "declaration of '%N' redeclares the '%N' (declared %P)",
-			       entity, previous, ppos);
+			errorf(pos, "declaration of '%N' redeclares '%N'", entity, previous);
+			note_prev_decl(previous);
 			goto finish;
 		}
 
@@ -4194,12 +4192,12 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 						goto finish;
 				} else {
 					/* GCC extension: redef in system headers is allowed */
-					if ((pos->is_system_header || ppos->is_system_header)
+					if ((pos->is_system_header || previous->base.pos.is_system_header)
 					    && types_compatible(type, prev_type))
 						goto finish;
 				}
-				errorf(pos, "redefinition of '%N' (declared %P)",
-				       entity, ppos);
+				errorf(pos, "redefinition of '%N'", entity);
+				note_prev_decl(previous);
 				goto finish;
 			}
 
@@ -4222,15 +4220,15 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 			type_t *const prev_type = skip_typeref(prev_decl->type);
 
 			if (!types_compatible(type, prev_type)) {
-				errorf(pos, "declaration '%#N' is incompatible with '%#N' (declared %P)",
-				       entity, previous, ppos);
+				errorf(pos, "declaration '%#N' is incompatible with '%#N'", entity, previous);
+				note_prev_decl(previous);
 			} else {
 				unsigned old_storage_class = prev_decl->storage_class;
 				if (is_definition                     &&
 				    !prev_decl->used                  &&
 				    !(prev_decl->modifiers & DM_USED) &&
 				    prev_decl->storage_class == STORAGE_CLASS_STATIC) {
-					warningf(WARN_REDUNDANT_DECLS, ppos,
+					warningf(WARN_REDUNDANT_DECLS, &previous->base.pos,
 					         "unnecessary static forward declaration for '%#N'",
 					         previous);
 				}
@@ -4282,16 +4280,14 @@ warn_redundant_declaration: ;
 					if (has_new_attrs) {
 						merge_in_attributes(decl, prev_decl->attributes);
 					} else if (!is_definition && is_type_valid(prev_type)) {
-						warningf(WARN_REDUNDANT_DECLS, pos,
-						         "redundant declaration for '%N' (declared %P)",
-						         entity, ppos);
+						if (warningf(WARN_REDUNDANT_DECLS, pos, "redundant declaration for '%N'", entity))
+							note_prev_decl(previous);
 					}
 				} else if (current_function == NULL) {
 					if (old_storage_class != STORAGE_CLASS_STATIC
 					    && new_storage_class == STORAGE_CLASS_STATIC) {
-						errorf(pos,
-						       "static declaration of '%N' follows non-static declaration (declared %P)",
-						       entity, ppos);
+						errorf(pos, "static declaration of '%N' follows non-static declaration", entity);
+						note_prev_decl(previous);
 					} else if (old_storage_class == STORAGE_CLASS_EXTERN) {
 						prev_decl->storage_class          = STORAGE_CLASS_NONE;
 						prev_decl->declared_storage_class = STORAGE_CLASS_NONE;
@@ -4304,13 +4300,11 @@ warn_redundant_declaration: ;
 				} else if (is_type_valid(prev_type)) {
 					if (old_storage_class == new_storage_class) {
 error_redeclaration:
-						errorf(pos, "redeclaration of '%N' (declared %P)",
-						       entity, ppos);
+						errorf(pos, "redeclaration of '%N'", entity);
 					} else {
-						errorf(pos,
-						       "redeclaration of '%N' with different linkage (declared %P)",
-						       entity, ppos);
+						errorf(pos, "redeclaration of '%N' with different linkage", entity);
 					}
+					note_prev_decl(previous);
 				}
 			}
 
@@ -4323,8 +4317,8 @@ error_redeclaration:
 		    || (is_warn_on(why = WARN_SHADOW_LOCAL)
 		    && previous->base.parent_scope != file_scope)) {
 			char const *const what = get_entity_kind_name(previous->kind);
-			warningf(why, pos, "'%N' shadows %s (declared %P)", entity, what,
-			         ppos);
+			if (warningf(why, pos, "'%N' shadows %s", entity, what))
+				note_prev_decl(previous);
 		}
 	}
 
@@ -4715,9 +4709,8 @@ decl_list_end:
 	entity->declaration.type      = identify_new_type(new_type);
 
 	if (need_incompatible_warning) {
-		position_t const *const pos  = &entity->base.pos;
-		position_t const *const ppos = &proto_type->base.pos;
-		warningf(WARN_OTHER, pos, "declaration '%#N' is incompatible with '%#N' (declared %P)", proto_type, entity, ppos);
+		if (warningf(WARN_OTHER, &entity->base.pos, "declaration '%#N' is incompatible with '%#N'", proto_type, entity))
+			note_prev_decl(proto_type);
 	}
 
 	rem_anchor_token('{');
@@ -5611,13 +5604,9 @@ static void check_deprecated(const position_t *pos, const entity_t *entity)
 
 	position_t const *const epos = &entity->base.pos;
 	char       const *const msg  = get_deprecated_string(entity->declaration.attributes);
-	if (msg != NULL) {
-		warningf(WARN_DEPRECATED_DECLARATIONS, pos,
-		         "'%N' is deprecated (declared %P): \"%s\"", entity, epos, msg);
-	} else {
-		warningf(WARN_DEPRECATED_DECLARATIONS, pos,
-		         "'%N' is deprecated (declared %P)", entity, epos);
-	}
+	char       const *const fmt  = msg ? "'%N' is deprecated: \"%s\"" : "'%N' is deprecated";
+	if (warningf(WARN_DEPRECATED_DECLARATIONS, pos, fmt, entity, msg))
+		notef(epos, "declaration of '%N' was here", entity);
 }
 
 
@@ -5754,9 +5743,8 @@ static void parse_compound_declarators(compound_t *compound,
 		if (symbol != NULL) {
 			entity_t *prev = find_compound_entry(compound, symbol);
 			if (prev != NULL) {
-				position_t const *const ppos = &prev->base.pos;
-				errorf(pos, "multiple declarations of '%N' (declared %P)",
-				       entity, ppos);
+				errorf(pos, "multiple declarations of '%N'", entity);
+				note_prev_decl(prev);
 			}
 		}
 
@@ -9316,9 +9304,8 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 			need_normalization = true;
 			entity_t *old = set_entity(output);
 			if (old != NULL) {
-				errorf(&output->base.pos,
-				       "multiple declarations of '%N' (declared %P)",
-				       output, &old->base.pos);
+				errorf(&output->base.pos, "multiple declarations of '%N'", output);
+				note_prev_decl(old);
 			}
 		}
 	}
@@ -9330,9 +9317,8 @@ static void normalize_asm_text(asm_statement_t *asm_statement)
 			need_normalization = true;
 			entity_t *old = set_entity(input);
 			if (old != NULL) {
-				errorf(&input->base.pos,
-				       "multiple declarations of '%N' (declared %P)",
-				       input, &old->base.pos);
+				errorf(&input->base.pos, "multiple declarations of '%N'", input);
+				note_prev_decl(old);
 			}
 		}
 	}
@@ -9563,8 +9549,8 @@ static statement_t *parse_case_statement(void)
 				 || c->first_case > l->last_case)
 					continue;
 
-				errorf(pos, "duplicate case value (previously used %P)",
-				       &l->base.pos);
+				errorf(pos, "duplicate case value");
+				notef(&l->base.pos, "previous case label was here");
 				break;
 			}
 		}
@@ -9602,9 +9588,8 @@ static statement_t *parse_default_statement(void)
 	if (current_switch != NULL) {
 		const case_label_statement_t *def_label = current_switch->default_label;
 		if (def_label != NULL) {
-			errorf(&statement->base.pos,
-			       "multiple default labels in one switch (previous declared %P)",
-			       &def_label->base.pos);
+			errorf(&statement->base.pos, "multiple default labels in one switch");
+			notef(&def_label->base.pos, "previous default label was here");
 		} else {
 			current_switch->default_label = &statement->case_label;
 
@@ -9644,8 +9629,8 @@ static statement_t *parse_label_statement(void)
 	 */
 	position_t const* const pos = &statement->base.pos;
 	if (label->statement != NULL) {
-		errorf(pos, "duplicate '%N' (declared %P)",
-		       (entity_t const*)label, &label->base.pos);
+		errorf(pos, "duplicate '%N'", (entity_t const*)label);
+		note_prev_decl((entity_t const*)label);
 	} else {
 		label->base.pos  = *pos;
 		label->statement = statement;
@@ -10265,10 +10250,8 @@ static statement_t *parse_local_label_declaration(void)
 		if (symbol) {
 			entity_t *entity = get_entity(symbol, NAMESPACE_LABEL);
 			if (entity != NULL && entity->base.parent_scope == current_scope) {
-				position_t const *const ppos = &entity->base.pos;
-				errorf(&pos,
-				       "multiple definitions of '%N' (previous definition %P)",
-				       entity, ppos);
+				errorf(&pos, "multiple definitions of '%N'", entity);
+				note_prev_decl(entity);
 			} else {
 				entity = allocate_entity_zero(ENTITY_LOCAL_LABEL, NAMESPACE_LABEL, symbol, &pos);
 				entity->base.parent_scope = current_scope;

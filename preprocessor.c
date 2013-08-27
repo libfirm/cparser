@@ -2909,9 +2909,8 @@ finish_argument_list:
 			warningf(WARN_BUILTIN_MACRO_REDEFINED, &input.pos,
 					 "redefining builtin macro '%Y'", macro_symbol);
 		} else if (!pp_definitions_equal(old_definition, new_definition)) {
-			warningf(WARN_OTHER, &input.pos,
-			         "multiple definition of macro '%Y' (first defined %P)",
-			         macro_symbol, &old_definition->pos);
+			if (warningf(WARN_OTHER, &input.pos, "multiple definitions of macro '%Y'", macro_symbol))
+				notef(&old_definition->pos, "macro '%Y' first defined here", macro_symbol);
 		} else {
 			/* reuse the old definition */
 			obstack_free(&pp_obstack, new_definition);
@@ -3538,8 +3537,8 @@ static void parse_elif_directive(void)
 	}
 
 	if (cond->in_else) {
-		errorf(&pp_token.base.pos, "#elif after #else (condition started %P)",
-		       &cond->pos);
+		errorf(&pp_token.base.pos, "#elif after #else");
+		notef(&cond->pos, "condition started here");
 		skip_mode = true;
 		eat_pp_directive();
 		return;
@@ -3625,9 +3624,8 @@ static void parse_else_directive(void)
 	}
 
 	if (conditional->in_else) {
-		errorf(&pp_token.base.pos,
-		       "#else after #else (condition started %P)",
-		       &conditional->pos);
+		errorf(&pp_token.base.pos, "#else after #else");
+		notef(&conditional->pos, "condition started here");
 		skip_mode = true;
 		return;
 	}
