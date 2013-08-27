@@ -18,7 +18,6 @@
  *  %#k  va_list*, char const*
  *  %N   entity_t const*
  *  %#N  entity_t const*
- *  %P   position_t const*
  *  %Q   unsigned (qualifier)
  *  %S   string_t const*
  *  %T   type_t const*

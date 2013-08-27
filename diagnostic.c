@@ -21,20 +21,6 @@ unsigned warning_count           = 0;
 bool     show_column             = true;
 bool     diagnostics_show_option = true;
 
-static char const *last_input_name = NULL;
-
-/**
- * prints an additional source position
- */
-static void print_position(FILE *out, const position_t *pos)
-{
-	fprintf(out, "at line %u", pos->lineno);
-	if (show_column)
-		fprintf(out, ":%u", (unsigned)pos->colno);
-	if (last_input_name != pos->input_name)
-		fprintf(out, " of \"%s\"", pos->input_name);
-}
-
 static void fpututf32(utf32 const c, FILE *const out)
 {
 	if (c < 0x80U) {
@@ -62,15 +48,11 @@ static void diagnosticvf(position_t const *const pos, char const *const kind, ch
 	FILE *const out = stderr;
 
 	if (pos) {
-		last_input_name = pos->input_name;
-
 		char const *const posfmt =
 			pos->colno  != 0 && show_column ? "%s:%u:%u: " :
 			pos->lineno != 0                ? "%s:%u: "    :
 			"%s: ";
 		fprintf(out, posfmt, pos->input_name, pos->lineno, pos->colno);
-	} else {
-		last_input_name = NULL;
 	}
 	fprintf(out, "%s: ", kind);
 
@@ -211,12 +193,6 @@ done_flags:;
 					fprintf(out, "anonymous %s", ent_kind);
 				}
 			}
-			break;
-		}
-
-		case 'P': {
-			position_t const *const p = va_arg(ap, const position_t *);
-			print_position(out, p);
 			break;
 		}
 
