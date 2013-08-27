@@ -109,9 +109,7 @@ done_flags:;
 
 		case 'S': {
 			const string_t *str = va_arg(ap, const string_t*);
-			for (size_t i = 0; i < str->size; ++i) {
-				fputc(str->begin[i], out);
-			}
+			fwrite(str->begin, 1, str->size, out);
 			break;
 		}
 
