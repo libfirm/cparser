@@ -752,7 +752,8 @@ static entity_t *get_tag(symbol_t const *const symbol,
 {
 	entity_t *entity = get_entity(symbol, NAMESPACE_TAG);
 	if (entity != NULL && (entity_kind_tag_t)entity->kind != kind) {
-		errorf(pos, "'%Y' defined as wrong kind of tag", symbol);
+		char const *const tag = get_entity_kind_name(kind);
+		errorf(pos, "'%s %Y' defined as wrong kind of tag, should be '%N'", tag, symbol, entity);
 		note_prev_decl(entity);
 		entity = NULL;
 	}
@@ -4316,8 +4317,7 @@ error_redeclaration:
 		if (is_warn_on(why = WARN_SHADOW)
 		    || (is_warn_on(why = WARN_SHADOW_LOCAL)
 		    && previous->base.parent_scope != file_scope)) {
-			char const *const what = get_entity_kind_name(previous->kind);
-			if (warningf(why, pos, "'%N' shadows %s", entity, what))
+			if (warningf(why, pos, "'%N' shadows '%N'", entity, previous))
 				note_prev_decl(previous);
 		}
 	}
