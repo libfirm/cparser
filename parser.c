@@ -2713,31 +2713,31 @@ static attribute_t *parse_attribute_ms_property(attribute_t *attribute)
 
 static attribute_t *parse_microsoft_extended_decl_modifier_single(void)
 {
-	attribute_kind_t kind = ATTRIBUTE_UNKNOWN;
-	if (accept(T_restrict)) {
-		kind = ATTRIBUTE_MS_RESTRICT;
-	} else if (token.kind == T_IDENTIFIER) {
-		char const *const name = token.base.symbol->string;
-		for (attribute_kind_t k = ATTRIBUTE_MS_FIRST; k <= ATTRIBUTE_MS_LAST;
-		     ++k) {
-			const char *attribute_name = get_attribute_name(k);
-			if (attribute_name != NULL && streq(attribute_name, name)) {
-				kind = k;
-				break;
-			}
-		}
-
-		if (kind == ATTRIBUTE_UNKNOWN) {
-			warningf(WARN_ATTRIBUTE, HERE, "unknown __declspec '%s' ignored",
-			         name);
-		}
-	} else {
+	/* parse "any-word" */
+	symbol_t const *const symbol = token.base.symbol;
+	if (!symbol) {
 		parse_error_expected("while parsing __declspec", T_IDENTIFIER, NULL);
 		return NULL;
 	}
 
+	attribute_kind_t  kind;
+	char const *const name = symbol->string;
+	for (attribute_kind_t k = ATTRIBUTE_MS_FIRST;; ++k) {
+		if (k > ATTRIBUTE_MS_LAST) {
+			warningf(WARN_ATTRIBUTE, HERE, "unknown __declspec '%s' ignored", name);
+			kind = ATTRIBUTE_UNKNOWN;
+			break;
+		}
+
+		char const *const attribute_name = get_attribute_name(k);
+		if (attribute_name && streq(attribute_name, name)) {
+			kind = k;
+			break;
+		}
+	}
+
 	attribute_t *attribute = allocate_attribute_zero(kind);
-	eat(T_IDENTIFIER);
+	next_token();
 
 	if (kind == ATTRIBUTE_MS_PROPERTY) {
 		return parse_attribute_ms_property(attribute);
