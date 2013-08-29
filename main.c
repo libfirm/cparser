@@ -2658,7 +2658,7 @@ invalid_o_option:
 
 		/* hack to emulate the behaviour of some gcc spec files which filter
 		 * flags to pass to cpp/ld/as */
-		static const char *pass_to_cpp_and_ld[] = {
+		static char const *const pass_to_cpp_and_ld[] = {
 			"soft-float", "32", "64", "16"
 		};
 		for (size_t i = 0; i < ARRAY_SIZE(pass_to_cpp_and_ld); ++i) {
