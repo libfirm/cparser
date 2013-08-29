@@ -213,16 +213,9 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 {
 	/* This isn't really correct, the backend should provide a list of machine
 	 * specific modes (according to gcc philosophy that is...) */
-	attribute_argument_t *arg = attribute->a.arguments;
-	if (arg == NULL) {
-		errorf(&attribute->pos,
-		       "__attribute__((visibility(X))) misses argument");
-		return;
-	}
-	const char *string = get_argument_string(arg);
+	char const *const string = get_argument_string(attribute->a.arguments);
 	if (string == NULL) {
-		errorf(&attribute->pos,
-		       "__attribute__((visibility(X))) argument is not a string");
+		errorf(&attribute->pos, "__attribute__((visibility(X))) requires a string argument");
 		return;
 	}
 	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string);
