@@ -6,11 +6,12 @@
 #define ATTRIBUTE_H
 
 #include "entity.h"
+#include "string_rep.h"
 #include "type.h"
 
 typedef struct attribute_t attribute_t;
 
-const char *get_deprecated_string(const attribute_t *attribute);
+string_t const *get_deprecated_string(attribute_t const *attribute);
 
 type_t *handle_type_attributes(const attribute_t *attributes, type_t *type);
 void handle_entity_attributes(const attribute_t *attributes, entity_t *entity);

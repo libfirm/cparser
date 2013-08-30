@@ -5599,14 +5599,14 @@ static void check_deprecated(const position_t *pos, const entity_t *entity)
 {
 	if (!is_declaration(entity))
 		return;
-	if ((entity->declaration.modifiers & DM_DEPRECATED) == 0)
+	declaration_t const *const decl = &entity->declaration;
+	if ((decl->modifiers & DM_DEPRECATED) == 0)
 		return;
 
-	position_t const *const epos = &entity->base.pos;
-	char       const *const msg  = get_deprecated_string(entity->declaration.attributes);
-	char       const *const fmt  = msg ? "'%N' is deprecated: \"%s\"" : "'%N' is deprecated";
+	string_t const *const msg = get_deprecated_string(decl->attributes);
+	char     const *const fmt = msg ? "'%N' is deprecated: \"%S\"" : "'%N' is deprecated";
 	if (warningf(WARN_DEPRECATED_DECLARATIONS, pos, fmt, entity, msg))
-		notef(epos, "declaration of '%N' was here", entity);
+		notef(&entity->base.pos, "declaration of '%N' was here", entity);
 }
 
 

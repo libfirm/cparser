@@ -196,7 +196,7 @@ static void handle_attribute_aligned(const attribute_t *attribute,
 	}
 }
 
-static const char *get_argument_string(const attribute_argument_t *argument)
+static string_t const *get_argument_string(attribute_argument_t const *const argument)
 {
 	if (argument == NULL)
 		return NULL;
@@ -205,7 +205,7 @@ static const char *get_argument_string(const attribute_argument_t *argument)
 	expression_t *expression = argument->v.expression;
 	if (expression->kind != EXPR_STRING_LITERAL)
 		return NULL;
-	return expression->string_literal.value.begin;
+	return &expression->string_literal.value;
 }
 
 static void handle_attribute_visibility(const attribute_t *attribute,
@@ -213,15 +213,14 @@ static void handle_attribute_visibility(const attribute_t *attribute,
 {
 	/* This isn't really correct, the backend should provide a list of machine
 	 * specific modes (according to gcc philosophy that is...) */
-	char const *const string = get_argument_string(attribute->a.arguments);
+	string_t const *const string = get_argument_string(attribute->a.arguments);
 	if (string == NULL) {
 		errorf(&attribute->pos, "__attribute__((visibility(X))) requires a string argument");
 		return;
 	}
-	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string);
+	elf_visibility_tag_t visibility = get_elf_visibility_from_string(string->begin);
 	if (visibility == ELF_VISIBILITY_ERROR) {
-		errorf(&attribute->pos,
-		       "unknown visibility type '%s'", string);
+		errorf(&attribute->pos, "unknown visibility type '%S'", string);
 		return;
 	}
 
@@ -285,12 +284,12 @@ static void handle_attribute_alias(const attribute_t *attribute,
                                    entity_t *entity)
 {
 	const attribute_argument_t *argument = attribute->a.arguments;
-	const char *string = get_argument_string(argument);
+	string_t const *const string = get_argument_string(argument);
 	if (string == NULL) {
 		errorf(&attribute->pos, "attribute 'alias' requires a string argument");
 		return;
 	}
-	symbol_t *symbol = symbol_table_insert(string);
+	symbol_t *const symbol = symbol_table_insert(string->begin);
 	switch (entity->kind) {
 	case ENTITY_VARIABLE:
 		entity->variable.alias.symbol = symbol;
@@ -478,14 +477,11 @@ type_t *handle_type_attributes(const attribute_t *attributes, type_t *type)
 	return type;
 }
 
-const char *get_deprecated_string(const attribute_t *attribute)
+string_t const *get_deprecated_string(attribute_t const *attribute)
 {
 	for ( ; attribute != NULL; attribute = attribute->next) {
-		if (attribute->kind != ATTRIBUTE_MS_DEPRECATED)
-			continue;
-
-		attribute_argument_t *argument = attribute->a.arguments;
-		return get_argument_string(argument);
+		if (attribute->kind == ATTRIBUTE_MS_DEPRECATED)
+			return get_argument_string(attribute->a.arguments);
 	}
 	return NULL;
 }
