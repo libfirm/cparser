@@ -8418,11 +8418,47 @@ static void warn_string_literal_address(expression_t const* expr)
 static bool maybe_negative(expression_t const *const expr)
 {
 	switch (is_constant_expression(expr)) {
-	case EXPR_CLASS_VARIABLE: return true;
-	case EXPR_CLASS_ERROR:    return false;
+	case EXPR_CLASS_ERROR:
+		return false;
+
 	case EXPR_CLASS_CONSTANT:
 	case EXPR_CLASS_INTEGER_CONSTANT:
 		return folded_expression_is_negative(expr);
+
+	case EXPR_CLASS_VARIABLE:
+		switch (expr->kind) {
+		case EXPR_BINARY_EQUAL:
+		case EXPR_BINARY_GREATER:
+		case EXPR_BINARY_GREATEREQUAL:
+		case EXPR_BINARY_ISGREATER:
+		case EXPR_BINARY_ISGREATEREQUAL:
+		case EXPR_BINARY_ISLESS:
+		case EXPR_BINARY_ISLESSEQUAL:
+		case EXPR_BINARY_ISLESSGREATER:
+		case EXPR_BINARY_ISUNORDERED:
+		case EXPR_BINARY_LESS:
+		case EXPR_BINARY_LESSEQUAL:
+		case EXPR_BINARY_LOGICAL_AND:
+		case EXPR_BINARY_LOGICAL_OR:
+		case EXPR_BINARY_NOTEQUAL:
+		case EXPR_UNARY_NOT:
+			/* The result of comparison and logical operators never is negative. */
+			return false;
+
+		case EXPR_BINARY_COMMA:
+			return maybe_negative(expr->binary.right);
+
+		case EXPR_CONDITIONAL: {
+			conditional_expression_t const *const c = &expr->conditional;
+			expression_t             const *const t = c->true_expression;
+			return
+				maybe_negative(t ? t : c->condition) ||
+				maybe_negative(c->false_expression);
+		}
+
+		default:
+			return true;
+		}
 	}
 	panic("invalid expression classification");
 }
