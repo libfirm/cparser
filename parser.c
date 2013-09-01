@@ -4163,7 +4163,7 @@ entity_t *record_entity(entity_t *entity, const bool is_definition)
 	if (previous != NULL) {
 		if (previous->base.parent_scope == &current_function->parameters &&
 		    previous->base.parent_scope->depth+1 == current_scope->depth) {
-			assert(kind == ENTITY_PARAMETER);
+			assert(previous->kind == ENTITY_PARAMETER);
 			errorf(pos, "declaration of '%N' redeclares '%N'", entity, previous);
 			note_prev_decl(previous);
 			goto finish;
