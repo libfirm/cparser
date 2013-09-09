@@ -7429,7 +7429,7 @@ static void semantic_call(call_expression_t *call)
 
 	if (function_type == NULL) {
 		errorf(&call->base.pos,
-		       "called object '%E' (type '%T') is not a pointer to a function",
+		       "called object '%E' (type '%T') is not a function or function pointer",
 		       function, orig_type);
 		goto error;
 	}
