@@ -7414,8 +7414,6 @@ static void semantic_call(call_expression_t *call)
 	expression_t *const function  = call->function;
 	type_t       *const orig_type = function->base.type;
 	type_t       *const type      = skip_typeref(orig_type);
-	if (!is_type_valid(type))
-		goto error;
 
 	function_type_t *function_type = NULL;
 	if (is_type_pointer(type)) {
@@ -7428,9 +7426,11 @@ static void semantic_call(call_expression_t *call)
 	}
 
 	if (function_type == NULL) {
-		errorf(&call->base.pos,
-		       "called object '%E' (type '%T') is not a function or function pointer",
-		       function, orig_type);
+		if (is_type_valid(type)) {
+			errorf(&call->base.pos,
+			       "called object '%E' (type '%T') is not a function or function pointer",
+			       function, orig_type);
+		}
 		goto error;
 	}
 
