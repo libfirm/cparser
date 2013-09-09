@@ -2503,7 +2503,7 @@ static type_t *parse_enum_specifier(void)
 			anonymous_entity = entity;
 		}
 	} else if (!entity->enume.complete && !(c_mode & _GNUC)) {
-		errorf(HERE,
+		errorf(&pos,
 		       "'%T' used before definition (incomplete enums are a GNU extension)",
 		       type);
 	}
@@ -7428,7 +7428,7 @@ static void semantic_call(call_expression_t *call)
 	}
 
 	if (function_type == NULL) {
-		errorf(HERE,
+		errorf(&call->base.pos,
 		       "called object '%E' (type '%T') is not a pointer to a function",
 		       function, orig_type);
 		goto error;
