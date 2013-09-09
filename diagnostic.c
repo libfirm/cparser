@@ -43,18 +43,19 @@ static void fpututf32(utf32 const c, FILE *const out)
 /**
  * Issue a diagnostic message.
  */
-static void diagnosticvf(position_t const *const pos, char const *const kind, char const *fmt, va_list ap)
+static void diagnosticvf(int level, position_t const *const pos, char const *const kind, char const *fmt, va_list ap)
 {
 	FILE *const out = stderr;
 
 	if (pos) {
 		char const *const posfmt =
-			pos->colno  != 0 && show_column ? "%s:%u:%u: " :
-			pos->lineno != 0                ? "%s:%u: "    :
-			"%s: ";
-		fprintf(out, posfmt, pos->input_name, pos->lineno, pos->colno);
+			pos->colno  != 0 && show_column ? "%s%s:%u:%u: " :
+			pos->lineno != 0                ? "%s%s:%u: "    :
+			"%s%s: ";
+		fprintf(out, posfmt, COL_H, pos->input_name, pos->lineno, pos->colno);
 	}
-	fprintf(out, "%s: ", kind);
+
+	fprintf(out, "%s%s%s:%s ", COL_X(level), COL_H, kind, COL_RA);
 
 	for (char const *f; (f = strchr(fmt, '%')); fmt = f) {
 		fwrite(fmt, sizeof(*fmt), f - fmt, out); // Print till '%'.
@@ -63,11 +64,13 @@ static void diagnosticvf(position_t const *const pos, char const *const kind, ch
 		bool extended  = false;
 		bool flag_zero = false;
 		bool flag_long = false;
+		bool flag_high = false;
 		for (;; ++f) {
 			switch (*f) {
 			case '#': extended  = true; break;
 			case '0': flag_zero = true; break;
 			case 'l': flag_long = true; break;
+			case 'h': flag_high = true; break;
 			default:  goto done_flags;
 			}
 		}
@@ -78,7 +81,8 @@ done_flags:;
 			++f;
 			field_width = va_arg(ap, int);
 		}
-
+		if (flag_high)
+			fputs(COL_H, stderr);
 		switch (*f++) {
 		case '%':
 			fputc('%', out);
@@ -128,35 +132,46 @@ done_flags:;
 
 		case 'Y': {
 			const symbol_t *const symbol = va_arg(ap, const symbol_t*);
+			fputs(COL_H, out);
 			fputs(symbol ? symbol->string : "(null)", out);
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'E': {
 			const expression_t* const expr = va_arg(ap, const expression_t*);
+			fputs(COL_H, stderr);
 			print_expression(expr);
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'Q': {
 			const unsigned qualifiers = va_arg(ap, unsigned);
+			fputs(COL_H, stderr);
 			print_type_qualifiers(qualifiers, QUAL_SEP_NONE);
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'T': {
 			const type_t* const type = va_arg(ap, const type_t*);
+			fputs(COL_H, stderr);
 			print_type_ext(type, NULL, NULL);
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'K': {
 			const token_t* const token = va_arg(ap, const token_t*);
+			fputs(COL_H, stderr);
 			print_token(out, token);
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'k': {
+			fputs(COL_H, stderr);
 			if (extended) {
 				va_list* const toks = va_arg(ap, va_list*);
 				separator_t    sep  = { "", va_arg(ap, const char*) };
@@ -175,28 +190,35 @@ done_flags:;
 				print_token_kind(out, token);
 				fputc('\'', out);
 			}
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		case 'N': {
 			entity_t const *const ent = va_arg(ap, entity_t const*);
+			fputs(COL_H, stderr);
 			if (extended && is_declaration(ent)) {
 				print_type_ext(ent->declaration.type, ent->base.symbol, NULL);
 			} else {
 				char     const *const ent_kind = get_entity_kind_name(ent->kind);
 				symbol_t const *const sym      = ent->base.symbol;
 				if (sym) {
-					fprintf(out, "%s %s", ent_kind, sym->string);
+					fprintf(out, "%s%s %s%s", COL_H, ent_kind, sym->string, COL_RH);
 				} else {
-					fprintf(out, "anonymous %s", ent_kind);
+					fprintf(out, "%sanonymous %s%s", COL_H, ent_kind, COL_RH);
 				}
 			}
+			fputs(COL_RH, stderr);
 			break;
 		}
 
 		default:
+			fputs(COL_F, stderr);
 			panic("unknown format specifier");
+			fputs(COL_RA, stderr);
 		}
+		if (flag_high)
+			fputs(COL_RH, stderr);
 	}
 	fputs(fmt, out); // Print rest.
 }
@@ -205,7 +227,7 @@ static void errorvf(const position_t *pos,
                     const char *const fmt, va_list ap)
 {
 	++error_count;
-	diagnosticvf(pos, "error", fmt, ap);
+	diagnosticvf(ERROR, pos, "error", fmt, ap);
 	fputc('\n', stderr);
 	if (is_warn_on(WARN_FATAL_ERRORS))
 		exit(EXIT_FAILURE);
@@ -223,7 +245,7 @@ void notef(position_t const *const pos, char const *const fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	diagnosticvf(pos, "note", fmt, ap);
+	diagnosticvf(NOTE, pos, "note", fmt, ap);
 	fputc('\n', stderr);
 	va_end(ap);
 }
@@ -235,23 +257,26 @@ bool warningf(warning_t const warn, position_t const* pos, char const *const fmt
 
 	warning_switch_t const *const s = get_warn_switch(warn);
 	switch ((unsigned) s->state) {
-			char const* kind;
+		char const* kind;
+		int level;
 		case WARN_STATE_ON:
 			if (is_warn_on(WARN_ERROR)) {
 		case WARN_STATE_ON | WARN_STATE_ERROR:
 				++error_count;
-				kind = "error";
+				kind  = "error";
+				level = ERROR;
 			} else {
 		case WARN_STATE_ON | WARN_STATE_NO_ERROR:
 				++warning_count;
-				kind = "warning";
+				kind  = "warning";
+				level = WARN;
 			}
 			va_list ap;
 			va_start(ap, fmt);
-			diagnosticvf(pos, kind, fmt, ap);
+			diagnosticvf(level, pos, kind, fmt, ap);
 			va_end(ap);
 			if (diagnostics_show_option)
-				fprintf(stderr, " [-W%s]\n", s->name);
+				fprintf(stderr, " %s[-W%s]%s\n", COL_X(level), s->name, COL_RA);
 			else
 				fputc('\n', stderr);
 			return true;

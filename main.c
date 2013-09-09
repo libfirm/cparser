@@ -34,6 +34,7 @@
 #define popen(cmd, mode)         _popen(cmd, mode)
 #define pclose(file)             _pclose(file)
 #define unlink(filename)         _unlink(filename)
+#define isatty(fd)               _isatty(fd)
 
 #else
 #include <unistd.h>
@@ -247,6 +248,13 @@ static bool close_input(compilation_unit_t *unit)
 	unit->input = NULL;
 	unit->name  = NULL;
 	return res;
+}
+
+static int check_term(int use)
+{
+	if (use && !getenv("NO_COLOR") && getenv("TERM") && isatty(2))
+            return 1 + !!getenv("COLORTERM");
+        return 0;
 }
 
 static void print_error_summary(void)
@@ -725,6 +733,7 @@ static void print_help_parser(void)
 	put_help("-fmessage-length=LEN",     "Ignored (gcc compatibility)");
 	put_help("-fshort-wchar",            "Type \"wchar_t\" is unsigned short instead of int");
 	put_help("-fshow-column",            "Show the column number in diagnostic messages");
+        put_help("-fcolor-diagnostics",      "Use colors in diagnostics");
 	put_help("-fsigned-char",            "Type \"char\" is a signed type");
 	put_help("-funsigned-char",          "Type \"char\" is an unsigned type");
 	put_help("--ms",                     "Enable msvc extensions");
@@ -2095,6 +2104,10 @@ int main(int argc, char **argv)
 	/* initialize this early because it has to parse options */
 	gen_firm_init();
 
+	/* check for terminal capabilities */
+
+	use_colors = check_term(1);
+
 	/* early options parsing (find out optimization level and OS) */
 	bool argument_errors = false;
 	for (int i = 1; i < argc; ++i) {
@@ -2296,6 +2309,8 @@ invalid_o_option:
 							: ATOMIC_TYPE_INT;
 					} else if (streq(opt, "show-column")) {
 						show_column = truth_value;
+					} else if (streq(opt, "color-diagnostics")) {
+						use_colors = check_term(truth_value);
 					} else if (streq(opt, "signed-char")) {
 						char_is_signed = truth_value;
 					} else if (streq(opt, "strength-reduce")) {

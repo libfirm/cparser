@@ -1232,7 +1232,7 @@ static attribute_t *parse_attribute_gnu_single(void)
 			}
 
 			warningf(WARN_ATTRIBUTE, HERE,
-			         "unknown attribute '%s' ignored", name);
+			         "unknown attribute '%hs' ignored", name);
 			/* TODO: we should still save the attribute in the list... */
 			kind = ATTRIBUTE_UNKNOWN;
 			break;

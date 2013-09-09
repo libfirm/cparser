@@ -11,6 +11,14 @@
 #include "warning.h"
 #include "help.h"
 
+int use_colors = 0;
+
+const char *const colors[][STYLE_LAST + 1] = {
+	{               "",               "",               "",               "",        ""          "",        "" },
+	{       "\033[31m",       "\033[31m",       "\033[33m",     "\033[37;2m", "\033[1m", "\033[22m", "\033[0m" },
+	{ "\033[38;5;124m", "\033[38;5;160m", "\033[38;5;139m", "\033[38;5;008m", "\033[1m", "\033[22m", "\033[0m" },
+};
+
 static warning_switch_t warning[] = {
 	[WARN_ADDRESS]                       = { WARN_STATE_ON,   "address"                       },
 	[WARN_AGGREGATE_RETURN]              = { WARN_STATE_NONE, "aggregate-return"              },
@@ -185,7 +193,8 @@ extra:
 		warning[WARN_IMPLICIT_FUNCTION_DECLARATION].state = WARN_STATE_ON | WARN_STATE_ERROR;
 	}
 	else {
-		fprintf(stderr, "warning: ignoring unknown option -W%s\n", opt);
+		fprintf(stderr, "%s%swarning:%s ignoring unknown option %s-W%s%s\n",
+		        COL_H, COL_W, COL_RA, COL_H, opt, COL_RA);
 	}
 }
 
