@@ -9714,6 +9714,13 @@ static expression_t *parse_condition(void)
 	return expr;
 }
 
+static void warn_empty_body(statement_t const *const stmt)
+{
+	if (stmt->kind == STATEMENT_EMPTY) {
+		warningf(WARN_EMPTY_BODY, &stmt->base.pos, "suggest braces around empty body in ‘if’ statement");
+	}
+}
+
 /**
  * Parse an if statement.
  */
@@ -9736,20 +9743,13 @@ static statement_t *parse_if(void)
 
 	statement_t *const true_stmt = parse_inner_statement();
 	statement->ifs.true_statement = true_stmt;
+	warn_empty_body(true_stmt);
+
 	rem_anchor_token(T_else);
-
-	if (true_stmt->kind == STATEMENT_EMPTY) {
-		warningf(WARN_EMPTY_BODY, HERE,
-		         "suggest braces around empty body in an ‘if’ statement");
-	}
-
 	if (accept(T_else)) {
-		statement->ifs.false_statement = parse_inner_statement();
-
-		if (statement->ifs.false_statement->kind == STATEMENT_EMPTY) {
-			warningf(WARN_EMPTY_BODY, HERE,
-			         "suggest braces around empty body in an ‘if’ statement");
-		}
+		statement_t *const false_stmt = parse_inner_statement();
+		statement->ifs.false_statement = false_stmt;
+		warn_empty_body(false_stmt);
 	} else if (true_stmt->kind == STATEMENT_IF
 	        && true_stmt->ifs.false_statement != NULL) {
 		position_t const *const pos = &true_stmt->base.pos;
