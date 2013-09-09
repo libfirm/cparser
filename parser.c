@@ -2631,7 +2631,7 @@ static type_t *parse_typedef_name(void)
 	/* Error handling: Look in the tag namespace if no typedef name was found. */
 	entity_t *const tagent = get_entity(symbol, NAMESPACE_TAG);
 	if (tagent) {
-		errorf(HERE, "%Y does not name a type; assuming '%N'", symbol, tagent);
+		errorf(HERE, "'%Y' does not name a type; assuming '%N'", symbol, tagent);
 		switch ((entity_kind_tag_t)tagent->kind) {
 		case ENTITY_ENUM: {
 			type_t *const type = allocate_type_zero(TYPE_ENUM);
@@ -2656,7 +2656,7 @@ static type_t *parse_typedef_name(void)
 			panic("invalid entity kind");
 		}
 	} else {
-		errorf(HERE, "%Y does not name a type", symbol);
+		errorf(HERE, "'%Y' does not name a type", symbol);
 		entity_t *const errent = create_error_entity(symbol, ENTITY_TYPEDEF);
 		type_t   *const type   = allocate_type_zero(TYPE_TYPEDEF);
 		type->typedeft.typedefe = &errent->typedefe;
