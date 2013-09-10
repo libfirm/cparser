@@ -1979,8 +1979,6 @@ static void advance_current_object(type_path_t *path, size_t top_path_level)
 			return;
 		}
 	} else if (is_type_array(type)) {
-		assert(is_type_array(type));
-
 		top->v.index++;
 
 		if (!type->array.size_constant || top->v.index < type->array.size) {
