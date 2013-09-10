@@ -9141,8 +9141,7 @@ static void semantic_asm_argument(asm_argument_t *argument, bool is_out)
 		 * not change size or type representation (e.g. int -> long is
 		 * ok, but int -> float is not) */
 		if (expression->kind == EXPR_UNARY_CAST) {
-			type_t      *const type = expression->base.type;
-			type_kind_t  const kind = type->kind;
+			type_kind_t const kind = type->kind;
 			if (kind == TYPE_ATOMIC || kind == TYPE_POINTER) {
 				unsigned flags;
 				unsigned size;
