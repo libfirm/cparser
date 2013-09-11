@@ -2709,9 +2709,9 @@ static void error_missing_macro_param(void)
 	errorf(&pp_token.base.pos, "'#' is not followed by a macro parameter");
 }
 
-static bool is_defineable_token(char const *const context)
+static bool is_defineable_token(char const *const context, bool defined_allowed)
 {
-	if (pp_token.kind == T_EOF) {
+	if (pp_token.kind == T_EOF || pp_token.kind == T_NEWLINE) {
 		errorf(&pp_token.base.pos, "unexpected end of line after %s", context);
 		return false;
 	}
@@ -2722,14 +2722,12 @@ static bool is_defineable_token(char const *const context)
 		return false;
 	}
 
-	/* TODO turn this into a flag in pp_def. */
-	switch (pp_token.base.symbol->pp_ID) {
-	/* §6.10.8:4 */
-	case TP_defined:
+	if (!defined_allowed && pp_token.base.symbol->pp_ID == TP_defined) {
 		errorf(&pp_token.base.pos, "%K cannot be used as macro name in %s",
 		       &pp_token, context);
 		return false;
 	}
+
 	return true;
 }
 
@@ -2743,7 +2741,7 @@ static void parse_define_directive(void)
 
 	assert(obstack_object_size(&pp_obstack) == 0);
 
-	if (!is_defineable_token("#define"))
+	if (!is_defineable_token("#define", false))
 		goto error_out;
 	symbol_t *const macro_symbol = pp_token.base.symbol;
 
@@ -2953,7 +2951,7 @@ static void parse_undef_directive(void)
 		return;
 	}
 
-	if (!is_defineable_token("#undef")) {
+	if (!is_defineable_token("#undef", false)) {
 		eat_pp_directive();
 		return;
 	}
@@ -3583,7 +3581,7 @@ static void parse_ifdef_ifndef_directive(bool const is_ifdef)
 	}
 
 	char const *const ctx = is_ifdef ? "#ifdef" : "#ifndef";
-	if (!is_defineable_token(ctx)) {
+	if (!is_defineable_token(ctx, true)) {
 		eat_pp_directive();
 
 		/* just take the true case in the hope to avoid further errors */
