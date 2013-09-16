@@ -62,6 +62,7 @@ cparser_SOURCES = \
 	jump_target.c \
 	main.c \
 	mangle.c \
+	options.c \
 	predefs.c \
 	preprocessor.c \
 	printer.c \
