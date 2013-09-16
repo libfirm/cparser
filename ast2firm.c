@@ -3083,7 +3083,7 @@ incdec:
 	case EXPR_ENUM_CONSTANT:
 		tv = enum_constant_to_tarval(&expr->reference);
 		goto make_const;
-	case EXPR_LITERAL_CASES:;
+	case EXPR_LITERAL_CASES:
 		tv = literal_to_tarval(&expr->literal);
 		goto make_const;
 	case EXPR_LITERAL_CHARACTER:
@@ -4063,13 +4063,14 @@ static complex_value expression_to_complex(const expression_t *expression)
 	case EXPR_BINARY_ASSIGN:
 		return complex_assign_to_firm(&expression->binary);
 	case EXPR_LITERAL_INTEGER:
-	case EXPR_LITERAL_FLOATINGPOINT:;
+	case EXPR_LITERAL_FLOATINGPOINT: {
 		complex_constant cnst = fold_complex_literal(&expression->literal);
 		dbg_info        *dbgi = get_dbg_info(&expression->base.pos);
 		return (complex_value) {
 			new_d_Const(dbgi, cnst.real),
 			new_d_Const(dbgi, cnst.imag)
 		};
+	}
 	case EXPR_CALL:
 		return complex_call_to_firm(&expression->call);
 	case EXPR_CONDITIONAL:
